@@ -1,5 +1,5 @@
 //! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
-//! same inputs), with fourteen changes:
+//! same inputs), with fifteen changes:
 //! - the building heights follow rule C (the higher of the height tag and the levels, features.rs), not 0806ac2's rule A (the height
 //!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
 //! - the slots have Python's key order (__rs_cls before __rs_arw, tests/colors.rs): the same data, other bytes;
@@ -30,6 +30,8 @@
 //!   export too, not only its tiled style (N27).
 //! - the tile size (2026-10-25): the sort key `__rs_s` is an integer (100,000,000 for each step of the key and 1 for each road, the same
 //!   order), a tile has no `__rs_*` flag that is false, and the pieces of the tiles have no MVT id (the source's promoteId is their id).
+//! - the look's defaults (2026-10-25): the class minzoom is on (the roads, arrow and label layers' filters; the pieces keep `highway`,
+//!   which the filter reads) and casing.drop_below_px is 1 (the casing clause); the tiles leave out what the filters hide.
 //!
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
@@ -58,7 +60,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "3a22c7ce5b904858a0f58b7cc4c5723e5ad0103c72b3e41484a2bbb97c862c66");
+    assert_eq!(style_hash(&area), "32bc4fafedbcb037500a5a554d4060cd53fdc30b87adb236d6f73d77be8e0ce1");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -67,7 +69,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(style_hash(&area), "a79e345809f825eab1eb58d8d7d4927e87736d84aa8445d2b22555a1bb143de0");
+    assert_eq!(style_hash(&area), "df9fc3f735ebcc09d3e81a911dd283928d1d68a87d59fed71a33896caddc61d8");
 }
 
 /// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
@@ -107,7 +109,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "ddfcd3c2c1ebd9104eba24c0f7a4d00c09ff3aa28f9767c15ba56e3242af1eca");
+    assert_eq!(tiles_hash(&area), "c578f77002cc014695d73676aff11e84c0aa4fbe2edc1e8b5d819de5a228d7cc");
 }
 
 /// tiles.py's extra layers: the sea of Monaco (a polygon) is in the tiles at its west edge, where only its box reaches.
@@ -131,5 +133,5 @@ fn the_sea_at_the_tile_edge() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "0bb79d1e1cbd30c7ceccc4b87b3da34630d2cfe5df21f453f8e77574fb1bae41");
+    assert_eq!(tiles_hash(&area), "ffa7620783a3ad229bfd13730e0a266a3bdf84167a4db1a02c2cc404158b68ea");
 }

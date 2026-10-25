@@ -3140,10 +3140,12 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     surface = ["==", bd, 0]
     low = ["<", bd, 0]
     bridge = ["!", ["to-boolean", 1]] if levels else ["all", [">", lv, 0], is_b]     # position mode: a bridge is drawn at its positions, no layers of its own
+    bridge_band = bridge          # the band alone: the highlight's split below (bridge gets the minzoom clause; "!" of both shows hidden classes)
     high = ["all", [">", bd, 0], ["!", is_b]]
-    # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override).
+    # minzoom: hide minor classes when zoomed out (config.DEFAULT.minzoom, or a caller override); on by default since 2026-10-25, as
+    # OpenMapTiles and OSM-Carto do (None or True: the table; False: every class at every zoom).
     # AND-ed onto each road filter rather than given its own layers, so layer ids are untouched.
-    mz = ({**CONFIG.minzoom} if minzoom is True else
+    mz = ({**CONFIG.minzoom} if minzoom is True or minzoom is None else
           {**CONFIG.minzoom, **minzoom} if isinstance(minzoom, dict) else None)
     tunnel = ["all", low, is_t]                     # the tunnel look, inside the low band
     # a tunnel drawn in another band (a caller's band_col: a stretch of it at ground level) keeps its look
@@ -3259,9 +3261,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             elif l["id"] == "roads-highlight":
                 # bridges glow on the flat line only while the flat line is shown; the deck
                 # carries its own feature-state glow above flat_below
-                l["filter"] = ["!", bridge]
+                l["filter"] = ["!", bridge_band]
                 style["layers"].append(
-                    {**l, "id": "roads-highlight-bridge", "maxzoom": _fb, "filter": bridge})
+                    {**l, "id": "roads-highlight-bridge", "maxzoom": _fb, "filter": bridge_band})
                 break
         # extruded bridge decks: physical ribbons floating base_m above ground — in the tilted
         # view you look UNDER a bridge and see the roads passing beneath it. The casing ring

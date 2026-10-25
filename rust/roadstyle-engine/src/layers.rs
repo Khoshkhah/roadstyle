@@ -646,9 +646,10 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let export = args["export"] == true;
 
     // roads-simple and the invisible roads-fill (simple mode)
-    // render's minzoom: true the config's table of the classes' first zooms, a mapping that table with changes, else none (_minzoom_filter)
+    // render's minzoom (_minzoom_filter): null or true the config's table of the classes' first zooms (the default since 2026-10-25, as
+    // OpenMapTiles and OSM-Carto do), a mapping that table with changes, false every class at every zoom
     let mz: Option<Map<String, Value>> = match &look.args["minzoom"] {
-        Value::Bool(true) => Some(cfg["minzoom"].as_object().cloned().unwrap_or_default()),
+        Value::Bool(true) | Value::Null => Some(cfg["minzoom"].as_object().cloned().unwrap_or_default()),
         Value::Object(o) => {
             let mut t = cfg["minzoom"].as_object().cloned().unwrap_or_default();
             t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
@@ -660,7 +661,9 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let mut flt = vec![json!("all")];
     flt.extend(mz_filter("highway"));
     let casing_px = if args["casing_min_px"].is_null() { th["casing"]["min_px"].clone() } else { args["casing_min_px"].clone() };
-    flt.extend(casing_drop_filter(m, th["casing"]["drop_below_px"].as_f64().unwrap_or(0.0), metres && casing_px.as_f64().unwrap_or(0.0) >= th["casing"]["drop_below_px"].as_f64().unwrap_or(0.0)));
+    // casing.drop_below_px: the profile's 1.0 for a look made before the key (2026-10-25)
+    let drop = th["casing"]["drop_below_px"].as_f64().unwrap_or(1.0);
+    flt.extend(casing_drop_filter(m, drop, metres && casing_px.as_f64().unwrap_or(0.0) >= drop));
     flt.push(seam_filter());
     // the 3D decks (view_3d): a bridge is the flat line below flat_below and the extruded deck from it up
     let dk = &look.deck;

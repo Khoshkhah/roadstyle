@@ -129,14 +129,13 @@ def _tile_classes(data, z, layer="roads", lon=18.03, lat=59.301):
 
 
 def test_tile_class_gating_follows_the_minzoom_parameter():
-    """Default render: NO class thinning in the tiles (same look as inline — residential shows
-    at every zoom). minzoom=True opts into the settings table: the pieces' layer hides a class below its first zoom, so the low-zoom tiles
-    leave it out (zoom_rules, 2026-10-25)."""
+    """minzoom=False: NO class thinning in the tiles (residential shows at every zoom). The default (since 2026-10-25) is the settings
+    table: the pieces' layer hides a class below its first zoom, so the low-zoom tiles leave it out (zoom_rules)."""
     from roadstyle.render_web import render
     g = _edges()
-    plain = _archive_of(render(g, basemap="blank", tiles=True).html)
+    plain = _archive_of(render(g, basemap="blank", tiles=True, minzoom=False).html)
     assert "service" in _tile_classes(plain, 10, "simple")               # everything, even at z10
-    thin = _archive_of(render(g, basemap="blank", tiles=True, minzoom=True).html)
+    thin = _archive_of(render(g, basemap="blank", tiles=True).html)
     assert "service" not in _tile_classes(thin, 10, "simple")            # service minzoom is 15
     assert "primary" in _tile_classes(thin, 10, "simple")
 

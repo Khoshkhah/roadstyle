@@ -14,7 +14,7 @@
       "roads-simple",
       "line",
       "simple",
-      "a0894aa3fdcc8faf",
+      "f400c3887e0b8239",
       "d26af327faadf901",
       "32554e5658942863"
     ],
@@ -22,7 +22,7 @@
       "roads-fill",
       "line",
       "roads",
-      "c9729173f5cf5f9f",
+      "3a1b5d6463213abf",
       "97344518adf6cfa0",
       "9fcf0e01ba5670e6"
     ],
@@ -30,7 +30,7 @@
       "roads-arrows",
       "symbol",
       "slots",
-      "eae28bcca8caacf2",
+      "052373ab617afa51",
       "b9e63a214b296e3e",
       "ab198cfa36f5f9c3"
     ],
@@ -38,7 +38,7 @@
       "roads-labels",
       "symbol",
       "slots",
-      "fa31f5cc7748bc7d",
+      "223a08596fb041b3",
       "e66f1480f0ee2761",
       "bc66e941e4f8c5a1"
     ],
@@ -60,7 +60,7 @@
     "simple": [
       "geojson",
       17830,
-      "1870327636bf2def"
+      "c353e39117899afb"
     ],
     "slots": [
       "geojson",
@@ -74,7 +74,7 @@
     "roadstyle:sources": "de9ed92a2cabe7fc",
     "roadstyle:controls": "7ad47e2cab264f27"
   },
-  "hash": "ba358b7671d8487d",
+  "hash": "2e032977d0e9ab8a",
   "road_table": {
     "rows": 13298,
     "columns": [
@@ -116,7 +116,7 @@
     }
   },
   "text": {
-    "bytes": 19175525,
-    "sha16": "ba358b7671d8487d"
+    "bytes": 19547788,
+    "sha16": "2e032977d0e9ab8a"
   }
 }

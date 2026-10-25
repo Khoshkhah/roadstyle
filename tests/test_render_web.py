@@ -260,13 +260,14 @@ def _road_filters(html):
             if l["id"] in ("roads-simple", "roads-fill", "roads-casing", "roads-low-fill", "roads-bridge-fill")}
 
 
-def test_minzoom_off_by_default():
-    """Existing maps must be byte-identical — `track` is a width channel for some callers, and
-    hiding it by class would make their data disappear."""
-    from roadstyle.render_web import _seam_filter, render
+def test_minzoom_off_with_false():
+    """minzoom=False (the old look before 2026-10-25, when the class minzoom became the default): every class at every zoom. A caller
+    with `track` as a width channel keeps its data; with casing.drop_below_px 0 no zoom is in the road filters but the seams'."""
+    from roadstyle.render_web import _casing_drop_filter, _seam_filter, render
     seam = json.dumps(_seam_filter())   # only the casing seams (round from z17) and laps (flat below z17)
-    for f in _road_filters(render(_many_edges(20)).html).values():
-        assert "zoom" not in json.dumps(f).replace(seam, "")
+    drop = json.dumps(_casing_drop_filter(1.0, False))
+    for f in _road_filters(render(_many_edges(20), minzoom=False).html).values():
+        assert "zoom" not in json.dumps(f).replace(seam, "").replace(drop, "")
 
 
 def test_minzoom_true_uses_the_config_table():
@@ -904,6 +905,17 @@ def _eval(e, p):
         return any(_eval(x, p) for x in a)
     if op == "zoom":
         return p.get("$zoom", 22)                                   # a street zoom unless the test says otherwise
+    if op == "literal":
+        return a[0]
+    if op == "at":
+        lst = _eval(a[1], p)
+        return lst[int(_eval(a[0], p))]
+    if op == "match":                                               # the class minzoom (on by default since 2026-10-25)
+        x = _eval(a[0], p)
+        for lab, v in zip(a[1:-1:2], a[2:-1:2], strict=True):
+            if x in (lab if isinstance(lab, list) else [lab]):
+                return _eval(v, p)
+        return _eval(a[-1], p)
     x, y = _eval(a[0], p), _eval(a[1], p)
     return {"==": x == y, "<": x < y if op == "<" else None, ">": x > y if op == ">" else None, ">=": x >= y if op == ">=" else None}[op]
 

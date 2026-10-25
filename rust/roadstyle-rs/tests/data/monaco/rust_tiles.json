@@ -15,7 +15,7 @@
         "roads-simple",
         "line",
         "roads",
-        "a0894aa3fdcc8faf",
+        "f400c3887e0b8239",
         "d26af327faadf901",
         "32554e5658942863"
       ],
@@ -23,7 +23,7 @@
         "roads-fill",
         "line",
         "roads",
-        "c9729173f5cf5f9f",
+        "3a1b5d6463213abf",
         "97344518adf6cfa0",
         "9fcf0e01ba5670e6"
       ],
@@ -31,7 +31,7 @@
         "roads-arrows",
         "symbol",
         "roads",
-        "eae28bcca8caacf2",
+        "052373ab617afa51",
         "b9e63a214b296e3e",
         "ab198cfa36f5f9c3"
       ],
@@ -39,7 +39,7 @@
         "roads-labels",
         "symbol",
         "roads",
-        "fa31f5cc7748bc7d",
+        "223a08596fb041b3",
         "e66f1480f0ee2761",
         "bc66e941e4f8c5a1"
       ],
@@ -65,7 +65,7 @@
       "roadstyle:sources": "f06f4789e4af8cce",
       "roadstyle:controls": "7ad47e2cab264f27"
     },
-    "hash": "0d40914c3586a64f"
+    "hash": "af716f71985a7636"
   },
   "tiles": {
     "z12": {
@@ -76,8 +76,8 @@
       },
       "simple": {
         "tiles": 1,
-        "features": 16666,
-        "hash": "45e132e8d9032c63"
+        "features": 3060,
+        "hash": "93cd1e84bb0f89da"
       }
     },
     "z14": {
@@ -88,13 +88,13 @@
       },
       "simple": {
         "tiles": 4,
-        "features": 17652,
-        "hash": "94246ea4c3712f30"
+        "features": 6169,
+        "hash": "06fcbd15355d473b"
       },
       "slots": {
         "tiles": 4,
-        "features": 2309,
-        "hash": "db964ea2e957cc39"
+        "features": 1264,
+        "hash": "46a18d3621fbef87"
       }
     },
     "z15": {
@@ -106,7 +106,7 @@
       "simple": {
         "tiles": 8,
         "features": 16636,
-        "hash": "a35f404ce4e04039"
+        "hash": "b0be8437570f7052"
       },
       "slots": {
         "tiles": 8,

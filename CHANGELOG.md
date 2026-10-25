@@ -21,11 +21,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls. On a phone the panel is a sheet at the bottom
   (`layout`: `"auto"`, a sheet up to 700 px wide; `"sheet"`; `"side"`), with a handle (one row, half, full), taps on the roads, 44 px
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
-- **`casing.drop_below_px`** (a profile key, both engines; default `0.0`, which changes nothing): no casing piece at a zoom where the
+- **`casing.drop_below_px`** (a profile key, both engines; default `1.0`, `0` = always a casing): no casing piece at a zoom where the
   whole casing line is narrower than this many px, so the fill draws alone there; the casing comes back at the first zoom where it is as
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **Minor roads are hidden below their class's zoom by default** (both engines), as in OpenMapTiles and OSM-Carto: `minzoom` is on
+  (the profile's table: residential and unclassified from 13, cycleway, track and pedestrian from 14, service, footway and path from
+  15, tertiary from 11; motorway to secondary from 4 to 9). **The old look: `minzoom=False`.** `minzoom=None` now means the table too:
+  a caller that passed `None` to draw every class at every zoom must pass `False`. Also on by default: `casing.drop_below_px` 1 (see
+  Added). Tartu, one 1280 × 800 view at zoom 12: 5.6 MB to 1.2 MB of tiles (the largest tile 389 KB), made about 6 times faster.
 - **The tiles read the zoom rules from the style** (both engines). A tile leaves out a feature that every layer drawing its source
   hides at every zoom of that tile, by the clauses `[">=", ["zoom"], E]` of the layers' filters: the class minzoom (`minzoom=True`) and
   `casing.drop_below_px`. The tiles of the last zoom keep every feature. Python's `build_pmtiles` takes `layers` (the style's) in place
