@@ -57,15 +57,23 @@ def _goldens():
 @pytest.mark.parametrize("choice", ["all osm google", "driving osm google", "walking osm google", "cycling osm google", "all grey google",
                                     "walking google komoot", "driving osm google only", "walking osm google only"])
 def test_the_style_is_mapstyles(choice):
-    """The style of roadstyle.duckosm.export_inline (the reader, the base map's look and stage 1 in Rust) has the normalised digest of
-    today's mapstyle export_inline of the same choice (tests/make_mapstyle_goldens.py: the rules of `normalised`, each with its reason)."""
+    """The style of roadstyle.duckosm.export_inline (the reader, the base map's look and stage 1 in Rust) is the stored mapstyle
+    export_inline of the same choice, both normalised (tests/make_mapstyle_goldens.py: the rules of `normalised` and `differences`, each
+    with its reason)."""
     from roadstyle import duckosm
 
     gen, digests = _goldens()
     mode, theme, paths, *only = choice.split()
-    style = duckosm.export_inline(DB, mode, theme=theme, paths=paths, only=bool(only))
     name = gen.name_of(mode, theme, paths, bool(only))
-    assert gen.digest(gen.normalised(style)) == digests[name]["normalised"]
+    if not (gen.HERE / "data" / "mapstyle" / f"{name}.json.gz").is_file():
+        pytest.skip("the stored mapstyle styles are local only: run rust/roadstyle-rs/tests/make_mapstyle_goldens.py styles")
+    style = duckosm.export_inline(DB, mode, theme=theme, paths=paths, only=bool(only))
+    # the stored mapstyle style (local, as the digests), normalised: the same, a colour within 1 in each channel (review D4); the digests
+    # stay as the record of the stored styles
+    want = gen.stored(name)
+    assert gen.digest(want)["sha256"] == digests[name]["sha256"], f"{name}: not the stored golden"
+    bad = gen.differences(gen.normalised(style), gen.normalised(want))
+    assert not bad, "\n".join(bad)
     # the 3D decks' union area of each chain (the normalised form has their chains, edges, heights and heads)
     want, got = gen.deck_areas(gen.stored(name)), gen.deck_areas(style)
     assert set(got) == set(want)

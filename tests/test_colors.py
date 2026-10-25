@@ -56,3 +56,26 @@ def test_a_list_of_colours_and_a_colour_name():
         ColorRamp(["#000000", "nocolour"])
     with pytest.raises(ValueError, match="at least 2 colors"):
         ColorRamp(["#000000"])
+
+
+def test_a_bad_colour_is_an_error_that_names_it():
+    """Review D4, through the Python binding: export_look reads "#fff", "#ffffff", "red" and "" (a palette's "no casing"); "#zzz" is a
+    ValueError that names the colour (it panicked before)."""
+    import json
+    from pathlib import Path
+
+    from roadstyle import _engine
+    if not _engine.available():
+        pytest.skip("no roadstyle._rust")
+    base = json.loads((Path(__file__).resolve().parents[1] / "rust/roadstyle-rs/tests/data/look.json").read_text())
+    pal = base["theme"]["active"]["palette"]
+
+    def export(fill):
+        base["theme"]["palettes"][pal]["residential"]["fill"] = fill
+        look = _engine.rust().Look.from_json(json.dumps(base))
+        return _engine.rust().export_look(look, ["highway", "oneway", "tunnel", "bridge", "edge_id"], [0, 1])
+
+    for ok in ("#fff", "#ffffff", "red", ""):
+        assert json.loads(export(ok))["layers"]
+    with pytest.raises(ValueError, match='"#zzz" is not a colour'):
+        export("#zzz")

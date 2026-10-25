@@ -47,6 +47,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A look colour "#fff" no longer crashes `export_look`** (review D4: a panic in Rust, an abort in the browser). One colour module in the
+  look crate (`roadstyle_look::color`) reads every colour of the look: "#rrggbb", "#rgb" and a CSS colour name; any other "#..." text is
+  an error that names it. One mix rounds half up for the look and the export (the base map's look rounded half to even: some of its
+  casing colours move by 1 in one channel).
 - **The duckOSM reader reads a file with no `private_edges`** (an older file, granville_island): the union typed its `access` as an
   integer, and the roads failed with "Could not convert string 'bus' to INT32". mapstyle's SQL had the same fault. And the reader's plan
   gives the base map's queries also for a file with no network ("roads" is null, "roads_error" says why).
