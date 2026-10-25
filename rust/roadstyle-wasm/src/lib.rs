@@ -20,11 +20,13 @@ mod grow {
     pub static LIVE: AtomicUsize = AtomicUsize::new(0);
     pub static PEAK: AtomicUsize = AtomicUsize::new(0);
 
+    #[inline(never)]
     fn took(n: usize) {
         let live = LIVE.fetch_add(n, Relaxed) + n;
         PEAK.fetch_max(live, Relaxed);
     }
 
+    #[inline(never)]
     fn ahead() {
         let now = memory_size(0);
         if now != PAGES.load(Relaxed) {
@@ -45,7 +47,12 @@ mod grow {
 
     struct Ahead;
 
+    // Every function of the allocator is out of line (#[inline(never)]): with fat LTO they were inlined at each allocation site, thousands of
+    // copies, 1.31 MB of the package (12,312,335 to 11,006,948 bytes; parity.md, "Size"). The cost is one call for each allocation:
+    // Tartu's makeSources and tileSources in Node took about 2 % longer, about the noise between runs.
+
     unsafe impl GlobalAlloc for Ahead {
+        #[inline(never)]
         unsafe fn alloc(&self, l: Layout) -> *mut u8 {
             let p = System.alloc(l);
             if !p.is_null() {
@@ -54,6 +61,7 @@ mod grow {
             ahead();
             p
         }
+        #[inline(never)]
         unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
             let p = System.alloc_zeroed(l);
             if !p.is_null() {
@@ -62,6 +70,7 @@ mod grow {
             ahead();
             p
         }
+        #[inline(never)]
         unsafe fn realloc(&self, p: *mut u8, l: Layout, size: usize) -> *mut u8 {
             let q = System.realloc(p, l, size);
             if !q.is_null() {
@@ -71,6 +80,7 @@ mod grow {
             ahead();
             q
         }
+        #[inline(never)]
         unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
             LIVE.fetch_sub(l.size(), Relaxed);
             System.dealloc(p, l)
