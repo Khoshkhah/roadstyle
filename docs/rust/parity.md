@@ -227,7 +227,7 @@ wasm-bindgen --target nodejs --out-dir /tmp/rs-pkg rust/target/wasm32-unknown-un
 node rust/roadstyle-wasm/bench.mjs /tmp/rs-pkg rust/roadstyle-rs/tests/data/tartu
 ```
 
-| Area | Roads | `makeSources` | `tileSources` | Wasm memory after both | For each road |
+| Area | Roads | `makeSources` | `tileSources` | Wasm memory after both | For each road: (after − at the start) / roads |
 |---|---|---|---|---|---|
 | Monaco | 13,298 | 259 ms | 111 ms | 110 MiB (19 MiB at the start) | 7.0 KiB |
 | Tartu | 64,828 | 1,039 ms | 709 ms | 213 MiB | 3.1 KiB |
