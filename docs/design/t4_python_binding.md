@@ -1,6 +1,7 @@
 # T4: the Python binding on the public API
 
-Status: plan, 2026-10-25. It starts after the stage-2 API of roadstyle-rs's T4 lands (target_architecture.md, (f)).
+Status: approved plan, 2026-10-25. Done on branch t4-binding-now: the error classes (section 3), one getter for each `Look` part and
+`make_area`'s options JSON. The other steps follow roadstyle-rs's T4 landings (target_architecture.md, (f)).
 
 This plan changes `rust/roadstyle-py` (the module `roadstyle._rust`) and its Python callers so that each binding entry calls one
 facade function. The rules come from target_architecture.md:
@@ -18,11 +19,11 @@ These are the names of (f). An item in *italics* does not exist yet; roadstyle-r
 |---|---|---|
 | `Look::resolve(&Options)`, `Look::from_json`, `look.with_arg` | a resolved look | the same |
 | *`style(roads, look, opts, Inputs)`* → `Styled` | stage 1 in memory | `sources_of`, `make_sources` |
-| *`Styled::write_style(w, SourceMode)`* | the style text: data inline, file names or tile URLs | `Sources::write_style`, `make_style` |
+| *`Styled::write_style(w, SourceMode)`* (`Inline{export, maxzoom, tolerance}` \| `Files` \| `Tiled(at)`) | the style text: data inline, file names or tile URLs | `Sources::write_style`, `make_style` |
 | *`Styled::write_files(dir, Format)`* | stage 1's files | `save_sources` |
 | `write_road_table(styled, fields, w)` | the road table text | the same (lean table, 2026-10-25) |
 | *`Styled::restyle(look)`* | a view's palette | `palettes::add` |
-| *`tile(TileInput, &TileOptions)`* → `Tiled` | stage 2 | `tiled_of`, `make_tiled`, `tile_files`, `tile_made`, `tile_stage` |
+| *`tile(TileInput, &TileOptions)`* → `Tiled` (`TileOptions` has `keep` and `layers`) | stage 2 | `tiled_of`, `make_tiled`, `tile_files`, `tile_made`, `tile_stage` |
 | `Tiled::tile(z, x, y)` | one tile | `Tiles::tile` |
 | *`Tiled::write_pmtiles(w)`*, *`Tiled::write_xyz(dir)`* | the archive, the tile folder (every tile, with the empty ones of the bounds) | `Tiles::archive`; the folder walk is in Python |
 | *`Tiled::write_style(w)`* | the tiled style | the first item of `tiled_of` |
@@ -42,17 +43,17 @@ These are the names of (f). An item in *italics* does not exist yet; roadstyle-r
 | Entry today | Callers | It becomes | The Python code that goes |
 |---|---|---|---|
 | `resolve_look(options)`, `Look.from_json`, `Look.json`, `Look.with_arg` | `_engine.py`, `duckosm.py` | no change (one facade call each) | none |
-| `Look.part(key)` (7 keys, a `match`) | `_engine.py` (`sections`, `other`), `duckosm.py` (`map`, `base_map_page`, `palette`, `settings`, `features`) | one getter for each part: `Look.map()`, `Look.sections()`, `Look.other()`, `Look.base_map_page()`, ... Each returns the JSON text of one typed field, so the binding has no `match` on a key (pattern 9) | the `part("…")` calls take the getter names |
+| `Look.part(key)` (7 keys, a `match`; done on t4-binding-now) | `_engine.py` (`sections`, `other`), `duckosm.py` (`map`, `base_map_page`, `palette`, `settings`, `features`) | one getter for each part: `Look.map()`, `Look.sections()`, `Look.other()`, `Look.base_map_page()`, ... Each returns the JSON text of one typed field, so the binding has no `match` on a key (pattern 9) | the `part("…")` calls take the getter names |
 | `make_style(roads, look, features, planner, name)` | `_engine.py` (export_inline), `duckosm.py` | `style(...)` then `Styled.write_style(SourceMode::Inline)`: one entry `Styled.style_text(mode)` on the class below | `make_style` goes |
 | `make_sources(...)` → `Sources` | `_engine.py` (export_geojson) | `style(...)` → `Styled` (the class `Sources` takes the name `Styled`) | none |
 | `Sources.save(dir, format, keep)` | `_engine.py` | `Styled.write_files(dir, format)`. `format` is parsed by `Format::parse` in the facade, not by the binding's `format()` | the binding's `fn format` goes |
 | `Sources.style()`, `Sources.road_table(fields)` | tests only | `Styled.style_text(SourceMode)`, `Styled.road_table(fields)` | none |
-| `Sources.metadata()` | tests only | `Styled.metadata()` (a part of `MapFacts`, (b) item 7) | none |
+| `Sources.metadata()` | tests only | `Styled.facts()` (`MapFacts`, typed); the saved metadata only in the written style (`write_style`) | the tests read `facts()` or the written style |
 | `Sources.add_palettes(base, looks)` | none | `Styled.restyle(look)` (one view a call) | the entry goes, if no caller comes before T4 |
 | `Sources.file_names`, `Sources.file` | none | they go | none |
 | `Sources.tile_stage(only, exact, keep, at)`, `Sources.page_arrows()` | tests only (`test_stages.py`, `test_engine_parity.py`) | `tile(TileInput::Styled(&styled), &TileOptions)` → `Tiled`; the page arrows are inside `page` | both entries go; the tests call `tile` and `page` |
 | `tile_files(dir, keep, prefix)` → `Tiler` | `_engine.py` (`tile_geojson`) | `tile(TileInput::Files([dir]), &TileOptions)` → `Tiled` | see "Tiled" below |
-| `Tiler(roads, look, features, name, prefix, keep)` | `_engine.py` (export with tiles), `duckosm.py` | `style(...)` then `tile(TileInput::Styled)`: one entry `tiled(roads, look, ..., options)` that calls the two in the facade, or two calls from Python (`Styled` then `Styled.tile(options)`) | none |
+| `Tiler(roads, look, features, name, prefix, keep)` | `_engine.py` (export with tiles), `duckosm.py` | two calls from Python: `style(...)`, then `Styled.tile(options)`, which calls `tile(TileInput::Styled)` (agreed with roadstyle-rs; Python keeps the `Styled` for the page) | `Tiler(...)` |
 | `Tiler.tile`, `Tiler.props`, `Tiler.bounds`, `Tiler.layers`, `Tiler.zooms` | `_engine.py`, `duckosm.py` | `Tiled.tile`, `Tiled.props`, `Tiled.bounds`, `Tiled.layers`, `Tiled.zooms` (the class `Tiler` takes the name `Tiled`) | none |
 | `Tiler.archive(bounds, layers)` | `_engine.py` (`tile_geojson`, `_pmtiles`) | `Tiled.write_pmtiles(path)` (the bounds and the layers come from the tiles; the facade writes the file) | the bounds and layer arguments in Python |
 | (none: a Python loop) | `_engine.py` `tile_geojson` (format "xyz"), `_write_export` | `Tiled.write_xyz(dir)` | the two z/x/y loops of `_engine.py` (about 40 lines) and their `_merc` / `_tile_range` imports. This is (f)'s "`_engine.py` loses its tile walk" |
@@ -64,9 +65,9 @@ These are the names of (f). An item in *italics* does not exist yet; roadstyle-r
 
 | Entry today | Callers | It becomes | The Python code that goes |
 |---|---|---|---|
-| `compute_levels(roads, method, cols, band_col, order, ...)` | `_engine.py`, through `levels.py`, `export.py`, `render_web.py` | no change: it calls `level_edges` (one rule with the engine's `compute_levels`) and `levels::levels` | none |
+| `compute_levels(roads, method, cols, band_col, order, ...)` | `_engine.py`, through `levels.py`, `export.py`, `render_web.py` | one options text: a facade `levels::Options::from_json` (the method and the order parsed in the facade; today the binding has a `match` on `order`, against pattern 9), then `level_edges` and `levels::levels` | none |
 | `solve_rules(...)` | `_engine.py` | no change | none |
-| `make_area(edges, folder, id_col, ...)` (11 keyword arguments) | `level_area.py` | `level_area::make_area(table, &MakeOptions, folder)`, with `MakeOptions` from one JSON text (`MakeOptions::from_json`), so the binding has one argument for the options, not 11 | none |
+| `make_area(edges, folder, id_col, ...)` (11 keyword arguments; done on t4-binding-now) | `level_area.py` | `level_area::make_area(table, &MakeOptions, folder)`, with `MakeOptions` from one JSON text (`MakeOptions::from_json`), so the binding has one argument for the options, not 11 | none |
 | `serve(area, port, page)` | `level_area.py` | no change | none |
 | `duckosm_catalog_sql`, `duckosm_levels`, `duckosm_subset_levels`, `duckosm_features_select` | `duckosm.py` | no change (one facade call each) | none |
 | `duckosm_plan(tables, columns, mode, tags, specs, only, ...)` | `duckosm.py` | `duckosm::plan(&Catalog, &PlanOptions)`: one facade function for the binding, the wasm binding and the CLI (D7). The wasm `duckosmPlan` gives the same keys (today they differ) | none |
@@ -110,8 +111,10 @@ are `#[non_exhaustive]`, so the `match` ends with `_ => ValueError`.
 - Each facade error kind gives its Python class (a test with one bad input for each class).
 - The Tartu tiled export (`export_style(..., tiles=True)`) has the same files as before, and its peak memory is not above today's.
 
-## 6. Open points for roadstyle-rs
+## 6. Agreed with roadstyle-rs (2026-10-25)
 
-1. `Tiler(roads, look, ...)` in one call: one binding entry `tiled(...)` (the facade composes `style` and `tile`), or two calls from
-   Python (`style` then `Styled.tile`)? Pattern 9 allows both. The second gives Python the `Styled` for the page too.
-2. `Styled.metadata()`: a part of `MapFacts`, or the saved style's metadata as today?
+1. Python's `Tiler(...)` becomes two calls: `style(...)`, then `Styled.tile(options)` in the binding, which calls the facade's `tile`.
+   No composed `tiled(...)` entry.
+2. No `Styled.metadata()`: a caller reads `facts()` (`MapFacts`, typed). The saved metadata (`roadstyle:tiles`, `roadstyle:columns`) is
+   only in the written style.
+3. The names are (f)'s, fixed as each of roadstyle-rs's steps lands; roadstyle-rs tells the binding lane when one differs.
