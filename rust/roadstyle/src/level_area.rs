@@ -57,11 +57,11 @@ pub const EDITS_HEADER: &str = "relation,a,b,a_end,b_end,enabled\n";
 
 /// The solver's input of the edges `table` in `folder`: roads.parquet and pairs.csv (written again each time) and an empty edits.csv the
 /// first time. The folder's heads.csv, when there is one, gives a road's own head lengths.
-pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<AreaFiles, String> {
+pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<AreaFiles, crate::Error> {
     let heads = std::fs::read_to_string(folder.join("heads.csv")).unwrap_or_default();
     let f = make_files(table, o, &heads)?;
-    std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
-    let write = |name: &str, bytes: &[u8]| std::fs::write(folder.join(name), bytes).map_err(|e| format!("{}: {e}", folder.join(name).display()));
+    std::fs::create_dir_all(folder).map_err(|e| crate::error::file(folder.display(), e))?;
+    let write = |name: &str, bytes: &[u8]| std::fs::write(folder.join(name), bytes).map_err(|e| crate::error::file(folder.join(name).display(), e));
     write("roads.parquet", &f.roads)?;
     write("pairs.csv", f.pairs.as_bytes())?;
     if !folder.join("edits.csv").exists() {
@@ -72,7 +72,7 @@ pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<Ar
 
 /// The solver's input of the edges `table` in memory (a page with no server makes its area so): `heads` is heads.csv's text ("" for none),
 /// which gives a road's own head lengths.
-pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<AreaFiles, String> {
+pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<AreaFiles, crate::Error> {
     let mut warnings = Vec::new();
     let has = |c: &str| table.names().iter().any(|n| n == c);
     let (order, order_col) = match o.order.as_deref() {
@@ -92,7 +92,7 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
     let ids: Vec<i64> = (0..table.len()).map(|i| match has(&o.id_col) {
         false => Ok(i as i64),
         true => table.get(i, &o.id_col).and_then(|c| cell_text(c)).and_then(|t| t.parse().ok())
-            .ok_or(format!("make: the {} of row {i} is not a whole number", o.id_col)),
+            .ok_or_else(|| crate::Error::Model(roadstyle_model::Error::Column { column: o.id_col.clone(), message: format!("make: row {i} is not a whole number") })),
     }).collect::<Result<_, _>>()?;
     for (e, &id) in edges.iter_mut().zip(&ids) {
         e.edge_id = id;
@@ -218,21 +218,21 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
 type Heads = Vec<(i64, [Option<f64>; 2])>;
 
 /// heads.csv's text (`road`, `start_m`, `end_m`; empty: the default), by any edge id of a road.
-fn read_heads(text: &str) -> Result<Heads, String> {
+fn read_heads(text: &str) -> Result<Heads, crate::Error> {
     let mut lines = text.lines().filter(|l| !l.trim().is_empty());
     let head: Vec<&str> = lines.next().unwrap_or("").split(',').map(str::trim).collect();
     let at = |n: &str| head.iter().position(|h| *h == n);
     let (Some(r), s, e) = (at("road"), at("start_m"), at("end_m")) else { return Ok(Vec::new()) };
     lines.map(|l| {
         let f: Vec<&str> = l.split(',').map(str::trim).collect();
-        let num = |i: Option<usize>| -> Result<Option<f64>, String> {
+        let num = |i: Option<usize>| -> Result<Option<f64>, crate::Error> {
             match i.and_then(|i| f.get(i)).copied().unwrap_or("") {
                 "" => Ok(None),
-                v => v.parse().map(Some).map_err(|_| format!("heads.csv: '{v}' is not a number of metres")),
+                v => v.parse().map(Some).map_err(|_| crate::error::edits(format!("heads.csv: '{v}' is not a number of metres"))),
             }
         };
         let id = f.get(r).copied().unwrap_or("");
-        Ok((id.parse().map_err(|_| format!("heads.csv: '{id}' is not an edge id"))?, [num(s)?, num(e)?]))
+        Ok((id.parse().map_err(|_| crate::error::edits(format!("heads.csv: '{id}' is not an edge id")))?, [num(s)?, num(e)?]))
     }).collect()
 }
 

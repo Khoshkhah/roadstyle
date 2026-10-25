@@ -88,5 +88,5 @@ fn export_look_reads_every_form_of_a_colour() {
     assert_eq!(serde_json::to_string(&with("#fff").unwrap()).unwrap().replace("\"#fff\"", "\"#ffffff\""),
                serde_json::to_string(&with("#ffffff").unwrap()).unwrap(), "the short form is the long form");
     let e = with("#zzz").unwrap_err();
-    assert!(e.contains("\"#zzz\" is not a colour"), "{e}");
+    assert!(matches!(e, roadstyle_rs::EngineError::Look(_)) && e.to_string().contains("\"#zzz\" is not a colour"), "{e}");
 }

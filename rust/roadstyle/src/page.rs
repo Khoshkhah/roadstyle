@@ -241,11 +241,11 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
 
 /// The page from JSON texts (the Python and the browser bindings): `style`, `page` (the options) and `parts` ({name, cam, bounds,
 /// side_panel_html, host_panel_width, compress, gz, side, side_b64, simple_js}); `pmtiles`: the archive of a tiled page.
-pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -> Result<String, String> {
-    let read = |t: &str, what: &str| serde_json::from_str::<Value>(t).map_err(|e| format!("{what}: not JSON: {e}"));
+pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -> Result<String, crate::Error> {
+    let read = |t: &str, what: &str| serde_json::from_str::<Value>(t).map_err(|e| crate::error::options(format!("{what}: not JSON: {e}")));
     let (style, p) = (read(style, "style")?, read(parts, "parts")?);
-    let page: PageOptions = serde_json::from_str(page).map_err(|e| format!("page: {e}"))?;
-    let cam: Camera = serde_json::from_value(p["cam"].clone()).map_err(|e| format!("parts.cam: {e}"))?;
+    let page: PageOptions = serde_json::from_str(page).map_err(|e| crate::error::options(format!("page: {e}")))?;
+    let cam: Camera = serde_json::from_value(p["cam"].clone()).map_err(|e| crate::error::options(format!("parts.cam: {e}")))?;
     let b = |i: usize| p["bounds"][i].as_f64().unwrap_or(0.0);
     let parts = PageParts {
         name: p["name"].as_str().unwrap_or(""), cam, bounds: [b(0), b(1), b(2), b(3)], side_panel_html: p["side_panel_html"].as_str(),

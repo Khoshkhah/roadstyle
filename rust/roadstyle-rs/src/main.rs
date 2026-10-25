@@ -51,7 +51,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
         t = Instant::now();
     };
     let look = look_file(look_path);
-    let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e.into())));
+    let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)));
     mark("read the roads");
     let colors = roads::mark_roads(&mut feats, &look.road, &look.args).unwrap_or_else(|e| fail(e));
     mark("mark the roads (colours, pairs, levels)");
@@ -78,14 +78,14 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     mark(&format!("the text of the sources ({} MB, {} layers)", text.len() >> 20, layers.len()));
 }
 
-fn fail(msg: String) -> ! {
+fn fail(msg: impl std::fmt::Display) -> ! {
     eprintln!("{msg}");
     process::exit(1)
 }
 
 /// A saved look (version 1 or 0).
 fn look_file(p: &str) -> roadstyle_rs::Look {
-    roadstyle_rs::Look::from_value(json_file(p)).unwrap_or_else(|e| fail(e.into()))
+    roadstyle_rs::Look::from_value(json_file(p)).unwrap_or_else(|e| fail(e))
 }
 
 fn json_file(path: &str) -> Value {
@@ -184,7 +184,7 @@ fn main() {
     let layers_only = args.len() == 4 && args[1] == "--layers";
     if !layers_only && args.len() != 6 {
         fail("usage: roadstyle-rs <look.json> <roads.parquet> <features.parquet | -> <planner.parquet | -> <out.json>  |  \
-              roadstyle-rs --layers <look.json> <roads.parquet>".into());
+              roadstyle-rs --layers <look.json> <roads.parquet>");
     }
     let (look_path, roads_path) = if layers_only { (&args[2], &args[3]) } else { (&args[1], &args[2]) };
     let look = look_file(look_path);

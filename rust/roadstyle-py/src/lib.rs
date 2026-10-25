@@ -14,6 +14,14 @@ thread_local! {
     static PENDING: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
+/// A facade error as Python's ValueError, with this binding's advice: a part that the Rust engine does not draw names the Python engine
+/// (the engine's message names no binding, target_architecture.md (e) item 5).
+fn py_err(e: impl Into<roadstyle::Error>) -> PyErr {
+    let e = e.into();
+    let unsupported = matches!(&e, roadstyle::Error::Engine(roadstyle::EngineError::Unsupported(_)));
+    PyValueError::new_err(if unsupported { format!("engine='rust': {e}; use engine='python'") } else { e.to_string() })
+}
+
 fn warned(w: &[String]) {
     PENDING.with(|p| p.borrow_mut().extend_from_slice(w));
 }
@@ -35,9 +43,9 @@ type Tables = (RoadTable, Option<FeatureTable>, Option<Vec<Row>>);
 
 /// The roads (their lines in `geometry`), the base map's rows (features_of: the land without the sea) and the planner's rows.
 fn tables(roads: ArrowArrayStreamReader, features: Option<ArrowArrayStreamReader>, planner: Option<ArrowArrayStreamReader>)
-          -> Result<Tables, String> {
+          -> Result<Tables, roadstyle::Error> {
     Ok((roadstyle::read::roads_from(roads, "geometry")?,
-        features.map(|f| roadstyle::read::feature_table_from(f, "geometry").map_err(String::from).and_then(roadstyle::features_of)).transpose()?,
+        features.map(|f| roadstyle::read::feature_table_from(f, "geometry").map_err(roadstyle::Error::from).and_then(roadstyle::features_of)).transpose()?,
         planner.map(|p| roadstyle::read::table_from(p, "")).transpose()?))
 }
 
@@ -102,7 +110,7 @@ fn make_style(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>,
               planner: Option<&Bound<'_, PyAny>>, name: Option<String>) -> PyResult<String> {
     let look = &look.0;
     let (r, f, p) = (stream(roads)?, features.map(stream).transpose()?, planner.map(stream).transpose()?);
-    let s = py.detach(|| tables(r, f, p).and_then(|(r, f, p)| roadstyle::sources_of(r, look, f, p, name))).map_err(PyValueError::new_err)?;
+    let s = py.detach(|| tables(r, f, p).and_then(|(r, f, p)| roadstyle::sources_of(r, look, f, p, name))).map_err(py_err)?;
     warned(&s.warnings);
     let mut out = Vec::new();
     py.detach(|| s.write_style(&mut out)).expect("a Vec takes every byte");
@@ -128,7 +136,7 @@ impl Tiler {
         let look = &look.0;
         let (r, f) = (stream(roads)?, features.map(stream).transpose()?);
         let (style, tiles, w) = py.detach(|| tables(r, f, None).and_then(|(r, f, _)| roadstyle::tiled_of(r, look, f, name, &prefix, &keep)))
-            .map_err(PyValueError::new_err)?;
+            .map_err(py_err)?;
         warned(&w);
         Ok(Tiler { style, tiles })
     }
@@ -185,7 +193,7 @@ impl Sources {
     #[pyo3(signature = (dir, format="geojson", keep=Vec::new()))]
     fn save(&self, py: Python<'_>, dir: String, format: &str, keep: Vec<String>) -> PyResult<Vec<(String, usize)>> {
         let f = self::format(format)?;
-        py.detach(|| roadstyle::save_sources(&self.inner, std::path::Path::new(&dir), f, &keep)).map_err(PyValueError::new_err)
+        py.detach(|| roadstyle::save_sources(&self.inner, std::path::Path::new(&dir), f, &keep)).map_err(py_err)
     }
 
     /// file_names(format="geojson") -> list[str]: the names of stage 1's files.
@@ -237,7 +245,7 @@ impl Sources {
         let looks: Vec<(String, roadstyle::Look)> = looks.into_iter().map(|(n, l)| (n, l.0.clone())).collect();
         let s = &mut self.inner;
         let before = s.warnings.len();
-        py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(PyValueError::new_err)?;
+        py.detach(|| roadstyle::palettes::add(s, &base, &looks)).map_err(py_err)?;
         warned(&s.warnings[before..]);
         Ok(())
     }
@@ -253,7 +261,7 @@ impl Sources {
     #[pyo3(signature = (name, format="geojson", keep=Vec::new()))]
     fn file<'py>(&self, py: Python<'py>, name: &str, format: &str, keep: Vec<String>) -> PyResult<Bound<'py, PyBytes>> {
         let f = self::format(format)?;
-        let b = py.detach(|| roadstyle::source_file(&self.inner, name, f, &self.inner.drawn(&keep))).map_err(PyValueError::new_err)?;
+        let b = py.detach(|| roadstyle::source_file(&self.inner, name, f, &self.inner.drawn(&keep))).map_err(py_err)?;
         Ok(PyBytes::new(py, &b))
     }
 }
@@ -265,7 +273,7 @@ fn make_sources(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook
                 planner: Option<&Bound<'_, PyAny>>, name: Option<String>) -> PyResult<Sources> {
     let look = &look.0;
     let (r, f, p) = (stream(roads)?, features.map(stream).transpose()?, planner.map(stream).transpose()?);
-    let inner = py.detach(|| tables(r, f, p).and_then(|(r, f, p)| roadstyle::sources_of(r, look, f, p, name))).map_err(PyValueError::new_err)?;
+    let inner = py.detach(|| tables(r, f, p).and_then(|(r, f, p)| roadstyle::sources_of(r, look, f, p, name))).map_err(py_err)?;
     warned(&inner.warnings);
     Ok(Sources { inner })
 }
@@ -275,7 +283,7 @@ fn make_sources(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook
 #[pyfunction]
 #[pyo3(signature = (dir, keep=Vec::new(), prefix=String::new()))]
 fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) -> PyResult<Tiler> {
-    let (style, tiles) = py.detach(|| roadstyle::tile_files(std::path::Path::new(&dir), &keep, None, &roadstyle::xyz_at(&prefix))).map_err(PyValueError::new_err)?;
+    let (style, tiles) = py.detach(|| roadstyle::tile_files(std::path::Path::new(&dir), &keep, None, &roadstyle::xyz_at(&prefix))).map_err(py_err)?;
     Ok(Tiler { style: style.to_string(), tiles })
 }
 
@@ -339,7 +347,7 @@ fn solve_rules(py: Python<'_>, roads: usize, meets: Vec<(usize, usize, usize, us
 #[pyfunction]
 #[pyo3(signature = (style, page, parts, pmtiles=None))]
 fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>>) -> PyResult<String> {
-    roadstyle::page::make_page(&style, &page, &parts, pmtiles.as_deref()).map_err(PyValueError::new_err)
+    roadstyle::page::make_page(&style, &page, &parts, pmtiles.as_deref()).map_err(py_err)
 }
 
 /// page_from(roads, look, options, given) -> str: the page of the roads (an Arrow table) in one call (roadstyle::page_options), as
@@ -354,12 +362,12 @@ fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, 
     let given: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&given).map_err(|e| PyValueError::new_err(format!("given: {e}")))?;
     let (look, roads, features) = (&look.0, stream(roads)?, features.map(stream).transpose()?);
     let page = py.detach(|| {
-        let features = features.map(|f| roadstyle::read::feature_table_from(f, "geometry").map_err(String::from).and_then(roadstyle::features_of))
+        let features = features.map(|f| roadstyle::read::feature_table_from(f, "geometry").map_err(roadstyle::Error::from).and_then(roadstyle::features_of))
             .transpose()?;
-        roadstyle::read::roads_from(roads, "geometry").map_err(String::from)
+        roadstyle::read::roads_from(roads, "geometry").map_err(roadstyle::Error::from)
             .and_then(|r| roadstyle::page_options::page_from(r, features, look, &options, &given))
     })
-        .map_err(PyValueError::new_err)?;
+        .map_err(py_err)?;
     warned(&page.warnings);
     Ok(page.html)
 }
@@ -382,7 +390,7 @@ fn sidebar_defaults() -> String {
 #[pyfunction]
 fn export_look(look: PyRef<'_, PyLook>, cols: [String; 5], positions: Vec<i64>) -> PyResult<String> {
     let c = roadstyle::export_look::LookCols { highway: &cols[0], oneway: &cols[1], tunnel: &cols[2], bridge: &cols[3], id: &cols[4] };
-    roadstyle::export_look::export_look(&look.0, &c, &positions).map(|v| v.to_string()).map_err(PyValueError::new_err)
+    roadstyle::export_look::export_look(&look.0, &c, &positions).map(|v| v.to_string()).map_err(py_err)
 }
 
 /// make_area(edges, folder, ...) -> (roads, pairs, warnings): roadstyle's make_area (level_input) in Rust (roadstyle::level_area): writes
@@ -401,7 +409,7 @@ fn make_area(py: Python<'_>, edges: &Bound<'_, PyAny>, folder: String, id_col: S
     py.detach(|| {
         let table = roadstyle::read::roads_from(edges, "geometry")?;
         roadstyle::level_area::make_area(&table, std::path::Path::new(&folder), &o).map(|f| (f.made.roads, f.made.pairs, f.made.warnings))
-    }).map_err(|e: String| PyValueError::new_err(e))
+    }).map_err(|e: roadstyle::Error| py_err(e))
 }
 
 /// base_map_theme(theme) -> str: a base map's theme (roadstyle-look's basemap::load_theme) as JSON text: [osm_carto.yaml in the theme's

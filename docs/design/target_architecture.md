@@ -277,7 +277,9 @@ hash goes into the metadata, so that the regional archives can be checked as one
 | C. `String` or `anyhow` | None | No caller can act on a kind. The plan's Python classes (`LookError(ValueError)`) are not possible. |
 
 **Today.** `roadstyle-look` and `roadstyle-io` have one enum each (on `origin/rust-engine`), `roadstyle-snapshot` has one,
-`roadstyle-levels` and `roadstyle-cli` have one on `n28-editor` (green CI, not landed). Not started: model, engine, tiles, facade. The
+`roadstyle-levels` and `roadstyle-cli` have one; the model and the tiles (t3-errors), the engine and the facade (2026-10-25: `roadstyle_engine::Error` with
+`Column`, `Options`, `Data`, `Limit`, `Unsupported` and the crates' kinds; `roadstyle::Error` with a kind for each crate and `Options`, `File`,
+`Edits`) have one. The JS binding passes the message only: an `Error` with a `name` for each kind is open. The
 pattern: one enum per crate, `Display`, hand-written `From`, no `thiserror`. The engine's messages name Python (`engine="python"`) and
 "the plugin" (rule 1, minor).
 

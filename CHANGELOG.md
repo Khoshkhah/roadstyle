@@ -30,6 +30,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The Rust engine and the facade have typed errors** (target (e)). `roadstyle_engine::Error` has the kinds `Column` (with the
+  column), `Options`, `Data`, `Limit` (what it counts and the most), `Unsupported` (the part that this engine does not draw) and the
+  look's, the levels' and the model's errors; `roadstyle::Error` wraps each crate's error and has `Options`, `File` (with the file) and
+  `Edits` (the level editor's input). No public function of the two crates gives a `String` error now. The messages name no binding:
+  the Python binding adds "use engine='python'" to an `Unsupported` kind. A test feeds roads with a line of one point, a line of two
+  equal points and no geometry through both stages: no panic.
 - **The tiles go to zoom 18** (both engines; `tiles.maxzoom`, was 15). The map scales the last zoom's tiles up, and the casing
   pieces' cut points round to that zoom's grid, so at zoom 21 and 22 a casing piece stood up to 4–5 px off its fill: thick on one
   side, missing on the other, with notches where the pieces meet. At 18 it is about 1 px. The archive of a tiled page doubles

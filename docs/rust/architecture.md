@@ -147,8 +147,9 @@ The roads go in as Arrow batches (the geometry as WKB in EPSG:4326). Python give
 give the bytes of a GeoParquet file. The look goes in as a typed `Look`
 (`roadstyle-look`): the palette, the profile, the settings and the keywords of `render_edges`, merged one time by `Look::resolve`, or a
 saved look read by `Look::from_json` (version 1, or version 0: the `look.json` of 0.25.0). The style comes out as JSON
-text, with the metadata for the dashboard. Errors are text: `Result<_, String>` in Rust, a thrown `Error` in JavaScript, a
-`ValueError` in Python.
+text, with the metadata for the dashboard. Each crate has one error enum (`roadstyle::Error` in the facade, with a kind for each
+crate's error and its own kinds), a thrown `Error` in JavaScript, a `ValueError` in Python. A message names no binding: the Python
+binding adds "use engine='python'" to a part that the Rust engine does not draw (`EngineError::Unsupported`).
 
 ## The modules of each crate
 
@@ -596,7 +597,7 @@ an item shows "yes" when the code has it:
 |---|---|---|
 | The core has no I/O: the engine does not depend on a reader | `roadstyle-engine` depends on: `roadstyle-levels`, `roadstyle-look`, `roadstyle-model` | yes |
 | A crate `roadstyle-look` for the typed, versioned look | `roadstyle-look` exists | yes |
-| One error enum for each crate | `Result<_, String>`: 80 places; error enums: Error, SnapshotError | no |
+| One error enum for each crate | the engine and the facade have theirs (2026-10-25); 0 `Result<_, String>` in their public signatures | yes |
 | A typed render model in place of JSON trees | `Value` (serde_json) in `roadstyle-engine`: 598 times | no |
 | Typed fields in place of the `__rs_*` properties | 59 distinct `__rs_*` names in `rust/` | no |
 | Stage 2 (the tiles) has its own public call in Python and in the browser | `roadstyle-py`: none; `roadstyle-wasm`: `tileSources` | no |

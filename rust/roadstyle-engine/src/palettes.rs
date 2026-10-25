@@ -37,7 +37,7 @@ pub fn merge(base: &mut Sources, base_name: &str, copies: &[(String, Sources)]) 
         if cp.layers.len() != ids.len() || cp.layers.iter().zip(&ids).any(|(l, id)| &l["id"] != *id) {
             return Err(crate::error::options(format!("palette {n:?} makes other layers than {base_name:?}: a palette holds only colours (docs/design/style_config.md)")));
         }
-        let other = || format!("palette {n:?} makes other features than {base_name:?}: a palette holds only colours");
+        let other = || crate::error::options(format!("palette {n:?} makes other features than {base_name:?}: a palette holds only colours"));
         if cp.roads.roads.len() != base.roads.roads.len() || cp.sources.len() != base.sources.len() {
             return Err(other());
         }

@@ -5,7 +5,8 @@
 use std::fmt;
 
 /// An error of roadstyle-engine. `Display` gives its message; `String::from` gives the same text, for a caller whose error is text.
-/// A regional build tells the kinds apart: `Data` and `Column` are in the input data (skip and log), the others in the options (stop).
+/// A regional build tells the kinds apart: `Data`, `Column` and `Model` are in the input data (skip and log), the others in the options
+/// (stop).
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
@@ -25,6 +26,8 @@ pub enum Error {
     Look(roadstyle_look::Error),
     /// The drawing positions (roadstyle-levels' error).
     Levels(roadstyle_levels::Error),
+    /// A table of the roads or of the base map (roadstyle-model's error: in the input data).
+    Model(roadstyle_model::Error),
 }
 
 /// What a `Limit` counts.
@@ -57,6 +60,8 @@ pub enum Unsupported {
     MultiLineItem { overlay: String, item: usize },
     /// Line items of an overlay from a typed table (only a caller's overlay has items).
     TableItems { overlay: String },
+    /// A tiled page with a view's palette (the tiles have one palette).
+    TiledPalettes,
 }
 
 impl fmt::Display for Error {
@@ -77,9 +82,11 @@ impl fmt::Display for Error {
                 Unsupported::ItemPalette { palette, key } => write!(f, "palette {palette:?} changes {key} of an item and not of its road: not in this engine"),
                 Unsupported::MultiLineItem { overlay, item } => write!(f, "overlay {overlay}: item {item} is a MultiLineString; this engine draws LineString items only"),
                 Unsupported::TableItems { overlay } => write!(f, "overlay {overlay}: line items from a typed table are not made (only a caller's overlay has items)"),
+                Unsupported::TiledPalettes => f.write_str("tiles=True with a view's palette: the tiles have one palette"),
             },
             Error::Look(e) => e.fmt(f),
             Error::Levels(e) => e.fmt(f),
+            Error::Model(e) => e.fmt(f),
         }
     }
 }
@@ -89,6 +96,7 @@ impl std::error::Error for Error {
         match self {
             Error::Look(e) => Some(e),
             Error::Levels(e) => Some(e),
+            Error::Model(e) => Some(e),
             _ => None,
         }
     }
@@ -109,6 +117,12 @@ impl From<roadstyle_look::Error> for Error {
 impl From<roadstyle_levels::Error> for Error {
     fn from(e: roadstyle_levels::Error) -> Error {
         Error::Levels(e)
+    }
+}
+
+impl From<roadstyle_model::Error> for Error {
+    fn from(e: roadstyle_model::Error) -> Error {
+        Error::Model(e)
     }
 }
 

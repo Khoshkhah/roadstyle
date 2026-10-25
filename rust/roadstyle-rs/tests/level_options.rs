@@ -82,6 +82,7 @@ fn the_look_keyword_levels() {
     };
     let meta = |hash: &str| serde_json::json!({"edge_hash": hash, "n_edges": ids.len()});
     assert!(style(meta(&roadstyle_rs::levels::edge_hash(&ids))).is_ok());
-    assert!(style(meta("0123")).unwrap_err().contains("not the edges the stored levels were solved for"));
+    let e = style(meta("0123")).unwrap_err();
+    assert!(matches!(e, roadstyle_rs::Error::Engine(roadstyle_rs::EngineError::Data(_))) && e.to_string().contains("not the edges the stored levels were solved for"), "{e}");
     assert!(style(Value::from("tags")).is_ok());
 }

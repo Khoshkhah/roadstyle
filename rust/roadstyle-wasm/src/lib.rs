@@ -101,7 +101,7 @@ mod wasm {
     /// makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
     #[wasm_bindgen(js_name = makeStyle)]
     pub fn make_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
-        roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e))
+        roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// makeArea(edges: Uint8Array, options?: string) -> AreaFiles: a level area's files in memory (roadstyle::level_area::make_files), for
@@ -123,7 +123,7 @@ mod wasm {
             band_dist: num("band_dist", d.band_dist), head_m: num("head_m", d.head_m), near_rules: o["near_rules"].as_bool().unwrap_or(d.near_rules),
         };
         let table = roadstyle::read::read_roads(edges, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
-        roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e))
+        roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// A level area's files (makeArea): `roads` (roads.parquet's bytes, for new LevelArea), `pairs` and `edits` (pairs.csv and an empty
@@ -168,16 +168,16 @@ mod wasm {
     impl LevelArea {
         #[wasm_bindgen(constructor)]
         pub fn new(roads: Vec<u8>, pairs: &str) -> Result<LevelArea, JsError> {
-            roadstyle::level_editor::Editor::new(roads, pairs).map(LevelArea).map_err(|e| JsError::new(&e))
+            roadstyle::level_editor::Editor::new(roads, pairs).map(LevelArea).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The whole solve with the edits (edits.csv text).
         pub fn solve(&mut self, edits: &str) -> Result<String, JsError> {
-            self.0.solve(edits).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
+            self.0.solve(edits).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The solve after a change that names the roads of `changed` (edge ids): the roads around it, else the whole area.
         #[wasm_bindgen(js_name = solveLocal)]
         pub fn solve_local(&mut self, edits: &str, changed: Vec<String>) -> Result<String, JsError> {
-            self.0.solve_local(edits, &changed).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
+            self.0.solve_local(edits, &changed).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part".
         #[wasm_bindgen(js_name = startFrom)]
@@ -187,11 +187,11 @@ mod wasm {
                 (f.next().unwrap_or_default(), f.next().unwrap_or_default(), f.next().unwrap_or_default())
             }).collect();
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e))
+            self.0.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The check before rules are added (rows: CSV text with a header): [[index, why, [rule rows]]].
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {
-            self.0.check(edits, rows).map(|c| roadstyle::level_editor::conflicts_json(&c).to_string()).map_err(|e| JsError::new(&e))
+            self.0.check(edits, rows).map(|c| roadstyle::level_editor::conflicts_json(&c).to_string()).map_err(|e| JsError::new(&e.to_string()))
         }
         /// What the panel shows of each road, a list in the roads' order.
         pub fn facts(&self) -> String {
@@ -199,18 +199,18 @@ mod wasm {
         }
         /// Each road end as drawn, a list in the roads' order: heads, caps, and yours (heads.csv, caps.csv).
         pub fn ends(&self, heads: &str, caps: &str) -> Result<String, JsError> {
-            self.0.ends_json(heads, caps).map_err(|e| JsError::new(&e))
+            self.0.ends_json(heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
         /// levels.csv: one row for each edge with its four numbers and its ends as drawn (4 numbers for each road).
         #[wasm_bindgen(js_name = levelsCsv)]
         pub fn levels_csv(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<String, JsError> {
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.levels_csv(&levels, heads, caps).map_err(|e| JsError::new(&e))
+            self.0.levels_csv(&levels, heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The map's table (GeoParquet, one row for each edge) for makeStyle: 4 numbers for each road.
         pub fn draw(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<Vec<u8>, JsError> {
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.draw(&levels, heads, caps).map_err(|e| JsError::new(&e))
+            self.0.draw(&levels, heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
     }
 
@@ -230,8 +230,8 @@ mod wasm {
             Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
             None => serde_json::Map::new(),
         };
-        let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e))?;
-        let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
+        let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e.to_string()))?;
+        let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e.to_string()))?;
         page.warnings.iter().for_each(|w| console_warn(w));
         Ok(page.html)
     }
@@ -250,7 +250,7 @@ mod wasm {
         let c = |i: usize| cols.get(i).map(String::as_str).unwrap_or(["highway", "oneway", "tunnel", "bridge", "edge_id"][i]);
         let lc = roadstyle::export_look::LookCols { highway: c(0), oneway: c(1), tunnel: c(2), bridge: c(3), id: c(4) };
         let ps: Vec<i64> = positions.into_iter().map(i64::from).collect();
-        roadstyle::export_look::export_look(&look.0, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::export_look::export_look(&look.0, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and
@@ -267,7 +267,7 @@ mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: Vec<String>)
                    -> Result<Tiler, JsError> {
-            let (style, tiles, _) = roadstyle::make_tiled(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e))?;
+            let (style, tiles, _) = roadstyle::make_tiled(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
             Ok(Tiler { style, tiles })
         }
 
@@ -325,7 +325,7 @@ mod wasm {
         /// file(name, format, keep): one of stage 1's files ("geojson" or "geoparquet"; the roads' file has their drawing values and
         /// `keep`, the road table every field of each road).
         pub fn file(&self, name: &str, format: &str, keep: Vec<String>) -> Result<Vec<u8>, JsError> {
-            roadstyle::source_file(&self.inner, name, self::format(format)?, &self.inner.drawn(&keep)).map_err(|e| JsError::new(&e))
+            roadstyle::source_file(&self.inner, name, self::format(format)?, &self.inner.drawn(&keep)).map_err(|e| JsError::new(&e.to_string()))
         }
     }
 
@@ -333,7 +333,7 @@ mod wasm {
     #[wasm_bindgen(js_name = makeSources)]
     pub fn make_sources(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
                         -> Result<Sources, JsError> {
-        roadstyle::make_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e))
+        roadstyle::make_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// Roads that a reader of a road file gave (roadstyle-io: a RoadTable, one row for each road): `readGeoJson(bytes)` makes them. `length`
@@ -361,9 +361,9 @@ mod wasm {
 
         /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
         pub fn sources(&self, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Sources, JsError> {
-            let err = |e: String| JsError::new(&e);
+            let err = |e: roadstyle::Error| JsError::new(&e.to_string());
             let features = features.map(roadstyle::read_features).transpose().map_err(err)?;
-            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(String::from).map_err(err)?;
+            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(roadstyle::Error::from).map_err(err)?;
             roadstyle::sources_of(self.0.clone(), &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(err)
         }
     }
@@ -469,7 +469,7 @@ mod wasm {
     /// Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
     #[wasm_bindgen(js_name = tileSources)]
     pub fn tile_sources(sources: &Sources, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
-        let (style, tiles) = roadstyle::tile_made(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e))?;
+        let (style, tiles) = roadstyle::tile_made(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Tiler { style, tiles })
     }
 
@@ -497,7 +497,7 @@ mod wasm {
     #[wasm_bindgen(js_name = tileFiles)]
     pub fn tile_files(files: &FileSet, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
         let read = |n: &str| files.files.get(n).cloned().ok_or_else(|| format!("{n}: not in the files"));
-        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e))?;
+        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Tiler { style: style.to_string(), tiles })
     }
 
