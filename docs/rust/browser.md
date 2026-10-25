@@ -133,8 +133,10 @@ const look = resolveLook(JSON.stringify({args: {state: "live", casing_level_col:
 const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
 ```
 
-`makeRoads(q, catalog, opts)` runs one time for each file. It makes the temporary table `r`: one row for each edge of all modes, with
-its levels. `writeRoads(q, mode)` runs for each mode, and writes only `roads.parquet` from `r`.
+`makeRoads(q, catalog, opts)` runs one time for each file. It makes the run's temporary table (`duckosm_r_<run>`, from `duckosmPlan`'s
+`"run"`): one row for each edge of all modes, with its levels. `writeRoads(q, mode)` runs for each mode, and writes only `roads.parquet`
+from that table. Each reading has its own tables, so two readings at the same time on one connection do not drop or replace each other's
+tables; `writeFeatures` drops its tables when it has written `features.parquet`.
 
 - `mode`: `"all"`, `"driving"`, `"walking"` or `"cycling"`.
 - `opts.levels: "stored"` reads `visualization.edge_levels`, the levels of a solved level area. `makeRoads` returns their
@@ -256,21 +258,29 @@ await init();
 const a = pkg.makeArea(edges, JSON.stringify({id_col: "edge_id"}));
 const store = browserStore("monaco", "Monaco");          // localStorage for the texts, the private file system for roads.parquet
 for (const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
-const editor = await levelEditor({map, container: document.getElementById("panel"), pkg, store});
-editor.addEventListener("solved", (e) => apply(e.detail.levelsCsv, e.detail.draw()));
+const pkgUrl = new URL("roadstyle-wasm/pkg/roadstyle_wasm.js", import.meta.url);   // the package's module, for the editor's worker
+const editor = await levelEditor({map, container: document.getElementById("panel"), pkgUrl, store});
+editor.addEventListener("solved", async (e) => apply(e.detail.levelsCsv, await e.detail.draw()));
 ```
 
-`levelEditor({map, container, pkg, store})` draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
+`levelEditor({map, container, pkgUrl, store})` runs the engine (the solver, the map's sources and its tiles) in a Web Worker
+(`editor/level_worker.js`, which loads the package from `pkgUrl`), so the page does not stop while it works. It draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
 and puts the editor's panel in `container`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
 is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
-then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`; your base map stays), draws its roads
-with your prefix and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
+then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`, by source and source layer; your base
+map stays, also when it shares a tile source with your roads), draws its roads with your prefix and its own sources (`<prefix>lv-roads`,
+apart from yours) and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
 the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel,
 its listeners, its roads, tiles and images, and puts your roads, your road table and your dashboard's style back. Your files stay in
 the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
 in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
-(one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (the map's table,
-GeoParquet). `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The module needs the
+(one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the map's
+table, GeoParquet). `editor.roads` is the area's roads, as the panel shows them. On a phone the panel is a sheet at the bottom of the map:
+`layout` is `"auto"` (a sheet up to 700 px wide, the dashboard panel's width; a column at the right above it), `"sheet"` or `"side"`. The
+sheet's handle folds it to one row and opens it full, a tap on a road picks it, the targets are 44 px, the sheet goes up above the phone's
+keyboard, and it folds when a Street View or Google 3D window opens at the bottom. Give your page `<meta name="viewport"
+content="width=device-width">`, so that a phone lays it out at its own width. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The panel follows the
+page's theme: dark when the system is dark, unless the page sets `data-theme="light"` or `"dark"` on `<html>`. The module needs these
 files of `static/` beside it: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
 
 ## Keep the main thread free

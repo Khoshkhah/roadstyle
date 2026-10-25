@@ -368,16 +368,23 @@ mod wasm {
         }
     }
 
-    /// duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
+    /// duckosmPlan(catalog, mode, tags, specs, only?, run?) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
     /// Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
     /// null, "select": the roads of `mode` ("roads" is null when the file has no network of `mode`: "roads_error" says why), "layers": [{spec, name, sql: the
     /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's
     /// layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and
     /// of its edge_ids (for duckosmSubsetLevels). "level_edges": the edges of the file's level area (duckosm::level_edges_sql), for makeArea.
+    /// `run`: the id of this reading of the file: its tables have their own names (each layer's "table"; "drop" drops them), so two
+    /// readings at the same time on one connection do not meet. With no `run`, a new one; "run" gives it, for the next calls of the same
+    /// reading.
     #[wasm_bindgen(js_name = duckosmPlan)]
-    pub fn duckosm_plan(catalog: &str, mode: &str, tags: bool, specs: &str, only: Option<bool>) -> Result<String, JsError> {
+    pub fn duckosm_plan(catalog: &str, mode: &str, tags: bool, specs: &str, only: Option<bool>, run: Option<String>) -> Result<String, JsError> {
         let only = only.unwrap_or(false);
+        let run = roadstyle::duckosm::Run::new(&run.unwrap_or_else(|| {
+            static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            format!("w{}", N.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+        })).map_err(|e| JsError::new(&e.to_string()))?;
         use roadstyle::duckosm;
         let err = |e: String| JsError::new(&e);
         let c: serde_json::Value = serde_json::from_str(catalog).map_err(|e| err(format!("catalog: {e}")))?;
@@ -390,16 +397,19 @@ mod wasm {
         let cat = duckosm::Catalog { tables: rows("tables").iter().map(|r| (text(&r[0]), text(&r[1]))).collect(),
                                      columns: rows("columns").iter().map(|r| (text(&r[0]), text(&r[1]), text(&r[2]))).collect() };
         let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| err(format!("specs: {e}")))?;
-        let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
-            .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
+        let made = duckosm::features_sql(&cat, &specs);
+        let drop = run.drop_sql(&made.iter().map(|l| l.spec).collect::<Vec<_>>());
+        let layers: Vec<serde_json::Value> = made.into_iter()
+            .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "table": run.feature(l.spec), "sql": l.sql})).collect();
         // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
-        let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode)) {
+        let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode), &run) {
             Ok(r) => (Some(r), None),
             Err(e) => (None, Some(e)),
         };
-        Ok(serde_json::json!({"catalog": queries, "roads": roads, "roads_error": roads_error, "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
-                              "select": duckosm::roads_select(mode).map_err(String::from).map_err(err)?, "layers": layers,
-                              "subset": (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]),
+        Ok(serde_json::json!({"catalog": queries, "run": run.id(), "roads": roads, "roads_error": roads_error,
+                              "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
+                              "select": duckosm::roads_select(mode, &run).map_err(String::from).map_err(err)?, "layers": layers,
+                              "subset": (only && !tags).then(|| [duckosm::subset_sql(&run), duckosm::ids_sql(&run)]), "drop": drop,
                               "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
     }
 
@@ -426,10 +436,12 @@ mod wasm {
         roadstyle::duckosm::subset_levels_keyword(row, missing as i64, example, &ids).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
-    /// duckosmFeaturesSelect(specs: number[]) -> string | undefined: the base map's rows from the tables f<spec> that were made.
+    /// duckosmFeaturesSelect(specs: number[], run: string) -> string | undefined: the base map's rows from the run's tables of the layers
+    /// `specs` that were made.
     #[wasm_bindgen(js_name = duckosmFeaturesSelect)]
-    pub fn duckosm_features_select(specs: Vec<u32>) -> Option<String> {
-        roadstyle::duckosm::features_select(&specs.into_iter().map(|i| i as usize).collect::<Vec<_>>())
+    pub fn duckosm_features_select(specs: Vec<u32>, run: &str) -> Result<Option<String>, JsError> {
+        let run = roadstyle::duckosm::Run::new(run).map_err(|e| JsError::new(&e.to_string()))?;
+        Ok(roadstyle::duckosm::features_select(&specs.into_iter().map(|i| i as usize).collect::<Vec<_>>(), &run))
     }
 
     /// readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as makeSources

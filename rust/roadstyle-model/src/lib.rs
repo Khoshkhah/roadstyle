@@ -10,6 +10,7 @@ pub mod geom;
 pub mod props;
 pub mod table;
 pub mod topology;
+pub mod wkb;
 
 pub use table::{Cell, Lines, RoadTable};
 

@@ -16,9 +16,22 @@ ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "src" / "roadstyle" / "static"
 PKG = STATIC / "level_editor" / "pkg" / "roadstyle_wasm.js"
 EDGES = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "level_area" / "edges.parquet"
-pytestmark = pytest.mark.skipif(not PKG.exists(), reason="no editor wasm package (rust/roadstyle-wasm/build_editor.sh)")
+needs_pkg = pytest.mark.skipif(not PKG.exists(), reason="no editor wasm package (rust/roadstyle-wasm/build_editor.sh)")
 
 
+def test_the_panels_colour_variables_have_values():
+    """Each --lv-* variable that the panel (static/level_editor.html) uses is defined, and no definition is the variable itself (a loop
+    has no value: the segment buttons lost their background so, 2026-10-24)."""
+    import re
+
+    text = (STATIC / "level_editor.html").read_text()
+    defined = dict(re.findall(r"--(lv-[a-z0-9-]+):([^;}]*)", text))
+    used = set(re.findall(r"var\(--(lv-[a-z0-9-]+)\)", text))      # with no fallback (var(--lv-kb,0px): the module sets it)
+    assert used <= set(defined), used - set(defined)
+    assert not [k for k, v in re.findall(r"--(lv-[a-z0-9-]+):([^;}]*)", text) if f"var(--{k})" in v]
+
+
+@needs_pkg
 @pytest.mark.skipif(shutil.which("node") is None, reason="no node")
 def test_make_area_in_the_page_gives_the_folder_forms_files(tmp_path):
     import pyarrow.parquet as pq
@@ -44,7 +57,7 @@ console.log(JSON.stringify([a.roadCount, a.pairCount]));"""
         assert (tmp_path / f).read_bytes() == (folder / f).read_bytes(), f
 
 
-PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8">
+PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="/vendor/maplibre-gl.js"></script><link rel="stylesheet" href="/vendor/maplibre-gl.css">
 <link rel="stylesheet" href="/dashboard/dashboard.css"><link rel="stylesheet" href="/popup.css">
 <style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}</style></head><body><div id="map"></div><div id="panel"></div>
@@ -71,19 +84,26 @@ await map.once("load");
 map.addSource("host-water", {type: "geojson", data: {type: "Feature", properties: {}, geometry: {type: "Polygon",
   coordinates: [[[7.41, 43.72], [7.43, 43.72], [7.43, 43.74], [7.41, 43.74], [7.41, 43.72]]]}}});
 map.addLayer({id: "host-water", type: "fill", source: "host-water", paint: {"fill-color": "#aad3df"}});
+// its roads as vector tiles, in one tile source with its base map (duckosm-rust's page: the base map's layers are other source
+// layers of the roads' source)
 const edges = new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer());
-const own = JSON.parse(pkg.makeStyle(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}}))));
+const hostTiles = pkg.tileSources(pkg.makeSources(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "host"),
+  "hostt://", ["edge_id", "name", "highway"]);
+maplibregl.addProtocol("hostt", async (q) => { const [source, z, x, y] = q.url.slice("hostt://".length).split("/");
+  return {data: hostTiles.tile(source, +z, +x, +y)}; });
+const own = JSON.parse(hostTiles.style());
 for(const [k, v] of Object.entries(own.state || {})) map.setGlobalStateProperty(k, v.default ?? null);     // a live style's state
 for(const [id, im] of Object.entries(own.metadata["roadstyle:images"] || {}))
   map.addImage("host-" + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio});
 for(const [id, src] of Object.entries(own.sources)) map.addSource("host-" + id, src);
 for(const l of own.layers) map.addLayer({...JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"host-oneway"')), id: "host-" + l.id, source: "host-" + l.source});
+map.addLayer({id: "host-land", type: "fill", source: "host-roads", "source-layer": "landuse", paint: {"fill-color": "#eeeeee"}});
 window.hostRoads = own.layers.map(l => "host-" + l.id);
 const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: false});
 window.host = host;
 const panel = document.getElementById("panel");
 if(location.search === "?no-dashboard"){                         // the host's dashboard not given: an error, no second dashboard
-  try { await levelEditor({map, container: panel, pkg, store}); window.ready = "made a second dashboard"; }
+  try { await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store}); window.ready = "made a second dashboard"; }
   catch(e){ window.ready = e.message; }
   throw new Error("stop");
 }
@@ -93,8 +113,8 @@ window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening
 window.before = counts();
 window.solved = [];
 window.openEditor = async () => {
-  const ed = await levelEditor({map, container: panel, pkg, store, dashboard: host, prefix: "host-"});
-  ed.addEventListener("solved", e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: e.detail.draw().length}));
+  const ed = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-"});
+  ed.addEventListener("solved", async e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: (await e.detail.draw()).length}));
   window.editor = ed;
 };
 await window.openEditor();
@@ -127,6 +147,7 @@ class _Files(SimpleHTTPRequestHandler):
         pass
 
 
+@needs_pkg
 def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dashboard():
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
@@ -147,16 +168,20 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             roads = page.evaluate("window.ready")
             assert page.evaluate("window.rs === window.host"), "the editor uses the host's dashboard, not a second one"
             assert page.evaluate("hostMap.getStyle().layers.some(l => l.id.startsWith('host-roads'))"), "the editor's roads with the host's prefix"
-            assert page.evaluate("!!hostMap.getLayer('host-water')"), "the host's base map stays"
+            assert page.evaluate("!!hostMap.getLayer('host-water') && !!hostMap.getLayer('host-land')"), "the host's base map stays"
+            assert page.evaluate("!!hostMap.getSource('host-roads') && !!hostMap.getSource('host-lv-roads')"), "the host's source and the editor's"
             # the host's own roads went (the layers of the roles of its style's roadstyle:sources): every road layer is the editor's
-            assert page.evaluate("hostMap.getStyle().layers.filter(l => l.id.startsWith('host-roads')).every(l => l.source === 'host-roads')")
+            assert page.evaluate("hostMap.getStyle().layers.filter(l => l.id.startsWith('host-roads')).every(l => l.source === 'host-lv-roads')")
             stored = page.evaluate("localStorage.getItem('lv:test-area:levels.csv')")
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1, "the panel is in the host's container"
             # a head's length through the panel's API: solved again, the host hears it, the store has heads.csv
-            road = page.evaluate("JSON.parse(window.editor.area.facts())[0].road")
+            road = page.evaluate("window.editor.roads[0].road")
+            # the engine is in the worker: the page has no LevelArea of its own
+            assert page.evaluate("!!window.editor && !('area' in window.editor)")
             said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'end', m: '7'}]})", road)
             assert said["ok"] and said["redrawn"], said
+            page.wait_for_function("window.solved.length === 1", timeout=30000)
             solved = page.evaluate("window.solved")
             assert len(solved) == 1 and solved[0]["rows"] > roads and solved[0]["draw"] > 0, solved
             assert road in page.evaluate("localStorage.getItem('lv:test-area:heads.csv')")
@@ -168,12 +193,24 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
                 page.evaluate("window.editor.destroy()")
                 assert page.evaluate("counts()") == page.evaluate("window.before"), "no listener of the editor left"
                 assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
-                assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-roads')")
+                assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-lv-roads')")
                 assert page.evaluate("window.rs === window.host && !window.lvApi && !document.body.classList.contains('lv-open')")
                 page.evaluate("window.openEditor()")
                 page.wait_for_function("!!document.getElementById('lv') && !!window.lvApi", timeout=60000)
                 assert page.evaluate("counts()") == opened, "one listener of each kind after each open"
-            assert not errors, errors
+            # a worker that stops (here: its script throws as it loads) rejects the waiting call (worker/call.js), not a call that never settles
+            said = page.evaluate("""async () => { const {caller} = await import('/dashboard/worker/call.js');
+              const w = new Worker(URL.createObjectURL(new Blob(['throw new Error("boom")'], {type: 'text/javascript'})), {type: 'module'});
+              try { await caller(w)({type: 'x'}); return 'settled'; } catch(e){ return e.message; } }""")
+            assert said.startswith("the worker stopped"), said
+            # the panel follows the page's theme: the system's dark, unless the page sets data-theme on <html>
+            bg = "getComputedStyle(document.querySelector('#lv header')).backgroundColor"
+            assert page.evaluate(bg) == "rgb(255, 255, 255)"
+            page.emulate_media(color_scheme="dark")
+            assert page.evaluate(bg) == "rgb(36, 42, 52)"
+            page.evaluate("document.documentElement.dataset.theme = 'light'")
+            assert page.evaluate(bg) == "rgb(255, 255, 255)"
+            assert not [e for e in errors if e != "boom"], errors      # "boom": the stopped worker's own error, which the page reports too
             b.close()
     finally:
         server.shutdown()
@@ -204,3 +241,57 @@ def test_the_level_edges_query_gives_duckosms_load_roads():
             assert all(bytes(a) == b.wkb for a, b in zip(got[c], want.geometry, strict=True))
         else:
             assert [norm(v) for v in got[c]] == [norm(v) for v in want[c]], c
+
+
+@needs_pkg
+def test_the_editor_on_a_phone(tmp_path):
+    """The editor on a phone (390 x 844, device scale 3, touch): the panel is a sheet at the bottom (layout "auto" up to 700 px wide), a tap
+    on a road picks it (the wide tap line), a head's change is solved, the handle folds and opens the sheet, and a dashboard window at the
+    bottom (Street View, Google 3D) folds it."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=3, is_mobile=True, has_touch=True)
+            page = ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html")
+            page.wait_for_function("window.ready && !!document.getElementById('lv')", timeout=60000)
+            assert page.evaluate("document.body.classList.contains('lv-sheet') && document.body.dataset.lvSheet") == "half"
+            top = page.evaluate("document.getElementById('lv').getBoundingClientRect().top")
+            assert 380 < top < 470, top                                           # half the height: the map keeps the top
+            page.wait_for_timeout(1500)                                           # the tiles of the editor's roads
+            # a road under the map's free part, and a tap on it
+            xy = page.evaluate(f"""() => {{ const m = window.hostMap;
+              for(const f of m.queryRenderedFeatures({{layers: ['host-lv-tap']}})){{
+                const c = f.geometry.coordinates, pt = m.project(c[Math.floor(c.length / 2)]);
+                if(pt.x > 40 && pt.x < 350 && pt.y > 120 && pt.y < {top} - 40) return [pt.x, pt.y, f.properties.road]; }} return null; }}""")
+            assert xy, "a road above the sheet"
+            page.touchscreen.tap(xy[0], xy[1])
+            page.wait_for_function("document.querySelectorAll('#lv-cards [data-hroad]').length > 0", timeout=20000)
+            # an end: the start head to 3 m by its slider, then Apply: solved again
+            page.evaluate("""() => { const i = document.querySelector('#lv-cards input[data-hend=start]'); i.value = '3';
+              i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true})); }""")
+            page.locator("#lv-apply").tap()
+            page.wait_for_function("document.getElementById('lv-toast').textContent.startsWith('Applied')", timeout=60000)
+            assert "re-solved" in page.inner_text("#lv-toast") or "solved the whole area" in page.inner_text("#lv-toast")
+            # 44 px targets
+            for sel in ("#lv .tabs button", "#lv-cards .seg button", "#lv .find input"):
+                assert page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().height") >= 44, sel
+            page.screenshot(path=str(tmp_path / "phone.png"))
+            # the handle: half -> full -> fold -> half
+            for want in ("full", "fold", "half"):
+                page.locator("#lv-handle").tap()
+                assert page.evaluate("document.body.dataset.lvSheet") == want
+            page.wait_for_timeout(300)
+            assert page.evaluate("document.getElementById('lv').getBoundingClientRect().top") == pytest.approx(top, abs=2)
+            # a dashboard window at the bottom: the sheet folds
+            page.evaluate("const w = document.createElement('div'); w.className = 'rs-svw'; document.body.appendChild(w);")
+            page.wait_for_function("document.body.dataset.lvSheet === 'fold'", timeout=5000)
+            assert not errors, errors
+            b.close()
+    finally:
+        server.shutdown()

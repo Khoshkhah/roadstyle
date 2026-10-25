@@ -485,7 +485,7 @@ def test_web_pick_survives_missing_layers():
     list to existing layers or every hover/click errors out and nothing is selectable."""
     html = render_edges(_edges(), backend="web", view_3d=True).html
     assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
-    assert "concat(RS_DECK_LAYERS)" in html.split("PICK_LAYERS = style.layers")[1][:220]
+    assert "PICK_LAYERS = O.pick" in html and _opt(html, "pick") == ["roads-simple"]   # the page gives the pick layers (R7)
 
 
 def test_web_camera_max_pitch():

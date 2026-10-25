@@ -77,14 +77,59 @@ pub fn levels_keyword(row: Option<(&str, i64, &str)>) -> Result<Value, Error> {
     Ok(serde_json::json!({"edge_hash": hash, "n_edges": n}))
 }
 
-/// The roads of `r` (after `roads_sql`) that have no stored levels: (their number, the smallest edge_id of them), for a map of one mode.
-pub const SUBSET_SQL: &str = "SELECT count(*), min(edge_id) FROM r WHERE NOT EXISTS (SELECT 1 FROM visualization.edge_levels lv WHERE lv.edge_id = r.edge_id)";
+/// One reading of a file on a connection: its temporary tables have the run's own names, so two readings at the same time on one
+/// connection (a page that draws twice) do not replace or drop each other's tables. `id`: letters, digits and `_` (the caller's, unique
+/// on its connection).
+pub struct Run(String);
 
-/// The edge_ids of the roads of `r`, for `subset_levels_keyword`.
-pub const IDS_SQL: &str = "SELECT edge_id FROM r";
+impl Run {
+    pub fn new(id: &str) -> Result<Run, Error> {
+        if id.is_empty() || id.len() > 40 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+            return Err(Error::Options(format!("run {id:?}: 1 to 40 letters, digits or _")));
+        }
+        Ok(Run(id.to_string()))
+    }
+
+    /// The run's id.
+    pub fn id(&self) -> &str {
+        &self.0
+    }
+
+    fn e(&self) -> String {
+        format!("duckosm_e_{}", self.0)
+    }
+
+    /// The table of every edge of the file, with its stored levels (`roads_sql`).
+    pub fn roads(&self) -> String {
+        format!("duckosm_r_{}", self.0)
+    }
+
+    /// The table of the base-map layer `spec` (the caller makes it from the layer's first query that runs, `features_sql`).
+    pub fn feature(&self, spec: usize) -> String {
+        format!("duckosm_f{spec}_{}", self.0)
+    }
+
+    /// The statement that drops the run's tables, when the caller has read them (`specs`: the base-map layers that it made).
+    pub fn drop_sql(&self, specs: &[usize]) -> String {
+        std::iter::once(self.roads()).chain(specs.iter().map(|&s| self.feature(s)))
+            .map(|t| format!("DROP TABLE IF EXISTS {t};")).collect::<Vec<_>>().join(" ")
+    }
+}
+
+/// The roads of the run's table (after `roads_sql`) that have no stored levels: (their number, the smallest edge_id of them), for a map
+/// of one mode.
+pub fn subset_sql(run: &Run) -> String {
+    let r = run.roads();
+    format!("SELECT count(*), min(edge_id) FROM {r} WHERE NOT EXISTS (SELECT 1 FROM visualization.edge_levels lv WHERE lv.edge_id = {r}.edge_id)")
+}
+
+/// The edge_ids of the roads of the run's table, for `subset_levels_keyword`.
+pub fn ids_sql(run: &Run) -> String {
+    format!("SELECT edge_id FROM {}", run.roads())
+}
 
 /// The look's keyword `levels` of the stored levels for a map of one mode (roadstyle's load_area_levels(subset=True)): the levels were
-/// solved for the roads of every mode together, so each road of the map must have its stored row (`missing`, `example`: `SUBSET_SQL`'s
+/// solved for the roads of every mode together, so each road of the map must have its stored row (`missing`, `example`: `subset_sql`'s
 /// row). Then the keyword names these roads (`ids`: their edge_ids), so that the engine's check of the roads holds for them.
 pub fn subset_levels_keyword(row: Option<(&str, i64, &str)>, missing: i64, example: Option<i64>, ids: &[i64]) -> Result<Value, Error> {
     levels_keyword(row)?;
@@ -99,15 +144,16 @@ const NO_LEVELS: &str = "CAST(NULL AS INTEGER) AS casing_start, CAST(NULL AS INT
     CAST(NULL AS INTEGER) AS fill_level, CAST(NULL AS DOUBLE) AS head_start_m, CAST(NULL AS DOUBLE) AS head_end_m, \
     CAST(NULL AS VARCHAR) AS cap_start, CAST(NULL AS VARCHAR) AS cap_end";
 
-/// The statements that make the temporary table `r` (one row for each edge of every mode, with its stored levels; `tags`: no stored
-/// levels, the engine computes them with the tags rule), in order. Run them one time for each file; then `roads_select` for each mode.
-/// Before the second statement the caller reads `LEVELS_META_SQL` (not with `tags`). `only`: the edges and private_edges of that mode
-/// alone (render_map(only=True): a driving map has no walking paths); then the stored levels are checked with `SUBSET_SQL` and
+/// The statements that make the run's table `run.roads()` (one row for each edge of every mode, with its stored levels; `tags`: no
+/// stored levels, the engine computes them with the tags rule), in order. Run them one time for each file; then `roads_select` for each
+/// mode. Before the second statement the caller reads `LEVELS_META_SQL` (not with `tags`). `only`: the edges and private_edges of that
+/// mode alone (render_map(only=True): a driving map has no walking paths); then the stored levels are checked with `subset_sql` and
 /// `subset_levels_keyword`, and `roads_select` takes that mode.
-pub fn roads_sql(cat: &Catalog, tags: bool, only: Option<&str>) -> Result<[String; 3], String> {
+pub fn roads_sql(cat: &Catalog, tags: bool, only: Option<&str>, run: &Run) -> Result<[String; 3], String> {
     let union = roads_union(cat, only)?;
     let first = |c: &str| format!("first({c} ORDER BY mode IS NULL, mode, pmode)");
-    let e = format!("CREATE OR REPLACE TEMP TABLE e AS
+    let (e_name, r_name) = (run.e(), run.roads());
+    let e = format!("CREATE OR REPLACE TEMP TABLE {e_name} AS
     SELECT edge_id, any_value(source) AS source, any_value(target) AS target,
            {} AS osm_id, {} AS highway, COALESCE({}, '') AS name,
            {} AS bridge, {} AS tunnel, {} AS layer, bool_or(oneway) AS oneway,
@@ -125,19 +171,19 @@ pub fn roads_sql(cat: &Catalog, tags: bool, only: Option<&str>) -> Result<[Strin
     let path = format!("coalesce(highway IN ({}), false)", PATH_CLASSES.iter().map(|c| format!("'{c}'")).collect::<Vec<_>>().join(", "));
     let levels = if tags { NO_LEVELS.to_string() }
                  else { "lv.casing_start, lv.casing_level, lv.casing_end, lv.fill_level, lv.head_start_m, lv.head_end_m, lv.cap_start, lv.cap_end".into() };
-    let r = format!("CREATE OR REPLACE TEMP TABLE r AS
+    let r = format!("CREATE OR REPLACE TEMP TABLE {r_name} AS
     SELECT e.* EXCLUDE (geom), ST_AsWKB(e.geom) AS geometry,
-           NOT driving AND NOT cycling AND NOT {path} AND osm_id IN (SELECT osm_id FROM e WHERE driving OR cycling) AS und,
+           NOT driving AND NOT cycling AND NOT {path} AND osm_id IN (SELECT osm_id FROM {e_name} WHERE driving OR cycling) AS und,
            {path} AS path,
            {levels}
-    FROM e {}", if tags { "" } else { "LEFT JOIN visualization.edge_levels lv ON lv.edge_id = e.edge_id" });
-    Ok([e, r, "DROP TABLE e".into()])
+    FROM {e_name} e {}", if tags { "" } else { "LEFT JOIN visualization.edge_levels lv ON lv.edge_id = e.edge_id" });
+    Ok([e, r, format!("DROP TABLE {e_name}")])
 }
 
-/// The roads of the map of `mode` ("all", or one network) from the table `r` of `roads_sql`, in the order of mapstyle's load_roads (an
+/// The roads of the map of `mode` ("all", or one network) from the run's table of `roads_sql`, in the order of mapstyle's load_roads (an
 /// undirected edge on a street's own directed edge first, then by edge_id), with the columns that render_map adds: `access` (_access),
 /// `is_directed` (_is_directed) and `has_arrows`. A SELECT: the browser writes it as roads.parquet (`COPY (...) TO`).
-pub fn roads_select(mode: &str) -> Result<String, Error> {
+pub fn roads_select(mode: &str, run: &Run) -> Result<String, Error> {
     if mode != "all" && !MODES.contains(&mode) {
         return Err(Error::Options(format!("unknown mode {mode}")));
     }
@@ -147,16 +193,16 @@ pub fn roads_select(mode: &str) -> Result<String, Error> {
     THEN coalesce(access_driving, access_walking, access_cycling) END".into()
     };
     let restricted = "coalesce(access IN ('private', 'bus'), false)";
-    Ok(format!("WITH a AS (SELECT *, {access} AS access FROM r)
+    Ok(format!("WITH a AS (SELECT *, {access} AS access FROM {})
     SELECT a.* EXCLUDE (und, path, access_driving, access_walking, access_cycling),
            (driving OR cycling OR {restricted}) AND NOT path AS is_directed,
            driving OR {restricted} AS has_arrows
-    FROM a ORDER BY NOT und, edge_id"))
+    FROM a ORDER BY NOT und, edge_id", run.roads()))
 }
 
 /// One base-map layer's queries (`features_sql`): the layer's index in layers.yaml, its name, and its SELECTs in order: the first is
 /// mapstyle's query; the next one is mapstyle's fallback (a file with no `tags` column: no height tags, the height of the kind). The
-/// caller makes `f<spec>` from the first that runs (`CREATE OR REPLACE TEMP TABLE f<spec> AS <select>`), says so when it is not the
+/// caller makes `run.feature(spec)` from the first that runs (`CREATE OR REPLACE TEMP TABLE <it> AS <select>`), says so when it is not the
 /// first, and skips the layer when none runs, as load_layers does. The background is the whole boundary here: `cut_sea` makes its land.
 pub struct LayerSql {
     pub spec: usize,
@@ -196,10 +242,11 @@ pub fn features_sql(cat: &Catalog, specs: &[Value]) -> Vec<LayerSql> {
     out
 }
 
-/// The base map's rows from the tables `f<spec>` that the caller made (`specs`: the spec numbers of those tables), in load_layers'
+/// The base map's rows from the run's tables `run.feature(spec)` that the caller made (`specs`: the spec numbers of those tables), in load_layers'
 /// order: the layers in layers.yaml's order, each table in its rowid order. A SELECT: the browser writes it as features.parquet.
-pub fn features_select(specs: &[usize]) -> Option<String> {
-    (!specs.is_empty()).then(|| format!("{} ORDER BY spec, rid", specs.iter().map(|i| format!("SELECT * FROM f{i}")).collect::<Vec<_>>().join(" UNION ALL ")))
+pub fn features_select(specs: &[usize], run: &Run) -> Option<String> {
+    (!specs.is_empty()).then(|| format!("{} ORDER BY spec, rid",
+                                        specs.iter().map(|&i| format!("SELECT * FROM {}", run.feature(i))).collect::<Vec<_>>().join(" UNION ALL ")))
 }
 
 /// The background of the base map's rows (`features_select`: the layer `landcover`, kind `background`, the whole boundary) as the land:
@@ -301,6 +348,17 @@ mod tests {
 
     fn square(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<Vec<Vec<[f64; 2]>>> {
         vec![vec![vec![[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]]
+    }
+
+    #[test]
+    fn a_runs_tables_have_its_own_names() {
+        let run = Run::new("w7").unwrap();
+        assert_eq!((run.roads(), run.feature(3)), ("duckosm_r_w7".to_string(), "duckosm_f3_w7".to_string()));
+        assert_eq!(run.drop_sql(&[3]), "DROP TABLE IF EXISTS duckosm_r_w7; DROP TABLE IF EXISTS duckosm_f3_w7;");
+        assert!(roads_select("all", &run).unwrap().contains("FROM duckosm_r_w7"));
+        for bad in ["", "a b", "x;DROP", &"a".repeat(41)] {
+            assert!(Run::new(bad).is_err(), "{bad:?}");
+        }
     }
 
     #[test]

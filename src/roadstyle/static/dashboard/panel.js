@@ -56,7 +56,7 @@ export function initPanelTab(){
       d.appendChild(b); return d;
     }, onRemove(){}});
   }
-  if(_hostEl){ let on=innerWidth>700; try{ const v=localStorage.getItem(_hostKey); if(v!=null) on=v==="1"; }catch(e){} if(!on) rsPanelShow(false); }   // remembered per page; a narrow screen starts closed
+  if(_hostEl){ let on=!_narrow(); try{ const v=localStorage.getItem(_hostKey); if(v!=null) on=v==="1"; }catch(e){} if(!on) rsPanelShow(false); }   // remembered per page; a narrow screen starts closed
 }
 export function rsInfoClear(){ if(_sideBd) _sideBd.innerHTML='<div class="rs-empty">Click a road to see its full record here.</div>'; }
 export function rsInfoShow(html){ if(_sideBd) _sideBd.innerHTML=html; }
@@ -65,7 +65,11 @@ export function rsInfoShow(html){ if(_sideBd) _sideBd.innerHTML=html; }
 // (folded: true or false, the start; null: it does not fold); a checkbox row (o: id, cls, rule: the first row of a group, ruled off;
 // sw: a swatch of this colour, swCls its class)
 export const _el = (tag, cls) => { const e = document.createElement(tag); if(cls) e.className = cls; return e; };
+// a phone (a screen 700 px wide or less): the side panel starts closed and each box (Roads, Layers, Legend) folded, so that they do
+// not cover the map; a tap on a box's title opens it
+export const _narrow = () => innerWidth <= 700;
 export function _box(cls, pre, title, folded){
+  if(_narrow()) folded = true;
   const box = _el("div", cls), hd = _el("div", pre+"-hd"), body = _el("div", pre+"-body");
   const set = c => { box.classList.toggle("collapsed", c); hd.textContent = title+" "+(c ? "▸" : "▾"); };
   if(folded == null) hd.textContent = title; else { set(folded); hd.onclick = () => set(!box.classList.contains("collapsed")); }

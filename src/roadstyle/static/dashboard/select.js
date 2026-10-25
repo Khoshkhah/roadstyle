@@ -1,6 +1,6 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, RS_DECK_LAYERS, OVERLAYS, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
+import {map, style, O, RS_PREFIX, RS_LEAN, OVERLAYS, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot} from "./svspot.js";
@@ -30,7 +30,7 @@ export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); i
   let l = map.queryRenderedFeatures([p.x, p.y], q);
   if(!l.length) l = map.queryRenderedFeatures(box(p), q);
   return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && l[0].layer.id===RS_LEAN ? _roadOfPiece(l[0]) : l[0]; }
-export function srcOf(f){ return f && f.layer && f.layer.id.indexOf(RS_PREFIX+"roads-bridge-decks")===0 ? "decks" : "roads"; }
+export function srcOf(f){ return f && f.layer && _role(f.layer)==="decks" ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // road table's row behind the feature id; decks keep the feature's own properties
 function _pickProps(f){ const t=_side();
@@ -123,8 +123,7 @@ let _sel=null;
 export function useSelect(){
   if(_tip) _tip.remove();
   _sel=null; _hov=null; _cur=null;
-  PICK_LAYERS = style.layers.filter(l=>l.source!=="halves").map(l=>RS_PREFIX+l.id)
-    .filter(id=>(RS_LEAN ? id===RS_LEAN : /^roads-(low-|high-|bridge-)?fill/.test(id.slice(RS_PREFIX.length))) || ITEM_LAYERS.has(id)).concat(RS_DECK_LAYERS);
+  PICK_LAYERS = O.pick.map(id=>RS_PREFIX+id).concat([...ITEM_LAYERS]);
   _roadPopup = O.road_popup !== false; _popupFields = Array.isArray(O.road_popup) ? O.road_popup : null;
   _ttip = O.road_tooltip; _ttipOnly = Array.isArray(_ttip) ? _ttip : null; _TIP_DELAY = O.hover_delay_ms;
   _tip = _ttip ? new maplibregl.Popup(
