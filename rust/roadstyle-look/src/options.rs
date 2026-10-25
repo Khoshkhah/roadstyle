@@ -88,8 +88,11 @@ pub struct LevelColumns {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Levels {
-    /// the engine solves them (compute_levels(method="solve"))
+    /// the given columns, else the input's contract columns casing_level / fill_level (duckOSM's stored levels), else solved
+    /// (docs/reference/contract.md, "The drawing positions"; duckosm.read(levels="auto"))
     #[default]
+    Auto,
+    /// the engine solves them (compute_levels(method="solve")), whatever the input has
     Solve,
     /// the engine computes them with the tags rule
     Tags,
@@ -497,7 +500,7 @@ impl MapOptions {
             (Some(Value::String(s)), _) if s == "tags" || s == "solve" => json!(s),
             (Some(other), _) => return Err(Error::Options(format!("levels: {{edge_hash, n_edges}}, \"tags\" or \"solve\", not {other}"))),
             (None, Some(c)) if c.get("casing_level").is_some() || c.get("fill_level").is_some() => json!("given"),
-            (None, _) => json!("solve"),
+            (None, _) => json!("auto"),
         };
         out.insert("levels".into(), levels);
         match a.get("minzoom") {
@@ -685,7 +688,7 @@ mod tests {
         let m = MapOptions::from_json("{}").unwrap();
         assert_eq!(m, MapOptions::default());
         assert_eq!((m.columns.class.as_str(), m.roads.fill, m.labels.on, m.arrows.on), ("highway", true, true, true));
-        assert_eq!((&m.levels, &m.roads.minzoom, &m.interaction.popup, m.output.state), (&Levels::Solve, &ClassMinzoom::Profile, &Popup::Default, State::Static));
+        assert_eq!((&m.levels, &m.roads.minzoom, &m.interaction.popup, m.output.state), (&Levels::Auto, &ClassMinzoom::Profile, &Popup::Default, State::Static));
         // the JSON form reads back as the same options
         assert_eq!(MapOptions::from_json(&serde_json::to_string(&m).unwrap()).unwrap(), m);
     }
@@ -718,7 +721,8 @@ mod tests {
         assert_eq!((ov.kind, ov.edge.as_ref().map(|e| e.column.as_str()), ov.visible, ov.popup_window), (Some(OverlayKind::Line), Some("eid"), false, true));
         assert_eq!(m.base_map.as_ref().unwrap().modes, ["driving"]);
         // no level columns and no `levels`: solved; the columns alone: given; minzoom False: off
-        assert_eq!(MapOptions::from_args(&json!({})).unwrap().0.levels, Levels::Solve);
+        assert_eq!(MapOptions::from_args(&json!({})).unwrap().0.levels, Levels::Auto);
+        assert_eq!(MapOptions::from_args(&json!({"levels": "solve"})).unwrap().0.levels, Levels::Solve);
         assert_eq!(MapOptions::from_args(&json!({"fill_level_col": "f"})).unwrap().0.levels, Levels::Given);
         assert_eq!(MapOptions::from_args(&json!({"minzoom": false})).unwrap().0.roads.minzoom, ClassMinzoom::Off);
         assert_eq!(MapOptions::from_args(&json!({"levels": "tags"})).unwrap().0.levels, Levels::Tags);
