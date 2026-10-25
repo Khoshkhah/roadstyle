@@ -1,5 +1,7 @@
 # The Python shape that is still in the Rust side
 
+The appendix of [the target architecture](target_architecture.md).
+
 A read-only list (2026-10-24, at `d065db9`: rust-engine `efc7912` with D3, N29, D9 and the Rust-made goldens) for the target
 architecture document. The rule of 2026-10-24 is that the Rust API is the design and Python is a thin binding (rust_library.md, the
 decisions). Each kind below is Python's design that the Rust side still copies. The counts are of the code in `rust/*/src/`, not of
