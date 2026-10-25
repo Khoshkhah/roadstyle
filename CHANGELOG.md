@@ -222,6 +222,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   roads do not have is an error** (`roadstyle_model::Error::MissingColumn`, with the nearest column names, for example `highway_col: the
   roads have no column fclas (the nearest: fclass, class)`); before, the keyword was not used, and the engine read the column of the
   contract name (`highway`) when the roads had one. The outputs do not change (the goldens are equal).
+- **The Rust engine's errors have Python classes** (docs/design/t4_python_binding.md): `roadstyle.DataError`, `OptionsError`,
+  `LevelsError`, `FileError` and `UnsupportedError`, each a `ValueError` (code that catches `ValueError` keeps working). The class says
+  what to do: correct the data, the call, the edits, the file, or use another engine. The message is the engine's text.
+- **The binding's `Look` has one getter for each part** (`map()`, `sections()`, `palette()`, `settings()`, `features()`, `other()`,
+  `base_map_page()`) in place of `part(key)`. **`make_area` takes its options as one JSON text** (`MakeOptions::from_json`, the same
+  parse as the wasm `makeArea`); an option that is not one is an `OptionsError`, and the wasm `makeArea` gives an error for it too
+  (before, it was not used).
 - **One fixture, three languages, one hash** (docs/design/target_architecture.md, (i) item 6): the wasm package in Node
   (`rust/roadstyle-wasm/cross_language.mjs`) gives Monaco's style and road table with the size and hash of the native golden
   (`monaco/rust_style.json`), as the Python binding does (`tests/test_binding.py`). CI runs it in the Rust job on the dist build that

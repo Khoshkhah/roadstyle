@@ -84,6 +84,7 @@ def make_area(edges, folder, db=None, engine=None, **level_input_kw):
             print(f"{', '.join(got)}: written from {db} (visualization.level_*)", flush=True)
     from . import _engine
     if _engine.engine(engine) == "rust":                 # ``engine``: "python" or "rust" (ROADSTYLE_ENGINE): roadstyle::level_area in Rust
+        import json
         import warnings
 
         kw = {k: v for k, v in level_input_kw.items() if v is not None or k in ("band_col", "order")}
@@ -93,7 +94,7 @@ def make_area(edges, folder, db=None, engine=None, **level_input_kw):
             raise ValueError("engine='rust': make_area reads the folder's heads.csv; heads= is in the Python engine only")
         if edges.crs is not None and edges.crs.to_epsg() != 4326:      # Rust reads longitude and latitude
             edges = edges.to_crs(4326)
-        _, _, said = _engine.rust().make_area(_engine._arrow(edges), str(folder), **kw)
+        _, _, said = _engine.rust().make_area(_engine._arrow(edges), str(folder), json.dumps(kw))
         for w in said:
             warnings.warn(w, stacklevel=2)
         roads, pairs = read_roads(folder), pd.read_csv(folder / "pairs.csv", dtype=str, keep_default_na=False)

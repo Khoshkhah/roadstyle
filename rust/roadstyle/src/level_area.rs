@@ -11,7 +11,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 /// The keywords of roadstyle's make_area / level_input.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct MakeOptions {
     /// The edges' id column (`id_col`, default edge_id; the row number when the edges have none).
     pub id_col: String,
@@ -27,6 +28,26 @@ pub struct MakeOptions {
     pub band_dist: f64,
     pub head_m: f64,
     pub near_rules: bool,
+}
+
+impl MakeOptions {
+    /// The options from the JSON text of their keys, as the bindings give them: each key optional (its default), `order` null or "none"
+    /// for no order; a key that is not an option is an error. `heads` (the heads.csv text of the in-memory form, `make_files`) is read
+    /// apart and given back ("" when the text has none); the folder form reads the folder's heads.csv.
+    pub fn from_json(text: &str) -> Result<(MakeOptions, String), crate::Error> {
+        let err = |e: serde_json::Error| crate::Error::Options(format!("the level area's options: {e}"));
+        let mut v: serde_json::Map<String, Value> = serde_json::from_str(text).map_err(err)?;
+        let heads = match v.remove("heads") {
+            None | Some(Value::Null) => String::new(),
+            Some(Value::String(s)) => s,
+            Some(_) => return Err(crate::Error::Options("the level area's options: heads is the heads.csv text".into())),
+        };
+        let mut o: MakeOptions = serde_json::from_value(Value::Object(v)).map_err(err)?;
+        if o.order.as_deref() == Some("none") {
+            o.order = None;
+        }
+        Ok((o, heads))
+    }
 }
 
 impl Default for MakeOptions {

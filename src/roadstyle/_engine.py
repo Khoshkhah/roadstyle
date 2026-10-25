@@ -78,8 +78,8 @@ def _arrow(edges):
 
 def look(*, palette=None, profile=None, settings=None, args=None, features=None):
     """The resolved look of render_edges' palette, profile and settings, made by the Rust engine: a ``Look`` handle (roadstyle-look),
-    parsed one time; ``.json()`` gives its text, ``.part("sections")`` the JSON text of one part (map, sections, palette, settings,
-    features, other, base_map_page)."""
+    parsed one time; ``.json()`` gives its text, and one getter for each part its JSON text: ``.map()``, ``.sections()``, ``.palette()``
+    (the name), ``.settings()``, ``.features()``, ``.other()`` and ``.base_map_page()``."""
     return rust().resolve_look(json.dumps(_look_options(palette, profile, settings, args, features)))
 
 
@@ -188,7 +188,7 @@ def _look_and_options(kwargs):
     o = _look_options(palette, profile, given, kwargs, features)
     lk = rust().resolve_look(json.dumps(o))
     # the tunnel look is checked by the look (the texts of render_web._tun_settings)
-    sec = json.loads(lk.part("sections"))
+    sec = json.loads(lk.sections())
     if sec["roads"]["twin_casing"] not in ("one", "each"):
         raise ValueError(f'twin_casing must be "one" or "each", got {sec["roads"]["twin_casing"]!r}')
     if overlays:
@@ -441,7 +441,7 @@ def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=
         resolved = [dataclasses.asdict(get_basemap(k, api_key=a["api_key"])) for k in keys]
     finally:
         _use(*prev)
-    page = json.loads(lk.part("other")) if lk is not None else {}
+    page = json.loads(lk.other()) if lk is not None else {}
     page.update({k: v for k, v in (args or {}).items() if k in ("name", "road_popup")})
     return {**page, "resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
 

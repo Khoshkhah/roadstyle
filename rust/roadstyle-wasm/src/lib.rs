@@ -144,22 +144,12 @@ mod wasm {
     /// a page with no server: `edges` is GeoParquet of the area's edges (the line in `geometry`, longitude and latitude; a duckOSM file's:
     /// duckosmPlan's "level_edges"); `options` the JSON text of {"id_col", "highway_col", "layer_col", "bridge_col", "tunnel_col",
     /// "junction_col", "band_col", "order" ("priority", "class", a column, or null), "band_dist", "head_m", "near_rules", "heads" (heads.csv
-    /// text)}, each optional (make_area's defaults).
+    /// text)}, each optional (make_area's defaults; MakeOptions::from_json); another key is an error.
     #[wasm_bindgen(js_name = makeArea)]
     pub fn make_area(edges: Vec<u8>, options: Option<String>) -> Result<AreaFiles, JsError> {
-        let o: serde_json::Value = serde_json::from_str(options.as_deref().unwrap_or("{}")).map_err(|e| JsError::new(&format!("options: {e}")))?;
-        let d = roadstyle::level_area::MakeOptions::default();
-        let text = |k: &str, d: String| o[k].as_str().map_or(d, String::from);
-        let num = |k: &str, d: f64| o[k].as_f64().unwrap_or(d);
-        let m = roadstyle::level_area::MakeOptions {
-            id_col: text("id_col", d.id_col), highway_col: text("highway_col", d.highway_col), layer_col: text("layer_col", d.layer_col),
-            bridge_col: text("bridge_col", d.bridge_col), tunnel_col: text("tunnel_col", d.tunnel_col), junction_col: text("junction_col", d.junction_col),
-            band_col: o["band_col"].as_str().map(String::from),
-            order: if o.get("order").is_some() { o["order"].as_str().filter(|v| *v != "none").map(String::from) } else { d.order },
-            band_dist: num("band_dist", d.band_dist), head_m: num("head_m", d.head_m), near_rules: o["near_rules"].as_bool().unwrap_or(d.near_rules),
-        };
+        let (m, heads) = roadstyle::level_area::MakeOptions::from_json(options.as_deref().unwrap_or("{}")).map_err(|e| JsError::new(&e.to_string()))?;
         let table = roadstyle::read::read_roads(edges, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
-        roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e.to_string()))
+        roadstyle::level_area::make_files(&table, &m, &heads).map(AreaFiles).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// A level area's files (makeArea): `roads` (roads.parquet's bytes, for new LevelArea), `pairs` and `edits` (pairs.csv and an empty

@@ -37,6 +37,7 @@ from .emit import (
     to_iframe,
     to_spec,
 )
+from .errors import DataError, FileError, LevelsError, OptionsError, UnsupportedError
 from .export import export_geojson, export_inline, export_look, export_style, tile_geojson
 from .filters import filter_edges, highway_types
 from .legend import make_legend
@@ -134,6 +135,7 @@ except Exception:                                    # running from a bare sourc
     __version__ = "0+unknown"
 
 __all__ = [
+    "DataError", "OptionsError", "LevelsError", "FileError", "UnsupportedError",
     "export_inline",
     "export_look",
     "export_style",
