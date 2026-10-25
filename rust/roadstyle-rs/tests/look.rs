@@ -8,10 +8,10 @@ mod common;
 
 use serde_json::{json, Value};
 
-/// The views of version 1 of the look of `options` (makeLook's options): the goldens are a summary of them, so a look of version 2 has the
+/// The resolution's look of version 1 of `options` (makeLook's options): the goldens are a summary of it, so a look of version 2 has the
 /// same goldens as before (T3 step 2).
 fn views(options: &Value) -> Result<Value, roadstyle_rs::look::Error> {
-    Ok(roadstyle_rs::Look::resolve(&roadstyle_rs::look::Options::from_value(options)?)?.views_value())
+    roadstyle_rs::Look::resolution_value(&roadstyle_rs::look::Options::from_value(options)?)
 }
 
 /// A look as a golden sees it: the hash of each part, and of the whole look.
@@ -50,27 +50,18 @@ fn the_looks_are_their_goldens() {
     common::golden("rust_looks.json", &Value::Array(got));
 }
 
-/// The views of a look as version 0: without their `schema_version`.
-fn v0(mut look: Value) -> Value {
-    assert_eq!(look["schema_version"], 1, "the views are version 1's form");
-    look.as_object_mut().unwrap().shift_remove("schema_version");
-    look
-}
-
 #[test]
 fn a_saved_look_of_version_0_1_and_2() {
     let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json");
     let text = std::fs::read_to_string(p).unwrap();
     let old = roadstyle_rs::Look::from_json(&text).unwrap();           // version 0: 0.25.0's look.json
-    let v1 = roadstyle_rs::Look::from_value(old.views_value()).unwrap(); // version 1: the views as a look of version 1 was written
+    let v1 = roadstyle_rs::Look::from_json(&text.replacen('{', r#"{"schema_version": 1, "#, 1)).unwrap(); // version 1: the same with its version
     let new = roadstyle_rs::Look::from_json(&old.to_json()).unwrap();  // version 2, written and read again
     assert_eq!(old.to_value()["schema_version"], 2);
     assert_eq!(new.to_json(), old.to_json());
     assert_eq!(v1.to_json(), old.to_json());
-    // the views of each version are the saved look, byte for byte
-    for l in [&old, &v1, &new] {
-        assert_eq!(v0(l.views_value()).to_string(), serde_json::from_str::<Value>(&text).unwrap().to_string());
-    }
+    // version 2 has the map options in place of render_edges' keywords, and no page key
+    assert!(old.to_value().get("args").is_none() && old.to_value()["map"].is_object());
     let later = text.replacen('{', r#"{"schema_version": 3, "#, 1);
     let e = roadstyle_rs::Look::from_json(&later).unwrap_err();
     assert_eq!(e, roadstyle_rs::look::Error::Version { found: 3 });

@@ -628,7 +628,6 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
 
     let lay = json!({"line-cap": s.roads.cap, "line-join": s.roads.join, "line-sort-key": 0});
     // render's width_m_col: metre widths from width_m_zoom on (docs/design/metre_widths.md)
-    let args = &look.args;
     // state "live" (a page with the dashboard): the expressions keep ["global-state", name]; else the export's style, the state baked
     let mo = &look.map;
     let live = mo.output.state == roadstyle_look::options::State::Live;
@@ -652,7 +651,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let soff = if items.is_empty() { off.clone() } else { by_feature(&[(is_it.clone(), metre_curve(&exp2(&off), Mark::ItemOffsetM.name()))], &exp2(&off)) };
     // audit N2: the pieces draw and pick, and the road table has the fields and the lines; only an export (an app with no road table)
     // keeps the roads, with their pick and highlight layers, for its clicks
-    let export = args["export"] == true;
+    let export = crate::export(look);
 
     // roads-simple and the invisible roads-fill (simple mode)
     let mz = class_minzoom(look);

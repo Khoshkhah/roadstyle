@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "LookFile",
-  "description": "A look as it is written, version 2: the typed sections, with the map options as render_edges' keywords (`args`, until N32 step 2). Its\nJSON is one mapping: these four keys and the sections' keys.",
+  "description": "A look as it is written, version 2: the typed sections and the typed map options. It has no page key: a look file is the style. Its\nJSON is one mapping: these four keys and the sections' keys.",
   "type": "object",
   "properties": {
     "schema_version": {
@@ -17,8 +17,9 @@
     "settings": {
       "description": "the settings sources as given (a mapping, a list of them, or null)"
     },
-    "args": {
-      "description": "the map options: render_edges' keywords"
+    "map": {
+      "description": "the map options",
+      "$ref": "#/$defs/MapOptions"
     },
     "roads": {
       "$ref": "#/$defs/RoadsLook"
@@ -99,7 +100,7 @@
     "schema_version",
     "palette",
     "settings",
-    "args",
+    "map",
     "roads",
     "casing",
     "labels",
@@ -120,6 +121,1289 @@
     "interaction"
   ],
   "$defs": {
+    "MapOptions": {
+      "description": "The map options. Each group has its default; a value that the profile gives is an `Option`: `None` is the profile's value.",
+      "type": "object",
+      "properties": {
+        "columns": {
+          "$ref": "#/$defs/Columns",
+          "default": {
+            "class": "highway",
+            "tunnel": null,
+            "bridge": null,
+            "layer": null,
+            "edge_id": null,
+            "directed": null,
+            "driving": null,
+            "access": null,
+            "filter": null,
+            "width_m": null,
+            "cap": null,
+            "levels": null
+          }
+        },
+        "levels": {
+          "$ref": "#/$defs/Levels",
+          "default": "auto"
+        },
+        "color": {
+          "description": "the data colours",
+          "$ref": "#/$defs/DataColor",
+          "default": {
+            "by": null,
+            "colors": null,
+            "cmap": null,
+            "vmin": null,
+            "vmax": null,
+            "missing": "base",
+            "style": null,
+            "table": null,
+            "options": [],
+            "active": null
+          }
+        },
+        "width": {
+          "$ref": "#/$defs/Width",
+          "default": {
+            "by": null,
+            "range": null,
+            "m_zoom": null
+          }
+        },
+        "roads": {
+          "$ref": "#/$defs/Roads",
+          "default": {
+            "fill": true,
+            "head_m": null,
+            "casing_m": null,
+            "casing_min_px": null,
+            "offset_frac": null,
+            "width_frac": null,
+            "offset_zoom": null,
+            "minzoom": "profile"
+          }
+        },
+        "interaction": {
+          "$ref": "#/$defs/Interaction",
+          "default": {
+            "popup": "default",
+            "tooltip": null,
+            "hover_color": null,
+            "select_color": null
+          }
+        },
+        "labels": {
+          "$ref": "#/$defs/Labels",
+          "default": {
+            "on": true
+          }
+        },
+        "arrows": {
+          "$ref": "#/$defs/Arrows",
+          "default": {
+            "on": true
+          }
+        },
+        "tunnels": {
+          "$ref": "#/$defs/Tunnels",
+          "default": {
+            "control": false
+          }
+        },
+        "bridges": {
+          "$ref": "#/$defs/Bridges",
+          "default": {
+            "decks_3d": false
+          }
+        },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Overlay"
+          },
+          "default": []
+        },
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Items"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "boundary": {
+          "description": "GeoJSON: a geometry, a Feature or a FeatureCollection"
+        },
+        "base_map": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaseMapOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output": {
+          "$ref": "#/$defs/Output",
+          "default": {
+            "name": null,
+            "state": "static",
+            "live_data": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Columns": {
+      "description": "The columns of the roads that the engine reads, by their names in the caller's table (the engine's own name when none is given).",
+      "type": "object",
+      "properties": {
+        "class": {
+          "description": "the road class (OSM's `highway`)",
+          "type": "string",
+          "default": "highway"
+        },
+        "tunnel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "bridge": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "layer": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "edge_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "directed": {
+          "description": "a two-way road as one edge (true) or as two",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "driving": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "access": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "filter": {
+          "description": "the column that the filter panel lists, when it is not the class",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "width_m": {
+          "description": "each road's width in metres",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "cap": {
+          "description": "the cap of each road's ends",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "levels": {
+          "description": "the drawing positions, when the caller gives them (`Levels::Given` or `Levels::Stored`)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LevelColumns"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "LevelColumns": {
+      "description": "The columns of the drawing positions (compute_levels' output columns).",
+      "type": "object",
+      "properties": {
+        "casing_start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "casing_level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "casing_end": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "fill_level": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "head_start_m": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "head_end_m": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "cap_start": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "cap_end": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "Levels": {
+      "description": "Where the drawing positions come from.",
+      "oneOf": [
+        {
+          "description": "the given columns, else the input's contract columns casing_level / fill_level (duckOSM's stored levels), else solved\n(docs/reference/contract.md, \"The drawing positions\"; duckosm.read(levels=\"auto\"))",
+          "type": "string",
+          "const": "auto"
+        },
+        {
+          "description": "the engine solves them (compute_levels(method=\"solve\")), whatever the input has",
+          "type": "string",
+          "const": "solve"
+        },
+        {
+          "description": "the engine computes them with the tags rule",
+          "type": "string",
+          "const": "tags"
+        },
+        {
+          "description": "a duckOSM file's stored levels (`columns.levels`), solved for these edges: the engine checks that the edges are the same",
+          "type": "object",
+          "properties": {
+            "stored": {
+              "type": "object",
+              "properties": {
+                "edge_hash": {
+                  "type": "string"
+                },
+                "n_edges": {
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "edge_hash",
+                "n_edges"
+              ]
+            }
+          },
+          "required": [
+            "stored"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "the caller's columns (`columns.levels`)",
+          "type": "string",
+          "const": "given"
+        }
+      ]
+    },
+    "DataColor": {
+      "description": "The colours of a map coloured by data (render_edges' data styler, colour table and colour options).",
+      "type": "object",
+      "properties": {
+        "by": {
+          "description": "the column that gives each road its colour",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "colors": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Colors"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cmap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cmap"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "vmin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "vmax": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "missing": {
+          "$ref": "#/$defs/Missing",
+          "default": "base"
+        },
+        "style": {
+          "description": "a styler object (render_edges' `style`), as its JSON",
+          "default": null
+        },
+        "table": {
+          "description": "a colour for each road, by the value of a column",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorTable"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "options": {
+          "description": "the \"Colour by\" menu: one colouring for each option",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ColorOption"
+          },
+          "default": []
+        },
+        "active": {
+          "description": "the option shown first: its number or its name",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Active"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "Colors": {
+      "description": "Categorical colours: a colour for each value, or `\"self\"` (the value is the colour).",
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": true
+        },
+        {
+          "$ref": "#/$defs/Itself"
+        }
+      ]
+    },
+    "Itself": {
+      "description": "The text `\"self\"`.",
+      "type": "string",
+      "enum": [
+        "self"
+      ]
+    },
+    "Cmap": {
+      "description": "A numeric ramp: a colour map's name, or a list of colours.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Color"
+          }
+        }
+      ]
+    },
+    "Color": {
+      "description": "\"#rrggbb\", \"#rgb\", a CSS colour name, or rgb(...), rgba(...), hsl(...), hsla(...)",
+      "type": "string"
+    },
+    "Missing": {
+      "description": "In a colour option: a road with no value keeps the first option's fill (`base`) or takes the no-data colour (`self`).",
+      "type": "string",
+      "enum": [
+        "base",
+        "self"
+      ]
+    },
+    "ColorTable": {
+      "description": "A colour for each road: `colors` by the value of the column `key`.",
+      "type": "object",
+      "properties": {
+        "colors": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "key": {
+          "type": "string",
+          "default": "edge_id"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "colors"
+      ]
+    },
+    "ColorOption": {
+      "description": "One option of the \"Colour by\" menu: the keys of a data styler, all optional (none: the class style).",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "default": ""
+        },
+        "by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "colors": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Colors"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cmap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Cmap"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "vmin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "vmax": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "width": {
+          "description": "the width follows the value: (min, max) in px",
+          "type": [
+            "array",
+            "null"
+          ],
+          "prefixItems": [
+            {
+              "type": "number",
+              "format": "double"
+            },
+            {
+              "type": "number",
+              "format": "double"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "default": null
+        },
+        "missing": {
+          "$ref": "#/$defs/Missing",
+          "default": "base"
+        },
+        "palette": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "style": {
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "Active": {
+      "description": "An option of the \"Colour by\" menu: its number or its name.",
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "Width": {
+      "description": "The width of a road by data.",
+      "type": "object",
+      "properties": {
+        "by": {
+          "description": "the column of the value (the data styler's column, when it is not given)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "range": {
+          "description": "(min, max) in px",
+          "type": [
+            "array",
+            "null"
+          ],
+          "prefixItems": [
+            {
+              "type": "number",
+              "format": "double"
+            },
+            {
+              "type": "number",
+              "format": "double"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "default": null
+        },
+        "m_zoom": {
+          "description": "roads in metres: the zoom where a metre width is the class width",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "Roads": {
+      "description": "The drawing of the roads.",
+      "type": "object",
+      "properties": {
+        "fill": {
+          "description": "false: the casing of each road, not its fill (the fill layers stay, for the clicks)",
+          "type": "boolean",
+          "default": true
+        },
+        "head_m": {
+          "description": "the length of a road's head in metres",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "casing_m": {
+          "description": "roads in metres: the casing in metres",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "casing_min_px": {
+          "description": "roads in metres: a casing is never thinner than this many pixels each side",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "offset_frac": {
+          "description": "two-way roads: each direction this part of the road width aside",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "width_frac": {
+          "description": "two-way roads: each direction this part of the road width",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "offset_zoom": {
+          "description": "two-way roads: the zoom where the two directions separate",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "minzoom": {
+          "description": "the first zoom of each class",
+          "$ref": "#/$defs/ClassMinzoom",
+          "default": "profile"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ClassMinzoom": {
+      "description": "The first zoom of each class: the profile's table, none (every class at every zoom), or the profile's table with these changes.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "profile",
+            "off"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "table": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "table"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Interaction": {
+      "description": "The clicks and the hover of the roads.",
+      "type": "object",
+      "properties": {
+        "popup": {
+          "$ref": "#/$defs/Popup",
+          "default": "default"
+        },
+        "tooltip": {
+          "description": "none: no tooltip",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Tooltip"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "hover_color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "select_color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "Popup": {
+      "description": "The road popup.",
+      "oneOf": [
+        {
+          "description": "the look's fields",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "these columns",
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "fields"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "description": "every column",
+          "type": "string",
+          "const": "all"
+        },
+        {
+          "description": "the look's fields, in the docked panel",
+          "type": "string",
+          "const": "panel"
+        },
+        {
+          "description": "no popup (a click still selects)",
+          "type": "string",
+          "const": "off"
+        }
+      ]
+    },
+    "Tooltip": {
+      "description": "The hover tooltip of the roads.",
+      "oneOf": [
+        {
+          "description": "every column",
+          "type": "string",
+          "const": "all"
+        },
+        {
+          "description": "these columns",
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "fields"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Labels": {
+      "type": "object",
+      "properties": {
+        "on": {
+          "description": "the street names",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "Arrows": {
+      "type": "object",
+      "properties": {
+        "on": {
+          "description": "the one-way arrows",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "Tunnels": {
+      "type": "object",
+      "properties": {
+        "control": {
+          "description": "the \"Tunnels\" box (a tool for choosing the tunnel look)",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "Bridges": {
+      "type": "object",
+      "properties": {
+        "decks_3d": {
+          "description": "the raised 3D bridge decks, and the page opens tilted",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "Overlay": {
+      "description": "An overlay (rs.Overlay): a layer of the caller's features over or under the roads. `None`: the overlays settings' value.",
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "data": {
+          "description": "a FeatureCollection",
+          "default": null
+        },
+        "kind": {
+          "description": "none: from the geometries",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OverlayKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "placement": {
+          "$ref": "#/$defs/Placement",
+          "default": "over"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "color_column": {
+          "description": "the property with a colour for each feature (null: `color`)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "outline": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "opacity": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "width": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "width_m": {
+          "description": "a line's width in metres, exact from `min_zoom` on (in place of `width`)",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "radius": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "dash": {
+          "description": "a line's dash pattern, in line widths",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "double"
+          },
+          "default": null
+        },
+        "popup": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "default": null
+        },
+        "popup_window": {
+          "description": "false: a click selects it, with no floating popup",
+          "type": "boolean",
+          "default": false
+        },
+        "tooltip": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "default": null
+        },
+        "visible": {
+          "type": "boolean",
+          "default": false
+        },
+        "min_zoom": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "max_zoom": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "select": {
+          "description": "a click picks its road or the item itself (with `edge`)",
+          "$ref": "#/$defs/Select",
+          "default": "road"
+        },
+        "edge": {
+          "description": "the features are items of the roads: drawn at their road's fill number",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EdgeLink"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "text": {
+          "description": "`kind: text`: the text and its paint",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextStyle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "style": {
+          "description": "the name of a style of the theme's `overlays.styles`, whose fields fill what the overlay does not give",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "OverlayKind": {
+      "type": "string",
+      "enum": [
+        "fill",
+        "line",
+        "circle",
+        "text"
+      ]
+    },
+    "Placement": {
+      "type": "string",
+      "enum": [
+        "over",
+        "under"
+      ]
+    },
+    "Select": {
+      "type": "string",
+      "enum": [
+        "road",
+        "item"
+      ]
+    },
+    "EdgeLink": {
+      "description": "The road of each feature of an overlay (rs.Overlay's edge_col and the columns that go with it).",
+      "type": "object",
+      "properties": {
+        "column": {
+          "description": "the property with the id of the feature's road",
+          "type": "string",
+          "default": ""
+        },
+        "order_column": {
+          "description": "the property with the feature's order (lower first; null: 0)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "width_m_column": {
+          "description": "lines, simple mode: the property with each item's width in metres (else `width_m`)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "offset_m_column": {
+          "description": "lines, simple mode: the property with each item's offset in metres (right of the line's direction; null: 0)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "dash_column": {
+          "description": "lines, simple mode: the property with each item's dash pattern (null: `dash`)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "TextStyle": {
+      "type": "object",
+      "properties": {
+        "column": {
+          "description": "the property that holds the text",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "size": {
+          "description": "px",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double",
+          "default": null
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "halo": {
+          "description": "the halo's colour (none: no halo)",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Color"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "Items": {
+      "description": "The road's own line items (lanes, lane lines, marks).",
+      "type": "object",
+      "properties": {
+        "data": {
+          "description": "a FeatureCollection whose features name their road",
+          "default": null
+        },
+        "popup": {
+          "description": "the fields that a clicked item shows (none: all its fields)",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "default": null
+        }
+      },
+      "additionalProperties": false
+    },
+    "BaseMapOptions": {
+      "description": "A duckOSM map's base map: its modes and the start values of its layers.",
+      "type": "object",
+      "properties": {
+        "modes": {
+          "description": "the mode columns of the road table (driving, walking, cycling, ...)",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "layers": {
+          "description": "a layer's start values",
+          "type": "object",
+          "additionalProperties": true,
+          "default": {}
+        }
+      },
+      "additionalProperties": false
+    },
+    "Output": {
+      "description": "The output: its name and its state.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "state": {
+          "$ref": "#/$defs/State",
+          "default": "static"
+        },
+        "live_data": {
+          "description": "the feature states that a page's dashboard colours the roads with (rs.setData)",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "State": {
+      "description": "A style with its state baked in, or one that keeps MapLibre's global state (a page with the dashboard).",
+      "type": "string",
+      "enum": [
+        "static",
+        "live"
+      ]
+    },
     "RoadsLook": {
       "type": "object",
       "properties": {
@@ -471,10 +1755,6 @@
         "slots",
         "slot_m"
       ]
-    },
-    "Color": {
-      "description": "\"#rrggbb\", \"#rgb\", a CSS colour name, or rgb(...), rgba(...), hsl(...), hsla(...)",
-      "type": "string"
     },
     "Slots": {
       "description": "The slots' tables (the names and the arrows): the class order, and each class's casing width at zoom 20 in px.",

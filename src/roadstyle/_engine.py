@@ -76,21 +76,10 @@ def _arrow(edges):
         return g.to_arrow(index=False, geometry_encoding="WKB")
 
 
-def _check_tunnels(cfg):
-    """render_web._tun_settings' checks of the tunnel look: each colour of tunnel_towards a '#rrggbb', tunnel_toward one of them or one."""
-    import re
-    hexc = re.compile(r"#[0-9a-fA-F]{6}")
-    towards, toward = cfg.get("tunnel_towards") or {}, cfg.get("tunnel_toward")
-    for n, c in towards.items():
-        if not (isinstance(c, str) and hexc.fullmatch(c)):
-            raise ValueError(f"tunnel_towards {n!r}: {c!r} is not a '#rrggbb' colour")
-    if toward not in towards and not (isinstance(toward, str) and hexc.fullmatch(toward)):
-        raise ValueError(f"tunnel_toward {toward!r} is not a colour name in {list(towards)} or a '#rrggbb' colour")
-
-
 def look(*, palette=None, profile=None, settings=None, args=None, features=None):
     """The resolved look of render_edges' palette, profile and settings, made by the Rust engine: a ``Look`` handle (roadstyle-look),
-    parsed one time; ``.json()`` gives its text, ``.part("config")`` the JSON text of one part."""
+    parsed one time; ``.json()`` gives its text, ``.part("sections")`` the JSON text of one part (map, sections, palette, settings,
+    features, other, base_map_page)."""
     return rust().resolve_look(json.dumps(_look_options(palette, profile, settings, args, features)))
 
 
@@ -184,6 +173,9 @@ def _look_and_options(kwargs):
     kwargs = dict(kwargs)
     palette, profile, settings = kwargs.pop("palette", None), kwargs.pop("profile", None), kwargs.pop("settings", None)
     features, overlays, items = kwargs.pop("features", None), kwargs.pop("overlays", None), kwargs.pop("items", None)
+    if items is not None:          # render's items=: the road's own line items, as GeoJSON (read with items_popup)
+        from .overlays import to_fc
+        kwargs["items"] = to_fc(items)
     if kwargs.get("boundary") is not None:   # a shapely geometry or a GeoDataFrame: GeoJSON, as render does (_boundary_fc)
         from .render_web import _boundary_fc
         kwargs["boundary"] = json.loads(json.dumps(_boundary_fc(kwargs["boundary"])))
@@ -195,15 +187,12 @@ def _look_and_options(kwargs):
         given = [*active, *(given if isinstance(given, list) else [given] if given is not None else [])]
     o = _look_options(palette, profile, given, kwargs, features)
     lk = rust().resolve_look(json.dumps(o))
-    cfg = json.loads(lk.part("config"))
-    _check_tunnels(cfg)
-    if cfg.get("twin_casing") not in ("one", "each"):
-        raise ValueError(f'twin_casing must be "one" or "each", got {cfg.get("twin_casing")!r}')
+    # the tunnel look is checked by the look (the texts of render_web._tun_settings)
+    sec = json.loads(lk.part("sections"))
+    if sec["roads"]["twin_casing"] not in ("one", "each"):
+        raise ValueError(f'twin_casing must be "one" or "each", got {sec["roads"]["twin_casing"]!r}')
     if overlays:
-        lk = lk.with_arg("overlays", json.dumps([_overlay_json(ov, (cfg.get("overlays") or {}).get("styles") or {}) for ov in overlays]))
-    if items is not None:          # render's items=: the road's own line items, as GeoJSON
-        from .overlays import to_fc
-        lk = lk.with_arg("items", json.dumps(to_fc(items)))
+        lk = lk.with_arg("overlays", json.dumps([_overlay_json(ov, sec["overlays"].get("styles") or {}) for ov in overlays]))
     return lk, o
 
 
@@ -423,15 +412,17 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         kwargs = {**kwargs, **level_kw}
     lk, o = _look_and_options({**kwargs, "palette": palette, "profile": profile, "settings": settings, "highway_col": highway_col,
                                "state": "live"})
-    html = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings)))
+    html = rust().page_from(_arrow(g), lk, json.dumps(o), json.dumps(page_given(kwargs, palette, profile, settings, lk, o["args"])))
     _warn()
     return rw.WebMap(html)
 
 
-def page_given(kwargs, palette=None, profile=None, settings=None) -> dict:
-    """What only Python knows of a page (roadstyle::page_options makes the rest): the Google Maps key of the environment, and each base
-    map key with its API key of roadstyle.json, of set_api_key or of the environment (basemaps.get_api_key, by provider), in force with
-    the settings of the call as render_edges applies them."""
+def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=None) -> dict:
+    """The page's keys and what only Python knows of a page (roadstyle::page_options makes the rest): the call's keywords that are not
+    map options (the look ``lk``'s part "other": a look file has no page key) and the two map options of the call ``args`` that a
+    sidebar's defaults give way to, the Google Maps key of the environment, and each base map key with its API key of roadstyle.json,
+    of set_api_key or of the environment (basemaps.get_api_key, by provider), in force with the settings of the call as render_edges
+    applies them."""
     import dataclasses
 
     from . import _settings as _s
@@ -450,7 +441,9 @@ def page_given(kwargs, palette=None, profile=None, settings=None) -> dict:
         resolved = [dataclasses.asdict(get_basemap(k, api_key=a["api_key"])) for k in keys]
     finally:
         _use(*prev)
-    return {"resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
+    page = json.loads(lk.part("other")) if lk is not None else {}
+    page.update({k: v for k, v in (args or {}).items() if k in ("name", "road_popup")})
+    return {**page, "resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
 
 
 def _pmtiles(t, z0, z1, bounds, names) -> bytes:

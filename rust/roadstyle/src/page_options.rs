@@ -56,32 +56,42 @@ pub struct Page {
 }
 
 /// The page of `roads` with `look` (resolved from `options`, which a view's palette resolves again with its palette). `given`: the
-/// caller's values over the look's args: `street_view_key`, `api_key` (put into a base map's URL), and `resolved_basemaps`, the
-/// entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (Python: its key of each provider). `features`:
-/// the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
+/// page's keys (render's keywords: name, basemap_switcher, sidebar, views, hover_delay_ms, ...; a look has none), over the base map's page
+/// defaults (`look.base_map_page`), and the caller's values: `street_view_key`, `api_key` (put into a base map's URL), and
+/// `resolved_basemaps`, the entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (Python: its key of
+/// each provider). `features`: the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
 pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
                  -> Result<Page, crate::Error> {
-    let sidebar = match given.get("sidebar").or(look.args.get("sidebar")).filter(|v| !v.is_null()) {
+    let sidebar = match given.get("sidebar").filter(|v| !v.is_null()) {
         None => None,
         Some(v) => Some(SIDEBARS.iter().find(|s| v == s.0).ok_or_else(|| crate::error::options(format!("sidebar must be \"dashboard\" or \"report\", got {}", repr(v))))?),
     };
-    // a sidebar's keywords, where the caller gave none, as keywords of the call: stage 1 reads one of them (the popup)
+    // a sidebar's keywords, where the caller gave none: the page's keys, and one map option (the popup), which stage 1 reads
     let mut owned = None;
+    let mut a = page_defaults();
+    a.extend(look.base_map_page.iter().map(|(k, v)| (k.clone(), v.clone())));
+    let named = look.map.output.name.as_ref();         // the map's name: the call's or the base map's, over a sidebar's
+    if let Some(n) = named {
+        a.insert("name".into(), n.as_str().into());
+    }
     if let Some((_, _, d)) = sidebar {
         let mut l = look.clone();
-        for (k, v) in serde_json::from_str::<Map<String, Value>>(d).expect("a sidebar's defaults are JSON") {
-            if look.args.get(&k).is_none() && !given.contains_key(&k) {
+        let mine = |k: &str| given.contains_key(k) || (k == "name" && named.is_some());
+        for (k, v) in serde_json::from_str::<Map<String, Value>>(d).expect("a sidebar's defaults are JSON").into_iter().filter(|(k, _)| !mine(k)) {
+            if k == "road_popup" {
                 l = l.with_arg(&k, v)?;
+            } else {
+                a.insert(k, v);
             }
         }
         owned = Some(l);
     }
     let look = owned.as_ref().unwrap_or(look);
-    let mut a = page_defaults();
-    a.extend(look.args.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
     a.extend(given.iter().map(|(k, v)| (k.clone(), v.clone())));
     let on = |k: &str| py_truth(&a[k]);
-    let mode = if a["road_popup"] == "panel" { "panel" } else { a["popup_mode"].as_str().filter(|m| !m.is_empty()).unwrap_or("popup") };
+    // the map options that the page reads too: the popup panel, the 3D view, the hover colour, the colour options, the columns
+    let mo = &look.map;
+    let mode = if mo.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { a["popup_mode"].as_str().filter(|m| !m.is_empty()).unwrap_or("popup") };
     if !a["side_panel_html"].is_null() && mode == "panel" {
         return Err(crate::error::options("side_panel_html and popup_mode='panel' are two panels on the right: use one"));
     }
@@ -102,7 +112,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     if tiled && views.iter().any(|v| v["set"].get("palette").is_some()) {
         return Err(crate::Error::Engine(roadstyle_engine::Error::Unsupported(roadstyle_engine::Unsupported::TiledPalettes)));
     }
-    let (mut style, archive) = if tiled { tiled_page(&src, &a)? } else {
+    let (mut style, archive) = if tiled { tiled_page(&src, look)? } else {
         src.page_arrows();          // stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
         // the style without its sources' data, which the page writer writes from `src` (audit D3, N29)
         (src.style_with(|_| Value::Null, false), None)
@@ -138,7 +148,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     }
     let (ls, c) = (&look.sections, &look.sections.camera);
     let mut cam = json!({"pitch": c.pitch, "bearing": c.bearing, "pitch_3d": c.pitch_3d, "max_pitch": c.max_pitch});
-    if on("view_3d") {
+    if mo.bridges.decks_3d {
         cam["pitch"] = cam["pitch_3d"].clone();
     }
     for k in ["pitch", "max_pitch", "bearing"] {
@@ -158,12 +168,14 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         color_active: ctl["color_active"].clone(), overlays: ctl["overlays"].clone(), overlay_control: on("overlay_control"),
         overlay_popup: on("overlay_popup"), tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),
-        hover_delay_ms: inter["hover_delay_ms"].as_i64().ok_or_else(|| crate::error::options("roadstyle:interaction has no hover_delay_ms"))?,
+        // the page's hover_delay_ms, else the look's (roadstyle:interaction)
+        hover_delay_ms: a.get("hover_delay_ms").and_then(Value::as_f64).map(|d| d as i64).or_else(|| inter["hover_delay_ms"].as_i64())
+            .ok_or_else(|| crate::error::options("roadstyle:interaction has no hover_delay_ms"))?,
         edge_id_col: ctl["edge_id_col"].as_str().unwrap_or("edge_id").into(), arrow_icon: ctl["arrow_icon"].clone(),
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
-        modes: ctl["modes"].clone(), box_layout: ctl["box_layout"].clone(),
+        modes: ctl["modes"].clone(), box_layout: a.get("box_layout").cloned().unwrap_or_default(),
     };
-    let hover = Some(&a["hover_color"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!(ls.selection.hover));
+    let hover = json!(mo.interaction.hover_color.as_ref().unwrap_or(&ls.selection.hover).css());
     let simple_js = json!({"layer": "roads-simple", "bridge": ls.bridges.casing_color, "shadow": ls.bridges.shadow.color,
                            "select": ctl["select_color"], "hover": hover, "tunnels": py_truth(&ctl["tunnel"]["layers"]),
                            "dashes": ctl["dashes"]});
@@ -345,11 +357,11 @@ fn check_views(views: &Value, have: [(&str, Vec<Value>); 5]) -> Result<Vec<Value
 }
 
 /// _engine._views: the views as the page reads them, and the palettes that they name other than the page's. Each such palette is
-/// resolved with the look's options and args (its colours), and merged into stage 1's output (palettes::add).
+/// resolved with the look's options and map options (its colours), and merged into stage 1's output (palettes::add).
 fn views(src: &mut Sources, a: &Map<String, Value>, look: &Look, options: &Options, basemaps: &[Value]) -> Result<(Vec<Value>, Vec<String>), crate::Error> {
     let meta = &src.metadata;
     let ctl = &meta["roadstyle:controls"];
-    let colors: Vec<Value> = if py_truth(&a.get("color_options").cloned().unwrap_or_default()) {
+    let colors: Vec<Value> = if !look.map.color.options.is_empty() {
         meta["roadstyle:color_options"].as_array().into_iter().flatten().map(|o| o["name"].clone()).collect()
     } else { Vec::new() };
     let overlays: Vec<Value> = ctl["overlays"].as_array().into_iter().flatten().map(|o| o["label"].clone()).collect();
@@ -365,8 +377,8 @@ fn views(src: &mut Sources, a: &Map<String, Value>, look: &Look, options: &Optio
     }
     if !pals.is_empty() {
         let looks = pals.iter().map(|n| {
-            let o = Options { palette: Some(n.clone()), args: look.args.clone(), ..options.clone() };
-            Ok((n.clone(), Look::resolve(&o)?))
+            let o = Options { palette: Some(n.clone()), ..options.clone() };
+            Ok((n.clone(), Look::resolve(&o)?.with_map(look.map.clone())?))
         }).collect::<Result<Vec<_>, crate::Error>>()?;
         crate::palettes::add(src, &look.palette, &looks)?;
     }
@@ -404,10 +416,13 @@ fn palette_swatches(style: &mut Value, props: &Value, pals: &[String], look: &Lo
 
 /// _engine._tiled_page: the tiled page's style and its PMTiles archive, from stage 2 of the same stage 1 (no second build). The style
 /// has one vector source `roads` (the embedded archive) with the layers `simple` and `slots`; the other sources stay inline.
-fn tiled_page(s: &Sources, a: &Map<String, Value>) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
-    let hw = a.get("highway_col").and_then(Value::as_str).unwrap_or("highway");
-    let col = |k: &str| a.get(k).and_then(Value::as_str).filter(|c| !c.is_empty());
-    let keep = [Some(hw), Some(col("filter_col").unwrap_or(hw)), Some(roadstyle_model::mark::Mark::Twoway.name()), Some(roadstyle_model::mark::Mark::Edge.name()), Some("lvl"), col("width_m_col")];
+fn tiled_page(s: &Sources, look: &Look) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
+    let c = &look.map.columns;
+    let hw = Some(c.class.as_str()).filter(|h| !h.is_empty()).unwrap_or("highway");
+    fn col(v: &Option<String>) -> Option<&str> {
+        v.as_deref().filter(|c| !c.is_empty())
+    }
+    let keep = [Some(hw), Some(col(&c.filter).unwrap_or(hw)), Some(roadstyle_model::mark::Mark::Twoway.name()), Some(roadstyle_model::mark::Mark::Edge.name()), Some("lvl"), col(&c.width_m)];
     let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &[])?;
     o.exact = Some(keep.into_iter().flatten().map(String::from).collect());
     o.only = Some(["roads", "simple", "slots"].map(String::from).to_vec());

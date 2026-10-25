@@ -54,7 +54,8 @@ data and the look that the keywords name: [Inputs and outputs](../reference/form
 
 | Keyword | Python | Rust |
 |---|---|---|
-| `road_popup`, `popup_mode`, `road_tooltip`, `tooltip`, `hover_delay_ms` | yes | yes (in the style's metadata `roadstyle:interaction`) |
+| `road_popup`, `popup_mode`, `road_tooltip`, `tooltip` | yes | yes (in the style's metadata `roadstyle:interaction`) |
+| `hover_delay_ms` | yes | page (the style's `roadstyle:interaction` has the look's default) |
 | `side_panel_html`, `host_panel_width` | yes | page |
 | `data_maxzoom`, `data_tolerance` | yes | yes |
 | `selected`, `copy_field` | folium | folium |

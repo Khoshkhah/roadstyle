@@ -14,6 +14,7 @@ pub use error::Error;
 pub use roadstyle_engine::Error as EngineError;
 pub mod level_area;
 pub mod level_editor;
+pub mod options;
 pub mod page;
 pub mod page_options;
 pub use roadstyle_levels as levels;
@@ -427,8 +428,10 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
     let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &serde_json::json!(look.sections.tiles), &columns(look), keep)?;
     // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
-    o.exact = look.args["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
-    o.only = look.args["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
+    // keys of stage 2, read from the look's `other` until T4 moves them to TileOptions
+    let list = |k: &str| look.other.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(String::from));
+    o.exact = list("tile_keep").map(Iterator::collect);
+    o.only = list("tile_layers").map(Iterator::collect);
     let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix))?;
     Ok((style_text(&s, &style), tiled, s.warnings))
 }

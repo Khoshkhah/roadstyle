@@ -2,9 +2,9 @@
 //! place of the JSON values `theme` and `config` (StyleConfig's flat view, most of whose keys were a copy of a theme section) and of the
 //! resolution's tables (`styles`, `slots`, `roads_model`, the arrow image, the road popup, the base map's part).
 //!
-//! A look of version 2 is written with these sections (`LookFile`). The readers that have not moved to them read the JSON views of
-//! version 1 (`LookData`), which `views` makes from the sections. A number keeps its written form (`Num`: 15 stays 15, 2.0 stays 2.0)
-//! and a colour its text (`Color`), so a look of version 1 that goes to version 2 and back gives the same views, byte for byte.
+//! A look of version 2 is written with these sections and the map options (`LookFile`); a look of version 1 gives its sections with
+//! `from_views`. A number keeps its written form (`Num`: 15 stays 15, 2.0 stays 2.0) and a colour its text (`Color`), so the outputs of a
+//! look of version 1 and of the same look as version 2 are the same, byte for byte.
 //!
 //! `look.schema.json` is made from these types with the feature `schema` (schemars; its tests turn it on).
 //!
@@ -440,7 +440,7 @@ pub struct BaseMapLook {
     pub images: Value,
 }
 
-/// A look as it is written, version 2: the typed sections, with the map options as render_edges' keywords (`args`, until N32 step 2). Its
+/// A look as it is written, version 2: the typed sections and the typed map options. It has no page key: a look file is the style. Its
 /// JSON is one mapping: these four keys and the sections' keys.
 // Read and written by hand, not with serde's `flatten`: `flatten` reads the sections a second time through serde's buffer, which put a
 // second reader of each section into the binary (113 KB of the wasm package for `Sections` alone), and it does not go with
@@ -454,8 +454,8 @@ pub struct LookFile {
     pub palette: String,
     /// the settings sources as given (a mapping, a list of them, or null)
     pub settings: Value,
-    /// the map options: render_edges' keywords
-    pub args: Value,
+    /// the map options
+    pub map: crate::MapOptions,
     #[cfg_attr(feature = "schema", schemars(flatten))]
     pub sections: Sections,
 }
@@ -467,10 +467,11 @@ impl LookFile {
         let mut take = |k: &str| m.shift_remove(k).ok_or_else(|| bad("a look of version 2", format!("missing field `{k}`")));
         let schema_version = take("schema_version")?.as_u64().ok_or_else(|| bad("a look of version 2", "schema_version is not a number"))? as u32;
         let palette = take("palette")?.as_str().ok_or_else(|| bad("a look of version 2", "palette is not a text"))?.to_string();
-        let (settings, args) = (take("settings")?, take("args")?);
+        let (settings, map) = (take("settings")?, take("map")?);
+        let map = crate::MapOptions::from_value(map)?;
         check_tunnels(m.get("tunnels").unwrap_or(&Value::Null))?;
         let sections = serde_json::from_value(Value::Object(m)).map_err(|e| bad("a look of version 2", e))?;
-        Ok(LookFile { schema_version, palette, settings, args, sections })
+        Ok(LookFile { schema_version, palette, settings, map, sections })
     }
 
     /// The file as a JSON value: the four keys, then the sections' keys.
@@ -479,7 +480,7 @@ impl LookFile {
         m.insert("schema_version".into(), self.schema_version.into());
         m.insert("palette".into(), self.palette.clone().into());
         m.insert("settings".into(), self.settings.clone());
-        m.insert("args".into(), self.args.clone());
+        m.insert("map".into(), serde_json::to_value(&self.map).expect("the map options are JSON"));
         if let Value::Object(s) = serde_json::to_value(&self.sections).expect("the sections are JSON") {
             m.extend(s);
         }
@@ -487,12 +488,9 @@ impl LookFile {
     }
 }
 
-/// The theme sections that are written as they are in version 1 (the others: `access`, `palettes`, `active`, `background`).
+/// The theme sections of a look of version 1 that are sections of version 2 as they are.
 const THEME: [&str; 14] = ["roads", "casing", "labels", "arrows", "bridges", "tunnels", "selection", "data", "overlays", "boundary",
                            "background", "access", "palettes", "active"];
-
-/// The keys of a version-2 section that are not keys of the version-1 theme section: (section, key).
-const NOT_THEME: [(&str, &str); 5] = [("roads", "styles"), ("roads", "model"), ("roads", "head_m"), ("labels", "slots"), ("labels", "slot_m")];
 
 fn bad(what: &str, e: impl std::fmt::Display) -> Error {
     Error::Look(format!("look: {what}: {e}"))
@@ -554,47 +552,6 @@ pub fn from_views(d: &LookData) -> Result<Sections, Error> {
         s.insert("base_map".into(), d.features.clone());
     }
     serde_json::from_value(Value::Object(s)).map_err(|e| bad("the sections of a version-1 look", e))
-}
-
-/// The JSON views of version 1 (`theme`, `config`, `styles`, `slots`, `roads_model`, `head_m`, `features`, `oneway_image`,
-/// `interaction`) of the sections, for the readers that have not moved to the sections.
-pub fn views(f: &LookFile) -> Result<LookData, Error> {
-    let s = serde_json::to_value(&f.sections).expect("the sections are JSON");
-    let mut theme = Map::new();
-    for k in THEME {
-        let mut v = s[k].clone();
-        if let Some(m) = v.as_object_mut() {
-            for (_, key) in NOT_THEME.iter().filter(|(sec, _)| *sec == k) {
-                m.shift_remove(*key);
-            }
-            if k == "arrows" {
-                m.shift_remove("image");
-            }
-        }
-        theme.insert(k.into(), v);
-    }
-    let theme = Value::Object(theme);
-    let mut extra = Map::new();
-    extra.insert("camera".into(), s["camera"].clone());
-    extra.insert("tiles".into(), s["tiles"].clone());
-    extra.insert("annotations".into(), json!({"slot_m": s["labels"]["slot_m"]}));
-    extra.insert("basemap".into(), s["page"]["basemap"].clone());
-    let config = crate::resolve::config_of(&theme, extra)?;
-    Ok(LookData {
-        schema_version: 1,
-        palette: f.palette.clone(),
-        settings: f.settings.clone(),
-        args: f.args.clone(),
-        theme,
-        config,
-        styles: s["roads"]["styles"].clone(),
-        head_m: f.sections.roads.head_m,
-        slots: s["labels"]["slots"].clone(),
-        roads_model: s["roads"]["model"].clone(),
-        features: s.get("base_map").cloned().unwrap_or(Value::Null),
-        oneway_image: s["arrows"]["image"].clone(),
-        interaction: s["interaction"].clone(),
-    })
 }
 
 /// The JSON Schema of a look of version 2 (look.schema.json; the feature `schema`).

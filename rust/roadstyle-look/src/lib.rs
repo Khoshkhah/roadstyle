@@ -1,7 +1,8 @@
 //! roadstyle's look (docs/design/rust_library.md, "The config: the look"): the one typed, versioned value that the engine draws a map
 //! with. `Look::resolve` makes it from render_edges' palette, profile, settings and keywords (`resolve.rs`, the port of `_settings.py`);
-//! `Look::from_json` reads a saved look of version 2 (the typed sections, `sections.rs`), 1 or 0 (0.25.0's `look.json`, with no
-//! `schema_version`), and `Look::to_json` writes version 2. The look is parsed
+//! `Look::from_json` reads a saved look of version 2 (the typed sections and the map options, `sections.rs`), 1 or 0 (0.25.0's
+//! `look.json`, with no `schema_version`), and `Look::to_json` writes version 2. A look file is the style: it has no page key. The look
+//! is parsed
 //! one time: the typed parts that the stages read (`model`, `road`, `slot`, `deck`) are made when the look is made, not in each stage.
 //!
 //! The look does not know the roads (rule 2 of the layers): the engine combines the two.
@@ -33,8 +34,8 @@ use std::collections::{HashMap, HashSet};
 /// The version of the look that this crate writes. It reads this version, 1 and 0 (0.25.0's `look.json`; until the frozen hosts move, T6).
 pub const VERSION: u32 = 2;
 
-/// The look's JSON views of version 1 (as a look of version 1 or 0 is written): the resolved theme and settings, the class styles, the
-/// road tables and the map options. The readers that have not moved to the typed sections read these.
+/// A look of version 1 (as a look of version 1 or 0 is written, and as the resolution makes it): the resolved theme and settings, the
+/// class styles, the road tables and render_edges' keywords. `Look::new` makes the typed look of it.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LookData {
@@ -68,11 +69,14 @@ pub struct LookData {
     pub interaction: Value,
 }
 
-/// The look: its data and the typed parts that the stages read, made one time from the data.
+/// The look: the typed sections, the map options and the typed parts that the stages read, made one time from them.
 #[derive(Clone, Debug)]
 pub struct Look {
-    data: LookData,
-    /// the typed sections (version 2)
+    /// the palette's name (render_edges' palette)
+    pub palette: String,
+    /// the settings sources as given (a mapping, a list of them, or null)
+    pub settings: Value,
+    /// the typed sections
     pub sections: Sections,
     /// the road width model (widths by zoom, draw order, the two-way split)
     pub model: RoadModel,
@@ -82,23 +86,37 @@ pub struct Look {
     pub slot: SlotLook,
     /// the values of the 3D bridge decks
     pub deck: DeckLook,
-    /// the map options of `args` (MapOptions::from_args); the readers move to them in N32 step 2
+    /// the map options (what the caller chooses for one map)
     pub map: MapOptions,
-    /// the keywords of `args` that are not map options (the page's, the host's, a misspelt one), for the caller that knows the page's keys
-    pub other_args: Vec<String>,
-}
-
-impl std::ops::Deref for Look {
-    type Target = LookData;
-    fn deref(&self) -> &LookData {
-        &self.data
-    }
+    /// the call's keywords that are not map options, with their values: the page's, the writer's (export, data_maxzoom, data_tolerance,
+    /// tile_keep, tile_layers: SourceMode and TileOptions in T4), the host's, a misspelt one. In memory only: never in the file. The
+    /// caller checks them (`roadstyle::options::unknown`); the page takes its keys from its own caller (`given`), not from here.
+    pub other: Map<String, Value>,
+    /// the base map's page defaults (box_layout, basemap, basemaps, copy_field), for the page under the caller's keys. In memory only.
+    pub base_map_page: Map<String, Value>,
 }
 
 impl Look {
     /// The look of render_edges' palette, profile, settings and keywords (`Options`).
     pub fn resolve(o: &Options) -> Result<Look, Error> {
-        Look::new(resolve::resolve(o)?)
+        let (mut data, bm) = resolve::resolve(o)?;
+        let (_, page) = MapOptions::from_args(&Value::Object(bm.clone()))?;
+        let base_map_page = bm.into_iter().filter(|(k, _)| page.contains(k)).collect();
+        // the call's own keywords only: the resolution's `args` has the base map's too (its map options where the call gives none)
+        let call = o.args.as_object().cloned().unwrap_or_default();
+        no_keys(&mut data);
+        let mut look = Look::new(data)?;
+        let (_, rest) = MapOptions::from_args(&Value::Object(call.clone()))?;
+        look.other = call.into_iter().filter(|(k, _)| rest.contains(k) && !KEY_ARGS.contains(&k.as_str())).collect();
+        look.base_map_page = base_map_page;
+        Ok(look)
+    }
+
+    /// The version-1 look that the resolution makes of `o` (its JSON value): the parity goldens are a summary of it.
+    pub fn resolution_value(o: &Options) -> Result<Value, Error> {
+        let (mut data, _) = resolve::resolve(o)?;
+        no_keys(&mut data);
+        Ok(serde_json::to_value(&data).expect("a look is JSON"))
     }
 
     /// A look from its views of version 1 (a look of version 1 or 0, or the resolution's): the sections and the typed parts are made
@@ -110,14 +128,27 @@ impl Look {
         data.schema_version = 1;
         no_keys(&mut data);
         let sections = sections::from_views(&data)?;
-        Look::with(data, sections)
+        let (map, rest) = MapOptions::from_args(&data.args)?;
+        let other = data.args.as_object().into_iter().flatten().filter(|(k, _)| rest.contains(k)).map(|(k, v)| (k.clone(), v.clone())).collect();
+        let mut look = Look::with(data.palette, data.settings, sections, map)?;
+        look.other = other;
+        Ok(look)
     }
 
-    fn with(data: LookData, sections: Sections) -> Result<Look, Error> {
-        let (map, other_args) = MapOptions::from_args(&data.args)?;
+    /// The look of its parts: the typed parts that the stages read are made here.
+    pub fn with(palette: String, settings: Value, sections: Sections, map: MapOptions) -> Result<Look, Error> {
         let r = &sections.roads;
-        Ok(Look { model: RoadModel::new(&r.model, &r.links, &r.split, &r.fallback, &map)?, road: RoadLook::new(&sections, &data.palette, &map),
-                  slot: SlotLook::new(&sections), deck: DeckLook::new(&sections.bridges.decks), map, other_args, sections, data })
+        Ok(Look { model: RoadModel::new(&r.model, &r.links, &r.split, &r.fallback, &map)?, road: RoadLook::new(&sections, &palette, &map),
+                  slot: SlotLook::new(&sections), deck: DeckLook::new(&sections.bridges.decks), map, sections, palette, settings,
+                  other: Map::new(), base_map_page: Map::new() })
+    }
+
+    /// The same look with other map options (a view's palette resolved again keeps the page's map options); `other` stays.
+    pub fn with_map(self, map: MapOptions) -> Result<Look, Error> {
+        let (other, page) = (self.other, self.base_map_page);
+        let mut look = Look::with(self.palette, self.settings, self.sections, map)?;
+        (look.other, look.base_map_page) = (other, page);
+        Ok(look)
     }
 
     /// A saved look (its JSON text), of version 2, 1 or 0.
@@ -131,7 +162,7 @@ impl Look {
             n if n > VERSION as u64 => Err(Error::Version { found: n as u32 }),
             2 => {
                 let f = LookFile::from_value(v)?;
-                Look::with(sections::views(&f)?, f.sections)
+                Look::with(f.palette, f.settings, f.sections, f.map)
             }
             _ => Look::new(serde_json::from_value(v).map_err(|e| Error::Look(format!("look: {e}")))?),
         }
@@ -147,29 +178,23 @@ impl Look {
         self.file().to_value()
     }
 
-    /// The look's JSON views of version 1, as a JSON value (as a look of version 1 was written).
-    pub fn views_value(&self) -> Value {
-        serde_json::to_value(&self.data).expect("a look is JSON")
-    }
-
     fn file(&self) -> LookFile {
-        LookFile { schema_version: VERSION, palette: self.data.palette.clone(), settings: self.data.settings.clone(), args: self.data.args.clone(),
+        LookFile { schema_version: VERSION, palette: self.palette.clone(), settings: self.settings.clone(), map: self.map.clone(),
                    sections: self.sections.clone() }
     }
 
-    /// The data, to change it: give it to `Look::new` again (for example a map option that the caller adds after the resolution).
-    pub fn into_data(self) -> LookData {
-        self.data
-    }
-
-    /// The same look with the map option `key` set to `value`.
+    /// The same look with the keyword `key` (render_edges' flat keyword) set to `value`: a map option changes the map options, another
+    /// keyword goes to `other`. A keyword that is read with another one (`items` with `items_popup`, `color_table` with `color_key`)
+    /// takes the other one from this call only: give both to the resolution.
     pub fn with_arg(self, key: &str, value: Value) -> Result<Look, Error> {
-        let mut data = self.data;
-        if !data.args.is_object() {
-            data.args = Value::Object(Map::new());
+        let mut one = Map::new();
+        one.insert(key.into(), value.clone());
+        let (map, rest) = self.map.with_args(&Value::Object(one))?;
+        let mut look = self.with_map(map)?;
+        if rest.iter().any(|k| k == key) && !KEY_ARGS.contains(&key) {
+            look.other.insert(key.into(), value);
         }
-        data.args[key] = value;
-        Look::new(data)
+        Ok(look)
     }
 }
 

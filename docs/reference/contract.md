@@ -84,7 +84,7 @@ contract makes changeable (or a value that is not used).
 | `road_popup` | false, null (every field) or fields; `DEFAULT_ROAD_POPUP` | `render`; `roadstyle:interaction.popup`; option | `select.js`, `find.js` | gap | |
 | `popup_mode` | `"popup"` or `"panel"` | `render`; option | `panel.js` and every docked control | no | |
 | `road_tooltip`, `tooltip` | false, true or fields | `render`; look `args.tooltip`; `roadstyle:interaction.tooltip` | `select.js` | gap | |
-| `hover_delay_ms` | ms, 300 | `render`; `roadstyle:interaction`; option; `_TIP_DELAY` | `select.js`, `overlays.js` | gap | |
+| `hover_delay_ms` | ms, 300 | `render` (a page key); `roadstyle:interaction` (the look's default); option; `_TIP_DELAY` | `select.js`, `overlays.js` | gap | |
 | `copy_field` | text, `"edge_id"` | look `args.copy_field` (mapstyle passes it) | folium only | gap: not used by the web page | |
 | `hover_color` | color, `selection.hover` (`#b388ff`) | `render`; the palette | engine: a literal in each highlight expression | gap: fixed in the style | planned (see below) |
 | `select_color` | color, `selection.select` (`#7c4dff`) | `render`; the palette; option (Google 3D line) | engine (literal), `google3d.js` | gap: fixed in the style | planned (see below) |
@@ -103,7 +103,7 @@ contract makes changeable (or a value that is not used).
 | the bridge look | casing color and width, shadow, deck (look `bridges`) | the look | engine | no | |
 | `views` | `{name: {setting: value}}` | `render`; option | `views.js` | yes | `rsSetView`; `rs:viewselect`; `window.RS_VIEWS` |
 | `palette` (views) | text | `render`; views | engine (`rs_palette`) | yes, among the palettes that the views name | `rsSetView` |
-| `arrows`, `labels` | bool, true | `render`; look `args` | engine | gap: no switch at run time (a visibility change is enough) | |
+| `arrows`, `labels` | bool, true | `render`; the map options (`arrows.on`, `labels.on`) | engine | gap: no switch at run time (a visibility change is enough) | |
 | `arrow_icon`, `arrow_color`, `arrow_rules` | the look (`arrows`, `labels.base_size`) | option | `arrows.js` | no | |
 | `street_view` | `"window"`, true, false | `render`; option | `streetview.js`, `svspot.js` | yes | `rsSetStreetView`; `rs:streetviewchange` |
 | Street View mode | `"linked"` or classic | `localStorage` `rs-street-view-mode` | `streetview.js` | yes | the window's buttons |

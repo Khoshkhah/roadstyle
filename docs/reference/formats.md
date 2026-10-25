@@ -200,26 +200,25 @@ Bundled: `amber`, `carto`, `highsat`, `mono`. The table shows `amber`; the other
 - **The keywords of `render_edges`** that change the style (`arrows`, `labels`, `color_by`, `view_3d`, the column names, ...):
   [Every parameter](parameters.md#render_edges).
 
-## The merged look
+## The look file
 
 `make_look` (Python: `roadstyle._engine.look`; the browser: `resolveLook`) merges the four parts into one JSON object, the input of
-the engine.
+the engine. Its file (`Look.to_json`) is version 2. Its schema is `rust/roadstyle-look/look.schema.json`.
 
 !!! warning "Internal"
-    The merged look has no schema and no version yet, and it changes with the design of the Rust engine (the plan's typed look,
-    `roadstyle-look`). Make it with `make_look` or `resolveLook`; do not write it by hand.
+    The look file changes with the design of the Rust engine. Make it with `make_look` or `resolveLook`; do not write it by hand.
+
+A look file is the style. It has no page key (`name` of the page, `basemap_switcher`, `sidebar`, `views`, `hover_delay_ms`, ...) and
+no API key: the page takes them from its caller. The engine also reads a look of version 1 or 0 (0.25.0's `look.json`), whose `args`
+are `render_edges`' keywords.
 
 | Key | Content |
 |---|---|
-| `palette`, `settings`, `args` | the inputs as given: the palette name, the settings, the keywords |
-| `theme` | the profile and the palette merged: `roads`, `casing`, `labels`, `arrows`, `bridges`, `tunnels`, `selection`, `data`, `overlays`, `boundary`, ... |
-| `config` | the merged values as the fields of `StyleConfig` (`fill_opacity`, `bridge_casing_color`, `tunnel_*`, ...) |
-| `styles` | the look of each road class (`classes`, `fallback`) |
-| `roads_model` | the widths by zoom of each group, the casing ratios, the zoom stops, the order of the classes |
-| `slots` | the order and the widths at zoom 20 that the names and the arrows use |
-| `head_m` | the default head length, in metres |
-| `oneway_image` | the arrow image, as a data URL |
-| `interaction` | the popup fields and the hover delay |
+| `schema_version` | 2 |
+| `palette`, `settings` | the inputs as given: the palette name, the settings |
+| `map` | the map options (what the caller chooses for one map): `columns`, `levels`, `color`, `width`, `roads`, `interaction`, `labels`, `arrows`, `tunnels`, `bridges`, `overlays`, `items`, `boundary`, `base_map`, `output` |
+| `roads`, `casing`, `labels`, `arrows`, `bridges`, `tunnels`, `selection`, `data`, `overlays`, `boundary`, `background`, `access`, `camera`, `tiles`, `page`, `palettes`, `active`, `interaction` | the sections: the profile and the palette merged, with the settings over them, and the tables of the resolution (the class styles, the road model, the slots, the arrow image) |
+| `base_map` | the base map's part (a duckOSM map's layers, 3D heights, style and images); none with no base map |
 
 ## The outputs
 

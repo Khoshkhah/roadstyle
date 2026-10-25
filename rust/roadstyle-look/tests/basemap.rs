@@ -72,7 +72,7 @@ fn the_64_looks_of_mapstyle() {
         let [mode, theme, paths]: [&str; 3] = choice.split('|').collect::<Vec<_>>().try_into().unwrap();
         let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into(), place: None }), args: want["args"].clone(),
                           ..Default::default() };
-        let mut got = Look::resolve(&o).unwrap_or_else(|e| panic!("{choice}: {e}")).views_value();
+        let mut got = Look::resolution_value(&o).unwrap_or_else(|e| panic!("{choice}: {e}"));
         got.as_object_mut().unwrap().shift_remove("schema_version");
         // added on 2026-10-24 for the dashboard's port of mapstyle's page scripts: the restricted roads' colour baked into the fills
         // (access_col), the Modes filter's columns and the page's box layout; mapstyle's look had them in its page script

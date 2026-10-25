@@ -1,6 +1,6 @@
-//! The typed sections (T3 step 2, docs/design/t3_map_options_and_look.md): each golden look written as version 2 and read again gives the
-//! same views of version 1, byte for byte, and the same sections; a bad colour of a section is an error that names it; look.schema.json is
-//! the schema of the types (`ROADSTYLE_BLESS=1 cargo test -p roadstyle-look --test sections` writes it).
+//! The typed sections (T3 step 2, docs/design/t3_map_options_and_look.md): each golden look written as version 2 and read again is the
+//! same look, and a look of version 1 gives the same sections as the resolution; a bad colour of a section is an error that names it;
+//! look.schema.json is the schema of the types (`ROADSTYLE_BLESS=1 cargo test -p roadstyle-look --test sections` writes it).
 
 use roadstyle_look::{basemap::BaseMap, Look, Options};
 use serde_json::{json, Value};
@@ -11,14 +11,19 @@ fn here(p: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(p)
 }
 
-/// The golden looks: the fixture (a look of version 0), each built-in profile x palette, and the 64 looks of mapstyle's choices.
-fn looks() -> Vec<(String, Look)> {
-    let fixture = std::fs::read_to_string(here("../roadstyle-rs/tests/data/look.json")).unwrap();
-    let mut out = vec![("the fixture".to_string(), Look::from_json(&fixture).unwrap())];
+/// The fixture: a look of version 0 (0.25.0's look.json), as its JSON value.
+fn fixture() -> Value {
+    serde_json::from_str(&std::fs::read_to_string(here("../roadstyle-rs/tests/data/look.json")).unwrap()).unwrap()
+}
+
+/// The golden looks: the fixture, each built-in profile x palette, and the 64 looks of mapstyle's choices; with the options of each
+/// resolved one.
+fn looks() -> Vec<(String, Look, Option<Options>)> {
+    let mut out = vec![("the fixture".to_string(), Look::from_value(fixture()).unwrap(), None)];
     for pr in ["default", "highsat"] {
         for pa in ["amber", "carto", "highsat", "mono"] {
             let o = Options::from_value(&json!({"palette": pa, "profile": pr})).unwrap();
-            out.push((format!("{pr} x {pa}"), Look::resolve(&o).unwrap()));
+            out.push((format!("{pr} x {pa}"), Look::resolve(&o).unwrap(), Some(o)));
         }
     }
     let mut text = String::new();
@@ -29,53 +34,71 @@ fn looks() -> Vec<(String, Look)> {
         let args = g["parts"]["args"][idx["args"].as_u64().unwrap() as usize].clone();
         let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into(), place: None }), args,
                           ..Default::default() };
-        out.push((choice.clone(), Look::resolve(&o).unwrap()));
+        out.push((choice.clone(), Look::resolve(&o).unwrap(), Some(o)));
     }
     out
 }
 
 #[test]
-fn version_2_gives_the_same_views() {
+fn version_2_is_the_same_look() {
     let all = looks();
     assert!(all.len() > 70);
-    for (name, look) in &all {
+    for (name, look, options) in &all {
         let file = look.to_json();
         let again = Look::from_json(&file).unwrap_or_else(|e| panic!("{name}: {e}"));
-        let (a, b) = (again.views_value(), look.views_value());
-        for (k, v) in b.as_object().unwrap() {
-            let (x, y) = (a[k].to_string(), v.to_string());
-            assert!(x == y, "{name}: the view {k}: {x:.300} against {y:.300}");
-        }
-        assert_eq!(a.to_string(), b.to_string(), "{name}: the views");
         assert_eq!(again.sections, look.sections, "{name}: the sections");
+        assert_eq!(again.map, look.map, "{name}: the map options");
         assert_eq!(again.to_json(), file, "{name}: written again");
+        // the resolution's look of version 1 gives the same look
+        if let Some(o) = options {
+            let v1 = Look::from_value(Look::resolution_value(o).unwrap()).unwrap_or_else(|e| panic!("{name}: {e}"));
+            assert_eq!(v1.to_json(), file, "{name}: version 1");
+        }
     }
 }
 
 #[test]
 fn the_sections_are_the_views() {
-    // a section's value is its theme section's (or config's) value
-    let (_, look) = &looks()[0];
-    assert_eq!(look.sections.labels.color.css(), look.theme["labels"]["color"].as_str().unwrap());
-    assert_eq!(look.sections.bridges.decks.match_zoom.f(), look.config["bridge_decks"]["match_zoom"].as_f64().unwrap());
-    assert_eq!(look.sections.labels.slot_m.f(), look.config["annotations"]["slot_m"].as_f64().unwrap());
-    assert_eq!(look.sections.page.basemap, look.config["basemap"].as_str().unwrap());
-    assert_eq!(look.sections.camera.pitch_3d.f(), look.config["camera"]["pitch_3d"].as_f64().unwrap());
-    assert_eq!(serde_json::to_value(&look.sections.access).unwrap(), look.theme["access"]);
-    assert_eq!(serde_json::to_value(&look.sections.roads.styles).unwrap(), look.styles);
-    assert_eq!(serde_json::to_value(&look.sections.roads.model).unwrap(), look.roads_model);
-    assert_eq!(serde_json::to_value(&look.sections.labels.slots).unwrap(), look.slots);
-    assert_eq!(look.sections.arrows.image, look.oneway_image);
+    // a section's value is its theme section's (or config's) value of the look of version 0
+    let (f, look) = (fixture(), Look::from_value(fixture()).unwrap());
+    let (theme, config) = (&f["theme"], &f["config"]);
+    assert_eq!(look.sections.labels.color.css(), theme["labels"]["color"].as_str().unwrap());
+    assert_eq!(look.sections.bridges.decks.match_zoom.f(), config["bridge_decks"]["match_zoom"].as_f64().unwrap());
+    assert_eq!(look.sections.labels.slot_m.f(), config["annotations"]["slot_m"].as_f64().unwrap());
+    assert_eq!(look.sections.page.basemap, config["basemap"].as_str().unwrap());
+    assert_eq!(look.sections.camera.pitch_3d.f(), config["camera"]["pitch_3d"].as_f64().unwrap());
+    assert_eq!(serde_json::to_value(&look.sections.access).unwrap(), theme["access"]);
+    assert_eq!(serde_json::to_value(&look.sections.roads.styles).unwrap(), f["styles"]);
+    assert_eq!(serde_json::to_value(&look.sections.roads.model).unwrap(), f["roads_model"]);
+    assert_eq!(serde_json::to_value(&look.sections.labels.slots).unwrap(), f["slots"]);
+    assert_eq!(look.sections.arrows.image, f["oneway_image"]);
+}
+
+/// A look file has no page key and nothing of `other`: the keywords that are not map options stay in memory.
+#[test]
+fn a_look_file_has_no_page_key() {
+    let o = Options::from_value(&json!({"args": {"name": "m", "basemap_switcher": false, "export": true, "color_by": "lanes"}})).unwrap();
+    let look = Look::resolve(&o).unwrap();
+    let keys: Vec<&String> = look.other.keys().collect();
+    assert_eq!(keys, ["basemap_switcher", "export"]);
+    let v = look.to_value();
+    assert!(v.get("args").is_none() && v["map"]["color"]["by"] == "lanes" && v["map"]["output"]["name"] == "m", "{}", v["map"]);
+    let text = look.to_json();
+    assert!(!text.contains("basemap_switcher") && !text.contains("\"export\""), "a page key in the look file");
+    assert!(Look::from_json(&text).unwrap().other.is_empty());
+    // with_arg: a map option changes the map options and keeps the others; another keyword goes to `other`
+    let l = look.with_arg("arrows", json!(false)).unwrap().with_arg("legend", json!(false)).unwrap();
+    assert!(!l.map.arrows.on && l.map.color.by.as_deref() == Some("lanes") && l.other["legend"] == false);
 }
 
 #[test]
 fn a_bad_colour_of_a_section_names_it() {
-    let (_, look) = &looks()[0];
+    let look = Look::from_value(fixture()).unwrap();
     let mut v = look.to_value();
     v["labels"]["color"] = "#zzz".into();
     let e = Look::from_value(v).unwrap_err().to_string();
     assert!(e.contains("\"#zzz\" is not a colour"), "{e}");
-    let mut v = look.views_value();
+    let mut v = fixture();
     v["theme"]["bridges"]["casing_color"] = "nocolour".into();
     let e = Look::from_value(v).unwrap_err().to_string();
     assert!(e.contains("\"nocolour\" is not a colour"), "{e}");
@@ -103,7 +126,7 @@ fn a_look_holds_no_api_key() {
     let o = Options::from_value(&json!({"settings": [{"config": {"api_key": "SECRET1", "api_keys": {"carto": "SECRET2"}, "basemap": "osm"}}],
                                         "args": {"api_key": "SECRET3", "street_view_key": "SECRET4", "name": "m"}})).unwrap();
     let look = Look::resolve(&o).unwrap();
-    for text in [look.to_json(), look.views_value().to_string(), Look::from_json(&look.to_json()).unwrap().to_json()] {
+    for text in [look.to_json(), Look::resolution_value(&o).unwrap().to_string(), Look::from_json(&look.to_json()).unwrap().to_json()] {
         assert!(!text.contains("SECRET"), "a key in the look: {}", &text[text.find("SECRET").unwrap().saturating_sub(80)..][..120]);
     }
     assert_eq!(look.sections.page.basemap, "osm", "the settings' other config keys stay");
@@ -122,10 +145,13 @@ fn a_look_holds_no_api_key() {
     }
     let mut found = Vec::new();
     keys_with_values(&look.to_value(), "", &mut found);
-    keys_with_values(&look.views_value(), "", &mut found);
+    keys_with_values(&Look::resolution_value(&o).unwrap(), "", &mut found);
     assert!(found.is_empty(), "{found:?}");
-    let schema = roadstyle_look::sections::schema().to_string();
-    assert!(!schema.to_lowercase().contains("key\":"), "a field with \"key\" in its name in look.schema.json");
+    // the map options' colour table has a `key` (its join column, "edge_id"), which is not an API key
+    let schema = roadstyle_look::sections::schema().to_string().to_lowercase();
+    for k in ["api_key", "api_keys", "street_view_key"] {
+        assert!(!schema.contains(&format!("\"{k}\"")), "the field {k} in look.schema.json");
+    }
 }
 
 /// The tunnel look's rule (render_web._tun_settings, the texts of Python's _check_tunnels): each colour of tunnel_towards a "#rrggbb",

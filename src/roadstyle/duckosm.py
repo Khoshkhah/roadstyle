@@ -148,8 +148,8 @@ def page(db, mode: str = "all", *, theme: str = "osm", paths: str = "google", la
     o = _options(db, mode, theme, paths, level_kw, kw)
     lk = rust().resolve_look(json.dumps(o))
     # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
-    args = json.loads(lk.part("args"))
-    given = page_given({**{k: args.get(k) for k in ("basemap", "basemaps")}, **kw})
+    page = json.loads(lk.part("base_map_page"))
+    given = page_given({**{k: page.get(k) for k in ("basemap", "basemaps")}, **kw}, lk=lk, args=o["args"])
     html = rust().page_from(roads, lk, json.dumps(o), json.dumps(given), features)
     _warn()
     return rw.WebMap(html)
@@ -184,17 +184,17 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
     t = rust().Tiler(roads, lk, features, None, "", keep)
     _warn()
     bounds = tuple(float(v) for v in shapely.total_bounds(shapely.from_wkb(roads.column("geometry").to_numpy(zero_copy_only=False))))
-    return _write_export(t, out_dir, base_url, format, json.loads(lk.part("args"))["name"], bounds)
+    return _write_export(t, out_dir, base_url, format, json.loads(lk.part("map"))["output"]["name"], bounds)
 
 
 def base_map(mode: str = "all", *, theme: str = "osm", paths: str = "google") -> dict:
     """The base map's look of one choice (roadstyle-look's basemap.rs; mapstyle's mode_settings and styles): {"palette": the roads'
     palette name, "settings": its settings source, "features": the base map's part of the look (its layers, 3D heights, style and
-    images), "args": the mode's map options}."""
+    images), "map": the look's map options with the mode's, "page": the mode's page defaults}."""
     from ._engine import rust
 
     lk = rust().resolve_look(json.dumps({"base_map": {"mode": mode, "theme": theme, "paths": paths}}))
-    return {k: json.loads(lk.part(k)) for k in ("palette", "settings", "features", "args")}
+    return {**{k: json.loads(lk.part(k)) for k in ("palette", "settings", "features", "map")}, "page": json.loads(lk.part("base_map_page"))}
 
 
 def theme(name: str = "osm"):

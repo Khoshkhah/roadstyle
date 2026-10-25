@@ -67,18 +67,21 @@ impl PyLook {
         self.0.to_json()
     }
 
-    /// part(key) -> str: the JSON text of one part of the look: "args" (the map options), "config", "theme", "palette" (its name),
-    /// "settings" (the settings sources as given) or "features" (the base map's part).
+    /// part(key) -> str: the JSON text of one part of the look: "map" (the map options), "sections" (the typed look), "palette" (its
+    /// name), "settings" (the settings sources as given), "features" (the base map's part, null with none), "other" (the call's keywords
+    /// that are not map options) or "base_map_page" (the base map's page defaults). "other" and "base_map_page" are never in the file.
     fn part(&self, key: &str) -> PyResult<String> {
         let l = &self.0;
+        let json = |v: serde_json::Result<serde_json::Value>| v.expect("a part of the look is JSON").to_string();
         match key {
-            "args" => Ok(l.args.to_string()),
-            "config" => Ok(l.config.to_string()),
-            "theme" => Ok(l.theme.to_string()),
+            "map" => Ok(json(serde_json::to_value(&l.map))),
+            "sections" => Ok(json(serde_json::to_value(&l.sections))),
             "palette" => Ok(serde_json::Value::from(l.palette.as_str()).to_string()),
             "settings" => Ok(l.settings.to_string()),
-            "features" => Ok(l.features.to_string()),
-            _ => Err(PyValueError::new_err(format!("part {key:?}: the parts are args, config, theme, palette, settings and features"))),
+            "features" => Ok(json(serde_json::to_value(&l.sections.base_map))),
+            "other" => Ok(serde_json::Value::Object(l.other.clone()).to_string()),
+            "base_map_page" => Ok(serde_json::Value::Object(l.base_map_page.clone()).to_string()),
+            _ => Err(PyValueError::new_err(format!("part {key:?}: the parts are map, sections, palette, settings, features, other and base_map_page"))),
         }
     }
 

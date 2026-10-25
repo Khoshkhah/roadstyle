@@ -16,7 +16,7 @@ fn data(p: &str) -> PathBuf {
 /// An area's look: its options (golden_options.json.gz), as an export (the roads source too, audit N2).
 fn look(area: &str) -> roadstyle_rs::Look {
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
-    let mut look = roadstyle_rs::look::make_look(&o).unwrap();
+    let mut look = roadstyle_rs::Look::resolution_value(&roadstyle_rs::look::Options::from_value(&o).unwrap()).unwrap();
     look["args"]["export"] = true.into();
     roadstyle_rs::Look::from_value(look).unwrap()
 }
@@ -52,7 +52,10 @@ fn style(area: &str) -> Value {
 fn page(area: &str) -> Value {
     let t = roadstyle_rs::read::read_roads(roads(area), "geometry").unwrap();
     let l = look(area).with_arg("state", "live".into()).unwrap();
-    let p = roadstyle_rs::page_options::page_from(t, None, &l, &roadstyle_rs::look::Options::default(), &serde_json::Map::new()).unwrap();
+    // the page's keys come from the call (the area's options), not from the look
+    let mut given = common::gz_json(&format!("{area}/golden_options.json.gz"))["args"].as_object().cloned().unwrap_or_default();
+    given.extend([("export".to_string(), json!(true)), ("state".to_string(), json!("live"))]);
+    let p = roadstyle_rs::page_options::page_from(t, None, &l, &roadstyle_rs::look::Options::default(), &given).unwrap();
     json!({"page": text(p.html.as_bytes()), "warnings": p.warnings})
 }
 

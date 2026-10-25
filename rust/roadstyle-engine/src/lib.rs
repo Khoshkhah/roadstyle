@@ -126,7 +126,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         ov.edge_id_col = look.map.columns.edge_id.clone();
     }
     // render's simple=False (the full look: a layer for each drawing position) is the Python engine's only (plan decision 2)
-    if look.args["simple"] == false {
+    if look.other.get("simple") == Some(&Value::Bool(false)) {
         return Err(Error::Unsupported(Unsupported::FullLook));
     }
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
@@ -168,7 +168,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let live = look.map.output.state == roadstyle_look::options::State::Live;
     // audit N2 (2026-10-24): stage 1 gives the road-table form for every style (the pieces draw and glow, by their road's row; the road
     // table has the roads); only an export (render's export_inline, export_style: an app with no road table) asks for the roads source
-    let export = look.args["export"] == true;
+    let export = export(look);
     (roads.in_style, simple.promote) = (export, true);
     let (contract, state) = if live {
         let st = contract::page_state(look, colors.active, ovs.len());
@@ -221,7 +221,6 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let mut metadata = serde_json::Map::new();
     // the export's page metadata: the road popup's fields, the hover tooltip and the hover delay (roadstyle:interaction)
     let it = &look.sections.interaction;
-    let args = &look.args;
     // render's road_popup: true (or not given) the default fields, a list those fields, "panel" the default fields in the side panel,
     // another text every column (null), false no popup; road_tooltip, else the folium name tooltip, else none
     use roadstyle_look::options::{Popup, Tooltip};
@@ -236,8 +235,8 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         Some(Tooltip::Fields(f)) => json!(f),
         None => json!(false),
     };
-    let delay = args["hover_delay_ms"].as_f64().map_or_else(|| json!(it.hover_delay_ms), |d| json!(d as i64));
-    metadata.insert("roadstyle:interaction".into(), json!({"popup": popup, "tooltip": tooltip, "hover_delay_ms": delay}));
+    // the look's hover delay: render's hover_delay_ms is a page key (the page's options, a host's own)
+    metadata.insert("roadstyle:interaction".into(), json!({"popup": popup, "tooltip": tooltip, "hover_delay_ms": it.hover_delay_ms}));
     metadata.insert("roadstyle:images".into(), Value::Object(images));
     if let Some((k, v)) = planned {
         metadata.insert(k.into(), v);
@@ -271,7 +270,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         metadata.insert("roadstyle:controls".into(), controls);
     }
     let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
-    data_settings(&mut sources, &look.args);
+    data_settings(&mut sources, &look.other);
     cols.to_user(&mut sources, &mut layers);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
 }
@@ -451,10 +450,17 @@ impl ColumnMap {
     }
 }
 
-/// render's data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance).
-fn data_settings(sources: &mut [(String, Src)], args: &Value) {
-    let maxzoom = args["data_maxzoom"].as_f64().map(|z| z as i64);
-    let tolerance = args["data_tolerance"].as_f64();
+/// render's export (export_inline, export_style: a style for an app with no road table). A key of the style writer: read from the look's
+/// `other` until T4 moves it to SourceMode::Inline.
+pub(crate) fn export(look: &Look) -> bool {
+    look.other.get("export") == Some(&Value::Bool(true))
+}
+
+/// render's data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance). Keys of the style writer:
+/// read from the look's `other` until T4 moves them to SourceMode::Inline.
+fn data_settings(sources: &mut [(String, Src)], other: &serde_json::Map<String, Value>) {
+    let maxzoom = other.get("data_maxzoom").and_then(Value::as_f64).map(|z| z as i64);
+    let tolerance = other.get("data_tolerance").and_then(Value::as_f64);
     for (_, src) in sources.iter_mut() {
         match src {
             Src::Roads(s) => {
