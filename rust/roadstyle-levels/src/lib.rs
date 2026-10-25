@@ -271,7 +271,7 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
             crossings = rules.crossings.len();
             crossings_not_kept = s.crossings_not_kept.iter().map(|&(c, p, h)| (id(c), id(p), h)).collect();
             stages = s.stages;
-            solved_rows(edges, &roads, &rules, &s, o.head_m)
+            solved_rows(edges, &roads, &rules, &s, o.head_m, o.max_level)?
         }
     };
     let ids: Vec<i64> = rows.iter().map(|r| r.edge_id).collect();
@@ -515,6 +515,38 @@ fn tags(edges: &[&LevelEdge], ends: &[(u32, u32)]) -> Vec<Row> {
         .collect()
 }
 
+/// The solver's numbers (`parts`, in the box [0, 2 max_level]) around the ground: the main casing number that most edges have
+/// (`weight`: the edges of each road) becomes 0 and the numbers become consecutive (roadstyle's _compress). Then, if a number is out of
+/// the box [-max_level, max_level], the ground moves by the smallest step that puts all numbers in the box, so that the answer is a
+/// correct `fixed` input again. An error when the answer has more than 2 max_level + 1 different numbers (a margin below 1).
+pub(crate) fn to_ground(parts: &[[i64; 4]], weight: &[usize], max_level: i64) -> Result<Vec<[i64; 4]>, Error> {
+    let mut count: HashMap<i64, usize> = HashMap::new();
+    for (p, &w) in parts.iter().zip(weight) {
+        *count.entry(p[1]).or_default() += w;
+    }
+    let ground = count
+        .iter()
+        .max_by_key(|(v, c)| (**c, -**v))
+        .map_or(0, |(v, _)| *v);
+    let mut values: Vec<i64> = parts.iter().flatten().copied().chain([ground]).collect();
+    values.sort_unstable();
+    values.dedup();
+    let top = values.len() as i64 - 1;
+    if top > 2 * max_level {
+        return Err(Error::Options(format!(
+            "compute_levels: the answer has {} different numbers, more than the box [-max_level, max_level] holds ({}): \
+             make max_level larger or the margin 1 or more",
+            top + 1,
+            2 * max_level + 1
+        )));
+    }
+    let zero = (values.binary_search(&ground).unwrap() as i64).clamp(top - max_level, max_level);
+    Ok(parts
+        .iter()
+        .map(|p| p.map(|v| values.binary_search(&v).unwrap() as i64 - zero))
+        .collect())
+}
+
 /// The rows of a solve (`solve_levels`, then duckOSM's level area with its defaults): the casing number of most
 /// edges becomes 0 (the ground), the numbers become consecutive, an edge against its road gets the heads the other
 /// way round; the heads are 5 m, a cap is round, square at the dead end of a two-way road (`dead_end_cap`).
@@ -524,21 +556,13 @@ fn solved_rows(
     rules: &solve::Rules,
     s: &solve::Solved,
     head_m: f64,
-) -> Vec<Row> {
-    let mut count: HashMap<i64, usize> = HashMap::new();
+    max_level: i64,
+) -> Result<Vec<Row>, Error> {
+    let mut weight = vec![0; roads.first.len()];
     for &r in &roads.road {
-        *count.entry(s.parts[r][1]).or_default() += 1;
+        weight[r] += 1;
     }
-    let ground = count
-        .iter()
-        .max_by_key(|(v, c)| (**c, -**v))
-        .map_or(0, |(v, _)| *v);
-    let mut values: Vec<i64> = s.parts.iter().flatten().map(|v| v - ground).collect();
-    values.push(0);
-    values.sort_unstable();
-    values.dedup();
-    let zero = values.binary_search(&0).unwrap() as i64;
-    let small = |v: i64| values.binary_search(&(v - ground)).unwrap() as i64 - zero;
+    let parts = to_ground(&s.parts, &weight, max_level)?;
     let met: HashSet<(usize, usize)> = rules
         .meets
         .iter()
@@ -560,12 +584,12 @@ fn solved_rows(
             "round"
         }
     };
-    edges
+    Ok(edges
         .iter()
         .enumerate()
         .map(|(i, e)| {
             let r = roads.road[i];
-            let [a0, am, a2, b] = s.parts[r].map(small);
+            let [a0, am, a2, b] = parts[r];
             let (cs, ce) = (cap(r, 0), cap(r, 2));
             let (casing_start, casing_end, cap_start, cap_end) = if roads.same[i] {
                 (a0, a2, cs, ce)
@@ -584,7 +608,7 @@ fn solved_rows(
                 cap_end: Some(cap_end),
             }
         })
-        .collect()
+        .collect())
 }
 
 #[cfg(test)]
@@ -597,6 +621,17 @@ mod tests {
     }
 
     use super::*;
+
+    /// The ground of most edges is the lowest number, and the highest number is 4 above it: the ground moves up by 2, so that every
+    /// number is in the box [-2, 2]. Six different numbers do not go in the box of max_level 2.
+    #[test]
+    fn the_ground_keeps_the_box() {
+        let parts = [[0, 0, 0, 1], [0, 0, 0, 1], [3, 3, 3, 4]];
+        assert_eq!(to_ground(&parts, &[1, 1, 1], 20).unwrap(), [[0, 0, 0, 1], [0, 0, 0, 1], [2, 2, 2, 3]]);
+        let parts = [[0, 0, 0, 1], [0, 0, 0, 1], [2, 2, 3, 4]];
+        assert_eq!(to_ground(&parts, &[1, 1, 1], 2).unwrap(), [[-2, -2, -2, -1], [-2, -2, -2, -1], [0, 0, 1, 2]]);
+        assert!(to_ground(&[[0, 1, 2, 5], [3, 4, 4, 5]], &[1, 1], 2).is_err());
+    }
 
     #[test]
     fn the_tags_rule_on_two_edges() {

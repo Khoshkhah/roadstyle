@@ -286,21 +286,8 @@ impl Area {
         }
         let steps = (2.0 * max_level as f64 / margin + 1e-9).floor() as i64;
         let s = solve::solve(&rules, steps, true)?;
-        // the main casing number that most edges have is the ground; then small consecutive numbers (roadstyle's _compress)
-        let mut count: HashMap<i64, usize> = HashMap::new();
-        for (r, road) in self.roads.iter().enumerate() {
-            *count.entry(s.parts[r][1]).or_default() += road.edges.len() + road.reversed.len();
-        }
-        let ground = count
-            .iter()
-            .max_by_key(|(v, c)| (**c, -**v))
-            .map_or(0, |(v, _)| *v);
-        let mut values: Vec<i64> = s.parts.iter().flatten().map(|v| v - ground).collect();
-        values.push(0);
-        values.sort_unstable();
-        values.dedup();
-        let zero = values.binary_search(&0).unwrap() as i64;
-        let small = |v: i64| values.binary_search(&(v - ground)).unwrap() as i64 - zero;
+        let weight: Vec<usize> = self.roads.iter().map(|road| road.edges.len() + road.reversed.len()).collect();
+        let levels = crate::to_ground(&s.parts, &weight, max_level)?;
         let both: HashSet<(usize, usize)> = rules
             .lifts
             .iter()
@@ -313,7 +300,7 @@ impl Area {
                 .collect()
         };
         Ok(AreaSolved {
-            levels: s.parts.iter().map(|p| p.map(small)).collect(),
+            levels,
             given_up: s.given_up.clone(),
             given_up_parts: side(&s.given_up_parts),
             near_parts: side(&s.near_not_kept),
