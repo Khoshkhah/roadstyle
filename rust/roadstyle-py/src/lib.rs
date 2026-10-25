@@ -455,20 +455,7 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
     let cat = duckosm::Catalog { tables, columns };
     let run = duckosm::Run::new(&run.unwrap_or_else(new_run)).map_err(|e| PyValueError::new_err(e.to_string()))?;
     let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| PyValueError::new_err(format!("specs: {e}")))?;
-    // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
-    let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode), &run) {
-        Ok(r) => (Some(r), None),
-        Err(e) => (None, Some(e)),
-    };
-    let select = duckosm::roads_select(mode, &run).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let made = duckosm::features_sql(&cat, &specs);
-    let drop = run.drop_sql(&made.iter().map(|l| l.spec).collect::<Vec<_>>());
-    let layers: Vec<serde_json::Value> = made.into_iter()
-        .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "table": run.feature(l.spec), "sql": l.sql})).collect();
-    let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
-    let subset = (only && !tags).then(|| [duckosm::subset_sql(&run), duckosm::ids_sql(&run)]);
-    Ok(serde_json::json!({"run": run.id(), "roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers,
-                          "subset": subset, "drop": drop, "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
+    duckosm::plan(&cat, mode, tags, &specs, only, &run).map(|v| v.to_string()).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 /// A new run id of this process (duckosm_plan's default).

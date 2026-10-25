@@ -440,20 +440,12 @@ mod wasm {
         let cat = duckosm::Catalog { tables: rows("tables").iter().map(|r| (text(&r[0]), text(&r[1]))).collect(),
                                      columns: rows("columns").iter().map(|r| (text(&r[0]), text(&r[1]), text(&r[2]))).collect() };
         let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| err(format!("specs: {e}")))?;
-        let made = duckosm::features_sql(&cat, &specs);
-        let drop = run.drop_sql(&made.iter().map(|l| l.spec).collect::<Vec<_>>());
-        let layers: Vec<serde_json::Value> = made.into_iter()
-            .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "table": run.feature(l.spec), "sql": l.sql})).collect();
-        // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
-        let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode), &run) {
-            Ok(r) => (Some(r), None),
-            Err(e) => (None, Some(e)),
-        };
-        Ok(serde_json::json!({"catalog": queries, "run": run.id(), "roads": roads, "roads_error": roads_error,
-                              "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
-                              "select": duckosm::roads_select(mode, &run).map_err(String::from).map_err(err)?, "layers": layers,
-                              "subset": (only && !tags).then(|| [duckosm::subset_sql(&run), duckosm::ids_sql(&run)]), "drop": drop,
-                              "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
+        let plan = duckosm::plan(&cat, mode, tags, &specs, only, &run).map_err(String::from).map_err(err)?;
+        // the catalog's queries first, then the plan (its keys in their order)
+        let mut out = serde_json::Map::new();
+        out.insert("catalog".into(), serde_json::json!(queries));
+        out.extend(plan.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
+        Ok(serde_json::Value::Object(out).to_string())
     }
 
     /// duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row

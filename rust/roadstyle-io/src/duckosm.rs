@@ -306,6 +306,28 @@ const LEVEL_OPTIONAL: [&str; 5] = ["walk_type", "junction", "name", "edge_ref", 
 /// driving, walking, cycling, `edges` before `private_edges`); `driving` and `cycling` (in that mode's network); `oneway` (the driving
 /// network's, NULL off it); `modes` ("driving + walking"; a cycling edge where bikes are pushed is walked; a private road only: its
 /// modes with " (private)"; "bus" where a bus route runs); `bus_lines` (the refs of bus.route_edges, "1, 2, 5"); the line as WKB in
+/// The SQL that reads a duckOSM file, as one JSON value (the bindings' duckosm_plan): {"run": the run's id, "roads": the 3 statements of
+/// the roads (null when the file has no network of `mode`: "roads_error" says why), "meta": the stored levels' query (null with `tags`),
+/// "select": the roads of `mode`, "layers": [{"spec", "name", "table", "sql"}] of the base map (`specs`: layers.yaml's layers), "subset":
+/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids, "drop": the statement that
+/// drops the run's tables, "level_edges": the edges of the file's level area}.
+pub fn plan(cat: &Catalog, mode: &str, tags: bool, specs: &[Value], only: bool, run: &Run) -> Result<Value, Error> {
+    // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
+    let (roads, roads_error) = match roads_sql(cat, tags, only.then_some(mode), run) {
+        Ok(r) => (Some(r), None),
+        Err(e) => (None, Some(e)),
+    };
+    let select = roads_select(mode, run)?;
+    let made = features_sql(cat, specs);
+    let drop = run.drop_sql(&made.iter().map(|l| l.spec).collect::<Vec<_>>());
+    let layers: Vec<Value> = made.into_iter()
+        .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "table": run.feature(l.spec), "sql": l.sql})).collect();
+    let meta = (!tags).then_some(LEVELS_META_SQL);
+    let subset = (only && !tags).then(|| [subset_sql(run), ids_sql(run)]);
+    Ok(serde_json::json!({"run": run.id(), "roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers,
+                          "subset": subset, "drop": drop, "level_edges": level_edges_sql(cat).ok()}))
+}
+
 /// `geometry`. A SELECT: a page writes it as Parquet (`COPY (...) TO`) for makeArea.
 pub fn level_edges_sql(cat: &Catalog) -> Result<String, Error> {
     let modes: Vec<&str> = MODES.iter().copied().filter(|m| cat.has_table(m, "edges")).collect();
