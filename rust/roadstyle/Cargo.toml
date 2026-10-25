@@ -12,6 +12,8 @@ roadstyle-engine.workspace = true
 roadstyle-assets.workspace = true
 roadstyle-io.workspace = true
 roadstyle-levels.workspace = true
+roadstyle-look.workspace = true
+roadstyle-model.workspace = true
 roadstyle-tiles.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

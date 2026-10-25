@@ -2977,6 +2977,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             raise ValueError(f"access_col {access_col!r} is not a column of the edges")
         g = g.copy()
         g["__rs_access"] = g[access_col].where(g[access_col].isin([a[0] for a in _ACCESS]), None).astype(object)   # ``__rs_*`` goes with every piece (_mark_cls: also with the names and arrows)
+    if not (casing_level_col or fill_level_col) and {"casing_level", "fill_level"} & set(g.columns):
+        # duckOSM's stored levels (2026-10-25, as the Rust engine's compute_levels): an input column with a contract name is the level input
+        casing_level_col, fill_level_col, casing_start_col, casing_end_col = (
+            c if c in g.columns else None for c in ("casing_level", "fill_level", "casing_start", "casing_end"))
     if not (casing_level_col or fill_level_col):       # the only way of drawing: positions, computed here with the level step's defaults
         from .levels import compute_levels
         g = compute_levels(g, layer_col=layer_col, bridge_col=bridge_col, tunnel_col=tunnel_col, method="solve",
@@ -3751,7 +3755,10 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            "bridges": any((f.get("properties") or {}).get("lvl", 0) > 0
                           for f in geo.get("features", [])),
            "tunnels": any((f.get("properties") or {}).get("lvl", 0) < 0
-                          for f in geo.get("features", []))}
+                          for f in geo.get("features", [])),
+           # the class minzoom (2026-10-25): the first zoom of each class of the panel that has one (the Roads box dims a hidden
+           # class); None when the minzoom is off (contract.rs filter_panel)
+           "minzoom": {c: mz[c] for c in classes if (mz.get(c) or 0) > 0} if mz else None}
 
     view_list = _check_views(views, [o["name"] for o in color_opts_meta or []] if color_options else [],
                              [o["label"] for o in ov_meta], classes, [b["key"] for b in bms], _settings.style_names("palettes"))

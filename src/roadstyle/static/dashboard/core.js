@@ -38,6 +38,16 @@ export function useStyle(st){
   RS_ROLES = new Set(Object.keys(O.sources || (style.metadata || {})["roadstyle:sources"] || {}));
   _decks = null;
   _checkPromote();
+  _useState();
+}
+// the style's global state (roadstyle:state: rs_co, rs_fill_on, ...): the start value of each name that the map does not have yet. A
+// host that adds a live style's layers to its own map has none of them (they are in the style's own "state"); a value that the map has
+// (the host's, the user's) stays. MapLibre takes a value only when its style is loaded: before that, on style.load
+function _useState(){
+  const st = (style.metadata || {})["roadstyle:state"];
+  if(!st) return;
+  const set = () => { const have = map.getGlobalState(); for(const k in st) if(!(k in have)) map.setGlobalStateProperty(k, st[k]); };
+  try { set(); } catch(e){ if(!/not done loading/.test(e.message)) throw e; map.once("style.load", set); }
 }
 // simple mode needs the pieces' row as their id (promoteId "__rs_edge"): else the glow by row lights other pieces. Checked when the map has
 // the source (at the start: on "load")

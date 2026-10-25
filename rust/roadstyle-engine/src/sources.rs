@@ -3,6 +3,7 @@
 //! the base map, ...) and the road table (every field of each road, by its row). Nothing here is about tiles: stage 2 (roadstyle-tiles)
 //! cuts the sources, from memory or from the files that this output is saved as (GeoJSON or GeoParquet: the facade and roadstyle-io).
 
+use roadstyle_model::mark::Mark;
 use crate::road::RoadsSource;
 use crate::{take_roads, Parts, Roads, RoadTable, Src};
 use roadstyle_model::table::JsSafe;
@@ -124,7 +125,7 @@ impl Sources {
             s.insert("data".into(), data);
             s.insert("tolerance".into(), tolerance.into());
             if promote {
-                s.insert("promoteId".into(), "__rs_edge".into());
+                s.insert("promoteId".into(), Mark::Edge.name().into());
             }
             if let Some(z) = maxzoom {
                 s.insert("maxzoom".into(), z.into());

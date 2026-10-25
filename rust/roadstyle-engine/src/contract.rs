@@ -3,9 +3,11 @@
 //! `roadstyle:controls` the options of rsDashboard that come from the style (render_web.render's `page`: the filter panel, the overlays,
 //! the tunnel look, the road fill, the arrows' rules, ...). The page's own options (the base maps, Street View, the panel) are not here.
 
+use roadstyle_model::mark::Mark;
 use crate::layers::{Model, PageInfo};
 use crate::road::{Road, Roads};
 use roadstyle_model::Cell;
+use roadstyle_look::sections::Num;
 use serde_json::{json, Map, Value};
 
 /// The version of the contract (metadata roadstyle:contract).
@@ -14,27 +16,17 @@ pub const CONTRACT: i64 = 1;
 /// _ACCESS: the access kinds and the text of their row in the filter panel.
 const ACCESS: [(&str, &str); 4] = [("private", "Private roads"), ("bus", "Bus lanes"), ("pedestrian", "Pedestrian streets"), ("delivery", "Delivery only")];
 
-fn merged(a: &Value, b: &Value) -> Map<String, Value> {
-    let mut m = a.as_object().cloned().unwrap_or_default();
-    m.extend(b.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
-    m
-}
-
 /// The page's global state and the start value of each (render_web: style["state"]), in Python's order. `active`: the colour option.
 pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<String, Value> {
-    let (th, cfg) = (&look.theme, &look.config);
-    let towards = cfg["tunnel_towards"].as_object().cloned().unwrap_or_default();
-    let toward = &cfg["tunnel_toward"];
-    let colour = toward.as_str().and_then(|t| towards.get(t)).cloned().unwrap_or_else(|| toward.clone());
-    let pair = cfg["tunnel_palette"].as_str().and_then(|p| cfg["tunnel_palettes"].get(p)).filter(|v| !v.is_null()).cloned();
-    let dash = &th["tunnels"]["to"]["dash"];
-    let ratio: Vec<f64> = cfg["tunnel_casing_dash"].as_array().filter(|a| !a.is_empty()).map(|a| a.iter().filter_map(Value::as_f64).collect())
-        .unwrap_or_else(|| vec![1.0, 1.0]);
+    let tu = &look.sections.tunnels;
+    let pair = tu.pair();
+    let dash = &tu.to["dash"];
+    let ratio: Vec<f64> = Some(&tu.casing_dash).filter(|a| !a.is_empty()).map(|a| a.iter().map(Num::f).collect()).unwrap_or_else(|| vec![1.0, 1.0]);
     // render's road_fill: the start value of rs_fill_on (off: each fill's opacity is 0)
-    let road_fill = !matches!(look.args["road_fill"], Value::Bool(false));
+    let road_fill = look.map.roads.fill;
     let mut state = json!({"rs_co": active, "rs_top": [], "rs_fill_on": road_fill,
-        "rs_tun_strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0), "rs_tun_toward": colour, "rs_tun_two": pair.is_some(),
-        "rs_tun_c0": pair.as_ref().map_or(dash, |p| &p[0]), "rs_tun_c1": pair.as_ref().map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
+        "rs_tun_strength": tu.strength.f(), "rs_tun_toward": tu.toward_color(), "rs_tun_two": pair.is_some(),
+        "rs_tun_c0": pair.map_or(dash, |p| &p[0]), "rs_tun_c1": pair.map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
         .as_object().unwrap().clone();
     for i in 0..n_overlays {
         state.insert(format!("rs_ov_{i}"), json!({}));
@@ -49,11 +41,12 @@ pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<S
 /// restricted one), the access kinds with their counts (access_col), and whether there are bridges and tunnels.
 fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
     let args = &look.args;
-    let fb_fill = &look.theme["roads"]["fallback"]["fill"];
-    let col = args["filter_col"].as_str().or_else(|| args["highway_col"].as_str()).filter(|c| !c.is_empty()).unwrap_or("highway");
+    let fb_fill = &look.sections.roads.fallback["fill"];
+    let c = &look.map.columns;
+    let col = crate::roads::named(&c.filter).unwrap_or(if c.class.is_empty() { "highway" } else { &c.class });
     let (mut classes, mut seen, mut swatches, mut by_access) = (Vec::<String>::new(), std::collections::HashSet::new(), Map::new(),
                                                                std::collections::HashSet::new());
-    let restricted = |p: Road| p.get("__rs_access").map(Cell::to_value).is_some_and(|a| !a.is_null() && a != false && a != "");
+    let restricted = |p: Road| p.get(Mark::Access.name()).map(Cell::to_value).is_some_and(|a| !a.is_null() && a != false && a != "");
     for p in roads.iter() {
         let cls = p.cls();
         let Some(c) = cls.as_str().filter(|c| !c.is_empty()) else { continue };
@@ -66,14 +59,14 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
             if restricted(p) {
                 by_access.insert(c.to_string());
             }
-            swatches.insert(c.into(), p.get("__rs_fill").filter(|v| crate::layers::py_truth(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
+            swatches.insert(c.into(), p.get(Mark::Fill.name()).filter(|v| crate::layers::py_truth(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
         }
     }
     classes.sort_by(|a, b| m.z_of(b).total_cmp(&m.z_of(a)).then_with(|| a.cmp(b)));
     let mut access = Vec::new();
-    if args["access_col"].as_str().is_some_and(|c| !c.is_empty()) {
-        let n = |k: &str| roads.iter().filter(|f| f.get("__rs_access").and_then(Cell::as_str) == Some(k)).count();
-        access = ACCESS.iter().filter(|(k, _)| n(k) > 0).map(|(k, label)| json!([k, look.theme["access"][*k], label, n(k)])).collect();
+    if crate::roads::named(&look.map.columns.access).is_some() {
+        let n = |k: &str| roads.iter().filter(|f| f.get(Mark::Access.name()).and_then(Cell::as_str) == Some(k)).count();
+        access = ACCESS.iter().filter(|(k, _)| n(k) > 0).map(|(k, label)| json!([k, look.sections.access.get(*k), label, n(k)])).collect();
         // driving's pedestrian streets that cars may not use have their own row: where no usable road is of the class, a class row would
         // be a second switch for them
         if n("pedestrian") > 0 && classes.iter().any(|c| c == "pedestrian")
@@ -82,8 +75,13 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
         }
     }
     let lvl = |f: Road| f.get("lvl").and_then(Cell::as_f64).unwrap_or(0.0);
+    // the class minzoom (2026-10-25): the first zoom of each class of the panel that has one, so the Roads box dims a hidden class;
+    // null when the minzoom is off
+    let minzoom = crate::layers::class_minzoom(look).map(|t| {
+        classes.iter().filter_map(|c| t.get(c).filter(|z| z.as_f64().is_some_and(|z| z > 0.0)).map(|z| (c.clone(), z.clone()))).collect::<Map<_, _>>()
+    });
     json!({"on": args["filter_control"] != false && !classes.is_empty(), "col": col, "classes": classes, "access": access, "swatches": swatches,
-           "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0)})
+           "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0), "minzoom": minzoom})
 }
 
 /// roadstyle:sources: each road role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of
@@ -140,40 +138,37 @@ pub fn arrow_kind(layers: &[Value]) -> Value {
 }
 
 /// roadstyle:controls: the options of rsDashboard that the style gives (render_web.render's `page`, in its order).
-pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, String> {
-    let (th, cfg, args) = (&look.theme, &look.config, &look.args);
+pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, crate::Error> {
+    let (s, args) = (&look.sections, &look.args);
     let m = &look.model;
-    let cam = merged(&json!({"pitch": 0, "bearing": 0, "pitch_3d": 55, "max_pitch": 70}), &cfg["camera"]);
-    let select = match &args["select_color"] { Value::Null => th["selection"]["select"].clone(), v => v.clone() };
-    let arw = merged(&th["arrows"], &cfg["arrows"]);
-    let place = &arw["place"];
-    let towards = cfg["tunnel_towards"].as_object().cloned().unwrap_or_default();
-    let toward = &cfg["tunnel_toward"];
-    let colour = toward.as_str().and_then(|t| towards.get(t)).cloned().unwrap_or_else(|| toward.clone());
-    let mut to = th["tunnels"]["to"].as_object().cloned().unwrap_or_default();
-    to.insert("fill".into(), colour);
-    let control = args["tunnel_control"] == true && !info.tunnel_layers.is_empty();
-    let ratio = cfg["tunnel_casing_dash"].as_array().filter(|a| !a.is_empty()).cloned().unwrap_or_else(|| vec![json!(1), json!(1)]);
-    let tunnel = json!({"layers": info.tunnel_layers, "dash": info.tunnel_dash, "casing": info.tunnel_casing, "strength": cfg["tunnel_strength"].as_f64().unwrap_or(0.0),
-        "palette": cfg["tunnel_palette"], "palettes": cfg["tunnel_palettes"], "ratio": ratio,
+    let mo = &look.map;
+    let select = json!(mo.interaction.select_color.as_ref().unwrap_or(&s.selection.select).css());
+    let (arw, tu) = (&s.arrows, &s.tunnels);
+    let place = &arw.place;
+    let mut to = tu.to.clone();
+    to.insert("fill".into(), tu.toward_color().into());
+    let control = mo.tunnels.control && !info.tunnel_layers.is_empty();
+    let ratio = if tu.casing_dash.is_empty() { json!([1, 1]) } else { json!(tu.casing_dash) };
+    let tunnel = json!({"layers": info.tunnel_layers, "dash": info.tunnel_dash, "casing": info.tunnel_casing, "strength": tu.strength.f(),
+        "palette": tu.palette, "palettes": tu.palettes, "ratio": ratio,
         // the canvas colour of the base map: the page that adds a base map sets its own
-        "bg": th["background"]["light"], "steps": th["tunnels"]["steps"], "ratios": th["tunnels"]["ratios"],
-        "toward": toward, "towards": cfg["tunnel_towards"], "to": to, "control": control});
-    let items = if args["items"].is_null() { Value::Null } else { json!({"label": "items", "popup": args["items_popup"], "layer": "roads-simple"}) };
+        "bg": s.background.light, "steps": tu.steps, "ratios": tu.ratios,
+        "toward": tu.toward, "towards": tu.towards, "to": to, "control": control});
+    let items = mo.items.as_ref().map_or(Value::Null, |it| json!({"label": "items", "popup": it.popup, "layer": "roads-simple"}));
     // a page is in simple mode, in both ways: the pieces pick and glow (the road layer roads-simple), and there are no fill layers
     // the facts of the look and of the roads that a host's dashboard needs; the caller's page keywords (tiles, views, the base maps, ...)
     // are not here: the page gives them (RS_OPTIONS, page_options::page_from), as a host does (rule 5, R3)
-    let mut out = json!({"simple": "roads-simple", "pitch_3d": cam["pitch_3d"],
+    let mut out = json!({"simple": "roads-simple", "pitch_3d": s.camera.pitch_3d,
         "select_color": select, "filter": filter_panel(look, roads, m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
-        "fill_layers": [], "road_fill": {"on": args["road_fill"] != false, "paint": info.fill_paint}, "dashes": info.dashes,
-        "items": items, "edge_id_col": args["edge_id_col"].as_str().unwrap_or("edge_id"), "arrow_icon": arw["icon"], "arrow_color": arw["color"],
-        "arrow_rules": {"mainBelow": arw["main_below"], "main": arw["main"], "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],
+        "fill_layers": [], "road_fill": {"on": mo.roads.fill, "paint": info.fill_paint}, "dashes": info.dashes,
+        "items": items, "edge_id_col": mo.columns.edge_id.as_deref().unwrap_or("edge_id"), "arrow_icon": arw.icon, "arrow_color": arw.color,
+        "arrow_rules": {"mainBelow": arw.main_below, "main": arw.main, "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],
                         "nameGapPx": place["name_gap_px"], "edgePx": place["edge_px"], "charWidth": place["char_width"],
-                        "baseSize": th["labels"]["base_size"]}});
+                        "baseSize": s.labels.base_size}});
     // the map option `modes` (a base map's look: the road table's mode columns): each mode that some road has, with its count, in order
-    if let Some(modes) = args["modes"].as_array() {
+    if let Some(modes) = mo.base_map.as_ref().map(|b| &b.modes).filter(|m| !m.is_empty()) {
         let yes = |c: Option<Cell>| matches!(c, Some(Cell::Bool(true))) || c.and_then(Cell::as_str) == Some("true");
-        out["modes"] = modes.iter().filter_map(Value::as_str)
+        out["modes"] = modes.iter().map(String::as_str)
             .map(|m| (m, roads.iter().filter(|r| yes(r.get(m))).count())).filter(|(_, n)| *n > 0).map(|(m, n)| json!([m, n])).collect();
     }
     if let Some(b) = args["box_layout"].as_str() {      // a base map's page: the Roads and Layers boxes in one stack

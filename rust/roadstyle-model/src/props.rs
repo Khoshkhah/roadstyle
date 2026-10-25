@@ -1,46 +1,33 @@
 //! The properties of a road or a piece, and the typed features of the sources `roads` and `simple` (docs/design/rust_engine.md, step 3).
-//! `Props` has the methods of serde_json's `Map` with `preserve_order` (an insert of a key that is there keeps its place), but each key
-//! name is kept once for the whole program: an entry is about 48 bytes, not about 100. A `Feat` keeps its line as numbers, not as JSON
+//! `Props` has the methods of serde_json's `Map` with `preserve_order` (an insert of a key that is there keeps its place); a mark's key is
+//! its static name, with no copy (R17: no global table of names). A `Feat` keeps its line as numbers, not as JSON
 //! arrays. The JSON text they write is byte for byte the text of the same tree of `serde_json::Value`.
 
 use serde_json::{Map, Value};
-use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock};
+use std::borrow::Cow;
 
-fn names() -> &'static Mutex<HashSet<&'static str>> {
-    static NAMES: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-    NAMES.get_or_init(Default::default)
-}
+/// A key: a mark's name (static), a name that the props borrow (a road's column), or an owned one (an overlay's field).
+pub type Key<'a> = Cow<'a, str>;
 
-thread_local! {
-    /// this thread's names already looked up (audit R11: the global lock only for a name that the thread has not seen)
-    static SEEN: std::cell::RefCell<std::collections::HashMap<Box<str>, &'static str>> = Default::default();
-}
-
-/// The one copy of a key name (made the first time; a program has some hundred names).
-pub fn intern(k: &str) -> &'static str {
-    if let Some(s) = SEEN.with(|m| m.borrow().get(k).copied()) {
-        return s;
-    }
-    let s = {
-        let mut t = names().lock().unwrap();
-        match t.get(k) {
-            Some(&s) => s,
-            None => {
-                let s: &'static str = Box::leak(k.into());
-                t.insert(s);
-                s
-            }
-        }
-    };
-    SEEN.with(|m| m.borrow_mut().insert(k.into(), s));
-    s
+fn key<'a>(k: &str) -> Key<'a> {
+    crate::mark::Mark::of(k).map_or_else(|| Cow::Owned(k.to_string()), |m| Cow::Borrowed(m.name()))
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Props(Vec<(&'static str, Value)>);
+pub struct Props<'a>(Vec<(Key<'a>, Value)>);
 
-impl Props {
+impl<'a> Props<'a> {
+    /// Insert with a name that the props borrow (no copy): a road's column, a mark.
+    pub fn insert_name(&mut self, k: &'a str, v: Value) -> Option<Value> {
+        match self.at(k) {
+            Some(i) => Some(std::mem::replace(&mut self.0[i].1, v)),
+            None => {
+                self.0.push((Cow::Borrowed(k), v));
+                None
+            }
+        }
+    }
+
     /// A key's place: by its text, with no lock (audit R11).
     fn at(&self, k: &str) -> Option<usize> {
         self.0.iter().position(|e| e.0 == k)
@@ -67,7 +54,7 @@ impl Props {
         match self.at(k) {
             Some(i) => Some(std::mem::replace(&mut self.0[i].1, v)),
             None => {
-                self.0.push((intern(k), v));
+                self.0.push((key(k), v));
                 None
             }
         }
@@ -80,7 +67,7 @@ impl Props {
             self.0.remove(j);
             return self.rename(from, to);
         }
-        self.0[i].0 = intern(to);
+        self.0[i].0 = key(to);
         true
     }
 
@@ -88,12 +75,8 @@ impl Props {
         self.at(k).map(|i| self.0.remove(i).1)
     }
 
-    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Value> {
-        self.0.iter_mut().map(|(_, v)| v)
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (&'static str, &Value)> {
-        self.0.iter().map(|(k, v)| (*k, v))
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
+        self.0.iter().map(|(k, v)| (k.as_ref(), v))
     }
 
     /// The same properties as a JSON object.
@@ -108,7 +91,7 @@ impl Props {
             if i > 0 {
                 out.push(b',');
             }
-            serde_json::to_writer(&mut *out, k).unwrap();
+            serde_json::to_writer(&mut *out, k.as_ref()).unwrap();
             out.push(b':');
             serde_json::to_writer(&mut *out, &crate::table::JsSafe(v)).unwrap();
         }
@@ -116,7 +99,7 @@ impl Props {
     }
 }
 
-impl std::ops::Index<&str> for Props {
+impl std::ops::Index<&str> for Props<'_> {
     type Output = Value;
 
     /// As the `Map`'s: a missing key is an error.
@@ -125,45 +108,56 @@ impl std::ops::Index<&str> for Props {
     }
 }
 
-impl<K: AsRef<str>> FromIterator<(K, Value)> for Props {
-    fn from_iter<I: IntoIterator<Item = (K, Value)>>(it: I) -> Props {
+/// The props of (name, value) pairs; a name that they can borrow is not copied.
+impl<'a> FromIterator<(&'a str, Value)> for Props<'a> {
+    fn from_iter<I: IntoIterator<Item = (&'a str, Value)>>(it: I) -> Props<'a> {
         let mut p = Props::default();
         for (k, v) in it {
-            p.insert(k.as_ref(), v);
+            p.insert_name(k, v);
         }
         p
     }
 }
 
-impl IntoIterator for Props {
-    type Item = (&'static str, Value);
-    type IntoIter = std::vec::IntoIter<(&'static str, Value)>;
+impl<'a> FromIterator<(Key<'a>, Value)> for Props<'a> {
+    fn from_iter<I: IntoIterator<Item = (Key<'a>, Value)>>(it: I) -> Props<'a> {
+        let mut p = Props::default();
+        for (k, v) in it {
+            match k {
+                Cow::Borrowed(k) => p.insert_name(k, v),
+                Cow::Owned(k) => p.insert(&k, v),
+            };
+        }
+        p
+    }
+}
+
+impl<'a> IntoIterator for Props<'a> {
+    type Item = (Key<'a>, Value);
+    type IntoIter = std::vec::IntoIter<(Key<'a>, Value)>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-/// The page's declaration (roadstyle-assets: static/dashboard/reads.json): the properties that its dashboard modules read on a drawn
-/// feature (`pieces`) and on a row of the road table (`table`).
-pub const PAGE_READS: &str = roadstyle_assets::text!("static/dashboard/reads.json");
-
-fn declared(part: &str) -> Vec<String> {
-    let v: Value = serde_json::from_str(PAGE_READS).expect("reads.json is JSON");
-    v[part].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect()
-}
-
-/// The properties of a drawn feature that the page's modules read (PAGE_READS's `pieces`).
+/// The properties of a drawn feature that the page's modules read (mark.rs: the marks and columns of `Kind::Pieces`).
 pub fn page_reads() -> Vec<String> {
-    declared("pieces")
+    crate::mark::page_reads(crate::mark::Kind::Pieces)
 }
 
 /// A property of a road that the road table keeps (R1): every public field (the popup, the tooltip, an app's click), the stage
-/// values that the page's modules read on a row (PAGE_READS's `table`), and the fills (`__rs_fill*`: the filter's swatches of a view's
+/// values that the page's modules read on a row (`Kind::Table`), and the fills (`__rs_fill*`: the filter's swatches of a view's
 /// palette).
 pub fn table_keeps(k: &str) -> bool {
-    static TABLE: std::sync::OnceLock<std::collections::HashSet<String>> = std::sync::OnceLock::new();
-    !k.starts_with("__rs_") || k.starts_with("__rs_fill") || TABLE.get_or_init(|| declared("table").into_iter().collect()).contains(k)
+    use crate::mark::{Kind, Mark};
+    if !k.starts_with(crate::mark::PREFIX) {
+        return true;            // a user's column (also one named like a slot's mark: rank, chain), and lvl
+    }
+    if crate::mark::is_fill(k) {
+        return true;
+    }
+    Mark::of(k).is_some_and(|m| m.page_reads().contains(&Kind::Table))
 }
 
 /// The feature properties that the expressions of `v` read: `["get", name]` and `["has", name]` (the forms with an object, `["get",
@@ -212,7 +206,7 @@ pub trait Get {
     fn value(&self, k: &str) -> Option<Value>;
 }
 
-impl Get for Props {
+impl Get for Props<'_> {
     fn value(&self, k: &str) -> Option<Value> {
         self.get(k).cloned()
     }
@@ -227,7 +221,7 @@ impl Get for Map<String, Value> {
 /// A feature of the source `roads` or `simple`: its id, its properties and its line (None: not a LineString, `"geometry": null`).
 pub struct Feat {
     pub id: usize,
-    pub props: Props,
+    pub props: Props<'static>,
     pub coords: Option<Vec<[f64; 2]>>,
 }
 

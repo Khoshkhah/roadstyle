@@ -1508,6 +1508,8 @@ dependencies = [
  "roadstyle-engine",
  "roadstyle-io",
  "roadstyle-levels",
+ "roadstyle-look",
+ "roadstyle-model",
  "roadstyle-tiles",
  "serde",
  "serde_json",
@@ -1574,9 +1576,13 @@ dependencies = [
  "base64 0.22.1",
  "crc32fast",
  "flate2",
+ "indexmap",
  "roadstyle-assets",
+ "roadstyle-look",
+ "schemars",
  "serde",
  "serde_json",
+ "strsim",
  "yaml-rust2",
 ]
 
@@ -1601,7 +1607,6 @@ version = "0.25.0"
 dependencies = [
  "arrow-array",
  "arrow-schema",
- "roadstyle-assets",
  "roadstyle-levels",
  "rstar",
  "serde",
@@ -1776,6 +1781,7 @@ checksum = "ab508826f74a77ca9d5aba6ff19b522583ee3eaf28a19384ff3d0e5835fadf6e"
 dependencies = [
  "chrono",
  "dyn-clone",
+ "indexmap",
  "ref-cast",
  "schemars_derive",
  "serde",
