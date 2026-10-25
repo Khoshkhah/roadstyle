@@ -144,7 +144,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
         }
         ("page", [roads, out]) => {
             let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).map(Value::String);
-            let mut given = Map::new();
+            let mut given = Map::new();         // the page's keys: the call's keywords (a look has none), and the keys
             given.insert("api_key".into(), take(&mut opts, "api_key").map(Value::String).or_else(|| env("ROADSTYLE_API_KEY")).unwrap_or_default());
             given.insert("street_view_key".into(), take(&mut opts, "street_view_key").map(Value::String).or_else(|| env("GOOGLE_MAPS_KEY"))
                 .unwrap_or_default());
@@ -152,6 +152,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
                 kw.insert("state".into(), "live".into()); // a page's style: the state in the expressions, the interaction contract
             })?;
             let look = roadstyle::Look::resolve(&o)?;
+            given.extend(o.args.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
             let page = roadstyle::page_options::page_from(self::roads(roads)?, None, &look, &o, &given)?;
             for w in &page.warnings {
                 eprintln!("warning: {w}");

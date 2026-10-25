@@ -3878,8 +3878,9 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                 lyr["filter"] = ["all", lyr["filter"], ["has", "__rs_arw"], ["any", main, [">=", ["zoom"], arw["main_below"]]],
                                  ["==", ["%", ["get", "__rs_arw"], ["step", ["zoom"], 4, 16, 2, 17, 1]], 0]]
                 lyr["layout"] = {**{k: v for k, v in lyr["layout"].items() if k != "symbol-spacing"}, "symbol-placement": "line-center"}
-        # the page's road click popup, hover tooltip and hover delay, for the app's plugin (the same rules as the page's)
-        inter = {"popup": popup_fields if popup_on else False, "tooltip": road_tooltip, "hover_delay_ms": int(hover_delay_ms)}
+        # the page's road click popup, hover tooltip and hover delay, for the app's plugin (the same rules as the page's). The delay is
+        # the look's default (the Rust look's HOVER_DELAY_MS): hover_delay_ms is a page key, which the app gives itself (N32 step 2)
+        inter = {"popup": popup_fields if popup_on else False, "tooltip": road_tooltip, "hover_delay_ms": 300}
         # the legend data of a data-coloured map, as the page's COLOR_OPTIONS: {name, prop, legend} for each colour option
         return {"style": style, "pmtiles": pmt, "bounds": (minx, miny, maxx, maxy), "interaction": inter,
                 "color_options": color_opts_meta or None}

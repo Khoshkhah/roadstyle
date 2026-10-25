@@ -14,6 +14,7 @@ use serde_json::{json, Map, Value};
 
 /// The map options. Each group has its default; a value that the profile gives is an `Option`: `None` is the profile's value.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 #[non_exhaustive]
 pub struct MapOptions {
@@ -41,6 +42,7 @@ pub struct MapOptions {
 
 /// The columns of the roads that the engine reads, by their names in the caller's table (the engine's own name when none is given).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Columns {
     /// the road class (OSM's `highway`)
@@ -72,6 +74,7 @@ impl Default for Columns {
 
 /// The columns of the drawing positions (compute_levels' output columns).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct LevelColumns {
     pub casing_start: Option<String>,
@@ -86,6 +89,7 @@ pub struct LevelColumns {
 
 /// Where the drawing positions come from.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Levels {
     /// the given columns, else the input's contract columns casing_level / fill_level (duckOSM's stored levels), else solved
@@ -104,6 +108,7 @@ pub enum Levels {
 
 /// The colours of a map coloured by data (render_edges' data styler, colour table and colour options).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct DataColor {
     /// the column that gives each road its colour
@@ -125,6 +130,7 @@ pub struct DataColor {
 
 /// Categorical colours: a colour for each value, or `"self"` (the value is the colour).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum Colors {
     Map(Map<String, Value>),
@@ -133,6 +139,7 @@ pub enum Colors {
 
 /// The text `"self"`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Itself {
     #[serde(rename = "self")]
     Itself,
@@ -140,6 +147,7 @@ pub enum Itself {
 
 /// A numeric ramp: a colour map's name, or a list of colours.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum Cmap {
     Name(String),
@@ -148,6 +156,7 @@ pub enum Cmap {
 
 /// In a colour option: a road with no value keeps the first option's fill (`base`) or takes the no-data colour (`self`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Missing {
     #[default]
@@ -158,6 +167,7 @@ pub enum Missing {
 
 /// A colour for each road: `colors` by the value of the column `key`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ColorTable {
     pub colors: Map<String, Value>,
@@ -171,6 +181,7 @@ fn edge_id() -> String {
 
 /// One option of the "Colour by" menu: the keys of a data styler, all optional (none: the class style).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct ColorOption {
     pub name: String,
@@ -188,6 +199,7 @@ pub struct ColorOption {
 
 /// An option of the "Colour by" menu: its number or its name.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum Active {
     Index(usize),
@@ -196,6 +208,7 @@ pub enum Active {
 
 /// The width of a road by data.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Width {
     /// the column of the value (the data styler's column, when it is not given)
@@ -208,6 +221,7 @@ pub struct Width {
 
 /// The drawing of the roads.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Roads {
     /// false: the casing of each road, not its fill (the fill layers stay, for the clicks)
@@ -237,6 +251,7 @@ impl Default for Roads {
 
 /// The first zoom of each class: the profile's table, none (every class at every zoom), or the profile's table with these changes.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum ClassMinzoom {
     #[default]
@@ -247,6 +262,7 @@ pub enum ClassMinzoom {
 
 /// The clicks and the hover of the roads.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Interaction {
     pub popup: Popup,
@@ -258,6 +274,7 @@ pub struct Interaction {
 
 /// The road popup.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Popup {
     /// the look's fields
@@ -275,6 +292,7 @@ pub enum Popup {
 
 /// The hover tooltip of the roads.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum Tooltip {
     /// every column
@@ -284,6 +302,7 @@ pub enum Tooltip {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Labels {
     /// the street names
@@ -297,6 +316,7 @@ impl Default for Labels {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Arrows {
     /// the one-way arrows
@@ -310,6 +330,7 @@ impl Default for Arrows {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Tunnels {
     /// the "Tunnels" box (a tool for choosing the tunnel look)
@@ -317,6 +338,7 @@ pub struct Tunnels {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Bridges {
     /// the raised 3D bridge decks, and the page opens tilted
@@ -325,6 +347,7 @@ pub struct Bridges {
 
 /// An overlay (rs.Overlay): a layer of the caller's features over or under the roads. `None`: the overlays settings' value.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Overlay {
     pub label: Option<String>,
@@ -368,6 +391,7 @@ impl Overlay {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum OverlayKind {
     Fill,
@@ -377,6 +401,7 @@ pub enum OverlayKind {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Placement {
     #[default]
@@ -385,6 +410,7 @@ pub enum Placement {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Select {
     #[default]
@@ -394,6 +420,7 @@ pub enum Select {
 
 /// The road of each feature of an overlay (rs.Overlay's edge_col and the columns that go with it).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct EdgeLink {
     /// the property with the id of the feature's road
@@ -409,6 +436,7 @@ pub struct EdgeLink {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct TextStyle {
     /// the property that holds the text
@@ -422,6 +450,7 @@ pub struct TextStyle {
 
 /// The road's own line items (lanes, lane lines, marks).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Items {
     /// a FeatureCollection whose features name their road
@@ -432,6 +461,7 @@ pub struct Items {
 
 /// A duckOSM map's base map: its modes and the start values of its layers.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct BaseMapOptions {
     /// the mode columns of the road table (driving, walking, cycling, ...)
@@ -442,6 +472,7 @@ pub struct BaseMapOptions {
 
 /// The output: its name and its state.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct Output {
     pub name: Option<String>,
@@ -452,6 +483,7 @@ pub struct Output {
 
 /// A style with its state baked in, or one that keeps MapLibre's global state (a page with the dashboard).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum State {
     #[default]
@@ -474,96 +506,126 @@ impl MapOptions {
     /// options (the page's, the host's, a misspelt one), in their order: the caller knows the page's keys and checks them. A map keyword
     /// with a value of the wrong kind is an error that names it.
     pub fn from_args(args: &Value) -> Result<(MapOptions, Vec<String>), Error> {
-        let empty = Map::new();
-        let a = match args {
-            Value::Object(a) => a,
-            Value::Null => &empty,
-            other => return Err(Error::Options(format!("map options: a mapping of keywords, not {other}"))),
-        };
-        let mut out = Map::new();
-        let mut rest = Vec::new();
-        for (k, v) in a {
-            if v.is_null() && k != "minzoom" {
-                continue;       // a keyword given as None: its default
-            }
-            if let Some(path) = FLAT.iter().find(|f| f.0 == k).map(|f| f.1) {
-                set(&mut out, path, v.clone());
-            } else if !SPECIAL.contains(&k.as_str()) {
-                rest.push(k.clone());
-            }
-        }
-        let get = |k: &str| a.get(k).filter(|v| !v.is_null());
-        // the drawing positions: stored ({edge_hash, n_edges}), the tags rule ("tags"), solved whatever the input has ("solve", 2026-10-25:
-        // the engine reads an input's contract columns casing_level / fill_level when no keyword is given), the caller's columns, else solved
-        let levels = match (get("levels"), out.get("columns").and_then(|c| c.get("levels"))) {
-            (Some(Value::Object(m)), _) => json!({"stored": m}),
-            (Some(Value::String(s)), _) if s == "tags" || s == "solve" => json!(s),
-            (Some(other), _) => return Err(Error::Options(format!("levels: {{edge_hash, n_edges}}, \"tags\" or \"solve\", not {other}"))),
-            (None, Some(c)) if c.get("casing_level").is_some() || c.get("fill_level").is_some() => json!("given"),
-            (None, _) => json!("auto"),
-        };
-        out.insert("levels".into(), levels);
-        match a.get("minzoom") {
-            None | Some(Value::Null) | Some(Value::Bool(true)) => {}
-            Some(Value::Bool(false)) => set(&mut out, "roads.minzoom", json!("off")),
-            Some(Value::Object(t)) => set(&mut out, "roads.minzoom", json!({"table": t})),
-            Some(other) => return Err(Error::Options(format!("minzoom: True, False, None or a {{class: zoom}} mapping, not {other}"))),
-        }
-        if let Some(p) = get("road_popup") {
-            set(&mut out, "interaction.popup", match p {
-                Value::Bool(true) => json!("default"),
-                Value::Bool(false) => json!("off"),
-                Value::Array(f) => json!({"fields": f}),
-                Value::String(s) if s == "panel" => json!("panel"),
-                Value::String(_) => json!("all"),
-                other => return Err(Error::Options(format!("road_popup: True, False, a list of columns, \"all\" or \"panel\", not {other}"))),
-            });
-        }
-        // the hover tooltip: road_tooltip, else the folium name tooltip
-        let given = |v: &&Value| !matches!(v, Value::Bool(false)) && *v != "" && v.as_array().is_none_or(|f| !f.is_empty());
-        if let Some(t) = get("road_tooltip").filter(given).or_else(|| get("tooltip")).filter(given) {
-            set(&mut out, "interaction.tooltip", match t {
-                Value::Bool(true) => json!("all"),
-                Value::Array(f) => json!({"fields": f}),
-                Value::String(s) => json!({"fields": [s]}),
-                other => return Err(Error::Options(format!("road_tooltip: True or a list of columns, not {other}"))),
-            });
-        }
-        if let Some(t) = get("color_table") {
-            set(&mut out, "color.table", json!({"colors": t, "key": get("color_key").cloned().unwrap_or_else(|| json!("edge_id"))}));
-        }
-        if let Some(o) = get("color_options") {
-            let named: Vec<(String, Value)> = match o {
-                Value::Object(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                Value::Array(l) => l.iter().map(|x| (x["name"].as_str().unwrap_or_default().to_string(), x.clone())).collect(),
-                other => return Err(Error::Options(format!("color_options: a {{name: options}} mapping or a list, not {other}"))),
-            };
-            let opts = named.into_iter().map(|(name, o)| {
-                let mut n = Map::new();
-                n.insert("name".into(), name.into());
-                for (k, v) in o.as_object().into_iter().flatten().filter(|(k, v)| *k != "name" && !v.is_null()) {
-                    let to = COLOR_OPTION.iter().find(|f| f.0 == k).map(|f| f.1)
-                        .ok_or_else(|| Error::Options(format!("color_options: unknown key {k:?}{}", nearest(k, COLOR_OPTION.iter().map(|f| f.0)))))?;
-                    n.insert(to.into(), v.clone());
-                }
-                Ok(Value::Object(n))
-            }).collect::<Result<Vec<_>, Error>>()?;
-            set(&mut out, "color.options", Value::Array(opts));
-        }
-        if let Some(l) = get("overlays") {
-            let l = l.as_array().ok_or_else(|| Error::Options(format!("overlays: a list, not {l}")))?;
-            set(&mut out, "overlays", Value::Array(l.iter().map(overlay_from_flat).collect::<Result<_, _>>()?));
-        }
-        if let Some(d) = get("items") {
-            set(&mut out, "items", json!({"data": d, "popup": get("items_popup")}));
-        }
-        let modes = get("modes");
-        let layers = get("interaction");
-        if modes.is_some() || layers.is_some() {
-            set(&mut out, "base_map", json!({"modes": modes.cloned().unwrap_or(json!([])), "layers": layers.cloned().unwrap_or(json!({}))}));
-        }
-        Ok((MapOptions::from_value(Value::Object(out))?, rest))
+        let f = flat(args)?;
+        Ok((MapOptions::from_value(Value::Object(f.out))?, f.rest))
     }
+
+    /// These options with the flat keywords `args` over them: each field that a keyword sets changes, the others stay. The names of the
+    /// keywords that are not map options, as `from_args`.
+    pub fn with_args(&self, args: &Value) -> Result<(MapOptions, Vec<String>), Error> {
+        let f = flat(args)?;
+        let Value::Object(mut base) = serde_json::to_value(self).expect("the map options are JSON") else { unreachable!("a mapping") };
+        for p in &f.paths {
+            set(&mut base, p, at(&f.out, p).cloned().unwrap_or(Value::Null));
+        }
+        Ok((MapOptions::from_value(Value::Object(base))?, f.rest))
+    }
+}
+
+/// The fields of render_edges' flat keywords (`flat`).
+struct Flat {
+    /// the sparse options: the fields that the keywords set
+    out: Map<String, Value>,
+    /// the paths of those fields, in order
+    paths: Vec<String>,
+    /// the names of the keywords that are not map options
+    rest: Vec<String>,
+}
+
+/// The fields of render_edges' flat keywords `args`.
+fn flat(args: &Value) -> Result<Flat, Error> {
+    let empty = Map::new();
+    let a = match args {
+        Value::Object(a) => a,
+        Value::Null => &empty,
+        other => return Err(Error::Options(format!("map options: a mapping of keywords, not {other}"))),
+    };
+    let mut out = Map::new();
+    let mut paths: Vec<String> = Vec::new();
+    let mut rest = Vec::new();
+    for (k, v) in a {
+        if v.is_null() && k != "minzoom" {
+            continue;       // a keyword given as None: its default
+        }
+        if let Some(path) = FLAT.iter().find(|f| f.0 == k).map(|f| f.1) {
+            put(&mut out, &mut paths, path, v.clone());
+        } else if !SPECIAL.contains(&k.as_str()) {
+            rest.push(k.clone());
+        }
+    }
+    let get = |k: &str| a.get(k).filter(|v| !v.is_null());
+    // the drawing positions: stored ({edge_hash, n_edges}), the tags rule ("tags"), solved whatever the input has ("solve", 2026-10-25:
+    // the engine reads an input's contract columns casing_level / fill_level when no keyword is given), the caller's columns, else solved
+    let levels = match (get("levels"), out.get("columns").and_then(|c| c.get("levels"))) {
+        (Some(Value::Object(m)), _) => json!({"stored": m}),
+        (Some(Value::String(s)), _) if s == "tags" || s == "solve" => json!(s),
+        (Some(other), _) => return Err(Error::Options(format!("levels: {{edge_hash, n_edges}}, \"tags\" or \"solve\", not {other}"))),
+        (None, Some(c)) if c.get("casing_level").is_some() || c.get("fill_level").is_some() => json!("given"),
+        (None, _) => Value::Null,        // the default (auto)
+    };
+    if !levels.is_null() {
+        put(&mut out, &mut paths, "levels", levels);
+    }
+    match a.get("minzoom") {
+        None | Some(Value::Null) | Some(Value::Bool(true)) => {}
+        Some(Value::Bool(false)) => put(&mut out, &mut paths, "roads.minzoom", json!("off")),
+        Some(Value::Object(t)) => put(&mut out, &mut paths, "roads.minzoom", json!({"table": t})),
+        Some(other) => return Err(Error::Options(format!("minzoom: True, False, None or a {{class: zoom}} mapping, not {other}"))),
+    }
+    if let Some(p) = get("road_popup") {
+        put(&mut out, &mut paths, "interaction.popup", match p {
+            Value::Bool(true) => json!("default"),
+            Value::Bool(false) => json!("off"),
+            Value::Array(f) => json!({"fields": f}),
+            Value::String(s) if s == "panel" => json!("panel"),
+            Value::String(_) => json!("all"),
+            other => return Err(Error::Options(format!("road_popup: True, False, a list of columns, \"all\" or \"panel\", not {other}"))),
+        });
+    }
+    // the hover tooltip: road_tooltip, else the folium name tooltip
+    let given = |v: &&Value| !matches!(v, Value::Bool(false)) && *v != "" && v.as_array().is_none_or(|f| !f.is_empty());
+    if let Some(t) = get("road_tooltip").filter(given).or_else(|| get("tooltip")).filter(given) {
+        put(&mut out, &mut paths, "interaction.tooltip", match t {
+            Value::Bool(true) => json!("all"),
+            Value::Array(f) => json!({"fields": f}),
+            Value::String(s) => json!({"fields": [s]}),
+            other => return Err(Error::Options(format!("road_tooltip: True or a list of columns, not {other}"))),
+        });
+    }
+    if let Some(t) = get("color_table") {
+        put(&mut out, &mut paths, "color.table", json!({"colors": t, "key": get("color_key").cloned().unwrap_or_else(|| json!("edge_id"))}));
+    }
+    if let Some(o) = get("color_options") {
+        let named: Vec<(String, Value)> = match o {
+            Value::Object(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            Value::Array(l) => l.iter().map(|x| (x["name"].as_str().unwrap_or_default().to_string(), x.clone())).collect(),
+            other => return Err(Error::Options(format!("color_options: a {{name: options}} mapping or a list, not {other}"))),
+        };
+        let opts = named.into_iter().map(|(name, o)| {
+            let mut n = Map::new();
+            n.insert("name".into(), name.into());
+            for (k, v) in o.as_object().into_iter().flatten().filter(|(k, v)| *k != "name" && !v.is_null()) {
+                let to = COLOR_OPTION.iter().find(|f| f.0 == k).map(|f| f.1)
+                    .ok_or_else(|| Error::Options(format!("color_options: unknown key {k:?}{}", nearest(k, COLOR_OPTION.iter().map(|f| f.0)))))?;
+                n.insert(to.into(), v.clone());
+            }
+            Ok(Value::Object(n))
+        }).collect::<Result<Vec<_>, Error>>()?;
+        put(&mut out, &mut paths, "color.options", Value::Array(opts));
+    }
+    if let Some(l) = get("overlays") {
+        let l = l.as_array().ok_or_else(|| Error::Options(format!("overlays: a list, not {l}")))?;
+        put(&mut out, &mut paths, "overlays", Value::Array(l.iter().map(overlay_from_flat).collect::<Result<_, _>>()?));
+    }
+    if let Some(d) = get("items") {
+        put(&mut out, &mut paths, "items", json!({"data": d, "popup": get("items_popup")}));
+    }
+    let modes = get("modes");
+    let layers = get("interaction");
+    if modes.is_some() || layers.is_some() {
+        put(&mut out, &mut paths, "base_map", json!({"modes": modes.cloned().unwrap_or(json!([])), "layers": layers.cloned().unwrap_or(json!({}))}));
+    }
+    Ok(Flat { out, paths, rest })
 }
 
 /// The flat keywords that are one field each: (keyword, the field's path).
@@ -615,6 +677,20 @@ fn overlay_from_flat(o: &Value) -> Result<Value, Error> {
     Ok(Value::Object(n))
 }
 
+/// `set`, and the path in `paths` (the fields that the flat keywords set, for `with_args`).
+fn put(m: &mut Map<String, Value>, paths: &mut Vec<String>, path: &str, v: Value) {
+    set(m, path, v);
+    paths.push(path.into());
+}
+
+/// The value at the dotted `path` of `m`.
+fn at<'a>(m: &'a Map<String, Value>, path: &str) -> Option<&'a Value> {
+    match path.split_once('.') {
+        None => m.get(path),
+        Some((head, tail)) => at(m.get(head)?.as_object()?, tail),
+    }
+}
+
 /// `v` at the dotted `path` of `m`, with the mappings on the way.
 fn set(m: &mut Map<String, Value>, path: &str, v: Value) {
     match path.split_once('.') {
@@ -631,11 +707,19 @@ fn set(m: &mut Map<String, Value>, path: &str, v: Value) {
     }
 }
 
-/// `"; did you mean \"x\"?"` with the known name nearest `k` (Jaro-Winkler 0.75 or more: a common start counts more, so "by_column" finds
-/// "by"), or "".
+/// `"; did you mean \"x\"?"` with the known name nearest `k` (`nearest_name`), or "".
 pub fn nearest<'a>(k: &str, known: impl IntoIterator<Item = &'a str>) -> String {
-    known.into_iter().map(|n| (strsim::jaro_winkler(k, n), n)).filter(|(s, _)| *s >= 0.75)
-        .max_by(|a, b| a.0.total_cmp(&b.0)).map_or_else(String::new, |(_, n)| format!("; did you mean \"{n}\"?"))
+    nearest_name(k, known).map_or_else(String::new, |n| format!("; did you mean \"{n}\"?"))
+}
+
+/// The known name nearest `k` (Jaro-Winkler 0.75 or more: a common start counts more, so "by_column" finds "by"), or none.
+pub fn nearest_name<'a>(k: &str, known: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
+    known.into_iter().map(|n| (strsim::jaro_winkler(k, n), n)).filter(|(s, _)| *s >= 0.75).max_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, n)| n)
+}
+
+/// render_edges' flat keywords that are map options (`from_args` reads them).
+pub fn keywords() -> impl Iterator<Item = &'static str> {
+    FLAT.iter().map(|f| f.0).chain(SPECIAL.iter().copied())
 }
 
 /// serde's error of the nested options, explained: an unknown key with its path and the nearest known key; another error as it is.

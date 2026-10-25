@@ -1,11 +1,11 @@
 # T3: the typed map options and the typed look
 
-**Status (2026-10-25):** steps 1 to 3 are on rust-engine (1c5b926). Step 4 is roadstyle-rs's N32 step 2. The code differs from this
-design at these points, which the coordinator accepted:
+**Status (2026-10-25):** steps 1 to 4 are done (step 4 is roadstyle-rs's N32 step 2). The code differs from this design at these
+points, which the coordinator accepted:
 
 - `MapOptions::from_args` (render_edges' flat keywords) is in roadstyle-look, not in roadstyle-py: a saved look of version 1 has flat
-  `args`, so the look crate must read them. It does not reject an unknown keyword: it gives the names to the caller
-  (`Look::other_args`), which knows the page's keys.
+  `args`, so the look crate must read them. It does not reject an unknown keyword: it keeps it in `Look::other` (in memory, never in
+  the file), and `roadstyle::options::unknown` gives each keyword that no part reads, with the nearest known keyword.
 - The nearest known key is found with Jaro-Winkler (0.75 or more), not with the MCP's Levenshtein, which does not find "by" for
   "by_column".
 - Added fields: `color.style`, `Popup::All`, `Overlay.style`, `EdgeLink.{width_m,offset_m,dash}_column`; `Missing` is `Base` or
@@ -13,8 +13,13 @@ design at these points, which the coordinator accepted:
 - The sections have the names `RoadsLook`, `CasingLook`, `LabelLook`, ... (`roadstyle_look::sections`), and one more section,
   `PageLook`, which has the base map only: **no API key goes into a look** (the keywords `api_key` and `street_view_key` and the
   settings' `config.api_key` and `config.api_keys` are removed; the caller gives the keys to the page in `given`).
-- A version 2 look still has `args` (step 4 removes it). The readers that have not moved read the JSON views of version 1, which are
-  fields of the look (no `theme_value(path)`), the same byte for byte for every golden look.
+- A look file of version 2 has `map` (the typed `MapOptions`) and the sections, and no `args`: a look file is the style, and page keys
+  do not belong in it (the coordinator's decision, 2026-10-25; version 2 was not released, so it changed in place). The page takes its
+  keys from its caller (`page_from`'s `given`: the Python binding and the CLI give the call's keywords). The writer's keys (`export`,
+  `data_maxzoom`, `data_tolerance`) and stage 2's (`tile_keep`, `tile_layers`) are in `Look::other` until T4 moves them to
+  `SourceMode::Inline` and `TileOptions`. The base map's page defaults (`box_layout`, `basemap`, `basemaps`, `copy_field`) are in
+  `Look::base_map_page`, in memory only. The look has no JSON views of version 1: `Look::resolution_value` gives the resolution's
+  version-1 value, of which the parity goldens are a summary.
 - The big tables (the class tables, the width tables, the palettes, the base map's layers) stay JSON mappings; `RoadsModel`,
   `ClassStyles` and `Slots` are typed (step 3).
 - schemars is behind the feature `schema`. `LookFile` is read and written by hand: serde's `flatten` put a second reader of each

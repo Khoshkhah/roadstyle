@@ -138,7 +138,7 @@ pub fn arrow_kind(layers: &[Value]) -> Value {
 
 /// roadstyle:controls: the options of rsDashboard that the style gives (render_web.render's `page`, in its order).
 pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, crate::Error> {
-    let (s, args) = (&look.sections, &look.args);
+    let s = &look.sections;
     let m = &look.model;
     let mo = &look.map;
     let select = json!(mo.interaction.select_color.as_ref().unwrap_or(&s.selection.select).css());
@@ -169,9 +169,6 @@ pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize
         let yes = |c: Option<Cell>| matches!(c, Some(Cell::Bool(true))) || c.and_then(Cell::as_str) == Some("true");
         out["modes"] = modes.iter().map(String::as_str)
             .map(|m| (m, roads.iter().filter(|r| yes(r.get(m))).count())).filter(|(_, n)| *n > 0).map(|(m, n)| json!([m, n])).collect();
-    }
-    if let Some(b) = args["box_layout"].as_str() {      // a base map's page: the Roads and Layers boxes in one stack
-        out["box_layout"] = b.into();
     }
     Ok(out)
 }

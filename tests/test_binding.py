@@ -48,7 +48,9 @@ def test_a_lean_road_table_has_only_the_fields_given():
 
 def test_the_binding_gives_the_facades_page():
     want = json.loads((DATA / "monaco/rust_page.json").read_text())
-    html = _engine.rust().page_from(pq.read_table(DATA / "monaco/roads.parquet"), _look().with_arg("state", '"live"'), "{}", "{}")
+    # the page's keys come from the call (the area's options), as the facade's test gives them (areas.rs)
+    given = {**json.loads(gzip.decompress((DATA / "monaco/golden_options.json.gz").read_bytes()))["args"], "export": True, "state": "live"}
+    html = _engine.rust().page_from(pq.read_table(DATA / "monaco/roads.parquet"), _look().with_arg("state", '"live"'), "{}", json.dumps(given))
     assert _text(html) == want["page"]
 
 

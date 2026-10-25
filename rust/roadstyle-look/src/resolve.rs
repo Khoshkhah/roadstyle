@@ -318,12 +318,6 @@ fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, 
     Ok(cfg)
 }
 
-/// The config view of a theme and of the config keys that are not in the theme (`extra`: camera, tiles, annotations, basemap), as the
-/// resolution makes it (`style_config`, then `config`): a look of version 2's view.
-pub(crate) fn config_of(theme: &Value, extra: Map<String, Value>) -> Result<Value, Error> {
-    Ok(config(&style_config(theme, &[json!({"config": extra})])?))
-}
-
 /// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default; the set minor_no_casing as a
 /// sorted list (as the look is written). `api_key` and `api_keys` are always empty: a look is saved and published, so a key of the
 /// settings is never written into it (the caller gives the keys to the page in `given`).
@@ -448,12 +442,13 @@ impl Options {
     }
 }
 
-/// The look of render_edges(palette=, profile=, settings=, **args) as a JSON value (version 1): `options` as `Options` reads them.
+/// The look of render_edges(palette=, profile=, settings=, **args) as a JSON value (version 2): `options` as `Options` reads them.
 pub fn make_look(options: &Value) -> Result<Value, Error> {
     Ok(crate::Look::resolve(&Options::from_value(options)?)?.to_value())
 }
 
-pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
+/// The look of version 1 of `options`, and the base map's keywords (its map options and its page defaults; none with no base map).
+pub(crate) fn resolve(options: &Options) -> Result<(LookData, Map<String, Value>), Error> {
     let own = options.own();
     let bm = options.base_map.as_ref().map(crate::basemap::base_map).transpose()?;
     if bm.is_some() && (options.palette.is_some() || options.features.is_some()) {
@@ -507,7 +502,8 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
     let slots = json!({"z_order": roads_model["z_order"], "width_z20": width_z20, "width_z20_fallback": model.class_width_px(None, 20.0, true)});
     let png = base64::engine::general_purpose::STANDARD.encode(SPRITE);
     let oneway = json!({"url": format!("data:image/png;base64,{png}"), "sdf": true, "pixelRatio": path(&th, "arrows.icon.pixel_ratio")?});
-    Ok(LookData {
+    let bm_args = bm.as_ref().map(|b| b.args.clone()).unwrap_or_default();
+    Ok((LookData {
         schema_version: 1,
         palette: palette.into(),
         settings,
@@ -521,5 +517,5 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
         features: bm.map(|b| b.features).or_else(|| options.features.clone()).unwrap_or(Value::Null),
         oneway_image: oneway,
         interaction: json!({"popup": ROAD_POPUP, "hover_delay_ms": HOVER_DELAY_MS}),
-    })
+    }, bm_args))
 }

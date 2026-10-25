@@ -80,6 +80,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The Rust engine's style has no page keys `filter_control` and `legend`** (N32 step 2): the page gives them in its options
   (`RS_OPTIONS.filter_control`, `RS_OPTIONS.legend`, default true). `roadstyle:controls.filter` has no `on`, and a lone data styler's
   legend is always in `roadstyle:color_options`. A host page that gives neither shows both boxes.
+- **Look version 2: `map` in place of `args`** (version 2 was not released; N32 step 2). A look file has the typed map options
+  (`map`) and the sections, and no page key: the page takes its keys (`name`, `basemap_switcher`, `sidebar`, `views`,
+  `hover_delay_ms`, ...) from its caller. Rust: `page_from`'s `given` has the call's keywords (the Python binding and the CLI give them).
+  `Look` has no JSON views of version 1 (`theme`, `config`, `args`, ...). The call's other keywords are in `Look::other`, in memory only.
+  `roadstyle::options::unknown` gives each keyword that no part reads, with the nearest known one. `Look.part()` (Python) gives "map",
+  "sections", "palette", "settings", "features", "other" and "base_map_page" ("args", "config" and "theme" are gone).
+  `roadstyle:interaction.hover_delay_ms` is the look's default, and `roadstyle:controls` has no `box_layout`: both are page keys.
+  `simple=False` is still an error (Unsupported::FullLook). Looks of version 1 and 0 are read as before.
 - **The Roads box dims a class that the map does not draw at this zoom.** With the class minzoom (the default since 2026-10-25), a
   class row is dimmed below its first zoom (`roadstyle:controls.filter.minzoom`), with the title "from zoom N". Before, the box listed
   the hidden classes as if they were drawn.

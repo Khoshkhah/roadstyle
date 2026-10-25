@@ -76,7 +76,7 @@ fn the_look_keyword_levels() {
     let t = roadstyle_rs::read::read_roads(roads.clone(), "geometry").unwrap();
     let ids: Vec<i64> = (0..t.len()).map(|i| t.get(i, "edge_id").unwrap().to_value().as_str().unwrap().parse().unwrap()).collect();
     let style = |levels: Value| {
-        let mut look = roadstyle_rs::look::make_look(&o).unwrap();
+        let mut look = roadstyle_rs::Look::resolution_value(&roadstyle_rs::look::Options::from_value(&o).unwrap()).unwrap();
         look["args"]["levels"] = levels;
         roadstyle_rs::make_style(roads.clone(), &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None)
     };
