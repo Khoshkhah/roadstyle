@@ -41,8 +41,9 @@ pub(crate) fn named(c: &Option<String>) -> Option<&str> {
     c.as_deref().filter(|c| !c.is_empty())
 }
 
-/// `legend`: render's legend (a page key; colors::bake).
-pub fn mark_roads(fs: &mut Roads, look: &Look, m: &MapOptions, legend: bool) -> Result<crate::colors::Baked, crate::Error> {
+/// Stage 1's marks of each road: the colours (colors::bake), the two-way and access marks, the levels, the caps and heads, the twins
+/// and the metre widths.
+pub fn mark_roads(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<crate::colors::Baked, crate::Error> {
     let access_col = named(&m.columns.access);
     if let Some(col) = access_col {
         if fs.table.col(col).is_none() && !fs.is_empty() {
@@ -53,7 +54,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, m: &MapOptions, legend: bool) -> 
             fs.draw[i].access = Some(kind.and_then(|k| crate::draw::ACCESS_KINDS.iter().position(|a| *a == k)).map(|k| k as u8));
         }
     }
-    let colors = crate::colors::bake(fs, look, m, legend)?;
+    let colors = crate::colors::bake(fs, look, m)?;
     // render: the direction columns are read only when they are named (directed_col, driving_col: None by default)
     mark_twoway(fs, named(&m.columns.directed).is_some(), named(&m.columns.driving).is_some());
     // a road with an access kind has its kind's colour in every colour option (the palette's `access`)

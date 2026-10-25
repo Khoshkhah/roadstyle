@@ -53,7 +53,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
     let look = look_file(look_path);
     let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)));
     mark("read the roads");
-    let colors = roads::mark_roads(&mut feats, &look.road, &look.map, look.args["legend"] != false).unwrap_or_else(|e| fail(e));
+    let colors = roads::mark_roads(&mut feats, &look.road, &look.map).unwrap_or_else(|e| fail(e));
     mark("mark the roads (colours, pairs, levels)");
     let simple = simple::simple_source(&feats, look.road.head_m, look.road.bridge_shadow, None, Vec::new()).unwrap_or_else(|e| fail(e));
     mark("pieces (simple)");
@@ -203,7 +203,7 @@ fn main() {
     }
     // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)
     let mut feats = roadstyle_rs::Roads::new(read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}"))));
-    let colors = roads::mark_roads(&mut feats, &look.road, &look.map, look.args["legend"] != false).unwrap_or_else(|e| fail(e));
+    let colors = roads::mark_roads(&mut feats, &look.road, &look.map).unwrap_or_else(|e| fail(e));
     let simple = simple::simple_source(&feats, look.road.head_m, look.road.bridge_shadow, None, Vec::new()).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &look.slot);
     let roads = roads::roads_source(feats);

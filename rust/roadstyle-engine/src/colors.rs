@@ -266,8 +266,8 @@ fn bake_props(fs: &mut Roads, f: &Frame) {
 
 /// render_edges' colouring and render_web.render's: the per-edge props of the class styles, of a data styler (color_by, color_table), or
 /// of colour options (color_options: one fill per option, the shared width and casing from the class styles or the data styler).
-/// `legend`: false (render's legend=False) writes no "colour by" entry for a lone data styler.
-pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions, legend: bool) -> Result<Baked, crate::Error> {
+/// A lone data styler's legend is always in the style (its "colour by" entry); the page option `legend` shows or hides it.
+pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<Baked, crate::Error> {
     // render_edges: color_table, an edge_id -> colour map, as the column __rs_color (keys as text, as str(id) in Python)
     let main = if let Some(ct) = &m.color.table {
         let (key, t) = (ct.key.as_str(), &ct.colors);
@@ -319,12 +319,10 @@ pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions, legend: bool) -> Result
     }
     let f = main.unwrap_or_else(|| class_frame(fs, look));
     bake_props(fs, &f);
-    // a data styler's legend as the one "colour by" entry (no menu, only the key); legend=False: none
+    // a data styler's legend as the one "colour by" entry (no menu, only the key)
     let meta = match &f.legend {
-        Some(l) if legend => {
-            vec![json!({"name": get(l, "title").cloned().unwrap_or_else(|| json!("data")), "prop": Mark::Fill.name(), "legend": l})]
-        }
-        _ => Vec::new(),
+        Some(l) => vec![json!({"name": get(l, "title").cloned().unwrap_or_else(|| json!("data")), "prop": Mark::Fill.name(), "legend": l})],
+        None => Vec::new(),
     };
     Ok(Baked { props: vec![Mark::Fill.name().into()], active: 0, meta })
 }

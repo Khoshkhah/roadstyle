@@ -92,7 +92,7 @@ contract makes changeable (or a value that is not used).
 | `filter` | `{col, classes, swatches, palettes, bridges, tunnels, access, minzoom}`; the dashboard sets `on` from the page option `filter_control` (default true) and a class to show | `render` (`filter_col`, `access_col`); the page (`filter_control`); option | `filter.js`, `views.js` | yes | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`; `rs:filterchange`; `window.RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
 | access colors | `access.private`, `bus`, `pedestrian`, `delivery` (palette) | the palette | engine (`__rs_access` colors) | no | |
 | `color_options` | `[{name, prop, legend}]` | `render`; `roadstyle:color_options`; option | `color.js`, `legend.js`, `views.js` | the choice: yes; a new option: `restyle` | `rsSetColorField`; `rs:colorchange`; `window.RS_COLOR_OPTIONS` |
-| the legend | `{title, kind, entries}` or `{title, kind, ramp, vmin, vmax}` | the data styler (`bake_color_options`) | `legend.js` | follows the option | gap: the metadata does not give the active option |
+| the legend | `{title, kind, entries}` or `{title, kind, ramp, vmin, vmax}` | the data styler (`bake_color_options`); the page shows it when its option `legend` is true (the default) | `legend.js` | follows the option | gap: the metadata does not give the active option |
 | `color_active` | index or name, 0 | `render`; option | `color.js` | yes | `rs_co` |
 | host colors | `[{color, ids}]` | the host page | the fill and item expressions | yes | `rsColor`, `rsColorBase`; `rs:colorchange` |
 | `road_fill` | `{on, paint}`, on | `render`; option | `color.js` | yes | `rsSetRoadFill`; `rs:roadfillchange` |

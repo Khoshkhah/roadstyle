@@ -55,6 +55,8 @@ pub struct PageOptions {
     /// the Roads box (render's filter_control; the dashboard shows it when the filter has classes)
     pub filter_control: bool,
     pub color_options: Value,
+    /// the legend box of the colour options (render's legend)
+    pub legend: bool,
     pub color_active: Value,
     pub overlays: Value,
     pub overlay_control: bool,

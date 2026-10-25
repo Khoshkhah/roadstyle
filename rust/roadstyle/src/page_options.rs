@@ -19,7 +19,7 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "simple": true, "views": null, "tiles": false,
-    "sidebar": null, "filter_control": true}"#;
+    "sidebar": null, "filter_control": true, "legend": true}"#;
 
 /// The bundled sidebars (`sidebar=`, pages.render_dashboard and render_report): the template that goes on the page, and the keywords
 /// that it changes when the caller does not give them (pages.py's defaults; tests/test_pages.py checks them).
@@ -154,7 +154,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         popup_mode: mode.into(), find_control: on("find_control"), zoom_readout: on("zoom_readout"), pitch_3d: number(&ctl["pitch_3d"])?,
         street_view: a["street_view"].clone(), street_view_key: key.unwrap_or_default(), google_3d: on("google_3d"),
         select_color: ctl["select_color"].clone(), filter: ctl["filter"].clone(), filter_control: on("filter_control"),
-        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!([])),
+        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!([])), legend: on("legend"),
         color_active: ctl["color_active"].clone(), overlays: ctl["overlays"].clone(), overlay_control: on("overlay_control"),
         overlay_popup: on("overlay_popup"), tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),

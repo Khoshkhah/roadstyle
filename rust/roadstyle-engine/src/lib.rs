@@ -105,7 +105,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let mut feats = Roads::new(table);
     feats.solved = solved;
     feats.cls = fcol;
-    let colors = roads::mark_roads(&mut feats, &look.road, &look.map, look.args["legend"] != false)?;
+    let colors = roads::mark_roads(&mut feats, &look.road, &look.map)?;
     let width_col = roads::named(&look.map.columns.width_m);
     // render's arrows and labels (both on by default): the slots exist only for them
     let (arrows, labels) = (look.map.arrows.on, look.map.labels.on);

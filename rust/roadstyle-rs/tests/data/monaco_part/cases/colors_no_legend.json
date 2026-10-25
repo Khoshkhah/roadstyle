@@ -72,13 +72,16 @@
     "metadata": {
       "roadstyle:interaction": "a911c29a8eeae5d8",
       "roadstyle:images": "e9049aa3d5b18840",
+      "roadstyle:color_options": "66c6f425f6da8ba6",
       "roadstyle:sources": "de9ed92a2cabe7fc",
       "roadstyle:controls": "7ad47e2cab264f27"
     },
-    "hash": "b5f4d43f2d4a779c"
+    "hash": "708b6b322e5eabfc"
   },
   "color_options": {
-    "names": [],
-    "hash": "4f53cda18c2baa0c"
+    "names": [
+      "lanes"
+    ],
+    "hash": "66c6f425f6da8ba6"
   }
 }

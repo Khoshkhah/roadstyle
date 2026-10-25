@@ -3009,11 +3009,11 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             styler = build_styler(palette=palette, highway_col=highway_col)
         rf = styler.resolve_frame(g)
         geo = bake_props(fc_dict(g), rf)   # per-edge __rs_fill/__rs_casing
-        if legend and getattr(rf, "legend", None):
+        if getattr(rf, "legend", None):
             # a data styler (color_by / cmap / colors) stashes legend metadata on its resolved
-            # frame; surface it as a single legend-only "colour by" entry so the page draws the
-            # legend (one entry ⇒ no dropdown, just the key). Class styling carries none, and
-            # legend=False opts out — matching the folium backend's `legend` arg.
+            # frame; surface it as a single legend-only "colour by" entry (one entry ⇒ no dropdown,
+            # just the key). Class styling carries none. The style always has it: legend=False is
+            # the page's option ``legend``, which hides the box (N32 step 2).
             color_opts_meta = [{"name": rf.legend.get("title") or "data",
                                 "prop": "__rs_fill", "legend": rf.legend}]
     _mark_twoway(geo, directed_col, highway_col, driving_col)
@@ -3890,7 +3890,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             "sources": _roles(style["layers"]), "arrows": _arrow_kind(style["layers"]), "live": None,     # live_data: the Rust engine only
             "popup_mode": mode, "find_control": bool(find_control), "zoom_readout": bool(zoom_readout), "pitch_3d": cam["pitch_3d"],
             "street_view": street_view, "street_view_key": street_view_key or "", "google_3d": bool(google_3d), "select_color": select_color,
-            "filter": flt, "filter_control": bool(filter_control), "color_options": color_opts_meta or [],
+            "filter": flt, "filter_control": bool(filter_control), "color_options": color_opts_meta or [], "legend": bool(legend),
             "color_active": _active, "overlays": ov_meta,
             "overlay_control": bool(overlay_control), "overlay_popup": bool(overlay_popup),
             "tunnel": {"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
