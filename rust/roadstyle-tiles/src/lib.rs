@@ -14,6 +14,7 @@
 
 pub mod error;
 pub mod pmtiles;
+pub mod rules;
 pub mod stage;
 
 pub use error::Error;
@@ -37,6 +38,9 @@ fn check_zooms(min_zoom: f64, max_zoom: f64) -> Result<(), Error> {
 }
 /// The name of the one vector source.
 pub const SOURCE: &str = "roads";
+/// The pieces' tile layer: the vector source's `promoteId` (`__rs_edge`, the road's row) is their feature id, so their tiles have no MVT
+/// id (MapLibre does not read it there).
+const PROMOTED: &str = "simple";
 
 type P = [f64; 2];
 
@@ -58,6 +62,8 @@ pub enum Val {
 
 struct Feat {
     id: Option<u64>,
+    /// the first zoom at which a layer of the style draws it (rules.rs; 0 with no rules)
+    from: f32,
     geom: Geom,
     /// (key, value): the numbers of the layer's key and value
     props: Vec<(u32, u32)>,
@@ -94,6 +100,8 @@ const TILE_CACHE_BYTES: usize = 64 << 20;
 /// the tile's edge).
 pub struct Tiles {
     layers: IndexMap<String, Layer>,
+    /// the style's layers, for each source's first-zoom rules (`drawn_by`)
+    style: Vec<Value>,
     min_zoom: u32,
     max_zoom: u32,
     buffer: f64,
@@ -180,6 +188,16 @@ fn val(v: &Value) -> Option<Val> {
     })
 }
 
+fn json_of(v: &Val) -> Value {
+    match v {
+        Val::Str(s) => Value::from(&**s),
+        Val::Bool(b) => Value::from(*b),
+        Val::Int(i) => Value::from(*i),
+        Val::UInt(u) => Value::from(*u),
+        Val::Dbl(d) => Value::from(*d),
+    }
+}
+
 fn bounds(g: &Geom) -> Option<(P, P)> {
     let mut lo = [f64::INFINITY; 2];
     let mut hi = [f64::NEG_INFINITY; 2];
@@ -204,7 +222,17 @@ impl Tiles {
         if !(buffer >= 0.0 && buffer.is_finite()) {
             return Err(Error::Options(format!("the tile buffer is {buffer}: give 0 or more")));
         }
-        Ok(Tiles { layers: IndexMap::new(), min_zoom, max_zoom, buffer, cache: Default::default() })
+        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffer, cache: Default::default() })
+    }
+
+    /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom
+    /// of that tile (rules.rs: the class minzoom, `casing.drop_below_px`).
+    pub fn drawn_by(&mut self, layers: &[Value]) {
+        self.style = layers.iter().map(|l| serde_json::json!({"source": l["source"], "source-layer": l["source-layer"], "filter": l["filter"]})).collect();
+    }
+
+    fn builder(&self, name: &str) -> Builder {
+        Builder { rules: rules::ZoomRules::of(&self.style, name), ..Default::default() }
     }
 
     /// A new layer: the caches of the old tiles go.
@@ -217,7 +245,7 @@ impl Tiles {
     /// tree. The properties in `keep` and every `__rs_*` property go into the tiles, all of a whole layer's (tiles.py's tile_props). `whole`: see the module; `min_zoom`: the layer's first zoom.
     pub fn add(&mut self, name: &str, source: &Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let empty = Map::new();
-        let mut b = Builder::default();
+        let mut b = self.builder(name);
         for (i, f) in source["data"]["features"].as_array().into_iter().flatten().enumerate() {
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
             let id = Some(i as u64); // tiles.py: a feature's id is its index in its source
@@ -234,7 +262,7 @@ impl Tiles {
         use roadstyle_model::feature_table::GeomType;
         let g = t.geometries_of();
         let names: Vec<&str> = t.names().iter().map(String::as_str).filter(|k| whole || k.starts_with("__rs_") || keep.contains(*k)).collect();
-        let mut b = Builder::default();
+        let mut b = self.builder(name);
         for row in 0..t.len() {
             let Some(kind) = g.kind(row) else { continue };
             let pts = |r: &[[f64; 2]]| r.iter().filter_map(|p| merc_ll(p[0], p[1])).collect::<Vec<P>>();
@@ -263,7 +291,7 @@ impl Tiles {
     /// index). The properties are the `__rs_*` ones and those in `keep` (all of them when `whole`).
     pub fn add_lines<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (Option<L>, P)>, keep: &HashSet<String>, whole: bool, min_zoom: u32)
     where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
-        let mut b = Builder::default();
+        let mut b = self.builder(name);
         for (i, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
@@ -277,16 +305,7 @@ impl Tiles {
     pub fn props(&self, name: &str, id: u64) -> String {
         let Some(layer) = self.layers.get(name) else { return "null".into() };
         let Some(f) = layer.by_id.get(&id).map(|&i| &layer.feats[i as usize]) else { return "null".into() };
-        let m: Map<String, Value> = f.props.iter().map(|(k, v)| {
-            let v = match &layer.vals[*v as usize] {
-                Val::Str(s) => Value::from(&**s),
-                Val::Bool(b) => Value::from(*b),
-                Val::Int(i) => Value::from(*i),
-                Val::UInt(u) => Value::from(*u),
-                Val::Dbl(d) => Value::from(*d),
-            };
-            (layer.keys[*k as usize].clone(), v)
-        }).collect();
+        let m: Map<String, Value> = f.props.iter().map(|(k, v)| (layer.keys[*k as usize].clone(), json_of(&layer.vals[*v as usize]))).collect();
         Value::Object(m).to_string()
     }
 
@@ -391,6 +410,9 @@ impl Tiles {
         let mut enc = Encoder::default();
         for i in hits {
             let f = &layer.feats[i as usize];
+            if z < self.max_zoom && (z + 1) as f32 <= f.from {
+                continue; // no layer draws it at a zoom of this tile (the last zoom's tiles are scaled up for every zoom after it)
+            }
             let (kind, geometry) = match &f.geom {
                 Geom::Points(ps) => {
                     let ps: Vec<[i32; 2]> =
@@ -434,7 +456,7 @@ impl Tiles {
                 }
             };
             if !geometry.is_empty() {
-                enc.feature(f, kind, &geometry, &layer.keys);
+                enc.feature(f, kind, &geometry, &layer.keys, name != PROMOTED);
             }
         }
         enc.finish(name, &layer.encoded)
@@ -451,6 +473,7 @@ struct Builder {
     val_at: HashMap<Vec<u8>, u32>,
     feats: Vec<Feat>,
     boxes: Vec<GeomWithData<Rectangle<P>, u32>>,
+    rules: rules::ZoomRules,
 }
 
 impl Builder {
@@ -458,9 +481,17 @@ impl Builder {
     fn push<K: AsRef<str>, V: TileValue>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, V)>) {
         let Some((lo, hi)) = bounds(&g) else { return };
         let (keys, key_at, vals, encoded, val_at) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at);
+        let rules = &self.rules;
+        let mut read = Map::new();        // the values that the first-zoom rules read
         let props = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
+                if rules.reads(k.as_ref()) {
+                    read.insert(k.as_ref().to_string(), json_of(&v));
+                }
+                if v == Val::Bool(false) && k.as_ref().starts_with("__rs_") {
+                    return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
+                }
                 let m = encode(&v);
                 let v = match val_at.get(&m) {
                     Some(&at) => at,
@@ -483,7 +514,8 @@ impl Builder {
             })
             .collect();
         self.boxes.push(GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32));
-        self.feats.push(Feat { id, geom: g, props });
+        let from = if rules.is_empty() { 0.0 } else { rules.first_zoom(&read) as f32 };
+        self.feats.push(Feat { id, from, geom: g, props });
     }
 
     fn layer(self, whole: bool, min_zoom: u32) -> Layer {
@@ -777,7 +809,7 @@ struct Encoder {
 }
 
 impl Encoder {
-    fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String]) {
+    fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String], with_id: bool) {
         let mut tags = Vec::with_capacity(f.props.len() * 2);
         for (k, v) in &f.props {
             let key = *self.key_at.entry(*k).or_insert_with(|| {
@@ -792,7 +824,7 @@ impl Encoder {
             tags.push(at);
         }
         let mut msg = Vec::new();
-        if let Some(id) = f.id {
+        if let Some(id) = f.id.filter(|_| with_id) {
             msg.push(1 << 3);
             varint(&mut msg, id);
         }

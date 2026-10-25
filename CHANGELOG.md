@@ -23,8 +23,31 @@ All notable changes to **roadstyle** are documented here. The format is based on
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
   `browserStore` keeps every file in the origin's private file system, also the texts (pairs.csv of Burnaby is more than
   localStorage's 5 MB); a text that an older version kept in localStorage moves there when it is read.
+- **`casing.drop_below_px`** (a profile key, both engines; default `1.0`, `0` = always a casing): no casing piece at a zoom where the
+  whole casing line is narrower than this many px, so the fill draws alone there; the casing comes back at the first zoom where it is as
+  wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **Minor roads are hidden below their class's zoom by default** (both engines), as in OpenMapTiles and OSM-Carto: `minzoom` is on
+  (the profile's table: residential and unclassified from 13, cycleway, track and pedestrian from 14, service, footway and path from
+  15, tertiary from 11; motorway to secondary from 4 to 9). **The old look: `minzoom=False`.** `minzoom=None` now means the table too:
+  a caller that passed `None` to draw every class at every zoom must pass `False`. Also on by default: `casing.drop_below_px` 1 (see
+  Added). Tartu, one 1280 × 800 view at zoom 12: 5.6 MB to 1.2 MB of tiles (the largest tile 389 KB), made about 6 times faster.
+- **The tiles read the zoom rules from the style** (both engines). A tile leaves out a feature that every layer drawing its source
+  hides at every zoom of that tile, by the clauses `[">=", ["zoom"], E]` of the layers' filters: the class minzoom (`minzoom=True`) and
+  `casing.drop_below_px`. The tiles of the last zoom keep every feature. Python's `build_pmtiles` takes `layers` (the style's) in place
+  of `class_col` and `minzoom_table`. With `minzoom=True`, a source that a layer draws with no minzoom clause (the full look's
+  `roads-highlight`) keeps every class in its tiles.
+- **Smaller tiles** (both engines). The sort key `__rs_s` of a piece is an integer: 100,000,000 for each step of the key and 1 for each
+  road (before: the key + the road × 1e-8, a double). The order does not change, and the step of a painted road is 50,000,000. A tile
+  keeps no `__rs_*` flag that is false (every reader takes a missing flag as false), and the pieces (the tile layer `simple`) have no
+  MVT id: the source's `promoteId` (`__rs_edge`) is their feature id. The map does not change. Tartu, one 1280 × 800 view (`bench_tiles.mjs`, wasm in Node, the middle of three runs): z12 7.1 MB to
+  5.6 MB in 130 ms to 119 ms (the largest tile 3,268 KB to 2,529 KB), z14 6.6 MB to 5.3 MB in 130 ms to 115 ms.
+- **A source's tiles start at the zoom where it is drawn** (both engines). Its first tile zoom is the first zoom at which a layer of
+  the style draws it, not later than the tiles' last zoom; a source that no layer draws keeps its rule. The base map's buildings and
+  points (drawn from zoom 15 or 16) are no longer in the tiles of zoom 6 to 14. The map does not change. Tartu, the tiles of one
+  1280 × 800 view (`rust/roadstyle-wasm/bench_tiles.mjs`, wasm in Node): z12 8.6 MB to 7.1 MB (the largest tile 3,863 KB to 3,268 KB),
+  z14 7.8 MB to 6.6 MB, made in 10 to 14 % less time; z15 does not change.
 - **roadstyle's files have one copy, the crate roadstyle-assets** (audit N25). The profiles and palettes, the base map's files,
   `cmaps.json`, `basemaps.json`, `defaults.json`, the sprite, the dashboard's JS and CSS, the popup files, the page templates, the
   level editor's page and the vendored MapLibre moved from `src/roadstyle/{data,static,templates,vendor}/` to

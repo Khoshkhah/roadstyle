@@ -198,7 +198,10 @@ def export_inline(edges, *, engine: str | None = None, **kwargs) -> dict:
     _tag_groups(style, kwargs.get("overlays"))
     icon = _settings.theme_value("arrows.icon")
     png = _assets.data("data/sprite.png")
+    from .render_web import _pick_layers, _roles
     style.setdefault("metadata", {}).update({
+        # every style has the road roles and the pick layers (contract::describe in Rust, R7): a host's dashboard reads them
+        "roadstyle:sources": _roles(style["layers"]), "roadstyle:controls": {"pick": _pick_layers(style["layers"])},
         "roadstyle:interaction": out["interaction"],
         "roadstyle:images": {"oneway": {"url": "data:image/png;base64," + base64.b64encode(png).decode(), "sdf": True, "pixelRatio": icon["pixel_ratio"]}}})
     if out.get("color_options"):     # the legend data for the dashboard module (docs/design/dashboard_module.md, "The legend data")

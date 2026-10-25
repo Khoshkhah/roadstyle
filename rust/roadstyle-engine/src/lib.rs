@@ -240,10 +240,15 @@ fn style_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, pl
             "color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
             "ramp": ramp.stops(9), "nodata": look.theme["data"]["nodata"]}));
     }
+    // audit N7, R7: the road roles and the pick layers from the final layers, in every style, so that a host's dashboard finds and picks
+    // the roads with no contract too (contract::describe; tiled_style writes them again for the tiles)
+    let pick = contract::pick_layers(&layers);
+    if contract.is_none() {
+        metadata.insert("roadstyle:sources".into(), contract::roles(&layers));
+        metadata.insert("roadstyle:controls".into(), json!({"pick": pick}));
+    }
     if let Some((mut controls, st)) = contract {
-        // audit N7: the roles, the arrow kind and the pick layers from the final layers (contract::describe; tiled_style writes them
-        // again for the tiles)
-        controls["pick"] = contract::pick_layers(&layers);
+        controls["pick"] = pick;
         metadata.insert("roadstyle:sources".into(), contract::roles(&layers));
         metadata.insert("roadstyle:arrows".into(), contract::arrow_kind(&layers));
         metadata.insert("roadstyle:contract".into(), json!(contract::CONTRACT));
