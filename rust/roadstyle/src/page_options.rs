@@ -6,7 +6,7 @@
 
 use crate::look::Options;
 use crate::page::{escape, gzip_b64, page_html, Camera, PageOptions, PageParts};
-use crate::sources::Sources;
+use crate::sources::Styled;
 use crate::tiles::stage::{TileOptions, COLUMNS, TILES};
 use crate::{layers::py_truth, FeatureTable, Look, RoadTable};
 use serde_json::{json, Map, Value};
@@ -374,7 +374,7 @@ fn check_views(views: &Value, have: [(&str, Vec<Value>); 5]) -> Result<Vec<Value
 
 /// _engine._views: the views as the page reads them, and the palettes that they name other than the page's. Each such palette is
 /// resolved with the look's options and map options (its colours), and merged into stage 1's output (palettes::add).
-fn views(src: &mut Sources, a: &Map<String, Value>, look: &Look, options: &Options, basemaps: &[Value]) -> Result<(Vec<Value>, Vec<String>), crate::Error> {
+fn views(src: &mut Styled, a: &Map<String, Value>, look: &Look, options: &Options, basemaps: &[Value]) -> Result<(Vec<Value>, Vec<String>), crate::Error> {
     let meta = &src.metadata;
     let ctl = &meta["roadstyle:controls"];
     let colors: Vec<Value> = if !look.map.color.options.is_empty() {
@@ -432,7 +432,7 @@ fn palette_swatches(style: &mut Value, props: &Value, pals: &[String], look: &Lo
 
 /// _engine._tiled_page: the tiled page's style and its PMTiles archive, from stage 2 of the same stage 1 (no second build). The style
 /// has one vector source `roads` (the embedded archive) with the layers `simple` and `slots`; the other sources stay inline.
-fn tiled_page(s: &Sources, look: &Look) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
+fn tiled_page(s: &Styled, look: &Look) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
     let c = &look.map.columns;
     let hw = Some(c.class.as_str()).filter(|h| !h.is_empty()).unwrap_or("highway");
     fn col(v: &Option<String>) -> Option<&str> {

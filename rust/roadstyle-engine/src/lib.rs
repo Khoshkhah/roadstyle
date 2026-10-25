@@ -45,22 +45,23 @@ use serde_json::{json, Value};
 /// ponytail: an estimate from Tartu only; measure a larger area in a browser before the limit goes higher.
 pub const MAX_ROADS: usize = 200_000;
 
-/// A source of the style: the roads, the simple pieces (both typed, written from the roads), a base-map layer (typed, audit R10) or a
+/// A source of the style after the roads: the simple pieces (typed, written from the roads), a base-map layer (typed, audit R10) or a
 /// GeoJSON source as JSON (a caller's overlays, slots, decks).
 pub enum Src {
-    /// boxed: the roads' table, drawing values and roles are much larger than the other sources, and a style has one roads source
-    Roads(Box<road::RoadsSource>),
     Simple(simple::SimpleSource),
     Features(features::FeatureSource),
     Json(Value),
 }
 
-/// The parts of a style: its layers, its sources in their order (roads, ov<i>, simple, slots), its metadata and its camera.
+/// The parts of a style: its layers, its sources in their order (the roads first, then ov<i>, simple, slots), its metadata and its camera.
 pub struct Parts {
     pub name: Value,
     pub center: Value,
     pub zoom: Value,
     pub layers: Vec<Value>,
+    /// the source `roads`, the first of the style (audit N15: not in `sources`)
+    pub roads: road::RoadsSource,
+    /// the sources after the roads, in the style's order
     pub sources: Vec<(String, Src)>,
     pub metadata: Value,
     /// The names' font, when there are labels.
@@ -101,9 +102,9 @@ fn roles_of(table: &RoadTable, c: &roadstyle_look::options::Columns) -> Result<R
 /// The parts of another palette of the same call (a view's palette, palettes.rs): the roads of `s` as they were before their marks
 /// (their columns and roles, their levels solved), with the look `look` (the same keywords, another palette). No base map and no route
 /// planner, as a page's views have none.
-pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, Error> {
+pub fn restyle(s: &sources::Styled, look: &Look) -> Result<sources::Styled, Error> {
     let r = &s.roads.roads;
-    Ok(sources::Sources::new(style_parts(r.table.clone(), r.roles.clone(), r.solved.clone(), look, None, None, None)?))
+    Ok(sources::Styled::new(style_parts(r.table.clone(), r.roles.clone(), r.solved.clone(), look, None, None, None)?))
 }
 
 /// make_parts after the roads are prepared (the roles, the levels).
@@ -188,7 +189,7 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
     }
     // render's order: the roads, the overlays (_build_overlays), the 3D decks, the pieces
-    let mut sources = vec![("roads".to_string(), Src::Roads(Box::new(roads)))];
+    let mut sources = Vec::new();
     for (i, ov) in ovs.into_iter().enumerate() {
         let src = match ov.data {
             overlays::Data::Table(table) => Src::Features(features::FeatureSource { table: *table, maxzoom: None }),
@@ -278,29 +279,16 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
         metadata.insert("roadstyle:controls".into(), controls);
     }
     let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
-    data_settings(&mut sources, &look.other);
-    Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
+    data_settings(&mut roads, &mut sources, &look.other);
+    Ok(Parts { name, center, zoom, layers, roads, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
 }
 
-/// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Sources`), written.
+/// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Styled`), written.
 pub fn make_style(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, Error> {
-    let s = sources::Sources::new(make_parts(table, look, features, planner, name)?);
+    let s = sources::Styled::new(make_parts(table, look, features, planner, name)?);
     let mut out = Vec::new();
     s.write_style(&mut out).expect("a Vec takes every byte");
     Ok(String::from_utf8(out).expect("serde_json writes UTF-8"))
-}
-
-/// The roads source out of the sources (its place keeps an empty `Src::Roads` mark): the other typed sources are written from it.
-pub fn take_roads(mut sources: Vec<(String, Src)>) -> (Vec<(String, Src)>, Option<road::RoadsSource>) {
-    let mut roads = None;
-    for (_, s) in sources.iter_mut() {
-        if let Src::Roads(r) = s {
-            let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty(), Default::default(), None), tolerance: r.tolerance, maxzoom: r.maxzoom,
-                                            in_style: r.in_style, read: None };
-            roads = Some(std::mem::replace(&mut **r, empty));
-        }
-    }
-    (sources, roads)
 }
 
 /// roadstyle.export._camera: the centre and the zoom that fit the roads' bounds in a 1024 x 768 px view, as the page's fitBounds.
@@ -376,15 +364,13 @@ pub(crate) fn export(look: &Look) -> bool {
 
 /// render's data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance). Keys of the style writer:
 /// read from the look's `other` until T4 moves them to SourceMode::Inline.
-fn data_settings(sources: &mut [(String, Src)], other: &serde_json::Map<String, Value>) {
+fn data_settings(roads: &mut road::RoadsSource, sources: &mut [(String, Src)], other: &serde_json::Map<String, Value>) {
     let maxzoom = other.get("data_maxzoom").and_then(Value::as_f64).map(|z| z as i64);
     let tolerance = other.get("data_tolerance").and_then(Value::as_f64);
+    roads.maxzoom = maxzoom.or(roads.maxzoom);
+    roads.tolerance = tolerance.unwrap_or(roads.tolerance);
     for (_, src) in sources.iter_mut() {
         match src {
-            Src::Roads(s) => {
-                s.maxzoom = maxzoom.or(s.maxzoom);
-                s.tolerance = tolerance.unwrap_or(s.tolerance);
-            }
             Src::Simple(s) => {
                 s.maxzoom = maxzoom.or(s.maxzoom);
                 s.tolerance = tolerance.unwrap_or(s.tolerance);

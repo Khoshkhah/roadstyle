@@ -35,7 +35,7 @@ fn roads(stored: bool) -> roadstyle_rs::RoadTable {
     roadstyle_rs::geojson::read_roads(fc.to_string().as_bytes()).unwrap()
 }
 
-fn props(s: &roadstyle_rs::sources::Sources, i: usize) -> Vec<(String, Value)> {
+fn props(s: &roadstyle_rs::sources::Styled, i: usize) -> Vec<(String, Value)> {
     s.roads.roads.road(i).own().map(|(k, v)| (k.to_string(), v.to_value())).collect()
 }
 

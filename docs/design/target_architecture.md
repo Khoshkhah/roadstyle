@@ -661,7 +661,7 @@ the coordinator (marked *C*).
 | R20 | open, waits for the duckosm-rust freeze | (k) |
 | R21, D6 | open: `substring`, `class_key`, `merged`, `varint`, `length` in 2 to 4 copies | (a) `model::geom::line`; the levels crate keeps its own (it is a leaf) |
 | N5 | partly: piece properties as `Val::Json` | (c) typed pieces, JSON only in the writer |
-| N15 | open: the empty `Src::Roads` mark | (f) the new `Styled` keeps the roads out of the source list |
+| N15 | done (T4 step 1): `Styled` keeps the roads out of the source list; `Styled::shown` gives the style's sources in order | (f) |
 | N16, D8 | open (on a branch): full-look leftovers in JS and Rust | (h) item 6; dead code in phase T4 |
 | N17 | `roadstyle-serve` on `n28-editor` (*C*) | (a) item 7 |
 | N18 | open: the CLI reads only GeoParquet | (g) item 7, `read::path` |

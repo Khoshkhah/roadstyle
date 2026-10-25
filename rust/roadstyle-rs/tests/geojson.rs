@@ -14,7 +14,7 @@ fn a_geojson_file_makes_the_style_of_its_geoparquet_file() {
     let fc = roadstyle_rs::read::features(pq.clone()).unwrap();
     let roads = roadstyle_rs::geojson::read_roads(fc.to_string().as_bytes()).unwrap();
     assert_eq!(roads.len(), fc["features"].as_array().unwrap().len());
-    let style = |s: roadstyle_rs::sources::Sources| {
+    let style = |s: roadstyle_rs::sources::Styled| {
         let mut out = Vec::new();
         s.write_style(&mut out).unwrap();
         serde_json::from_slice::<serde_json::Value>(&out).unwrap()
