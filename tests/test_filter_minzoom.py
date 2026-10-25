@@ -32,7 +32,7 @@ def test_a_class_hidden_at_this_zoom_is_dimmed_in_the_roads_box(tmp_path):
         browser = p.chromium.launch()
         pg = browser.new_page(viewport={"width": 1000, "height": 800})
         pg.goto(page.as_uri())
-        pg.wait_for_function("window.map && map.loaded() && document.querySelector('.flt-ctrl label')", timeout=120000)
+        pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded() && document.querySelector('.flt-ctrl label')", timeout=120000)
         seen = {}
         for z in (12, 15):
             pg.evaluate("z => new Promise(r => { map.once('zoomend', r); map.jumpTo({zoom: z}); })", z)
