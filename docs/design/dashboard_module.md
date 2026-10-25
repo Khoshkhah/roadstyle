@@ -169,7 +169,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
 | `tunnel` | `tunnel_control` and the theme's tunnels: `{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}` | `{layers: {}, steps: [], control: false}` | `tunnel.js`, `arrows.js` |
 | `fill_layers` | the road fill layer ids | `[]` | `svspot.js` |
-| `pick` | the layers that a road is picked on (`roadstyle:controls`) | `[]`: nothing to pick | `select.js` |
+| `pick` | the layers that a road is picked on (`roadstyle:controls`) | `[]`: the road layer of simple mode (a style with no interaction contract: a host's `makeStyle`, the level editor's style) | `select.js` |
 | `road_fill` | `road_fill`: `{on, paint}` | `{on: true, paint: {}}` | `color.js` |
 | `views` | `views` | `[]` | `views.js` |
 | `items` | `items`, `items_popup`: `{label, popup, layer}` or `null` | `null` | `select.js` |
