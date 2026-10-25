@@ -47,7 +47,10 @@ fn monaco_is_clipped_to_its_boundary() {
 #[test]
 #[ignore]
 fn the_files_of_a_folder_are_clipped() {
-    let dir = PathBuf::from(std::env::var("ROADSTYLE_CLIP").expect("ROADSTYLE_CLIP: a folder of features.parquet files"));
+    let Ok(dir) = std::env::var("ROADSTYLE_CLIP").map(PathBuf::from) else {
+        println!("ROADSTYLE_CLIP is not set: a folder of features.parquet files, to measure them");
+        return;
+    };
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().filter_map(|e| Some(e.ok()?.path())).filter(|p| p.extension().is_some_and(|e| e == "parquet")).collect();
     files.sort();
     for f in files {
