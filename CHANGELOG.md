@@ -89,6 +89,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The Rust engine's style has no page keys `filter_control` and `legend`** (N32 step 2): the page gives them in its options
   (`RS_OPTIONS.filter_control`, `RS_OPTIONS.legend`, default true). `roadstyle:controls.filter` has no `on`, and a lone data styler's
   legend is always in `roadstyle:color_options`. A host page that gives neither shows both boxes.
+- **Stage 1's output is `Styled`** (Rust: `roadstyle::sources::Styled`, was `Sources`; T4 step 1, audit N15). The roads are in their own
+  field and not in the source list, so `Src` has no `Roads` variant. `Styled::shown()` gives the style's sources in order (the roads
+  first when the style has them), and `Styled::source(name)` gives one of them. The bindings' classes keep their names.
 - **Look version 2: `map` in place of `args`** (version 2 was not released; N32 step 2). A look file has the typed map options
   (`map`) and the sections, and no page key: the page takes its keys (`name`, `basemap_switcher`, `sidebar`, `views`,
   `hover_delay_ms`, ...) from its caller. Rust: `page_from`'s `given` has the call's keywords (the Python binding and the CLI give them).

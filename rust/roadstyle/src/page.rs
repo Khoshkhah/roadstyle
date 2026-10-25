@@ -6,7 +6,7 @@
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use crate::sources::Sources;
+use crate::sources::Styled;
 use roadstyle_engine::table::JsSafe;
 use serde_json::{Map, Number, Value};
 
@@ -107,8 +107,8 @@ pub struct PageParts<'a> {
     pub side: Option<(&'a Value, Option<&'a str>)>,
     /// the settings of simple mode's recolouring script, when the page is in simple mode
     pub simple_js: Option<&'a Value>,
-    /// the Sources of the style's null `data` (page_from's style: `Sources::style_with`); None: the style has its data
-    pub sources: Option<&'a Sources>,
+    /// the Styled of the style's null `data` (page_from's style: `Styled::style_with`); None: the style has its data
+    pub sources: Option<&'a Styled>,
 }
 
 /// The dashboard bundle (render_web: the modules without their import lines and the word export at a line start, one script).
@@ -169,7 +169,7 @@ pub(crate) fn gzip_b64(raw: &[u8]) -> String {
 
 /// _compress_sources: every GeoJSON source of 256 KB or more out of the style, as gzipped base64; the source starts empty. A null
 /// `data` is the source's of `fill` (page_from's style, audit D3).
-fn compress_sources(style: &mut Value, fill: Option<&Sources>) -> Map<String, Value> {
+fn compress_sources(style: &mut Value, fill: Option<&Styled>) -> Map<String, Value> {
     let mut blobs = Map::new();
     for (sid, src) in style["sources"].as_object_mut().into_iter().flatten() {
         if src["type"] != "geojson" {

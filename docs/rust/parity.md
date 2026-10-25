@@ -251,10 +251,18 @@ output of `wasm-bindgen` for the profile `dist`), the same file with gzip -9, an
 | Step 2 as first written (d68e184) | 11,828,534 B (+4.7 %) | 2,840,954 B (+5.7 %) | 32,334,320 B (+3.3 %) |
 | Step 2 (db210f9: no serde `flatten`, schemars behind the feature `schema`) | 11,587,165 B (+2.6 %) | 2,773,038 B (+3.2 %) | 31,871,560 B (+1.8 %) |
 | Step 3 (the look crate's readers read the typed sections) | 11,669,114 B (+3.3 %) | 2,794,223 B (+4.0 %) | 32,124,408 B (+2.6 %) |
+| Step 4 (275bf1a: N32 step 2, and the other lanes' work since the first row) | 12,316,520 B (+9.1 %) | 2,912,756 B (+8.4 %) | 33,823,608 B (+8.0 %) |
+| The allocator out of line (13c0cdf and `#[inline(never)]` in `roadstyle-wasm`'s `grow`) | 11,006,948 B (−2.5 %) | 2,710,790 B (+0.9 %) | the same (the browser's allocator only) |
 
 The percentages are against the first row. The typed sections cost their serde readers (161 KB of the WebAssembly at step 2); serde's
 `flatten` read every section a second time through its buffer (113 KB for `Sections` alone), so `LookFile` is read and written by
 hand. The target: under +2 % again when N32 step 2 removes the JSON views of version 1 and the flat reader of `args`.
+
+The step from the step-3 row to step 4 is not N32 step 2 (2026-10-25, the WebAssembly at each landing). The landings of the engine lane
+(the typed errors, `Mark`, the tight `Draw`) and N32 step 2 changed it by less than 30 KB each, and the page keys by 45 KB. The allocator's
+counters of `liveBytes` (a6845cf) added about 495 KB: with fat LTO, the allocator's functions were inlined at each allocation site. With
+every function of the allocator out of line, the package is 1.31 MB smaller, and under the first row. The Python module does not have
+this allocator: Python +8.0 %, causes not measured (to measure in T5, when the engine splits change the code).
 
 ## Memory
 

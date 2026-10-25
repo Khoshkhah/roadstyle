@@ -178,7 +178,7 @@ impl Tiler {
 /// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory (make_sources).
 #[pyclass]
 struct Sources {
-    inner: roadstyle::sources::Sources,
+    inner: roadstyle::sources::Styled,
 }
 
 fn format(f: &str) -> PyResult<roadstyle::Format> {

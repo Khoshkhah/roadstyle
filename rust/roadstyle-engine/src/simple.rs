@@ -428,7 +428,7 @@ pub struct SimpleSource {
     pub promote: bool,
     /// a view's palettes (palettes.rs): the roads' `Extra` that the pieces differ in, in the order of the copies on each piece
     pub palette: Vec<usize>,
-    /// R1: the only properties that a piece keeps (what the layers and the page read; `Sources::set_reads`), None: all
+    /// R1: the only properties that a piece keeps (what the layers and the page read; `Styled::set_reads`), None: all
     pub read: Option<std::collections::HashSet<String>>,
     /// R8: the classes of the road layer's class index (`__rs_ci`, the last property of every feature), None: no index
     pub classes: Option<Vec<String>>,

@@ -4,8 +4,10 @@
 //! cuts the sources, from memory or from the files that this output is saved as (GeoJSON or GeoParquet: the facade and roadstyle-io).
 
 use roadstyle_model::mark::Mark;
+use crate::features::FeatureSource;
 use crate::road::RoadsSource;
-use crate::{take_roads, Parts, Roads, RoadTable, Src};
+use crate::simple::SimpleSource;
+use crate::{Parts, Src};
 use roadstyle_model::table::JsSafe;
 use roadstyle_model::Cell;
 use serde_json::Value;
@@ -20,8 +22,27 @@ pub struct TableRow<'a> {
     pub line: Option<&'a [[f64; 2]]>,
 }
 
+/// One source of the style, borrowed: the roads (`Styled::roads`) or one of `Styled::sources`.
+#[derive(Clone, Copy)]
+pub enum Source<'a> {
+    Roads(&'a RoadsSource),
+    Simple(&'a SimpleSource),
+    Features(&'a FeatureSource),
+    Json(&'a Value),
+}
+
+impl<'a> From<&'a Src> for Source<'a> {
+    fn from(s: &'a Src) -> Source<'a> {
+        match s {
+            Src::Simple(p) => Source::Simple(p),
+            Src::Features(f) => Source::Features(f),
+            Src::Json(v) => Source::Json(v),
+        }
+    }
+}
+
 /// Stage 1's output.
-pub struct Sources {
+pub struct Styled {
     pub name: Value,
     pub center: Value,
     pub zoom: Value,
@@ -29,8 +50,9 @@ pub struct Sources {
     pub metadata: Value,
     pub glyphs: Option<Value>,
     pub state: Option<Value>,
-    /// the sources in the style's order; the roads' place holds an empty `Src::Roads`
+    /// the sources after the roads, in the style's order (audit N15: the roads are not in this list)
     pub sources: Vec<(String, Src)>,
+    /// the source `roads`, the first of the style when the style has it (`RoadsSource::in_style`)
     pub roads: RoadsSource,
     /// the metadata that only a saved style has (what stage 2 reads from it: `roadstyle:tiles`, `roadstyle:columns`)
     pub saved: serde_json::Map<String, Value>,
@@ -38,13 +60,10 @@ pub struct Sources {
     pub warnings: Vec<String>,
 }
 
-impl Sources {
-    pub fn new(p: Parts) -> Sources {
-        let (sources, roads) = take_roads(p.sources);
-        let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty(), Default::default(), None), tolerance: 0.05, maxzoom: None,
-                                                          in_style: false, read: None });
-        let mut s = Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
-                              sources, roads, saved: serde_json::Map::new(), warnings: p.warnings };
+impl Styled {
+    pub fn new(p: Parts) -> Styled {
+        let mut s = Styled { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
+                             sources: p.sources, roads: p.roads, saved: serde_json::Map::new(), warnings: p.warnings };
         s.set_reads();
         s
     }
@@ -92,14 +111,14 @@ impl Sources {
         roadstyle_model::props::drawn(&self.layers, &self.metadata, keep)
     }
 
-    /// The FeatureCollection of the source `i` as GeoJSON text, written to `w`. The roads have only the properties of `drawn` and their
-    /// marks: their fields are in the road table, and their lines too when no layer draws the roads (`draws_roads`).
-    pub fn write_data<W: std::io::Write>(&self, i: usize, drawn: &HashSet<String>, w: &mut W) -> std::io::Result<()> {
-        match &self.sources[i].1 {
-            Src::Roads(_) => self.roads.write_data(w, Some(drawn), self.draws_roads()),
-            Src::Simple(s) => s.write_data(w, &self.roads.roads),
-            Src::Features(f) => f.write_data(w),
-            Src::Json(v) => serde_json::to_writer(w, &JsSafe(&v["data"])).map_err(std::io::Error::other),
+    /// The FeatureCollection of the source `src` (one of `shown`'s) as GeoJSON text, written to `w`. The roads have only the properties of
+    /// `drawn` and their marks: their fields are in the road table, and their lines too when no layer draws the roads (`draws_roads`).
+    pub fn write_data<W: std::io::Write>(&self, src: Source, drawn: &HashSet<String>, w: &mut W) -> std::io::Result<()> {
+        match src {
+            Source::Roads(r) => r.write_data(w, Some(drawn), self.draws_roads()),
+            Source::Simple(s) => s.write_data(w, &self.roads.roads),
+            Source::Features(f) => f.write_data(w),
+            Source::Json(v) => serde_json::to_writer(w, &JsSafe(&v["data"])).map_err(std::io::Error::other),
         }
     }
 
@@ -132,12 +151,12 @@ impl Sources {
             }
             Value::Object(s)
         };
-        let sources: serde_json::Map<String, Value> = self.shown().map(|(_, (k, s))| (k.clone(), match s {
-            Src::Roads(_) => spec(self.roads.tolerance, false, self.roads.maxzoom, data(k)),
-            Src::Simple(s) => spec(s.tolerance, s.promote, s.maxzoom, data(k)),
-            Src::Features(f) => f.spec(data(k)),
+        let sources: serde_json::Map<String, Value> = self.shown().map(|(k, s)| (k.to_string(), match s {
+            Source::Roads(r) => spec(r.tolerance, false, r.maxzoom, data(k)),
+            Source::Simple(s) => spec(s.tolerance, s.promote, s.maxzoom, data(k)),
+            Source::Features(f) => f.spec(data(k)),
             // the source's other members, and `data` in its place
-            Src::Json(v) => v.as_object().map_or_else(|| v.clone(), |o| Value::Object(o.iter().map(|(m, x)| {
+            Source::Json(v) => v.as_object().map_or_else(|| v.clone(), |o| Value::Object(o.iter().map(|(m, x)| {
                 (m.clone(), if m == "data" { data(k) } else { x.clone() })
             }).collect())),
         })).collect();
@@ -156,25 +175,31 @@ impl Sources {
         style
     }
 
-    /// The sources that a style shows, with their place in `sources`: all but the roads when they are not in the style.
-    fn shown(&self) -> impl Iterator<Item = (usize, &(String, Src))> {
-        self.sources.iter().enumerate().filter(|(_, (_, s))| !matches!(s, Src::Roads(_)) || self.roads.in_style)
+    /// The sources that the style shows, in its order, with their names: the roads first when the style has them, then `sources`.
+    pub fn shown(&self) -> impl Iterator<Item = (&str, Source<'_>)> {
+        let roads = self.roads.in_style.then_some(("roads", Source::Roads(&self.roads)));
+        roads.into_iter().chain(self.sources.iter().map(|(k, s)| (k.as_str(), Source::from(s))))
+    }
+
+    /// The source `name` that the style shows, or none.
+    pub fn source(&self, name: &str) -> Option<Source<'_>> {
+        self.shown().find(|(k, _)| *k == name).map(|(_, s)| s)
     }
 
     /// The FeatureCollection of the source `name` as the style has it (write_style's), written to `w`; false: no such source.
     pub fn write_source_data<W: std::io::Write>(&self, name: &str, w: &mut W) -> std::io::Result<bool> {
-        let Some((_, (_, s))) = self.shown().find(|(_, (k, _))| k == name) else { return Ok(false) };
+        let Some(s) = self.source(name) else { return Ok(false) };
         match s {
-            Src::Roads(_) => self.roads.write_data(w, None, true)?,
-            Src::Simple(p) => p.write_data(w, &self.roads.roads)?,
-            Src::Features(f) => f.write_data(w)?,
-            Src::Json(v) => serde_json::to_writer(&mut *w, &JsSafe(&v["data"]))?,
+            Source::Roads(r) => r.write_data(w, None, true)?,
+            Source::Simple(p) => p.write_data(w, &self.roads.roads)?,
+            Source::Features(f) => f.write_data(w)?,
+            Source::Json(v) => serde_json::to_writer(&mut *w, &JsSafe(&v["data"]))?,
         }
         Ok(true)
     }
 
     /// `style` (`style_with`'s, perhaps changed: tiled, merged into a page) as JSON text, written to `w` a part at a time: a source of
-    /// these Sources whose `data` is null gets its FeatureCollection there (`write_source_data`); all else is written as it is.
+    /// this Styled whose `data` is null gets its FeatureCollection there (`write_source_data`); all else is written as it is.
     pub fn write_with<W: std::io::Write>(&self, style: &Value, w: &mut W) -> std::io::Result<()> {
         let Some(top) = style.as_object() else { return serde_json::to_writer(w, &JsSafe(style)).map_err(std::io::Error::other) };
         w.write_all(b"{")?;
