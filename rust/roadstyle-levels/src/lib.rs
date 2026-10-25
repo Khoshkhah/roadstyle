@@ -22,6 +22,10 @@ pub type Pt = (f64, f64);
 /// The roadstyle version of these rules and defaults (`edge_levels_meta.roadstyle_version`): this crate's version, which is roadstyle's.
 pub const ROADSTYLE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The path classes (OSM's `highway`): the ways that a car does not use. The one list of every crate: the level input (a path at a node
+/// where a car road goes on is a crossing, not a meet), the base map's edges (a crossing's street) and duckOSM's walking network.
+pub const PATH_CLASSES: [&str; 7] = ["footway", "path", "cycleway", "steps", "pedestrian", "bridleway", "corridor"];
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Method {
     None,
@@ -121,8 +125,12 @@ pub struct Levels {
     pub orders_not_kept_pairs: Vec<(i64, i64)>,
     /// Solve only: the near parts (upper road, lower road, part 0, 1 or 2) that are not over the lower road.
     pub near_not_kept: Vec<(i64, i64, usize)>,
+    /// Solve only: the crossings (a path at a node where a car road goes on), and those whose path is not under the road's head (road,
+    /// path, end 0 or 2).
+    pub crossings: usize,
+    pub crossings_not_kept: Vec<(i64, i64, usize)>,
     /// Solve only: the best value of each stage (see `solve::Solved::stages`).
-    pub stages: [i64; 4],
+    pub stages: [i64; 5],
 }
 
 /// The wishes of `order`: the priority (roundabouts, tunnels, bridges, then the class), the class only, the edges'
@@ -136,7 +144,7 @@ pub enum Order {
     None,
 }
 
-/// One row of `visualization.level_edits` (roadstyle's `solve_levels(edits=...)`): `relation` is meet, stack, near or
+/// One row of `visualization.level_edits` (roadstyle's `solve_levels(edits=...)`): `relation` is meet, stack, crossing, near or
 /// order; `a` and `b` are any edges of their roads. `enabled` false removes the same rule of the roads, all other rows
 /// add a rule. A meet has the ends `start` or `end`; a stack or a near rule has the part of `a` (`start`, `main` or
 /// `end`) in `a_end`.
@@ -207,10 +215,10 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
         )));
     }
     let roads = input::road_split(edges)?;
-    let (mut given_up, mut orders_not_kept, mut stages, mut pairs, mut order_pairs) =
-        (0, 0, [0; 4], 0, 0);
-    let (mut given_up_pairs, mut orders_not_kept_pairs, mut near_not_kept) =
-        (Vec::new(), Vec::new(), Vec::new());
+    let (mut given_up, mut orders_not_kept, mut stages, mut pairs, mut order_pairs, mut crossings) =
+        (0, 0, [0; 5], 0, 0, 0);
+    let (mut given_up_pairs, mut orders_not_kept_pairs, mut near_not_kept, mut crossings_not_kept) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     let rows = match o.method {
         Method::Tags => tags(edges, &roads.ends),
         _ => {
@@ -260,6 +268,8 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
                 .iter()
                 .map(|&(u, l, h)| (id(u), id(l), h))
                 .collect();
+            crossings = rules.crossings.len();
+            crossings_not_kept = s.crossings_not_kept.iter().map(|&(c, p, h)| (id(c), id(p), h)).collect();
             stages = s.stages;
             solved_rows(edges, &roads, &rules, &s, o.head_m)
         }
@@ -277,6 +287,8 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
         given_up_pairs,
         orders_not_kept_pairs,
         near_not_kept,
+        crossings,
+        crossings_not_kept,
         stages,
     })
 }
@@ -405,10 +417,15 @@ fn edit(
                 (a, b, side(&e.a_end, ab, &["start", "main", "end"])?),
                 e.enabled,
             ),
+            "crossing" => toggle(
+                &mut rules.crossings,
+                (a, b, side(&e.a_end, ab, &["start", "end"])?),
+                e.enabled,
+            ),
             "order" => toggle(&mut rules.orders, (a, b), e.enabled),
             r => {
                 return Err(Error::Edits(format!(
-                    "pairs: the relation '{r}' is not meet, stack, near or order"
+                    "pairs: the relation '{r}' is not meet, stack, crossing, near or order"
                 )))
             }
         };

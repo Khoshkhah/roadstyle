@@ -401,6 +401,9 @@ pub struct Answer {
     pub given_up_parts: Vec<(i64, i64, Side)>,
     pub near: Vec<(i64, i64, Side)>,
     pub orders_not_kept: Vec<(i64, i64)>,
+    /// The crossings (road, path, the road's end) whose path is not under the road's head, and the number of crossings.
+    pub crossings_not_kept: Vec<(i64, i64, Side)>,
+    pub crossings: usize,
     pub roads: usize,
     pub pairs: usize,
     pub meets: usize,
@@ -417,9 +420,10 @@ impl Answer {
         let pairs = |v: &[(i64, i64)]| v.iter().map(|&(a, b)| json!([a.to_string(), b.to_string()])).collect::<Vec<_>>();
         let parts = |v: &[(i64, i64, Side)]| v.iter().map(|&(a, b, h)| json!([a.to_string(), b.to_string(), side_name(h)])).collect::<Vec<_>>();
         json!({"levels": self.levels, "given_up": pairs(&self.given_up), "given_up_parts": parts(&self.given_up_parts),
-               "near": parts(&self.near), "orders_not_kept": pairs(&self.orders_not_kept),
+               "near": parts(&self.near), "orders_not_kept": pairs(&self.orders_not_kept), "crossings_not_kept": parts(&self.crossings_not_kept),
                "info": {"roads": self.roads, "pairs": self.pairs, "meets": self.meets, "order_pairs": self.order_pairs,
-                        "order_violations": self.orders_not_kept.len(), "near_warnings": self.near_warnings, "solver": "rust"},
+                        "order_violations": self.orders_not_kept.len(), "near_warnings": self.near_warnings, "crossings": self.crossings,
+                        "crossing_violations": self.crossings_not_kept.len(), "solver": "rust"},
                "resolve": {"how": match self.how { How::Full => "full", How::Local => "local" }, "why": self.why}})
     }
 }
@@ -452,8 +456,10 @@ impl Editor {
     }
 
     /// The answer that the page starts from (levels.csv and levels_info.json, not solved again): 4 numbers for each road in its own way,
-    /// the given-up parts (upper, lower, part) as levels_info.json has them, and the numbers of order wishes not kept and near warnings.
-    pub fn start_from(&mut self, levels: &[i64], given_up_parts: &[(String, String, String)], orders_not_kept: usize, near: usize) -> Result<(), crate::Error> {
+    /// the given-up parts (upper, lower, part) as levels_info.json has them, and the numbers of order wishes not kept, near warnings and
+    /// crossings not kept.
+    pub fn start_from(&mut self, levels: &[i64], given_up_parts: &[(String, String, String)], orders_not_kept: usize, near: usize,
+                      crossings: usize) -> Result<(), crate::Error> {
         let n = self.roads().len();
         if levels.len() != 4 * n {
             return Err(crate::error::edits(format!("levels: {} numbers for {n} roads", levels.len())));
@@ -461,7 +467,7 @@ impl Editor {
         let road = |t: &str| id(t).ok().and_then(|i| self.area.road_of(i)).ok_or_else(|| crate::error::edits(format!("levels_info: '{t}' is not a road")));
         let parts = given_up_parts.iter().map(|(u, l, h)| Ok((road(u)?, road(l)?, side(h)?.ok_or_else(|| crate::error::edits("levels_info: a part with no name"))?)))
             .collect::<Result<_, crate::Error>>()?;
-        self.last = Some(Previous { levels: levels.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]).collect(), given_up_parts: parts, orders_not_kept, near });
+        self.last = Some(Previous { levels: levels.chunks(4).map(|c| [c[0], c[1], c[2], c[3]]).collect(), given_up_parts: parts, orders_not_kept, near, crossings });
         Ok(())
     }
 
@@ -477,7 +483,8 @@ impl Editor {
         let parts = |v: &[(usize, usize, Side)]| v.iter().map(|&(a, b, h)| (id(a), id(b), h)).collect();
         let near: HashSet<(usize, usize)> = s.near_parts.iter().map(|&(u, l, _)| (u, l)).collect();
         Answer { levels: s.levels.clone(), given_up: pairs(&s.given_up), given_up_parts: parts(&s.given_up_parts), near: parts(&s.near_parts),
-                 orders_not_kept: pairs(&s.orders_not_kept), roads: self.roads().len(), pairs: s.pairs, meets: s.meets, order_pairs: s.order_pairs,
+                 orders_not_kept: pairs(&s.orders_not_kept), crossings_not_kept: parts(&s.crossings_not_kept), crossings: s.crossings,
+                 roads: self.roads().len(), pairs: s.pairs, meets: s.meets, order_pairs: s.order_pairs,
                  near_warnings: near.len(), how, why }
     }
 }
@@ -499,7 +506,8 @@ pub fn read_pairs(csv: &str) -> Result<Vec<PairRow>, crate::Error> {
             "stack" => Relation::Stack,
             "near" => Relation::Near,
             "order" => Relation::Order,
-            r => return Err(crate::error::edits(format!("pairs: the relation '{r}' is not meet, stack, near or order"))),
+            "crossing" => Relation::Crossing,
+            r => return Err(crate::error::edits(format!("pairs: the relation '{r}' is not meet, stack, crossing, near or order"))),
         };
         Ok(PairRow { relation, a: id(&col("a"))?, b: id(&col("b"))?, a_end: side(&col("a_end"))?, b_end: side(&col("b_end"))?,
                      enabled: !matches!(col("enabled").to_lowercase().as_str(), "false" | "0" | "no") })
@@ -513,6 +521,7 @@ fn row_json(r: &PairRow) -> Value {
         Relation::Stack => "stack",
         Relation::Near => "near",
         Relation::Order => "order",
+        Relation::Crossing => "crossing",
     };
     json!({"relation": rel, "a": r.a.to_string(), "b": r.b.to_string(), "a_end": r.a_end.map_or("", side_name), "b_end": r.b_end.map_or("", side_name)})
 }

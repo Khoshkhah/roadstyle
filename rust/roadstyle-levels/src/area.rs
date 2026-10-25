@@ -25,6 +25,9 @@ pub enum Relation {
     Near,
     /// `a`'s fill is over `b`'s fill where they meet (a wish).
     Order,
+    /// `b` is a path at the end `a_end` of `a`, where the car road `a` goes on (a crossing at grade): `a`'s head there is over `b`'s
+    /// fill, so the path is drawn under the road's outline (a wish after the stack rules).
+    Crossing,
 }
 
 /// An end of a road (`Start`, `End`) or a part of its casing (`Start` head, `Main` part, `End` head).
@@ -77,9 +80,12 @@ pub struct AreaSolved {
     pub given_up_parts: Vec<(usize, usize, Side)>,
     /// The near parts that are not over the lower fill (warnings), and the order wishes not kept (higher, lower).
     pub near_parts: Vec<(usize, usize, Side)>,
+    /// The crossings (road, path, the road's end) whose path is not under the road's head.
+    pub crossings_not_kept: Vec<(usize, usize, Side)>,
     pub orders_not_kept: Vec<(usize, usize)>,
-    /// The number of stack pairs (near rules included), meets and order wishes.
+    /// The number of stack pairs (near rules included), meets, order wishes and crossings.
     pub pairs: usize,
+    pub crossings: usize,
     pub meets: usize,
     pub order_pairs: usize,
 }
@@ -92,6 +98,7 @@ pub struct Previous {
     pub given_up_parts: HashSet<(usize, usize, Side)>,
     pub orders_not_kept: usize,
     pub near: usize,
+    pub crossings: usize,
 }
 
 impl From<&AreaSolved> for Previous {
@@ -101,6 +108,7 @@ impl From<&AreaSolved> for Previous {
             given_up_parts: s.given_up_parts.iter().copied().collect(),
             orders_not_kept: s.orders_not_kept.len(),
             near: s.near_parts.len(),
+            crossings: s.crossings_not_kept.len(),
         }
     }
 }
@@ -139,7 +147,7 @@ fn key(r: &PairRow) -> Key {
             );
             Key::Meet(x.min(y), x.max(y))
         }
-        Relation::Stack | Relation::Near => {
+        Relation::Stack | Relation::Near | Relation::Crossing => {
             Key::Part(r.relation, r.a, r.b, r.a_end.unwrap_or(Side::Main))
         }
         Relation::Order => Key::Order(r.a, r.b),
@@ -238,7 +246,7 @@ impl Area {
             roads: self.roads.len(),
             ..Default::default()
         };
-        let mut rows: [Vec<PairRow>; 4] = Default::default();
+        let mut rows: [Vec<PairRow>; 5] = Default::default();
         for (row, _) in merged {
             let (a, b) = (idx(row.a)?, idx(row.b)?);
             let part = row.a_end.unwrap_or(Side::Main).index();
@@ -251,6 +259,7 @@ impl Area {
                 )),
                 Relation::Stack => r.lifts.push((a, b, part)),
                 Relation::Near => r.near.push((a, b, part)),
+                Relation::Crossing => r.crossings.push((a, b, part)),
                 Relation::Order => r.orders.push((a, b)),
             }
             rows[row.relation as usize].push(row.clone());
@@ -308,9 +317,11 @@ impl Area {
             given_up: s.given_up.clone(),
             given_up_parts: side(&s.given_up_parts),
             near_parts: side(&s.near_not_kept),
+            crossings_not_kept: side(&s.crossings_not_kept),
             orders_not_kept: s.orders_not_kept.clone(),
             pairs: both.len(),
             meets: rules.meets.len(),
+            crossings: rules.crossings.len(),
             order_pairs: rules.orders.iter().collect::<HashSet<_>>().len(),
         })
     }
@@ -557,6 +568,13 @@ fn worse(local: &AreaSolved, previous: &Previous) -> Option<String> {
             "{} order wishes not kept, {} before",
             local.orders_not_kept.len(),
             previous.orders_not_kept
+        ));
+    }
+    if local.crossings_not_kept.len() > previous.crossings {
+        return Some(format!(
+            "{} crossings not kept, {} before",
+            local.crossings_not_kept.len(),
+            previous.crossings
         ));
     }
     if local.near_parts.len() > previous.near {

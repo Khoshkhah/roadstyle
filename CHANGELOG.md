@@ -59,6 +59,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **A path at a crossing goes under the road** (the level input, 2026-10-25). A path-class way (footway, path, cycleway, steps,
+  pedestrian, bridleway, corridor) at a node where a car road goes on was a `meet`: the road's head went under the path's fill, which
+  cut a notch into the road's outline and made a step in its casing (Burnaby's Canada Way at edge 1289720226#2f). Now it is a
+  `crossing` (a new relation in pairs.csv: the road, the path, the road's end): the road's head there is over the path's fill, so the
+  path is drawn under the road, as in OSM-Carto. Only where the other rules agree: one band (a footbridge or a tunnel mouth stays a
+  meet) and the road's priority above the path's (a pedestrian street over a service road stays a meet). The solver has a crossing
+  stage after the stack rules (`stages` has 5 values: stack, crossing, order, near, cost), so a bridge outranks a crossing; the answer
+  gives `crossings_not_kept`. Monaco: 2,552 crossings, 2 not kept, no stack pair given up, 18 order wishes not kept (16 before);
+  Tartu: 15,878 crossings, 0 not kept, 6 order wishes not kept (0 before); Burnaby: 42,424 crossings, 1 not kept. The goldens
+  `monaco/rust_levels_solve.json` and `sodermalm/rust_levels_solve.json` change for this. `roadstyle_levels::PATH_CLASSES` is the one
+  list of the path classes (the base map's edges and duckOSM's plan read it too).
 - **The level editor starts from the map's levels** (2026-10-25): `levelEditor({..., levels: {csv, edge_hash}})` takes the levels that
   the host's map has (duckOSM's `visualization.edge_levels`, with `edge_levels_meta.edge_hash`) and starts from them with no solve,
   when the hash is the area's; else it solves the whole area and `editor.answer().resolve.why` says why. `saveArea(store, area,

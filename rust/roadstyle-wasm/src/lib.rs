@@ -225,15 +225,16 @@ mod wasm {
         pub fn solve_local(&mut self, edits: &str, changed: Vec<String>) -> Result<String, JsError> {
             self.0.solve_local(edits, &changed).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e.to_string()))
         }
-        /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part".
+        /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part"; the
+        /// numbers of order wishes not kept, near warnings and crossings not kept.
         #[wasm_bindgen(js_name = startFrom)]
-        pub fn start_from(&mut self, levels: Vec<i32>, given_up_parts: Vec<String>, orders_not_kept: usize, near: usize) -> Result<(), JsError> {
+        pub fn start_from(&mut self, levels: Vec<i32>, given_up_parts: Vec<String>, orders_not_kept: usize, near: usize, crossings: usize) -> Result<(), JsError> {
             let parts: Vec<(String, String, String)> = given_up_parts.iter().map(|p| {
                 let mut f = p.split('|').map(String::from);
                 (f.next().unwrap_or_default(), f.next().unwrap_or_default(), f.next().unwrap_or_default())
             }).collect();
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e.to_string()))
+            self.0.start_from(&levels, &parts, orders_not_kept, near, crossings).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The check before rules are added (rows: CSV text with a header): [[index, why, [rule rows]]].
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {

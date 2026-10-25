@@ -508,24 +508,39 @@ pub fn relations(
     let lines: Vec<&[Pt]> = head.iter().map(|e| e.geometry.as_slice()).collect();
     let m = metres(&lines);
 
-    // meet: the road ends at each node
+    // meet: the road ends at each node. A path (PATH_CLASSES) at a node where a car road goes on (two car road ends or more there) is a
+    // crossing, not a meet: the map draws the path under the road, which keeps its outline (OSM-Carto's look; a meet put the road's head
+    // under the path's fill, a notch in the outline and a step in the casing, 2026-10-25). So the road's head at that node is lifted over
+    // the path (a crossing: a wish after the stack rules, so a bridge outranks it), and the road's own ends there meet as at any node. Only where the other rules agree: the path and
+    // the road are of one band (a footbridge or a tunnel mouth at the node stays a meet), and the road's priority is above the path's (the
+    // order wish puts it over the path too; a pedestrian street over a service road stays a meet). A platform is not a car road.
+    let is_path = |r: usize| crate::PATH_CLASSES.contains(&head[r].highway.as_str());
+    let is_car = |r: usize| !is_path(r) && head[r].highway != "platform" && omega[r].is_some();
+    let crossing = |car: usize, path: usize| is_car(car) && is_path(path) && band[car] == band[path] && omega[car] > omega[path];
     let mut at: BTreeMap<u32, Vec<(usize, usize)>> = BTreeMap::new();
     for (r, &(s, t)) in re.iter().enumerate() {
         at.entry(s).or_default().push((r, 0));
         at.entry(t).or_default().push((r, 2));
     }
     let mut meets = Vec::new();
+    let mut crossings = Vec::new();
     let mut shared: BTreeMap<(usize, usize), BTreeSet<u32>> = BTreeMap::new();
     for (&v, here) in &at {
+        let cars = here.iter().filter(|&&(r, _)| is_car(r)).count();
         for (i, &(x, ex)) in here.iter().enumerate() {
             for &(y, ey) in &here[i + 1..] {
                 if x != y {
+                    shared.entry((x.min(y), x.max(y))).or_default().insert(v);
+                    if cars >= 2 && (crossing(x, y) || crossing(y, x)) {
+                        let (car, end, path) = if crossing(x, y) { (x, ex, y) } else { (y, ey, x) };
+                        crossings.push((car, path, end));
+                        continue;
+                    }
                     meets.push(if x < y {
                         (x, ex, y, ey)
                     } else {
                         (y, ey, x, ex)
                     });
-                    shared.entry((x.min(y), x.max(y))).or_default().insert(v);
                 }
             }
         }
@@ -639,6 +654,7 @@ pub fn relations(
             roads: n,
             meets,
             lifts,
+            crossings,
             orders,
             near,
             fixed: Vec::new(),
@@ -674,6 +690,38 @@ mod tests {
             "{parts:?}"
         );
         assert!(outside(&[(-0.5, 0.0), (0.5, 0.0)], &c).is_empty());
+    }
+
+    /// A road of two edges through a node and a path that ends there (a bridge with `bridge`): the rules of the roads.
+    fn node_rules(path: &str, bridge: bool, road: &str) -> Rules {
+        let e = |id: i64, hw: &str, br: bool, geometry: Vec<Pt>| LevelEdge {
+            edge_id: id,
+            highway: hw.into(),
+            bridge: br.then(|| "yes".into()),
+            layer: br.then(|| "1".into()),
+            geometry,
+            ..Default::default()
+        };
+        let edges = [
+            e(1, road, false, vec![(18.0, 59.0), (18.001, 59.0)]),
+            e(2, road, false, vec![(18.001, 59.0), (18.002, 59.0)]),
+            e(3, path, bridge, vec![(18.001, 59.0), (18.001, 59.001)]),
+        ];
+        let refs: Vec<&LevelEdge> = edges.iter().collect();
+        let roads = road_split(&refs).unwrap();
+        relations(&refs, &roads, &Options { method: crate::Method::Solve, ..Default::default() }, &HashMap::new()).0
+    }
+
+    #[test]
+    fn a_path_at_a_node_where_a_road_goes_on_is_a_crossing() {
+        // a footway: under both of the road's heads there (crossings), no meet with it; the road's own edges meet
+        let r = node_rules("footway", false, "residential");
+        assert_eq!(r.crossings, vec![(0, 2, 2), (1, 2, 0)], "{r:?}");
+        assert_eq!(r.meets, vec![(0, 2, 1, 0)]);
+        // a footbridge (another band) and a pedestrian street over a service road (the order puts the path over the road) stay meets
+        for r in [node_rules("footway", true, "residential"), node_rules("pedestrian", false, "service")] {
+            assert!(r.crossings.is_empty() && r.meets.len() == 3, "{r:?}");
+        }
     }
 
     #[test]

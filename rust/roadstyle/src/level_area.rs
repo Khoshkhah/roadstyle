@@ -193,7 +193,8 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
     }
     let wkb = |i: usize| table.line(i).map(roadstyle_io::columns::line_wkb);
     out.push(("geometry".into(), Column::Wkb(input.roads.iter().map(|r| wkb(r.first)).collect())));
-    // pairs.csv: the meets, the stacks (one row for each part), the near rules (near_rules), the order wishes
+    // pairs.csv: the meets, the stacks (one row for each part), the near rules (near_rules), the order wishes, the crossings (a path at a
+    // node where a car road goes on: the road's end in a_end)
     let road = |r: usize| id(input.roads[r].first);
     let (end, part) = (["start", "", "end"], ["start", "main", "end"]);
     let mut pairs = String::from("relation,a,b,a_end,b_end\n");
@@ -209,7 +210,10 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
     for &(x, y) in &r.orders {
         pairs += &format!("order,{},{},,\n", road(x), road(y));
     }
-    let count = r.meets.len() + r.lifts.len() + r.near.len() + r.orders.len();
+    for &(c, p, h) in &r.crossings {
+        pairs += &format!("crossing,{},{},{},\n", road(c), road(p), end[h]);
+    }
+    let count = r.meets.len() + r.lifts.len() + r.near.len() + r.orders.len() + r.crossings.len();
     Ok(AreaFiles { roads: write_columns(out)?, pairs, edits: EDITS_HEADER.into(), made: Made { roads: n, pairs: count, warnings } })
 }
 

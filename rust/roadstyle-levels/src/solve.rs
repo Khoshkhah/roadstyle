@@ -15,6 +15,9 @@ pub struct Rules {
     pub meets: Vec<(usize, usize, usize, usize)>,
     /// `(upper, lower, part)`: that casing part of the upper road is over the fill of the lower road.
     pub lifts: Vec<(usize, usize, usize)>,
+    /// `(road, path, end)`: a path at a node where the road goes on (a crossing at grade): the road's head there over the path's fill,
+    /// so the path is drawn under the road's outline. A wish after the stack rules: a bridge over the road outranks it.
+    pub crossings: Vec<(usize, usize, usize)>,
     /// `(higher, lower)`: the fill of the higher road is over the fill of the lower road where they meet (a wish).
     pub orders: Vec<(usize, usize)>,
     /// `(upper, lower, part)`: a casing part that only comes near the lower road (`near_rules`): the last wish.
@@ -31,19 +34,22 @@ pub struct Solved {
     pub given_up: Vec<(usize, usize)>,
     /// The lifted parts `(upper, lower, part)` of those pairs that are not over the lower fill.
     pub given_up_parts: Vec<(usize, usize, usize)>,
+    /// The crossings `(road, path, end)` whose path is not under the road's head.
+    pub crossings_not_kept: Vec<(usize, usize, usize)>,
     /// The order wishes that are not kept.
     pub orders_not_kept: Vec<(usize, usize)>,
     /// The near parts `(upper, lower, part)` that are not over the lower fill.
     pub near_not_kept: Vec<(usize, usize, usize)>,
     /// The best value of each stage (roadstyle's objectives): the steps by which the stack rules are broken, the
-    /// same for the order wishes and for the near rules, and the cost (the casings, and the span with its weight).
-    pub stages: [i64; 4],
+    /// same for the crossings, the order wishes and the near rules, and the cost (the casings, and the span with its weight).
+    pub stages: [i64; 5],
 }
 
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
     Hard,
     Stack,
+    Crossing,
     Order,
     Near,
     Gone,
@@ -99,6 +105,12 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     for &(u, l, h) in &lifts {
         arcs.push((l, col(u, h), -1, Kind::Stack)); // H3: b_l + 1 <= a_(u, h)
     }
+    let mut crossings = rules.crossings.clone();
+    crossings.sort_unstable();
+    crossings.dedup();
+    for &(c, p, h) in &crossings {
+        arcs.push((p, col(c, h), -1, Kind::Crossing)); // b_p + 1 <= a_(c, h)
+    }
     for &(u, l, h) in &near {
         arcs.push((l, col(u, h), -1, Kind::Near));
     }
@@ -110,8 +122,8 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     if !rules.fixed.is_empty() {
         pi = potentials(&arcs, nodes)?; // the arcs of the fixed numbers have negative costs
     }
-    let mut stages = [0i64; 4];
-    for (s, soft) in [Kind::Stack, Kind::Order, Kind::Near]
+    let mut stages = [0i64; 5];
+    for (s, soft) in [Kind::Stack, Kind::Crossing, Kind::Order, Kind::Near]
         .into_iter()
         .enumerate()
     {
@@ -161,7 +173,7 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     let (g, _) = network(&arcs, nodes, |k| (k == Kind::Hard).then_some(INF));
     let flow = g.solve(&supply, &mut pi)?;
     let w4 = if min_positions { w4 } else { 0 };
-    stages[3] = w4 * span - (0..g.from.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>();
+    stages[4] = w4 * span - (0..g.from.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>();
     let x = least_numbers(&g, &flow, &pi);
     feasible(rules, &x, steps)?;
     let parts = (0..n)
@@ -175,6 +187,11 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     let mut given_up: Vec<(usize, usize)> =
         given_up_parts.iter().map(|&(u, l, _)| (u, l)).collect();
     given_up.dedup();
+    let crossings_not_kept = crossings
+        .iter()
+        .copied()
+        .filter(|&(c, p, h)| x[p] - x[col(c, h)] > -1)
+        .collect();
     let orders_not_kept = orders
         .iter()
         .copied()
@@ -189,6 +206,7 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
         parts,
         given_up,
         given_up_parts,
+        crossings_not_kept,
         orders_not_kept,
         near_not_kept,
         stages,
@@ -406,6 +424,6 @@ mod tests {
         };
         let s = solve(&r, 20, true).unwrap();
         assert!(!s.orders_not_kept.is_empty(), "{:?}", s.parts);
-        assert_eq!(s.stages[1], 3); // around the ring the misses add up to 3 steps, however they are shared
+        assert_eq!(s.stages[2], 3); // around the ring the misses add up to 3 steps, however they are shared
     }
 }

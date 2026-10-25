@@ -158,8 +158,9 @@ async function fromStored(){
   if(!levels) return null;
   const info = JSON.parse(infoF.body);
   await call({type: "startFrom", levels: levels.flat(), parts: (info.given_up_parts || []).map(p => p.join("|")), orders: (info.orders_not_kept || []).length,
-    near: (info.near || []).length});
+    near: (info.near || []).length, crossings: (info.crossings_not_kept || []).length});
   return {levels, given_up: info.given_up || [], given_up_parts: info.given_up_parts || [], near: info.near || [], orders_not_kept: info.orders_not_kept || [],
+    crossings_not_kept: info.crossings_not_kept || [],
     info: {pairs: info.pairs, meets: info.meets, order_pairs: info.order_pairs, order_violations: info.order_violations, near_warnings: info.near_warnings},
     resolve: {how: "stored"}};
 }
@@ -167,7 +168,7 @@ async function save(newRes){                                       // levels.csv
   const [heads, caps] = [headsText, capsText];
   const levelsCsv = (await call({type: "levelsCsv", levels: flat(newRes), heads, caps})).csv;
   const info = JSON.stringify({...newRes.info, given_up: newRes.given_up, given_up_parts: newRes.given_up_parts, near: newRes.near,
-    orders_not_kept: newRes.orders_not_kept, inputs: await inputsKey(editsText)});
+    orders_not_kept: newRes.orders_not_kept, crossings_not_kept: newRes.crossings_not_kept || [], inputs: await inputsKey(editsText)});
   await store.save("levels.csv", levelsCsv);
   await store.save("levels_info.json", info);
   events.dispatchEvent(new CustomEvent("solved", {detail: {levelsCsv, levelsInfo: info,
@@ -190,7 +191,7 @@ async function fromGiven(){
   if(given.edge_hash !== await edgeHash()){ givenWhy = "the map's levels are for other edges (edge_hash): solved the whole area"; return null; }
   const levels = levelsOf(given.csv);
   if(!levels){ givenWhy = "the map's levels have no row for some edges of the area: solved the whole area"; return null; }
-  await call({type: "startFrom", levels: levels.flat(), parts: [], orders: 0, near: 0});
+  await call({type: "startFrom", levels: levels.flat(), parts: [], orders: 0, near: 0, crossings: 0});
   const n = rel => pairs.filter(r => r.relation === rel).length;
   return {levels, given_up: [], given_up_parts: [], near: [], orders_not_kept: [],
     info: {pairs: n("stack"), meets: n("meet"), order_pairs: n("order"), order_violations: null, near_warnings: null}, resolve: {how: "given"}};

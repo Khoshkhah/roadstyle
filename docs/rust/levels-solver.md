@@ -31,9 +31,15 @@ wanted on top. The solver reads only these tables, never the lines.
 
 1. **Stack.** A road that crosses over another road: the crossing part of its casing is at least one step over the fill of the
    lower road. This is a real bridge or tunnel.
-2. **Order wish.** At a place where roads only meet, the fill of one road is over the fill of the other: a roundabout over a
+2. **Crossing.** A path (footway, path, cycleway, steps, pedestrian, bridleway, corridor) at a node where a car road goes on (two
+   car road ends or more), of the same band and of a lower priority than the road: the road's head there is at least one step over
+   the path's fill, so the map draws the path under the road and the road keeps its outline (OSM-Carto's look). There is no meet
+   between them. Before 2026-10-25 they were a meet: the road's head went under the path's fill, a notch in the road's outline and a
+   step in its casing. A crossing comes after the stacks, so a bridge over the road outranks it (a footbridge shorter than its two
+   heads can land on such a path).
+3. **Order wish.** At a place where roads only meet, the fill of one road is over the fill of the other: a roundabout over a
    tunnel, a tunnel over a bridge, a higher class over a lower one.
-3. **Near** (only with `near_rules=True`): a part that only comes near the lower road.
+4. **Near** (only with `near_rules=True`): a part that only comes near the lower road.
 
 After these: **as few positions as possible** (the span of the numbers, with `min_positions`, the default), and then the casings as
 close to their fills as possible.
@@ -69,6 +75,7 @@ x_i − x_j ≤ w
 |---|---|
 | H1: a casing part not over its fill | `a − b ≤ 0` |
 | Stack: the part `a` of the upper road one step over the fill `b'` of the lower road | `b' − a ≤ −1` |
+| Crossing: the head `a` of the road one step over the fill `b'` of the path | `b' − a ≤ −1` |
 | Order: the fill `b` over the fill `b'` | `b' − b ≤ −1` |
 | The box: every number at most `steps` | `x − 0 ≤ steps` |
 
@@ -104,7 +111,7 @@ Flow goes only around the loops whose cost is negative, because only there it lo
 the fewest steps that must be broken. The flow also shows **which** rules break: the soft arcs that carry flow. With no
 negative loop there is no flow, and nothing breaks.
 
-The stages run in the order of priority: stack, then order, then near. After each stage, the solver **locks** its result, so a
+The stages run in the order of priority: stack, then crossing, then order, then near. After each stage, the solver **locks** its result, so a
 later stage cannot spoil it:
 
 | After a stage, an arc | becomes | so that |
@@ -152,8 +159,8 @@ negative costs, and a Bellman-Ford search gives the first potentials.
   numbers and the box. A failure is an error, never a quiet result.
 - **A loop of hard rules** (a negative loop with no soft arc in it) has no solution. It is an error that names it.
 
-The solver returns the numbers, the best value of each stage (the steps by which stack rules, order wishes and near rules are
-broken, and the cost of the last stage), and the pairs that it did not keep. `compute_levels` gives these pairs as
+The solver returns the numbers, the best value of each stage (the steps by which stack rules, crossings, order wishes and near
+rules are broken, and the cost of the last stage), and the pairs that it did not keep. `compute_levels` gives these pairs as
 `levels_given_up` (the stacks) and `levels_orders_not_kept` (the order wishes).
 
 ## Examples from the tests

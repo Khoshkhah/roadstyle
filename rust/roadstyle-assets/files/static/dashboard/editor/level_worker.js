@@ -21,7 +21,7 @@ answer({
   ends: ({heads, caps}) => ({ends: area.ends(heads, caps)}),
   solve: ({edits}) => ({answer: area.solve(edits)}),
   solveLocal: ({edits, changed}) => ({answer: area.solveLocal(edits, changed)}),
-  startFrom({levels, parts, orders, near}){ area.startFrom(i32(levels), parts, orders, near); },
+  startFrom({levels, parts, orders, near, crossings}){ area.startFrom(i32(levels), parts, orders, near, crossings); },
   check: ({edits, rows}) => ({conflicts: area.check(edits, rows)}),
   levelsCsv: ({levels, heads, caps}) => ({csv: area.levelsCsv(i32(levels), heads, caps)}),
   draw: ({levels, heads, caps}) => bytes(area.draw(i32(levels), heads, caps)),

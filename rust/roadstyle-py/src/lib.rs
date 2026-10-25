@@ -329,7 +329,8 @@ fn compute_levels(py: Python<'_>, roads: &Bound<'_, PyAny>, method: String, cols
         let info = serde_json::json!({"roads": levels.roads, "pairs": levels.pairs, "order_pairs": levels.order_pairs,
                                       "given_up": levels.given_up, "order_violations": levels.orders_not_kept,
                                       "given_up_pairs": levels.given_up_pairs, "orders_not_kept_pairs": levels.orders_not_kept_pairs,
-                                      "near_not_kept": levels.near_not_kept});
+                                      "near_not_kept": levels.near_not_kept, "crossings": levels.crossings,
+                                      "crossings_not_kept": levels.crossings_not_kept});
         Ok((rows, info.to_string()))
     })
     .map_err(|e: String| PyValueError::new_err(e))
@@ -343,7 +344,8 @@ fn compute_levels(py: Python<'_>, roads: &Bound<'_, PyAny>, method: String, cols
 fn solve_rules(py: Python<'_>, roads: usize, meets: Vec<(usize, usize, usize, usize)>, lifts: Vec<(usize, usize, usize)>,
                near: Vec<(usize, usize, usize)>, orders: Vec<(usize, usize)>, fixed: Vec<(usize, [i64; 4])>, steps: i64, min_positions: bool)
                -> PyResult<(Vec<[i64; 4]>, Vec<(usize, usize, usize)>, Vec<(usize, usize)>, Vec<(usize, usize, usize)>)> {
-    let rules = roadstyle::levels::solve::Rules { roads, meets, lifts, orders, near, fixed };
+    // the Python engine's rules have no crossings (roadstyle-levels' input makes them)
+    let rules = roadstyle::levels::solve::Rules { roads, meets, lifts, crossings: Vec::new(), orders, near, fixed };
     let s = py.detach(|| roadstyle::levels::solve::solve(&rules, steps, min_positions)).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok((s.parts, s.given_up_parts, s.orders_not_kept, s.near_not_kept))
 }

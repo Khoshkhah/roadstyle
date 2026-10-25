@@ -13,7 +13,7 @@ use serde_json::Value;
 /// The networks of a duckOSM file, in order.
 pub const MODES: [&str; 3] = ["driving", "walking", "cycling"];
 const OPTIONAL_COLS: [&str; 4] = ["walk_type", "junction", "edge_ref", "lanes"];
-const PATH_CLASSES: [&str; 7] = ["footway", "path", "cycleway", "steps", "pedestrian", "bridleway", "corridor"];
+use roadstyle_levels::PATH_CLASSES;
 const COLS: &str = "edge_id, source, target, osm_id, highway, name, bridge, tunnel, layer, oneway, geometry";
 
 /// The SQL that reads the catalog: the tables (schema, table) and the columns (schema, table, column) of the database `catalog`.

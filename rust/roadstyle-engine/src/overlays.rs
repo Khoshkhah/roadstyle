@@ -13,7 +13,7 @@ use roadstyle_model::feature_table::{FeatureTable, GeomType};
 use serde_json::{json, Map, Value};
 
 const EDGE_ATTACHED: [&str; 2] = ["crossings", "traffic_signals"];
-const PATH_CLASSES: [&str; 7] = ["footway", "path", "cycleway", "steps", "pedestrian", "bridleway", "corridor"];
+use roadstyle_levels::PATH_CLASSES;
 const CLASS_RANK: [&str; 9] = ["motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "service"];
 
 /// One overlay, as mapstyle's feature_overlays gives it to roadstyle (rs.Overlay), and its entry of the restyle's config (`l`).
