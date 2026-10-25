@@ -17,7 +17,8 @@ DATA = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "monaco_part" / "road
 PKG = ROOT / "rust" / "roadstyle-wasm" / "pkg" / "roadstyle_wasm.js"
 ARGS = {"state": "live", "basemap": "blank", "sidebar": "dashboard", "popup_mode": "panel", "find_control": True, "name": "Monaco",
         "road_popup": ["highway", "name"]}
-KEYS = ("sidebar", "popup_mode", "find_control", "name", "road_popup", "basemap_switcher", "filter_control")
+# the page keys in RS_OPTIONS (the sidebar is the page's #sb, the name its <title>)
+KEYS = ("popup_mode", "find_control", "road_popup", "basemap_switcher", "filter_control")
 
 
 def _opts(html):
@@ -57,6 +58,7 @@ writeFileSync({json.dumps(str(tmp_path / "wasm.html"))}, makePage(readFileSync({
     g = gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
     py = rs.render_edges(g, engine="rust", **{k: v for k, v in ARGS.items() if k != "state"}).html
     assert 'id="sb"' in wasm and 'id="sb"' in py, "both pages have the dashboard's sidebar"
+    assert "<title>Monaco</title>" in wasm and "<title>Monaco</title>" in py, "both pages have the call's name"
     a, b = _opts(wasm), _opts(py)
     missing = {"wasm page": [k for k in KEYS if k not in a], "Python page": [k for k in KEYS if k not in b]}
     assert not any(missing.values()), f"keys that a page does not have: {missing} (an extension or a wasm package of another commit?)"
