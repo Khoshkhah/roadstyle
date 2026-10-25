@@ -35,24 +35,23 @@ export function httpStore(base = "/area/"){
   return s;
 }
 
-/** The store of a page with no server: the area's files in this browser under `key` (the texts in localStorage, the bytes, such as
- * roads.parquet, in the origin's private file system), each with the time it was saved (seconds). */
+/** The store of a page with no server: the area's files in this browser under `key`, in the origin's private file system (the texts
+ * too: pairs.csv of a large area is more than localStorage holds), each with the time it was saved (seconds, in localStorage). */
 export function browserStore(key, name = key){
   const at = n => `lv:${key}:${n}`;
   const dir = async () => (await navigator.storage.getDirectory()).getDirectoryHandle("lv-" + key.replace(/[^\w.-]/g, "_"), {create: true});
+  const write = async (n, data) => { const w = await (await (await dir()).getFileHandle(n, {create: true})).createWritable(); await w.write(data); await w.close(); };
   return {key, name,
     async load(n, bytes){
-      const mtime = +(localStorage.getItem(at(n) + "@mtime") || 0);
-      if(bytes){
-        try { const f = await (await (await dir()).getFileHandle(n)).getFile(); return {body: new Uint8Array(await f.arrayBuffer()), mtime}; }
-        catch { return null; }
-      }
-      const body = localStorage.getItem(at(n));
-      return body == null ? null : {body, mtime};
+      const old = localStorage.getItem(at(n));                    // a text that an older version kept in localStorage: moved once
+      if(old != null){ await write(n, old); localStorage.removeItem(at(n)); }
+      let f;
+      try { f = await (await (await dir()).getFileHandle(n)).getFile(); }
+      catch(e){ if(e.name === "NotFoundError") return null; throw e; }
+      return {body: bytes ? new Uint8Array(await f.arrayBuffer()) : await f.text(), mtime: +(localStorage.getItem(at(n) + "@mtime") || 0)};
     },
     async save(n, data){
-      if(typeof data === "string") localStorage.setItem(at(n), data);
-      else { const w = await (await (await dir()).getFileHandle(n, {create: true})).createWritable(); await w.write(data); await w.close(); }
+      await write(n, data);
       localStorage.setItem(at(n) + "@mtime", String(Date.now() / 1000));
     }};
 }

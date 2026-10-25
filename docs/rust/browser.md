@@ -256,7 +256,7 @@ import {levelEditor, browserStore} from "roadstyle/static/dashboard/editor/level
 
 await init();
 const a = pkg.makeArea(edges, JSON.stringify({id_col: "edge_id"}));
-const store = browserStore("monaco", "Monaco");          // localStorage for the texts, the private file system for roads.parquet
+const store = browserStore("monaco", "Monaco");          // the files in the origin's private file system
 for (const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
 const pkgUrl = new URL("roadstyle-wasm/pkg/roadstyle_wasm.js", import.meta.url);   // the package's module, for the editor's worker
 const editor = await levelEditor({map, container: document.getElementById("panel"), pkgUrl, store});
@@ -273,7 +273,8 @@ apart from yours) and gives your dashboard its style. Without a dashboard of you
 the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel,
 its listeners, its roads, tiles and images, and puts your roads, your road table and your dashboard's style back. Your files stay in
 the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
-in this browser, `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
+in this browser (in the origin's private file system: pairs.csv of a large area is more than localStorage's 5 MB; a text that an
+older version kept in localStorage moves there when it is read), `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
 (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the map's
 table, GeoParquet). `editor.roads` is the area's roads, as the panel shows them. On a phone the panel is a sheet at the bottom of the map:
 `layout` is `"auto"` (a sheet up to 700 px wide, the dashboard panel's width; a column at the right above it), `"sheet"` or `"side"`. The

@@ -21,6 +21,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls. On a phone the panel is a sheet at the bottom
   (`layout`: `"auto"`, a sheet up to 700 px wide; `"sheet"`; `"side"`), with a handle (one row, half, full), taps on the roads, 44 px
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
+  `browserStore` keeps every file in the origin's private file system, also the texts (pairs.csv of Burnaby is more than
+  localStorage's 5 MB); a text that an older version kept in localStorage moves there when it is read.
 
 ### Changed
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and

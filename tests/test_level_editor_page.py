@@ -76,6 +76,7 @@ await init();
 // the host's part: the area made in the page and kept in the browser, and the host's own map
 const a = pkg.makeArea(new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer()), JSON.stringify({id_col: "edge_id"}));
 const store = browserStore("test-area", "Monaco test");
+window.stored = async n => (await store.load(n))?.body ?? null;     // a text file of the store
 for(const [n, v] of [["roads.parquet", a.roads], ["pairs.csv", a.pairs], ["edits.csv", a.edits]]) await store.save(n, v);
 const map = new maplibregl.Map({container: "map", style: {version: 8, glyphs: "/fonts/{fontstack}/{range}.pbf", sources: {}, layers: []},
   center: [7.42, 43.73], zoom: 15});
@@ -172,7 +173,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate("!!hostMap.getSource('host-roads') && !!hostMap.getSource('host-lv-roads')"), "the host's source and the editor's"
             # the host's own roads went (the layers of the roles of its style's roadstyle:sources): every road layer is the editor's
             assert page.evaluate("hostMap.getStyle().layers.filter(l => l.id.startsWith('host-roads')).every(l => l.source === 'host-lv-roads')")
-            stored = page.evaluate("localStorage.getItem('lv:test-area:levels.csv')")
+            stored = page.evaluate("stored('levels.csv')")
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1, "the panel is in the host's container"
             # a head's length through the panel's API: solved again, the host hears it, the store has heads.csv
@@ -184,7 +185,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             page.wait_for_function("window.solved.length === 1", timeout=30000)
             solved = page.evaluate("window.solved")
             assert len(solved) == 1 and solved[0]["rows"] > roads and solved[0]["draw"] > 0, solved
-            assert road in page.evaluate("localStorage.getItem('lv:test-area:heads.csv')")
+            assert road in page.evaluate("stored('heads.csv')")
             assert page.evaluate("window.editor.files") == ["edits.csv", "heads.csv", "caps.csv", "levels.csv"]
             # close, open again, close: the same listeners each time, none left; the host's roads, base map and dashboard back
             opened = page.evaluate("counts()")
@@ -203,6 +204,16 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
               const w = new Worker(URL.createObjectURL(new Blob(['throw new Error("boom")'], {type: 'text/javascript'})), {type: 'module'});
               try { await caller(w)({type: 'x'}); return 'settled'; } catch(e){ return e.message; } }""")
             assert said.startswith("the worker stopped"), said
+            # browserStore keeps the texts in the private file system: a pairs.csv over localStorage's 5 MB (Burnaby's), and a text that
+            # an older version kept in localStorage moves there once
+            said = page.evaluate("""async () => { const {browserStore} = await import('/dashboard/editor/level_editor.js');
+              const s = browserStore('big-area'), big = 'relation,a,b,a_end,b_end,enabled\\n' + 'cross,1,2,start,end,1\\n'.repeat(300000);
+              await s.save('pairs.csv', big);
+              localStorage.setItem('lv:big-area:edits.csv', 'old edits');
+              const edits = (await s.load('edits.csv')).body;
+              return [big.length, (await s.load('pairs.csv')).body === big, edits, localStorage.getItem('lv:big-area:edits.csv'),
+                      (await s.load('edits.csv')).body, await s.load('caps.csv')]; }""")
+            assert said[0] > 5_500_000 and said[1:] == [True, "old edits", None, "old edits", None], said
             # the panel follows the page's theme: the system's dark, unless the page sets data-theme on <html>
             bg = "getComputedStyle(document.querySelector('#lv header')).backgroundColor"
             assert page.evaluate(bg) == "rgb(255, 255, 255)"
