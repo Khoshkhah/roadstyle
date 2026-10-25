@@ -7,12 +7,13 @@ use roadstyle_model::mark::Mark;
 use crate::road::Roads;
 use crate::roads::Look;
 use roadstyle_model::Cell;
+use roadstyle_look::options::{Active, Cmap, ColorOption, Colors, MapOptions, Missing};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 
 /// The colouring of a map: the baked fill property of each colour option (option 0: __rs_fill), the active option (state rs_co) and the
 /// legend data, the page's COLOR_OPTIONS ({name, prop, legend} for each option; empty for class colours).
-pub struct Colors {
+pub struct Baked {
     pub props: Vec<String>,
     pub active: usize,
     pub meta: Vec<Value>,
@@ -37,6 +38,39 @@ struct Frame {
 
 fn get<'a>(o: &'a Value, k: &str) -> Option<&'a Value> {
     o.get(k).filter(|v| !v.is_null())
+}
+
+/// A data styler's keywords (render_edges' color_by, colors, cmap, vmin, vmax, width_by, or a colour option's), from the map options.
+#[derive(Clone, Copy, Default)]
+struct Styler<'a> {
+    by: Option<&'a str>,
+    colors: Option<&'a Colors>,
+    cmap: Option<&'a Cmap>,
+    vmin: Option<f64>,
+    vmax: Option<f64>,
+    width: Option<(f64, f64)>,
+    missing_self: bool,
+    palette: Option<&'a str>,
+    style: bool,
+}
+
+impl<'a> Styler<'a> {
+    /// The map's own data styler (no `missing`: it has no base option).
+    fn of_map(m: &'a MapOptions) -> Styler<'a> {
+        let c = &m.color;
+        Styler { by: c.by.as_deref(), colors: c.colors.as_ref(), cmap: c.cmap.as_ref(), vmin: c.vmin, vmax: c.vmax, width: m.width.range,
+                 missing_self: false, palette: None, style: c.style.is_some() }
+    }
+
+    fn of_option(o: &'a ColorOption) -> Styler<'a> {
+        Styler { by: o.by.as_deref(), colors: o.colors.as_ref(), cmap: o.cmap.as_ref(), vmin: o.vmin, vmax: o.vmax, width: o.width,
+                 missing_self: o.missing == Missing::Itself, palette: o.palette.as_deref(), style: o.style.is_some() }
+    }
+}
+
+/// A number that the caller gave, as JSON: a whole number as an integer (the caller's `1` stays `1` in the legend, as in Python).
+fn given(v: f64) -> Value {
+    if v.fract() == 0.0 && v.abs() < 9.0e15 { Value::from(v as i64) } else { num(v) }
 }
 
 /// Python's str() of a column value (pandas: integers stay integers with integer_object_nulls).
@@ -154,15 +188,16 @@ fn categorical(fs: &Roads, look: &Look, column: &str, colors: &Map<String, Value
 }
 
 /// NumericStyler: a continuous ramp over [vmin, vmax] (the data's range where not given); width_by (min_px, max_px) over the data's range.
-fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, crate::Error> {
+fn numeric(fs: &Roads, look: &Look, column: &str, o: Styler) -> Result<Frame, crate::Error> {
     let d = &look.data;
     let nums: Vec<Option<f64>> = fs.iter().map(|ft| as_float(ft.get(column))).collect();
     let present: Vec<f64> = nums.iter().flatten().copied().collect();
     let low = present.iter().copied().reduce(f64::min);
     let high = present.iter().copied().reduce(f64::max);
-    let vmin = get(o, "vmin").cloned().unwrap_or_else(|| num(low.unwrap_or(0.0)));
-    let vmax = get(o, "vmax").cloned().unwrap_or_else(|| num(high.unwrap_or(1.0)));
-    let ramp = Ramp::new(get(o, "cmap").unwrap_or(&json!("viridis")))?;
+    let vmin = o.vmin.map_or_else(|| num(low.unwrap_or(0.0)), given);
+    let vmax = o.vmax.map_or_else(|| num(high.unwrap_or(1.0)), given);
+    let cmap = o.cmap.map_or_else(|| json!("viridis"), |c| serde_json::to_value(c).unwrap_or(Value::Null));
+    let ramp = Ramp::new(&cmap)?;
     let (lo_v, hi_v) = (float(&vmin)?, float(&vmax)?);
     let span = if hi_v - lo_v != 0.0 { hi_v - lo_v } else { 1.0 };
     let nodata = d["nodata"].as_str().unwrap_or("#cccccc");
@@ -170,16 +205,11 @@ fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, cr
         None => nodata.to_string(),
         Some(v) => ramp.hex(((v - lo_v) / span).clamp(0.0, 1.0)),
     };
-    let widths: Vec<Value> = match get(o, "width_by") {
-        Some(wb) => {
-            let (lo, hi) = match wb.as_array().map(|a| a.as_slice()) {
-                Some([lo, hi]) => (lo, hi),
-                _ => return Err(crate::error::options(format!("width_by: (min_px, max_px), not {wb}"))),
-            };
+    let widths: Vec<Value> = match o.width {
+        Some((lf, hf)) => {
             let (wmin, wmax) = (low.unwrap_or(0.0), high.unwrap_or(1.0));
             let wspan = if wmax - wmin != 0.0 { wmax - wmin } else { 1.0 };
-            let (lf, hf) = (float(lo)?, float(hi)?);
-            nums.iter().map(|v| v.map_or_else(|| lo.clone(), |v| num(lf + (hf - lf) * ((v - wmin) / wspan).clamp(0.0, 1.0)))).collect()
+            nums.iter().map(|v| v.map_or_else(|| given(lf), |v| num(lf + (hf - lf) * ((v - wmin) / wspan).clamp(0.0, 1.0)))).collect()
         }
         None => vec![num(float(&d["width"])?); fs.len()],
     };
@@ -191,7 +221,7 @@ fn numeric(fs: &Roads, look: &Look, column: &str, o: &Value) -> Result<Frame, cr
     let stops: Vec<Value> = ramp.stops(9).into_iter().map(Value::from).collect();
     f.legend = Some(json!({"kind": "continuous", "title": column, "vmin": vmin, "vmax": vmax, "ramp": stops}));
     f.missing = Some(nums.iter().map(Option::is_none).collect());
-    f.missing_self = get(o, "missing").and_then(Value::as_str) == Some("self");
+    f.missing_self = o.missing_self;
     Ok(f)
 }
 
@@ -211,22 +241,20 @@ fn color_table(fs: &Roads, look: &Look, column: &str) -> Frame {
 }
 
 /// build_styler (option_styler for a colour option): `o` holds color_by, colors, cmap, vmin, vmax, width_by, missing, palette.
-fn resolve(fs: &Roads, look: &Look, o: &Value) -> Result<Frame, crate::Error> {
-    if get(o, "style").is_some() {
+fn resolve(fs: &Roads, look: &Look, o: Styler) -> Result<Frame, crate::Error> {
+    if o.style {
         return Err(crate::Error::Unsupported(crate::Unsupported::Styler));
     }
-    if let Some(p) = get(o, "palette").and_then(Value::as_str).filter(|p| *p != look.palette) {
+    if let Some(p) = o.palette.filter(|p| *p != look.palette) {
         return Err(crate::Error::Unsupported(crate::Unsupported::Palette { palette: p.to_string(), look: look.palette.to_string() }));
     }
-    let Some(column) = get(o, "color_by") else { return Ok(class_frame(fs, look)) };
-    let column = column.as_str().ok_or_else(|| crate::error::options("color_by: a column name"))?;
+    let Some(column) = o.by else { return Ok(class_frame(fs, look)) };
     if fs.at(0).is_some_and(|f| !f.contains_key(column)) {
         return Err(crate::error::column(column, "color_by names it, and the roads do not have it"));
     }
-    match get(o, "colors") {
-        Some(Value::String(s)) if s == "self" => Ok(color_table(fs, look, column)),
-        Some(Value::Object(colors)) => categorical(fs, look, column, colors, get(o, "missing").and_then(Value::as_str) == Some("self")),
-        Some(other) => Err(crate::error::options(format!("colors: a {{value: colour}} map or \"self\", not {other}"))),
+    match o.colors {
+        Some(Colors::Itself(_)) => Ok(color_table(fs, look, column)),
+        Some(Colors::Map(colors)) => categorical(fs, look, column, colors, o.missing_self),
         None => numeric(fs, look, column, o),
     }
 }
@@ -241,11 +269,11 @@ fn bake_props(fs: &mut Roads, f: &Frame) {
 
 /// render_edges' colouring and render_web.render's: the per-edge props of the class styles, of a data styler (color_by, color_table), or
 /// of colour options (color_options: one fill per option, the shared width and casing from the class styles or the data styler).
-pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::Error> {
+/// `legend`: false (render's legend=False) writes no "colour by" entry for a lone data styler.
+pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions, legend: bool) -> Result<Baked, crate::Error> {
     // render_edges: color_table, an edge_id -> colour map, as the column __rs_color (keys as text, as str(id) in Python)
-    let main = if let Some(t) = get(args, "color_table") {
-        let key = get(args, "color_key").and_then(Value::as_str).unwrap_or("edge_id");
-        let t = t.as_object().ok_or_else(|| crate::error::options("color_table: a {edge_id: colour} map"))?;
+    let main = if let Some(ct) = &m.color.table {
+        let (key, t) = (ct.key.as_str(), &ct.colors);
         if fs.at(0).is_some_and(|f| !f.contains_key(key)) {
             return Err(crate::error::column(key, "color_key names it, and the edges do not have it"));
         }
@@ -254,25 +282,15 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
             fs.draw[i].color = Some(fs.values.ix(&c));
         }
         Some(color_table(fs, look, Mark::Color.name()))
-    } else if get(args, "style").is_some() || get(args, "color_by").is_some() {
-        Some(resolve(fs, look, &json!({"color_by": get(args, "color_by"), "colors": get(args, "colors"), "cmap": get(args, "cmap"),
-                                         "vmin": get(args, "vmin"), "vmax": get(args, "vmax"), "width_by": get(args, "width_by"),
-                                         "style": get(args, "style")}))?)
+    } else if m.color.style.is_some() || m.color.by.is_some() {
+        Some(resolve(fs, look, Styler::of_map(m))?)
     } else {
         None
     };
-    if let Some(opts) = get(args, "color_options") {
+    if !m.color.options.is_empty() {
         // one fill per option; the width, casing and dash from the main styler or the class styles
-        let named: Vec<(String, Value)> = match opts {
-            Value::Object(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-            Value::Array(a) => a.iter().map(|o| {
-                let name = o["name"].as_str().map(String::from).ok_or_else(|| crate::error::options("color_options: each item needs a name"))?;
-                let rest: Map<String, Value> = o.as_object().unwrap().iter().filter(|(k, _)| *k != "name").map(|(k, v)| (k.clone(), v.clone())).collect();
-                Ok((name, Value::Object(rest)))
-            }).collect::<Result<_, crate::Error>>()?,
-            other => return Err(crate::error::options(format!("color_options: a {{name: options}} map or a list, not {other}"))),
-        };
-        let frames = named.iter().map(|(n, o)| Ok((n.clone(), resolve(fs, look, o)?))).collect::<Result<Vec<_>, crate::Error>>()?;
+        let named = &m.color.options;
+        let frames = named.iter().map(|o| Ok((o.name.clone(), resolve(fs, look, Styler::of_option(o))?))).collect::<Result<Vec<_>, crate::Error>>()?;
         bake_props(fs, &main.unwrap_or_else(|| class_frame(fs, look)));
         let base = &frames[0].1.fill;
         let mut meta = Vec::new();
@@ -295,23 +313,23 @@ pub fn bake(fs: &mut Roads, look: &Look, args: &Value) -> Result<Colors, crate::
             props.push(prop);
         }
         fs.values.fill_names = props.clone();
-        let active = match get(args, "color_active") {
-            Some(Value::Number(n)) => n.as_u64().ok_or_else(|| crate::error::options("color_active: an option's number or name"))? as usize,
-            Some(Value::String(s)) => named.iter().position(|(n, _)| n == s).unwrap_or(0),
-            _ => 0,
+        let active = match &m.color.active {
+            Some(Active::Index(i)) => *i,
+            Some(Active::Name(s)) => named.iter().position(|o| o.name == *s).unwrap_or(0),
+            None => 0,
         };
-        return Ok(Colors { props, active, meta });
+        return Ok(Baked { props, active, meta });
     }
     let f = main.unwrap_or_else(|| class_frame(fs, look));
     bake_props(fs, &f);
     // a data styler's legend as the one "colour by" entry (no menu, only the key); legend=False: none
     let meta = match &f.legend {
-        Some(l) if get(args, "legend") != Some(&Value::Bool(false)) => {
+        Some(l) if legend => {
             vec![json!({"name": get(l, "title").cloned().unwrap_or_else(|| json!("data")), "prop": Mark::Fill.name(), "legend": l})]
         }
         _ => Vec::new(),
     };
-    Ok(Colors { props: vec![Mark::Fill.name().into()], active: 0, meta })
+    Ok(Baked { props: vec![Mark::Fill.name().into()], active: 0, meta })
 }
 
 #[cfg(test)]

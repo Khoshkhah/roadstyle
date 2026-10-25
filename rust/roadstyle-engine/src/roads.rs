@@ -1,6 +1,7 @@
 //! The "roads" source: the stages of roadstyle's render_web.render that bake the `__rs_*` properties of each road, in the same
 //! order. Each function names the Python function it ports; the columns are the ones mapstyle passes (docs/design/rust-spike.md, S2).
 
+use roadstyle_look::options::MapOptions;
 use crate::draw::Cap;
 use crate::road::Roads;
 use roadstyle_model::{flags, Cell};
@@ -35,8 +36,14 @@ pub(crate) fn class_style<'a>(look: &'a Look, highway: Option<Cell>) -> (&'a Val
 /// render's access_col: the kinds that have their own colour and row (_ACCESS); any other value is null.
 const ACCESS_KINDS: [&str; 4] = ["private", "bus", "pedestrian", "delivery"];
 
-pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::colors::Colors, crate::Error> {
-    let access_col = args["access_col"].as_str().filter(|c| !c.is_empty());
+/// A column that the caller names: a column keyword that is given and not empty.
+pub(crate) fn named(c: &Option<String>) -> Option<&str> {
+    c.as_deref().filter(|c| !c.is_empty())
+}
+
+/// `legend`: render's legend (a page key; colors::bake).
+pub fn mark_roads(fs: &mut Roads, look: &Look, m: &MapOptions, legend: bool) -> Result<crate::colors::Baked, crate::Error> {
+    let access_col = named(&m.columns.access);
     if let Some(col) = access_col {
         if fs.table.col(col).is_none() && !fs.is_empty() {
             return Err(crate::error::column(col, "access_col names it, and it is not a column of the edges"));
@@ -46,10 +53,9 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
             fs.draw[i].access = Some(kind.and_then(|k| crate::draw::ACCESS_KINDS.iter().position(|a| *a == k)).map(|k| k as u8));
         }
     }
-    let colors = crate::colors::bake(fs, look, args)?;
+    let colors = crate::colors::bake(fs, look, m, legend)?;
     // render: the direction columns are read only when they are named (directed_col, driving_col: None by default)
-    let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
-    mark_twoway(fs, named("directed_col"), named("driving_col"));
+    mark_twoway(fs, named(&m.columns.directed).is_some(), named(&m.columns.driving).is_some());
     // a road with an access kind has its kind's colour in every colour option (the palette's `access`)
     for i in (0..fs.len()).filter(|_| access_col.is_some()) {
         let kind = fs.draw[i].access.flatten().map(|k| crate::draw::ACCESS_KINDS[k as usize]);
@@ -66,18 +72,19 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
         mark_single_line(fs, &look.single_line);
     }
     mark_lvl(fs);
-    let caps = CapCols::from_args(args);
+    let lc = m.columns.levels.clone().unwrap_or_default();
+    let caps = CapCols { whole: named(&m.columns.cap).map(String::from), start: named(&lc.cap_start).is_some(), end: named(&lc.cap_end).is_some() };
     mark_caps(fs, &caps);
-    mark_heads(fs, [named("head_start_m_col"), named("head_end_m_col")]);
+    mark_heads(fs, [named(&lc.head_start_m).is_some(), named(&lc.head_end_m).is_some()]);
     mark_levels(fs);
     // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
-    let width_col = args["width_m_col"].as_str().filter(|c| !c.is_empty());
+    let width_col = named(&m.columns.width_m);
     let pairs = if look.twin_one || width_col.is_some() { twin_pairs(fs) } else { Vec::new() };       // one time for both stages
     if look.twin_one && mark_twin_casing(fs, &pairs, look.head_m, Some("edge_id")) {        // render passes its edge_id_col (the engine's edge_id)
         mark_twin_dead_ends(fs, &caps);
     }
     if let Some(col) = width_col {
-        mark_width_m(fs, &pairs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
+        mark_width_m(fs, &pairs, col, m.roads.casing_m.unwrap_or(look.casing_m));
     }
     for d in fs.draw.iter_mut() {
         d.keyed = true;
@@ -238,13 +245,6 @@ pub(crate) struct CapCols {
     whole: Option<String>,
     start: bool,
     end: bool,
-}
-
-impl CapCols {
-    fn from_args(args: &Value) -> CapCols {
-        let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
-        CapCols { whole: args["cap_col"].as_str().filter(|c| !c.is_empty()).map(String::from), start: named("cap_start_col"), end: named("cap_end_col") }
-    }
 }
 
 /// A value is given: set, and not NaN (Python: not None and equal to itself).
