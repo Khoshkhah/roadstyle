@@ -5,6 +5,7 @@
 //! `rs_palette`). A palette holds only colours: other layers or other features are an error.
 
 use crate::road::{Extra, Roads};
+use roadstyle_model::mark;
 use crate::simple::SimpleSource;
 use crate::sources::Sources;
 use crate::Src;
@@ -13,8 +14,8 @@ use serde_json::{json, Value};
 
 /// The palettes `looks` ({palette: the look of the same call with that palette}) of a page's views, merged into stage 1's output `s`
 /// (the palette `base_name`). A warning of a palette that the first palette gave too is given one time (`s.warnings`).
-pub fn add(s: &mut Sources, base_name: &str, looks: &[(String, crate::Look)]) -> Result<(), String> {
-    let copies = looks.iter().map(|(n, l)| Ok((n.clone(), crate::restyle(s, l)?))).collect::<Result<Vec<_>, String>>()?;
+pub fn add(s: &mut Sources, base_name: &str, looks: &[(String, crate::Look)]) -> Result<(), crate::Error> {
+    let copies = looks.iter().map(|(n, l)| Ok((n.clone(), crate::restyle(s, l)?))).collect::<Result<Vec<_>, crate::Error>>()?;
     for w in copies.iter().flat_map(|(_, c)| &c.warnings) {
         if !s.warnings.contains(w) {
             s.warnings.push(w.clone());
@@ -24,7 +25,7 @@ pub fn add(s: &mut Sources, base_name: &str, looks: &[(String, crate::Look)]) ->
 }
 
 /// Merge the palettes `copies` (each made by `crate::restyle` from `base`'s roads) into `base` (the palette `base_name`).
-pub fn merge(base: &mut Sources, base_name: &str, copies: &[(String, Sources)]) -> Result<(), String> {
+pub fn merge(base: &mut Sources, base_name: &str, copies: &[(String, Sources)]) -> Result<(), crate::Error> {
     let ids: Vec<&Value> = base.layers.iter().map(|l| &l["id"]).collect();
     let mut differ: Vec<(String, Vec<String>)> = Vec::new();     // each property that differs, with the palettes it differs in
     let mut note = |keys: Vec<String>, n: &str| for k in keys {
@@ -35,9 +36,9 @@ pub fn merge(base: &mut Sources, base_name: &str, copies: &[(String, Sources)]) 
     };
     for (n, cp) in copies {
         if cp.layers.len() != ids.len() || cp.layers.iter().zip(&ids).any(|(l, id)| &l["id"] != *id) {
-            return Err(format!("palette {n:?} makes other layers than {base_name:?}: a palette holds only colours (docs/design/style_config.md)"));
+            return Err(crate::error::options(format!("palette {n:?} makes other layers than {base_name:?}: a palette holds only colours (docs/design/style_config.md)")));
         }
-        let other = || format!("palette {n:?} makes other features than {base_name:?}: a palette holds only colours");
+        let other = || crate::error::options(format!("palette {n:?} makes other features than {base_name:?}: a palette holds only colours"));
         if cp.roads.roads.len() != base.roads.roads.len() || cp.sources.len() != base.sources.len() {
             return Err(other());
         }
@@ -67,7 +68,7 @@ pub fn merge(base: &mut Sources, base_name: &str, copies: &[(String, Sources)]) 
         for (l, o) in base.layers.iter().zip(&cp.layers) {
             for k in ["filter", "minzoom", "maxzoom", "source", "source-layer", "type"] {
                 if l.get(k) != o.get(k) {
-                    return Err(format!("palette {n:?} changes {k} of layer {}: a palette holds only colours", l["id"]));
+                    return Err(crate::error::options(format!("palette {n:?} changes {k} of layer {}: a palette holds only colours", l["id"])));
                 }
             }
         }
@@ -120,14 +121,14 @@ fn roads(base: &mut Roads, cp: &Roads, n: &str) -> Vec<String> {
     }
     for k in &keys {
         let vals = (0..cp.len()).map(|i| cp.road(i).get(k).map(Cell::to_value)).collect();
-        base.extra.push(Extra { name: format!("{k}@{n}"), key: k.clone(), vals });
+        base.extra.push(Extra { name: mark::in_palette(k, n), key: k.clone(), vals });
     }
     keys
 }
 
 /// The simple source: a piece's values are its road's (the roads' `Extra` from `from` on holds this palette's; `SimpleSource::palette`
 /// names those that the pieces differ in, in the order they first differ); an item's are its own, and it gets its copies here.
-fn simple(b: &mut SimpleSource, c: &SimpleSource, roads: &Roads, cp: &Roads, from: usize, n: &str) -> Result<Vec<String>, String> {
+fn simple(b: &mut SimpleSource, c: &SimpleSource, roads: &Roads, cp: &Roads, from: usize, n: &str) -> Result<Vec<String>, crate::Error> {
     let mut keys: Vec<String> = Vec::new();
     let ex = from..roads.extra.len();
     for (_, p) in &b.pieces {
@@ -137,7 +138,7 @@ fn simple(b: &mut SimpleSource, c: &SimpleSource, roads: &Roads, cp: &Roads, fro
         let (r, e) = (roads.road(p.edge as usize), p.edge as usize);
         for (k, v) in cp.road(e).own() {
             if b.cols.keeps(p.part, k) && !keys.iter().any(|x| x == k) && !r.get(k).is_some_and(|w| same(w, v)) {
-                let x = ex.clone().find(|&x| roads.extra[x].key == k).ok_or_else(|| format!("palette {n:?}: a piece differs in {k}, its road not"))?;
+                let x = ex.clone().find(|&x| roads.extra[x].key == k).ok_or_else(|| crate::error::options(format!("palette {n:?}: a piece differs in {k}, its road not")))?;
                 keys.push(k.to_string());
                 b.palette.push(x);
             }
@@ -148,7 +149,7 @@ fn simple(b: &mut SimpleSource, c: &SimpleSource, roads: &Roads, cp: &Roads, fro
         for (k, v) in ci.props.iter() {
             if !keys.iter().any(|x| x == k) && bi.props.get(k) != Some(v) {
                 if b.pieces.iter().any(|(_, p)| b.cols.keeps(p.part, k) && cp.road(p.edge as usize).get(k).is_some()) {
-                    return Err(format!("palette {n:?} changes {k} of an item and not of its road: not in the Rust engine (use engine='python')"));
+                    return Err(crate::Error::Unsupported(crate::Unsupported::ItemPalette { palette: n.to_string(), key: k.to_string() }));
                 }
                 keys.push(k.to_string());
             }
@@ -157,7 +158,7 @@ fn simple(b: &mut SimpleSource, c: &SimpleSource, roads: &Roads, cp: &Roads, fro
     for ((_, bi), (_, ci)) in b.items.iter_mut().zip(&c.items) {
         for k in &keys {
             if let Some(v) = ci.props.get(k) {
-                bi.props.insert(&format!("{k}@{n}"), v.clone());
+                bi.props.insert(&mark::in_palette(k, n), v.clone());
             }
         }
     }
@@ -184,7 +185,7 @@ fn features(b: &mut [Value], c: &[Value], n: &str) -> Vec<String> {
         if let Some(p) = bf["properties"].as_object_mut() {
             for k in &keys {
                 if let Some(v) = cp.get(k) {
-                    p.insert(format!("{k}@{n}"), v.clone());
+                    p.insert(mark::in_palette(k, n), v.clone());
                 }
             }
         }
@@ -238,7 +239,7 @@ fn pick(e: &mut Value, differ: &[(String, Vec<String>)]) {
             for p in ps {
                 if !seen.contains(&p) {
                     seen.push(p);
-                    m.extend([json!(p), json!(["get", format!("{k}@{p}")])]);
+                    m.extend([json!(p), json!(["get", mark::in_palette(k, p)])]);
                 }
             }
             m.push(e.clone());

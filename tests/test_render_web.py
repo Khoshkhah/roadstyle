@@ -282,6 +282,17 @@ def test_minzoom_true_uses_the_config_table():
         assert f'"residential", {float(DEFAULT.minzoom["residential"])}' in blob
 
 
+@pytest.mark.parametrize("engine", ["python", "rust"])
+def test_the_filter_panel_names_each_class_first_zoom(engine):
+    """roadstyle:controls.filter.minzoom (2026-10-25): the first zoom of each class of the panel that the class minzoom hides below a zoom,
+    so the Roads box dims it; a dict's change is in it; None with minzoom=False."""
+    from roadstyle.config import DEFAULT
+    flt = _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom={"residential": 9}).html, "filter")
+    assert flt["minzoom"]["residential"] == 9 and set(flt["minzoom"]) <= set(flt["classes"]), flt
+    assert all(flt["minzoom"].get(c) == DEFAULT.minzoom[c] for c in flt["classes"] if c != "residential" and DEFAULT.minzoom.get(c))
+    assert _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom=False).html, "filter")["minzoom"] is None
+
+
 def test_minzoom_dict_overrides_only_what_it_names():
     from roadstyle.config import DEFAULT
     from roadstyle.render_web import render
@@ -1872,7 +1883,9 @@ def test_level_columns_put_each_positions_street_names_after_its_arrows():
         assert ids.index(names) == ids.index(arrows) + 1, names
         assert '"fl"' in json.dumps(lay[names]["filter"])
     assert ids.index("roads-labels-lv-1") < ids.index("roads-fill") < ids.index("roads-labels-lv1")     # a higher position's names are above lower roads
-    plain = [l["id"] for l in _style(render_edges(g, backend="web", simple=False).html)["layers"]]
+    # with no level columns (an input column casing_level / fill_level is the level input since 2026-10-25): the solver's levels
+    bare = g.drop(columns=[c for c in ("casing_start", "casing_level", "casing_end", "fill_level") if c in g.columns])
+    plain = [l["id"] for l in _style(render_edges(bare, backend="web", simple=False).html)["layers"]]
     assert plain.count("roads-labels") == 1 and not [i for i in plain if i.startswith("roads-labels-lv")]
 
 
@@ -4330,3 +4343,13 @@ def test_the_version_is_the_one_of_a_source_tree():
         pytest.skip("not a source tree")
     assert rs._source_version() == re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
     assert rs.__version__ == rs._source_version()
+
+
+def test_the_contract_level_columns_are_the_level_input(monkeypatch):
+    """An input column casing_level / fill_level (duckOSM's stored levels) is the level input when no level keyword names one (2026-10-25,
+    as the Rust engine's compute_levels): the levels are read, not solved."""
+    from roadstyle import levels
+    g = _many_edges(4).assign(casing_level=0, fill_level=1, casing_start=0, casing_end=0)
+    monkeypatch.setattr(levels, "compute_levels", lambda *a, **k: (_ for _ in ()).throw(AssertionError("solved")))
+    feats = _stages(g)["sources"]["simple"]["data"]["features"]
+    assert {f["properties"]["__rs_fl"] for f in feats if "__rs_fl" in f["properties"]} == {1}

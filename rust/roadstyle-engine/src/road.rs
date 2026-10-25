@@ -3,6 +3,7 @@
 //! its mark, else its column: a mark takes the place of a column of the same name, as a dict's assignment does in Python. The output
 //! writes the columns in their order and then the other marks, so the text is the text of the old JSON object of each road.
 
+use roadstyle_model::mark;
 use crate::draw::{Draw, Values};
 use crate::props::Get;
 use roadstyle_model::topology::Topology;
@@ -22,6 +23,9 @@ pub struct Roads {
     pub cls: String,
     /// the warnings of the stages (Python's warnings.warn in render_web), for the caller (`Sources::warnings`)
     pub warnings: Vec<String>,
+    /// the drawing positions that the engine solved (casing_start, casing_level, casing_end, fill_level of each road), given under the
+    /// contract names after the road's columns; None: the input has them (lib.rs compute_levels)
+    pub solved: Option<Vec<[i16; 4]>>,
     topo: std::sync::OnceLock<Box<Topology>>,
 }
 
@@ -36,7 +40,7 @@ pub struct Extra {
 impl Roads {
     pub fn new(table: RoadTable) -> Roads {
         let draw = vec![Draw::default(); table.len()];
-        Roads { table, draw, values: Values::default(), extra: Vec::new(), cls: "highway".into(), warnings: Vec::new(),
+        Roads { table, draw, values: Values::default(), extra: Vec::new(), cls: "highway".into(), warnings: Vec::new(), solved: None,
                 topo: std::sync::OnceLock::new() }
     }
 
@@ -49,7 +53,7 @@ impl Roads {
     }
 
     pub fn road(&self, i: usize) -> Road<'_> {
-        Road { t: &self.table, d: &self.draw[i], v: &self.values, x: &self.extra, c: &self.cls, i }
+        Road { t: &self.table, d: &self.draw[i], v: &self.values, x: &self.extra, c: &self.cls, s: self.solved.as_ref().map(|s| &s[i]), i }
     }
 
     /// The road `i`, or None past the last road.
@@ -84,12 +88,18 @@ pub struct Road<'a> {
     v: &'a Values,
     x: &'a [Extra],
     c: &'a str,
+    /// its solved drawing positions (casing_start, casing_level, casing_end, fill_level), when the engine solved them
+    s: Option<&'a [i16; 4]>,
     pub i: usize,
 }
 
+/// The contract names of the solved drawing positions, in their order.
+const SOLVED: [mark::Mark; 4] = [mark::Mark::CasingStartColumn, mark::Mark::CasingLevelColumn, mark::Mark::CasingEndColumn, mark::Mark::FillLevelColumn];
+
 impl<'a> Road<'a> {
     pub fn get(self, k: &str) -> Option<Cell<'a>> {
-        self.d.get(self.v, k).or_else(|| self.t.get(self.i, k))
+        self.d.get(self.v, self.i, k).or_else(|| self.t.get(self.i, k))
+            .or_else(|| self.s.and_then(|s| SOLVED.iter().position(|m| m.name() == k).map(|j| Cell::Int(s[j].into()))))
             .or_else(|| self.x.iter().find(|e| e.name == k).and_then(|e| e.vals[self.i].as_ref().map(Cell::Json)))
     }
 
@@ -114,8 +124,10 @@ impl<'a> Road<'a> {
     /// The road's own properties in the output's order: the columns (a mark in the place of a column of its name), then the other marks.
     pub fn own(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
         let (t, d, v, i) = (self.t, self.d, self.v, self.i);
-        t.names().iter().enumerate().map(move |(c, n)| (n.as_str(), d.get(v, n).unwrap_or_else(|| t.cell(c, i))))
-            .chain(d.marks(v).into_iter().filter(move |(k, _)| t.col(k).is_none()))
+        let solved = self.s.into_iter().flat_map(|s| SOLVED.iter().zip(s).map(|(m, x)| (m.name(), Cell::Int((*x).into()))));
+        t.names().iter().enumerate().map(move |(c, n)| (n.as_str(), d.get(v, i, n).unwrap_or_else(|| t.cell(c, i))))
+            .chain(solved)
+            .chain(d.marks(v, i).into_iter().filter(move |(k, _)| t.col(k).is_none()))
     }
 
     /// The properties in the output's order: its own, then its marks in the other palettes of the views.
@@ -178,7 +190,7 @@ pub fn row_of(key: u64) -> Option<usize> {
 
 /// The name of a kept column (a column with an engine name that is not the named one) while the engine runs.
 pub fn kept(own: &str) -> String {
-    format!("__rs_kept_{own}")
+    format!("{}{own}", mark::KEPT)
 }
 
 impl RoadsSource {
@@ -187,14 +199,14 @@ impl RoadsSource {
         if let Some((_, user)) = self.names.iter().find(|(own, _)| *own == k) {
             return user;
         }
-        k.strip_prefix("__rs_kept_").and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
+        k.strip_prefix(mark::KEPT).and_then(|o| self.names.iter().find(|(own, _)| *own == o)).map_or(k, |(own, _)| own)
     }
 
     /// A road's properties with the output's names, as the roads source writes them in every form (GeoJSON, GeoParquet, tiles): its
     /// fields that `keep` takes (None: all), and the stage values that are read (R1: `read`).
     pub fn props<'a>(&'a self, r: Road<'a>, keep: Option<&'a std::collections::HashSet<String>>) -> impl Iterator<Item = (&'a str, Cell<'a>)> + 'a {
         r.iter().map(|(k, c)| (self.out_name(k), c)).filter(move |(k, _)| {
-            if k.starts_with("__rs_") { self.read.as_ref().is_none_or(|s| s.contains(*k)) } else { keep.is_none_or(|s| s.contains(*k)) }
+            if k.starts_with(mark::PREFIX) { self.read.as_ref().is_none_or(|s| s.contains(*k)) } else { keep.is_none_or(|s| s.contains(*k)) }
         })
     }
 

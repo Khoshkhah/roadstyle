@@ -9,14 +9,17 @@ pub enum Error {
     Usage(String),
     /// A file that is not read or not written.
     File(String),
-    /// The engine, a reader, the levels or Chromium refused the input: their text (the facade's errors are still text).
+    /// A reader, the levels or Chromium refused the input: their text.
     Engine(String),
+    /// The facade refused the input (its kind: the engine, the tiles, a reader, the options, a file, the level editor's input).
+    Facade(roadstyle::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Usage(m) | Error::File(m) | Error::Engine(m) => f.write_str(m),
+            Error::Facade(e) => e.fmt(f),
         }
     }
 }
@@ -29,7 +32,13 @@ impl From<Error> for String {
     }
 }
 
-/// The facade's errors, which are text.
+impl From<roadstyle::Error> for Error {
+    fn from(e: roadstyle::Error) -> Error {
+        Error::Facade(e)
+    }
+}
+
+/// The errors that are text (a reader's message).
 impl From<String> for Error {
     fn from(m: String) -> Error {
         Error::Engine(m)

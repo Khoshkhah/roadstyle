@@ -4,6 +4,7 @@
 //! A piece is typed (`Piece`: its road, what it draws, its place in the road layer, its line); its JSON properties are made only at the
 //! output (`Piece::props`), from its road, with render_web's keys in render_web's order.
 
+use roadstyle_model::mark::{self, Mark};
 use crate::draw::Cap;
 use crate::props::{Get, Props};
 use crate::road::{Road, Roads};
@@ -26,7 +27,7 @@ pub type Pt = [f64; 2];
 
 /// An item on a road (an overlay's line in metres, render's items=): its own properties and its line.
 pub struct Item {
-    pub props: Props,
+    pub props: Props<'static>,
     pub coords: Option<Vec<Pt>>,
 }
 
@@ -101,7 +102,7 @@ impl Cols {
 
     /// A property of a casing piece: the class, lvl, the metre width's column and every mark but the fills.
     fn casing(&self, k: &str) -> bool {
-        k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || (k.starts_with("__rs_") && !k.starts_with("__rs_fill"))
+        k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || (k.starts_with(mark::PREFIX) && !mark::is_fill(k))
     }
 
     /// The piece of `part` has the road's property `k` (a fill's keys, else a casing's).
@@ -111,14 +112,14 @@ impl Cols {
 
     /// A property of a fill piece in simple mode: the same, with the fills.
     fn fill(&self, k: &str) -> bool {
-        k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || k.starts_with("__rs_")
+        k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || k.starts_with(mark::PREFIX)
     }
 }
 
 /// The properties of a road as JSON values, those that `keep` takes. The road's own `__rs_cls` (set later, for the roads source) is
 /// not one: a piece marks its class itself, as the last property.
-fn road_props(r: Road, keep: impl Fn(&str) -> bool) -> Props {
-    r.own().filter(|(k, _)| *k != "__rs_cls" && keep(k)).map(|(k, v)| (k, v.to_value())).collect()
+fn road_props<'a>(r: Road<'a>, keep: impl Fn(&str) -> bool) -> Props<'a> {
+    r.own().filter(|(k, _)| *k != Mark::Class.name() && keep(k)).map(|(k, v)| (k, v.to_value())).collect()
 }
 
 impl Piece {
@@ -160,55 +161,55 @@ impl Piece {
     pub fn cl(&self, roads: &Roads) -> i64 {
         match self.part {
             Part::Cut(_, n) | Part::Seam(n) | Part::Lap(n) => n,
-            _ => self.road(roads).draw().levels.map_or(0, |l| l[0]),
+            _ => self.road(roads).draw().levels64().map_or(0, |l| l[0]),
         }
     }
 
     /// The properties of the piece as render_web makes them, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
     /// the edge's tie-breaker) and `__rs_cls`.
-    pub fn props(&self, roads: &Roads, cols: &Cols) -> Props {
+    pub fn props<'a>(&self, roads: &'a Roads, cols: &Cols) -> Props<'a> {
         let r = self.road(roads);
         let d = r.draw();
         let (edge, key) = (self.edge as i64, crate::road::key(self.edge as usize).get());      // the row (the sort key's tie-breaker), the road's key
-        let mut q: Props = match self.part {
+        let mut q: Props<'a> = match self.part {
             Part::Fill => road_props(r, |k| cols.fill(k)),
             Part::Half(k) => {
-                let mut q = road_props(r, |kk| !matches!(kk, "__rs_cap0" | "__rs_cap1" | "__rs_split"));
-                q.insert("__rs_edge", key.into());
+                let mut q = road_props(r, |kk| !matches!(Mark::of(kk), Some(Mark::Cap0 | Mark::Cap1 | Mark::Split)));
+                q.insert(Mark::Edge.name(), key.into());
                 if let Some(c) = d.split.map(|s| s[k as usize]).filter(|c| *c != Cap::Round) {
-                    q.insert("__rs_cap", c.value());
+                    q.insert(Mark::Cap.name(), c.value());
                 }
                 q
             }
             _ => {
                 let mut q = road_props(r, |k| cols.casing(k));
-                q.insert("__rs_edge", key.into());
+                q.insert(Mark::Edge.name(), key.into());
                 if let Some(tw) = d.twin {
-                    q.insert("__rs_pair", true.into());
-                    q.insert("__rs_edge2", crate::road::key(tw as usize).get().into());
+                    q.insert(Mark::Pair.name(), true.into());
+                    q.insert(Mark::Edge2.name(), crate::road::key(tw.get()).get().into());
                 }
                 match self.part {
                     Part::Cut(k, num) => {
-                        q.insert("__rs_cl", num.into());
+                        q.insert(Mark::CasingLevel.name(), num.into());
                         if k == 1 {
                             // the main piece ends at two cuts: flat ends
-                            q.insert("__rs_cap", true.into());
-                            q.insert("__rs_main", true.into());
+                            q.insert(Mark::Cap.name(), true.into());
+                            q.insert(Mark::Main.name(), true.into());
                         } else if let Some(s) = d.split {
                             // a head of an edge with two different ends: that end's cap
-                            q.insert("__rs_cap", s[usize::from(k != 0)].value());
+                            q.insert(Mark::Cap.name(), s[usize::from(k != 0)].value());
                         }
-                        if q.get("__rs_cap").is_none_or(Value::is_null) {
-                            q.shift_remove("__rs_cap");
+                        if q.get(Mark::Cap.name()).is_none_or(Value::is_null) {
+                            q.shift_remove(Mark::Cap.name());
                         }
                     }
                     Part::Seam(num) | Part::Lap(num) => {
-                        q.insert("__rs_cl", num.into());
-                        q.insert("__rs_seam", true.into());
-                        q.shift_remove("__rs_cap");
+                        q.insert(Mark::CasingLevel.name(), num.into());
+                        q.insert(Mark::Seam.name(), true.into());
+                        q.shift_remove(Mark::Cap.name());
                         if matches!(self.part, Part::Lap(_)) {
-                            q.insert("__rs_cap", true.into());
-                            q.insert("__rs_lap", true.into());
+                            q.insert(Mark::Cap.name(), true.into());
+                            q.insert(Mark::Lap.name(), true.into());
                         }
                     }
                     _ => {}
@@ -217,18 +218,18 @@ impl Piece {
             }
         };
         match self.end {
-            End::Flat => drop(q.insert("__rs_cap", true.into())),
-            End::Stub => drop(q.insert("__rs_stub", true.into())),
+            End::Flat => drop(q.insert(Mark::Cap.name(), true.into())),
+            End::Stub => drop(q.insert(Mark::Stub.name(), true.into())),
             End::AsIs => {}
         }
         if matches!(self.part, Part::Half(_)) {
             q = q.into_iter().filter(|(k, _)| cols.fill(k)).collect();
         }
         if let Some(dk) = self.draw {
-            q.insert("__rs_k", dk.kind.into());
-            q.insert("__rs_s", sort_key(dk.key, edge).into());
+            q.insert(Mark::PieceKind.name(), dk.kind.into());
+            q.insert(Mark::Sort.name(), sort_key(dk.key, edge).into());
         }
-        q.insert("__rs_cls", r.cls());
+        q.insert(Mark::Class.name(), r.cls());
         q
     }
 }
@@ -321,11 +322,11 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
             continue; // one line for a reverse pair: its twin draws it
         }
         let edge = p.i as u32;
-        if d.twin.is_some_and(|tw| tw < edge) {
+        if d.twin.is_some_and(|tw| tw.get() < edge as usize) {
             continue; // a two-way pair's one casing: the first edge's pieces
         }
         let piece = |part: Part, coords: PieceLine| Piece { edge, part, end: End::AsIs, draw: None, coords };
-        let [cm, _, cs, ce] = d.levels.unwrap_or_default();
+        let [cm, _, cs, ce] = d.levels64().unwrap_or_default();
         let split = d.split.is_some();
         let c = match p.line() {
             Some(c) if c.len() >= 2 && !(cs == cm && cm == ce && !split) => c,
@@ -336,7 +337,7 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
         };
         let line = Line::new(c);
         let n = line.len();
-        let (h0, h1) = (d.head_start.unwrap_or(head_m), d.head_end.unwrap_or(head_m));
+        let (h0, h1) = (d.head(&roads.values, 0).unwrap_or(head_m), d.head(&roads.values, 1).unwrap_or(head_m));
         // k: 0 the start head, 1 the main part, 2 the end head. A short road is cut once, in the heads' ratio (roadstyle after 0.24.2,
         // short_road_heads.md "One cut"): two cuts at h0 and n - h1 are one point only in exact arithmetic
         let cuts: Vec<(f64, f64, i64, u8)> = if h0 + h1 >= n - 0.05 {
@@ -357,7 +358,7 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
         cut_at.retain(|&x| x != 0.0 && x != n);
         cut_at.sort_by(f64::total_cmp);
         cut_at.dedup_by(|a, b| a == b);
-        let solid = !truthy(p.get("__rs_dash")) && !truthy(p.get("__rs_tunnel"));
+        let solid = !truthy(p.get(Mark::Dash.name())) && !truthy(p.get(Mark::Tunnel.name()));
         for &cut in &cut_at {
             let near: Vec<&(f64, f64, i64, u8)> = cuts.iter().filter(|(a, b, _, _)| b - a > 1e-9 && ((b - cut).abs() < 1e-9 || (a - cut).abs() < 1e-9)).collect();
             let half = near.iter().map(|(a, b, _, _)| (b - a) / 4.0).fold(SEAM_M, f64::min);
@@ -424,7 +425,7 @@ pub struct SimpleSource {
     pub maxzoom: Option<i64>,
     /// the column keywords (ColumnMap): an engine column's user name at the output; a kept column goes away
     pub names: Vec<(&'static str, String)>,
-    /// a page: `promoteId` "__rs_edge" (every piece of a road has its row, so one feature state lights them all)
+    /// a page: `promoteId` Mark::Edge.name() (every piece of a road has its row, so one feature state lights them all)
     pub promote: bool,
     /// a view's palettes (palettes.rs): the roads' `Extra` that the pieces differ in, in the order of the copies on each piece
     pub palette: Vec<usize>,
@@ -444,8 +445,8 @@ impl SimpleSource {
     }
 
     /// The features in their order, each as (id, properties with the output's names, line).
-    pub fn features<'a>(&'a self, roads: &'a Roads) -> impl Iterator<Item = (usize, Props, Option<&'a [Pt]>)> + 'a {
-        let named = move |mut p: Props| {
+    pub fn features<'a>(&'a self, roads: &'a Roads) -> impl Iterator<Item = (usize, Props<'a>, Option<&'a [Pt]>)> + 'a {
+        let named = move |mut p: Props<'a>| {
             for (own, user) in &self.names {
                 if p.rename(own, user) {
                     p.shift_remove(&crate::road::kept(own));
@@ -465,7 +466,7 @@ impl SimpleSource {
 
     /// The properties with the class index last (R8): the place of the feature's class (`highway`, the user's column by its own name at
     /// the output) in the classes, else their number.
-    fn with_index(&self, mut q: Props) -> Props {
+    fn with_index<'a>(&self, mut q: Props<'a>) -> Props<'a> {
         if let Some(cs) = &self.classes {
             let col = self.names.iter().find(|(own, _)| *own == "highway").map_or("highway", |(_, user)| user.as_str());
             let c = q.get(col).and_then(Value::as_str);
@@ -475,17 +476,17 @@ impl SimpleSource {
     }
 
     /// A piece's properties that are read (R1), in their order.
-    fn slim(&self, q: Props) -> Props {
+    fn slim<'a>(&self, q: Props<'a>) -> Props<'a> {
         match &self.read {
-            Some(r) => q.into_iter().filter(|(k, _)| r.contains(*k)).collect(),
+            Some(r) => q.into_iter().filter(|(k, _)| r.contains(k.as_ref())).collect(),
             None => q,
         }
     }
 
     /// An item's: its own fields (a picked item's popup fields: the item has no others) and the stage values that are read.
-    fn slim_item(&self, q: Props) -> Props {
+    fn slim_item<'a>(&self, q: Props<'a>) -> Props<'a> {
         match &self.read {
-            Some(r) => q.into_iter().filter(|(k, _)| !k.starts_with("__rs_") || r.contains(*k)).collect(),
+            Some(r) => q.into_iter().filter(|(k, _)| !k.starts_with(mark::PREFIX) || r.contains(k.as_ref())).collect(),
             None => q,
         }
     }
@@ -497,7 +498,7 @@ impl SimpleSource {
         w.write_all(br#","tolerance":"#)?;
         serde_json::to_writer(&mut *w, &self.tolerance)?;
         if self.promote {
-            w.write_all(br#","promoteId":"__rs_edge""#)?;
+            w.write_all(br#","promoteId":Mark::Edge.name()"#)?;
         }
         if let Some(z) = self.maxzoom {
             write!(w, r#","maxzoom":{z}"#)?;
@@ -562,7 +563,7 @@ impl SimpleSource {
 /// (edge * PIECES + n), the tie-breaker per edge and __rs_cls (_mark_cls).
 /// `width_col`: render's width_m_col, which the pieces keep (the layer's `cols`).
 /// `items`: the line items on the edges (_item_pieces, `__rs_k` 5), each over its edge's fill, by its rank on the edge.
-pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Option<&str>, items: Vec<Item>) -> Result<SimpleSource, String> {
+pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Option<&str>, items: Vec<Item>) -> Result<SimpleSource, crate::Error> {
     let line_of: Vec<Option<&[Pt]>> = roads.iter().map(|f| f.line()).collect();
     let mut halves = halves(roads);
     let mut out: Vec<Piece> = Vec::new();
@@ -571,18 +572,18 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         let stub = q0.cap(roads) != Some(Cap::Flat) && !q0.seam();
         for q in if stub { end_stub(q0, roads) } else { vec![q0] } {
             let r = roads.road(q.edge as usize);
-            if truthy(r.get("__rs_dash")) || (q.seam() && truthy(r.get("__rs_tunnel"))) {
+            if truthy(r.get(Mark::Dash.name())) || (q.seam() && truthy(r.get(Mark::Tunnel.name()))) {
                 continue; // a dashed class has no casing; a tunnel's casing is its dashes alone
             }
-            let bridge = truthy(r.get("__rs_bridge"));
+            let bridge = truthy(r.get(Mark::Bridge.name()));
             let cl = q.cl(roads);
             let k = 2.0 * cl as f64 + if bridge { 0.25 } else { 0.0 };
-            let [_, _, cs, ce] = r.draw().levels.unwrap_or_default();
+            let [_, _, cs, ce] = r.draw().levels64().unwrap_or_default();
             let whole = cs == cl && cl == ce;
             if shadows && bridge && (matches!(q.part, Part::Cut(1, _)) || whole) {
                 out.push(key(&q, 2, k - 0.1));
             }
-            if truthy(r.get("__rs_tunnel")) && !bridge {
+            if truthy(r.get(Mark::Tunnel.name())) && !bridge {
                 out.push(key(&q, 3, k));
                 out.push(key(&q, 4, k + 0.1));
             } else {
@@ -602,7 +603,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
                          coords: if p.line().is_some() { PieceLine::Road } else { PieceLine::None } }]
         };
         let fl = p.draw().levels.map_or(0, |l| l[1]);
-        let s = 2.0 * fl as f64 + if truthy(p.get("__rs_dash")) { -0.5 } else { 1.0 };
+        let s = 2.0 * fl as f64 + if truthy(p.get(Mark::Dash.name())) { -0.5 } else { 1.0 };
         out.extend(fills.into_iter().map(|h| Piece { draw: Some(DrawKey { kind: 1, key: s }), ..h }));
     }
     let mut items = items;
@@ -613,34 +614,34 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         let e = f.edge;
         let c = n.entry(e).or_default();
         if *c == PIECES {
-            return Err(format!("edge {e} has more than {PIECES} pieces"));
+            return Err(crate::Error::Limit { what: crate::Limit::Pieces { edge: e as usize }, found: PIECES + 1, max: PIECES });
         }
         if e as usize >= MAX_EDGES {
-            return Err(format!("more than {MAX_EDGES} edges"));
+            return Err(crate::Error::Limit { what: crate::Limit::Edges, found: e as usize + 1, max: MAX_EDGES });
         }
         let id = e as usize * PIECES + *c;
         *c += 1;
         pieces.push((id, f));
     }
     // the items, by edge, order, overlay and feature: an id per edge and rank, and a sort key over the edge's fill
-    items.sort_by_key(|f| ["__rs_edge", "__rs_ord", "__rs_ov", "__rs_item"].map(|k| f.props.get(k).and_then(Value::as_i64).unwrap_or(0)));
+    items.sort_by_key(|f| [Mark::Edge.name(), Mark::ItemOrder.name(), Mark::ItemOverlay.name(), Mark::Item.name()].map(|k| f.props.get(k).and_then(Value::as_i64).unwrap_or(0)));
     let mut rank: HashMap<i64, usize> = HashMap::new();
     let mut placed = Vec::with_capacity(items.len());
     for mut f in items {
-        let e = f.props.get("__rs_edge").and_then(Value::as_u64).and_then(crate::road::row_of).unwrap_or(0) as i64;
+        let e = f.props.get(Mark::Edge.name()).and_then(Value::as_u64).and_then(crate::road::row_of).unwrap_or(0) as i64;
         let r = rank.entry(e).or_default();
         *r += 1;
         if *r > MAX_ITEMS {
-            return Err(format!("simple=True: edge {e} has more than {MAX_ITEMS} items; they do not fit between its fill and the next casings"));
+            return Err(crate::Error::Limit { what: crate::Limit::Items { edge: e as usize }, found: *r, max: MAX_ITEMS });
         }
         let id = MAX_EDGES * PIECES + e as usize * MAX_ITEMS + *r - 1;
-        let s = sort_key(2.0 * int(&f.props, "__rs_fl") as f64 + 1.0 + *r as f64 * ITEM_STEP, e);
-        f.props.insert("__rs_s", s.into());
+        let s = sort_key(2.0 * int(&f.props, Mark::FillLevel.name()) as f64 + 1.0 + *r as f64 * ITEM_STEP, e);
+        f.props.insert(Mark::Sort.name(), s.into());
         // _mark_cls: the class and the access of the item's road
         let road = roads.at(e as usize);
-        f.props.insert("__rs_cls", road.map(Road::cls).unwrap_or(Value::Null));
-        if let Some(a) = road.and_then(|p| p.get("__rs_access")).filter(|a| !a.is_null()) {
-            f.props.insert("__rs_access", a.to_value());
+        f.props.insert(Mark::Class.name(), road.map(Road::cls).unwrap_or(Value::Null));
+        if let Some(a) = road.and_then(|p| p.get(Mark::Access.name())).filter(|a| !a.is_null()) {
+            f.props.insert(Mark::Access.name(), a.to_value());
         }
         placed.push((id, f));
     }
@@ -706,13 +707,13 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
     let topo = roads.topo();
     let mut wide: indexmap::IndexMap<i64, (f64, f64)> = indexmap::IndexMap::new();
     for p in roads.iter() {
-        let (Some(wm), Some(c)) = (p.get("__rs_wm").and_then(Cell::as_f64), p.line().filter(|c| c.len() >= 2)) else { continue };
-        if truthy(p.get("__rs_dup")) {
+        let (Some(wm), Some(c)) = (p.get(Mark::WidthM.name()).and_then(Cell::as_f64), p.line().filter(|c| c.len() >= 2)) else { continue };
+        if truthy(p.get(Mark::Dup.name())) {
             continue;
         }
         let k = c[0][1].to_radians().cos();
-        let cm = p.get("__rs_cm").and_then(Cell::as_f64).unwrap_or(0.0);
-        wide.insert(p.get("__rs_edge").and_then(Cell::as_u64).and_then(crate::road::row_of).unwrap_or(p.i) as i64, (wm * k, (wm - 2.0 * cm) * k));
+        let cm = p.get(Mark::CasingM.name()).and_then(Cell::as_f64).unwrap_or(0.0);
+        wide.insert(p.get(Mark::Edge.name()).and_then(Cell::as_u64).and_then(crate::road::row_of).unwrap_or(p.i) as i64, (wm * k, (wm - 2.0 * cm) * k));
     }
     let line = |e: i64| line_of.get(e as usize).copied().flatten();
     // the ends of the metre roads at each node (a road end's node: Topology)
@@ -779,7 +780,7 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
     // the items: an end with the items of its colour and dash that start within ITEM_JOIN_M (and a start with those that end there)
     let lines: Vec<usize> = (0..items.len()).filter(|&k| items[k].coords.as_ref().is_some_and(|c| c.len() >= 2)).collect();
     let text = |f: &Item, k: &str| f.props.get(k).filter(|v| !v.is_null()).map(Value::to_string);     // Python's None: missing or null
-    let key = |f: &Item| (text(f, "__rs_ic"), text(f, "__rs_dash"));
+    let key = |f: &Item| (text(f, Mark::ItemColor.name()), text(f, Mark::Dash.name()));
     let cell = |p: &Pt| ((p[0] / 3e-5).floor() as i64, (p[1] / 3e-5).floor() as i64);
     let end_of = |c: &Vec<Pt>, first: bool| if first { c[0] } else { c[c.len() - 1] };
     let mut by: HashMap<_, Vec<usize>> = HashMap::new();
@@ -795,8 +796,8 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
         let cl = c[0][1].to_radians().cos();
         let u = heading(c, first);
         let out_u = if first { (-u.0, -u.1) } else { u };
-        let o = num(&f.props, "__rs_iom") * cl;
-        (xy(&end_of(c, first)), out_u, num(&f.props, "__rs_iwm") * cl / 2.0, if first { -o } else { o })
+        let o = num(&f.props, Mark::ItemOffsetM.name()) * cl;
+        (xy(&end_of(c, first)), out_u, num(&f.props, Mark::ItemWidthM.name()) * cl / 2.0, if first { -o } else { o })
     };
     let mut pushes = Vec::new();
     for &k in &lines {

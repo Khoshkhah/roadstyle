@@ -43,6 +43,8 @@ Serve the folder over http. A module script does not load from a `file://` addre
 |---|---|---|
 | `init()` | a Promise | loads the WebAssembly module; call it one time, first |
 | `resolveLook(options)` | a `Look` | the look: `render_edges`' `palette`, `profile`, `settings` and keywords (`args`), from the JSON text `options` |
+| `look.withArg(key, value)` | a `Look` | the same look with the keyword `key` (`color_by`, `state`, `live_data`, ...) set to `value` (JSON text) |
+| `look.toJson()`, `Look.fromJson(text)` | JSON text, a `Look` | save a look and load it again (version 2; `fromJson` also reads 1 and 0) |
 | `makeStyle(roads, look, features?, planner?, name?)` | JSON text | the style with the roads in it (as `export_inline`) |
 | `new Tiler(roads, look, features?, name?, prefix, keep)` | a `Tiler` | the style with vector-tile sources, and the tiles on request |
 | `tiler.style()` | JSON text | the style of the `Tiler` |
@@ -54,6 +56,9 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `makeArea(edges, options?)` | an `AreaFiles` | a level area's files in memory ([The level editor in a page](#the-level-editor-in-a-page)) |
 | `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
+
+A look's JSON (`toJson`) is a format to save and load a look, not an API: its inner fields change between versions. Do not read or
+change its fields. Give your keywords to `resolveLook`, or change a saved look with `withArg`.
 
 `roads` is the bytes of a GeoParquet file: the geometry as WKB in EPSG:4326, and the columns of
 [the data contract](../get-started.md#what-your-data-needs). An error is a thrown `Error` with a message that tells what is wrong.
@@ -212,6 +217,9 @@ The parts of this page:
 - **`style: null`, `prefix: "rs-"`.** The dashboard starts with no roads, and adds `rs-` to each source and layer id that it uses.
 - **`engine.props`.** The dashboard asks the engine for one road's properties at a click, at `rsSelect` and for the tooltip.
 - **`rs.setStyle(style)`.** The controls stay. The Colour by menu and the legend are made again, and the selection is cleared.
+  The dashboard sets the style's global state: a live style's layers read MapLibre's global state (`rs_co`, `rs_fill_on`, ...),
+  whose start values are in the style's own `state` block, which your map does not have. The dashboard sets each value of
+  `roadstyle:state` that your map does not have yet, and keeps the values that your map has.
 
 With `engine.props` only, `rs.query`, `rs.find`, `rs.props` and `rs.focus` find nothing: they need all roads' properties in the
 page.

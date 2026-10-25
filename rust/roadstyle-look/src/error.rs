@@ -23,7 +23,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Version { found } => write!(f, "look version {found}: this engine reads versions 0 and {}", crate::VERSION),
+            Error::Version { found } => write!(f, "look version {found}: this engine reads versions 0 to {}", crate::VERSION),
             Error::Look(m) | Error::Options(m) | Error::Unknown(m) | Error::File(m) | Error::Image(m) => f.write_str(m),
         }
     }

@@ -10,7 +10,7 @@ then draws the roads with MapLibre GL JS. The package `roadstyle-dashboard` adds
 import init, { Look, resolveLook, makeStyle, Tiler } from "roadstyle-wasm";
 
 await init();                                            // loads pkg/roadstyle_wasm_bg.wasm
-const look = resolveLook(JSON.stringify({ palette: "carto" }));   // or Look.fromJson(text): a saved look.json (version 1 or 0)
+const look = resolveLook(JSON.stringify({ palette: "carto" }));   // or Look.fromJson(text): a saved look.json (version 2, 1 or 0)
 const style = JSON.parse(makeStyle(roadsParquet, look));          // one style, the roads in it as GeoJSON
 
 // or vector tiles, made when the map asks for them

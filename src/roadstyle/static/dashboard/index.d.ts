@@ -37,11 +37,17 @@ export interface DashboardOptions {
   /** The selection colour (the theme's selection.select). */
   select_color?: string;
   /** The Roads box: {on, col, classes, swatches, palettes, bridges, tunnels, access}. */
-  filter?: { on: boolean; classes: string[]; col?: string; [k: string]: unknown };
+  /** The Roads box (roadstyle:controls.filter). minzoom: {class: its first zoom}; a class's row is dimmed below it; null: no class minzoom. */
+  filter?: { on: boolean; classes: string[]; col?: string; minzoom?: Record<string, number> | null; [k: string]: unknown };
   /** The colour options: [{name, prop, legend}]; the legend is categorical {title, entries} or continuous {title, ramp, vmin, vmax}. */
   color_options?: ColorOption[];
   /** The index of the colour option that shows first. */
   color_active?: number;
+  /** The Roads box (render's filter_control, a page key). Default true; a style made before N32 step 2 has its own filter.on, which
+   *  stays when this is not given. */
+  filter_control?: boolean;
+  /** The legend box of the colour options (render's legend, a page key; the style always has the legend data). Default true. */
+  legend?: boolean;
   overlays?: Array<Record<string, unknown>>;
   overlay_control?: boolean;
   overlay_popup?: boolean;

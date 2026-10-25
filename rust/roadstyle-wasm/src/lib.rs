@@ -1,9 +1,11 @@
 //! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through
 //! wasm-bindgen, and the allocator that grows the memory in large steps. Natively the crate is empty.
 
-/// The allocator in the browser: the standard one (dlmalloc), but when it grows the memory, the memory grows once more by its size (16 to
-/// 256 MB) in one step, and the allocator keeps that block free for the next allocations. dlmalloc alone grows the memory 64 KB at a time,
-/// thousands of steps for Monaco, and in Edge on Windows each step is slow: the first style took 14 to 21 s there, 3 s with the memory grown first.
+/// The allocator in the browser: the standard one (dlmalloc), but when it grows the memory, the memory grows once more by a quarter of its
+/// size (16 to 64 MB) in one step, and the allocator keeps that block free for the next allocations. dlmalloc alone grows the memory 64 KB
+/// at a time, thousands of steps for Monaco, and in Edge on Windows each step is slow: the first style took 14 to 21 s there, 3 s with the
+/// memory grown first. The step was the whole size (16 to 256 MB) until 2026-10-25; the quarter keeps the memory near what is held (Monaco
+/// 110 to 68 MiB, Tartu 221 to 197 MiB) with few steps. Edge's first-style time on Windows must be checked again with the quarter step.
 #[cfg(target_arch = "wasm32")]
 mod grow {
     use core::arch::wasm32::memory_size;
@@ -11,16 +13,31 @@ mod grow {
     use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
     static PAGES: AtomicUsize = AtomicUsize::new(0); // the memory's size (64 KB pages) after the last step ahead
+    /// the times that the memory grew (dlmalloc's own steps and the steps ahead)
+    pub static STEPS: AtomicUsize = AtomicUsize::new(0);
+    /// the bytes that the program holds now, and their most since `peak_reset` (the memory's size grows in steps ahead, so it does not
+    /// show these: parity.md, "The drawing values of a road")
+    pub static LIVE: AtomicUsize = AtomicUsize::new(0);
+    pub static PEAK: AtomicUsize = AtomicUsize::new(0);
+
+    fn took(n: usize) {
+        let live = LIVE.fetch_add(n, Relaxed) + n;
+        PEAK.fetch_max(live, Relaxed);
+    }
 
     fn ahead() {
         let now = memory_size(0);
         if now != PAGES.load(Relaxed) {
-            let l = Layout::from_size_align((now << 16).clamp(16 << 20, 256 << 20), 16).unwrap();
+            STEPS.fetch_add(1, Relaxed);
+            let l = Layout::from_size_align(((now << 16) / 4).clamp(16 << 20, 64 << 20), 16).unwrap();
             unsafe {
                 let p = System.alloc(l); // null when the memory cannot grow: then nothing is taken ahead
                 if !p.is_null() {
                     System.dealloc(p, l);
                 }
+            }
+            if memory_size(0) != now {
+                STEPS.fetch_add(1, Relaxed);
             }
             PAGES.store(memory_size(0), Relaxed);
         }
@@ -31,20 +48,31 @@ mod grow {
     unsafe impl GlobalAlloc for Ahead {
         unsafe fn alloc(&self, l: Layout) -> *mut u8 {
             let p = System.alloc(l);
+            if !p.is_null() {
+                took(l.size());
+            }
             ahead();
             p
         }
         unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
             let p = System.alloc_zeroed(l);
+            if !p.is_null() {
+                took(l.size());
+            }
             ahead();
             p
         }
         unsafe fn realloc(&self, p: *mut u8, l: Layout, size: usize) -> *mut u8 {
             let q = System.realloc(p, l, size);
+            if !q.is_null() {
+                LIVE.fetch_sub(l.size(), Relaxed);
+                took(size);
+            }
             ahead();
             q
         }
         unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
+            LIVE.fetch_sub(l.size(), Relaxed);
             System.dealloc(p, l)
         }
     }
@@ -58,26 +86,26 @@ mod wasm {
     use wasm_bindgen::prelude::*;
 
     /// A resolved look (roadstyle-look), parsed one time: `resolveLook(options)` makes it, `Look.fromJson(text)` reads a saved look
-    /// (version 1, or version 0: today's look.json), `toJson()` gives its text (version 1). The calls below take it, not its text.
+    /// (version 2, 1, or 0: the look.json of 0.25.0), `toJson()` gives its text (version 2). The calls below take it, not its text.
     #[wasm_bindgen(js_name = Look)]
     pub struct JsLook(roadstyle::Look);
 
     #[wasm_bindgen(js_class = Look)]
     impl JsLook {
-        /// Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error.
+        /// Look.fromJson(text): a saved look (version 2, 1 or 0). An error is a thrown Error.
         #[wasm_bindgen(js_name = fromJson)]
         pub fn from_json(text: &str) -> Result<JsLook, JsError> {
             roadstyle::Look::from_json(text).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
         }
 
-        /// toJson(): the look's text (version 1).
+        /// toJson(): the look's text (version 2), to save and load it. It is not an API: read no field of it.
         #[wasm_bindgen(js_name = toJson)]
         pub fn to_json(&self) -> String {
             self.0.to_json()
         }
 
-        /// withArg(key, value): the look with the keyword `key` set to `value` (JSON text), as the Python binding's `with_arg`. An
-        /// error is a thrown Error.
+        /// withArg(key: string, value: string) -> Look: the same look with the map option `key` (a render_edges keyword: color_by, state,
+        /// live_data, levels, ...) set to `value` (JSON text), as the Python binding's Look.with_arg. An error is a thrown Error.
         #[wasm_bindgen(js_name = withArg)]
         pub fn with_arg(&self, key: &str, value: &str) -> Result<JsLook, JsError> {
             let v: serde_json::Value = serde_json::from_str(value).map_err(|e| JsError::new(&format!("{key}: not JSON: {e}")))?;
@@ -109,7 +137,7 @@ mod wasm {
     /// makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
     #[wasm_bindgen(js_name = makeStyle)]
     pub fn make_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
-        roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e))
+        roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// makeArea(edges: Uint8Array, options?: string) -> AreaFiles: a level area's files in memory (roadstyle::level_area::make_files), for
@@ -131,7 +159,7 @@ mod wasm {
             band_dist: num("band_dist", d.band_dist), head_m: num("head_m", d.head_m), near_rules: o["near_rules"].as_bool().unwrap_or(d.near_rules),
         };
         let table = roadstyle::read::read_roads(edges, "geometry").map_err(|e| JsError::new(&e.to_string()))?;
-        roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e))
+        roadstyle::level_area::make_files(&table, &m, o["heads"].as_str().unwrap_or("")).map(AreaFiles).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// A level area's files (makeArea): `roads` (roads.parquet's bytes, for new LevelArea), `pairs` and `edits` (pairs.csv and an empty
@@ -176,16 +204,16 @@ mod wasm {
     impl LevelArea {
         #[wasm_bindgen(constructor)]
         pub fn new(roads: Vec<u8>, pairs: &str) -> Result<LevelArea, JsError> {
-            roadstyle::level_editor::Editor::new(roads, pairs).map(LevelArea).map_err(|e| JsError::new(&e))
+            roadstyle::level_editor::Editor::new(roads, pairs).map(LevelArea).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The whole solve with the edits (edits.csv text).
         pub fn solve(&mut self, edits: &str) -> Result<String, JsError> {
-            self.0.solve(edits).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
+            self.0.solve(edits).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The solve after a change that names the roads of `changed` (edge ids): the roads around it, else the whole area.
         #[wasm_bindgen(js_name = solveLocal)]
         pub fn solve_local(&mut self, edits: &str, changed: Vec<String>) -> Result<String, JsError> {
-            self.0.solve_local(edits, &changed).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e))
+            self.0.solve_local(edits, &changed).map(|a| a.to_json().to_string()).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The answer to start from (levels.csv, levels_info.json): 4 numbers for each road; the given-up parts as "upper|lower|part".
         #[wasm_bindgen(js_name = startFrom)]
@@ -195,11 +223,11 @@ mod wasm {
                 (f.next().unwrap_or_default(), f.next().unwrap_or_default(), f.next().unwrap_or_default())
             }).collect();
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e))
+            self.0.start_from(&levels, &parts, orders_not_kept, near).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The check before rules are added (rows: CSV text with a header): [[index, why, [rule rows]]].
         pub fn check(&self, edits: &str, rows: &str) -> Result<String, JsError> {
-            self.0.check(edits, rows).map(|c| roadstyle::level_editor::conflicts_json(&c).to_string()).map_err(|e| JsError::new(&e))
+            self.0.check(edits, rows).map(|c| roadstyle::level_editor::conflicts_json(&c).to_string()).map_err(|e| JsError::new(&e.to_string()))
         }
         /// What the panel shows of each road, a list in the roads' order.
         pub fn facts(&self) -> String {
@@ -207,18 +235,18 @@ mod wasm {
         }
         /// Each road end as drawn, a list in the roads' order: heads, caps, and yours (heads.csv, caps.csv).
         pub fn ends(&self, heads: &str, caps: &str) -> Result<String, JsError> {
-            self.0.ends_json(heads, caps).map_err(|e| JsError::new(&e))
+            self.0.ends_json(heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
         /// levels.csv: one row for each edge with its four numbers and its ends as drawn (4 numbers for each road).
         #[wasm_bindgen(js_name = levelsCsv)]
         pub fn levels_csv(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<String, JsError> {
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.levels_csv(&levels, heads, caps).map_err(|e| JsError::new(&e))
+            self.0.levels_csv(&levels, heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
         /// The map's table (GeoParquet, one row for each edge) for makeStyle: 4 numbers for each road.
         pub fn draw(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<Vec<u8>, JsError> {
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
-            self.0.draw(&levels, heads, caps).map_err(|e| JsError::new(&e))
+            self.0.draw(&levels, heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
     }
 
@@ -238,8 +266,8 @@ mod wasm {
             Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
             None => serde_json::Map::new(),
         };
-        let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e))?;
-        let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e))?;
+        let features = features.map(roadstyle::read_features).transpose().map_err(|e| JsError::new(&e.to_string()))?;
+        let page = roadstyle::page_options::page_from(roads, features, &look.0, &o, &given).map_err(|e| JsError::new(&e.to_string()))?;
         page.warnings.iter().for_each(|w| console_warn(w));
         Ok(page.html)
     }
@@ -258,7 +286,7 @@ mod wasm {
         let c = |i: usize| cols.get(i).map(String::as_str).unwrap_or(["highway", "oneway", "tunnel", "bridge", "edge_id"][i]);
         let lc = roadstyle::export_look::LookCols { highway: c(0), oneway: c(1), tunnel: c(2), bridge: c(3), id: c(4) };
         let ps: Vec<i64> = positions.into_iter().map(i64::from).collect();
-        roadstyle::export_look::export_look(&look.0, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e))
+        roadstyle::export_look::export_look(&look.0, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and
@@ -275,7 +303,7 @@ mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: Vec<String>)
                    -> Result<Tiler, JsError> {
-            let (style, tiles, _) = roadstyle::make_tiled(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e))?;
+            let (style, tiles, _) = roadstyle::make_tiled(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
             Ok(Tiler { style, tiles })
         }
 
@@ -340,7 +368,7 @@ mod wasm {
         /// file(name, format, keep): one of stage 1's files ("geojson" or "geoparquet"; the roads' file has their drawing values and
         /// `keep`, the road table every field of each road).
         pub fn file(&self, name: &str, format: &str, keep: Vec<String>) -> Result<Vec<u8>, JsError> {
-            roadstyle::source_file(&self.inner, name, self::format(format)?, &self.inner.drawn(&keep)).map_err(|e| JsError::new(&e))
+            roadstyle::source_file(&self.inner, name, self::format(format)?, &self.inner.drawn(&keep)).map_err(|e| JsError::new(&e.to_string()))
         }
     }
 
@@ -348,7 +376,7 @@ mod wasm {
     #[wasm_bindgen(js_name = makeSources)]
     pub fn make_sources(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
                         -> Result<Sources, JsError> {
-        roadstyle::make_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e))
+        roadstyle::make_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// Roads that a reader of a road file gave (roadstyle-io: a RoadTable, one row for each road): `readGeoJson(bytes)` makes them. `length`
@@ -376,9 +404,9 @@ mod wasm {
 
         /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
         pub fn sources(&self, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Sources, JsError> {
-            let err = |e: String| JsError::new(&e);
+            let err = |e: roadstyle::Error| JsError::new(&e.to_string());
             let features = features.map(roadstyle::read_features).transpose().map_err(err)?;
-            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(String::from).map_err(err)?;
+            let planner = planner.map(|p| roadstyle::read::read_table(p, "")).transpose().map_err(roadstyle::Error::from).map_err(err)?;
             roadstyle::sources_of(self.0.clone(), &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(err)
         }
     }
@@ -484,7 +512,7 @@ mod wasm {
     /// Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
     #[wasm_bindgen(js_name = tileSources)]
     pub fn tile_sources(sources: &Sources, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
-        let (style, tiles) = roadstyle::tile_made(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e))?;
+        let (style, tiles) = roadstyle::tile_made(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Tiler { style, tiles })
     }
 
@@ -512,13 +540,33 @@ mod wasm {
     #[wasm_bindgen(js_name = tileFiles)]
     pub fn tile_files(files: &FileSet, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
         let read = |n: &str| files.files.get(n).cloned().ok_or_else(|| format!("{n}: not in the files"));
-        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e))?;
+        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Tiler { style: style.to_string(), tiles })
     }
 
-    /// The size of the module's memory, in bytes.
+    /// The size of the module's memory, in bytes (it grows in steps ahead and never gets smaller: `liveBytes` gives what is held).
     #[wasm_bindgen(js_name = memoryBytes)]
     pub fn memory_bytes() -> usize {
         core::arch::wasm32::memory_size(0) * 65536
+    }
+
+    /// liveBytes() -> [now, peak]: the bytes that the program holds now, and the most it held since the last `liveBytesReset()`.
+    #[wasm_bindgen(js_name = liveBytes)]
+    pub fn live_bytes() -> Vec<f64> {
+        use std::sync::atomic::Ordering::Relaxed;
+        vec![crate::grow::LIVE.load(Relaxed) as f64, crate::grow::PEAK.load(Relaxed) as f64]
+    }
+
+    /// The times that the memory grew since the module started (dlmalloc's own steps and the allocator's steps ahead).
+    #[wasm_bindgen(js_name = growSteps)]
+    pub fn grow_steps() -> usize {
+        crate::grow::STEPS.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// The peak of `liveBytes` starts again from the bytes held now.
+    #[wasm_bindgen(js_name = liveBytesReset)]
+    pub fn live_bytes_reset() {
+        use std::sync::atomic::Ordering::Relaxed;
+        crate::grow::PEAK.store(crate::grow::LIVE.load(Relaxed), Relaxed);
     }
 }

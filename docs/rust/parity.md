@@ -109,7 +109,37 @@ order: the first tile zoom of a source is the first zoom at which a layer draws 
 | 12 | 8.6 MB | 7.1 MB, 130 ms | 5.6 MB, 119 ms | 3,863 KB, 3,268 KB, 2,529 KB |
 | 14 | 7.8 MB | 6.6 MB, 130 ms | 5.3 MB, 115 ms | 735 KB, 592 KB (the second and third) |
 
-That is about 18 ms for each 10,000 roads at zoom 12, cold. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
+That is about 18 ms for each 10,000 roads at zoom 12, cold.
+
+#### The drawing values of a road
+
+The engine keeps one `Draw` for each road (the computed values: levels, ends, flags, the style values' numbers). Its size on a 64-bit
+machine: 288 bytes before the tight types (2026-10-25), 80 bytes after. On Tartu, the old program's allocation count (`roadstyle-rs
+--bench`) gives 26 MB in use after the marks of the roads, not 39 MB, and each later peak is 13 MB lower. Two numbers of the wasm module must not be mixed up. `bench.mjs` gives both:
+
+- **the memory size** (`memoryBytes`): the linear memory, which never gets smaller. The allocator (`roadstyle-wasm` lib.rs `grow`) grows
+  it ahead in steps (a quarter of its size, 16 to 64 MB; the whole size, 16 to 256 MB, before 2026-10-25), so the size moves in steps
+  of many MB and is more than the live bytes;
+- **the live bytes** (`liveBytes`: now and the peak): what the program holds.
+
+| Tartu, wasm in Node | memory size | live peak in makeSources | live peak in tileSources |
+|---|---|---|---|
+| before the tight `Draw` (a941b46) | 213 MiB | 70 MiB | 123 MiB |
+| after (bf409d5) | 221 MiB | 59 MiB | 111 MiB |
+
+The live bytes fall by 11 to 12 MiB. The memory size went up by one growth step, which lands at another point; it shows nothing about the
+data.
+
+The step ahead (2026-10-25): a quarter of the size (16 to 64 MB) in place of the whole size (16 to 256 MB). `bench.mjs` (Node) and the
+first style in headless Chromium (`makeStyle` with the base map, the middle of three runs; the memory size after it):
+
+| | Monaco: memory, growth steps (Node) | Monaco: first style (Chromium) | Tartu: memory, growth steps (Node) | Tartu: first style (Chromium) |
+|---|---|---|---|---|
+| the whole size | 110 MiB, 6 | 848 ms, 45 MiB | 221 MiB, 8 | 1,726 ms, 340 MiB |
+| a quarter | 68 MiB, 6 | 294 ms, 38 MiB | 197 MiB, 14 | 1,398 ms, 138 MiB |
+
+The step ahead exists for Edge on Windows, where each of dlmalloc's 64 KB steps was slow (the first style took 14 to 21 s). The quarter
+step keeps the count small, but Edge's first-style time on Windows was not measured with it. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
 of lines and about 1.2 MB of marks: every mark is one that a layer or the page reads. The wasm memory after `makeSources` and
 `tileSources` (`bench.mjs`) stays 213 MiB.
 
@@ -207,6 +237,24 @@ MapLibre's workers.
 |---|---|---|---|
 | Monaco, a part (1,373 roads) | the style of `export_inline` | 0.57 s | 0.12 s |
 | Monaco (osmnx, 849 drive edges) | `render_edges` | 0.9 to 1.3 s | 0.3 s |
+
+## Size
+
+The size of the engine in each build, for the later steps to compare with: the WebAssembly package (`roadstyle_wasm_bg.wasm`, the
+output of `wasm-bindgen` for the profile `dist`), the same file with gzip -9, and the Python module (`_rust.abi3.so`, profile
+`release`, Linux x86-64). The steps of T3 (the typed map options and the typed look, `docs/design/t3_map_options_and_look.md`),
+2026-10-25:
+
+| Build | WebAssembly | gzip | Python module |
+|---|---|---|---|
+| Before T3 step 2 (94fc86f, step 1: `MapOptions`) | 11,292,251 B | 2,686,887 B | 31,304,056 B |
+| Step 2 as first written (d68e184) | 11,828,534 B (+4.7 %) | 2,840,954 B (+5.7 %) | 32,334,320 B (+3.3 %) |
+| Step 2 (db210f9: no serde `flatten`, schemars behind the feature `schema`) | 11,587,165 B (+2.6 %) | 2,773,038 B (+3.2 %) | 31,871,560 B (+1.8 %) |
+| Step 3 (the look crate's readers read the typed sections) | 11,669,114 B (+3.3 %) | 2,794,223 B (+4.0 %) | 32,124,408 B (+2.6 %) |
+
+The percentages are against the first row. The typed sections cost their serde readers (161 KB of the WebAssembly at step 2); serde's
+`flatten` read every section a second time through its buffer (113 KB for `Sections` alone), so `LookFile` is read and written by
+hand. The target: under +2 % again when N32 step 2 removes the JSON views of version 1 and the flat reader of `args`.
 
 ## Memory
 

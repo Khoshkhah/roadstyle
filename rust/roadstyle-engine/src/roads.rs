@@ -1,6 +1,7 @@
 //! The "roads" source: the stages of roadstyle's render_web.render that bake the `__rs_*` properties of each road, in the same
 //! order. Each function names the Python function it ports; the columns are the ones mapstyle passes (docs/design/rust-spike.md, S2).
 
+use roadstyle_look::options::MapOptions;
 use crate::draw::Cap;
 use crate::road::Roads;
 use roadstyle_model::{flags, Cell};
@@ -35,52 +36,58 @@ pub(crate) fn class_style<'a>(look: &'a Look, highway: Option<Cell>) -> (&'a Val
 /// render's access_col: the kinds that have their own colour and row (_ACCESS); any other value is null.
 const ACCESS_KINDS: [&str; 4] = ["private", "bus", "pedestrian", "delivery"];
 
-pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::colors::Colors, String> {
-    let access_col = args["access_col"].as_str().filter(|c| !c.is_empty());
+/// A column that the caller names: a column keyword that is given and not empty.
+pub(crate) fn named(c: &Option<String>) -> Option<&str> {
+    c.as_deref().filter(|c| !c.is_empty())
+}
+
+/// `legend`: render's legend (a page key; colors::bake).
+pub fn mark_roads(fs: &mut Roads, look: &Look, m: &MapOptions, legend: bool) -> Result<crate::colors::Baked, crate::Error> {
+    let access_col = named(&m.columns.access);
     if let Some(col) = access_col {
         if fs.table.col(col).is_none() && !fs.is_empty() {
-            return Err(format!("access_col {col:?} is not a column of the edges"));
+            return Err(crate::error::column(col, "access_col names it, and it is not a column of the edges"));
         }
         for i in 0..fs.len() {
             let kind = fs.get(i, col).and_then(Cell::as_str).and_then(|k| ACCESS_KINDS.iter().find(|a| **a == k).copied());
-            fs.draw[i].access = Some(kind);
+            fs.draw[i].access = Some(kind.and_then(|k| crate::draw::ACCESS_KINDS.iter().position(|a| *a == k)).map(|k| k as u8));
         }
     }
-    let colors = crate::colors::bake(fs, look, args)?;
+    let colors = crate::colors::bake(fs, look, m, legend)?;
     // render: the direction columns are read only when they are named (directed_col, driving_col: None by default)
-    let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
-    mark_twoway(fs, named("directed_col"), named("driving_col"));
+    mark_twoway(fs, named(&m.columns.directed).is_some(), named(&m.columns.driving).is_some());
     // a road with an access kind has its kind's colour in every colour option (the palette's `access`)
     for i in (0..fs.len()).filter(|_| access_col.is_some()) {
-        let Some(c) = fs.draw[i].access.flatten().and_then(|k| look.access.get(k)).filter(|c| !c.is_null()) else { continue };
+        let kind = fs.draw[i].access.flatten().map(|k| crate::draw::ACCESS_KINDS[k as usize]);
+        let Some(c) = kind.and_then(|k| look.access.get(k)).filter(|c| !c.is_null()) else { continue };
         let c = fs.values.id(c);
-        let d = &mut fs.draw[i];
-        if let Some(s) = d.style.as_mut() {
+        if let Some(s) = fs.draw[i].style {
+            let mut s = fs.values.style(s);
             s[0] = c;
+            fs.draw[i].style = Some(fs.values.style_ix(s));
         }
-        d.fills.iter_mut().for_each(|f| *f = c);
+        fs.draw[i].fills.iter_mut().for_each(|f| *f = c);
     }
     if !look.single_line.is_empty() {
         mark_single_line(fs, &look.single_line);
     }
     mark_lvl(fs);
-    let caps = CapCols::from_args(args);
+    let lc = m.columns.levels.clone().unwrap_or_default();
+    let caps = CapCols { whole: named(&m.columns.cap).map(String::from), start: named(&lc.cap_start).is_some(), end: named(&lc.cap_end).is_some() };
     mark_caps(fs, &caps);
-    mark_heads(fs, [named("head_start_m_col"), named("head_end_m_col")]);
-    let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
-    let computed = !named("casing_level_col") && !named("fill_level_col");      // render computes all four (compute_levels)
-    mark_levels(fs, ["casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col"].map(|k| computed || named(k)));
+    mark_heads(fs, [named(&lc.head_start_m).is_some(), named(&lc.head_end_m).is_some()]);
+    mark_levels(fs);
     // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
-    let width_col = args["width_m_col"].as_str().filter(|c| !c.is_empty());
+    let width_col = named(&m.columns.width_m);
     let pairs = if look.twin_one || width_col.is_some() { twin_pairs(fs) } else { Vec::new() };       // one time for both stages
     if look.twin_one && mark_twin_casing(fs, &pairs, look.head_m, Some("edge_id")) {        // render passes its edge_id_col (the engine's edge_id)
         mark_twin_dead_ends(fs, &caps);
     }
     if let Some(col) = width_col {
-        mark_width_m(fs, &pairs, col, args["casing_m"].as_f64().unwrap_or(look.casing_m));
+        mark_width_m(fs, &pairs, col, m.roads.casing_m.unwrap_or(look.casing_m));
     }
-    for (i, d) in fs.draw.iter_mut().enumerate() {
-        d.edge = Some(crate::road::key(i));
+    for d in fs.draw.iter_mut() {
+        d.keyed = true;
     }
     Ok(colors)
 }
@@ -90,7 +97,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, args: &Value) -> Result<crate::co
 pub fn roads_source(mut fs: Roads) -> crate::road::RoadsSource {
     for i in 0..fs.len() {
         let cls = fs.road(i).cls();
-        fs.draw[i].cls = Some(fs.values.id(&cls));
+        fs.draw[i].cls = Some(fs.values.ix(&cls));
     }
     crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, names: Vec::new(), in_style: true, read: None }
 }
@@ -198,8 +205,8 @@ fn mark_single_line(fs: &mut Roads, classes: &HashSet<String>) {
             }
             Some(j) => {
                 fs.draw[i].dup = true;
-                fs.draw[i].edge2 = Some(crate::road::key(j));
-                fs.draw[j].edge2 = Some(crate::road::key(i));
+                fs.draw[i].edge2 = Some(crate::draw::Ix::new(j));
+                fs.draw[j].edge2 = Some(crate::draw::Ix::new(i));
                 for r in [i, j] {
                     (fs.draw[r].twoway, fs.draw[r].oneway) = (Some(false), Some(false));
                 }
@@ -215,7 +222,7 @@ fn mark_lvl(fs: &mut Roads) {
         let (br, tu) = (truthy(fs.get(i, BRIDGE)), truthy(fs.get(i, TUNNEL)));
         let lvl = if ly != 0 { ly } else if br { 1 } else if tu { -1 } else { 0 };
         let d = &mut fs.draw[i];
-        (d.lvl, d.bridge, d.tunnel) = (Some(lvl), Some(br), Some(tu));
+        (d.lvl, d.bridge, d.tunnel) = (Some(lvl.clamp(i16::MIN.into(), i16::MAX.into()) as i16), Some(br), Some(tu));
     }
 }
 
@@ -238,13 +245,6 @@ pub(crate) struct CapCols {
     whole: Option<String>,
     start: bool,
     end: bool,
-}
-
-impl CapCols {
-    fn from_args(args: &Value) -> CapCols {
-        let named = |k: &str| args[k].as_str().is_some_and(|c| !c.is_empty());
-        CapCols { whole: args["cap_col"].as_str().filter(|c| !c.is_empty()).map(String::from), start: named("cap_start_col"), end: named("cap_end_col") }
-    }
 }
 
 /// A value is given: set, and not NaN (Python: not None and equal to itself).
@@ -277,23 +277,27 @@ fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
     }
     for i in 0..fs.len() {
         let head = |on: bool, col: &str| if on { fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0) } else { None };
-        (fs.draw[i].head_start, fs.draw[i].head_end) = (head(named[0], "head_start_m"), head(named[1], "head_end_m"));
+        let (s, e) = (head(named[0], "head_start_m"), head(named[1], "head_end_m"));
+        fs.draw[i].heads = [s, e].map(|h| h.map(|h| fs.values.ix(&serde_json::json!(h))));
     }
 }
 
-/// _mark_levels: __rs_cl / __rs_fl (casing at most the fill), the heads' casing numbers __rs_cs / __rs_ce, band 0.
-/// _mark_levels: `named` says which of the columns casing_level, fill_level, casing_start and casing_end render reads (a keyword names it,
-/// or render computed the levels); a head that has none takes the main casing number.
-fn mark_levels(fs: &mut Roads, named: [bool; 4]) {
+/// _mark_levels: __rs_cl / __rs_fl (casing at most the fill), the heads' casing numbers __rs_cs / __rs_ce, band 0, from the solved
+/// positions or from the input's columns casing_level, fill_level, casing_start and casing_end (the ones it has; a head that has none
+/// takes the main casing number).
+fn mark_levels(fs: &mut Roads) {
+    use roadstyle_model::mark::Mark;
     let num = |v: Option<Cell>| v.and_then(py_float).filter(|x| !x.is_nan()).map_or(0, |x| x.round_ties_even() as i64);
+    let has = [Mark::CasingLevelColumn, Mark::FillLevelColumn, Mark::CasingStartColumn, Mark::CasingEndColumn]
+        .map(|m| fs.solved.is_some() || fs.table.col(m.name()).is_some());
     for i in 0..fs.len() {
         let r = fs.road(i);
-        let col = |k: usize, c: &str| if named[k] { num(r.get(c)) } else { 0 };
-        let (c, fl) = (col(0, "casing_level"), col(1, "fill_level"));
+        let col = |k: usize, m: Mark| if has[k] { num(r.get(m.name())) } else { 0 };
+        let (c, fl) = (col(0, Mark::CasingLevelColumn), col(1, Mark::FillLevelColumn));
         let (c, fl) = (c.min(fl), c.max(fl));
-        let cs = if named[2] { num(r.get("casing_start")).min(fl) } else { c };
-        let ce = if named[3] { num(r.get("casing_end")).min(fl) } else { c };
-        fs.draw[i].levels = Some([c, fl, cs, ce]);
+        let cs = if has[2] { num(r.get(Mark::CasingStartColumn.name())).min(fl) } else { c };
+        let ce = if has[3] { num(r.get(Mark::CasingEndColumn.name())).min(fl) } else { c };
+        fs.draw[i].set_levels([c, fl, cs, ce]);
     }
 }
 
@@ -303,14 +307,14 @@ fn mark_levels(fs: &mut Roads, named: [bool; 4]) {
 fn mark_twin_casing(fs: &mut Roads, pairs: &[(usize, usize)], head_m: f64, id_col: Option<&str>) -> bool {
     let mut bad = Vec::new();
     for &(j, i) in pairs {
-        fs.draw[i].twin = Some(j as u32);
-        fs.draw[j].twin = Some(i as u32);
+        fs.draw[i].twin = Some(crate::draw::Ix::new(j));
+        fs.draw[j].twin = Some(crate::draw::Ix::new(i));
         // each end: its casing number, its head length and its cap
         let ends = |d: &crate::draw::Draw| {
             let whole = d.cap.unwrap_or(Cap::Round);
             let [s0, s1] = d.split.unwrap_or([whole, whole]);
-            let lv = |k: usize| d.levels.map(|l| l[k]);
-            ((lv(2), d.head_start.unwrap_or(head_m), s0), (lv(3), d.head_end.unwrap_or(head_m), s1))
+            let lv = |k: usize| d.levels64().map(|l| l[k]);
+            ((lv(2), d.head(&fs.values, 0).unwrap_or(head_m), s0), (lv(3), d.head(&fs.values, 1).unwrap_or(head_m), s1))
         };
         let (p, q) = (&fs.draw[i], &fs.draw[j]);
         let (ep, eq) = (ends(p), ends(q));
@@ -363,13 +367,13 @@ fn mark_width_m(fs: &mut Roads, pairs: &[(usize, usize)], col: &str, casing_m: f
             continue;
         }
         let sec = 1.0 / (pts.iter().map(|c| c[1]).sum::<f64>() / pts.len() as f64).to_radians().cos();
-        fs.draw[i].width_m = Some(crate::layers::py_round(w * sec, 4));
-        fs.draw[i].casing_m = Some(crate::layers::py_round(casing_m * sec, 4));
+        fs.draw[i].metres_mut().width = Some(crate::layers::py_round(w * sec, 4));
+        fs.draw[i].metres_mut().casing = Some(crate::layers::py_round(casing_m * sec, 4));
     }
     for &(i, j) in pairs {
-        if let (Some(a), Some(b)) = (fs.draw[i].width_m, fs.draw[j].width_m) {
-            fs.draw[i].twin_width_m = Some(b);
-            fs.draw[j].twin_width_m = Some(a);
+        if let (Some(a), Some(b)) = (fs.draw[i].width_m(), fs.draw[j].width_m()) {
+            fs.draw[i].metres_mut().twin_width = Some(b);
+            fs.draw[j].metres_mut().twin_width = Some(a);
         }
     }
 }

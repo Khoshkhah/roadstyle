@@ -251,7 +251,7 @@ impl Tiles {
             let id = Some(i as u64); // tiles.py: a feature's id is its index in its source
             let props = f["properties"].as_object().unwrap_or(&empty);
             // tiles.py's tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
-            b.push(id, g, props.iter().filter(|(k, _)| whole || k.starts_with("__rs_") || keep.contains(k.as_str())).map(|(k, v)| (k.as_str(), v.clone())));
+            b.push(id, g, props.iter().filter(|(k, _)| whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_str())).map(|(k, v)| (k.as_str(), v.clone())));
         }
         self.put(name, b.layer(whole, min_zoom));
     }
@@ -261,7 +261,7 @@ impl Tiles {
     pub fn add_features(&mut self, name: &str, t: &FeatureTable, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         use roadstyle_model::feature_table::GeomType;
         let g = t.geometries_of();
-        let names: Vec<&str> = t.names().iter().map(String::as_str).filter(|k| whole || k.starts_with("__rs_") || keep.contains(*k)).collect();
+        let names: Vec<&str> = t.names().iter().map(String::as_str).filter(|k| whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(*k)).collect();
         let mut b = self.builder(name);
         for row in 0..t.len() {
             let Some(kind) = g.kind(row) else { continue };
@@ -295,7 +295,7 @@ impl Tiles {
         for (i, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
-            b.push(Some(i as u64), g, props.filter(|(k, _)| whole || k.as_ref().starts_with("__rs_") || keep.contains(k.as_ref())));
+            b.push(Some(i as u64), g, props.filter(|(k, _)| whole || k.as_ref().starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_ref())));
         }
         self.put(name, b.layer(whole, min_zoom));
     }
@@ -489,7 +489,7 @@ impl Builder {
                 if rules.reads(k.as_ref()) {
                     read.insert(k.as_ref().to_string(), json_of(&v));
                 }
-                if v == Val::Bool(false) && k.as_ref().starts_with("__rs_") {
+                if v == Val::Bool(false) && k.as_ref().starts_with(roadstyle_model::mark::PREFIX) {
                     return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
                 }
                 let m = encode(&v);

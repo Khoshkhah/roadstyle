@@ -23,9 +23,11 @@ const area = new URLSearchParams(location.search).get("area") || "monaco";
 const DATA = "../../rust/roadstyle-rs/tests/data/";
 const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
 const [, roads, lookText] = await Promise.all([init(), bytes(DATA + area + "/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
-const look = JSON.parse(lookText);
-look.args.live_data = true;                       // the road layer reads the feature states rs_c and rs_w (metadata roadstyle:live)
-const sources = makeSources(roads, Look.fromJson(JSON.stringify(look)), undefined, undefined, area);
+// the saved look (look.json: a format to save and load, not an API to read fields from) with this page's map options, render_edges'
+// keywords, each through Look.withArg
+const withArgs = (look, args) => Object.entries(args).reduce((l, [k, v]) => l.withArg(k, JSON.stringify(v)), look);
+// live_data: the road layer reads the feature states rs_c and rs_w (metadata roadstyle:live)
+const sources = makeSources(roads, withArgs(Look.fromJson(lookText), {live_data: true}), undefined, undefined, area);
 const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
 const tiler = tileSources(sources, "rs://1/", ["name", "edge_id", "highway"]);
 const style = JSON.parse(tiler.style());
