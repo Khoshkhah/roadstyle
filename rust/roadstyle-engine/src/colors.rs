@@ -137,7 +137,7 @@ pub use roadstyle_look::Ramp;
 fn class_frame(fs: &Roads, look: &Look) -> Frame {
     let mut f = Frame::empty(fs.len());
     for ft in fs.iter() {
-        let (s, base) = crate::roads::class_style(look, ft.get("highway"));
+        let (s, base) = crate::roads::class_style(look, ft.role(roadstyle_model::Role::Class));
         f.push(&s["fill"], &s["width"], &s["opacity"], &s["dash"], &s["casing"], &s["casing_width"], &s["casing_opacity"], &Value::from(base));
     }
     f

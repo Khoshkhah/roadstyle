@@ -87,22 +87,23 @@ pub struct Piece {
     pub coords: PieceLine,
 }
 
-/// The columns that the pieces keep besides the class and the marks: the class filter's (render's filter_col, in the engine's names)
-/// and the metre width's (width_m_col).
+/// The columns that the pieces keep besides the marks: the class role's, the class filter's (render's filter_col) and the metre width's
+/// (width_m_col), each by its own name in the table.
 #[derive(Clone, Debug)]
 pub struct Cols {
+    pub class: String,
     pub fcol: String,
     pub width: Option<String>,
 }
 
 impl Cols {
-    pub fn new(fcol: &str, width: Option<&str>) -> Cols {
-        Cols { fcol: fcol.into(), width: width.map(String::from) }
+    pub fn new(class: &str, fcol: &str, width: Option<&str>) -> Cols {
+        Cols { class: class.into(), fcol: fcol.into(), width: width.map(String::from) }
     }
 
     /// A property of a casing piece: the class, lvl, the metre width's column and every mark but the fills.
     fn casing(&self, k: &str) -> bool {
-        k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || (k.starts_with(mark::PREFIX) && !mark::is_fill(k))
+        k == self.class || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || (k.starts_with(mark::PREFIX) && !mark::is_fill(k))
     }
 
     /// The piece of `part` has the road's property `k` (a fill's keys, else a casing's).
@@ -112,7 +113,7 @@ impl Cols {
 
     /// A property of a fill piece in simple mode: the same, with the fills.
     fn fill(&self, k: &str) -> bool {
-        k == "highway" || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || k.starts_with(mark::PREFIX)
+        k == self.class || k == self.fcol || k == "lvl" || Some(k) == self.width.as_deref() || k.starts_with(mark::PREFIX)
     }
 }
 
@@ -423,8 +424,6 @@ pub struct SimpleSource {
     pub tolerance: f64,
     /// render's data_maxzoom (None: MapLibre's default)
     pub maxzoom: Option<i64>,
-    /// the column keywords (ColumnMap): an engine column's user name at the output; a kept column goes away
-    pub names: Vec<(&'static str, String)>,
     /// a page: `promoteId` Mark::Edge.name() (every piece of a road has its row, so one feature state lights them all)
     pub promote: bool,
     /// a view's palettes (palettes.rs): the roads' `Extra` that the pieces differ in, in the order of the copies on each piece
@@ -437,39 +436,30 @@ pub struct SimpleSource {
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None, classes: None }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, promote: false, palette: Vec::new(), read: None, classes: None }
     }
 
     pub fn is_empty(&self) -> bool {
         self.pieces.is_empty() && self.items.is_empty()
     }
 
-    /// The features in their order, each as (id, properties with the output's names, line).
+    /// The features in their order, each as (id, properties, line).
     pub fn features<'a>(&'a self, roads: &'a Roads) -> impl Iterator<Item = (usize, Props<'a>, Option<&'a [Pt]>)> + 'a {
-        let named = move |mut p: Props<'a>| {
-            for (own, user) in &self.names {
-                if p.rename(own, user) {
-                    p.shift_remove(&crate::road::kept(own));
-                }
-            }
-            p
-        };
         self.pieces.iter().map(move |(id, p)| {
-            let mut q = named(p.props(roads, &self.cols));
+            let mut q = p.props(roads, &self.cols);
             for (k, v) in self.palette_props(p, roads) {
                 q.insert(&k, v);
             }
             (*id, self.slim(self.with_index(q)), p.points(roads))
         })
-            .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(self.with_index(named(it.props.clone()))), it.coords.as_deref())))
+            .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(self.with_index(it.props.clone())), it.coords.as_deref())))
     }
 
-    /// The properties with the class index last (R8): the place of the feature's class (`highway`, the user's column by its own name at
-    /// the output) in the classes, else their number.
+    /// The properties with the class index last (R8): the place of the feature's class (the class role's column) in the classes, else
+    /// their number.
     fn with_index<'a>(&self, mut q: Props<'a>) -> Props<'a> {
         if let Some(cs) = &self.classes {
-            let col = self.names.iter().find(|(own, _)| *own == "highway").map_or("highway", |(_, user)| user.as_str());
-            let c = q.get(col).and_then(Value::as_str);
+            let c = q.get(&self.cols.class).and_then(Value::as_str);
             q.insert(crate::layers::CLASS_INDEX, cs.iter().position(|x| Some(x.as_str()) == c).unwrap_or(cs.len()).into());
         }
         q
@@ -645,7 +635,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(&roads.cls, width_col), tolerance: 0.05, maxzoom: None, names: Vec::new(), promote: false, palette: Vec::new(), read: None, classes: None })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, promote: false, palette: Vec::new(), read: None, classes: None })
 }
 
 // _mitre_ends: a flat end where another road with metre widths goes on is pushed on to close the corner with the road that goes on most

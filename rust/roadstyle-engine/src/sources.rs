@@ -41,7 +41,7 @@ pub struct Sources {
 impl Sources {
     pub fn new(p: Parts) -> Sources {
         let (sources, roads) = take_roads(p.sources);
-        let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: 0.05, maxzoom: None, names: Vec::new(),
+        let roads = roads.unwrap_or_else(|| RoadsSource { roads: Roads::new(RoadTable::empty(), Default::default(), None), tolerance: 0.05, maxzoom: None,
                                                           in_style: false, read: None });
         let mut s = Sources { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
                               sources, roads, saved: serde_json::Map::new(), warnings: p.warnings };
@@ -231,9 +231,8 @@ impl Sources {
         }).collect()
     }
 
-    /// One road's row of the road table: its fields and the stage values that the page reads (R1: props::table_keeps), with the
-    /// output's names.
+    /// One road's row of the road table: its fields and the stage values that the page reads (R1: props::table_keeps).
     pub fn road_row<'a>(&'a self, r: crate::Road<'a>) -> Vec<(&'a str, Cell<'a>)> {
-        r.iter().filter(|(k, _)| roadstyle_model::props::table_keeps(k)).map(|(k, c)| (self.roads.out_name(k), c)).collect()
+        r.iter().filter(|(k, _)| roadstyle_model::props::table_keeps(k)).collect()
     }
 }

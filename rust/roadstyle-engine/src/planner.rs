@@ -5,7 +5,7 @@
 use crate::layers::py_round;
 use crate::road::{Road, Roads};
 use crate::Row;
-use roadstyle_model::Cell;
+use roadstyle_model::{Cell, Role};
 use serde_json::{json, Map, Value};
 use std::collections::{BTreeSet, HashMap};
 
@@ -83,7 +83,7 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, crate::Er
     if modes.is_empty() {
         return Err(crate::error::data("no mode with edges + edge_graph to route on"));
     }
-    let eid = |r: Road| -> i64 { match r.get("edge_id").map(Cell::to_value) { Some(Value::String(s)) => s.parse().unwrap_or(0), Some(v) => v.as_i64().unwrap_or(0), None => 0 } };
+    let eid = |r: Road| -> i64 { match r.role(Role::EdgeId).map(Cell::to_value) { Some(Value::String(s)) => s.parse().unwrap_or(0), Some(v) => v.as_i64().unwrap_or(0), None => 0 } };
     let mut k_of: HashMap<i64, usize> = HashMap::new(); // a road cut into pieces has several rows: the first one is the road
     for (k, r) in roads.iter().enumerate() {
         k_of.entry(eid(r)).or_insert(k);
@@ -108,7 +108,7 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, crate::Er
     data.insert("tgt".into(), json!(row.iter().map(|r| n_of[&r.1]).collect::<Vec<_>>()));
     data.insert("name".into(), json!(roads.iter().map(|r| r.get("name").map_or(Value::Null, Cell::to_value)).collect::<Vec<_>>()));
     data.insert("len".into(), json!(row.iter().map(|r| py_round(r.2, 1)).collect::<Vec<_>>()));
-    data.insert("hw".into(), json!(roads.iter().map(|r| r.get("highway").and_then(Cell::as_str).unwrap_or("").to_string()).collect::<Vec<_>>()));
+    data.insert("hw".into(), json!(roads.iter().map(|r| r.role(Role::Class).and_then(Cell::as_str).unwrap_or("").to_string()).collect::<Vec<_>>()));
     data.insert("rb".into(), json!(row.iter().enumerate().filter(|(_, r)| matches!(r.3.as_str(), Some("roundabout" | "circular"))).map(|(k, _)| k).collect::<Vec<_>>()));
     let mut graphs = Map::new();
     for (mi, m) in MODES.iter().enumerate().filter(|(_, m)| modes.iter().any(|x| x == **m)) {

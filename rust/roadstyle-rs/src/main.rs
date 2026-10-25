@@ -11,6 +11,12 @@ use serde_json::{json, Value};
 use std::time::Instant;
 use std::{env, fs, process};
 
+/// The roads of a table with the contract names (no column keywords): each role's column by its contract name.
+fn with_roles(table: roadstyle_rs::RoadTable) -> roadstyle_rs::Roads {
+    let roles = roadstyle_rs::Roles::resolve(&table, &[]).unwrap_or_else(|e| fail(e));
+    roadstyle_rs::Roads::new(table, roles, None)
+}
+
 /// The native program counts its memory (--bench): the bytes in use, and the peak since the last stage.
 struct Count;
 static NOW: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -51,7 +57,7 @@ fn bench(look_path: &str, roads_path: &str, features_path: &str) {
         t = Instant::now();
     };
     let look = look_file(look_path);
-    let mut feats = roadstyle_rs::Roads::new(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)));
+    let mut feats = with_roles(read::read_roads(fs::read(roads_path).unwrap(), "geometry").unwrap_or_else(|e| fail(e)));
     mark("read the roads");
     let colors = roads::mark_roads(&mut feats, &look.road, &look.map).unwrap_or_else(|e| fail(e));
     mark("mark the roads (colours, pairs, levels)");
@@ -202,7 +208,7 @@ fn main() {
         return;
     }
     // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)
-    let mut feats = roadstyle_rs::Roads::new(read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}"))));
+    let mut feats = with_roles(read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}"))));
     let colors = roads::mark_roads(&mut feats, &look.road, &look.map).unwrap_or_else(|e| fail(e));
     let simple = simple::simple_source(&feats, look.road.head_m, look.road.bridge_shadow, None, Vec::new()).unwrap_or_else(|e| fail(e));
     let slots = slots::slots_source(&feats, &look.slot);

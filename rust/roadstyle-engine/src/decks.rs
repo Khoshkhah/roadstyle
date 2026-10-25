@@ -237,7 +237,7 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
             let mid = (d0 + d1) / 2.0;
             let (pp, ffi, rfi) = props_at(mid);
             let pprops = roads.road(pp);
-            let cls = pprops.get("highway").and_then(Cell::as_str).unwrap_or("");
+            let cls = pprops.role(roadstyle_model::Role::Class).and_then(Cell::as_str).unwrap_or("");
             let px = m.gwidth(m.group_of(cls), dk.match_zoom);
             let half = (px * mpp / 2.0).max(2.0) * dk.width_scale;
             let up = if ramp_head { mid / ramp } else { 1.0 };

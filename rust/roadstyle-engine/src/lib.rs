@@ -23,7 +23,7 @@ pub mod sources;
 
 // The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
 // (roadstyle-io) are the facade's.
-pub use roadstyle_model::{feature_table, geom, mark, props, table, Cell, RoadTable, Row};
+pub use roadstyle_model::{feature_table, geom, mark, props, table, Cell, RoadTable, Role, Roles, Row};
 pub use roadstyle_model::feature_table::FeatureTable;
 pub use error::{Error, Limit, Unsupported};
 
@@ -48,7 +48,8 @@ pub const MAX_ROADS: usize = 200_000;
 /// A source of the style: the roads, the simple pieces (both typed, written from the roads), a base-map layer (typed, audit R10) or a
 /// GeoJSON source as JSON (a caller's overlays, slots, decks).
 pub enum Src {
-    Roads(road::RoadsSource),
+    /// boxed: the roads' table, drawing values and roles are much larger than the other sources, and a style has one roads source
+    Roads(Box<road::RoadsSource>),
     Simple(simple::SimpleSource),
     Features(features::FeatureSource),
     Json(Value),
@@ -73,38 +74,46 @@ pub struct Parts {
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base map's rows as the worker's SQL
 /// writes them, `read::read_feature_table`), the base map ("ov<i>"). `look`: look.json (the resolved look); `table`: the roads (roadstyle-io reads them from the
 /// GeoParquet of tools/make_spike_fixture.py or the worker's SQL); `planner`: the route planner's rows.
-pub fn make_parts(mut table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, Error> {
+pub fn make_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, Error> {
     if table.len() > MAX_ROADS {
         return Err(Error::Limit { what: Limit::Roads, found: table.len(), max: MAX_ROADS });
     }
-    ColumnMap::of(&look.map.columns).to_engine(&mut table);
+    let roles = roles_of(&table, &look.map.columns)?;
     let mut warnings = Vec::new();
-    let levels = compute_levels(&mut table, &look.map, look.road.head_m, &mut warnings)?;
-    let mut parts = style_parts(table, levels, look, features, planner, name)?;
+    let levels = compute_levels(&table, &roles, &look.map, look.road.head_m, &mut warnings)?;
+    let mut parts = style_parts(table, roles, levels, look, features, planner, name)?;
     parts.warnings.splice(0..0, warnings);
     Ok(parts)
 }
 
-/// The parts of another palette of the same call (a view's palette, palettes.rs): the roads of `s` as they were before their marks
-/// (their columns in the engine's names, their levels solved), with the look `look` (the same keywords, another palette). No base map
-/// and no route planner, as a page's views have none.
-pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, Error> {
-    Ok(sources::Sources::new(style_parts(s.roads.roads.table.clone(), s.roads.roads.solved.clone(), look, None, None, None)?))
+/// The roles of the table's columns (roadstyle_model::Roles): the column keywords of render (highway_col, tunnel_col, ...), else the
+/// contract names. The stages read a role's cell by its index and the layers write the table's own name: no column is renamed.
+fn roles_of(table: &RoadTable, c: &roadstyle_look::options::Columns) -> Result<Roles, Error> {
+    let l = c.levels.clone().unwrap_or_default();
+    let given = [(Role::Class, Some(&c.class)), (Role::Tunnel, c.tunnel.as_ref()), (Role::Bridge, c.bridge.as_ref()), (Role::Layer, c.layer.as_ref()),
+                 (Role::EdgeId, c.edge_id.as_ref()), (Role::CasingLevel, l.casing_level.as_ref()), (Role::FillLevel, l.fill_level.as_ref()),
+                 (Role::CasingStart, l.casing_start.as_ref()), (Role::CasingEnd, l.casing_end.as_ref()), (Role::HeadStartM, l.head_start_m.as_ref()),
+                 (Role::HeadEndM, l.head_end_m.as_ref()), (Role::CapStart, l.cap_start.as_ref()), (Role::CapEnd, l.cap_end.as_ref()),
+                 (Role::Directed, c.directed.as_ref()), (Role::Driving, c.driving.as_ref())];
+    Ok(Roles::resolve(table, &given.map(|(r, n)| (r, n.map(String::as_str))))?)
 }
 
-/// make_parts after the roads are prepared (the engine's column names, the levels).
-fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>,
-               name: Option<String>) -> Result<Parts, Error> {
-    let cols = ColumnMap::of(&look.map.columns);
-    // render's filter_col: in the engine's names (a keyword's column has the engine's name; a column with an engine name is kept aside)
-    let fcol = roads::named(&look.map.columns.filter).map_or_else(|| "highway".to_string(), |f| {
-        cols.0.iter().find(|(_, user)| user == f).map(|(own, _)| own.to_string())
-            .or_else(|| cols.0.iter().find(|(own, _)| *own == f).map(|(own, _)| ColumnMap::kept(own)))
-            .unwrap_or_else(|| f.to_string())
-    });
-    let mut feats = Roads::new(table);
-    feats.solved = solved;
-    feats.cls = fcol;
+/// The parts of another palette of the same call (a view's palette, palettes.rs): the roads of `s` as they were before their marks
+/// (their columns and roles, their levels solved), with the look `look` (the same keywords, another palette). No base map and no route
+/// planner, as a page's views have none.
+pub fn restyle(s: &sources::Sources, look: &Look) -> Result<sources::Sources, Error> {
+    let r = &s.roads.roads;
+    Ok(sources::Sources::new(style_parts(r.table.clone(), r.roles.clone(), r.solved.clone(), look, None, None, None)?))
+}
+
+/// make_parts after the roads are prepared (the roles, the levels).
+fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, look: &Look, features: Option<FeatureTable>,
+               planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, Error> {
+    let mut feats = Roads::new(table, roles, solved);
+    // render's filter_col, else the class role's column
+    if let Some(f) = roads::named(&look.map.columns.filter) {
+        feats.cls = f.to_string();
+    }
     let colors = roads::mark_roads(&mut feats, &look.road, &look.map)?;
     let width_col = roads::named(&look.map.columns.width_m);
     // render's arrows and labels (both on by default): the slots exist only for them
@@ -133,7 +142,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let mut items = Vec::new();
     if ovs.iter().any(overlays::metre_items) || look.map.items.is_some() {
         let by_id: std::collections::HashMap<String, Road> =
-            feats.iter().filter_map(|f| f.get("edge_id").map(|e| (overlays::eid(e), f))).collect();
+            feats.iter().filter_map(|f| f.role(Role::EdgeId).map(|e| (overlays::eid(e), f))).collect();
         for (i, ov) in ovs.iter_mut().enumerate().filter(|(_, o)| overlays::metre_items(o)) {
             overlays::edge_overlay(ov, &by_id)?;
             items.extend(overlays::item_pieces(ov, i, look)?);
@@ -156,9 +165,8 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks)
     let decks = if look.map.bridges.decks_3d {
-        // a casing slab names the user's own `highway` column (Python's props.get("highway")): kept aside when highway_col is another
-        let hw = if cols.0.iter().any(|(own, _)| *own == "highway") { ColumnMap::kept("highway") } else { "highway".into() };
-        decks::bridge_decks(&roads.roads, &look.deck, &look.model, &hw)
+        // a casing slab names the user's own `highway` column (Python's props.get("highway")), whatever highway_col is
+        decks::bridge_decks(&roads.roads, &look.deck, &look.model, "highway")
     } else { Vec::new() };
     let (layers, info) = layers::road_layers(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
                                              &colors.props, colors.active)?;
@@ -180,7 +188,7 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
         glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
     }
     // render's order: the roads, the overlays (_build_overlays), the 3D decks, the pieces
-    let mut sources = vec![("roads".to_string(), Src::Roads(roads))];
+    let mut sources = vec![("roads".to_string(), Src::Roads(Box::new(roads)))];
     for (i, ov) in ovs.into_iter().enumerate() {
         let src = match ov.data {
             overlays::Data::Table(table) => Src::Features(features::FeatureSource { table: *table, maxzoom: None }),
@@ -272,7 +280,6 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     }
     let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
     data_settings(&mut sources, &look.args);
-    cols.to_user(&mut sources, &mut layers);
     Ok(Parts { name, center, zoom, layers, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
 }
 
@@ -289,9 +296,9 @@ pub fn take_roads(mut sources: Vec<(String, Src)>) -> (Vec<(String, Src)>, Optio
     let mut roads = None;
     for (_, s) in sources.iter_mut() {
         if let Src::Roads(r) = s {
-            let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty()), tolerance: r.tolerance, maxzoom: r.maxzoom, names: Vec::new(),
+            let empty = road::RoadsSource { roads: Roads::new(RoadTable::empty(), Default::default(), None), tolerance: r.tolerance, maxzoom: r.maxzoom,
                                             in_style: r.in_style, read: None };
-            roads = Some(std::mem::replace(r, empty));
+            roads = Some(std::mem::replace(&mut **r, empty));
         }
     }
     (sources, roads)
@@ -323,12 +330,13 @@ fn source_features(source: &Value) -> &[Value] {
 /// `levels` (roads_sql.js makeRoads): "tags" computes them with the tags rule and "solve" with the solver, whatever the input has;
 /// `{edge_hash, n_edges}` (edge_levels_meta) checks that the stored levels are for these edges. Computed, they are not written into the
 /// table: they come back (casing_start, casing_level, casing_end, fill_level for each road), and the roads give them under the contract
-/// names (`Roads::solved`). A user column with a contract name, when the levels are computed, is kept aside as `__rs_kept_<name>`, with
-/// a warning.
-fn compute_levels(table: &mut RoadTable, m: &roadstyle_look::options::MapOptions, head_m: f64, warnings: &mut Vec<String>) -> Result<Option<Vec<[i16; 4]>>, Error> {
+/// names (`Roads::solved`). A user column with a contract name, when the levels are computed, goes to the output as
+/// `__rs_kept_<name>` (`Roads::new`), with a warning. The roles name the columns (`roles_of`); the table does not change.
+fn compute_levels(table: &RoadTable, roles: &Roles, m: &roadstyle_look::options::MapOptions, head_m: f64, warnings: &mut Vec<String>)
+                  -> Result<Option<Vec<[i16; 4]>>, Error> {
     use roadstyle_look::options::Levels;
     if let Levels::Stored { edge_hash, n_edges } = &m.levels {
-        let ids = (0..table.len()).map(|i| match table.get(i, "edge_id").map(Cell::to_value) {
+        let ids = (0..table.len()).map(|i| match roles.cell(table, Role::EdgeId, i).map(Cell::to_value) {
             Some(Value::Number(n)) => n.as_i64(),
             Some(Value::String(s)) => s.parse().ok(),
             _ => None,
@@ -339,19 +347,18 @@ fn compute_levels(table: &mut RoadTable, m: &roadstyle_look::options::MapOptions
         }
     }
     let (tags, forced) = (m.levels == Levels::Tags, matches!(m.levels, Levels::Tags | Levels::Solve));
-    let contract = [Mark::CasingLevelColumn, Mark::FillLevelColumn].iter().any(|m| table.col(m.name()).is_some());
+    let contract = [Role::CasingLevel, Role::FillLevel].iter().any(|r| roles.col(*r).is_some());
     if m.levels == Levels::Given || (!forced && contract) {
         return Ok(None);
     }
     const COLUMNS: [Mark; 4] = [Mark::CasingStartColumn, Mark::CasingLevelColumn, Mark::CasingEndColumn, Mark::FillLevelColumn];
     let present: Vec<Mark> = COLUMNS.into_iter().filter(|m| table.col(m.name()).is_some()).collect();
     for m in present {
-        table.rename(m.name(), &road::kept(m.name()));
         warnings.push(format!("the column {} is not the levels (levels={}): it is kept as {}", m.name(), if tags { "tags" } else { "solve" },
                               road::kept(m.name())));
     }
-    // the engine's own names: ColumnMap gave the user's columns these names before this step
-    let edges = level_edges(table, ["highway", "layer", "bridge", "tunnel", "junction", "", ""]);
+    let name = |r: Role| roles.name(table, r).unwrap_or("");
+    let edges = level_edges(table, [name(Role::Class), name(Role::Layer), name(Role::Bridge), name(Role::Tunnel), "junction", "", ""]);
     let method = if tags { roadstyle_levels::Method::Tags } else { roadstyle_levels::Method::Solve };
     let Some(levels) = roadstyle_levels::levels(&edges, &roadstyle_levels::Options { method, head_m, ..Default::default() })? else { return Ok(None) };
     // one row for each edge, in the edges' order (the edge id is the row)
@@ -360,95 +367,6 @@ fn compute_levels(table: &mut RoadTable, m: &roadstyle_look::options::MapOptions
     }
     let small = |v: i64| v.clamp(i16::MIN.into(), i16::MAX.into()) as i16;
     Ok(Some(levels.rows.iter().map(|r| [r.casing_start, r.casing_level, r.casing_end, r.fill_level].map(small)).collect()))
-}
-
-/// The column keywords of render (highway_col, tunnel_col, ...): the engine reads its own names (highway, tunnel, ...), so a user's
-/// column gets the engine's name on the way in and its own name back on the way out, in the data and the expressions of the sources
-/// `roads` and `simple`. As in Python, the slots and their layers keep `highway`, and the popup fields stay as given. A column that has
-/// the engine's name but is not the named one is kept under another name in between, and gets its name back.
-struct ColumnMap(Vec<(&'static str, String)>);
-
-impl ColumnMap {
-    /// The columns that the caller names with another name than the engine's (MapOptions' columns).
-    fn of(c: &roadstyle_look::options::Columns) -> ColumnMap {
-        let l = c.levels.clone().unwrap_or_default();
-        let given: [(&'static str, Option<&String>); 15] = [
-            ("highway", Some(&c.class)), ("tunnel", c.tunnel.as_ref()), ("bridge", c.bridge.as_ref()), ("layer", c.layer.as_ref()),
-            ("edge_id", c.edge_id.as_ref()), ("casing_level", l.casing_level.as_ref()), ("fill_level", l.fill_level.as_ref()),
-            ("casing_start", l.casing_start.as_ref()), ("casing_end", l.casing_end.as_ref()), ("head_start_m", l.head_start_m.as_ref()),
-            ("head_end_m", l.head_end_m.as_ref()), ("cap_start", l.cap_start.as_ref()), ("cap_end", l.cap_end.as_ref()),
-            ("is_directed", c.directed.as_ref()), ("has_arrows", c.driving.as_ref()),
-        ];
-        ColumnMap(given.into_iter().filter_map(|(own, u)| u.filter(|u| !u.is_empty() && *u != own).map(|u| (own, u.clone()))).collect())
-    }
-
-    fn kept(own: &str) -> String {
-        road::kept(own)
-    }
-
-    fn to_engine(&self, table: &mut RoadTable) {
-        for (own, user) in &self.0 {
-            if table.col(user).is_some() {
-                table.rename(own, &Self::kept(own));
-                table.rename(user, own);
-            }
-        }
-    }
-
-    fn to_user(&self, sources: &mut [(String, Src)], layers: &mut [Value]) {
-        if self.0.is_empty() {
-            return;
-        }
-        for (name, src) in sources.iter_mut() {
-            match src {
-                // the roads keep every column, with the user's names at the output; a kept one gets its own name back
-                Src::Roads(s) => s.names = self.0.clone(),
-                // the pieces of `simple` have only the class and the __rs_* marks: the user's names at the output, and a kept column
-                // (an __rs_ name in between) goes away there
-                Src::Simple(s) => s.names = self.0.clone(),
-                // the 3D decks are copies of the roads' properties: the user's names, as the roads
-                Src::Json(s) if name == "decks" => {
-                    for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
-                        if let Some(p) = f["properties"].as_object_mut().filter(|p| !p.contains_key(Mark::CasingSlab.name())) {
-                            for (own, user) in &self.0 {
-                                if p.contains_key(*own) {
-                                    let kept = Self::kept(own);
-                                    let name = |k: &String| if k == own { user.clone() } else if *k == kept { own.to_string() } else { k.clone() };
-                                    *p = std::mem::take(p).into_iter().map(|(k, v)| (name(&k), v)).collect();
-                                }
-                            }
-                        }
-                    }
-                }
-                Src::Json(s) => {
-                    for f in s["data"]["features"].as_array_mut().into_iter().flatten() {
-                        if let Some(p) = f["properties"].as_object_mut() {
-                            self.0.iter().for_each(|(own, _)| { p.shift_remove(&Self::kept(own)); });
-                        }
-                    }
-                }
-                // the base map's layers have no road column
-                Src::Features(_) => {}
-            }
-        }
-        fn gets(v: &mut Value, own: &str, user: &str) {
-            match v {
-                Value::Array(a) => {
-                    if a.len() == 2 && matches!(a[0].as_str(), Some("get" | "has")) && a[1] == own {
-                        a[1] = user.into();
-                    }
-                    a.iter_mut().for_each(|x| gets(x, own, user));
-                }
-                Value::Object(o) => o.values_mut().for_each(|x| gets(x, own, user)),
-                _ => {}
-            }
-        }
-        for l in layers.iter_mut().filter(|l| matches!(l["source"].as_str(), Some("roads" | "simple"))) {
-            for (own, user) in &self.0 {
-                gets(l, own, user);
-            }
-        }
-    }
 }
 
 /// render's data_maxzoom (every GeoJSON source) and data_tolerance (every GeoJSON source that has a tolerance).
@@ -539,27 +457,15 @@ mod tests {
     }
 
     #[test]
-    fn column_map_gives_the_engine_its_names_and_the_user_theirs() {
-        // only a column keyword with another name than the engine's own: tunnel_col "tunnel" and an empty one change nothing
-        let args = json!({"highway_col": "fclass", "tunnel_col": "tunnel", "edge_id_col": "", "cap_start_col": "cs"});
-        let m = ColumnMap::of(&roadstyle_look::options::MapOptions::from_args(&args).unwrap().0.columns);
-        assert_eq!(m.0, vec![("highway", "fclass".to_string()), ("cap_start", "cs".to_string())]);
-        // the user's column gets the engine's name; a column that already has it is kept under another name in between
-        let mut t = table(&["highway", "fclass"]);
-        m.to_engine(&mut t);
-        assert_eq!(t.names(), [ColumnMap::kept("highway"), "highway".to_string()]);
-        assert_eq!(t.get(0, "highway").map(|c| c.to_value()), Some(json!(1)), "the user's fclass is the engine's highway");
-        // a named column that the table does not have: nothing changes
-        let mut t = table(&["highway"]);
-        m.to_engine(&mut t);
-        assert_eq!(t.names(), ["highway".to_string()]);
-        // the expressions of the roads and simple layers read the user's names again; another source's layer keeps its names
-        let mut layers = vec![json!({"id": "a", "source": "roads", "filter": ["==", ["get", "highway"], "primary"],
-                                     "paint": {"line-color": ["case", ["has", "cap_start"], "#000000", "#ffffff"]}}),
-                              json!({"id": "b", "source": "slots", "filter": ["get", "highway"]})];
-        m.to_user(&mut [], &mut layers);
-        assert_eq!(layers[0]["filter"], json!(["==", ["get", "fclass"], "primary"]));
-        assert_eq!(layers[0]["paint"]["line-color"][1], json!(["has", "cs"]));
-        assert_eq!(layers[1]["filter"], json!(["get", "highway"]));
+    fn the_column_keywords_resolve_to_roles_and_rename_nothing() {
+        let cols = |args: Value| roadstyle_look::options::MapOptions::from_args(&args).unwrap().0.columns;
+        // highway_col "fclass": the class is fclass, and the table's own highway stays a column of its name
+        let t = table(&["highway", "fclass"]);
+        let r = roles_of(&t, &cols(json!({"highway_col": "fclass", "edge_id_col": ""}))).unwrap();
+        assert_eq!((r.col(Role::Class), r.name(&t, Role::Class)), (Some(1), Some("fclass")));
+        assert_eq!(t.names(), ["highway".to_string(), "fclass".to_string()], "no rename");
+        // a keyword that names a column the roads do not have: an error with the nearest names (before: silently not used)
+        let e = roles_of(&t, &cols(json!({"highway_col": "fclas"}))).unwrap_err();
+        assert!(matches!(&e, Error::Model(roadstyle_model::Error::MissingColumn { column, nearest, .. }) if column == "fclas" && nearest[0] == "fclass"), "{e}");
     }
 }

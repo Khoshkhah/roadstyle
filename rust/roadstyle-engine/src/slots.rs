@@ -9,7 +9,7 @@
 use roadstyle_model::mark::Mark;
 use crate::road::Roads;
 use crate::roads::truthy;
-use roadstyle_model::Cell;
+use roadstyle_model::{Cell, Role};
 use crate::simple::{Line, Pt, KY};
 use indexmap::IndexMap;
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
@@ -183,7 +183,7 @@ struct Rep {
 
 /// The "slots" source.
 pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
-    let hw_of = |i: usize| roads.get(i, "highway");
+    let hw_of = |i: usize| roads.role(i, Role::Class);
     // every road's line: what a name or an arrow keeps away from (the Topology's R-tree); the nodes of the road ends
     let topo = roads.topo();
     let node = |i: usize, k: usize| -> (Node, (f64, f64)) {
@@ -282,7 +282,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
         // the group's class: the most common (the first of equal counts)
         let mut count: IndexMap<String, (usize, Value)> = IndexMap::new();
         for e in &edges {
-            let v = roads.get(e.p, "highway").map_or(Value::Null, Cell::to_value);
+            let v = roads.role(e.p, Role::Class).map_or(Value::Null, Cell::to_value);
             count.entry(v.to_string()).or_insert((0, v)).0 += 1;
         }
         let mut hw = Value::Null;

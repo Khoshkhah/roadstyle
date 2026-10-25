@@ -207,6 +207,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   below 2^53 while the table is below 2^21 (`RoadKey::TABLES`; a larger table is `Error::Key`). The engine writes the keys of the
   roads (`__rs_edge`, `__rs_edge2`, the decks' `__rs_edges`, the slots) through it and reads a row back from a key. A build has one
   table (0), so a key is its road's row and the output does not change.
+- **The column keywords are roles, not renames** (Rust only; docs/design/target_architecture.md, (b) item 2, audit R6 part 3):
+  `highway_col`, `bridge_col`, `edge_id_col` and the other 12 resolve one time to column indexes (`roadstyle_model::Roles`). The stages
+  read a role's cell by its index and the road layers write the table's own name in their expressions, so the engine renames no column
+  in or out (`ColumnMap`, its `__rs_kept_*` columns in between and the output name maps are gone). **A keyword that names a column the
+  roads do not have is an error** (`roadstyle_model::Error::MissingColumn`, with the nearest column names, for example `highway_col: the
+  roads have no column fclas (the nearest: fclass, class)`); before, the keyword was not used, and the engine read the column of the
+  contract name (`highway`) when the roads had one. The outputs do not change (the goldens are equal).
 - **One fixture, three languages, one hash** (docs/design/target_architecture.md, (i) item 6): the wasm package in Node
   (`rust/roadstyle-wasm/cross_language.mjs`) gives Monaco's style and road table with the size and hash of the native golden
   (`monaco/rust_style.json`), as the Python binding does (`tests/test_binding.py`). CI runs it in the Rust job on the dist build that

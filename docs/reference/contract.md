@@ -164,8 +164,8 @@ when a layer reads it.
 | `__rs_bridge`, `__rs_tunnel`, `__rs_access`, `__rs_lvl` | the bridge look, the tunnel look, the access kind, the tag level of an attached item | `_mark_lvl`, `access_col`, `_edge_overlay` | engine, `filter.js` (`__rs_access`, `__rs_lvl`) | dashboard (`__rs_access`, `__rs_lvl`) | `RoadDraw.structure`, `RoadDraw.look.access` |
 | `__rs_ci` | the class index of every feature of `simple` (R8): its class's place in the profile's class list, else the list's length; the road layer reads its width and offset tables with `["at", ["get", "__rs_ci"], ["literal", [...]]]` | `layers::class_index`, `simple.rs`, `_class_index` | the layers | engine | |
 | `__rs_cls` | the class column of the edge on every piece, name and arrow (for the class filter) | `_mark_cls`, `roads.rs`, `slots.rs` | `filter.js` | dashboard | the edge label: the dashboard reads the class through the edge |
-| `__rs_kept_` (the prefix of `__rs_kept_<column>`) | a data column that has the engine's name of another keyword's column (a column `highway` when `highway_col` names another one), kept under this name in between | the column map (`lib.rs`, `ColumnMap`) | the engine | internal | |
-| `__rs_edge`, `__rs_edge2`, `__rs_edges` | the edge label: the edge's row, the twin's row, the rows of a shadow or a deck | every generator | `core.js`, `filter.js`, `select.js`, `arrows.js`, the level editor | dashboard | the edge label of each piece (render model) |
+| `__rs_kept_` (the prefix of `__rs_kept_<column>`) | the output name of an input column with one of the four level names (casing_start, casing_level, casing_end, fill_level) when the engine computes the levels: the computed ones take the four names | `road.rs` (`Roads::new`, `kept`) | the outputs | internal | |
+| `__rs_edge`, `__rs_edge2`, `__rs_edges` | the edge label: the road's key (`RoadKey`, `table << 32 \| row`; the row for one table), the twin's key, the keys of a shadow or a deck | every generator | `core.js`, `filter.js`, `select.js`, `arrows.js`, the level editor | dashboard | the edge label of each piece (render model) |
 | `__rs_k`, `__rs_s` | the kind of piece (0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item) and its sort key | `_simple_pieces`, `simple.rs` | engine, `core.js`, `svspot.js` (`__rs_k`) | dashboard (`__rs_k`) | `DrawKey` |
 | `__rs_main`, `__rs_seam`, `__rs_lap`, `__rs_stub`, `__rs_nocase` | the main casing piece, a seam, a lap, an end stub, an end cap with no casing ring | `_casing_parts`, `simple.rs`, `_twin_ends` | engine | internal | the piece generators |
 | `__rs_wm`, `__rs_cm`, `__rs_twm` | the width, the casing and the pair width in metres (over cos of the latitude) | `_mark_width_m` | engine | internal | `RoadDraw.look.width_m` |
@@ -212,8 +212,10 @@ The positions of a road (its casing numbers at the start, in the middle and at t
 3. else the solver (`compute_levels(method="solve")` with its defaults).
 
 The browser's keyword `levels` (`"tags"` or `"solve"`, Rust engine) computes them whatever the input has. Then an input column with one
-of the four names is kept aside as `__rs_kept_<name>`, and a warning names it. Computed positions are not written into the caller's
-table: the roads source and the road table give them under the four names, after the road's own columns, as before (2026-10-25).
+of the four names goes to the outputs as `__rs_kept_<name>`, and a warning names it. Computed positions are not written into the
+caller's table: the roads source and the road table give them under the four names, after the road's own columns, as before (2026-10-25).
+The table is not renamed: the column keywords (`highway_col`, `bridge_col`, ...) resolve one time to the roles of the columns
+(`roadstyle_model::Roles`), and a keyword that names a column the roads do not have is an error that gives the nearest column names.
 
 ## The page's placeholders
 

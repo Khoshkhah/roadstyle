@@ -61,11 +61,10 @@ const KEYWORDS: [&str; 15] = ["highway_col", "edge_id_col", "tunnel_col", "bridg
                               "casing_end_col", "fill_level_col", "head_start_m_col", "head_end_m_col", "cap_start_col", "cap_end_col",
                               "directed_col", "driving_col"];
 
-/// The roles of one road table: for each role, its column's index and name in the table (None: the table has no column for it).
+/// The roles of one road table: for each role, its column's index in the table (None: the table has no column for it).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Roles {
-    cols: [Option<usize>; 15],
-    names: [Option<String>; 15],
+    cols: [Option<u32>; 15],
 }
 
 impl Roles {
@@ -77,7 +76,7 @@ impl Roles {
             let named = given.iter().find(|(g, _)| *g == role).and_then(|(_, n)| *n).filter(|n| !n.is_empty());
             let name = named.unwrap_or(role.name());
             match table.col(name) {
-                Some(i) => (r.cols[role as usize], r.names[role as usize]) = (Some(i), Some(name.to_string())),
+                Some(i) => r.cols[role as usize] = Some(i as u32),
                 None if named.is_some_and(|n| n != role.name()) => {
                     return Err(Error::MissingColumn { keyword: role.keyword().into(), column: name.into(), nearest: nearest(name, table.names()) });
                 }
@@ -89,12 +88,12 @@ impl Roles {
 
     /// The index of the role's column.
     pub fn col(&self, role: Role) -> Option<usize> {
-        self.cols[role as usize]
+        self.cols[role as usize].map(|c| c as usize)
     }
 
     /// The table's own name of the role's column (the name that an expression gets).
-    pub fn name(&self, role: Role) -> Option<&str> {
-        self.names[role as usize].as_deref()
+    pub fn name<'a>(&self, table: &'a RoadTable, role: Role) -> Option<&'a str> {
+        self.col(role).map(|c| table.names()[c].as_str())
     }
 
     /// The role's cell of the road `row` (None: the table has no column for the role).
@@ -144,9 +143,9 @@ mod tests {
     fn a_role_is_its_keywords_column_else_its_contract_name() {
         let t = table(&["fclass", "highway", "bridge", "edge"]);
         let r = Roles::resolve(&t, &[(Role::Class, Some("fclass")), (Role::EdgeId, Some("edge")), (Role::Tunnel, Some(""))]).unwrap();
-        assert_eq!((r.col(Role::Class), r.name(Role::Class)), (Some(0), Some("fclass")), "the keyword's column, not the one named highway");
-        assert_eq!((r.col(Role::Bridge), r.name(Role::Bridge)), (Some(2), Some("bridge")), "no keyword: the contract name");
-        assert_eq!(r.name(Role::EdgeId), Some("edge"));
+        assert_eq!((r.col(Role::Class), r.name(&t, Role::Class)), (Some(0), Some("fclass")), "the keyword's column, not the one named highway");
+        assert_eq!((r.col(Role::Bridge), r.name(&t, Role::Bridge)), (Some(2), Some("bridge")), "no keyword: the contract name");
+        assert_eq!(r.name(&t, Role::EdgeId), Some("edge"));
         assert_eq!(r.col(Role::Tunnel), None, "no column: no role (\"\" is no keyword)");
         assert_eq!(r.cell(&t, Role::Class, 0), Some(Cell::Str("x")));
         // a keyword with the contract name: the role is optional, as with no keyword
