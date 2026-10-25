@@ -71,7 +71,7 @@ Each arrow points from a crate to the crate that uses it:
 flowchart TB
     roadstyle_assets["roadstyle-assets<br/>62 lines"]
     roadstyle_model["roadstyle-model<br/>1,477 lines"]
-    roadstyle_look["roadstyle-look<br/>2,426 lines"]
+    roadstyle_look["roadstyle-look<br/>2,953 lines"]
     roadstyle_io["roadstyle-io<br/>1,516 lines"]
     roadstyle_levels["roadstyle-levels<br/>2,666 lines"]
     roadstyle_engine["roadstyle-engine<br/>6,306 lines"]
@@ -119,7 +119,7 @@ step) takes this crate alone.
 |---|---|---|---|
 | [`roadstyle-assets`](#roadstyle-assets) | roadstyle's files: the look's YAML and palettes, the base map's files, the dashboard's JS and CSS, the page templates and MapLibre, by name | 62 | (none) |
 | [`roadstyle-model`](#roadstyle-model) | roadstyle's road model: the roads as features with typed properties, and the geometry helpers | 1,477 | `roadstyle-assets`, `roadstyle-levels`, arrow-array, arrow-schema, rstar, serde, serde_json |
-| [`roadstyle-look`](#roadstyle-look) | roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with | 2,426 | `roadstyle-assets`, base64, crc32fast, flate2, serde, serde_json, strsim, yaml-rust2 |
+| [`roadstyle-look`](#roadstyle-look) | roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with | 2,953 | `roadstyle-assets`, base64, crc32fast, flate2, indexmap, schemars, serde, serde_json, strsim, yaml-rust2 |
 | [`roadstyle-io`](#roadstyle-io) | roadstyle's readers: the roads and other tables from GeoParquet, GeoJSON, Shapefile and (feature gpkg) GeoPackage | 1,516 | `roadstyle-levels`, `roadstyle-model`, arrow-array, arrow-schema, arrow-select, bytes, crs-definitions, i_overlay, parquet, proj4rs, proj4wkt, rusqlite, serde_json, shapefile |
 | [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (a leaf crate: the road flags are its own module) | 2,666 | rstar, sha2 |
 | [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 6,306 | `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, indexmap, rstar, serde_json |
@@ -133,7 +133,7 @@ step) takes this crate alone.
 | [`roadstyle-serve`](#roadstyle-serve) | roadstyle serve: the level editor's page files and an area folder on 127.0.0.1 (the program and the Python binding call it) | 280 | `roadstyle-assets`, httparse |
 | [`roadstyle-snapshot`](#roadstyle-snapshot) | PNG pictures of saved roadstyle pages: Chromium over CDP draws the page, as roadstyle's Python snapshot does | 180 | anyhow, headless_chrome, serde_json |
 
-All crates: 20,045 lines of Rust in `rust/*/src/`.
+All crates: 20,572 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -146,7 +146,7 @@ The roads go in as Arrow batches (the geometry as WKB in EPSG:4326). Python give
 `__arrow_c_stream__`; the binding reads it through the Arrow C stream interface), and bytes are a `TypeError`. The CLI and the browser
 give the bytes of a GeoParquet file. The look goes in as a typed `Look`
 (`roadstyle-look`): the palette, the profile, the settings and the keywords of `render_edges`, merged one time by `Look::resolve`, or a
-saved look read by `Look::from_json` (version 1, or version 0: the `look.json` of 0.25.0). The style comes out as JSON
+saved look read by `Look::from_json` (version 2, 1, or 0: the `look.json` of 0.25.0). The style comes out as JSON
 text, with the metadata for the dashboard. Errors are text: `Result<_, String>` in Rust, a thrown `Error` in JavaScript, a
 `ValueError` in Python.
 
@@ -180,18 +180,19 @@ Library, in `rust/roadstyle-model/`. Public API: `feature_table`, `flags`, `geom
 
 #### `roadstyle-look` { #roadstyle-look }
 
-Library, in `rust/roadstyle-look/`. Public API: `basemap`, `color`, `options`, `widths`, `VERSION`, `LookData`, `Look`, `RoadLook`, `SlotLook`, `DeckLook`, `Error`, `MapOptions`, `Ramp`, `make_look`, `theme`, `Options`, `py_round`, `RoadModel`, `png_pixels`.
+Library, in `rust/roadstyle-look/`. Public API: `basemap`, `color`, `options`, `sections`, `widths`, `VERSION`, `LookData`, `Look`, `RoadLook`, `SlotLook`, `DeckLook`, `Error`, `MapOptions`, `LookFile`, `Sections`, `Ramp`, `make_look`, `theme`, `Options`, `py_round`, `RoadModel`, `png_pixels`.
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 261 | roadstyle's look: the one typed, versioned value that the engine draws a map with | `_settings.py` |
+| `lib` | 297 | roadstyle's look: the one typed, versioned value that the engine draws a map with | `_settings.py` |
 | `basemap` | 380 | The base map's half of the look (mapstyle's styles, merged into roadstyle on 2026-10-23): a duckOSM map's travel mode, its theme and its path style give the roads' palette and settings (mapstyle's `mode_settings`) and the base map's part of the look (`features`: the layers of layers.yaml, the 3D heights, the base map's style in the theme's colours and its images) | `style.py` |
-| `color` | 105 | The look's colours (review D4): one reader for every colour of the look, and the mixes |  |
+| `color` | 128 | The look's colours (review D4): one reader for every colour of the look, and the mixes |  |
 | `error` | 38 | The errors of the look: one kind for each cause, each with the text that the bindings show (the same text as before the type) |  |
 | `options` | 735 | The map options: what a caller chooses for one map, the keys that change the output of stage 1 (the style, its sources, the road table) |  |
 | `png` | 96 | The PNG images of the look: a texture's mask (8-bit grey) read, and a texture in its colour (8-bit RGBA) written |  |
 | `ramp` | 118 | The colour ramps of data colours (render_edges' cmap): branca's LinearColormap, as roadstyle's colors.py ColorRamp makes it | `colors.py` |
-| `resolve` | 510 | The resolution of the look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as Python makes it | `_settings.py`, `style.py` |
+| `resolve` | 516 | The resolution of the look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as Python makes it | `_settings.py`, `style.py` |
+| `sections` | 462 | The typed look: one struct for each section of the resolved look, in place of the JSON values `theme` and `config` (StyleConfig's flat view, most of whose keys were a copy of a theme section) and of the resolution's tables (`styles`, `slots`, `roads_model`, the arrow image, the road popup, the base map's part) |  |
 | `widths` | 183 | The road width model (render_web's _load_road_model: the look's "roads_model" and the theme's roads): the width of each class by zoom, its draw order and its two-way split | `render_web.py` |
 
 #### `roadstyle-io` { #roadstyle-io }
@@ -524,9 +525,9 @@ saved page still works offline.*
 
 | Call | Its doc comment |
 |---|---|
-| `Look` | A resolved look (roadstyle-look), parsed one time: `resolveLook(options)` makes it, `Look.fromJson(text)` reads a saved look (version 1, or version 0: today's look.json), `toJson()` gives its text (version 1). The calls below take it, not its text. |
-| `fromJson` | Look.fromJson(text): a saved look (version 1 or 0). An error is a thrown Error. |
-| `toJson` | toJson(): the look's text (version 1). |
+| `Look` | A resolved look (roadstyle-look), parsed one time: `resolveLook(options)` makes it, `Look.fromJson(text)` reads a saved look (version 2, 1, or 0: the look.json of 0.25.0), `toJson()` gives its text (version 2). The calls below take it, not its text. |
+| `fromJson` | Look.fromJson(text): a saved look (version 2, 1 or 0). An error is a thrown Error. |
+| `toJson` | toJson(): the look's text (version 2). |
 | `resolveLook` | resolveLook(options: string) -> Look: the look of render_edges' palette, profile and settings; options: {"palette", "profile", "settings", "args", "features", "files"} as JSON text. An error is a thrown Error. |
 | `rampStops` | rampStops(cmap: string, n: number) -> string[]: `n` colours ("#rrggbb") at even steps along a ramp (render_edges' cmap: a branca scheme or a matplotlib colormap name, or the JSON text of a list of colours), from the first colour to the last (at least 2), as roadstyle's ColorRamp.stops: for example a colour for each category of a column. An error is a thrown Error. |
 | `makeStyle` | makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error. |

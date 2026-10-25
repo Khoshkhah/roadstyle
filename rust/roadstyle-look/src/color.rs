@@ -33,33 +33,55 @@ pub fn hex(c: [u8; 3]) -> String {
 /// A colour of the options or the look: the channels of "#rrggbb", "#rgb" or a CSS colour name (written "#rrggbb"), or a colour that
 /// MapLibre reads and this type does not (`rgb(...)`, `rgba(...)`, `hsl(...)`, `hsla(...)`), kept as its text so that no value is lost.
 /// Any other text is an error that names it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Color {
-    Rgb([u8; 3]),
-    Text(String),
+/// It keeps its text as given (a look of version 1 that goes to version 2 and back gives the same text); two colours with channels are
+/// the same when their channels are.
+#[derive(Clone, Debug)]
+pub struct Color {
+    text: String,
+    rgb: Option<[u8; 3]>,
 }
 
 impl Color {
     /// The colour of a text, or an error that names it.
     pub fn parse(c: &str) -> Result<Color, Error> {
         if ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|f| c.trim_start().to_lowercase().starts_with(f)) {
-            return Ok(Color::Text(c.to_string()));
+            return Ok(Color { text: c.to_string(), rgb: None });
         }
-        parse(c).map(Color::Rgb)
+        Ok(Color { text: c.to_string(), rgb: Some(parse(c)?) })
     }
 
-    /// The colour as MapLibre reads it: "#rrggbb", or the text as given.
-    pub fn css(&self) -> String {
-        match self {
-            Color::Rgb(c) => hex(*c),
-            Color::Text(t) => t.clone(),
+    /// The colour as MapLibre reads it: the text as given.
+    pub fn css(&self) -> &str {
+        &self.text
+    }
+
+    /// The channels; none for a MapLibre colour text (`rgba(...)`).
+    pub fn rgb(&self) -> Option<[u8; 3]> {
+        self.rgb
+    }
+}
+
+impl PartialEq for Color {
+    fn eq(&self, o: &Color) -> bool {
+        match (self.rgb, o.rgb) {
+            (Some(a), Some(b)) => a == b,
+            _ => self.text == o.text,
         }
     }
 }
 
 impl serde::Serialize for Color {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.css())
+        s.serialize_str(&self.text)
+    }
+}
+
+impl schemars::JsonSchema for Color {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Color".into()
+    }
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({"type": "string", "description": "\"#rrggbb\", \"#rgb\", a CSS colour name, or rgb(...), rgba(...), hsl(...), hsla(...)"})
     }
 }
 
@@ -96,10 +118,11 @@ mod tests {
 
     #[test]
     fn a_colour_value() {
-        assert_eq!(serde_json::from_str::<Color>("\"Red\"").unwrap(), Color::Rgb([255, 0, 0]));
-        assert_eq!(serde_json::to_string(&Color::parse("#abc").unwrap()).unwrap(), "\"#aabbcc\"");
+        assert_eq!(serde_json::from_str::<Color>("\"Red\"").unwrap().rgb(), Some([255, 0, 0]));
+        assert_eq!(serde_json::to_string(&Color::parse("#abc").unwrap()).unwrap(), "\"#abc\"", "the text as given");
+        assert_eq!(Color::parse("#abc").unwrap(), Color::parse("#AABBCC").unwrap(), "the same channels");
         let t = Color::parse("rgba(0, 0, 0, 0.5)").unwrap();
-        assert_eq!((t.css(), serde_json::to_string(&t).unwrap()), ("rgba(0, 0, 0, 0.5)".into(), "\"rgba(0, 0, 0, 0.5)\"".into()));
+        assert_eq!((t.css(), t.rgb(), serde_json::to_string(&t).unwrap()), ("rgba(0, 0, 0, 0.5)", None, "\"rgba(0, 0, 0, 0.5)\"".into()));
         assert!(serde_json::from_str::<Color>("\"#zzz\"").unwrap_err().to_string().starts_with("\"#zzz\" is not a colour"));
     }
 }

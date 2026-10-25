@@ -318,6 +318,12 @@ fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, 
     Ok(cfg)
 }
 
+/// The config view of a theme and of the config keys that are not in the theme (`extra`: camera, tiles, annotations, basemap, api_key,
+/// api_keys), as the resolution makes it (`style_config`, then `config`): a look of version 2's view.
+pub(crate) fn config_of(theme: &Value, extra: Map<String, Value>) -> Result<Value, Error> {
+    Ok(config(&style_config(theme, &[json!({"config": extra})])?))
+}
+
 /// dataclasses.asdict(StyleConfig(...)): the fields in order, each from the settings, else its default (api_key, api_keys); the set
 /// minor_no_casing as a sorted list (as the look is written).
 fn config(cfg: &Map<String, Value>) -> Value {
@@ -493,7 +499,7 @@ pub(crate) fn resolve(options: &Options) -> Result<LookData, Error> {
     let png = base64::engine::general_purpose::STANDARD.encode(SPRITE);
     let oneway = json!({"url": format!("data:image/png;base64,{png}"), "sdf": true, "pixelRatio": path(&th, "arrows.icon.pixel_ratio")?});
     Ok(LookData {
-        schema_version: crate::VERSION,
+        schema_version: 1,
         palette: palette.into(),
         settings,
         args,

@@ -7,6 +7,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The typed look, version 2 (T3 step 2, audit R16).** A look is now one struct for each section (`roadstyle_look::sections`: roads,
+  casing, labels, arrows, bridges, tunnels, selection, data, overlays, boundary, background, access, camera, tiles, page, palettes,
+  active, interaction, base_map), in place of the JSON values `theme` and `config` (StyleConfig's flat view) and the resolution's
+  tables. `Look::to_json` writes version 2 (`LookFile`); `Look::from_json` reads versions 2, 1 and 0. The readers that have not moved
+  read the JSON views of version 1 (`Look::views_value`), which are the same, byte for byte, for every golden look: a number keeps its
+  written form (`Num`) and a colour its text (`Color`). A bad colour or an unknown key of a section is an error that names it.
+  `rust/roadstyle-look/look.schema.json` is the JSON Schema of version 2, made from the types (a test fails when it differs).
+  **A host that reads the JSON of a look** (`json()` in Python, `toJson()` in JavaScript) gets version 2: its parts are now the
+  sections (`part("theme")`, `part("config")` still give the views).
 - **`roadstyle_look::MapOptions`, the typed map options (T3 step 1, audit N32).** The keys that change the output of stage 1, in groups
   (`columns`, `levels`, `color`, `width`, `roads`, `interaction`, `labels`, `arrows`, `tunnels`, `bridges`, `overlays`, `items`,
   `boundary`, `base_map`, `output`; docs/design/t3_map_options_and_look.md). `MapOptions::from_json` reads the nested form: an unknown

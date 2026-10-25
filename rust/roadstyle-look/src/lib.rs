@@ -1,6 +1,7 @@
 //! roadstyle's look (docs/design/rust_library.md, "The config: the look"): the one typed, versioned value that the engine draws a map
 //! with. `Look::resolve` makes it from render_edges' palette, profile, settings and keywords (`resolve.rs`, the port of `_settings.py`);
-//! `Look::from_json` reads a saved look, of version 1 or of version 0 (today's `look.json`, with no `schema_version`). The look is parsed
+//! `Look::from_json` reads a saved look of version 2 (the typed sections, `sections.rs`), 1 or 0 (0.25.0's `look.json`, with no
+//! `schema_version`), and `Look::to_json` writes version 2. The look is parsed
 //! one time: the typed parts that the stages read (`model`, `road`, `slot`, `deck`) are made when the look is made, not in each stage.
 //!
 //! The look does not know the roads (rule 2 of the layers): the engine combines the two.
@@ -9,6 +10,7 @@ pub mod basemap;
 pub mod color;
 mod error;
 pub mod options;
+pub mod sections;
 mod png;
 mod ramp;
 mod resolve;
@@ -16,6 +18,7 @@ pub mod widths;
 
 pub use error::Error;
 pub use options::MapOptions;
+pub use sections::{LookFile, Sections};
 pub use ramp::Ramp;
 pub use resolve::{make_look, theme, Options};
 pub use widths::{py_round, RoadModel};
@@ -27,14 +30,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
 
-/// The version of the look that this crate writes. It reads this version and the one before it (0: today's `look.json`).
-pub const VERSION: u32 = 1;
+/// The version of the look that this crate writes. It reads this version, 1 and 0 (0.25.0's `look.json`; until the frozen hosts move, T6).
+pub const VERSION: u32 = 2;
 
-/// The look as it is written (`look.json`): the resolved theme and settings, the class styles, the road tables and the map options.
+/// The look's JSON views of version 1 (as a look of version 1 or 0 is written): the resolved theme and settings, the class styles, the
+/// road tables and the map options. The readers that have not moved to the typed sections read these.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LookData {
-    /// 1 for this version; a look of version 0 has none
+    /// 1 (the views are version 1's form); a look of version 0 has none
     #[serde(default)]
     pub schema_version: u32,
     /// the palette's name (render_edges' palette)
@@ -68,6 +72,8 @@ pub struct LookData {
 #[derive(Clone, Debug)]
 pub struct Look {
     data: LookData,
+    /// the typed sections (version 2)
+    pub sections: Sections,
     /// the road width model (widths by zoom, draw order, the two-way split)
     pub model: RoadModel,
     /// the values of the roads' stages (the class styles, the twins, the access colours)
@@ -95,35 +101,65 @@ impl Look {
         Look::new(resolve::resolve(o)?)
     }
 
-    /// A look from its data: the typed parts are made here. A version past `VERSION` is an error.
+    /// A look from its views of version 1 (a look of version 1 or 0, or the resolution's): the sections and the typed parts are made
+    /// here. A version past 1 is an error.
     pub fn new(mut data: LookData) -> Result<Look, Error> {
-        if data.schema_version > VERSION {
+        if data.schema_version > 1 {
             return Err(Error::Version { found: data.schema_version });
         }
-        data.schema_version = VERSION;
+        data.schema_version = 1;
+        let sections = sections::from_views(&data)?;
+        Look::with(data, sections)
+    }
+
+    fn with(data: LookData, sections: Sections) -> Result<Look, Error> {
         let (map, other_args) = MapOptions::from_args(&data.args)?;
         Ok(Look { model: RoadModel::new(&data.roads_model, &data.theme["roads"], &data.args)?, road: RoadLook::new(&data)?,
-                  slot: SlotLook::new(&data)?, deck: DeckLook::new(&data.config["bridge_decks"]), map, other_args, data })
+                  slot: SlotLook::new(&data)?, deck: DeckLook::new(&data.config["bridge_decks"]), map, other_args, sections, data })
     }
 
-    /// A saved look (its JSON text), of version 1 or 0.
+    /// A saved look (its JSON text), of version 2, 1 or 0.
     pub fn from_json(text: &str) -> Result<Look, Error> {
-        Look::new(serde_json::from_str(text).map_err(|e| Error::Look(format!("look: {e}")))?)
+        Look::from_value(serde_json::from_str(text).map_err(|e| Error::Look(format!("look: {e}")))?)
     }
 
-    /// A look from its JSON value, of version 1 or 0.
+    /// A look from its JSON value, of version 2, 1 or 0.
     pub fn from_value(v: Value) -> Result<Look, Error> {
-        Look::new(serde_json::from_value(v).map_err(|e| Error::Look(format!("look: {e}")))?)
+        match v.get("schema_version").and_then(Value::as_u64).unwrap_or(0) {
+            n if n > VERSION as u64 => Err(Error::Version { found: n as u32 }),
+            2 => {
+                let keys: Vec<String> = v.as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default();
+                let f: LookFile = serde_json::from_value(v).map_err(|e| Error::Look(format!("look: {e}")))?;
+                // serde's deny_unknown_fields does not go with flatten: the keys of the file are checked here
+                let known = serde_json::to_value(&f).expect("a look is JSON");
+                if let Some(k) = keys.iter().find(|k| known.get(k.as_str()).is_none() && k.as_str() != "base_map") {
+                    let names = known.as_object().into_iter().flatten().map(|(n, _)| n.as_str());
+                    return Err(Error::Look(format!("look: unknown field `{k}`{}", options::nearest(k, names))));
+                }
+                Look::with(sections::views(&f)?, f.sections)
+            }
+            _ => Look::new(serde_json::from_value(v).map_err(|e| Error::Look(format!("look: {e}")))?),
+        }
     }
 
-    /// The look as it is written: version 1.
+    /// The look as it is written: version 2.
     pub fn to_json(&self) -> String {
-        serde_json::to_string(&self.data).expect("a look is JSON")
+        serde_json::to_string(&self.file()).expect("a look is JSON")
     }
 
-    /// The look as a JSON value: version 1.
+    /// The look as a JSON value: version 2.
     pub fn to_value(&self) -> Value {
+        serde_json::to_value(self.file()).expect("a look is JSON")
+    }
+
+    /// The look's JSON views of version 1, as a JSON value (as a look of version 1 was written).
+    pub fn views_value(&self) -> Value {
         serde_json::to_value(&self.data).expect("a look is JSON")
+    }
+
+    fn file(&self) -> LookFile {
+        LookFile { schema_version: VERSION, palette: self.data.palette.clone(), settings: self.data.settings.clone(), args: self.data.args.clone(),
+                   sections: self.sections.clone() }
     }
 
     /// The data, to change it: give it to `Look::new` again (for example a map option that the caller adds after the resolution).
