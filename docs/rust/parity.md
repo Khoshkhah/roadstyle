@@ -23,10 +23,10 @@ Two kinds of golden check the Rust engine:
   with their hash; and the hash of the whole output. The goldens are a few KB each, in git. `ROADSTYLE_BLESS=1 cargo test` writes
   them again after a change that you decided, and a test that fails names the part that changed. `areas.rs` has the style and the
   tiles of Monaco, the Södermalm sample and Tartu (64,828 roads, with `--ignored`); `cases.rs` has the engine's cases on a part of
-  Monaco.
+  Monaco, and `colors.rs` the data-driven colour cases on it.
 - **Python's goldens** (`rust/roadstyle-rs/tests/make_goldens.py`), for what is still checked against Python: the levels (the tags
-  rule and the solve), the data-driven colour cases (`colors.rs`) and the looks of each profile and palette (`look.rs`). The last
-  check of the style and the tiles against Python was audit 3's N27 (2026-10-24).
+  rule and the solve) and the looks of each profile and palette (`look.rs`). The last check of the style, the tiles and the colour
+  cases against Python was 2026-10-24 (audit 3's N27).
 
 Tartu's inputs are on the GitHub pre-release `rust-test-data`; `get_goldens.sh` gets them and checks their SHA-256.
 
