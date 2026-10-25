@@ -30,6 +30,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The wasm module grows its memory by a quarter step** (`roadstyle-wasm`): when it grows, it takes a quarter of its size ahead (16 to
+  64 MB), not its whole size (16 to 256 MB). Monaco: 110 MiB to 68 MiB after the map's two stages; Tartu: 221 MiB to 197 MiB, and 340 MiB
+  to 138 MiB after the first style in Chromium, which is not slower (Tartu 1.7 s to 1.4 s). `liveBytes()` gives the bytes held and their
+  peak, and `growSteps()` the growth steps, beside `memoryBytes()`. **To check:** Edge's first-style time on Windows with the quarter step
+  (the step ahead was made for Edge's slow memory growth); this was not measured.
 - **An input column `casing_level` or `fill_level` is the level input** (both engines). With no level keyword, the engine reads the
   input's `casing_level`, `fill_level`, `casing_start` and `casing_end` (duckOSM's stored levels) and does not solve. Before, it solved and
   wrote over them. The browser's `levels: "tags"` or `"solve"` (Rust engine) still computes them; an input column with one of these names

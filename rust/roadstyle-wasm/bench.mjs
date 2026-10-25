@@ -31,5 +31,6 @@ const tiler = rs.tileSources(sources, "", []);
 const afterTiles = rs.memoryBytes();
 const [live2, peak2] = rs.liveBytes();
 console.log(`  tileSources   ${(performance.now() - t).toFixed(0)} ms, memory ${mb(afterTiles)} MiB, live ${mb(live2)} MiB (peak ${mb(peak2)} MiB)`);
+console.log(`  growth steps: ${rs.growSteps()}`);
 console.log(`  per road: ${((afterTiles - start) / n / 1024).toFixed(1)} KiB (the memory after both calls, less the module's start)`);
 tiler.free?.();

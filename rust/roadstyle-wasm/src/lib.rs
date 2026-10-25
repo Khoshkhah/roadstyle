@@ -1,9 +1,11 @@
 //! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through
 //! wasm-bindgen, and the allocator that grows the memory in large steps. Natively the crate is empty.
 
-/// The allocator in the browser: the standard one (dlmalloc), but when it grows the memory, the memory grows once more by its size (16 to
-/// 256 MB) in one step, and the allocator keeps that block free for the next allocations. dlmalloc alone grows the memory 64 KB at a time,
-/// thousands of steps for Monaco, and in Edge on Windows each step is slow: the first style took 14 to 21 s there, 3 s with the memory grown first.
+/// The allocator in the browser: the standard one (dlmalloc), but when it grows the memory, the memory grows once more by a quarter of its
+/// size (16 to 64 MB) in one step, and the allocator keeps that block free for the next allocations. dlmalloc alone grows the memory 64 KB
+/// at a time, thousands of steps for Monaco, and in Edge on Windows each step is slow: the first style took 14 to 21 s there, 3 s with the
+/// memory grown first. The step was the whole size (16 to 256 MB) until 2026-10-25; the quarter keeps the memory near what is held (Monaco
+/// 110 to 68 MiB, Tartu 221 to 197 MiB) with few steps. Edge's first-style time on Windows must be checked again with the quarter step.
 #[cfg(target_arch = "wasm32")]
 mod grow {
     use core::arch::wasm32::memory_size;
@@ -11,6 +13,8 @@ mod grow {
     use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 
     static PAGES: AtomicUsize = AtomicUsize::new(0); // the memory's size (64 KB pages) after the last step ahead
+    /// the times that the memory grew (dlmalloc's own steps and the steps ahead)
+    pub static STEPS: AtomicUsize = AtomicUsize::new(0);
     /// the bytes that the program holds now, and their most since `peak_reset` (the memory's size grows in steps ahead, so it does not
     /// show these: parity.md, "The drawing values of a road")
     pub static LIVE: AtomicUsize = AtomicUsize::new(0);
@@ -24,12 +28,16 @@ mod grow {
     fn ahead() {
         let now = memory_size(0);
         if now != PAGES.load(Relaxed) {
-            let l = Layout::from_size_align((now << 16).clamp(16 << 20, 256 << 20), 16).unwrap();
+            STEPS.fetch_add(1, Relaxed);
+            let l = Layout::from_size_align(((now << 16) / 4).clamp(16 << 20, 64 << 20), 16).unwrap();
             unsafe {
                 let p = System.alloc(l); // null when the memory cannot grow: then nothing is taken ahead
                 if !p.is_null() {
                     System.dealloc(p, l);
                 }
+            }
+            if memory_size(0) != now {
+                STEPS.fetch_add(1, Relaxed);
             }
             PAGES.store(memory_size(0), Relaxed);
         }
@@ -532,6 +540,12 @@ mod wasm {
     pub fn live_bytes() -> Vec<f64> {
         use std::sync::atomic::Ordering::Relaxed;
         vec![crate::grow::LIVE.load(Relaxed) as f64, crate::grow::PEAK.load(Relaxed) as f64]
+    }
+
+    /// The times that the memory grew since the module started (dlmalloc's own steps and the allocator's steps ahead).
+    #[wasm_bindgen(js_name = growSteps)]
+    pub fn grow_steps() -> usize {
+        crate::grow::STEPS.load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// The peak of `liveBytes` starts again from the bytes held now.

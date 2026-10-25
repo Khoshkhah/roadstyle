@@ -118,7 +118,8 @@ machine: 288 bytes before the tight types (2026-10-25), 80 bytes after. On Tartu
 --bench`) gives 26 MB in use after the marks of the roads, not 39 MB, and each later peak is 13 MB lower. Two numbers of the wasm module must not be mixed up. `bench.mjs` gives both:
 
 - **the memory size** (`memoryBytes`): the linear memory, which never gets smaller. The allocator (`roadstyle-wasm` lib.rs `grow`) grows
-  it ahead in large steps (by its size, 16 to 256 MB), so the size moves in steps of many MB and is about twice the live bytes;
+  it ahead in steps (a quarter of its size, 16 to 64 MB; the whole size, 16 to 256 MB, before 2026-10-25), so the size moves in steps
+  of many MB and is more than the live bytes;
 - **the live bytes** (`liveBytes`: now and the peak): what the program holds.
 
 | Tartu, wasm in Node | memory size | live peak in makeSources | live peak in tileSources |
@@ -127,8 +128,18 @@ machine: 288 bytes before the tight types (2026-10-25), 80 bytes after. On Tartu
 | after (bf409d5) | 221 MiB | 59 MiB | 111 MiB |
 
 The live bytes fall by 11 to 12 MiB. The memory size went up by one growth step, which lands at another point; it shows nothing about the
-data. With a step of a quarter of the size (16 to 64 MB), the memory size is 197 MiB on Tartu and 68 MiB on Monaco (110 MiB now), in the
-same time. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
+data.
+
+The step ahead (2026-10-25): a quarter of the size (16 to 64 MB) in place of the whole size (16 to 256 MB). `bench.mjs` (Node) and the
+first style in headless Chromium (`makeStyle` with the base map, the middle of three runs; the memory size after it):
+
+| | Monaco: memory, growth steps (Node) | Monaco: first style (Chromium) | Tartu: memory, growth steps (Node) | Tartu: first style (Chromium) |
+|---|---|---|---|---|
+| the whole size | 110 MiB, 6 | 848 ms, 45 MiB | 221 MiB, 8 | 1,726 ms, 340 MiB |
+| a quarter | 68 MiB, 6 | 294 ms, 38 MiB | 197 MiB, 14 | 1,398 ms, 138 MiB |
+
+The step ahead exists for Edge on Windows, where each of dlmalloc's 64 KB steps was slow (the first style took 14 to 21 s). The quarter
+step keeps the count small, but Edge's first-style time on Windows was not measured with it. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
 of lines and about 1.2 MB of marks: every mark is one that a layer or the page reads. The wasm memory after `makeSources` and
 `tileSources` (`bench.mjs`) stays 213 MiB.
 
