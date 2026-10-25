@@ -339,7 +339,7 @@ mod wasm {
     /// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory.
     #[wasm_bindgen]
     pub struct Sources {
-        inner: roadstyle::sources::Sources,
+        inner: roadstyle::sources::Styled,
     }
 
     #[wasm_bindgen]

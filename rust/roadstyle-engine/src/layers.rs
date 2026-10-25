@@ -826,7 +826,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
             spacing.extend(zp.as_array().unwrap().iter().cloned());
         }
         let (arrows, labels) = (look.map.arrows.on, look.map.labels.on);
-        // the arrows along the slots; stage 3 chooses another kind (the inline page's points: Sources::page_arrows; the export's
+        // the arrows along the slots; stage 3 chooses another kind (the inline page's points: Styled::page_arrows; the export's
         // line-center, below)
         let (source, mut layout) = ("slots", json!({"symbol-placement": "line", "symbol-spacing": spacing}));
         for (k, v) in [("icon-image", json!("oneway")), ("icon-rotation-alignment", json!("map")), ("symbol-sort-key", sort.clone()), ("icon-size", Value::Array(icon))] {

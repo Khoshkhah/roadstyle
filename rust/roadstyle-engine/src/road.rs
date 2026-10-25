@@ -23,7 +23,7 @@ pub struct Roads {
     pub cls: String,
     /// the roles of the table's columns (the class, the edge id, the flags, the levels): the stages read a role's cell by its index
     pub roles: Roles,
-    /// the warnings of the stages (Python's warnings.warn in render_web), for the caller (`Sources::warnings`)
+    /// the warnings of the stages (Python's warnings.warn in render_web), for the caller (`Styled::warnings`)
     pub warnings: Vec<String>,
     /// the drawing positions that the engine solved (casing_start, casing_level, casing_end, fill_level of each road), given under the
     /// contract names after the road's columns; None: the input has them (lib.rs compute_levels)
@@ -201,7 +201,7 @@ pub struct RoadsSource {
     pub maxzoom: Option<i64>,
     /// the style has the source `roads` (the export); a page has none: its pieces draw, and the road table has the fields and the lines
     pub in_style: bool,
-    /// R1: the only stage values (`__rs_*`) that a road keeps (`Sources::set_reads`), None: all; its fields stay
+    /// R1: the only stage values (`__rs_*`) that a road keeps (`Styled::set_reads`), None: all; its fields stay
     pub read: Option<std::collections::HashSet<String>>,
 }
 
