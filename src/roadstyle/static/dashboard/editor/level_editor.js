@@ -8,6 +8,7 @@
 // browserStore for a page with no server.
 import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
+import {caller} from "../worker/call.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
 const EMPTY = COLS.join(",") + "\n";
@@ -34,24 +35,23 @@ export function httpStore(base = "/area/"){
   return s;
 }
 
-/** The store of a page with no server: the area's files in this browser under `key` (the texts in localStorage, the bytes, such as
- * roads.parquet, in the origin's private file system), each with the time it was saved (seconds). */
+/** The store of a page with no server: the area's files in this browser under `key`, in the origin's private file system (the texts
+ * too: pairs.csv of a large area is more than localStorage holds), each with the time it was saved (seconds, in localStorage). */
 export function browserStore(key, name = key){
   const at = n => `lv:${key}:${n}`;
   const dir = async () => (await navigator.storage.getDirectory()).getDirectoryHandle("lv-" + key.replace(/[^\w.-]/g, "_"), {create: true});
+  const write = async (n, data) => { const w = await (await (await dir()).getFileHandle(n, {create: true})).createWritable(); await w.write(data); await w.close(); };
   return {key, name,
     async load(n, bytes){
-      const mtime = +(localStorage.getItem(at(n) + "@mtime") || 0);
-      if(bytes){
-        try { const f = await (await (await dir()).getFileHandle(n)).getFile(); return {body: new Uint8Array(await f.arrayBuffer()), mtime}; }
-        catch { return null; }
-      }
-      const body = localStorage.getItem(at(n));
-      return body == null ? null : {body, mtime};
+      const old = localStorage.getItem(at(n));                    // a text that an older version kept in localStorage: moved once
+      if(old != null){ await write(n, old); localStorage.removeItem(at(n)); }
+      let f;
+      try { f = await (await (await dir()).getFileHandle(n)).getFile(); }
+      catch(e){ if(e.name === "NotFoundError") return null; throw e; }
+      return {body: bytes ? new Uint8Array(await f.arrayBuffer()) : await f.text(), mtime: +(localStorage.getItem(at(n) + "@mtime") || 0)};
     },
     async save(n, data){
-      if(typeof data === "string") localStorage.setItem(at(n), data);
-      else { const w = await (await (await dir()).getFileHandle(n, {create: true})).createWritable(); await w.write(data); await w.close(); }
+      await write(n, data);
       localStorage.setItem(at(n) + "@mtime", String(Date.now() / 1000));
     }};
 }
@@ -74,8 +74,9 @@ const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
-export async function levelEditor({map = null, container = document.body, pkg, store, maplibregl: ml = globalThis.maplibregl, dashboard = null,
-                                   prefix = dashboard ? null : "lv-rs-"}){
+export async function levelEditor({map = null, container = document.body, pkgUrl, store, maplibregl: ml = globalThis.maplibregl, dashboard = null,
+                                   prefix = dashboard ? null : "lv-rs-", layout = "auto"}){
+if(!["auto", "sheet", "side"].includes(layout)) throw new Error(`level editor: layout must be "auto", "sheet" or "side", not ${JSON.stringify(layout)}`);
 if(map && !dashboard && window.rs)
   throw new Error("level editor: this page has a dashboard (window.rs): give it as levelEditor({dashboard, prefix}), so that the editor uses it; a second dashboard takes the first one's state");
 if(dashboard && !prefix)
@@ -83,27 +84,32 @@ if(dashboard && !prefix)
 if(map && window.map instanceof ml.Map && window.map !== map)     // (an element with the id "map" is window.map too: not a map)
   throw new Error("level editor: window.map is another map; the panel draws on window.map");
 const P = map ? prefix : "rs-";                                  // a host map: the editor's layers and sources with the prefix given
-const {LevelArea} = pkg;
+// the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
+const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
+const call = caller(worker);
+await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), look: JSON.stringify({args: LOOK})});
+const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
 const get = (n, bytes) => store.load(n, bytes);
 const [roadsF, pairsF, editsF, headsF, capsF, levelsF, infoF] = await Promise.all([get("roads.parquet", true), get("pairs.csv"), get("edits.csv"),
   get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
 if(!roadsF || !pairsF) throw new Error("the store has no roads.parquet or pairs.csv: make the area first (makeArea, or roadstyle levels make)");
-const area = new LevelArea(roadsF.body, pairsF.body);
+const roadsBytes = roadsF.body.slice();
+const opened = await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer]);
 const pairs = csvRows(pairsF.body);
-const order = JSON.parse(area.facts());                          // each road, in the roads' order
+const order = JSON.parse(opened.facts);                          // each road, in the roads' order
 const facts = Object.fromEntries(order.map(f => [f.road, f]));
 const roadOf = {};                                               // any edge id -> its road id
 for(const f of order){ roadOf[f.road] = f.road; for(const d of f.directions) roadOf[d.edge] = f.road; }
-const autoEnds = JSON.parse(area.ends("", ""));                  // the ends with none of yours: the default caps and heads
+const autoEnds = JSON.parse(opened.auto);                        // the ends with none of yours: the default caps and heads
 let editsText = editsF ? editsF.body : EMPTY, headsText = headsF ? headsF.body : "", capsText = capsF ? capsF.body : "";
 const SAVED = "lv-saved:" + (store.key || location.pathname);    // the edits saved before this session (the Python server keeps it)
 let saved = +(sessionStorage.getItem(SAVED) ?? csvRows(editsText).length);
 let res = null;                                                  // the last answer of the solver (JSON of LevelArea)
 
 // --- the answer to start from: levels.csv when it is newer than the inputs and has every edge, else a solve
-function fromStored(){
+async function fromStored(){
   if(!levelsF || !infoF) return null;
   const newest = Math.max(roadsF.mtime, pairsF.mtime, editsF ? editsF.mtime : 0, headsF ? headsF.mtime : 0);
   if(levelsF.mtime < newest) return null;
@@ -116,47 +122,56 @@ function fromStored(){
     else return null;
   }
   const info = JSON.parse(infoF.body);
-  area.startFrom(Int32Array.from(levels.flat()), (info.given_up_parts || []).map(p => p.join("|")), (info.orders_not_kept || []).length, (info.near || []).length);
+  await call({type: "startFrom", levels: levels.flat(), parts: (info.given_up_parts || []).map(p => p.join("|")), orders: (info.orders_not_kept || []).length,
+    near: (info.near || []).length});
   return {levels, given_up: info.given_up || [], given_up_parts: info.given_up_parts || [], near: info.near || [], orders_not_kept: info.orders_not_kept || [],
     info: {pairs: info.pairs, meets: info.meets, order_pairs: info.order_pairs, order_violations: info.order_violations, near_warnings: info.near_warnings},
     resolve: {how: "stored"}};
 }
 async function save(newRes){                                       // levels.csv and levels_info.json of an answer; then the host hears of it
-  const levelsCsv = area.levelsCsv(Int32Array.from(newRes.levels.flat()), headsText, capsText);
+  const [heads, caps] = [headsText, capsText];
+  const levelsCsv = (await call({type: "levelsCsv", levels: flat(newRes), heads, caps})).csv;
   const info = JSON.stringify({...newRes.info, given_up: newRes.given_up, given_up_parts: newRes.given_up_parts, near: newRes.near,
     orders_not_kept: newRes.orders_not_kept});
   await store.save("levels.csv", levelsCsv);
   await store.save("levels_info.json", info);
-  events.dispatchEvent(new CustomEvent("solved", {detail: {levelsCsv, levelsInfo: info, draw: () => area.draw(Int32Array.from(newRes.levels.flat()), headsText, capsText)}}));
+  events.dispatchEvent(new CustomEvent("solved", {detail: {levelsCsv, levelsInfo: info,
+    draw: async () => (await call({type: "draw", levels: flat(newRes), heads, caps})).bytes}}));
 }
-res = fromStored();
-if(!res){ res = JSON.parse(area.solve(editsText)); try { await save(res); } catch(e){ console.warn(e.message); } }
+res = await fromStored();
+if(!res){ res = JSON.parse((await call({type: "solve", edits: editsText})).answer); try { await save(res); } catch(e){ console.warn(e.message); } }
 
 // --- what the panel shows: each road's numbers and ends
-function setFacts(){
-  const ends = JSON.parse(area.ends(headsText, capsText));
+const endsNow = async () => JSON.parse((await call({type: "ends", heads: headsText, caps: capsText})).ends);
+async function setFacts(){
+  const ends = await endsNow();
   order.forEach((f, i) => Object.assign(f, {levels: res.levels[i], heads: ends[i].heads, heads_auto: autoEnds[i].heads,
     heads_own: ends[i].heads_own.map(Boolean), caps: ends[i].caps_own, caps_auto: autoEnds[i].caps}));
 }
-setFacts();
+await setFacts();
 const stats = () => ({area: store.name || "area", roads: order.length,
   ...res.info, given_up: res.given_up});
 
 // --- the map: the engine's tiles of one row for each edge, a new generation for each answer
-const look = pkg.resolveLook(JSON.stringify({args: LOOK}));
-let tiler = null, gen = 0;
-function build(){
-  const src = pkg.makeSources(area.draw(Int32Array.from(res.levels.flat()), headsText, capsText), look, undefined, undefined, "Level editor");
-  window.RS_SIDE = JSON.parse(new TextDecoder().decode(src.roadTable()));
-  tiler = pkg.tileSources(src, `lv://${++gen}/`, KEEP);
+async function build(){
+  const b = await call({type: "build", levels: flat(res), heads: headsText, caps: capsText, keep: KEEP});
+  window.RS_SIDE = JSON.parse(new TextDecoder().decode(b.table));
   document.dispatchEvent(new CustomEvent("rs:tableready"));
-  return JSON.parse(tiler.style());
+  return ownSources(JSON.parse(b.style));
 }
-const style = build();
-ml.addProtocol("lv", async (params) => {                             // the editor's own tiles (a host's rs:// stays its own)
-  const [g, source, z, x, y] = params.url.slice("lv://".length).split("/");
-  return {data: +g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array()};
-});
+// the editor's sources with names of their own ("lv-roads", ...; on the map with the prefix P): a host's source of the same name (one that
+// its base map's layers share with its roads) stays. The layer ids stay the dashboard's (it finds them by its prefix), and the roles in
+// roadstyle:sources name the new sources.
+function ownSources(st){
+  const name = id => "lv-" + id;
+  st.sources = Object.fromEntries(Object.entries(st.sources).map(([id, src]) => [name(id), src]));
+  for(const l of st.layers) if(l.source) l.source = name(l.source);
+  for(const r of Object.values((st.metadata || {})["roadstyle:sources"] || {})) if(r.source) r.source = name(r.source);
+  return st;
+}
+const style = await build();
+// the editor's own tiles (a host's rs:// stays its own), cut in the worker
+ml.addProtocol("lv", async (params) => ({data: (await call({type: "tile", url: params.url})).bytes}));
 // the camera: the area's box (the road table's boxes)
 const bb = window.RS_SIDE.bboxes.filter(Boolean).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])],
   [180, 90, -180, -90]);
@@ -181,8 +196,10 @@ async function showRoads(st){                                      // the roads 
   const layers = st.layers.map(l => P + l.id), sources = Object.keys(st.sources).map(id => P + id);
   // off: the editor's own layers, the layers with an id it adds, and the first time the host dashboard's roads (the layers of the roles of
   // its style's roadstyle:sources: not its base map)
-  const roles = first && dashboard ? Object.values((dashboardStyle?.metadata || {})["roadstyle:sources"] || {}).map(r => P + r.source) : [];
-  const off = new Set([...mine.layers, ...layers, ...map.getStyle().layers.filter(l => roles.includes(l.source)).map(l => l.id)]);
+  // (a role is a source and its source layer: a host's base map can share the roads' tile source with other source layers)
+  const role = (source, layer) => source + "|" + (layer || "");
+  const roles = first && dashboard ? Object.values((dashboardStyle?.metadata || {})["roadstyle:sources"] || {}).map(r => role(P + r.source, r.layer)) : [];
+  const off = new Set([...mine.layers, ...layers, ...map.getStyle().layers.filter(l => roles.includes(role(l.source, l["source-layer"]))).map(l => l.id)]);
   if(first && dashboard){                                          // the host's, as they are, to put back
     const now = map.getStyle();
     Object.assign(taken, {layers: now.layers.filter(l => off.has(l.id)), order: now.layers.map(l => l.id), style: dashboardStyle,
@@ -195,11 +212,15 @@ async function showRoads(st){                                      // the roads 
     if(!map.hasImage(P + id)){ map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio}); mine.images.push(P + id); }
   // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none)
   for(const [k, v] of Object.entries(st.state || {})) map.setGlobalStateProperty(k, v.default ?? null);
-  for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
+  for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "lv-roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
   for(const l of st.layers){
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));
     map.addLayer({...layer, id: P + l.id, source: P + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks
   }
+  // the taps of a finger: a wide line on the roads that draws nothing (the sheet's layout picks a road with it)
+  map.addLayer({id: P + "lv-tap", type: "line", source: P + "lv-roads", "source-layer": "simple", paint: {"line-width": 28, "line-opacity": 0}},
+    map.getLayer("lv-ends") ? "lv-ends" : undefined);
+  mine.layers.push(P + "lv-tap");
   rs.setStyle(st);
 }
 // the style loaded: a host map's load event can be over, and isStyleLoaded false a moment while it loads an image, with no event after
@@ -256,14 +277,14 @@ function after(ops){                                             // edits.csv af
   const gone = new Set(ops.filter(o => o.op === "delete").map(o => +o.index));
   return editRows().filter((_, i) => !gone.has(i)).concat(ops.filter(o => o.op === "add").map(o => rowOf(o.body)));
 }
-function check(rows_, ops = []){
-  const found = JSON.parse(area.check(toCsv(after(ops)), toCsv(rows_.map(rowOf))));
+async function check(rows_, ops = []){
+  const found = JSON.parse((await call({type: "check", edits: toCsv(after(ops)), rows: toCsv(rows_.map(rowOf))})).conflicts);
   return found.map(([i, why, w]) => ({rule: say(rowOf(rows_[i])), why, with: w.map(r => say({...r, own: false}))}));
 }
 async function apply(ops){
   if(!ops || !ops.length) throw new Error("nothing to apply");
   if(ops.some(o => !["add", "delete", "cap", "head"].includes(o.op))) throw new Error("a change is add, delete, cap or head");
-  const ends = JSON.parse(area.ends(headsText, capsText)), idx = Object.fromEntries(order.map((f, i) => [f.road, i]));
+  const ends = await endsNow(), idx = Object.fromEntries(order.map((f, i) => [f.road, i]));
   const caps = Object.fromEntries(order.map((f, i) => [f.road, [...ends[i].caps_own]])), heads = Object.fromEntries(order.map((f, i) => [f.road, [...ends[i].heads_own]]));
   for(const o of ops){
     const r = roadOf[String(o.road)], k = {start: 0, end: 1}[o.end];
@@ -301,7 +322,7 @@ async function apply(ops){
   let said = "not solved again (only caps)", full = false, next = res;
   if(newEdits || headsCsv !== headsText){
     const t = performance.now();
-    next = JSON.parse(area.solveLocal(nextEdits, changed));         // a refusal throws: nothing is saved
+    next = JSON.parse((await call({type: "solveLocal", edits: nextEdits, changed})).answer);   // a refusal throws: nothing is saved
     const s = ((performance.now() - t) / 1000).toFixed(1);
     full = next.resolve.how === "full";
     said = full ? `solved the whole area in ${s} s${next.resolve.why ? ": the local re-solve did not do (" + next.resolve.why + ")" : ""}`
@@ -314,8 +335,8 @@ async function apply(ops){
   await save(res);
   saved -= gone.filter(i => i < saved).length;
   sessionStorage.setItem(SAVED, String(saved));
-  setFacts();
-  await showRoads(build());                                        // the new map in place: new tiles, the roads style swapped
+  await setFacts();
+  await showRoads(await build());                                  // the new map in place: new tiles, the roads style swapped
   return {ok: true, said, full, redrawn: true, facts, stats: stats()};
 }
 window.lvApi = async (path, body) => {
@@ -325,7 +346,7 @@ window.lvApi = async (path, body) => {
     case "/api/given_up": return givenUp();
     case "/api/find": return find(q("q"));
     case "/api/relations": return relations(q("a"), q("b") || null);
-    case "/api/check": return {conflicts: check(body.rows || [], body.ops || [])};
+    case "/api/check": return {conflicts: await check(body.rows || [], body.ops || [])};
     case "/api/new_session": saved = editRows().length; sessionStorage.setItem(SAVED, String(saved)); return {ok: true, saved};
     case "/api/apply": return apply(body.ops || []);
   }
@@ -348,12 +369,48 @@ try {
     container.appendChild(node);                                 // a script runs here, at once
   }
 } finally { [document.addEventListener, map.on] = [docOn, mapOn]; }
+
+// --- the phone's layout: a sheet at the bottom of the map (layout "sheet", or "auto" up to 700 px wide: the dashboard panel's width)
+const narrow = matchMedia("(max-width: 700px)"), body = document.body, root = document.documentElement;
+const sheetOn = () => layout === "sheet" || (layout === "auto" && narrow.matches);
+function sheet(state){                                           // "fold" (one row), "half" or "full"; the map's camera keeps the top
+  body.dataset.lvSheet = state;
+  setTimeout(() => sheetOn() && map.setPadding({...map.getPadding(), bottom: document.getElementById("lv").getBoundingClientRect().height}), 220);
+}
+function useLayout(){
+  const on = sheetOn();
+  body.classList.toggle("lv-sheet", on);
+  if(on) sheet(body.dataset.lvSheet || "half");
+  else { delete body.dataset.lvSheet; map.setPadding({...map.getPadding(), bottom: 0}); }
+  setTimeout(() => map.resize(), 220);
+}
+const NEXT = {half: "full", full: "fold", fold: "half"};
+const handle = document.getElementById("lv-handle");
+handle.onclick = () => sheet(NEXT[body.dataset.lvSheet] || "half");
+// the phone's keyboard: the sheet goes up above it (the visual viewport is the part of the page the keyboard leaves)
+const keyboard = () => root.style.setProperty("--lv-kb", `${Math.max(0, innerHeight - visualViewport.height - visualViewport.offsetTop)}px`);
+// a Street View or Google 3D window at the bottom (the dashboard's, up to 520 px wide): the sheet folds to its one row
+const windows = new MutationObserver(() => {
+  if(sheetOn() && innerWidth <= 520 && [...document.querySelectorAll(".rs-svw")].some(w => !w.hidden)) sheet("fold");
+});
+windows.observe(body, {subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"]});
+// a tap on a road: the wide tap line, when the dashboard's own road layers have nothing under the finger
+const roadLayers = () => map.getStyle().layers.map(l => l.id).filter(id => id.startsWith(P + "roads-"));
+function tap(e){
+  if(!sheetOn() || map.queryRenderedFeatures(e.point, {layers: roadLayers()}).length) return;
+  const f = map.queryRenderedFeatures(e.point, {layers: [P + "lv-tap"]})[0];
+  if(f) document.dispatchEvent(new CustomEvent("rs:select", {detail: {properties: f.properties}}));
+}
+narrow.addEventListener("change", useLayout);
+visualViewport?.addEventListener("resize", keyboard);
+map.on("click", tap);
+useLayout();
 // the files of the area as the page has them now, to download (a page with no server keeps them in the browser)
-const files = {"edits.csv": () => editsText, "heads.csv": () => headsText, "caps.csv": () => capsText,
-  "levels.csv": () => area.levelsCsv(Int32Array.from(res.levels.flat()), headsText, capsText)};
-function download(name){
+const files = {"edits.csv": async () => editsText, "heads.csv": async () => headsText, "caps.csv": async () => capsText,
+  "levels.csv": async () => (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv};
+async function download(name){
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([files[name]()], {type: "text/csv"}));
+  a.href = URL.createObjectURL(new Blob([await files[name]()], {type: "text/csv"}));
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -362,6 +419,15 @@ function download(name){
  * on a host map, the host's roads that it took off go back in their places, with the host's road table and dashboard style. Your
  * files stay in the store. A map of its own is removed. */
 function destroy(){
+  worker.terminate();
+  narrow.removeEventListener("change", useLayout);
+  visualViewport?.removeEventListener("resize", keyboard);
+  windows.disconnect();
+  map.off("click", tap);
+  if(!own) map.setPadding({...map.getPadding(), bottom: 0});
+  body.classList.remove("lv-sheet");
+  delete body.dataset.lvSheet;
+  root.style.removeProperty("--lv-kb");
   heard.forEach(off => off());
   nodes.forEach(n => n.remove());
   document.body.classList.remove("lv-open");
@@ -383,5 +449,5 @@ function destroy(){
   // window.map stays the host's map (the panel's last timers read it)
   if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
 }
-return Object.assign(events, {map, area, download, destroy, files: Object.keys(files), answer: () => res});
+return Object.assign(events, {map, roads: order, download, destroy, files: Object.keys(files), answer: () => res});
 }

@@ -12,7 +12,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The
   editor is a module, `static/dashboard/editor/level_editor.js`: `levelEditor({map, container, pkg, store})` on a host's map or one of
   its own, with `browserStore` (the files in the browser) or `httpStore` (`roadstyle serve`), the event `"solved"` (levels.csv and the
-  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
+  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module. On a host map the editor's
+  sources have names of their own (a host whose base map shares the roads' tile source keeps it), and the panel follows the page's
+  theme (dark with the system, unless `data-theme` on `<html>` says otherwise). The engine runs in a Web Worker
+  (`editor/level_worker.js`): on Tartu (64,828 edges) the longest main-thread task is 0.3 s, not 4.4 s. **A host changes one argument:**
+  `levelEditor({..., pkgUrl})` (the URL of `roadstyle_wasm.js`) in place of `pkg`; the event's `draw()` gives a Promise, and `editor.roads`
+  (the roads) takes the place of `editor.area`. The worker's calls are `static/dashboard/worker/call.js` (`caller`, `answer`), which the
+  browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls. On a phone the panel is a sheet at the bottom
+  (`layout`: `"auto"`, a sheet up to 700 px wide; `"sheet"`; `"side"`), with a handle (one row, half, full), taps on the roads, 44 px
+  targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
+  `browserStore` keeps every file in the origin's private file system, also the texts (pairs.csv of Burnaby is more than
+  localStorage's 5 MB); a text that an older version kept in localStorage moves there when it is read.
 
 ### Changed
 - **roadstyle's files have one copy, the crate roadstyle-assets** (audit N25). The profiles and palettes, the base map's files,
@@ -27,6 +37,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Deprecated: the old paths `src/roadstyle/static/dashboard/`, `popup.css`, `popup.js` and `level_editor.html`.** They are a
   generated copy (`rust/roadstyle-assets/sync_old_paths.py`, checked by a test) for one release, for a page build that copies them
   from a roadstyle checkout. They go in roadstyle 0.27.0. They are not in the wheel.
+- **`roadstyle-levels` is a leaf crate** (audit N26): its only dependencies are rstar and sha2, 17 crates in all (it was 49, with
+  Arrow through roadstyle-model). The road flags' rule (`NO`, `yes_text`, `layer`, `level`, `directed`, `sql_yes`) is
+  `roadstyle_levels::flags` now; `roadstyle_model::flags` re-exports it with the JSON value's `yes` and `maplibre_yes`. duckosm-rust
+  can take the levels alone. CI fails when the levels depend on more.
 - **`cargo test` at `rust/` builds 113 crates in about 1 minute, not 195 in 5** (review D1). The programs `roadstyle-cli` and
   `roadstyle-snapshot` (bundled SQLite, headless_chrome) are not default members: CI tests them in a step of their own (`-p`). Fat LTO
   and one codegen unit moved from `release` to a new profile `dist` (`inherits = "release"`), which the wheels (`maturin --profile
@@ -59,6 +73,19 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **The 3D buildings of a duckOSM file have the height of all the digits of their tags.** The reader's SQL
+  (`roadstyle_io::duckosm`, for Python and the browser) read a tag as `tags['k'][1]`. In DuckDB 1.5 and in duckdb-wasm, `tags['k']` is
+  the text, so `[1]` gave its first character: `building:levels` "25" was "2", and the building was 7.32 m high, not 91.5 m. The SQL
+  now reads `map_extract(tags, 'k')[1]`, which is a list in every DuckDB version. On Monaco, 104 buildings have a tag with two or more
+  characters.
+- **A road is picked again on a page whose style has no interaction contract** (a host's `makeStyle`, the duckosm-rust page, the
+  level editor). Since R7 the dashboard picked a road only on the layers of the option `pick`, which only a style with the contract
+  has: on the other pages no road had a hover, a tooltip or a click (`rs:select`), and Street View waited for a click. With no `pick`,
+  the dashboard picks on the road layer of simple mode again. A test moves and clicks the real mouse on both kinds of page.
+- **Two readings of a duckOSM file at the same time on one connection no longer break each other** (the duckosm-rust page: "Table with
+  name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
+  `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,
+  `features_sql.js` and Python's `duckosm.read` use them.
 - **On a phone, the boxes start folded.** On a screen 700 px wide or less, the Roads, Layers and Legend boxes start folded,
   as the side panel starts closed; a tap on a box's title opens it. Before, the Roads box of a page with the default options
   covered about half of the map at 390 px. A wider screen does not change.
@@ -107,6 +134,26 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`rust/roadstyle-wasm/bench.mjs` measures the browser's path** in Node: `makeSources` and `tileSources` with the base map, and the
+  wasm memory after them (Monaco 110 MiB, 7.0 KiB for each road; Tartu 213 MiB, 3.1 KiB). docs/rust/parity.md has the table, and the
+  target architecture's (j) the memory target for each road in the browser.
+- **A test that the Python binding passes the output through** (`tests/test_binding.py`): on Monaco, the binding's style, road
+  table and page are the Rust facade's texts byte for byte (the hashes in the Rust goldens, which `tests/areas.rs` makes). A page
+  gives the CARTO no-key warning once, not once for each CARTO base map of the switcher.
+- **The areas' goldens are the Rust engine's own** (2026-10-24: the Rust API is the design). `tests/areas.rs` checks the style and
+  the tiles of Monaco, Södermalm and Tartu against summaries in git (`rust_style.json`, `rust_tiles.json`, about 2 KB each), which
+  `ROADSTYLE_BLESS=1 cargo test` writes. The comparisons with Python's `golden_style` and `golden_tiles` are gone; the levels, the
+  colour cases and the looks are still checked against Python.
+- **`examples/bench.rs` measures the stages** (review 4, D9): the time, the peak memory and the memory after each stage, on Monaco
+  and Tartu (`cargo run --release -p roadstyle --example bench`; the numbers are in docs/rust/parity.md). The archive (PMTiles) and
+  the CLI's XYZ folder make each tile once, with no cache (`Tiles::build`; `Tiles::tile` keeps its cache for a map): Tartu's archive
+  7.2 s to 6.4 s, peak 663 MB to 596 MB, and no 68 MB of cached tiles after it.
+- **One style builder, and the page writes each source once** (review 4, D3 and N29). `Sources::style_with` makes the style with
+  no source's data in it, and `Sources::write_with` writes it, with each source's data written into the text as it goes. Stage 2
+  (`tile_stage`) and the page (`page_from`) use them: no source is cloned, written and parsed back any more. The page's JSON is
+  `serde_json`'s compact text, each `<` as `\u003c`; Python's `json.dumps` copy in Rust (`pyjson`) is gone. On Tartu, the Rust page:
+  peak memory 1.91 GB to 0.60 GB and 4.1 s to 2.5 s (no gzip), 1.84 GB to 0.42 GB and 6.3 s to 5.5 s (gzip); `make_tiled` stays
+  at 173 MB (it tiles every source).
 - **An exported style tells an app's dashboard its roads** (audit 3, N27, both engines). `export_style`'s metadata has
   `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers that a road is picked on), from its final layers, as a
   live style has them. A dashboard on an exported style finds and picks the roads with no layer-id prefix.

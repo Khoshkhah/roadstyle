@@ -10,6 +10,7 @@ description = "roadstyle's road model: the roads as features with typed properti
 [dependencies]
 # reads.json (props.rs, PAGE_READS): a temporary edge, which T3 removes when Mark makes reads.json (N25; the target architecture's gap list)
 roadstyle-assets.workspace = true
+roadstyle-levels.workspace = true    # the road flags' rule (flags.rs re-exports it; N26: the levels are a leaf)
 serde.workspace = true
 serde_json.workspace = true
 arrow-array.workspace = true

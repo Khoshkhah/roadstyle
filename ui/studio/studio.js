@@ -2,6 +2,7 @@
 // Rust engine in a Web Worker (worker.js: the whole page for each change of the knobs, page_from) and that page in an iframe. The page in
 // the iframe is the page that "Download" saves; the code panel is the Python call that makes it.
 import {pythonCode, pyrepr} from "./code.js";
+import {caller} from "../../rust/roadstyle-assets/files/static/dashboard/worker/call.js";
 
 const $ = (id) => document.getElementById(id);
 const SAMPLES = {"Södermalm driving": "sodermalm_driving", "Södermalm walking": "sodermalm_walking", "Södermalm cycling": "sodermalm_cycling"};
@@ -24,10 +25,7 @@ let BASEMAPS = [], colourOpts = [{name: "Class"}];      // basemaps.json's keys;
 
 // ---------------------------------------------------------------- the engine in its worker
 const worker = new Worker(new URL("./worker.js", import.meta.url), {type: "module"});
-let callId = 0;
-const pending = new Map();
-worker.onmessage = (e) => { const p = pending.get(e.data.id); pending.delete(e.data.id); e.data.ok ? p.ok(e.data) : p.no(new Error(e.data.error)); };
-const call = (msg, transfer) => new Promise((ok, no) => { const id = ++callId; pending.set(id, {ok, no}); worker.postMessage({...msg, id}, transfer || []); });
+const call = caller(worker);                // the calls and answers of rust/roadstyle-assets/files/static/dashboard/worker/call.js
 window.studio = {debug: () => ({table, columns, allClasses, st})};      // for a check in a browser (the tests)
 
 // ---------------------------------------------------------------- the page's keywords

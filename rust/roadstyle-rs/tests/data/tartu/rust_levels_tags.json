@@ -1,0 +1,18 @@
+{
+  "method": "Tags",
+  "rows": 64828,
+  "roads": 32546,
+  "edge_hash": "e4b0c96f7cd32e296ef15c69f93523a6",
+  "rows_hash": "4f1b041f76adc1fa",
+  "casing_levels": {
+    "-1": 205,
+    "-2": 4,
+    "0": 64609,
+    "1": 10
+  },
+  "fill_levels": {
+    "-1": 24,
+    "0": 64610,
+    "1": 194
+  }
+}

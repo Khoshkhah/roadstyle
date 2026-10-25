@@ -5,6 +5,11 @@ from shapely.geometry import LineString
 import roadstyle as rs
 
 
+def _in(needle, html):
+    """A JSON fragment in a page, in either engine's spacing: Python's json.dumps (", ", ": ") or serde_json's compact text."""
+    return needle in html or needle.replace(": ", ":").replace(", ", ",") in html
+
+
 def _edges():
     return gpd.GeoDataFrame(
         {"highway": ["motorway", "primary", "residential"],
@@ -58,7 +63,7 @@ def test_render_street_view_injects_panel():
     assert h.count("</body>") == 1
     # the panel replaces the popup; the map keeps its own base-map switcher and class filter
     assert "Roads and Street View" in h
-    assert '"street_view": true, "street_view_key"' in h                   # no second Street View (the map button): a link, not the window
+    assert _in('"street_view": true, "street_view_key"', h)                   # no second Street View (the map button): a link, not the window
 
 
 def test_street_view_width_and_divider_are_options():
@@ -99,17 +104,17 @@ def test_street_view_window_takes_the_key_too(monkeypatch):
     """The floating window every dashboard uses: the same Linked / Classic switch with a key."""
     monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
     h = rs.render_edges(_edges(), backend="web", street_view="window").html
-    assert '"street_view_key": "", "google_3d"' in h
+    assert _in('"street_view_key": "", "google_3d"', h)
     h = rs.render_edges(_edges(), backend="web", street_view="window", street_view_key="AIzaTEST").html
-    assert '"street_view_key": "AIzaTEST", "google_3d"' in h and "__rsGmReady" in h and 'class="rs-svw-mode"' in h
+    assert _in('"street_view_key": "AIzaTEST", "google_3d"', h) and "__rsGmReady" in h and 'class="rs-svw-mode"' in h
 
 
 def test_street_view_key_comes_from_the_environment(monkeypatch):
     """GOOGLE_MAPS_KEY is every page's key when none is passed (2026-10-10: the editor, mapstyle and lanestyle pages had none); a passed one wins."""
     monkeypatch.setenv("GOOGLE_MAPS_KEY", "AIzaENV")
-    assert '"street_view_key": "AIzaENV", "google_3d"' in rs.render_edges(_edges(), backend="web").html
+    assert _in('"street_view_key": "AIzaENV", "google_3d"', rs.render_edges(_edges(), backend="web").html)
     assert 'const GKEY = "AIzaENV";' in rs.render_street_view(_edges()).html
-    assert '"street_view_key": "AIzaMINE", "google_3d"' in rs.render_edges(_edges(), backend="web", street_view_key="AIzaMINE").html
+    assert _in('"street_view_key": "AIzaMINE", "google_3d"', rs.render_edges(_edges(), backend="web", street_view_key="AIzaMINE").html)
 
 
 def test_street_view_spot_is_readable():

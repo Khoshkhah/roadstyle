@@ -14,6 +14,11 @@ from shapely.geometry import LineString
 from roadstyle import Overlay, compute_levels, render_edges
 
 
+def _in(needle, html):
+    """A JSON fragment in a page, in either engine's spacing: Python's json.dumps (", ", ": ") or serde_json's compact text."""
+    return needle in html or needle.replace(": ", ":").replace(", ", ",") in html
+
+
 def _edges():
     return gpd.GeoDataFrame(
         {"highway": ["motorway", "primary", "residential"],
@@ -61,7 +66,7 @@ def test_web_color_options_bake_variants_and_wire_recolour():
     # the recolour hooks + the Colour-by control are present
     for needle in ("rsSetColorField", "RS_COLOR_OPTIONS", "setPaintProperty", "co-ctrl"):
         assert needle in wm.html
-    assert '"AADT"' in wm.html and '"prop": "__rs_fill__1"' in wm.html
+    assert '"AADT"' in wm.html and _in('"prop": "__rs_fill__1"', wm.html)
 
 
 def test_web_color_option_missing_self_keeps_nan_color():
@@ -93,7 +98,7 @@ def test_web_color_by_bakes_its_legend():
     # the plain color_by/cmap path renders the styler's legend on the web backend (no dropdown —
     # one legend-only entry). legend=True is the default, matching folium.
     on = _copts(render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis").html)
-    assert '"legend"' in on and '"kind": "continuous"' in on   # continuous ramp legend baked
+    assert '"legend"' in on and _in('"kind": "continuous"', on)   # continuous ramp legend baked
     # legend=False opts out
     off = _copts(render_edges(_edges(), backend="web", color_by="aadt", cmap="viridis",
                               legend=False).html)
@@ -228,8 +233,8 @@ def test_compress_is_smaller_and_otherwise_identical():
     for k in ("__FILTER__", "__COLOR_OPTIONS__"):       # placeholders are gone; compare the results
         assert k not in plain and k not in small
     # the filter panel's class list is baked from the features either way
-    assert '"classes": ["residential"]' in plain.replace("'", '"')
-    assert '"classes": ["residential"]' in small.replace("'", '"')
+    assert _in('"classes": ["residential"]', plain.replace("'", '"'))
+    assert _in('"classes": ["residential"]', small.replace("'", '"'))
 
 
 def test_a_small_source_is_left_inline():
@@ -480,7 +485,7 @@ def test_web_pick_survives_missing_layers():
     list to existing layers or every hover/click errors out and nothing is selectable."""
     html = render_edges(_edges(), backend="web", view_3d=True).html
     assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
-    assert "PICK_LAYERS = O.pick" in html and _opt(html, "pick") == ["roads-simple"]   # the page gives the pick layers (R7)
+    assert "O.pick.map(id=>RS_PREFIX+id)" in html and _opt(html, "pick") == ["roads-simple"]   # the page gives the pick layers (R7)
 
 
 def test_web_camera_max_pitch():
@@ -591,9 +596,9 @@ def test_render_edges_scoped_settings():
     no files, no lingering global state."""
     styled = render_edges(_edges(), backend="web",
                           settings={"config": {"labels": {"color": "#123123"}}}).html
-    assert '"text-color": "#123123"' in styled
+    assert _in('"text-color": "#123123"', styled)
     plain = render_edges(_edges(), backend="web").html
-    assert '"text-color": "#5b5b5b"' in plain      # fully restored afterwards
+    assert _in('"text-color": "#5b5b5b"', plain)      # fully restored afterwards
 
 
 def test_overlay_defaults_come_from_settings():
@@ -601,7 +606,7 @@ def test_overlay_defaults_come_from_settings():
     from roadstyle import Overlay
     styled = render_edges(_edges(), backend="web", overlays=[Overlay(_pois())],
                           settings={"config": {"overlays": {"color": "#112233", "radius": 11}}}).html
-    assert "#112233" in styled and '"circle-radius": 11' in styled
+    assert "#112233" in styled and _in('"circle-radius": 11', styled)
     explicit = render_edges(_edges(), backend="web",
                             overlays=[Overlay(_pois(), color="#ffd166")],
                             settings={"config": {"overlays": {"color": "#112233"}}}).html
@@ -918,10 +923,10 @@ def test_tunnels_toggle_like_bridges():
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
                                    LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
     html = render_edges(g, backend="web").html
-    assert '"tunnels": true' in html and "function rsSetTunnels(" in html and '"rs-flt-tn"' in html
+    assert _in('"tunnels": true', html) and "function rsSetTunnels(" in html and '"rs-flt-tn"' in html
     assert '[">=",["coalesce",["get",lvl],0],0]' in html                     # lvl: the piece's level, or an attached item's baked __rs_lvl
     plain = render_edges(_edges(), backend="web").html
-    assert '"tunnels": false' in plain
+    assert _in('"tunnels": false', plain)
 
 
 def test_links_draw_below_every_street_like_osm_carto():
@@ -3592,7 +3597,7 @@ def test_simple_is_the_default_and_simple_false_is_the_full_look():
 
 def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
     html = render_edges(_edge_world(), backend="web", basemap="blank", tunnel_control=True).html
-    assert '"control": true' in html and "TUNNEL.simple" not in html and "rsSetTunnelStyle=function" not in html     # one rsSetTunnelStyle: it sets state
+    assert _in('"control": true', html) and "TUNNEL.simple" not in html and "rsSetTunnelStyle=function" not in html     # one rsSetTunnelStyle: it sets state
 
 
 def test_simple_same_key_pieces_keep_their_order_after_an_update_in_place():

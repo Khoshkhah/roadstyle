@@ -104,9 +104,8 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     }
     let (mut style, archive) = if tiled { tiled_page(&src, &a)? } else {
         src.page_arrows();          // stage 3 of the inline page: the arrows are points that the page puts itself (audit N2)
-        let mut out = Vec::new();
-        src.write_style(&mut out).map_err(|e| e.to_string())?;
-        (serde_json::from_slice(&out).map_err(|e| e.to_string())?, None)
+        // the style without its sources' data, which the page writer writes from `src` (audit D3, N29)
+        (src.style_with(|_| Value::Null, false), None)
     };
     let mut table = Vec::new();
     crate::write_road_table(&src, &mut table).map_err(|e| e.to_string())?;
@@ -174,7 +173,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let parts = PageParts {
         name: a["name"].as_str().unwrap_or("roadstyle"), cam, bounds, side_panel_html: a["side_panel_html"].as_str(),
         host_panel_width: a["host_panel_width"].as_f64().unwrap_or(320.0), compress: on("compress"), gz: None, tiles: archive.as_deref(),
-        side: Some((&Value::Null, Some(&side))), simple_js: on("simple").then_some(&simple_js),
+        side: Some((&Value::Null, Some(&side))), simple_js: on("simple").then_some(&simple_js), sources: Some(&src),
     };
     let mut html = page_html(page_style, &opts, &parts);
     if let Some((_, template, _)) = sidebar {
@@ -242,9 +241,13 @@ fn basemap(v: &Value, api_key: Option<&str>, resolved: &[Value], warnings: &mut 
     };
     match api_key.filter(|t| !t.is_empty()) {
         Some(t) => bm["url"] = inject_token(bm["url"].as_str().unwrap_or(""), t).into(),
-        None if bm["url"].as_str().is_some_and(|u| u.contains("cartocdn.com")) => warnings.push(
-            "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, or use \
-             a keyless base map (esri_street, esri_dark_gray, osm).".into()),
+        None if bm["url"].as_str().is_some_and(|u| u.contains("cartocdn.com")) => {
+            let w = "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, \
+                     or use a keyless base map (esri_street, esri_dark_gray, osm).";
+            if !warnings.iter().any(|x| x == w) {
+                warnings.push(w.into());        // one for the page, not one for each CARTO base map of the switcher
+            }
+        }
         None => {}
     }
     Ok(bm)

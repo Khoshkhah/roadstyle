@@ -1,0 +1,118 @@
+{
+  "style": {
+    "keys": [
+      "version",
+      "name",
+      "center",
+      "zoom",
+      "layers",
+      "sources",
+      "metadata",
+      "glyphs"
+    ],
+    "layers": [
+      [
+        "roads-simple",
+        "line",
+        "roads",
+        "a0894aa3fdcc8faf",
+        "9c9ddddc14675143",
+        "c57eb06c5a87ff06"
+      ],
+      [
+        "roads-fill",
+        "line",
+        "roads",
+        "a0894aa3fdcc8faf",
+        "c5a38c14a2deb8a1",
+        "9fcf0e01ba5670e6"
+      ],
+      [
+        "roads-arrows",
+        "symbol",
+        "roads",
+        "eae28bcca8caacf2",
+        "b9e63a214b296e3e",
+        "6defc6068961f92c"
+      ],
+      [
+        "roads-labels",
+        "symbol",
+        "roads",
+        "9de716419d39dad7",
+        "e66f1480f0ee2761",
+        "042c1e60af4c52d7"
+      ],
+      [
+        "roads-highlight",
+        "line",
+        "roads",
+        "74234e98afe7498f",
+        "18d823d8fbe1e80f",
+        "9fcf0e01ba5670e6"
+      ]
+    ],
+    "sources": {
+      "roads": [
+        "vector",
+        null,
+        "24a54fe031688e1d"
+      ]
+    },
+    "metadata": {
+      "roadstyle:interaction": "8bd55e519f81a314",
+      "roadstyle:images": "e9049aa3d5b18840",
+      "roadstyle:sources": "f06f4789e4af8cce",
+      "roadstyle:controls": "7ad47e2cab264f27"
+    },
+    "hash": "879597289593fea5"
+  },
+  "tiles": {
+    "z12": {
+      "roads": {
+        "tiles": 3,
+        "features": 4647,
+        "hash": "3c5321bcb5b45b68"
+      },
+      "simple": {
+        "tiles": 3,
+        "features": 13854,
+        "hash": "0904f1107d25d8dc"
+      }
+    },
+    "z14": {
+      "roads": {
+        "tiles": 7,
+        "features": 4434,
+        "hash": "aa12594b82f800e9"
+      },
+      "simple": {
+        "tiles": 7,
+        "features": 14220,
+        "hash": "56b6a0114862298a"
+      },
+      "slots": {
+        "tiles": 7,
+        "features": 1682,
+        "hash": "d74cab808033aa97"
+      }
+    },
+    "z15": {
+      "roads": {
+        "tiles": 9,
+        "features": 2781,
+        "hash": "2f176c9eab64dca6"
+      },
+      "simple": {
+        "tiles": 9,
+        "features": 8846,
+        "hash": "529a048134e85bde"
+      },
+      "slots": {
+        "tiles": 9,
+        "features": 1139,
+        "hash": "bb59a82bc79eef0d"
+      }
+    }
+  }
+}

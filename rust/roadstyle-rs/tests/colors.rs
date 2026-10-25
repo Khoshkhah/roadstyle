@@ -1,43 +1,59 @@
 //! Data-driven colour and width (render_edges' color_by, colors, cmap, vmin, vmax, width_by, color_table, color_options, color_active,
-//! legend): the style must be roadstyle's own (Python export_inline) for a part of Monaco, and the legend data
-//! (metadata "roadstyle:color_options") the page's COLOR_OPTIONS. The goldens come from tests/make_goldens.py; each case's options are
-//! added to look["args"].
+//! legend) on a part of Monaco: the style and the legend data (metadata "roadstyle:color_options", the page's colour options) against
+//! goldens that the Rust engine makes (tests/data/monaco_part/cases/colors_<case>.json; `ROADSTYLE_BLESS=1 cargo test --test colors`
+//! writes them). The last check of these cases against Python's export_inline was 2026-10-24 (the goldens of make_goldens.py's colors).
 
 mod common;
 
-use common::diff;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::path::PathBuf;
 
 fn data(p: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(p)
 }
 
+/// The case's keywords (make_goldens.py's CASES, until 2026-10-24).
+fn args(case: &str) -> Value {
+    match case {
+        "plain" => json!({}),
+        "numeric" => json!({"color_by": "lanes", "cmap": "YlOrRd", "vmin": 1, "vmax": 4}),
+        "numeric_width" => json!({"color_by": "lanes", "cmap": "viridis", "width_by": [1.0, 6.0]}),
+        "categorical" => json!({"color_by": "access", "colors": {"private": "#d62728", "destination": "#ff7f0e", "no": "#7f7f7f"}}),
+        "color_table" => json!({"color_table": table_of_colours()}),
+        "color_options" => json!({"color_options": {"class": {}, "lanes": {"color_by": "lanes", "cmap": "Blues", "vmin": 1, "vmax": 3},
+                                                    "access": {"color_by": "access", "colors": {"private": "#d62728"}, "missing": "self"}},
+                                  "color_active": "lanes"}),
+        "no_legend" => json!({"color_by": "lanes", "cmap": "magma", "legend": false}),
+        _ => unreachable!("no case {case}"),
+    }
+}
+
+/// Every third road: one of three colours, by its edge_id (the keys as text, as a JSON object has them).
+fn table_of_colours() -> Value {
+    let t = roadstyle_rs::read::read_roads(std::fs::read(data("monaco_part/roads.parquet")).unwrap(), "geometry").unwrap();
+    let cols = ["#e41a1c", "#377eb8", "#4daf4a"];
+    let id = |r: usize| {
+        let c = t.get(r, "edge_id").unwrap();
+        c.as_i64().map(|i| i.to_string()).or_else(|| c.as_str().map(String::from)).unwrap()
+    };
+    Value::Object((0..t.len()).step_by(3).map(|r| (id(r), json!(cols[r % 3]))).collect())
+}
+
 fn check(case: &str) {
-    let golden = common::gz_json(&format!("monaco_part/{case}.json.gz"));
     let mut look: Value = serde_json::from_str(&std::fs::read_to_string(data("look.json")).unwrap()).unwrap();
-    look["args"]["arrows"] = true.into(); // as tests/make_goldens.py: the engine always makes the names and arrows
+    look["args"]["arrows"] = true.into(); // the engine always makes the names and arrows
     look["args"]["labels"] = true.into();
-    look["args"]["export"] = true.into(); // the goldens are exports (audit N2)
-    for (k, v) in golden["args"].as_object().unwrap() {
+    look["args"]["export"] = true.into(); // an export (audit N2)
+    for (k, v) in args(case).as_object().unwrap() {
         look["args"][k] = v.clone();
     }
     let roads = std::fs::read(data("monaco_part/roads.parquet")).unwrap();
-    let style = roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look.clone()).unwrap(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
+    let style = roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look).unwrap(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
     let style: Value = serde_json::from_str(&style).unwrap();
-    // the page's colour options are the export's roadstyle:color_options (both engines write them; none: [])
-    let options = style["metadata"].get("roadstyle:color_options").cloned().unwrap_or(Value::Array(vec![]));
-    // the top level: the engine writes mapstyle's export (its key order); below it, all must be the same
-    let mut out = Vec::new();
-    let (mut a, mut b): (Vec<&String>, Vec<&String>) = (style.as_object().unwrap().keys().collect(), golden["style"].as_object().unwrap().keys().collect());
-    a.sort();
-    b.sort();
-    assert_eq!(a, b, "{case}: the keys of the style");
-    for k in a {
-        diff(&style[k], &golden["style"][k], &format!("style.{k}"), &mut out);
-    }
-    diff(&options, &golden["color_options"], "color_options", &mut out);
-    assert!(out.is_empty(), "{case}: the first differences:\n{}", out.join("\n"));
+    let options = style["metadata"].get("roadstyle:color_options").cloned().unwrap_or(json!([]));
+    let names: Vec<Value> = options.as_array().into_iter().flatten().map(|o| o["name"].clone()).collect();
+    common::golden(&format!("monaco_part/cases/colors_{case}.json"),
+                   &json!({"style": common::summary(&style), "color_options": {"names": names, "hash": common::hash16(&options)}}));
 }
 
 #[test]

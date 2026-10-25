@@ -360,23 +360,34 @@ def test_live_style_and_contract(part, keywords, case):
 
 
 def _same_page(ru, py):
-    """The two engines' pages are the same: byte for byte but the gzipped blobs (the road table, the big sources), which two gzip writers
-    write in their own bytes (R3, 2026-10-24: the Rust page writer gzips them); those are the same when they are read back."""
+    """The two engines' pages are the same page: their JSON values (the style, RS_OPTIONS, RS_SIMPLE, and the gzipped blobs read back)
+    are equal, and the rest of the page is the same text. The JSON text itself is each engine's own (2026-10-24: the Rust API is the
+    design; serde_json's text, not Python's json.dumps; R3: the Rust writer gzips the blobs)."""
     import base64
     import gzip
     import re
 
-    pat = r'(id="rs-(?:gz|side)" type="application/json">)(.*?)(</script>)'
-    def blobs(html):
-        out = []
-        for m in re.finditer(pat, html, re.S):
+    dec = json.JSONDecoder()
+
+    def parts(html):
+        values, rest, at = [], [], 0
+        for m in re.finditer(r"const style = |const RS_OPTIONS = |const RS_SIMPLE = ", html):
+            if m.start() < at:
+                continue
+            v, end = dec.raw_decode(html, m.end())
+            rest.append(html[at:m.end()])
+            values.append(v)
+            at = end
+        rest.append(html[at:])
+        text = "".join(rest)
+        for m in re.finditer(r'id="rs-(gz|side)" type="application/json">(.*?)</script>', text, re.S):
             v = m.group(2)
-            out.append({k: json.loads(gzip.decompress(base64.b64decode(b))) for k, b in json.loads(v).items()} if v.startswith("{")
-                       else json.loads(gzip.decompress(base64.b64decode(v))))
-        return out
-    cut = lambda html: re.sub(pat, r"\1\3", html, flags=re.S)        # noqa: E731
-    assert cut(ru) == cut(py)
-    assert blobs(ru) == blobs(py)
+            values.append({k: json.loads(gzip.decompress(base64.b64decode(b))) for k, b in json.loads(v).items()} if v.startswith("{")
+                          else json.loads(gzip.decompress(base64.b64decode(v))))
+        return values, re.sub(r'(id="rs-(?:gz|side)" type="application/json">).*?(</script>)', r"\1\2", text, flags=re.S)
+    (vr, tr), (vp, tp) = parts(ru), parts(py)
+    assert tr == tp
+    assert vr == vp
     return True
 
 
@@ -402,7 +413,7 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
         at = html.index("const style = ") + len("const style = ")
         st, end = json.JSONDecoder().raw_decode(html[at:])
         st["sources"]["decks"]["data"]["features"] = len(st["sources"]["decks"]["data"]["features"])
-        return st, html[:at] + html[at + end:]
+        return st, html[:at] + "null" + html[at + end:]
     (sr, hr), (sp, hp) = cut(ru), cut(py)
     assert diff(sr, sp) == [] and _same_page(hr, hp)
 
@@ -422,9 +433,9 @@ def test_render_edges_tiled_page(part, keywords, case, monkeypatch):
     def parts(html):
         pm = re.search(r'atob\("([A-Za-z0-9+/=]+)"\)', html).group(1)
         side = re.search(r'id="rs-side" type="application/json">([A-Za-z0-9+/=]+)<', html).group(1)
-        return _archive(base64.b64decode(pm)), gzip.decompress(base64.b64decode(side)), html.replace(pm, "PM").replace(side, "SIDE")
+        return _archive(base64.b64decode(pm)), json.loads(gzip.decompress(base64.b64decode(side))), html.replace(pm, "PM")
     (tp, sp, hp), (tr, sr, hr) = (parts(rs.render_edges(part, backend="web", engine=e, **{**keywords, **opts}).html) for e in ("python", "rust"))
-    assert hr == hp and sr == sp
+    assert _same_page(hr, hp) and sr == sp
     for k in sorted(set(tp) | set(tr)):
         assert tile_diff(tr.get(k, b""), tp.get(k, b"")) == [], k
 
@@ -505,8 +516,7 @@ def test_the_page_writer_gzips_by_itself(part, keywords):
     table = lambda html: json.loads(gzip.decompress(base64.b64decode(re.search(r'id="rs-side" type="application/json">(.*?)</script>', html,   # noqa: E731
                                                                                 re.S).group(1))))
     assert table(ru) == table(py) == side
-    cut = lambda html: re.sub(r'(id="rs-(gz|side)" type="application/json">).*?(</script>)', r"\1\3", html, flags=re.S)       # noqa: E731
-    assert cut(ru) == cut(py)
+    assert _same_page(ru, py)
 
 
 def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):

@@ -121,21 +121,21 @@ fn json_lines(src: &Value) -> bool {
 
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
 /// (`{"url": "pmtiles://roads"}` for an archive, `{"tiles": ["<prefix>roads/{z}/{x}/{y}"]}` for a folder). `o`: which sources and
-/// which properties. The sources that `o` leaves out stay in the style with their data.
+/// which properties. The sources that `o` leaves out stay in the style with a null `data` (audit D3: not copied), which
+/// `Sources::write_with` fills as it writes the style.
 pub fn tile_stage(s: &sources::Sources, o: &tiles::stage::TileOptions, at: &Value) -> (Value, tiles::Tiles) {
     let tiles = tile_sources(s, o);
-    let mut style = s.style(|_| String::new());
-    let mut tiled = Vec::new();
-    for (i, (k, _)) in s.sources.iter().enumerate().filter(|(_, (_, src))| !matches!(src, Src::Roads(_)) || s.roads.in_style) {
-        if o.wants(k) {
-            tiled.push(k.clone());
-        } else {
-            let mut data = Vec::new();
-            s.write_data(i, &s.drawn(&[]), &mut data).expect("a Vec takes every byte");
-            style["sources"][k]["data"] = serde_json::from_slice(&data).expect("the engine writes JSON");
-        }
-    }
+    let style = s.style_with(|_| Value::Null, true);
+    let tiled: Vec<String> = s.sources.iter().filter(|(k, src)| (!matches!(src, Src::Roads(_)) || s.roads.in_style) && o.wants(k))
+        .map(|(k, _)| k.clone()).collect();
     (tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles)
+}
+
+/// A style of these Sources (`tile_stage`'s, `style_with`'s) as JSON text, each null `data` with its source's FeatureCollection.
+pub fn style_text(s: &sources::Sources, style: &Value) -> String {
+    let mut out = Vec::new();
+    s.write_with(style, &mut out).expect("a Vec takes every byte");
+    String::from_utf8(out).expect("JSON text is UTF-8")
 }
 
 /// The style that draws stage 2's tiles: the sources `tiled` become the tile layers of one vector source `roads` (first, at `at`, with the
@@ -284,7 +284,7 @@ pub fn write_source_file<W: std::io::Write + Send>(s: &sources::Sources, file: &
     let ext = ext(format);
     let io = |e: std::io::Error| format!("{file}: {e}");
     if file == "style.json" {
-        serde_json::to_writer(&mut w, &s.style(|n| format!("{n}.{ext}"))).map_err(|e| e.to_string())?;
+        serde_json::to_writer(&mut w, &s.style_with(|n| format!("{n}.{ext}").into(), true)).map_err(|e| e.to_string())?;
         return Ok(w);
     }
     if file == ROAD_TABLE {
@@ -342,10 +342,10 @@ fn road_rows(s: &sources::Sources) -> impl Iterator<Item = roadstyle_io::write::
     })
 }
 
-/// The road table as the page loads it (tiles.sidecar's form, with Python's JSON text; `Sources::table_rows`): `{"props", "mids",
-/// "bboxes", "lines"}`, each a list with one item for each road (its row).
+/// The road table as the page loads it (tiles.sidecar's form; `Sources::table_rows`): `{"props", "mids", "bboxes", "lines"}`, each a
+/// list with one item for each road (its row).
 pub fn write_road_table<W: std::io::Write>(s: &sources::Sources, w: &mut W) -> std::io::Result<()> {
-    use page::pyjson::dumps;
+    let dumps = |v: &Value, _compact: bool| v.to_string();
     let rows = s.table_rows();
     let list = |w: &mut W, key: &str, first: bool, item: &dyn Fn(&sources::TableRow) -> String| -> std::io::Result<()> {
         write!(w, "{}\"{key}\":[", if first { "{" } else { "," })?;
@@ -384,7 +384,7 @@ pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format,
 pub fn tile_made(s: &sources::Sources, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), String> {
     let o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
     let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix));
-    Ok((style.to_string(), tiled))
+    Ok((style_text(s, &style), tiled))
 }
 
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of
@@ -416,6 +416,6 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
         style["metadata"]["roadstyle:sources"] = contract::roles(&layers);
         style["metadata"]["roadstyle:controls"] = json!({"pick": contract::pick_layers(&layers)});
     }
-    Ok((style.to_string(), tiled, s.warnings))
+    Ok((style_text(&s, &style), tiled, s.warnings))
 }
 

@@ -1,0 +1,114 @@
+{
+  "keys": [
+    "version",
+    "name",
+    "center",
+    "zoom",
+    "layers",
+    "sources",
+    "metadata",
+    "glyphs"
+  ],
+  "layers": [
+    [
+      "roads-simple",
+      "line",
+      "simple",
+      "a0894aa3fdcc8faf",
+      "9c9ddddc14675143",
+      "c57eb06c5a87ff06"
+    ],
+    [
+      "roads-fill",
+      "line",
+      "roads",
+      "a0894aa3fdcc8faf",
+      "c5a38c14a2deb8a1",
+      "9fcf0e01ba5670e6"
+    ],
+    [
+      "roads-arrows",
+      "symbol",
+      "slots",
+      "eae28bcca8caacf2",
+      "b9e63a214b296e3e",
+      "6defc6068961f92c"
+    ],
+    [
+      "roads-labels",
+      "symbol",
+      "slots",
+      "9de716419d39dad7",
+      "e66f1480f0ee2761",
+      "042c1e60af4c52d7"
+    ],
+    [
+      "roads-highlight",
+      "line",
+      "roads",
+      "74234e98afe7498f",
+      "18d823d8fbe1e80f",
+      "9fcf0e01ba5670e6"
+    ]
+  ],
+  "sources": {
+    "roads": [
+      "geojson",
+      4563,
+      "c850ea518e531633"
+    ],
+    "simple": [
+      "geojson",
+      17573,
+      "aa12467aa8dbc7e9"
+    ],
+    "slots": [
+      "geojson",
+      1739,
+      "716dc0dd2795fc16"
+    ]
+  },
+  "metadata": {
+    "roadstyle:interaction": "8bd55e519f81a314",
+    "roadstyle:images": "e9049aa3d5b18840"
+  },
+  "hash": "04f2e9b9fbb0eac8",
+  "road_table": {
+    "rows": 4563,
+    "columns": [
+      "edge_id",
+      "osm_id",
+      "edge_ref",
+      "highway",
+      "name",
+      "lanes",
+      "oneway",
+      "maxspeed_kmh",
+      "length_m",
+      "tunnel",
+      "bridge",
+      "layer",
+      "casing_start",
+      "casing_level",
+      "casing_end",
+      "fill_level",
+      "head_start_m",
+      "head_end_m",
+      "cap_start",
+      "cap_end",
+      "__rs_fill",
+      "__rs_twoway",
+      "lvl",
+      "__rs_cls"
+    ],
+    "hash": "d59862fa01aa8007",
+    "text": {
+      "bytes": 2929872,
+      "sha16": "d59862fa01aa8007"
+    }
+  },
+  "text": {
+    "bytes": 10822293,
+    "sha16": "04f2e9b9fbb0eac8"
+  }
+}
