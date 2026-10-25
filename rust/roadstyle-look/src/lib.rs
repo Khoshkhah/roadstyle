@@ -6,6 +6,7 @@
 //! The look does not know the roads (rule 2 of the layers): the engine combines the two.
 
 pub mod basemap;
+pub mod color;
 mod error;
 mod png;
 mod ramp;

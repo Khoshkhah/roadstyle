@@ -17,30 +17,6 @@ use crate::crs::{Crs, ToWgs84};
 use crate::geojson;
 pub use roadstyle_model::RoadTable;
 
-/// The x, y of a LineString in WKB (ISO: the type 1002, 2002, 3002 for Z, M, ZM; EWKB: the flags 0x80000000 Z, 0x40000000 M and
-/// 0x20000000 an SRID before the points). None for another geometry.
-fn wkb_line(b: &[u8]) -> Option<Vec<[f64; 2]>> {
-    let le = *b.first()? == 1;
-    let u32_at = |i: usize| -> Option<u32> {
-        let w: [u8; 4] = b.get(i..i + 4)?.try_into().ok()?;
-        Some(if le { u32::from_le_bytes(w) } else { u32::from_be_bytes(w) })
-    };
-    let f64_at = |i: usize| -> Option<f64> {
-        let w: [u8; 8] = b.get(i..i + 8)?.try_into().ok()?;
-        Some(if le { f64::from_le_bytes(w) } else { f64::from_be_bytes(w) })
-    };
-    let t = u32_at(1)?;
-    let (base, z, m) = ((t & 0x0FFF_FFFF) % 1000, t & 0x8000_0000 != 0 || matches!((t & 0x0FFF_FFFF) / 1000, 1 | 3),
-                        t & 0x4000_0000 != 0 || matches!((t & 0x0FFF_FFFF) / 1000, 2 | 3));
-    if base != 2 {
-        return None;
-    }
-    let start = 5 + if t & 0x2000_0000 != 0 { 4 } else { 0 };
-    let step = 8 * (2 + usize::from(z) + usize::from(m));
-    let n = u32_at(start)? as usize;
-    (0..n).map(|k| Some([f64_at(start + 4 + step * k)?, f64_at(start + 12 + step * k)?])).collect()
-}
-
 /// The WKB of a GeoPackage geometry: after "GP", the version, the flags (bit 0: the byte order; bits 1-3: the envelope, 0 / 32 / 48 / 48
 /// / 64 bytes), the srs_id and the envelope.
 fn gpkg_wkb(b: &[u8]) -> Option<&[u8]> {
@@ -110,7 +86,7 @@ pub fn read_roads(data: &[u8], what: &str) -> Result<(RoadTable, Option<String>)
             props.insert(name.clone(), v);
         }
         let line = match row.get_ref(0).map_err(&err)? {
-            ValueRef::Blob(b) => gpkg_wkb(b).and_then(wkb_line),
+            ValueRef::Blob(b) => gpkg_wkb(b).and_then(crate::read::wkb_line),
             _ => None,
         };
         let geom = match line {

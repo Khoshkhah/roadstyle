@@ -1145,8 +1145,9 @@ flowchart TB
 (13,298 roads), the Södermalm sample (4,563 driving edges, with duckOSM's solved levels) and Tartu (64,828 roads) it writes the roads-only
 style of `export_inline`, the tiles of `export_style` (the 3 x 3 tiles around the centre at zooms 12, 14 and 15) and the levels (the tags
 rule; the solve with duckOSM's level-area defaults, not for Tartu: Python's solve needs too much memory there). The files over 1 MB and
-Tartu's inputs are on the pre-release `rust-test-data` (`goldens-1.tar`, 42.5 MB); `tests/get_goldens.sh` gets them and checks their
-SHA-256. The colour cases and the looks of tasks 1 and 3 come from the same script. `tests/areas.rs` compares the engine with them.
+Tartu's inputs are on the pre-release `rust-test-data` (`goldens-2.tar`, 40.1 MB, made with the Python of 2026-10-24; `goldens-1.tar` of
+0.24.3 stays there for the older commits); `tests/get_goldens.sh` gets them and checks their SHA-256. The tests compare the engine with
+these goldens as they are (audit 3, N27: no test changes a golden). The colour cases and the looks of tasks 1 and 3 come from the same script. `tests/areas.rs` compares the engine with them.
 
 **Differences found and fixed** (the engine now does what Python does):
 
@@ -1649,6 +1650,14 @@ Later decisions:
 - 2026-10-24: P7 and 1.0 approved, on the condition that the coordinator reports the design steps done (R3, R1/R4, (d), (e), dead
   code, the third audit and its top items), with both engine suites and CI green. The publish of 1.0 waits for the owner's answer to
   that report.
+- 2026-10-24: **The Rust API is the design; Python is a thin binding.** The owner's words: "The aim is make this rust version the real
+  and main library instead of python version. So I need to make it independent. I don't want because wrong design of its python
+  version we have the same issues in rust version." So the rule "Python is the reference" ends: the Rust engine is not made to copy a
+  Python design, and byte parity with Python is no goal. The Python package adapts its keywords to the Rust types at its border. These
+  contracts stay fixed: duckOSM's `edge_id` hash and column names, the observation formats of sensor-matching and SonoFlow, and the
+  border formats (GeoJSON, GeoParquet, PMTiles). After N27 (the last check against Python), the goldens are made with the Rust engine,
+  and the parity tests become checks of the structure (layers, sources, metadata, road-table rows) plus one test that the Python
+  binding passes the data through unchanged.
 
 ## Found during the inventory
 
