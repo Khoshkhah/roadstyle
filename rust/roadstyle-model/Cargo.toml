@@ -14,4 +14,5 @@ serde.workspace = true
 serde_json.workspace = true
 arrow-array.workspace = true
 arrow-schema.workspace = true
+arrow-select.workspace = true         # FeatureTable::filter (the base map clipped to its boundary)
 rstar.workspace = true

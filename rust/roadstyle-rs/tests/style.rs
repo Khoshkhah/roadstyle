@@ -60,7 +60,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "32bc4fafedbcb037500a5a554d4060cd53fdc30b87adb236d6f73d77be8e0ce1");
+    assert_eq!(style_hash(&area), "dd4a192fc46899de53947efb5532c2481dd40e5d2134918a28ec01a3507d7b7c");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -109,12 +109,13 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "c578f77002cc014695d73676aff11e84c0aa4fbe2edc1e8b5d819de5a228d7cc");
+    assert_eq!(tiles_hash(&area), "d1a526023116145745a6c433994b9011830d2cd32891a970a701ca3c3de61982");
 }
 
-/// tiles.py's extra layers: the sea of Monaco (a polygon) is in the tiles at its west edge, where only its box reaches.
+/// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at
+/// the west edge, where only its box reaches; now these tiles, beyond the boundary, have no sea.
 #[test]
-fn the_sea_at_the_tile_edge() {
+fn the_sea_is_cut_at_the_boundary() {
     let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data");
     let read = |p: PathBuf| std::fs::read(&p).unwrap();
     let mut look: serde_json::Value = serde_json::from_slice(&read(data.join("look.json"))).unwrap();
@@ -124,7 +125,7 @@ fn the_sea_at_the_tile_edge() {
                                                  None, "rs://", &[]).unwrap();
     for (z, x, y) in [(14, 8528, 5973), (14, 8528, 5974), (15, 17057, 11946), (15, 17057, 11947), (15, 17057, 11948)] {
         let t = tiles.tile(z, x, y);
-        assert!(!t.is_empty() && t.windows(3).any(|w| w == b"ov1"), "{z}/{x}/{y}: no sea");
+        assert!(t.is_empty() || !t.windows(3).any(|w| w == b"ov1"), "{z}/{x}/{y}: sea beyond the boundary");
     }
 }
 

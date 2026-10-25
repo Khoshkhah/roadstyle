@@ -34,15 +34,15 @@ fn tables(parquet: Vec<u8>, features: Option<Vec<u8>>, planner: Option<Vec<u8>>)
         planner.map(|p| read::read_table(p, "")).transpose()?))
 }
 
-/// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), the background's land without the sea
-/// (duckosm::cut_sea).
+/// The base map's rows from their GeoParquet bytes (the duckOSM reader's features.parquet), clipped to the area's boundary
+/// (duckosm::clip_to_boundary), the background's land without the sea (duckosm::cut_sea).
 pub fn read_features(features: Vec<u8>) -> Result<FeatureTable, crate::Error> {
     features_of(read::read_feature_table(features, "geometry")?)
 }
 
 /// The base map's rows that a reader gave (`read::feature_table_from`, ...), as `read_features`.
 pub fn features_of(t: FeatureTable) -> Result<FeatureTable, crate::Error> {
-    Ok(duckosm::cut_sea(t)?)
+    Ok(duckosm::cut_sea(duckosm::clip_to_boundary(t)?)?)
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
