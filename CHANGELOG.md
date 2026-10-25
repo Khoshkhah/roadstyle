@@ -86,6 +86,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **A test that the Python binding passes the output through** (`tests/test_binding.py`): on Monaco, the binding's style, road
+  table and page are the Rust facade's texts byte for byte (the hashes in the Rust goldens, which `tests/areas.rs` makes). A page
+  gives the CARTO no-key warning once, not once for each CARTO base map of the switcher.
 - **The areas' goldens are the Rust engine's own** (2026-10-24: the Rust API is the design). `tests/areas.rs` checks the style and
   the tiles of Monaco, Södermalm and Tartu against summaries in git (`rust_style.json`, `rust_tiles.json`, about 2 KB each), which
   `ROADSTYLE_BLESS=1 cargo test` writes. The comparisons with Python's `golden_style` and `golden_tiles` are gone; the levels, the

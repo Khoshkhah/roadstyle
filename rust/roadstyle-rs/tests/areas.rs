@@ -25,17 +25,35 @@ fn roads(area: &str) -> Vec<u8> {
     std::fs::read(data(&format!("{area}/roads.parquet"))).unwrap()
 }
 
-/// The style of an area (stage 1, export_inline's) as a summary, with its road table's rows, columns and hash.
+/// The size and the first 16 hex characters of the SHA-256 of a text: what the bindings must give byte for byte
+/// (tests/test_binding.py compares the Python binding's texts with these).
+fn text(b: &[u8]) -> Value {
+    use sha2::{Digest, Sha256};
+    json!({"bytes": b.len(), "sha16": Sha256::digest(b).iter().take(8).map(|x| format!("{x:02x}")).collect::<String>()})
+}
+
+/// The style of an area (stage 1, export_inline's) as a summary, with its road table's rows, columns and hash, and the two texts.
 fn style(area: &str) -> Value {
     let s = roadstyle_rs::make_sources(roads(area), &look(area), None, None, None).unwrap();
     let (mut out, mut table) = (Vec::new(), Vec::new());
     s.write_style(&mut out).unwrap();
     roadstyle_rs::write_road_table(&s, &mut table).unwrap();
+    let (style_text, table_text) = (text(&out), text(&table));
     let table: Value = serde_json::from_slice(&table).unwrap();
     let cols: Vec<String> = table["props"][0].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
     let mut sum = common::summary(&serde_json::from_slice(&out).unwrap());
-    sum["road_table"] = json!({"rows": table["props"].as_array().map(Vec::len), "columns": cols, "hash": common::hash16(&table)});
+    sum["road_table"] = json!({"rows": table["props"].as_array().map(Vec::len), "columns": cols, "hash": common::hash16(&table),
+                               "text": table_text});
+    sum["text"] = style_text;
     sum
+}
+
+/// The page of an area (page_from with the area's look, state "live", and no other option): its text.
+fn page(area: &str) -> Value {
+    let t = roadstyle_rs::read::read_roads(roads(area), "geometry").unwrap();
+    let l = look(area).with_arg("state", "live".into()).unwrap();
+    let p = roadstyle_rs::page_options::page_from(t, None, &l, &roadstyle_rs::look::Options::default(), &serde_json::Map::new()).unwrap();
+    json!({"page": text(p.html.as_bytes()), "warnings": p.warnings})
 }
 
 /// The tiles of an area (make_tiled, every column of the roads kept): the 3 x 3 tiles around the roads' centre at zooms 12, 14 and 15,
@@ -75,6 +93,7 @@ fn monaco_and_sodermalm_are_their_goldens() {
         common::golden(&format!("{area}/rust_style.json"), &style(area));
         common::golden(&format!("{area}/rust_tiles.json"), &tiles(area));
     }
+    common::golden("monaco/rust_page.json", &page("monaco"));
 }
 
 /// The engine's levels (levels.rs) of an area's roads: one rank, as the roads are one table.

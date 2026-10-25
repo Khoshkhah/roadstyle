@@ -1,0 +1,9 @@
+{
+  "page": {
+    "bytes": 4378094,
+    "sha16": "1c95f9b9675c332f"
+  },
+  "warnings": [
+    "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, or use a keyless base map (esri_street, esri_dark_gray, osm)."
+  ]
+}

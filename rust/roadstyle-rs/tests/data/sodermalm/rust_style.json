@@ -101,6 +101,14 @@
       "lvl",
       "__rs_cls"
     ],
-    "hash": "d59862fa01aa8007"
+    "hash": "d59862fa01aa8007",
+    "text": {
+      "bytes": 2929872,
+      "sha16": "d59862fa01aa8007"
+    }
+  },
+  "text": {
+    "bytes": 10822293,
+    "sha16": "04f2e9b9fbb0eac8"
   }
 }

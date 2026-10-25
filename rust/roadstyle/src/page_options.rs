@@ -241,9 +241,13 @@ fn basemap(v: &Value, api_key: Option<&str>, resolved: &[Value], warnings: &mut 
     };
     match api_key.filter(|t| !t.is_empty()) {
         Some(t) => bm["url"] = inject_token(bm["url"].as_str().unwrap_or(""), t).into(),
-        None if bm["url"].as_str().is_some_and(|u| u.contains("cartocdn.com")) => warnings.push(
-            "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, or use \
-             a keyless base map (esri_street, esri_dark_gray, osm).".into()),
+        None if bm["url"].as_str().is_some_and(|u| u.contains("cartocdn.com")) => {
+            let w = "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, \
+                     or use a keyless base map (esri_street, esri_dark_gray, osm).";
+            if !warnings.iter().any(|x| x == w) {
+                warnings.push(w.into());        // one for the page, not one for each CARTO base map of the switcher
+            }
+        }
         None => {}
     }
     Ok(bm)
