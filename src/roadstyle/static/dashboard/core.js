@@ -39,6 +39,7 @@ export function initCore(m, opts){
   RS_TILED = opts.tiles; OVERLAYS = opts.overlays;
   useStyle(opts.style);
   map.once("load", _checkPromote);
+  map.on("styleimagemissing", _emptyImage);
   map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; if(_SRC.decks && e.sourceId===RS_PREFIX+_SRC.decks.source) _decks=null; });
   window.rsQuery = rsQuery; window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight; window.rsFocus = rsFocus;
 }
@@ -55,6 +56,32 @@ export function useStyle(st){
   _decks = null;
   _checkPromote();
   _useState();
+  _useImages();
+}
+// the style's images (O.images: a page's; else roadstyle:images of a host's style): each one that the map does not have yet, never in
+// place of the host's of the same name. "oneway" is arrows.js' when the page gives arrow_icon. A layer that asks for an image before it
+// has loaded gets an empty one at once (styleimagemissing: no "image not found" warning), which the real one replaces when it has loaded.
+const _ownImg = new Set(), _emptyImg = new Set();          // the ids that the dashboard added; of them, the empty ones
+// an image is a data URL (a base map's pattern or icon) or {url, sdf, pixelRatio} (the arrow)
+function _imgOf(id){ const v = id === "oneway" && O.arrow_icon ? null : (O.images || {})[id]; return v ? (typeof v === "string" ? {url: v} : v) : null; }
+function _useImages(){
+  for(const id of Object.keys(O.images || {})){
+    const im = _imgOf(id);
+    if(!im || (map.hasImage(id) && !_emptyImg.has(id))) continue;          // the arrow of arrows.js, the host's or one already added
+    const img = new Image();                                                 // an <img> reads an SVG icon too (map.loadImage does not)
+    img.onload = () => {
+      if(map.hasImage(id)){ if(!_emptyImg.has(id)) return; map.removeImage(id); }
+      map.addImage(id, img, {sdf: !!im.sdf, pixelRatio: im.pixelRatio || 1});
+      _ownImg.add(id); _emptyImg.delete(id);
+    };
+    img.onerror = () => console.error("roadstyle: the image " + id + " of the style could not be read");
+    img.src = im.url;
+  }
+}
+function _emptyImage(e){
+  if(!_imgOf(e.id) || map.hasImage(e.id)) return;
+  map.addImage(e.id, {width: 1, height: 1, data: new Uint8Array(4)});
+  _ownImg.add(e.id); _emptyImg.add(e.id);
 }
 // the style's global state (roadstyle:state: rs_co, rs_fill_on, ...): the start value of each name that the map does not have yet. A
 // host that adds a live style's layers to its own map has none of them (they are in the style's own "state"); a value that the map has

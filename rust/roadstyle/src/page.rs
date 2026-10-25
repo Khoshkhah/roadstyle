@@ -80,6 +80,10 @@ pub struct PageOptions {
     pub modes: Value,
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub box_layout: Value,
+    /// the style's images (roadstyle:images: {id: {url, sdf, pixelRatio}}) but the arrow, which the page draws from arrow_icon: a base
+    /// map's patterns and icons, which the dashboard adds to the map; none with no base map
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub images: Value,
 }
 
 /// The page's start camera (the camera settings with the call's pitch, bearing and max_pitch).

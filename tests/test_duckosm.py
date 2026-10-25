@@ -291,3 +291,36 @@ def test_a_building_tag_of_two_digits_gives_its_height(tmp_path):
     assert features.column("levels").to_pylist() == ["25"]
     html = duckosm.page(db, "driving", levels="tags", layers=["buildings"]).html
     assert '"height":91.5' in html.replace(" ", ""), "the building's height in the page's base map"
+
+
+@needs_db
+def test_the_page_draws_the_base_maps_textures_and_icons(tmp_path):
+    """duckosm.page: the base map's patterns and icons (RS_OPTIONS.images; the page writer takes them from roadstyle:images) are in the map
+    at their size, a texture is drawn at zoom 16 (Monaco has forest, no wetland), and no image is "not found"."""
+    pw = pytest.importorskip("playwright.sync_api")
+    from roadstyle import duckosm
+
+    out = tmp_path / "monaco.html"
+    duckosm.page(DB, "all").save(str(out))
+    html = out.read_text()
+    images = json.JSONDecoder().raw_decode(html, html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]["images"]
+    assert "ms-pat-forest" in images and "oneway" not in images
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page(viewport={"width": 900, "height": 700})
+        console = []
+        pg.on("console", lambda m: console.append((m.type, m.text)))
+        pg.goto(out.as_uri())
+        pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded()", timeout=90000)
+        sizes = pg.evaluate("ids => ids.map(i => map.getImage(i) && map.getImage(i).data.width)", sorted(images))
+        center = pg.evaluate("""() => { const l = map.getStyle().layers.find(l => l.id === 'ov0-pattern');
+            const f = map.querySourceFeatures(l.source, l['source-layer'] ? {sourceLayer: l['source-layer']} : {}).find(f => f.properties.kind === 'forest');
+            const r = f.geometry.type === 'Polygon' ? f.geometry.coordinates[0] : f.geometry.coordinates[0][0];
+            return [r.reduce((s, c) => s + c[0], 0) / r.length, r.reduce((s, c) => s + c[1], 0) / r.length]; }""")
+        pg.evaluate("c => map.jumpTo({center: c, zoom: 16})", center)
+        pg.wait_for_function("map.loaded()", timeout=60000)
+        drawn = pg.evaluate("map.queryRenderedFeatures({layers: ['ov0-pattern']}).filter(f => f.properties.kind === 'forest').length")
+        browser.close()
+    assert all(s and s > 1 for s in sizes), dict(zip(sorted(images), sizes, strict=True))
+    assert drawn > 0
+    assert not [t for k, t in console if "could not be loaded" in t or "could not be read" in t], console

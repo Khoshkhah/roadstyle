@@ -67,6 +67,9 @@ export interface DashboardOptions {
   /** The column of the road's id (the search always reads it). */
   edge_id_col?: string;
   arrow_icon?: Record<string, unknown> | null;
+  /** The images that the dashboard adds to the map, {id: data URL | {url, sdf, pixelRatio}} (a page's base-map patterns and icons);
+   *  null: the style's roadstyle:images. An image that the map has (the host's) stays. */
+  images?: Record<string, string | { url: string; sdf?: boolean; pixelRatio?: number }> | null;
   arrow_color?: string;
   arrow_rules?: Record<string, unknown>;
 }

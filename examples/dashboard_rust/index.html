@@ -37,10 +37,7 @@ const road_table = JSON.parse(new TextDecoder().decode(makeSources(roads, lk, un
 const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});
 map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
 map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
-// the style's images (the one-way arrow): the style's metadata roadstyle:images
-for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {})) {
-  map.loadImage(im.url).then((r) => map.addImage(id, r.data, {sdf: im.sdf, pixelRatio: im.pixelRatio}));
-}
+// the style's images (the one-way arrow; a base map's patterns and icons, roadstyle:images): the dashboard adds them
 // the popup fields, the tooltip and the hover delay come from the style's metadata roadstyle:interaction, the legend from
 // roadstyle:color_options
 rsDashboard(map, {

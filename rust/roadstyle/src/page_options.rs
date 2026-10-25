@@ -189,6 +189,8 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         edge_id_col: ctl["edge_id_col"].as_str().unwrap_or("edge_id").into(), arrow_icon: ctl["arrow_icon"].clone(),
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
         modes: ctl["modes"].clone(), box_layout: a.get("box_layout").cloned().unwrap_or_default(),
+        images: Some(meta["roadstyle:images"].as_object().into_iter().flatten().filter(|(k, _)| *k != "oneway")
+            .map(|(k, v)| (k.clone(), v.clone())).collect::<Map<String, Value>>()).filter(|m| !m.is_empty()).map(Value::Object).unwrap_or_default(),
     };
     let hover = json!(mo.interaction.hover_color.as_ref().unwrap_or(&ls.selection.hover).css());
     let simple_js = json!({"layer": "roads-simple", "bridge": ls.bridges.casing_color, "shadow": ls.bridges.shadow.color,

@@ -188,6 +188,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A duckOSM page draws its base map's textures and icons.** The engine writes them in `roadstyle:images`, but no roadstyle code added
+  them to the map (only hosts did), so `roadstyle.duckosm.page` drew none. The dashboard now adds each image of the style that the map
+  does not have yet, never in place of the host's, with an empty one at once for a layer that asks before the image has loaded (no
+  "image not found" warning). A page gives them as the option `images`.
 - **The studio's Dashboard and Report pages have their sidebar again.** Since the page keys came from `given` only (N32 step 2), the
   wasm page (`makePage`, `Roads.page`) lost the page keys of its call (`sidebar`, `popup_mode`, ...). One function now makes them,
   `roadstyle::page_options::given_of` (the look's other keywords, and `name` and `road_popup` of the call), for the wasm page and for

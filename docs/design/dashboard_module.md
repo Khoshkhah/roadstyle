@@ -175,6 +175,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `road_fill` | `road_fill`: `{on, paint}` | `{on: true, paint: {}}` | `color.js` |
 | `views` | `views` | `[]` | `views.js` |
 | `items` | `items`, `items_popup`: `{label, popup, layer}` or `null` | `null` | `select.js` |
+| `images` | the page's images: a base map's patterns and icons (`roadstyle:images` but `oneway`) | `null`: the style's `roadstyle:images` | `core.js` |
 | `road_popup` | `road_popup`: `false` (no popup), `null` (all fields) or a field list | the style's metadata | `select.js`, `find.js` |
 | `road_tooltip` | `road_tooltip` or `tooltip`: `false`, `true` or a field list | the style's metadata | `select.js` |
 | `hover_delay_ms` | `hover_delay_ms` | the style's metadata, else `300` | `select.js`, `overlays.js` |

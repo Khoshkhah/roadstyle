@@ -21,7 +21,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | `roadstyle:interaction` | `{popup, tooltip, hover_delay_ms}`: the road popup's fields, the hover tooltip, the hover delay |
 | `roadstyle:color_options` | `[{name, prop, legend}]`: the colour options and their legends |
 | `roadstyle:live` | with `live_data=True` only: `{color, width, types, ramp, nodata}`: the feature states that the road layer reads on the road's row (`rs_c` a colour, `rs_w` a width factor), the default ramp (9 colours of `cmap`) and the no-data colour; a page gives it to the dashboard as the option `live` (null without `live_data`) |
-| `roadstyle:images` | the images that the host adds (`oneway`) |
+| `roadstyle:images` | the style's images: `oneway` (`{url, sdf, pixelRatio}`) and a base map's patterns and icons (data URLs). The dashboard adds each one that the map does not have yet and never replaces the host's of the same name (`core.js`, `_useImages`); a page gives them as the option `images` (but `oneway`, which `arrows.js` draws from `arrow_icon`). A host that renames the image names in the layers (a prefix) adds its own |
 | `roadstyle:planner`, `roadstyle:planner_skipped` | the route planner's graphs, or the number of roads past its limit |
 | layer `roadstyle:group` | the group of a layer: `roads`, or an overlay's label |
 | layer `roadstyle:over` | a base-map layer that goes over the roads (the 3D buildings) |

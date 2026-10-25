@@ -85,9 +85,7 @@ const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live",
 const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
 
 const map = new maplibregl.Map({container: "map", style});
-for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {}))
-  map.loadImage(im.url).then((r) => map.addImage(id, r.data, {sdf: im.sdf, pixelRatio: im.pixelRatio}));
-const rs = rsDashboard(map, {style, find_control: true});
+const rs = rsDashboard(map, {style, find_control: true});     // it adds the style's images (roadstyle:images) too
 </script>
 ```
 

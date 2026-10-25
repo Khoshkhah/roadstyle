@@ -40,6 +40,7 @@ const RS_DEFAULTS = {
   modes: [], box_layout: "corner",   // roadstyle:controls.modes [[mode, count], ...]; "stack": a base map's page (Layers under Roads, folded)
   tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], pick: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,
+  images: null,                 // {id: {url, sdf, pixelRatio}} (a page's base-map patterns and icons); null: the style's roadstyle:images
 };
 // the options that the page did not give and that the style's metadata gives: the road popup, the hover tooltip and the hover delay
 // (roadstyle:interaction: export_style, the Rust engine), the colour options and their legends (roadstyle:color_options: the Rust
@@ -63,6 +64,7 @@ function fromStyle(o, given){
   if(given.has("filter_control") || !("on" in f)) o.filter = {...f, on: o.filter_control !== false && (f.classes || []).length > 0};
   if(!given.has("color_options")) o.color_options = meta["roadstyle:color_options"] || [];
   if(!given.has("live")) o.live = meta["roadstyle:live"] || null;
+  if(!given.has("images")) o.images = meta["roadstyle:images"] || null;
 }
 // returns the dashboard object (docs/design/rust_library.md, "The runtime API", api.js): setStyle, and the methods of the API
 export function rsDashboard(map, options){
