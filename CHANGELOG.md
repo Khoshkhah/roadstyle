@@ -86,6 +86,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **One style builder, and the page writes each source once** (review 4, D3 and N29). `Sources::style_with` makes the style with
+  no source's data in it, and `Sources::write_with` writes it, with each source's data written into the text as it goes. Stage 2
+  (`tile_stage`) and the page (`page_from`) use them: no source is cloned, written and parsed back any more. The page's JSON is
+  `serde_json`'s compact text, each `<` as `\u003c`; Python's `json.dumps` copy in Rust (`pyjson`) is gone. On Tartu, the Rust page:
+  peak memory 1.91 GB to 0.60 GB and 4.1 s to 2.5 s (no gzip), 1.84 GB to 0.42 GB and 6.3 s to 5.5 s (gzip); `make_tiled` stays
+  at 173 MB (it tiles every source).
 - **An exported style tells an app's dashboard its roads** (audit 3, N27, both engines). `export_style`'s metadata has
   `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers that a road is picked on), from its final layers, as a
   live style has them. A dashboard on an exported style finds and picks the roads with no layer-id prefix.

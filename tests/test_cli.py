@@ -11,6 +11,12 @@ SAMPLE = Path(__file__).resolve().parent.parent / "notebooks" / "data" / "soderm
 pytestmark = pytest.mark.skipif(not SAMPLE.exists(), reason="sample gpkg not present")
 
 
+
+def _in(needle, html):
+    """A JSON fragment in a page, in either engine's spacing: Python's json.dumps (", ", ": ") or serde_json's compact text."""
+    return needle in html or needle.replace(": ", ":").replace(", ", ",") in html
+
+
 def test_version(capsys):
     with pytest.raises(SystemExit) as e:
         main(["--version"])
@@ -55,7 +61,7 @@ def test_cli_view_3d(tmp_path):
     out = tmp_path / "m3d.html"
     assert main([str(SAMPLE), "-o", str(out), "-f", "web", "--view-3d", "--bearing", "-20"]) == 0
     html = out.read_text()
-    assert '"pitch": 55, "bearing": -20' in html
+    assert _in('"pitch": 55, "bearing": -20', html)
     assert out.exists() and out.stat().st_size > 0
 
 

@@ -64,8 +64,8 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
 - **Large networks.** On Tartu (64,828 roads) the page takes 6.1 s with Rust and 19.5 s with Python. With `tiles=True` it takes
   13.4 s and 137.4 s, and a folder of tiles (`export_style`) 4.6 s and 152.0 s ([Parity and speed](parity.md#speed)).
-- **Nightly pages.** The output is the same as the Python output, byte for byte, so you can change the engine without a change
-  to your pages.
+- **Nightly pages.** The output is the same map as the Python output (the same style, options and data), so you can change the
+  engine without a change to your pages.
 - **The browser.** A page can make the style and the tiles itself, from a duckOSM file or a GeoParquet file, with no Python.
 
 The Rust engine does not do everything that the Python engine does. For example, the `folium` and `lonboard` backends and a

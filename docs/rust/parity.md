@@ -5,9 +5,9 @@ much memory it uses.</p>
 
 ## What "the same" means
 
-For the style and the page, the same means byte for byte: the same keys in the same order, the same numbers to the last digit.
-The Rust engine writes JSON as Python's `json.dumps` writes it, with its separators, its `\uXXXX` escapes and its floats
-(`1e-05`, `60.0`), and it parses floats exactly.
+For the style and the page, the same means the same JSON values: the same keys, the same numbers to the last digit (the engine
+parses floats exactly). The JSON text is each engine's own: since 2026-10-24 the Rust engine writes `serde_json`'s compact text, not
+Python's `json.dumps` (the Rust API is the design), and the tests compare the values (`_same_page`).
 
 For the tiles, the same means the same features when decoded: the same ids, properties and geometry. The bytes can differ,
 because Python's encoder (`mapbox_vector_tile`) writes a negative integer as `int_value` and a float with no fraction as an

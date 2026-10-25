@@ -1387,8 +1387,8 @@ public calls. A5 is the levels session's.
 Library switches (2026-10-24). Before P7: the PMTiles writer (`roadstyle-tiles/src/pmtiles.rs`) becomes the `pmtiles` crate's writer,
 in N22 (one tile writer), if it builds for wasm32. After P7, because they change bytes and must wait until Rust is the reference: the
 MVT encoder (`mvt` or `geozero`), the geometry helpers (`geo`: simplify, interpolate, line locate; `cavalier_contours` for offsets),
-the GeoParquet metadata (`geoparquet` or `geoarrow`, when they reach 1.0), and the removal of the Python-style JSON writer and rounding
-(`pyjson`, `py_round`). These stay as they are: the level solver, parquet and arrow, shapefile, proj4rs, i_overlay, rusqlite, rstar,
+the GeoParquet metadata (`geoparquet` or `geoarrow`, when they reach 1.0), and the removal of the Python-style rounding (`py_round`).
+The Python-style JSON writer (`pyjson`) went on 2026-10-24 (D3, N29). These stay as they are: the level solver, parquet and arrow, shapefile, proj4rs, i_overlay, rusqlite, rstar,
 sha2 and yaml-rust2.
 
 #### A2: the MCP server in Rust

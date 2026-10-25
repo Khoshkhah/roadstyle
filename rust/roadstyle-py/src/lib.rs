@@ -217,7 +217,7 @@ impl Sources {
             None => roadstyle::xyz_at(""),
         };
         let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at));
-        let style = style.to_string();
+        let style = py.detach(|| roadstyle::style_text(s, &style));
         Ok((style.clone(), Tiler { style, tiles }))
     }
 
