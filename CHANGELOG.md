@@ -47,6 +47,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **Two readings of a duckOSM file at the same time on one connection no longer break each other** (the duckosm-rust page: "Table with
+  name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
+  `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,
+  `features_sql.js` and Python's `duckosm.read` use them.
 - **A look colour "#fff" no longer crashes `export_look`** (review D4: a panic in Rust, an abort in the browser). One colour module in the
   look crate (`roadstyle_look::color`) reads every colour of the look: "#rrggbb", "#rgb" and a CSS colour name; any other "#..." text is
   an error that names it. One mix rounds half up for the look and the export (the base map's look rounded half to even: some of its

@@ -71,14 +71,14 @@ Each arrow points from a crate to the crate that uses it:
 flowchart TB
     roadstyle_model["roadstyle-model<br/>1,526 lines"]
     roadstyle_look["roadstyle-look<br/>1,635 lines"]
-    roadstyle_io["roadstyle-io<br/>1,526 lines"]
+    roadstyle_io["roadstyle-io<br/>1,584 lines"]
     roadstyle_levels["roadstyle-levels<br/>2,598 lines"]
     roadstyle_engine["roadstyle-engine<br/>6,265 lines"]
     roadstyle_tiles["roadstyle-tiles<br/>1,127 lines"]
     roadstyle["roadstyle<br/>2,104 lines"]
     roadstyle_rs["roadstyle-rs<br/>216 lines"]
-    roadstyle_wasm["roadstyle-wasm<br/>497 lines"]
-    roadstyle_py["roadstyle-py<br/>531 lines"]
+    roadstyle_wasm["roadstyle-wasm<br/>509 lines"]
+    roadstyle_py["roadstyle-py<br/>545 lines"]
     roadstyle_cli["roadstyle-cli<br/>389 lines"]
     roadstyle_mcp["roadstyle-mcp<br/>305 lines"]
     roadstyle_serve["roadstyle-serve<br/>264 lines"]
@@ -114,20 +114,20 @@ step) takes this crate alone.
 |---|---|---|---|
 | [`roadstyle-model`](#roadstyle-model) | roadstyle's road model: the roads as features with typed properties, and the geometry helpers | 1,526 | arrow-array, arrow-schema, rstar, serde, serde_json |
 | [`roadstyle-look`](#roadstyle-look) | roadstyle's look: the typed, versioned config (palettes, profiles, settings, map options) that the engine draws a map with | 1,635 | base64, crc32fast, flate2, serde, serde_json, yaml-rust2 |
-| [`roadstyle-io`](#roadstyle-io) | roadstyle's readers: the roads and other tables from GeoParquet, GeoJSON, Shapefile and (feature gpkg) GeoPackage | 1,526 | `roadstyle-levels`, `roadstyle-model`, arrow-array, arrow-schema, arrow-select, bytes, crs-definitions, i_overlay, parquet, proj4rs, proj4wkt, rusqlite, serde_json, shapefile |
+| [`roadstyle-io`](#roadstyle-io) | roadstyle's readers: the roads and other tables from GeoParquet, GeoJSON, Shapefile and (feature gpkg) GeoPackage | 1,584 | `roadstyle-levels`, `roadstyle-model`, arrow-array, arrow-schema, arrow-select, bytes, crs-definitions, i_overlay, parquet, proj4rs, proj4wkt, rusqlite, serde_json, shapefile |
 | [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (on roadstyle-model only, for the road flags) | 2,598 | `roadstyle-model`, rstar, sha2 |
 | [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 6,265 | `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, indexmap, rstar, serde_json |
 | [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 1,127 | `roadstyle-model`, flate2, indexmap, rstar, serde_json |
 | [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 2,104 | `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-tiles`, base64, flate2, serde, serde_json |
 | [`roadstyle-rs`](#roadstyle-rs) | The old name of the facade crate roadstyle, kept for one version | 216 | `roadstyle`, serde_json |
-| [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 497 | `roadstyle`, serde_json, wasm-bindgen |
-| [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 531 | `roadstyle`, `roadstyle-serve`, arrow-array, pyo3, serde_json |
+| [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes | 509 | `roadstyle`, serde_json, wasm-bindgen |
+| [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 545 | `roadstyle`, `roadstyle-serve`, arrow-array, pyo3, serde_json |
 | [`roadstyle-cli`](#roadstyle-cli) | The roadstyle program: one command for each job (serve: the level editor's files; snapshot: a PNG of a saved page) | 389 | `roadstyle`, `roadstyle-serve`, `roadstyle-snapshot`, serde_json |
 | [`roadstyle-mcp`](#roadstyle-mcp) | MCP server for roadstyle: AI agents draw styled, interactive road maps of road files | 305 | `roadstyle`, `roadstyle-snapshot`, base64, rmcp, schemars, serde, serde_json, strsim, tokio |
 | [`roadstyle-serve`](#roadstyle-serve) | roadstyle serve: the level editor's page files and an area folder on 127.0.0.1 (the program and the Python binding call it) | 264 | httparse |
 | [`roadstyle-snapshot`](#roadstyle-snapshot) | PNG pictures of saved roadstyle pages: Chromium over CDP draws the page, as roadstyle's Python snapshot does | 180 | anyhow, headless_chrome, serde_json |
 
-All crates: 19,163 lines of Rust in `rust/*/src/`.
+All crates: 19,247 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -187,7 +187,7 @@ Library, in `rust/roadstyle-io/`. Public API: `columns`, `crs`, `duckosm`, `geoj
 | `lib` | 20 | roadstyle's readers and writers: the roads and other tables from GeoParquet (`read`), the roads from GeoJSON (`geojson`), Shapefile (`shp`) and GeoPackage (`gpkg`, the feature "gpkg": SQLite is C, so not in wasm), a file's CRS to EPSG:4326 (`crs`), the SQL that reads a duckOSM file (`duckosm`), a table or a source's features as Parquet or GeoParquet (`write`, stage 1's files), and a table of typed columns (`columns`) |  |
 | `columns` | 206 | The one Parquet writer: typed columns as Parquet, a batch at a time; with a WKB column, GeoParquet (the `geo` metadata of GeoParquet 1.1) |  |
 | `crs` | 84 | A road file's coordinates to EPSG:4326 (lon, lat), with the rule of Python's `validate.to_wgs84`: a file with no CRS is an error, EPSG:4326 stays as it is, another CRS is reprojected | `validate.py` |
-| `duckosm` | 326 | The SQL that reads a duckOSM file: the roads of every mode (mapstyle's `_roads_union` and `load_roads`, with the stored levels and the columns that render_map adds) and the base map's tables (`features.*`, the queries of mapstyle's `load_layers`) |  |
+| `duckosm` | 384 | The SQL that reads a duckOSM file: the roads of every mode (mapstyle's `_roads_union` and `load_roads`, with the stored levels and the columns that render_map adds) and the base map's tables (`features.*`, the queries of mapstyle's `load_layers`) |  |
 | `error` | 39 | The errors of the readers and the writers: one kind for each cause, each with the text that the bindings show (the same text as before the type) |  |
 | `geojson` | 119 | The roads from a GeoJSON file (RFC 7946: a FeatureCollection in EPSG:4326) |  |
 | `gpkg` | 127 | The roads from a GeoPackage (the feature "gpkg": SQLite through rusqlite, a C build, so not in wasm) |  |
@@ -268,7 +268,7 @@ Cdylib, in `rust/roadstyle-wasm/`. Public API: `Look`, `fromJson`, `toJson`, `re
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 497 | The browser's front-end of roadstyle-rs: `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through wasm-bindgen, and the allocator that grows the memory in large steps |  |
+| `lib` | 509 | The browser's front-end of roadstyle-rs: `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through wasm-bindgen, and the allocator that grows the memory in large steps |  |
 
 #### `roadstyle-py` { #roadstyle-py }
 
@@ -276,7 +276,7 @@ Cdylib, in `rust/roadstyle-py/`. Public API: `resolve_look`, `make_style`, `make
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 531 | The Python binding of roadstyle's Rust engine: the module `roadstyle._rust` | `_engine.py` |
+| `lib` | 545 | The Python binding of roadstyle's Rust engine: the module `roadstyle._rust` | `_engine.py` |
 
 #### `roadstyle-cli` { #roadstyle-cli }
 
@@ -500,8 +500,8 @@ saved page still works offline.*
 
 | File | Lines | Exports |
 |---|---|---|
-| `features_sql.js` | 33 | `writeFeatures(q, catalog, specs)` |
-| `roads_sql.js` | 45 | `readCatalog(q, catalog)`, `makeRoads(q, catalog, opts = {})`, `writeRoads(q, mode = "all")` |
+| `features_sql.js` | 35 | `writeFeatures(q, catalog, specs)` |
+| `roads_sql.js` | 46 | `readCatalog(q, catalog)`, `makeRoads(q, catalog, opts = {})`, `writeRoads(q, mode = "all")` |
 
 **The WebAssembly API** (`rust/roadstyle-wasm/src/lib.rs`):
 
@@ -522,10 +522,10 @@ saved page still works offline.*
 | `fileNames` | fileNames(format): the names of stage 1's files (style.json, a file for each source, road_table.parquet). |
 | `roadTable` | roadTable(): the road table as the page loads it, JSON text (props, mids, bboxes, lines: one item for each road). |
 | `makeSources` | makeSources(parquet, look, features, planner, name): stage 1, with makeStyle's arguments. |
-| `duckosmPlan` | duckosmPlan(catalog, mode, tags, specs) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or null, "select": the roads of `mode` ("roads" is null when the file has no network of `mode`: "roads_error" says why), "layers": [{spec, name, sql: the queries in order}]}. `catalog`: the JSON text of {"name", "tables": [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and of its edge_ids (for duckosmSubsetLevels). "level_edges": the edges of the file's level area (duckosm::level_edges_sql), for makeArea. |
+| `duckosmPlan` | duckosmPlan(catalog, mode, tags, specs, only?, run?) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or null, "select": the roads of `mode` ("roads" is null when the file has no network of `mode`: "roads_error" says why), "layers": [{spec, name, sql: the queries in order}]}. `catalog`: the JSON text of {"name", "tables": [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's layers as JSON text. `only`: the map of `mode` alone; then "subset" has the queries of its roads with no stored levels and of its edge_ids (for duckosmSubsetLevels). "level_edges": the edges of the file's level area (duckosm::level_edges_sql), for makeArea. `run`: the id of this reading of the file: its tables have their own names (each layer's "table"; "drop" drops them), so two readings at the same time on one connection do not meet. With no `run`, a new one; "run" gives it, for the next calls of the same reading. |
 | `duckosmLevels` | duckosmLevels(source?, nEdges?, edgeHash?) -> string: the look's keyword `levels` (JSON text) from the stored levels' metadata row (none: the file has no such row); an error says what to do. |
 | `duckosmSubsetLevels` | duckosmSubsetLevels(source?, nEdges?, edgeHash?, missing, example?, ids) -> string: the look's keyword `levels` (JSON text) for a map of one mode: the stored levels' metadata row, the row of the plan's "subset" query, and the map's edge_ids (a BigInt64Array). |
-| `duckosmFeaturesSelect` | duckosmFeaturesSelect(specs: number[]) -> string \| undefined: the base map's rows from the tables f<spec> that were made. |
+| `duckosmFeaturesSelect` | duckosmFeaturesSelect(specs: number[], run: string) -> string \| undefined: the base map's rows from the run's tables of the layers `specs` that were made. |
 | `readGeoParquet` | readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as makeSources reads it). An error is a thrown Error. |
 | `readGeoJson` | readGeoJson(bytes: Uint8Array) -> Roads: the roads of a GeoJSON file (a FeatureCollection in EPSG:4326; roadstyle-io's geojson.rs says how each property becomes a column). An error is a thrown Error. |
 | `readShp` | readShp(shp: Uint8Array, dbf: Uint8Array, prj?: string, name?: string) -> Roads: the roads of a Shapefile, in EPSG:4326 (roadstyle-io's shp.rs; no prj: no CRS, an error). A GeoPackage is not read here: SQLite is C (the native programs read it). An error is a thrown Error. |

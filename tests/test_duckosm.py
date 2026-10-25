@@ -194,3 +194,54 @@ def test_auto_levels_solve_a_file_with_no_stored_levels(tmp_path):
     assert level_kw is None
     with pytest.raises(ValueError, match="duckosm levels"):
         duckosm.read(db, "driving", levels="stored")
+
+
+def _two_runs(db, mode="all"):
+    """Two readings of `db` at the same time on one connection, their statements interleaved (a page that draws twice): the roads and
+    the base map of each."""
+    import duckdb
+
+    from roadstyle import _engine, duckosm
+
+    r = _engine.rust()
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        tq, cq = r.duckosm_catalog_sql(con.execute("SELECT current_database()").fetchone()[0])
+        tables, columns = con.execute(tq).fetchall(), con.execute(cq).fetchall()
+        a, b = (json.loads(r.duckosm_plan(tables, columns, mode, True, json.dumps(duckosm.layer_specs()))) for _ in range(2))
+        assert a["run"] != b["run"]
+        for x, y in zip(a["roads"], b["roads"], strict=True):     # e of a, e of b, r of a, r of b, drop e of a, drop e of b
+            con.execute(x)
+            con.execute(y)
+        made = {p["run"]: [] for p in (a, b)}
+        for la, lb in zip(a["layers"], b["layers"], strict=True):
+            for p, lyr in ((a, la), (b, lb)):
+                for sql in lyr["sql"]:
+                    try:
+                        con.execute(f"CREATE OR REPLACE TEMP TABLE {lyr['table']} AS {sql}")
+                    except duckdb.Error:
+                        continue
+                    made[p["run"]].append(lyr["spec"])
+                    break
+        out = []
+        for p in (a, b):
+            fsel = r.duckosm_features_select(made[p["run"]], p["run"])
+            out.append((con.execute(p["select"]).to_arrow_table(), con.execute(fsel).to_arrow_table() if fsel else None))
+        for p in (a, b):
+            con.execute(p["drop"])
+        return out
+    finally:
+        con.close()
+
+
+def test_two_readings_at_the_same_time_give_the_same_tables(tmp_path):
+    """duckosm_plan's temporary tables have the run's own names: two readings at the same time on one connection do not drop or replace
+    each other's tables (the duckosm-rust page: "Table with name e does not exist!")."""
+    (ra, fa), (rb, fb) = _two_runs(_tiny(tmp_path / "two.duckdb"))
+    assert ra.num_rows == 2 and ra.equals(rb) and fa.equals(fb)
+
+
+@needs_db
+def test_two_readings_at_the_same_time_on_monaco():
+    (ra, fa), (rb, fb) = _two_runs(DB)
+    assert ra.num_rows > 1000 and ra.equals(rb) and fa.num_rows > 1000 and fa.equals(fb)

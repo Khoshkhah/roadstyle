@@ -133,8 +133,10 @@ const look = resolveLook(JSON.stringify({args: {state: "live", casing_level_col:
 const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
 ```
 
-`makeRoads(q, catalog, opts)` runs one time for each file. It makes the temporary table `r`: one row for each edge of all modes, with
-its levels. `writeRoads(q, mode)` runs for each mode, and writes only `roads.parquet` from `r`.
+`makeRoads(q, catalog, opts)` runs one time for each file. It makes the run's temporary table (`rs_r_<run>`, from `duckosmPlan`'s
+`"run"`): one row for each edge of all modes, with its levels. `writeRoads(q, mode)` runs for each mode, and writes only `roads.parquet`
+from that table. Each reading has its own tables, so two readings at the same time on one connection do not drop or replace each other's
+tables; `writeFeatures` drops its tables when it has written `features.parquet`.
 
 - `mode`: `"all"`, `"driving"`, `"walking"` or `"cycling"`.
 - `opts.levels: "stored"` reads `visualization.edge_levels`, the levels of a solved level area. `makeRoads` returns their
