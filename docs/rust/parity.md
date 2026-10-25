@@ -97,6 +97,22 @@ and the time of the slowest one.
 The browser numbers are the middle of three runs. The headless browser measures only Monaco, the limit of this machine for a
 browser test. On Monaco the WebAssembly module is as fast as the native code.
 
+#### The size of the tiles
+
+`rust/roadstyle-wasm/bench_tiles.mjs` makes, in WebAssembly in Node, the tiles of one 1280 × 800 view at the roads' center (the
+tiles of 512 px in view and one more on each side), cold. The numbers are the middle of three runs on Tartu (64,828 roads), in
+order: the first tile zoom of a source is the first zoom at which a layer draws it (6ecff70); then the integer sort key, no false
+`__rs_*` flag and no MVT id on the pieces (2026-10-25).
+
+| Zoom | Before | First drawn zoom | Integer key, no false flags, no piece id | The largest tile |
+|---|---|---|---|---|
+| 12 | 8.6 MB | 7.1 MB, 130 ms | 5.6 MB, 119 ms | 3,863 KB, 3,268 KB, 2,529 KB |
+| 14 | 7.8 MB | 6.6 MB, 130 ms | 5.3 MB, 115 ms | 735 KB, 592 KB (the second and third) |
+
+That is about 18 ms for each 10,000 roads at zoom 12, cold. In the tile z12/2351/1225 (1,920 KB), the 35,239 pieces have 385 KB
+of lines and about 1.2 MB of marks: every mark is one that a layer or the page reads. The wasm memory after `makeSources` and
+`tileSources` (`bench.mjs`) stays 213 MiB.
+
 ### In the browser: Rust or MapLibre cuts the tiles
 
 The test compares only stage 2: **the same GeoJSON files go into both cutters, with the same tile settings.**
@@ -191,6 +207,24 @@ MapLibre's workers.
 |---|---|---|---|
 | Monaco, a part (1,373 roads) | the style of `export_inline` | 0.57 s | 0.12 s |
 | Monaco (osmnx, 849 drive edges) | `render_edges` | 0.9 to 1.3 s | 0.3 s |
+
+## Size
+
+The size of the engine in each build, for the later steps to compare with: the WebAssembly package (`roadstyle_wasm_bg.wasm`, the
+output of `wasm-bindgen` for the profile `dist`), the same file with gzip -9, and the Python module (`_rust.abi3.so`, profile
+`release`, Linux x86-64). The steps of T3 (the typed map options and the typed look, `docs/design/t3_map_options_and_look.md`),
+2026-10-25:
+
+| Build | WebAssembly | gzip | Python module |
+|---|---|---|---|
+| Before T3 step 2 (94fc86f, step 1: `MapOptions`) | 11,292,251 B | 2,686,887 B | 31,304,056 B |
+| Step 2 as first written (d68e184) | 11,828,534 B (+4.7 %) | 2,840,954 B (+5.7 %) | 32,334,320 B (+3.3 %) |
+| Step 2 (db210f9: no serde `flatten`, schemars behind the feature `schema`) | 11,587,165 B (+2.6 %) | 2,773,038 B (+3.2 %) | 31,871,560 B (+1.8 %) |
+| Step 3 (the look crate's readers read the typed sections) | 11,669,114 B (+3.3 %) | 2,794,223 B (+4.0 %) | 32,124,408 B (+2.6 %) |
+
+The percentages are against the first row. The typed sections cost their serde readers (161 KB of the WebAssembly at step 2); serde's
+`flatten` read every section a second time through its buffer (113 KB for `Sections` alone), so `LookFile` is read and written by
+hand. The target: under +2 % again when N32 step 2 removes the JSON views of version 1 and the flat reader of `args`.
 
 ## Memory
 

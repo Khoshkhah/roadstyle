@@ -183,6 +183,12 @@ pub fn roads_sql(cat: &Catalog, tags: bool, only: Option<&str>, run: &Run) -> Re
 /// The roads of the map of `mode` ("all", or one network) from the run's table of `roads_sql`, in the order of mapstyle's load_roads (an
 /// undirected edge on a street's own directed edge first, then by edge_id), with the columns that render_map adds: `access` (_access),
 /// `is_directed` (_is_directed) and `has_arrows`. A SELECT: the browser writes it as roads.parquet (`COPY (...) TO`).
+///
+/// It gives every road of the run's table, by design: `mode` is render_map(mode), the roads of every mode in the look of `mode` (the mode
+/// decides `access` and the style, not the rows). The map of one mode alone is render_map(only=True): `roads_sql` with `only` makes the
+/// table from that mode's edges and private_edges, so this SELECT gives only those, and `subset_sql` / `ids_sql` check their stored levels.
+/// A caller does not filter the roads of a mode itself (`WHERE <mode> OR access IS NOT NULL` gives the same roads on Monaco, but it is a
+/// second copy of the rule).
 pub fn roads_select(mode: &str, run: &Run) -> Result<String, Error> {
     if mode != "all" && !MODES.contains(&mode) {
         return Err(Error::Options(format!("unknown mode {mode}")));
@@ -281,7 +287,7 @@ pub fn cut_sea(t: FeatureTable) -> Result<FeatureTable, Error> {
         }).collect()).collect();
         out.push(GeomType::MultiPolygon, &closed);
     }
-    t.with_geometries(out).map_err(Error::Data)
+    t.with_geometries(out).map_err(|e| Error::Data(e.to_string()))
 }
 
 /// Every ring of the Polygon or MultiPolygon `row`.

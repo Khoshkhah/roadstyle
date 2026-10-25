@@ -12,9 +12,12 @@
 // Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
+pub mod error;
 pub mod pmtiles;
+pub mod rules;
 pub mod stage;
 
+pub use error::Error;
 use roadstyle_model::feature_table::FeatureTable;
 use rstar::{primitives::GeomWithData, primitives::Rectangle, RTree, AABB};
 use serde_json::{Map, Value};
@@ -23,8 +26,21 @@ use std::collections::{HashMap, HashSet};
 
 /// The tile's size in its own units.
 pub const EXTENT: f64 = 4096.0;
+/// The last zoom of a tile: MapLibre's last zoom (a map asks for no tile after it).
+pub const MAX_ZOOM: u32 = 24;
+
+/// The zooms `min_zoom` to `max_zoom` are tile zooms: from 0 to `MAX_ZOOM`, the first not after the last.
+fn check_zooms(min_zoom: f64, max_zoom: f64) -> Result<(), Error> {
+    if !(0.0 <= min_zoom && min_zoom <= max_zoom && max_zoom <= MAX_ZOOM as f64) {
+        return Err(Error::Options(format!("the tile zooms are {min_zoom} to {max_zoom}: give zooms from 0 to {MAX_ZOOM}, the first not after the last")));
+    }
+    Ok(())
+}
 /// The name of the one vector source.
 pub const SOURCE: &str = "roads";
+/// The pieces' tile layer: the vector source's `promoteId` (`__rs_edge`, the road's row) is their feature id, so their tiles have no MVT
+/// id (MapLibre does not read it there).
+const PROMOTED: &str = "simple";
 
 type P = [f64; 2];
 
@@ -46,6 +62,8 @@ pub enum Val {
 
 struct Feat {
     id: Option<u64>,
+    /// the first zoom at which a layer of the style draws it (rules.rs; 0 with no rules)
+    from: f32,
     geom: Geom,
     /// (key, value): the numbers of the layer's key and value
     props: Vec<(u32, u32)>,
@@ -82,6 +100,8 @@ const TILE_CACHE_BYTES: usize = 64 << 20;
 /// the tile's edge).
 pub struct Tiles {
     layers: IndexMap<String, Layer>,
+    /// the style's layers, for each source's first-zoom rules (`drawn_by`)
+    style: Vec<Value>,
     min_zoom: u32,
     max_zoom: u32,
     buffer: f64,
@@ -168,6 +188,16 @@ fn val(v: &Value) -> Option<Val> {
     })
 }
 
+fn json_of(v: &Val) -> Value {
+    match v {
+        Val::Str(s) => Value::from(&**s),
+        Val::Bool(b) => Value::from(*b),
+        Val::Int(i) => Value::from(*i),
+        Val::UInt(u) => Value::from(*u),
+        Val::Dbl(d) => Value::from(*d),
+    }
+}
+
 fn bounds(g: &Geom) -> Option<(P, P)> {
     let mut lo = [f64::INFINITY; 2];
     let mut hi = [f64::NEG_INFINITY; 2];
@@ -186,8 +216,23 @@ fn bounds(g: &Geom) -> Option<(P, P)> {
 }
 
 impl Tiles {
-    pub fn new(min_zoom: u32, max_zoom: u32, buffer: f64) -> Tiles {
-        Tiles { layers: IndexMap::new(), min_zoom, max_zoom, buffer, cache: Default::default() }
+    /// The tiles of the zooms `min_zoom` to `max_zoom` (see `check_zooms`), with `buffer` (tile units, 0 or more) round each tile.
+    pub fn new(min_zoom: u32, max_zoom: u32, buffer: f64) -> Result<Tiles, Error> {
+        check_zooms(min_zoom as f64, max_zoom as f64)?;
+        if !(buffer >= 0.0 && buffer.is_finite()) {
+            return Err(Error::Options(format!("the tile buffer is {buffer}: give 0 or more")));
+        }
+        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffer, cache: Default::default() })
+    }
+
+    /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom
+    /// of that tile (rules.rs: the class minzoom, `casing.drop_below_px`).
+    pub fn drawn_by(&mut self, layers: &[Value]) {
+        self.style = layers.iter().map(|l| serde_json::json!({"source": l["source"], "source-layer": l["source-layer"], "filter": l["filter"]})).collect();
+    }
+
+    fn builder(&self, name: &str) -> Builder {
+        Builder { rules: rules::ZoomRules::of(&self.style, name), ..Default::default() }
     }
 
     /// A new layer: the caches of the old tiles go.
@@ -200,7 +245,7 @@ impl Tiles {
     /// tree. The properties in `keep` and every `__rs_*` property go into the tiles, all of a whole layer's (tiles.py's tile_props). `whole`: see the module; `min_zoom`: the layer's first zoom.
     pub fn add(&mut self, name: &str, source: &Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let empty = Map::new();
-        let mut b = Builder::default();
+        let mut b = self.builder(name);
         for (i, f) in source["data"]["features"].as_array().into_iter().flatten().enumerate() {
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
             let id = Some(i as u64); // tiles.py: a feature's id is its index in its source
@@ -217,7 +262,7 @@ impl Tiles {
         use roadstyle_model::feature_table::GeomType;
         let g = t.geometries_of();
         let names: Vec<&str> = t.names().iter().map(String::as_str).filter(|k| whole || k.starts_with("__rs_") || keep.contains(*k)).collect();
-        let mut b = Builder::default();
+        let mut b = self.builder(name);
         for row in 0..t.len() {
             let Some(kind) = g.kind(row) else { continue };
             let pts = |r: &[[f64; 2]]| r.iter().filter_map(|p| merc_ll(p[0], p[1])).collect::<Vec<P>>();
@@ -246,7 +291,7 @@ impl Tiles {
     /// index). The properties are the `__rs_*` ones and those in `keep` (all of them when `whole`).
     pub fn add_lines<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (Option<L>, P)>, keep: &HashSet<String>, whole: bool, min_zoom: u32)
     where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
-        let mut b = Builder::default();
+        let mut b = self.builder(name);
         for (i, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
@@ -260,24 +305,16 @@ impl Tiles {
     pub fn props(&self, name: &str, id: u64) -> String {
         let Some(layer) = self.layers.get(name) else { return "null".into() };
         let Some(f) = layer.by_id.get(&id).map(|&i| &layer.feats[i as usize]) else { return "null".into() };
-        let m: Map<String, Value> = f.props.iter().map(|(k, v)| {
-            let v = match &layer.vals[*v as usize] {
-                Val::Str(s) => Value::from(&**s),
-                Val::Bool(b) => Value::from(*b),
-                Val::Int(i) => Value::from(*i),
-                Val::UInt(u) => Value::from(*u),
-                Val::Dbl(d) => Value::from(*d),
-            };
-            (layer.keys[*k as usize].clone(), v)
-        }).collect();
+        let m: Map<String, Value> = f.props.iter().map(|(k, v)| (layer.keys[*k as usize].clone(), json_of(&layer.vals[*v as usize]))).collect();
         Value::Object(m).to_string()
     }
 
     /// The archive of every tile of the bounds `[min lon, min lat, max lon, max lat]` (an empty tile is left out), in zoom and then x, y
     /// order, as render's tiled page and export_style write it; `layers`: the tile layers of the metadata's vector_layers.
-    pub fn archive(&self, bounds: [f64; 4], layers: &[String]) -> Option<Vec<u8>> {
+    pub fn archive(&self, bounds: [f64; 4], layers: &[String]) -> Result<Vec<u8>, Error> {
         let mut w = pmtiles::Writer::default();
-        let (lo, hi) = (merc_ll(bounds[0], bounds[1])?, merc_ll(bounds[2], bounds[3])?);
+        let ll = |lon, lat| merc_ll(lon, lat).ok_or_else(|| Error::Options(format!("the archive's bounds {bounds:?} are not longitude and latitude")));
+        let (lo, hi) = (ll(bounds[0], bounds[1])?, ll(bounds[2], bounds[3])?);
         for z in self.min_zoom..=self.max_zoom {
             let n = (1u64 << z) as f64;
             let last = (1u32 << z) - 1;
@@ -297,7 +334,7 @@ impl Tiles {
                                      center_zoom: ((self.min_zoom + self.max_zoom) / 2) as u8,
                                      center_lon_e7: (e7[0] + e7[2]) / 2, center_lat_e7: (e7[1] + e7[3]) / 2 };
         let meta = serde_json::json!({"vector_layers": layers.iter().map(|n| serde_json::json!({"id": n, "fields": {}})).collect::<Vec<_>>()});
-        w.finish(&place, &meta.to_string())
+        w.finish(&place, &meta.to_string()).ok_or(Error::Empty)
     }
 
     /// The box of every feature `[min lon, min lat, max lon, max lat]` (None: no feature), as an archive's bounds.
@@ -373,6 +410,9 @@ impl Tiles {
         let mut enc = Encoder::default();
         for i in hits {
             let f = &layer.feats[i as usize];
+            if z < self.max_zoom && (z + 1) as f32 <= f.from {
+                continue; // no layer draws it at a zoom of this tile (the last zoom's tiles are scaled up for every zoom after it)
+            }
             let (kind, geometry) = match &f.geom {
                 Geom::Points(ps) => {
                     let ps: Vec<[i32; 2]> =
@@ -416,7 +456,7 @@ impl Tiles {
                 }
             };
             if !geometry.is_empty() {
-                enc.feature(f, kind, &geometry, &layer.keys);
+                enc.feature(f, kind, &geometry, &layer.keys, name != PROMOTED);
             }
         }
         enc.finish(name, &layer.encoded)
@@ -433,6 +473,7 @@ struct Builder {
     val_at: HashMap<Vec<u8>, u32>,
     feats: Vec<Feat>,
     boxes: Vec<GeomWithData<Rectangle<P>, u32>>,
+    rules: rules::ZoomRules,
 }
 
 impl Builder {
@@ -440,9 +481,17 @@ impl Builder {
     fn push<K: AsRef<str>, V: TileValue>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, V)>) {
         let Some((lo, hi)) = bounds(&g) else { return };
         let (keys, key_at, vals, encoded, val_at) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at);
+        let rules = &self.rules;
+        let mut read = Map::new();        // the values that the first-zoom rules read
         let props = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
+                if rules.reads(k.as_ref()) {
+                    read.insert(k.as_ref().to_string(), json_of(&v));
+                }
+                if v == Val::Bool(false) && k.as_ref().starts_with("__rs_") {
+                    return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
+                }
                 let m = encode(&v);
                 let v = match val_at.get(&m) {
                     Some(&at) => at,
@@ -465,7 +514,8 @@ impl Builder {
             })
             .collect();
         self.boxes.push(GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32));
-        self.feats.push(Feat { id, geom: g, props });
+        let from = if rules.is_empty() { 0.0 } else { rules.first_zoom(&read) as f32 };
+        self.feats.push(Feat { id, from, geom: g, props });
     }
 
     fn layer(self, whole: bool, min_zoom: u32) -> Layer {
@@ -759,7 +809,7 @@ struct Encoder {
 }
 
 impl Encoder {
-    fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String]) {
+    fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String], with_id: bool) {
         let mut tags = Vec::with_capacity(f.props.len() * 2);
         for (k, v) in &f.props {
             let key = *self.key_at.entry(*k).or_insert_with(|| {
@@ -774,7 +824,7 @@ impl Encoder {
             tags.push(at);
         }
         let mut msg = Vec::new();
-        if let Some(id) = f.id {
+        if let Some(id) = f.id.filter(|_| with_id) {
             msg.push(1 << 3);
             varint(&mut msg, id);
         }
@@ -823,7 +873,7 @@ mod tests {
 
     #[test]
     fn a_tile_has_the_feature_its_id_and_properties() {
-        let mut t = Tiles::new(0, 15, 80.0);
+        let mut t = Tiles::new(0, 15, 80.0).unwrap();
         t.add("roads", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "id": 7, "properties": {"name": "A", "lanes": 2, "w": 1.5, "bridge": true, "gone": null, "n": -3},
              "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [10.0, 10.0]]}}]}}), &keys(&["name", "lanes", "w", "bridge", "gone", "n"]), false, 0);
@@ -841,7 +891,7 @@ mod tests {
 
     #[test]
     fn the_outer_ring_has_a_positive_area() {
-        let mut t = Tiles::new(0, 15, 80.0);
+        let mut t = Tiles::new(0, 15, 80.0).unwrap();
         // a square around (1, 1) degrees, counterclockwise in lon / lat (clockwise on the screen after y goes down)
         t.add("land", &json!({"type": "geojson", "generateId": true, "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "properties": {}, "geometry": {"type": "Polygon",
@@ -870,7 +920,7 @@ mod tests {
         // the zooms: no tile out of 6 to 15, no tile of a layer before its first zoom
         let fc = json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
             {"type": "Feature", "id": 1, "properties": {}, "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [1.01, 1.0]]}}]}});
-        let mut t = Tiles::new(6, 15, 80.0);
+        let mut t = Tiles::new(6, 15, 80.0).unwrap();
         t.add("slots", &fc, &keys(&[]), true, 14);
         let at = |z: u32| {
             let n = (1u64 << z) as f64;
@@ -878,5 +928,22 @@ mod tests {
             t.tile(z, (x * n) as u32, (y * n) as u32)
         };
         assert!(at(13).is_empty() && at(16).is_empty() && !at(14).is_empty() && !at(15).is_empty());
+    }
+
+    #[test]
+    fn bad_settings_are_errors_not_panics() {
+        // zooms past MAX_ZOOM overflowed the shifts of the archive (1 << z); a first zoom after the last; a buffer below 0
+        for (lo, hi, buffer) in [(0, 40, 80.0), (5, 4, 80.0), (0, 15, -1.0), (0, 15, f64::NAN)] {
+            assert!(matches!(Tiles::new(lo, hi, buffer), Err(Error::Options(_))), "{lo} {hi} {buffer}");
+        }
+        let settings = |max: f64| json!({"minzoom": 0, "maxzoom": max, "buffer_px": 80, "extent": 4096});
+        assert!(matches!(stage::TileOptions::new(&[], &json!({}), &settings(40.0), &json!({}), &[]), Err(Error::Options(_))));
+        assert!(stage::TileOptions::new(&[], &json!({}), &settings(MAX_ZOOM as f64), &json!({}), &[]).is_ok());
+        assert!(matches!(stage::TileOptions::from_style(&json!({}), &[]), Err(Error::Options(_))));
+        // a tile far out of the world is empty; bounds that are not longitude and latitude, and an archive of no tile, are errors
+        let t = Tiles::new(0, MAX_ZOOM, 80.0).unwrap();
+        assert!(t.tile(MAX_ZOOM, u32::MAX, u32::MAX).is_empty());
+        assert!(matches!(t.archive([f64::NAN, 0.0, 1.0, 1.0], &[]), Err(Error::Options(_))));
+        assert_eq!(Tiles::new(0, 2, 80.0).unwrap().archive([0.0, 0.0, 1.0, 1.0], &[]), Err(Error::Empty));
     }
 }

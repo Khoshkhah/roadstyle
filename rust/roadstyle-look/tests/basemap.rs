@@ -72,12 +72,20 @@ fn the_64_looks_of_mapstyle() {
         let [mode, theme, paths]: [&str; 3] = choice.split('|').collect::<Vec<_>>().try_into().unwrap();
         let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into(), place: None }), args: want["args"].clone(),
                           ..Default::default() };
-        let mut got = Look::resolve(&o).unwrap_or_else(|e| panic!("{choice}: {e}")).to_value();
+        let mut got = Look::resolve(&o).unwrap_or_else(|e| panic!("{choice}: {e}")).views_value();
         got.as_object_mut().unwrap().shift_remove("schema_version");
         // added on 2026-10-24 for the dashboard's port of mapstyle's page scripts: the restricted roads' colour baked into the fills
         // (access_col), the Modes filter's columns and the page's box layout; mapstyle's look had them in its page script
         for k in ["access_col", "modes", "box_layout"] {
             got["args"].as_object_mut().unwrap().shift_remove(k);
+        }
+        // added on 2026-10-25: the profile's casing.drop_below_px (0 = always a casing), after mapstyle's look; and the tiles' last
+        // zoom 18 (was 15: the casing pieces round to the last zoom's grid)
+        if let Some(c) = got.pointer_mut("/theme/casing").and_then(Value::as_object_mut) {
+            c.shift_remove("drop_below_px");
+        }
+        if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
+            *t = 15.into();
         }
         let mut out = Vec::new();
         first_differences(&canon(&got), &canon(&Value::Object(want)), choice, &mut out);

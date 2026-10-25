@@ -30,15 +30,15 @@
       "roads-simple",
       "line",
       "simple",
-      "a0894aa3fdcc8faf",
+      "f400c3887e0b8239",
       "6ca30948e440fa6a",
-      "c57eb06c5a87ff06"
+      "32554e5658942863"
     ],
     [
       "roads-arrows",
       "symbol",
       "slots",
-      "b6fe0bd5e873ecd9",
+      "bf4dc344d3bca1f4",
       "b9e63a214b296e3e",
       "7d902068fb67d6a8"
     ],
@@ -46,7 +46,7 @@
       "roads-labels",
       "symbol",
       "slots",
-      "fa31f5cc7748bc7d",
+      "223a08596fb041b3",
       "e66f1480f0ee2761",
       "bc66e941e4f8c5a1"
     ],
@@ -86,7 +86,7 @@
     "simple": [
       "geojson",
       1855,
-      "97ada68ec9b11f6c"
+      "9d0318ec60ec58fb"
     ],
     "slots": [
       "geojson",
@@ -96,9 +96,11 @@
   },
   "metadata": {
     "roadstyle:interaction": "a911c29a8eeae5d8",
-    "roadstyle:images": "e9049aa3d5b18840"
+    "roadstyle:images": "e9049aa3d5b18840",
+    "roadstyle:sources": "3eb959a8e2207438",
+    "roadstyle:controls": "7ad47e2cab264f27"
   },
-  "hash": "d187d190e342be55",
+  "hash": "1b2358c199117bc3",
   "road_table": {
     "rows": 1373,
     "columns": [

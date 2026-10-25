@@ -90,7 +90,7 @@ ignore it.
 | `legend_position` | `"bottomleft"` | folium | legend corner |
 | `name` | web `"roadstyle"`, folium `"roads"` | web, folium | page title (web) / layer name (folium) |
 | `hover_color` / `select_color` | `"#b388ff"` / `"#7c4dff"` | web | highlight of the hovered / selected road |
-| `minzoom` | `None` | web | hide minor classes when zoomed out: `True` = the `minzoom` setting, a dict overrides parts, `None` = all classes at all zooms |
+| `minzoom` | `None` | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default), a dict overrides parts, `False` = all classes at all zooms |
 | `offset_frac` | `0.28` | web | two-way lane offset, fraction of the road's pixel width; `0` = no lane split |
 | `width_frac` | `0.6` | web | each lane's width, fraction of the full road width |
 | `offset_zoom` | `15` | web | zoom where the two directions start to fan apart |
@@ -330,7 +330,8 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#64748b"` (slate) | bridge casing, px wider / colour |
 | `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` (and `bridge_shadow_trim_m` `3`: no shadow over the last 3 m where a bridge comes down) | a soft shadow under a bridge: a line per stretch at the lowest casing number of its edges, straight on through a junction where the numbers agree; none where the bridge comes down (position mode): px of blur, px shifted right and down (lit from the top left) |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
-| `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom, with `minzoom=True` |
+| `casing.drop_below_px` | `1.0` (`0` = always a casing) | no casing piece (a bridge's keeps it) at a zoom where the whole casing line is narrower than this many px: the fill alone, and the casing from the first zoom where it is as wide. The tiles leave out those pieces. Nothing is dropped from a road in metres when `casing_min_px` ≥ this value |
+| `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom (unless `minzoom=False`); the tiles leave out a hidden class |
 | `basemap` | `"voyager"` | the default base map |
 | `labels` | `color #5b5b5b`, no halo | street-name paint; `size`: `[[zoom, px], ...]`, the names' size per zoom for every class (roads in metres) instead of following each class's width |
 | `arrows` | `color #5b5b5b`, `opacity 0.7` | one-way chevron paint |
@@ -338,7 +339,7 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `bridge_decks` | `base_m 5`, `thickness_m 1`, `ramp_m 40`, `step_m 2.5`, `match_zoom 18`, `opacity 0.7`, `width_scale 0.6`, `flat_below 16`, `casing_px 2` | 3D bridge decks |
 | `overlays` | `color #6aa9ff`, `radius 6`, `width 2`, per-kind opacities, `circle_stroke #ffffff` | `Overlay` defaults |
 | `annotations` | `slot_m 100` | label / arrow spacing along a road, metres |
-| `tiles` | `minzoom 6`, `maxzoom 15`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset |
+| `tiles` | `minzoom 6`, `maxzoom 18`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up: at maxzoom 15 a casing piece stood 4–5 px off its fill at zoom 22, at 18 about 1 px |
 | `api_key` / `api_keys` | `None` / `{}` | default key / per-provider keys |
 
 **See also:** [JavaScript API](javascript.md) · [Settings & palettes](settings.md) · [Command line](cli.md)

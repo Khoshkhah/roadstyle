@@ -1,5 +1,5 @@
 //! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
-//! same inputs), with eleven changes:
+//! same inputs), with fifteen changes:
 //! - the building heights follow rule C (the higher of the height tag and the levels, features.rs), not 0806ac2's rule A (the height
 //!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
 //! - the slots have Python's key order (__rs_cls before __rs_arw, tests/colors.rs): the same data, other bytes;
@@ -24,6 +24,14 @@
 //!   rows that rsColor painted), and the state has `rs_top` in place of `rs_colors` and `rs_base` (Python has it too: the goldens of goldens-2).
 //! - audit 3, N27 (2026-10-24): an exported tiled style has `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers
 //!   that a road is picked on), so an app's dashboard finds and picks the roads, as on a live style (Python has it too: goldens-2).
+//! - 2026-10-25: a source's tiles start at the first zoom at which a layer draws it (not past the tiles' last zoom): the base map's
+//!   buildings and points, drawn from zoom 15 or 16, are not in the tiles of zoom 6 to 14 (the style does not change).
+//! - R7 (2026-10-25): every style has `roadstyle:sources` and `roadstyle:controls.pick` (contract::describe), the inline style of an
+//!   export too, not only its tiled style (N27).
+//! - the tile size (2026-10-25): the sort key `__rs_s` is an integer (100,000,000 for each step of the key and 1 for each road, the same
+//!   order), a tile has no `__rs_*` flag that is false, and the pieces of the tiles have no MVT id (the source's promoteId is their id).
+//! - the look's defaults (2026-10-25): the class minzoom is on (the roads, arrow and label layers' filters; the pieces keep `highway`,
+//!   which the filter reads) and casing.drop_below_px is 1 (the casing clause); the tiles leave out what the filters hide.
 //!
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
@@ -52,7 +60,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "81661f5f9256821c3db474a302c235cf03d51e25c94e38b2f061399e954f8f46");
+    assert_eq!(style_hash(&area), "32bc4fafedbcb037500a5a554d4060cd53fdc30b87adb236d6f73d77be8e0ce1");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -61,7 +69,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(style_hash(&area), "2389300f4ad1e5588ae9db9b7d95f1fb0b9b5d980ab2cef15013ac995a61ae00");
+    assert_eq!(style_hash(&area), "df9fc3f735ebcc09d3e81a911dd283928d1d68a87d59fed71a33896caddc61d8");
 }
 
 /// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
@@ -101,7 +109,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "0974f3058c75fb6f4321d87ab3257199f054e8e21b8d6a66ee9a0fb11e8c345a");
+    assert_eq!(tiles_hash(&area), "c578f77002cc014695d73676aff11e84c0aa4fbe2edc1e8b5d819de5a228d7cc");
 }
 
 /// tiles.py's extra layers: the sea of Monaco (a polygon) is in the tiles at its west edge, where only its box reaches.
@@ -125,5 +133,5 @@ fn the_sea_at_the_tile_edge() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "c0d314c251dbc2926ad9e86e2098ede3588e0bdb0ec52962100c63526602ffa8");
+    assert_eq!(tiles_hash(&area), "ffa7620783a3ad229bfd13730e0a266a3bdf84167a4db1a02c2cc404158b68ea");
 }

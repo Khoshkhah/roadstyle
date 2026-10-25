@@ -82,8 +82,13 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
         }
     }
     let lvl = |f: Road| f.get("lvl").and_then(Cell::as_f64).unwrap_or(0.0);
+    // the class minzoom (2026-10-25): the first zoom of each class of the panel that has one, so the Roads box dims a hidden class;
+    // null when the minzoom is off
+    let minzoom = crate::layers::class_minzoom(look).map(|t| {
+        classes.iter().filter_map(|c| t.get(c).filter(|z| z.as_f64().is_some_and(|z| z > 0.0)).map(|z| (c.clone(), z.clone()))).collect::<Map<_, _>>()
+    });
     json!({"on": args["filter_control"] != false && !classes.is_empty(), "col": col, "classes": classes, "access": access, "swatches": swatches,
-           "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0)})
+           "bridges": roads.iter().any(|f| lvl(f) > 0.0), "tunnels": roads.iter().any(|f| lvl(f) < 0.0), "minzoom": minzoom})
 }
 
 /// roadstyle:sources: each road role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of
@@ -102,18 +107,19 @@ pub fn roles(layers: &[Value]) -> Value {
     Value::Object(out)
 }
 
-/// The one writer of what the dashboard reads about a style's layers (audit N7): `roadstyle:sources` (`roles`), `roadstyle:arrows`
-/// (`arrow_kind`) and the controls' `pick` (`pick_layers`) from its final layers, in a style with the interaction contract. Stage 2
-/// calls it again on the tiled style.
+/// The one writer of what the dashboard reads about a style's layers (audit N7): `roadstyle:sources` (`roles`) and the controls' `pick`
+/// (`pick_layers`) from its final layers, in every style, and `roadstyle:arrows` (`arrow_kind`) in a style with the interaction contract.
+/// Stage 2 calls it again on the tiled style.
 pub fn describe(style: &mut Value) {
-    if style["metadata"]["roadstyle:contract"].is_null() {
-        return;
-    }
     let layers = style["layers"].as_array().cloned().unwrap_or_default();
+    // every style (R7): the road roles and the pick layers, for a host's dashboard with or without the contract
     style["metadata"]["roadstyle:sources"] = roles(&layers);
-    style["metadata"]["roadstyle:arrows"] = arrow_kind(&layers);
-    if style["metadata"]["roadstyle:controls"].is_object() {
-        style["metadata"]["roadstyle:controls"]["pick"] = pick_layers(&layers);
+    if !style["metadata"]["roadstyle:controls"].is_object() {
+        style["metadata"]["roadstyle:controls"] = json!({});
+    }
+    style["metadata"]["roadstyle:controls"]["pick"] = pick_layers(&layers);
+    if !style["metadata"]["roadstyle:contract"].is_null() {
+        style["metadata"]["roadstyle:arrows"] = arrow_kind(&layers);
     }
 }
 
