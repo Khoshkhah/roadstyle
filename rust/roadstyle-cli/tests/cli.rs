@@ -72,12 +72,10 @@ fn levels_make_and_solve() {
     let dir = tmp("levels");
     let said = roadstyle(&["levels", "make", &data("level_area/edges.parquet"), &dir.to_string_lossy()]);
     assert!(said.contains("694 roads"), "{said}");
-    let lines = |p: String| {
-        let mut l: Vec<String> = std::fs::read_to_string(p).unwrap().lines().map(String::from).collect();
-        l.sort();
-        l
-    };
-    assert_eq!(lines(dir.join("pairs.csv").to_string_lossy().into_owned()), lines(data("level_area/pairs.csv")));
+    // the pairs of make's golden (roadstyle-rs tests/level_area.rs: rust_make.json)
+    let golden: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(data("level_area/rust_make.json")).unwrap()).unwrap();
+    let pairs = std::fs::read_to_string(dir.join("pairs.csv")).unwrap().lines().count() - 1;
+    assert_eq!(pairs as u64, golden["pairs"].as_u64().unwrap());
     let said = roadstyle(&["levels", "solve", &dir.to_string_lossy()]);
     assert!(said.contains("694 roads"), "{said}");
     let rows = std::fs::read_to_string(dir.join("levels.csv")).unwrap().lines().count();

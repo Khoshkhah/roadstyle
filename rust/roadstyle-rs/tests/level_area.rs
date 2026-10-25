@@ -1,24 +1,45 @@
-//! A level area as the level editor has it (roadstyle_levels::area), on tests/data/level_area/ (tests/make_goldens.py level_area): the
-//! solve is feasible (the solver checks its hard rules), with edits and with the local re-solve, and the check before a rule is added
-//! says what roadstyle's rule_conflicts says.
+//! A level area as the level editor has it (roadstyle_levels::area), made by roadstyle-levels make from tests/data/level_area/edges.parquet
+//! (a part of Monaco). The goldens are the engine's (`ROADSTYLE_BLESS=1` writes them): make's output (level_area/rust_make.json: the
+//! counts and the hashes of roads.parquet's rows and pairs.csv's rows) and the check before a rule is added (level_area/rust_conflicts.json).
+//! The solve is feasible (the solver checks its hard rules), with edits and with the local re-solve.
+
+mod common;
 
 use roadstyle_rs::level_editor::read_pairs;
 use roadstyle_rs::levels::area::{Area, AreaRoad, PairRow, Previous, Relation, Why};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
-fn data(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/level_area").join(name)
+/// make's files of the fixture's edges, in memory: (roads.parquet, pairs.csv).
+fn made() -> &'static (Vec<u8>, String) {
+    static MADE: OnceLock<(Vec<u8>, String)> = OnceLock::new();
+    MADE.get_or_init(|| {
+        let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/level_area/edges.parquet");
+        let table = roadstyle_rs::read::read_roads(std::fs::read(p).unwrap(), "geometry").unwrap();
+        let f = roadstyle_rs::level_area::make_files(&table, &Default::default(), "").unwrap();
+        (f.roads, f.pairs)
+    })
 }
 
 fn area() -> Area {
-    let rows = roadstyle_rs::read::read_table(std::fs::read(data("roads.parquet")).unwrap(), "geometry").unwrap();
+    let rows = roadstyle_rs::read::read_table(made().0.clone(), "geometry").unwrap();
     let id = |v: &Value| v.as_i64().unwrap();      // roads.parquet has the ids as Int64
     let ids = |v: &Value| v.as_array().unwrap().iter().map(id).collect();
     let roads = rows.iter().map(|r| AreaRoad { id: id(&r.cols["road"]), edges: ids(&r.cols["edges"]), reversed: ids(&r.cols["reversed"]) })
         .collect();
-    Area::new(roads, read_pairs(&std::fs::read_to_string(data("pairs.csv")).unwrap()).unwrap()).unwrap()
+    Area::new(roads, read_pairs(&made().1).unwrap()).unwrap()
+}
+
+#[test]
+fn make_is_its_golden() {
+    let rows = roadstyle_rs::read::read_table(made().0.clone(), "geometry").unwrap();
+    let mut pairs: Vec<&str> = made().1.lines().collect();
+    pairs.sort();
+    let rows_json: Vec<Value> = rows.iter().map(|r| json!([r.cols, r.blob])).collect();
+    common::golden("level_area/rust_make.json", &json!({"roads": rows.len(), "pairs": pairs.len() - 1, "columns": rows[0].cols.keys().collect::<Vec<_>>(),
+        "roads_hash": common::hash16(&Value::Array(rows_json)), "pairs_hash": common::hash16(&json!(pairs))}));
 }
 
 #[test]
@@ -39,40 +60,18 @@ fn the_solve_with_edits_and_the_local_re_solve() {
     assert!(matches!(a.merged(&[off]).unwrap_err(), roadstyle_rs::levels::Error::Edits(m) if m.contains("to switch off")));
 }
 
+/// The check before rules are added: an order wish that is there (a duplicate), one the other way of a stack (a loop) and one between the
+/// first and the last road; the answers (the row, why, and how many rules it meets) are the golden.
 #[test]
-fn the_check_before_a_rule_is_added_as_roadstyle() {
+fn the_check_before_a_rule_is_added_is_its_golden() {
     let a = area();
-    let checks: Value = serde_json::from_str(&std::fs::read_to_string(data("checks.json")).unwrap()).unwrap();
-    let text = |v: &Value, k: &str| v[k].as_str().unwrap_or("").to_string();
-    let csv = std::iter::once("relation,a,b,a_end,b_end,enabled".to_string())
-        .chain(checks["rows"].as_array().unwrap().iter().map(|r| ["relation", "a", "b", "a_end", "b_end", "enabled"].map(|k| text(r, k)).join(",")))
-        .collect::<Vec<_>>().join("\n");
+    let order = a.pairs.iter().find(|r| r.relation == Relation::Order).unwrap();
+    let stack = a.pairs.iter().find(|r| r.relation == Relation::Stack).unwrap();
+    let (first, last) = (a.roads[0].id, a.roads[a.roads.len() - 1].id);
+    let csv = format!("relation,a,b,a_end,b_end,enabled\norder,{},{},,,true\norder,{},{},,,true\norder,{first},{last},,,true\n",
+                      order.a, order.b, stack.b, stack.a);
     let got: Vec<Value> = a.conflicts(&[], &read_pairs(&csv).unwrap()).unwrap().into_iter().map(|c| {
-        assert!(!c.with.is_empty());
-        serde_json::json!([c.row, match c.why { Why::Duplicate => "duplicate", Why::NotKept => "not kept", Why::Loop => "loop" }])
+        json!([c.row, match c.why { Why::Duplicate => "duplicate", Why::NotKept => "not kept", Why::Loop => "loop" }, c.with.len()])
     }).collect();
-    assert_eq!(Value::Array(got), checks["conflicts"]);
-}
-
-/// make (roadstyle-levels make) on make's input of the fixture: the same roads.parquet (every column but the line, which is the first
-/// edge's) and the same pairs.csv rows as roadstyle's make_area.
-#[test]
-fn make_gives_roadstyle_s_input() {
-    let dir = std::env::temp_dir().join(format!("roadstyle-make-{}", std::process::id()));
-    let table = roadstyle_rs::read::read_roads(std::fs::read(data("edges.parquet")).unwrap(), "geometry").unwrap();
-    let made = roadstyle_rs::level_area::make_area(&table, &dir, &Default::default()).unwrap().made;
-    let lines = |p: PathBuf| {
-        let mut l: Vec<String> = std::fs::read_to_string(p).unwrap().lines().map(String::from).collect();
-        l.sort();
-        l
-    };
-    assert_eq!(lines(dir.join("pairs.csv")), lines(data("pairs.csv")));
-    let rows = |p: PathBuf| roadstyle_rs::read::read_table(std::fs::read(p).unwrap(), "geometry").unwrap();
-    let (got, want) = (rows(dir.join("roads.parquet")), rows(data("roads.parquet")));
-    assert_eq!((made.roads, got.len()), (want.len(), want.len()));
-    for (g, w) in got.iter().zip(&want) {
-        assert_eq!(g.cols, w.cols, "road {}", w.cols["road"]);
-        assert_eq!(g.blob.is_some(), w.blob.is_some());
-    }
-    std::fs::remove_dir_all(&dir).ok();
+    common::golden("level_area/rust_conflicts.json", &Value::Array(got));
 }

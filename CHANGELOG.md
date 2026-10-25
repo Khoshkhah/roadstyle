@@ -12,7 +12,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the query `level_edges`, the edges of a duckOSM file's level area (duckOSM's `load_roads`, the same rows and columns on Monaco). The
   editor is a module, `static/dashboard/editor/level_editor.js`: `levelEditor({map, container, pkg, store})` on a host's map or one of
   its own, with `browserStore` (the files in the browser) or `httpStore` (`roadstyle serve`), the event `"solved"` (levels.csv and the
-  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module.
+  map's table) and downloads of edits.csv and levels.csv. `roadstyle serve`'s page uses the same module. On a host map the editor's
+  sources have names of their own (a host whose base map shares the roads' tile source keeps it), and the panel follows the page's
+  theme (dark with the system, unless `data-theme` on `<html>` says otherwise). The engine runs in a Web Worker
+  (`editor/level_worker.js`): on Tartu (64,828 edges) the longest main-thread task is 0.3 s, not 4.4 s. **A host changes one argument:**
+  `levelEditor({..., pkgUrl})` (the URL of `roadstyle_wasm.js`) in place of `pkg`; the event's `draw()` gives a Promise, and `editor.roads`
+  (the roads) takes the place of `editor.area`. The worker's calls are `static/dashboard/worker/call.js` (`caller`, `answer`), which the
+  browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls. On a phone the panel is a sheet at the bottom
+  (`layout`: `"auto"`, a sheet up to 700 px wide; `"sheet"`; `"side"`), with a handle (one row, half, full), taps on the roads, 44 px
+  targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
 
 ### Changed
 - **`roadstyle-levels` is a leaf crate** (audit N26): its only dependencies are rstar and sha2, 17 crates in all (it was 49, with
@@ -51,6 +59,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **Two readings of a duckOSM file at the same time on one connection no longer break each other** (the duckosm-rust page: "Table with
+  name e does not exist!"). The reader's temporary tables have the run's own names (`duckosmPlan`'s optional `run`, returned in
+  `"run"`; each base-map layer's `"table"`; `"drop"` drops them), and `duckosmFeaturesSelect(specs, run)` takes the run. `roads_sql.js`,
+  `features_sql.js` and Python's `duckosm.read` use them.
+- **On a phone, the boxes start folded.** On a screen 700 px wide or less, the Roads, Layers and Legend boxes start folded,
+  as the side panel starts closed; a tap on a box's title opens it. Before, the Roads box of a page with the default options
+  covered about half of the map at 390 px. A wider screen does not change.
 - **A look colour "#fff" no longer crashes `export_look`** (review D4: a panic in Rust, an abort in the browser). One colour module in the
   look crate (`roadstyle_look::color`) reads every colour of the look: "#rrggbb", "#rgb" and a CSS colour name; any other "#..." text is
   an error that names it. One mix rounds half up for the look and the export (the base map's look rounded half to even: some of its
@@ -64,6 +79,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   (`data/cmaps.json`). A matplotlib colormap name still works for `cmap`. branca stays: folium's page elements use it.
 
 ### Changed
+- **The dashboard tests no layer id for a prefix** (R7). The road filters act on the layers of the road roles (`sources`, `roadstyle:sources`), and a road is picked on the layers of the new option `pick` (`roadstyle:controls`). A deck is known by its role `decks`.
+
 - **The colour ramps have one source for both engines**: `src/roadstyle/data/cmaps.json` (branca's 269 schemes and colour names, and the
   180 matplotlib colormaps at 9 stops). Python's `ColorRamp` reads it, as roadstyle-look does, and no longer asks branca or matplotlib:
   all 445 ramps give the same colours as before (tests/test_colors.py).
@@ -94,6 +111,26 @@ All notable changes to **roadstyle** are documented here. The format is based on
   look, options, given?)` call it. Python gives only what it alone knows: the data steps, the look's options, the base maps' keys and the
   Google Maps key. A view's palette resolves its look in Rust (Python makes no extra looks). The page writer gzips the road table and
   the big sources itself; the two engines' pages are the same byte for byte but these blobs, which are the same when read back.
+- **`rust/roadstyle-wasm/bench.mjs` measures the browser's path** in Node: `makeSources` and `tileSources` with the base map, and the
+  wasm memory after them (Monaco 110 MiB, 7.0 KiB for each road; Tartu 213 MiB, 3.1 KiB). docs/rust/parity.md has the table, and the
+  target architecture's (j) the memory target for each road in the browser.
+- **A test that the Python binding passes the output through** (`tests/test_binding.py`): on Monaco, the binding's style, road
+  table and page are the Rust facade's texts byte for byte (the hashes in the Rust goldens, which `tests/areas.rs` makes). A page
+  gives the CARTO no-key warning once, not once for each CARTO base map of the switcher.
+- **The areas' goldens are the Rust engine's own** (2026-10-24: the Rust API is the design). `tests/areas.rs` checks the style and
+  the tiles of Monaco, Södermalm and Tartu against summaries in git (`rust_style.json`, `rust_tiles.json`, about 2 KB each), which
+  `ROADSTYLE_BLESS=1 cargo test` writes. The comparisons with Python's `golden_style` and `golden_tiles` are gone; the levels, the
+  colour cases and the looks are still checked against Python.
+- **`examples/bench.rs` measures the stages** (review 4, D9): the time, the peak memory and the memory after each stage, on Monaco
+  and Tartu (`cargo run --release -p roadstyle --example bench`; the numbers are in docs/rust/parity.md). The archive (PMTiles) and
+  the CLI's XYZ folder make each tile once, with no cache (`Tiles::build`; `Tiles::tile` keeps its cache for a map): Tartu's archive
+  7.2 s to 6.4 s, peak 663 MB to 596 MB, and no 68 MB of cached tiles after it.
+- **One style builder, and the page writes each source once** (review 4, D3 and N29). `Sources::style_with` makes the style with
+  no source's data in it, and `Sources::write_with` writes it, with each source's data written into the text as it goes. Stage 2
+  (`tile_stage`) and the page (`page_from`) use them: no source is cloned, written and parsed back any more. The page's JSON is
+  `serde_json`'s compact text, each `<` as `\u003c`; Python's `json.dumps` copy in Rust (`pyjson`) is gone. On Tartu, the Rust page:
+  peak memory 1.91 GB to 0.60 GB and 4.1 s to 2.5 s (no gzip), 1.84 GB to 0.42 GB and 6.3 s to 5.5 s (gzip); `make_tiled` stays
+  at 173 MB (it tiles every source).
 - **An exported style tells an app's dashboard its roads** (audit 3, N27, both engines). `export_style`'s metadata has
   `roadstyle:sources` (the road roles) and `roadstyle:controls.pick` (the layers that a road is picked on), from its final layers, as a
   live style has them. A dashboard on an exported style finds and picks the roads with no layer-id prefix.
@@ -173,7 +210,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 - **A base-map layer's overlay entry names its 3D layer** (`roadstyle:controls.overlays[].extrude`, the fill-extrusion's id), so a host's
-  dashboard finds the 3D buildings on a page, whose layers have no metadata.
+  dashboard finds the 3D buildings on a page, whose layers have no metadata. The dashboard reads it (`features.js`, with the page's
+  prefix), not the layer metadata: before, `rsSetBuildings3D(true)` did nothing on `roadstyle.duckosm.page`.
 - **`roadstyle.duckosm.page(db, mode, ...)`: mapstyle's `render_map` on the Rust engine.** The page of a duckOSM file: its roads, its
   base map and the shared dashboard with the base map's controls (modes, kinds, each layer's clicks, tooltip and popup). The keywords of
   render_map: `theme`, `paths`, `layers`, `only`, `interaction` (a layer's start `{clickable, tooltip, popup}`; a layer that the map does

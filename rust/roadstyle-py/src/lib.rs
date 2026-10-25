@@ -217,7 +217,7 @@ impl Sources {
             None => roadstyle::xyz_at(""),
         };
         let (style, tiles) = py.detach(|| roadstyle::tile_stage(s, &o, &at));
-        let style = style.to_string();
+        let style = py.detach(|| roadstyle::style_text(s, &style));
         Ok((style.clone(), Tiler { style, tiles }))
     }
 
@@ -427,30 +427,43 @@ fn duckosm_catalog_sql(catalog: &str) -> [String; 2] {
     roadstyle::duckosm::catalog_sql(catalog)
 }
 
-/// duckosm_plan(tables, columns, mode, tags, specs, only=False) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm, the one
-/// copy of it), as JSON text: {"roads": [3 statements] (null when the file has no network of `mode`: "roads_error" says why), "meta": the stored levels' query or null (tags), "select": the roads of `mode`,
-/// "layers": [{"spec", "name", "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset":
-/// with `only` (the map of `mode` alone), the queries of its roads with no stored levels and of its edge_ids, "level_edges": the edges of the
-/// file's level area (duckOSM's load_roads)}. `tables` and `columns`: the rows of the catalog's information_schema.
+/// duckosm_plan(tables, columns, mode, tags, specs, only=False, run=None) -> str: the SQL that reads a duckOSM file (roadstyle_io::duckosm,
+/// the one copy of it), as JSON text: {"run": the run's id (its tables have their own names, so two readings at the same time on one
+/// connection do not meet; with no `run`, a new one), "roads": [3 statements] (null when the file has no network of `mode`: "roads_error"
+/// says why), "meta": the stored levels' query or null (tags), "select": the roads of `mode`, "layers": [{"spec", "name", "table": the table
+/// to make, "sql": [the queries in order]}] for the base map (`specs`: layers.yaml's layers as JSON text), "subset": with `only` (the map
+/// of `mode` alone), the queries of its roads with no stored levels and of its edge_ids, "drop": the statement that drops the run's
+/// tables, "level_edges": the edges of the file's level area (duckOSM's load_roads)}. `tables` and `columns`: the rows of the catalog's
+/// information_schema.
 #[pyfunction]
-#[pyo3(signature = (tables, columns, mode, tags, specs, only=false))]
-fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str, only: bool)
-                -> PyResult<String> {
+#[pyo3(signature = (tables, columns, mode, tags, specs, only=false, run=None))]
+#[allow(clippy::too_many_arguments)]
+fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, String)>, mode: &str, tags: bool, specs: &str, only: bool,
+                run: Option<String>) -> PyResult<String> {
     use roadstyle::duckosm;
     let cat = duckosm::Catalog { tables, columns };
+    let run = duckosm::Run::new(&run.unwrap_or_else(new_run)).map_err(|e| PyValueError::new_err(e.to_string()))?;
     let specs: Vec<serde_json::Value> = serde_json::from_str(specs).map_err(|e| PyValueError::new_err(format!("specs: {e}")))?;
     // the base map's queries also for a file with no network: then "roads" is null and "roads_error" says why
-    let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode)) {
+    let (roads, roads_error) = match duckosm::roads_sql(&cat, tags, only.then_some(mode), &run) {
         Ok(r) => (Some(r), None),
         Err(e) => (None, Some(e)),
     };
-    let select = duckosm::roads_select(mode).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let layers: Vec<serde_json::Value> = duckosm::features_sql(&cat, &specs).into_iter()
-        .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "sql": l.sql})).collect();
+    let select = duckosm::roads_select(mode, &run).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    let made = duckosm::features_sql(&cat, &specs);
+    let drop = run.drop_sql(&made.iter().map(|l| l.spec).collect::<Vec<_>>());
+    let layers: Vec<serde_json::Value> = made.into_iter()
+        .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "table": run.feature(l.spec), "sql": l.sql})).collect();
     let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
-    let subset = (only && !tags).then_some([duckosm::SUBSET_SQL, duckosm::IDS_SQL]);
-    Ok(serde_json::json!({"roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers, "subset": subset,
-                          "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
+    let subset = (only && !tags).then(|| [duckosm::subset_sql(&run), duckosm::ids_sql(&run)]);
+    Ok(serde_json::json!({"run": run.id(), "roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers,
+                          "subset": subset, "drop": drop, "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())
+}
+
+/// A new run id of this process (duckosm_plan's default).
+fn new_run() -> String {
+    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    format!("p{}_{}", std::process::id(), N.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
 }
 
 /// duckosm_levels(row) -> str: the look's keyword `levels` (JSON text) from the stored levels' metadata row (source, n_edges, edge_hash),
@@ -470,10 +483,11 @@ fn duckosm_subset_levels(row: Option<(String, i64, String)>, missing: i64, examp
         .map(|v| v.to_string()).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-/// duckosm_features_select(specs) -> str | None: the base map's rows from the tables f<spec> that were made.
+/// duckosm_features_select(specs, run) -> str | None: the base map's rows from the run's tables of the layers `specs` that were made.
 #[pyfunction]
-fn duckosm_features_select(specs: Vec<usize>) -> Option<String> {
-    roadstyle::duckosm::features_select(&specs)
+fn duckosm_features_select(specs: Vec<usize>, run: &str) -> PyResult<Option<String>> {
+    let run = roadstyle::duckosm::Run::new(run).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(roadstyle::duckosm::features_select(&specs, &run))
 }
 
 /// serve(area, port, page=None): roadstyle serve (roadstyle-serve) in a thread of its own: the level editor's page files (in the extension,

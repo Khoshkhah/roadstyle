@@ -1,0 +1,17 @@
+{
+  "method": "Solve",
+  "rows": 4563,
+  "roads": 3024,
+  "edge_hash": "220ed85386f6bb80162f9e7826559b3f",
+  "pairs": 87,
+  "order_pairs": 1160,
+  "given_up": 0,
+  "orders_not_kept": 0,
+  "near_not_kept": 0,
+  "stages": [
+    0,
+    0,
+    0,
+    2904122
+  ]
+}

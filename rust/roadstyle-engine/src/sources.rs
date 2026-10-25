@@ -110,40 +110,18 @@ impl Sources {
     /// The style as one JSON text (export_inline's), with each source's GeoJSON in it, written to `w` a part at a time. A page's style
     /// has no `roads` source (`RoadsSource::in_style`).
     pub fn write_style<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
-        write!(w, r#"{{"version":8,"name":{},"center":{},"zoom":{},"layers":"#, self.name, self.center, self.zoom)?;
-        serde_json::to_writer(&mut *w, &self.layers.iter().map(JsSafe).collect::<Vec<_>>())?;
-        w.write_all(br#","sources":{"#)?;
-        let shown = self.sources.iter().filter(|(_, s)| !matches!(s, Src::Roads(_)) || self.roads.in_style);
-        for (i, (k, s)) in shown.enumerate() {
-            if i > 0 {
-                w.write_all(b",")?;
-            }
-            serde_json::to_writer(&mut *w, k)?;
-            w.write_all(b":")?;
-            match s {
-                Src::Roads(_) => self.roads.write_json(w)?,
-                Src::Simple(p) => p.write_json(w, &self.roads.roads)?,
-                Src::Features(f) => f.write_json(w)?,
-                Src::Json(v) => serde_json::to_writer(&mut *w, &JsSafe(v))?,
-            }
-        }
-        w.write_all(br#"},"metadata":"#)?;
-        serde_json::to_writer(&mut *w, &JsSafe(&self.metadata))?;
-        if let Some(g) = &self.glyphs {
-            write!(w, r#","glyphs":{g}"#)?;
-        }
-        if let Some(st) = &self.state {
-            write!(w, r#","state":{st}"#)?;
-        }
-        w.write_all(b"}")
+        self.write_with(&self.style_with(|_| Value::Null, false), w)
     }
 
-    /// The style with each source's data at `url(name)` (a GeoJSON source can name its data by URL), in place of the data.
-    pub fn style(&self, url: impl Fn(&str) -> String) -> Value {
-        let spec = |tolerance: f64, promote: bool, maxzoom: Option<i64>, url: String| {
+    /// The style as a JSON value, each source's `data` as `data(name)` (audit D3: no source is copied with its data): a URL of it, or
+    /// null, where `write_with` writes the source's FeatureCollection. `saved`: the metadata has what only a saved style has
+    /// (`roadstyle:tiles`, `roadstyle:columns`). The one builder of a style: export_inline's text, the saved style, stage 2's and the
+    /// page's.
+    pub fn style_with(&self, data: impl Fn(&str) -> Value, saved: bool) -> Value {
+        let spec = |tolerance: f64, promote: bool, maxzoom: Option<i64>, data: Value| {
             let mut s = serde_json::Map::new();
             s.insert("type".into(), "geojson".into());
-            s.insert("data".into(), url.into());
+            s.insert("data".into(), data);
             s.insert("tolerance".into(), tolerance.into());
             if promote {
                 s.insert("promoteId".into(), "__rs_edge".into());
@@ -153,19 +131,17 @@ impl Sources {
             }
             Value::Object(s)
         };
-        let sources: serde_json::Map<String, Value> = self.sources.iter().filter(|(_, s)| !matches!(s, Src::Roads(_)) || self.roads.in_style)
-            .map(|(k, s)| (k.clone(), match s {
-            Src::Roads(_) => spec(self.roads.tolerance, false, self.roads.maxzoom, url(k)),
-            Src::Simple(s) => spec(s.tolerance, s.promote, s.maxzoom, url(k)),
-            Src::Features(f) => f.spec(url(k).into()),
-            Src::Json(v) => {
-                let mut v = v.clone();
-                v["data"] = url(k).into();
-                v
-            }
+        let sources: serde_json::Map<String, Value> = self.shown().map(|(_, (k, s))| (k.clone(), match s {
+            Src::Roads(_) => spec(self.roads.tolerance, false, self.roads.maxzoom, data(k)),
+            Src::Simple(s) => spec(s.tolerance, s.promote, s.maxzoom, data(k)),
+            Src::Features(f) => f.spec(data(k)),
+            // the source's other members, and `data` in its place
+            Src::Json(v) => v.as_object().map_or_else(|| v.clone(), |o| Value::Object(o.iter().map(|(m, x)| {
+                (m.clone(), if m == "data" { data(k) } else { x.clone() })
+            }).collect())),
         })).collect();
         let mut metadata = self.metadata.clone();
-        if let Some(m) = metadata.as_object_mut() {
+        if let Some(m) = metadata.as_object_mut().filter(|_| saved) {
             m.extend(self.saved.iter().map(|(k, v)| (k.clone(), v.clone())));
         }
         let mut style = serde_json::json!({"version": 8, "name": self.name, "center": self.center, "zoom": self.zoom, "layers": self.layers,
@@ -177,6 +153,71 @@ impl Sources {
             style["state"] = st.clone();
         }
         style
+    }
+
+    /// The sources that a style shows, with their place in `sources`: all but the roads when they are not in the style.
+    fn shown(&self) -> impl Iterator<Item = (usize, &(String, Src))> {
+        self.sources.iter().enumerate().filter(|(_, (_, s))| !matches!(s, Src::Roads(_)) || self.roads.in_style)
+    }
+
+    /// The FeatureCollection of the source `name` as the style has it (write_style's), written to `w`; false: no such source.
+    pub fn write_source_data<W: std::io::Write>(&self, name: &str, w: &mut W) -> std::io::Result<bool> {
+        let Some((_, (_, s))) = self.shown().find(|(_, (k, _))| k == name) else { return Ok(false) };
+        match s {
+            Src::Roads(_) => self.roads.write_data(w, None, true)?,
+            Src::Simple(p) => p.write_data(w, &self.roads.roads)?,
+            Src::Features(f) => f.write_data(w)?,
+            Src::Json(v) => serde_json::to_writer(&mut *w, &JsSafe(&v["data"]))?,
+        }
+        Ok(true)
+    }
+
+    /// `style` (`style_with`'s, perhaps changed: tiled, merged into a page) as JSON text, written to `w` a part at a time: a source of
+    /// these Sources whose `data` is null gets its FeatureCollection there (`write_source_data`); all else is written as it is.
+    pub fn write_with<W: std::io::Write>(&self, style: &Value, w: &mut W) -> std::io::Result<()> {
+        let Some(top) = style.as_object() else { return serde_json::to_writer(w, &JsSafe(style)).map_err(std::io::Error::other) };
+        w.write_all(b"{")?;
+        for (i, (k, v)) in top.iter().enumerate() {
+            if i > 0 {
+                w.write_all(b",")?;
+            }
+            serde_json::to_writer(&mut *w, k)?;
+            w.write_all(b":")?;
+            match (k.as_str(), v.as_object()) {
+                ("sources", Some(srcs)) => {
+                    w.write_all(b"{")?;
+                    for (j, (name, src)) in srcs.iter().enumerate() {
+                        if j > 0 {
+                            w.write_all(b",")?;
+                        }
+                        serde_json::to_writer(&mut *w, name)?;
+                        w.write_all(b":")?;
+                        self.write_source(name, src, w)?;
+                    }
+                    w.write_all(b"}")?;
+                }
+                _ => serde_json::to_writer(&mut *w, &JsSafe(v))?,
+            }
+        }
+        w.write_all(b"}")
+    }
+
+    fn write_source<W: std::io::Write>(&self, name: &str, src: &Value, w: &mut W) -> std::io::Result<()> {
+        let Some(o) = src.as_object().filter(|o| o.get("data").is_some_and(Value::is_null)) else {
+            return serde_json::to_writer(w, &JsSafe(src)).map_err(std::io::Error::other);
+        };
+        w.write_all(b"{")?;
+        for (i, (m, x)) in o.iter().enumerate() {
+            if i > 0 {
+                w.write_all(b",")?;
+            }
+            serde_json::to_writer(&mut *w, m)?;
+            w.write_all(b":")?;
+            if m != "data" || !self.write_source_data(name, w)? {
+                serde_json::to_writer(&mut *w, &JsSafe(x))?;
+            }
+        }
+        w.write_all(b"}")
     }
 
     /// The road table (audit N4): one typed row for each road (its row is its position), which the page's JSON and the Parquet file

@@ -162,22 +162,12 @@ fn binary(col: &ArrayRef, r: usize) -> Option<&[u8]> {
     }
 }
 
-/// The points of a 2D WKB LineString; None for any other geometry.
+/// The points of a WKB LineString (a Z or an M left out: roadstyle_model::wkb, the one reader); None for any other geometry.
 pub fn wkb_line(b: &[u8]) -> Option<Vec<[f64; 2]>> {
-    let le = *b.first()? == 1;
-    let u32_at = |i: usize| -> Option<u32> {
-        let w: [u8; 4] = b.get(i..i + 4)?.try_into().ok()?;
-        Some(if le { u32::from_le_bytes(w) } else { u32::from_be_bytes(w) })
-    };
-    let f64_at = |i: usize| -> Option<f64> {
-        let w: [u8; 8] = b.get(i..i + 8)?.try_into().ok()?;
-        Some(if le { f64::from_le_bytes(w) } else { f64::from_be_bytes(w) })
-    };
-    if u32_at(1)? != 2 {
-        return None;
+    match roadstyle_model::wkb::read(b)? {
+        (roadstyle_model::feature_table::GeomType::LineString, mut parts) => parts.pop()?.pop(),
+        _ => None,
     }
-    let n = u32_at(5)? as usize;
-    (0..n).map(|k| Some([f64_at(9 + 16 * k)?, f64_at(17 + 16 * k)?])).collect()
 }
 
 /// A GeoParquet file (as `write::parquet` writes it, or any with a WKB `geometry` column) as a GeoJSON FeatureCollection: each row a
@@ -223,42 +213,7 @@ pub fn features(data: Vec<u8>) -> Result<Value, Error> {
     Ok(serde_json::json!({"type": "FeatureCollection", "features": features}))
 }
 
-/// A 2D WKB geometry as GeoJSON (Point, LineString, Polygon and their Multi kinds); None for another.
+/// A WKB geometry as GeoJSON (roadstyle_model::wkb, the one reader).
 pub(crate) fn wkb_geometry(b: &[u8]) -> Option<Value> {
-    fn at(b: &[u8], i: &mut usize, le: bool) -> Option<u32> {
-        let w: [u8; 4] = b.get(*i..*i + 4)?.try_into().ok()?;
-        *i += 4;
-        Some(if le { u32::from_le_bytes(w) } else { u32::from_be_bytes(w) })
-    }
-    fn f(b: &[u8], i: &mut usize, le: bool) -> Option<f64> {
-        let w: [u8; 8] = b.get(*i..*i + 8)?.try_into().ok()?;
-        *i += 8;
-        Some(if le { f64::from_le_bytes(w) } else { f64::from_be_bytes(w) })
-    }
-    fn pt(b: &[u8], i: &mut usize, le: bool) -> Option<Value> {
-        Some(serde_json::json!([f(b, i, le)?, f(b, i, le)?]))
-    }
-    fn pts(b: &[u8], i: &mut usize, le: bool) -> Option<Value> {
-        let n = at(b, i, le)?;
-        (0..n).map(|_| pt(b, i, le)).collect::<Option<Vec<_>>>().map(Value::Array)
-    }
-    fn one(b: &[u8], i: &mut usize) -> Option<(&'static str, Value)> {
-        let le = *b.get(*i)? == 1;
-        *i += 1;
-        let t = at(b, i, le)?;
-        let rings = |i: &mut usize| -> Option<Value> { let n = at(b, i, le)?; (0..n).map(|_| pts(b, i, le)).collect::<Option<Vec<_>>>().map(Value::Array) };
-        Some(match t {
-            1 => ("Point", pt(b, i, le)?),
-            2 => ("LineString", pts(b, i, le)?),
-            3 => ("Polygon", rings(i)?),
-            4..=6 => {
-                let n = at(b, i, le)?;
-                let parts = (0..n).map(|_| one(b, i).map(|p| p.1)).collect::<Option<Vec<_>>>()?;
-                ([("MultiPoint"), "MultiLineString", "MultiPolygon"][t as usize - 4], Value::Array(parts))
-            }
-            _ => return None,
-        })
-    }
-    let (t, c) = one(b, &mut 0)?;
-    Some(serde_json::json!({"type": t, "coordinates": c}))
+    roadstyle_model::geom::from_wkb(b).map(|g| g.geojson())
 }

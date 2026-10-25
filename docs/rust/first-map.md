@@ -49,14 +49,9 @@ bridges over tunnels. Move the mouse over a road: the road glows. Click a road: 
 
 ## Compare with the Python engine
 
-Add these lines:
-
-```python
-p = rs.render_edges(edges, name="Monaco")      # the default engine: Python
-print("same page:", m.html == p.html)
-```
-
-Run the file. It writes `same page: True`. The two engines write the same page, byte for byte.
+The default engine (Python) makes the same map: `rs.render_edges(edges, name="Monaco")`. The two pages have the same style, the same
+dashboard options and the same data, as JSON values. Their JSON text is not the same: the Rust engine writes `serde_json`'s compact
+text. So compare values, not text, as `tests/test_engine_parity.py` does (`_same_page`).
 
 ## Measure the two engines
 

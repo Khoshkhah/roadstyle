@@ -186,7 +186,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
                         let ([x0, y0], [x1, y1]) = (tile_of(bounds[0], bounds[3], z), tile_of(bounds[2], bounds[1], z));
                         for x in x0..=x1 {
                             for y in y0..=y1 {
-                                let b = tiles.tile(z, x, y);
+                                let b = tiles.build(z, x, y);        // each tile once: no cache (review 4, D9)
                                 if !b.is_empty() {
                                     let p = out.join("roads").join(z.to_string()).join(x.to_string());
                                     std::fs::create_dir_all(&p).map_err(|e| Error::File(format!("{}: {e}", p.display())))?;

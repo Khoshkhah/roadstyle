@@ -5,7 +5,7 @@ repository.workspace = true
 homepage.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "roadstyle's drawing levels: the tags rule and the solver (on roadstyle-model only, for the road flags)"
+description = "roadstyle's drawing levels: the tags rule and the solver (a leaf crate: the road flags are its own module)"
 
 [dependencies]
 rstar.workspace = true

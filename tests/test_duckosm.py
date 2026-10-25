@@ -194,3 +194,81 @@ def test_auto_levels_solve_a_file_with_no_stored_levels(tmp_path):
     assert level_kw is None
     with pytest.raises(ValueError, match="duckosm levels"):
         duckosm.read(db, "driving", levels="stored")
+
+
+def _two_runs(db, mode="all"):
+    """Two readings of `db` at the same time on one connection, their statements interleaved (a page that draws twice): the roads and
+    the base map of each."""
+    import duckdb
+
+    from roadstyle import _engine, duckosm
+
+    r = _engine.rust()
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        tq, cq = r.duckosm_catalog_sql(con.execute("SELECT current_database()").fetchone()[0])
+        tables, columns = con.execute(tq).fetchall(), con.execute(cq).fetchall()
+        a, b = (json.loads(r.duckosm_plan(tables, columns, mode, True, json.dumps(duckosm.layer_specs()))) for _ in range(2))
+        assert a["run"] != b["run"]
+        for x, y in zip(a["roads"], b["roads"], strict=True):     # e of a, e of b, r of a, r of b, drop e of a, drop e of b
+            con.execute(x)
+            con.execute(y)
+        made = {p["run"]: [] for p in (a, b)}
+        for la, lb in zip(a["layers"], b["layers"], strict=True):
+            for p, lyr in ((a, la), (b, lb)):
+                for sql in lyr["sql"]:
+                    try:
+                        con.execute(f"CREATE OR REPLACE TEMP TABLE {lyr['table']} AS {sql}")
+                    except duckdb.Error:
+                        continue
+                    made[p["run"]].append(lyr["spec"])
+                    break
+        out = []
+        for p in (a, b):
+            fsel = r.duckosm_features_select(made[p["run"]], p["run"])
+            out.append((con.execute(p["select"]).to_arrow_table(), con.execute(fsel).to_arrow_table() if fsel else None))
+        for p in (a, b):
+            con.execute(p["drop"])
+        return out
+    finally:
+        con.close()
+
+
+def test_two_readings_at_the_same_time_give_the_same_tables(tmp_path):
+    """duckosm_plan's temporary tables have the run's own names: two readings at the same time on one connection do not drop or replace
+    each other's tables (the duckosm-rust page: "Table with name e does not exist!")."""
+    (ra, fa), (rb, fb) = _two_runs(_tiny(tmp_path / "two.duckdb"))
+    assert ra.num_rows == 2 and ra.equals(rb) and fa.equals(fb)
+
+
+@needs_db
+def test_two_readings_at_the_same_time_on_monaco():
+    (ra, fa), (rb, fb) = _two_runs(DB)
+    assert ra.num_rows > 1000 and ra.equals(rb) and fa.num_rows > 1000 and fa.equals(fb)
+
+
+@needs_db
+def test_the_buildings_3d_button_shows_and_hides_them(tmp_path):
+    """rsSetBuildings3D on duckosm.page: the dashboard finds the 3D layer by its overlay's `extrude` (the page's layers have no metadata),
+    and the button under the 2D/3D button shows and hides it. Before, the button did nothing on this page."""
+    pw = pytest.importorskip("playwright.sync_api")
+    from roadstyle import duckosm
+
+    out = tmp_path / "monaco.html"
+    duckosm.page(DB, "all").save(str(out))
+    html = out.read_text()
+    ovs = json.JSONDecoder().raw_decode(html, html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]["overlays"]
+    ids = [ov["extrude"] for ov in ovs if ov.get("extrude")]
+    assert ids, "Monaco has buildings with heights"
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        pg = browser.new_page()
+        pg.goto(out.as_uri())
+        pg.wait_for_selector("#rs-b3d-btn", timeout=120000)         # the dashboard has found the 3D layer
+        shown = lambda: pg.evaluate("ids => ids.map(id => map.getLayoutProperty(id, 'visibility'))", ids)  # noqa: E731
+        assert shown() == ["none"] * len(ids)
+        pg.click("#rs-b3d-btn")
+        assert shown() == ["visible"] * len(ids) and pg.evaluate("rsGetBuildings3D()")
+        pg.click("#rs-b3d-btn")
+        assert shown() == ["none"] * len(ids)
+        browser.close()

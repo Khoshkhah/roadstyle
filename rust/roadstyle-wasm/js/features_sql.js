@@ -12,13 +12,14 @@ import {readCatalog} from "./roads_sql.js";
 export async function writeFeatures(q, catalog, specs) {
   const cat = await readCatalog(q, catalog);
   const made = [];
-  // each layer: f<spec> from its first query that runs (the next ones are mapstyle's fallbacks); none runs: the layer is skipped, as
-  // load_layers does
-  for (const l of JSON.parse(duckosmPlan(JSON.stringify(cat), "all", true, JSON.stringify(specs))).layers || []) {
+  // each layer: its table (the run's own name) from its first query that runs (the next ones are mapstyle's fallbacks); none runs: the
+  // layer is skipped, as load_layers does
+  const p = JSON.parse(duckosmPlan(JSON.stringify(cat), "all", true, JSON.stringify(specs)));
+  for (const l of p.layers || []) {
     let error = null;
     for (const [k, sql] of l.sql.entries()) {
       try {
-        await q(`CREATE OR REPLACE TEMP TABLE f${l.spec} AS ${sql}`);
+        await q(`CREATE OR REPLACE TEMP TABLE ${l.table} AS ${sql}`);
         if (k) console.warn(`base-map layer ${l.name}: its query ${k + 1} (an older file: ${error})`);
         made.push(l.spec); error = null;
         break;
@@ -26,8 +27,9 @@ export async function writeFeatures(q, catalog, specs) {
     }
     if (error) console.warn(`base-map layer ${l.name} skipped: ${error}`);
   }
-  const select = duckosmFeaturesSelect(Uint32Array.from(made));
+  const select = duckosmFeaturesSelect(Uint32Array.from(made), p.run);
   if (!select) return false;
   await q(`COPY (${select}) TO 'features.parquet' (FORMAT parquet)`);
+  await q(p.drop);                                     // the run's tables
   return true;
 }

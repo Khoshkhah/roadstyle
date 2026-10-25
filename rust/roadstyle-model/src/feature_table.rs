@@ -20,7 +20,7 @@ pub enum GeomType {
 }
 
 impl GeomType {
-    fn of(code: u32) -> Option<GeomType> {
+    pub(crate) fn of(code: u32) -> Option<GeomType> {
         use GeomType::*;
         // ISO WKB: 1000 more for a Z, 2000 for an M, 3000 for both; the coordinates past x and y are left out
         Some(match code % 1000 {
@@ -101,7 +101,7 @@ impl Geometries {
             self.push_none();
             return Ok(());
         };
-        let (kind, parts, _) = wkb(b, 0).ok_or("a geometry that is not WKB")?;
+        let (kind, parts) = crate::wkb::read(b).ok_or("a geometry that is not WKB")?;
         self.push(kind, &parts);
         Ok(())
     }
@@ -125,16 +125,7 @@ impl Geometries {
 
     /// The feature `row`'s geometry as the engine's `Geom` (a copy; None: it has none).
     pub fn geom(&self, row: usize) -> Option<Geom> {
-        let parts: Parts = self.parts(row).map(|rings| rings.map(<[_]>::to_vec).collect()).collect();
-        let firsts = || parts.iter().map(|p| p[0].clone());      // the one ring of each part of a MultiPoint or a MultiLineString
-        Some(match self.kinds[row]? {
-            GeomType::Point => Geom::Point(parts[0][0][0]),
-            GeomType::LineString => Geom::LineString(parts[0][0].clone()),
-            GeomType::Polygon => Geom::Polygon(parts[0].clone()),
-            GeomType::MultiPoint => Geom::MultiPoint(firsts().map(|r| r[0]).collect()),
-            GeomType::MultiLineString => Geom::MultiLineString(firsts().collect()),
-            GeomType::MultiPolygon => Geom::MultiPolygon(parts),
-        })
+        Geom::from_parts(self.kinds[row]?, self.parts(row).map(|rings| rings.map(<[_]>::to_vec).collect()).collect())
     }
 
     /// The feature `row`'s geometry as GeoJSON (null: none).
@@ -151,56 +142,6 @@ impl Geometries {
         };
         json!({"type": kind.name(), "coordinates": c})
     }
-}
-
-type Parts = Vec<Vec<Vec<[f64; 2]>>>;
-
-/// One WKB geometry at `i`: its type, its parts and the index after it.
-fn wkb(b: &[u8], mut i: usize) -> Option<(GeomType, Parts, usize)> {
-    let le = *b.get(i)? == 1;
-    let u32_at = |i: usize| -> Option<u32> {
-        let w: [u8; 4] = b.get(i..i + 4)?.try_into().ok()?;
-        Some(if le { u32::from_le_bytes(w) } else { u32::from_be_bytes(w) })
-    };
-    let code = u32_at(i + 1)?;
-    let kind = GeomType::of(code)?;
-    let dims = match code / 1000 { 1 | 2 => 3, 3 => 4, _ => 2 };
-    i += 5;
-    let pt = |i: &mut usize| -> Option<[f64; 2]> {
-        let f = |k: usize| -> Option<f64> {
-            let w: [u8; 8] = b.get(k..k + 8)?.try_into().ok()?;
-            Some(if le { f64::from_le_bytes(w) } else { f64::from_be_bytes(w) })
-        };
-        let p = [f(*i)?, f(*i + 8)?];
-        *i += 8 * dims;
-        Some(p)
-    };
-    let ring = |i: &mut usize| -> Option<Vec<[f64; 2]>> {
-        let n = u32_at(*i)? as usize;
-        *i += 4;
-        (0..n).map(|_| pt(i)).collect()
-    };
-    let parts = match kind {
-        GeomType::Point => vec![vec![vec![pt(&mut i)?]]],
-        GeomType::LineString => vec![vec![ring(&mut i)?]],
-        GeomType::Polygon => {
-            let n = u32_at(i)? as usize;
-            i += 4;
-            vec![(0..n).map(|_| ring(&mut i)).collect::<Option<Vec<_>>>()?]
-        }
-        _ => {
-            let n = u32_at(i)? as usize;
-            i += 4;
-            let mut out = Vec::with_capacity(n);
-            for _ in 0..n {
-                let (_, mut p, next) = wkb(b, i)?;
-                i = next;
-                out.append(&mut p);
-            }
-            out
-        }
-    };
-    Some((kind, parts, i))
 }
 
 /// The features: their properties (`props`, a `RoadTable` with no lines) and their geometries, one of each for each feature. Each
