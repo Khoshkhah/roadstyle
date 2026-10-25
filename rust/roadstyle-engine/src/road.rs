@@ -6,7 +6,7 @@
 use crate::draw::{Draw, Values};
 use crate::props::Get;
 use roadstyle_model::topology::Topology;
-use roadstyle_model::{Cell, RoadTable};
+use roadstyle_model::{Cell, RoadKey, RoadTable};
 use serde_json::{Map, Value};
 
 pub type Pt = [f64; 2];
@@ -163,6 +163,17 @@ pub struct RoadsSource {
     pub in_style: bool,
     /// R1: the only stage values (`__rs_*`) that a road keeps (`Sources::set_reads`), None: all; its fields stay
     pub read: Option<std::collections::HashSet<String>>,
+}
+
+/// The key of the road in the row `row` (`__rs_edge`): table 0, as a build has one road table (make_parts keeps the rows below
+/// MAX_ROADS, so a row fits in 32 bits).
+pub fn key(row: usize) -> RoadKey {
+    RoadKey::of_row(row as u32)
+}
+
+/// The row of a road from its key's number (`__rs_edge`, `__rs_edge2`).
+pub fn row_of(key: u64) -> Option<usize> {
+    RoadKey::from_u64(key).map(|k| k.row() as usize)
 }
 
 /// The name of a kept column (a column with an engine name that is not the named one) while the engine runs.

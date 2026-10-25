@@ -27,7 +27,7 @@ pub fn roads_from(reader: impl RecordBatchReader, geom_col: &str) -> Result<Road
         lines.push(g.and_then(wkb_line).as_deref());
         Ok(())
     })?;
-    RoadTable::new(names, cols, lines).map_err(Error::Format)
+    Ok(RoadTable::new(names, cols, lines)?)
 }
 
 /// The base map's (or any) features from a GeoParquet file: every column but the geometry an Arrow array, and the geometry of each row
@@ -40,7 +40,7 @@ pub fn read_feature_table(data: Vec<u8>, geom_col: &str) -> Result<FeatureTable,
 pub fn feature_table_from(reader: impl RecordBatchReader, geom_col: &str) -> Result<FeatureTable, Error> {
     let mut geoms = FeatureTable::geometries();
     let (names, cols) = columns_from(reader, geom_col, |g| geoms.push_wkb(g).map_err(|e| Error::Format(format!("{geom_col}: {e}"))))?;
-    FeatureTable::new(names, cols, geoms).map_err(Error::Format)
+    Ok(FeatureTable::new(names, cols, geoms)?)
 }
 
 /// The columns of Arrow batches but `geom_col` (each one Arrow array of every row), and `geom` called with each row's geometry bytes

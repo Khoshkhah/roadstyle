@@ -169,12 +169,12 @@ impl Piece {
     pub fn props(&self, roads: &Roads, cols: &Cols) -> Props {
         let r = self.road(roads);
         let d = r.draw();
-        let edge = self.edge as i64;
+        let (edge, key) = (self.edge as i64, crate::road::key(self.edge as usize).get());      // the row (the sort key's tie-breaker), the road's key
         let mut q: Props = match self.part {
             Part::Fill => road_props(r, |k| cols.fill(k)),
             Part::Half(k) => {
                 let mut q = road_props(r, |kk| !matches!(kk, "__rs_cap0" | "__rs_cap1" | "__rs_split"));
-                q.insert("__rs_edge", edge.into());
+                q.insert("__rs_edge", key.into());
                 if let Some(c) = d.split.map(|s| s[k as usize]).filter(|c| *c != Cap::Round) {
                     q.insert("__rs_cap", c.value());
                 }
@@ -182,10 +182,10 @@ impl Piece {
             }
             _ => {
                 let mut q = road_props(r, |k| cols.casing(k));
-                q.insert("__rs_edge", edge.into());
+                q.insert("__rs_edge", key.into());
                 if let Some(tw) = d.twin {
                     q.insert("__rs_pair", true.into());
-                    q.insert("__rs_edge2", (tw as i64).into());
+                    q.insert("__rs_edge2", crate::road::key(tw as usize).get().into());
                 }
                 match self.part {
                     Part::Cut(k, num) => {
@@ -627,7 +627,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
     let mut rank: HashMap<i64, usize> = HashMap::new();
     let mut placed = Vec::with_capacity(items.len());
     for mut f in items {
-        let e = f.props.get("__rs_edge").and_then(Value::as_i64).unwrap_or(0);
+        let e = f.props.get("__rs_edge").and_then(Value::as_u64).and_then(crate::road::row_of).unwrap_or(0) as i64;
         let r = rank.entry(e).or_default();
         *r += 1;
         if *r > MAX_ITEMS {
@@ -712,7 +712,7 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
         }
         let k = c[0][1].to_radians().cos();
         let cm = p.get("__rs_cm").and_then(Cell::as_f64).unwrap_or(0.0);
-        wide.insert(p.get("__rs_edge").and_then(Cell::as_i64).unwrap_or(p.i as i64), (wm * k, (wm - 2.0 * cm) * k));
+        wide.insert(p.get("__rs_edge").and_then(Cell::as_u64).and_then(crate::road::row_of).unwrap_or(p.i) as i64, (wm * k, (wm - 2.0 * cm) * k));
     }
     let line = |e: i64| line_of.get(e as usize).copied().flatten();
     // the ends of the metre roads at each node (a road end's node: Topology)

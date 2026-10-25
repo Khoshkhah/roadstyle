@@ -80,8 +80,8 @@ fn first_drawn(layers: &[Value], k: &str, from: u32, last: u32) -> u32 {
 }
 
 /// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules), borrowed (audit N6: `s` stays as it is).
-fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::Tiles {
-    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> Result<tiles::Tiles, tiles::Error> {
+    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px)?;
     tiled.drawn_by(&s.layers);
     let keys = |v: &Value| -> std::collections::HashSet<String> {
         v["data"]["features"].as_array().into_iter().flatten().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect()
@@ -114,7 +114,7 @@ fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::T
             }
         }
     }
-    tiled
+    Ok(tiled)
 }
 
 /// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
@@ -132,13 +132,13 @@ fn json_lines(src: &Value) -> bool {
 /// Stage 2 from memory (audit N3): the tiles of stage 1's sources and the one style that draws them (`tiled_style`), the tiles at `at`
 /// (`{"url": "pmtiles://roads"}` for an archive, `{"tiles": ["<prefix>roads/{z}/{x}/{y}"]}` for a folder). `o`: which sources and
 /// which properties. The sources that `o` leaves out stay in the style with a null `data` (audit D3: not copied), which
-/// `Sources::write_with` fills as it writes the style.
-pub fn tile_stage(s: &sources::Sources, o: &tiles::stage::TileOptions, at: &Value) -> (Value, tiles::Tiles) {
-    let tiles = tile_sources(s, o);
+/// `Sources::write_with` fills as it writes the style. An error for zooms in `o` that are not tile zooms.
+pub fn tile_stage(s: &sources::Sources, o: &tiles::stage::TileOptions, at: &Value) -> Result<(Value, tiles::Tiles), tiles::Error> {
+    let tiles = tile_sources(s, o)?;
     let style = s.style_with(|_| Value::Null, true);
     let tiled: Vec<String> = s.sources.iter().filter(|(k, src)| (!matches!(src, Src::Roads(_)) || s.roads.in_style) && o.wants(k))
         .map(|(k, _)| k.clone()).collect();
-    (tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles)
+    Ok((tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles))
 }
 
 /// A style of these Sources (`tile_stage`'s, `style_with`'s) as JSON text, each null `data` with its source's FeatureCollection.
@@ -195,7 +195,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
                        -> Result<(Value, tiles::Tiles), String> {
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| format!("style.json: {e}"))?;
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
-    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px)?;
     let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
     tiled.drawn_by(layers);
     let mut names = Vec::new();
@@ -395,7 +395,7 @@ pub fn save_sources(s: &sources::Sources, dir: &std::path::Path, format: Format,
 /// `prefix`) and the tiles.
 pub fn tile_made(s: &sources::Sources, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), String> {
     let o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
-    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix));
+    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix))?;
     Ok((style_text(s, &style), tiled))
 }
 
@@ -420,7 +420,7 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
     o.exact = look.args["tile_keep"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
     o.only = look.args["tile_layers"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect());
-    let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix));
+    let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix))?;
     Ok((style_text(&s, &style), tiled, s.warnings))
 }
 
