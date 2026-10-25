@@ -1,4 +1,25 @@
-# T3: the typed map options and the typed look (design, no code yet)
+# T3: the typed map options and the typed look
+
+**Status (2026-10-25):** steps 1 to 3 are on rust-engine (1c5b926). Step 4 is roadstyle-rs's N32 step 2. The code differs from this
+design at these points, which the coordinator accepted:
+
+- `MapOptions::from_args` (render_edges' flat keywords) is in roadstyle-look, not in roadstyle-py: a saved look of version 1 has flat
+  `args`, so the look crate must read them. It does not reject an unknown keyword: it gives the names to the caller
+  (`Look::other_args`), which knows the page's keys.
+- The nearest known key is found with Jaro-Winkler (0.75 or more), not with the MCP's Levenshtein, which does not find "by" for
+  "by_column".
+- Added fields: `color.style`, `Popup::All`, `Overlay.style`, `EdgeLink.{width_m,offset_m,dash}_column`; `Missing` is `Base` or
+  `Self` (the documented values); `base_map.modes` is text (duckOSM has more modes than three).
+- The sections have the names `RoadsLook`, `CasingLook`, `LabelLook`, ... (`roadstyle_look::sections`), and one more section,
+  `PageLook`, which has the base map only: **no API key goes into a look** (the keywords `api_key` and `street_view_key` and the
+  settings' `config.api_key` and `config.api_keys` are removed; the caller gives the keys to the page in `given`).
+- A version 2 look still has `args` (step 4 removes it). The readers that have not moved read the JSON views of version 1, which are
+  fields of the look (no `theme_value(path)`), the same byte for byte for every golden look.
+- The big tables (the class tables, the width tables, the palettes, the base map's layers) stay JSON mappings; `RoadsModel`,
+  `ClassStyles` and `Slots` are typed (step 3).
+- schemars is behind the feature `schema`. `LookFile` is read and written by hand: serde's `flatten` put a second reader of each
+  section into the binary. The sizes are in docs/rust/parity.md ("Size").
+
 
 The target architecture (section (d), approved on 2026-10-24) gives three option types, one for each consumer: the `Look` (the resolved
 style), `MapOptions` (what a caller chooses for one map, which changes stage 1) and `PageOptions` (the page's keys, `page.rs`). Stage 2
