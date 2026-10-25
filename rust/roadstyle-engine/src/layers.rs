@@ -34,7 +34,7 @@ pub trait Exprs {
     fn sort_key(&self, col: &str) -> Value;
     /// _pair_width: a two-way pair's one casing as wide as its two directions (no metre widths).
     /// _pair_width; with width_m_zoom (`wmz`), a pair with metres on both has its width in `expr` already from that zoom on.
-    fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value;
+    fn pair_width(&self, col: &str, expr: &Value, wmz: Option<f64>) -> Value;
 }
 
 impl Exprs for Model {
@@ -150,11 +150,11 @@ impl Exprs for Model {
         json!(["+", ["*", ["coalesce", ["get", "lvl"], 0], 1000], m])
     }
 
-    fn pair_width(&self, expr: &Value, wmz: Option<f64>) -> Value {
+    fn pair_width(&self, col: &str, expr: &Value, wmz: Option<f64>) -> Value {
         let (z0, z1) = (self.zstops[0].as_f64().unwrap(), self.zstops[self.zstops.len() - 1].as_f64().unwrap());
         plus_px(expr, |z| {
             let zf = z.as_f64().unwrap();
-            let add = json!(["*", 2, self.offset_match("highway", zf.clamp(z0, z1))]);
+            let add = json!(["*", 2, self.offset_match(col, zf.clamp(z0, z1))]);
             match wmz { Some(w) if zf >= w => json!(["case", ["has", Mark::TwinWidthM.name()], 0, add]), _ => add }
         }, Some(&json!(["to-boolean", ["get", Mark::Pair.name()]])))
     }
@@ -634,14 +634,16 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let metres = crate::roads::named(&mo.columns.width_m).is_some();
     let wmz = mo.width.m_zoom.map_or_else(|| json!(s.roads.width_m_zoom), crate::given);
     let wing = s.bridges.wing_scale.f();
-    let off = if metres { m.offset_expr_m("highway", pairs, &wmz) } else { m.offset_expr("highway", pairs) };
+    // the road layers read the class role's column by its own name in the table (the slots have their own "highway")
+    let hw = roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name());
+    let off = if metres { m.offset_expr_m(hw, pairs, &wmz) } else { m.offset_expr(hw, pairs) };
     let (cw, fw, bcw) = if metres {
         let casing_px = mo.roads.casing_min_px.map_or_else(|| json!(s.casing.min_px), crate::given);
         let ml = MetreLook { wmz: wmz.clone(), bridge_m: json!(s.bridges.casing_m), bridge_px: json!(s.bridges.casing_px), casing_px, wing_scale: wing };
-        let mk = |k: &str| m.width_m_expr("highway", k, &ml);
+        let mk = |k: &str| m.width_m_expr(hw, k, &ml);
         (mk("casing"), mk("fill"), mk("wings"))
     } else {
-        (m.width_expr("highway", true, 1.0), m.width_expr("highway", false, 1.0), m.width_expr("highway", true, wing))
+        (m.width_expr(hw, true, 1.0), m.width_expr(hw, false, 1.0), m.width_expr(hw, true, wing))
     };
     // the line items on the edges (__rs_k 5): every curve of the road layer base-2 exponential, so theirs in metres is exact at every zoom
     let items: Vec<&Props> = simple.items.iter().map(|(_, it)| &it.props).filter(|p| p.get(Mark::PieceKind.name()) == Some(&json!(5))).collect();
@@ -657,7 +659,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let mz = class_minzoom(look);
     let mz_filter = |col: &str| mz.as_ref().map(|t| minzoom_filter(col, t));
     let mut flt = vec![json!("all")];
-    flt.extend(mz_filter("highway"));
+    flt.extend(mz_filter(hw));
     let casing_px = mo.roads.casing_min_px.map_or_else(|| json!(s.casing.min_px), crate::given);
     // casing.drop_below_px: the profile's 1.0 for a look made before the key (2026-10-25)
     let drop = s.casing.drop_below_px.as_ref().map_or(1.0, Num::f);
@@ -722,7 +724,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     }
     paint.insert("line-color".into(), Value::Array(color));
     let width = by_feature(&wide, &fw);
-    let width = if pairs { m.pair_width(&width, if metres { wmz.as_f64() } else { None }) } else { width };
+    let width = if pairs { m.pair_width(hw, &width, if metres { wmz.as_f64() } else { None }) } else { width };
     let factor = json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]);
     paint.insert("line-width".into(), times_each_stop(&width, &factor));
     paint.insert("line-offset".into(), times_each_stop(&soff, &factor));
@@ -732,7 +734,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     simple_layout.insert("line-cap".into(), simple_cap());
     simple_layout.insert("line-sort-key".into(), json!(["get", Mark::Sort.name()]));
     let mut paint = Value::Object(paint);
-    class_index(&mut paint, "highway", &m.classes);
+    class_index(&mut paint, hw, &m.classes);
     let road = json!({"id": "roads-simple", "type": "line", "source": "simple", "layout": simple_layout, "filter": flt, "paint": paint});
     let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": flt,
                       "paint": {"line-color": ["coalesce", ["get", Mark::Fill.name()], fb_fill], "line-width": fw, "line-offset": off, "line-opacity": 0}});
@@ -743,7 +745,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
         highlight["filter"] = json!(["!", ["!", ["to-boolean", 1]]]);
     }
     // the base map's overlays (_build_overlays): under the roads, over them, or on a street (_edge_overlay: one copy per fill number)
-    let by_id: HashMap<String, crate::road::Road> = rp.iter().filter_map(|p| p.get("edge_id").map(|e| (crate::overlays::eid(e), p))).collect();
+    let by_id: HashMap<String, crate::road::Road> = rp.iter().filter_map(|p| p.role(roadstyle_model::Role::EdgeId).map(|e| (crate::overlays::eid(e), p))).collect();
     let (mut under, mut over, mut edge, mut ov_ids) = (Vec::new(), Vec::new(), Vec::new(), Vec::new());
     for (i, ov) in ovs.iter_mut().enumerate() {
         let sid = format!("ov{i}");

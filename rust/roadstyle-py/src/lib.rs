@@ -526,6 +526,14 @@ fn take_warnings() -> Vec<String> {
     PENDING.with(|p| std::mem::take(&mut *p.borrow_mut()))
 }
 
+/// given_of(look, options) -> str: the page's keys of a call (page_options::given_of, the one rule of the wasm page too): the look's
+/// other keywords and name and road_popup of the options' args, as JSON text. The caller adds its own values (the API keys).
+#[pyfunction]
+fn given_of(look: PyRef<'_, PyLook>, options: &str) -> PyResult<String> {
+    let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| PyValueError::new_err(format!("options: {e}")))?;
+    Ok(serde_json::Value::Object(roadstyle::page_options::given_of(&look.0, &o.args)).to_string())
+}
+
 /// asset(name) -> bytes: one of roadstyle's files by its name (roadstyle-assets: "data/cmaps.json", "static/popup.js", ...). Python has no
 /// copy of them (roadstyle/_assets.py).
 #[pyfunction]
@@ -553,6 +561,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(asset, m)?)?;
     m.add_function(wrap_pyfunction!(asset_names, m)?)?;
     m.add_function(wrap_pyfunction!(unknown_keywords, m)?)?;
+    m.add_function(wrap_pyfunction!(given_of, m)?)?;
     m.add_function(wrap_pyfunction!(make_page, m)?)?;
     m.add_function(wrap_pyfunction!(page_from, m)?)?;
     m.add_function(wrap_pyfunction!(page_defaults, m)?)?;

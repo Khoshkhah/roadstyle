@@ -6,7 +6,7 @@ use roadstyle_look::sections::Num;
 use roadstyle_look::options::{EdgeLink, Overlay as Spec, OverlayKind, Placement, Select};
 use roadstyle_model::mark::{self, Mark};
 use crate::road::{Road, Roads};
-use roadstyle_model::Cell;
+use roadstyle_model::{Cell, Role};
 use crate::roads::truthy;
 use crate::slots::point_line_dist;
 use roadstyle_model::feature_table::{FeatureTable, GeomType};
@@ -70,7 +70,8 @@ fn kind_of_type(t: &str) -> Option<&'static str> {
 
 /// _band: below (-1 ...), on (0) or over (1 ...) the ground: the OSM layer if it is a number, else 1 for a bridge, -1 for a tunnel.
 fn band(r: Road) -> f64 {
-    let p: std::collections::HashMap<&str, Value> = ["layer", "bridge", "tunnel"].into_iter().filter_map(|k| r.get(k).map(|c| (k, c.to_value()))).collect();
+    let p: std::collections::HashMap<&str, Value> = [("layer", Role::Layer), ("bridge", Role::Bridge), ("tunnel", Role::Tunnel)].into_iter()
+        .filter_map(|(k, role)| r.role(role).map(|c| (k, c.to_value()))).collect();
     let layer = match p.get("layer") {
         Some(Value::String(s)) => s.trim().parse::<f64>().ok(),
         Some(Value::Number(n)) => n.as_f64(),
@@ -92,11 +93,11 @@ fn band(r: Road) -> f64 {
 pub fn edge_attach(tables: &mut [(String, FeatureTable)], roads: &Roads) -> Result<Vec<String>, crate::Error> {
     let n = roads.len();
     let klass: Vec<f64> = roads.iter().map(|r| {
-        let h = r.get("highway").and_then(Cell::as_str).unwrap_or("");
+        let h = r.role(Role::Class).and_then(Cell::as_str).unwrap_or("");
         let h = h.strip_suffix("_link").unwrap_or(h);
         CLASS_RANK.iter().position(|c| *c == h).map_or(99.0, |i| (i + 1) as f64)
     }).collect();
-    let fill: Vec<f64> = roads.iter().map(|r| r.get("fill_level").and_then(Cell::as_f64).unwrap_or(0.0)).collect();
+    let fill: Vec<f64> = roads.iter().map(|r| r.role(Role::FillLevel).and_then(Cell::as_f64).unwrap_or(0.0)).collect();
     let bands: Vec<f64> = roads.iter().map(band).collect();
     // np.lexsort((-klass, band, fill))[::-1]: by fill, then band, then -klass, ascending and stable; reversed
     let mut order: Vec<usize> = (0..n).collect();
@@ -105,7 +106,7 @@ pub fn edge_attach(tables: &mut [(String, FeatureTable)], roads: &Roads) -> Resu
     for (k, &i) in order.iter().rev().enumerate() {
         rank[i] = k;
     }
-    let street: Vec<bool> = roads.iter().map(|r| !r.get("highway").and_then(Cell::as_str).is_some_and(|h| PATH_CLASSES.contains(&h))).collect();
+    let street: Vec<bool> = roads.iter().map(|r| !r.role(Role::Class).and_then(Cell::as_str).is_some_and(|h| PATH_CLASSES.contains(&h))).collect();
     let topo = roads.topo();        // its R-tree: every road with a point or more
     let dist = |p: [f64; 2], i: usize| roads.line(i).map_or(f64::INFINITY, |c| point_line_dist(p, c));
     let within = |p: [f64; 2], d: f64| -> Vec<usize> {
@@ -136,7 +137,7 @@ pub fn edge_attach(tables: &mut [(String, FeatureTable)], roads: &Roads) -> Resu
             } else {
                 *hits.iter().min_by_key(|&&i| rank[i]).unwrap()
             };
-            ids.push(match roads.get(j, "edge_id").map(Cell::to_value) { Some(Value::String(s)) => s, Some(v) => v.to_string(), None => String::new() });
+            ids.push(match roads.role(j, Role::EdgeId).map(Cell::to_value) { Some(Value::String(s)) => s, Some(v) => v.to_string(), None => String::new() });
         }
         t.set_column("edge_id", &ids.iter().map(|s| Cell::Str(s)).collect::<Vec<_>>(), true)?;
         done.push(name.to_string());

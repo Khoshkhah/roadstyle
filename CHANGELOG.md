@@ -168,6 +168,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **The studio's Dashboard and Report pages have their sidebar again.** Since the page keys came from `given` only (N32 step 2), the
+  wasm page (`makePage`, `Roads.page`) lost the page keys of its call (`sidebar`, `popup_mode`, ...). One function now makes them,
+  `roadstyle::page_options::given_of` (the look's other keywords, and `name` and `road_popup` of the call), for the wasm page and for
+  Python's page (`_engine.page_given`, through `_rust.given_of`), so the same keywords give the same page.
 - **A live style on a host's own map has its global state.** The dashboard sets each value of `roadstyle:state` that the map does
   not have yet (at the start and in `setStyle`), and keeps the values that the map has. Before, a host that added a live style's
   layers to its own map (whose style has no such `state` block) got MapLibre errors, unless it set the values itself.
@@ -220,6 +224,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
   below 2^53 while the table is below 2^21 (`RoadKey::TABLES`; a larger table is `Error::Key`). The engine writes the keys of the
   roads (`__rs_edge`, `__rs_edge2`, the decks' `__rs_edges`, the slots) through it and reads a row back from a key. A build has one
   table (0), so a key is its road's row and the output does not change.
+- **The column keywords are roles, not renames** (Rust only; docs/design/target_architecture.md, (b) item 2, audit R6 part 3):
+  `highway_col`, `bridge_col`, `edge_id_col` and the other 12 resolve one time to column indexes (`roadstyle_model::Roles`). The stages
+  read a role's cell by its index and the road layers write the table's own name in their expressions, so the engine renames no column
+  in or out (`ColumnMap`, its `__rs_kept_*` columns in between and the output name maps are gone). **A keyword that names a column the
+  roads do not have is an error** (`roadstyle_model::Error::MissingColumn`, with the nearest column names, for example `highway_col: the
+  roads have no column fclas (the nearest: fclass, class)`); before, the keyword was not used, and the engine read the column of the
+  contract name (`highway`) when the roads had one. The outputs do not change (the goldens are equal).
 - **One fixture, three languages, one hash** (docs/design/target_architecture.md, (i) item 6): the wasm package in Node
   (`rust/roadstyle-wasm/cross_language.mjs`) gives Monaco's style and road table with the size and hash of the native golden
   (`monaco/rust_style.json`), as the Python binding does (`tests/test_binding.py`). CI runs it in the Rust job on the dist build that

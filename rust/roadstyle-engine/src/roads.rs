@@ -4,7 +4,7 @@
 use roadstyle_look::options::MapOptions;
 use crate::draw::Cap;
 use crate::road::Roads;
-use roadstyle_model::{flags, Cell};
+use roadstyle_model::{flags, Cell, Role};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
@@ -12,14 +12,6 @@ use std::collections::{HashMap, HashSet};
 pub use roadstyle_look::RoadLook as Look;
 
 // the columns of the roads, as mapstyle names them (render_map's kw)
-const HIGHWAY: &str = "highway";
-const DIRECTED: &str = "is_directed";
-const DRIVING: &str = "has_arrows";
-const LAYER: &str = "layer";
-const BRIDGE: &str = "bridge";
-const TUNNEL: &str = "tunnel";
-const CAP_START: &str = "cap_start";
-const CAP_END: &str = "cap_end";
 
 /// ClassStyler: a class's style (plain or link, resolved at build time) and its base class (normalize_highway).
 pub(crate) fn class_style<'a>(look: &'a Look, highway: Option<Cell>) -> (&'a Value, String) {
@@ -81,7 +73,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<crate::
     // render's width_m_col: metre widths (docs/design/metre_widths.md); casing_m, else the theme's casing.m
     let width_col = named(&m.columns.width_m);
     let pairs = if look.twin_one || width_col.is_some() { twin_pairs(fs) } else { Vec::new() };       // one time for both stages
-    if look.twin_one && mark_twin_casing(fs, &pairs, look.head_m, Some("edge_id")) {        // render passes its edge_id_col (the engine's edge_id)
+    if look.twin_one && mark_twin_casing(fs, &pairs, look.head_m) {
         mark_twin_dead_ends(fs, &caps);
     }
     if let Some(col) = width_col {
@@ -100,7 +92,7 @@ pub fn roads_source(mut fs: Roads) -> crate::road::RoadsSource {
         let cls = fs.road(i).cls();
         fs.draw[i].cls = Some(fs.values.ix(&cls));
     }
-    crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, names: Vec::new(), in_style: true, read: None }
+    crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, in_style: true, read: None }
 }
 
 // --- helpers: Python's values ---
@@ -150,7 +142,7 @@ type EndKey = Option<(u32, u32, String)>;
 /// _mark_twoway: __rs_twoway (a reverse twin of the same class, both directed) and __rs_oneway (the arrows).
 fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
     let topo = fs.topo();
-    let keys: Vec<EndKey> = fs.iter().map(|f| topo.ends[f.i].map(|[a, z]| (a, z, class_key(f.get(HIGHWAY))))).collect();
+    let keys: Vec<EndKey> = fs.iter().map(|f| topo.ends[f.i].map(|[a, z]| (a, z, class_key(f.role(Role::Class))))).collect();
     let rev = |k: &EndKey| k.as_ref().map(|(a, z, c)| (*z, *a, c.clone()));
     let mut by: HashMap<EndKey, Vec<usize>> = HashMap::new();
     for (i, k) in keys.iter().enumerate() {
@@ -168,7 +160,7 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
     }
     if directed {
         // directed_col: a pair is two lanes only when neither edge is undirected (null = directed)
-        let und = |f: crate::road::Road| !missing(f.get(DIRECTED)) && !truthy(f.get(DIRECTED));
+        let und = |f: crate::road::Road| !missing(f.role(Role::Directed)) && !truthy(f.role(Role::Directed));
         let undirected: Vec<bool> = fs.iter().map(und).collect();
         for (i, k) in keys.iter().enumerate() {
             if fs.draw[i].twoway != Some(true) {
@@ -187,7 +179,7 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
     }
     if driving {
         for i in 0..fs.len() {        // driving_col: no arrows where cars may not drive (null = driving)
-            if !missing(fs.get(i, DRIVING)) && !truthy(fs.get(i, DRIVING)) {
+            if !missing(fs.role(i, Role::Driving)) && !truthy(fs.role(i, Role::Driving)) {
                 fs.draw[i].oneway = Some(false);
             }
         }
@@ -198,7 +190,7 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
 fn mark_single_line(fs: &mut Roads, classes: &HashSet<String>) {
     let mut first: HashMap<(u32, u32, String), usize> = HashMap::new();
     for i in 0..fs.len() {
-        let kind = match fs.get(i, HIGHWAY).and_then(Cell::as_str) { Some(s) if classes.contains(s) => s.to_string(), _ => continue };
+        let kind = match fs.role(i, Role::Class).and_then(Cell::as_str) { Some(s) if classes.contains(s) => s.to_string(), _ => continue };
         let Some([a, z]) = fs.topo().ends[i] else { continue };
         match first.remove(&(z, a, kind.clone())) {
             None => {
@@ -219,8 +211,8 @@ fn mark_single_line(fs: &mut Roads, classes: &HashSet<String>) {
 /// _mark_lvl: lvl from the OSM layer (else 1 for a bridge, -1 for a tunnel), and the bridge and tunnel looks.
 fn mark_lvl(fs: &mut Roads) {
     for i in 0..fs.len() {
-        let ly = fs.get(i, LAYER).and_then(py_float).filter(|v| v.is_finite()).map_or(0, |v| v.trunc() as i64);
-        let (br, tu) = (truthy(fs.get(i, BRIDGE)), truthy(fs.get(i, TUNNEL)));
+        let ly = fs.role(i, Role::Layer).and_then(py_float).filter(|v| v.is_finite()).map_or(0, |v| v.trunc() as i64);
+        let (br, tu) = (truthy(fs.role(i, Role::Bridge)), truthy(fs.role(i, Role::Tunnel)));
         let lvl = if ly != 0 { ly } else if br { 1 } else if tu { -1 } else { 0 };
         let d = &mut fs.draw[i];
         (d.lvl, d.bridge, d.tunnel) = (Some(lvl.clamp(i16::MIN.into(), i16::MAX.into()) as i16), Some(br), Some(tu));
@@ -240,8 +232,8 @@ fn cap_value(v: Cell) -> Value {
 }
 
 /// _mark_caps (no cap_col; cap_start_col / cap_end_col): __rs_cap when the two ends agree, else __rs_cap0 / __rs_cap1 / __rs_split.
-/// render's cap columns: `cap_col` (both ends; the user's name) and `cap_start_col` / `cap_end_col` (one end each; the engine's names
-/// cap_start / cap_end after ColumnMap). Only the named ones are read.
+/// render's cap columns: `cap_col` (both ends) and `cap_start_col` / `cap_end_col` (one end each: the roles CapStart / CapEnd). Only the
+/// named ones are read.
 pub(crate) struct CapCols {
     whole: Option<String>,
     start: bool,
@@ -257,8 +249,8 @@ fn mark_caps(fs: &mut Roads, caps: &CapCols) {
     for i in 0..fs.len() {
         let r = fs.road(i);
         let whole = caps.whole.as_deref().and_then(|c| r.get(c)).filter(|v| given(Some(*v))).map_or(Value::Null, cap_value);
-        let end = |on: bool, col: &str| if on && given(r.get(col)) { cap_value(r.get(col).unwrap()) } else { whole.clone() };
-        let (s0, s1) = (Cap::from_value(&end(caps.start, CAP_START)), Cap::from_value(&end(caps.end, CAP_END)));
+        let end = |on: bool, role: Role| match r.role(role).filter(|v| on && given(Some(*v))) { Some(v) => cap_value(v), None => whole.clone() };
+        let (s0, s1) = (Cap::from_value(&end(caps.start, Role::CapStart)), Cap::from_value(&end(caps.end, Role::CapEnd)));
         let d = &mut fs.draw[i];
         if s0 == s1 {
             if s0 != Cap::Round {
@@ -277,8 +269,8 @@ fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
         return;
     }
     for i in 0..fs.len() {
-        let head = |on: bool, col: &str| if on { fs.get(i, col).and_then(py_float).filter(|v| *v > 0.0) } else { None };
-        let (s, e) = (head(named[0], "head_start_m"), head(named[1], "head_end_m"));
+        let head = |on: bool, role: Role| if on { fs.role(i, role).and_then(py_float).filter(|v| *v > 0.0) } else { None };
+        let (s, e) = (head(named[0], Role::HeadStartM), head(named[1], Role::HeadEndM));
         fs.draw[i].heads = [s, e].map(|h| h.map(|h| fs.values.ix(&serde_json::json!(h))));
     }
 }
@@ -287,17 +279,15 @@ fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
 /// positions or from the input's columns casing_level, fill_level, casing_start and casing_end (the ones it has; a head that has none
 /// takes the main casing number).
 fn mark_levels(fs: &mut Roads) {
-    use roadstyle_model::mark::Mark;
     let num = |v: Option<Cell>| v.and_then(py_float).filter(|x| !x.is_nan()).map_or(0, |x| x.round_ties_even() as i64);
-    let has = [Mark::CasingLevelColumn, Mark::FillLevelColumn, Mark::CasingStartColumn, Mark::CasingEndColumn]
-        .map(|m| fs.solved.is_some() || fs.table.col(m.name()).is_some());
+    let has = [Role::CasingLevel, Role::FillLevel, Role::CasingStart, Role::CasingEnd].map(|r| fs.solved.is_some() || fs.roles.col(r).is_some());
     for i in 0..fs.len() {
         let r = fs.road(i);
-        let col = |k: usize, m: Mark| if has[k] { num(r.get(m.name())) } else { 0 };
-        let (c, fl) = (col(0, Mark::CasingLevelColumn), col(1, Mark::FillLevelColumn));
+        let col = |k: usize, role: Role| if has[k] { num(r.role(role)) } else { 0 };
+        let (c, fl) = (col(0, Role::CasingLevel), col(1, Role::FillLevel));
         let (c, fl) = (c.min(fl), c.max(fl));
-        let cs = if has[2] { num(r.get(Mark::CasingStartColumn.name())).min(fl) } else { c };
-        let ce = if has[3] { num(r.get(Mark::CasingEndColumn.name())).min(fl) } else { c };
+        let cs = if has[2] { num(r.role(Role::CasingStart)).min(fl) } else { c };
+        let ce = if has[3] { num(r.role(Role::CasingEnd)).min(fl) } else { c };
         fs.draw[i].set_levels([c, fl, cs, ce]);
     }
 }
@@ -305,7 +295,7 @@ fn mark_levels(fs: &mut Roads) {
 /// _twin_pairs + _mark_twin_casing: a two-way edge and a reverse edge of its class on the same line backwards share one casing
 /// (__rs_twin: the other's position). Returns whether any pair was found. The two must agree, reversed (casing numbers, heads and end
 /// shapes); a pair that does not is named in a warning, by `id_col` (render's edge_id_col), else by position.
-fn mark_twin_casing(fs: &mut Roads, pairs: &[(usize, usize)], head_m: f64, id_col: Option<&str>) -> bool {
+fn mark_twin_casing(fs: &mut Roads, pairs: &[(usize, usize)], head_m: f64) -> bool {
     let mut bad = Vec::new();
     for &(j, i) in pairs {
         fs.draw[i].twin = Some(crate::draw::Ix::new(j));
@@ -320,7 +310,7 @@ fn mark_twin_casing(fs: &mut Roads, pairs: &[(usize, usize)], head_m: f64, id_co
         let (p, q) = (&fs.draw[i], &fs.draw[j]);
         let (ep, eq) = (ends(p), ends(q));
         if (eq.0 != ep.1 || eq.1 != ep.0) || q.levels.map(|l| l[0]) != p.levels.map(|l| l[0]) {
-            let name = |k: usize| match id_col.and_then(|c| fs.get(k, c)) {
+            let name = |k: usize| match fs.role(k, Role::EdgeId) {
                 Some(c) => c.as_str().map_or_else(|| c.to_value().to_string(), String::from),
                 None => k.to_string(),
             };
@@ -347,7 +337,7 @@ fn twin_pairs(fs: &Roads) -> Vec<(usize, usize)> {
         let r7 = |x: f64| { let v: f64 = format!("{x:.7}").parse().unwrap(); if v == 0.0 { 0u64 } else { v.to_bits() } };
         let line: Vec<(u64, u64)> = c.iter().map(|x| (r7(x[0]), r7(x[1]))).collect();
         let back: Vec<(u64, u64)> = line.iter().rev().copied().collect();
-        let ck = class_key(fs.get(i, HIGHWAY));
+        let ck = class_key(fs.role(i, Role::Class));
         match first.remove(&(back, ck.clone())) {
             None => {
                 first.entry((line, ck)).or_insert(i);
@@ -390,7 +380,7 @@ fn mark_twin_dead_ends(fs: &mut Roads, caps: &CapCols) {
         }
         let r = fs.road(i);
         let whole_given = caps.whole.as_deref().is_some_and(|c| given(r.get(c)));
-        let end_given = [(caps.start, CAP_START), (caps.end, CAP_END)].map(|(on, col)| on && given(r.get(col)));
+        let end_given = [(caps.start, Role::CapStart), (caps.end, Role::CapEnd)].map(|(on, role)| on && given(r.role(role)));
         let d = &mut fs.draw[i];
         let whole = d.cap.unwrap_or(Cap::Round);
         let split = d.split.is_some();
@@ -426,8 +416,9 @@ mod tests {
         let mut lines = roadstyle_model::table::Lines::default();
         rows.iter().for_each(|(l, _, _)| lines.push(Some(l)));
         let mut t = roadstyle_model::RoadTable::new(Vec::new(), Vec::new(), lines).unwrap();
-        t.set_ints(HIGHWAY, rows.iter().map(|r| r.1).collect());
-        let mut fs = Roads::new(t);
+        t.set_ints(Role::Class.name(), rows.iter().map(|r| r.1).collect());
+        let roles = roadstyle_model::Roles::resolve(&t, &[]).unwrap();
+        let mut fs = Roads::new(t, roles, None);
         for (d, r) in fs.draw.iter_mut().zip(rows) {
             d.twoway = Some(r.2);
         }

@@ -585,8 +585,7 @@ def test_web_panel_search_always_reads_the_id():
     assert '__EDGE_ID_COL__' not in html
     assert _opt(html, "edge_id_col") == "edge_id" and '_ID_KEYS = [...new Set([O.edge_id_col, "edge_ref"])]' in html
     assert '_popupFields.concat(_ID_KEYS' in html
-    other = render_edges(_edges().rename(columns={"edge_id": "eid"}), backend="web",
-                         edge_id_col="eid", popup_mode="panel").html
+    other = render_edges(_edges().assign(eid=[1, 2, 3]), backend="web", edge_id_col="eid", popup_mode="panel").html
     assert _opt(other, "edge_id_col") == "eid"
 
 
@@ -3875,8 +3874,8 @@ def test_an_unclassed_two_way_pair_pairs_and_the_warning_names_it():
     """Both directions of a road with no class (an area outline taken as a road) are a pair: one casing, a fill per direction (NaN != NaN
     made them two roads). render_edges warns once, with the count and the edge ids."""
     a, b = (18.00, 59.30), (18.00, 59.31)
-    g = gpd.GeoDataFrame({"highway": [None, float("nan")], "edge_ref": ["w#2f", "w#2r"]},
-                         geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
+    g = gpd.GeoDataFrame({"highway": [None, float("nan")], "edge_ref": ["w#2f", "w#2r"], "cs": 0, "cm": 0, "ce": 0, "fl": 0,
+                          "cap_s": None, "cap_e": None}, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)   # _TWIN_KW's columns
     with pytest.warns(UserWarning, match=r"2 edges have no 'highway' value.*w#2f, w#2r"):
         html = render_edges(g, **_TWIN_KW).html
     feats = [f["properties"] for f in _style(html)["sources"]["simple"]["data"]["features"]]

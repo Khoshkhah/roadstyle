@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-/// An error of roadstyle-model: in the input data (`Column`, `Geometry`: a regional build skips the table and logs it) or in a build's
+/// An error of roadstyle-model: in the input data (`Column`, `Geometry`, `MissingColumn`: a regional build skips the table and logs it) or in a build's
 /// options (`Key`: it stops). `Display` gives its message; `String::from` gives the same text, for a caller whose error is text.
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
@@ -13,6 +13,9 @@ pub enum Error {
     Column { column: String, message: String },
     /// Geometries that the model does not take: bytes that are not WKB, a count that is not the count of the features.
     Geometry(String),
+    /// A column that a keyword names (`keyword`, for example `highway_col`) and the roads do not have: its name and the table's nearest
+    /// names.
+    MissingColumn { keyword: String, column: String, nearest: Vec<String> },
     /// A table number of `RoadKey::TABLES` or more: its keys pass 2^53, which JavaScript does not hold exactly.
     Key { table: u32 },
 }
@@ -22,6 +25,8 @@ impl fmt::Display for Error {
         match self {
             Error::Column { column, message } => write!(f, "column {column}: {message}"),
             Error::Geometry(m) => f.write_str(m),
+            Error::MissingColumn { keyword, column, nearest } if nearest.is_empty() => write!(f, "{keyword}: the roads have no column {column}"),
+            Error::MissingColumn { keyword, column, nearest } => write!(f, "{keyword}: the roads have no column {column} (the nearest: {})", nearest.join(", ")),
             Error::Key { table } => write!(f, "road table {table}: the tables are 0 to {} (a key stays below 2^53)", crate::RoadKey::TABLES - 1),
         }
     }

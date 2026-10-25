@@ -11,12 +11,14 @@ pub mod geom;
 pub mod key;
 pub mod mark;
 pub mod props;
+pub mod roles;
 pub mod table;
 pub mod topology;
 pub mod wkb;
 
 pub use error::Error;
 pub use key::RoadKey;
+pub use roles::{Role, Roles};
 pub use table::{Cell, Lines, RoadTable};
 
 use serde_json::Value;
