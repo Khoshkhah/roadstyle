@@ -330,6 +330,23 @@ pub(crate) fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
     json!([">=", ["zoom"], m])
 }
 
+/// casing.drop_below_px (2026-10-25): a casing piece (`__rs_k` 0, not a bridge's) only from its class's first zoom whose tiles show the
+/// casing line at least `drop` px wide: the first z with the class's casing width at z + 1 >= `drop` (the width grows with the zoom).
+/// None when `drop` is 0, when every class has a casing from zoom 0, or when `kept` (a road in metres with casing.min_px >= drop).
+/// render_web._casing_drop_filter; the tiles read the clause (roadstyle-tiles rules.rs).
+pub(crate) fn casing_drop_filter(m: &Model, drop: f64, kept: bool) -> Option<Value> {
+    if drop <= 0.0 || kept {
+        return None;
+    }
+    let first = |c: Option<&str>| (0..24).find(|&z| m.class_width_px(c, (z + 1) as f64, true) >= drop).unwrap_or(24);
+    let zs: Vec<u32> = m.classes.iter().map(|c| first(Some(c))).chain([first(None)]).collect();
+    if zs.iter().all(|&z| z == 0) {
+        return None;
+    }
+    let casing = json!(["all", ["==", ["get", "__rs_k"], 0], ["!", ["to-boolean", ["get", "__rs_bridge"]]]]);
+    Some(json!([">=", ["zoom"], ["case", casing, ["at", ["get", CLASS_INDEX], ["literal", zs]], 0]]))
+}
+
 /// `filter` with `extra` added at its end (["all", ...]), or as it is.
 fn with_minzoom(filter: Value, extra: Option<Value>) -> Value {
     match (filter, extra) {
@@ -642,6 +659,8 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let mz_filter = |col: &str| mz.as_ref().map(|t| minzoom_filter(col, t));
     let mut flt = vec![json!("all")];
     flt.extend(mz_filter("highway"));
+    let casing_px = if args["casing_min_px"].is_null() { th["casing"]["min_px"].clone() } else { args["casing_min_px"].clone() };
+    flt.extend(casing_drop_filter(m, th["casing"]["drop_below_px"].as_f64().unwrap_or(0.0), metres && casing_px.as_f64().unwrap_or(0.0) >= th["casing"]["drop_below_px"].as_f64().unwrap_or(0.0)));
     flt.push(seam_filter());
     // the 3D decks (view_3d): a bridge is the flat line below flat_below and the extruded deck from it up
     let dk = &look.deck;

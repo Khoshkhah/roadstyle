@@ -80,6 +80,7 @@ fn first_drawn(layers: &[Value], k: &str, from: u32, last: u32) -> u32 {
 /// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules), borrowed (audit N6: `s` stays as it is).
 fn tile_sources(s: &sources::Sources, o: &tiles::stage::TileOptions) -> tiles::Tiles {
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
+    tiled.drawn_by(&s.layers);
     let keys = |v: &Value| -> std::collections::HashSet<String> {
         v["data"]["features"].as_array().into_iter().flatten().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect()
     };
@@ -194,6 +195,7 @@ pub fn tile_files_with(read: impl Fn(&str) -> Result<Vec<u8>, String>, keep: &[S
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px);
     let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
+    tiled.drawn_by(layers);
     let mut names = Vec::new();
     for (k, spec) in style["sources"].as_object().into_iter().flatten() {
         if !o.wants(k) || spec["type"] != "geojson" {

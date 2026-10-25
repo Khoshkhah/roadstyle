@@ -60,12 +60,11 @@ def _kept(k, v) -> bool:
     return v is not None and not (v is False and k.startswith("__rs_"))
 
 
-def _prep(fc: dict, class_col: str | None, keep: set | None, minzoom_table: dict | None):
-    """Project features to mercator; return ([(idx, geom, bounds, class_minzoom, props)], world_bbox)."""
+def _prep(fc: dict, keep: set | None, rules=None):
+    """Project features to mercator; return ([(idx, geom, bounds, first_zoom, props)], world_bbox). ``rules``: the layer's zoom_rules."""
     from shapely.geometry import shape
     from shapely.ops import transform as shp_transform
 
-    mz = {str(k): int(v) for k, v in (minzoom_table or {}).items()}
     feats, world = [], [1e30, 1e30, -1e30, -1e30]
     for i, ft in enumerate(fc.get("features", [])):
         g = ft.get("geometry")
@@ -82,19 +81,99 @@ def _prep(fc: dict, class_col: str | None, keep: set | None, minzoom_table: dict
         world[3] = max(world[3], b[3])
         props = tile_props(p, keep) if keep is not None else \
             {k: v for k, v in p.items() if _kept(k, v)}
-        feats.append((i, geom, b, mz.get(str(p.get(class_col, ""))) if class_col else 0, props))
+        feats.append((i, geom, b, first_zoom(rules, props) if rules else 0, props))
     return feats, world
 
 
-def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | None = None,
+def zoom_rules(layers, name):
+    """A feature's first zoom from the style (roadstyle-tiles rules.rs, 2026-10-25): for each layer that draws the tile layer ``name``, the E
+    of each ``[">=", ["zoom"], E]`` at the top of its filter that reads no zoom. None when a layer draws every feature from zoom 0, or no layer
+    draws it."""
+    out = []
+    for lyr in layers or []:
+        if (lyr.get("source-layer") or lyr.get("source")) != name:
+            continue
+        cs = [c[2] for c in _tops(lyr.get("filter")) if isinstance(c, list) and len(c) == 3 and c[0] == ">=" and c[1] == ["zoom"] and not _reads_zoom(c[2])]
+        if not cs:
+            return None
+        out.append(cs)
+    return out or None
+
+
+def _tops(f):
+    """The clauses of a filter that must all hold: the items of its "all", and of an "all" in it."""
+    return [c for x in f[1:] for c in _tops(x)] if isinstance(f, list) and f[:1] == ["all"] else [f]
+
+
+def _reads_zoom(e):
+    return isinstance(e, list) and (e[:1] == ["zoom"] or any(_reads_zoom(x) for x in e))
+
+
+def first_zoom(rules, p):
+    """The first zoom at which a layer draws a feature with the properties ``p``: the lowest over the layers of the highest E (not a number: 0)."""
+    def num(v):
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0.0
+    return min(max(num(_ev(e, p)) for e in cs) for cs in rules)
+
+
+def _truthy(v):
+    return v not in (None, False, 0, "") if not isinstance(v, (list, dict)) else True
+
+
+def _same(a, b):
+    num = (int, float)
+    if isinstance(a, num) and isinstance(b, num) and not isinstance(a, bool) and not isinstance(b, bool):
+        return float(a) == float(b)
+    return a == b and type(a) is type(b)
+
+
+def _ev(e, p):
+    """A MapLibre expression's value on a feature, for the operators of the clauses (rules.rs ev); None for another operator."""
+    if not isinstance(e, list):
+        return e
+    if not e or not isinstance(e[0], str):
+        return None
+    op, a = e[0], e[1:]
+    if op == "get":
+        return p.get(a[0])
+    if op == "literal":
+        return a[0]
+    if op == "coalesce":
+        return next((v for v in (_ev(x, p) for x in a) if v is not None), None)
+    if op == "to-boolean":
+        return _truthy(_ev(a[0], p))
+    if op == "!":
+        return not _truthy(_ev(a[0], p))
+    if op in ("all", "any"):
+        return (all if op == "all" else any)(_truthy(_ev(x, p)) for x in a)
+    if op in ("==", "!="):
+        return _same(_ev(a[0], p), _ev(a[1], p)) == (op == "==")
+    if op == "at":
+        i, lst = _ev(a[0], p), _ev(a[1], p)
+        return lst[int(i)] if isinstance(i, (int, float)) and isinstance(lst, list) and 0 <= int(i) < len(lst) else None
+    if op == "case":
+        for c, v in zip(a[:-1:2], a[1:-1:2], strict=True):
+            if _truthy(_ev(c, p)):
+                return _ev(v, p)
+        return _ev(a[-1], p)
+    if op == "match":
+        x = _ev(a[0], p)
+        for lab, v in zip(a[1:-1:2], a[2:-1:2], strict=True):
+            if any(_same(lb, x) for lb in (lab if isinstance(lab, list) else [lab])):
+                return _ev(v, p)
+        return _ev(a[-1], p)
+    return None
+
+
+def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
                   minzoom: int = 6, maxzoom: int = 15, extent: int = 4096,
                   buffer_px: int = 80, layer: str = "roads",
                   extra_layers: list | None = None, line_layers: list | None = None) -> bytes:
     """Encode GeoJSON FeatureCollections (lon/lat) into a PMTiles archive (bytes).
 
     Feature ``id`` = index in ``fc["features"]`` — the exact id space the inline version gives each feature (its own ``id``), so feature-state, ``rsFilter``/``rsColor`` id filters and the sidecar table
-    all line up. Per zoom, features whose class sits below its ``minzoom_table`` entry are left
-    out (they pop in when zooming — same rule the visual ``minzoom`` filter uses), geometry is
+    all line up. A feature that every layer of ``layers`` (the style's) drawing its tile layer hides at every zoom of a tile is left out of
+    it (zoom_rules: the class minzoom, casing.drop_below_px; the last zoom's tiles keep every feature), geometry is
     simplified to ~half a tile pixel and clipped to the tile + buffer (skipped when the feature
     already fits inside — the common case at street zooms).
 
@@ -111,15 +190,15 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
     from pmtiles.writer import Writer
     from shapely import clip_by_rect
 
-    feats, world = _prep(fc, class_col, keep, minzoom_table)
+    feats, world = _prep(fc, keep, zoom_rules(layers, layer))
     lines = [(layer, feats, minzoom)]
     for ln in (line_layers or []):
-        lf, lw = _prep(ln["fc"], class_col, ln.get("keep"), minzoom_table)
+        lf, lw = _prep(ln["fc"], ln.get("keep"), zoom_rules(layers, ln["name"]))
         world = [min(world[0], lw[0]), min(world[1], lw[1]), max(world[2], lw[2]), max(world[3], lw[3])]
         lines.append((ln["name"], lf, int(ln.get("minzoom", minzoom))))
     extras = []          # (name, from_zoom, prepped features)
     for ex in (extra_layers or []):
-        efeats, ew = _prep(ex["fc"], None, ex.get("keep"), None)
+        efeats, ew = _prep(ex["fc"], ex.get("keep"), zoom_rules(layers, ex["name"]))
         world = [min(world[0], ew[0]), min(world[1], ew[1]),
                  max(world[2], ew[2]), max(world[3], ew[3])]
         extras.append((ex["name"], int(ex.get("minzoom", minzoom)), efeats))
@@ -135,8 +214,8 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
             if z < from_zoom:
                 continue
             for i, geom, b, fmz, props in lfeats:
-                if z < (fmz or 0):
-                    continue
+                if z < maxzoom and z + 1 <= fmz:
+                    continue        # no layer draws it at a zoom of this tile
                 g = geom.simplify(tol) if z < maxzoom else geom
                 if g.is_empty or g.length < tol:
                     continue
@@ -158,7 +237,9 @@ def build_pmtiles(fc: dict, *, class_col: str, keep: set, minzoom_table: dict | 
         for name, from_zoom, efeats in extras:
             if z < from_zoom:
                 continue
-            for i, geom, b, _fmz, props in efeats:
+            for i, geom, b, fmz, props in efeats:
+                if z < maxzoom and z + 1 <= fmz:
+                    continue
                 x0, x1, y0, y1 = _tile_range(b, z)
                 for tx in range(x0, x1 + 1):
                     for ty in range(y0, y1 + 1):

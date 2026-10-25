@@ -34,8 +34,9 @@ def test_build_pmtiles_round_trip():
 
     from roadstyle.tiles import build_pmtiles
     fc = _fc(_edges())
-    data = build_pmtiles(fc, class_col="highway", keep={"highway", "__rs_twoway", "lvl"},
-                         minzoom_table={"service": 13}, minzoom=8, maxzoom=14)
+    # the style's rule (zoom_rules): the one layer on the roads hides service below zoom 13
+    layers = [{"id": "r", "source": "roads", "filter": ["all", [">=", ["zoom"], ["match", ["get", "highway"], "service", 13, 0]]]}]
+    data = build_pmtiles(fc, keep={"highway", "__rs_twoway", "lvl"}, layers=layers, minzoom=8, maxzoom=14)
     r = Reader(MemorySource(data))
     h = r.header()
     assert (h["min_zoom"], h["max_zoom"]) == (8, 14)
@@ -65,7 +66,7 @@ def test_extra_layers_ride_along_from_their_minzoom():
     slots = {"type": "FeatureCollection", "features": [
         {"type": "Feature", "id": 0, "properties": {"slot": 0, "name": "A", "oneway": 1},
          "geometry": {"type": "LineString", "coordinates": [[18.0, 59.3], [18.001, 59.301]]}}]}
-    data = build_pmtiles(fc, class_col="highway", keep={"highway"}, minzoom=8, maxzoom=15,
+    data = build_pmtiles(fc, keep={"highway"}, minzoom=8, maxzoom=15,
                          extra_layers=[{"name": "slots", "fc": slots, "minzoom": 14}])
     r = Reader(MemorySource(data))
 
@@ -112,7 +113,7 @@ def _archive_of(html):
     return base64.b64decode(html.split('atob("')[1].split('")')[0])
 
 
-def _tile_classes(data, z, lon=18.03, lat=59.301):
+def _tile_classes(data, z, layer="roads", lon=18.03, lat=59.301):
     import math
 
     import mapbox_vector_tile
@@ -124,19 +125,20 @@ def _tile_classes(data, z, lon=18.03, lat=59.301):
     if not raw:
         return set()
     t = mapbox_vector_tile.decode(gzip.decompress(raw))
-    return {f["properties"].get("highway") for f in t.get("roads", {}).get("features", [])}
+    return {f["properties"].get("highway", f["properties"].get("__rs_cls")) for f in t.get(layer, {}).get("features", [])}   # a piece: __rs_cls
 
 
 def test_tile_class_gating_follows_the_minzoom_parameter():
     """Default render: NO class thinning in the tiles (same look as inline — residential shows
-    at every zoom). minzoom=True opts into the settings table, thinning low-zoom tiles too."""
+    at every zoom). minzoom=True opts into the settings table: the pieces' layer hides a class below its first zoom, so the low-zoom tiles
+    leave it out (zoom_rules, 2026-10-25)."""
     from roadstyle.render_web import render
     g = _edges()
-    plain = _archive_of(render(g, basemap="blank", tiles=True, simple=False).html)
-    assert "service" in _tile_classes(plain, 10)               # everything, even at z10
-    thin = _archive_of(render(g, basemap="blank", tiles=True, minzoom=True, simple=False).html)
-    assert "service" not in _tile_classes(thin, 10)            # service minzoom is 14
-    assert "primary" in _tile_classes(thin, 10)
+    plain = _archive_of(render(g, basemap="blank", tiles=True).html)
+    assert "service" in _tile_classes(plain, 10, "simple")               # everything, even at z10
+    thin = _archive_of(render(g, basemap="blank", tiles=True, minzoom=True).html)
+    assert "service" not in _tile_classes(thin, 10, "simple")            # service minzoom is 15
+    assert "primary" in _tile_classes(thin, 10, "simple")
 
 
 def test_render_without_tiles_is_unchanged():

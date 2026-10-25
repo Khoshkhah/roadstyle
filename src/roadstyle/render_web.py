@@ -1953,6 +1953,19 @@ _TILES_JS = _page_part("tiles")
 _SIDE_JS = _page_part("side")
 
 
+def _casing_drop_filter(drop, kept):
+    """casing.drop_below_px (2026-10-25): a casing piece (``__rs_k`` 0, not a bridge's) only from its class's first zoom whose tiles show the
+    casing line at least ``drop`` px wide: the first z with the class's casing width at z + 1 >= ``drop``. None when ``drop`` is 0, when every
+    class has a casing from zoom 0, or when ``kept`` (a road in metres with casing.min_px >= drop). layers.rs casing_drop_filter."""
+    if drop <= 0 or kept:
+        return None
+    zs = [next((z for z in range(24) if class_width_px(c, z + 1) >= drop), 24) for c in [*_CLASSES, None]]
+    if not any(zs):
+        return None
+    casing = ["all", ["==", ["get", "__rs_k"], 0], ["!", ["to-boolean", ["get", "__rs_bridge"]]]]
+    return [">=", ["zoom"], ["case", casing, ["at", ["get", "__rs_ci"], ["literal", zs]], 0]]
+
+
 def _minzoom_filter(col, table):
     """A filter clause keeping a feature only at/above its class's minzoom.
 
@@ -3450,6 +3463,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
             cw, fw, bcw = _exp2(cw), _exp2(fw), _exp2(bcw)
         soff = _by_feature([(is_it, _metre_curve(_exp2(off), "__rs_iom"))], _exp2(off)) if items else off   # an item: its own metres, not a direction's shift
         flt = [f for f in ((_minzoom_filter(highway_col, mz) if mz else None),
+                           _casing_drop_filter(_cs.get("drop_below_px", 0.0), bool(width_m_col) and casing_min_px >= _cs.get("drop_below_px", 0.0)),
                            _seam_filter(),     # the full look's rule: a seam only from zoom 17 (below it a bridge's seams are dark dots at every head)
                            (["any", ["<", ["zoom"], dk["flat_below"]], ["!", is_b]] if decks["features"] else None),
                            (["any", ["!", ["has", "__rs_imz"]], [">=", ["zoom"], ["get", "__rs_imz"]]]      # an item's own minzoom
@@ -3850,8 +3864,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
                     if isinstance(v_, int) and not isinstance(v_, bool) and abs(v_) >= 2 ** 53:
                         p_[k_] = str(v_)
         pmt = _tiler.build_pmtiles(
-            {"type": "FeatureCollection", "features": [] if lean else _slim_roads(geo["features"], read)}, class_col=highway_col, keep=roads_keep,   # a page: no road lines
-            minzoom_table=mz, minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
+            {"type": "FeatureCollection", "features": [] if lean else _slim_roads(geo["features"], read)}, keep=roads_keep,   # a page: no road lines
+            layers=style["layers"], minzoom=tc["minzoom"], maxzoom=tc["maxzoom"],
             extent=tc["extent"], buffer_px=tc["buffer_px"], extra_layers=extra or None,
             line_layers=line_layers or None)
         side = _tiler.sidecar(geo)

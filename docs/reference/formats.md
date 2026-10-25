@@ -102,7 +102,7 @@ Bundled: `default`, `highsat`. The table shows `default`; the others state only 
 | `roads.width_m_zoom` | `16` | roads in metres (width_m_col): the zoom where a metre width equals the class width |
 | `roads.twin_end_caps` | `true` | one road-wide round end under a two-way road's two lanes |
 | `roads.twin_casing` | `"one"` | a two-way road as two edges: one casing around both, or each its own |
-| `casing` | `{"extra": 2.0, "m": 0.15, "min_px": 0.0}` | m, min_px: roads in metres |
+| `casing` | `{"extra": 2.0, "m": 0.15, "min_px": 0.0, "drop_below_px": 0.0}` | m, min_px: roads in metres; drop_below_px: no casing piece where the casing line is narrower than this (0 = always a casing) |
 | `labels` | `10 entries: halo_width, font, glyphs, minzoom, ...` |  |
 | `labels.halo_width` | `0` |  |
 | `labels.font` | `["Noto Sans Regular"]` |  |

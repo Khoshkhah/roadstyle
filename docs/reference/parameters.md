@@ -330,7 +330,8 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#64748b"` (slate) | bridge casing, px wider / colour |
 | `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` (and `bridge_shadow_trim_m` `3`: no shadow over the last 3 m where a bridge comes down) | a soft shadow under a bridge: a line per stretch at the lowest casing number of its edges, straight on through a junction where the numbers agree; none where the bridge comes down (position mode): px of blur, px shifted right and down (lit from the top left) |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
-| `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom, with `minzoom=True` |
+| `casing.drop_below_px` | `0.0` (always a casing) | no casing piece (a bridge's keeps it) at a zoom where the whole casing line is narrower than this many px: the fill alone, and the casing from the first zoom where it is as wide. The tiles leave out those pieces. Nothing is dropped from a road in metres when `casing_min_px` ≥ this value |
+| `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom, with `minzoom=True`; the tiles leave out a hidden class |
 | `basemap` | `"voyager"` | the default base map |
 | `labels` | `color #5b5b5b`, no halo | street-name paint; `size`: `[[zoom, px], ...]`, the names' size per zoom for every class (roads in metres) instead of following each class's width |
 | `arrows` | `color #5b5b5b`, `opacity 0.7` | one-way chevron paint |

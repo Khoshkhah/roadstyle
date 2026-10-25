@@ -21,8 +21,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   browser studio (`ui/studio`) uses too; a worker that stops rejects its waiting calls. On a phone the panel is a sheet at the bottom
   (`layout`: `"auto"`, a sheet up to 700 px wide; `"sheet"`; `"side"`), with a handle (one row, half, full), taps on the roads, 44 px
   targets, room for the keyboard, and a fold when a Street View or Google 3D window opens at the bottom.
+- **`casing.drop_below_px`** (a profile key, both engines; default `0.0`, which changes nothing): no casing piece at a zoom where the
+  whole casing line is narrower than this many px, so the fill draws alone there; the casing comes back at the first zoom where it is as
+  wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **The tiles read the zoom rules from the style** (both engines). A tile leaves out a feature that every layer drawing its source
+  hides at every zoom of that tile, by the clauses `[">=", ["zoom"], E]` of the layers' filters: the class minzoom (`minzoom=True`) and
+  `casing.drop_below_px`. The tiles of the last zoom keep every feature. Python's `build_pmtiles` takes `layers` (the style's) in place
+  of `class_col` and `minzoom_table`. With `minzoom=True`, a source that a layer draws with no minzoom clause (the full look's
+  `roads-highlight`) keeps every class in its tiles.
 - **Smaller tiles** (both engines). The sort key `__rs_s` of a piece is an integer: 100,000,000 for each step of the key and 1 for each
   road (before: the key + the road × 1e-8, a double). The order does not change, and the step of a painted road is 50,000,000. A tile
   keeps no `__rs_*` flag that is false (every reader takes a missing flag as false), and the pieces (the tile layer `simple`) have no
