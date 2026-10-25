@@ -15,7 +15,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 
 | Key | Content |
 |---|---|
-| `roadstyle:contract` | the version of the contract: 1 |
+| `roadstyle:contract` | the version of the contract: 1. The dashboard reads it (`core.js`, `CONTRACT`): a newer version is an error (the console, `rs.error`), and the dashboard adds no road interaction for that style; a style with `roadstyle:*` keys and no version is read as version 1, with a note |
 | `roadstyle:state` | each global state `rs_*` and its start value |
 | `roadstyle:controls` | the options of `rsDashboard` that come from the style (the next table), and `dashes`: the sorted dash patterns of the road layer's features, for the page's simple-mode script (not an option) |
 | `roadstyle:interaction` | `{popup, tooltip, hover_delay_ms}`: the road popup's fields, the hover tooltip, the hover delay |

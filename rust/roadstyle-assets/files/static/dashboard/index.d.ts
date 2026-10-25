@@ -114,6 +114,9 @@ export type DashboardEvent = "state" | "select" | "deselect" | "filter" | "color
 
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
+  /** null, or the error of a style whose interaction contract (roadstyle:contract) is newer than this dashboard reads: then the
+   *  dashboard adds no road interaction for it. setStyle sets it again. */
+  error: string | null;
   readonly contract: number;
   /** A new roads style: add its sources and layers to the map first (with the prefix). The controls stay. more.road_table: its road table. */
   setStyle(style: StyleSpecification, more?: { road_table?: RoadTableData | null }): void;
