@@ -1,84 +1,84 @@
 {
  "style_all_osm_google": {
-  "sha256": "6cadd6826875c82b660d5e80aa50ada9c729828140c3117d8815ca2444ecea18",
+  "sha256": "f7caea4aed88d3332eedc348380866c178b904bbe2d644f9677dc357525f7a38",
   "layers": 61,
-  "bytes": 33415788,
+  "bytes": 33416100,
   "normalised": {
-   "sha256": "0ac19ee795a2f1946f4a77b327cfb664d4a8c377af73c415979c6921c735f102",
+   "sha256": "8f9031ab9c4b2eaa2481f86d86cc0f522b4d4fd02bb65098424e468464e0befe",
    "layers": 61,
-   "bytes": 31689755
+   "bytes": 31690067
   }
  },
  "style_driving_osm_google": {
-  "sha256": "3f626dea5e46e36eb29a3ef72c5b94bc5345f36285251f5a7883f1d402ede44b",
+  "sha256": "599e99d86a8431a7f8c7d0aade8f45d3369cccfdb3e66824e9a18afa36ec1c79",
   "layers": 61,
-  "bytes": 33469837,
+  "bytes": 33470149,
   "normalised": {
-   "sha256": "93589f5531f2a2041a52b65aad92f4050389a8fbe300205b5a2322c8a7d63ba4",
+   "sha256": "ffc59c215c935d030d59be95b25c4227680bb96402a250aedbdd19b2f67a6c5d",
    "layers": 61,
-   "bytes": 31743208
+   "bytes": 31743520
   }
  },
  "style_walking_osm_google": {
-  "sha256": "303b2ff08c88dc96008b5d74553ecd7d9319747541a497a4e3d20375a308c4ff",
+  "sha256": "968a6a8327552e40082ad0cc50e97774218508a202b1e070c599102d79503619",
   "layers": 61,
-  "bytes": 33394314,
+  "bytes": 33394626,
   "normalised": {
-   "sha256": "9bf8ccca8d4c3731d3df7090ac0f0078eac1c2925bfc4134854330483a832154",
+   "sha256": "81b74cc3741b7842438181412012696fd0a58676ef9da3f944b2edff752a7e74",
    "layers": 61,
-   "bytes": 31705712
+   "bytes": 31706024
   },
   "note": "the Rust style's normalised digest differs since review D4 (2026-10-24: one colour mix, rounded half up; some casing colours 1 off in one channel): tests/test_duckosm.py compares the styles with differences()"
  },
  "style_cycling_osm_google": {
-  "sha256": "e696c87f055f1416e1294be300265e967d55b64eb8081cc0a7f4596ccbba6b28",
+  "sha256": "9f69bbcc7acbb6c3cf0bb1e47dc9583c4ece1ff1fd65aed3409db571b4a09ff5",
   "layers": 61,
-  "bytes": 33441951,
+  "bytes": 33442263,
   "normalised": {
-   "sha256": "f2f28890c86739c7fe970302aac1e52dd7b9f8eef0e3f88044a5938965024e2a",
+   "sha256": "d852580707989d1eb69e7ea67110212cdaf3317a0c0f614d31eb3c2a1c7baff2",
    "layers": 61,
-   "bytes": 31715398
+   "bytes": 31715710
   },
   "note": "the Rust style's normalised digest differs since review D4 (2026-10-24: one colour mix, rounded half up; some casing colours 1 off in one channel): tests/test_duckosm.py compares the styles with differences()"
  },
  "style_all_grey_google": {
-  "sha256": "b1cc5ec671a79ebc2b9a83a466bd0dba52b16c3a2565e93e283a72edda8c099a",
+  "sha256": "092cd4eaa1883d2fe8af9fa5e627a1b72ba4d946f4808380f9704d9c268c69de",
   "layers": 60,
-  "bytes": 33409218,
+  "bytes": 33409530,
   "normalised": {
-   "sha256": "032bf174e9a313d16bb27f9fa7cbea2867d1a867e43a77beba0011d12fa0ca3d",
+   "sha256": "e90c39c3c262d27cd6d60c2ed8a175c1b94b0263f556c6415e8f326a8eb28537",
    "layers": 60,
-   "bytes": 31687545
+   "bytes": 31687857
   }
  },
  "style_walking_google_komoot": {
-  "sha256": "e0d598a056845d359f0f5a59b3125682a99c5e1d74ae3e164fd5e842b10411ef",
+  "sha256": "b82d8163238ad70c3ac11b0da33b1e7c2f734297198408dd9546f942b0e705c0",
   "layers": 60,
-  "bytes": 33389134,
+  "bytes": 33389446,
   "normalised": {
-   "sha256": "88df8a2ac5935e18daf83ccae5ab5125bf702821ebac03e510f469a3cc7617c4",
+   "sha256": "e5b6e5361dde1a54fad7968be898abf072edaba95abd96c45b0c0b909ed6ed19",
    "layers": 60,
-   "bytes": 31704890
+   "bytes": 31705202
   }
  },
  "style_driving_osm_google_only": {
-  "sha256": "53599ecad0fe7e9eca067271518fce9adec8191f78ff7902add2693fe1547ca0",
+  "sha256": "af1c43a5c7684112777007234108c075d0afbe9a299e6575992e0d4d019a3635",
   "layers": 61,
-  "bytes": 13825996,
+  "bytes": 13826308,
   "normalised": {
-   "sha256": "81de3832aae5a6cb450bc8d17593ab4e9a79cffd60c0c0099582439944ff3826",
+   "sha256": "c28a4a4824eb004ead475e9c2bc54d153ef712b6b769ddd73819e09f63705675",
    "layers": 61,
-   "bytes": 12858868
+   "bytes": 12859180
   }
  },
  "style_walking_osm_google_only": {
-  "sha256": "538a322b184fee174bb66a3f686863e50c442c19b7938ee91641879780513c4a",
+  "sha256": "89bf4eefccd991549ceb14c7c8a2d942085a42fc9fa331deca474b4c2edcb4bb",
   "layers": 60,
-  "bytes": 31074999,
+  "bytes": 31075311,
   "normalised": {
-   "sha256": "c59764f91f32b2015e11cade19f222f5284e18dc16a552e6829de9c89ba737ec",
+   "sha256": "3153af0a7f6192aa4cad17658c683707a7190c69bfca6dae384e68eaf30990f0",
    "layers": 60,
-   "bytes": 29640909
+   "bytes": 29641221
   },
   "note": "the Rust style's normalised digest differs since review D4 (2026-10-24: one colour mix, rounded half up; some casing colours 1 off in one channel): tests/test_duckosm.py compares the styles with differences()"
  }

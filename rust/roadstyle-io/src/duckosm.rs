@@ -235,7 +235,8 @@ pub fn features_sql(cat: &Catalog, specs: &[Value]) -> Vec<LayerSql> {
             schema.unwrap_or("features"), s["where"].as_str().map(|w| format!(" AND ({w})")).unwrap_or_default(),
             if s["outside_networks"] == true { format!(" AND osm_id NOT IN ({nets})") } else { String::new() });
         let none = |_: &str| "NULL".to_string();
-        let tags = |k: &str| format!("tags['{k}'][1]");
+        // map_extract gives a list in every DuckDB; from DuckDB 1.5, tags['k'] is the value and [1] is its first character ('25' -> '2')
+        let tags = |k: &str| format!("map_extract(tags, '{k}')[1]");
         let queries = if s["height"] == true { vec![sql("geom", &tags), sql("geom", &none)] } else { vec![sql("geom", &none)] };
         out.push(LayerSql { spec: i, name: name.to_string(), sql: queries });
     }
