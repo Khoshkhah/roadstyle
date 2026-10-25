@@ -262,7 +262,7 @@ The step from the step-3 row to step 4 is not N32 step 2 (2026-10-25, the WebAss
 (the typed errors, `Mark`, the tight `Draw`) and N32 step 2 changed it by less than 30 KB each, and the page keys by 45 KB. The allocator's
 counters of `liveBytes` (a6845cf) added about 495 KB: with fat LTO, the allocator's functions were inlined at each allocation site. With
 every function of the allocator out of line, the package is 1.31 MB smaller, and under the first row. The Python module does not have
-this allocator: its +8.0 % has the other causes.
+this allocator: Python +8.0 %, causes not measured (to measure in T5, when the engine splits change the code).
 
 ## Memory
 
