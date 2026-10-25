@@ -788,18 +788,23 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
             if ov.under { under.extend(ls) } else { over.extend(ls) }
         }
         // _build_overlays' entry for the page (the Layers box, the popups, the hover and the select)
-        let u = &ov.user;
-        let label = if u.is_null() { ov.name.clone() } else { u["label"].as_str().filter(|l| !l.is_empty()).map_or_else(|| format!("Layer {}", i + 1), String::from) };
-        let list = |v: &Value| v.as_array().filter(|a| !a.is_empty()).map(|a| Value::Array(a.clone())).unwrap_or(Value::Null);
+        let u = ov.user.as_deref();
+        let label = match u {
+            None => ov.name.clone(),
+            Some(u) => u.label.as_deref().filter(|l| !l.is_empty()).map_or_else(|| format!("Layer {}", i + 1), String::from),
+        };
+        let popup = u.and_then(|u| u.popup.as_ref());
+        let list = |v: Option<&Vec<String>>| v.filter(|a| !a.is_empty()).map_or(Value::Null, |a| json!(a));
         info.overlays.push(json!({"label": label, "source": sid, "layers": ids, "hit": ids.first(), "visible": ov.visible, "color": ov.color,
-            "popup": if u["popup"].is_array() { u["popup"].clone() } else { Value::Null },
+            "popup": popup.map_or(Value::Null, |p| json!(p)),
             // render_map's interaction: a base-map layer's start popup and tooltip (the tooltip on: the popup's fields, else every field,
             // as the dashboard's rsSetInteraction)
-            "popup_window": ov.popup_on.unwrap_or(u["popup_window"] != false),
-            "tooltip": match ov.tooltip_on { Some(true) => Some(list(&u["popup"])).filter(|p| !p.is_null()).unwrap_or(json!(true)), Some(false) => Value::Null,
-                                             None => list(&u["tooltip"]) }, "under": ov.under && !ov.edge, "base": if ov.edge { Value::Object(base) } else { Value::Null },
-            "select": u["select"].as_str().unwrap_or("road"),
-            "interactive": ov.clickable.unwrap_or(!u["popup"].is_array() || list(&u["popup"]) != Value::Null)}));
+            "popup_window": ov.popup_on.unwrap_or(u.is_none_or(|u| u.popup_window)),
+            "tooltip": match ov.tooltip_on { Some(true) => Some(list(popup)).filter(|p| !p.is_null()).unwrap_or(json!(true)), Some(false) => Value::Null,
+                                             None => list(u.and_then(|u| u.tooltip.as_ref())) }, "under": ov.under && !ov.edge,
+            "base": if ov.edge { Value::Object(base) } else { Value::Null },
+            "select": if u.is_some_and(|u| u.select == roadstyle_look::options::Select::Item) { "item" } else { "road" },
+            "interactive": ov.clickable.unwrap_or(popup.is_none() || list(popup) != Value::Null)}));
         if !ov.kinds.is_empty() {          // a base-map layer's kinds with their counts, most first (the page's kind filter)
             info.overlays.last_mut().unwrap()["kinds"] = json!(ov.kinds);
         }

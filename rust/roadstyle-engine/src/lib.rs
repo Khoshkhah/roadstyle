@@ -121,9 +121,9 @@ fn style_parts(table: RoadTable, solved: Option<Vec<[i16; 4]>>, look: &Look, fea
     }
     // render's overlays=: the caller's own, after the base map's (each knows the roads' id column, for its error)
     let first_user = ovs.len();
-    ovs.extend(overlays::user_overlays(&look.args["overlays"], ovs.len())?);
+    ovs.extend(overlays::user_overlays(&look.map.overlays, ovs.len())?);
     for ov in ovs[first_user..].iter_mut() {
-        ov.user["edge_id_col"] = look.map.columns.edge_id.as_deref().map_or(Value::Null, Value::from);
+        ov.edge_id_col = look.map.columns.edge_id.clone();
     }
     // render's simple=False (the full look: a layer for each drawing position) is the Python engine's only (plan decision 2)
     if look.args["simple"] == false {
