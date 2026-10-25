@@ -106,7 +106,7 @@ jobs:
 
       - name: Toolchain
         run: |
-          rustup toolchain install "$RUST" --profile minimal --component clippy
+          rustup toolchain install "$RUST" --profile minimal --component clippy --target wasm32-unknown-unknown
           rustup default "$RUST"
 
       - uses: actions/cache@v4
@@ -116,6 +116,18 @@ jobs:
             ~/.cargo/git
             rust/target
           key: rust-py-${{ env.RUST }}-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: The WebAssembly package (the tests of the wasm page and of the level editor's page read it; serve builds the editor's in)
+        working-directory: rust
+        run: |
+          cargo fetch --locked
+          cargo build --offline --release --target wasm32-unknown-unknown -p roadstyle-wasm
+          v=$(grep -m1 -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p')
+          curl -sSfL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$v/wasm-bindgen-$v-x86_64-unknown-linux-musl.tar.gz" | tar xz -C "$RUNNER_TEMP"
+          bindgen="$RUNNER_TEMP/wasm-bindgen-$v-x86_64-unknown-linux-musl/wasm-bindgen"
+          # the package of the page (makePage, the studio) and of the level editor (build_editor.sh's folder), before maturin builds serve
+          "$bindgen" --target web --out-dir roadstyle-wasm/pkg target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
+          "$bindgen" --target web --out-dir target/editor-pkg target/wasm32-unknown-unknown/release/roadstyle_wasm.wasm
 
       - name: Install roadstyle (maturin builds the extension roadstyle._rust) and a headless Chromium for the browser tests
         run: |
@@ -131,7 +143,8 @@ jobs:
         run: pytest -q tests/test_engine_parity.py
 
       - name: The whole suite with the Rust engine as the default, with the browser tests (docs/design/rust_library.md, P5's golden test)
-        run: ROADSTYLE_ENGINE=rust pytest -q
+        # ROADSTYLE_REQUIRE_WASM: the tests that need the wasm package fail when it is missing, not skip
+        run: ROADSTYLE_ENGINE=rust ROADSTYLE_REQUIRE_WASM=1 pytest -q
 
   tartu:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

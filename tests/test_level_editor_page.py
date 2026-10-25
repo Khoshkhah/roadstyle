@@ -21,7 +21,9 @@ STATIC = ASSETS / "static"
 # the editor's wasm package: build_editor.sh writes it to $CARGO_TARGET_DIR/editor-pkg/ (else rust/target/editor-pkg/)
 PKG = Path(os.environ.get("CARGO_TARGET_DIR") or ROOT / "rust" / "target") / "editor-pkg" / "roadstyle_wasm.js"
 EDGES = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "level_area" / "edges.parquet"
-needs_pkg = pytest.mark.skipif(not PKG.exists(), reason="no editor wasm package (rust/roadstyle-wasm/build_editor.sh)")
+# CI (ROADSTYLE_REQUIRE_WASM=1) builds the package: there a missing package is a failure, not a skip
+needs_pkg = pytest.mark.skipif(not PKG.exists() and os.environ.get("ROADSTYLE_REQUIRE_WASM") != "1",
+                               reason="no editor wasm package (rust/roadstyle-wasm/build_editor.sh)")
 
 
 def test_the_panels_colour_variables_have_values():

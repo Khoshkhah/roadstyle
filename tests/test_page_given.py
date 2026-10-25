@@ -3,6 +3,7 @@ look's other keywords, and name and road_popup of the call. Python's page (_engi
 the studio) use it, so the same keywords give the same page. Before, the wasm page lost them (the studio's Dashboard and Report pages had
 no sidebar)."""
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -33,7 +34,9 @@ def test_given_of_has_the_calls_page_keys():
     assert "state" not in g, "a map option is the look's"
 
 
-@pytest.mark.skipif(not (_engine.available() and PKG.exists() and shutil.which("node")), reason="no roadstyle._rust, node or wasm package")
+# CI (ROADSTYLE_REQUIRE_WASM=1) builds the wasm package: there a missing package or node is a failure, not a skip
+@pytest.mark.skipif(not (_engine.available() and PKG.exists() and shutil.which("node")) and os.environ.get("ROADSTYLE_REQUIRE_WASM") != "1",
+                    reason="no roadstyle._rust, node or wasm package")
 def test_a_python_page_and_a_wasm_page_of_the_same_keywords_have_the_same_page_keys(tmp_path):
     import geopandas as gpd
     import pyarrow.parquet as pq
@@ -55,5 +58,7 @@ writeFileSync({json.dumps(str(tmp_path / "wasm.html"))}, makePage(readFileSync({
     py = rs.render_edges(g, engine="rust", **{k: v for k, v in ARGS.items() if k != "state"}).html
     assert 'id="sb"' in wasm and 'id="sb"' in py, "both pages have the dashboard's sidebar"
     a, b = _opts(wasm), _opts(py)
-    assert {k: a.get(k) for k in KEYS} == {k: b.get(k) for k in KEYS}
+    missing = {"wasm page": [k for k in KEYS if k not in a], "Python page": [k for k in KEYS if k not in b]}
+    assert not any(missing.values()), f"keys that a page does not have: {missing} (an extension or a wasm package of another commit?)"
+    assert {k: a[k] for k in KEYS} == {k: b[k] for k in KEYS}
     assert a["popup_mode"] == "panel" and a["find_control"] is True
