@@ -1,6 +1,7 @@
 target/
 # tests/get_goldens.sh gets these from the pre-release rust-test-data
-roadstyle-rs/tests/data/tartu/
+roadstyle-rs/tests/data/tartu/*
+!roadstyle-rs/tests/data/tartu/rust_*.json
 roadstyle-rs/tests/data/monaco/golden_style.json.gz
 roadstyle-rs/tests/data/monaco/golden_tiles.json.gz
 roadstyle-rs/tests/data/sodermalm/golden_style.json.gz
