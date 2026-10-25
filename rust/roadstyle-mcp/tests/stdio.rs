@@ -2,6 +2,7 @@
 //! Python server, tests/test_mcp_server.py, on Monaco).
 
 use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use serde_json::{json, Value};
@@ -36,6 +37,13 @@ fn call(tool: &str, args: Value) -> (Vec<String>, Value) {
     (tools, res)
 }
 
+/// A file in this test run's own folder: other runs at the same time (in other worktrees) must not remove or write its pages.
+fn tmp(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("roadstyle-mcp-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir.join(name)
+}
+
 fn text(res: &Value) -> &str {
     res["content"][0]["text"].as_str().unwrap()
 }
@@ -50,7 +58,7 @@ fn preview_ok(res: &Value) -> bool {
 
 #[test]
 fn render_file_saves_the_map_and_reports() {
-    let out = std::env::temp_dir().join("roadstyle-mcp-test/monaco.html");
+    let out = tmp("monaco.html");
     let _ = std::fs::remove_file(&out);
     let (tools, res) = call("render_file", json!({"path": MONACO, "output_path": out, "options": {"basemap": "blank", "color_by": "highway"}}));
     assert_eq!(tools, ["render_file", "render_place", "snapshot"]);
@@ -64,7 +72,7 @@ fn render_file_saves_the_map_and_reports() {
 
 #[test]
 fn render_file_reads_a_geopackage() {
-    let out = std::env::temp_dir().join("roadstyle-mcp-test/sodermalm.html");
+    let out = tmp("sodermalm.html");
     let (_, res) = call("render_file", json!({"path": SODERMALM, "output_path": out, "options": {"basemap": "blank"}}));
     assert_ne!(res["isError"], true, "{res}");
     assert!(text(&res).contains("4,563 edges; classes: "), "{res}");
@@ -73,7 +81,7 @@ fn render_file_reads_a_geopackage() {
 
 #[test]
 fn misspelt_option_is_an_error_with_a_suggestion() {
-    let out = std::env::temp_dir().join("roadstyle-mcp-test/x.html");
+    let out = tmp("x.html");
     let (_, res) = call("render_file", json!({"path": MONACO, "output_path": out, "options": {"colour_by": "highway"}}));
     assert_eq!(res["isError"], true);
     assert!(text(&res).contains("'colour_by' (did you mean 'color_by'"), "{res}");
@@ -96,9 +104,7 @@ fn render_place_sends_the_agent_to_the_python_server() {
 
 #[test]
 fn snapshot_is_a_png_or_a_note_without_a_browser() {
-    let dir = std::env::temp_dir().join("roadstyle-mcp-test");
-    std::fs::create_dir_all(&dir).unwrap();
-    let page = dir.join("page.html");
+    let page = tmp("page.html");
     std::fs::write(&page, "<!doctype html><body style='background:#2a6'><h1>roadstyle</h1></body>").unwrap();
     let (_, res) = call("snapshot", json!({"html_path": page}));
     assert_ne!(res["isError"], true, "{res}");

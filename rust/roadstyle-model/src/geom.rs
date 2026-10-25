@@ -15,62 +15,10 @@ pub enum Geom {
     MultiPolygon(Vec<Vec<Ring>>),
 }
 
-struct Reader<'a> {
-    b: &'a [u8],
-    at: usize,
-}
-
-impl Reader<'_> {
-    fn u8(&mut self) -> Option<u8> {
-        let v = *self.b.get(self.at)?;
-        self.at += 1;
-        Some(v)
-    }
-    fn u32(&mut self, le: bool) -> Option<u32> {
-        let w: [u8; 4] = self.b.get(self.at..self.at + 4)?.try_into().ok()?;
-        self.at += 4;
-        Some(if le { u32::from_le_bytes(w) } else { u32::from_be_bytes(w) })
-    }
-    fn f64(&mut self, le: bool) -> Option<f64> {
-        let w: [u8; 8] = self.b.get(self.at..self.at + 8)?.try_into().ok()?;
-        self.at += 8;
-        Some(if le { f64::from_le_bytes(w) } else { f64::from_be_bytes(w) })
-    }
-    fn pt(&mut self, le: bool) -> Option<Pt> {
-        Some([self.f64(le)?, self.f64(le)?])
-    }
-    fn pts(&mut self, le: bool) -> Option<Vec<Pt>> {
-        let n = self.u32(le)? as usize;
-        (0..n).map(|_| self.pt(le)).collect()
-    }
-    fn rings(&mut self, le: bool) -> Option<Vec<Ring>> {
-        let n = self.u32(le)? as usize;
-        (0..n).map(|_| self.pts(le)).collect()
-    }
-    fn geom(&mut self) -> Option<Geom> {
-        let le = self.u8()? == 1;
-        let t = self.u32(le)?;
-        Some(match t {
-            1 => Geom::Point(self.pt(le)?),
-            2 => Geom::LineString(self.pts(le)?),
-            3 => Geom::Polygon(self.rings(le)?),
-            4..=6 => {
-                let n = self.u32(le)? as usize;
-                let parts: Vec<Geom> = (0..n).map(|_| self.geom()).collect::<Option<_>>()?;
-                match t {
-                    4 => Geom::MultiPoint(parts.into_iter().map(|g| if let Geom::Point(p) = g { Some(p) } else { None }).collect::<Option<_>>()?),
-                    5 => Geom::MultiLineString(parts.into_iter().map(|g| if let Geom::LineString(l) = g { Some(l) } else { None }).collect::<Option<_>>()?),
-                    _ => Geom::MultiPolygon(parts.into_iter().map(|g| if let Geom::Polygon(p) = g { Some(p) } else { None }).collect::<Option<_>>()?),
-                }
-            }
-            _ => return None, // a 3D, measured or collection geometry: not in a duckOSM base map
-        })
-    }
-}
-
-/// A 2D WKB geometry (point, line, polygon, or their multi forms).
+/// A WKB geometry (a point, a line, a polygon or their Multi forms; a Z or an M is left out: crate::wkb, the one reader).
 pub fn from_wkb(b: &[u8]) -> Option<Geom> {
-    Reader { b, at: 0 }.geom()
+    let (kind, parts) = crate::wkb::read(b)?;
+    Geom::from_parts(kind, parts)
 }
 
 fn coords(p: &[Pt]) -> Value {
@@ -78,6 +26,20 @@ fn coords(p: &[Pt]) -> Value {
 }
 
 impl Geom {
+    /// A geometry from its type and parts (crate::wkb's form); None for a part with no ring or no point where the type needs one.
+    pub fn from_parts(kind: crate::feature_table::GeomType, mut parts: crate::wkb::Parts) -> Option<Geom> {
+        use crate::feature_table::GeomType as T;
+        let first = |p: &mut Vec<Vec<Pt>>| (!p.is_empty()).then(|| p.swap_remove(0));     // the one ring of a point's or a line's part
+        Some(match kind {
+            T::Point => Geom::Point(*first(parts.first_mut()?)?.first()?),
+            T::LineString => Geom::LineString(first(parts.first_mut()?)?),
+            T::Polygon => Geom::Polygon((!parts.is_empty()).then(|| parts.swap_remove(0))?),
+            T::MultiPoint => Geom::MultiPoint(parts.iter_mut().map(|p| first(p).and_then(|r| r.first().copied())).collect::<Option<_>>()?),
+            T::MultiLineString => Geom::MultiLineString(parts.iter_mut().map(first).collect::<Option<_>>()?),
+            T::MultiPolygon => Geom::MultiPolygon(parts),
+        })
+    }
+
     /// The GeoJSON geometry (shapely's mapping, DuckDB's ST_AsGeoJSON): the rings as stored.
     pub fn geojson(&self) -> Value {
         match self {

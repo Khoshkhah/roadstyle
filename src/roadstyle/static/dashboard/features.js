@@ -1,16 +1,15 @@
 // The base map's layers (mapstyle's page scripts, docs/design/mapstyle_page_scripts.md): the 3D buildings and each layer's clicks,
-// tooltip and popup. The layers are found by their roles in the style's metadata (audit R7): the 3D buildings are the layers with
-// roadstyle:group "buildings 3D", which belong to the overlay with their source; a layer's start switches are its entry in
-// roadstyle:controls.overlays (interactive, tooltip, popup_window).
-import {map, O, OVERLAYS, RS_PREFIX, _emit} from "./core.js";
+// tooltip and popup. Each comes from the layer's entry in roadstyle:controls.overlays (audit R7; a page's layers have no metadata):
+// its 3D layer (extrude: the layer id), its start switches (interactive, tooltip, popup_window).
+import {map, OVERLAYS, _emit} from "./core.js";
 import {_ovCbs} from "./overlays.js";
 import {VIEW_CTRL} from "./view3d.js";
 import {_check} from "./panel.js";
-let _b3d = [], _b3dOv = null, _b3dOn = false;     // the 3D layers' ids, their overlay, the switch
-// the 3D buildings show while the switch is on and their overlay (the buildings) is shown
+let _b3d = [], _b3dOn = false;     // the overlays with a 3D layer (ov.extrude), the switch
+// a 3D layer shows while the switch is on and its overlay (the buildings) is shown
 function _show3d(){
-  const on = _b3dOn && !!_b3dOv && _b3dOv.visible !== false;
-  _b3d.forEach(id => { if(map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
+  _b3d.forEach(ov => { if(map.getLayer(ov.extrude))
+    map.setLayoutProperty(ov.extrude, "visibility", _b3dOn && ov.visible !== false ? "visible" : "none"); });
 }
 export function rsSetBuildings3D(on){
   _b3dOn = !!on; _show3d();
@@ -38,14 +37,11 @@ export function initFeatures(){
   OVERLAYS.forEach(ov => { if(ov.tooltip) _tips[ov.label] = ov.tooltip; });
   window.rsSetInteraction = rsSetInteraction;
   window.rsGetInteraction = rsGetInteraction;
-  const layers = (O.style && O.style.layers) || [];
-  const b3d = layers.filter(l => (l.metadata || {})["roadstyle:group"] === "buildings 3D");
-  _b3d = b3d.map(l => RS_PREFIX + l.id);
-  _b3dOv = b3d.length ? OVERLAYS.find(ov => ov.source === RS_PREFIX + b3d[0].source) || null : null;
+  _b3d = OVERLAYS.filter(ov => ov.extrude);
   window.rsSetBuildings3D = rsSetBuildings3D;
   window.rsGetBuildings3D = () => _b3dOn;
   if(!_b3d.length) return;
-  document.addEventListener("rs:overlaychange", e => { if(_b3dOv && e.detail.overlay === _b3dOv.label) _show3d(); });
+  document.addEventListener("rs:overlaychange", e => { if(_b3d.some(ov => ov.label === e.detail.overlay)) _show3d(); });
   // its button, right under the 2D/3D button
   map.addControl({onAdd(){
     const d = document.createElement("div"), bt = document.createElement("button");
@@ -59,7 +55,7 @@ export function initFeatures(){
     return d;
   }, onRemove(){}});
   // its row in the Layers box, under the buildings' row
-  const row = _b3dOv && _ovCbs[_b3dOv.label] && _ovCbs[_b3dOv.label].parentNode;
+  const row = _ovCbs[_b3d[0].label] && _ovCbs[_b3d[0].label].parentNode;
   if(row){
     const {lab} = _check("Buildings 3D", false, rsSetBuildings3D, {id: "rs-b3d"});
     lab.style.paddingLeft = "18px";

@@ -29,3 +29,19 @@ fn interaction_sets_a_layers_start_values() {
     assert_eq!((&on["interactive"], &on["tooltip"], &on["popup_window"]), (&json!(true), &json!(true), &json!(false)));
     assert!(w.contains(&"interaction: no layer nolayer on this map".to_string()), "{w:?}");
 }
+
+/// A base-map layer with a 3D layer names it in its entry (`extrude`): the dashboard's 3D button finds it there, as a page's layers have no
+/// metadata. Monaco's buildings.
+#[test]
+fn the_buildings_entry_names_its_3d_layer() {
+    let mut look: Value = serde_json::from_slice(&data("look.json")).unwrap();
+    look["args"]["state"] = "live".into();
+    let look = roadstyle_rs::Look::from_value(look).unwrap();
+    let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let ovs = s.metadata["roadstyle:controls"]["overlays"].as_array().unwrap();
+    let with: Vec<&Value> = ovs.iter().filter(|o| o.get("extrude").is_some()).collect();
+    assert_eq!(with.len(), 1, "only the buildings have heights");
+    let id = with[0]["extrude"].as_str().unwrap();
+    assert_eq!(with[0]["label"], "buildings");
+    assert!(s.layers.iter().any(|l| l["id"] == id && l["type"] == "fill-extrusion"), "{id}: no such 3D layer");
+}

@@ -35,8 +35,17 @@ fn canon(v: &Value) -> Value {
     }
 }
 
+/// Two hex colours that differ by at most 1 in each channel: the look rounds a mixed colour half up (roadstyle_look::color::mix, one rule
+/// for the look and the export, review D4, 2026-10-24); mapstyle's _mix rounded half to even. The picture is the same.
+fn near_colour(a: &Value, b: &Value) -> bool {
+    match (a.as_str().and_then(roadstyle_look::color::hex_rgb), b.as_str().and_then(roadstyle_look::color::hex_rgb)) {
+        (Some(x), Some(y)) => (0..3).all(|i| x[i].abs_diff(y[i]) <= 1),
+        _ => false,
+    }
+}
+
 fn first_differences(a: &Value, b: &Value, path: &str, out: &mut Vec<String>) {
-    if out.len() >= 8 || a == b {
+    if out.len() >= 8 || a == b || near_colour(a, b) {
         return;
     }
     match (a, b) {

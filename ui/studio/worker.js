@@ -6,26 +6,20 @@
 // is its .shp bytes, its .dbf bytes and its .prj text); {type: "page", options, given}
 // -> {html} (MapLibre still a placeholder); {type: "ramp", cmap, n} -> {stops}. Every answer has the message's id, and ok or error.
 import init, {resolveLook, rampStops, readGeoJson, readGeoParquet, readShp} from "../../rust/roadstyle-wasm/pkg/roadstyle_wasm.js";
+import {answer} from "../../src/roadstyle/static/dashboard/worker/call.js";
 
-const ready = init();
 let roads = null;
 
-onmessage = async (e) => {
-  const m = e.data;
-  try {
-    await ready;
-    if (m.type === "roads") {
-      roads = m.kind === "shp" ? readShp(new Uint8Array(m.bytes), new Uint8Array(m.dbf), m.prj, m.name)
-            : (m.kind === "geojson" ? readGeoJson : readGeoParquet)(new Uint8Array(m.bytes));
-      postMessage({id: m.id, ok: true, columns: roads.columns()});
-    } else if (m.type === "ramp") {
-      postMessage({id: m.id, ok: true, stops: rampStops(m.cmap, m.n)});
-    } else if (m.type === "page") {
-      const t0 = performance.now(), options = JSON.stringify(m.options);
-      const html = roads.page(resolveLook(options), options, JSON.stringify(m.given || {}));
-      postMessage({id: m.id, ok: true, html, ms: performance.now() - t0});
-    }
-  } catch (err) {
-    postMessage({id: m.id, ok: false, error: String((err && err.message) || err)});
-  }
-};
+answer({
+  roads(m){
+    roads = m.kind === "shp" ? readShp(new Uint8Array(m.bytes), new Uint8Array(m.dbf), m.prj, m.name)
+          : (m.kind === "geojson" ? readGeoJson : readGeoParquet)(new Uint8Array(m.bytes));
+    return {columns: roads.columns()};
+  },
+  ramp: (m) => ({stops: rampStops(m.cmap, m.n)}),
+  page(m){
+    const t0 = performance.now(), options = JSON.stringify(m.options);
+    const html = roads.page(resolveLook(options), options, JSON.stringify(m.given || {}));
+    return {html, ms: performance.now() - t0};
+  },
+}, init());

@@ -38,17 +38,21 @@ def test_a_road_name_is_text_not_markup(tmp_path, engine, popup_mode):
         pg = browser.new_page()
         pg.goto(page.as_uri())
         pg.wait_for_function("window.rs && window.map && map.isStyleLoaded() && window.rsQuery && rsQuery(() => true).length", timeout=60000)
-        shown = pg.evaluate("""async () => {
-          const wait = () => new Promise(r => setTimeout(r, 300)), out = {};
+        # each step waits for its text (a fixed wait failed under the load of the whole suite); then 300 ms more, so that an <img> that
+        # was not escaped has the time to fail and run its onerror
+        shown = pg.evaluate("""async evil => {
+          const wait = ms => new Promise(r => setTimeout(r, ms)), out = {};
+          const until = async f => { for (let t = 0; t < 200 && !f().includes(evil); t++) await wait(50); return f(); };
           const q = document.querySelector('.rs-side-q input, input[type=search]');      // the search
-          if (q) { q.value = 'img'; q.dispatchEvent(new Event('input')); await wait(); }
-          out.search = (document.querySelector('.rs-side-q-res, .rs-q-res') || {}).textContent || '';
-          rsSelect(0); await wait();                                                     // the popup or the side panel
-          out.select = [...document.querySelectorAll('.maplibregl-popup-content, .rs-side')].map(e => e.textContent).join(' ');
-          rsSetColorField('kind'); await wait();                                         // the legend
-          out.legend = (document.querySelector('.co-lg') || {}).textContent || '';
+          if (q) { q.value = 'img'; q.dispatchEvent(new Event('input')); }
+          out.search = q ? await until(() => (document.querySelector('.rs-side-q-res, .rs-q-res') || {}).textContent || '') : '';
+          rsSelect(0);                                                                   // the popup or the side panel
+          out.select = await until(() => [...document.querySelectorAll('.maplibregl-popup-content, .rs-side')].map(e => e.textContent).join(' '));
+          rsSetColorField('kind');                                                       // the legend
+          out.legend = await until(() => (document.querySelector('.co-lg') || {}).textContent || '');
+          await wait(300);
           out.xss = window.__xss === undefined ? 'none' : 'RAN';
-          return out; }""")
+          return out; }""", EVIL)
         browser.close()
     assert shown["xss"] == "none"
     assert EVIL in shown["select"] and EVIL in shown["legend"]          # shown as text

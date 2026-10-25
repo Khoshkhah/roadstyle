@@ -1650,6 +1650,10 @@ Later decisions:
 - 2026-10-24: P7 and 1.0 approved, on the condition that the coordinator reports the design steps done (R3, R1/R4, (d), (e), dead
   code, the third audit and its top items), with both engine suites and CI green. The publish of 1.0 waits for the owner's answer to
   that report.
+- 2026-10-24: **The target architecture is approved:** [target_architecture.md](target_architecture.md) (the crate graph, the road table,
+  the property model, the options and the look, the errors, the public API, the bindings and the assets, the dashboard contract, the
+  tests, parallelism, the duckosm-rust border and the worldwide service; the order of work T0 to T7). Its appendix lists the Python
+  shape that is still in the Rust side ([python_shape_left.md](python_shape_left.md)).
 - 2026-10-24: **The Rust API is the design; Python is a thin binding.** The owner's words: "The aim is make this rust version the real
   and main library instead of python version. So I need to make it independent. I don't want because wrong design of its python
   version we have the same issues in rust version." So the rule "Python is the reference" ends: the Rust engine is not made to copy a

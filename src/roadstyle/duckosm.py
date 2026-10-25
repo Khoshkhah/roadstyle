@@ -74,7 +74,7 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
         for lyr in (x for x in plan["layers"] if layers is True or x["name"] in layers):
             for k, sql in enumerate(lyr["sql"]):          # mapstyle's query, then its fallback (no tags: the height of the kind)
                 try:
-                    con.execute(f"CREATE OR REPLACE TEMP TABLE f{lyr['spec']} AS {sql}")
+                    con.execute(f"CREATE OR REPLACE TEMP TABLE {lyr['table']} AS {sql}")      # the run's own table
                 except duckdb.Error as e:
                     if k == len(lyr["sql"]) - 1:
                         warnings.warn(f"{db}: base-map layer {lyr['name']} skipped: {e}", stacklevel=2)
@@ -84,8 +84,9 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
                 made.append(lyr["spec"])
                 break
         roads = con.execute(plan["select"]).to_arrow_table()      # in memory: the connection closes below (DuckDB 1.5 and later)
-        fsel = r.duckosm_features_select(made)
+        fsel = r.duckosm_features_select(made, plan["run"])
         features = con.execute(fsel).to_arrow_table() if fsel else None
+        con.execute(plan["drop"])                           # the run's tables
     finally:
         con.close()
     return roads, features, level_kw

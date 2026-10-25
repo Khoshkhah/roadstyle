@@ -85,6 +85,8 @@ of `core.js` do it; the other files call them.
   `roadstyle:sources` (role to `{source, layer}`) gives the map. A style without it gives the same map from its layers: a layer's
   `source-layer`, else its source, is its role. `_src(role)` gives the map's source id (with the prefix) and the source layer
   only for a vector source. Filters, picking, the glow, the decks, the slots and Street View use it, with no branch on tiles.
+  The road filters act on the layers of the road roles alone (`RS_ROLES`: the keys of `sources`, else of `roadstyle:sources`), and
+  a road is picked on the layers of the option `pick`. No layer id is tested for a prefix (R7).
 - **The road table (`RoadTable`).** One port for every read of a road: `has(i)`, `props(i)`, `line(i)`, `mid(i)`, `bbox(i)`,
   `rows()`, by the road's row. The data is the road table of stage 1 (`{props, mids, bboxes, lines}`), from the option
   `road_table` or from `window.RS_SIDE`. `_road(i)` makes a
@@ -140,14 +142,14 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 
 | Option | From `render` | Default in `index.js` | Read by |
 |---|---|---|---|
-| `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (deck layers), `select.js` (pick layers), `basemap.js` (the base map layer) |
+| `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (the roles), `basemap.js` (the base map layer) |
 | `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
 | `road_table` | (none: the tiled page sets `window.RS_SIDE`) | `null` | `core.js` (`RoadTable`) |
 | `live` | `live_data=True` (the Rust engine): `{color, width, types, ramp, nodata}` | the metadata `roadstyle:live`, else `null` | `live.js` |
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
 | `basemap_switcher` | `basemap_switcher` | `true` | `basemap.js` |
 | `tiles` | `tiles` | `false` | `core.js` (the sidecar table `window.RS_SIDE`) |
-| `sources` | the page's roles (`roadstyle:sources`) | `null`: the metadata, else the style's layers | `core.js` (`_src`) |
+| `sources` | the page's roles (`roadstyle:sources`) | `null`: the metadata, else the style's layers | `core.js` (`_src`, `RS_ROLES`), `filter.js` |
 | `arrows` | the page's arrows (`roadstyle:arrows`) | the metadata, else `"points"` with an `arrows` source | `arrows.js` |
 | `popup_mode` | `popup_mode` (or `road_popup="panel"`) | `"popup"` | `panel.js`, and each control that docks in the panel |
 | `find_control` | `find_control` | `false` | `find.js` |
@@ -162,11 +164,12 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `color_active` | `color_active`, as an index | `0` | `color.js` |
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window, kinds}]` (`kinds`: a base-map layer's `[[kind, count], ...]`, most first) | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js`, `features.js` |
 | `modes` | a duckOSM map's modes: `[[mode, count], ...]` (`roadstyle:controls.modes`) | `[]` | `filter.js` |
-| `box_layout` | `"stack"`: a base map's page (the Roads and Layers boxes folded, Layers under Roads); `"corner"`: the Layers box alone in its corner | `"corner"` | `filter.js`, `overlays.js` |
+| `box_layout` | `"stack"`: a base map's page (the Roads and Layers boxes folded, Layers under Roads); `"corner"`: the Layers box alone in its corner. On a screen 700 px wide or less (`panel._narrow`), every box (Roads, Layers, Legend) starts folded in both layouts, as the side panel starts closed | `"corner"` | `filter.js`, `overlays.js`, `panel.js` |
 | `overlay_control` | `overlay_control` | `true` | `overlays.js` |
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
 | `tunnel` | `tunnel_control` and the theme's tunnels: `{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}` | `{layers: {}, steps: [], control: false}` | `tunnel.js`, `arrows.js` |
 | `fill_layers` | the road fill layer ids | `[]` | `svspot.js` |
+| `pick` | the layers that a road is picked on (`roadstyle:controls`) | `[]`: nothing to pick | `select.js` |
 | `road_fill` | `road_fill`: `{on, paint}` | `{on: true, paint: {}}` | `color.js` |
 | `views` | `views` | `[]` | `views.js` |
 | `items` | `items`, `items_popup`: `{label, popup, layer}` or `null` | `null` | `select.js` |

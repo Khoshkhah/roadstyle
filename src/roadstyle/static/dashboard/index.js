@@ -36,7 +36,7 @@ const RS_DEFAULTS = {
   filter: {on: false, classes: []}, color_active: 0,
   overlays: [], overlay_control: true, overlay_popup: true,
   modes: [], box_layout: "corner",   // roadstyle:controls.modes [[mode, count], ...]; "stack": a base map's page (Layers under Roads, folded)
-  tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], road_fill: {on: true, paint: {}},
+  tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], pick: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,
 };
 // the options that the page did not give and that the style's metadata gives: the road popup, the hover tooltip and the hover delay
@@ -49,7 +49,7 @@ function fromStyle(o, given){
   const ctl = meta["roadstyle:controls"] || {}, P = o.prefix || "";
   for(const k in ctl) if(!given.has(k)) o[k] = ctl[k];
   if(!given.has("overlays") && ctl.overlays && P)
-    o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit,
+    o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit, extrude: ov.extrude && P+ov.extrude,
                                         base: ov.base && Object.fromEntries(Object.entries(ov.base).map(([id, f])=>[P+id, f]))}));
   if(!given.has("road_popup")) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
