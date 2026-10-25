@@ -55,6 +55,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   wide. A bridge keeps its casing. The road layer's filter has the rule, and the tiles leave out the pieces that it hides.
 
 ### Changed
+- **An unknown keyword of `render_edges` gives a warning** (T3), with the nearest known name: "render_edges: unknown keyword
+  'colour_by' (did you mean 'color_by'?); it does nothing". Before, `render_edges` ignored it with no message. From roadstyle 0.27.0
+  it is an error. The rule is one function, `roadstyle::options::unknown` (Python: `_rust.unknown_keywords`), which the MCP server's
+  option check uses too, in place of its own list. `band_col` and `order` are now an error with both engines (before, the Rust engine
+  ignored them).
 - **The wasm module grows its memory by a quarter step** (`roadstyle-wasm`): when it grows, it takes a quarter of its size ahead (16 to
   64 MB), not its whole size (16 to 256 MB). Monaco: 110 MiB to 68 MiB after the map's two stages; Tartu: 221 MiB to 197 MiB, and 340 MiB
   to 138 MiB after the first style in Chromium, which is not slower (Tartu 1.7 s to 1.4 s). `liveBytes()` gives the bytes held and their

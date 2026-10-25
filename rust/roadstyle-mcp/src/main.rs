@@ -32,18 +32,6 @@ const PYTHON: &str = "the Python server (pip install roadstyle-mcp==0.25.0)";
 const MAPLIBRE_JS: &str = roadstyle::assets::text!("vendor/maplibre-gl.js");
 const MAPLIBRE_CSS: &str = roadstyle::assets::text!("vendor/maplibre-gl.css");
 
-/// The options that stage 1 (the look and the sources) reads: render_edges keywords. The page's own keywords (basemap, popup_mode, ...)
-/// are page_from's (`page_options::page_defaults`). `overlays` and `items` are not here: they are GeoDataFrames.
-const STAGE1: &[&str] = &[
-    "access_col", "arrows", "boundary", "bridge_col", "cap_col", "cap_end_col", "cap_start_col", "casing_end_col", "casing_level_col",
-    "casing_m", "casing_min_px", "casing_start_col", "cmap", "color_active", "color_by", "color_col", "color_key", "color_options",
-    "color_table", "colors", "data_maxzoom", "data_tolerance", "directed_col", "driving_col", "edge_id_col", "fill_level_col",
-    "filter_col", "filter_control", "head_end_m_col", "head_m", "head_start_m_col", "highway_col", "hover_color", "hover_delay_ms",
-    "items_popup", "labels", "layer_col", "legend", "minzoom", "name", "offset_frac", "offset_zoom", "palette", "profile", "road_fill",
-    "road_popup", "road_tooltip", "select_color", "settings", "simple", "style", "tiles", "tooltip", "tunnel_col", "tunnel_control",
-    "view_3d", "views", "vmax", "vmin", "width_by", "width_frac", "width_m_col", "width_m_zoom",
-];
-
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct RenderFile {
     /// The road file: GeoParquet, GeoJSON, a Shapefile (its .dbf and .prj beside it) or a GeoPackage.
@@ -152,25 +140,21 @@ fn result(r: Result<String, String>) -> CallToolResult {
     }
 }
 
-/// render_edges ignores a misspelt keyword; an agent needs to hear about it (with the close names, as Python's difflib gives them). The
-/// keywords: stage 1's and the page's (page_from's defaults).
+/// A keyword that no part of roadstyle reads did nothing, with no message; an agent needs to hear about it, with the nearest known name.
+/// The one rule of the Python binding too (roadstyle::options::unknown). palette, profile and settings are the look's own options
+/// (render_file reads them apart).
 fn check_options(options: &Map<String, Value>) -> Result<(), String> {
-    let page = roadstyle::page_options::page_defaults();
-    let mut valid: Vec<&str> = STAGE1.iter().copied().chain(page.keys().map(String::as_str)).collect();
-    valid.sort();
-    valid.dedup();
-    let mut bad: Vec<&String> = options.keys().filter(|k| !valid.contains(&k.as_str())).collect();
+    let rest: Map<String, Value> = options.iter().filter(|(k, _)| !["palette", "profile", "settings"].contains(&k.as_str()))
+        .map(|(k, v)| (k.clone(), v.clone())).collect();
+    let bad = roadstyle::options::unknown(&rest);
     if bad.is_empty() {
         return Ok(());
     }
-    bad.sort();
-    let hints: Vec<String> = bad.iter().map(|k| {
-        let mut close: Vec<(f64, &str)> = valid.iter().map(|v| (strsim::normalized_levenshtein(k, v), *v)).filter(|(s, _)| *s >= 0.6).collect();
-        close.sort_by(|a, b| b.0.total_cmp(&a.0));
-        let close: Vec<String> = close.iter().take(3).map(|(_, v)| format!("'{v}'")).collect();
-        if close.is_empty() { format!("'{k}'") } else { format!("'{k}' (did you mean {}?)", close.join(", ")) }
+    let hints: Vec<String> = bad.iter().map(|(k, near)| match near {
+        Some(n) => format!("'{k}' (did you mean '{n}'?)"),
+        None => format!("'{k}'"),
     }).collect();
-    Err(format!("unknown option(s): {}. Valid options: {}", hints.join("; "), valid.join(", ")))
+    Err(format!("unknown option(s): {}. The options are render_edges keywords (docs/reference/parameters.md)", hints.join("; ")))
 }
 
 /// The roads of a road file, by its extension, and a reader's warning (a GeoPackage with more tables: geopandas' words).
