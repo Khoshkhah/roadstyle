@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`Look.withArg(key, value)` in the WebAssembly package**: the same look with one keyword changed, as the Python binding's
+  `Look.with_arg`. The examples in `examples/dashboard_rust/` use it and no longer read or change a look's JSON fields (`args`,
+  `theme`): a look's JSON is a format to save and load, not an API (docs/rust/browser.md). With `state: "live"`, the dashboard takes
+  the selection colour from the style's `roadstyle:controls`; a host that adds the layers to its own map sets the global state from
+  `roadstyle:state` (tiles.html).
 - **The typed look, version 2 (T3 step 2, audit R16).** A look is now one struct for each section (`roadstyle_look::sections`: roads,
   casing, labels, arrows, bridges, tunnels, selection, data, overlays, boundary, background, access, camera, tiles, page, palettes,
   active, interaction, base_map), in place of the JSON values `theme` and `config` (StyleConfig's flat view) and the resolution's

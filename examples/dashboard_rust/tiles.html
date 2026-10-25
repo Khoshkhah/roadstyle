@@ -20,7 +20,9 @@ import {rsDashboard} from "../../rust/roadstyle-assets/files/static/dashboard/in
 const DATA = "../../rust/roadstyle-rs/tests/data/";
 const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
 const [, roads, lookText] = await Promise.all([init(), bytes(DATA + "monaco/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
-const theme = JSON.parse(lookText).theme;
+// the saved look (look.json: a format to save and load, not an API to read fields from) with this page's map options, render_edges'
+// keywords, each through Look.withArg
+const withArgs = (look, args) => Object.entries(args).reduce((l, [k, v]) => l.withArg(k, JSON.stringify(v)), look);
 
 const map = new maplibregl.Map({container: "map", style: "https://tiles.openfreemap.org/styles/positron", center: [7.42, 43.735], zoom: 14,
   attributionControl: {compact: true}});
@@ -39,7 +41,6 @@ const rs = rsDashboard(map, {
   style: null,
   prefix: "rs-",
   tiles: true,
-  select_color: theme.selection.select,
   street_view: "window",
 });
 window.rs = rs;
@@ -47,9 +48,9 @@ window.rs = rs;
 // a roads style on the map, in place of the one before: its images, sources and layers with the prefix rs-, then rs.setStyle with the
 // style and its road table (stage 1 gives both: the table, then the tiles from the same sources)
 async function showRoads(colorBy) {
-  const look = JSON.parse(lookText);
-  if (colorBy) Object.assign(look.args, colorBy);
-  const sources = makeSources(roads, Look.fromJson(JSON.stringify(look)), undefined, undefined, "Monaco");
+  // state "live": the dashboard takes its controls (the selection colour, ...) from the style's metadata roadstyle:controls
+  const look = withArgs(Look.fromJson(lookText), {state: "live", ...colorBy});
+  const sources = makeSources(roads, look, undefined, undefined, "Monaco");
   const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
   tiler = tileSources(sources, `rs://${++gen}/`, ["name", "edge_id", "highway"]);
   const style = JSON.parse(tiler.style());
@@ -60,6 +61,9 @@ async function showRoads(colorBy) {
   }
   // the one vector source "roads" (its source layers: simple, slots). promoteId: the pieces of a road have the road's row as their id, so
   // one feature state lights them all (the engine sets it only on its own pages)
+  // a style with state "live" reads MapLibre's global state (rs_co, rs_fill_on, ...). Its start values are in the style's "state",
+  // which this map (another style) does not have: set them from the metadata roadstyle:state
+  for (const [k, v] of Object.entries(style.metadata["roadstyle:state"] || {})) map.setGlobalStateProperty(k, v);
   for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
   for (const l of style.layers) {
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));   // the image name in the layout
