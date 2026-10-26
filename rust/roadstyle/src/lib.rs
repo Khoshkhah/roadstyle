@@ -17,6 +17,7 @@ pub mod level_editor;
 pub mod options;
 pub mod page;
 pub mod page_options;
+pub mod relevel;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 
@@ -89,36 +90,41 @@ fn first_drawn(layers: &[Value], k: &str, from: u32, last: u32) -> u32 {
 fn tile_sources(s: &sources::Styled, o: &tiles::stage::TileOptions) -> Result<tiles::Tiles, tiles::Error> {
     let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px)?;
     tiled.drawn_by(&s.layers);
+    for (k, src) in s.shown().filter(|(k, _)| o.wants(k)) {
+        tile_source(&mut tiled, s, o, k, src);
+    }
+    Ok(tiled)
+}
+
+/// One source of stage 1 as the tile layer `k` (`tile_sources`; the level editor's redraw adds a source again with it).
+fn tile_source(tiled: &mut tiles::Tiles, s: &sources::Styled, o: &tiles::stage::TileOptions, k: &str, src: Source) {
     let keys = |v: &Value| -> std::collections::HashSet<String> {
         v["data"]["features"].as_array().into_iter().flatten().filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect()
     };
-    for (k, src) in s.shown().filter(|(k, _)| o.wants(k)) {
-        match src {
-            // the roads, from the table and the marks (no copy of their properties); a page has none
-            Source::Roads(r) => {
-                let (keep, whole, from) = o.rule(k, Default::default);
-                tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))        // the cells, no JSON copy
-            }
-            Source::Simple(p) => {
-                let (keep, whole, from) = o.rule(k, Default::default);
-                tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
-            }
-            Source::Json(v) => {
-                let (keep, whole, from) = whole_unless_lines(json_lines(v), o.rule(k, || keys(v)), o.min_zoom);
-                tiled.add(k, v, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
-            }
-            // a base-map layer, from its table (audit R10)
-            Source::Features(f) => {
-                use roadstyle_engine::feature_table::GeomType;
-                let t = &f.table;
-                let lines = (0..t.len()).all(|r| matches!(t.geometries_of().kind(r), Some(GeomType::LineString | GeomType::MultiLineString)));
-                let keys = || t.names().iter().filter(|n| (0..t.len()).any(|r| t.has_key(r, n))).cloned().collect();
-                let (keep, whole, from) = whole_unless_lines(lines, o.rule(k, keys), o.min_zoom);
-                tiled.add_features(k, t, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
-            }
+    match src {
+        // the roads, from the table and the marks (no copy of their properties); a page has none
+        Source::Roads(r) => {
+            let (keep, whole, from) = o.rule(k, Default::default);
+            tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))        // the cells, no JSON copy
+        }
+        Source::Simple(p) => {
+            let (keep, whole, from) = o.rule(k, Default::default);
+            tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
+        }
+        Source::Json(v) => {
+            let (keep, whole, from) = whole_unless_lines(json_lines(v), o.rule(k, || keys(v)), o.min_zoom);
+            tiled.add(k, v, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
+        }
+        // a base-map layer, from its table (audit R10)
+        Source::Features(f) => {
+            use roadstyle_engine::feature_table::GeomType;
+            let t = &f.table;
+            let lines = (0..t.len()).all(|r| matches!(t.geometries_of().kind(r), Some(GeomType::LineString | GeomType::MultiLineString)));
+            let keys = || t.names().iter().filter(|n| (0..t.len()).any(|r| t.has_key(r, n))).cloned().collect();
+            let (keep, whole, from) = whole_unless_lines(lines, o.rule(k, keys), o.min_zoom);
+            tiled.add_features(k, t, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
         }
     }
-    Ok(tiled)
 }
 
 /// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go

@@ -289,6 +289,42 @@ impl RoadTable {
         true
     }
 
+    /// Set some cells of the column `col` (`cells`: each row and its new value; null is Value::Null), as `set_values` sets a column.
+    pub fn set_cells(&mut self, col: usize, cells: &[(usize, Value)]) -> Result<(), crate::Error> {
+        let name = self.names[col].clone();
+        let mut vals: Vec<Value> = (0..self.len()).map(|r| self.cell(col, r).to_value()).collect();
+        for (r, v) in cells {
+            *vals.get_mut(*r).ok_or_else(|| crate::Error::Column { column: name.clone(), message: format!("no road {r}") })? = v.clone();
+        }
+        self.set_values(&name, vals)
+    }
+
+    /// Set the column `name` (in its place, else as the last column) to `values`, one for each road: integers when every value is a whole
+    /// number or null, else numbers, or texts. A boolean or a mix of texts and numbers is an error.
+    pub fn set_values(&mut self, name: &str, values: Vec<Value>) -> Result<(), crate::Error> {
+        if values.len() != self.len() {
+            return Err(crate::Error::Column { column: name.into(), message: format!("{} values, the roads are {}", values.len(), self.len()) });
+        }
+        let given = || values.iter().filter(|v| !v.is_null());
+        let a: ArrayRef = if given().all(|v| v.is_i64()) {
+            Arc::new(values.iter().map(Value::as_i64).collect::<Int64Array>())
+        } else if given().all(Value::is_number) {
+            Arc::new(values.iter().map(Value::as_f64).collect::<arrow_array::Float64Array>())
+        } else if given().all(Value::is_string) {
+            Arc::new(values.iter().map(Value::as_str).collect::<arrow_array::StringArray>())
+        } else {
+            return Err(crate::Error::Column { column: name.into(), message: "values of more than one kind (texts and numbers), or booleans".into() });
+        };
+        match self.col(name) {
+            Some(i) => self.cols[i] = a,
+            None => {
+                self.names.push(name.to_string());
+                self.cols.push(a);
+            }
+        }
+        Ok(())
+    }
+
     /// Set the column `name` to integers: in its place when it is there, else as the last column.
     pub fn set_ints(&mut self, name: &str, values: Vec<i64>) {
         assert_eq!(values.len(), self.len(), "a column of {name} for each road");

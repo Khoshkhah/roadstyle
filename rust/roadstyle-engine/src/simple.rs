@@ -455,6 +455,17 @@ impl SimpleSource {
             .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(self.with_index(it.props.clone())), it.coords.as_deref())))
     }
 
+    /// The pieces of the edges `rows` (no items), as `features` gives them (the level editor's redraw compares these alone).
+    pub fn features_of<'a>(&'a self, roads: &'a Roads, rows: &'a std::collections::HashSet<u32>) -> impl Iterator<Item = (usize, Props<'a>, Option<&'a [Pt]>)> + 'a {
+        self.pieces.iter().filter(move |(_, p)| rows.contains(&p.edge)).map(move |(id, p)| {
+            let mut q = p.props(roads, &self.cols);
+            for (k, v) in self.palette_props(p, roads) {
+                q.insert(&k, v);
+            }
+            (*id, self.slim(self.with_index(q)), p.points(roads))
+        })
+    }
+
     /// The properties with the class index last (R8): the place of the feature's class (the class role's column) in the classes, else
     /// their number.
     fn with_index<'a>(&self, mut q: Props<'a>) -> Props<'a> {

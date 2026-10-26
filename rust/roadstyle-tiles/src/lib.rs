@@ -300,6 +300,45 @@ impl Tiles {
         self.put(name, b.layer(whole, min_zoom));
     }
 
+    /// Replace the features of some roads in the line layer `name` (one that add_lines made): the features whose `__rs_edge` is in
+    /// `edges` go, and `feats` come with the layer's rules (`keep`, `whole`, as add_lines). The new features' ids go on after the layer's
+    /// last. Only this layer's box tree is made again, and the cached tiles go. Returns how many features went.
+    pub fn replace_lines<L, K, V, P>(&mut self, name: &str, edges: &HashSet<u64>, feats: impl Iterator<Item = (Option<L>, P)>, keep: &HashSet<String>,
+                                     whole: bool) -> Result<usize, Error>
+    where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
+        let rules = rules::ZoomRules::of(&self.style, name);
+        let layer = self.layers.get_mut(name).ok_or_else(|| Error::Options(format!("replace: the tiles have no layer {name}")))?;
+        let edge = layer.keys.iter().position(|k| k == roadstyle_model::mark::Mark::Edge.name()).map(|k| k as u32);
+        // ponytail: one pass over the features' keys (no index of each road's features); an index if a large area is slow
+        let mut gone = vec![false; layer.feats.len()];
+        let mut n = 0;
+        for (i, f) in layer.feats.iter_mut().enumerate() {
+            let e = f.props.iter().find(|(k, _)| Some(*k) == edge).and_then(|(_, v)| match layer.vals[*v as usize] { Val::Int(x) => u64::try_from(x).ok(), Val::UInt(x) => Some(x), _ => None });
+            if e.is_some_and(|e| edges.contains(&e)) {
+                (gone[i], f.id, f.geom, f.props) = (true, None, Geom::Lines(Vec::new()), Vec::new());
+                n += 1;
+            }
+        }
+        let first = layer.feats.len() as u64;
+        let keys = std::mem::take(&mut layer.keys);
+        let encoded = std::mem::take(&mut layer.encoded);
+        let mut b = Builder {
+            key_at: keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
+            val_at: encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect(),
+            keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats),
+            boxes: layer.tree.iter().filter(|h| !gone[h.data as usize]).cloned().collect(), rules,
+        };
+        for (j, (c, props)) in feats.enumerate() {
+            let Some(c) = c else { continue };
+            let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
+            b.push(Some(first + j as u64), g, props.filter(|(k, _)| whole || k.as_ref().starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_ref())));
+        }
+        let min_zoom = layer.min_zoom;
+        *layer = b.layer(whole, min_zoom);
+        *self.cache.get_mut().unwrap() = TileCache::default();
+        Ok(n)
+    }
+
     /// The properties of the feature `id` of the source `name` (those in the tiles), as JSON; `null` when there is no such feature.
     /// The map draws the roads from other sources, so a click on a road asks for its properties here (`__rs_edge` is its id).
     pub fn props(&self, name: &str, id: u64) -> String {

@@ -323,6 +323,12 @@ const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
 - After an apply, `replaceRoads(rows)` gets the rows of levels.csv (one object for each edge, its fields as text: `edge`,
   `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`, `head_end_m`, `cap_start`, `cap_end`) of only the edges
   whose levels, heads or caps changed. Draw them, then resolve the Promise. The `"solved"` event comes too.
+- To draw the rows fast, make your map's tiles with `LiveMap` in place of `tileSources`: `new LiveMap(makeSources(roads, look), look,
+  prefix, keep)` has the Tiler's `style()` and `tile(source, z, x, y)`, and `relevel(JSON.stringify(rows))` gives the edges their new
+  values. It runs stage 1 again and replaces in the tiles only the pieces of the edges that changed and of the edges at their end
+  nodes. The answer is `{edges, pieces_gone, sources, style_changed}`: then load the visible tiles again (with `style_changed`, set
+  the style again). Your roads must have the level, head and cap columns that the look names (`casing_start_col`, ...,
+  `cap_end_col`). Monaco: about 110 ms; Burnaby: 1.6 s (stage 1 of the whole area; a new map is about 5 s).
 - `colors` (each optional, also without `host`): `select` is road 1 of the panel, `second` is road 2, `hover` is the hover of the
   editor's own map (on your map, your style's hover stays).
 

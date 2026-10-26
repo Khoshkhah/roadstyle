@@ -533,6 +533,51 @@ mod wasm {
         Ok(Tiler { style, tiles })
     }
 
+    /// A tiled map that the level editor redraws (roadstyle::relevel): `new LiveMap(sources, look, prefix, keep)` takes stage 1 (the
+    /// Sources are used up) and the look that made it; `style()` and `tile(source, z, x, y)` as a Tiler's; `relevel(rows)` gives the edges
+    /// new values. `rows`: JSON text, an array of levels.csv rows (`edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`,
+    /// `head_start_m`, `head_end_m`, `cap_start`, `cap_end`; numbers or their text, "" or null for none); the answer is JSON text
+    /// `{edges, pieces_gone, sources, style_changed}`. Then reload the map's tiles (with `style_changed`: set the style again).
+    #[wasm_bindgen]
+    pub struct LiveMap(roadstyle::relevel::LiveTiles);
+
+    #[wasm_bindgen]
+    impl LiveMap {
+        #[wasm_bindgen(constructor)]
+        pub fn new(sources: Sources, look: &JsLook, prefix: &str, keep: Vec<String>) -> Result<LiveMap, JsError> {
+            roadstyle::relevel::LiveTiles::new(sources.inner, look.0.clone(), prefix, &keep).map(LiveMap).map_err(|e| JsError::new(&e.to_string()))
+        }
+
+        pub fn style(&self) -> String {
+            self.0.style().to_string()
+        }
+
+        pub fn tile(&self, source: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
+            if source == roadstyle::tiles::SOURCE { self.0.tiles.tile(z, x, y) } else { Vec::new() }
+        }
+
+        pub fn relevel(&mut self, rows: &str) -> Result<String, JsError> {
+            let err = |m: String| JsError::new(&format!("relevel: {m}"));
+            let rows: Vec<serde_json::Value> = serde_json::from_str(rows).map_err(|e| err(e.to_string()))?;
+            let text = |v: &serde_json::Value| v.as_str().map(str::trim).filter(|t| !t.is_empty()).map(String::from)
+                .or_else(|| v.as_f64().map(|n| n.to_string()));
+            let num = |r: &serde_json::Value, k: &str| -> Result<Option<f64>, JsError> {
+                text(&r[k]).map(|t| t.parse::<f64>().map_err(|_| err(format!("{k} is not a number: {t}")))).transpose()
+            };
+            let int = |r: &serde_json::Value, k: &str| -> Result<i64, JsError> {
+                num(r, k)?.filter(|n| n.fract() == 0.0).map(|n| n as i64).ok_or_else(|| err(format!("{k} is not a whole number")))
+            };
+            let rows = rows.iter().map(|r| Ok(roadstyle::relevel::LevelRow {
+                edge_id: text(&r["edge"]).and_then(|t| t.parse().ok()).ok_or_else(|| err(format!("an edge id: {}", r["edge"])))?,
+                levels: [int(r, "casing_start")?, int(r, "casing_level")?, int(r, "casing_end")?, int(r, "fill_level")?],
+                heads: [num(r, "head_start_m")?, num(r, "head_end_m")?],
+                caps: [text(&r["cap_start"]), text(&r["cap_end"])],
+            })).collect::<Result<Vec<_>, JsError>>()?;
+            let done = self.0.relevel(&rows).map_err(|e| JsError::new(&e.to_string()))?;
+            Ok(serde_json::to_string(&done).expect("JSON of counts"))
+        }
+    }
+
     /// Stage 1's files for stage 2: each file's name and bytes (style.json and the files that it names).
     #[wasm_bindgen]
     #[derive(Default)]
