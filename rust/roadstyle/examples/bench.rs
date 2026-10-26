@@ -77,6 +77,29 @@ fn main() {
         });
         let archive = step("stage 2's archive (PMTiles)", || tiles.archive(tiles.bounds().unwrap(), &tiles.layer_names()).unwrap().len());
         println!("  (the archive: {:.1} MB; the tiled style: {:.1} KB)", archive as f64 / 1e6, roadstyle::style_text(&s, &tstyle).len() as f64 / 1e3);
+        // the low zooms (the lag of a tilted view): the centre tile of z10-12, and the tiles of a 1280 x 800 view (512 px tiles, one
+        // more on each side) at each of z10-13, which a tilted view shows together
+        let [w, s_, e, n] = tiles.bounds().unwrap();
+        let (lon, lat) = ((w + e) / 2.0, (s_ + n) / 2.0);
+        let at = |z: u32| ((lon + 180.0) / 360.0 * (1u64 << z) as f64, (1.0 - lat.to_radians().tan().asinh() / std::f64::consts::PI) / 2.0 * (1u64 << z) as f64);
+        for z in [10, 11, 12] {
+            let (x, y) = at(z);
+            let t = Instant::now();
+            let b = tiles.build(z, x as u32, y as u32).len();
+            println!("  the centre tile of z{z}: {:.1} ms, {:.0} KB", t.elapsed().as_secs_f64() * 1e3, b as f64 / 1e3);
+        }
+        let (mut count, t) = (0, Instant::now());
+        for z in 10..=13 {
+            let (cx, cy) = at(z);
+            let (hx, hy) = (1280.0 / 512.0 / 2.0 + 1.0, 800.0 / 512.0 / 2.0 + 1.0);
+            for x in (cx - hx).floor() as u32..=(cx + hx).floor() as u32 {
+                for y in (cy - hy).floor() as u32..=(cy + hy).floor() as u32 {
+                    tiles.build(z, x, y);
+                    count += 1;
+                }
+            }
+        }
+        println!("  a view's tiles at z10-13: {count} tiles, {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
         drop((s, tiles));
         let live = look.clone().with_arg("state", "live".into()).unwrap();
         let options = roadstyle::look::Options::default();
