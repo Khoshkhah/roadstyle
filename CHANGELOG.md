@@ -10,8 +10,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **A fast redraw of new levels** (2026-10-26): `roadstyle::relevel::LiveTiles` (wasm: `new LiveMap(sources, look, prefix, keep)`,
   `relevel(rows)`) keeps stage 1 and gives some edges new levels, heads and caps. It runs stage 1 again, compares the pieces of the
   changed edges and of the edges at their end nodes, and replaces only those that changed in the tiles (`Tiles::replace_lines`); a
-  slots or decks source only when it changed. The tiles then have the same features as a new map (tests/relevel.rs). Monaco: about
-  110 ms; Burnaby: 1.6 s, against about 5 s for a new map. `RoadTable::set_cells` and `set_values` set a column's cells.
+  slots or decks source only when it changed, and the slots are not made again when no fill level changed. The tiles then have the
+  same features as a new map (tests/relevel.rs). A head or a cap: Monaco about 70 ms, Burnaby 0.8 s; a level change: Monaco about
+  120 ms, Burnaby 1.7 s; a new map: about 5 s on Burnaby. `RoadTable::set_cells` and `set_values` set a column's cells.
 - **The level editor opens on the host's map** (2026-10-26): `levelEditor({..., host: {replaceRoads(rows), edgeIdCol}})` makes no map
   of its own (no draw, stage 1, road table or stage 2 at open; Burnaby: 1.7 s in place of about 9.6 s). It uses the host's roads, road
   table and pick, and after an apply it gives `replaceRoads` only the levels.csv rows of the edges that changed. Without `host`, the

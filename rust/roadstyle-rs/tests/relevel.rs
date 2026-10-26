@@ -83,10 +83,13 @@ fn a_redraw_has_the_features_of_a_new_map() {
         after.set_cells(c, &cs).unwrap();
     }
     let mut m = live(before);
-    let t = std::time::Instant::now();
-    let done = m.relevel(&[head, cap, edit].map(|i| row(&after, i))).unwrap();
-    eprintln!("Monaco redraw: {:.0} ms, {done:?}", t.elapsed().as_secs_f64() * 1e3);
-    assert!(done.edges >= 3 && !done.style_changed, "{done:?}");      // the three edges, and the roads whose ends meet them
+    // a head and a cap (no fill level changes: the slots stay), then the levels of a relation edit
+    for (rows, what) in [(vec![head, cap], "head and cap"), (vec![edit], "level change")] {
+        let t = std::time::Instant::now();
+        let done = m.relevel(&rows.iter().map(|&i| row(&after, i)).collect::<Vec<_>>()).unwrap();
+        eprintln!("Monaco redraw, {what}: {:.0} ms, {done:?}", t.elapsed().as_secs_f64() * 1e3);
+        assert!(done.edges >= rows.len() && !done.style_changed, "{done:?}");
+    }
     let new = live(after.clone());
     for i in [head, cap, edit] {
         let [lon, lat] = after.line(i).unwrap()[0];

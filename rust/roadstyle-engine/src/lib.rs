@@ -82,7 +82,7 @@ pub fn make_parts(table: RoadTable, look: &Look, features: Option<FeatureTable>,
     let roles = roles_of(&table, &look.map.columns)?;
     let mut warnings = Vec::new();
     let levels = compute_levels(&table, &roles, &look.map, look.road.head_m, &mut warnings)?;
-    let mut parts = style_parts(table, roles, levels, look, features, planner, name)?;
+    let mut parts = style_parts(table, roles, levels, look, features, planner, name, None)?;
     parts.warnings.splice(0..0, warnings);
     Ok(parts)
 }
@@ -104,12 +104,22 @@ fn roles_of(table: &RoadTable, c: &roadstyle_look::options::Columns) -> Result<R
 /// planner, as a page's views have none.
 pub fn restyle(s: &sources::Styled, look: &Look) -> Result<sources::Styled, Error> {
     let r = &s.roads.roads;
-    Ok(sources::Styled::new(style_parts(r.table.clone(), r.roles.clone(), r.solved.clone(), look, None, None, None)?))
+    Ok(sources::Styled::new(style_parts(r.table.clone(), r.roles.clone(), r.solved.clone(), look, None, None, None, None)?))
+}
+
+/// `restyle` with the slots of `s` as they are (they read only each road's fill level: the level editor's redraw, when no fill level
+/// changed).
+pub fn restyle_same_fills(s: &sources::Styled, look: &Look) -> Result<sources::Styled, Error> {
+    let r = &s.roads.roads;
+    let slots = s.sources.iter().find_map(|(k, v)| match v { Src::Json(v) if k == "slots" => Some(v.clone()), _ => None });
+    Ok(sources::Styled::new(style_parts(r.table.clone(), r.roles.clone(), r.solved.clone(), look, None, None, None, slots)?))
 }
 
 /// make_parts after the roads are prepared (the roles, the levels).
+/// `slots`: the slots source to take as it is (None: made from the roads).
+#[allow(clippy::too_many_arguments)]
 fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, look: &Look, features: Option<FeatureTable>,
-               planner: Option<Vec<Row>>, name: Option<String>) -> Result<Parts, Error> {
+               planner: Option<Vec<Row>>, name: Option<String>, slots: Option<Value>) -> Result<Parts, Error> {
     let mut feats = Roads::new(table, roles, solved);
     // render's filter_col, else the class role's column
     if let Some(f) = roads::named(&look.map.columns.filter) {
@@ -119,7 +129,7 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
     let width_col = roads::named(&look.map.columns.width_m);
     // render's arrows and labels (both on by default): the slots exist only for them
     let (arrows, labels) = (look.map.arrows.on, look.map.labels.on);
-    let slots = if arrows || labels { slots::slots_source(&feats, &look.slot) }
+    let slots = if let Some(s) = slots { s } else if arrows || labels { slots::slots_source(&feats, &look.slot) }
                 else { json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}) };
     let mut ovs = Vec::new();
     let mut images = serde_json::Map::new();

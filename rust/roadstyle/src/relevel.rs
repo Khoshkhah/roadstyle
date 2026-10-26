@@ -2,7 +2,8 @@
 //! Stage 1 runs again for the whole area (`roadstyle_engine::restyle`). Only the edges that changed and the edges at their end nodes
 //! (the ring: a road's caps and joins come from the roads at its nodes) are compared; stage 2 replaces the pieces of those whose
 //! pieces changed (`Tiles::replace_lines`), and a slots or decks source only when it changed. The tiles then have the same features
-//! as a new map of the new values (tests/relevel.rs). Monaco: about 110 ms, of which stage 1 is 97 ms.
+//! as a new map of the new values (tests/relevel.rs). The slots read only the fill levels: with no new fill level they stay as they
+//! are (`restyle_same_fills`). Monaco: a head or a cap about 70 ms, a level change about 120 ms (stage 1 is most of it).
 //! ponytail: stage 1 of the whole area; stage 1 of the ring alone (global keys) when a large area is too slow.
 
 use crate::{sources, tiles, Look};
@@ -67,13 +68,14 @@ impl LiveTiles {
 
     /// Give the edges of `rows` their new levels, heads and caps, and change the tiles where the drawing changed.
     pub fn relevel(&mut self, rows: &[LevelRow]) -> Result<Redrawn, crate::Error> {
+        let fills = self.fills_change(rows);
         self.set_rows(rows)?;
         // the ring: the changed edges and the edges at their end nodes (a road's caps and joins come from the roads at its nodes)
         let table = &self.styled.roads.roads.table;
         let ring: HashSet<u32> = rows.iter().map(|x| self.rows[&x.edge_id]).flat_map(|i| {
             std::iter::once(i as u32).chain(ends(table.line(i)).into_iter().flat_map(|p| self.at_node[&p].iter().copied()))
         }).collect();
-        let new = roadstyle_engine::restyle(&self.styled, &self.look)?;
+        let new = if fills { roadstyle_engine::restyle(&self.styled, &self.look)? } else { roadstyle_engine::restyle_same_fills(&self.styled, &self.look)? };
         let mut out = Redrawn { style_changed: new.layers != self.styled.layers, ..Default::default() };
         let mut new_sources: HashMap<String, Src> = new.sources.into_iter().collect();
         for i in 0..self.styled.sources.len() {
@@ -107,6 +109,15 @@ impl LiveTiles {
         }
         self.styled.roads = new.roads;
         Ok(out)
+    }
+
+    /// A row gives an edge another fill level (then the slots are made again).
+    fn fills_change(&self, rows: &[LevelRow]) -> bool {
+        let r = &self.styled.roads.roads;
+        rows.iter().any(|x| self.rows.get(&x.edge_id).is_none_or(|&i| match &r.solved {
+            Some(s) => i64::from(s[i][3]) != x.levels[3],
+            None => r.roles.col(Role::FillLevel).is_none_or(|c| r.table.cell(c, i).as_i64() != Some(x.levels[3])),
+        }))
     }
 
     /// The new values in the roads' table (the solved levels when the engine solved them, else the level columns) for the next stage 1.

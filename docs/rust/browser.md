@@ -328,7 +328,8 @@ const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
   values. It runs stage 1 again and replaces in the tiles only the pieces of the edges that changed and of the edges at their end
   nodes. The answer is `{edges, pieces_gone, sources, style_changed}`: then load the visible tiles again (with `style_changed`, set
   the style again). Your roads must have the level, head and cap columns that the look names (`casing_start_col`, ...,
-  `cap_end_col`). Monaco: about 110 ms; Burnaby: 1.6 s (stage 1 of the whole area; a new map is about 5 s).
+  `cap_end_col`). A head or a cap: Monaco about 70 ms, Burnaby 0.8 s; a level change: Monaco about 120 ms, Burnaby 1.7 s (stage 1 of
+  the whole area; a new map is about 5 s).
 - `colors` (each optional, also without `host`): `select` is road 1 of the panel, `second` is road 2, `hover` is the hover of the
   editor's own map (on your map, your style's hover stays).
 
