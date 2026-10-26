@@ -8,6 +8,9 @@
 // browserStore for a page with no server.
 // The option `levels` ({csv, edge_hash}: the levels that the host's map has) is the answer to start from with no solve; saveArea and
 // areaIsFor let a page make the area only when its edges changed (docs/rust/browser.md, "The level editor in a page").
+// The option `host` ({replaceRoads(rows) -> Promise, edgeIdCol = "edge_id"}, with `map` and `dashboard`): the editor draws no map. It uses
+// the host's roads, road table (window.RS_SIDE, which must keep the edge id field) and pick; an apply gives replaceRoads the levels.csv
+// rows (one object for each edge, the CSV's fields as text) of the edges whose levels, heads or caps changed, and the host draws them.
 import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
@@ -93,11 +96,16 @@ const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
 export async function levelEditor({map = null, container = document.body, pkgUrl, store, maplibregl: ml = globalThis.maplibregl, dashboard = null,
-                                   prefix = dashboard ? null : "lv-rs-", layout = "auto", levels: given = null}){
+                                   prefix = dashboard ? null : "lv-rs-", layout = "auto", levels: given = null, host = null,
+                                   colors = {}}){
+// the picked roads and the hover (`colors`: {select, hover, second}): road 1 in the selection's colour, road 2 darker, the hover lighter
+const COLORS = {select: "#7c4dff", hover: "#b388ff", second: "#4527a0", ...colors};
 if(!["auto", "sheet", "side"].includes(layout)) throw new Error(`level editor: layout must be "auto", "sheet" or "side", not ${JSON.stringify(layout)}`);
 if(map && !dashboard && window.rs)
   throw new Error("level editor: this page has a dashboard (window.rs): give it as levelEditor({dashboard, prefix}), so that the editor uses it; a second dashboard takes the first one's state");
-if(dashboard && !prefix)
+if(host && !(map && dashboard && typeof host.replaceRoads === "function"))
+  throw new Error("level editor: the option host needs the host's map and dashboard, and host.replaceRoads(rows)");
+if(dashboard && !prefix && !host)
   throw new Error("level editor: give the prefix of your dashboard (its layers and sources); the editor takes the layers with it off the map before it draws");
 if(map && window.map instanceof ml.Map && window.map !== map)     // (an element with the id "map" is window.map too: not a map)
   throw new Error("level editor: window.map is another map; the panel draws on window.map");
@@ -110,7 +118,7 @@ const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road"];
 // the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
 const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
 const call = caller(worker);
-await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), look: JSON.stringify({args: LOOK})});
+await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), look: JSON.stringify({args: {...LOOK, hover_color: COLORS.hover}})});
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
@@ -137,6 +145,7 @@ let editsText = editsF ? editsF.body : EMPTY, headsText = headsF ? headsF.body :
 const SAVED = "lv-saved:" + (store.key || location.pathname);    // the edits saved before this session (the Python server keeps it)
 let saved = +(sessionStorage.getItem(SAVED) ?? csvRows(editsText).length);
 let res = null;                                                  // the last answer of the solver (JSON of LevelArea)
+let lastCsv = null;                                              // levels.csv of `res` as save wrote it (host: the rows before an apply)
 
 // --- the answer to start from: levels.csv when it was solved for these inputs (inputsKey) and has every edge, else a solve
 // each road's 4 numbers in its own way from a levels.csv text (one row for each edge), or null when an edge of the area has none
@@ -166,7 +175,7 @@ async function fromStored(){
 }
 async function save(newRes){                                       // levels.csv and levels_info.json of an answer; then the host hears of it
   const [heads, caps] = [headsText, capsText];
-  const levelsCsv = (await call({type: "levelsCsv", levels: flat(newRes), heads, caps})).csv;
+  const levelsCsv = lastCsv = (await call({type: "levelsCsv", levels: flat(newRes), heads, caps})).csv;
   const info = JSON.stringify({...newRes.info, given_up: newRes.given_up, given_up_parts: newRes.given_up_parts, near: newRes.near,
     orders_not_kept: newRes.orders_not_kept, crossings_not_kept: newRes.crossings_not_kept || [], inputs: await inputsKey(editsText)});
   await store.save("levels.csv", levelsCsv);
@@ -232,64 +241,84 @@ function ownSources(st){
   for(const r of Object.values((st.metadata || {})["roadstyle:sources"] || {})) if(r.source) r.source = name(r.source);
   return st;
 }
-const style = await build();
-// the editor's own tiles (a host's rs:// stays its own), cut in the worker
-ml.addProtocol("lv", async (params) => ({data: (await call({type: "tile", url: params.url})).bytes}));
-// the camera: the area's box (the road table's boxes)
-const bb = window.RS_SIDE.bboxes.filter(Boolean).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])],
-  [180, 90, -180, -90]);
 const own = !map;                                                // no host map: the editor's own, on the area's box
-if(own){
-  const div = document.createElement("div");
-  div.style.cssText = "position:absolute;inset:0";
-  container.appendChild(div);
-  map = new ml.Map({container: div, style: "https://tiles.openfreemap.org/styles/positron", bounds: [[bb[0], bb[1]], [bb[2], bb[3]]],
-    attributionControl: {compact: true}});
-  map.addControl(new ml.NavigationControl({visualizePitch: true}));
-  map.addControl(new ml.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
-} else map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {padding: 40, duration: 0});
-window.map = map;                                                // the panel (level_editor.html) draws on the global map
-// the page's one dashboard: the host's, else one for the editor (the road fields: the road table RS_SIDE)
-const rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
-  select_color: "rgba(0,0,0,0)"});
+const added = ["road", "s_lon", "s_lat", "e_lon", "e_lat"];      // host: the fields that the panel reads, put on the host's road table
 const mine = {layers: [], sources: [], images: []};              // what the editor put on the map
 const taken = {layers: [], sources: {}, order: [], style: null};  // the host's roads that the editor took off, for destroy
-let first = true;
-async function showRoads(st){                                      // the roads style on the map (prefix P), in place of the one before
-  const layers = st.layers.map(l => P + l.id), sources = Object.keys(st.sources).map(id => P + id);
-  // off: the editor's own layers, the layers with an id it adds, and the first time the host dashboard's roads (the layers of the roles of
-  // its style's roadstyle:sources: not its base map)
-  // (a role is a source and its source layer: a host's base map can share the roads' tile source with other source layers)
-  const role = (source, layer) => source + "|" + (layer || "");
-  const roles = first && dashboard ? Object.values((dashboardStyle?.metadata || {})["roadstyle:sources"] || {}).map(r => role(P + r.source, r.layer)) : [];
-  const off = new Set([...mine.layers, ...layers, ...map.getStyle().layers.filter(l => roles.includes(role(l.source, l["source-layer"]))).map(l => l.id)]);
-  if(first && dashboard){                                          // the host's, as they are, to put back
-    const now = map.getStyle();
-    Object.assign(taken, {layers: now.layers.filter(l => off.has(l.id)), order: now.layers.map(l => l.id), style: dashboardStyle,
-      sources: Object.fromEntries(sources.filter(id => now.sources[id]).map(id => [id, now.sources[id]]))});
-  }
-  for(const id of off) if(map.getLayer(id)) map.removeLayer(id);
-  for(const id of new Set([...mine.sources, ...sources])) if(map.getSource(id) && !map.getStyle().layers.some(l => l.source === id)) map.removeSource(id);
-  [mine.layers, mine.sources, first] = [layers, sources, false];
-  for(const [id, im] of Object.entries(st.metadata["roadstyle:images"] || {}))
-    if(!map.hasImage(P + id)){ map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio}); mine.images.push(P + id); }
-  // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none)
-  for(const [k, v] of Object.entries(st.state || {})) map.setGlobalStateProperty(k, v.default ?? null);
-  for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "lv-roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
-  for(const l of st.layers){
-    const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));
-    map.addLayer({...layer, id: P + l.id, source: P + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks
-  }
-  // the taps of a finger: a wide line on the roads that draws nothing (the sheet's layout picks a road with it)
-  map.addLayer({id: P + "lv-tap", type: "line", source: P + "lv-roads", "source-layer": "simple", paint: {"line-width": 28, "line-opacity": 0}},
-    map.getLayer("lv-ends") ? "lv-ends" : undefined);
-  mine.layers.push(P + "lv-tap");
-  rs.setStyle(st);
+let rs = dashboard, showRoads = null;
+// host: each row of the host's road table gets its road and its line's ends (the panel's end marks), again when the host gives a new table
+function addFields(){
+  const t = window.RS_SIDE, col = host.edgeIdCol || "edge_id";
+  if(!t || !t.props) throw new Error("level editor: the host has no road table (window.RS_SIDE)");
+  if(t.lvFields) return;
+  t.lvFields = true;
+  t.props.forEach((p, i) => {
+    const r = p && roadOf[String(p[col])], c = t.lines && t.lines[i];
+    if(r == null) return;
+    p.road = r;
+    if(c && c.length){ [p.s_lon, p.s_lat] = c[0]; [p.e_lon, p.e_lat] = c[c.length - 1]; }
+  });
 }
-// the style loaded: a host map's load event can be over, and isStyleLoaded false a moment while it loads an image, with no event after
-while(!map.isStyleLoaded()) await new Promise(ok => setTimeout(ok, 50));
-await showRoads(style);
-await map.once("idle");                                          // the roads style in place: the panel starts on a loaded style
+if(host){                                                        // the host's map and pick stay as they are
+  addFields();
+  window.map = map;
+} else {
+  const style = await build();
+  // the editor's own tiles (a host's rs:// stays its own), cut in the worker
+  ml.addProtocol("lv", async (params) => ({data: (await call({type: "tile", url: params.url})).bytes}));
+  // the camera: the area's box (the road table's boxes)
+  const bb = window.RS_SIDE.bboxes.filter(Boolean).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])],
+    [180, 90, -180, -90]);
+  if(own){
+    const div = document.createElement("div");
+    div.style.cssText = "position:absolute;inset:0";
+    container.appendChild(div);
+    map = new ml.Map({container: div, style: "https://tiles.openfreemap.org/styles/positron", bounds: [[bb[0], bb[1]], [bb[2], bb[3]]],
+      attributionControl: {compact: true}});
+    map.addControl(new ml.NavigationControl({visualizePitch: true}));
+    map.addControl(new ml.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
+  } else map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {padding: 40, duration: 0});
+  window.map = map;                                                // the panel (level_editor.html) draws on the global map
+  // the page's one dashboard: the host's, else one for the editor (the road fields: the road table RS_SIDE)
+  rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
+    select_color: "rgba(0,0,0,0)"});
+  let first = true;
+  showRoads = async function(st){                                      // the roads style on the map (prefix P), in place of the one before
+    const layers = st.layers.map(l => P + l.id), sources = Object.keys(st.sources).map(id => P + id);
+    // off: the editor's own layers, the layers with an id it adds, and the first time the host dashboard's roads (the layers of the roles of
+    // its style's roadstyle:sources: not its base map)
+    // (a role is a source and its source layer: a host's base map can share the roads' tile source with other source layers)
+    const role = (source, layer) => source + "|" + (layer || "");
+    const roles = first && dashboard ? Object.values((dashboardStyle?.metadata || {})["roadstyle:sources"] || {}).map(r => role(P + r.source, r.layer)) : [];
+    const off = new Set([...mine.layers, ...layers, ...map.getStyle().layers.filter(l => roles.includes(role(l.source, l["source-layer"]))).map(l => l.id)]);
+    if(first && dashboard){                                          // the host's, as they are, to put back
+      const now = map.getStyle();
+      Object.assign(taken, {layers: now.layers.filter(l => off.has(l.id)), order: now.layers.map(l => l.id), style: dashboardStyle,
+        sources: Object.fromEntries(sources.filter(id => now.sources[id]).map(id => [id, now.sources[id]]))});
+    }
+    for(const id of off) if(map.getLayer(id)) map.removeLayer(id);
+    for(const id of new Set([...mine.sources, ...sources])) if(map.getSource(id) && !map.getStyle().layers.some(l => l.source === id)) map.removeSource(id);
+    [mine.layers, mine.sources, first] = [layers, sources, false];
+    for(const [id, im] of Object.entries(st.metadata["roadstyle:images"] || {}))
+      if(!map.hasImage(P + id)){ map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio}); mine.images.push(P + id); }
+    // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none)
+    for(const [k, v] of Object.entries(st.state || {})) map.setGlobalStateProperty(k, v.default ?? null);
+    for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "lv-roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
+    for(const l of st.layers){
+      const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));
+      map.addLayer({...layer, id: P + l.id, source: P + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks
+    }
+    // the taps of a finger: a wide line on the roads that draws nothing (the sheet's layout picks a road with it)
+    map.addLayer({id: P + "lv-tap", type: "line", source: P + "lv-roads", "source-layer": "simple", paint: {"line-width": 28, "line-opacity": 0}},
+      map.getLayer("lv-ends") ? "lv-ends" : undefined);
+    mine.layers.push(P + "lv-tap");
+    rs.setStyle(st);
+  }
+  // the style loaded: a host map's load event can be over, and isStyleLoaded false a moment while it loads an image, with no event after
+  while(!map.isStyleLoaded()) await new Promise(ok => setTimeout(ok, 50));
+  await showRoads(style);
+  await map.once("idle");                                          // the roads style in place: the panel starts on a loaded style
+}
 
 // --- the editor's API in the page (roadstyle's level_editor.Area): the same answers as the Python server's /api/...
 const name = r => { const f = facts[r] || {}; return (f.name || f.highway || "road") + (f.edge_ref ? ` [${f.edge_ref}]` : ` [${r}]`); };
@@ -392,6 +421,7 @@ async function apply(ops){
     said = full ? `solved the whole area in ${s} s${next.resolve.why ? ": the local re-solve did not do (" + next.resolve.why + ")" : ""}`
       : `re-solved the roads around the change in ${s} s`;
   }
+  const was = host ? lastCsv ?? (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv : null;
   await store.save("heads.csv", headsCsv);
   await store.save("caps.csv", capsCsv);
   if(newEdits) await store.save("edits.csv", nextEdits);
@@ -400,7 +430,13 @@ async function apply(ops){
   saved -= gone.filter(i => i < saved).length;
   sessionStorage.setItem(SAVED, String(saved));
   await setFacts();
-  await showRoads(await build());                                  // the new map in place: new tiles, the roads style swapped
+  if(host){                                                        // the host draws the edges whose row of levels.csv changed
+    const before = new Set(was.split("\n"));
+    const t = performance.now();
+    await host.replaceRoads(csvRows(lastCsv.split("\n").filter((l, i) => i === 0 || !before.has(l)).join("\n")));
+    addFields();
+    said += ` · drawn in ${((performance.now() - t) / 1000).toFixed(1)} s`;
+  } else await showRoads(await build());                           // the new map in place: new tiles, the roads style swapped
   return {ok: true, said, full, redrawn: true, facts, stats: stats()};
 }
 window.lvApi = async (path, body) => {
@@ -419,6 +455,7 @@ window.lvApi = async (path, body) => {
 
 // --- the panel (static/level_editor.html, the Python editor's too), with its scripts run
 const panel = (await (await fetch(new URL("../../level_editor.html", import.meta.url))).text()).replace("__STATS__", JSON.stringify(stats()));
+window.lvColors = [COLORS.select, COLORS.second];
 const holder = document.createElement("div");
 holder.innerHTML = panel;
 // the panel's nodes, and the listeners that its scripts add to the document and the map as they run (destroy takes them off)
@@ -461,7 +498,7 @@ windows.observe(body, {subtree: true, childList: true, attributes: true, attribu
 // a tap on a road: the wide tap line, when the dashboard's own road layers have nothing under the finger
 const roadLayers = () => map.getStyle().layers.map(l => l.id).filter(id => id.startsWith(P + "roads-"));
 function tap(e){
-  if(!sheetOn() || map.queryRenderedFeatures(e.point, {layers: roadLayers()}).length) return;
+  if(host || !sheetOn() || map.queryRenderedFeatures(e.point, {layers: roadLayers()}).length) return;
   const f = map.queryRenderedFeatures(e.point, {layers: [P + "lv-tap"]})[0];
   if(f) document.dispatchEvent(new CustomEvent("rs:select", {detail: {properties: f.properties}}));
 }
@@ -498,6 +535,13 @@ function destroy(){
   for(const id of [...mine.layers, "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
   for(const id of [...mine.sources, "lv-ends"]) if(map.getSource(id)) map.removeSource(id);
   mine.images.forEach(id => map.hasImage(id) && map.removeImage(id));
+  if(host){
+    const t = window.RS_SIDE;
+    if(t && t.lvFields){ t.props.forEach(p => { if(p) for(const k of added) delete p[k]; }); delete t.lvFields; }
+    if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
+    delete window.lvColors;
+    return;
+  }
   ml.removeProtocol("lv");
   if(own){ map.remove(); if(window.map === map) delete window.map; }
   else if(dashboard){
@@ -512,6 +556,7 @@ function destroy(){
   }
   // window.map stays the host's map (the panel's last timers read it)
   if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
+  delete window.lvColors;
 }
 return Object.assign(events, {map, roads: order, download, destroy, files: Object.keys(files), answer: () => res});
 }

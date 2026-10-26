@@ -1,6 +1,6 @@
 <style>
 :root{--lv-w:400px;--lv-bg:#f6f7f9;--lv-card:#fff;--lv-line:#e4e7ec;--lv-line2:#d0d5dd;--lv-ink:#1d2433;--lv-ink2:#3b4252;--lv-mute:#6b7280;
-  --lv-soft:#eef1f6;--lv-hover:#f2f6fc;--lv-r1:#e8590c;--lv-r2:#1971c2;--lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131;
+  --lv-soft:#eef1f6;--lv-hover:#f2f6fc;--lv-r1:#7c4dff;--lv-r2:#4527a0;--lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131;
   --lv-bad-bg:#ffe3e3;--lv-warn-bg:#fff4e6;--lv-warn-ink:#b35c00;--lv-warn-line:#ffc078;--lv-queue-line:#fde68a}
 /* the dark theme, by the stack's rule: the system's, unless the page sets data-theme on <html> */
 @media (prefers-color-scheme: dark){:root:not([data-theme=light]){--lv-bg:#1b1f27;--lv-card:#242a34;--lv-line:#343b47;--lv-line2:#465061;
@@ -187,7 +187,8 @@ body.lv-sheet #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
 <div id="lv-busy" hidden><div class="box"><div class="spin"></div><span id="lv-busy-t">Solving …</span></div></div>
 <script>
 (function(){
-  let STATS = __STATS__; const $ = id => document.getElementById(id), C = ["#e8590c", "#1971c2"];
+  let STATS = __STATS__; const $ = id => document.getElementById(id), C = window.lvColors || ["#7c4dff", "#4527a0"];   // road 1 (the selection's colour) and road 2 (darker)
+  for(const [k, c] of [["--lv-r1", C[0]], ["--lv-r2", C[1]]]) document.getElementById("lv").style.setProperty(k, c);
   const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
   let pairRows = [];                                          // what the two tables have between the two picked roads
   let kind = "order", end1 = "start", end2 = "start", parts = new Set(["main"]), top = null, pairKey = "";   // top: which picked road (0 / 1) is on top for an order or a stack: none until chosen, for each new pair

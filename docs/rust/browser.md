@@ -306,6 +306,26 @@ page's theme: dark when the system is dark, unless the page sets `data-theme="li
 of `rust/roadstyle-assets/files/static/` beside it, in the same layout: `dashboard/` with its subfolders, `level_editor.html` (the panel),
 `dashboard.css` and `popup.css`.
 
+### The editor on your map, with no map of its own
+
+When your page already draws the area's roads and levels, give `host`: the editor then makes no map. It opens with the stored area
+and the panel only (Burnaby, 76,189 roads: 1.7 s, against 7.9 s more for its own map's draw, stage 1, road table and stage 2).
+
+```js
+const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
+  host: {edgeIdCol: "edge_id", replaceRoads: async (rows) => redraw(rows)},
+  colors: {select: "#7c4dff", hover: "#b388ff", second: "#4527a0"}});
+```
+
+- Your map, your roads and your pick stay as they are. Your road table (`window.RS_SIDE`) must keep the edge id field (`edgeIdCol`,
+  default `edge_id`) and the lines. The editor adds the fields `road`, `s_lon`, `s_lat`, `e_lon` and `e_lat` to each row, and again
+  when you put a new table in `window.RS_SIDE`. `destroy()` takes them off.
+- After an apply, `replaceRoads(rows)` gets the rows of levels.csv (one object for each edge, its fields as text: `edge`,
+  `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`, `head_end_m`, `cap_start`, `cap_end`) of only the edges
+  whose levels, heads or caps changed. Draw them, then resolve the Promise. The `"solved"` event comes too.
+- `colors` (each optional, also without `host`): `select` is road 1 of the panel, `second` is road 2, `hover` is the hover of the
+  editor's own map (on your map, your style's hover stays).
+
 ## Keep the main thread free
 
 For a large area, run the engine in a Web Worker, as duckosm-rust does: the worker keeps the `Tiler` and answers `tile` and

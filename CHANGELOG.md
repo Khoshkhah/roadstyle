@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The level editor opens on the host's map** (2026-10-26): `levelEditor({..., host: {replaceRoads(rows), edgeIdCol}})` makes no map
+  of its own (no draw, stage 1, road table or stage 2 at open; Burnaby: 1.7 s in place of about 9.6 s). It uses the host's roads, road
+  table and pick, and after an apply it gives `replaceRoads` only the levels.csv rows of the edges that changed. Without `host`, the
+  editor is as before. The option `colors` ({select, hover, second}) sets the picked roads' colours: violet by default (#7c4dff,
+  road 2 #4527a0, hover #b388ff), no orange.
 - **The dashboard reads the interaction contract's version** (`roadstyle:contract`; docs/design/contract_schema.md, step 4). A style of
   a newer version than the dashboard knows (`CONTRACT` in `core.js`, `rs.contract`) is an error on the console and in `rs.error`, and
   the dashboard adds no road interaction for it, not a wrong map with no message. A style with `roadstyle:*` keys and no version is read

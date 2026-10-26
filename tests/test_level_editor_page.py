@@ -95,8 +95,10 @@ map.addLayer({id: "host-water", type: "fill", source: "host-water", paint: {"fil
 // its roads as vector tiles, in one tile source with its base map (duckosm-rust's page: the base map's layers are other source
 // layers of the roads' source)
 const edges = new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer());
-const hostTiles = pkg.tileSources(pkg.makeSources(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "host"),
-  "hostt://", ["edge_id", "name", "highway"]);
+const hostSources = pkg.makeSources(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "host");
+window.hostTable = () => JSON.parse(new TextDecoder().decode(hostSources.roadTable()));   // the host's road table (its RS_SIDE)
+const hostSide = window.hostTable();
+const hostTiles = pkg.tileSources(hostSources, "hostt://", ["edge_id", "name", "highway"]);
 maplibregl.addProtocol("hostt", async (q) => { const [source, z, x, y] = q.url.slice("hostt://".length).split("/");
   return {data: hostTiles.tile(source, +z, +x, +y)}; });
 const own = JSON.parse(hostTiles.style());
@@ -128,10 +130,19 @@ window.hostSources = Object.fromEntries(map.getStyle().layers.filter(l => l.id.s
 window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening).filter(e => e[1])));
 window.before = counts();
 window.solved = [];
-window.openEditor = async () => {
+window.openEditor = async () => { const t = performance.now();
   const ed = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-"});
   ed.addEventListener("solved", async e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: (await e.detail.draw()).length}));
-  window.editor = ed;
+  window.editor = ed; return performance.now() - t;
+};
+// the option host: the editor on the host's roads and road table; replaceRoads keeps the rows that it gets
+window.replaced = [];
+window.openHosted = async () => {
+  window.RS_SIDE = hostSide;
+  const t = performance.now();
+  window.editor = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host,
+    host: {replaceRoads: async rows => { window.replaced.push(rows); }}});
+  return performance.now() - t;
 };
 await window.openEditor();
 window.ready = a.roadCount;
@@ -266,6 +277,27 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             page.evaluate("window.editor.destroy()")
             got = page.evaluate("([csv, h]) => openWith('other-hash', {csv, edge_hash: '0' + h.slice(1)}, h)", [levels_csv, hsh])
             assert got[0]["how"] == "full" and "other edges" in got[0]["why"], got
+            # the option host: no map of the editor's own (no source, no protocol, the host's layers as they are); the host's road table
+            # gets each edge's road; an apply gives replaceRoads only the rows of the edges that changed; destroy takes the fields off
+            page.evaluate("window.editor.destroy()")
+            ms = page.evaluate("openHosted()")
+            page.evaluate("window.editor.destroy()")
+            old = page.evaluate("window.openEditor()")
+            page.evaluate("window.editor.destroy()")
+            ms = page.evaluate("openHosted()")
+            print(f"own map open: {old:.0f} ms")
+            assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
+            assert page.evaluate("!hostMap.getSource('host-lv-roads') && window.RS_SIDE.props.every(p => p.road != null)")
+            assert page.evaluate("window.editor.answer().resolve.how") == "stored"
+            road = page.evaluate("window.editor.roads[0]")
+            said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'start', m: '3'}]})", road["road"])
+            assert said["ok"] and " · drawn in " in said["said"], said
+            rows = page.evaluate("window.replaced")
+            assert len(rows) == 1 and {r["edge"] for r in rows[0]} == {d["edge"] for d in road["directions"]}, (rows, road)
+            assert all(3 in (float(r["head_start_m"]), float(r["head_end_m"])) for r in rows[0]), rows[0]
+            page.evaluate("window.editor.destroy()")
+            assert page.evaluate("window.RS_SIDE.props.every(p => !('road' in p) && !('s_lon' in p)) && !window.RS_SIDE.lvFields")
+            print(f"host open: {ms:.0f} ms")
             assert not [e for e in errors if e != "boom"], errors      # "boom": the stopped worker's own error, which the page reports too
             b.close()
     finally:
