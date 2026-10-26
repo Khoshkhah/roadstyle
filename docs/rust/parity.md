@@ -111,6 +111,21 @@ order: the first tile zoom of a source is the first zoom at which a layer draws 
 
 That is about 18 ms for each 10,000 roads at zoom 12, cold.
 
+#### One R-tree for each first zoom
+
+A low-zoom tile found almost all features of a source in its R-tree (Tartu z10: 114,182) and skipped the 96 % that no layer draws
+at that zoom, one by one. Since 2026-10-26, a source has one R-tree for each first tile zoom of its features, and a tile of zoom z
+reads only the trees of zoom z or less. The tiles are the same (the goldens did not change). Tartu, one run each, cold:
+
+| | Before | After |
+|---|---|---|
+| Native, the center tile of z10 / z11 / z12 (`examples/bench.rs`) | 4.4 / 5.0 / 4.4 ms | 3.6 / 4.7 / 4.3 ms |
+| Native, a view's tiles at z10-13 (103 tiles) | 66 ms | 60 ms |
+| Wasm in Node, the view's tiles at z10 / z11 / z12 / z13 (`bench_tiles.mjs`, two runs) | 18-20 / 17-18 / 19 / 39-42 ms | 16-19 / 14-15 / 16-19 / 35-45 ms |
+| Memory in use after stage 2 (native) | 133.4 MB | 135.0 MB |
+
+The gain is small: the time of a low-zoom tile is in the features that it draws (238-366 KB of tile), not in the skipped ones.
+
 #### The drawing values of a road
 
 The engine keeps one `Draw` for each road (the computed values: levels, ends, flags, the style values' numbers). Its size on a 64-bit

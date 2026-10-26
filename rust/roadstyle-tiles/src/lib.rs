@@ -76,7 +76,9 @@ struct Layer {
     vals: Vec<Val>,
     encoded: Vec<Vec<u8>>,
     feats: Vec<Feat>,
-    tree: RTree<GeomWithData<Rectangle<P>, u32>>,
+    /// one tree for each first tile zoom of its features (the first zoom that draws them, the last zoom for the rest), in the order of
+    /// the zooms: a tile of zoom z reads only the trees of zoom z or less (Tartu z10: 4,422 features, not 114,182)
+    trees: Vec<(u32, RTree<GeomWithData<Rectangle<P>, u32>>)>,
     /// The features go whole into the tiles: not clipped and not simplified.
     whole: bool,
     min_zoom: u32,
@@ -253,7 +255,7 @@ impl Tiles {
             // tiles.py's tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
             b.push(id, g, props.iter().filter(|(k, _)| whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_str())).map(|(k, v)| (k.as_str(), v.clone())));
         }
-        self.put(name, b.layer(whole, min_zoom));
+        self.put(name, b.layer(whole, min_zoom, self.max_zoom));
     }
 
     /// Add a typed table of features (a base-map layer, audit R10) as the layer `name`, as `add` adds the same features as GeoJSON: each
@@ -279,7 +281,7 @@ impl Tiles {
             let props = names.iter().filter(|k| t.has_key(row, k)).filter_map(|k| t.get(row, k).map(|c| (*k, c)));
             b.push(Some(row as u64), geom, props);
         }
-        self.put(name, b.layer(whole, min_zoom));
+        self.put(name, b.layer(whole, min_zoom, self.max_zoom));
     }
 
     /// Add a source of typed features (roads, simple), as `add` adds its JSON.
@@ -297,7 +299,7 @@ impl Tiles {
             let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
             b.push(Some(i as u64), g, props.filter(|(k, _)| whole || k.as_ref().starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_ref())));
         }
-        self.put(name, b.layer(whole, min_zoom));
+        self.put(name, b.layer(whole, min_zoom, self.max_zoom));
     }
 
     /// The properties of the feature `id` of the source `name` (those in the tiles), as JSON; `null` when there is no such feature.
@@ -340,7 +342,7 @@ impl Tiles {
     /// The box of every feature `[min lon, min lat, max lon, max lat]` (None: no feature), as an archive's bounds.
     pub fn bounds(&self) -> Option<[f64; 4]> {
         use rstar::Envelope;
-        let boxes: Vec<AABB<P>> = self.layers.values().filter(|l| l.tree.size() > 0).map(|l| l.tree.root().envelope()).collect();
+        let boxes: Vec<AABB<P>> = self.layers.values().flat_map(|l| &l.trees).map(|(_, t)| t.root().envelope()).collect();
         let b = boxes.into_iter().reduce(|a, b| a.merged(&b))?;
         let (lo, hi) = (b.lower(), b.upper());
         let lon = |x: f64| x * 360.0 - 180.0;
@@ -350,7 +352,7 @@ impl Tiles {
 
     /// The tile layers, in their order.
     pub fn layer_names(&self) -> Vec<String> {
-        self.layers.iter().filter(|(_, l)| l.tree.size() > 0).map(|(k, _)| k.clone()).collect()      // a layer with no feature is none
+        self.layers.iter().filter(|(_, l)| !l.trees.is_empty()).map(|(k, _)| k.clone()).collect()      // a layer with no feature is none
     }
 
     /// The tile z/x/y, made again (`tile` with no cache): for a walk that asks for each tile once (the archive, a folder of tiles).
@@ -400,8 +402,9 @@ impl Tiles {
         let buffer = if layer.whole { 0.0 } else { self.buffer };
         let (x0, y0) = (x as f64 / n, y as f64 / n);
         // tiles.py: a feature is in the tiles its box touches; the buffer is for the clipping only
-        let found = layer.tree.locate_in_envelope_intersecting(&AABB::from_corners([x0, y0], [x0 + 1.0 / n, y0 + 1.0 / n]));
-        let mut hits: Vec<u32> = found.map(|h| h.data).collect();
+        let tile = AABB::from_corners([x0, y0], [x0 + 1.0 / n, y0 + 1.0 / n]);
+        let trees = layer.trees.iter().take_while(|(first, _)| *first <= z);
+        let mut hits: Vec<u32> = trees.flat_map(|(_, t)| t.locate_in_envelope_intersecting(&tile)).map(|h| h.data).collect();
         hits.sort_unstable(); // the order of the source: the drawing order of features in one layer
         // the tile's own units: (merc * 2^z - x) * EXTENT
         let to = |p: &P| [(p[0] * n - x as f64) * EXTENT, (p[1] * n - y as f64) * EXTENT];
@@ -410,9 +413,7 @@ impl Tiles {
         let mut enc = Encoder::default();
         for i in hits {
             let f = &layer.feats[i as usize];
-            if z < self.max_zoom && (z + 1) as f32 <= f.from {
-                continue; // no layer draws it at a zoom of this tile (the last zoom's tiles are scaled up for every zoom after it)
-            }
+            debug_assert!(z == self.max_zoom || ((z + 1) as f32) > f.from, "the trees give only the features drawn at zoom {z}");
             let (kind, geometry) = match &f.geom {
                 Geom::Points(ps) => {
                     let ps: Vec<[i32; 2]> =
@@ -472,7 +473,7 @@ struct Builder {
     encoded: Vec<Vec<u8>>,
     val_at: HashMap<Vec<u8>, u32>,
     feats: Vec<Feat>,
-    boxes: Vec<GeomWithData<Rectangle<P>, u32>>,
+    boxes: Vec<(f32, GeomWithData<Rectangle<P>, u32>)>,
     rules: rules::ZoomRules,
 }
 
@@ -513,14 +514,21 @@ impl Builder {
                 Some((at, v))
             })
             .collect();
-        self.boxes.push(GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32));
         let from = if rules.is_empty() { 0.0 } else { rules.first_zoom(&read) as f32 };
+        self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
         self.feats.push(Feat { id, from, geom: g, props });
     }
 
-    fn layer(self, whole: bool, min_zoom: u32) -> Layer {
+    fn layer(self, whole: bool, min_zoom: u32, max_zoom: u32) -> Layer {
         let by_id = self.feats.iter().enumerate().filter_map(|(i, f)| f.id.map(|id| (id, i as u32))).rev().collect();      // the first of an id
-        Layer { keys: self.keys, vals: self.vals, encoded: self.encoded, feats: self.feats, tree: RTree::bulk_load(self.boxes), whole, min_zoom, by_id }
+        // the first tile zoom z of a feature: a tile of zoom z < max_zoom has it when z + 1 > from (a layer draws it in the zooms of
+        // that tile); the tiles of max_zoom have every feature (MapLibre scales them up for every zoom after it)
+        let mut by_first: std::collections::BTreeMap<u32, Vec<_>> = Default::default();
+        for (from, b) in self.boxes {
+            by_first.entry((from.floor().max(0.0) as u32).min(max_zoom)).or_default().push(b);
+        }
+        let trees = by_first.into_iter().map(|(z, boxes)| (z, RTree::bulk_load(boxes))).collect();
+        Layer { keys: self.keys, vals: self.vals, encoded: self.encoded, feats: self.feats, trees, whole, min_zoom, by_id }
     }
 }
 
