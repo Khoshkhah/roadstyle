@@ -218,6 +218,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `docs/design/dashboard_module.md`, "Trusted inputs".
 
 ### Fixed
+- **A tap on a phone picks one road in the level editor** (2026-10-26): the dashboard's pick and the editor's tap line both picked, so
+  the second pick could cancel the first road or add a road beside it (or a road "undefined"). The tap line now picks only when the
+  dashboard picked nothing for that tap, with the road of the road table's row; the panel ignores a pick with no road.
 - **A duckOSM map's base map no longer draws outside its area.** The cut of a duckOSM file keeps the whole ways and relations that touch
   its area (osmium's complete-ways strategy), so a river, its islands or a wetland reached kilometres past the boundary line, and the
   page drew them there. Every base-map feature is now clipped to the area's boundary (`main.boundary`, the row of the layer

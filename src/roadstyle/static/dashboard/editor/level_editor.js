@@ -495,12 +495,19 @@ const windows = new MutationObserver(() => {
   if(sheetOn() && innerWidth <= 520 && [...document.querySelectorAll(".rs-svw")].some(w => !w.hidden)) sheet("fold");
 });
 windows.observe(body, {subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"]});
-// a tap on a road: the wide tap line, when the dashboard's own road layers have nothing under the finger
-const roadLayers = () => map.getStyle().layers.map(l => l.id).filter(id => id.startsWith(P + "roads-"));
+// a tap on a road: the wide tap line, when the dashboard picked nothing for this tap (its pick box can be wider than the road layers
+// under the finger, and its pick comes before the map's click); the road table's row of the piece, which has the road
+let lastPick = -1e9;
+const heardPick = (e) => { if(!e.detail.lvTap) lastPick = performance.now(); };
+document.addEventListener("rs:select", heardPick);
 function tap(e){
-  if(host || !sheetOn() || map.queryRenderedFeatures(e.point, {layers: roadLayers()}).length) return;
+  if(host || !sheetOn()) return;
   const f = map.queryRenderedFeatures(e.point, {layers: [P + "lv-tap"]})[0];
-  if(f) document.dispatchEvent(new CustomEvent("rs:select", {detail: {properties: f.properties}}));
+  const p = f && window.RS_SIDE?.props[f.id ?? f.properties.__rs_edge];
+  const t = performance.now();
+  setTimeout(() => {                                             // ponytail: one gesture = 300 ms around the click
+    if(p?.road != null && lastPick < t - 300) document.dispatchEvent(new CustomEvent("rs:select", {detail: {properties: p, lvTap: true}}));
+  });
 }
 narrow.addEventListener("change", useLayout);
 visualViewport?.addEventListener("resize", keyboard);
@@ -525,6 +532,7 @@ function destroy(){
   visualViewport?.removeEventListener("resize", keyboard);
   windows.disconnect();
   map.off("click", tap);
+  document.removeEventListener("rs:select", heardPick);
   if(!own) map.setPadding({...map.getPadding(), bottom: 0});
   body.classList.remove("lv-sheet");
   delete body.dataset.lvSheet;

@@ -246,6 +246,7 @@ body.lv-sheet #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   function focus(roads){ const ids = roads.flatMap(idsOf); if(ids.length) rsFocus(ids, {padding: 90, maxZoom: 18}); }
   // --- selection
   function pick(r){
+    if(r == null) return;                                      // a pick with no road (not a road of the area)
     r = String(r);
     const k = sel.indexOf(r);
     if(k >= 0) sel[k] = null;                                  // a picked road clicked again: cancelled

@@ -360,6 +360,9 @@ def test_the_editor_on_a_phone(tmp_path):
             assert xy, "a road above the sheet"
             page.touchscreen.tap(xy[0], xy[1])
             page.wait_for_function("document.querySelectorAll('#lv-cards [data-hroad]').length > 0", timeout=20000)
+            # one pick for each tap: the dashboard's pick and the tap line do not both pick (the tap line can hit a road beside it)
+            page.wait_for_timeout(300)
+            assert page.evaluate("document.querySelectorAll('#lv-cards .card .x').length") == 1
             # an end: the start head to 3 m by its slider (applied when the slider is let go)
             page.evaluate("""() => { const i = document.querySelector('#lv-cards input[data-hend=start]'); i.value = '3';
               i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true})); }""")
