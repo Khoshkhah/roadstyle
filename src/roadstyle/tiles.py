@@ -17,6 +17,7 @@ Needs the ``tiles`` extra: ``pip install "roadstyle[tiles]"`` (mapbox-vector-til
 """
 from __future__ import annotations
 
+import functools
 import gzip
 import io
 import json
@@ -63,7 +64,7 @@ def _kept(k, v) -> bool:
 
 
 def _prep(fc: dict, keep: set | None, rules=None):
-    """Project features to mercator; return ([(idx, geom, bounds, first_zoom, props)], world_bbox). ``rules``: the layer's zoom_rules."""
+    """Project features to mercator; return ([(idx, geom, bounds, (from, until) zooms, props)], world_bbox). ``rules``: the layer's zoom_rules."""
     from shapely.geometry import shape
     from shapely.ops import transform as shp_transform
 
@@ -83,19 +84,19 @@ def _prep(fc: dict, keep: set | None, rules=None):
         world[3] = max(world[3], b[3])
         props = tile_props(p, keep) if keep is not None else \
             {k: v for k, v in p.items() if _kept(k, v)}
-        feats.append((i, geom, b, first_zoom(rules, props) if rules else 0, props))
+        feats.append((i, geom, b, zoom_span(rules, props) if rules else (0, float("inf")), props))
     return feats, world
 
 
 def zoom_rules(layers, name):
-    """A feature's first zoom from the style (roadstyle-tiles rules.rs, 2026-10-25): for each layer that draws the tile layer ``name``, the E
-    of each ``[">=", ["zoom"], E]`` at the top of its filter that reads no zoom. None when a layer draws every feature from zoom 0, or no layer
-    draws it."""
+    """A feature's zooms from the style (roadstyle-tiles rules.rs): for each layer that draws the tile layer ``name``, the clauses at the top of
+    its filter that read the zoom (``[">=", ["zoom"], E]``, ``["<", ["zoom"], E]``, and an "all" or "any" of them and of clauses on the
+    feature). None when a layer draws every feature at every zoom, or no layer draws it."""
     out = []
     for lyr in layers or []:
         if (lyr.get("source-layer") or lyr.get("source")) != name:
             continue
-        cs = [c[2] for c in _tops(lyr.get("filter")) if isinstance(c, list) and len(c) == 3 and c[0] == ">=" and c[1] == ["zoom"] and not _reads_zoom(c[2])]
+        cs = [c for c in _tops(lyr.get("filter")) if _reads_zoom(c)]
         if not cs:
             return None
         out.append(cs)
@@ -111,11 +112,48 @@ def _reads_zoom(e):
     return isinstance(e, list) and (e[:1] == ["zoom"] or any(_reads_zoom(x) for x in e))
 
 
-def first_zoom(rules, p):
-    """The first zoom at which a layer draws a feature with the properties ``p``: the lowest over the layers of the highest E (not a number: 0)."""
-    def num(v):
-        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0.0
-    return min(max(num(_ev(e, p)) for e in cs) for cs in rules)
+_ALL, _NONE = (0.0, float("inf")), (float("inf"), 0.0)
+
+
+def _meet(a, b):
+    return (max(a[0], b[0]), min(a[1], b[1]))
+
+
+def _span(c, p):
+    """The zooms [from, until) where the clause ``c`` holds for the feature ``p`` (rules.rs span); every zoom for a clause that is not known."""
+    def num(e, default):
+        v = _ev(e, p) if not _reads_zoom(e) else None
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else default
+    if isinstance(c, list) and len(c) == 3 and c[1] == ["zoom"] and c[0] == ">=":
+        return (num(c[2], 0.0), float("inf"))
+    if isinstance(c, list) and len(c) == 3 and c[1] == ["zoom"] and c[0] == "<":
+        return (0.0, num(c[2], float("inf")))
+    if isinstance(c, list) and c[:1] == ["all"]:
+        out = _ALL
+        for x in c[1:]:
+            out = _meet(out, _span(x, p))
+        return out
+    if isinstance(c, list) and c[:1] == ["any"]:
+        sp = [s for s in (_span(x, p) for x in c[1:]) if s[0] < s[1]]
+        return (min(s[0] for s in sp), max(s[1] for s in sp)) if sp else _NONE
+    if not _reads_zoom(c) and _known(c):
+        return _ALL if _truthy(_ev(c, p)) else _NONE
+    return _ALL
+
+
+def _known(e):
+    """An expression of only the operators that ``_ev`` knows (rules.rs known)."""
+    if not isinstance(e, list):
+        return True
+    if e[:1] in (["get"], ["literal"]):
+        return True
+    return bool(e) and e[0] in ("coalesce", "to-boolean", "!", "all", "any", "==", "!=", "at", "case", "match") and all(_known(x) for x in e[1:])
+
+
+def zoom_span(rules, p):
+    """The zooms [from, until) at which a layer draws a feature with the properties ``p``: the lowest from and the highest until over the layers."""
+    sp = [functools.reduce(_meet, (_span(c, p) for c in cs), _ALL) for cs in rules]
+    return (min(s[0] for s in sp), max(s[1] for s in sp))
 
 
 def _truthy(v):
@@ -360,7 +398,7 @@ def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
             if z < from_zoom:
                 continue
             for i, geom, b, fmz, props in lfeats:
-                if z < maxzoom and z + 1 <= fmz:
+                if z < maxzoom and z + 1 <= fmz[0] or z >= fmz[1]:
                     continue        # no layer draws it at a zoom of this tile
                 g = geom.simplify(tol) if z < maxzoom else geom
                 if g.is_empty or g.length < tol:
@@ -385,7 +423,7 @@ def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
             if z < from_zoom:
                 continue
             for i, geom, b, fmz, props in efeats:
-                if z < maxzoom and z + 1 <= fmz:
+                if z < maxzoom and z + 1 <= fmz[0] or z >= fmz[1]:
                     continue
                 x0, x1, y0, y1 = _tile_range(b, z)
                 for tx in range(x0, x1 + 1):

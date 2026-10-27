@@ -76,8 +76,8 @@
       },
       "simple": {
         "tiles": 3,
-        "features": 3370,
-        "hash": "946baf65ed40f0ec"
+        "features": 2804,
+        "hash": "9dca089317cf06d5"
       }
     },
     "z14": {
@@ -88,8 +88,8 @@
       },
       "simple": {
         "tiles": 7,
-        "features": 12079,
-        "hash": "aea19dc562d1aeee"
+        "features": 10555,
+        "hash": "5d9f0b2628173bbc"
       },
       "slots": {
         "tiles": 7,
@@ -105,8 +105,8 @@
       },
       "simple": {
         "tiles": 9,
-        "features": 10666,
-        "hash": "bbc49fba6dc8ba91"
+        "features": 9405,
+        "hash": "97aec12c4775bc9f"
       },
       "slots": {
         "tiles": 9,

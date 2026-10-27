@@ -64,8 +64,9 @@ pub enum Val<'a> {
 
 struct Feat {
     id: Option<u64>,
-    /// the first zoom at which a layer of the style draws it (rules.rs; 0 with no rules)
+    /// the zooms [from, until) at which a layer of the style draws it (rules.rs; every zoom with no rules)
     from: f32,
+    until: f32,
     geom: Geom,
     /// (key, value): the numbers of the layer's key and value
     props: Vec<(u32, u32)>,
@@ -392,7 +393,7 @@ impl Tiles {
         let mut b = Builder { keys: std::mem::take(&mut layer.keys), key_at, vals: std::mem::take(&mut layer.vals),
                               encoded: std::mem::take(&mut layer.encoded), val_at, ..Default::default() };
         for (i, c, props) in feats {
-            let (props, _) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
+            let (props, ..) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
             let f = &mut layer.feats[i as usize];
             (f.geom, f.props, f.wait) = (line_geom(c.as_ref()), props, None);
         }
@@ -614,7 +615,9 @@ impl Layer {
         let (x0, y0) = ((x as f64 - b) / n, (y as f64 - b) / n);
         let tile = AABB::from_corners([x0, y0], [x0 + (1.0 + 2.0 * b) / n, y0 + (1.0 + 2.0 * b) / n]);
         let trees = self.trees.iter().take_while(|t| t.first <= z);
-        let mut hits: Vec<u32> = trees.flat_map(|t| t.get().locate_in_envelope_intersecting(&tile)).map(|h| h.data).collect();
+        // a feature that no layer draws at a zoom of this tile (zoom z up to z + 1) is left out: its last zoom is not after z
+        let mut hits: Vec<u32> = trees.flat_map(|t| t.get().locate_in_envelope_intersecting(&tile)).map(|h| h.data)
+            .filter(|&i| self.feats[i as usize].until > z as f32).collect();
         hits.sort_unstable();
         hits
     }
@@ -642,26 +645,27 @@ impl Builder {
     /// A feature without a point (bounds) is left out; a null value is not in the tiles.
     fn push<K: AsRef<str>, V: TileValue>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, V)>) {
         let Some((lo, hi)) = bounds(&g) else { return };
-        let (props, from) = self.intern(props);
+        let (props, from, until) = self.intern(props);
         self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
-        self.feats.push(Feat { id, from, geom: g, props, wait: None });
+        self.feats.push(Feat { id, from, until, geom: g, props, wait: None });
     }
 
     /// A feature that waits for its line and properties (`Tiles::add_waiting`): its box and its first zoom, from `rule_props`.
     fn wait<K: AsRef<str>, V: TileValue>(&mut self, id: u64, g: Geom, rule_props: impl Iterator<Item = (K, V)>, wait: (u64, u64)) {
         let Some((lo, hi)) = bounds(&g) else { return };
-        let from = if self.rules.is_empty() { 0.0 } else {
+        let (from, until) = if self.rules.is_empty() { (0.0, f32::INFINITY) } else {
             // the values that `intern` reads
             let read = rule_props.filter(|(k, _)| self.rules.reads(k.as_ref())).filter_map(|(k, v)| Some((k.as_ref().to_string(), json_of(&v.tile_val()?)))).collect();
-            self.rules.first_zoom(&read) as f32
+            let (a, b) = self.rules.span(&read);
+            (a as f32, b as f32)
         };
         self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
-        self.feats.push(Feat { id: Some(id), from, geom: Geom::Lines(Vec::new()), props: Vec::new(), wait: Some(wait) });
+        self.feats.push(Feat { id: Some(id), from, until, geom: Geom::Lines(Vec::new()), props: Vec::new(), wait: Some(wait) });
     }
 
     /// The numbers of the properties' keys and values (a key or a value seen first gets the next number), and the first zoom that
     /// the rules give them.
-    fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32) {
+    fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32, f32) {
         let (keys, key_at, vals, encoded, val_at, scratch) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at, &mut self.scratch);
         let (rules, last) = (&self.rules, &self.last);
         let mut read = Map::new();        // the values that the first-zoom rules read
@@ -702,7 +706,8 @@ impl Builder {
             })
             .collect();
         self.last.clone_from(&props);
-        (props, if rules.is_empty() { 0.0 } else { rules.first_zoom(&read) as f32 })
+        let (from, until) = if rules.is_empty() { (0.0, f32::INFINITY) } else { let (a, b) = rules.span(&read); (a as f32, b as f32) };
+        (props, from, until)
     }
 
     fn layer(self, whole: bool, min_zoom: u32, max_zoom: u32) -> Layer {

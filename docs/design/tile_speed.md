@@ -75,6 +75,32 @@ The memory that the first tiles add stays the same (native: 35 to 67 MB).
 
 After the change, the tilted view in native: waiting 22 ms, cells 70 to 88 ms, make 106 to 122 ms, build 88 to 100 ms.
 
+## Features that no layer draws (option A)
+
+MapLibre must parse every feature of a tile, also a feature that the style does not draw at that zoom. The style hides a casing end
+(`__rs_seam`) without lap (`__rs_lap`) below z17, and a casing end with lap from z17. A tile of z12 to z16 had both kinds, so 17 % of
+the features were parse work with no picture (Burnaby, the tilted view: 15,040 of 87,360 pieces in the z14 tiles).
+
+A layer's filter now gives a feature a span of zooms [from, until) (`ZoomRules::span`; tiles.py `zoom_span`). The clauses that the rule
+reads are `[">=", ["zoom"], E]`, `["<", ["zoom"], E]`, and "all" and "any" of them and of clauses on the feature. A clause with an
+operator that the rule does not know keeps the feature at every zoom. A tile of zoom z has a feature when z + 1 is after `from` and z is
+before `until` (the tiles of the last zoom have every feature that is drawn at or after the last zoom). One rule from the style: no
+second copy of the zoom numbers.
+
+Checked on the Burnaby tiles of z11 to z14: the features that the style draws (tested at z, z + 0.5 and z + 0.999) are the same before
+and after, and the tiles after have no feature that is not drawn. Tile bytes (Burnaby, the same views):
+
+| View | Features before | After | MB before | After | tile() Node before | After |
+|---|---|---|---|---|---|---|
+| z11 | 51,338 | 51,338 | 2.49 | 2.49 | 178 ms | 176 ms |
+| z12 | 61,178 | 53,162 | 2.87 | 2.55 | 173 ms | 176–190 ms |
+| z13 | 137,392 | 113,567 | 4.56 | 3.87 | 270 ms | 251–255 ms |
+| z14 | 83,179 | 68,991 | 1.45 | 1.24 | 105 ms | 99–100 ms |
+| Pitch 60, z14 (21 tiles) | | | 6.47 | 5.54 | 327 ms | 319–332 ms |
+
+The time of `tile()` does not change: the pieces that go are the pieces that the cells step has not made yet, but the encode of the
+rest is the same work. The gain is in MapLibre's parse (the page measured 1.4 s of 2.15 s there).
+
 ## What gave no gain
 
 - **One projection for each road.** To project each road's line one time for all of its pieces saved about 5 % of the make.
@@ -93,9 +119,10 @@ own time, allocations (`malloc`, `free`, `realloc`) about 47 ms, piece cells abo
   could remove some of them.
 - **Allocations.** Each piece makes three vectors: its cells (a copy of the road's base), its interned numbers and its line. A
   buffer that the run keeps for the cells could remove one.
-- **Build.** Clipping, simplification and encoding are now about a third of the time. A coarser simplification at low zooms, or
-  fewer pieces at low zooms (one line for each road where the low-zoom layers read only a few keys), could make the tiles smaller
-  and faster. These change the tile bytes, so they need a decision.
+- **Build.** Clipping, simplification and encoding are now about a third of the time. A coarser simplification at low zooms (1 px of a
+  512 px tile) gave 1 to 2 % on Burnaby, because its lines have few points: not worth the change of bytes. Fewer pieces at low zooms (one
+  line for each road) cut the tile() time of z11 to z13 to a third and the pitch-60 case from 327 ms to 208 ms, but the map loses the
+  two casing halves, the bridge casing and the order of levels.
 - **The page's tilted view.** The page asked for 36 tiles at pitch 60, zoom 14 (1.5 s before). The model of MapLibre's tilted view
   in `bench_live_views.mjs` gives 21 tiles. With the gain above, the page's case is about 1.0 s. The target of 0.6 s needs one of
   the levers that change the tile bytes, or tiles that the worker makes before the map asks for them.

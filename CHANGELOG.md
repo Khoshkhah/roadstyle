@@ -15,6 +15,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **Fewer features in the low-zoom tiles** (2026-10-27): the tiles leave out a piece that no layer draws at any zoom of the tile. The rule
+  is the style's filter, as for the class minzoom, and now it reads a clause on the zoom with `<` and an "all" or "any" of clauses
+  (`roadstyle_tiles::rules::ZoomRules::span`, tiles.py `zoom_span`). A casing end without lap (`__rs_seam`) is now only in tiles of z17
+  and higher, and an end with lap only in tiles below z17. The drawn features are the same at every zoom. Burnaby z12 to z14 tiles: 13 to
+  17 % fewer features and about 12 % fewer bytes. The tile goldens (Monaco, Södermalm, Tartu) change only by this rule.
 - **Faster first tiles of the level editor's map** (2026-10-27): a piece's properties borrow its road's cells (`Props<'a, V>`,
   `Cells<'a>`; no owned JSON values), the engine reads each road one time for all of its pieces (`SimpleSource::piece_cells`,
   `Roads::own_plan`), and `Tiles::make` interns a value with no copy (`Val<'a>`, foldhash maps). The same tile bytes. Burnaby, the
