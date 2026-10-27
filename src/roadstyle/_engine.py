@@ -332,7 +332,7 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
 
     from . import _assets, _settings
     from .export import _camera, _plugin_css
-    from .tiles import _merc, _tile_range
+    from .tiles import _R, _merc, _tile_range, buffers_px
 
     style, base = json.loads(t.style), base_url.rstrip("/")
     roads = style["sources"]["roads"]
@@ -359,9 +359,12 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
     # every tile with data (a base map can reach past the roads), and an empty file for each other tile in the roads' bounds, as export.py
     every = t.bounds() or bounds
     elo, ehi = _merc(*every[:2]), _merc(*every[2:])
+    # a tile whose buffer has a road's stroke has the road (Tiles::hits): the data's box widened by each zoom's buffer (Tiles::archive)
+    bufs = buffers_px(style["layers"], int(roads["maxzoom"]), fallback=meta.get("roadstyle:tiles", {}).get("buffer_px", 80))
     for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():
         x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
-        ex0, ex1, ey0, ey1 = _tile_range((elo[0], elo[1], ehi[0], ehi[1]), z)
+        pad = 2 * _R / (1 << z) * bufs[z] / 512
+        ex0, ex1, ey0, ey1 = _tile_range((elo[0] - pad, elo[1] - pad, ehi[0] + pad, ehi[1] + pad), z)
         for x in range(min(x0, ex0), max(x1, ex1) + 1):
             for y in range(min(y0, ey0), max(y1, ey1) + 1):
                 b = t.tile(z, x, y)

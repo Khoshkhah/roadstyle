@@ -35,10 +35,11 @@ pub fn buffers_px(layers: &[Value], max_zoom: u32, live: f64, fallback: f64) -> 
 }
 
 /// The reach of a layer's stroke from its line or point at the map zoom `z`, in px: 0 for a layer with no stroke or that the zoom does
-/// not draw (and for the labels and arrows: the `slots` go whole into the tiles, and a symbol is placed by its anchor).
+/// not draw (and for the labels and arrows: the `slots`, a source or a tiled style's source layer, go whole into the tiles, and a
+/// symbol is placed by its anchor).
 fn reach(l: &Value, z: f64, live: f64) -> Option<f64> {
     let drawn = l["minzoom"].as_f64().is_none_or(|m| z >= m) && l["maxzoom"].as_f64().is_none_or(|m| z < m);
-    if !drawn || l["source"] == "slots" {
+    if !drawn || l["source"] == "slots" || l["source-layer"] == "slots" {
         return Some(0.0);
     }
     let p = &l["paint"];

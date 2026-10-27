@@ -269,7 +269,7 @@ def _bound(e, z, live):
 def _reach(layer, z, live):
     """roadstyle_tiles::buffer::reach: how far a layer's stroke reaches from its line or point at the map zoom z, in px."""
     lo, hi = layer.get("minzoom"), layer.get("maxzoom")
-    if (lo is not None and z < lo) or (hi is not None and z >= hi) or layer.get("source") == "slots":
+    if (lo is not None and z < lo) or (hi is not None and z >= hi) or "slots" in (layer.get("source"), layer.get("source-layer")):
         return 0.0
     paint = layer.get("paint") or {}
 
