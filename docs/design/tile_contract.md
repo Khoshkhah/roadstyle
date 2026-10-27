@@ -105,6 +105,42 @@ fill reads `rs_c`).
   between the fills. Its id is its road's row, so a filter or a glow of the road applies to it. To pick an item as itself, the page
   needs the item's own number. See decision D3.
 
+### The size of the id
+
+The MVT feature id is field 1 of a feature: one byte for the field, then the row as a varint. A varint is 1 byte below 128, 2 bytes
+below 16,384 and 3 bytes below 2,097,152. The id is not in the tags and not in the layer's value table. The source has no
+`promoteId`: MapLibre uses the MVT id when no `promoteId` is set. The pieces of one road have the same row, so a road adds no values
+to the tile.
+
+Measured on the 30 Burnaby tiles of the tilted view (the `simple` layer: 87,362 pieces of 20,935 roads, 4.17 MB). A tag is two
+varints (the key's index and the value's index). "Distinct values" is the sum over the tiles. Script:
+`.claude/tile-lag/idcost.py` of the workspace (`python3 idcost.py tiles/roads`).
+
+| Item | Pieces with it | Tags | Value table | Total | Distinct values |
+|---|---|---|---|---|---|
+| `__rs_edge` now (the row, as a tag) | 87,362 | 258 KB | 146 KB | **404 KB** | 25,088 |
+| `__rs_edge2` now (the twin's row) | 43,924 | 131 KB | 67 KB | **198 KB** | 11,147 |
+| `__rs_s` now (rank × 10^8 + row) | 87,362 | 259 KB | 374 KB | **632 KB** | 48,806 |
+| MVT id = row, rows as now (max 151,752) | 87,362 | 327 KB (id field) | 0 | **327 KB** | 0 |
+| MVT id = row, best order for this view | 87,362 | 264 KB (id field) | 0 | **264 KB** | 0 |
+| `__rs_r` (the small rank, about 100 values) | 87,362 | about 175 KB | under 1 KB | **about 175 KB** | about 100 |
+
+With the rows as now, 75 % of the pieces have a 3-byte row (row 16,384 or more), 25 % a 2-byte row, and 321 pieces a 1-byte row.
+
+The expected saving (Burnaby, the tilted view, 5.9 MB):
+
+- Phase 1 (the id): `__rs_edge` and `__rs_s` go out (−1,036 KB), and the MVT id and `__rs_r` come in (+502 KB). The net is
+  **−0.53 MB** and **−74k distinct values**.
+- Phase 3 removes `__rs_edge2` (−198 KB, −11k distinct values).
+- Together: **−0.73 MB (−12 %)** and **−85k of the about 90k distinct values** that the id keys give now.
+
+**The order of the rows.** Smaller numbers for the roads that a view shows most can make the id smaller. The best case is an order
+made for this one view: the roads of the low zooms first, then by the number of their pieces. It gives 264 KB, not 327 KB: −63 KB,
+1 % of the tiles. A real order is for the whole area (151k roads), so fewer roads get a 2-byte row, and the gain is less than this.
+A spatial order (Hilbert) does not make the numbers smaller: a varint holds the number, not its difference from the last one. A new
+order also makes a permutation between the road table's input order and the rows. This costs more than 1 % gives, so the rows stay
+in the road table's order (decision D7).
+
 ## 3. The keys come from the style
 
 The set of keys of a tile layer at zoom z is calculated from the style. It is not a list that a person keeps.
@@ -246,7 +282,7 @@ Each phase can ship alone. The tile bytes change in phases 1 to 3, so each phase
 | Phase | roadstyle | The page (dashboard, duckosm-rust) | Expected gain (Burnaby, tilted view) | Risks | Tests |
 |---|---|---|---|---|---|
 | 0. Undrawn features out (done, `5f79037`) | `ZoomRules::span` | none | −15k features, −0.6 MB; time in the noise | | the span tests, the Burnaby hashes |
-| 1. The id | MVT id = road row on `simple` and the slots; no `promoteId`; `__rs_edge` out of the tile; sort key from `__rs_r` and `["id"]` | read `f.id` (`select.js`, `core.js`, `arrows.js`, editor); no `promoteId` in `addSource` | −49k different values, about −0.4 MB (an estimate); time small (the sort key test showed no time) | MapLibre with the same id on many features (now true with `promoteId`, so low); an old page with a new style | sort-key order test (`sources.rs`), glow and live colour e2e, editor e2e |
+| 1. The id | MVT id = road row on `simple` and the slots; no `promoteId`; `__rs_edge` out of the tile; sort key from `__rs_r` and `["id"]` | read `f.id` (`select.js`, `core.js`, `arrows.js`, editor); no `promoteId` in `addSource` | −74k different values, −0.53 MB (measured, section 2); time small (the sort key test showed no time) | MapLibre with the same id on many features (now true with `promoteId`, so low); an old page with a new style | sort-key order test (`sources.rs`), glow and live colour e2e, editor e2e |
 | 2. The data layer | `generation`, `edgeIds`, `rowsOf`, `fields`, `columns`, `select`, `features` in roadstyle-wasm and Python | filters from `select`, `rs.setData` with `rowsOf`, `ov4` popup from `features` | none alone; it lets phase 3 remove keys | a filter change with 150k ids (size of the `match`); a popup that waits for the worker | unit tests of `select` (twins, modes), filter e2e, popup e2e |
 | 3. Keys from the style | `TileOptions::rule` keeps the style's keys of each zoom only; `highway` replaced by `__rs_ci` in the filter; `reads.json` `pieces` empty | no page read of a tile property | −4 keys on 87k pieces, −`osm_id`/`kind`/`name` on 24k buildings: with phase 1, −0.8 to −1.0 MB of 5.9 MB; time about −0.05 to −0.1 s | a reader that nobody found: the contract test and `test_contract_names.py` find it | the contract test, the size budget |
 | 4. Small expressions | `__rs_wk` and a width table; 2-stop curves where they are the same | none | up to −0.38 s (width), up to −0.65 s with all of the road layer's values | a change of pixels; more keys if the index is not shared | pixel goldens, Burnaby `expr/` harness, the expression budget |
@@ -267,3 +303,4 @@ plan. It changes the picture and the live colour of each direction, so it needs 
 | D4 | The views of the CI checks: Monaco and Tartu in CI; Burnaby only as a local bench gate (its data is not in CI) | yes |
 | D5 | The width: one index key `__rs_wk` with a table in the style, or keep the 5 keys and only make the `case` tree smaller | measure both in `expr/`; `__rs_wk` if it gives most of the 0.38 s with the same pixels |
 | D6 | The order: phase 4 (expressions) first, or the phases in their number order | phase 4 first: it has the time gain and touches no page code |
+| D7 | The rows: in the road table's order, or numbered again so that the roads of the low zooms get 1- and 2-byte ids | the road table's order: a new order gives 1 % at most (−63 KB in the best case) and adds a permutation |
