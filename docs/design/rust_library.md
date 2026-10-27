@@ -955,7 +955,7 @@ pub struct Look {
     pub background: Background,
     pub access: AccessColors,
     pub palettes: IndexMap<String, PaletteColors>, // the palettes that views name (`__rs_fill@mono`)
-    pub tiles: TileLook,                 // zooms 6 to 15, extent 4096, buffer 80 (defaults.json)
+    pub tiles: TileLook,                 // zooms 6 to 15, extent 4096; buffer_px 80 only where a stroke has no limit (roadstyle_tiles::buffer)
     pub camera: CameraLook,              // pitch_3d 55, max_pitch 70
     pub options: StyleOptions,           // the map options: columns, arrows, labels, view_3d, boundary, head_m, ...
 }

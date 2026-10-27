@@ -52,9 +52,10 @@ enum Geom {
 }
 
 /// A value of a tile feature (the vector tile spec's value kinds that the tiles use).
+/// A layer keeps `Val<'static>`; a property that is read borrows its text (no copy of a value that the layer has).
 #[derive(Clone, PartialEq)]
-pub enum Val {
-    Str(Box<str>),
+pub enum Val<'a> {
+    Str(std::borrow::Cow<'a, str>),
     Bool(bool),
     Int(i64),
     UInt(u64),
@@ -90,20 +91,23 @@ impl Tree {
 /// each tile: half of a tile's time was this), its features and their boxes.
 struct Layer {
     keys: Vec<String>,
-    vals: Vec<Val>,
+    vals: Vec<Val<'static>>,
     encoded: Vec<Vec<u8>>,
     feats: Vec<Feat>,
     /// one tree for each first tile zoom of its features (the first zoom that draws them, the last zoom for the rest), in the order of
     /// the zooms: a tile of zoom z reads only the trees of zoom z or less (Tartu z10: 4,422 features, not 114,182)
     trees: Vec<Tree>,
     /// the numbers of the keys and the values, kept while a feature waits (`Tiles::make` adds its properties)
-    at: Option<(HashMap<String, u32>, HashMap<Vec<u8>, u32>)>,
+    at: Option<(Numbers<String>, Numbers<Vec<u8>>)>,
     /// The features go whole into the tiles: not clipped and not simplified.
     whole: bool,
     min_zoom: u32,
     /// each feature id's place (audit R14: a click asks by id)
     by_id: HashMap<u64, u32>,
 }
+
+/// The numbers of a layer's keys or values (a fast hash: a tile looks up each property of each feature it makes).
+type Numbers<K> = HashMap<K, u32, foldhash::fast::FixedState>;
 
 /// The last tiles asked for, up to `TILE_CACHE_BYTES` (audit R14: a map asks for the same tiles again).
 #[derive(Default)]
@@ -178,17 +182,17 @@ fn geom(g: &Value) -> Option<Geom> {
 
 /// A property's value as the tiles keep it: a JSON value, or a cell of the roads' Arrow columns (audit N5: no JSON copy of each cell).
 pub trait TileValue {
-    fn tile_val(&self) -> Option<Val>;
+    fn tile_val(&self) -> Option<Val<'_>>;
 }
 
 impl TileValue for Value {
-    fn tile_val(&self) -> Option<Val> {
+    fn tile_val(&self) -> Option<Val<'_>> {
         val(self)
     }
 }
 
 impl TileValue for roadstyle_model::Cell<'_> {
-    fn tile_val(&self) -> Option<Val> {
+    fn tile_val(&self) -> Option<Val<'_>> {
         use roadstyle_model::Cell;
         Some(match *self {
             Cell::Null => return None,
@@ -204,7 +208,7 @@ impl TileValue for roadstyle_model::Cell<'_> {
     }
 }
 
-fn val(v: &Value) -> Option<Val> {
+fn val(v: &Value) -> Option<Val<'_>> {
     Some(match v {
         Value::String(s) => Val::Str(s.as_str().into()),
         Value::Bool(b) => Val::Bool(*b),
@@ -220,7 +224,20 @@ fn val(v: &Value) -> Option<Val> {
     })
 }
 
-fn json_of(v: &Val) -> Value {
+impl Val<'_> {
+    /// The value with its own text (a layer keeps it).
+    fn owned(&self) -> Val<'static> {
+        match self {
+            Val::Str(s) => Val::Str(std::borrow::Cow::Owned(s.to_string())),
+            Val::Bool(b) => Val::Bool(*b),
+            Val::Int(i) => Val::Int(*i),
+            Val::UInt(u) => Val::UInt(*u),
+            Val::Dbl(d) => Val::Dbl(*d),
+        }
+    }
+}
+
+fn json_of(v: &Val<'_>) -> Value {
     match v {
         Val::Str(s) => Value::from(&**s),
         Val::Bool(b) => Value::from(*b),
@@ -409,7 +426,7 @@ impl Tiles {
         let encoded = std::mem::take(&mut layer.encoded);
         let (key_at, val_at) = layer.at.take().unwrap_or_else(|| (keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
                                                                   encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect()));
-        let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules, last: Vec::new() };
+        let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules, last: Vec::new(), scratch: Vec::new() };
         for (j, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
@@ -607,16 +624,18 @@ impl Layer {
 #[derive(Default)]
 struct Builder {
     keys: Vec<String>,
-    key_at: HashMap<String, u32>,
-    vals: Vec<Val>,
+    key_at: Numbers<String>,
+    vals: Vec<Val<'static>>,
     encoded: Vec<Vec<u8>>,
-    val_at: HashMap<Vec<u8>, u32>,
+    val_at: Numbers<Vec<u8>>,
     feats: Vec<Feat>,
     boxes: Vec<(f32, GeomWithData<Rectangle<P>, u32>)>,
     rules: rules::ZoomRules,
     /// the numbers of the last feature's properties, by place: the pieces of one road come one after another and have most of their
     /// properties the same, which then take their numbers with no lookup
     last: Vec<(u32, u32)>,
+    /// a value's bytes, to look it up with no new buffer
+    scratch: Vec<u8>,
 }
 
 impl Builder {
@@ -643,7 +662,7 @@ impl Builder {
     /// The numbers of the properties' keys and values (a key or a value seen first gets the next number), and the first zoom that
     /// the rules give them.
     fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32) {
-        let (keys, key_at, vals, encoded, val_at) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at);
+        let (keys, key_at, vals, encoded, val_at, scratch) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at, &mut self.scratch);
         let (rules, last) = (&self.rules, &self.last);
         let mut read = Map::new();        // the values that the first-zoom rules read
         let mut j = 0;
@@ -660,13 +679,14 @@ impl Builder {
                 if let Some(&(at, n)) = last.get(j - 1).filter(|(at, n)| keys[*at as usize] == k.as_ref() && vals[*n as usize] == v) {
                     return Some((at, n));        // the key and the value of the last feature's property in this place
                 }
-                let m = encode(&v);
-                let v = match val_at.get(&m) {
+                scratch.clear();
+                encode_into(&v, scratch);
+                let v = match val_at.get(scratch.as_slice()) {
                     Some(&at) => at,
                     None => {
-                        vals.push(v);
-                        encoded.push(m.clone());
-                        val_at.insert(m, vals.len() as u32 - 1);
+                        vals.push(v.owned());
+                        encoded.push(scratch.clone());
+                        val_at.insert(scratch.clone(), vals.len() as u32 - 1);
                         vals.len() as u32 - 1
                     }
                 };
@@ -944,33 +964,31 @@ fn packed(out: &mut Vec<u8>, field: u32, vs: &[u32]) {
     bytes_field(out, field, &d);
 }
 
-/// The bytes of a value's Value message in a tile.
-fn encode(v: &Val) -> Vec<u8> {
-    let mut m = Vec::new();
+/// The bytes of a value's Value message in a tile, written to `m`.
+fn encode_into(v: &Val<'_>, m: &mut Vec<u8>) {
     match v {
-        Val::Str(s) => bytes_field(&mut m, 1, s.as_bytes()),
+        Val::Str(s) => bytes_field(m, 1, s.as_bytes()),
         Val::Dbl(d) => {
             m.push((3 << 3) | 1);
             m.extend_from_slice(&d.to_le_bytes());
         }
         Val::Int(i) if *i < 0 => {
             m.push(6 << 3);
-            varint(&mut m, ((*i << 1) ^ (*i >> 63)) as u64);
+            varint(m, ((*i << 1) ^ (*i >> 63)) as u64);
         }
         Val::Int(i) => {
             m.push(5 << 3);
-            varint(&mut m, *i as u64);
+            varint(m, *i as u64);
         }
         Val::UInt(u) => {
             m.push(5 << 3);
-            varint(&mut m, *u);
+            varint(m, *u);
         }
         Val::Bool(b) => {
             m.push(7 << 3);
             m.push(*b as u8);
         }
     }
-    m
 }
 
 /// One layer of a tile: its keys and values in the order they first come (the layer's numbers of them), and the features.

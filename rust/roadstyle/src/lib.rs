@@ -273,7 +273,7 @@ enum FileValue<'a> {
 }
 
 impl tiles::TileValue for FileValue<'_> {
-    fn tile_val(&self) -> Option<tiles::Val> {
+    fn tile_val(&self) -> Option<tiles::Val<'_>> {
         match self {
             FileValue::Cell(c) => c.tile_val(),
             FileValue::Json(v) => v.tile_val(),

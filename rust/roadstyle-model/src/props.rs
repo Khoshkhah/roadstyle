@@ -13,12 +13,20 @@ fn key<'a>(k: &str) -> Key<'a> {
     crate::mark::Mark::of(k).map_or_else(|| Cow::Owned(k.to_string()), |m| Cow::Borrowed(m.name()))
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Props<'a>(Vec<(Key<'a>, Value)>);
+/// The properties in their order. `V`: JSON values, or the road's cells (`Cell`: a piece's properties borrow its road's, with no copy;
+/// `to_values` makes the JSON form).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Props<'a, V = Value>(Vec<(Key<'a>, V)>);
 
-impl<'a> Props<'a> {
+impl<V> Default for Props<'_, V> {
+    fn default() -> Self {
+        Props(Vec::new())
+    }
+}
+
+impl<'a, V> Props<'a, V> {
     /// Insert with a name that the props borrow (no copy): a road's column, a mark.
-    pub fn insert_name(&mut self, k: &'a str, v: Value) -> Option<Value> {
+    pub fn insert_name(&mut self, k: &'a str, v: V) -> Option<V> {
         match self.at(k) {
             Some(i) => Some(std::mem::replace(&mut self.0[i].1, v)),
             None => {
@@ -33,16 +41,11 @@ impl<'a> Props<'a> {
         self.0.iter().position(|e| e.0 == k)
     }
 
-    pub fn get(&self, k: &str) -> Option<&Value> {
+    pub fn get(&self, k: &str) -> Option<&V> {
         self.at(k).map(|i| &self.0[i].1)
     }
 
-    /// The property as a cell (the type that the stages read the roads' columns with).
-    pub fn cell(&self, k: &str) -> Option<crate::Cell<'_>> {
-        self.get(k).map(crate::Cell::Json)
-    }
-
-    pub fn get_mut(&mut self, k: &str) -> Option<&mut Value> {
+    pub fn get_mut(&mut self, k: &str) -> Option<&mut V> {
         self.at(k).map(|i| &mut self.0[i].1)
     }
 
@@ -50,7 +53,7 @@ impl<'a> Props<'a> {
         self.at(k).is_some()
     }
 
-    pub fn insert(&mut self, k: &str, v: Value) -> Option<Value> {
+    pub fn insert(&mut self, k: &str, v: V) -> Option<V> {
         match self.at(k) {
             Some(i) => Some(std::mem::replace(&mut self.0[i].1, v)),
             None => {
@@ -71,12 +74,30 @@ impl<'a> Props<'a> {
         true
     }
 
-    pub fn shift_remove(&mut self, k: &str) -> Option<Value> {
+    pub fn shift_remove(&mut self, k: &str) -> Option<V> {
         self.at(k).map(|i| self.0.remove(i).1)
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
+    pub fn retain(&mut self, mut keep: impl FnMut(&str, &V) -> bool) {
+        self.0.retain(|(k, v)| keep(k, v));
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &V)> {
         self.0.iter().map(|(k, v)| (k.as_ref(), v))
+    }
+}
+
+impl<'a> Props<'a, crate::Cell<'a>> {
+    /// The same properties as JSON values.
+    pub fn to_values(self) -> Props<'a> {
+        Props(self.0.into_iter().map(|(k, v)| (k, v.to_value())).collect())
+    }
+}
+
+impl<'a> Props<'a> {
+    /// The property as a cell (the type that the stages read the roads' columns with).
+    pub fn cell(&self, k: &str) -> Option<crate::Cell<'_>> {
+        self.get(k).map(crate::Cell::Json)
     }
 
     /// The same properties as a JSON object.
@@ -109,8 +130,8 @@ impl std::ops::Index<&str> for Props<'_> {
 }
 
 /// The props of (name, value) pairs; a name that they can borrow is not copied.
-impl<'a> FromIterator<(&'a str, Value)> for Props<'a> {
-    fn from_iter<I: IntoIterator<Item = (&'a str, Value)>>(it: I) -> Props<'a> {
+impl<'a, V> FromIterator<(&'a str, V)> for Props<'a, V> {
+    fn from_iter<I: IntoIterator<Item = (&'a str, V)>>(it: I) -> Props<'a, V> {
         let mut p = Props::default();
         for (k, v) in it {
             p.insert_name(k, v);
@@ -119,8 +140,8 @@ impl<'a> FromIterator<(&'a str, Value)> for Props<'a> {
     }
 }
 
-impl<'a> FromIterator<(Key<'a>, Value)> for Props<'a> {
-    fn from_iter<I: IntoIterator<Item = (Key<'a>, Value)>>(it: I) -> Props<'a> {
+impl<'a, V> FromIterator<(Key<'a>, V)> for Props<'a, V> {
+    fn from_iter<I: IntoIterator<Item = (Key<'a>, V)>>(it: I) -> Props<'a, V> {
         let mut p = Props::default();
         for (k, v) in it {
             match k {
@@ -132,9 +153,9 @@ impl<'a> FromIterator<(Key<'a>, Value)> for Props<'a> {
     }
 }
 
-impl<'a> IntoIterator for Props<'a> {
-    type Item = (Key<'a>, Value);
-    type IntoIter = std::vec::IntoIter<(Key<'a>, Value)>;
+impl<'a, V> IntoIterator for Props<'a, V> {
+    type Item = (Key<'a>, V);
+    type IntoIter = std::vec::IntoIter<(Key<'a>, V)>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

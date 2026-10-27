@@ -11,7 +11,7 @@ use crate::road::{Road, Roads};
 use crate::roads::truthy;
 use roadstyle_model::Cell;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const SEAM_M: f64 = 0.5; // a seam reaches this far each way from its cut, at most a quarter of either piece
 const LAP_M: f64 = 2.0; // a lap (the flat seam below zoom 17) reaches this far each way, at most half of either piece
@@ -24,6 +24,9 @@ const ITEM_STEP: f64 = 0.01; // an item's step above its edge's fill, by its ran
 const MAX_ITEMS: usize = 38; // the most items of one edge between its fill and the next casings
 
 pub type Pt = [f64; 2];
+
+/// A piece's properties: its road's cells and its marks, with no copy (`Props::to_values`: the JSON form).
+pub type Cells<'a> = Props<'a, Cell<'a>>;
 
 /// An item on a road (an overlay's line in metres, render's items=): its own properties and its line.
 pub struct Item {
@@ -117,23 +120,28 @@ impl Cols {
     }
 }
 
-/// The properties of a road as JSON values, those that `keep` takes. The road's own `__rs_cls` (set later, for the roads source) is
+/// The properties of a road as its cells (no copy), those that `keep` takes. The road's own `__rs_cls` (set later, for the roads source) is
 /// not one: a piece marks its class itself, as the last property.
 /// `only`: the keys to read (the others are not read), None: all.
-fn road_props<'a>(r: Road<'a>, only: Option<&[&str]>, keep: impl Fn(&str) -> bool) -> Props<'a> {
-    let keep = |k: &str| k != Mark::Class.name() && keep(k);
+fn road_props<'a>(r: Road<'a>, only: Option<&[&str]>, keep: impl Fn(&str) -> bool) -> Cells<'a> {
+    let keep = |k: &str| own_keeps(k, &keep);
     match only {
-        None => r.own_where(&keep).map(|(k, v)| (k, v.to_value())).collect(),
+        None => r.own_where(&keep).collect(),
         Some(ks) => {
             let mut q = Props::default();
             for k in ks.iter().filter(|k| keep(k)) {
                 if let Some(v) = r.own_get(k) {
-                    q.insert(k, v.to_value());
+                    q.insert(k, v);
                 }
             }
             q
         }
     }
+}
+
+/// A road's own `__rs_cls` is not a piece's (`road_props`).
+fn own_keeps(k: &str, keep: impl Fn(&str) -> bool) -> bool {
+    k != Mark::Class.name() && keep(k)
 }
 
 impl Piece {
@@ -182,78 +190,121 @@ impl Piece {
     /// The properties of the piece as render_web makes them, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
     /// the edge's tie-breaker) and `__rs_cls`.
     pub fn props<'a>(&self, roads: &'a Roads, cols: &Cols) -> Props<'a> {
-        self.props_where(roads, cols, None, None)
+        self.over(roads, cols, self.base(roads, cols, None, None), None).to_values()
     }
 
-    /// The piece's properties, with only the road's cells of the keys `only` (the marks of the piece are all there); None: all.
-    /// `read`: no road cell of another key (the road's class stays: the class index reads it), in the road's order; a slim piece
-    /// (SimpleSource::slim) then drops nothing more than without it, and a tile's first show makes no value that goes (Tartu z11).
-    fn props_where<'a>(&self, roads: &'a Roads, cols: &Cols, only: Option<&[&str]>, read: Option<&std::collections::HashSet<String>>) -> Props<'a> {
-        let read = |k: &str| read.is_none_or(|r| r.contains(k) || k == cols.class);
+    /// What the piece takes of its road's properties.
+    fn base_kind(&self) -> Base {
+        match self.part {
+            Part::Fill => Base::Fill,
+            Part::Half(_) => Base::Half,
+            _ => Base::Casing,
+        }
+    }
+
+    /// The road's cells that the piece starts from (the same for each piece of the road of its `base_kind`), with only the road's cells
+    /// of the keys `only` (None: all). `read`: no road cell of another key (the road's class stays: the class index reads it), in the
+    /// road's order; a slim piece (SimpleSource::slim) then drops nothing more than without it, and a tile's first show makes no value
+    /// that goes (Tartu z11).
+    fn base<'a>(&self, roads: &'a Roads, cols: &Cols, only: Option<&[&str]>, read: Option<&HashSet<String>>) -> Cells<'a> {
+        road_props(self.road(roads), only, self.base_kind().keeps(cols, read))
+    }
+
+    /// The piece's properties: its road's cells (`base`) and its own marks. `read`: no mark that is not read (`Run::marks`).
+    fn over<'a>(&self, roads: &'a Roads, cols: &Cols, mut q: Cells<'a>, read: Option<&[bool]>) -> Cells<'a> {
+        let put = |q: &mut Cells<'a>, k: Mark, v: Cell<'a>| if read.is_none_or(|r| r[k as usize]) {
+            q.insert_name(k.name(), v);
+        };
         let r = self.road(roads);
         let d = r.draw();
-        let (edge, key) = (self.edge as i64, crate::road::key(self.edge as usize).get());      // the row (the sort key's tie-breaker), the road's key
-        let mut q: Props<'a> = match self.part {
-            Part::Fill => road_props(r, only, |k| cols.fill(k) && read(k)),
+        let (edge, key) = (self.edge as i64, crate::road::key(self.edge as usize).get() as i64);      // the row (the sort key's tie-breaker), the road's key
+        match self.part {
+            Part::Fill => {}
             Part::Half(k) => {
-                let mut q = road_props(r, only, |kk| !matches!(Mark::of(kk), Some(Mark::Cap0 | Mark::Cap1 | Mark::Split)) && read(kk));
-                q.insert(Mark::Edge.name(), key.into());
+                put(&mut q, Mark::Edge, Cell::Int(key));
                 if let Some(c) = d.split.map(|s| s[k as usize]).filter(|c| *c != Cap::Round) {
-                    q.insert(Mark::Cap.name(), c.value());
+                    put(&mut q, Mark::Cap, c.cell());
                 }
-                q
             }
             _ => {
-                let mut q = road_props(r, only, |k| cols.casing(k) && read(k));
-                q.insert(Mark::Edge.name(), key.into());
+                put(&mut q, Mark::Edge, Cell::Int(key));
                 if let Some(tw) = d.twin {
-                    q.insert(Mark::Pair.name(), true.into());
-                    q.insert(Mark::Edge2.name(), crate::road::key(tw.get()).get().into());
+                    put(&mut q, Mark::Pair, Cell::Bool(true));
+                    put(&mut q, Mark::Edge2, Cell::Int(crate::road::key(tw.get()).get() as i64));
                 }
                 match self.part {
                     Part::Cut(k, num) => {
-                        q.insert(Mark::CasingLevel.name(), num.into());
+                        put(&mut q, Mark::CasingLevel, Cell::Int(num));
                         if k == 1 {
                             // the main piece ends at two cuts: flat ends
-                            q.insert(Mark::Cap.name(), true.into());
-                            q.insert(Mark::Main.name(), true.into());
+                            put(&mut q, Mark::Cap, Cell::Bool(true));
+                            put(&mut q, Mark::Main, Cell::Bool(true));
                         } else if let Some(s) = d.split {
                             // a head of an edge with two different ends: that end's cap
-                            q.insert(Mark::Cap.name(), s[usize::from(k != 0)].value());
+                            put(&mut q, Mark::Cap, s[usize::from(k != 0)].cell());
                         }
-                        if q.get(Mark::Cap.name()).is_none_or(Value::is_null) {
+                        if q.get(Mark::Cap.name()).is_none_or(|c| c.to_value().is_null()) {
                             q.shift_remove(Mark::Cap.name());
                         }
                     }
                     Part::Seam(num) | Part::Lap(num) => {
-                        q.insert(Mark::CasingLevel.name(), num.into());
-                        q.insert(Mark::Seam.name(), true.into());
+                        put(&mut q, Mark::CasingLevel, Cell::Int(num));
+                        put(&mut q, Mark::Seam, Cell::Bool(true));
                         q.shift_remove(Mark::Cap.name());
                         if matches!(self.part, Part::Lap(_)) {
-                            q.insert(Mark::Cap.name(), true.into());
-                            q.insert(Mark::Lap.name(), true.into());
+                            put(&mut q, Mark::Cap, Cell::Bool(true));
+                            put(&mut q, Mark::Lap, Cell::Bool(true));
                         }
                     }
                     _ => {}
                 }
-                q
             }
-        };
+        }
         match self.end {
-            End::Flat => drop(q.insert(Mark::Cap.name(), true.into())),
-            End::Stub => drop(q.insert(Mark::Stub.name(), true.into())),
+            End::Flat => put(&mut q, Mark::Cap, Cell::Bool(true)),
+            End::Stub => put(&mut q, Mark::Stub, Cell::Bool(true)),
             End::AsIs => {}
         }
         if matches!(self.part, Part::Half(_)) {
-            q = q.into_iter().filter(|(k, _)| cols.fill(k)).collect();
+            q.retain(|k, _| cols.fill(k));
         }
         if let Some(dk) = self.draw {
-            q.insert(Mark::PieceKind.name(), dk.kind.into());
-            q.insert(Mark::Sort.name(), sort_key(dk.key, edge).into());
+            put(&mut q, Mark::PieceKind, Cell::Int(dk.kind));
+            put(&mut q, Mark::Sort, Cell::Int(sort_key(dk.key, edge)));
         }
-        q.insert(Mark::Class.name(), r.cls());
+        put(&mut q, Mark::Class, r.cls_cell());
         q
     }
+}
+
+impl Base {
+    /// The road's keys that a piece of this kind takes (`Piece::base`).
+    fn keeps<'c>(self, cols: &'c Cols, read: Option<&'c HashSet<String>>) -> impl Fn(&str) -> bool + 'c {
+        let read = move |k: &str| read.is_none_or(|r| r.contains(k) || k == cols.class);
+        move |k: &str| read(k) && match self {
+            Base::Fill => cols.fill(k),
+            Base::Half => !matches!(Mark::of(k), Some(Mark::Cap0 | Mark::Cap1 | Mark::Split)),
+            Base::Casing => cols.casing(k),
+        }
+    }
+}
+
+/// What the pieces of one call share: the last piece's road cells (key, cells, class index), and what is read (None: all): each
+/// mark (by its place in `Mark::ALL`) and the class.
+struct Run<'a> {
+    last: Option<((u32, Base), Cells<'a>, Option<usize>)>,
+    /// the plan of each kind's `Piece::base` (Fill, Half, Casing), made when a piece first needs it
+    plans: [Option<crate::road::OwnPlan>; 3],
+    marks: Option<Vec<bool>>,
+    class: bool,
+}
+
+/// What a piece takes of its road's properties: a fill's, a half's (a fill's after its marks) or a casing's.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum Base {
+    Fill,
+    Half,
+    Casing,
 }
 
 /// np.round(x, d) for d > 0: rint(x * 10^d) / 10^d.
@@ -466,13 +517,15 @@ impl SimpleSource {
 
     /// The features in their order, each as (id, properties, line).
     pub fn features<'a>(&'a self, roads: &'a Roads) -> impl Iterator<Item = (usize, Props<'a>, Option<&'a [Pt]>)> + 'a {
-        self.pieces.iter().map(move |q| self.piece_feature(roads, q, None))
+        let mut run = self.run();
+        self.pieces.iter().map(move |q| self.piece_feature(roads, q, None, &mut run))
             .chain(self.items.iter().map(move |(id, it)| (*id, self.slim_item(self.with_index(it.props.clone())), it.coords.as_deref())))
     }
 
     /// The pieces of the edges `rows` (no items), as `features` gives them (the level editor's redraw compares these alone).
     pub fn features_of<'a>(&'a self, roads: &'a Roads, rows: &'a std::collections::HashSet<u32>) -> impl Iterator<Item = (usize, Props<'a>, Option<&'a [Pt]>)> + 'a {
-        self.pieces.iter().filter(move |(_, p)| rows.contains(&p.edge)).map(move |q| self.piece_feature(roads, q, None))
+        let mut run = self.run();
+        self.pieces.iter().filter(move |(_, p)| rows.contains(&p.edge)).map(move |q| self.piece_feature(roads, q, None, &mut run))
     }
 
     /// The pieces (no items), each with only the properties `keys` of those that `features` gives it (a road's other cells are not
@@ -480,41 +533,81 @@ impl SimpleSource {
     pub fn pieces_with<'a>(&'a self, roads: &'a Roads, keys: &'a [String]) -> impl Iterator<Item = (usize, Props<'a>, Option<&'a [Pt]>)> + 'a {
         // the class too: the class index reads it
         let only: Vec<&str> = keys.iter().map(String::as_str).chain([self.cols.class.as_str()]).collect();
+        let mut run = self.run();
         self.pieces.iter().map(move |q| {
-            let (id, p, c) = self.piece_feature(roads, q, Some(&only));
+            let (id, p, c) = self.piece_feature(roads, q, Some(&only), &mut run);
             (id, p.into_iter().filter(|(k, _)| keys.iter().any(|x| x == k)).collect(), c)
         })
     }
 
     /// The piece at `i` in `pieces`, as `features` gives it.
     pub fn piece<'a>(&'a self, roads: &'a Roads, i: usize) -> (usize, Props<'a>, Option<&'a [Pt]>) {
-        self.piece_feature(roads, &self.pieces[i], None)
+        self.piece_feature(roads, &self.pieces[i], None, &mut self.run())
     }
 
-    fn piece_feature<'a>(&'a self, roads: &'a Roads, (id, p): &'a (usize, Piece), only: Option<&[&str]>) -> (usize, Props<'a>, Option<&'a [Pt]>) {
-        let mut q = p.props_where(roads, &self.cols, only, self.read.as_ref());
-        for (k, v) in self.palette_props(p, roads) {
-            q.insert(&k, v);
+    /// The pieces at the places `at` in `pieces` (in their order: the pieces of a road are one after another), as `piece` gives them,
+    /// with their roads' cells (no JSON values: a tile's interning reads them). Each road's cells are read once for all its pieces.
+    pub fn piece_cells<'a>(&'a self, roads: &'a Roads, at: impl Iterator<Item = usize>) -> impl Iterator<Item = (usize, Cells<'a>, Option<&'a [Pt]>)> {
+        let mut run = self.run();
+        at.map(move |i| self.cells(roads, &self.pieces[i], None, &mut run))
+    }
+
+    /// A run of pieces with nothing read yet.
+    fn run<'a>(&self) -> Run<'a> {
+        let marks = self.read.as_ref().map(|r| Mark::ALL.iter().map(|m| r.contains(m.name())).collect());
+        let class = self.read.as_ref().is_none_or(|r| r.contains(&self.cols.class));
+        Run { last: None, plans: Default::default(), marks, class }
+    }
+
+    fn piece_feature<'a>(&'a self, roads: &'a Roads, q: &'a (usize, Piece), only: Option<&[&str]>, run: &mut Run<'a>) -> (usize, Props<'a>, Option<&'a [Pt]>) {
+        let (id, p, c) = self.cells(roads, q, only, run);
+        (id, p.to_values(), c)
+    }
+
+    /// The piece's properties: its road's cells (`Piece::base`, the run's when the last piece had the same), its marks, its palette's,
+    /// the class index (R8), and only those that are read (R1), in their order.
+    fn cells<'a>(&'a self, roads: &'a Roads, (id, p): &'a (usize, Piece), only: Option<&[&str]>, run: &mut Run<'a>) -> (usize, Cells<'a>, Option<&'a [Pt]>) {
+        let key = (p.edge, p.base_kind());
+        if run.last.as_ref().is_none_or(|l| l.0 != key) {
+            let kind = p.base_kind();
+            let base = match only {
+                Some(_) => p.base(roads, &self.cols, only, self.read.as_ref()),
+                None => {
+                    let plan = run.plans[kind as usize].get_or_insert_with(|| roads.own_plan(|k| own_keeps(k, kind.keeps(&self.cols, self.read.as_ref()))));
+                    roads.road(p.edge as usize).own_by(plan).collect()
+                }
+            };
+            let index = self.class_index(base.get(&self.cols.class).and_then(|c| c.as_str()));
+            run.last = Some((key, base, index));
         }
-        (*id, self.slim(self.with_index(q)), p.points(roads))
+        let (_, base, index) = run.last.as_ref().expect("the run's last road");
+        let mut q = p.over(roads, &self.cols, base.clone(), run.marks.as_deref());
+        for (k, v) in self.palette_props(p, roads) {
+            if self.read.as_ref().is_none_or(|r| r.contains(k)) {
+                q.insert_name(k, v);
+            }
+        }
+        if let Some(i) = index.filter(|_| run.marks.as_ref().is_none_or(|r| r[Mark::ClassIndex as usize])) {
+            q.insert_name(crate::layers::CLASS_INDEX, Cell::Int(i as i64));
+        }
+        if !run.class {
+            q.shift_remove(&self.cols.class);      // the class index read it
+        }
+        (*id, q, p.points(roads))
     }
 
     /// The properties with the class index last (R8): the place of the feature's class (the class role's column) in the classes, else
     /// their number.
     fn with_index<'a>(&self, mut q: Props<'a>) -> Props<'a> {
-        if let Some(cs) = &self.classes {
-            let c = q.get(&self.cols.class).and_then(Value::as_str);
-            q.insert(crate::layers::CLASS_INDEX, cs.iter().position(|x| Some(x.as_str()) == c).unwrap_or(cs.len()).into());
+        if let Some(i) = self.class_index(q.get(&self.cols.class).and_then(Value::as_str)) {
+            q.insert(crate::layers::CLASS_INDEX, i.into());
         }
         q
     }
 
-    /// A piece's properties that are read (R1), in their order.
-    fn slim<'a>(&self, q: Props<'a>) -> Props<'a> {
-        match &self.read {
-            Some(r) => q.into_iter().filter(|(k, _)| r.contains(k.as_ref())).collect(),
-            None => q,
-        }
+    /// The class index of a feature of the class `c` (R8; None: no index).
+    fn class_index(&self, c: Option<&str>) -> Option<usize> {
+        self.classes.as_ref().map(|cs| cs.iter().position(|x| Some(x.as_str()) == c).unwrap_or(cs.len()))
     }
 
     /// An item's: its own fields (a picked item's popup fields: the item has no others) and the stage values that are read.

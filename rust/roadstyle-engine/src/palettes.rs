@@ -251,10 +251,10 @@ fn pick(e: &mut Value, differ: &[(String, Vec<String>)]) {
 
 impl SimpleSource {
     /// A piece's copy of its road's mark in another palette (the roads' `Extra`), where the copy's piece has the mark.
-    pub(crate) fn palette_props(&self, p: &crate::simple::Piece, roads: &Roads) -> Vec<(String, Value)> {
+    pub(crate) fn palette_props<'a>(&self, p: &crate::simple::Piece, roads: &'a Roads) -> Vec<(&'a str, roadstyle_model::Cell<'a>)> {
         self.palette.iter().filter_map(|&x| {
             let e = &roads.extra[x];
-            e.vals[p.edge as usize].as_ref().filter(|_| self.cols.keeps(p.part, &e.key)).map(|v| (e.name.clone(), v.clone()))
+            e.vals[p.edge as usize].as_ref().filter(|_| self.cols.keeps(p.part, &e.key)).map(|v| (e.name.as_str(), roadstyle_model::Cell::Json(v)))
         }).collect()
     }
 }

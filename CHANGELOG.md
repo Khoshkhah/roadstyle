@@ -15,6 +15,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **Faster first tiles of the level editor's map** (2026-10-27): a piece's properties borrow its road's cells (`Props<'a, V>`,
+  `Cells<'a>`; no owned JSON values), the engine reads each road one time for all of its pieces (`SimpleSource::piece_cells`,
+  `Roads::own_plan`), and `Tiles::make` interns a value with no copy (`Val<'a>`, foldhash maps). The same tile bytes. Burnaby, the
+  first tiles of a tilted view (pitch 60, z14, 21 tiles): native 482 ms to 295 ms, Node 521 ms to 359 ms
+  (docs/design/tile_speed.md). The new benchmarks: `examples/bench_live.rs` and `roadstyle-wasm/bench_live_views.mjs`.
 - **Faster first tiles** (2026-10-27): `Tiles::make` takes a property that is the same as the last feature's (the pieces of one road)
   with no lookup.
 - **The road table without the roads' lines** (2026-10-26): `roadTable(fields?, lines?)` (wasm) and `road_table(fields=None,

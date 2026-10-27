@@ -1533,6 +1533,7 @@ dependencies = [
 name = "roadstyle-engine"
 version = "0.25.0"
 dependencies = [
+ "foldhash",
  "indexmap",
  "roadstyle-levels",
  "roadstyle-look",
@@ -1660,6 +1661,7 @@ name = "roadstyle-tiles"
 version = "0.25.0"
 dependencies = [
  "flate2",
+ "foldhash",
  "indexmap",
  "roadstyle-model",
  "rstar",

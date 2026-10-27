@@ -66,6 +66,14 @@ impl Roads {
                s: self.solved.as_ref().map(|s| &s[i]), i }
     }
 
+    /// What `Road::own_where(keep)` takes of each road, worked out once: then a road's read looks up no name of a column.
+    pub fn own_plan(&self, keep: impl Fn(&str) -> bool) -> OwnPlan {
+        let cols = self.out.iter().zip(self.table.names()).map(|(o, n)| (keep(o), mark::Mark::of(n).is_some() || mark::option_of_fill(n).is_some())).collect();
+        let names = mark::Mark::ALL.iter().map(|m| m.name()).chain(self.values.fill_names.iter().map(String::as_str));
+        let marks = names.map(|k| (k.to_string(), keep(k) && self.table.col(k).is_none())).collect();
+        OwnPlan { cols, solved: SOLVED.map(|m| keep(m.name())), marks }
+    }
+
     /// The road `i`, or None past the last road.
     pub fn at(&self, i: usize) -> Option<Road<'_>> {
         (i < self.len()).then(|| self.road(i))
@@ -93,6 +101,14 @@ impl Roads {
     pub fn topo(&self) -> &Topology {
         self.topo.get_or_init(|| Box::new(Topology::new(&self.table)))
     }
+}
+
+/// What `Road::own_by` takes (`Roads::own_plan`): each column (kept, a mark can take its place), each solved level, and each mark's
+/// name (kept and not a column's).
+pub struct OwnPlan {
+    cols: Vec<(bool, bool)>,
+    solved: [bool; 4],
+    marks: std::collections::HashMap<String, bool, foldhash::fast::FixedState>,
 }
 
 /// One road: a view of its column values and its marks.
@@ -149,7 +165,11 @@ impl<'a> Road<'a> {
 
     /// The road's value of the class filter (render's fcol).
     pub fn cls(self) -> Value {
-        self.get(self.c).map_or(Value::Null, Cell::to_value)
+        self.cls_cell().to_value()
+    }
+
+    pub fn cls_cell(self) -> Cell<'a> {
+        self.get(self.c).unwrap_or(Cell::Null)
     }
 
     pub fn contains_key(self, k: &str) -> bool {
@@ -179,6 +199,21 @@ impl<'a> Road<'a> {
             .map(move |(c, n)| (o[c].as_str(), d.get(v, i, n).unwrap_or_else(|| t.cell(c, i))))
             .chain(solved.filter(move |(k, _)| keep(k)))
             .chain(d.marks(v, i).into_iter().filter(move |(k, _)| keep(k) && t.col(k).is_none()))
+    }
+
+    /// `own_where` with the plan of its `keep` (`Roads::own_plan`).
+    pub fn own_by<'p>(self, plan: &'p OwnPlan) -> impl Iterator<Item = (&'a str, Cell<'a>)> + use<'a, 'p> {
+        let (t, d, v, i) = (self.t, self.d, self.v, self.i);
+        let solved = self.s.into_iter().flat_map(|s| SOLVED.iter().zip(s).zip(plan.solved).filter(|x| x.1).map(|((m, x), _)| (m.name(), Cell::Int((*x).into()))));
+        let o = self.o;
+        t.names().iter().enumerate().filter(move |(c, _)| plan.cols[*c].0)
+            .map(move |(c, n)| (o[c].as_str(), if plan.cols[c].1 { d.get(v, i, n).unwrap_or_else(|| t.cell(c, i)) } else { t.cell(c, i) }))
+            .chain(solved)
+            .chain(d.marks(v, i).into_iter().filter(move |(k, _)| {
+                let known = plan.marks.get(*k);
+                debug_assert!(known.is_some(), "own_plan has no mark {k}");
+                known == Some(&true)
+            }))
     }
 
     /// The properties in the output's order: its own, then its marks in the other palettes of the views.

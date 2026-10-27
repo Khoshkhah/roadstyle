@@ -14,3 +14,4 @@ roadstyle-levels.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
 rstar.workspace = true
+foldhash = "0.2"                    # Roads::own_plan: a lookup for each mark of each road that a tile reads
