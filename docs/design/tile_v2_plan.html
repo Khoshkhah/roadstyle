@@ -311,7 +311,7 @@ three filter keys. <code>ov4</code>'s <code>osm_id</code>, <code>kind</code> and
 <dt>Page</dt><dd>The base-map popup reads its fields by row (in step 8).</dd></dl></div>
 
 <div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 3b: tiny pieces at low zoom</h3><dl>
-<dt>What</dt><dd>Rule B, in the tile encoder (<code>drop_tiny</code> in <code>roadstyle-tiles</code>, <code>_drop_tiny</code> in <code>tiles.py</code>), for every zoom below the last zoom. A road whose pieces are together under 1 px (8 of 4096 units) is left out, unless it leaves the tile (its length there is a cut). A casing end piece (<code>__rs_seam</code>, with or without lap) under 1 px is left out. Every fill piece and every casing body piece stays.</dd>
+<dt>What</dt><dd>Rule B, in the tile encoder (<code>drop_tiny</code> in <code>roadstyle-tiles</code>; Rust only, D0 removes the Python tile engine), for every zoom below the last zoom. A road whose pieces are together under 1 px (8 of 4096 units) is left out, unless it leaves the tile (its length there is a cut). A casing end piece (<code>__rs_seam</code>, with or without lap) under 1 px is left out. Every fill piece and every casing body piece stays.</dd>
 <dt>Why</dt><dd>Rule 7. A rule that dropped every piece under 1 px made visible breaks in streets, so it was rejected.</dd>
 <dt>Gain</dt><dd>Burnaby, 4 workers, median of 5 (the same harness as the measurement):
 <table>

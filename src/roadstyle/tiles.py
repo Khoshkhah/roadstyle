@@ -348,38 +348,6 @@ def buffers_px(layers, max_zoom, live=LIVE_WIDTH_MAX, fallback=80.0):
     return out
 
 
-def _drop_tiny(rows, tb, extent=4096):
-    """Rule B for the "simple" pieces of one tile below the last zoom (roadstyle_tiles::drop_tiny): ``rows`` is ``[(row, clipped geometry)]``.
-    A road (``__rs_edge``) whose pieces are together under 1 px (8 units of 4096; the casing and the fill each count, the longer decides)
-    is left out unless a point of it is out of the tile; a casing end piece (``__rs_seam``) under 1 px is left out. The lengths are
-    those of the tile's rounded units (what the encoder writes), as the Rust engine's."""
-    px = extent / 512
-
-    def units(g):
-        lines = []
-        for part in (g.geoms if hasattr(g, "geoms") else [g]):
-            pts = [(round(extent * (x - tb[0]) / (tb[2] - tb[0])), round(extent * (y - tb[1]) / (tb[3] - tb[1]))) for x, y in part.coords]
-            pts = [p for i, p in enumerate(pts) if i == 0 or p != pts[i - 1]]
-            if len(pts) >= 2:
-                lines.append(pts)
-        return lines
-
-    shapes = [units(g) for _, g in rows]
-    length = [sum(math.dist(a, b) for l in ls for a, b in zip(l, l[1:])) for ls in shapes]
-    roads = {}          # edge -> ({kind: length}, a point is out of the tile)
-    for (row, _), ls, n in zip(rows, shapes, length):
-        p = row["properties"]
-        kinds, out = roads.setdefault(p.get("__rs_edge"), ({}, [False]))
-        kinds[p.get("__rs_k")] = kinds.get(p.get("__rs_k"), 0.0) + n
-        out[0] = out[0] or any(not 0 <= v <= extent for l in ls for pt in l for v in pt)
-
-    def tiny_road(p):
-        kinds, out = roads[p.get("__rs_edge")]
-        return p.get("__rs_edge") is not None and not out[0] and max(kinds.values()) < px
-    return [row for (row, _), n in zip(rows, length)
-            if not tiny_road(row["properties"]) and not (row["properties"].get("__rs_seam") and n < px)]
-
-
 def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
                   minzoom: int = 6, maxzoom: int = 15, extent: int = 4096,
                   buffer_px: int = 80, layer: str = "roads",
@@ -403,7 +371,7 @@ def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
     import mapbox_vector_tile
     from pmtiles.tile import Compression, TileType, zxy_to_tileid
     from pmtiles.writer import Writer
-    from shapely import clip_by_rect, wkb
+    from shapely import clip_by_rect
 
     feats, world = _prep(fc, keep, zoom_rules(layers, layer))
     lines = [(layer, feats, minzoom)]
@@ -464,12 +432,6 @@ def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
                             {"geometry": geom.wkb, "properties": props, "id": i})
         for (tx, ty), by_layer in sorted(cells.items()):
             tb = _tile_bounds(z, tx, ty)
-            if z < maxzoom and "simple" in by_layer:
-                by_layer["simple"] = _drop_tiny([(r, wkb.loads(r["geometry"])) for r in by_layer["simple"]], tb, extent)
-                if not by_layer["simple"]:
-                    del by_layer["simple"]
-                    if not by_layer:
-                        continue
             data = mapbox_vector_tile.encode(
                 [{"name": n, "features": rows} for n, rows in by_layer.items()],
                 default_options={"extents": extent,

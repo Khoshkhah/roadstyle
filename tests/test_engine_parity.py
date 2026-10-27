@@ -12,6 +12,7 @@ import roadstyle as rs
 from roadstyle import _engine
 
 pytestmark = pytest.mark.skipif(not _engine.available(), reason="the Rust extension roadstyle._rust is not built")
+RULE_B = pytest.mark.xfail(reason="rule B is Rust-only; D0 removes the Python tile engine (docs/design/tile_v2_plan.md)", strict=False)
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "rust" / "roadstyle-rs" / "tests" / "data"
@@ -289,6 +290,7 @@ def test_export_inline_decks_on_curves():
             assert abs(a - b) <= tol * a, f"chain {c} ({'slabs' if slab else 'decks'}): area {b} against {a}"
 
 
+@RULE_B
 @pytest.mark.parametrize("fmt", ["xyz", "pmtiles"])
 @pytest.mark.parametrize("case", ["plain", "numeric", "categorical", "road_popup", "view_3d", "kinds", "items and metre overlay", "other column names"])
 def test_export_style(part, keywords, case, fmt, tmp_path):
@@ -320,6 +322,7 @@ def test_export_style(part, keywords, case, fmt, tmp_path):
             assert a == b, f
 
 
+@RULE_B
 def test_the_tile_rules_of_the_style(part, keywords, tmp_path, monkeypatch):
     """casing.drop_below_px and minzoom=True (2026-10-25): both engines write the same filter clauses, and their tiles leave out the same
     pieces (each reads the clauses from the style: tiles.zoom_rules, roadstyle-tiles rules.rs)."""
@@ -447,6 +450,7 @@ def test_render_edges_page(part, keywords, case, monkeypatch):
     assert diff(sr, sp) == [] and _same_page(hr, hp)
 
 
+@RULE_B
 @pytest.mark.parametrize("case", ["plain", "controls", "items and metre overlay"])
 def test_render_edges_tiled_page(part, keywords, case, monkeypatch):
     """render_edges(tiles=True, engine="rust"): the same page as the Python engine's, but the embedded PMTiles archive, whose tiles are the
