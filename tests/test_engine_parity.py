@@ -558,7 +558,7 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
     from pmtiles.tile import Compression, TileType, zxy_to_tileid
     from pmtiles.writer import Writer
 
-    from roadstyle.tiles import _merc, _tile_range
+    from roadstyle.tiles import _R, _merc, _tile_range, buffers_px
     lk = _engine._look_of({**keywords, "tiles": True})
     t = _engine.rust().Tiler(_engine._arrow(part), lk, None, None, "", [])
     b = [float(v) for v in part.total_bounds]
@@ -567,8 +567,10 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
     w = Writer(buf)
     (mx0, my0), (mx1, my1) = _merc(*b[:2]), _merc(*b[2:])
     h = Reader(MemorySource(ru)).header()          # the look's zooms (tiles.maxzoom: 18 since 2026-10-25)
+    bufs = buffers_px(json.loads(t.style)["layers"], h["max_zoom"])     # the bounds and each zoom's buffer, as Tiles::archive
     for z in range(h["min_zoom"], h["max_zoom"] + 1):
-        x0, x1, y0, y1 = _tile_range((mx0, my0, mx1, my1), z)
+        pad = 2 * _R / (1 << z) * bufs[z] / 512
+        x0, x1, y0, y1 = _tile_range((mx0 - pad, my0 - pad, mx1 + pad, my1 + pad), z)
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1):
                 if d := t.tile(z, x, y):
