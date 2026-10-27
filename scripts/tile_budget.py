@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BUDGET = ROOT / "rust/roadstyle-rs/tests/data/tile_budget.json"
 DOC = ("The tile size budget: the largest numbers that the tiles and the style can have (rust/roadstyle-rs/tests/tile_budget.rs; "
        "docs/design/tile_contract.md, 'The tile size standard'). Limits only go down: scripts/tile_budget.py. A raise needs --raise "
-       "--why, is listed in `raises`, and the PR text must say why; Kaveh must agree.")
+       "--why, is listed in `raises`, and the PR text must say why; Kaveh must agree. `known_over` lists the hard limits that the tiles "
+       "break today; a new entry is a raise too.")
 
 
 def limit(m):
@@ -65,10 +66,25 @@ def merge(measured, old, path, raising, log):
 
 def update(measured, budget, raising, why):
     log = {"lowered": [], "raised": [], "missing": [], "removed": []}
+    measured = dict(measured)
+    broken = measured.pop("hard_violations", None)          # the hard limits that the measured areas break
     areas = dict(budget.get("areas", {}))
     for area, m in measured.items():                     # an area that was not measured (no inputs here) stays as it is
         areas[area] = merge(m, areas.get(area, {}), area, raising, log)
-    out = {"_doc": DOC, "areas": areas, "raises": list(budget.get("raises", []))}
+    out = {"_doc": DOC, "areas": areas, "known_over": list(budget.get("known_over", [])), "raises": list(budget.get("raises", []))}
+    if broken is not None:
+        # a violation that is gone leaves the list; a new one stays out of it unless the call is a raise
+        mine = lambda k: any(k.startswith(a + ".") for a in measured)      # noqa: E731  (an area that was not measured keeps its own)
+        out["known_over"] = [k for k in out["known_over"] if k in broken or not mine(k)]
+        log["removed"] += [f"known_over {k}" for k in budget.get("known_over", []) if mine(k) and k not in broken]
+        for k in broken:
+            if k not in out["known_over"]:
+                if raising:
+                    out["known_over"].append(k)
+                    log["raised"].append(f"known_over: {k}")
+                else:
+                    log["missing"].append(f"{k}: over a hard limit")
+        out["known_over"].sort()
     if log["raised"]:
         out["raises"].append({"date": datetime.date.today().isoformat(), "why": why, "changes": log["raised"]})
     return out, log

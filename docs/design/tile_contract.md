@@ -24,24 +24,39 @@ and CI fails when a number gets worse.
 5. small expressions. A filter, a paint or a layout is data-driven only when it must be, and it has no more than 256 characters of
    JSON, unless the budget lists it with a limit (section 6).
 
-**The limits.** The budget file `rust/roadstyle-rs/tests/data/tile_budget.json` has a limit for each number below. The views are the
-3 x 3 tiles around a fixed centre of Monaco and of Tartu, at zoom 12, 13, 14 and 15, with an empty keep list (the engine's own tiles,
-without a page's popup fields).
+**The hard limits.** These are absolute. The ratchet below only keeps today's numbers, so it cannot say that a number is too large.
+
+| Number | Hard limit | Why |
+|---|---|---|
+| Bytes of one tile | 500,000 | The usual ceiling of a vector tile: Tippecanoe's default and Mapbox's tile limit are 500 KB. |
+| Features in one tile, all layers | 10,000 | Our own limit. MapLibre's parse follows the drawn features (section 6): the Burnaby tiles of the 1.4 s parse hold up to 9,705. Tippecanoe's 200,000 does not protect a browser. |
+| Characters of one filter, paint or layout | 4,096 | Section 6. `evaluate` is 20 % of the worker's profile on Burnaby. |
+| Bytes and features of the tiles of one view (Burnaby, tilted, zoom 14; target, the Burnaby gate prints it) | 3 MB, 60,000 | Half of today's 5.9 MB and 115k features. |
+
+A number over a hard limit is a violation. The budget lists today's violations in `known_over`. A new violation fails CI, and so does a
+listed one that is gone (the script removes it). The aim is an empty list.
+
+**The limits that the ratchet keeps.** The budget file `rust/roadstyle-rs/tests/data/tile_budget.json` has a limit for each number
+below. The views are the 3 x 3 tiles around a fixed centre of Monaco and of Tartu, at zoom 12, 13, 14 and 15, with an empty keep list
+(the engine's own tiles, without a page's popup fields). Each area has two looks: `monaco` and `tartu` are the page's look (the lean
+look: the `simple` pieces and the slots), and `monaco-full` and `tartu-full` are the look of `export_style` for a server (it has the
+layer of whole roads, `roads`, too).
 
 | Number | For |
 |---|---|
 | features, bytes, values (the distinct values), keys | the largest tile of each tile layer, in each view |
-| bytes of all the tiles, bytes of the largest tile | each view |
+| bytes of all the tiles, bytes and features of the largest tile | each view |
 | layers, characters of all expressions | the style |
 | characters of each filter, paint and layout over 256 | each style layer |
 
 **The protocol.**
 
-- A change that makes a number larger than its limit fails CI. The Rust test `tile_budget` checks Monaco and Tartu and the style.
-  `tests/test_tile_budget.py` checks that the Python binding gives Monaco's tiles within the same limits.
+- A change that makes a number larger than its limit fails CI. The Rust test `tile_budget` checks the four looks and the style.
+  `tests/test_tile_budget.py` checks that the Python binding gives Monaco's page tiles within the same limits.
 - To lower the limits after a change that makes the tiles smaller, run `scripts/tile_budget.py` and commit the file. The script lowers a
-  limit and never raises one. A limit is the measured number plus 2 % (at least 1).
-- To raise a limit or to add one (a new layer, a new expression over 256 characters), run
+  limit and never raises one. A limit is the measured number plus 2 % (at least 1). It also removes a violation that is gone from
+  `known_over`.
+- To raise a limit or to add one (a new layer, a new expression over 256 characters, a new violation), run
   `scripts/tile_budget.py --raise --why "the reason"`. The script writes the new limits and the reason in the file (`raises`). The PR
   text must give the same reason, with the numbers before and after, and Kaveh must agree before the merge. Do not edit a limit by hand.
 - The local Burnaby gate prints the same table for the Burnaby roads, with the limits of `areas.burnaby` when the file has them:
@@ -50,24 +65,51 @@ without a page's popup fields).
   roads are not in the repository, so CI does not run it. Burnaby is the only gate that covers the base-map layers (`ov*`), because
   the golden looks of Monaco and Tartu have no base-map layer spec.
 
-**The budget now** (2026-10-27, `rust-engine` at `5a4297b`; each limit in the file is this number plus 2 %). The `simple` columns are
-the largest tile of that layer.
+**The budget now** (2026-10-27; each limit in the file is this number plus 2 %). The page's look:
 
-| Area | Zoom | Bytes, 9 tiles | Largest tile (bytes) | `simple`: features | bytes | values | keys |
+| Area | Zoom | Bytes, 9 tiles | Largest tile: bytes | features | `simple`: features | bytes | values |
 |---|---|---|---|---|---|---|---|
-| monaco | 12 | 1,515,563 | 1,515,563 | 3,057 | 148,817 | 4,496 | 18 |
-| monaco | 13 | 2,126,348 | 1,174,723 | 3,930 | 188,682 | 5,109 | 18 |
-| monaco | 14 | 2,062,676 | 1,200,631 | 4,243 | 209,696 | 5,530 | 18 |
-| monaco | 15 | 2,861,059 | 906,307 | 6,605 | 333,935 | 8,806 | 18 |
-| tartu | 12 | 8,048,022 | 3,984,675 | 5,366 | 243,927 | 6,362 | 18 |
-| tartu | 13 | 8,006,596 | 2,008,851 | 5,778 | 280,126 | 7,051 | 18 |
-| tartu | 14 | 4,409,960 | 846,441 | 3,155 | 152,719 | 3,958 | 18 |
-| tartu | 15 | 1,638,464 | 340,709 | 3,018 | 146,333 | 3,058 | 18 |
+| monaco | 12 | 148,817 | 148,817 | 3,057 | 3,057 | 148,817 | 4,496 |
+| monaco | 13 | 328,297 | 188,682 | 3,930 | 3,930 | 188,682 | 5,109 |
+| monaco | 14 | 422,576 | 261,434 | 5,092 | 4,243 | 209,696 | 5,530 |
+| monaco | 15 | 1,189,927 | 383,687 | 7,384 | 6,605 | 333,935 | 8,806 |
+| tartu | 12 | 471,606 | 243,927 | 5,366 | 5,366 | 243,927 | 6,362 |
+| tartu | 13 | 1,200,903 | 280,126 | 5,778 | 5,778 | 280,126 | 7,051 |
+| tartu | 14 | 1,101,318 | 184,791 | 3,710 | 3,155 | 152,719 | 3,958 |
+| tartu | 15 | 785,237 | 167,383 | 3,348 | 3,018 | 146,333 | 3,058 |
 
-The file also has the limits of the `roads` and `slots` layers. The style (the same for both areas) has 5 layers and 60,630
-characters of expressions. These are over 256 characters: `roads-simple` `line-width` 25,796 (the largest, phase 1 of the plan),
-`line-offset` 2,973, `line-color` 1,732 and the filter 787; `roads-fill` and `roads-highlight` `line-width` 4,645 and `line-offset`
-5,376; `roads-labels` `text-size` 3,464. Each phase of the plan must show its change in these numbers.
+**Where the big tiles are.** The look of `export_style` (the full look) has a second road layer, `roads`: one feature for each whole
+road, with 21 columns (`edge_id`, `osm_id`, `name`, `edge_ref`, `lanes`, `access` and the `__rs_*` marks). In the largest tile of
+each view it is most of the bytes (the largest tile of each layer, in the full look):
+
+| Look and zoom | `roads`: features | bytes | `simple`: features | bytes | The tile | Features |
+|---|---|---|---|---|---|---|
+| monaco-full 12 | 13,078 | 1,366,746 | 3,057 | 148,817 | 1,515,563 | 16,135 |
+| monaco-full 13 | 9,452 | 986,041 | 3,930 | 188,682 | 1,174,723 | 13,382 |
+| monaco-full 14 | 8,967 | 938,677 | 4,243 | 209,696 | 1,200,631 | 14,059 |
+| monaco-full 15 | 5,035 | 522,236 | 6,605 | 333,935 | 906,307 | 12,419 |
+| tartu-full 12 | 35,672 | 3,740,748 | 5,366 | 243,927 | 3,984,675 | 41,038 |
+| tartu-full 13 | 16,844 | 1,741,891 | 5,778 | 280,126 | 2,008,851 | 22,465 |
+| tartu-full 14 | 6,648 | 686,194 | 3,155 | 152,719 | 846,441 | 10,132 |
+
+The page does not ship `roads`: its look has no layer that reads it. In the page's look no tile of the four zoom levels is near a
+hard limit (the largest is 383,687 bytes and 7,384 features). The causes of the full look's size:
+
+1. `roads-highlight` (the glow of a hovered road) reads `roads` with no zoom clause, so the tiles of zoom 12 hold every road, also the
+   service roads that `simple` hides below zoom 15 (`ZoomRules` leaves a feature out only when every layer hides it). `roads-fill` has
+   a class minzoom, but its opacity is 0: it is only a click target.
+2. The popup columns are in the tiles (43,386 distinct values in one Monaco tile; 114,871 in one Tartu tile).
+3. The road is stored two times: once as pieces (`simple`) and once as a whole road (`roads`).
+
+**Today's violations** (`known_over` has 26 entries):
+
+| Violation | Looks | Value now | What must change |
+|---|---|---|---|
+| Bytes of one tile over 500,000 | `monaco-full` z12 to z15, `tartu-full` z12 to z14 | 3,984,675 at most | The glow and the fill read `simple` with feature-state, as the page's look does, and `roads` goes. The popup columns go to a props file by id (the data layer for a server, section 4), fetched on a click. |
+| Features in one tile over 10,000 | the same looks | 41,038 at most | The same change: `simple` has at most 6,605 in a tile. |
+| `line-width` of `roads-simple` over 4,096 characters | all four looks | 25,796 | Phase 1 of the plan: one width key for each piece (`__rs_wk`) and one table lookup for each zoom stop. |
+| `line-width` and `line-offset` of `roads-fill` and `roads-highlight` over 4,096 | `monaco-full`, `tartu-full` | 4,645 and 5,376 | They go with `roads`. |
+| Burnaby, the tilted view, over 3 MB and 60,000 features (target) | the page's look | 5.9 MB, 115k | The keys from the style (section 3), the id (section 2), and one casing for the two halves of a two-way road (option B of `ANALYSIS.md`, its own note). |
 
 ## Why
 

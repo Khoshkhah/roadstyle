@@ -1,7 +1,7 @@
 {
- "_doc": "The tile size budget: the largest numbers that the tiles and the style can have (rust/roadstyle-rs/tests/tile_budget.rs; docs/design/tile_contract.md, 'The tile size standard'). Limits only go down: scripts/tile_budget.py. A raise needs --raise --why, is listed in `raises`, and the PR text must say why; Kaveh must agree.",
+ "_doc": "The tile size budget: the largest numbers that the tiles and the style can have (rust/roadstyle-rs/tests/tile_budget.rs; docs/design/tile_contract.md, 'The tile size standard'). Limits only go down: scripts/tile_budget.py. A raise needs --raise --why, is listed in `raises`, and the PR text must say why; Kaveh must agree. `known_over` lists the hard limits that the tiles break today; a new entry is a raise too.",
  "areas": {
-  "monaco": {
+  "monaco-full": {
    "center": [
     7.42431,
     43.73837
@@ -10,6 +10,7 @@
     "view_bytes": 1545875,
     "view_features": 16458,
     "max_tile_bytes": 1545875,
+    "max_tile_features": 16458,
     "layers": {
      "roads": {
       "features": 13340,
@@ -29,6 +30,7 @@
     "view_bytes": 2168875,
     "view_features": 24706,
     "max_tile_bytes": 1198218,
+    "max_tile_features": 13650,
     "layers": {
      "roads": {
       "features": 9642,
@@ -48,6 +50,7 @@
     "view_bytes": 2103930,
     "view_features": 24492,
     "max_tile_bytes": 1224644,
+    "max_tile_features": 14341,
     "layers": {
      "roads": {
       "features": 9147,
@@ -73,6 +76,7 @@
     "view_bytes": 2918281,
     "view_features": 39757,
     "max_tile_bytes": 924434,
+    "max_tile_features": 12668,
     "layers": {
      "roads": {
       "features": 5136,
@@ -126,7 +130,7 @@
     }
    }
   },
-  "tartu": {
+  "tartu-full": {
    "center": [
     26.70605,
     58.36462
@@ -135,6 +139,7 @@
     "view_bytes": 8208983,
     "view_features": 84607,
     "max_tile_bytes": 4064369,
+    "max_tile_features": 41859,
     "layers": {
      "roads": {
       "features": 36386,
@@ -154,6 +159,7 @@
     "view_bytes": 8166728,
     "view_features": 92305,
     "max_tile_bytes": 2049029,
+    "max_tile_features": 22915,
     "layers": {
      "roads": {
       "features": 17181,
@@ -173,6 +179,7 @@
     "view_bytes": 4498160,
     "view_features": 55218,
     "max_tile_bytes": 863370,
+    "max_tile_features": 10335,
     "layers": {
      "roads": {
       "features": 6781,
@@ -198,6 +205,7 @@
     "view_bytes": 1671234,
     "view_features": 24197,
     "max_tile_bytes": 347524,
+    "max_tile_features": 5125,
     "layers": {
      "roads": {
       "features": 1710,
@@ -250,8 +258,228 @@
      }
     }
    }
+  },
+  "monaco": {
+   "center": [
+    7.42431,
+    43.73837
+   ],
+   "z12": {
+    "view_bytes": 151794,
+    "view_features": 3119,
+    "max_tile_bytes": 151794,
+    "max_tile_features": 3119,
+    "layers": {
+     "simple": {
+      "features": 3119,
+      "bytes": 151794,
+      "values": 4586,
+      "keys": 19
+     }
+    }
+   },
+   "z13": {
+    "view_bytes": 334863,
+    "view_features": 6914,
+    "max_tile_bytes": 192456,
+    "max_tile_features": 4009,
+    "layers": {
+     "simple": {
+      "features": 4009,
+      "bytes": 192456,
+      "values": 5212,
+      "keys": 19
+     }
+    }
+   },
+   "z14": {
+    "view_bytes": 431028,
+    "view_features": 8361,
+    "max_tile_bytes": 266663,
+    "max_tile_features": 5194,
+    "layers": {
+     "simple": {
+      "features": 4328,
+      "bytes": 213890,
+      "values": 5641,
+      "keys": 19
+     },
+     "slots": {
+      "features": 866,
+      "bytes": 52773,
+      "values": 1502,
+      "keys": 13
+     }
+    }
+   },
+   "z15": {
+    "view_bytes": 1213726,
+    "view_features": 23293,
+    "max_tile_bytes": 391361,
+    "max_tile_features": 7532,
+    "layers": {
+     "simple": {
+      "features": 6738,
+      "bytes": 340614,
+      "values": 8983,
+      "keys": 19
+     },
+     "slots": {
+      "features": 795,
+      "bytes": 50748,
+      "values": 1564,
+      "keys": 13
+     }
+    }
+   },
+   "style": {
+    "layers": 4,
+    "expressions_total": 39715,
+    "expressions": {
+     "roads-simple": {
+      "filter": 803,
+      "paint.line-color": 1767,
+      "paint.line-width": 26312,
+      "paint.line-offset": 3033
+     },
+     "roads-arrows": {
+      "filter": 579,
+      "layout.symbol-sort-key": 494,
+      "layout.icon-size": 406
+     },
+     "roads-labels": {
+      "filter": 1075,
+      "layout.text-size": 3534,
+      "layout.symbol-sort-key": 494
+     }
+    }
+   }
+  },
+  "tartu": {
+   "center": [
+    26.70605,
+    58.36462
+   ],
+   "z12": {
+    "view_bytes": 481039,
+    "view_features": 10457,
+    "max_tile_bytes": 248806,
+    "max_tile_features": 5474,
+    "layers": {
+     "simple": {
+      "features": 5474,
+      "bytes": 248806,
+      "values": 6490,
+      "keys": 19
+     }
+    }
+   },
+   "z13": {
+    "view_bytes": 1224922,
+    "view_features": 25367,
+    "max_tile_bytes": 285729,
+    "max_tile_features": 5894,
+    "layers": {
+     "simple": {
+      "features": 5894,
+      "bytes": 285729,
+      "values": 7193,
+      "keys": 19
+     }
+    }
+   },
+   "z14": {
+    "view_bytes": 1123345,
+    "view_features": 22243,
+    "max_tile_bytes": 188487,
+    "max_tile_features": 3785,
+    "layers": {
+     "simple": {
+      "features": 3219,
+      "bytes": 155774,
+      "values": 4038,
+      "keys": 19
+     },
+     "slots": {
+      "features": 567,
+      "bytes": 32714,
+      "values": 1070,
+      "keys": 13
+     }
+    }
+   },
+   "z15": {
+    "view_bytes": 800942,
+    "view_features": 15656,
+    "max_tile_bytes": 170731,
+    "max_tile_features": 3415,
+    "layers": {
+     "simple": {
+      "features": 3079,
+      "bytes": 149260,
+      "values": 3120,
+      "keys": 19
+     },
+     "slots": {
+      "features": 337,
+      "bytes": 21471,
+      "values": 824,
+      "keys": 13
+     }
+    }
+   },
+   "style": {
+    "layers": 4,
+    "expressions_total": 39715,
+    "expressions": {
+     "roads-simple": {
+      "filter": 803,
+      "paint.line-color": 1767,
+      "paint.line-width": 26312,
+      "paint.line-offset": 3033
+     },
+     "roads-arrows": {
+      "filter": 579,
+      "layout.symbol-sort-key": 494,
+      "layout.icon-size": 406
+     },
+     "roads-labels": {
+      "filter": 1075,
+      "layout.text-size": 3534,
+      "layout.symbol-sort-key": 494
+     }
+    }
+   }
   }
  },
+ "known_over": [
+  "monaco-full.style.roads-fill.paint.line-offset",
+  "monaco-full.style.roads-fill.paint.line-width",
+  "monaco-full.style.roads-highlight.paint.line-offset",
+  "monaco-full.style.roads-highlight.paint.line-width",
+  "monaco-full.style.roads-simple.paint.line-width",
+  "monaco-full.z12.max_tile_bytes",
+  "monaco-full.z12.max_tile_features",
+  "monaco-full.z13.max_tile_bytes",
+  "monaco-full.z13.max_tile_features",
+  "monaco-full.z14.max_tile_bytes",
+  "monaco-full.z14.max_tile_features",
+  "monaco-full.z15.max_tile_bytes",
+  "monaco-full.z15.max_tile_features",
+  "monaco.style.roads-simple.paint.line-width",
+  "tartu-full.style.roads-fill.paint.line-offset",
+  "tartu-full.style.roads-fill.paint.line-width",
+  "tartu-full.style.roads-highlight.paint.line-offset",
+  "tartu-full.style.roads-highlight.paint.line-width",
+  "tartu-full.style.roads-simple.paint.line-width",
+  "tartu-full.z12.max_tile_bytes",
+  "tartu-full.z12.max_tile_features",
+  "tartu-full.z13.max_tile_bytes",
+  "tartu-full.z13.max_tile_features",
+  "tartu-full.z14.max_tile_bytes",
+  "tartu-full.z14.max_tile_features",
+  "tartu.style.roads-simple.paint.line-width"
+ ],
  "raises": [
   {
    "date": "2026-10-27",
@@ -395,6 +623,150 @@
     "tartu.style.expressions.roads-labels.layout.symbol-sort-key: new, 494",
     "tartu.style.expressions.roads-highlight.paint.line-width: new, 4738",
     "tartu.style.expressions.roads-highlight.paint.line-offset: new, 5484"
+   ]
+  },
+  {
+   "date": "2026-10-27",
+   "why": "two looks (the page's lean look, and the full look of export_style, which has the whole-road layer), the largest tile's features, and the hard limits with their known violations",
+   "changes": [
+    "monaco.z12.view_bytes: new, 151794",
+    "monaco.z12.view_features: new, 3119",
+    "monaco.z12.max_tile_bytes: new, 151794",
+    "monaco.z12.max_tile_features: new, 3119",
+    "monaco.z12.layers.simple.features: new, 3119",
+    "monaco.z12.layers.simple.bytes: new, 151794",
+    "monaco.z12.layers.simple.values: new, 4586",
+    "monaco.z12.layers.simple.keys: new, 19",
+    "monaco.z13.view_bytes: new, 334863",
+    "monaco.z13.view_features: new, 6914",
+    "monaco.z13.max_tile_bytes: new, 192456",
+    "monaco.z13.max_tile_features: new, 4009",
+    "monaco.z13.layers.simple.features: new, 4009",
+    "monaco.z13.layers.simple.bytes: new, 192456",
+    "monaco.z13.layers.simple.values: new, 5212",
+    "monaco.z13.layers.simple.keys: new, 19",
+    "monaco.z14.view_bytes: new, 431028",
+    "monaco.z14.view_features: new, 8361",
+    "monaco.z14.max_tile_bytes: new, 266663",
+    "monaco.z14.max_tile_features: new, 5194",
+    "monaco.z14.layers.simple.features: new, 4328",
+    "monaco.z14.layers.simple.bytes: new, 213890",
+    "monaco.z14.layers.simple.values: new, 5641",
+    "monaco.z14.layers.simple.keys: new, 19",
+    "monaco.z14.layers.slots.features: new, 866",
+    "monaco.z14.layers.slots.bytes: new, 52773",
+    "monaco.z14.layers.slots.values: new, 1502",
+    "monaco.z14.layers.slots.keys: new, 13",
+    "monaco.z15.view_bytes: new, 1213726",
+    "monaco.z15.view_features: new, 23293",
+    "monaco.z15.max_tile_bytes: new, 391361",
+    "monaco.z15.max_tile_features: new, 7532",
+    "monaco.z15.layers.simple.features: new, 6738",
+    "monaco.z15.layers.simple.bytes: new, 340614",
+    "monaco.z15.layers.simple.values: new, 8983",
+    "monaco.z15.layers.simple.keys: new, 19",
+    "monaco.z15.layers.slots.features: new, 795",
+    "monaco.z15.layers.slots.bytes: new, 50748",
+    "monaco.z15.layers.slots.values: new, 1564",
+    "monaco.z15.layers.slots.keys: new, 13",
+    "monaco.style.layers: new, 4",
+    "monaco.style.expressions_total: new, 39715",
+    "monaco.style.expressions.roads-simple.filter: new, 803",
+    "monaco.style.expressions.roads-simple.paint.line-color: new, 1767",
+    "monaco.style.expressions.roads-simple.paint.line-width: new, 26312",
+    "monaco.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "monaco.style.expressions.roads-arrows.filter: new, 579",
+    "monaco.style.expressions.roads-arrows.layout.symbol-sort-key: new, 494",
+    "monaco.style.expressions.roads-arrows.layout.icon-size: new, 406",
+    "monaco.style.expressions.roads-labels.filter: new, 1075",
+    "monaco.style.expressions.roads-labels.layout.text-size: new, 3534",
+    "monaco.style.expressions.roads-labels.layout.symbol-sort-key: new, 494",
+    "monaco-full.z12.max_tile_features: new, 16458",
+    "monaco-full.z13.max_tile_features: new, 13650",
+    "monaco-full.z14.max_tile_features: new, 14341",
+    "monaco-full.z15.max_tile_features: new, 12668",
+    "tartu.z12.view_bytes: new, 481039",
+    "tartu.z12.view_features: new, 10457",
+    "tartu.z12.max_tile_bytes: new, 248806",
+    "tartu.z12.max_tile_features: new, 5474",
+    "tartu.z12.layers.simple.features: new, 5474",
+    "tartu.z12.layers.simple.bytes: new, 248806",
+    "tartu.z12.layers.simple.values: new, 6490",
+    "tartu.z12.layers.simple.keys: new, 19",
+    "tartu.z13.view_bytes: new, 1224922",
+    "tartu.z13.view_features: new, 25367",
+    "tartu.z13.max_tile_bytes: new, 285729",
+    "tartu.z13.max_tile_features: new, 5894",
+    "tartu.z13.layers.simple.features: new, 5894",
+    "tartu.z13.layers.simple.bytes: new, 285729",
+    "tartu.z13.layers.simple.values: new, 7193",
+    "tartu.z13.layers.simple.keys: new, 19",
+    "tartu.z14.view_bytes: new, 1123345",
+    "tartu.z14.view_features: new, 22243",
+    "tartu.z14.max_tile_bytes: new, 188487",
+    "tartu.z14.max_tile_features: new, 3785",
+    "tartu.z14.layers.simple.features: new, 3219",
+    "tartu.z14.layers.simple.bytes: new, 155774",
+    "tartu.z14.layers.simple.values: new, 4038",
+    "tartu.z14.layers.simple.keys: new, 19",
+    "tartu.z14.layers.slots.features: new, 567",
+    "tartu.z14.layers.slots.bytes: new, 32714",
+    "tartu.z14.layers.slots.values: new, 1070",
+    "tartu.z14.layers.slots.keys: new, 13",
+    "tartu.z15.view_bytes: new, 800942",
+    "tartu.z15.view_features: new, 15656",
+    "tartu.z15.max_tile_bytes: new, 170731",
+    "tartu.z15.max_tile_features: new, 3415",
+    "tartu.z15.layers.simple.features: new, 3079",
+    "tartu.z15.layers.simple.bytes: new, 149260",
+    "tartu.z15.layers.simple.values: new, 3120",
+    "tartu.z15.layers.simple.keys: new, 19",
+    "tartu.z15.layers.slots.features: new, 337",
+    "tartu.z15.layers.slots.bytes: new, 21471",
+    "tartu.z15.layers.slots.values: new, 824",
+    "tartu.z15.layers.slots.keys: new, 13",
+    "tartu.style.layers: new, 4",
+    "tartu.style.expressions_total: new, 39715",
+    "tartu.style.expressions.roads-simple.filter: new, 803",
+    "tartu.style.expressions.roads-simple.paint.line-color: new, 1767",
+    "tartu.style.expressions.roads-simple.paint.line-width: new, 26312",
+    "tartu.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "tartu.style.expressions.roads-arrows.filter: new, 579",
+    "tartu.style.expressions.roads-arrows.layout.symbol-sort-key: new, 494",
+    "tartu.style.expressions.roads-arrows.layout.icon-size: new, 406",
+    "tartu.style.expressions.roads-labels.filter: new, 1075",
+    "tartu.style.expressions.roads-labels.layout.text-size: new, 3534",
+    "tartu.style.expressions.roads-labels.layout.symbol-sort-key: new, 494",
+    "tartu-full.z12.max_tile_features: new, 41859",
+    "tartu-full.z13.max_tile_features: new, 22915",
+    "tartu-full.z14.max_tile_features: new, 10335",
+    "tartu-full.z15.max_tile_features: new, 5125",
+    "known_over: monaco.style.roads-simple.paint.line-width",
+    "known_over: monaco-full.z12.max_tile_bytes",
+    "known_over: monaco-full.z12.max_tile_features",
+    "known_over: monaco-full.z13.max_tile_bytes",
+    "known_over: monaco-full.z13.max_tile_features",
+    "known_over: monaco-full.z14.max_tile_bytes",
+    "known_over: monaco-full.z14.max_tile_features",
+    "known_over: monaco-full.z15.max_tile_bytes",
+    "known_over: monaco-full.z15.max_tile_features",
+    "known_over: monaco-full.style.roads-simple.paint.line-width",
+    "known_over: monaco-full.style.roads-fill.paint.line-width",
+    "known_over: monaco-full.style.roads-fill.paint.line-offset",
+    "known_over: monaco-full.style.roads-highlight.paint.line-width",
+    "known_over: monaco-full.style.roads-highlight.paint.line-offset",
+    "known_over: tartu.style.roads-simple.paint.line-width",
+    "known_over: tartu-full.z12.max_tile_bytes",
+    "known_over: tartu-full.z12.max_tile_features",
+    "known_over: tartu-full.z13.max_tile_bytes",
+    "known_over: tartu-full.z13.max_tile_features",
+    "known_over: tartu-full.z14.max_tile_bytes",
+    "known_over: tartu-full.z14.max_tile_features",
+    "known_over: tartu-full.style.roads-simple.paint.line-width",
+    "known_over: tartu-full.style.roads-fill.paint.line-width",
+    "known_over: tartu-full.style.roads-fill.paint.line-offset",
+    "known_over: tartu-full.style.roads-highlight.paint.line-width",
+    "known_over: tartu-full.style.roads-highlight.paint.line-offset"
    ]
   }
  ]

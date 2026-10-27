@@ -80,21 +80,23 @@ def test_the_binding_tiles_of_monaco_are_within_the_budget():
     from roadstyle import _engine
 
     o = json.loads(gzip.decompress((DATA / "monaco/golden_options.json.gz").read_bytes()))
-    look = _engine.rust().resolve_look(json.dumps(o)).with_arg("export", "true")
+    look = _engine.rust().resolve_look(json.dumps(o)).with_arg("export", "false")
     tiler = _engine.rust().Tiler(pq.read_table(DATA / "monaco/roads.parquet"), look, None, None, "rs://", [])
     budget = BUDGET["areas"]["monaco"]
     lon, lat = budget["center"]
     over = []
     for z in range(12, 16):
         limit, biggest, view_bytes, view_features, layers = budget[f"z{z}"], 0, 0, 0, {}
+        most = 0
         for tile in (tiler.tile(*t) for t in _square(z, lon, lat)):
             view_bytes += len(tile)
             biggest = max(biggest, len(tile))
+            most = max(most, sum(layer[1] for layer in _layers(tile)))
             for name, f, b, k, v in _layers(tile):
                 view_features += f
                 e = layers.setdefault(name, [0, 0, 0, 0])
                 layers[name] = [max(e[0], f), max(e[1], b), max(e[2], v), max(e[3], k)]
-        got = {"view_bytes": view_bytes, "view_features": view_features, "max_tile_bytes": biggest}
+        got = {"view_bytes": view_bytes, "view_features": view_features, "max_tile_bytes": biggest, "max_tile_features": most}
         over += [f"z{z}.{k}: {v} > {limit[k]}" for k, v in got.items() if v > limit[k]]
         assert set(layers) == set(limit["layers"]), f"z{z}: the tile layers are not the budget's"
         for name, nums in layers.items():
@@ -124,6 +126,15 @@ def test_a_raise_is_in_the_file_with_its_reason():
     assert new["raises"][0]["why"] == "a new layer" and new["raises"][0]["changes"] == log["raised"]
     with pytest.raises(SystemExit):
         script.main(["--raise", "--measured", "/dev/null"])          # no --why
+
+
+def test_a_new_hard_violation_needs_a_raise_and_a_fixed_one_leaves_the_list():
+    old = {"areas": {}, "known_over": ["a.z12.max_tile_bytes", "b.z12.max_tile_bytes"]}
+    new, log = script.update({"a": {}, "hard_violations": ["a.z13.max_tile_bytes"]}, old, False, "")
+    assert new["known_over"] == ["b.z12.max_tile_bytes"], "a is measured: its fixed violation leaves; b was not measured: it stays"
+    assert len(log["missing"]) == 1, "a new violation is not added without a raise"
+    new, _ = script.update({"a": {}, "hard_violations": ["a.z13.max_tile_bytes"]}, old, True, "a new view")
+    assert "a.z13.max_tile_bytes" in new["known_over"]
 
 
 def test_a_budget_limit_has_a_margin_over_nothing_else():
