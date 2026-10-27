@@ -98,8 +98,16 @@ and after, and the tiles after have no feature that is not drawn. Tile bytes (Bu
 | z14 | 83,179 | 68,991 | 1.45 | 1.24 | 105 ms | 99–100 ms |
 | Pitch 60, z14 (21 tiles) | | | 6.47 | 5.54 | 327 ms | 319–332 ms |
 
-The time of `tile()` does not change: the pieces that go are the pieces that the cells step has not made yet, but the encode of the
-rest is the same work. The gain is in MapLibre's parse (the page measured 1.4 s of 2.15 s there).
+The time of `tile()` does not change: it makes and encodes the pieces that are drawn, and those are the same. Less data goes to the main
+thread, but MapLibre's parse did not get much faster either. In the page session's control (the same style, tiles as static files, jump to
+z14 at pitch 60, median of 5 runs, headless Chromium with software GL): now 1.47 s, with this rule 1.43 to 1.53 s (the runs overlap).
+MapLibre does not build a bucket for a feature that its layer's filter hides, so a feature that is not drawn costs it little. The cost
+follows the features that are drawn.
+
+With no road layer at all, the same view takes 0.66 s (the base map and the overlays). With one feature for each road (only the fills below
+z15, the casing as a second style layer on the same feature; a measurement, not code in the library) it takes 1.24 to 1.32 s: 26,064
+road features in 3.15 MB. So the roads cost about 0.8 s now and about 0.6 s with one feature. Files and pictures:
+`.claude/tile-lag/one-feature/` of the workspace.
 
 ## What gave no gain
 
