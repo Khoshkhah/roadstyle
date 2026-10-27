@@ -12,6 +12,9 @@ pub struct TileOptions {
     pub min_zoom: u32,
     pub max_zoom: u32,
     pub buffer_px: f64,
+    /// the buffer of each zoom 0 to max_zoom in px (crate::buffer::buffers_px: from the style's strokes; `buffer_px` where a stroke's
+    /// width cannot be bounded)
+    pub buffers: Vec<f64>,
     /// the properties that the drawing reads (props::drawn), with the caller's `keep`; every `__rs_*` one goes too
     pub read: HashSet<String>,
     /// the pieces' own columns: the class, lvl, the metre width and the class filter
@@ -45,7 +48,9 @@ impl TileOptions {
         let col = |k: &str| columns[k].as_str().filter(|c| !c.is_empty()).map(String::from);
         let pieces = [col("class").unwrap_or_else(|| "highway".into()), "lvl".into()].into_iter().chain(col("width")).chain(col("filter")).collect();
         let slots_from = layers.iter().filter(|l| l["source"] == "slots").map(|l| l["minzoom"].as_f64().unwrap_or(0.0) as u32).min().unwrap_or(0);
-        Ok(TileOptions { min_zoom: num("minzoom")? as u32, max_zoom: num("maxzoom")? as u32, buffer_px: num("buffer_px")?,
+        let (min_zoom, max_zoom, buffer_px) = (num("minzoom")? as u32, num("maxzoom")? as u32, num("buffer_px")?);
+        let buffers = crate::buffer::buffers_px(layers, max_zoom, crate::buffer::LIVE_WIDTH_MAX, buffer_px);
+        Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers,
                          read: roadstyle_model::props::drawn(layers, metadata, keep), pieces, exact: None, only: None, slots_from, wait: false })
     }
 
@@ -59,12 +64,12 @@ impl TileOptions {
         TileOptions::new(layers, m, &m[TILES], &m[COLUMNS], keep)
     }
 
-    /// The empty tiles of these rules: their zooms, and `buffer_px` as tile units (MapLibre draws a vector tile at 512 px, so a pixel
-    /// is EXTENT / 512 units). A road whose line is out of a tile but whose stroke reaches into it is then in that tile: each tile is
-    /// drawn only inside its own edges, and with the buffer as 80 units (10 px) a primary road near a tile edge lost its casing in the
-    /// next tile from the tiles' last zoom on (Burnaby, z19.6, 2026-10-27).
+    /// The empty tiles of these rules: their zooms, and the buffer of each zoom (`buffers`) as tile units (MapLibre draws a vector
+    /// tile at 512 px, so a pixel is EXTENT / 512 units). A road whose line is out of a tile but whose stroke reaches into it is then in
+    /// that tile: each tile is drawn only inside its own edges, and with a buffer of 80 units (10 px) a primary road near a tile edge
+    /// lost its casing in the next tile from the tiles' last zoom on (Burnaby, z19.6, 2026-10-27).
     pub fn tiles(&self) -> Result<crate::Tiles, Error> {
-        crate::Tiles::new(self.min_zoom, self.max_zoom, self.buffer_px * crate::EXTENT / TILE_PX)
+        crate::Tiles::with_buffers(self.min_zoom, self.max_zoom, self.buffers.iter().map(|b| b * crate::EXTENT / TILE_PX).collect())
     }
 
     /// The source goes into the tiles.

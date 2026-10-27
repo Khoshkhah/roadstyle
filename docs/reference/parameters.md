@@ -339,7 +339,7 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `bridge_decks` | `base_m 5`, `thickness_m 1`, `ramp_m 40`, `step_m 2.5`, `match_zoom 18`, `opacity 0.7`, `width_scale 0.6`, `flat_below 16`, `casing_px 2` | 3D bridge decks |
 | `overlays` | `color #6aa9ff`, `radius 6`, `width 2`, per-kind opacities, `circle_stroke #ffffff` | `Overlay` defaults |
 | `annotations` | `slot_m 100` | label / arrow spacing along a road, metres |
-| `tiles` | `minzoom 6`, `maxzoom 18`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up: at maxzoom 15 a casing piece stood 4–5 px off its fill at zoom 22, at 18 about 1 px |
+| `tiles` | `minzoom 6`, `maxzoom 18`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up: at maxzoom 15 a casing piece stood 4–5 px off its fill at zoom 22, at 18 about 1 px. The Rust engine gives each zoom the buffer of its widest stroke (half the line width, the gap and the offset, 3 times a live width; `roadstyle_tiles::buffer`); `buffer_px` is the buffer of a zoom where a width cannot be bounded |
 | `api_key` / `api_keys` | `None` / `{}` | default key / per-provider keys |
 
 **See also:** [JavaScript API](javascript.md) · [Settings & palettes](settings.md) · [Command line](cli.md)

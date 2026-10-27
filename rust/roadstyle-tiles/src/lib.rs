@@ -12,6 +12,7 @@
 // Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
+pub mod buffer;
 pub mod error;
 pub mod pmtiles;
 pub mod rules;
@@ -124,7 +125,8 @@ pub struct Tiles {
     style: Vec<Value>,
     min_zoom: u32,
     max_zoom: u32,
-    buffer: f64,
+    /// the buffer of each zoom (index: the zoom), in tile units
+    buffers: Vec<f64>,
     cache: std::sync::Mutex<TileCache>,
 }
 
@@ -249,10 +251,19 @@ impl Tiles {
     /// The tiles of the zooms `min_zoom` to `max_zoom` (see `check_zooms`), with `buffer` (tile units, 0 or more) round each tile.
     pub fn new(min_zoom: u32, max_zoom: u32, buffer: f64) -> Result<Tiles, Error> {
         check_zooms(min_zoom as f64, max_zoom as f64)?;
-        if !(buffer >= 0.0 && buffer.is_finite()) {
-            return Err(Error::Options(format!("the tile buffer is {buffer}: give 0 or more")));
+        Tiles::with_buffers(min_zoom, max_zoom, vec![buffer; max_zoom as usize + 1])
+    }
+
+    /// `new` with a buffer for each zoom (`buffers[z]`, tile units, 0 or more; one for each zoom 0 to `max_zoom`).
+    pub fn with_buffers(min_zoom: u32, max_zoom: u32, buffers: Vec<f64>) -> Result<Tiles, Error> {
+        check_zooms(min_zoom as f64, max_zoom as f64)?;
+        if let Some(b) = buffers.iter().find(|b| !(**b >= 0.0 && b.is_finite())) {
+            return Err(Error::Options(format!("the tile buffer is {b}: give 0 or more")));
         }
-        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffer, cache: Default::default() })
+        if buffers.len() != max_zoom as usize + 1 {
+            return Err(Error::Options(format!("{} tile buffers for the zooms 0 to {max_zoom}", buffers.len())));
+        }
+        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default() })
     }
 
     /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom
@@ -352,7 +363,7 @@ impl Tiles {
     /// The features of the layer `name` that the tile z/x/y has and that wait (`add_waiting`): each feature's place and tag.
     pub fn waiting(&self, name: &str, z: u32, x: u32, y: u32) -> Vec<(u32, u64)> {
         let Some(layer) = self.layers.get(name).filter(|l| l.at.is_some() && z >= self.min_zoom && z <= self.max_zoom && z >= l.min_zoom) else { return Vec::new() };
-        layer.hits(z, x, y, self.pad(layer)).into_iter().filter_map(|i| layer.feats[i as usize].wait.map(|(_, tag)| (i, tag))).collect()
+        layer.hits(z, x, y, self.pad(layer, z)).into_iter().filter_map(|i| layer.feats[i as usize].wait.map(|(_, tag)| (i, tag))).collect()
     }
 
     /// Give waiting features of the layer `name` their line and properties (`keep`, `whole`: add_waiting's): each as (place, line,
@@ -505,14 +516,15 @@ impl Tiles {
         out
     }
 
-    /// The buffer round a tile of `layer`, in tile units: none for a whole layer (its features go whole into the tiles they touch).
-    fn pad(&self, layer: &Layer) -> f64 {
-        if layer.whole { 0.0 } else { self.buffer }
+    /// The buffer round a tile of zoom `z` of `layer`, in tile units: none for a whole layer (its features go whole into the tiles
+    /// they touch).
+    fn pad(&self, layer: &Layer, z: u32) -> f64 {
+        if layer.whole { 0.0 } else { self.buffers[z as usize] }
     }
 
     fn layer_tile(&self, name: &str, layer: &Layer, z: u32, x: u32, y: u32) -> Vec<u8> {
         let n = (1u64 << z) as f64;
-        let buffer = self.pad(layer);
+        let buffer = self.pad(layer, z);
         let hits = layer.hits(z, x, y, buffer);
         // the tile's own units: (merc * 2^z - x) * EXTENT
         let to = |p: &P| [(p[0] * n - x as f64) * EXTENT, (p[1] * n - y as f64) * EXTENT];
@@ -1093,19 +1105,22 @@ mod tests {
 
     #[test]
     fn the_buffer_is_in_pixels() {
-        // a road 40 px above tile 18/41536/89738 (Burnaby): its stroke reaches into the tile, so the tile has it (buffer_px 80); with
-        // the buffer as 80 units (10 px) the tile had none, and the road's casing was missing in the tile (each tile is drawn inside
-        // its own edges only)
-        let o = stage::TileOptions::new(&[], &json!({}), &json!({"minzoom": 0, "maxzoom": 18, "buffer_px": 80, "extent": 4096}), &json!({}), &[]).unwrap();
+        // roads 100 px wide (a reach of 50 px) 40 px and 60 px above tiles of zoom 18 (Burnaby): the stroke of the first reaches into
+        // its tile, so the tile has it; with the buffer as 80 units (10 px) the tile had none, and the road's casing was missing in the
+        // tile (each tile is drawn inside its own edges only). The second does not reach into its tile.
+        let layers = [json!({"type": "line", "source": "roads", "paint": {"line-width": 100}})];
+        let o = stage::TileOptions::new(&layers, &json!({}), &json!({"minzoom": 0, "maxzoom": 18, "buffer_px": 80, "extent": 4096}), &json!({}), &[]).unwrap();
         let mut t = o.tiles().unwrap();
         let n = (1u64 << 18) as f64;
         let at = |x: f64, y: f64| [x / n * 360.0 - 180.0, (std::f64::consts::PI * (1.0 - 2.0 * y / n)).sinh().atan().to_degrees()];
-        let y = 89738.0 - 40.0 / 512.0;
-        t.add("roads", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
-            "geometry": {"type": "LineString", "coordinates": [at(41536.1, y), at(41536.9, y)]}}]}}), &keys(&[]), false, 0);
+        let road = |x: f64, px: f64| json!({"type": "Feature", "properties": {}, "geometry": {"type": "LineString",
+            "coordinates": [at(x + 0.1, 89738.0 - px / 512.0), at(x + 0.9, 89738.0 - px / 512.0)]}});
+        t.add("roads", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [road(41536.0, 40.0), road(41540.0, 60.0)]}}),
+              &keys(&[]), false, 0);
         assert!(!t.tile(18, 41536, 89737).is_empty());
         assert!(!t.tile(18, 41536, 89738).is_empty(), "the road 40 px out of the tile is in it");
         assert!(t.tile(18, 41536, 89739).is_empty(), "and not in the tile after it");
+        assert!(t.tile(18, 41540, 89738).is_empty(), "the road 60 px out of the tile is not in it");
     }
 
     #[test]

@@ -6,7 +6,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **A casing gap on a tile edge** (2026-10-27): a wide road near the edge of a tile lost its casing in the next tile (Burnaby, z19.6).
+  MapLibre draws each tile only inside its own edges, and the tiles had a buffer of 80 units (10 px) and only the features whose box
+  touches the tile. Now a tile has the features whose box touches the tile and its buffer, and the Rust engine gives each zoom the
+  buffer of its widest stroke (half the line width, the gap and the offset, 3 times where the width reads the live width;
+  `roadstyle_tiles::buffer`; `buffer_px` where a width cannot be bounded). tiles.py reads `buffer_px` as px. Burnaby's buffers: 11.7 px
+  up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
+
 ### Changed
+- **Faster first tiles** (2026-10-27): `Tiles::make` takes a property that is the same as the last feature's (the pieces of one road)
+  with no lookup.
 - **The road table without the roads' lines** (2026-10-26): `roadTable(fields?, lines?)` (wasm) and `road_table(fields=None,
   lines=False)` (Python) give the lines only with `lines`; `roadLines(rows)` / `road_lines(rows)` give the lines of some rows. The
   dashboard reads a road's line from the table's `linesOf(rows)` when the table has no lines (a click and `rsSelect` load it before

@@ -109,7 +109,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "e186b2fb87497cf2bd9a061b68675d5ff60a4c28ef7b1d19fd513a0e60b923d4");
+    assert_eq!(tiles_hash(&area), "f06445e75d95f65a12532b380f85fe98dfeda119b10411394b609197eb9a4674");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at
@@ -134,5 +134,5 @@ fn the_sea_is_cut_at_the_boundary() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "9e69260d48e91291d99f13396985bde902ec227a9234b16b5474f596fe7d3193");
+    assert_eq!(tiles_hash(&area), "c02b3384c4e7e54835fec7887e533b32d6a798f02df8b6adfcb4302f55a2b6e9");
 }
