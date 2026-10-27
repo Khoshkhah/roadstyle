@@ -566,7 +566,8 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
     buf = io.BytesIO()
     w = Writer(buf)
     (mx0, my0), (mx1, my1) = _merc(*b[:2]), _merc(*b[2:])
-    h = Reader(MemorySource(ru)).header()          # the look's zooms (tiles.maxzoom: 18 since 2026-10-25)
+    h = Reader(MemorySource(ru)).header()          # the look's zooms (the header's first zoom is the first with a tile: rule B can empty the lowest;
+    #                                                 the centre zoom is from the look's zooms, `t.zooms()`) (tiles.maxzoom: 18 since 2026-10-25)
     bufs = buffers_px(json.loads(t.style)["layers"], h["max_zoom"])     # the bounds and each zoom's buffer, as Tiles::archive
     for z in range(h["min_zoom"], h["max_zoom"] + 1):
         pad = 2 * _R / (1 << z) * bufs[z] / 512
@@ -577,7 +578,7 @@ def test_the_pmtiles_writer_is_the_pmtiles_packages(part, keywords):
                     w.write_tile(zxy_to_tileid(z, x, y), gzip.compress(d, 6, mtime=0))
     e7 = [int(v * 1e7) for v in b]
     w.finalize({"tile_type": TileType.MVT, "tile_compression": Compression.GZIP, "min_lon_e7": e7[0], "min_lat_e7": e7[1], "max_lon_e7": e7[2],
-                "max_lat_e7": e7[3], "center_zoom": (h["min_zoom"] + h["max_zoom"]) // 2, "center_lon_e7": (e7[0] + e7[2]) // 2, "center_lat_e7": (e7[1] + e7[3]) // 2},
+                "max_lat_e7": e7[3], "center_zoom": sum(t.zooms()) // 2, "center_lon_e7": (e7[0] + e7[2]) // 2, "center_lat_e7": (e7[1] + e7[3]) // 2},
                {"vector_layers": [{"id": n, "fields": {}} for n in ("roads", "simple", "slots")]})
     py = buf.getvalue()
     head = lambda a: {k: v for k, v in Reader(MemorySource(a)).header().items() if "offset" not in k and "length" not in k}    # noqa: E731
