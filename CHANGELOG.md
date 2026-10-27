@@ -11,6 +11,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   lines=False)` (Python) give the lines only with `lines`; `roadLines(rows)` / `road_lines(rows)` give the lines of some rows. The
   dashboard reads a road's line from the table's `linesOf(rows)` when the table has no lines (a click and `rsSelect` load it before
   they show). The static page's table keeps its lines. Tartu, every field: 45.1 MiB to 39.2 MiB; with 7 fields: 18.5 MiB to 12.5 MiB.
+- **Faster first tiles of a live map** (2026-10-26): a piece reads only the road cells that its tiles keep (`Road::own_where`; R1's
+  read set and the class), not every cell before the filter. The tiles have the same bytes. Tartu, the first tiles of a 1280 x 800
+  view (rust/roadstyle-wasm/bench_live.mjs): z11 74 ms to 54 ms, z14 168 ms to 113 ms in Node; z11 70 ms to 41 ms, z14 169 ms to
+  96 ms natively.
 
 ### Added
 - **A faster open of the level editor and its map** (2026-10-26): the page asks the worker for a road's facts and ends only when the

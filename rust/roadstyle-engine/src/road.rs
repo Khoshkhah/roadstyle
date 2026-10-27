@@ -167,12 +167,18 @@ impl<'a> Road<'a> {
 
     /// The road's own properties in the output's order: the columns (a mark in the place of a column of its name), then the other marks.
     pub fn own(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
+        self.own_where(|_| true)
+    }
+
+    /// `own` with only the keys that `keep` takes; the cell of another key is not read (a tile's first show of many pieces).
+    pub fn own_where(self, keep: impl Fn(&str) -> bool + Copy) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
         let (t, d, v, i) = (self.t, self.d, self.v, self.i);
         let solved = self.s.into_iter().flat_map(|s| SOLVED.iter().zip(s).map(|(m, x)| (m.name(), Cell::Int((*x).into()))));
         let o = self.o;
-        t.names().iter().enumerate().map(move |(c, n)| (o[c].as_str(), d.get(v, i, n).unwrap_or_else(|| t.cell(c, i))))
-            .chain(solved)
-            .chain(d.marks(v, i).into_iter().filter(move |(k, _)| t.col(k).is_none()))
+        t.names().iter().enumerate().filter(move |(c, _)| keep(o[*c].as_str()))
+            .map(move |(c, n)| (o[c].as_str(), d.get(v, i, n).unwrap_or_else(|| t.cell(c, i))))
+            .chain(solved.filter(move |(k, _)| keep(k)))
+            .chain(d.marks(v, i).into_iter().filter(move |(k, _)| keep(k) && t.col(k).is_none()))
     }
 
     /// The properties in the output's order: its own, then its marks in the other palettes of the views.

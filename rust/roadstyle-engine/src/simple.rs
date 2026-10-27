@@ -123,7 +123,7 @@ impl Cols {
 fn road_props<'a>(r: Road<'a>, only: Option<&[&str]>, keep: impl Fn(&str) -> bool) -> Props<'a> {
     let keep = |k: &str| k != Mark::Class.name() && keep(k);
     match only {
-        None => r.own().filter(|(k, _)| keep(k)).map(|(k, v)| (k, v.to_value())).collect(),
+        None => r.own_where(&keep).map(|(k, v)| (k, v.to_value())).collect(),
         Some(ks) => {
             let mut q = Props::default();
             for k in ks.iter().filter(|k| keep(k)) {
@@ -182,18 +182,21 @@ impl Piece {
     /// The properties of the piece as render_web makes them, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
     /// the edge's tie-breaker) and `__rs_cls`.
     pub fn props<'a>(&self, roads: &'a Roads, cols: &Cols) -> Props<'a> {
-        self.props_where(roads, cols, None)
+        self.props_where(roads, cols, None, None)
     }
 
     /// The piece's properties, with only the road's cells of the keys `only` (the marks of the piece are all there); None: all.
-    fn props_where<'a>(&self, roads: &'a Roads, cols: &Cols, only: Option<&[&str]>) -> Props<'a> {
+    /// `read`: no road cell of another key (the road's class stays: the class index reads it), in the road's order; a slim piece
+    /// (SimpleSource::slim) then drops nothing more than without it, and a tile's first show makes no value that goes (Tartu z11).
+    fn props_where<'a>(&self, roads: &'a Roads, cols: &Cols, only: Option<&[&str]>, read: Option<&std::collections::HashSet<String>>) -> Props<'a> {
+        let read = |k: &str| read.is_none_or(|r| r.contains(k) || k == cols.class);
         let r = self.road(roads);
         let d = r.draw();
         let (edge, key) = (self.edge as i64, crate::road::key(self.edge as usize).get());      // the row (the sort key's tie-breaker), the road's key
         let mut q: Props<'a> = match self.part {
-            Part::Fill => road_props(r, only, |k| cols.fill(k)),
+            Part::Fill => road_props(r, only, |k| cols.fill(k) && read(k)),
             Part::Half(k) => {
-                let mut q = road_props(r, only, |kk| !matches!(Mark::of(kk), Some(Mark::Cap0 | Mark::Cap1 | Mark::Split)));
+                let mut q = road_props(r, only, |kk| !matches!(Mark::of(kk), Some(Mark::Cap0 | Mark::Cap1 | Mark::Split)) && read(kk));
                 q.insert(Mark::Edge.name(), key.into());
                 if let Some(c) = d.split.map(|s| s[k as usize]).filter(|c| *c != Cap::Round) {
                     q.insert(Mark::Cap.name(), c.value());
@@ -201,7 +204,7 @@ impl Piece {
                 q
             }
             _ => {
-                let mut q = road_props(r, only, |k| cols.casing(k));
+                let mut q = road_props(r, only, |k| cols.casing(k) && read(k));
                 q.insert(Mark::Edge.name(), key.into());
                 if let Some(tw) = d.twin {
                     q.insert(Mark::Pair.name(), true.into());
@@ -489,7 +492,7 @@ impl SimpleSource {
     }
 
     fn piece_feature<'a>(&'a self, roads: &'a Roads, (id, p): &'a (usize, Piece), only: Option<&[&str]>) -> (usize, Props<'a>, Option<&'a [Pt]>) {
-        let mut q = p.props_where(roads, &self.cols, only);
+        let mut q = p.props_where(roads, &self.cols, only, self.read.as_ref());
         for (k, v) in self.palette_props(p, roads) {
             q.insert(&k, v);
         }
