@@ -240,7 +240,7 @@ def _bound(e, z, live):
         pairs = a[3:]
         if len(pairs) % 2 or not all(isinstance(x, (int, float)) for x in pairs[0::2]):
             return None
-        stops = list(zip([float(x) for x in pairs[0::2]], pairs[1::2]))
+        stops = list(zip([float(x) for x in pairs[0::2]], pairs[1::2], strict=True))
         if a[2] != ["zoom"]:
             return mx([v for _, v in stops])
         i = 0
