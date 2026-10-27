@@ -98,7 +98,7 @@ def test_the_binding_tiles_of_monaco_are_within_the_budget():
         over += [f"z{z}.{k}: {v} > {limit[k]}" for k, v in got.items() if v > limit[k]]
         assert set(layers) == set(limit["layers"]), f"z{z}: the tile layers are not the budget's"
         for name, nums in layers.items():
-            for key, v in zip(("features", "bytes", "values", "keys"), nums):
+            for key, v in zip(("features", "bytes", "values", "keys"), nums, strict=True):
                 if v > limit["layers"][name][key]:
                     over.append(f"z{z}.{name}.{key}: {v} > {limit['layers'][name][key]}")
     assert not over, "the binding's tiles are over the budget (docs/design/tile_contract.md):\n" + "\n".join(over)
