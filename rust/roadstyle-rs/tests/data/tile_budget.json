@@ -1,0 +1,401 @@
+{
+ "_doc": "The tile size budget: the largest numbers that the tiles and the style can have (rust/roadstyle-rs/tests/tile_budget.rs; docs/design/tile_contract.md, 'The tile size standard'). Limits only go down: scripts/tile_budget.py. A raise needs --raise --why, is listed in `raises`, and the PR text must say why; Kaveh must agree.",
+ "areas": {
+  "monaco": {
+   "center": [
+    7.42431,
+    43.73837
+   ],
+   "z12": {
+    "view_bytes": 1545875,
+    "view_features": 16458,
+    "max_tile_bytes": 1545875,
+    "layers": {
+     "roads": {
+      "features": 13340,
+      "bytes": 1394081,
+      "values": 44254,
+      "keys": 22
+     },
+     "simple": {
+      "features": 3119,
+      "bytes": 151794,
+      "values": 4586,
+      "keys": 19
+     }
+    }
+   },
+   "z13": {
+    "view_bytes": 2168875,
+    "view_features": 24706,
+    "max_tile_bytes": 1198218,
+    "layers": {
+     "roads": {
+      "features": 9642,
+      "bytes": 1005762,
+      "values": 32057,
+      "keys": 22
+     },
+     "simple": {
+      "features": 4009,
+      "bytes": 192456,
+      "values": 5212,
+      "keys": 19
+     }
+    }
+   },
+   "z14": {
+    "view_bytes": 2103930,
+    "view_features": 24492,
+    "max_tile_bytes": 1224644,
+    "layers": {
+     "roads": {
+      "features": 9147,
+      "bytes": 957451,
+      "values": 30413,
+      "keys": 22
+     },
+     "simple": {
+      "features": 4328,
+      "bytes": 213890,
+      "values": 5641,
+      "keys": 19
+     },
+     "slots": {
+      "features": 866,
+      "bytes": 53304,
+      "values": 1502,
+      "keys": 14
+     }
+    }
+   },
+   "z15": {
+    "view_bytes": 2918281,
+    "view_features": 39757,
+    "max_tile_bytes": 924434,
+    "layers": {
+     "roads": {
+      "features": 5136,
+      "bytes": 532681,
+      "values": 17172,
+      "keys": 22
+     },
+     "simple": {
+      "features": 6738,
+      "bytes": 340614,
+      "values": 8983,
+      "keys": 19
+     },
+     "slots": {
+      "features": 795,
+      "bytes": 51139,
+      "values": 1564,
+      "keys": 14
+     }
+    }
+   },
+   "style": {
+    "layers": 6,
+    "expressions_total": 61843,
+    "expressions": {
+     "roads-simple": {
+      "filter": 803,
+      "paint.line-color": 1767,
+      "paint.line-width": 26312,
+      "paint.line-offset": 3033
+     },
+     "roads-fill": {
+      "filter": 852,
+      "paint.line-width": 4738,
+      "paint.line-offset": 5484
+     },
+     "roads-arrows": {
+      "filter": 875,
+      "layout.symbol-sort-key": 494,
+      "layout.icon-size": 406
+     },
+     "roads-labels": {
+      "filter": 1075,
+      "layout.text-size": 3534,
+      "layout.symbol-sort-key": 494
+     },
+     "roads-highlight": {
+      "paint.line-width": 4738,
+      "paint.line-offset": 5484
+     }
+    }
+   }
+  },
+  "tartu": {
+   "center": [
+    26.70605,
+    58.36462
+   ],
+   "z12": {
+    "view_bytes": 8208983,
+    "view_features": 84607,
+    "max_tile_bytes": 4064369,
+    "layers": {
+     "roads": {
+      "features": 36386,
+      "bytes": 3815563,
+      "values": 117169,
+      "keys": 23
+     },
+     "simple": {
+      "features": 5474,
+      "bytes": 248806,
+      "values": 6490,
+      "keys": 19
+     }
+    }
+   },
+   "z13": {
+    "view_bytes": 8166728,
+    "view_features": 92305,
+    "max_tile_bytes": 2049029,
+    "layers": {
+     "roads": {
+      "features": 17181,
+      "bytes": 1776729,
+      "values": 55334,
+      "keys": 23
+     },
+     "simple": {
+      "features": 5894,
+      "bytes": 285729,
+      "values": 7193,
+      "keys": 19
+     }
+    }
+   },
+   "z14": {
+    "view_bytes": 4498160,
+    "view_features": 55218,
+    "max_tile_bytes": 863370,
+    "layers": {
+     "roads": {
+      "features": 6781,
+      "bytes": 699918,
+      "values": 21764,
+      "keys": 22
+     },
+     "simple": {
+      "features": 3219,
+      "bytes": 155774,
+      "values": 4038,
+      "keys": 19
+     },
+     "slots": {
+      "features": 567,
+      "bytes": 32924,
+      "values": 1070,
+      "keys": 14
+     }
+    }
+   },
+   "z15": {
+    "view_bytes": 1671234,
+    "view_features": 24197,
+    "max_tile_bytes": 347524,
+    "layers": {
+     "roads": {
+      "features": 1710,
+      "bytes": 176680,
+      "values": 5547,
+      "keys": 22
+     },
+     "simple": {
+      "features": 3079,
+      "bytes": 149260,
+      "values": 3120,
+      "keys": 19
+     },
+     "slots": {
+      "features": 337,
+      "bytes": 21585,
+      "values": 826,
+      "keys": 14
+     }
+    }
+   },
+   "style": {
+    "layers": 6,
+    "expressions_total": 61843,
+    "expressions": {
+     "roads-simple": {
+      "filter": 803,
+      "paint.line-color": 1767,
+      "paint.line-width": 26312,
+      "paint.line-offset": 3033
+     },
+     "roads-fill": {
+      "filter": 852,
+      "paint.line-width": 4738,
+      "paint.line-offset": 5484
+     },
+     "roads-arrows": {
+      "filter": 875,
+      "layout.symbol-sort-key": 494,
+      "layout.icon-size": 406
+     },
+     "roads-labels": {
+      "filter": 1075,
+      "layout.text-size": 3534,
+      "layout.symbol-sort-key": 494
+     },
+     "roads-highlight": {
+      "paint.line-width": 4738,
+      "paint.line-offset": 5484
+     }
+    }
+   }
+  }
+ },
+ "raises": [
+  {
+   "date": "2026-10-27",
+   "why": "the first budget: the numbers of the engine at 5a4297b plus the margin",
+   "changes": [
+    "monaco.z12.view_bytes: new, 1545875",
+    "monaco.z12.view_features: new, 16458",
+    "monaco.z12.max_tile_bytes: new, 1545875",
+    "monaco.z12.layers.roads.features: new, 13340",
+    "monaco.z12.layers.roads.bytes: new, 1394081",
+    "monaco.z12.layers.roads.values: new, 44254",
+    "monaco.z12.layers.roads.keys: new, 22",
+    "monaco.z12.layers.simple.features: new, 3119",
+    "monaco.z12.layers.simple.bytes: new, 151794",
+    "monaco.z12.layers.simple.values: new, 4586",
+    "monaco.z12.layers.simple.keys: new, 19",
+    "monaco.z13.view_bytes: new, 2168875",
+    "monaco.z13.view_features: new, 24706",
+    "monaco.z13.max_tile_bytes: new, 1198218",
+    "monaco.z13.layers.roads.features: new, 9642",
+    "monaco.z13.layers.roads.bytes: new, 1005762",
+    "monaco.z13.layers.roads.values: new, 32057",
+    "monaco.z13.layers.roads.keys: new, 22",
+    "monaco.z13.layers.simple.features: new, 4009",
+    "monaco.z13.layers.simple.bytes: new, 192456",
+    "monaco.z13.layers.simple.values: new, 5212",
+    "monaco.z13.layers.simple.keys: new, 19",
+    "monaco.z14.view_bytes: new, 2103930",
+    "monaco.z14.view_features: new, 24492",
+    "monaco.z14.max_tile_bytes: new, 1224644",
+    "monaco.z14.layers.roads.features: new, 9147",
+    "monaco.z14.layers.roads.bytes: new, 957451",
+    "monaco.z14.layers.roads.values: new, 30413",
+    "monaco.z14.layers.roads.keys: new, 22",
+    "monaco.z14.layers.simple.features: new, 4328",
+    "monaco.z14.layers.simple.bytes: new, 213890",
+    "monaco.z14.layers.simple.values: new, 5641",
+    "monaco.z14.layers.simple.keys: new, 19",
+    "monaco.z14.layers.slots.features: new, 866",
+    "monaco.z14.layers.slots.bytes: new, 53304",
+    "monaco.z14.layers.slots.values: new, 1502",
+    "monaco.z14.layers.slots.keys: new, 14",
+    "monaco.z15.view_bytes: new, 2918281",
+    "monaco.z15.view_features: new, 39757",
+    "monaco.z15.max_tile_bytes: new, 924434",
+    "monaco.z15.layers.roads.features: new, 5136",
+    "monaco.z15.layers.roads.bytes: new, 532681",
+    "monaco.z15.layers.roads.values: new, 17172",
+    "monaco.z15.layers.roads.keys: new, 22",
+    "monaco.z15.layers.simple.features: new, 6738",
+    "monaco.z15.layers.simple.bytes: new, 340614",
+    "monaco.z15.layers.simple.values: new, 8983",
+    "monaco.z15.layers.simple.keys: new, 19",
+    "monaco.z15.layers.slots.features: new, 795",
+    "monaco.z15.layers.slots.bytes: new, 51139",
+    "monaco.z15.layers.slots.values: new, 1564",
+    "monaco.z15.layers.slots.keys: new, 14",
+    "monaco.style.layers: new, 6",
+    "monaco.style.expressions_total: new, 61843",
+    "monaco.style.expressions.roads-simple.filter: new, 803",
+    "monaco.style.expressions.roads-simple.paint.line-color: new, 1767",
+    "monaco.style.expressions.roads-simple.paint.line-width: new, 26312",
+    "monaco.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "monaco.style.expressions.roads-fill.filter: new, 852",
+    "monaco.style.expressions.roads-fill.paint.line-width: new, 4738",
+    "monaco.style.expressions.roads-fill.paint.line-offset: new, 5484",
+    "monaco.style.expressions.roads-arrows.filter: new, 875",
+    "monaco.style.expressions.roads-arrows.layout.symbol-sort-key: new, 494",
+    "monaco.style.expressions.roads-arrows.layout.icon-size: new, 406",
+    "monaco.style.expressions.roads-labels.filter: new, 1075",
+    "monaco.style.expressions.roads-labels.layout.text-size: new, 3534",
+    "monaco.style.expressions.roads-labels.layout.symbol-sort-key: new, 494",
+    "monaco.style.expressions.roads-highlight.paint.line-width: new, 4738",
+    "monaco.style.expressions.roads-highlight.paint.line-offset: new, 5484",
+    "tartu.z12.view_bytes: new, 8208983",
+    "tartu.z12.view_features: new, 84607",
+    "tartu.z12.max_tile_bytes: new, 4064369",
+    "tartu.z12.layers.roads.features: new, 36386",
+    "tartu.z12.layers.roads.bytes: new, 3815563",
+    "tartu.z12.layers.roads.values: new, 117169",
+    "tartu.z12.layers.roads.keys: new, 23",
+    "tartu.z12.layers.simple.features: new, 5474",
+    "tartu.z12.layers.simple.bytes: new, 248806",
+    "tartu.z12.layers.simple.values: new, 6490",
+    "tartu.z12.layers.simple.keys: new, 19",
+    "tartu.z13.view_bytes: new, 8166728",
+    "tartu.z13.view_features: new, 92305",
+    "tartu.z13.max_tile_bytes: new, 2049029",
+    "tartu.z13.layers.roads.features: new, 17181",
+    "tartu.z13.layers.roads.bytes: new, 1776729",
+    "tartu.z13.layers.roads.values: new, 55334",
+    "tartu.z13.layers.roads.keys: new, 23",
+    "tartu.z13.layers.simple.features: new, 5894",
+    "tartu.z13.layers.simple.bytes: new, 285729",
+    "tartu.z13.layers.simple.values: new, 7193",
+    "tartu.z13.layers.simple.keys: new, 19",
+    "tartu.z14.view_bytes: new, 4498160",
+    "tartu.z14.view_features: new, 55218",
+    "tartu.z14.max_tile_bytes: new, 863370",
+    "tartu.z14.layers.roads.features: new, 6781",
+    "tartu.z14.layers.roads.bytes: new, 699918",
+    "tartu.z14.layers.roads.values: new, 21764",
+    "tartu.z14.layers.roads.keys: new, 22",
+    "tartu.z14.layers.simple.features: new, 3219",
+    "tartu.z14.layers.simple.bytes: new, 155774",
+    "tartu.z14.layers.simple.values: new, 4038",
+    "tartu.z14.layers.simple.keys: new, 19",
+    "tartu.z14.layers.slots.features: new, 567",
+    "tartu.z14.layers.slots.bytes: new, 32924",
+    "tartu.z14.layers.slots.values: new, 1070",
+    "tartu.z14.layers.slots.keys: new, 14",
+    "tartu.z15.view_bytes: new, 1671234",
+    "tartu.z15.view_features: new, 24197",
+    "tartu.z15.max_tile_bytes: new, 347524",
+    "tartu.z15.layers.roads.features: new, 1710",
+    "tartu.z15.layers.roads.bytes: new, 176680",
+    "tartu.z15.layers.roads.values: new, 5547",
+    "tartu.z15.layers.roads.keys: new, 22",
+    "tartu.z15.layers.simple.features: new, 3079",
+    "tartu.z15.layers.simple.bytes: new, 149260",
+    "tartu.z15.layers.simple.values: new, 3120",
+    "tartu.z15.layers.simple.keys: new, 19",
+    "tartu.z15.layers.slots.features: new, 337",
+    "tartu.z15.layers.slots.bytes: new, 21585",
+    "tartu.z15.layers.slots.values: new, 826",
+    "tartu.z15.layers.slots.keys: new, 14",
+    "tartu.style.layers: new, 6",
+    "tartu.style.expressions_total: new, 61843",
+    "tartu.style.expressions.roads-simple.filter: new, 803",
+    "tartu.style.expressions.roads-simple.paint.line-color: new, 1767",
+    "tartu.style.expressions.roads-simple.paint.line-width: new, 26312",
+    "tartu.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "tartu.style.expressions.roads-fill.filter: new, 852",
+    "tartu.style.expressions.roads-fill.paint.line-width: new, 4738",
+    "tartu.style.expressions.roads-fill.paint.line-offset: new, 5484",
+    "tartu.style.expressions.roads-arrows.filter: new, 875",
+    "tartu.style.expressions.roads-arrows.layout.symbol-sort-key: new, 494",
+    "tartu.style.expressions.roads-arrows.layout.icon-size: new, 406",
+    "tartu.style.expressions.roads-labels.filter: new, 1075",
+    "tartu.style.expressions.roads-labels.layout.text-size: new, 3534",
+    "tartu.style.expressions.roads-labels.layout.symbol-sort-key: new, 494",
+    "tartu.style.expressions.roads-highlight.paint.line-width: new, 4738",
+    "tartu.style.expressions.roads-highlight.paint.line-offset: new, 5484"
+   ]
+  }
+ ]
+}

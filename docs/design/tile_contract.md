@@ -1,6 +1,7 @@
 # The tile contract: tiles draw, the data layer knows
 
-Status: design, 2026-10-27. No library code yet. Branch `design-tile-contract`, from `rust-engine` at `cfa80c2`.
+Status: design, 2026-10-27. The tile size standard (below) is in force with its test and budget. The rest has no library code yet.
+Branch `design-tile-contract`, from `rust-engine` at `cfa80c2`.
 
 This note separates the data of a road from its tiles. A tile then has only what MapLibre needs to draw it. All other data stays
 in the map worker and the page gets it by id. The note gives the contract, the id, how the tile keys come from the style, the data
@@ -8,6 +9,65 @@ layer API, the CI checks, the expressions and a plan in phases. The decisions fo
 
 Measurements: Burnaby, the tilted view (pitch 60, zoom 14), headless Chromium with software GL. Files: `.claude/tile-lag/` of the
 workspace (`RESULT.md`, `ANALYSIS.md`, `one-feature/`, `expr/`) and [tile_speed.md](tile_speed.md).
+
+## The tile size standard
+
+Tiles stay small. This is a rule for each change to the engine, the style or the page. It is not a wish. A test measures the rule,
+and CI fails when a number gets worse.
+
+**The rules.** A tile has:
+
+1. only the features that a style layer draws at a zoom of the tile (`ZoomRules::span`);
+2. only the keys that the style reads at that zoom (section 3). All other data is in the data layer;
+3. the id as the MVT feature id, a dense row number, and no id in the tags (section 2);
+4. a number where a number does the job: no string for a flag, a class or a rank;
+5. small expressions. A filter, a paint or a layout is data-driven only when it must be, and it has no more than 256 characters of
+   JSON, unless the budget lists it with a limit (section 6).
+
+**The limits.** The budget file `rust/roadstyle-rs/tests/data/tile_budget.json` has a limit for each number below. The views are the
+3 x 3 tiles around a fixed centre of Monaco and of Tartu, at zoom 12, 13, 14 and 15, with an empty keep list (the engine's own tiles,
+without a page's popup fields).
+
+| Number | For |
+|---|---|
+| features, bytes, values (the distinct values), keys | the largest tile of each tile layer, in each view |
+| bytes of all the tiles, bytes of the largest tile | each view |
+| layers, characters of all expressions | the style |
+| characters of each filter, paint and layout over 256 | each style layer |
+
+**The protocol.**
+
+- A change that makes a number larger than its limit fails CI. The Rust test `tile_budget` checks Monaco and Tartu and the style.
+  `tests/test_tile_budget.py` checks that the Python binding gives Monaco's tiles within the same limits.
+- To lower the limits after a change that makes the tiles smaller, run `scripts/tile_budget.py` and commit the file. The script lowers a
+  limit and never raises one. A limit is the measured number plus 2 % (at least 1).
+- To raise a limit or to add one (a new layer, a new expression over 256 characters), run
+  `scripts/tile_budget.py --raise --why "the reason"`. The script writes the new limits and the reason in the file (`raises`). The PR
+  text must give the same reason, with the numbers before and after, and Kaveh must agree before the merge. Do not edit a limit by hand.
+- The local Burnaby gate prints the same table for the Burnaby roads, with the limits of `areas.burnaby` when the file has them:
+  `ROADSTYLE_BURNABY_ROADS=/abs/roads.parquet cargo test --release -p roadstyle-rs --test tile_budget burnaby -- --ignored --nocapture`
+  (more inputs: `ROADSTYLE_BURNABY_LOOK`, `ROADSTYLE_BURNABY_FEATURES`, `ROADSTYLE_BURNABY_VIEWS`; use absolute paths). The Burnaby
+  roads are not in the repository, so CI does not run it. Burnaby is the only gate that covers the base-map layers (`ov*`), because
+  the golden looks of Monaco and Tartu have no base-map layer spec.
+
+**The budget now** (2026-10-27, `rust-engine` at `5a4297b`; each limit in the file is this number plus 2 %). The `simple` columns are
+the largest tile of that layer.
+
+| Area | Zoom | Bytes, 9 tiles | Largest tile (bytes) | `simple`: features | bytes | values | keys |
+|---|---|---|---|---|---|---|---|
+| monaco | 12 | 1,515,563 | 1,515,563 | 3,057 | 148,817 | 4,496 | 18 |
+| monaco | 13 | 2,126,348 | 1,174,723 | 3,930 | 188,682 | 5,109 | 18 |
+| monaco | 14 | 2,062,676 | 1,200,631 | 4,243 | 209,696 | 5,530 | 18 |
+| monaco | 15 | 2,861,059 | 906,307 | 6,605 | 333,935 | 8,806 | 18 |
+| tartu | 12 | 8,048,022 | 3,984,675 | 5,366 | 243,927 | 6,362 | 18 |
+| tartu | 13 | 8,006,596 | 2,008,851 | 5,778 | 280,126 | 7,051 | 18 |
+| tartu | 14 | 4,409,960 | 846,441 | 3,155 | 152,719 | 3,958 | 18 |
+| tartu | 15 | 1,638,464 | 340,709 | 3,018 | 146,333 | 3,058 | 18 |
+
+The file also has the limits of the `roads` and `slots` layers. The style (the same for both areas) has 5 layers and 60,630
+characters of expressions. These are over 256 characters: `roads-simple` `line-width` 25,796 (the largest, phase 1 of the plan),
+`line-offset` 2,973, `line-color` 1,732 and the filter 787; `roads-fill` and `roads-highlight` `line-width` 4,645 and `line-offset`
+5,376; `roads-labels` `text-size` 3,464. Each phase of the plan must show its change in these numbers.
 
 ## Why
 
@@ -228,7 +288,7 @@ Two tests. Both use the views that CI already has (Monaco and Tartu; D4 for Burn
 The JavaScript side: `tests/test_contract_names.py` already fails when a dashboard module reads a `__rs_*` property that
 `reads.json` does not declare. With `pieces` empty, it fails when a module reads a tile property of a piece.
 
-**The size budget** (`tests/tile_budget.json`, checked by the same tests). For each fixed view, for each tile layer: the
+**The size budget** (done: see "The tile size standard"; `rust/roadstyle-rs/tests/data/tile_budget.json`). For each fixed view, for each tile layer: the
 features, the bytes, the keys and the different values of each key. The test fails when a number is more than 5 % above the
 budget. A change that makes the tiles smaller writes the new budget in the same commit. The budget also has the JSON size of each
 data-driven paint and layout property of the road layer (section 6), so a large expression fails CI too.
