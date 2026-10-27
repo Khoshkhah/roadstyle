@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tile v2 plan</title>
+<!-- The same content as tile_v2_plan.md, with diagrams. Edit both. -->
+<style>
+:root {
+  --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --line: #d1d9e0; --card: #f6f8fa; --code: #eff2f5; --link: #0969da;
+  --ml: #cf222e; --ours: #0969da; --page: #bc4c00; --other: #8c959f; --good: #1a7f37; --warn: #9a6700;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #3d444d; --card: #151b23; --code: #1f2630; --link: #4493f8;
+    --ml: #ff7b72; --ours: #4493f8; --page: #f0883e; --other: #6e7681; --good: #3fb950; --warn: #d29922;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --line: #3d444d; --card: #151b23; --code: #1f2630; --link: #4493f8;
+  --ml: #ff7b72; --ours: #4493f8; --page: #f0883e; --other: #6e7681; --good: #3fb950; --warn: #d29922;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; overflow-wrap: anywhere; }
+a { color: var(--link); }
+h1 { font-size: 1.7em; line-height: 1.25; margin: .2em 0 .4em; }
+h2 { border-bottom: 1px solid var(--line); padding-bottom: .3em; margin-top: 2em; }
+h3 { margin: 1.4em 0 .4em; }
+.lead { color: var(--muted); }
+.box { overflow-x: auto; margin: 1em 0; }
+table { border-collapse: collapse; min-width: 100%; }
+th, td { border: 1px solid var(--line); padding: 5px 8px; vertical-align: top; text-align: left; }
+th { background: var(--card); }
+td.n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+code { background: var(--code); padding: .1em .3em; border-radius: 4px; font-size: 88%; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 14px 0; }
+.card h3 { margin-top: 0; }
+.card dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; }
+.card dt { color: var(--muted); }
+.card dd { margin: 0; }
+@media (max-width: 560px) { .card dl { grid-template-columns: 1fr; } .card dd { margin-bottom: 6px; } }
+.tag { display: inline-block; font-size: 12px; padding: 0 7px; border-radius: 10px; border: 1px solid var(--line); margin-right: 4px; }
+.t-page { color: var(--page); border-color: var(--page); }
+.t-rs { color: var(--ours); border-color: var(--ours); }
+.t-dec { color: var(--muted); }
+.yes { color: var(--good); font-weight: 600; }
+.no { color: var(--ml); font-weight: 600; }
+.part { color: var(--warn); font-weight: 600; }
+figure { margin: 1.2em 0; }
+figure svg { width: 100%; max-width: 640px; height: auto; display: block; }
+figcaption { color: var(--muted); font-size: 13px; margin-top: 4px; }
+svg text { fill: var(--fg); font-family: system-ui, sans-serif; }
+svg .mut { fill: var(--muted); }
+svg .ml { fill: var(--ml); } svg .ours { fill: var(--ours); } svg .pg { fill: var(--page); } svg .oth { fill: var(--other); } svg .good { fill: var(--good); }
+svg .boxs { fill: var(--card); stroke: var(--line); }
+svg .ln { stroke: var(--muted); fill: none; stroke-width: 1.5; }
+svg .ln-ours { stroke: var(--ours); fill: none; stroke-width: 2; }
+svg .ln-pg { stroke: var(--page); fill: none; stroke-width: 2; stroke-dasharray: 5 4; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+ol.src { font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Tiles v2: the review and the plan</h1>
+<p class="lead">Status: plan, 2026-10-27, for Kaveh's OK. No code. roadstyle branch <code>design-tile-v2</code>, from <code>rust-engine</code> at
+<code>7dbf59d</code>. It includes phase 1 (<code>design-tile-wk</code>, not landed), an independent review and a web research. The same text:
+<code>docs/design/tile_v2_plan.md</code>.</p>
+
+<p><strong>The rule of this plan:</strong> a step is in it only if a measurement shows a real gain (time on the Burnaby tilted view, or a clear
+size), or if the data contract needs it. The other ideas are in <a href="#not-done">Not done, and why</a>.</p>
+
+<p>Measurements: Burnaby, the tilted view (pitch 60, zoom 14), the page's tiles as static files, MapLibre 5.24.0 (the page's version),
+headless Chromium with software GL, the median of 5 runs, each on a new page, with a 200 ms start wait in each time. Two batches
+differ by up to 0.15 s.</p>
+
+<nav class="card">
+<strong>Contents</strong>
+<ol>
+<li><a href="#problem">The problem and the measured root</a></li>
+<li><a href="#target">The target</a></li>
+<li><a href="#contract">The contract: tiles and data</a></li>
+<li><a href="#standard">The tile size standard</a></li>
+<li><a href="#steps">The steps</a></li>
+<li><a href="#future">Future needs, checked</a></li>
+<li><a href="#not-done">Not done, and why</a></li>
+<li><a href="#practice">Against established practice</a></li>
+<li><a href="#review">The review</a></li>
+<li><a href="#decisions">Decisions for Kaveh</a></li>
+<li><a href="#sources">Sources</a></li>
+</ol>
+</nav>
+
+<h2 id="problem">1. The problem and the measured root</h2>
+<p>The page's tilted view of Burnaby takes 2.15 s from the jump to an idle map. MapLibre's parse and layout of the 30 tiles (5.9 MB,
+115k features) is 1.41 s of it: that is the root.</p>
+
+<figure>
+<svg viewBox="0 0 420 70" role="img" aria-label="The 2.15 s of the tilted view, by step">
+  <rect x="10" y="10" width="19" height="28" class="oth"/>
+  <rect x="29" y="10" width="65" height="28" class="ours"/>
+  <rect x="94" y="10" width="9" height="28" class="oth"/>
+  <rect x="103" y="10" width="262" height="28" class="ml"/>
+  <rect x="365" y="10" width="45" height="28" class="pg"/>
+  <text x="234" y="29" text-anchor="middle" style="fill:#fff;font-size:13px;font-weight:600">1.41 s</text>
+  <text x="61" y="29" text-anchor="middle" style="fill:#fff;font-size:12px">0.35</text>
+  <text x="10" y="58" class="mut" style="font-size:12px">0 s</text>
+  <text x="410" y="58" text-anchor="end" class="mut" style="font-size:12px">2.15 s</text>
+</svg>
+<div class="legend">
+<span><i style="background:var(--other)"></i>to the first request 0.10 s; the bytes to the main thread 0.05 s</span>
+<span><i style="background:var(--ours)"></i><code>tile()</code> in the page's worker 0.35 s</span>
+<span><i style="background:var(--ml)"></i>MapLibre parse and layout 1.41 s</span>
+<span><i style="background:var(--page)"></i>draw until idle 0.24 s</span>
+</div>
+</figure>
+
+<div class="box"><table>
+<tr><th>Step of the 2.15 s</th><th>ms</th><th>Share</th></tr>
+<tr><td>The jump to the first tile request</td><td class="n">100</td><td class="n">5 %</td></tr>
+<tr><td><code>tile()</code> in the page's worker (28 calls)</td><td class="n">346</td><td class="n">16 %</td></tr>
+<tr><td>The bytes to the main thread</td><td class="n">54</td><td class="n">3 %</td></tr>
+<tr><td>MapLibre's parse and layout</td><td class="n">1,411</td><td class="n">66 %</td></tr>
+<tr><td>Draw until idle</td><td class="n">242</td><td class="n">11 %</td></tr>
+</table></div>
+
+<p>The probes find two causes. Both are measured:</p>
+
+<figure>
+<svg viewBox="0 0 420 252" role="img" aria-label="ms to idle for each probe">
+  <g style="font-size:13px">
+    <text x="10" y="18">now: 1 MapLibre worker (the default)</text>
+    <rect x="10" y="24" width="300" height="14" class="ml"/><text x="316" y="36">1,402</text>
+    <text x="10" y="60">4 MapLibre workers</text>
+    <rect x="10" y="66" width="190" height="14" class="ours"/><text x="206" y="78">889</text>
+    <text x="10" y="102">phase 1 (width and offset as tables), 1 worker</text>
+    <rect x="10" y="108" width="236" height="14" class="ours"/><text x="252" y="120">1,105</text>
+    <text x="10" y="144">phase 1 and 4 workers</text>
+    <rect x="10" y="150" width="174" height="14" class="good"/><text x="190" y="162">815</text>
+    <text x="10" y="186">all values of the road layer constant (a floor)</text>
+    <rect x="10" y="192" width="186" height="14" class="oth"/><text x="202" y="204">870</text>
+    <text x="10" y="228">no road layer</text>
+    <rect x="10" y="234" width="122" height="14" class="oth"/><text x="138" y="246">568</text>
+  </g>
+</svg>
+<figcaption>ms from the jump to an idle map, in the control harness (one batch for each pair; up to 0.15 s between batches).</figcaption>
+</figure>
+
+<ol>
+<li><strong>MapLibre parses all the tiles on one worker.</strong> In 5.24.0 the default worker count is 1 (<code>workerCount = isSafari ?
+min(cores, 3) : 1</code>, in its source). 4 workers: −0.45 to −0.51 s. 6 workers: 827 ms; 8: 894 ms.</li>
+<li><strong>The road layer's expressions.</strong> MapLibre calculates them for each feature. Phase 1 takes 0.3 s of it with 1 worker, and
+0.08 s with 4.</li>
+</ol>
+
+<h3>What the review of the code found</h3>
+<ol>
+<li><strong>The engine</strong> (<code>simple.rs</code>) cuts each road into pieces and gives each piece a property map: the road's columns and up to 20 marks.</li>
+<li><strong>The style builder</strong> (<code>layers.rs</code>) writes the look as expressions that read these marks. Phase 1 compiles the width and the
+offset into tables after the builder wrote them, with a fallback when the shape is not known.</li>
+<li><strong>The tiles</strong> keep every <code>__rs_*</code> mark and the page's keys, not only the keys that the style reads. The pieces have no MVT id:
+<code>promoteId</code> reads <code>__rs_edge</code>. The encoder itself (interning, trees, cache, clip) is good.</li>
+<li><strong>The page</strong> reads tile properties in <code>filter.js</code>, <code>select.js</code>, <code>core.js</code> and <code>arrows.js</code>. The popup, the panel and the
+live colours already use the road table (<code>RoadTable</code>, on the main thread) and the feature-state by row.</li>
+<li><strong>Python</strong> has its own engine (still the default). Phase 1 had to be written two times.</li>
+</ol>
+
+<h2 id="target">2. The target</h2>
+<div class="box"><table>
+<tr><th>Number</th><th>Now</th><th>After step 7</th></tr>
+<tr><td>Burnaby tilted view, ms to idle (harness)</td><td>1,343 to 1,534</td><td><strong>≤ 850</strong> (steps 1 and 6: 815 measured)</td></tr>
+<tr><td>Burnaby tilted view, bytes</td><td>5.29 MB</td><td>≤ 4.4 MB (steps 3 to 5, then +0.2 MB for phase 1's key)</td></tr>
+<tr><td><code>keys_unread</code>, <code>no_id</code> of <code>simple</code></td><td>3, all</td><td>0, 0</td></tr>
+<tr><td><code>simple</code>, largest tile, distinct values (Monaco z15)</td><td>8,806</td><td>≤ 2,000</td></tr>
+<tr><td>Full look, largest tile (Monaco z12 / Tartu z12)</td><td>1.5 MB / 4.0 MB</td><td>0.15 MB / 0.24 MB</td></tr>
+</table></div>
+<p>A step that does not give its gain is not merged.</p>
+
+<h2 id="contract">3. The contract: tiles and data</h2>
+
+<figure>
+<svg viewBox="0 0 420 400" role="img" aria-label="The engine makes the tiles and the road table; MapLibre reads the tiles, the page reads the table">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker>
+  <marker id="arp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--page)"/></marker></defs>
+  <rect x="95" y="8" width="230" height="50" rx="8" class="boxs"/>
+  <text x="210" y="29" text-anchor="middle" style="font-size:14px;font-weight:600">Engine (Rust)</text>
+  <text x="210" y="47" text-anchor="middle" class="mut" style="font-size:12px">roads → pieces, the look → the style</text>
+  <path d="M170 58 L105 96" class="ln" marker-end="url(#ar)"/>
+  <path d="M250 58 L315 96" class="ln" marker-end="url(#ar)"/>
+  <rect x="8" y="98" width="196" height="118" rx="8" class="boxs" style="stroke:var(--ours)"/>
+  <text x="106" y="120" text-anchor="middle" style="font-size:14px;font-weight:600" class="ours">Tiles (MVT)</text>
+  <g style="font-size:12.5px"><text x="20" y="144">• geometry</text><text x="20" y="164">• the row as the MVT id</text>
+  <text x="20" y="184">• only the keys that the style</text><text x="32" y="200">reads at that zoom</text></g>
+  <rect x="216" y="98" width="196" height="118" rx="8" class="boxs" style="stroke:var(--page)"/>
+  <text x="314" y="120" text-anchor="middle" style="font-size:14px;font-weight:600" class="pg">Data: RoadTable</text>
+  <g style="font-size:12.5px"><text x="228" y="144">• row → edge_id (public ID)</text><text x="228" y="164">• row → fields, line</text>
+  <text x="228" y="184">• filters: the rows that</text><text x="240" y="200">show, from the fields</text></g>
+  <path d="M106 216 L106 262" class="ln" marker-end="url(#ar)"/>
+  <path d="M314 216 L314 262" class="ln" marker-end="url(#ar)"/>
+  <rect x="8" y="264" width="196" height="64" rx="8" class="boxs"/>
+  <text x="106" y="290" text-anchor="middle" style="font-size:14px;font-weight:600">MapLibre style</text>
+  <text x="106" y="310" text-anchor="middle" class="mut" style="font-size:12px">draws; 4 workers parse</text>
+  <rect x="216" y="264" width="196" height="64" rx="8" class="boxs"/>
+  <text x="314" y="288" text-anchor="middle" style="font-size:13.5px;font-weight:600">Page, dashboard,</text>
+  <text x="314" y="306" text-anchor="middle" style="font-size:13.5px;font-weight:600">editor, Python, export</text>
+  <text x="314" y="322" text-anchor="middle" class="mut" style="font-size:12px">read by row</text>
+  <path d="M216 296 L206 296" class="ln-pg" marker-end="url(#arp)"/>
+  <text x="210" y="352" text-anchor="middle" class="pg" style="font-size:12.5px">the page → MapLibre, by row: feature-state</text>
+  <text x="210" y="370" text-anchor="middle" class="pg" style="font-size:12.5px">(colour, width, hover, select) and</text>
+  <text x="210" y="388" text-anchor="middle" class="pg" style="font-size:12.5px">one filter: match on ["id"]</text>
+</svg>
+<figcaption>The tiles have only what MapLibre draws. All other data of a road is in the road table, by row. The page changes the map by row,
+with no new tiles.</figcaption>
+</figure>
+
+<ul>
+<li><strong>A piece in a tile</strong> has the road's row as its MVT id, and only the keys that the style reads at that zoom. All pieces of a
+road share the row, so one feature-state paints the road.</li>
+<li><strong>The width and the offset</strong> are phase 1's tables (<code>__rs_wk</code>), written by the builder with no fallback.</li>
+<li><strong>The sort key</strong> is the small rank <code>r</code>, plus a raise for the top roads of <code>rsColor</code> (by <code>["id"]</code>). The encoder writes a
+tile's features in the order (rank, row), so the order stays after a relevel.</li>
+<li><strong>The data stays on the main thread</strong> in <code>RoadTable</code>. The filters compute the rows that show and set one <code>match</code> on
+<code>["id"]</code>; after a relevel they compute it again. Live colour, width and the glow stay feature-state by row.</li>
+</ul>
+
+<h3>Fixed and versioned</h3>
+<p><strong>Fixed</strong> (a change is contract 3, with a migration): the row as the MVT id; only the keys that the style reads; the layout of
+the style keys (<code>__rs_wk</code> = a fixed mode of the kind and the flags × the versioned class list, <code>__rs_k</code>, <code>r</code>); the
+feature-state names <code>rs_c</code>, <code>rs_w</code>, <code>hover</code>, <code>select</code>; the source name <code>roads</code>; 512 px tiles.
+<strong>Versioned</strong> (from the look, no break): the value tables, the zoom spans, the palettes, the base-map layers. A second theme with the
+same class list uses the same archive. The style and the PMTiles metadata get <code>contract: 2</code>, a hash of the key layout and the
+generation.</p>
+
+<h2 id="standard">4. The tile size standard</h2>
+<p>The tile algorithm applies every reduction that keeps the map the same. A test measures a number for each rule on Monaco and Tartu
+(<code>rust/roadstyle-rs/tests/tile_budget.rs</code>); the numbers only go down (<code>scripts/tile_budget.py</code>), and a raise needs a reason and
+Kaveh's OK.</p>
+<div class="box"><table>
+<tr><th>#</th><th>Rule</th><th>After this plan</th><th>Test (budget number)</th></tr>
+<tr><td>1</td><td>Only the features that a style layer draws at that zoom</td><td><span class="yes">done</span> (the full look: step 7)</td><td><code>undrawn</code> = 0, asserted</td></tr>
+<tr><td>2</td><td>Only the keys that the style reads</td><td><span class="yes">steps 3, 5, 6</span></td><td><code>keys_unread</code></td></tr>
+<tr><td>3</td><td>The row as the MVT id</td><td><span class="yes">step 4</span></td><td><code>no_id</code></td></tr>
+<tr><td>4</td><td>A number, not a text</td><td><span class="no">not done</span>: the colours are 200 to 300 bytes of text in a tile</td><td><code>strings</code>, <code>string_bytes</code></td></tr>
+<tr><td>5</td><td>Each key and value once in a layer</td><td><span class="yes">done</span></td><td><code>duplicates</code> = 0, asserted</td></tr>
+<tr><td>6</td><td>Simplify to the pixel tolerance</td><td><span class="no">not done</span>: 1 px gave about 1 %</td><td><code>short_segments</code></td></tr>
+<tr><td>7</td><td>Nothing under a pixel; merge</td><td><span class="no">not done</span>: a merge gave −0.02 s with 4 workers</td><td><code>tiny</code></td></tr>
+<tr><td>8</td><td>Coordinates on the zoom's grid</td><td><span class="no">not done</span>: geometry is 11 to 18 % of the bytes</td><td><code>bytes</code></td></tr>
+<tr><td>9</td><td>Base-map layers the same</td><td><span class="part">step 3</span> (<code>ov4</code>'s keys)</td><td>the Burnaby gate</td></tr>
+<tr><td>10</td><td>One copy of a road</td><td><span class="yes">step 7</span> (the full look)</td><td>the budget of <code>monaco-full</code>, <code>tartu-full</code></td></tr>
+</table></div>
+
+<h2 id="steps">5. The steps</h2>
+<p>Each step is one commit that passes CI and needs no raise. The picture stays the same (the Monaco and Tartu goldens, and the Burnaby view in
+the harness: 0 pixels differ). Phase 1 adds one key to each piece, so it comes after the steps that remove keys, and the ratchet runs after
+step 6.</p>
+
+<figure>
+<svg viewBox="0 0 420 440" role="img" aria-label="The order of the steps">
+  <path d="M30 26 L30 414" class="ln"/>
+  <g style="font-size:13px">
+    <circle cx="30" cy="26" r="11" class="pg"/><text x="30" y="31" text-anchor="middle" style="fill:#fff;font-weight:600">1</text>
+    <text x="52" y="22" style="font-weight:600">4 MapLibre workers</text><text x="52" y="39" class="mut">page PR; −0.45 to −0.51 s</text>
+    <circle cx="30" cy="80" r="11" class="oth"/><text x="30" y="85" text-anchor="middle" style="fill:#fff;font-weight:600">2</text>
+    <text x="52" y="76" style="font-weight:600">D0: one engine (Rust)</text><text x="52" y="93" class="mut">decision; no runtime change</text>
+    <circle cx="30" cy="134" r="11" class="ours"/><text x="30" y="139" text-anchor="middle" style="fill:#fff;font-weight:600">3</text>
+    <text x="52" y="130" style="font-weight:600">Keys from the style</text><text x="52" y="147" class="mut">roadstyle; ov4 −0.3 MB</text>
+    <circle cx="30" cy="188" r="11" class="ours"/><text x="30" y="193" text-anchor="middle" style="fill:#fff;font-weight:600">4</text>
+    <text x="52" y="184" style="font-weight:600">The row as the MVT id</text><text x="52" y="201" class="mut">roadstyle; −0.53 MB, −74k values</text>
+    <circle cx="30" cy="242" r="11" class="ours"/><text x="30" y="247" text-anchor="middle" style="fill:#fff;font-weight:600">5</text>
+    <text x="52" y="238" style="font-weight:600">Filters from RoadTable</text><text x="52" y="255" class="mut">roadstyle; −0.2 MB and more</text>
+    <circle cx="30" cy="296" r="11" class="ours"/><text x="30" y="301" text-anchor="middle" style="fill:#fff;font-weight:600">6</text>
+    <text x="52" y="292" style="font-weight:600">Phase 1 lands; the ratchet runs</text><text x="52" y="309" class="mut">roadstyle; −0.08 s with 4 workers</text>
+    <circle cx="30" cy="350" r="11" class="ours"/><text x="30" y="355" text-anchor="middle" style="fill:#fff;font-weight:600">7</text>
+    <text x="52" y="346" style="font-weight:600">export_style without roads</text><text x="52" y="363" class="mut">roadstyle; 1.5 MB → 0.15 MB tile</text>
+    <circle cx="30" cy="404" r="11" class="pg"/><text x="30" y="409" text-anchor="middle" style="fill:#fff;font-weight:600">8</text>
+    <text x="52" y="400" style="font-weight:600">The page PR</text><text x="52" y="417" class="mut">duckosm-rust; one PR</text>
+  </g>
+</svg>
+<div class="legend"><span><i style="background:var(--page)"></i>a page change</span><span><i style="background:var(--ours)"></i>a roadstyle commit</span><span><i style="background:var(--other)"></i>a decision</span></div>
+</figure>
+
+<div class="card"><h3><span class="tag t-page">page</span>Step 1: 4 MapLibre workers</h3><dl>
+<dt>What</dt><dd><code>maplibregl.setWorkerCount(Math.min(4, navigator.hardwareConcurrency || 1))</code> before the first map, in duckosm-rust's page
+and in roadstyle's page template. No tile change.</dd>
+<dt>Why</dt><dd>MapLibre 5.24.0 parses all tiles on 1 worker by default [1], [2]. The 28 tiles of the view then wait for each other.</dd>
+<dt>Gain</dt><dd>−0.45 to −0.51 s (1,343 to 889 ms; 1,402 to 892 ms). 6 workers: 827 ms; 8: 894 ms.</dd>
+<dt>Risks</dt><dd>Each worker holds the tiles that it parses; a phone has fewer cores (the minimum with the cores).</dd>
+<dt>Tests</dt><dd>The harness; the page's e2e tests and the phone check.</dd>
+<dt>Page</dt><dd>A small PR of its own, now.</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-dec">decision</span>Step 2: D0, one engine</h3><dl>
+<dt>What</dt><dd>The Python engine's road style and tiles stop; the Python binding gives the Rust output (the P7 switch).</dd>
+<dt>Why</dt><dd>Phase 1 had to be written in Rust and in Python. Each later step is two ports without it.</dd>
+<dt>Gain</dt><dd>No time on the map; half the work of each step.</dd>
+<dt>Risks</dt><dd>SonoFlow's <code>viz/daily.py</code> uses <code>simple=False</code>: its <code>rs.setData</code> path must ship first.</dd>
+<dt>Tests</dt><dd>The suite with <code>ROADSTYLE_ENGINE=rust</code>.</dd>
+<dt>Page</dt><dd>None.</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 3: keys from the style</h3><dl>
+<dt>What</dt><dd>The keep rule (<code>TileOptions::rule</code>) keeps the keys that the style reads at each zoom, plus the page's declared keys until step 5.
+<code>ov4</code>'s <code>osm_id</code>, <code>kind</code> and <code>name</code> leave (the style reads only <code>height</code> and <code>base</code>).</dd>
+<dt>Why</dt><dd>Rule 2. Planetiler and OpenMapTiles keep few attributes, each with a minzoom [8], [16].</dd>
+<dt>Gain</dt><dd><code>ov4</code>: −0.3 MB on Burnaby.</dd>
+<dt>Risks</dt><dd>A reader that nobody found: <code>test_contract_names.py</code> and the budget's <code>keys_unread</code> find it.</dd>
+<dt>Tests</dt><dd>The budget (rule 2), the contract test.</dd>
+<dt>Page</dt><dd>The base-map popup reads its fields from the feature table (in step 8).</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 4: the row as the MVT id</h3><dl>
+<dt>What</dt><dd>The MVT id of a piece of <code>simple</code> and of a slot is its road's row. The dashboard and the editor read <code>f.id</code>.
+<code>promoteId</code> goes; <code>__rs_edge</code> and <code>__rs_s</code> leave; <code>r</code> and the new sort key come in.</dd>
+<dt>Why</dt><dd>Rule 3. An integer MVT id is smaller than a promoted key [14].</dd>
+<dt>Gain</dt><dd>−0.53 MB and −74k distinct values on Burnaby (tile_contract.md, section 2).</dd>
+<dt>Risks</dt><dd>MapLibre and the same id on many features: true now with <code>promoteId</code>, so low. A sort key with <code>["id"]</code>: a browser test.</dd>
+<dt>Tests</dt><dd>The budget (rule 3); the glow, live-colour and editor e2e tests.</dd>
+<dt>Page</dt><dd>In step 8, with the package.</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 5: the filters from RoadTable</h3><dl>
+<dt>What</dt><dd>The dashboard computes the rows that show from <code>RoadTable</code> and sets one <code>match</code> on <code>["id"]</code>, again after each relevel.
+<code>__rs_edge2</code>, <code>__rs_cls</code>, <code>lvl</code> and <code>__rs_access</code> leave. <code>reads.json</code> <code>pieces</code> keeps only <code>__rs_pick</code> (items).</dd>
+<dt>Why</dt><dd>Rule 2: these keys go only to the dashboard. <code>match</code> is a hash, not a linear search [13].</dd>
+<dt>Gain</dt><dd>−0.2 MB for <code>__rs_edge2</code>, and more for the other three. A <code>match</code> of 152k ids adds 0.1 s to a filter change (1,592 against
+1,496 ms); the layout again of the loaded tiles is the cost, as now.</dd>
+<dt>Risks</dt><dd>A filter that is not computed again after a relevel: an e2e test.</dd>
+<dt>Tests</dt><dd>The filter e2e tests; the budget's <code>keys_unread</code> at 0.</dd>
+<dt>Page</dt><dd>In step 8.</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 6: phase 1 lands</h3><dl>
+<dt>What</dt><dd><code>design-tile-wk</code> lands; <code>width_key</code>'s fallback goes (a look that the tables cannot hold is a test error);
+<code>__rs_pair</code> and <code>__rs_twoway</code> leave. Then the ratchet runs. D2 decides the text form.</dd>
+<dt>Why</dt><dd>A composite expression is calculated twice for each feature [3], [4]; the old width was 29 KB.</dd>
+<dt>Gain</dt><dd>−0.08 s with 4 workers (889 to 815 ms); −0.3 s with 1. Other table forms gave no more (1,221 and 1,204 ms against 1,196).</dd>
+<dt>Risks</dt><dd>+4 % bytes for the new key (+0.2 MB on Burnaby), less than steps 3 to 5 take away.</dd>
+<dt>Tests</dt><dd>The <code>width_key</code> unit test (every kind, flag, class and stop), the goldens, the harness.</dd>
+<dt>Page</dt><dd>None.</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 7: export_style without roads</h3><dl>
+<dt>What</dt><dd>The full look for a server has no <code>roads</code>, <code>roads-fill</code> or <code>roads-highlight</code>; its popup reads a props file by row (D5).</dd>
+<dt>Why</dt><dd>Rules 1 and 10: <code>roads</code> repeats every road that <code>simple</code> has, with 21 columns, at every zoom (86 % not drawn at z12).</dd>
+<dt>Gain</dt><dd>The full look's largest tile: 1.5 MB to 0.15 MB (Monaco z12), 4.0 MB to 0.24 MB (Tartu z12).</dd>
+<dt>Risks</dt><dd>A server app needs the props file; SonoFlow's <code>simple=False</code> page.</dd>
+<dt>Tests</dt><dd>The budget of <code>monaco-full</code> and <code>tartu-full</code>.</dd>
+<dt>Page</dt><dd>None (a server export).</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-page">page</span>Step 8: the page PR</h3><dl>
+<dt>What</dt><dd>In duckosm-rust, one PR: the new wasm package, the new copy of the dashboard and <code>level_editor.js</code> (its <code>addSource</code>
+without <code>promoteId</code>) together. The dashboard checks the style's <code>contract: 2</code> and gives an error for another one.</dd>
+<dt>Why</dt><dd>If <code>promoteId</code> stays while <code>__rs_edge</code> is gone, no road has an id. A cached old page must fail loudly.</dd>
+<dt>Tests</dt><dd><code>e2e.py</code>, <code>editor_e2e.py</code>, <code>phone_e2e.py</code>, and a check of the phone layout.</dd></dl></div>
+
+<h2 id="future">6. Future needs, checked</h2>
+<p><strong>A planet service: an ID and a live colour for each road.</strong> The tile schema of a piece is the same in the page's live tiles, an
+xyz folder and a PMTiles archive. A planet archive is built one time; the live part is only feature-state. A planet build is a second
+driver over the same per-piece function (regions in parallel, written by tile). The row is valid in one generation (one build of the road
+set): the generation is in the tile URL and the metadata, and the archive and the live feed change together. duckOSM's <code>edge_id</code>
+is the stable public ID; the server keeps the map from <code>edge_id</code> to the row. The live service gives (generation, row, value) for the
+rows in a view, and the page sets <code>rs_c</code> and <code>rs_w</code>: no tile is made again. 152k states took 0.68 s one time, with no stall
+after it. Before the first planet build, count the planet's directed edges against 2<sup>32</sup> (D9).</p>
+<p><strong>Live changes with no new tiles.</strong> Colour, width, hover and selection are feature-state by row. A filter is one
+<code>match</code> on <code>["id"]</code>. A relevel changes only the pieces of the changed roads and their ring; the rows stay, and the filters are
+computed again. A new road set is a new generation: a new tile prefix, and the page clears its state.</p>
+<p><strong>All consumers on one contract.</strong> The page and the editor (the wasm tiles), Python (the binding, D0), the static export
+(PMTiles or xyz, with a props file, D5) and roadstyle's HTML pages (inline GeoJSON: the same feature schema; the GeoJSON <code>id</code> is the
+row).</p>
+
+<h2 id="not-done">7. Not done, and why</h2>
+<ul>
+<li><strong>One draw key for all style inputs; colour, opacity, dash, cap and filter as tables:</strong> no gain over phase 1 (1,221 and 1,204 ms against 1,196 ms).</li>
+<li><strong>A merge of the pieces of one road</strong> (research rank 3): 13 % fewer features; −0.10 s with 1 worker, −0.02 s with 4 (noise). Pieces with another sort rank (31 %) cannot merge: the draw order changes.</li>
+<li><strong><code>setSourceTileLodParams</code></strong> (research rank 4): (4, 3) and (2, 2) against the defaults (9.314, 3): the same 28 tiles and the same time.</li>
+<li><strong>Shared buckets</strong> (research rank 5): the road layer is one bucket; the 12 visible layers are 12 families, so nothing joins.</li>
+<li><strong>No data-driven sort key:</strong> −0.01 s; <code>r</code> stays for the raise of the top roads.</li>
+<li><strong>More than 4 workers:</strong> 6 gave 827 ms, 8 gave 894 ms: no clear gain, and a phone has fewer cores.</li>
+<li><strong>The data in a worker:</strong> no measurement shows a need; <code>RoadTable</code> on the main thread works.</li>
+<li><strong>A coarser simplification:</strong> 1 px gave 6.47 to 6.42 MB on Burnaby (about 1 %) and no time.</li>
+<li><strong>One casing per road at low zooms; one casing for two equal halves:</strong> not measured.</li>
+<li><strong>Class minzooms for steps, corridor, platform, bridleway, construction:</strong> −3 % features at z12; it changes the map.</li>
+<li><strong>A coarser grid at low zooms:</strong> geometry is 11 to 18 % of the bytes.</li>
+<li><strong>Colours as palette indexes:</strong> the text values of <code>simple</code> are 200 to 300 bytes in a tile.</li>
+</ul>
+
+<h2 id="practice">8. Against established practice</h2>
+<div class="box"><table>
+<tr><th>Practice</th><th>Source</th><th>Here</th><th>Measured</th></tr>
+<tr><td>More MapLibre workers (the default is 1)</td><td>[1], [2]</td><td><span class="yes">follow</span>, step 1</td><td>−0.45 to −0.51 s</td></tr>
+<tr><td>A small width expression (a composite expression is calculated twice for each feature)</td><td>[3], [4]</td><td><span class="yes">follow</span>, step 6</td><td>−0.08 s (4 workers)</td></tr>
+<tr><td>One feature for each road and level (line merge, <code>--coalesce</code>)</td><td>[5], [6]</td><td><span class="no">differ</span></td><td>−0.02 s (4 workers)</td></tr>
+<tr><td>Fewer tiles at the horizon; class minzooms</td><td>[7], [8]</td><td><span class="no">differ</span></td><td>no change; −1.6 to −3 % features</td></tr>
+<tr><td>Shared buckets; a constant sort key; features in draw order</td><td>[9], [10]</td><td><span class="part">in part</span>: (rank, row) order; the key stays</td><td>−0.01 s</td></tr>
+<tr><td>Feature-state for live colour (a stall at 20k keys, fixed in 2026)</td><td>[11], [12]</td><td><span class="yes">follow</span></td><td>152k states 0.68 s; no stall after</td></tr>
+<tr><td><code>match</code>, not <code>in</code>, for long lists</td><td>[13]</td><td><span class="yes">follow</span></td><td>152k ids: +0.1 s</td></tr>
+<tr><td>An MVT id SHOULD be unique in a layer</td><td>[14]</td><td><span class="no">differ</span>: the pieces of a road share its row, so one feature-state paints the road</td><td></td></tr>
+<tr><td>Drop or coalesce features to a size limit (500 KB, 200,000 features)</td><td>[6], [15]</td><td><span class="no">differ</span>: the style decides what is drawn</td><td></td></tr>
+<tr><td>Few attributes, each with a minzoom; booleans only when true</td><td>[8], [16]</td><td><span class="yes">follow</span></td><td></td></tr>
+</table></div>
+
+<h2 id="review">9. The review</h2>
+<p>The independent review, finding by finding:</p>
+<ol>
+<li>Step 1 not measured: <strong>accepted</strong>; probed (above); the phase 1 step has no fallback.</li>
+<li>An archive tied to one look: <strong>accepted</strong>; the key layout is fixed, only the value tables come from the look.</li>
+<li>An id list wrong after a relevel: <strong>accepted</strong>; the filters are computed again after each relevel.</li>
+<li>A large <code>match</code> not measured: <strong>measured</strong>; 152k ids add 0.1 s to a filter change.</li>
+<li>The road table to a worker not measured: <strong>accepted</strong>; <code>RoadTable</code> stays on the main thread.</li>
+<li><code>r</code> and the sort key can go: <strong>in part</strong>; <code>__rs_s</code> goes, <code>r</code> stays for the raise of the top roads.</li>
+<li>The id step too large: <strong>accepted</strong>; it is steps 4 and 5.</li>
+<li>Parts not defined: <strong>accepted</strong>; items keep <code>__rs_pick</code>; decks and shadows are inline GeoJSON and do not change; the contract
+test checks every zoom up to 24 for the tiles of the last zoom.</li>
+<li>Planet ids: <strong>accepted</strong> (D9).</li>
+<li>The order and the page's safety: <strong>accepted</strong> (step 8, D0).</li>
+</ol>
+
+<h2 id="decisions">10. Decisions for Kaveh</h2>
+<div class="box"><table>
+<tr><th></th><th>Decision</th><th>Changes the map?</th><th>Recommendation</th></tr>
+<tr><td>D1</td><td>4 MapLibre workers in duckosm-rust's page and roadstyle's pages, as a small PR now</td><td>no</td><td><span class="yes">yes</span></td></tr>
+<tr><td>D0</td><td>The Python engine's road style and tiles stop; the binding gives the Rust output (the P7 switch). SonoFlow's <code>viz/daily.py</code> (<code>simple=False</code>): its <code>rs.setData</code> path ships first.</td><td>no</td><td><span class="yes">yes</span>, before step 3</td></tr>
+<tr><td>D2</td><td>Phase 1's width and offset text (44 KB and 19 KB, over today's limit of 25,796 characters): a class curve plus a mode term (about 4 KB, the same time in the probe) if the unit test shows it exact, else a raise of that one limit</td><td>no</td><td><span class="yes">the compact form if exact</span></td></tr>
+<tr><td>D5</td><td><code>export_style</code> for a server: no <code>roads</code> layer; the popup reads a props file by row (the same SonoFlow condition)</td><td>no picture change</td><td><span class="yes">yes</span></td></tr>
+<tr><td>D9</td><td>A planet: the id as a dense global row under 2<sup>32</sup>, not <code>table &lt;&lt; 32 | row</code> (5 to 8 bytes for each id)</td><td>no</td><td><span class="yes">yes</span>, before the first planet build</td></tr>
+</table></div>
+
+<h2 id="sources">11. Sources</h2>
+<ol class="src">
+<li>MapLibre <code>getWorkerCount</code>: <a href="https://maplibre.org/maplibre-gl-js/docs/API/functions/getWorkerCount/">maplibre.org</a></li>
+<li>MapLibre <code>worker_pool.ts</code>: <a href="https://raw.githubusercontent.com/maplibre/maplibre-gl-js/main/src/util/worker_pool.ts">github</a></li>
+<li>MapLibre <code>program_configuration.ts</code>: <a href="https://raw.githubusercontent.com/maplibre/maplibre-gl-js/main/src/data/program_configuration.ts">github</a></li>
+<li>MapLibre expressions: <a href="https://maplibre.org/maplibre-style-spec/expressions/">maplibre.org</a></li>
+<li>Planetiler <code>FeatureMerge.java</code>: <a href="https://raw.githubusercontent.com/onthegomap/planetiler/main/planetiler-core/src/main/java/com/onthegomap/planetiler/FeatureMerge.java">github</a></li>
+<li>Tippecanoe README: <a href="https://raw.githubusercontent.com/felt/tippecanoe/main/README.md">github</a></li>
+<li>MapLibre <code>setSourceTileLodParams</code>: <a href="https://maplibre.org/maplibre-gl-js/docs/API/classes/Map/#setsourcetilelodparams">maplibre.org</a></li>
+<li>OpenMapTiles transportation in Planetiler: <a href="https://raw.githubusercontent.com/openmaptiles/planetiler-openmaptiles/main/src/main/java/org/openmaptiles/layers/Transportation.java">github</a></li>
+<li>MapLibre <code>group_by_layout.ts</code>: <a href="https://raw.githubusercontent.com/maplibre/maplibre-style-spec/main/src/group_by_layout.ts">github</a></li>
+<li>MapLibre <code>line_bucket.ts</code>: <a href="https://raw.githubusercontent.com/maplibre/maplibre-gl-js/main/src/data/bucket/line_bucket.ts">github</a></li>
+<li>MapLibre issue 6633: <a href="https://github.com/maplibre/maplibre-gl-js/issues/6633">github</a></li>
+<li>MapLibre PR 7550: <a href="https://github.com/maplibre/maplibre-gl-js/pull/7550">github</a></li>
+<li>The style spec's <code>match</code>: <a href="https://raw.githubusercontent.com/maplibre/maplibre-style-spec/main/src/expression/definitions/match.ts">github</a></li>
+<li>The vector tile spec 2.1: <a href="https://raw.githubusercontent.com/mapbox/vector-tile-spec/master/2.1/README.md">github</a></li>
+<li>Planetiler config: <a href="https://raw.githubusercontent.com/onthegomap/planetiler/main/planetiler-core/src/main/java/com/onthegomap/planetiler/config/PlanetilerConfig.java">github</a></li>
+<li>Shortbread schema: <a href="https://shortbread-tiles.org/schema/1.0/">shortbread-tiles.org</a></li>
+</ol>
+</main>
+</body>
+</html>
