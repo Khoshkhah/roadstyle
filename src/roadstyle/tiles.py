@@ -167,6 +167,149 @@ def _ev(e, p):
     return None
 
 
+LIVE_WIDTH_MAX = 3.0      # roadstyle_tiles::buffer::LIVE_WIDTH_MAX: a width that reads a feature state, at most this factor (widthRange [1, 3])
+
+
+def _bound(e, z, live):
+    """roadstyle_tiles::buffer::bound: an upper bound of |e| at the zoom z for every feature, or None."""
+    if isinstance(e, bool):
+        return None
+    if isinstance(e, (int, float)):
+        return abs(float(e))
+    if not isinstance(e, list) or not e or not isinstance(e[0], str):
+        return None
+    op, a = e[0], e
+
+    def mx(es):
+        m = 0.0
+        for x in es:
+            v = _bound(x, z, live)
+            if v is None:
+                return None
+            m = max(m, v)
+        return m
+
+    if op == "literal":
+        x = a[1]
+        if isinstance(x, list):
+            return mx(x) if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in x) else None
+        return _bound(x, z, live)
+    if op == "zoom":
+        return z
+    if op == "feature-state":
+        return live
+    if op == "at":
+        return _bound(a[2], z, live) if len(a) > 2 else None
+    if op == "abs":
+        return _bound(a[1], z, live) if len(a) > 1 else None
+    if op in ("*", "+", "-"):
+        m = 1.0 if op == "*" else 0.0
+        for x in a[1:]:
+            v = _bound(x, z, live)
+            if v is None:
+                return None
+            m = m * v if op == "*" else m + v
+        return m
+    if op == "/":
+        d = a[2] if len(a) > 2 else None
+        if not isinstance(d, (int, float)) or isinstance(d, bool) or d == 0:
+            return None
+        v = _bound(a[1], z, live)
+        return None if v is None else v / abs(float(d))
+    if op in ("max", "coalesce"):
+        return mx(a[1:])
+    if op == "min":
+        vs = [v for v in (_bound(x, z, live) for x in a[1:]) if v is not None]
+        return min(vs) if vs else None
+    if op == "case":
+        return mx(a[2::2] + a[-1:])
+    if op == "match":
+        return mx(a[3::2] + a[-1:])
+    if op == "step":
+        outs = [a[2]] + a[4::2]
+        if a[1] == ["zoom"]:
+            at = 0
+            for st in a[3::2]:
+                if isinstance(st, (int, float)) and st <= z:
+                    at += 1
+                else:
+                    break
+            return _bound(outs[at], z, live)
+        return mx(outs)
+    if op == "interpolate":
+        pairs = a[3:]
+        if len(pairs) % 2 or not all(isinstance(x, (int, float)) for x in pairs[0::2]):
+            return None
+        stops = list(zip([float(x) for x in pairs[0::2]], pairs[1::2]))
+        if a[2] != ["zoom"]:
+            return mx([v for _, v in stops])
+        i = 0
+        while i < len(stops) and stops[i][0] <= z:
+            i += 1
+        if i == 0:
+            return _bound(stops[0][1], z, live)
+        if i == len(stops):
+            return _bound(stops[i - 1][1], z, live)
+        (z0, e0), (z1, e1) = stops[i - 1], stops[i]
+        v0, v1 = _bound(e0, z, live), _bound(e1, z, live)
+        if v0 is None or v1 is None:
+            return None
+        kind = a[1][0] if isinstance(a[1], list) and a[1] else None
+        if kind == "linear":
+            t = (z - z0) / (z1 - z0)
+        elif kind == "exponential":
+            base = a[1][1]
+            t = (z - z0) / (z1 - z0) if base == 1 else (base ** (z - z0) - 1.0) / (base ** (z1 - z0) - 1.0)
+        else:
+            return max(v0, v1)
+        return v0 + min(max(t, 0.0), 1.0) * (v1 - v0)
+    return None
+
+
+def _reach(layer, z, live):
+    """roadstyle_tiles::buffer::reach: how far a layer's stroke reaches from its line or point at the map zoom z, in px."""
+    lo, hi = layer.get("minzoom"), layer.get("maxzoom")
+    if (lo is not None and z < lo) or (hi is not None and z >= hi) or layer.get("source") == "slots":
+        return 0.0
+    paint = layer.get("paint") or {}
+
+    def ub(k, none):
+        return none if paint.get(k) is None else _bound(paint[k], z, live)
+
+    if layer.get("type") == "line":
+        w, gap, off, blur = ub("line-width", 1.0), ub("line-gap-width", 0.0), ub("line-offset", 0.0), ub("line-blur", 0.0)
+        if None in (w, gap, off, blur):
+            return None
+        return (gap / 2.0 + w if gap > 0.0 else w / 2.0) + off + blur / 2.0
+    if layer.get("type") == "circle":
+        r, sw, blur = ub("circle-radius", 5.0), ub("circle-stroke-width", 0.0), ub("circle-blur", 0.0)
+        return None if None in (r, sw, blur) else r + sw + blur
+    return 0.0
+
+
+def buffers_px(layers, max_zoom, live=LIVE_WIDTH_MAX, fallback=80.0):
+    """roadstyle_tiles::buffer::buffers_px: the buffer of each tile zoom 0 to max_zoom in px of the tile, from the widest stroke at the
+    map zooms that draw that tile (a tile of zoom z: z to z + 1, scaled up by 2^(Z - z); the last zoom: to 24), plus 1 px; ``fallback``
+    where a stroke's width cannot be bounded."""
+    out = []
+    for z in range(max_zoom + 1):
+        top = z + 1.0 if z < max_zoom else 24.0
+        steps = math.ceil((top - z) * 16.0)
+        need, unknown = 0.0, False
+        for k in range(steps + 1):
+            zz = z + (top - z) * k / steps
+            for layer in layers or []:
+                px = _reach(layer, zz, live)
+                if px is None:
+                    unknown = True
+                    break
+                need = max(need, px / 2.0 ** (zz - z))
+            if unknown:
+                break
+        out.append(float(fallback) if unknown else need + 1.0)
+    return out
+
+
 def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
                   minzoom: int = 6, maxzoom: int = 15, extent: int = 4096,
                   buffer_px: int = 80, layer: str = "roads",
@@ -207,10 +350,11 @@ def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
 
     buf = io.BytesIO()
     writer = Writer(buf)
+    buffers = buffers_px(layers, maxzoom, LIVE_WIDTH_MAX, buffer_px)    # each zoom's buffer, as the Rust engine's TileOptions::tiles
     for z in range(minzoom, maxzoom + 1):
         s = 2 * _R / (1 << z)
         tol = s / extent / 2                       # ~half a tile pixel
-        pad = s * buffer_px / 512                  # buffer_px in px of a 512 px tile (was units: 10 px, a wide road lost its casing)
+        pad = s * buffers[z] / 512                 # px of a 512 px tile (it was 80 units, 10 px: a wide road lost its casing)
         cells = {}                                 # (x, y) -> {layer_name: [feature rows]}
         for lname, lfeats, from_zoom in lines:
             if z < from_zoom:
