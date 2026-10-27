@@ -8,7 +8,10 @@ use rstar::{RTree, AABB};
 
 /// Python's round(x, 6) as a float: the nearest double to the correctly rounded decimal (no tie can occur at 6 places), and no -0.
 pub fn round6(x: f64) -> f64 {
-    let v: f64 = format!("{x:.6}").parse().unwrap();
+    // fast: away from a half, x * 1e6 (error below 1e-7 for a coordinate) rounds to the same integer n as the decimal, and n / 1e6 (n
+    // and 1e6 exact) is the nearest double to it, as the parse gives; near a half, the decimal text decides
+    let y = x * 1e6;
+    let v = if y.abs() < 1e15 && ((y - y.trunc()).abs() - 0.5).abs() > 1e-6 { y.round() / 1e6 } else { format!("{x:.6}").parse().unwrap() };
     if v == 0.0 { 0.0 } else { v }
 }
 
@@ -61,5 +64,18 @@ mod tests {
         assert_eq!(round6(-0.0000004), 0.0);
         assert!(round6(-0.0000004).is_sign_positive());
         assert_eq!(round6(59.3141515), 59.314152);
+    }
+
+    #[test]
+    fn round6_fast_path_is_the_decimal_text() {
+        let text = |x: f64| { let v: f64 = format!("{x:.6}").parse().unwrap(); if v == 0.0 { 0.0 } else { v } };
+        let mut s = 0x2545F4914F6CDD1Du64;
+        for _ in 0..1_000_000 {
+            s ^= s << 13; s ^= s >> 7; s ^= s << 17;
+            let x = (s >> 11) as f64 / (1u64 << 53) as f64 * 360.0 - 180.0;
+            for x in [x, (x * 1e6).trunc() / 1e6 + 5e-7, (x * 1e7).round() / 1e7] {
+                assert_eq!(round6(x).to_bits(), text(x).to_bits(), "{x}");
+            }
+        }
     }
 }

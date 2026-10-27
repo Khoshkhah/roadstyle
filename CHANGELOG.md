@@ -13,6 +13,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   they show). The static page's table keeps its lines. `LiveMap.roadLines(rows)` and `LiveMap.roadEnds()` (a Float64Array, 4
   numbers for each row; Tartu: 1 ms) read the stage 1 that the map holds; the level editor on a host map reads its end marks from the
   table's `endsOf()`, not from every line. Tartu, every field: 45.1 MiB to 39.2 MiB; with 7 fields: 18.5 MiB to 12.5 MiB.
+- **Faster stage 1 and road table** (2026-10-27): the road table reads only the fields that it keeps (`table_rows_of`,
+  `Road::iter_where`), and writes a cell with no JSON copy; `Mark::of` finds a name in a map (a search of every mark for each cell was
+  most of the table's time); `round6` (the topology's nodes) has an exact fast path away from a half; `Values::id` makes no new
+  text for a value that is there. The same bytes. Tartu, natively: makeSources 250 ms to 210 ms, the road table 305 ms to 146 ms
+  (with 7 fields 300 ms to 81 ms), LiveTiles::new 285 ms to 230 ms.
 - **Faster first tiles of a live map** (2026-10-26): a piece reads only the road cells that its tiles keep (`Road::own_where`; R1's
   read set and the class), not every cell before the filter. The tiles have the same bytes. Tartu, the first tiles of a 1280 x 800
   view (rust/roadstyle-wasm/bench_live.mjs): z11 74 ms to 54 ms, z14 168 ms to 113 ms in Node; z11 70 ms to 41 ms, z14 169 ms to

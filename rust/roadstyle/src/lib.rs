@@ -379,10 +379,7 @@ fn road_rows(s: &sources::Styled) -> impl Iterator<Item = roadstyle_io::write::R
 /// table: what its page reads); None: every field. A page that has the engine gets the table without lines (the lines are most of
 /// its bytes) and asks for a road's line when it needs it (`write_road_lines`); a static page has no engine and gets the lines.
 pub fn write_road_table<W: std::io::Write>(s: &sources::Styled, fields: Option<&[String]>, lines: bool, w: &mut W) -> std::io::Result<()> {
-    let mut rows = s.table_rows();
-    if let Some(f) = fields {
-        rows.iter_mut().for_each(|t| t.props.retain(|(k, _)| f.iter().any(|n| n == k)));
-    }
+    let rows = s.table_rows_of(fields);
     // each value written straight to `w` (audit D11: no JSON tree for each row)
     type Item<W> = dyn Fn(&mut W, &sources::TableRow) -> serde_json::Result<()>;
     let list = |w: &mut W, key: &str, first: bool, item: &Item<W>| -> std::io::Result<()> {
@@ -403,7 +400,11 @@ pub fn write_road_table<W: std::io::Write>(s: &sources::Styled, fields: Option<&
             }
             serde_json::to_writer(&mut *w, k)?;
             w.write_all(b":").map_err(serde_json::Error::io)?;
-            serde_json::to_writer(&mut *w, &js_value(v.to_value()))?;
+            // a cell is written as it is (its text is to_value's, a large integer as text); a JSON number through js_value
+            match v {
+                Cell::Json(j @ Value::Number(_)) => serde_json::to_writer(&mut *w, &js_value((*j).clone()))?,
+                _ => serde_json::to_writer(&mut *w, v)?,
+            }
         }
         w.write_all(b"}").map_err(serde_json::Error::io)
     })?;

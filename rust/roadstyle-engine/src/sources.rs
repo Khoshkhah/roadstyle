@@ -276,15 +276,21 @@ impl Styled {
     /// The road table (audit N4): one typed row for each road (its row is its position), which the page's JSON and the Parquet file
     /// encode.
     pub fn table_rows(&self) -> Vec<TableRow<'_>> {
+        self.table_rows_of(None)
+    }
+
+    /// `table_rows` with only the fields `fields` of each road (None: every field); the cell of another field is not read.
+    pub fn table_rows_of(&self, fields: Option<&[String]>) -> Vec<TableRow<'_>> {
         use roadstyle_model::geom::line;
+        let keep = |k: &str| roadstyle_model::props::table_keeps(k) && fields.is_none_or(|f| f.iter().any(|n| n == k));
         self.roads.roads.iter().map(|r| {
             let c = r.line();
-            TableRow { props: self.road_row(r), mid: c.and_then(line::mid), bbox: c.and_then(line::bbox), line: c.filter(|c| !c.is_empty()) }
+            TableRow { props: r.iter_where(keep).collect(), mid: c.and_then(line::mid), bbox: c.and_then(line::bbox), line: c.filter(|c| !c.is_empty()) }
         }).collect()
     }
 
     /// One road's row of the road table: its fields and the stage values that the page reads (R1: props::table_keeps).
     pub fn road_row<'a>(&'a self, r: crate::Road<'a>) -> Vec<(&'a str, Cell<'a>)> {
-        r.iter().filter(|(k, _)| roadstyle_model::props::table_keeps(k)).collect()
+        r.iter_where(roadstyle_model::props::table_keeps).collect()
     }
 }

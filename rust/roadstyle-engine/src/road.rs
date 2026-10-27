@@ -183,8 +183,13 @@ impl<'a> Road<'a> {
 
     /// The properties in the output's order: its own, then its marks in the other palettes of the views.
     pub fn iter(self) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
+        self.iter_where(|_| true)
+    }
+
+    /// `iter` with only the keys that `keep` takes (`own_where`).
+    pub fn iter_where(self, keep: impl Fn(&str) -> bool + Copy) -> impl Iterator<Item = (&'a str, Cell<'a>)> {
         let i = self.i;
-        self.own().chain(self.x.iter().filter_map(move |e| e.vals[i].as_ref().map(|v| (e.name.as_str(), Cell::Json(v)))))
+        self.own_where(keep).chain(self.x.iter().filter(move |e| keep(&e.name)).filter_map(move |e| e.vals[i].as_ref().map(|v| (e.name.as_str(), Cell::Json(v)))))
     }
 
     pub fn to_map(self) -> Map<String, Value> {

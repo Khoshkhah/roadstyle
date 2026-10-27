@@ -193,7 +193,9 @@ pub const KEPT: &str = "__rs_kept_";
 impl Mark {
     /// The mark of a property name (None: not a mark; a colour option's fill: `option_of_fill`).
     pub fn of(name: &str) -> Option<Mark> {
-        Mark::ALL.iter().copied().find(|m| m.name() == name)
+        // a map of the names, made one time: the stages ask for each cell of each road (a search of ALL was most of the road table)
+        static BY_NAME: std::sync::OnceLock<std::collections::HashMap<&'static str, Mark>> = std::sync::OnceLock::new();
+        BY_NAME.get_or_init(|| Mark::ALL.iter().rev().map(|&m| (m.name(), m)).collect()).get(name).copied()
     }
 }
 

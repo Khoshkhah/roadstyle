@@ -61,14 +61,19 @@ pub struct Values {
     style_at: HashMap<[u32; 8], u32>,
     /// the property of each colour option's fill (mark::option_fill; colors::bake sets them)
     pub fill_names: Vec<String>,
+    /// the JSON text of the value that `id` looks for (one buffer: a value that is there makes no new text)
+    key: Vec<u8>,
 }
 
 impl Values {
     pub fn id(&mut self, v: &Value) -> u32 {
-        let key = v.to_string();
-        if let Some(&i) = self.at.get(&key) {
+        self.key.clear();
+        serde_json::to_writer(&mut self.key, v).expect("a Vec takes every byte");
+        let key = std::str::from_utf8(&self.key).expect("JSON text is UTF-8");
+        if let Some(&i) = self.at.get(key) {
             return i;
         }
+        let key = key.to_string();
         self.list.push(v.clone());
         let i = (self.list.len() - 1) as u32;
         self.at.insert(key, i);
