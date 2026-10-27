@@ -439,7 +439,9 @@ impl Tiles {
             let n = (1u64 << z) as f64;
             let last = (1u32 << z) - 1;
             let cell = |v: f64| ((v * n).floor().max(0.0) as u32).min(last);      // tiles.py's _tile_range
-            let (x0, x1, y0, y1) = (cell(lo[0]), cell(hi[0]), cell(hi[1]), cell(lo[1]));
+            // the bounds and the zoom's buffer: a tile whose buffer has a road's stroke has the road (tiles.py: the padded boxes)
+            let b = self.buffers[z as usize] / EXTENT / n;
+            let (x0, x1, y0, y1) = (cell(lo[0] - b), cell(hi[0] + b), cell(hi[1] - b), cell(lo[1] + b));
             for x in x0..=x1 {
                 for y in y0..=y1 {
                     let t = self.build(z, x, y);       // each tile once: the cache is for a map that asks again (review 4, D9)
