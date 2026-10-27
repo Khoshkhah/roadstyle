@@ -21,7 +21,7 @@ Two facts from the measurements decide the design:
 1. MapLibre's time follows the features that it draws and the data-driven expressions that it calculates for them. A feature that
    no layer draws costs little (option A, now in `rust-engine`).
 2. The road layer's expressions are most of the road cost. With all the paint and layout values of the road layer made constant,
-   the view takes 0.77 s, not 1.42 s (the `expr/` test, below). Smaller tiles alone give less.
+   the view takes 0.77 s, not 1.42 s, and `line-width` alone is 0.38 s (the `expr/` test, section 6). Smaller tiles alone give less.
 
 The contract therefore has two parts: small tiles, and small expressions.
 
@@ -129,9 +129,9 @@ With the rows as now, 75 % of the pieces have a 3-byte row (row 16,384 or more),
 
 The expected saving (Burnaby, the tilted view, 5.9 MB):
 
-- Phase 1 (the id): `__rs_edge` and `__rs_s` go out (−1,036 KB), and the MVT id and `__rs_r` come in (+502 KB). The net is
+- Phase 2 (the id): `__rs_edge` and `__rs_s` go out (−1,036 KB), and the MVT id and `__rs_r` come in (+502 KB). The net is
   **−0.53 MB** and **−74k distinct values**.
-- Phase 3 removes `__rs_edge2` (−198 KB, −11k distinct values).
+- Phase 4 removes `__rs_edge2` (−198 KB, −11k distinct values).
 - Together: **−0.73 MB (−12 %)** and **−85k of the about 90k distinct values** that the id keys give now.
 
 **The order of the rows.** Smaller numbers for the roads that a view shows most can make the id smaller. The best case is an order
@@ -235,60 +235,77 @@ data-driven paint and layout property of the road layer (section 6), so a large 
 
 ## 6. The expressions
 
-The `expr/` test (Burnaby, tilted view, 5 runs each, median, with a 200 ms start wait) changes one property of the road layer at a
-time to a constant:
+The `expr/` test (`.claude/tile-lag/expr/README.md`) changes one item of the live style and measures the time from the jump to an idle
+map: Burnaby, the tilted view, the tiles of `cfa80c2`, headless Chromium with software GL, the median of 5 runs, each on a new page,
+with a 200 ms start wait in each time.
 
 | Variant | ms to idle | Against now |
 |---|---|---|
 | now | 1416 | |
-| `line-width` constant | 1032 | −384 |
-| `line-color` constant | 1334 | −82 |
-| `line-opacity` constant | 1352 | −64 |
-| `line-offset` constant | 1364 | −52 |
-| `line-dasharray`, `line-sort-key`, cap and join, blur | 1400 to 1452 | in the noise |
-| all values of the road layer constant | 768 | −648 |
-| no road layer | 568 | −848 |
-| the road layer two times | 2190 | +774 |
-| the overlays half / none | 1232 / 1083 | −184 / −333 |
+| all 5 paint and 3 layout properties of `simple` constant | 768 | −648 |
+| only `line-width` as an interpolate on the zoom only (no feature data) | 1032 | −384 |
+| only `line-color` constant | 1334 | −82 |
+| only `line-opacity` constant | 1352 | −64 |
+| only `line-offset` constant | 1364 | −52 |
+| only `line-dasharray`, `line-sort-key`, `line-cap` or `line-blur` changed | 1400 to 1452 | in the noise |
+| the `simple` layer removed (the other layers stay) | 568 | −848 |
+| the `simple` layer two times | 2190 | +774 |
+| half of the other layers on the `rs-roads` source removed (24 of 49) | 1232 | −184 |
+| all other layers on the `rs-roads` source removed (49) | 1083 | −333 |
+
+The size of the expressions (characters of JSON): `line-width` 29,032, `line-offset` 3,184, `line-color` 1,895, the filter 859, each
+other property below 300. In the worker's CPU profile of "now" (1,576 ms of samples), `evaluate`, MapLibre's evaluation of style
+expressions, is the top function: 311 ms, 20 %.
+
+The style has 50 layers on the vector source `rs-roads`. One of them (`rs-roads-simple`) reads the road layer `simple`. The others
+read the overlays and the base-map layers (`ov0` to `ov14`). 12 of the 50 are visible.
 
 What this shows:
 
-- The road layer costs about 0.85 s. Of this, about 0.65 s is its expressions and about 0.2 s is the drawing of its features.
-- `line-width` alone is 0.38 s. It is 29 KB of JSON: an `interpolate` over 9 zoom stops, and at each stop a `case` on the piece
-  kind, pair, bridge and twin with an `["at", ["get", "__rs_ci"], ...]` table of 29 classes (about 3 KB for each stop). MapLibre
-  calculates it for each feature at the tile's zoom and the next zoom.
-- The sort key has no cost in time. Its cost is the 49k different values (bytes).
-- Each style layer on the same features costs again. One road layer is correct. A second layer for the casing is not a gain.
+- **The expressions are the main cause of the lag.** The road layer costs about 0.85 s. About 0.65 s of it is the calculation of its
+  paint and layout expressions, and about 0.2 s is the drawing of its features.
+- **`line-width` alone is 0.38 s.** It is an `interpolate` over 9 zoom stops (12 to 20). Each stop is a `case` on the piece kind, pair,
+  bridge and twin, with tables of the 29 classes (`["at", ["get", "__rs_ci"], ["literal", [...]]]`, about 3 KB for each stop).
+  MapLibre calculates it for each feature at two zooms.
+- **The sort key has no cost in time.** Its cost is its 49k different values (section 2).
+- **Each style layer on the same features costs again.** One road layer is correct. A second layer for the casing is not a gain. The
+  other 49 layers cost 0.33 s together. Their expressions get the same budget as the road layer's.
 
-How to keep them small:
+How to keep the expressions small:
 
-1. **One lookup for each stop.** The width reads 5 keys (`__rs_k`, `__rs_ci`, `__rs_pair`, `__rs_bridge`, `__rs_twoway`). The engine
-   can give each piece one small integer `__rs_wk`, the index of its width row, with fewer than 200 different values. Each stop is then
-   `["at", ["get", "__rs_wk"], ["literal", [...]]]`. The offset can use the same index. The 5 keys stay only where another expression
-   reads them.
-2. **No zoom stop that a linear line gives.** Where the widths of the class grow in one exponential curve, use
-   `["interpolate", ["exponential", 2], ["zoom"], z0, w0, z1, w1]` with 2 stops, not 9.
-3. **A budget** for each property (section 5), for example 4 KB.
-4. **The same pixels.** A change of an expression must not change the picture. The pixel goldens and the Burnaby pictures of
+1. **One small width key for each piece, from the engine.** The width reads 5 keys (`__rs_k`, `__rs_ci`, `__rs_pair`, `__rs_bridge`,
+   `__rs_twoway`). The engine already knows each piece's width row. It writes one small integer `__rs_wk`, the index of that row, with
+   fewer than 200 different values (1 byte in each tag). The style then has one width table for each zoom stop:
+   `["interpolate", ["linear"], ["zoom"], 12, ["at", ["get", "__rs_wk"], ["literal", [...]]], 13, ...]`. It is the same map: the same
+   widths at the same zooms, with one lookup for each stop, not a `case` tree. The live width stays a factor:
+   `["*", ..., ["coalesce", ["feature-state", "rs_w"], 1]]`.
+2. **The same index for the offset**, where the offset reads the same keys (`__rs_twoway`, `__rs_pair`, `__rs_ci`).
+3. **Fewer stops where the curve lets it.** The classes do not grow with one curve (for example, from zoom 12 to 20 one class grows
+   25 times and another 94 times), so one base width times a shared curve changes the pixels. A class whose widths are on one
+   exponential curve can have 2 stops, not 9.
+4. **A budget** for each data-driven property (section 5): 4 KB.
+5. **The same pixels.** A change of an expression must not change the picture. The pixel goldens and the Burnaby pictures of
    `expr/` decide this.
 
-The gain is not known before a test: `line-width` constant gives the top limit (−0.38 s). The first step of phase 4 is to make the
-`__rs_wk` style in the `expr/` harness and measure it.
+The zoom-only width gives the top limit of the gain (−0.38 s). A width that reads one key is still data-driven, so its gain is less.
+A probe before the code: in the `expr/` harness, make each stop one `["at", ["get", "__rs_ci"], ...]` lookup with the saved tiles.
+This has the same cost as `__rs_wk` (the pixels are wrong, the time is correct).
 
 ## 7. The plan
 
-Each phase can ship alone. The tile bytes change in phases 1 to 3, so each phase writes the new tile goldens and the new budget.
+Each phase can ship alone. Each phase that changes the tile bytes writes the new tile goldens and the new budget. The small
+expressions come first: they have the largest gain and need no page change.
 
 | Phase | roadstyle | The page (dashboard, duckosm-rust) | Expected gain (Burnaby, tilted view) | Risks | Tests |
 |---|---|---|---|---|---|
 | 0. Undrawn features out (done, `5f79037`) | `ZoomRules::span` | none | −15k features, −0.6 MB; time in the noise | | the span tests, the Burnaby hashes |
-| 1. The id | MVT id = road row on `simple` and the slots; no `promoteId`; `__rs_edge` out of the tile; sort key from `__rs_r` and `["id"]` | read `f.id` (`select.js`, `core.js`, `arrows.js`, editor); no `promoteId` in `addSource` | −74k different values, −0.53 MB (measured, section 2); time small (the sort key test showed no time) | MapLibre with the same id on many features (now true with `promoteId`, so low); an old page with a new style | sort-key order test (`sources.rs`), glow and live colour e2e, editor e2e |
-| 2. The data layer | `generation`, `edgeIds`, `rowsOf`, `fields`, `columns`, `select`, `features` in roadstyle-wasm and Python | filters from `select`, `rs.setData` with `rowsOf`, `ov4` popup from `features` | none alone; it lets phase 3 remove keys | a filter change with 150k ids (size of the `match`); a popup that waits for the worker | unit tests of `select` (twins, modes), filter e2e, popup e2e |
-| 3. Keys from the style | `TileOptions::rule` keeps the style's keys of each zoom only; `highway` replaced by `__rs_ci` in the filter; `reads.json` `pieces` empty | no page read of a tile property | −4 keys on 87k pieces, −`osm_id`/`kind`/`name` on 24k buildings: with phase 1, −0.8 to −1.0 MB of 5.9 MB; time about −0.05 to −0.1 s | a reader that nobody found: the contract test and `test_contract_names.py` find it | the contract test, the size budget |
-| 4. Small expressions | `__rs_wk` and a width table; 2-stop curves where they are the same | none | up to −0.38 s (width), up to −0.65 s with all of the road layer's values | a change of pixels; more keys if the index is not shared | pixel goldens, Burnaby `expr/` harness, the expression budget |
+| 1. Small expressions | the engine writes `__rs_wk` (and the offset's index); `line-width` and `line-offset` as one table lookup for each zoom stop; the same budget for the other 49 layers | none | up to −0.38 s (width); up to −0.65 s with all of the road layer's expressions; the probe gives the real number first | a change of pixels; one more key on each piece (1-byte tag) | pixel goldens, the `expr/` harness, the expression budget |
+| 2. The id | MVT id = road row on `simple` and the slots; no `promoteId`; `__rs_edge` out of the tile; sort key from `__rs_r` and `["id"]` | read `f.id` (`select.js`, `core.js`, `arrows.js`, editor); no `promoteId` in `addSource` | −74k different values, −0.53 MB (measured, section 2); time small (the sort key test showed no time) | MapLibre with the same id on many features (now true with `promoteId`, so low); an old page with a new style | sort-key order test (`sources.rs`), glow and live colour e2e, editor e2e |
+| 3. The data layer | `generation`, `edgeIds`, `rowsOf`, `fields`, `columns`, `select`, `features` in roadstyle-wasm and Python | filters from `select`, `rs.setData` with `rowsOf`, `ov4` popup from `features` | none alone; it lets phase 4 remove keys | a filter change with 150k ids (size of the `match`); a popup that waits for the worker | unit tests of `select` (twins, modes), filter e2e, popup e2e |
+| 4. Keys from the style | `TileOptions::rule` keeps the style's keys of each zoom only; `highway` replaced by `__rs_ci` in the filter; the 5 old width keys go out of the tile where no expression reads them; `reads.json` `pieces` empty | no page read of a tile property | −4 keys on 87k pieces, −`osm_id`/`kind`/`name` on 24k buildings: with phase 2, −0.8 to −1.0 MB of 5.9 MB; time about −0.05 to −0.1 s | a reader that nobody found: the contract test and `test_contract_names.py` find it | the contract test, the size budget |
 
-The sum: the control now takes 1.42 s; the roads are 0.85 s of it. Phases 1 to 3 give bytes and a clean contract, not much time.
-Phase 4 gives the time. Phase 4 does not need phases 1 to 3, so it can start first (D6).
+The sum: the control now takes 1.42 s, and the roads are 0.85 s of it. Phase 1 gives the time. Phases 2 to 4 give the bytes and a
+clean contract, with little time.
 
 A larger change, one casing for the two halves of a two-way road (option B in `ANALYSIS.md`, about −18k features), is not in this
 plan. It changes the picture and the live colour of each direction, so it needs its own note.
@@ -301,6 +318,6 @@ plan. It changes the picture and the live colour of each direction, so it needs 
 | D2 | The dashboard filters: an id list in the filter (a layout of the loaded tiles on each change), or a feature-state `rs_off` in the paint (no layout, but a hidden road is still drawn and a click still finds it) | the id list with `match`: a hidden road costs nothing, as with the filters now |
 | D3 | An item picked as itself: keep `__rs_pick` and the item's number as the only declared page keys on items, or give items their own id range | the declared keys: few features have them, and the road's filter and glow stay one lookup |
 | D4 | The views of the CI checks: Monaco and Tartu in CI; Burnaby only as a local bench gate (its data is not in CI) | yes |
-| D5 | The width: one index key `__rs_wk` with a table in the style, or keep the 5 keys and only make the `case` tree smaller | measure both in `expr/`; `__rs_wk` if it gives most of the 0.38 s with the same pixels |
-| D6 | The order: phase 4 (expressions) first, or the phases in their number order | phase 4 first: it has the time gain and touches no page code |
+| D5 | The width: one index key `__rs_wk` (the same pixels, one lookup for each stop), or one base width times a shared zoom curve (2 stops, but the pixels change) | `__rs_wk`; first the probe in `expr/` |
+| D6 | The order: small expressions first (phase 1, as in this note), or the id and the data layer first | expressions first: the largest gain, and no page code |
 | D7 | The rows: in the road table's order, or numbered again so that the roads of the low zooms get 1- and 2-byte ids | the road table's order: a new order gives 1 % at most (−63 KB in the best case) and adds a permutation |
