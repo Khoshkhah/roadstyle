@@ -123,6 +123,21 @@ impl<'a> Road<'a> {
             .or_else(|| self.x.iter().find(|e| e.name == k).and_then(|e| e.vals[self.i].as_ref().map(Cell::Json)))
     }
 
+    /// One property of `own` (its last value there), without the others: a solved level, else a mark that is not a column's name,
+    /// else the column.
+    pub fn own_get(self, k: &str) -> Option<Cell<'a>> {
+        if let Some(j) = self.s.and(SOLVED.iter().position(|m| m.name() == k)) {
+            return self.s.map(|s| Cell::Int(s[j].into()));
+        }
+        if self.t.col(k).is_none() {
+            if let Some(m) = self.d.get(self.v, self.i, k) {
+                return Some(m);
+            }
+        }
+        let c = self.o.iter().rposition(|n| n == k)?;
+        Some(self.d.get(self.v, self.i, &self.t.names()[c]).unwrap_or_else(|| self.t.cell(c, self.i)))
+    }
+
     /// The road's cell of a role: a solved level when the engine solved the levels, else the role's column (None: the table has none).
     pub fn role(self, r: Role) -> Option<Cell<'a>> {
         let level = [Role::CasingStart, Role::CasingLevel, Role::CasingEnd, Role::FillLevel].iter().position(|l| *l == r);

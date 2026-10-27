@@ -3,7 +3,8 @@
 //! (the ring: a road's caps and joins come from the roads at its nodes) are compared; stage 2 replaces the pieces of those whose
 //! pieces changed (`Tiles::replace_lines`), and a slots or decks source only when it changed. The tiles then have the same features
 //! as a new map of the new values (tests/relevel.rs). The slots read only the fill levels: with no new fill level they stay as they
-//! are (`restyle_same_fills`). Monaco: a head or a cap about 70 ms, a level change about 120 ms (stage 1 is most of it).
+//! are (`restyle_same_fills`). The pieces wait for their properties until a tile shows them (`Tiles::add_waiting`): a large area's
+//! map starts without them (`LiveTiles::tile` makes them). Monaco: a head or a cap about 70 ms, a level change about 120 ms (stage 1 is most of it).
 //! ponytail: stage 1 of the whole area; stage 1 of the ring alone (global keys) when a large area is too slow.
 
 use crate::{sources, tiles, Look};
@@ -42,13 +43,18 @@ pub struct LiveTiles {
     rows: HashMap<i64, usize>,
     /// the rows at each end node (the line's first and last point)
     at_node: HashMap<[u64; 2], Vec<u32>>,
+    /// each simple source's place of each piece id (the tag of a waiting piece), made when a tile first asks; a redraw clears it
+    piece_at: HashMap<String, HashMap<u64, usize>>,
 }
 
 impl LiveTiles {
     /// Stage 2 of `s` (`tile_made`'s), made by the look `look`, which a redraw runs stage 1 with again.
     pub fn new(s: sources::Styled, look: Look, prefix: &str, keep: &[String]) -> Result<LiveTiles, crate::Error> {
-        let options = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
-        let (style, tiles) = crate::tile_made(&s, prefix, keep)?;
+        let mut options = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
+        options.wait = true;
+        // tile_made's stage 2, with the pieces that wait
+        let (style, tiles) = crate::tile_stage(&s, &options, &crate::xyz_at(prefix), sources::SourceMode::INLINE)?;
+        let style = crate::style_text(&s, &style);
         let r = &s.roads.roads;
         let id = r.roles.col(Role::EdgeId).ok_or_else(|| crate::error::edits("redraw: the roads have no edge id column"))?;
         let rows = (0..r.table.len()).filter_map(|i| r.table.cell(id, i).as_i64().or_else(|| r.table.cell(id, i).as_str()?.parse().ok()).map(|e| (e, i))).collect();
@@ -58,7 +64,27 @@ impl LiveTiles {
                 at_node.entry(p).or_default().push(i as u32);
             }
         }
-        Ok(LiveTiles { styled: s, tiles, style, look, options, rows, at_node })
+        Ok(LiveTiles { styled: s, tiles, style, look, options, rows, at_node, piece_at: HashMap::new() })
+    }
+
+    /// The tile z/x/y of the tile source (`Tiles::tile`), after its waiting pieces got their properties.
+    pub fn tile(&mut self, z: u32, x: u32, y: u32) -> Vec<u8> {
+        let roads = &self.styled.roads.roads;
+        for (k, src) in &self.styled.sources {
+            let Src::Simple(p) = src else { continue };
+            let wait = self.tiles.waiting(k, z, x, y);
+            if wait.is_empty() {
+                continue;
+            }
+            let at = self.piece_at.entry(k.clone()).or_insert_with(|| p.pieces.iter().enumerate().map(|(i, (id, _))| (*id as u64, i)).collect());
+            let (keep, whole, _) = self.options.rule(k, Default::default);
+            let feats = wait.into_iter().map(|(i, tag)| {
+                let (_, props, c) = p.piece(roads, at[&tag]);
+                (i, c.expect("a waiting piece has a line"), props.into_iter())
+            });
+            self.tiles.make(k, feats, &keep, whole);
+        }
+        self.tiles.tile(z, x, y)
     }
 
     /// The tiled style (JSON text).
@@ -108,6 +134,7 @@ impl LiveTiles {
             }
         }
         self.styled.roads = new.roads;
+        self.piece_at.clear();
         Ok(out)
     }
 

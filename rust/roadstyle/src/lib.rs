@@ -107,6 +107,14 @@ fn tile_source(tiled: &mut tiles::Tiles, s: &sources::Styled, o: &tiles::stage::
             let (keep, whole, from) = o.rule(k, Default::default);
             tiled.add_lines(k, r.roads.iter().map(|x| (x.line(), r.props(x, None))), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))        // the cells, no JSON copy
         }
+        // the level editor's map (relevel.rs): each piece's box and first zoom now, its properties when a tile shows it
+        Source::Simple(p) if o.wait && p.items.is_empty() => {
+            let (keep, whole, from) = o.rule(k, Default::default);
+            let keys = tiled.rule_keys(k);
+            let feats = p.pieces.iter().zip(p.pieces_with(&s.roads.roads, &keys))
+                .map(|((_, q), (id, props, c))| (c, props.into_iter(), roadstyle_engine::road::key(q.edge as usize).get(), id as u64));
+            tiled.add_waiting(k, feats, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
+        }
         Source::Simple(p) => {
             let (keep, whole, from) = o.rule(k, Default::default);
             tiled.add_lines(k, p.features(&s.roads.roads).map(|(_, props, c)| (c, props.into_iter())), &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))

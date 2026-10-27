@@ -90,14 +90,40 @@ fn a_redraw_has_the_features_of_a_new_map() {
         eprintln!("Monaco redraw, {what}: {:.0} ms, {done:?}", t.elapsed().as_secs_f64() * 1e3);
         assert!(done.edges >= rows.len() && !done.style_changed, "{done:?}");
     }
-    let new = live(after.clone());
+    let mut new = live(after.clone());
     for i in [head, cap, edit] {
         let [lon, lat] = after.line(i).unwrap()[0];
         for z in 14..=18u32 {
             let n = (1u64 << z) as f64;
             let x = ((lon + 180.0) / 360.0 * n) as u32;
             let y = ((1.0 - (lat.to_radians().tan() + 1.0 / lat.to_radians().cos()).ln() / std::f64::consts::PI) / 2.0 * n) as u32;
-            assert_eq!(features(&m.tiles.tile(z, x, y)), features(&new.tiles.tile(z, x, y)), "row {i}, tile {z}/{x}/{y}");
+            assert_eq!(features(&m.tile(z, x, y)), features(&new.tile(z, x, y)), "row {i}, tile {z}/{x}/{y}");
         }
     }
+}
+
+/// The map whose pieces wait for their properties (LiveTiles) has the bytes of tile_made's tiles, at every tile of Monaco, the high
+/// zooms asked first.
+#[test]
+fn the_waiting_pieces_give_the_tiles_of_tile_made() {
+    let look = look();
+    let s = roadstyle_rs::sources_of(roads(), &look, None, None, None).unwrap();
+    let (_, made) = roadstyle_rs::tile_made(&s, "x://", &[]).unwrap();
+    let mut m = LiveTiles::new(s, look, "x://", &[]).unwrap();
+    let [w, so, e, no] = made.bounds().unwrap();
+    let (z0, z1) = made.zooms();
+    let mut tiles = 0;
+    for z in (z0..=z1).rev() {
+        let n = (1u64 << z) as f64;
+        let x = |lon: f64| ((lon + 180.0) / 360.0 * n) as u32;
+        let y = |lat: f64| ((1.0 - (lat.to_radians().tan() + 1.0 / lat.to_radians().cos()).ln() / std::f64::consts::PI) / 2.0 * n) as u32;
+        for tx in x(w)..=x(e) {
+            for ty in y(no)..=y(so) {
+                let b = made.tile(z, tx, ty);
+                assert_eq!(m.tile(z, tx, ty), b, "tile {z}/{tx}/{ty}");
+                tiles += usize::from(!b.is_empty());
+            }
+        }
+    }
+    assert!(tiles > 50, "{tiles} tiles");
 }

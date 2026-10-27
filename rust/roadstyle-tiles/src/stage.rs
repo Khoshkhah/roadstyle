@@ -22,6 +22,8 @@ pub struct TileOptions {
     pub only: Option<Vec<String>>,
     /// the first zoom of the names and arrows (`slots`), which go whole into the tiles (tiles.py: 14, their symbols' minzoom)
     pub slots_from: u32,
+    /// the pieces of a `simple` source wait for their properties until a tile shows them (`Tiles::add_waiting`; the level editor's map)
+    pub wait: bool,
 }
 
 /// The tile settings and the column names that stage 1 writes into a saved style: `{"minzoom", "maxzoom", "buffer_px", "extent"}` and
@@ -42,7 +44,7 @@ impl TileOptions {
         let pieces = [col("class").unwrap_or_else(|| "highway".into()), "lvl".into()].into_iter().chain(col("width")).chain(col("filter")).collect();
         let slots_from = layers.iter().filter(|l| l["source"] == "slots").map(|l| l["minzoom"].as_f64().unwrap_or(0.0) as u32).min().unwrap_or(0);
         Ok(TileOptions { min_zoom: num("minzoom")? as u32, max_zoom: num("maxzoom")? as u32, buffer_px: num("buffer_px")?,
-                         read: roadstyle_model::props::drawn(layers, metadata, keep), pieces, exact: None, only: None, slots_from })
+                         read: roadstyle_model::props::drawn(layers, metadata, keep), pieces, exact: None, only: None, slots_from, wait: false })
     }
 
     /// The rules of a saved style (stage 1's style.json).

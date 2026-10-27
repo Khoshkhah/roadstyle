@@ -552,8 +552,8 @@ mod wasm {
             self.0.style().to_string()
         }
 
-        pub fn tile(&self, source: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
-            if source == roadstyle::tiles::SOURCE { self.0.tiles.tile(z, x, y) } else { Vec::new() }
+        pub fn tile(&mut self, source: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
+            if source == roadstyle::tiles::SOURCE { self.0.tile(z, x, y) } else { Vec::new() }
         }
 
         pub fn relevel(&mut self, rows: &str) -> Result<String, JsError> {

@@ -67,6 +67,22 @@ struct Feat {
     geom: Geom,
     /// (key, value): the numbers of the layer's key and value
     props: Vec<(u32, u32)>,
+    /// a feature that waits for its line and properties (`Tiles::add_waiting`): its road (`__rs_edge`) and the caller's tag
+    wait: Option<(u64, u64)>,
+}
+
+/// The boxes of the features of one first tile zoom, and their tree, made when a tile first reads it.
+struct Tree {
+    first: u32,
+    boxes: Vec<GeomWithData<Rectangle<P>, u32>>,
+    // ponytail: the boxes stay after the tree is made (Tartu 4.5 MB); take them into the tree if the memory counts
+    tree: std::sync::OnceLock<RTree<GeomWithData<Rectangle<P>, u32>>>,
+}
+
+impl Tree {
+    fn get(&self) -> &RTree<GeomWithData<Rectangle<P>, u32>> {
+        self.tree.get_or_init(|| RTree::bulk_load(self.boxes.clone()))
+    }
 }
 
 /// A source made ready: its keys, its distinct values (each also as the bytes of its Value message in a tile, made once and not for
@@ -78,7 +94,9 @@ struct Layer {
     feats: Vec<Feat>,
     /// one tree for each first tile zoom of its features (the first zoom that draws them, the last zoom for the rest), in the order of
     /// the zooms: a tile of zoom z reads only the trees of zoom z or less (Tartu z10: 4,422 features, not 114,182)
-    trees: Vec<(u32, RTree<GeomWithData<Rectangle<P>, u32>>)>,
+    trees: Vec<Tree>,
+    /// the numbers of the keys and the values, kept while a feature waits (`Tiles::make` adds its properties)
+    at: Option<(HashMap<String, u32>, HashMap<Vec<u8>, u32>)>,
     /// The features go whole into the tiles: not clipped and not simplified.
     whole: bool,
     min_zoom: u32,
@@ -122,6 +140,16 @@ fn merc_ll(lon: f64, lat: f64) -> Option<P> {
     let lat = lat.clamp(-85.051_128_78, 85.051_128_78);
     let y = (std::f64::consts::FRAC_PI_4 + lat.to_radians() / 2.0).tan().ln();
     Some([(lon + 180.0) / 360.0, 0.5 - y / (2.0 * std::f64::consts::PI)])
+}
+
+/// A line of longitude and latitude in Web Mercator (a point that is not finite is left out).
+fn line_geom(c: &[[f64; 2]]) -> Geom {
+    Geom::Lines(vec![c.iter().filter_map(|p| merc_ll(p[0], p[1])).collect()])
+}
+
+/// The properties that a line layer's tiles keep: every `__rs_*` one and those in `keep`, all of them when `whole` (tiles.py's tile_props).
+fn kept(k: &str, keep: &HashSet<String>, whole: bool) -> bool {
+    whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k)
 }
 
 fn line(c: &Value) -> Vec<P> {
@@ -296,10 +324,52 @@ impl Tiles {
         let mut b = self.builder(name);
         for (i, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
-            let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
-            b.push(Some(i as u64), g, props.filter(|(k, _)| whole || k.as_ref().starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_ref())));
+            b.push(Some(i as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
         }
         self.put(name, b.layer(whole, min_zoom, self.max_zoom));
+    }
+
+    /// The properties that the first-zoom rules of the layer `name` read (rules.rs), for `add_waiting`.
+    pub fn rule_keys(&self, name: &str) -> Vec<String> {
+        rules::ZoomRules::of(&self.style, name).keys().to_vec()
+    }
+
+    /// A layer of lines as add_lines makes it, but each feature waits for its properties: now only its box and its first zoom are
+    /// made, from its line and `rule_props` (the properties of `rule_keys`; a tile has the same features as add_lines' tiles). Each
+    /// feature has its road (`__rs_edge`, for replace_lines) and a tag of the caller's. A tile asks `waiting`, and `make` gives those
+    /// features their properties, before `tile`; `props` and `archive` read only the features that were made.
+    pub fn add_waiting<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (Option<L>, P, u64, u64)>, keep: &HashSet<String>, whole: bool,
+                                   min_zoom: u32)
+    where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
+        let mut b = self.builder(name);
+        for (i, (c, rule_props, road, tag)) in feats.enumerate() {
+            let Some(c) = c else { continue };
+            b.wait(i as u64, line_geom(c.as_ref()), rule_props.filter(|(k, _)| kept(k.as_ref(), keep, whole)), (road, tag));
+        }
+        self.put(name, b.layer(whole, min_zoom, self.max_zoom));
+    }
+
+    /// The features of the layer `name` that the tile z/x/y has and that wait (`add_waiting`): each feature's place and tag.
+    pub fn waiting(&self, name: &str, z: u32, x: u32, y: u32) -> Vec<(u32, u64)> {
+        let Some(layer) = self.layers.get(name).filter(|l| l.at.is_some() && z >= self.min_zoom && z <= self.max_zoom && z >= l.min_zoom) else { return Vec::new() };
+        layer.hits(z, x, y).into_iter().filter_map(|i| layer.feats[i as usize].wait.map(|(_, tag)| (i, tag))).collect()
+    }
+
+    /// Give waiting features of the layer `name` their line and properties (`keep`, `whole`: add_waiting's): each as (place, line,
+    /// properties). The line must be the one that add_waiting had (its box and first zoom stay).
+    pub fn make<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (u32, L, P)>, keep: &HashSet<String>, whole: bool)
+    where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
+        let Some(layer) = self.layers.get_mut(name) else { return };
+        let Some((key_at, val_at)) = layer.at.take() else { return };
+        let mut b = Builder { keys: std::mem::take(&mut layer.keys), key_at, vals: std::mem::take(&mut layer.vals),
+                              encoded: std::mem::take(&mut layer.encoded), val_at, ..Default::default() };
+        for (i, c, props) in feats {
+            let (props, _) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
+            let f = &mut layer.feats[i as usize];
+            (f.geom, f.props, f.wait) = (line_geom(c.as_ref()), props, None);
+        }
+        (layer.keys, layer.vals, layer.encoded) = (b.keys, b.vals, b.encoded);
+        layer.at = layer.feats.iter().any(|f| f.wait.is_some()).then_some((b.key_at, b.val_at));
     }
 
     /// Replace the features of some roads in the line layer `name` (one that add_lines made): the features whose `__rs_edge` is in
@@ -316,26 +386,22 @@ impl Tiles {
         let mut n = 0;
         for (i, f) in layer.feats.iter_mut().enumerate() {
             let e = f.props.iter().find(|(k, _)| Some(*k) == edge).and_then(|(_, v)| match layer.vals[*v as usize] { Val::Int(x) => u64::try_from(x).ok(), Val::UInt(x) => Some(x), _ => None });
-            if e.is_some_and(|e| edges.contains(&e)) {
-                (gone[i], f.id, f.geom, f.props) = (true, None, Geom::Lines(Vec::new()), Vec::new());
+            if e.or(f.wait.map(|w| w.0)).is_some_and(|e| edges.contains(&e)) {
+                (gone[i], f.id, f.geom, f.props, f.wait) = (true, None, Geom::Lines(Vec::new()), Vec::new(), None);
                 n += 1;
             }
         }
         let first = layer.feats.len() as u64;
-        let boxes = layer.trees.iter().flat_map(|(_, t)| t.iter()).filter(|h| !gone[h.data as usize])
+        let boxes = layer.trees.iter().flat_map(|t| &t.boxes).filter(|h| !gone[h.data as usize])
             .map(|h| (layer.feats[h.data as usize].from, *h)).collect();
         let keys = std::mem::take(&mut layer.keys);
         let encoded = std::mem::take(&mut layer.encoded);
-        let mut b = Builder {
-            key_at: keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
-            val_at: encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect(),
-            keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats),
-            boxes, rules,
-        };
+        let (key_at, val_at) = layer.at.take().unwrap_or_else(|| (keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
+                                                                  encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect()));
+        let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules };
         for (j, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
-            let g = Geom::Lines(vec![c.as_ref().iter().filter_map(|p| merc_ll(p[0], p[1])).collect()]);
-            b.push(Some(first + j as u64), g, props.filter(|(k, _)| whole || k.as_ref().starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_ref())));
+            b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
         }
         let min_zoom = layer.min_zoom;
         *layer = b.layer(whole, min_zoom, self.max_zoom);      // the trees by first zoom again
@@ -383,7 +449,8 @@ impl Tiles {
     /// The box of every feature `[min lon, min lat, max lon, max lat]` (None: no feature), as an archive's bounds.
     pub fn bounds(&self) -> Option<[f64; 4]> {
         use rstar::Envelope;
-        let boxes: Vec<AABB<P>> = self.layers.values().flat_map(|l| &l.trees).map(|(_, t)| t.root().envelope()).collect();
+        use rstar::RTreeObject;
+        let boxes: Vec<AABB<P>> = self.layers.values().flat_map(|l| &l.trees).flat_map(|t| &t.boxes).map(|b| b.envelope()).collect();
         let b = boxes.into_iter().reduce(|a, b| a.merged(&b))?;
         let (lo, hi) = (b.lower(), b.upper());
         let lon = |x: f64| x * 360.0 - 180.0;
@@ -441,12 +508,7 @@ impl Tiles {
     fn layer_tile(&self, name: &str, layer: &Layer, z: u32, x: u32, y: u32) -> Vec<u8> {
         let n = (1u64 << z) as f64;
         let buffer = if layer.whole { 0.0 } else { self.buffer };
-        let (x0, y0) = (x as f64 / n, y as f64 / n);
-        // tiles.py: a feature is in the tiles its box touches; the buffer is for the clipping only
-        let tile = AABB::from_corners([x0, y0], [x0 + 1.0 / n, y0 + 1.0 / n]);
-        let trees = layer.trees.iter().take_while(|(first, _)| *first <= z);
-        let mut hits: Vec<u32> = trees.flat_map(|(_, t)| t.locate_in_envelope_intersecting(&tile)).map(|h| h.data).collect();
-        hits.sort_unstable(); // the order of the source: the drawing order of features in one layer
+        let hits = layer.hits(z, x, y);
         // the tile's own units: (merc * 2^z - x) * EXTENT
         let to = |p: &P| [(p[0] * n - x as f64) * EXTENT, (p[1] * n - y as f64) * EXTENT];
         let (lo, hi) = (-buffer, EXTENT + buffer);
@@ -454,6 +516,7 @@ impl Tiles {
         let mut enc = Encoder::default();
         for i in hits {
             let f = &layer.feats[i as usize];
+            debug_assert!(f.wait.is_none(), "a tile of features that wait: make them first (Tiles::waiting)");
             debug_assert!(z == self.max_zoom || ((z + 1) as f32) > f.from, "the trees give only the features drawn at zoom {z}");
             let (kind, geometry) = match &f.geom {
                 Geom::Points(ps) => {
@@ -505,6 +568,21 @@ impl Tiles {
     }
 }
 
+impl Layer {
+    /// The features in the tile z/x/y (of the trees of zoom z or less), in the order of the source: the drawing order of features in
+    /// one layer.
+    fn hits(&self, z: u32, x: u32, y: u32) -> Vec<u32> {
+        let n = (1u64 << z) as f64;
+        let (x0, y0) = (x as f64 / n, y as f64 / n);
+        // tiles.py: a feature is in the tiles its box touches; the buffer is for the clipping only
+        let tile = AABB::from_corners([x0, y0], [x0 + 1.0 / n, y0 + 1.0 / n]);
+        let trees = self.trees.iter().take_while(|t| t.first <= z);
+        let mut hits: Vec<u32> = trees.flat_map(|t| t.get().locate_in_envelope_intersecting(&tile)).map(|h| h.data).collect();
+        hits.sort_unstable();
+        hits
+    }
+}
+
 /// A layer made feature by feature: the keys in the order they come, and the box of each feature.
 #[derive(Default)]
 struct Builder {
@@ -522,6 +600,26 @@ impl Builder {
     /// A feature without a point (bounds) is left out; a null value is not in the tiles.
     fn push<K: AsRef<str>, V: TileValue>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, V)>) {
         let Some((lo, hi)) = bounds(&g) else { return };
+        let (props, from) = self.intern(props);
+        self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
+        self.feats.push(Feat { id, from, geom: g, props, wait: None });
+    }
+
+    /// A feature that waits for its line and properties (`Tiles::add_waiting`): its box and its first zoom, from `rule_props`.
+    fn wait<K: AsRef<str>, V: TileValue>(&mut self, id: u64, g: Geom, rule_props: impl Iterator<Item = (K, V)>, wait: (u64, u64)) {
+        let Some((lo, hi)) = bounds(&g) else { return };
+        let from = if self.rules.is_empty() { 0.0 } else {
+            // the values that `intern` reads
+            let read = rule_props.filter(|(k, _)| self.rules.reads(k.as_ref())).filter_map(|(k, v)| Some((k.as_ref().to_string(), json_of(&v.tile_val()?)))).collect();
+            self.rules.first_zoom(&read) as f32
+        };
+        self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
+        self.feats.push(Feat { id: Some(id), from, geom: Geom::Lines(Vec::new()), props: Vec::new(), wait: Some(wait) });
+    }
+
+    /// The numbers of the properties' keys and values (a key or a value seen first gets the next number), and the first zoom that
+    /// the rules give them.
+    fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32) {
         let (keys, key_at, vals, encoded, val_at) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at);
         let rules = &self.rules;
         let mut read = Map::new();        // the values that the first-zoom rules read
@@ -555,9 +653,7 @@ impl Builder {
                 Some((at, v))
             })
             .collect();
-        let from = if rules.is_empty() { 0.0 } else { rules.first_zoom(&read) as f32 };
-        self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
-        self.feats.push(Feat { id, from, geom: g, props });
+        (props, if rules.is_empty() { 0.0 } else { rules.first_zoom(&read) as f32 })
     }
 
     fn layer(self, whole: bool, min_zoom: u32, max_zoom: u32) -> Layer {
@@ -568,8 +664,9 @@ impl Builder {
         for (from, b) in self.boxes {
             by_first.entry((from.floor().max(0.0) as u32).min(max_zoom)).or_default().push(b);
         }
-        let trees = by_first.into_iter().map(|(z, boxes)| (z, RTree::bulk_load(boxes))).collect();
-        Layer { keys: self.keys, vals: self.vals, encoded: self.encoded, feats: self.feats, trees, whole, min_zoom, by_id }
+        let trees = by_first.into_iter().map(|(first, boxes)| Tree { first, boxes, tree: Default::default() }).collect();
+        let at = self.feats.iter().any(|f| f.wait.is_some()).then_some((self.key_at, self.val_at));
+        Layer { keys: self.keys, vals: self.vals, encoded: self.encoded, feats: self.feats, trees, at, whole, min_zoom, by_id }
     }
 }
 

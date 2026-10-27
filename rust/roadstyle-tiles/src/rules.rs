@@ -42,6 +42,11 @@ impl ZoomRules {
         self.layers.is_empty()
     }
 
+    /// The properties that the clauses read, in their order.
+    pub fn keys(&self) -> &[String] {
+        &self.keys
+    }
+
     /// The properties that the clauses read.
     pub fn reads(&self, k: &str) -> bool {
         self.keys.iter().any(|x| x == k)
