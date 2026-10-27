@@ -312,6 +312,8 @@ plan. It changes the picture and the live colour of each direction, so it needs 
 
 ## Decisions for Kaveh
 
+**Decided (Kaveh, 2026-10-27): D1 to D7, all as recommended.**
+
 | | Decision | Recommendation |
 |---|---|---|
 | D1 | The pieces' id: the MVT id (no `promoteId`), or keep `promoteId` on `__rs_edge` | the MVT id: one key less on each piece, and the page reads `f.id` |
