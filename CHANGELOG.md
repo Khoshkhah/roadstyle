@@ -15,6 +15,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **Tiny pieces at low zoom** (2026-10-27, rule B, tile standard rule 7): below the last zoom, a tile leaves out a road whose pieces are
+  together under 1 px (8 of 4096 units) unless it leaves the tile, and a casing end piece (`__rs_seam`) under 1 px. Every fill and every
+  casing body piece stays. `roadstyle_tiles::drop_tiny`; tiles.py `_drop_tiny` gives the same tiles. Burnaby (4 workers): z12 480 → 362 ms
+  and 2.55 → 1.57 MB, z13 494 → 418 ms and 3.49 → 2.64 MB; 0.65 % and 0.74 % of the pixels differ, with no gap. The Monaco and
+  Södermalm tile goldens and the budget change by this rule only.
 - **Fewer features in the low-zoom tiles** (2026-10-27): the tiles leave out a piece that no layer draws at any zoom of the tile. The rule
   is the style's filter, as for the class minzoom, and now it reads a clause on the zoom with `<` and an "all" or "any" of clauses
   (`roadstyle_tiles::rules::ZoomRules::span`, tiles.py `zoom_span`). A casing end without lap (`__rs_seam`) is now only in tiles of z17

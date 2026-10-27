@@ -7,10 +7,10 @@
     43.73837
    ],
    "z12": {
-    "view_bytes": 1545875,
-    "view_features": 16458,
-    "max_tile_bytes": 1545875,
-    "max_tile_features": 16458,
+    "view_bytes": 1478650,
+    "view_features": 15063,
+    "max_tile_bytes": 1478650,
+    "max_tile_features": 15063,
     "layers": {
      "roads": {
       "features": 13340,
@@ -25,24 +25,24 @@
       "tiny": 8240
      },
      "simple": {
-      "features": 3119,
-      "bytes": 151794,
-      "values": 4586,
-      "keys": 19,
+      "features": 1723,
+      "bytes": 84569,
+      "values": 2397,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 3119,
+      "no_id": 1723,
       "strings": 23,
       "string_bytes": 218,
-      "short_segments": 3375,
-      "tiny": 1564
+      "short_segments": 1730,
+      "tiny": 169
      }
     }
    },
    "z13": {
-    "view_bytes": 2168875,
-    "view_features": 24706,
-    "max_tile_bytes": 1198218,
-    "max_tile_features": 13650,
+    "view_bytes": 2114963,
+    "view_features": 23588,
+    "max_tile_bytes": 1165709,
+    "max_tile_features": 12963,
     "layers": {
      "roads": {
       "features": 9642,
@@ -57,24 +57,24 @@
       "tiny": 4036
      },
      "simple": {
-      "features": 4009,
-      "bytes": 192456,
-      "values": 5212,
-      "keys": 19,
+      "features": 3322,
+      "bytes": 159947,
+      "values": 4220,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 4009,
+      "no_id": 3322,
       "strings": 26,
       "string_bytes": 247,
-      "short_segments": 3840,
-      "tiny": 941
+      "short_segments": 3100,
+      "tiny": 253
      }
     }
    },
    "z14": {
-    "view_bytes": 2103930,
-    "view_features": 24492,
-    "max_tile_bytes": 1224644,
-    "max_tile_features": 14341,
+    "view_bytes": 2085146,
+    "view_features": 24120,
+    "max_tile_bytes": 1213772,
+    "max_tile_features": 14118,
     "layers": {
      "roads": {
       "features": 9147,
@@ -89,16 +89,16 @@
       "tiny": 1488
      },
      "simple": {
-      "features": 4328,
-      "bytes": 213890,
-      "values": 5641,
+      "features": 4106,
+      "bytes": 203018,
+      "values": 5290,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 4328,
+      "no_id": 4106,
       "strings": 31,
       "string_bytes": 302,
-      "short_segments": 2568,
-      "tiny": 363
+      "short_segments": 2338,
+      "tiny": 140
      },
      "slots": {
       "features": 866,
@@ -115,10 +115,10 @@
     }
    },
    "z15": {
-    "view_bytes": 2918281,
-    "view_features": 39757,
-    "max_tile_bytes": 924434,
-    "max_tile_features": 12668,
+    "view_bytes": 2888569,
+    "view_features": 39165,
+    "max_tile_bytes": 915225,
+    "max_tile_features": 12486,
     "layers": {
      "roads": {
       "features": 5136,
@@ -133,16 +133,16 @@
       "tiny": 283
      },
      "simple": {
-      "features": 6738,
-      "bytes": 340614,
-      "values": 8983,
+      "features": 6556,
+      "bytes": 331406,
+      "values": 8713,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 6738,
+      "no_id": 6556,
       "strings": 34,
       "string_bytes": 327,
-      "short_segments": 1096,
-      "tiny": 435
+      "short_segments": 914,
+      "tiny": 253
      },
      "slots": {
       "features": 795,
@@ -196,10 +196,10 @@
     58.36462
    ],
    "z12": {
-    "view_bytes": 8208983,
-    "view_features": 84607,
-    "max_tile_bytes": 4064369,
-    "max_tile_features": 41859,
+    "view_bytes": 8126709,
+    "view_features": 82855,
+    "max_tile_bytes": 4019591,
+    "max_tile_features": 40902,
     "layers": {
      "roads": {
       "features": 36386,
@@ -214,24 +214,24 @@
       "tiny": 12407
      },
      "simple": {
-      "features": 5474,
-      "bytes": 248806,
-      "values": 6490,
-      "keys": 19,
+      "features": 4517,
+      "bytes": 204028,
+      "values": 5127,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 5474,
-      "strings": 20,
-      "string_bytes": 188,
-      "short_segments": 2988,
-      "tiny": 1145
+      "no_id": 4517,
+      "strings": 19,
+      "string_bytes": 182,
+      "short_segments": 1972,
+      "tiny": 188
      }
     }
    },
    "z13": {
-    "view_bytes": 8166728,
-    "view_features": 92305,
-    "max_tile_bytes": 2049029,
-    "max_tile_features": 22915,
+    "view_bytes": 8091309,
+    "view_features": 90721,
+    "max_tile_bytes": 2029966,
+    "max_tile_features": 22514,
     "layers": {
      "roads": {
       "features": 17181,
@@ -246,24 +246,24 @@
       "tiny": 2851
      },
      "simple": {
-      "features": 5894,
-      "bytes": 285729,
-      "values": 7193,
-      "keys": 19,
+      "features": 5512,
+      "bytes": 267652,
+      "values": 6738,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 5894,
+      "no_id": 5512,
       "strings": 21,
       "string_bytes": 206,
-      "short_segments": 1553,
-      "tiny": 577
+      "short_segments": 1294,
+      "tiny": 252
      }
     }
    },
    "z14": {
-    "view_bytes": 4498160,
-    "view_features": 55218,
-    "max_tile_bytes": 863370,
-    "max_tile_features": 10335,
+    "view_bytes": 4488118,
+    "view_features": 55003,
+    "max_tile_bytes": 859785,
+    "max_tile_features": 10260,
     "layers": {
      "roads": {
       "features": 6781,
@@ -278,16 +278,16 @@
       "tiny": 252
      },
      "simple": {
-      "features": 3219,
-      "bytes": 155774,
-      "values": 4038,
+      "features": 3143,
+      "bytes": 152189,
+      "values": 3939,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 3219,
+      "no_id": 3143,
       "strings": 27,
       "string_bytes": 260,
-      "short_segments": 208,
-      "tiny": 104
+      "short_segments": 182,
+      "tiny": 46
      },
      "slots": {
       "features": 567,
@@ -304,10 +304,10 @@
     }
    },
    "z15": {
-    "view_bytes": 1671234,
-    "view_features": 24197,
-    "max_tile_bytes": 347524,
-    "max_tile_features": 5125,
+    "view_bytes": 1669272,
+    "view_features": 24155,
+    "max_tile_bytes": 346718,
+    "max_tile_features": 5108,
     "layers": {
      "roads": {
       "features": 1710,
@@ -322,16 +322,16 @@
       "tiny": 15
      },
      "simple": {
-      "features": 3079,
-      "bytes": 149260,
-      "values": 3120,
+      "features": 3062,
+      "bytes": 148454,
+      "values": 3108,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 3079,
+      "no_id": 3062,
       "strings": 22,
       "string_bytes": 200,
-      "short_segments": 432,
-      "tiny": 286
+      "short_segments": 415,
+      "tiny": 269
      },
      "slots": {
       "features": 337,
@@ -385,62 +385,62 @@
     43.73837
    ],
    "z12": {
-    "view_bytes": 151794,
-    "view_features": 3119,
-    "max_tile_bytes": 151794,
-    "max_tile_features": 3119,
+    "view_bytes": 84569,
+    "view_features": 1723,
+    "max_tile_bytes": 84569,
+    "max_tile_features": 1723,
     "layers": {
      "simple": {
-      "features": 3119,
-      "bytes": 151794,
-      "values": 4586,
-      "keys": 19,
+      "features": 1723,
+      "bytes": 84569,
+      "values": 2397,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 3119,
+      "no_id": 1723,
       "strings": 23,
       "string_bytes": 218,
-      "short_segments": 3375,
-      "tiny": 1564
+      "short_segments": 1730,
+      "tiny": 169
      }
     }
    },
    "z13": {
-    "view_bytes": 334863,
-    "view_features": 6914,
-    "max_tile_bytes": 192456,
-    "max_tile_features": 4009,
+    "view_bytes": 280951,
+    "view_features": 5796,
+    "max_tile_bytes": 159947,
+    "max_tile_features": 3322,
     "layers": {
      "simple": {
-      "features": 4009,
-      "bytes": 192456,
-      "values": 5212,
-      "keys": 19,
+      "features": 3322,
+      "bytes": 159947,
+      "values": 4220,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 4009,
+      "no_id": 3322,
       "strings": 26,
       "string_bytes": 247,
-      "short_segments": 3840,
-      "tiny": 941
+      "short_segments": 3100,
+      "tiny": 253
      }
     }
    },
    "z14": {
-    "view_bytes": 431028,
-    "view_features": 8361,
-    "max_tile_bytes": 266663,
-    "max_tile_features": 5194,
+    "view_bytes": 412244,
+    "view_features": 7990,
+    "max_tile_bytes": 255791,
+    "max_tile_features": 4972,
     "layers": {
      "simple": {
-      "features": 4328,
-      "bytes": 213890,
-      "values": 5641,
+      "features": 4106,
+      "bytes": 203018,
+      "values": 5290,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 4328,
+      "no_id": 4106,
       "strings": 31,
       "string_bytes": 302,
-      "short_segments": 2568,
-      "tiny": 363
+      "short_segments": 2338,
+      "tiny": 140
      },
      "slots": {
       "features": 866,
@@ -457,22 +457,22 @@
     }
    },
    "z15": {
-    "view_bytes": 1213726,
-    "view_features": 23293,
-    "max_tile_bytes": 391361,
-    "max_tile_features": 7532,
+    "view_bytes": 1184014,
+    "view_features": 22702,
+    "max_tile_bytes": 382153,
+    "max_tile_features": 7351,
     "layers": {
      "simple": {
-      "features": 6738,
-      "bytes": 340614,
-      "values": 8983,
+      "features": 6556,
+      "bytes": 331406,
+      "values": 8713,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 6738,
+      "no_id": 6556,
       "strings": 34,
       "string_bytes": 327,
-      "short_segments": 1096,
-      "tiny": 435
+      "short_segments": 914,
+      "tiny": 253
      },
      "slots": {
       "features": 795,
@@ -517,62 +517,62 @@
     58.36462
    ],
    "z12": {
-    "view_bytes": 481039,
-    "view_features": 10457,
-    "max_tile_bytes": 248806,
-    "max_tile_features": 5474,
+    "view_bytes": 398764,
+    "view_features": 8704,
+    "max_tile_bytes": 204028,
+    "max_tile_features": 4517,
     "layers": {
      "simple": {
-      "features": 5474,
-      "bytes": 248806,
-      "values": 6490,
-      "keys": 19,
+      "features": 4517,
+      "bytes": 204028,
+      "values": 5127,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 5474,
-      "strings": 20,
-      "string_bytes": 188,
-      "short_segments": 2988,
-      "tiny": 1145
+      "no_id": 4517,
+      "strings": 19,
+      "string_bytes": 182,
+      "short_segments": 1972,
+      "tiny": 188
      }
     }
    },
    "z13": {
-    "view_bytes": 1224922,
-    "view_features": 25367,
-    "max_tile_bytes": 285729,
-    "max_tile_features": 5894,
+    "view_bytes": 1149502,
+    "view_features": 23783,
+    "max_tile_bytes": 267652,
+    "max_tile_features": 5512,
     "layers": {
      "simple": {
-      "features": 5894,
-      "bytes": 285729,
-      "values": 7193,
-      "keys": 19,
+      "features": 5512,
+      "bytes": 267652,
+      "values": 6738,
+      "keys": 17,
       "keys_unread": 4,
-      "no_id": 5894,
+      "no_id": 5512,
       "strings": 21,
       "string_bytes": 206,
-      "short_segments": 1553,
-      "tiny": 577
+      "short_segments": 1294,
+      "tiny": 252
      }
     }
    },
    "z14": {
-    "view_bytes": 1123345,
-    "view_features": 22243,
-    "max_tile_bytes": 188487,
-    "max_tile_features": 3785,
+    "view_bytes": 1113303,
+    "view_features": 22027,
+    "max_tile_bytes": 184902,
+    "max_tile_features": 3709,
     "layers": {
      "simple": {
-      "features": 3219,
-      "bytes": 155774,
-      "values": 4038,
+      "features": 3143,
+      "bytes": 152189,
+      "values": 3939,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 3219,
+      "no_id": 3143,
       "strings": 27,
       "string_bytes": 260,
-      "short_segments": 208,
-      "tiny": 104
+      "short_segments": 182,
+      "tiny": 46
      },
      "slots": {
       "features": 567,
@@ -589,22 +589,22 @@
     }
    },
    "z15": {
-    "view_bytes": 800942,
-    "view_features": 15656,
-    "max_tile_bytes": 170731,
-    "max_tile_features": 3415,
+    "view_bytes": 798981,
+    "view_features": 15615,
+    "max_tile_bytes": 169925,
+    "max_tile_features": 3398,
     "layers": {
      "simple": {
-      "features": 3079,
-      "bytes": 149260,
-      "values": 3120,
+      "features": 3062,
+      "bytes": 148454,
+      "values": 3108,
       "keys": 19,
       "keys_unread": 4,
-      "no_id": 3079,
+      "no_id": 3062,
       "strings": 22,
       "string_bytes": 200,
-      "short_segments": 432,
-      "tiny": 286
+      "short_segments": 415,
+      "tiny": 269
      },
      "slots": {
       "features": 337,

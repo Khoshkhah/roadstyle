@@ -248,7 +248,7 @@ Kaveh's OK.</p>
 <tr><td>4</td><td>A number, not a text</td><td><span class="yes">step 6</span> (no colour in a piece)</td><td><code>strings</code>, <code>string_bytes</code></td></tr>
 <tr><td>5</td><td>Each key and value once in a layer</td><td><span class="yes">done</span></td><td><code>duplicates</code> = 0, asserted</td></tr>
 <tr><td>6</td><td>Simplify to the pixel tolerance</td><td><span class="no">not done</span>: 1 px gave about 1 %</td><td><code>short_segments</code></td></tr>
-<tr><td>7</td><td>Nothing under a pixel; merge</td><td><span class="no">not done</span>: a merge gave −0.02 s with 4 workers</td><td><code>tiny</code></td></tr>
+<tr><td>7</td><td>Nothing under a pixel; merge</td><td><span class="part">step 3b</span> (rule B below the last zoom). Not done: a merge gave −0.02 s with 4 workers</td><td><code>tiny</code></td></tr>
 <tr><td>8</td><td>Coordinates on the zoom's grid</td><td><span class="no">not done</span>: geometry is 11 to 18 % of the bytes</td><td><code>bytes</code></td></tr>
 <tr><td>9</td><td>Base-map layers the same</td><td><span class="part">step 3</span> (<code>ov4</code>'s keys)</td><td>the Burnaby gate</td></tr>
 <tr><td>10</td><td>One copy of a road</td><td><span class="yes">step 7</span> (the full look)</td><td>the budget of <code>monaco-full</code>, <code>tartu-full</code></td></tr>
@@ -309,6 +309,21 @@ three filter keys. <code>ov4</code>'s <code>osm_id</code>, <code>kind</code> and
 <dt>Risks</dt><dd>A reader that nobody found: <code>test_contract_names.py</code> and the budget's <code>keys_unread</code> find it.</dd>
 <dt>Tests</dt><dd>The budget (rule 2), the contract test.</dd>
 <dt>Page</dt><dd>The base-map popup reads its fields by row (in step 8).</dd></dl></div>
+
+<div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 3b: tiny pieces at low zoom</h3><dl>
+<dt>What</dt><dd>Rule B, in the tile encoder (<code>drop_tiny</code> in <code>roadstyle-tiles</code>, <code>_drop_tiny</code> in <code>tiles.py</code>), for every zoom below the last zoom. A road whose pieces are together under 1 px (8 of 4096 units) is left out, unless it leaves the tile (its length there is a cut). A casing end piece (<code>__rs_seam</code>, with or without lap) under 1 px is left out. Every fill piece and every casing body piece stays.</dd>
+<dt>Why</dt><dd>Rule 7. A rule that dropped every piece under 1 px made visible breaks in streets, so it was rejected.</dd>
+<dt>Gain</dt><dd>Burnaby, 4 workers, median of 5 (the same harness as the measurement):
+<table>
+<tr><th>View</th><th>ms to idle</th><th><code>simple</code> features</th><th>MB</th><th>Pixels that differ</th></tr>
+<tr><td>z12 flat</td><td>480 → 362</td><td>53,160 → 32,394</td><td>2.55 → 1.57</td><td>0.65 % (548 by more than 64 of 765)</td></tr>
+<tr><td>z13 flat</td><td>494 → 418</td><td>71,289 → 52,988</td><td>3.49 → 2.64</td><td>0.74 % (580)</td></tr>
+<tr><td>z14 tilted</td><td>968 → 992 (noise)</td><td>72,320 → 69,845</td><td>3.56 → 3.44</td><td>0.05 % (48)</td></tr>
+</table>
+The picture and the crops are in <code>.claude/tile-lag/ruleB/</code>. The budget: <code>tiny</code> of <code>simple</code> in Monaco z12 is 1,564 → 169.</dd>
+<dt>Risks</dt><dd>A gap in a street. The measurement found none at z12 and z13 with this rule. The tiles of the last zoom keep every piece.</dd>
+<dt>Tests</dt><dd>A unit test for each part (a short road, a road that leaves the tile, a short seam, a short fill), the parity test of the two engines, the goldens (they change only by this rule), the budget (rule 7).</dd>
+<dt>Page</dt><dd>None.</dd></dl></div>
 
 <div class="card"><h3><span class="tag t-rs">roadstyle</span>Step 4: the row as the MVT id</h3><dl>
 <dt>What</dt><dd>The MVT id of a piece of <code>simple</code> and of a slot is its road's row. The dashboard and the editor read <code>f.id</code>.

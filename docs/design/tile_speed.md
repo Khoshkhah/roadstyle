@@ -109,6 +109,20 @@ z15, the casing as a second style layer on the same feature; a measurement, not 
 road features in 3.15 MB. So the roads cost about 0.8 s now and about 0.6 s with one feature. Files and pictures:
 `.claude/tile-lag/one-feature/` of the workspace.
 
+## Tiny pieces at low zoom (rule B)
+
+Below the last zoom, the encoder leaves out a road whose pieces are together under 1 px (8 of 4096 units), unless the road leaves the
+tile, and a casing end piece (`__rs_seam`) under 1 px. It keeps every fill piece and every casing body piece. A rule that dropped all
+pieces under 1 px made visible breaks in streets. Burnaby, 4 MapLibre workers, flat views, median of 5 (`.claude/tile-lag/ruleB/`):
+
+| View | Before | After | `simple` features | MB | Pixels that differ |
+|---|---|---|---|---|---|
+| z12 | 480 ms | 362 ms | 53,160 → 32,394 | 2.55 → 1.57 | 0.65 % |
+| z13 | 494 ms | 418 ms | 71,289 → 52,988 | 3.49 → 2.64 | 0.74 % |
+| z14, pitch 60 | 968 ms | 992 ms (noise) | 72,320 → 69,845 | 3.56 → 3.44 | 0.05 % |
+
+The gain is in the low zooms that MapLibre parses and draws. The tilted view at z14 has few tiny pieces, so it does not change.
+
 ## What gave no gain
 
 - **One projection for each road.** To project each road's line one time for all of its pieces saved about 5 % of the make.

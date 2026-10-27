@@ -109,7 +109,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "3b5ea3d4a40a003e8d8e33957e05b4dd934f9dad559d76007e1cb03485ccda59");
+    assert_eq!(tiles_hash(&area), "b9b266a0f550cb9119b67574c4ebc7fa9bf8ccdd129c54c28b0109533bd32e42");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at

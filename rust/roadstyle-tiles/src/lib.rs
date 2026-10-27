@@ -550,7 +550,8 @@ impl Tiles {
         let to = |p: &P| [(p[0] * n - x as f64) * EXTENT, (p[1] * n - y as f64) * EXTENT];
         let (lo, hi) = (-buffer, EXTENT + buffer);
         let simplify = !layer.whole && z < self.max_zoom;
-        let mut enc = Encoder::default();
+        let tiny = name == PROMOTED && simplify;
+        let mut made: Vec<(&Feat, u32, Vec<u32>, Vec<Vec<[i32; 2]>>)> = Vec::new();
         for i in hits {
             let f = &layer.feats[i as usize];
             debug_assert!(f.wait.is_none(), "a tile of features that wait: make them first (Tiles::waiting)");
@@ -568,7 +569,12 @@ impl Tiles {
                         let l: Vec<P> = l.iter().map(to).collect();
                         if simplify { douglas_peucker_kept(&l, 0.5).iter().map(|&j| l[j as usize]).collect() } else { l }
                     }).collect();
-                    (2, lines_cmd(&line_parts(ls, (!layer.whole).then_some((lo, hi)))))
+                    let parts = line_parts(ls, (!layer.whole).then_some((lo, hi)));
+                    if tiny {
+                        made.push((f, 2, lines_cmd(&parts), parts));
+                        continue;
+                    }
+                    (2, lines_cmd(&parts))
                 }
                 Geom::Polygons(ps) => {
                     let mut rings = Vec::new();
@@ -598,7 +604,16 @@ impl Tiles {
                 }
             };
             if !geometry.is_empty() {
-                enc.feature(f, kind, &geometry, &layer.keys, name != PROMOTED);
+                made.push((f, kind, geometry, Vec::new()));
+            }
+        }
+        if tiny {
+            drop_tiny(layer, &mut made);
+        }
+        let mut enc = Encoder::default();
+        for (f, kind, geometry, _) in &made {
+            if !geometry.is_empty() {
+                enc.feature(f, *kind, geometry, &layer.keys, name != PROMOTED);
             }
         }
         enc.finish(name, &layer.encoded)
@@ -724,6 +739,35 @@ impl Builder {
     }
 }
 
+
+/// 1 px of a 512 px tile, in tile units.
+const PX: f64 = EXTENT / 512.0;
+
+/// Rule B (docs/design/tile_v2_plan.md, step 3b), for the pieces of a tile below the last zoom: a road whose pieces together are under
+/// 1 px is left out (its casing and its fill each count: the longer one decides), unless it goes out of the tile (its length here is
+/// a cut); and a casing end piece (`__rs_seam`, with or without lap) under 1 px is left out. Every fill and every casing body stays.
+fn drop_tiny(layer: &Layer, made: &mut Vec<(&Feat, u32, Vec<u32>, Vec<Vec<[i32; 2]>>)>) {
+    let key = |k: &str| layer.keys.iter().position(|x| x == k).map(|k| k as u32);
+    let (Some(edge), kind) = (key("__rs_edge"), key("__rs_k")) else { return };
+    let seam = key("__rs_seam");
+    let len = |parts: &Vec<Vec<[i32; 2]>>| parts.iter().map(|l| length(&l.iter().map(|p| [p[0] as f64, p[1] as f64]).collect::<Vec<P>>())).sum::<f64>();
+    let get = |f: &Feat, k: u32| f.props.iter().find(|p| p.0 == k).map(|p| p.1);
+    // by road (the value's number, one for each distinct value): the length of each kind of piece, and whether a point is out of the tile
+    let mut roads: HashMap<u32, (HashMap<Option<u32>, f64>, bool)> = HashMap::new();
+    let lens: Vec<f64> = made.iter().map(|m| len(&m.3)).collect();
+    for (m, l) in made.iter().zip(&lens) {
+        let Some(e) = get(m.0, edge) else { continue };
+        let r = roads.entry(e).or_default();
+        *r.0.entry(kind.and_then(|k| get(m.0, k))).or_default() += l;
+        r.1 |= m.3.iter().flatten().any(|p| p[0] < 0 || p[0] > EXTENT as i32 || p[1] < 0 || p[1] > EXTENT as i32);
+    }
+    let mut lens = lens.into_iter();
+    made.retain(|m| {
+        let l = lens.next().unwrap();
+        let tiny_road = get(m.0, edge).is_some_and(|e| { let r = &roads[&e]; !r.1 && r.0.values().all(|&v| v < PX) });
+        !tiny_road && !(seam.is_some_and(|s| get(m.0, s).is_some()) && l < PX)
+    });
+}
 
 /// The parts of a line (in the tile's units, simplified: `Tiles::kept`) in a tile: none when shorter than half a unit (tiles.py), then
 /// clipped to the square [lo, hi]^2 when `clip` is given.
@@ -1085,6 +1129,43 @@ mod tests {
         // tiles.py: a feature's id is its index in its source (not its own "id")
         assert_eq!(t.props("roads", 0), r#"{"name":"A","lanes":2,"w":1.5,"bridge":true,"n":-3}"#);
         assert_eq!(t.props("roads", 7), "null");
+    }
+
+    /// The text of the tile z/x/y of a "simple" layer with these pieces: (edge, kind, seam, coordinates); the tile is empty when no piece stays.
+    fn pieces(z: u32, x: u32, y: u32, fs: &[(i64, i64, bool, [[f64; 2]; 2])]) -> String {
+        let mut t = Tiles::new(0, 3, 80.0).unwrap();
+        let features: Vec<Value> = fs.iter().map(|(e, k, seam, c)| json!({"type": "Feature", "properties": {"__rs_edge": e, "__rs_k": k, "__rs_seam": seam},
+            "geometry": {"type": "LineString", "coordinates": c}})).collect();
+        t.add("simple", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": features}}), &keys(&[]), false, 0);
+        String::from_utf8_lossy(&t.tile(z, x, y)).into_owned()
+    }
+
+    // zoom 0: 1 px is 0.7 degrees of longitude; 0.1 degrees is 0.14 px
+    const SHORT: [[f64; 2]; 2] = [[10.0, 10.0], [10.1, 10.0]];
+    const LONG: [[f64; 2]; 2] = [[10.0, 10.0], [15.0, 10.0]];
+
+    #[test]
+    fn a_road_under_1_px_is_left_out_of_a_low_zoom_tile() {
+        assert!(pieces(0, 0, 0, &[(1, 0, false, SHORT), (1, 1, false, SHORT)]).is_empty());
+        assert!(!pieces(0, 0, 0, &[(1, 1, false, LONG)]).is_empty());
+        assert!(!pieces(3, 4, 3, &[(1, 1, false, [[10.0, 10.0], [10.1, 10.0]])]).is_empty(), "the last zoom keeps every piece");
+    }
+
+    #[test]
+    fn a_road_that_goes_out_of_the_tile_stays() {
+        // 0.1 degrees across the line between the tiles 1/0/0 and 1/1/0: a cut of 0.07 px at each side
+        let across = [[-0.05, 10.0], [0.05, 10.0]];
+        assert!(!pieces(1, 0, 0, &[(1, 1, false, across)]).is_empty());
+        assert!(!pieces(1, 1, 0, &[(1, 1, false, across)]).is_empty());
+    }
+
+    #[test]
+    fn a_casing_end_piece_under_1_px_is_left_out_and_a_short_fill_stays() {
+        let t = pieces(0, 0, 0, &[(1, 0, false, LONG), (1, 0, true, SHORT)]);
+        assert!(!t.is_empty() && !t.contains("__rs_seam"), "the short seam goes, the casing body stays");
+        let t = pieces(0, 0, 0, &[(1, 0, false, LONG), (1, 1, false, SHORT)]);
+        assert!(t.contains("__rs_k"), "a short fill of a long road stays");
+        assert!(pieces(0, 0, 0, &[(1, 0, true, LONG)]).contains("__rs_seam"), "a long seam stays");
     }
 
     #[test]

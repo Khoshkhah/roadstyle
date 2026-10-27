@@ -250,3 +250,17 @@ def test_tiles_carry_a_two_way_pairs_one_casing():
     y = int((1 - math.asinh(math.tan(math.radians(59.3))) / math.pi) / 2 * n)
     ps = [f["properties"] for f in mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))["simple"]["features"]]
     assert sorted((p["__rs_edge"], p["__rs_k"], p.get("__rs_pair"), p.get("__rs_edge2")) for p in ps) == [(0, 0, True, 1), (0, 1, None, None), (1, 1, None, None)]
+
+
+def test_rule_b_drops_a_road_and_a_seam_under_1_px():
+    """Rule B (tile_v2_plan.md, step 3b) in _drop_tiny: a road under 1 px goes unless it leaves the tile; a short seam goes; a short fill stays."""
+    from roadstyle.tiles import _drop_tiny
+    tb = (0.0, 0.0, 4096.0, 4096.0)             # 1 map unit = 1 tile unit; 1 px = 8 units
+
+    def row(edge, k, seam, x0, x1):
+        return ({"properties": {"__rs_edge": edge, "__rs_k": k, **({"__rs_seam": True} if seam else {})}}, LineString([(x0, 100), (x1, 100)]))
+    keep = lambda *rows: [r["properties"]["__rs_edge"] for r in _drop_tiny(list(rows), tb)]
+    assert keep(row(1, 1, False, 10, 14), row(1, 0, False, 10, 14)) == []                    # a short road
+    assert keep(row(1, 1, False, -5, 3)) == [1]                                              # leaves the tile: kept
+    assert keep(row(1, 0, False, 10, 50), row(1, 0, True, 10, 14)) == [1]                    # a short seam of a long road goes
+    assert keep(row(1, 0, False, 10, 50), row(1, 1, False, 10, 14)) == [1, 1]                # a short fill stays

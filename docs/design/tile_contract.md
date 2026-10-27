@@ -28,7 +28,7 @@ the number 0, and the test asserts it. For the other rules, the number can only 
 | 4 | A number, not a text | Not done. `simple` has 19 to 33 text values (class, colours). `roads` has 30,302 in one Monaco tile (509,422 bytes). | `strings`, `string_bytes` (ratchet) |
 | 5 | Each key and each value once in a layer | Done. | `duplicates` = 0 (asserted) |
 | 6 | Simplify a line to the pixel tolerance of the zoom | Partly. Below the last zoom the tolerance is 0.5 of 4096 units (1/16 px). A tolerance of 1 px gave 1 to 2 % on Burnaby ([tile_speed.md](tile_speed.md)). | `short_segments`, segments under 1 px (ratchet); a pixel test comes with the change |
-| 7 | Drop or merge a feature smaller than a pixel at the zoom | Partly. Only a line under half a unit goes. At z12 in Monaco, 1,533 of 3,057 `simple` features (50 %) and 8,078 of 13,078 `roads` features are under 1 px. The casing seams and laps close joints, so they need a merge, not a drop. | `tiny` (ratchet); a pixel test comes with the change |
+| 7 | Drop or merge a feature smaller than a pixel at the zoom | Partly. Done below the last zoom (rule B, 2026-10-27): a road whose pieces are together under 1 px goes unless it leaves the tile, and a casing end piece (`__rs_seam`) under 1 px goes. Every fill and every casing body piece stays: a rule that dropped all pieces under 1 px broke streets. `tiny` in Monaco z12: 1,564 → 169. Not done: a merge of equal pieces, and the tiles of the last zoom. | `tiny` (ratchet); the unit tests of `drop_tiny` and the parity test |
 | 8 | Coordinates on the grid of the zoom | Not done. All zooms use 4096 units (8 for each pixel); z12 needs 2. The gain is small: geometry is 11 % of `roads` and 18 % of `simple`. | `bytes` (ratchet); a test of the grid comes with the rule |
 | 9 | A base-map layer follows rules 1 to 8 | Partly. It follows rule 1 by its `minzoom`. All its keys stay (`ov4`: 0.3 MB of `osm_id`, `kind`, `name`). | The Burnaby gate prints the same numbers for `ov*`. CI cannot: the golden looks have no base-map layers. |
 | 10 | One copy of a road in the tile source | Done in the page's look. Not in the full look: `roads` repeats each road that `simple` has. | The `roads` layer of `monaco-full` and `tartu-full` (ratchet) |
@@ -57,7 +57,7 @@ The missing rules, in the order of their effect on these tiles:
    not read by the style, and most are text. They belong to the data layer (a props file by id for a server).
 3. **Rule 10.** With 1 and 2 done, `roads` has nothing that `simple` does not have, so the layer goes.
 
-In the page's look, the missing rules are 7 (half of the z12 `simple` features are under 1 px), 3 and 2.
+In the page's look, the missing rules are 3 and 2, and the rest of 7 (a merge).
 
 **The ratchet.** The budget file `rust/roadstyle-rs/tests/data/tile_budget.json` has a limit for each number. The views are the 3 x 3
 tiles around a fixed centre of Monaco and of Tartu, at zoom 12, 13, 14 and 15, with an empty keep list (the engine's own tiles,
