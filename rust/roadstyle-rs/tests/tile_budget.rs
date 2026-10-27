@@ -1,17 +1,19 @@
-//! The tile size standard (docs/design/tile_contract.md, "The tile size standard"): the tiles of fixed views of Monaco and Tartu at
-//! zoom 12 to 15, and the tiled style, must stay within the limits of tests/data/tile_budget.json. A number that is larger fails.
-//! The limits only go down (scripts/tile_budget.py); a raise needs `--raise --why "..."` and the PR text must say why.
+//! The tile size standard (docs/design/tile_contract.md, "The tile size standard"): the tile algorithm applies every reduction that keeps
+//! the map the same. This test measures each reduction rule on the tiles of fixed views of Monaco and Tartu at zoom 12 to 15, and on the
+//! tiled style, and compares the numbers with the limits of tests/data/tile_budget.json: a number that is larger fails. The limits only
+//! go down (scripts/tile_budget.py); a raise needs `--raise --why "..."` and the PR text must say why. Two rules are done, so their
+//! numbers are 0 (the test asserts it): no feature outside its zoom span (rule 1, where a layer's filter has a zoom rule) and no
+//! value or key twice in a layer (rule 5). The numbers of the other rules go down to 0 or to their best as the rules land.
 //!
-//! For each view, for each tile layer, the largest tile: its features, its bytes (the layer's share of the tile), its keys and its
-//! values (the value table: the distinct values). For the view: the bytes of all its tiles and of its largest tile. For the style: the
-//! size of each filter, paint and layout (JSON characters) that is over `SMALL`, and the total.
+//! For each view, for each tile layer, the largest tile: its features, bytes, keys and values (the distinct values), and
+//! `keys_unread` (rule 2: keys that no style layer on the layer reads), `no_id` (rule 3: features without an MVT id), `strings` and
+//! `string_bytes` (rule 4: values that are text), `short_segments` (rule 6: line segments under 1 px) and `tiny` (rule 7: features whose
+//! box is under 1 px). For the view: the bytes of all its tiles and the bytes and features of its largest tile. For the style: the size
+//! of each filter, paint and layout (JSON characters) that is over `SMALL`, and the total.
 //!
 //! The view of an area is the 3 x 3 tiles around a fixed centre (the budget file keeps it, `center`). The keep list of the tiles is
 //! empty: the numbers are the engine's own tiles, without a page's popup fields. Each area has two looks: `monaco` is the page's
 //! (the lean look: the `simple` pieces and the slots) and `monaco-full` is `export_style`'s (it has the whole-road layer `roads` too).
-//!
-//! The hard limits (`HARD_*`) are absolute, as the ratchet is not: a tile, a feature count or an expression over one is a violation.
-//! Today's violations are listed in the budget (`known_over`). A new one fails; so does one that is gone but still listed.
 //!
 //!     cargo test --release -p roadstyle-rs --test tile_budget -- --nocapture       (the table)
 //!     ROADSTYLE_BURNABY_ROADS=<roads.parquet> cargo test --release -p roadstyle-rs --test tile_budget burnaby -- --ignored --nocapture
@@ -19,7 +21,7 @@
 mod common;
 
 use serde_json::{json, Map, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 /// A view: its name and its tiles (zoom, x, y).
@@ -29,11 +31,8 @@ type View = (String, Vec<(u32, u32, u32)>);
 const ZOOMS: std::ops::RangeInclusive<u32> = 12..=15;
 /// A filter, paint or layout of a style layer over this many JSON characters has its own limit; a smaller one has none.
 const SMALL: usize = 256;
-/// The hard limits (docs/design/tile_contract.md, "The tile size standard"): the bytes and the features of one tile (all its layers),
-/// and the characters of one filter, paint or layout.
-const HARD_TILE_BYTES: usize = 500_000;
-const HARD_TILE_FEATURES: usize = 10_000;
-const HARD_EXPRESSION: usize = 4096;
+/// One pixel in tile units (512 px tiles, extent 4096).
+const PIXEL: i64 = 8;
 
 /// The areas of the budget: its name, the inputs' folder in tests/data, and whether it is the full look (`export_style`'s: the
 /// whole-road layer `roads` too) or the lean look of the page.
@@ -90,22 +89,115 @@ fn fields(b: &[u8]) -> Vec<(u64, u64, u64, &[u8])> {
     out
 }
 
-/// The layers of a vector tile: (name, features, bytes, keys, values). The bytes are the layer's share of the tile (tag, length, message).
-fn layers_of(tile: &[u8]) -> Vec<(String, usize, usize, usize, usize)> {
+/// What the layer's own tables say: `features`, `bytes` (the layer's share of the tile: tag, length, message), `keys`, `values`,
+/// `strings` and `string_bytes` (the text values), and `dup` (a key or a value twice, rule 5).
+#[derive(Default)]
+struct Tables {
+    features: usize,
+    bytes: usize,
+    keys: usize,
+    values: usize,
+    strings: usize,
+    string_bytes: usize,
+    dup: usize,
+}
+
+fn layers_of(tile: &[u8]) -> Vec<(String, Tables)> {
     fields(tile).into_iter().filter(|f| f.0 == 3).map(|(_, _, _, layer)| {
-        let (mut name, mut n) = (String::new(), [0usize; 3]);
+        let (mut name, mut t) = (String::new(), Tables::default());
+        let (mut keys, mut values): (HashSet<&[u8]>, HashSet<&[u8]>) = (HashSet::new(), HashSet::new());
         for (f, _, _, d) in fields(layer) {
             match f {
                 1 => name = String::from_utf8(d.to_vec()).unwrap(),
-                2 => n[0] += 1,
-                3 => n[1] += 1,
-                4 => n[2] += 1,
+                2 => t.features += 1,
+                3 => {
+                    t.keys += 1;
+                    t.dup += usize::from(!keys.insert(d));
+                }
+                4 => {
+                    t.values += 1;
+                    t.dup += usize::from(!values.insert(d));
+                    if fields(d).first().is_some_and(|v| v.0 == 1) {
+                        t.strings += 1;
+                        t.string_bytes += d.len();
+                    }
+                }
                 _ => {}
             }
         }
         let head = 1 + (64 - (layer.len() as u64 | 1).leading_zeros() as usize).div_ceil(7);
-        (name, n[0], head + layer.len(), n[1], n[2])
+        t.bytes = head + layer.len();
+        (name, t)
     }).collect()
+}
+
+/// The properties that the style's layers read, for each tile layer: `["get", k]` and `["has", k]` in the filter, paint and layout, the
+/// `{k}` of a text field, and the vector source's `promoteId`.
+fn style_reads(style: &Value) -> HashMap<String, HashSet<String>> {
+    fn walk(v: &Value, out: &mut HashSet<String>) {
+        match v {
+            Value::Array(a) => {
+                if let [op, Value::String(k)] = a.as_slice() {
+                    if op == "get" || op == "has" {
+                        out.insert(k.clone());
+                    }
+                }
+                a.iter().for_each(|x| walk(x, out));
+            }
+            Value::Object(o) => o.values().for_each(|x| walk(x, out)),
+            Value::String(t) => t.split('{').skip(1).filter_map(|r| r.split_once('}')).for_each(|(k, _)| {
+                out.insert(k.to_string());
+            }),
+            _ => {}
+        }
+    }
+    let mut out: HashMap<String, HashSet<String>> = HashMap::new();
+    for l in style["layers"].as_array().into_iter().flatten() {
+        let name = l["source-layer"].as_str().or(l["source"].as_str()).unwrap_or("").to_string();
+        let e = out.entry(name).or_default();
+        for part in ["filter", "paint", "layout"] {
+            walk(&l[part], e);
+        }
+    }
+    for src in style["sources"].as_object().into_iter().flatten().map(|(_, s)| &s["promoteId"]) {
+        for (layer, k) in src.as_object().into_iter().flatten() {
+            out.entry(layer.clone()).or_default().extend(k.as_str().map(String::from));
+        }
+    }
+    out
+}
+
+/// The numbers of one tile layer that the reduction rules (docs/design/tile_contract.md) are about, from its decoded features.
+#[derive(Default)]
+struct Rules {
+    keys_unread: usize,
+    no_id: usize,
+    short_segments: usize,
+    tiny: usize,
+    /// features outside their zoom span (rule 1; only for a layer with a zoom rule)
+    undrawn: usize,
+}
+
+fn rules_of(z: u32, feats: &[common::Feature], reads: Option<&HashSet<String>>,
+            zoom: &roadstyle_rs::tiles::rules::ZoomRules) -> Rules {
+    let mut r = Rules::default();
+    let mut used: HashSet<&str> = HashSet::new();
+    for (id, props, kind, parts) in feats {
+        used.extend(props.keys().map(String::as_str));
+        r.no_id += usize::from(id.is_none());
+        if !zoom.is_empty() {
+            let (from, until) = zoom.span(props);
+            r.undrawn += usize::from(!(z as f64 + 1.0 > from && (z as f64) < until));
+        }
+        if *kind != 1 {
+            let pts: Vec<[i64; 2]> = parts.iter().flatten().copied().collect();
+            let range = |i: usize| pts.iter().map(|p| p[i]).max().unwrap_or(0) - pts.iter().map(|p| p[i]).min().unwrap_or(0);
+            r.tiny += usize::from(range(0) < PIXEL && range(1) < PIXEL);
+            r.short_segments += parts.iter().flat_map(|l| l.windows(2)).filter(|w| (w[1][0] - w[0][0]).abs().max((w[1][1] - w[0][1]).abs()) < PIXEL).count();
+        }
+    }
+    r.keys_unread = used.iter().filter(|k| !reads.is_some_and(|s| s.contains(**k))).count();
+    r
 }
 
 /// The size of each filter, paint and layout of the style's layers (JSON characters): those over `SMALL`, and the total.
@@ -150,56 +242,55 @@ fn center_of(roads: &[u8]) -> [f64; 2] {
     [r((lo[0] + hi[0]) / 2.0), r((lo[1] + hi[1]) / 2.0)]
 }
 
-/// The numbers of an area: for each view, its tiles' sizes; and the style's. `views`: the name and the tiles of each.
-fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look, center: [f64; 2], views: Vec<View>) -> Value {
+/// The numbers of an area: for each view, its tiles' sizes and the numbers of the reduction rules; and the style's. `views`: the name and the
+/// tiles of each. A rule that is done and not 0 (rules 1 and 5) is in `broken`.
+fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look, center: [f64; 2], views: Vec<View>, broken: &mut Vec<String>) -> Value {
     let (style, tiles, _) = roadstyle_rs::make_tiled(roads, look, features, None, "rs://", &[]).unwrap();
+    let style: Value = serde_json::from_str(&style).unwrap();
+    let reads = style_reads(&style);
+    let layers_json = style["layers"].as_array().cloned().unwrap_or_default();
+    let mut zoom: HashMap<String, roadstyle_rs::tiles::rules::ZoomRules> = HashMap::new();
     let mut out = Map::new();
     out.insert("center".into(), json!(center));
     for (name, view) in views {
         let (mut bytes, mut features, mut biggest, mut most) = (0usize, 0usize, 0usize, 0usize);
-        let mut layers: BTreeMap<String, [usize; 4]> = BTreeMap::new();
+        let mut layers: BTreeMap<String, [usize; 10]> = BTreeMap::new();
         for (z, x, y) in view {
             let t = tiles.tile(z, x, y);
             bytes += t.len();
             biggest = biggest.max(t.len());
-            most = most.max(layers_of(&t).iter().map(|l| l.1).sum());
-            for (l, f, b, k, v) in layers_of(&t) {
-                features += f;
+            let decoded = common::decode_tile(&t);
+            let tables = layers_of(&t);
+            most = most.max(tables.iter().map(|l| l.1.features).sum());
+            for (l, tb) in tables {
+                features += tb.features;
+                let zr = zoom.entry(l.clone()).or_insert_with(|| roadstyle_rs::tiles::rules::ZoomRules::of(&layers_json, &l));
+                let r = rules_of(z, &decoded[&l], reads.get(&l), zr);
+                for (what, n) in [("undrawn", r.undrawn), ("duplicates", tb.dup)] {
+                    if n > 0 {
+                        broken.push(format!("{name} {l} {z}/{x}/{y}: {n} {what} (rule {})", if what == "undrawn" { 1 } else { 5 }));
+                    }
+                }
                 let e = layers.entry(l).or_default();
-                *e = [e[0].max(f), e[1].max(b), e[2].max(v), e[3].max(k)];
+                let now = [tb.features, tb.bytes, tb.values, tb.keys, r.keys_unread, r.no_id, tb.strings, tb.string_bytes, r.short_segments, r.tiny];
+                e.iter_mut().zip(now).for_each(|(m, n)| *m = (*m).max(n));
             }
         }
-        let layers: Map<String, Value> = layers.into_iter().map(|(k, [f, b, v, n])| (k, json!({"features": f, "bytes": b, "values": v, "keys": n}))).collect();
+        let layers: Map<String, Value> = layers.into_iter().map(|(k, n)| (k, json!({"features": n[0], "bytes": n[1], "values": n[2], "keys": n[3],
+            "keys_unread": n[4], "no_id": n[5], "strings": n[6], "string_bytes": n[7], "short_segments": n[8], "tiny": n[9]}))).collect();
         out.insert(name, json!({"view_bytes": bytes, "view_features": features, "max_tile_bytes": biggest, "max_tile_features": most, "layers": layers}));
     }
-    out.insert("style".into(), style_sizes(&serde_json::from_str(&style).unwrap()));
+    out.insert("style".into(), style_sizes(&style));
     Value::Object(out)
 }
 
 /// The areas of the budget: the fixed views of the area's roads (the budget's centre, else the roads' middle).
-fn measure_area(dir: &str, full: bool, saved: &Value) -> Value {
+fn measure_area(dir: &str, full: bool, saved: &Value, broken: &mut Vec<String>) -> Value {
     let roads = std::fs::read(data(&format!("{dir}/roads.parquet"))).unwrap();
     let center = saved["center"].as_array().map(|c| [c[0].as_f64().unwrap(), c[1].as_f64().unwrap()]).unwrap_or_else(|| center_of(&roads));
     let views = ZOOMS.map(|z| (format!("z{z}"), square(z, center[0], center[1]))).collect();
     // no base-map features: the areas' golden looks have no layers_yaml (the overlays are measured by the local Burnaby gate)
-    measure(roads, None, &look(dir, full), center, views)
-}
-
-/// The hard limits that an area's numbers break, as names: `<area>.<view>.max_tile_bytes`, `<area>.<view>.max_tile_features` and
-/// `<area>.style.<layer>.<property>`.
-fn hard_violations(area: &str, got: &Value) -> Vec<String> {
-    let mut out = Vec::new();
-    for (view, v) in got.as_object().into_iter().flatten().filter(|(k, _)| *k != "center" && *k != "style") {
-        for (key, max) in [("max_tile_bytes", HARD_TILE_BYTES), ("max_tile_features", HARD_TILE_FEATURES)] {
-            if v[key].as_u64() > Some(max as u64) {
-                out.push(format!("{area}.{view}.{key}"));
-            }
-        }
-    }
-    for (id, props) in got["style"]["expressions"].as_object().into_iter().flatten() {
-        out.extend(props.as_object().into_iter().flatten().filter(|(_, n)| n.as_u64() > Some(HARD_EXPRESSION as u64)).map(|(p, _)| format!("{area}.style.{id}.{p}")));
-    }
-    out
+    measure(roads, None, &look(dir, full), center, views, broken)
 }
 
 /// Every number of `got` that is larger than its limit in `limit`, or has none: as lines.
@@ -223,18 +314,17 @@ fn table(area: &str, got: &Value, limit: &Value) -> String {
         Some(l) => format!("{}/{}", g, l),
         None => g.to_string(),
     };
-    let mut s = format!("{area}: the largest tile of each layer (measured/limit)\n{:<12}{:<16}{:>16}{:>16}{:>16}{:>12}\n",
-                        "view", "layer", "features", "bytes", "values", "keys");
+    let mut s = format!("{area}: the largest tile of each layer (measured/limit)\n{:<6}{:<8}{:>20}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}\n",
+                        "view", "layer", "bytes", "feat.", "values", "unread", "no_id", "strings", "short", "tiny");
     for (view, v) in got.as_object().into_iter().flatten().filter(|(k, _)| *k != "center" && *k != "style") {
         for (layer, m) in v["layers"].as_object().into_iter().flatten() {
             let l = &limit[view]["layers"][layer];
-            s += &format!("{view:<12}{layer:<16}{:>16}{:>16}{:>16}{:>12}\n", cell(&m["features"], &l["features"]), cell(&m["bytes"], &l["bytes"]),
-                          cell(&m["values"], &l["values"]), cell(&m["keys"], &l["keys"]));
+            s += &format!("{view:<6}{layer:<8}{:>20}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}\n", cell(&m["bytes"], &l["bytes"]), m["features"].to_string(), m["values"].to_string(),
+                          m["keys_unread"].to_string(), m["no_id"].to_string(), m["strings"].to_string(), m["short_segments"].to_string(), m["tiny"].to_string());
         }
         let l = &limit[view];
-        s += &format!("{view:<12}{:<16}{:>16}{:>16}   largest tile {} bytes, {} features\n", "(all tiles)", cell(&v["view_features"], &l["view_features"]),
-                      cell(&v["view_bytes"], &l["view_bytes"]), cell(&v["max_tile_bytes"], &l["max_tile_bytes"]),
-                      cell(&v["max_tile_features"], &l["max_tile_features"]));
+        s += &format!("{view:<6}{:<8}{:>20}   all tiles {} features; largest tile {} bytes, {} features\n", "(all)", cell(&v["view_bytes"], &l["view_bytes"]),
+                      v["view_features"], cell(&v["max_tile_bytes"], &l["max_tile_bytes"]), cell(&v["max_tile_features"], &l["max_tile_features"]));
     }
     let st = &got["style"];
     s += &format!("style: {} layers, expressions {} characters ({} over {SMALL})\n", cell(&st["layers"], &limit["style"]["layers"]),
@@ -257,33 +347,24 @@ fn has(area: &str) -> bool {
     there
 }
 
-/// The tiles and the style of Monaco and Tartu (the page's look and the full look) are within the budget, and break no hard limit
-/// that the budget's `known_over` does not list. `ROADSTYLE_TILE_BUDGET_OUT=<file>` writes the numbers there first
-/// (scripts/tile_budget.py reads them; `hard_violations` is the list of the hard limits that they break).
+/// The tiles and the style of Monaco and Tartu (the page's look and the full look) are within the budget, and the done rules (1 and 5) hold.
+/// `ROADSTYLE_TILE_BUDGET_OUT=<file>` writes the numbers there first (scripts/tile_budget.py reads them).
 #[test]
 fn the_tiles_stay_within_their_budget() {
     let budget = budget();
-    let (mut got, mut errors, mut broken) = (Map::new(), Vec::new(), Vec::new());
+    let (mut got, mut errors) = (Map::new(), Vec::new());
     for (name, dir, full) in AREAS.into_iter().filter(|(_, dir, _)| has(dir)) {
-        let m = measure_area(dir, full, &budget["areas"][name]);
+        let m = measure_area(dir, full, &budget["areas"][name], &mut errors);
         println!("{}", table(name, &m, &budget["areas"][name]));
         over(&m, &budget["areas"][name], name, &mut errors);
-        broken.extend(hard_violations(name, &m));
         got.insert(name.into(), m);
     }
-    let known: Vec<String> = budget["known_over"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(String::from)).collect();
-    // an area that was not measured (no inputs here) keeps its known violations
-    let measured = |k: &String| got.keys().any(|a| k.starts_with(&format!("{a}.")));
-    errors.extend(broken.iter().filter(|b| !known.contains(b)).map(|b| format!("{b}: over a hard limit, and not in known_over")));
-    errors.extend(known.iter().filter(|k| measured(k) && !broken.contains(k)).map(|k| format!("{k}: no longer over a hard limit: scripts/tile_budget.py removes it from known_over")));
-    println!("over a hard limit ({HARD_TILE_BYTES} bytes or {HARD_TILE_FEATURES} features for a tile, {HARD_EXPRESSION} characters for an expression):\n  {}", broken.join("\n  "));
-    got.insert("hard_violations".into(), json!(broken));
     if let Some(out) = std::env::var_os("ROADSTYLE_TILE_BUDGET_OUT") {
         std::fs::write(out, serde_json::to_string_pretty(&Value::Object(got)).unwrap()).unwrap();
     }
-    assert!(errors.is_empty(), "the tiles are over their budget (docs/design/tile_contract.md, 'The tile size standard'). A change that makes the \
-            tiles smaller is the aim. To raise a limit, the PR text must say why and Kaveh must agree: scripts/tile_budget.py --raise --why \
-            '...'\n{}", errors.join("\n"));
+    assert!(errors.is_empty(), "the tiles break a reduction rule or are over their budget (docs/design/tile_contract.md, 'The tile size \
+            standard'). A change that makes the tiles smaller is the aim. To raise a limit, the PR text must say why and Kaveh must agree: \
+            scripts/tile_budget.py --raise --why '...'\n{}", errors.join("\n"));
 }
 
 /// The local gate for Burnaby (its roads are not in the repository): the same table, and the limits of `areas.burnaby` if the budget has
@@ -310,10 +391,9 @@ fn burnaby_gate() {
         views.extend(v.into_iter().map(|(n, t)| (n, t.into_iter().map(|[z, x, y]| (z, x, y)).collect())));
     }
     let features = std::env::var_os("ROADSTYLE_BURNABY_FEATURES").map(|p| std::fs::read(p).unwrap());
-    let m = measure(roads, features, &look, center, views);
-    println!("{}", table("burnaby", &m, saved));
-    println!("over a hard limit: {:?}", hard_violations("burnaby", &m));
     let mut errors = Vec::new();
+    let m = measure(roads, features, &look, center, views, &mut errors);
+    println!("{}", table("burnaby", &m, saved));
     if saved.is_object() {
         over(&m, saved, "burnaby", &mut errors);
     }

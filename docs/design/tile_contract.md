@@ -12,58 +12,79 @@ workspace (`RESULT.md`, `ANALYSIS.md`, `one-feature/`, `expr/`) and [tile_speed.
 
 ## The tile size standard
 
-Tiles stay small. This is a rule for each change to the engine, the style or the page. It is not a wish. A test measures the rule,
-and CI fails when a number gets worse.
+The tile algorithm applies every reduction that keeps the map the same. If a tile is still large after that, no reduction is left, and
+the tile is as small as it can be. So the standard is a list of reduction rules, not a size limit. Each rule has a status and a test.
+A ratchet keeps the numbers from getting worse. A change that adds a feature to a tile, or a key, or a layer, must say which rule
+allows it.
 
-**The rules.** A tile has:
+**The reduction rules.** Each rule has a number in the budget (per tile layer, the largest tile of the view). A rule that is done has
+the number 0, and the test asserts it. For the other rules, the number can only go down.
 
-1. only the features that a style layer draws at a zoom of the tile (`ZoomRules::span`);
-2. only the keys that the style reads at that zoom (section 3). All other data is in the data layer;
-3. the id as the MVT feature id, a dense row number, and no id in the tags (section 2);
-4. a number where a number does the job: no string for a flag, a class or a rank;
-5. small expressions. A filter, a paint or a layout is data-driven only when it must be, and it has no more than 256 characters of
-   JSON, unless the budget lists it with a limit (section 6).
+| # | Rule | Now | The test |
+|---|---|---|---|
+| 1 | Only the features that a style layer draws at a zoom of the tile (`ZoomRules::span`) | Done where every layer on the source has a zoom rule (`simple`: 17 % of its features out at z13). Not done where a layer draws the source at every zoom: `roads-highlight` keeps all of `roads` (full look). | `undrawn` = 0 for a layer with a zoom rule (asserted) |
+| 2 | Only the keys that the style reads (section 3) | Not done. Unread keys: `simple` 3 of 18, `slots` 6 of 12, `roads` 14 of 21 (full look). | `keys_unread` (ratchet) |
+| 3 | The id is the MVT feature id, a dense row, and no id key (section 2) | Not done. `simple` has no MVT id (`__rs_edge` and `__rs_edge2` are keys). | `no_id` (ratchet) |
+| 4 | A number, not a text | Not done. `simple` has 19 to 33 text values (class, colours). `roads` has 30,302 in one Monaco tile (509,422 bytes). | `strings`, `string_bytes` (ratchet) |
+| 5 | Each key and each value once in a layer | Done. | `duplicates` = 0 (asserted) |
+| 6 | Simplify a line to the pixel tolerance of the zoom | Partly. Below the last zoom the tolerance is 0.5 of 4096 units (1/16 px). A tolerance of 1 px gave 1 to 2 % on Burnaby ([tile_speed.md](tile_speed.md)). | `short_segments`, segments under 1 px (ratchet); a pixel test comes with the change |
+| 7 | Drop or merge a feature smaller than a pixel at the zoom | Partly. Only a line under half a unit goes. At z12 in Monaco, 1,533 of 3,057 `simple` features (50 %) and 8,078 of 13,078 `roads` features are under 1 px. The casing seams and laps close joints, so they need a merge, not a drop. | `tiny` (ratchet); a pixel test comes with the change |
+| 8 | Coordinates on the grid of the zoom | Not done. All zooms use 4096 units (8 for each pixel); z12 needs 2. The gain is small: geometry is 11 % of `roads` and 18 % of `simple`. | `bytes` (ratchet); a test of the grid comes with the rule |
+| 9 | A base-map layer follows rules 1 to 8 | Partly. It follows rule 1 by its `minzoom`. All its keys stay (`ov4`: 0.3 MB of `osm_id`, `kind`, `name`). | The Burnaby gate prints the same numbers for `ov*`. CI cannot: the golden looks have no base-map layers. |
+| 10 | One copy of a road in the tile source | Done in the page's look. Not in the full look: `roads` repeats each road that `simple` has. | The `roads` layer of `monaco-full` and `tartu-full` (ratchet) |
 
-**The hard limits.** These are absolute. The ratchet below only keeps today's numbers, so it cannot say that a number is too large.
+**What the big tiles are.** The full look (`export_style`, for a server) has a second road layer, `roads`: one feature for each whole
+road with 21 columns. In the largest z12 tile it is 1,366,746 of 1,515,563 bytes in Monaco and 3,740,748 of 3,984,675 in Tartu. The
+page's look has no `roads` layer, and its largest tile in these views is 383,687 bytes (Monaco z15).
 
-| Number | Hard limit | Why |
+| The `roads` layer, largest z12 tile | Monaco | Tartu |
 |---|---|---|
-| Bytes of one tile | 500,000 | The usual ceiling of a vector tile: Tippecanoe's default and Mapbox's tile limit are 500 KB. |
-| Features in one tile, all layers | 10,000 | Our own limit. MapLibre's parse follows the drawn features (section 6): the Burnaby tiles of the 1.4 s parse hold up to 9,705. Tippecanoe's 200,000 does not protect a browser. |
-| Characters of one filter, paint or layout | 4,096 | Section 6. `evaluate` is 20 % of the worker's profile on Burnaby. |
-| Bytes and features of the tiles of one view (Burnaby, tilted, zoom 14; target, the Burnaby gate prints it) | 3 MB, 60,000 | Half of today's 5.9 MB and 115k features. |
+| Bytes | 1,366,742 | 3,740,743 |
+| Geometry | 146,342 (11 %) | 392,562 (10 %) |
+| Tags | 493,455 (36 %) | 1,369,051 (37 %) |
+| Value table | 635,312 (46 %) | 1,702,620 (46 %) |
+| `edge_id`, `edge_ref`, `__rs_edge`, `osm_id`, `__rs_edge2` (tags and values) | 893,581 (65 %) | 2,424,304 (65 %) |
+| Features | 13,078 | 35,672 |
+| Features that `simple` draws at z12 (its fill pieces) | 1,850 (14 %) | 3,035 (9 %) |
+| Features under 1 px | 8,078 (62 %) | 12,163 (34 %) |
 
-A number over a hard limit is a violation. The budget lists today's violations in `known_over`. A new violation fails CI, and so does a
-listed one that is gone (the script removes it). The aim is an empty list.
+The missing rules, in the order of their effect on these tiles:
 
-**The limits that the ratchet keeps.** The budget file `rust/roadstyle-rs/tests/data/tile_budget.json` has a limit for each number
-below. The views are the 3 x 3 tiles around a fixed centre of Monaco and of Tartu, at zoom 12, 13, 14 and 15, with an empty keep list
-(the engine's own tiles, without a page's popup fields). Each area has two looks: `monaco` and `tartu` are the page's look (the lean
-look: the `simple` pieces and the slots), and `monaco-full` and `tartu-full` are the look of `export_style` for a server (it has the
-layer of whole roads, `roads`, too).
+1. **Rule 1.** `roads-highlight` (the glow of a hovered road) has no zoom rule, so `roads` keeps every road at z12, also those that
+   `simple` hides (86 % of the features in Monaco, 91 % in Tartu). `roads-fill` has a class minzoom, but its opacity is 0: it is only
+   a click target. If the glow reads `simple` with feature-state, as the page's look does, no layer needs `roads`.
+2. **Rules 2 and 4.** `edge_id` (a 64-bit hash), `edge_ref`, `osm_id` and `__rs_edge2` are popup data, and 65 % of the layer. They are
+   not read by the style, and most are text. They belong to the data layer (a props file by id for a server).
+3. **Rule 10.** With 1 and 2 done, `roads` has nothing that `simple` does not have, so the layer goes.
+
+In the page's look, the missing rules are 7 (half of the z12 `simple` features are under 1 px), 3 and 2.
+
+**The ratchet.** The budget file `rust/roadstyle-rs/tests/data/tile_budget.json` has a limit for each number. The views are the 3 x 3
+tiles around a fixed centre of Monaco and of Tartu, at zoom 12, 13, 14 and 15, with an empty keep list (the engine's own tiles,
+without a page's popup fields). Each area has two looks: `monaco` and `tartu` are the page's look (the lean look: the `simple`
+pieces and the slots), and `monaco-full` and `tartu-full` are the look of `export_style`.
 
 | Number | For |
 |---|---|
-| features, bytes, values (the distinct values), keys | the largest tile of each tile layer, in each view |
+| features, bytes, values (the distinct values), keys, and the numbers of rules 2, 3, 4, 6 and 7 | the largest tile of each tile layer, in each view |
 | bytes of all the tiles, bytes and features of the largest tile | each view |
 | layers, characters of all expressions | the style |
 | characters of each filter, paint and layout over 256 | each style layer |
 
 **The protocol.**
 
-- A change that makes a number larger than its limit fails CI. The Rust test `tile_budget` checks the four looks and the style.
-  `tests/test_tile_budget.py` checks that the Python binding gives Monaco's page tiles within the same limits.
+- A change that makes a number larger than its limit, or breaks a done rule, fails CI. The Rust test `tile_budget` checks the four looks
+  and the style. `tests/test_tile_budget.py` checks that the Python binding gives Monaco's page tiles within the same limits.
 - To lower the limits after a change that makes the tiles smaller, run `scripts/tile_budget.py` and commit the file. The script lowers a
-  limit and never raises one. A limit is the measured number plus 2 % (at least 1). It also removes a violation that is gone from
-  `known_over`.
-- To raise a limit or to add one (a new layer, a new expression over 256 characters, a new violation), run
+  limit and never raises one. A limit is the measured number plus 2 % (at least 1).
+- To raise a limit or to add one (a new layer, a new expression over 256 characters), run
   `scripts/tile_budget.py --raise --why "the reason"`. The script writes the new limits and the reason in the file (`raises`). The PR
   text must give the same reason, with the numbers before and after, and Kaveh must agree before the merge. Do not edit a limit by hand.
+- A new rule, or a rule that gets done, changes this table in the same PR: when a number reaches 0, the test asserts it from then on.
 - The local Burnaby gate prints the same table for the Burnaby roads, with the limits of `areas.burnaby` when the file has them:
   `ROADSTYLE_BURNABY_ROADS=/abs/roads.parquet cargo test --release -p roadstyle-rs --test tile_budget burnaby -- --ignored --nocapture`
   (more inputs: `ROADSTYLE_BURNABY_LOOK`, `ROADSTYLE_BURNABY_FEATURES`, `ROADSTYLE_BURNABY_VIEWS`; use absolute paths). The Burnaby
-  roads are not in the repository, so CI does not run it. Burnaby is the only gate that covers the base-map layers (`ov*`), because
-  the golden looks of Monaco and Tartu have no base-map layer spec.
+  roads are not in the repository, so CI does not run it.
 
 **The budget now** (2026-10-27; each limit in the file is this number plus 2 %). The page's look:
 
@@ -78,38 +99,9 @@ layer of whole roads, `roads`, too).
 | tartu | 14 | 1,101,318 | 184,791 | 3,710 | 3,155 | 152,719 | 3,958 |
 | tartu | 15 | 785,237 | 167,383 | 3,348 | 3,018 | 146,333 | 3,058 |
 
-**Where the big tiles are.** The look of `export_style` (the full look) has a second road layer, `roads`: one feature for each whole
-road, with 21 columns (`edge_id`, `osm_id`, `name`, `edge_ref`, `lanes`, `access` and the `__rs_*` marks). In the largest tile of
-each view it is most of the bytes (the largest tile of each layer, in the full look):
-
-| Look and zoom | `roads`: features | bytes | `simple`: features | bytes | The tile | Features |
-|---|---|---|---|---|---|---|
-| monaco-full 12 | 13,078 | 1,366,746 | 3,057 | 148,817 | 1,515,563 | 16,135 |
-| monaco-full 13 | 9,452 | 986,041 | 3,930 | 188,682 | 1,174,723 | 13,382 |
-| monaco-full 14 | 8,967 | 938,677 | 4,243 | 209,696 | 1,200,631 | 14,059 |
-| monaco-full 15 | 5,035 | 522,236 | 6,605 | 333,935 | 906,307 | 12,419 |
-| tartu-full 12 | 35,672 | 3,740,748 | 5,366 | 243,927 | 3,984,675 | 41,038 |
-| tartu-full 13 | 16,844 | 1,741,891 | 5,778 | 280,126 | 2,008,851 | 22,465 |
-| tartu-full 14 | 6,648 | 686,194 | 3,155 | 152,719 | 846,441 | 10,132 |
-
-The page does not ship `roads`: its look has no layer that reads it. In the page's look no tile of the four zoom levels is near a
-hard limit (the largest is 383,687 bytes and 7,384 features). The causes of the full look's size:
-
-1. `roads-highlight` (the glow of a hovered road) reads `roads` with no zoom clause, so the tiles of zoom 12 hold every road, also the
-   service roads that `simple` hides below zoom 15 (`ZoomRules` leaves a feature out only when every layer hides it). `roads-fill` has
-   a class minzoom, but its opacity is 0: it is only a click target.
-2. The popup columns are in the tiles (43,386 distinct values in one Monaco tile; 114,871 in one Tartu tile).
-3. The road is stored two times: once as pieces (`simple`) and once as a whole road (`roads`).
-
-**Today's violations** (`known_over` has 26 entries):
-
-| Violation | Looks | Value now | What must change |
-|---|---|---|---|
-| Bytes of one tile over 500,000 | `monaco-full` z12 to z15, `tartu-full` z12 to z14 | 3,984,675 at most | The glow and the fill read `simple` with feature-state, as the page's look does, and `roads` goes. The popup columns go to a props file by id (the data layer for a server, section 4), fetched on a click. |
-| Features in one tile over 10,000 | the same looks | 41,038 at most | The same change: `simple` has at most 6,605 in a tile. |
-| `line-width` of `roads-simple` over 4,096 characters | all four looks | 25,796 | Phase 1 of the plan: one width key for each piece (`__rs_wk`) and one table lookup for each zoom stop. |
-| `line-width` and `line-offset` of `roads-fill` and `roads-highlight` over 4,096 | `monaco-full`, `tartu-full` | 4,645 and 5,376 | They go with `roads`. |
-| Burnaby, the tilted view, over 3 MB and 60,000 features (target) | the page's look | 5.9 MB, 115k | The keys from the style (section 3), the id (section 2), and one casing for the two halves of a two-way road (option B of `ANALYSIS.md`, its own note). |
+The full look of the same views is larger because of `roads` (largest tile: Monaco 1,515,563 / 1,174,723 / 1,200,631 / 906,307 bytes at
+z12 to z15; Tartu 3,984,675 / 2,008,851 / 846,441 / 340,709). The style (the same for both areas) has 5 layers in the full look, 4 in
+the page's, and the page's `roads-simple` `line-width` is 25,796 characters (section 6).
 
 ## Why
 

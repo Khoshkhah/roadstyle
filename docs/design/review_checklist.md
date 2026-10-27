@@ -17,14 +17,13 @@ report.
 
 ## The tile size rule
 
-Each change to the engine, the style or the page keeps the tile size standard of [tile_contract.md](tile_contract.md) ("The tile
-size standard"): only drawn features, only the keys that the style reads, the id as the MVT id, numbers and not strings, small
-expressions. The tests `tile_budget` (Rust) and `tests/test_tile_budget.py` fail when a number is larger than its limit in
-`rust/roadstyle-rs/tests/data/tile_budget.json`.
+Each change to the engine, the style or the page keeps the tile size standard of [tile_contract.md](tile_contract.md) ("The tile size
+standard"): the tile algorithm applies every reduction that keeps the map the same. The ten reduction rules are there with their
+status. The tests `tile_budget` (Rust) and `tests/test_tile_budget.py` fail when a number is larger than its limit in
+`rust/roadstyle-rs/tests/data/tile_budget.json`, or when a done rule (1 and 5) breaks.
 
+- A change that adds a feature, a key or a layer to a tile says which rule allows it.
 - A change that makes the tiles smaller runs `scripts/tile_budget.py` and commits the lower limits.
 - A change that needs a higher limit runs `scripts/tile_budget.py --raise --why "the reason"`. The PR text gives the same reason with
   the numbers before and after, and Kaveh must agree before the merge. No limit is edited by hand.
-- The hard limits are 500,000 bytes and 10,000 features for a tile, and 4,096 characters for an expression. A new violation fails; a
-  change that fixes one removes it from `known_over` (the script does it).
 - The report of each step names the numbers of the budget that its change moved.

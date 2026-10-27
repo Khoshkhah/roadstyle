@@ -73,7 +73,8 @@ pub fn diff_summary(a: &Value, b: &Value) -> Vec<(String, usize)> {
 }
 
 /// A decoded vector tile (MVT 2.1): for each layer, its features as (id, properties, geometry type, the commands' points per part).
-pub type Tile = indexmap::IndexMap<String, Vec<(Option<u64>, serde_json::Map<String, Value>, u64, Vec<Vec<[i64; 2]>>)>>;
+pub type Feature = (Option<u64>, serde_json::Map<String, Value>, u64, Vec<Vec<[i64; 2]>>);
+pub type Tile = indexmap::IndexMap<String, Vec<Feature>>;
 
 pub fn decode_tile(b: &[u8]) -> Tile {
     fn varint(b: &[u8], i: &mut usize) -> u64 {
