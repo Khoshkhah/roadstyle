@@ -88,7 +88,7 @@ fn first_drawn(layers: &[Value], k: &str, from: u32, last: u32) -> u32 {
 
 /// Stage 2 from memory: the tiles of stage 1's sources (`o`: the rules), borrowed (audit N6: `s` stays as it is).
 fn tile_sources(s: &sources::Styled, o: &tiles::stage::TileOptions) -> Result<tiles::Tiles, tiles::Error> {
-    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px)?;
+    let mut tiled = o.tiles()?;
     tiled.drawn_by(&s.layers);
     for (k, src) in s.shown().filter(|(k, _)| o.wants(k)) {
         tile_source(&mut tiled, s, o, k, src);
@@ -216,7 +216,7 @@ pub fn tile_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<Vec<u
     let read = |name: &str| read(name).map_err(|e| crate::error::file(name, e));
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| crate::error::file("style.json", e))?;
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
-    let mut tiled = tiles::Tiles::new(o.min_zoom, o.max_zoom, o.buffer_px)?;
+    let mut tiled = o.tiles()?;
     let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
     tiled.drawn_by(layers);
     let mut names = Vec::new();

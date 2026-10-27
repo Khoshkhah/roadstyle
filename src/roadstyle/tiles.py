@@ -210,7 +210,7 @@ def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
     for z in range(minzoom, maxzoom + 1):
         s = 2 * _R / (1 << z)
         tol = s / extent / 2                       # ~half a tile pixel
-        pad = s * buffer_px / extent
+        pad = s * buffer_px / 512                  # buffer_px in px of a 512 px tile (was units: 10 px, a wide road lost its casing)
         cells = {}                                 # (x, y) -> {layer_name: [feature rows]}
         for lname, lfeats, from_zoom in lines:
             if z < from_zoom:
@@ -222,7 +222,8 @@ def build_pmtiles(fc: dict, *, keep: set, layers: list | None = None,
                 if g.is_empty or g.length < tol:
                     continue
                 gb = g.bounds
-                x0, x1, y0, y1 = _tile_range(b, z)
+                # the tiles whose buffer the box touches: a road out of a tile whose stroke reaches into it is in the tile
+                x0, x1, y0, y1 = _tile_range((b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad), z)
                 for tx in range(x0, x1 + 1):
                     for ty in range(y0, y1 + 1):
                         tb = _tile_bounds(z, tx, ty)

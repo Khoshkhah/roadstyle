@@ -29,6 +29,8 @@ pub struct TileOptions {
 /// The tile settings and the column names that stage 1 writes into a saved style: `{"minzoom", "maxzoom", "buffer_px", "extent"}` and
 /// `{"class", "filter", "width"}`.
 pub const TILES: &str = "roadstyle:tiles";
+/// The size of a vector tile on the screen (MapLibre's tileSize of a vector source), in px.
+pub const TILE_PX: f64 = 512.0;
 pub const COLUMNS: &str = "roadstyle:columns";
 
 impl TileOptions {
@@ -55,6 +57,14 @@ impl TileOptions {
             return Err(Error::Options(format!("the style has no {TILES}: give the tile settings")));
         }
         TileOptions::new(layers, m, &m[TILES], &m[COLUMNS], keep)
+    }
+
+    /// The empty tiles of these rules: their zooms, and `buffer_px` as tile units (MapLibre draws a vector tile at 512 px, so a pixel
+    /// is EXTENT / 512 units). A road whose line is out of a tile but whose stroke reaches into it is then in that tile: each tile is
+    /// drawn only inside its own edges, and with the buffer as 80 units (10 px) a primary road near a tile edge lost its casing in the
+    /// next tile from the tiles' last zoom on (Burnaby, z19.6, 2026-10-27).
+    pub fn tiles(&self) -> Result<crate::Tiles, Error> {
+        crate::Tiles::new(self.min_zoom, self.max_zoom, self.buffer_px * crate::EXTENT / TILE_PX)
     }
 
     /// The source goes into the tiles.

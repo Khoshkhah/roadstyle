@@ -71,25 +71,25 @@
     "z12": {
       "roads": {
         "tiles": 7,
-        "features": 65366,
-        "hash": "ae66ba6528f11eca"
+        "features": 112570,
+        "hash": "4ae73b5123ac09f0"
       },
       "simple": {
         "tiles": 6,
-        "features": 9212,
-        "hash": "91a3d96918dd93af"
+        "features": 15456,
+        "hash": "7a33670c209051ec"
       }
     },
     "z14": {
       "roads": {
         "tiles": 9,
-        "features": 27606,
-        "hash": "2e38530da73218f9"
+        "features": 46940,
+        "hash": "0e4acd4da7a01d53"
       },
       "simple": {
         "tiles": 9,
-        "features": 15665,
-        "hash": "bbe4864718597ce4"
+        "features": 26059,
+        "hash": "2d8e93ca503981c8"
       },
       "slots": {
         "tiles": 9,
@@ -100,13 +100,13 @@
     "z15": {
       "roads": {
         "tiles": 9,
-        "features": 7011,
-        "hash": "ec2d7f29f20174e2"
+        "features": 11889,
+        "hash": "0a0abeaa5943ca5a"
       },
       "simple": {
         "tiles": 9,
-        "features": 11594,
-        "hash": "6b8a11863cbb86a9"
+        "features": 20062,
+        "hash": "6cd8a4c080006eff"
       },
       "slots": {
         "tiles": 9,

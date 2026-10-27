@@ -352,7 +352,7 @@ impl Tiles {
     /// The features of the layer `name` that the tile z/x/y has and that wait (`add_waiting`): each feature's place and tag.
     pub fn waiting(&self, name: &str, z: u32, x: u32, y: u32) -> Vec<(u32, u64)> {
         let Some(layer) = self.layers.get(name).filter(|l| l.at.is_some() && z >= self.min_zoom && z <= self.max_zoom && z >= l.min_zoom) else { return Vec::new() };
-        layer.hits(z, x, y).into_iter().filter_map(|i| layer.feats[i as usize].wait.map(|(_, tag)| (i, tag))).collect()
+        layer.hits(z, x, y, self.pad(layer)).into_iter().filter_map(|i| layer.feats[i as usize].wait.map(|(_, tag)| (i, tag))).collect()
     }
 
     /// Give waiting features of the layer `name` their line and properties (`keep`, `whole`: add_waiting's): each as (place, line,
@@ -505,10 +505,15 @@ impl Tiles {
         out
     }
 
+    /// The buffer round a tile of `layer`, in tile units: none for a whole layer (its features go whole into the tiles they touch).
+    fn pad(&self, layer: &Layer) -> f64 {
+        if layer.whole { 0.0 } else { self.buffer }
+    }
+
     fn layer_tile(&self, name: &str, layer: &Layer, z: u32, x: u32, y: u32) -> Vec<u8> {
         let n = (1u64 << z) as f64;
-        let buffer = if layer.whole { 0.0 } else { self.buffer };
-        let hits = layer.hits(z, x, y);
+        let buffer = self.pad(layer);
+        let hits = layer.hits(z, x, y, buffer);
         // the tile's own units: (merc * 2^z - x) * EXTENT
         let to = |p: &P| [(p[0] * n - x as f64) * EXTENT, (p[1] * n - y as f64) * EXTENT];
         let (lo, hi) = (-buffer, EXTENT + buffer);
@@ -569,13 +574,14 @@ impl Tiles {
 }
 
 impl Layer {
-    /// The features in the tile z/x/y (of the trees of zoom z or less), in the order of the source: the drawing order of features in
-    /// one layer.
-    fn hits(&self, z: u32, x: u32, y: u32) -> Vec<u32> {
+    /// The features in the tile z/x/y and its buffer (`buffer`, tile units) (of the trees of zoom z or less), in the order of the
+    /// source: the drawing order of features in one layer. A feature out of the tile whose box is in the buffer is in the tile: its
+    /// stroke can reach into it (tiles.py took only the features whose box touches the tile).
+    fn hits(&self, z: u32, x: u32, y: u32, buffer: f64) -> Vec<u32> {
         let n = (1u64 << z) as f64;
-        let (x0, y0) = (x as f64 / n, y as f64 / n);
-        // tiles.py: a feature is in the tiles its box touches; the buffer is for the clipping only
-        let tile = AABB::from_corners([x0, y0], [x0 + 1.0 / n, y0 + 1.0 / n]);
+        let b = buffer / EXTENT;
+        let (x0, y0) = ((x as f64 - b) / n, (y as f64 - b) / n);
+        let tile = AABB::from_corners([x0, y0], [x0 + (1.0 + 2.0 * b) / n, y0 + (1.0 + 2.0 * b) / n]);
         let trees = self.trees.iter().take_while(|t| t.first <= z);
         let mut hits: Vec<u32> = trees.flat_map(|t| t.get().locate_in_envelope_intersecting(&tile)).map(|h| h.data).collect();
         hits.sort_unstable();
@@ -1074,6 +1080,23 @@ mod tests {
             t.tile(z, (x * n) as u32, (y * n) as u32)
         };
         assert!(at(13).is_empty() && at(16).is_empty() && !at(14).is_empty() && !at(15).is_empty());
+    }
+
+    #[test]
+    fn the_buffer_is_in_pixels() {
+        // a road 40 px above tile 18/41536/89738 (Burnaby): its stroke reaches into the tile, so the tile has it (buffer_px 80); with
+        // the buffer as 80 units (10 px) the tile had none, and the road's casing was missing in the tile (each tile is drawn inside
+        // its own edges only)
+        let o = stage::TileOptions::new(&[], &json!({}), &json!({"minzoom": 0, "maxzoom": 18, "buffer_px": 80, "extent": 4096}), &json!({}), &[]).unwrap();
+        let mut t = o.tiles().unwrap();
+        let n = (1u64 << 18) as f64;
+        let at = |x: f64, y: f64| [x / n * 360.0 - 180.0, (std::f64::consts::PI * (1.0 - 2.0 * y / n)).sinh().atan().to_degrees()];
+        let y = 89738.0 - 40.0 / 512.0;
+        t.add("roads", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {},
+            "geometry": {"type": "LineString", "coordinates": [at(41536.1, y), at(41536.9, y)]}}]}}), &keys(&[]), false, 0);
+        assert!(!t.tile(18, 41536, 89737).is_empty());
+        assert!(!t.tile(18, 41536, 89738).is_empty(), "the road 40 px out of the tile is in it");
+        assert!(t.tile(18, 41536, 89739).is_empty(), "and not in the tile after it");
     }
 
     #[test]
