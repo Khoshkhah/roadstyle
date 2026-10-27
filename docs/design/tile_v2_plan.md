@@ -157,7 +157,7 @@ hash and the generation. A page that gets another contract gives an error.
 - **A coarser grid at low zooms** (rule 8): geometry is 11 to 18 % of the bytes.
 - **Only the active colour option in the tiles**: no area with more than one option was measured.
 - **A ramp colour as a palette index**: no measurement; it changes colours by up to 1/256 of the ramp.
-- **A line merge at low zooms** (as OpenMapTiles): the pieces of a road differ in `d`, so few would merge.
+- **A line merge at low zooms** (as OpenMapTiles): the pieces of a road differ in `d`, so few pieces merge.
 
 ## Decisions for Kaveh
 
