@@ -1536,7 +1536,7 @@ def _width_keys(paint, stride):
     """Phase 1 of docs/design/tile_contract.md (roadstyle-engine width_key.rs): the road layer's ``line-width`` and ``line-offset`` (an
     ``interpolate`` on the zoom of ``["*", E, factor]``) as one table for each stop, read by ``__rs_wk``. True, and ``paint`` changed; False, and
     ``paint`` as it was, when an expression has another shape, reads another key, gives no number, or gives two numbers inside one mode."""
-    from .tiles import _known, _ev
+    from .tiles import _ev, _known
 
     def stops(e):
         if not (isinstance(e, list) and len(e) >= 5 and e[0] == "interpolate" and e[2] == ["zoom"]):
