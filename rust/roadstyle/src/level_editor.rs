@@ -25,6 +25,9 @@ const HEAD_M: f64 = 5.0;
 /// A road's ends as drawn: the head lengths, the caps, and yours (heads, caps; "" = not set), each [start, end] in the road's way.
 pub type Ends = ([f64; 2], [String; 2], [String; 2], [String; 2]);
 
+/// Your heads or caps (heads.csv, caps.csv) of each road that has one, by its place: [start, end] in its own way ("" = not set).
+type OwnEnds = HashMap<usize, [String; 2]>;
+
 pub struct Editor {
     pub area: Area,
     /// the last answer, for the local re-solve
@@ -113,107 +116,194 @@ impl Editor {
     /// What the panel shows of each road, a list in the roads' order (level_editor.Area.facts): its names and class, its look, its length in metres, its
     /// directions with their own edge_ref, lanes and modes, and how many of its edges cars may drive.
     pub fn facts(&self) -> String {
-        let mut out = Vec::new();
-        for (i, r) in self.roads().iter().enumerate() {
-            let c = &self.cols[i];
-            let get = |k: &str| {
-                c.get(k)
-                    .filter(|v| !v.is_null())
-                    .map(text)
-                    .unwrap_or_default()
-            };
-            let opt = |s: String| {
-                if s.is_empty() {
-                    Value::Null
-                } else {
-                    Value::String(s)
-                }
-            }; // a missing value is null, as Python's _txt
-            let mut directions = Vec::new();
-            for (k, (way, ids)) in [("along", &r.edges), ("against", &r.reversed)]
-                .into_iter()
-                .enumerate()
-            {
-                for (j, e) in ids.iter().enumerate() {
-                    let at = |name: &str| {
-                        self.own[i][k]
-                            .get(name)
-                            .and_then(|v| v.get(j))
-                            .filter(|v| !v.is_null())
-                            .map(text)
-                            .unwrap_or_default()
-                    };
-                    let edge_ref = match self.own[i][k].get("edge_ref") {
-                        Some(_) => at("edge_ref"),
-                        None if *e == r.id => get("edge_ref"),
-                        None => String::new(),
-                    };
-                    directions.push(json!({"edge": e.to_string(), "edge_ref": opt(edge_ref), "way": way, "lanes": opt(at("lanes")), "modes": opt(at("modes"))}));
-                }
+        Value::Array((0..self.roads().len()).map(|i| self.fact(i)).collect()).to_string()
+    }
+
+    /// What the panel shows of the road `i` (`facts`).
+    fn fact(&self, i: usize) -> Value {
+        let r = &self.roads()[i];
+        let c = &self.cols[i];
+        let get = |k: &str| {
+            c.get(k)
+                .filter(|v| !v.is_null())
+                .map(text)
+                .unwrap_or_default()
+        };
+        let opt = |s: String| {
+            if s.is_empty() {
+                Value::Null
+            } else {
+                Value::String(s)
             }
-            let flag = |name: &str| {
-                (0..2)
-                    .flat_map(|k| {
-                        self.own[i][k]
-                            .get(name)
-                            .and_then(Value::as_array)
-                            .cloned()
-                            .unwrap_or_default()
-                    })
-                    .collect::<Vec<_>>()
-            };
-            let yes = |v: &Value| v.is_null() || v.as_bool().unwrap_or(true);
-            let driving = flag("driving").iter().filter(|v| yes(v)).count();
-            let two_way = !r.reversed.is_empty() && flag("directed").iter().all(yes);
-            let truthy = |k: &str| !matches!(get(k).as_str(), "" | "no" | "false" | "0");
-            out.push(json!({
-                "road": r.id.to_string(), "name": opt(get("name")), "highway": opt(get("highway")), "edge_ref": opt(get("edge_ref")), "lanes": opt(get("lanes")),
-                "modes": opt(get("modes")), "bus_lines": opt(get("bus_lines")), "band": c.get("band").cloned().unwrap_or(Value::Null),
-                "priority": c.get("priority").cloned().unwrap_or(Value::Null), "edges": driving, "two_way": two_way,
-                "length_m": (metres(&self.lines[i]) * 10.0).round() / 10.0, "directions": directions,
-                "look": if truthy("tunnel") { "tunnel" } else if truthy("bridge") { "bridge" } else { "ground" },
-                "width_px": Value::Null,
-            }));
+        }; // a missing value is null, as Python's _txt
+        let mut directions = Vec::new();
+        for (k, (way, ids)) in [("along", &r.edges), ("against", &r.reversed)]
+            .into_iter()
+            .enumerate()
+        {
+            for (j, e) in ids.iter().enumerate() {
+                let at = |name: &str| {
+                    self.own[i][k]
+                        .get(name)
+                        .and_then(|v| v.get(j))
+                        .filter(|v| !v.is_null())
+                        .map(text)
+                        .unwrap_or_default()
+                };
+                let edge_ref = match self.own[i][k].get("edge_ref") {
+                    Some(_) => at("edge_ref"),
+                    None if *e == r.id => get("edge_ref"),
+                    None => String::new(),
+                };
+                directions.push(json!({"edge": e.to_string(), "edge_ref": opt(edge_ref), "way": way, "lanes": opt(at("lanes")), "modes": opt(at("modes"))}));
+            }
         }
+        let flag = |name: &str| {
+            (0..2)
+                .flat_map(|k| {
+                    self.own[i][k]
+                        .get(name)
+                        .and_then(Value::as_array)
+                        .cloned()
+                        .unwrap_or_default()
+                })
+                .collect::<Vec<_>>()
+        };
+        let yes = |v: &Value| v.is_null() || v.as_bool().unwrap_or(true);
+        let driving = flag("driving").iter().filter(|v| yes(v)).count();
+        let two_way = !r.reversed.is_empty() && flag("directed").iter().all(yes);
+        let truthy = |k: &str| !matches!(get(k).as_str(), "" | "no" | "false" | "0");
+        json!({
+            "road": r.id.to_string(), "name": opt(get("name")), "highway": opt(get("highway")), "edge_ref": opt(get("edge_ref")), "lanes": opt(get("lanes")),
+            "modes": opt(get("modes")), "bus_lines": opt(get("bus_lines")), "band": c.get("band").cloned().unwrap_or(Value::Null),
+            "priority": c.get("priority").cloned().unwrap_or(Value::Null), "edges": driving, "two_way": two_way,
+            "length_m": (metres(&self.lines[i]) * 10.0).round() / 10.0, "directions": directions,
+            "look": if truthy("tunnel") { "tunnel" } else if truthy("bridge") { "bridge" } else { "ground" },
+            "width_px": Value::Null,
+        })
+    }
+
+    /// The road ids, in the roads' order.
+    pub fn road_ids(&self) -> Vec<String> {
+        self.roads().iter().map(|r| r.id.to_string()).collect()
+    }
+
+    /// The road of each id (any edge id or road id; "" when it names none).
+    pub fn road_of(&self, ids: &[String]) -> Vec<String> {
+        ids.iter().map(|x| id(x).ok().and_then(|e| self.area.road_of(e)).map_or(String::new(), |i| self.roads()[i].id.to_string())).collect()
+    }
+
+    /// What the panel shows of the roads of `ids` (any edge id or road id; one that names none is left out), as `facts` gives each, with
+    /// its place in the roads' order (`i`) and its ends (`ends` with your heads.csv and caps.csv): `heads` as drawn, `heads_own` (true:
+    /// yours), `caps` (yours, "" = not set), and the defaults `heads_auto`, `caps_auto`. JSON text, a list in the order of `ids`.
+    pub fn facts_of(&self, ids: &[String], heads: &str, caps: &str) -> Result<String, crate::Error> {
+        let own = (self.own_ends(heads, ("start_m", "end_m"))?, self.own_ends(caps, ("start", "end"))?);
+        let none = (HashMap::new(), HashMap::new());
+        let mut seen = HashSet::new();
+        let out: Vec<Value> = ids.iter().filter_map(|x| id(x).ok().and_then(|e| self.area.road_of(e))).filter(|i| seen.insert(*i)).map(|i| {
+            let ((h, _, oh, oc), (ha, ca, _, _)) = (self.end_of(i, &own), self.end_of(i, &none));
+            let mut f = self.fact(i);
+            for (k, v) in [("i", json!(i)), ("heads", json!(h)), ("heads_own", json!(oh.map(|x| !x.is_empty()))), ("caps", json!(oc)),
+                           ("heads_auto", json!(ha)), ("caps_auto", json!(ca))] {
+                f[k] = v;
+            }
+            f
+        }).collect();
+        Ok(Value::Array(out).to_string())
+    }
+
+    /// Your heads and caps (heads.csv, caps.csv) of each road that has one: {road id: [[head start, head end], [cap start, cap end]]}
+    /// ("" = not set), in the road's own way. JSON text.
+    pub fn own_ends_json(&self, heads: &str, caps: &str) -> Result<String, crate::Error> {
+        let (h, c) = (self.own_ends(heads, ("start_m", "end_m"))?, self.own_ends(caps, ("start", "end"))?);
+        let none = [String::new(), String::new()];
+        let out: Map<String, Value> = h.keys().chain(c.keys()).map(|&i| {
+            (self.roads()[i].id.to_string(), json!([h.get(&i).unwrap_or(&none), c.get(&i).unwrap_or(&none)]))
+        }).collect();
+        Ok(Value::Object(out).to_string())
+    }
+
+    /// The roads whose edge_ref, or an edge's, has `q` in it (case not counted): [[road id, its edge_ref (null: none), one of them is
+    /// `q`]], in the roads' order (the page sorts them). JSON text.
+    pub fn find(&self, q: &str) -> String {
+        let low = q.trim().to_lowercase();
+        let out: Vec<Value> = (0..self.roads().len()).filter_map(|i| {
+            let f = self.fact(i);
+            let refs: Vec<String> = std::iter::once(&f["edge_ref"]).chain(f["directions"].as_array().into_iter().flatten().map(|d| &d["edge_ref"]))
+                .filter_map(Value::as_str).filter(|x| !x.is_empty()).map(str::to_lowercase).collect();
+            refs.iter().any(|x| x.contains(&low)).then(|| json!([f["road"], f["edge_ref"], refs.contains(&low)]))
+        }).collect();
         Value::Array(out).to_string()
+    }
+
+    /// The 4 numbers of each road (its own way) from a levels.csv text (one row for each edge, levels_csv's columns): of its first edge,
+    /// else of its first edge the other way (the start and end numbers swapped). None when a road has neither.
+    pub fn levels_of(&self, csv: &str) -> Option<Vec<i32>> {
+        let mut lines = csv.lines().filter(|l| !l.trim().is_empty());
+        let head: Vec<&str> = lines.next()?.split(',').map(str::trim).collect();
+        let cols: Vec<usize> = ["edge", "casing_start", "casing_level", "casing_end", "fill_level"].iter()
+            .map(|n| head.iter().position(|h| h == n)).collect::<Option<_>>()?;
+        // a number as the page reads it (JavaScript's +text, then a 32-bit integer: "" is 0, not a number 0)
+        let num = |t: &str| { let t = t.trim(); if t.is_empty() { 0 } else { t.parse::<f64>().map_or(0, |v| v as i32) } };
+        let mut at: HashMap<&str, [i32; 4]> = HashMap::new();
+        for l in lines {
+            let f: Vec<&str> = l.split(',').collect();
+            let get = |k: usize| f.get(cols[k]).copied().unwrap_or("");
+            at.insert(get(0).trim(), [1, 2, 3, 4].map(|k| num(get(k))));
+        }
+        let mut out = Vec::with_capacity(4 * self.roads().len());
+        for r in self.roads() {
+            let edge = |ids: &[i64]| ids.first().and_then(|e| at.get(e.to_string().as_str()));
+            out.extend(match (edge(&r.edges), edge(&r.reversed)) {
+                (Some(l), _) => *l,
+                (None, Some(&[s, m, e, f])) => [e, m, s, f],
+                _ => return None,
+            });
+        }
+        Some(out)
+    }
+
+    /// The area's edge_hash (roadstyle_levels::edge_hash of every edge both ways), as the host's levels name it.
+    pub fn edge_hash(&self) -> String {
+        roadstyle_levels::edge_hash(&self.roads().iter().flat_map(|r| r.edges.iter().chain(&r.reversed).copied()).collect::<Vec<_>>())
     }
 
     /// Each road end as drawn (level_area.ends): your heads.csv and caps.csv (a row may name any edge of a road) over the defaults (5 m
     /// heads; round caps, square at a two-way road's dead end). Per road: `[head_start_m, head_end_m]`, `[cap_start, cap_end]`, and
     /// yours (`""`: not set), in the road's own way.
     pub fn ends(&self, heads: &str, caps: &str) -> Result<Vec<Ends>, crate::Error> {
-        let own_h = self.own_ends(heads, ("start_m", "end_m"))?;
-        let own_c = self.own_ends(caps, ("start", "end"))?;
-        Ok((0..self.roads().len())
-            .map(|i| {
-                let auto_cap = |end: usize| {
-                    if self.dead_square.contains(&(i, end)) {
-                        "square"
-                    } else {
-                        "round"
-                    }
-                    .to_string()
-                };
-                let h = own_h.get(&i).cloned().unwrap_or_default();
-                let c = own_c.get(&i).cloned().unwrap_or_default();
-                let len = metres(&self.lines[i]);
-                let (mut hs, mut he) = (
-                    h[0].parse().unwrap_or(HEAD_M),
-                    h[1].parse().unwrap_or(HEAD_M),
-                );
-                if hs + he > len && len > 0.0 {
-                    (hs, he) = (len * hs / (hs + he), len * he / (hs + he));
-                }
-                let drawn = [0, 1].map(|e| {
-                    if c[e].is_empty() {
-                        auto_cap(e)
-                    } else {
-                        c[e].clone()
-                    }
-                });
-                ([hs, he], drawn, h, c)
-            })
-            .collect())
+        let own = (self.own_ends(heads, ("start_m", "end_m"))?, self.own_ends(caps, ("start", "end"))?);
+        Ok((0..self.roads().len()).map(|i| self.end_of(i, &own)).collect())
+    }
+
+    /// The ends of the road `i` (`ends`) with your heads and caps `own` (`own_ends` of heads.csv and caps.csv).
+    fn end_of(&self, i: usize, (own_h, own_c): &(OwnEnds, OwnEnds)) -> Ends {
+        let auto_cap = |end: usize| {
+            if self.dead_square.contains(&(i, end)) {
+                "square"
+            } else {
+                "round"
+            }
+            .to_string()
+        };
+        let h = own_h.get(&i).cloned().unwrap_or_default();
+        let c = own_c.get(&i).cloned().unwrap_or_default();
+        let len = metres(&self.lines[i]);
+        let (mut hs, mut he) = (
+            h[0].parse().unwrap_or(HEAD_M),
+            h[1].parse().unwrap_or(HEAD_M),
+        );
+        if hs + he > len && len > 0.0 {
+            (hs, he) = (len * hs / (hs + he), len * he / (hs + he));
+        }
+        let drawn = [0, 1].map(|e| {
+            if c[e].is_empty() {
+                auto_cap(e)
+            } else {
+                c[e].clone()
+            }
+        });
+        ([hs, he], drawn, h, c)
     }
 
     /// `ends` as JSON text, a list in the roads' order: `{"heads", "caps", "heads_own", "caps_own"}`.

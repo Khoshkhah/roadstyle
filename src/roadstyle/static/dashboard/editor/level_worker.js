@@ -1,7 +1,7 @@
 // The level editor's engine in a Web Worker (level_editor.js), so that the page does not stop while it solves, makes the map (the map's
 // table, stage 1, stage 2) or cuts a tile: it keeps the area (roadstyle-wasm's LevelArea) and the tiles of the last map. The calls
-// (worker/call.js): init (the package's URL and the map's look), open, ends, solve, solveLocal, startFrom, check, levelsCsv, draw, build
-// and tile.
+// (worker/call.js): init (the package's URL and the map's look), open, roadOf, facts, ownEnds, find, levelsOf, edgeHash, solve,
+// solveLocal, startFrom, check, levelsCsv, draw, build and tile.
 import {answer} from "../worker/call.js";
 
 let pkg = null, area = null, look = null, tiler = null, gen = 0;
@@ -16,9 +16,15 @@ answer({
   },
   open({roads, pairs}){
     area = new pkg.LevelArea(new Uint8Array(roads), pairs);
-    return {facts: area.facts(), auto: area.ends("", "")};
+    return {roads: area.roadIds()};
   },
-  ends: ({heads, caps}) => ({ends: area.ends(heads, caps)}),
+  // what the panel shows of some roads, when it asks (LevelArea's factsOf, roadOf, ownEnds, find)
+  roadOf: ({ids}) => ({roads: area.roadOf(ids)}),
+  facts: ({ids, heads, caps}) => ({facts: area.factsOf(ids, heads, caps)}),
+  ownEnds: ({heads, caps}) => ({ends: area.ownEnds(heads, caps)}),
+  find: ({q}) => ({hits: area.find(q)}),
+  levelsOf: ({csv}) => ({levels: area.levelsOf(csv) ?? null}),
+  edgeHash: () => ({hash: area.edgeHash()}),
   solve: ({edits}) => ({answer: area.solve(edits)}),
   solveLocal: ({edits, changed}) => ({answer: area.solveLocal(edits, changed)}),
   startFrom({levels, parts, orders, near, crossings}){ area.startFrom(i32(levels), parts, orders, near, crossings); },

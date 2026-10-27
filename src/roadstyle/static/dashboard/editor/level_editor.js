@@ -134,13 +134,21 @@ const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", 
   .map(b => b.toString(16).padStart(2, "0")).join("");
 const areaKey = `${await sha(roadsBytes)}:${await sha(pairsF.body)}`;
 const inputsKey = async edits => `${areaKey}:${await sha(edits)}`;
-const opened = await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer]);
-const pairs = csvRows(pairsF.body);
-const order = JSON.parse(opened.facts);                          // each road, in the roads' order
-const facts = Object.fromEntries(order.map(f => [f.road, f]));
-const roadOf = {};                                               // any edge id -> its road id
-for(const f of order){ roadOf[f.road] = f.road; for(const d of f.directions) roadOf[d.edge] = f.road; }
-const autoEnds = JSON.parse(opened.auto);                        // the ends with none of yours: the default caps and heads
+const order = (await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer])).roads;   // the road ids, in the roads' order
+// pairs.csv's lines: the panel's found rules of a road come from them when it asks (relations); the open does not parse them
+const pairLines = pairsF.body.split(/\r?\n/).filter(l => l.trim());
+// what the page knows of the roads, asked from the worker when the panel needs them (need): any edge id -> its road id, and a road's
+// facts (with its levels and ends). A new answer clears the facts.
+const roadOf = Object.fromEntries(order.map(r => [r, r]));
+let facts = {};
+async function need(ids){
+  ids = [...new Set(ids.filter(x => x != null && x !== "").map(String))];
+  const miss = ids.filter(x => !(x in roadOf));
+  if(miss.length){ const rs_ = (await call({type: "roadOf", ids: miss})).roads; miss.forEach((x, i) => { if(rs_[i]) roadOf[x] = rs_[i]; }); }
+  const roads = [...new Set(ids.map(x => roadOf[x]).filter(r => r != null && !(r in facts)))];
+  if(!roads.length) return;
+  for(const f of JSON.parse((await call({type: "facts", ids: roads, heads: headsText, caps: capsText})).facts)) facts[f.road] = {...f, levels: res.levels[f.i]};
+}
 let editsText = editsF ? editsF.body : EMPTY, headsText = headsF ? headsF.body : "", capsText = capsF ? capsF.body : "";
 const SAVED = "lv-saved:" + (store.key || location.pathname);    // the edits saved before this session (the Python server keeps it)
 let saved = +(sessionStorage.getItem(SAVED) ?? csvRows(editsText).length);
@@ -148,22 +156,16 @@ let res = null;                                                  // the last ans
 let lastCsv = null;                                              // levels.csv of `res` as save wrote it (host: the rows before an apply)
 
 // --- the answer to start from: levels.csv when it was solved for these inputs (inputsKey) and has every edge, else a solve
-// each road's 4 numbers in its own way from a levels.csv text (one row for each edge), or null when an edge of the area has none
-function levelsOf(text){
-  const at = Object.fromEntries(csvRows(text).map(r => [r.edge, [+r.casing_start, +r.casing_level, +r.casing_end, +r.fill_level]]));
-  const levels = [];
-  for(const f of order){
-    const fw = f.directions.find(d => d.way === "along"), bw = f.directions.find(d => d.way === "against");
-    if(fw && at[fw.edge]) levels.push(at[fw.edge]);
-    else if(bw && at[bw.edge]){ const [s, m, e, fl] = at[bw.edge]; levels.push([e, m, s, fl]); }      // only the other way: its heads swapped
-    else return null;
-  }
-  return levels;
+// each road's 4 numbers in its own way from a levels.csv text (one row for each edge; only the other way: its heads swapped), or null
+// when a road of the area has none
+async function levelsOf(text){
+  const l = (await call({type: "levelsOf", csv: text})).levels;
+  return l ? order.map((_, i) => Array.from(l.subarray(4 * i, 4 * i + 4))) : null;
 }
 async function fromStored(){
   if(!levelsF || !infoF) return null;
   if(JSON.parse(infoF.body).inputs !== await inputsKey(editsText)) return null;
-  const levels = levelsOf(levelsF.body);
+  const levels = await levelsOf(levelsF.body);
   if(!levels) return null;
   const info = JSON.parse(infoF.body);
   await call({type: "startFrom", levels: levels.flat(), parts: (info.given_up_parts || []).map(p => p.join("|")), orders: (info.orders_not_kept || []).length,
@@ -188,20 +190,16 @@ async function save(newRes){                                       // levels.csv
 // edges (roadstyle's edge_hash: sha256 of the sorted edge ids, 8 bytes each, little endian; the first 32 hex characters) and have one
 // row for each; else the whole area is solved and the answer says why (resolve.why). The rules that they do not keep are not known
 // without a solve: the counts of the pairs come from pairs.csv, the order wishes and near rules not kept are null.
-async function edgeHash(){
-  const ids = order.flatMap(f => f.directions.map(d => BigInt(d.edge))).sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
-  const b = new DataView(new ArrayBuffer(ids.length * 8));
-  ids.forEach((v, i) => b.setBigInt64(i * 8, v, true));
-  return (await sha(b.buffer)).slice(0, 32);
-}
+const edgeHash = async () => (await call({type: "edgeHash"})).hash;
 let givenWhy = null;
 async function fromGiven(){
   if(!given) return null;
   if(given.edge_hash !== await edgeHash()){ givenWhy = "the map's levels are for other edges (edge_hash): solved the whole area"; return null; }
-  const levels = levelsOf(given.csv);
+  const levels = await levelsOf(given.csv);
   if(!levels){ givenWhy = "the map's levels have no row for some edges of the area: solved the whole area"; return null; }
   await call({type: "startFrom", levels: levels.flat(), parts: [], orders: 0, near: 0, crossings: 0});
-  const n = rel => pairs.filter(r => r.relation === rel).length;
+  const at = pairLines[0].split(",").indexOf("relation");
+  const n = rel => pairLines.reduce((k, l, i) => k + (i > 0 && l.split(",")[at] === rel), 0);
   return {levels, given_up: [], given_up_parts: [], near: [], orders_not_kept: [],
     info: {pairs: n("stack"), meets: n("meet"), order_pairs: n("order"), order_violations: null, near_warnings: null}, resolve: {how: "given"}};
 }
@@ -213,14 +211,6 @@ if(!res){
   try { await save(res); } catch(e){ console.warn(e.message); }
 }
 
-// --- what the panel shows: each road's numbers and ends
-const endsNow = async () => JSON.parse((await call({type: "ends", heads: headsText, caps: capsText})).ends);
-async function setFacts(){
-  const ends = await endsNow();
-  order.forEach((f, i) => Object.assign(f, {levels: res.levels[i], heads: ends[i].heads, heads_auto: autoEnds[i].heads,
-    heads_own: ends[i].heads_own.map(Boolean), caps: ends[i].caps_own, caps_auto: autoEnds[i].caps}));
-}
-await setFacts();
 const stats = () => ({area: store.name || "area", roads: order.length,
   ...res.info, given_up: res.given_up});
 
@@ -247,20 +237,21 @@ const mine = {layers: [], sources: [], images: []};              // what the edi
 const taken = {layers: [], sources: {}, order: [], style: null};  // the host's roads that the editor took off, for destroy
 let rs = dashboard, showRoads = null;
 // host: each row of the host's road table gets its road and its line's ends (the panel's end marks), again when the host gives a new table
-function addFields(){
+async function addFields(){
   const t = window.RS_SIDE, col = host.edgeIdCol || "edge_id";
   if(!t || !t.props) throw new Error("level editor: the host has no road table (window.RS_SIDE)");
   if(t.lvFields) return;
   t.lvFields = true;
+  const roads = (await call({type: "roadOf", ids: t.props.map(p => p ? String(p[col]) : "")})).roads;
   t.props.forEach((p, i) => {
-    const r = p && roadOf[String(p[col])], c = t.lines && t.lines[i];
-    if(r == null) return;
+    const r = p && roads[i], c = t.lines && t.lines[i];
+    if(!r) return;
     p.road = r;
     if(c && c.length){ [p.s_lon, p.s_lat] = c[0]; [p.e_lon, p.e_lat] = c[c.length - 1]; }
   });
 }
 if(host){                                                        // the host's map and pick stay as they are
-  addFields();
+  await addFields();
   window.map = map;
 } else {
   const style = await build();
@@ -330,32 +321,45 @@ function say(r){
   return txt + (r.own ? " · yours" : "enabled" in r ? "" : " · found");
 }
 const editRows = () => csvRows(editsText).map(r => Object.fromEntries(COLS.map(c => [c, r[c] ?? ""])));
-function rows(){
-  return editRows().map((r, i) => ({...r, index: i, section: i < saved ? "saved" : "new", ra: roadOf[r.a] ?? r.a, rb: roadOf[r.b] ?? r.b}));
+async function rows(){
+  const e = editRows();
+  await need(e.flatMap(r => [r.a, r.b]));
+  return e.map((r, i) => ({...r, index: i, section: i < saved ? "saved" : "new", ra: roadOf[r.a] ?? r.a, rb: roadOf[r.b] ?? r.b}));
 }
-const roadsOf = rs_ => Object.fromEntries([...new Set(rs_)].map(x => [x, facts[x] || {road: x}]));
-function relations(a, b){
+async function roadsOf(rs_){
+  const ids = [...new Set(rs_)];
+  await need(ids);
+  return Object.fromEntries(ids.map(x => [x, facts[x] || {road: x}]));
+}
+// the found rules of a road: the lines of pairs.csv that name it, parsed
+const pairsOf = r => csvRows([pairLines[0], ...pairLines.slice(1).filter(l => ("," + l + ",").includes("," + r + ","))].join("\n"));
+async function relations(a, b){
+  await need([a, b]);
   const ra = roadOf[a], rb = b ? roadOf[b] : null;
   if(ra == null || (b && rb == null)) throw new Error("unknown road");
   const mine = (x, y) => (x === ra && (rb == null || y === rb)) || (y === ra && (rb == null || x === rb));
-  const found = pairs.filter(r => mine(r.a, r.b)).map(r => ({...r, section: "found", ra: r.a, rb: r.b}));
-  const edits = rows().filter(r => mine(r.ra, r.rb));
-  return {a: ra, b: rb, rows: found.concat(edits), roads: roadsOf([...found, ...edits].flatMap(r => [r.ra, r.rb]).concat([ra], rb ? [rb] : []))};
+  const found = pairsOf(ra).filter(r => mine(r.a, r.b)).map(r => ({...r, section: "found", ra: r.a, rb: r.b}));
+  const edits = (await rows()).filter(r => mine(r.ra, r.rb));
+  return {a: ra, b: rb, rows: found.concat(edits), roads: await roadsOf([...found, ...edits].flatMap(r => [r.ra, r.rb]).concat([ra], rb ? [rb] : []))};
 }
-function find(q){
+async function find(q){
   q = q.trim(); if(!q) return [];
+  await need([q]);
   if(q in roadOf) return [facts[roadOf[q]]];
-  const low = q.toLowerCase(), refs = f => [f.edge_ref, ...f.directions.map(d => d.edge_ref)].filter(Boolean).map(x => x.toLowerCase());
-  return order.filter(f => refs(f).some(x => x.includes(low)))
-    .sort((x, y) => (!refs(x).includes(low)) - (!refs(y).includes(low)) || String(x.edge_ref).localeCompare(String(y.edge_ref))).slice(0, 20);
+  // the roads whose edge_ref (or an edge's) has q in it: [road, edge_ref, one of them is q]
+  const hits = JSON.parse((await call({type: "find", q})).hits)
+    .sort((x, y) => (!x[2]) - (!y[2]) || String(x[1]).localeCompare(String(y[1]))).slice(0, 20);
+  await need(hits.map(h => h[0]));
+  return hits.map(h => facts[h[0]]);
 }
-function givenUp(){
+async function givenUp(){
+  await need([...res.given_up, ...res.near, ...res.orders_not_kept].flatMap(p => [p[0], p[1]]));
   const row = (u, l, broken) => { const lv = facts[u].levels, under = facts[l].levels[3];
     return {a: u, b: l, levels: lv, b_fill: under, fill_under: lv[3] <= under, parts: broken.filter(p => p[0] === u && p[1] === l).map(p => p[2])}; };
   const rows_ = res.given_up.map(([u, l]) => row(u, l, res.given_up_parts));
   const near = [...new Map(res.near.map(p => [p[0] + "|" + p[1], p])).values()].map(([u, l]) => row(u, l, res.near));
   const wishes = res.orders_not_kept.map(([x, y]) => ({a: x, b: y, fa: facts[x].levels[3], fb: facts[y].levels[3]}));
-  return {rows: rows_, near, wishes, roads: roadsOf([...rows_, ...near, ...wishes].flatMap(r => [r.a, r.b]))};
+  return {rows: rows_, near, wishes, roads: await roadsOf([...rows_, ...near, ...wishes].flatMap(r => [r.a, r.b]))};
 }
 function rowOf(body){                                             // one edit from the page's form, checked (level_editor._row)
   const row = Object.fromEntries(COLS.map(c => [c, String(body[c] ?? "")]));
@@ -370,28 +374,36 @@ function after(ops){                                             // edits.csv af
   return editRows().filter((_, i) => !gone.has(i)).concat(ops.filter(o => o.op === "add").map(o => rowOf(o.body)));
 }
 async function check(rows_, ops = []){
+  await need([...rows_, ...ops.filter(o => o.op === "add").map(o => o.body || {})].flatMap(r => [r.a, r.b]));
   const found = JSON.parse((await call({type: "check", edits: toCsv(after(ops)), rows: toCsv(rows_.map(rowOf))})).conflicts);
+  await need(found.flatMap(([, , w]) => w.flatMap(r => [r.a, r.b])));
   return found.map(([i, why, w]) => ({rule: say(rowOf(rows_[i])), why, with: w.map(r => say({...r, own: false}))}));
 }
 async function apply(ops){
   if(!ops || !ops.length) throw new Error("nothing to apply");
   if(ops.some(o => !["add", "delete", "cap", "head"].includes(o.op))) throw new Error("a change is add, delete, cap or head");
-  const ends = await endsNow(), idx = Object.fromEntries(order.map((f, i) => [f.road, i]));
-  const caps = Object.fromEntries(order.map((f, i) => [f.road, [...ends[i].caps_own]])), heads = Object.fromEntries(order.map((f, i) => [f.road, [...ends[i].heads_own]]));
+  // your heads and caps now (the roads that have one: {road: [heads, caps]}), and those of the roads that the changes name
+  const own = JSON.parse((await call({type: "ownEnds", heads: headsText, caps: capsText})).ends), prev = res;
+  await need(ops.flatMap(o => o.op === "add" ? [o.body?.a, o.body?.b] : [o.road]));
+  const heads = {}, caps = {};
+  for(const [r, [h, c]] of Object.entries(own)){ heads[r] = [...h]; caps[r] = [...c]; }
+  const mine = r => { heads[r] ??= ["", ""]; caps[r] ??= ["", ""]; };
   for(const o of ops){
     const r = roadOf[String(o.road)], k = {start: 0, end: 1}[o.end];
     if(o.op === "cap"){
       const c = o.cap || "";
       if(r == null || k == null || !["", "round", "square", "flat"].includes(c)) throw new Error(`ends: ${o.road} is not a road, ${o.end} not start / end, or ${c} not auto, round, square or flat`);
-      caps[r][k] = c === autoEnds[idx[r]].caps[k] ? "" : c;      // the default shape is not stored
+      mine(r);
+      caps[r][k] = c === facts[r].caps_auto[k] ? "" : c;          // the default shape is not stored
     } else if(o.op === "head"){
       const m = String(o.m ?? "").trim();
       if(r == null || k == null || !(m === "" || +m > 0)) throw new Error(`heads: ${o.road} is not a road, ${o.end} not start / end, or ${m} not a positive number of metres`);
+      mine(r);
       heads[r][k] = m;
     }
   }
   for(const r of new Set(ops.filter(o => o.op === "head").map(o => roadOf[String(o.road)]))){
-    const v = heads[r], [hs, he] = v.map((x, j) => x ? +x : autoEnds[idx[r]].heads[j]);
+    const v = heads[r], [hs, he] = v.map((x, j) => x ? +x : facts[r].heads_auto[j]);
     if(v.every(Boolean) && hs + he > facts[r].length_m + 0.05) throw new Error(`heads of ${name(r)}: ${hs} + ${he} m is more than the road's ${facts[r].length_m} m`);
   }
   const old = editRows(), gone = [...new Set(ops.filter(o => o.op === "delete").map(o => +o.index))];
@@ -409,7 +421,7 @@ async function apply(ops){
   // the roads a change names (level_editor._changed): of the edit rows added or taken out, and those whose heads changed
   const key = r => COLS.map(c => r[c]).join("|"), before = new Set(old.map(key)), now = new Set((newEdits || old).map(key));
   const changed = [...(newEdits || old), ...old].filter(r => before.has(key(r)) !== now.has(key(r))).flatMap(r => [r.a, r.b])
-    .concat(order.filter((f, i) => JSON.stringify(ends[i].heads_own) !== JSON.stringify(heads[f.road])).map(f => f.road));
+    .concat(Object.keys(heads).filter(r => JSON.stringify((own[r] || [["", ""]])[0]) !== JSON.stringify(heads[r])));
   const nextEdits = newEdits ? toCsv(newEdits) : editsText;
   // caps and heads are drawing only (level_editor.py's change, 2026-10-08): only a relation edit is solved, locally (solveLocal)
   let said = headsCsv === headsText ? "not solved again (only caps)" : "not solved again (heads and caps are drawing only)", full = false, next = res;
@@ -429,20 +441,23 @@ async function apply(ops){
   await save(res);
   saved -= gone.filter(i => i < saved).length;
   sessionStorage.setItem(SAVED, String(saved));
-  await setFacts();
+  // the panel's facts again: of the roads that the changes name and of those whose numbers changed
+  facts = {};
+  const shown = await roadsOf(ops.flatMap(o => o.op === "add" ? [o.body.a, o.body.b] : [o.road]).map(x => roadOf[String(x)])
+    .concat(order.filter((r, i) => res.levels[i].some((v, j) => v !== prev.levels[i][j]))).filter(Boolean));
   if(host){                                                        // the host draws the edges whose row of levels.csv changed
     const before = new Set(was.split("\n"));
     const t = performance.now();
     await host.replaceRoads(csvRows(lastCsv.split("\n").filter((l, i) => i === 0 || !before.has(l)).join("\n")));
-    addFields();
+    await addFields();
     said += ` · drawn in ${((performance.now() - t) / 1000).toFixed(1)} s`;
   } else await showRoads(await build());                           // the new map in place: new tiles, the roads style swapped
-  return {ok: true, said, full, redrawn: true, facts, stats: stats()};
+  return {ok: true, said, full, redrawn: true, facts: shown, stats: stats()};
 }
 window.lvApi = async (path, body) => {
   const u = new URL(path, location.href), q = k => u.searchParams.get(k) || "";
   switch(u.pathname){
-    case "/api/edits": { const r = rows(); return {rows: r, roads: roadsOf(r.flatMap(x => [x.ra, x.rb]))}; }
+    case "/api/edits": { const r = await rows(); return {rows: r, roads: await roadsOf(r.flatMap(x => [x.ra, x.rb]))}; }
     case "/api/given_up": return givenUp();
     case "/api/find": return find(q("q"));
     case "/api/relations": return relations(q("a"), q("b") || null);
@@ -566,5 +581,5 @@ function destroy(){
   if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
   delete window.lvColors;
 }
-return Object.assign(events, {map, roads: order, download, destroy, files: Object.keys(files), answer: () => res});
+return Object.assign(events, {map, roads: order, facts: roadsOf, download, destroy, files: Object.keys(files), answer: () => res});
 }

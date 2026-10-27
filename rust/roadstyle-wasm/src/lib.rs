@@ -244,6 +244,40 @@ mod wasm {
         pub fn facts(&self) -> String {
             self.0.facts()
         }
+        /// The road ids, in the roads' order.
+        #[wasm_bindgen(js_name = roadIds)]
+        pub fn road_ids(&self) -> Vec<String> {
+            self.0.road_ids()
+        }
+        /// The road of each id (any edge id or road id; "" when it names none).
+        #[wasm_bindgen(js_name = roadOf)]
+        pub fn road_of(&self, ids: Vec<String>) -> Vec<String> {
+            self.0.road_of(&ids)
+        }
+        /// What the panel shows of the roads of `ids` (any edge or road id), each with its place `i` and its ends (heads.csv, caps.csv).
+        #[wasm_bindgen(js_name = factsOf)]
+        pub fn facts_of(&self, ids: Vec<String>, heads: &str, caps: &str) -> Result<String, JsError> {
+            self.0.facts_of(&ids, heads, caps).map_err(|e| JsError::new(&e.to_string()))
+        }
+        /// Your heads and caps of each road that has one: {road: [[head start, head end], [cap start, cap end]]}.
+        #[wasm_bindgen(js_name = ownEnds)]
+        pub fn own_ends(&self, heads: &str, caps: &str) -> Result<String, JsError> {
+            self.0.own_ends_json(heads, caps).map_err(|e| JsError::new(&e.to_string()))
+        }
+        /// The roads whose edge_ref (or an edge's) has `q` in it: [[road, edge_ref, exact]].
+        pub fn find(&self, q: &str) -> String {
+            self.0.find(q)
+        }
+        /// The 4 numbers of each road from a levels.csv text; undefined when a road has no row.
+        #[wasm_bindgen(js_name = levelsOf)]
+        pub fn levels_of(&self, csv: &str) -> Option<Vec<i32>> {
+            self.0.levels_of(csv)
+        }
+        /// The area's edge_hash (every edge both ways), as the host's levels name it.
+        #[wasm_bindgen(js_name = edgeHash)]
+        pub fn edge_hash(&self) -> String {
+            self.0.edge_hash()
+        }
         /// Each road end as drawn, a list in the roads' order: heads, caps, and yours (heads.csv, caps.csv).
         pub fn ends(&self, heads: &str, caps: &str) -> Result<String, JsError> {
             self.0.ends_json(heads, caps).map_err(|e| JsError::new(&e.to_string()))

@@ -7,6 +7,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **A faster open of the level editor and its map** (2026-10-26): the page asks the worker for a road's facts and ends only when the
+  panel needs them (LevelArea `factsOf`, `roadOf`, `ownEnds`, `find`, `levelsOf`, `edgeHash`), not for every road at the open, and it
+  does not parse pairs.csv at the open. `editor.roads` is now the road ids; `editor.facts(ids)` gives the facts. Burnaby (76,189 roads)
+  in Node: 3.8 s to 1.2 s (rust/roadstyle-wasm/bench_editor.mjs). `new LiveMap` makes each piece's properties when a tile first shows
+  it, and each zoom's tree when a tile first reads it (`Tiles::add_waiting`, `waiting`, `make`); the tiles have the same bytes. Tartu in
+  Node: `new LiveMap` 919 ms to 336 ms (rust/roadstyle-wasm/bench_live.mjs).
 - **A fast redraw of new levels** (2026-10-26): `roadstyle::relevel::LiveTiles` (wasm: `new LiveMap(sources, look, prefix, keep)`,
   `relevel(rows)`) keeps stage 1 and gives some edges new levels, heads and caps. It runs stage 1 again, compares the pieces of the
   changed edges and of the edges at their end nodes, and replaces only those that changed in the tiles (`Tiles::replace_lines`); a

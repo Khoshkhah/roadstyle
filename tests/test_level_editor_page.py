@@ -220,11 +220,23 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert json.loads(page.evaluate("stored('levels_info.json')"))["inputs"] == key
             # a head's length through the panel's API: drawing only, so no solve (level_editor.py's change); the host hears it, the store has
             # heads.csv
-            road = page.evaluate("window.editor.roads[0].road")
+            road = page.evaluate("window.editor.roads[0]")
             # the engine is in the worker: the page has no LevelArea of its own
             assert page.evaluate("!!window.editor && !('area' in window.editor)")
             said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'end', m: '7'}]})", road)
             assert said["ok"] and said["redrawn"] and said["said"] == "not solved again (heads and caps are drawing only)", said
+            assert said["facts"][road]["heads_own"] == [False, True] and said["facts"][road]["levels"], said["facts"]
+            # the panel's other questions: the page asks the worker for the roads that they name (2026-10-26)
+            f = said["facts"][road]
+            edge = f["directions"][0]["edge"]
+            assert page.evaluate("q => window.lvApi('/api/find?q=' + q)", edge)[0]["road"] == road
+            ref = page.evaluate("window.editor.facts(window.editor.roads).then(fs => Object.values(fs).map(f => f.edge_ref).find(Boolean))")
+            hits = page.evaluate("q => window.lvApi('/api/find?q=' + encodeURIComponent(q))", ref.upper())
+            assert hits and all("levels" in h for h in hits) and any(h["edge_ref"] == ref for h in hits), (ref, hits)
+            rel = page.evaluate("r => window.lvApi('/api/relations?a=' + r)", edge)
+            assert rel["a"] == road and road in rel["roads"] and all(r["ra"] == road or r["rb"] == road for r in rel["rows"]), rel
+            gu = page.evaluate("window.lvApi('/api/given_up')")
+            assert all(k in gu["roads"] for r in gu["rows"] for k in (r["a"], r["b"])), gu
             page.wait_for_function("window.solved.length === 1", timeout=30000)
             solved = page.evaluate("window.solved")
             assert len(solved) == 1 and solved[0]["rows"] > roads and solved[0]["draw"] > 0, solved
@@ -289,7 +301,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
             assert page.evaluate("!hostMap.getSource('host-lv-roads') && window.RS_SIDE.props.every(p => p.road != null)")
             assert page.evaluate("window.editor.answer().resolve.how") == "stored"
-            road = page.evaluate("window.editor.roads[0]")
+            road = page.evaluate("window.editor.facts([window.editor.roads[0]]).then(f => Object.values(f)[0])")
             said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'start', m: '3'}]})", road["road"])
             assert said["ok"] and " · drawn in " in said["said"], said
             rows = page.evaluate("window.replaced")
