@@ -398,7 +398,7 @@ impl Tiles {
         let encoded = std::mem::take(&mut layer.encoded);
         let (key_at, val_at) = layer.at.take().unwrap_or_else(|| (keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
                                                                   encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect()));
-        let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules };
+        let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules, last: Vec::new() };
         for (j, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
@@ -600,6 +600,9 @@ struct Builder {
     feats: Vec<Feat>,
     boxes: Vec<(f32, GeomWithData<Rectangle<P>, u32>)>,
     rules: rules::ZoomRules,
+    /// the numbers of the last feature's properties, by place: the pieces of one road come one after another and have most of their
+    /// properties the same, which then take their numbers with no lookup
+    last: Vec<(u32, u32)>,
 }
 
 impl Builder {
@@ -627,9 +630,10 @@ impl Builder {
     /// the rules give them.
     fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32) {
         let (keys, key_at, vals, encoded, val_at) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at);
-        let rules = &self.rules;
+        let (rules, last) = (&self.rules, &self.last);
         let mut read = Map::new();        // the values that the first-zoom rules read
-        let props = props
+        let mut j = 0;
+        let props: Vec<(u32, u32)> = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
                 if rules.reads(k.as_ref()) {
@@ -637,6 +641,10 @@ impl Builder {
                 }
                 if v == Val::Bool(false) && k.as_ref().starts_with(roadstyle_model::mark::PREFIX) {
                     return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
+                }
+                j += 1;
+                if let Some(&(at, n)) = last.get(j - 1).filter(|(at, n)| keys[*at as usize] == k.as_ref() && vals[*n as usize] == v) {
+                    return Some((at, n));        // the key and the value of the last feature's property in this place
                 }
                 let m = encode(&v);
                 let v = match val_at.get(&m) {
@@ -659,6 +667,7 @@ impl Builder {
                 Some((at, v))
             })
             .collect();
+        self.last.clone_from(&props);
         (props, if rules.is_empty() { 0.0 } else { rules.first_zoom(&read) as f32 })
     }
 
