@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **The road table without the roads' lines** (2026-10-26): `roadTable(fields?, lines?)` (wasm) and `road_table(fields=None,
+  lines=False)` (Python) give the lines only with `lines`; `roadLines(rows)` / `road_lines(rows)` give the lines of some rows. The
+  dashboard reads a road's line from the table's `linesOf(rows)` when the table has no lines (a click and `rsSelect` load it before
+  they show). The static page's table keeps its lines. Tartu, every field: 45.1 MiB to 39.2 MiB; with 7 fields: 18.5 MiB to 12.5 MiB.
+
 ### Added
 - **A faster open of the level editor and its map** (2026-10-26): the page asks the worker for a road's facts and ends only when the
   panel needs them (LevelArea `factsOf`, `roadOf`, `ownEnds`, `find`, `levelsOf`, `edgeHash`), not for every road at the open, and it

@@ -407,12 +407,20 @@ mod wasm {
             Ok(roadstyle::file_names(&self.inner, self::format(format)?))
         }
 
-        /// roadTable(fields?): the road table as the page loads it, JSON text (props, mids, bboxes, lines: one item for each road);
-        /// `fields`: only these fields of each road.
+        /// roadTable(fields?, lines?): the road table as the page loads it, JSON text (props, mids, bboxes, and with `lines` the
+        /// lines: one item for each road); `fields`: only these fields of each road. Without lines, roadLines gives a road's line.
         #[wasm_bindgen(js_name = roadTable)]
-        pub fn road_table(&self, fields: Option<Vec<String>>) -> Vec<u8> {
+        pub fn road_table(&self, fields: Option<Vec<String>>, lines: Option<bool>) -> Vec<u8> {
             let mut out = Vec::new();
-            roadstyle::write_road_table(&self.inner, fields.as_deref(), &mut out).expect("a Vec takes every byte");
+            roadstyle::write_road_table(&self.inner, fields.as_deref(), lines.unwrap_or(false), &mut out).expect("a Vec takes every byte");
+            out
+        }
+
+        /// roadLines(ids): the lines of these rows of the road table, JSON text: a list with one item for each id (null: no line).
+        #[wasm_bindgen(js_name = roadLines)]
+        pub fn road_lines(&self, ids: Vec<u32>) -> Vec<u8> {
+            let mut out = Vec::new();
+            roadstyle::write_road_lines(&self.inner, &ids, &mut out).expect("a Vec takes every byte");
             out
         }
 

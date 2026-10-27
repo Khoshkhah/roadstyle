@@ -88,8 +88,10 @@ of `core.js` do it; the other files call them.
   The road filters act on the layers of the road roles alone (`RS_ROLES`: the keys of `sources`, else of `roadstyle:sources`), and
   a road is picked on the layers of the option `pick`. No layer id is tested for a prefix (R7).
 - **The road table (`RoadTable`).** One port for every read of a road: `has(i)`, `props(i)`, `line(i)`, `mid(i)`, `bbox(i)`,
-  `rows()`, by the road's row. The data is the road table of stage 1 (`{props, mids, bboxes, lines}`), from the option
-  `road_table` or from `window.RS_SIDE`. `_road(i)` makes a
+  `rows()`, by the road's row; `load(i)` gets the line of row i when the table has no lines (a Promise, or null when it has the
+  line). The data is the road table of stage 1 (`{props, mids, bboxes}`, and `lines` when the page asks for them), from the option
+  `road_table` or from `window.RS_SIDE`. A table without lines can have `linesOf(rows)`: the page's function that gives the lines of
+  these rows (or a Promise of them; the engine's `roadLines(rows)`). A click and `rsSelect` load the road's line before they show. `_road(i)` makes a
   feature with the road's whole line for Street View and Google 3D. `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` read the
   table, so they work with tiles when the page has the table.
 - **The glow (`_fs`).** The feature state of a road by its row. In simple mode the state goes on the pieces of the role

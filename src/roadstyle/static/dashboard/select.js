@@ -78,6 +78,7 @@ function _midOf(g){                         // the middle of the length (a middl
 export function rsSelect(id){
   const props = RoadTable.has(id) ? RoadTable.props(id) : null;
   if(props==null) return;
+  const w = RoadTable.load(id); if(w) return w.then(()=>rsSelect(id));   // its line first (a table without lines)
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   // a bridge: glow the deck chain (shown above flat_below) AND the flat line (shown below it)
@@ -143,7 +144,7 @@ export function initSelect(){
   window.rsSelect = rsSelect;
   map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
   map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; _cur=null; clearTimeout(_tipT); if(_tip) _tip.remove(); });
-  map.on("click", e=>{
+  map.on("click", async e=>{
     // visual stacking decides the click: an "over" overlay (POIs, in front of the roads) wins;
     // then the roads; an "under" overlay (zone fills) only when the click missed every road —
     // so a road inside a zone stays selectable and still feeds rs:select / the sidebar.
@@ -152,6 +153,7 @@ export function initSelect(){
     if(handleOverlayClick(e, "over")) return;
     const f = pick(e.point);
     if(!f){ if(!handleOverlayClick(e, "under")) rsDeselect(); return; }
+    const w = srcOf(f)==="roads" && RoadTable.load(f.id); if(w) await w;   // the road's line first (a table without lines)
     clearOvSel();
     if(_sel) setS(_sel,{select:false});
     _sel = hitOf(f); setS(_sel,{select:true});

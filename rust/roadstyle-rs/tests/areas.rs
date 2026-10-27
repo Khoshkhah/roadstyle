@@ -37,7 +37,7 @@ fn style(area: &str) -> Value {
     let s = roadstyle_rs::make_sources(roads(area), &look(area), None, None, None).unwrap();
     let (mut out, mut table) = (Vec::new(), Vec::new());
     s.write_style(&mut out, roadstyle_rs::sources::SourceMode::INLINE).unwrap();
-    roadstyle_rs::write_road_table(&s, None, &mut table).unwrap();
+    roadstyle_rs::write_road_table(&s, None, true, &mut table).unwrap();
     let (style_text, table_text) = (text(&out), text(&table));
     let table: Value = serde_json::from_slice(&table).unwrap();
     let cols: Vec<String> = table["props"][0].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();

@@ -110,6 +110,8 @@ export function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojso
 export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features)||[]; }
 // THE ROAD TABLE: each road's fields, midpoint, bbox and line, keyed by the row ({props, mids, bboxes, lines}, as stage 1
 // makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready).
+// A table without lines (the engine's roadTable without lines) can have linesOf(rows): the page's function that gives the lines of
+// these rows, or a Promise of them (the engine's roadLines). A selection loads its road's line before it shows (RoadTable.load).
 // RoadTable is the one port of every read of a road; null and {} where it has nothing (before the table has come).
 function _table(){ return O.road_table || window.RS_SIDE || null; }
 export function _side(){ return _table(); }
@@ -120,7 +122,10 @@ export function _setJoined(m){ _joined = m;
 export const RoadTable = {
   has(i){ const t=_table(); return !!t && t.props[i]!=null; },
   props(i){ const t=_table(), p=(t && t.props[i]) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
-  line(i){ const t=_table(); return (t && t.lines && t.lines[i]) || null; },
+  line(i){ const t=_table(); return (t && ((t.lines && t.lines[i]) || (t._lines && t._lines.get(i)))) || null; },
+  // a Promise that the line of row i is loaded (linesOf); null when there is nothing to load
+  load(i){ const t=_table(); if(!t || t.lines || !t.linesOf || i==null || (t._lines && t._lines.has(i))) return null;
+    return Promise.resolve(t.linesOf([i])).then(l=>{ (t._lines || (t._lines=new Map())).set(i, (l && l[0]) || null); }); },
   mid(i){ const t=_table(); return (t && t.mids && t.mids[i]) || null; },
   bbox(i){ const t=_table(); return (t && t.bboxes && t.bboxes[i]) || null; },
   rows(){ const t=_table(); return t ? t.props.length : 0; },
@@ -130,7 +135,7 @@ export function _rprops(i){ return RoadTable.props(i); }
 export function _road(i){ const c=RoadTable.line(i); return c ? {id:i, get properties(){ return RoadTable.props(i); }, geometry:{type:"LineString", coordinates:c}} : null; }
 // a fill piece, as the road feature it belongs to (its line: the road's whole line, from the road table)
 export function _roadOfPiece(f){ const e=f.properties.__rs_edge;
-  return {id:e, properties:_rprops(e), layer:{id:RS_PREFIX+"roads-fill"}, get geometry(){ const r=_road(e); return r && r.geometry; }}; }
+  return {id:e, properties:_rprops(e), layer:{id:RS_PREFIX+"roads-fill"}, get geometry(){ const r=_road(e); if(!r) RoadTable.load(e); return r && r.geometry; }}; }
 export const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "__rs_k"]]];   // the fill pieces of the road layer, and what has no piece kind (overlays, decks)
 // THE GLOW: the feature state of a road by its row. ref.source: "roads" or "decks" (roles of the roads style), or an overlay's source id.
 // Simple mode: the road's pieces in the role simple, which all have the row as their id (promoteId "__rs_edge"); the full look: the road in

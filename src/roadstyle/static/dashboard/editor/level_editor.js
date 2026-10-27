@@ -243,8 +243,9 @@ async function addFields(){
   if(t.lvFields) return;
   t.lvFields = true;
   const roads = (await call({type: "roadOf", ids: t.props.map(p => p ? String(p[col]) : "")})).roads;
+  const lines = t.lines || (t.linesOf ? await t.linesOf(t.props.map((_, i) => i)) : null);   // a table without lines: the host's linesOf
   t.props.forEach((p, i) => {
-    const r = p && roads[i], c = t.lines && t.lines[i];
+    const r = p && roads[i], c = lines && lines[i];
     if(!r) return;
     p.road = r;
     if(c && c.length){ [p.s_lon, p.s_lat] = c[0]; [p.e_lon, p.e_lat] = c[c.length - 1]; }

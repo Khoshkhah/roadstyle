@@ -374,10 +374,11 @@ fn road_rows(s: &sources::Styled) -> impl Iterator<Item = roadstyle_io::write::R
     })
 }
 
-/// The road table as the page loads it (tiles.sidecar's form; `Styled::table_rows`): `{"props", "mids", "bboxes", "lines"}`, each a
-/// list with one item for each road (its row). `fields`: only these fields of each road (the level editor's lean table: what its page
-/// reads); None: every field.
-pub fn write_road_table<W: std::io::Write>(s: &sources::Styled, fields: Option<&[String]>, w: &mut W) -> std::io::Result<()> {
+/// The road table as the page loads it (tiles.sidecar's form; `Styled::table_rows`): `{"props", "mids", "bboxes"}`, with `lines` also
+/// `"lines"`, each a list with one item for each road (its row). `fields`: only these fields of each road (the level editor's lean
+/// table: what its page reads); None: every field. A page that has the engine gets the table without lines (the lines are most of
+/// its bytes) and asks for a road's line when it needs it (`write_road_lines`); a static page has no engine and gets the lines.
+pub fn write_road_table<W: std::io::Write>(s: &sources::Styled, fields: Option<&[String]>, lines: bool, w: &mut W) -> std::io::Result<()> {
     let mut rows = s.table_rows();
     if let Some(f) = fields {
         rows.iter_mut().for_each(|t| t.props.retain(|(k, _)| f.iter().any(|n| n == k)));
@@ -408,8 +409,18 @@ pub fn write_road_table<W: std::io::Write>(s: &sources::Styled, fields: Option<&
     })?;
     list(w, "mids", false, &|w, t| serde_json::to_writer(w, &t.mid))?;
     list(w, "bboxes", false, &|w, t| serde_json::to_writer(w, &t.bbox))?;
-    list(w, "lines", false, &|w, t| serde_json::to_writer(w, &t.line))?;
+    if lines {
+        list(w, "lines", false, &|w, t| serde_json::to_writer(w, &t.line))?;
+    }
     w.write_all(b"}")
+}
+
+/// The lines of these roads (rows of the road table) as a JSON list, one item for each id: the road's line (`[[lon, lat], ...]`), or
+/// null for a row that has no line or is not in the table (the table's `lines` item of that row).
+pub fn write_road_lines<W: std::io::Write>(s: &sources::Styled, ids: &[u32], w: &mut W) -> std::io::Result<()> {
+    let roads = &s.roads.roads;
+    let line = |i: u32| Some(i as usize).filter(|&i| i < roads.len()).and_then(|i| roads.line(i)).filter(|c| !c.is_empty());
+    serde_json::to_writer(w, &ids.iter().map(|&i| line(i)).collect::<Vec<_>>()).map_err(std::io::Error::from)
 }
 
 /// Stage 1's files in `dir` (`file_names`, `source_file`). `keep`: more columns for the roads' file. Gives each file's name and size.

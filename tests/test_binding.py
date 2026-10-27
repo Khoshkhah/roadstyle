@@ -34,17 +34,26 @@ def test_the_binding_gives_the_facades_style_and_road_table():
     want = json.loads((DATA / "monaco/rust_style.json").read_text())
     s = _engine.rust().make_sources(pq.read_table(DATA / "monaco/roads.parquet"), _look())
     assert _text(s.style()) == want["text"]
-    assert _text(s.road_table()) == want["road_table"]["text"]
+    assert _text(s.road_table(lines=True)) == want["road_table"]["text"]
 
 
 
 def test_a_lean_road_table_has_only_the_fields_given():
     """road_table(fields): each road's row with only these fields (the level editor's table: what its page reads), the same rows."""
     s = _engine.rust().make_sources(pq.read_table(DATA / "monaco/roads.parquet"), _look())
-    full, lean = json.loads(s.road_table()), json.loads(s.road_table(["name", "highway", "__rs_twoway"]))
+    full, lean = json.loads(s.road_table(lines=True)), json.loads(s.road_table(["name", "highway", "__rs_twoway"], lines=True))
     assert len(lean["props"]) == len(full["props"]) and lean["lines"] == full["lines"] and lean["bboxes"] == full["bboxes"]
     assert all(set(p) <= {"name", "highway", "__rs_twoway"} for p in lean["props"])
     assert [p.get("name") for p in lean["props"]] == [p.get("name") for p in full["props"]]
+
+
+def test_a_road_table_without_lines_gives_them_by_road_lines():
+    """road_table() has no lines (the page asks for one with road_lines); road_lines(rows) gives the table's lines, null out of range."""
+    s = _engine.rust().make_sources(pq.read_table(DATA / "monaco/roads.parquet"), _look())
+    full, bare = json.loads(s.road_table(lines=True)), json.loads(s.road_table())
+    assert "lines" not in bare and {k: v for k, v in full.items() if k != "lines"} == bare
+    n = len(full["lines"])
+    assert json.loads(s.road_lines([0, n - 1, n])) == [full["lines"][0], full["lines"][n - 1], None]
 
 def test_the_binding_gives_the_facades_page():
     want = json.loads((DATA / "monaco/rust_page.json").read_text())

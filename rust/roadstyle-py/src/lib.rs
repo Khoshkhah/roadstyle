@@ -254,12 +254,19 @@ impl Sources {
         Ok(())
     }
 
-    /// road_table(fields=None) -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, lines); `fields`:
-    /// only these fields of each road.
-    #[pyo3(signature = (fields=None))]
-    fn road_table(&self, py: Python<'_>, fields: Option<Vec<String>>) -> String {
+    /// road_table(fields=None, lines=False) -> str: the road table as the page loads it (tiles.sidecar's form: props, mids, bboxes, and
+    /// with `lines` the lines); `fields`: only these fields of each road.
+    #[pyo3(signature = (fields=None, lines=false))]
+    fn road_table(&self, py: Python<'_>, fields: Option<Vec<String>>, lines: bool) -> String {
         let mut out = Vec::new();
-        py.detach(|| roadstyle::write_road_table(&self.inner, fields.as_deref(), &mut out)).expect("a Vec takes every byte");
+        py.detach(|| roadstyle::write_road_table(&self.inner, fields.as_deref(), lines, &mut out)).expect("a Vec takes every byte");
+        String::from_utf8(out).expect("JSON text is UTF-8")
+    }
+
+    /// road_lines(ids) -> str: the lines of these rows of the road table, a JSON list (null for a row without a line).
+    fn road_lines(&self, py: Python<'_>, ids: Vec<u32>) -> String {
+        let mut out = Vec::new();
+        py.detach(|| roadstyle::write_road_lines(&self.inner, &ids, &mut out)).expect("a Vec takes every byte");
         String::from_utf8(out).expect("JSON text is UTF-8")
     }
 

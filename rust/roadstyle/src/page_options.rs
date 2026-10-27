@@ -134,7 +134,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         (src.style_with(crate::sources::SourceMode::inline_of(&a), false), None)
     };
     let mut table = Vec::new();
-    crate::write_road_table(&src, None, &mut table).map_err(|e| crate::error::file(crate::ROAD_TABLE, e))?;
+    crate::write_road_table(&src, None, true, &mut table).map_err(|e| crate::error::file(crate::ROAD_TABLE, e))?;
     if !pals.is_empty() {
         palette_swatches(&mut style, &src.table_rows(), &pals, look);       // the rows, not the written table parsed again (N29)
     }

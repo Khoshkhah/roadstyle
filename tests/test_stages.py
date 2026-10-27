@@ -76,7 +76,7 @@ def test_the_road_table_of_rust_is_pythons(part, keywords):
     s = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, "roads")
     roads = rs.export_inline(part, engine="rust", **keywords)["sources"]["roads"]["data"]
     want = json.dumps(sidecar(roads), separators=(",", ":"))
-    got = s.road_table()
+    got = s.road_table(lines=True)
     assert json.loads(got) == json.loads(want)         # the same table; the JSON text is each engine's own (2026-10-24)
     t = json.loads(got)
     assert len(t["props"]) == len(t["lines"]) == len(t["mids"]) == len(part) and "headings" not in t       # N4: no JS reads a heading
