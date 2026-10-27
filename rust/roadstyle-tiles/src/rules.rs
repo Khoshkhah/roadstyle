@@ -3,6 +3,7 @@
 //! them and of clauses on the feature (a casing's seam: from zoom 17 without lap, below 17 with lap). A tile leaves out a feature that
 //! every layer of its source hides at every zoom of that tile, so the rule is in the style only and each way to the tiles reads it.
 
+use roadstyle_model::eval::{ev, known, truthy};
 use serde_json::{Map, Value};
 
 /// The zoom clauses of one source: for each layer that draws it, the clauses at the top of its filter that read the zoom.
@@ -80,18 +81,6 @@ fn span(c: &Value, p: &Map<String, Value>) -> (f64, f64) {
     }
 }
 
-/// An expression of only the operators that `ev` knows.
-fn known(e: &Value) -> bool {
-    match e.as_array() {
-        Some(a) => match a.first().and_then(Value::as_str) {
-            Some("get" | "literal") => true,
-            Some("coalesce" | "to-boolean" | "!" | "all" | "any" | "==" | "!=" | "at" | "case" | "match") => a[1..].iter().all(known),
-            _ => false,
-        },
-        None => true,
-    }
-}
-
 /// The clauses of a filter that must all hold: the items of its "all", and of an "all" in it.
 fn tops<'a>(f: &'a Value, out: &mut Vec<&'a Value>) {
     match f.as_array() {
@@ -115,69 +104,6 @@ fn gets(e: &Value, out: &mut Vec<String>) {
             }
         }
         a.iter().for_each(|x| gets(x, out));
-    }
-}
-
-fn truthy(v: &Value) -> bool {
-    match v {
-        Value::Bool(b) => *b,
-        Value::Null => false,
-        Value::Number(n) => n.as_f64().is_some_and(|x| x != 0.0),
-        Value::String(s) => !s.is_empty(),
-        _ => true,
-    }
-}
-
-fn same(a: &Value, b: &Value) -> bool {
-    match (a.as_f64(), b.as_f64()) {
-        (Some(x), Some(y)) => x == y,
-        _ => a == b,
-    }
-}
-
-/// The value of a MapLibre expression on a feature, for the operators of the clauses; Null for another operator (the clause then
-/// gives 0: the feature stays in the tiles).
-fn ev(e: &Value, p: &Map<String, Value>) -> Value {
-    let Some(a) = e.as_array() else { return e.clone() };
-    let Some(op) = a.first().and_then(Value::as_str) else { return Value::Null };
-    let arg = |i: usize| a.get(i).map_or(Value::Null, |x| ev(x, p));
-    match op {
-        "get" => a.get(1).and_then(Value::as_str).and_then(|k| p.get(k)).cloned().unwrap_or(Value::Null),
-        "literal" => a.get(1).cloned().unwrap_or(Value::Null),
-        "coalesce" => (1..a.len()).map(arg).find(|v| !v.is_null()).unwrap_or(Value::Null),
-        "to-boolean" => truthy(&arg(1)).into(),
-        "!" => (!truthy(&arg(1))).into(),
-        "all" => (1..a.len()).all(|i| truthy(&arg(i))).into(),
-        "any" => (1..a.len()).any(|i| truthy(&arg(i))).into(),
-        "==" => same(&arg(1), &arg(2)).into(),
-        "!=" => (!same(&arg(1), &arg(2))).into(),
-        "at" => arg(1).as_f64().and_then(|i| arg(2).as_array().and_then(|l| l.get(i as usize)).cloned()).unwrap_or(Value::Null),
-        "case" => {
-            let mut i = 1;
-            while i + 1 < a.len() {
-                if truthy(&arg(i)) {
-                    return arg(i + 1);
-                }
-                i += 2;
-            }
-            arg(a.len() - 1)
-        }
-        "match" => {
-            let x = arg(1);
-            let mut i = 2;
-            while i + 1 < a.len() {
-                let hit = match &a[i] {
-                    Value::Array(ls) => ls.iter().any(|l| same(l, &x)),
-                    l => same(l, &x),
-                };
-                if hit {
-                    return arg(i + 1);
-                }
-                i += 2;
-            }
-            arg(a.len() - 1)
-        }
-        _ => Value::Null,
     }
 }
 

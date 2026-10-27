@@ -109,6 +109,36 @@ z15, the casing as a second style layer on the same feature; a measurement, not 
 road features in 3.15 MB. So the roads cost about 0.8 s now and about 0.6 s with one feature. Files and pictures:
 `.claude/tile-lag/one-feature/` of the workspace.
 
+## The width as one table lookup (phase 1 of tile_contract.md)
+
+The one road layer costs MapLibre about 0.85 s of 1.42 s on the Burnaby tilted view, and its `line-width` expression (29 KB) is 0.38 s of
+that (`.claude/tile-lag/expr/`). The width and the offset were an `interpolate` on the zoom, with a `case` tree on the piece's kind,
+pair, bridge and twoway flags and a class table at each of 9 stops. MapLibre calculated the tree for each feature at two zooms.
+
+The engine now calculates it one time (`roadstyle_engine::width_key`; Python: `render_web._width_keys`). The mode of a piece is a fixed
+function of its kind group (a shadow, a bridge's casing, a tunnel's gap or dashes, another casing, a fill or an item), its pair flag and
+its twoway flag: 20 modes. The engine evaluates the old expression for every combination of the kind (0 to 5), the three flags and the
+class, and checks that the combinations of one mode give the same numbers. Each piece has `__rs_wk` = mode × (classes + 1) + class
+index, and each stop is `["*", ["at", ["get", "__rs_wk"], ["literal", table]], live factor]`, for the width and for the offset. As the
+mode needs no table, a saved style, the editor's update in place and both engines give the same keys. A layer whose expressions have
+another shape, read another key, or give two numbers inside one mode keeps them (no key).
+
+The pixels do not change: a unit test compares the old and new number at every stop for every kind, flag combination and class
+(`width_key::tests`), and the Burnaby tilted view is the same picture pixel for pixel (0 pixels differ). The three flags stay in the pieces until phase 4 of tile_contract.md, so the 30 tiles are 4 % larger (5.49 MB against 5.29 MB: the new key).
+
+
+Burnaby, `ctl.py` (jump to z14 at pitch 60, headless Chromium with software GL, median of 5, with a 200 ms start wait):
+
+| Style | ms to idle |
+|---|---|
+| before (cfa80c2) | 1360 to 1449 (two sets of 5 runs) |
+| width and offset as tables by `__rs_wk` | 1150 to 1155 (two sets) |
+
+That is 0.2 to 0.3 s less, as much as the 0.24 s of the probe (a lookup by `__rs_ci` with the pixels wrong). The two expressions are now
+larger text (width 44 KB, offset 19 KB, against 29 KB and 3 KB), because each of the 20 modes has all 29 classes at 9 stops. MapLibre
+reads a literal table one time, so the size costs no time in the measurement. A budget of 4 KB needs fewer modes (the width and the offset in
+two keys) or fewer stops; this is for a later step.
+
 ## What gave no gain
 
 - **One projection for each road.** To project each road's line one time for all of its pieces saved about 5 % of the make.

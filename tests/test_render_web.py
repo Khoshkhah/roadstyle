@@ -1105,7 +1105,8 @@ def test_a_two_way_pair_has_one_casing_and_a_fill_per_direction():
         width, offset = lyr["paint"]["line-width"], lyr["paint"]["line-offset"]
         pair = next(p for p in feats if p.get("__rs_pair") and p["__rs_k"] in (0, 3))
         fill = next(p for p in fills if p["__rs_edge"] == 0)
-        lane = {**pair, "__rs_pair": None}                                                # the same piece as one direction's casing
+        from roadstyle.render_web import _CLASSES, _wk_key
+        lane = {**pair, "__rs_pair": None, "__rs_wk": _wk_key(pair["__rs_k"], False, pair.get("__rs_bridge"), pair.get("__rs_twoway"), pair["__rs_ci"], len(_CLASSES) + 1)}   # the same piece as one direction's casing
         assert _num(offset[4 + 2 * z], pair) == 0 and _num(offset[4 + 2 * z], fill) > 0
         assert _num(width[4 + 2 * z], pair) == pytest.approx(_num(width[4 + 2 * z], lane) + 2 * _num(offset[4 + 2 * z], fill))
         if not extra:
@@ -1266,7 +1267,7 @@ def test_twin_casing_each_is_todays_look():
     assert "__rs_pair" not in html and "__rs_twin" not in html
     assert sorted((p["__rs_edge"], p["__rs_k"]) for p in feats) == [(0, 0), (0, 1), (1, 0), (1, 1)]
     one = _style(render_edges(g, **_TWIN_KW).html)
-    drop = lambda p: {k: v for k, v in p.items() if k not in ("__rs_pair", "__rs_twin", "__rs_edge2", "__rs_cap")}           # noqa: E731
+    drop = lambda p: {k: v for k, v in p.items() if k not in ("__rs_pair", "__rs_twin", "__rs_edge2", "__rs_cap", "__rs_wk")}           # noqa: E731
     assert [drop(f["properties"]) for f in one["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_edge"] == 0] == \
         [drop(p) for p in feats if p["__rs_edge"] == 0]                         # the first edge's pieces: the same, flagged
     assert "ends" in _style(render_edges(g, **{**_TWIN_KW, "simple": False}, **each).html)["sources"]
@@ -3592,11 +3593,14 @@ def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
     assert op[:3] == ["interpolate", ["linear"], ["zoom"]] and op[3] == 14 and op[4][:3] == ["case", ["==", ["get", "__rs_k"], 2], 0] and op[5] == 17
     paint = {**paint, "line-width": _bare(paint["line-width"])}       # N8: each stop × the width factor
     stops = dict(zip(paint["line-width"][3::2], paint["line-width"][4::2], strict=True))
-    extra = lambda z: stops[z][4][2]                                # noqa: E731 - the bridge casing's extra px at a stop: (case, shadow cond, shadow, bridge cond, bridge, ...)
-    assert extra(14) == 0.0 and extra(15) == 1.0 and extra(17) == 3.0 and extra(20) == 3.0
+    page = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]                # the pieces as the page has them (with their width keys)
+    bridge_casing = next(p for p in page if p["__rs_k"] == 0 and p.get("__rs_bridge") and p["__rs_edge"] == 1)
+    shadow = next(p for p in page if p["__rs_k"] == 2)
+    # the shadow's extra px over its bridge's casing at a stop (the width of each: the table of the piece's width key at that stop)
+    extra = lambda z: _num(stops[z], shadow) - _num(stops[z], bridge_casing)                  # noqa: E731
+    assert extra(14) == 0.0 and extra(15) > 0 and extra(20) > 0                 # the numbers are those of the old expressions (rust/roadstyle-engine width_key.rs tests)
     assert paint["line-color"][1:3] == [["==", ["get", "__rs_k"], 2], "rgba(0,0,0,0.25)"]
-    w = paint["line-width"][4]                                       # the first zoom stop: shadow, bridge casing, ... cases
-    assert w[0] == "case" and w[1] == ["==", ["get", "__rs_k"], 2]
+    assert "__rs_wk" in json.dumps(paint["line-width"][4])           # the first zoom stop: one table, read by the piece's width key
     assert "const RS_SIMPLE = " in html and "_simpleColor" not in html and "_applyFill" not in html      # the page builds no colour
 
 

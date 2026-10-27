@@ -15,6 +15,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **The road layer's width and offset as one table lookup** (2026-10-27, tile_contract.md phase 1): the engine writes `__rs_wk` on each
+  piece (a mode of its kind, pair, bridge and twoway flags, times the classes, plus the class index), and `line-width` and `line-offset` of
+  `roads-simple` are one table for each zoom stop (`roadstyle_engine::width_key`, Python `render_web._width_keys`; the mode is a fixed
+  function of the kind group and the pair and twoway flags). The pixels do not change. Burnaby, the tilted view in MapLibre: 1360 to 1449 ms before, 1150 to 1155 ms after. The pieces keep
+  `__rs_pair`, `__rs_bridge` and `__rs_twoway` until phase 4. A layer with other expressions keeps them. No page change.
 - **Fewer features in the low-zoom tiles** (2026-10-27): the tiles leave out a piece that no layer draws at any zoom of the tile. The rule
   is the style's filter, as for the class minzoom, and now it reads a clause on the zoom with `<` and an "all" or "any" of clauses
   (`roadstyle_tiles::rules::ZoomRules::span`, tiles.py `zoom_span`). A casing end without lap (`__rs_seam`) is now only in tiles of z17

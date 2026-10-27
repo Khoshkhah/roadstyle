@@ -20,6 +20,7 @@ pub mod roads;
 pub mod simple;
 pub mod slots;
 pub mod sources;
+pub mod width_key;
 
 // The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
 // (roadstyle-io) are the facade's.

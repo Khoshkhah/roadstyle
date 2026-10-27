@@ -95,6 +95,8 @@ marks! {
     Class = "__rs_cls" [Pieces, Table];
     /// the class index of the road layer's lookups
     ClassIndex = "__rs_ci";
+    /// the road layer's width key: the row of its width and offset tables (`width_key`), from the piece's kind, pair, bridge and twoway flags and its class
+    WidthKey = "__rs_wk";
     /// the road's grade (the position of its fill, as a number)
     Lvl = "lvl" [Pieces, Table];
     /// an item's road's grade
@@ -106,16 +108,17 @@ marks! {
     /// a deck's casing slab
     CasingSlab = "__rs_casing_slab" [Decks];
     /// a two-way road
-    Twoway = "__rs_twoway" [Table];
+    Twoway = "__rs_twoway" [Table, Pieces];
     /// a one-way road
     Oneway = "__rs_oneway";
     /// a reverse pair of a single-line class: the later edge
     Dup = "__rs_dup" [Table];
-    /// a two-way pair's one casing
-    Pair = "__rs_pair";
+    /// a two-way pair's one casing (a piece keeps it, with `Bridge` and `Twoway`, though the road layer reads them through `WidthKey`: the
+    /// editor's redraw and the tests compare pieces by them, until phase 4 of docs/design/tile_contract.md)
+    Pair = "__rs_pair" [Pieces];
     /// the twin's row
     Twin = "__rs_twin";
-    Bridge = "__rs_bridge";
+    Bridge = "__rs_bridge" [Pieces];
     Tunnel = "__rs_tunnel";
     /// the road's own colour (color_table)
     Color = "__rs_color";

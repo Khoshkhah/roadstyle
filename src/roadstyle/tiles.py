@@ -147,7 +147,7 @@ def _known(e):
         return True
     if e[:1] in (["get"], ["literal"]):
         return True
-    return bool(e) and e[0] in ("coalesce", "to-boolean", "!", "all", "any", "==", "!=", "at", "case", "match") and all(_known(x) for x in e[1:])
+    return bool(e) and e[0] in ("coalesce", "to-boolean", "!", "all", "any", "==", "!=", "at", "case", "match", "+", "*") and all(_known(x) for x in e[1:])
 
 
 def zoom_span(rules, p):
@@ -188,6 +188,11 @@ def _ev(e, p):
         return (all if op == "all" else any)(_truthy(_ev(x, p)) for x in a)
     if op in ("==", "!="):
         return _same(_ev(a[0], p), _ev(a[1], p)) == (op == "==")
+    if op in ("+", "*"):
+        xs = [_ev(x, p) for x in a]
+        if not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in xs):
+            return None
+        return functools.reduce(lambda u, v: u + v if op == "+" else u * v, xs, 0 if op == "+" else 1)
     if op == "at":
         i, lst = _ev(a[0], p), _ev(a[1], p)
         return lst[int(i)] if isinstance(i, (int, float)) and isinstance(lst, list) and 0 <= int(i) < len(lst) else None

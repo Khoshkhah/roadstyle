@@ -735,6 +735,8 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     simple_layout.insert("line-sort-key".into(), json!(["get", Mark::Sort.name()]));
     let mut paint = Value::Object(paint);
     class_index(&mut paint, hw, &m.classes);
+    // phase 1 of docs/design/tile_contract.md: the width and the offset as one table lookup for each stop, by the piece's `__rs_wk`
+    crate::width_key::compact(&mut paint, m.classes.len() + 1);
     let road = json!({"id": "roads-simple", "type": "line", "source": "simple", "layout": simple_layout, "filter": flt, "paint": paint});
     let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": flt,
                       "paint": {"line-color": ["coalesce", ["get", Mark::Fill.name()], fb_fill], "line-width": fw, "line-offset": off, "line-opacity": 0}});

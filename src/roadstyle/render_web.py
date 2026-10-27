@@ -1517,6 +1517,95 @@ def _class_index(e, col):
     return [_class_index(x, col) for x in e]
 
 
+_WK_KINDS, _WK_MODES = 6, 20
+
+
+def _wk_mode(kind, pair, bridge, twoway):
+    """roadstyle-engine width_key.rs ``mode``: the kind group (a shadow, a bridge's casing, a tunnel's gap or dashes, another casing, a fill or
+    an item), the pair flag and the twoway flag."""
+    group = 0 if kind == 2 else 1 if kind == 0 and bridge else 2 if kind in (3, 4) else 3 if kind == 0 else 4
+    return group * 4 + int(bool(pair)) * 2 + int(bool(twoway))
+
+
+def _wk_key(kind, pair, bridge, twoway, cls, stride):
+    """The width key of a piece (``__rs_wk``): its mode times ``stride`` (the classes and one more) plus its class index."""
+    return _wk_mode(kind, pair, bridge, twoway) * stride + cls
+
+
+def _width_keys(paint, stride):
+    """Phase 1 of docs/design/tile_contract.md (roadstyle-engine width_key.rs): the road layer's ``line-width`` and ``line-offset`` (an
+    ``interpolate`` on the zoom of ``["*", E, factor]``) as one table for each stop, read by ``__rs_wk``. True, and ``paint`` changed; False, and
+    ``paint`` as it was, when an expression has another shape, reads another key, gives no number, or gives two numbers inside one mode."""
+    from .tiles import _known, _ev
+
+    def stops(e):
+        if not (isinstance(e, list) and len(e) >= 5 and e[0] == "interpolate" and e[2] == ["zoom"]):
+            return None
+        out, factor = [], None
+        for z, o in zip(e[3::2], e[4::2], strict=True):
+            if not (isinstance(o, list) and len(o) == 3 and o[0] == "*") or (factor is not None and factor != o[2]):
+                return None
+            factor = o[2]
+            out.append((z, o[1]))
+        return out, factor
+
+    def gets(e, out):
+        if isinstance(e, list):
+            if len(e) == 2 and e[0] in ("get", "has") and isinstance(e[1], str):
+                out.add(e[1])
+            for x in e:
+                gets(x, out)
+
+    w, o = stops(paint.get("line-width")), stops(paint.get("line-offset"))
+    if w is None or o is None:
+        return False
+    exprs = [e for _, e in w[0] + o[0]]
+    read = set()
+    for e in exprs:
+        gets(e, read)
+    if not all(_known(e) for e in exprs) or read - {"__rs_k", "__rs_pair", "__rs_bridge", "__rs_twoway", "__rs_ci"}:
+        return False
+    rows = [None] * _WK_MODES
+    for code in range(_WK_KINDS * 8):
+        kind, pair, bridge, twoway = code // 8, code // 4 % 2 == 1, code // 2 % 2 == 1, code % 2 == 1
+        by_class = []
+        for cls in range(stride):
+            p = {"__rs_k": kind, "__rs_ci": cls, **{k: True for k, on in (("__rs_pair", pair), ("__rs_bridge", bridge), ("__rs_twoway", twoway)) if on}}
+            vals = [_ev(e, p) for e in exprs]
+            if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals):
+                return False
+            by_class.append([float(v) for v in vals])
+        m = _wk_mode(kind, pair, bridge, twoway)
+        if rows[m] is None:
+            rows[m] = by_class
+        elif rows[m] != by_class:
+            return False
+
+    def num(x):
+        return int(x) if x == int(x) and abs(x) < 1e15 else x
+
+    def make(ss, factor, first):
+        out = ["interpolate", ["linear"], ["zoom"]]
+        for j, (z, _) in enumerate(ss):
+            out += [z, ["*", ["at", ["get", "__rs_wk"], ["literal", [num(v[first + j]) for m in rows for v in m]]], factor]]
+        return out
+
+    paint["line-width"], paint["line-offset"] = make(w[0], w[1], 0), make(o[0], o[1], len(w[0]))
+    return True
+
+
+def _mark_width_key(features, stride):
+    """Each feature of the road layer's source: ``__rs_wk``, right after its class index (roadstyle-engine, ``SimpleSource::cells``)."""
+    from .tiles import _truthy
+
+    for f in features:
+        p = f["properties"]
+        k, ci = p.get("__rs_k"), p.get("__rs_ci")
+        if not isinstance(k, int) or isinstance(k, bool) or not 0 <= k < _WK_KINDS or not isinstance(ci, int) or not 0 <= ci < stride:
+            continue
+        p["__rs_wk"] = _wk_key(k, _truthy(p.get("__rs_pair")), _truthy(p.get("__rs_bridge")), _truthy(p.get("__rs_twoway")), ci, stride)
+
+
 def _mark_class_index(features, col):
     """R8: each feature's class index (``__rs_ci``, its last property): its class's place in ``_CLASSES``, else their number."""
     place = {c: i for i, c in enumerate(_CLASSES)}
@@ -2571,6 +2660,8 @@ def _edge_features(geo, edges, head_m, cols, fcol, slots, items=(), read=None):
     if read is not None:        # R1: as the whole page has them (``read``: the page's read set; the roads as its road table)
         from .tiles import table_keeps
         _mark_class_index(out["simple"], cols[0])
+        if "__rs_wk" in read:         # the page's road layer reads the width keys
+            _mark_width_key(out["simple"], len(_CLASSES) + 1)
         _slim_pieces(out["simple"], read)
         out["roads"] = [{**f, "properties": {k: v for k, v in f["properties"].items() if table_keeps(k)}} for f in out["roads"]]
     return out
@@ -3787,6 +3878,8 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     if road is not None:        # R8: the road layer's class tables read each feature's class index, its last property
         road["paint"] = _class_index(road["paint"], highway_col)
         _mark_class_index((style["sources"].get("simple") or {}).get("data", {}).get("features", []), highway_col)
+        if _width_keys(road["paint"], len(_CLASSES) + 1):      # phase 1 of docs/design/tile_contract.md: the width and offset tables
+            _mark_width_key((style["sources"].get("simple") or {}).get("data", {}).get("features", []), len(_CLASSES) + 1)
     read = _drawn(style["layers"], popup_fields if popup_on else False, road_tooltip)
     _slim_pieces((style["sources"].get("simple") or {}).get("data", {}).get("features", []), _piece_reads(style["layers"]))
     if isinstance((style["sources"].get("roads") or {}).get("data"), dict):

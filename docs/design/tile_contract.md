@@ -304,6 +304,13 @@ expressions come first: they have the largest gain and need no page change.
 | 3. The data layer | `generation`, `edgeIds`, `rowsOf`, `fields`, `columns`, `select`, `features` in roadstyle-wasm and Python | filters from `select`, `rs.setData` with `rowsOf`, `ov4` popup from `features` | none alone; it lets phase 4 remove keys | a filter change with 150k ids (size of the `match`); a popup that waits for the worker | unit tests of `select` (twins, modes), filter e2e, popup e2e |
 | 4. Keys from the style | `TileOptions::rule` keeps the style's keys of each zoom only; `highway` replaced by `__rs_ci` in the filter; the 5 old width keys go out of the tile where no expression reads them; `reads.json` `pieces` empty | no page read of a tile property | −4 keys on 87k pieces, −`osm_id`/`kind`/`name` on 24k buildings: with phase 2, −0.8 to −1.0 MB of 5.9 MB; time about −0.05 to −0.1 s | a reader that nobody found: the contract test and `test_contract_names.py` find it | the contract test, the size budget |
 
+**Phase 1 status (2026-10-27, branch `design-tile-wk`): done for the width and the offset.** The probe gave 1449 ms to 1184/1212 ms
+(−0.24 to −0.26 s). The code (`roadstyle_engine::width_key`, `render_web._width_keys`, `__rs_wk`) gives
+1360 to 1449 ms before, 1150 to 1155 ms after (−0.2 to −0.3 s) on the same harness, with the same pixels (0 pixels differ; a test compares the old and new numbers at every
+stop for every kind, flag combination and class). The three flags stay in the pieces until phase 4 (the editor's redraw and the tests compare
+pieces by them; `Mark::Pair`, `Bridge` and `Twoway` are kept as `Pieces`), so the tiles are 4 % larger (5.49 MB against 5.29 MB for the 30 tiles: the new key). Not done: the budget of 4 KB for each expression (width 44 KB and offset 19 KB now: 20 modes
+× 29 classes × 9 stops), the same for the other 49 layers, and the lines of item 3 (fewer stops). No page change.
+
 The sum: the control now takes 1.42 s, and the roads are 0.85 s of it. Phase 1 gives the time. Phases 2 to 4 give the bytes and a
 clean contract, with little time.
 

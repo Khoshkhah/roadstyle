@@ -234,7 +234,8 @@ def test_single_line_pair_rides_the_tiles():
 
 def test_tiles_carry_a_two_way_pairs_one_casing():
     """tiles=True: the pair's one casing (twin_casing "one") rides in the archive's "simple" layer with what the layer reads: only the first
-    edge has casing pieces, flagged __rs_pair and naming the other edge (__rs_edge2); both directions have their fill."""
+    edge has casing pieces, flagged __rs_pair, naming the other edge (__rs_edge2) and with a width key (__rs_wk) that is not a fill's (the flags stay
+    in the pieces until phase 4 of tile_contract.md); both directions have their fill."""
     import mapbox_vector_tile
     from pmtiles.reader import MemorySource, Reader
 
@@ -243,10 +244,13 @@ def test_tiles_carry_a_two_way_pairs_one_casing():
     g = gpd.GeoDataFrame({"highway": ["primary"] * 2}, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
     html = render(g, basemap="blank", tiles=True).html
     style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + 14)[0]
-    assert "__rs_pair" in json.dumps(next(l for l in style["layers"] if l["id"] == "roads-simple")["paint"]["line-width"])
+    # the width reads the pair flag through the piece's width key (tile_contract.md, phase 1), as one table for each stop
+    assert "__rs_wk" in json.dumps(next(l for l in style["layers"] if l["id"] == "roads-simple")["paint"]["line-width"])
     z = 15
     n = 1 << z
     x = int((18.0005 + 180) / 360 * n)
     y = int((1 - math.asinh(math.tan(math.radians(59.3))) / math.pi) / 2 * n)
     ps = [f["properties"] for f in mapbox_vector_tile.decode(gzip.decompress(Reader(MemorySource(_archive_of(html))).get(z, x, y)))["simple"]["features"]]
     assert sorted((p["__rs_edge"], p["__rs_k"], p.get("__rs_pair"), p.get("__rs_edge2")) for p in ps) == [(0, 0, True, 1), (0, 1, None, None), (1, 1, None, None)]
+    wk = {p["__rs_k"]: p["__rs_wk"] for p in ps if p["__rs_edge"] == 0}
+    assert wk[0] != wk[1], "a pair's casing has another width key than a fill"

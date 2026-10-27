@@ -60,7 +60,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "dd4a192fc46899de53947efb5532c2481dd40e5d2134918a28ec01a3507d7b7c");
+    assert_eq!(style_hash(&area), "03cf6bad7285884aa14d04989b0c701acae6681df93f4b1c5ac3e57f86b439f8");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -69,7 +69,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(style_hash(&area), "29769cce6c4dd1f86fc0ccbb3ec290e65ed283671a3c57247ece61ebd50cc844");
+    assert_eq!(style_hash(&area), "983508b2bc1865b71df37d8ebbd76ce33ce5c783c4c19aee197babaebcba2acd");
 }
 
 /// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
@@ -109,7 +109,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "3b5ea3d4a40a003e8d8e33957e05b4dd934f9dad559d76007e1cb03485ccda59");
+    assert_eq!(tiles_hash(&area), "3232711bfda907d74e35d93b9b04e596e9b998ae17cbb7262859b5ed1772fdb3");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at
@@ -134,5 +134,5 @@ fn the_sea_is_cut_at_the_boundary() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "a96db53c53f00898321b497c272079e28ae4aa33135a09b21254f72ac6aa893d");
+    assert_eq!(tiles_hash(&area), "c043e0707f95b8dbfe8712c9404fc5397e354f55059e7681cbf00a185f90cffa");
 }

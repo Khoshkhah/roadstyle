@@ -4,6 +4,7 @@
 // Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
+pub mod eval;
 pub mod error;
 pub mod feature_table;
 pub mod flags;

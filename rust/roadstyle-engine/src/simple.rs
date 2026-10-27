@@ -590,6 +590,15 @@ impl SimpleSource {
         if let Some(i) = index.filter(|_| run.marks.as_ref().is_none_or(|r| r[Mark::ClassIndex as usize])) {
             q.insert_name(crate::layers::CLASS_INDEX, Cell::Int(i as i64));
         }
+        if let (Some(i), Some(classes)) = (index.filter(|_| run.marks.as_ref().is_none_or(|r| r[Mark::WidthKey as usize])), self.classes.as_ref()) {
+            // from the piece's own values, not from the properties that it keeps: the style no longer reads pair, bridge and twoway
+            let r = p.road(roads);
+            let on = |m: Mark| r.own_get(m.name()).is_some_and(|c| roadstyle_model::eval::truthy(&c.to_value()));
+            let pair = !matches!(p.part, Part::Fill | Part::Half(_)) && r.draw().twin.is_some();
+            if let Some(k) = self.draw_kind(p).and_then(|k| crate::width_key::key(k, pair, on(Mark::Bridge), on(Mark::Twoway), i, classes.len() + 1)) {
+                q.insert_name(Mark::WidthKey.name(), Cell::Int(k));
+            }
+        }
         if !run.class {
             q.shift_remove(&self.cols.class);      // the class index read it
         }
@@ -601,8 +610,21 @@ impl SimpleSource {
     fn with_index<'a>(&self, mut q: Props<'a>) -> Props<'a> {
         if let Some(i) = self.class_index(q.get(&self.cols.class).and_then(Value::as_str)) {
             q.insert(crate::layers::CLASS_INDEX, i.into());
+            if self.read.as_ref().is_none_or(|r| r.contains(Mark::WidthKey.name())) {
+                let on = |m: Mark| q.get(m.name()).is_some_and(roadstyle_model::eval::truthy);
+                let k = q.get(Mark::PieceKind.name()).and_then(Value::as_i64);
+                let n = self.classes.as_ref().map_or(0, |c| c.len() + 1);
+                if let Some(k) = k.and_then(|k| crate::width_key::key(k, on(Mark::Pair), on(Mark::Bridge), on(Mark::Twoway), i, n)) {
+                    q.insert(Mark::WidthKey.name(), k.into());
+                }
+            }
         }
         q
+    }
+
+    /// The kind of a piece (`__rs_k`) as the layer's width key reads it.
+    fn draw_kind(&self, p: &Piece) -> Option<i64> {
+        p.draw.map(|d| d.kind)
     }
 
     /// The class index of a feature of the class `c` (R8; None: no index).
