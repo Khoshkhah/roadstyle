@@ -243,12 +243,14 @@ async function addFields(){
   if(t.lvFields) return;
   t.lvFields = true;
   const roads = (await call({type: "roadOf", ids: t.props.map(p => p ? String(p[col]) : "")})).roads;
-  const lines = t.lines || (t.linesOf ? await t.linesOf(t.props.map((_, i) => i)) : null);   // a table without lines: the host's linesOf
+  // a table without lines: the host's endsOf() gives 4 numbers for each row (the engine's roadEnds(): start lon, lat, end lon, lat)
+  const ends = !t.lines && t.endsOf ? await t.endsOf() : null;
   t.props.forEach((p, i) => {
-    const r = p && roads[i], c = lines && lines[i];
+    const r = p && roads[i], c = t.lines && t.lines[i];
     if(!r) return;
     p.road = r;
     if(c && c.length){ [p.s_lon, p.s_lat] = c[0]; [p.e_lon, p.e_lat] = c[c.length - 1]; }
+    else if(ends && !Number.isNaN(ends[4 * i])) [p.s_lon, p.s_lat, p.e_lon, p.e_lat] = ends.subarray(4 * i, 4 * i + 4);
   });
 }
 if(host){                                                        // the host's map and pick stay as they are

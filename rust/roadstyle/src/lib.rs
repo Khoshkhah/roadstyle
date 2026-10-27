@@ -423,6 +423,16 @@ pub fn write_road_lines<W: std::io::Write>(s: &sources::Styled, ids: &[u32], w: 
     serde_json::to_writer(w, &ids.iter().map(|&i| line(i)).collect::<Vec<_>>()).map_err(std::io::Error::from)
 }
 
+/// The two end points of each row's line (the level editor's end marks), 4 numbers for each row: the first point's lon and lat, then
+/// the last point's; NaN for a row without a line.
+pub fn road_ends(s: &sources::Styled) -> Vec<f64> {
+    let roads = &s.roads.roads;
+    (0..roads.len()).flat_map(|i| match roads.line(i).filter(|c| !c.is_empty()) {
+        Some(c) => [c[0][0], c[0][1], c[c.len() - 1][0], c[c.len() - 1][1]],
+        None => [f64::NAN; 4],
+    }).collect()
+}
+
 /// Stage 1's files in `dir` (`file_names`, `source_file`). `keep`: more columns for the roads' file. Gives each file's name and size.
 pub fn save_sources(s: &sources::Styled, dir: &std::path::Path, format: Format, keep: &[String]) -> Result<Vec<(String, usize)>, crate::Error> {
     std::fs::create_dir_all(dir).map_err(|e| crate::error::file(dir.display(), e))?;

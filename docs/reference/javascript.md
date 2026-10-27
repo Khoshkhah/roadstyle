@@ -178,7 +178,8 @@ on this page then work on that map. Roads that come later (vector tiles, a new s
 object that `rsDashboard` returns. `roadTable()` gives the table without the roads' lines (most of its bytes); give the table
 `linesOf: rows => JSON.parse(new TextDecoder().decode(sources.roadLines(rows)))` (or a function that returns a Promise of the
 lines, for an engine in a worker), and Street View and Google 3D get a road's line when they need it. `roadTable(fields, true)`
-gives the lines in the table. Live data (a style made with `live_data=True`): `rs.setData(rows, {colorBy, widthBy})` colours
+gives the lines in the table. A `LiveMap` has `roadLines(rows)` too, and `roadEnds()` (4 numbers for each row: the line's start
+lon, lat and end lon, lat); the level editor on a host map reads the table's `endsOf()` (a Promise of them) for its end marks. Live data (a style made with `live_data=True`): `rs.setData(rows, {colorBy, widthBy})` colours
 and sizes the roads from a table with no new style, and `rs.clearData()` takes it away. The options and the files:
 `docs/design/dashboard_module.md` in the repository.
 

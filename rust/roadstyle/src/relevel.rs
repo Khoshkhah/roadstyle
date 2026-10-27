@@ -92,6 +92,11 @@ impl LiveTiles {
         &self.style
     }
 
+    /// The stage 1 that the map holds (its road table's rows and lines; a redraw does not change the lines).
+    pub fn sources(&self) -> &sources::Styled {
+        &self.styled
+    }
+
     /// Give the edges of `rows` their new levels, heads and caps, and change the tiles where the drawing changed.
     pub fn relevel(&mut self, rows: &[LevelRow]) -> Result<Redrawn, crate::Error> {
         let fills = self.fills_change(rows);

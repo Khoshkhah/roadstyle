@@ -598,6 +598,20 @@ mod wasm {
             if source == roadstyle::tiles::SOURCE { self.0.tile(z, x, y) } else { Vec::new() }
         }
 
+        /// roadLines(rows): as Sources.roadLines, from the stage 1 that the map holds.
+        #[wasm_bindgen(js_name = roadLines)]
+        pub fn road_lines(&self, ids: Vec<u32>) -> Vec<u8> {
+            let mut out = Vec::new();
+            roadstyle::write_road_lines(self.0.sources(), &ids, &mut out).expect("a Vec takes every byte");
+            out
+        }
+
+        /// roadEnds(): the two end points of each row's line, 4 numbers for each row (start lon, lat, end lon, lat; NaN: no line).
+        #[wasm_bindgen(js_name = roadEnds)]
+        pub fn road_ends(&self) -> Vec<f64> {
+            roadstyle::road_ends(self.0.sources())
+        }
+
         pub fn relevel(&mut self, rows: &str) -> Result<String, JsError> {
             let err = |m: String| JsError::new(&format!("relevel: {m}"));
             let rows: Vec<serde_json::Value> = serde_json::from_str(rows).map_err(|e| err(e.to_string()))?;

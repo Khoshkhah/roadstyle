@@ -91,7 +91,8 @@ of `core.js` do it; the other files call them.
   `rows()`, by the road's row; `load(i)` gets the line of row i when the table has no lines (a Promise, or null when it has the
   line). The data is the road table of stage 1 (`{props, mids, bboxes}`, and `lines` when the page asks for them), from the option
   `road_table` or from `window.RS_SIDE`. A table without lines can have `linesOf(rows)`: the page's function that gives the lines of
-  these rows (or a Promise of them; the engine's `roadLines(rows)`). A click and `rsSelect` load the road's line before they show. `_road(i)` makes a
+  these rows (or a Promise of them; the engine's `roadLines(rows)`), and `endsOf()`: the ends of every row for the level
+editor's end marks (the engine's `roadEnds()`). A click and `rsSelect` load the road's line before they show. `_road(i)` makes a
   feature with the road's whole line for Street View and Google 3D. `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` read the
   table, so they work with tiles when the page has the table.
 - **The glow (`_fs`).** The feature state of a road by its row. In simple mode the state goes on the pieces of the role
