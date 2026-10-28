@@ -14,6 +14,10 @@ export interface DashboardOptions {
   road_table?: RoadTableData | null;
   /** The roads are a vector source (tiles). Simple mode and its road layer come from the style. */
   tiles?: boolean;
+  /** The generation of the tiles (the PMTiles metadata `generation`, a tile server's answer). None: the `?g=` of the style's tile URLs. A style of another
+   * generation (`roadstyle:generation`) is an error: the dashboard shows a message and hides the vector layers. The document event `rs:tiles-generation`
+   * (`detail`: the generation) gives it later. */
+  tiles_generation?: string | null;
   /** Role -> {source, layer} (roadstyle:sources): the roads style's sources by role; layer null for a GeoJSON source. */
   sources?: Record<string, { source: string; layer: string | null }> | null;
   /** The style's arrows (roadstyle:arrows): "points" (the dashboard places them), "line", "line-center", or null (none). */

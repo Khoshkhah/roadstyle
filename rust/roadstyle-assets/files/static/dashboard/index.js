@@ -2,6 +2,7 @@
 // to a MapLibre map (docs/design/dashboard_module.md). The options have the names of render_web.render's keywords; the values are
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
 import {initCore, useStyle, _contractError} from "./core.js";
+import {initGeneration, useGeneration} from "./generation.js";
 import {initPanel, initPanelTab} from "./panel.js";
 import {initZoom} from "./zoom.js";
 import {initView3D} from "./view3d.js";
@@ -31,6 +32,7 @@ const RS_DEFAULTS = {
   live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)
   basemaps: [], basemap_switcher: true,
   tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
+  tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
   street_view: "window", street_view_key: "", google_3d: false,
   filter: {on: false, classes: []}, color_active: 0,
@@ -68,8 +70,10 @@ function fromStyle(o, given){
 // returns the dashboard object (docs/design/rust_library.md, "The runtime API", api.js): setStyle, and the methods of the API
 export function rsDashboard(map, options){
   const o = {...RS_DEFAULTS, ...options}, given = new Set(Object.keys(options));
-  // a style of a newer contract: an error (console, the result's `error`), and the dashboard reads it as no style
-  let error = _contractError(o.style);
+  // a style of a newer contract, or of another generation than its tiles: an error (console, the result's `error`), and the dashboard
+  // reads it as no style
+  initGeneration(map, o);
+  let error = _contractError(o.style) || useGeneration(o.style);
   if(error){ console.error(error); o.style = null; }
   fromStyle(o, given);
   initCore(map, o);
@@ -95,7 +99,7 @@ export function rsDashboard(map, options){
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection and the hover go: they were the old roads'.
     setStyle(style, more){
-      rs.error = _contractError(style);
+      rs.error = _contractError(style) || useGeneration(style);
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)

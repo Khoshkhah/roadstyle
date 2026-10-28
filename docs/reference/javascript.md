@@ -27,7 +27,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rs.setColorBy(name)`, `rs.color([{color, ids}])`, `rs.setFilter({classes, bridges, tunnels, access, ids})` | as the controls |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.setStyle(style)` | a new roads style (a page whose roads come later) |
-| `rs.error` | `null`, or the error of a style whose interaction contract (`roadstyle:contract`) is newer than the dashboard reads: then the dashboard adds no road interaction for it. `setStyle` sets it again |
+| `rs.error` | `null`, or the error of a style whose interaction contract (`roadstyle:contract`) is newer than the dashboard reads, or whose generation (`roadstyle:generation`) is not the generation of its tiles: then the dashboard adds no road interaction for it (and, for the generation, shows a message and hides the vector layers). `setStyle` sets it again |
 | `rs.contract` | the newest `roadstyle:contract` that the dashboard reads |
 | `rs.destroy()` | removes the object's listeners |
 

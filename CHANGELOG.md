@@ -52,6 +52,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
     tables (the `let` variables of the layer `roads-simple`) or the road table.
   - `roadstyle:generation` (the first 16 hex characters of `edge_hash`) is in the style metadata. The tile URL has `?g=<generation>`, and the
     PMTiles metadata has `generation` and `contract`.
+  - The dashboard checks the generation of the tiles. A style of another generation than its tiles (`roadstyle:generation` against the
+    option `tiles_generation`, the document event `rs:tiles-generation`, or the `?g=` of the tile URL) gives one message on the map, hides
+    the layers of the vector sources, adds no road interaction and sets `rs.error`. The page of `tiles=True` reads the generation from the
+    PMTiles metadata.
   - `export_style` has no `roads` source, no `roads-fill` and no `roads-highlight` layer in the tiled style, and no `roads` tile layer. It
     writes `props.json` (the fields of each road by row; `roadstyle:interaction.props`): a click on a piece reads `props[feature.id]`.
   - The same for the base map: the feature id of a base-map or overlay feature is its row in its layer. The popup fields of an overlay (`roadstyle:popups`)

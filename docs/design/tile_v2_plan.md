@@ -212,6 +212,7 @@ each step: the package in the shared target folder is the one of the last build.
 | 6 | `fe5efa2` | The class colours are not in the pieces: the road layer reads them by `__rs_ci`. A piece has `__rs_fill` or `__rs_casing` only when its road has another colour (an access kind). Colour by a column, colour options and a colour table: see step 6b. |
 | 6b | `design-tile-colour` | The other colour modes (a colour by a number or a category, a colour table, colour options) have no colour text in the pieces too. The distinct fill colours and the distinct casing colours are two tables in the style (the `let` variables of the road layer's `line-color`, place 0 is the theme's fallback colour). A piece holds the place of its colour in `__rs_fill`, `__rs_fill__<i>` and `__rs_casing`. A numeric ramp has no other form: its colours are in the table too, one entry for each distinct colour, so the picture is exact (a ramp over many values gives a long table; a quantized ramp is the next step if a style gets too large). The picture stays the same ( 0 pixels differ in 5 modes on Monaco). A view palette has its own tables, and the copies `<property>@<palette>` are places in them. Test: `tile_colour.rs`. |
 | 7 | `185dfbc` | A tiled style has no `roads` source and no `roads-fill` or `roads-highlight` layer. `export_style` writes `props.json` (the fields of each road by row, `roadstyle:interaction.props`). The inline export keeps the `roads` source. |
+| 7b | `design-tile-colour` | The dashboard checks the generation of the tiles (`generation.js`): a style and tiles of two generations give one message, no vector layer and no road interaction. Test: `test_contract_version.py`. |
 
 The page's look, the tiles of the budget views (the 3 x 3 tiles of Monaco and of Tartu at zoom 12 to 15; the numbers are the budget limits,
 the measured number plus 2 %):
@@ -238,8 +239,7 @@ tiles of the Python binding, MapLibre 5.24.0 with 4 workers, headless Chromium w
 The times are inside the batch noise (0.15 s): these steps are a size and a contract gain, as the plan said. On this data the whole
 tilted view takes about 0.3 s, so a time gain is not visible.
 
-**What the page PR (step 8) must change:** see the list in the CHANGELOG, "Tiles, contract 2". **Not done:** a check of the generation in the dashboard (it checks the
-contract version, 2); the planet-scale count of directed edges against 2^32 (D9).
+**What the page PR (step 8) must change:** see the list in the CHANGELOG, "Tiles, contract 2". **Not done:** the planet-scale count of directed edges against 2^32 (D9).
 
 ## Decisions (Kaveh, 2026-10-27)
 

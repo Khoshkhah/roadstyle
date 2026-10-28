@@ -5,9 +5,14 @@
   var buf=arr.buffer;
   var src={getKey:function(){return "roads";},
            getBytes:function(o,l){return Promise.resolve({data:buf.slice(o,o+l)});}};
-  var proto=new pmtiles.Protocol();
-  proto.add(new pmtiles.PMTiles(src));
+  var proto=new pmtiles.Protocol(), archive=new pmtiles.PMTiles(src);
+  proto.add(archive);
   maplibregl.addProtocol("pmtiles", proto.tile);
   window.__rs_tiles={ok:true, bytes:arr.length};
+  // the generation of the road set in the archive's metadata: the dashboard compares it with the style's (generation.js)
+  archive.getMetadata().then(function(m){
+    window.__rs_tiles.generation=(m && m.generation) || null;
+    document.dispatchEvent(new CustomEvent("rs:tiles-generation", {detail: window.__rs_tiles.generation}));
+  });
 })();
 </script>
