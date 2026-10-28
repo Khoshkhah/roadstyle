@@ -24,6 +24,8 @@ opens, and the page removes it when you close the window.
 
 ## The two cameras move together
 
+For the four links, the range, and a check, see [The Google 3D camera link](google-3d-camera.md).
+
 When you move, turn, tilt or zoom the map, the 3D view moves to the same camera. When you do
 this in the 3D view, the map follows.
 

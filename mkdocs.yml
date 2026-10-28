@@ -54,6 +54,7 @@ nav:
       - Add your own layers: guides/overlays.md
       - Google Street View: guides/street-view.md
       - Google 3D: guides/google-3d.md
+      - Google 3D camera link: guides/google-3d-camera.md
       - Set up a Google key: guides/google-key.md
       - Big networks: guides/big-networks.md
       - Dashboards & JavaScript: guides/dashboards.md
