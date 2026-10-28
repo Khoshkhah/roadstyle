@@ -132,7 +132,7 @@ fn layers_of(tile: &[u8]) -> Vec<(String, Tables)> {
 }
 
 /// The properties that the style's layers read, for each tile layer: `["get", k]` and `["has", k]` in the filter, paint and layout, the
-/// `{k}` of a text field, and the vector source's `promoteId`.
+/// `{k}` of a text field, the vector source's `promoteId` and the dashboard's filter keys.
 fn style_reads(style: &Value) -> HashMap<String, HashSet<String>> {
     fn walk(v: &Value, out: &mut HashSet<String>) {
         match v {
@@ -158,6 +158,9 @@ fn style_reads(style: &Value) -> HashMap<String, HashSet<String>> {
         for part in ["filter", "paint", "layout"] {
             walk(&l[part], e);
         }
+    }
+    for layer in ["simple", "slots"] {          // the dashboard's filters read these (mark::filter_keys)
+        out.entry(layer.into()).or_default().extend(roadstyle_rs::mark::filter_keys().map(String::from));
     }
     for src in style["sources"].as_object().into_iter().flatten().map(|(_, s)| &s["promoteId"]) {
         for (layer, k) in src.as_object().into_iter().flatten() {

@@ -85,6 +85,7 @@ def test_a_missing_flag_is_false_for_the_page():
     flags = {m for t in code for m in re.findall(r"[\"'](__rs_\w+)[\"'][\]:,]\s*(?:\w+\(|\.?into\(\)\s*,?)?\s*(?:True|False|true|false)\b", t)}
     marks = dict(re.findall(r'^\s+([A-Z]\w*) = "(__rs_\w+)"', (ROOT / "rust/roadstyle-model/src/mark.rs").read_text(), re.M))
     flags |= {marks[m] for t in code for m in re.findall(r"flag\(&mut out, Mark::(\w+)", t)}       # draw.rs: the road's flags (by their marks)
+    flags |= {marks[m] for t in code for m in re.findall(r"put\(&mut q, Mark::(\w+), Cell::Bool\(true\)", t)}       # piece.rs: the pieces' flags
     assert {"__rs_bridge", "__rs_twoway", "__rs_seam"} <= flags, flags
     f = "(?:" + "|".join(sorted(flags)) + r")\b"
     bad = []

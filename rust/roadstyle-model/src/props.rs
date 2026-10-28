@@ -208,17 +208,31 @@ pub fn piece_reads(layers: &[Value]) -> std::collections::HashSet<String> {
     read
 }
 
+/// The properties that the layers on the source `source` read (`expression_reads`).
+pub fn source_reads(layers: &[Value], source: &str) -> std::collections::HashSet<String> {
+    let mut read = std::collections::HashSet::new();
+    let mut unknown = Vec::new();
+    layers.iter().filter(|l| l["source"] == source).for_each(|l| expression_reads(l, &mut read, &mut unknown));
+    read
+}
+
+/// The metadata key of the names of the base-map layers (stage 1 writes it): the tiles of such a layer keep what its layers and the
+/// popup read, not all its properties.
+pub const BASE_LAYERS: &str = "roadstyle:base";
+
+/// The fields of `roadstyle:interaction`'s popup and tooltip.
+pub fn interaction_fields(metadata: &Value) -> std::collections::HashSet<String> {
+    let i = &metadata["roadstyle:interaction"];
+    ["popup", "tooltip"].into_iter().flat_map(|k| i[k].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from)).collect()
+}
+
 /// The properties that a style's drawing reads: the layers' expressions (`expression_reads`), the popup and
-/// tooltip fields of `roadstyle:interaction`, the page's modules (`page_reads`), `name`, `kind` and the caller's `keep`. Every `__rs_*`
-/// property goes too, apart from this set.
+/// tooltip fields of `roadstyle:interaction`, the page's modules (`page_reads`), `name`, `kind` and the caller's `keep`.
 pub fn drawn(layers: &[Value], metadata: &Value, keep: &[String]) -> std::collections::HashSet<String> {
     let mut read: std::collections::HashSet<String> = keep.iter().cloned().chain(["name".to_string(), "kind".to_string()]).chain(page_reads()).collect();
     let mut unknown = Vec::new();
     layers.iter().for_each(|l| expression_reads(l, &mut read, &mut unknown));
-    let i = &metadata["roadstyle:interaction"];
-    for k in ["popup", "tooltip"] {
-        read.extend(i[k].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from));
-    }
+    read.extend(interaction_fields(metadata));
     read
 }
 

@@ -77,9 +77,9 @@ pub struct Tiles {
     cache: std::sync::Mutex<TileCache>,
 }
 
-/// The properties that a line layer's tiles keep: every `__rs_*` one and those in `keep`, all of them when `whole`.
-fn kept(k: &str, keep: &HashSet<String>, whole: bool) -> bool {
-    whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k)
+/// The properties that a layer's tiles keep: those in `keep`, the one key set of the layer (stage::TileOptions::rule).
+fn kept(k: &str, keep: &HashSet<String>) -> bool {
+    keep.contains(k)
 }
 
 impl Tiles {
@@ -118,7 +118,7 @@ impl Tiles {
     }
 
     /// Add a GeoJSON source of the style (`{"type": "geojson", "data": FeatureCollection, ...}`) as the layer `name`, and free its
-    /// tree. The properties in `keep` and every `__rs_*` property go into the tiles, all of a whole layer's. `whole`: see the module; `min_zoom`: the layer's first zoom.
+    /// tree. The properties in `keep` go into the tiles. `whole`: see the module; `min_zoom`: the layer's first zoom.
     pub fn add(&mut self, name: &str, source: &Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let empty = Map::new();
         let mut b = self.builder(name);
@@ -126,8 +126,7 @@ impl Tiles {
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
             let id = Some(i as u64); // a feature's id is its index in its source
             let props = f["properties"].as_object().unwrap_or(&empty);
-            // tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
-            b.push(id, g, props.iter().filter(|(k, _)| whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_str())).map(|(k, v)| (k.as_str(), v.clone())));
+            b.push(id, g, props.iter().filter(|(k, _)| kept(k, keep)).map(|(k, v)| (k.as_str(), v.clone())));
         }
         self.put(name, b.layer(whole, min_zoom, self.max_zoom));
     }
@@ -137,7 +136,7 @@ impl Tiles {
     pub fn add_features(&mut self, name: &str, t: &FeatureTable, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         use roadstyle_model::feature_table::GeomType;
         let g = t.geometries_of();
-        let names: Vec<&str> = t.names().iter().map(String::as_str).filter(|k| whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(*k)).collect();
+        let names: Vec<&str> = t.names().iter().map(String::as_str).filter(|k| kept(k, keep)).collect();
         let mut b = self.builder(name);
         for row in 0..t.len() {
             let Some(kind) = g.kind(row) else { continue };
@@ -164,13 +163,13 @@ impl Tiles {
     }
 
     /// A layer of lines, each with its properties (a feature's id is its index; a feature with no line is left out, and keeps its
-    /// index). The properties are the `__rs_*` ones and those in `keep` (all of them when `whole`).
+    /// index). The properties are those in `keep`.
     pub fn add_lines<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (Option<L>, P)>, keep: &HashSet<String>, whole: bool, min_zoom: u32)
     where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
         let mut b = self.builder(name);
         for (i, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
-            b.push(Some(i as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
+            b.push(Some(i as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep)));
         }
         self.put(name, b.layer(whole, min_zoom, self.max_zoom));
     }
@@ -190,7 +189,7 @@ impl Tiles {
         let mut b = self.builder(name);
         for (i, (c, rule_props, road, tag)) in feats.enumerate() {
             let Some(c) = c else { continue };
-            b.wait(i as u64, line_geom(c.as_ref()), rule_props.filter(|(k, _)| kept(k.as_ref(), keep, whole)), (road, tag));
+            b.wait(i as u64, line_geom(c.as_ref()), rule_props.filter(|(k, _)| kept(k.as_ref(), keep)), (road, tag));
         }
         self.put(name, b.layer(whole, min_zoom, self.max_zoom));
     }
@@ -201,16 +200,16 @@ impl Tiles {
         layer.hits(z, x, y, self.pad(layer, z)).into_iter().filter_map(|i| layer.feats[i as usize].wait.map(|(_, tag)| (i, tag))).collect()
     }
 
-    /// Give waiting features of the layer `name` their line and properties (`keep`, `whole`: add_waiting's): each as (place, line,
+    /// Give waiting features of the layer `name` their line and properties (`keep`: add_waiting's): each as (place, line,
     /// properties). The line must be the one that add_waiting had (its box and first zoom stay).
-    pub fn make<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (u32, L, P)>, keep: &HashSet<String>, whole: bool)
+    pub fn make<L, K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (u32, L, P)>, keep: &HashSet<String>)
     where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
         let Some(layer) = self.layers.get_mut(name) else { return };
         let Some((key_at, val_at)) = layer.at.take() else { return };
         let mut b = Builder { keys: std::mem::take(&mut layer.keys), key_at, vals: std::mem::take(&mut layer.vals),
                               encoded: std::mem::take(&mut layer.encoded), val_at, ..Default::default() };
         for (i, c, props) in feats {
-            let (props, ..) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
+            let (props, ..) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep)));
             let f = &mut layer.feats[i as usize];
             (f.geom, f.props, f.wait) = (line_geom(c.as_ref()), props, None);
         }
@@ -247,7 +246,7 @@ impl Tiles {
         let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules, last: Vec::new(), scratch: Vec::new() };
         for (j, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
-            b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep, whole)));
+            b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep)));
         }
         let min_zoom = layer.min_zoom;
         *layer = b.layer(whole, min_zoom, self.max_zoom);      // the trees by first zoom again

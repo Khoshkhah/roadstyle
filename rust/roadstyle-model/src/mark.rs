@@ -199,6 +199,11 @@ impl Mark {
     }
 }
 
+/// The keys of the dashboard's filters (class, level, access): a road-derived tile layer (the pieces, the slots) keeps them.
+pub fn filter_keys() -> [&'static str; 3] {
+    [Mark::Class.name(), "lvl", Mark::Access.name()]
+}
+
 /// What the page reads on `kind`: the marks, then the contract columns.
 pub fn page_reads(kind: Kind) -> Vec<String> {
     let marks = Mark::ALL.iter().filter(|m| m.page_reads().contains(&kind)).map(|m| m.name().to_string());

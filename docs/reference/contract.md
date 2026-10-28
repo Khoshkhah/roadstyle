@@ -30,6 +30,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | `roadstyle:arrows` | `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null, from the final layers; the page's option `arrows` |
 | `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
 | `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
+| `roadstyle:base` | the names of the base-map layers, if the map has any. The tiles of such a layer keep only the properties that its style layers and the popup read |
 | Parquet field `roadstyle:json` | stage 1's Parquet files (`write_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |
 
 ## The dashboard's options from the style

@@ -85,6 +85,10 @@ impl Styled {
         let mut s = Styled { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
                              sources: p.sources, roads: p.roads, saved: serde_json::Map::new(), warnings: p.warnings };
         s.set_reads();
+        let base: Vec<&str> = s.shown().filter(|(_, v)| matches!(v, Source::Features(_))).map(|(k, _)| k).collect();
+        if !base.is_empty() {
+            s.metadata[roadstyle_model::props::BASE_LAYERS] = base.into();
+        }
         s
     }
 

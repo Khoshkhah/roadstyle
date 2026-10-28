@@ -77,10 +77,10 @@ impl LiveTiles {
                 continue;
             }
             let at = self.piece_at.entry(k.clone()).or_insert_with(|| p.pieces.iter().enumerate().map(|(i, (id, _))| (*id as u64, i)).collect());
-            let (keep, whole, _) = self.options.rule(k, Default::default);
+            let (keep, ..) = self.options.rule(k, Default::default);
             let feats = wait.iter().zip(p.piece_cells(roads, wait.iter().map(|(_, tag)| at[tag])))
                 .map(|(&(i, _), (_, props, c))| (i, c.expect("a waiting piece has a line"), props.into_iter()));
-            self.tiles.make(k, feats, &keep, whole);
+            self.tiles.make(k, feats, &keep);
         }
         self.tiles.tile(z, x, y)
     }
