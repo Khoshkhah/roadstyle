@@ -23,3 +23,7 @@ def test_range_and_zoom_are_inverse():
     console.log(JSON.stringify([zoomOf(43.7, rangeOf(43.7, 16.3)), rangeOf(43.7,16.3)]));"""
     z, r = json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout)
     assert abs(z - 16.3) < 1e-9 and r > 0
+
+
+def test_one_owner_per_gesture():
+    assert "ONE OWNER PER GESTURE" in SRC and 'owner="3d"' in SRC and 'owner==="map"' in SRC

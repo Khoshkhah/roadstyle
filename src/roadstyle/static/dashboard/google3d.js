@@ -70,20 +70,31 @@ export function initGoogle3D(){
     const there=t=>{ const c=map.getCenter();     // the map is already at t: Google's change came from the map
       return Math.abs(c.lng-t.center[0])<1e-7 && Math.abs(c.lat-t.center[1])<1e-7 && turn(map.getBearing(), t.bearing)<0.05 &&
              Math.abs(map.getPitch()-t.pitch)<0.05 && Math.abs(map.getZoom()-t.zoom)<0.002; };
+    // ONE OWNER PER GESTURE. While the pointer is down in the 3D window, the 3D view leads: the map follows with one jumpTo per frame, and
+    // the map's moves are not sent back. While the map is dragged, the map leads. The owner is released one frame after the pointer goes up,
+    // and the two cameras are then made equal once. Each direction sends at most one update per frame.
+    let owner=null, toGQueued=false;
+    const release=()=>{ if(!owner) return; requestAnimationFrame(()=>requestAnimationFrame(()=>{ owner=null;
+      if(m3 && m3.center && m3.range && !there(toMap())) Object.assign(m3, toGoogle()); })); };
+    w.addEventListener("pointerdown", ()=>{ owner="3d"; }, true);
+    map.getContainer().addEventListener("pointerdown", ()=>{ owner="map"; }, true);
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
     map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows
-      if(!m3 || e.rsG3d) return;
-      lastMap=performance.now(); Object.assign(m3, toGoogle()); });
+      if(!m3 || e.rsG3d || owner==="3d") return;
+      lastMap=performance.now();
+      if(toGQueued) return; toGQueued=true;
+      requestAnimationFrame(()=>{ toGQueued=false; if(m3 && owner!=="3d") Object.assign(m3, toGoogle()); }); });
     const fromGoogle=()=>{                       // Google moved: the map follows, once a frame
       if(queued) return; queued=true;
       requestAnimationFrame(()=>{ queued=false;
-        // Google's late reports of a map move would pull the map back while it is dragged
-        if(!m3 || !m3.center || !m3.range || performance.now()-lastMap<300) return;
+        if(!m3 || !m3.center || !m3.range || owner==="map") return;
+        if(owner===null && performance.now()-lastMap<300) return;     // late reports of a map move would pull the map back
         const t=toMap(); if(there(t)) return;
         map.jumpTo(t, {rsG3d:true});
-        // THE MAP IS THE JUDGE: where it cannot follow (its maxBounds box, its maximum pitch) it stops at
-        // its limit, and Google goes back to the map's camera. Google's own bounds limit the position of
-        // its camera, not the point it looks at: a tilted, far camera left the box and moved the view.
-        if(!there(t)) Object.assign(m3, toGoogle()); }); };
+        // THE MAP IS THE JUDGE: where it cannot follow (its maxBounds box, its maximum pitch) it stops at its limit, and Google goes
+        // back to the map's camera. Not while the pointer is down in the 3D window: the release makes the two equal.
+        if(owner!=="3d" && !there(t)) Object.assign(m3, toGoogle()); }); };
     // THE MAP'S CENTER BESIDE THE WINDOW: while the window is open, the map's padding puts its center (the
     // point the two cameras share, where a clicked road comes to) in the middle of the map's free side, so
     // the window does not cover it. Phones keep the plain center: there the window docks at the bottom.

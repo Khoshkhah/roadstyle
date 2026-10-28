@@ -47,6 +47,8 @@ By default, roadstyle moves the map center to the free part of the map while the
 
 A review page sets this option to false, because a drag of a window or a toggle of a panel must not move the map.
 
+One owner leads each gesture. While the pointer is down in the 3D window, the 3D view leads. The map follows with one `jumpTo` per frame, and the map's moves do not go back to the 3D view. While the map is dragged, the map leads. The page releases the owner one frame after the pointer goes up, and then makes the two cameras equal once. This stops the map from shaking in a swipe.
+
 ## 5. Check the link in a browser
 
 The simready page has a debug line. Open the page with `?debug=1` and open the Google 3D window. The line shows:
