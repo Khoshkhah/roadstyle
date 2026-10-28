@@ -102,13 +102,13 @@ def test_the_dashboard_checks_the_tiles_generation(tmp_path, live_style, tiles, 
     """The style's generation (roadstyle:generation) against the `?g=` of its tile URL: another generation is an error, a message on the
     map, the vector layers hidden and no road interaction (a row is valid in one generation only)."""
     style, bounds = live_style
+    server = _serve(tmp_path)          # its port is in the tile URL: the answer is a quick 404, so that the map becomes idle
     style = json.loads(json.dumps(style))
     style["metadata"]["roadstyle:generation"] = "aaaa"
-    style["sources"]["tiled"] = {"type": "vector", "tiles": [f"http://127.0.0.1:1/{{z}}/{{x}}/{{y}}?g={tiles}"], "maxzoom": 14}
+    style["sources"]["tiled"] = {"type": "vector", "tiles": [f"http://127.0.0.1:{server.server_address[1]}/no-tiles/{{z}}/{{x}}/{{y}}?g={tiles}"], "maxzoom": 14}
     style["layers"].append({"id": "tiled-roads", "type": "line", "source": "tiled", "source-layer": "roads"})
     (tmp_path / "style.json").write_text(json.dumps(style))
     (tmp_path / "host.html").write_text(HOST.replace("BOUNDS", json.dumps(bounds)))
-    server = _serve(tmp_path)
     try:
         with pw.sync_playwright() as p:
             browser = p.chromium.launch()
