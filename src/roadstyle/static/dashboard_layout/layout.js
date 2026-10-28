@@ -168,6 +168,9 @@
           menu.style.marginTop = (over > 0 ? -over : under > 0 ? under : 0) + "px"; }).observe(menu, {attributes:true, attributeFilter:["class"]});
         document.addEventListener("keydown", e=>{ if(e.key === "Escape") menu.classList.remove("open"); }, true);
       }
+      // the base-map button: the layers icon (three tilted sheets: the top one filled, the two below as outlines)
+      const bmBtn = tb.querySelector(".bm-icon");
+      if(bmBtn){ bmBtn.title = "Base map and layers"; bmBtn.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path class="rs-sheet" d="M12 3 3 8l9 5 9-5-9-5z" fill="currentColor"/><path class="rs-sheet" d="M3 12.5l9 5 9-5" fill="none"/><path class="rs-sheet" d="M3 17l9 5 9-5" fill="none"/></svg>'; }
       filled = true; reveal();
       tb.querySelectorAll("button").forEach(b=>{ if(!b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; });
       // A panel on the side of a corner box or of the bar never covers it: when the panel is open, the box slides to 8 px beside it (150 ms); when the

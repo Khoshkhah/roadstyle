@@ -173,3 +173,15 @@ def test_theme_button_on_the_bar(tmp_path):
         pg.click("#rs-theme-btn")
         assert pg.evaluate("[document.getElementById('sb').dataset.theme, document.getElementById('rs-theme-btn').innerHTML.includes('<circle')]") == ["light", True]
         b.close()
+
+
+def test_base_map_button_has_the_layers_icon(tmp_path):
+    path = _page(tmp_path, "right")
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && document.querySelector('#rs-toolbar .bm-icon svg') && document.getElementById('rs-toolbar').classList.contains('rs-ready')", timeout=60000)
+        got = pg.evaluate("[document.querySelector('#rs-toolbar .bm-icon').title, document.querySelectorAll('#rs-toolbar .bm-icon svg .rs-sheet').length]")
+        assert got == ["Base map and layers", 3]
+        b.close()
