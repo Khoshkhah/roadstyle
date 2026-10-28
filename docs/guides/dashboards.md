@@ -106,3 +106,5 @@ To show a set of edges, recolour them with `rsColor`; don't draw extra lines ove
 Pick a highlight colour that no `color_options` entry already uses.
 
 **See also:** [JavaScript API](../reference/javascript.md) · [Command line](../reference/cli.md) · [Every parameter](../reference/parameters.md)
+
+For a full-size map with floating panels and a toolbar, see [The dashboard layout](dashboard-layout.md).

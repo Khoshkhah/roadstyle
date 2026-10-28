@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 from .render import render_edges
 
@@ -52,17 +53,40 @@ def _page(gdf, template: str, *, defaults: dict, edit=None, **kw):
     return m
 
 
-def render_dashboard(gdf, **kw):
+_LAYOUT_DIR = Path(__file__).resolve().parent / "static" / "dashboard_layout"
+
+
+def _with_layout(m, layout, toolbar):
+    """Add the overlay layout and the toolbar of a dashboard page (docs/guides/dashboard-layout.md): a style and a script before </body>."""
+    import json
+    if layout not in ("dock", "overlay"):
+        raise ValueError(f"layout must be 'dock' or 'overlay', not {layout!r}")
+    if toolbar not in (False, None, "right", "left", "top", "bottom"):
+        raise ValueError(f"toolbar must be False, 'right', 'left', 'top' or 'bottom', not {toolbar!r}")
+    if layout == "dock" and not toolbar:
+        return m
+    css = (_LAYOUT_DIR / "layout.css").read_text(encoding="utf-8")
+    js = (_LAYOUT_DIR / "layout.js").read_text(encoding="utf-8")
+    opt = json.dumps({"layout": layout, "toolbar": toolbar or False})
+    m._tpl = m._tpl.replace("</body>", f"<style>{css}</style><script>window.rsLayout={opt};</script><script>{js}</script></body>", 1)
+    return m
+
+
+def render_dashboard(gdf, *, layout="dock", toolbar=False, **kw):
     """A self-contained **dashboard** page: the styled map with every built-in control off and the
     bundled dashboard sidebar injected — base-map + colour-by selects, a class filter with a legend,
     a WHERE-clause query box with a result table, and a selected-road read-out.
 
     Populate the *Colour by* picker with ``color_options={...}`` (see :func:`render_edges`); any
     other ``render_edges`` keyword passes through. Returns a :class:`WebMap`;
-    ``.save("dashboard.html")`` writes the page."""
-    return _page(gdf, "dashboard",
-                 defaults=dict(name="Roads dashboard", basemap_switcher=False,
-                               filter_control=False, road_popup=False), **kw)
+    ``.save("dashboard.html")`` writes the page.
+
+    ``layout="overlay"``: the map fills the window and the panels float over it (default ``"dock"``: the
+    panels take their own space). ``toolbar="right"|"left"|"top"|"bottom"``: the map's controls on one
+    bar at that edge (default ``False``: the plain control column). See docs/guides/dashboard-layout.md."""
+    return _with_layout(_page(gdf, "dashboard",
+                              defaults=dict(name="Roads dashboard", basemap_switcher=False,
+                                            filter_control=False, road_popup=False), **kw), layout, toolbar)
 
 
 def render_report(gdf, **kw):

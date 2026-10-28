@@ -55,6 +55,7 @@ nav:
       - Google Street View: guides/street-view.md
       - Google 3D: guides/google-3d.md
       - Google 3D camera link: guides/google-3d-camera.md
+      - The dashboard layout: guides/dashboard-layout.md
       - Set up a Google key: guides/google-key.md
       - Big networks: guides/big-networks.md
       - Dashboards & JavaScript: guides/dashboards.md
