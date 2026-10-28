@@ -65,13 +65,15 @@ export function initGoogle3D(){
     // THE CAMERA ABOVE THE BUILDINGS. Google will not put its camera into its own 3D tiles: where the range set from the map's zoom puts the
     // camera lower than the tiles (a roundabout with buildings of 20 to 40 m, zoom 19.9), Google keeps the camera above them,
     // the view shows more than the map, and map3d.range still reports the value set. The camera's height above the ground is the range
-    // times cos(tilt). Below window.rsG3dMinAlt (metres, default 100: a first guess between 73 m, where Kaveh saw the mismatch, and 157 m, where the two agreed; read the debug line to set it) the title bar says so; the page does not stop the map's zoom.
+    // times cos(tilt). Below window.rsG3dMinAlt (metres, default MIN_ALT: 80) the title bar says so; the page does not stop the map's zoom.
     const NOTE="Google keeps its camera above the buildings: the 3D view shows more than the map", note=w.querySelector(".rs-g3d-note");
     note.textContent=NOTE; note.title=NOTE;
     window.rsG3dCamera=()=>{ const r=m3 && m3.range || rangeOf(map.getCenter().lat, map.getZoom()), t=m3 ? (m3.tilt||0) : map.getPitch(), c=map.getCenter();
       return {above:r*Math.cos(rad(t)), range:r, tilt:t, ground:ground(c.lng, c.lat), sea:(m3 && m3.center && m3.center.altitude || 0)+r*Math.cos(rad(t))}; };
-    const lowCam=()=>{ const c=window.rsG3dCamera(), min=typeof window.rsG3dMinAlt==="number" ? window.rsG3dMinAlt : 100; note.hidden=!(c.above<min); };
+    const MIN_ALT=80;      // metres above the ground: seen at Sainte-Devote, zoom 19.9 (73 m), the view widened; a page can set window.rsG3dMinAlt
+    const lowCam=()=>{ const c=window.rsG3dCamera(), min=typeof window.rsG3dMinAlt==="number" ? window.rsG3dMinAlt : MIN_ALT; note.hidden=w.hidden || !(c.above<min); };
     map.on("move", lowCam); map.on("zoom", lowCam); new MutationObserver(lowCam).observe(w, {attributes:true, attributeFilter:["hidden"]});
+    setInterval(()=>{ if(!w.hidden) lowCam(); }, 400);       // Google changes its own range without a map move
     const toGoogle=()=>{ const c=map.getCenter();
       return {center:{lat:c.lat, lng:c.lng, altitude:ground(c.lng, c.lat)}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
               range:rangeOf(c.lat, map.getZoom())}; };
