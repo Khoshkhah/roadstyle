@@ -80,7 +80,7 @@ export function initGoogle3D(){
     // the window does not cover it. Phones keep the plain center: there the window docks at the bottom.
     const pad=()=>{
       const m=map.getContainer().getBoundingClientRect(), r=w.getBoundingClientRect(), p={...map.getPadding(), left:0, right:0};
-      if(!w.hidden && innerWidth>520){
+      if(!w.hidden && innerWidth>520 && window.rsWindowRecentre!==false){      // a page can set window.rsWindowRecentre=false: the map then never moves for the window
         if(r.left+r.width/2 < m.left+m.width/2) p.left=Math.max(0, r.right-m.left);
         else p.right=Math.max(0, m.right-r.left); }
       const o=map.getPadding();
