@@ -4,7 +4,7 @@
 // to its center: the map's own camera distance at that zoom). A clicked road is drawn in the 3D view
 // and the camera flies along it (the map follows). Google's 3D map exists only while the window is
 // open: closing it drops it, as nothing is loaded from Google while it is closed.
-import {map, O, _road} from "./core.js";
+import {map, O, _road, _rprops} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {_svKey} from "./streetview.js";
 import {_svLine, _svDist, _svAt} from "./svspot.js";
@@ -14,12 +14,13 @@ export function initGoogle3D(){
     const w=document.createElement("div"); w.className="rs-svw rs-g3d"; w.hidden=true;
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
       '<span class="rs-g3d-note" hidden></span>'+
+      '<span class="rs-g3d-note rs-g3d-tun" hidden>This road is in a tunnel: Google shows the surface above it</span>'+
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
       '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
       ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
       '<button type="button" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
-    const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg");
+    const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
     let m3=null, lib=null, line=null, btn=null, lastMap=0, queued=false;
     const say=html=>{ msg.innerHTML=html; msg.hidden=false; if(m3){ m3.remove(); m3=null; line=null; } };
@@ -124,7 +125,17 @@ export function initGoogle3D(){
     map.on("resize", pad);
     // THE LABELS. SATELLITE has no labels or pins, HYBRID has them. The page's "Labels" switch (the base-map box, window.rsLabelsOn) rules both
     // the map and this view; without that switch the view has no labels.
-    const modeOf=l=>window.rsLabelsOn && window.rsLabelsOn() ? l.MapMode.HYBRID : l.MapMode.SATELLITE;
+    // The window always shows Google's photorealistic imagery: SATELLITE or HYBRID, nothing else (any other or unset mode makes Google draw its
+    // stylised map: dark blocks with pins). The enum's value, or its name when the library has no such enum. window.rsG3dLog keeps Google's
+    // last console warnings, and window.rsG3dMode() the mode the element reports (the debug line shows both).
+    const modeOf=l=>{ const n=window.rsLabelsOn && window.rsLabelsOn() ? "HYBRID" : "SATELLITE"; return (l.MapMode && l.MapMode[n]) || n; };
+    const isImagery=v=>/^(HYBRID|SATELLITE)$/i.test(String(v));
+    const LOG=window.rsG3dLog=[];
+    for(const k of ["warn", "error"]){ const f=console[k]; console[k]=function(...a){ try{ const t=a.map(String).join(" ");
+      if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>5) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
+    window.rsG3dMode=()=>m3 ? String(m3.mode) : null;
+    const keepImagery=()=>{ if(m3 && lib && !isImagery(m3.mode)){ LOG.push("mode "+m3.mode+" set again"); m3.mode=modeOf(lib); } };
+    setInterval(keepImagery, 1000);
     document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib) m3.mode=modeOf(lib); });
     const open=()=>{
       if(location.protocol==="file:"){
@@ -136,6 +147,7 @@ export function initGoogle3D(){
         if(w.hidden || m3) return;               // closed while it loaded
         lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:modeOf(l)}));
         for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
+        m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
         msg.hidden=true; w.appendChild(m3);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
     };
@@ -143,10 +155,19 @@ export function initGoogle3D(){
       const d=e.detail; if(d.overlay || !m3) return;
       const cs=_svLine(_road(d.id)); if(cs.length<2) return;
       const p=d.properties||{}; ttl.textContent=p.name||p.highway||"Unnamed road";
-      if(line) line.remove();
-      line=new lib.Polyline3DElement({path:cs.map(c=>({lat:c[1], lng:c[0]})), strokeColor:O.select_color, strokeWidth:8,
-                                      outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true});
-      m3.appendChild(line);
+      if(line) line.forEach(x=>x.remove());
+      line=[]; tun.hidden=true;
+      const lvl=(_rprops(d.id)||{}).lvl||0, ps=(r, a)=>({path:r.map(c=>({lat:c[1], lng:c[0], altitude:a||0})), strokeColor:O.select_color, strokeWidth:8, outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true});
+      if(lvl>0){            // a bridge: at its deck height above the ground (window.rsG3dDeckM(props, level) sets it; default 6 m a level)
+        const h=typeof window.rsG3dDeckM==="function" ? window.rsG3dDeckM(_rprops(d.id), lvl) : 6*lvl;
+        line.push(new lib.Polyline3DElement(Object.assign(ps(cs, h), {altitudeMode:(lib.AltitudeMode||{}).RELATIVE_TO_GROUND||"RELATIVE_TO_GROUND"}))); }
+      else if(lvl<0){       // a tunnel: dashed, in the tunnel colour, on the surface above it (Google cannot show the inside)
+        tun.hidden=false;
+        const dd=_svDist(cs), at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
+        for(let a=0, on=7, off=5; a<dd[dd.length-1]; a+=on+off){ const b=Math.min(a+on, dd[dd.length-1]);
+          const seg=[at(a)].concat(cs.filter((c, i)=>dd[i]>a && dd[i]<b), [at(b)]);
+          line.push(new lib.Polyline3DElement(Object.assign(ps(seg), {strokeColor:"#7e57c2", outerColor:"#ffffff"}))); } }
+      else line.push(new lib.Polyline3DElement(ps(cs)));
       const dist=_svDist(cs), len=dist[dist.length-1], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
       m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:ground(mid.lng, mid.lat)}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
                       durationMillis:1500});
@@ -154,7 +175,7 @@ export function initGoogle3D(){
     rsSetGoogle3D=function(on){
       w.hidden=!on;
       if(on){ if(innerWidth>520) place(); if(!m3) open(); }
-      else { if(m3){ m3.remove(); m3=null; line=null; } ttl.textContent="Google 3D"; }
+      else { if(m3){ m3.remove(); m3=null; line=null; } ttl.textContent="Google 3D"; tun.hidden=true; }
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on);
       document.dispatchEvent(new CustomEvent("rs:google3dchange", {detail:{open:!!on}}));
     };
