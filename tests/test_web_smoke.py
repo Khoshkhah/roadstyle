@@ -242,7 +242,7 @@ def test_edge_overlay_page_boots_and_rsfilter_keeps_position_and_order(tmp_path)
 
 
 def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
-    """docs/design/edge_overlays.md: after rsFilter(ids) on the roads, the arrow and name layers show only the slots of those edges (their id / __rs_edge2)."""
+    """docs/design/edge_overlays.md: after rsFilter(ids) on the roads, the arrow and name layers show only the slots of those edges (their id; a twin from the road table)."""
     from roadstyle import render_edges as render
 
     path = tmp_path / "slots.html"
@@ -263,7 +263,7 @@ def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
         reset = page.evaluate("ids => ids.map(i => JSON.stringify(map.getFilter(i)))", layers)
         browser.close()
     assert errors == []
-    assert not any("__rs_edge" in f for f in before) and all("__rs_edge" in f for f in after)
+    assert not any('"id"' in f for f in before) and all('"id"' in f for f in after)
     assert reset == before
 
 

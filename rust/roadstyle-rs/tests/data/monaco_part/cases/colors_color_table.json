@@ -56,17 +56,17 @@
       "roads": [
         "geojson",
         1373,
-        "17e9f701d61414a6"
+        "058e0085bab120dd"
       ],
       "simple": [
         "geojson",
         1855,
-        "cb92f5bc15921db4"
+        "ce3c23fef831d0fb"
       ],
       "slots": [
         "geojson",
         243,
-        "09cdfb926249de12"
+        "2cdac55d9243623c"
       ]
     },
     "metadata": {
@@ -76,7 +76,7 @@
       "roadstyle:controls": "7ad47e2cab264f27",
       "roadstyle:generation": "18db75a661ad967c"
     },
-    "hash": "e43e2beed88b692f"
+    "hash": "32dbaf67c406f7f2"
   },
   "color_options": {
     "names": [],

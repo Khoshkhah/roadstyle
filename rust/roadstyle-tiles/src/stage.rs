@@ -102,8 +102,8 @@ impl TileOptions {
             // the roads layer's feature id is its index, the road's row: `__rs_edge` is not a key there
             "roads" => (self.exact_or(&self.read).into_iter().filter(|k| k != Mark::Edge.name()).collect(), false, 0),
             "simple" => (self.exact_or(&self.pieces).into_iter().chain(reads(name)).chain(page_reads(Kind::Pieces)).chain([Mark::Edge.name().into()]).collect(), false, 0),
-            // the arrows' and names' filters take the twin from `__rs_edge2` (filter.js); `__rs_edge` is the carrier of a file's slot id
-            "slots" => (reads(name).into_iter().chain(page_reads(Kind::Slots)).chain(filter_keys().map(String::from)).chain([Mark::Edge2.name().into(), Mark::Edge.name().into()]).collect(), true, self.slots_from),
+            // `__rs_edge` is the carrier of a file's slot id
+            "slots" => (reads(name).into_iter().chain(page_reads(Kind::Slots)).chain(filter_keys().map(String::from)).chain([Mark::Edge.name().into()]).collect(), true, self.slots_from),
             _ if self.base.contains(name) => (self.base_keys(name), false, 0),
             _ => (self.read.iter().cloned().chain(props()).collect(), false, 0),
         }

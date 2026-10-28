@@ -121,6 +121,7 @@ fn slots_for(mut slots: Value, export: bool) -> Value {
     for f in slots["data"]["features"].as_array_mut().into_iter().flatten() {
         let Some(p) = f["properties"].as_object_mut() else { continue };
         let edge = p.shift_remove(Mark::Edge.name());
+        p.shift_remove(Mark::Edge2.name());          // the filter takes the twin from the road table
         if !export {
             p.shift_remove(Mark::SlotArrow.name());
         }

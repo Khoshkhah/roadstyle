@@ -85,7 +85,7 @@ marks! {
     /// id, not as a property); an overlay's item keeps it as a property
     Edge = "__rs_edge" [Pieces];
     /// the key of a two-way road's other edge
-    Edge2 = "__rs_edge2" [Pieces, Table];
+    Edge2 = "__rs_edge2" [Table];
     /// the keys of a deck's roads
     Edges = "__rs_edges" [Decks];
     /// a piece's kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item

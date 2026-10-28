@@ -2,7 +2,6 @@
   "_doc": "The feature properties that the page's dashboard modules and page scripts read (docs/reference/contract.md, 'What a page reads'). pieces: a feature of the road layer (a road piece or an item). decks: a 3D deck or shadow. slots: a name or arrow slot. table: a row of the road table (also the fields of roadstyle:interaction's popup and tooltip, every public field when the popup list is null, the edge_id_col, and the road's line). The layers' own expressions read what they read (props::drawn collects it). tests/test_contract_names.py fails when a module reads a __rs_* property that is not here.",
   "pieces": [
     "__rs_edge",
-    "__rs_edge2",
     "__rs_k",
     "__rs_cls",
     "lvl",

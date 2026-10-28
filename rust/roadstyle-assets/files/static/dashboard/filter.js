@@ -20,7 +20,7 @@ const _fltLayers=()=>map.getStyle().layers.filter(l=>RS_ROLES.has(_role(l)) || _
 // the one lookup (docs/design/edge_items.md): the class, bridge, tunnel and rsFilter switches decide which edges show, and every layer that
 // draws a piece of a road, or an item attached to one, shows exactly the pieces and items of those edges. The class and level tests stay
 // short property tests: every piece and item carries its edge's class (__rs_cls: FILTER.col of the edge, also on a name or an arrow,
-// which carry the chain's highway) and level (lvl; an attached item has it baked as __rs_lvl). The rsFilter id set goes through the id (the road's row), or __rs_edge2 (a two-way pair's shared piece shows while
+// which carry the chain's highway) and level (lvl; an attached item has it baked as __rs_lvl). The rsFilter id set goes through the id (the road's row) and the twin from the road table (a two-way pair's shared piece shows while
 // either edge shows). A shadow line or a 3D deck covers several edges (__rs_edges): it shows while any of them shows, decided here.
 export function _applyRoadFilters(){
   // the id set: rsFilter's and the modes' (both: the rows in each)
@@ -32,7 +32,8 @@ export function _applyRoadFilters(){
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
     ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
   const and = (f,c)=>f?["all",f,c]:c;
-  const qr = q && ["any",_has(["id"],ids),_has(["get","__rs_edge2"],ids)], qe = qr;   // once per change
+  // a pair drawn as one line has the row of one of its edges as the id of its pieces: it shows while either edge shows (the twin is in the road table)
+  const qr = q && _has(["id"],[...q, ...[...q].map(i=>(_rprops(i)||{}).__rs_edge2).filter(t=>t!=null)]), qe = qr;   // once per change
   _fltLayers().forEach(l=>{
     if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null;
     let f=_fltBase[l.id];

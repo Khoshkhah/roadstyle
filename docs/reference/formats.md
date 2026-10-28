@@ -327,7 +327,7 @@ these is a layer in its tiles (a layer's `source-layer`).
 | Source (or tile layer) | One feature for each | Monaco | Main properties |
 |---|---|---|---|
 | `roads` | edge (the whole road) | 849 | the class style (`__rs_fill`, `__rs_w`, `__rs_casing`, `__rs_cw`, `__rs_dash`, `__rs_op`), the levels (`__rs_cl`, `__rs_fl`, `__rs_cs`, `__rs_ce`), `__rs_bridge`, `__rs_tunnel`, `__rs_oneway`, `__rs_edge` (its row), and every column of your data |
-| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `r` (the rank: an integer, 100 for each step of the key), `__rs_cap`, `__rs_edge2` (the road's twin); the feature id is its road's row, `highway` |
+| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `r` (the rank: an integer, 100 for each step of the key), `__rs_cap`; the feature id is its road's row, `highway` |
 | `slots` | place of a street name or a one-way arrow along a road | 646 | `name`, `oneway`, `slot`, `rank`, `lvl`; the feature id is its road's row |
 | `decks` | part of a 3D bridge deck (only with `view_3d=True`) | 588 | `__rs_height`, `__rs_base`, `__rs_edges` |
 

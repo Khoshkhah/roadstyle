@@ -75,46 +75,46 @@
       "roads": {
         "tiles": 7,
         "features": 72697,
-        "hash": "ea0b93cea4bb2d41"
+        "hash": "771b490e8d8ea71b"
       },
       "simple": {
         "tiles": 6,
         "features": 8533,
-        "hash": "bda4369c203ed2da"
+        "hash": "fd6b6c787f36b809"
       }
     },
     "z14": {
       "roads": {
         "tiles": 9,
         "features": 32329,
-        "hash": "ae7456cc8518847a"
+        "hash": "62281c2e271b3ae8"
       },
       "simple": {
         "tiles": 9,
         "features": 17983,
-        "hash": "f4e99bb9a2aec5cd"
+        "hash": "82c8e8988e8180d3"
       },
       "slots": {
         "tiles": 9,
         "features": 3612,
-        "hash": "98ed04b532eca38c"
+        "hash": "9d6477d828053b81"
       }
     },
     "z15": {
       "roads": {
         "tiles": 9,
         "features": 8373,
-        "hash": "42bafd7a867bf273"
+        "hash": "9d0664ed5c2984a6"
       },
       "simple": {
         "tiles": 9,
         "features": 13418,
-        "hash": "8161eb42c788212d"
+        "hash": "19125577eb0e0d3c"
       },
       "slots": {
         "tiles": 9,
         "features": 1890,
-        "hash": "94b16ae3c0f14635"
+        "hash": "764f27970ce99489"
       }
     }
   }
