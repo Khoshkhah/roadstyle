@@ -1,6 +1,7 @@
 /* render_dashboard(layout="overlay", toolbar=...): the map fills the window; the panels float over it; the map's controls sit on one bar. */
 html.rs-overlay #map{position:absolute!important;inset:0!important;left:0!important;right:0!important;width:auto!important}
-html.rs-overlay #sb,html.rs-overlay .rs-side{z-index:5;background:#fff;box-shadow:0 0 12px rgba(0,0,0,.2)}
+html.rs-overlay #sb,html.rs-overlay .rs-side{z-index:5;box-shadow:0 0 12px rgba(0,0,0,.2)}
+html.rs-overlay #sb{background:var(--bg,#fff)}
 html.rs-overlay,html.rs-overlay body{overflow:hidden}
 /* the chevron that brings a hidden right panel back: a small square at the top right, not a control of the bar */
 #rs-show-right{position:fixed;top:10px;right:10px;z-index:6;width:32px;height:32px;display:none}
