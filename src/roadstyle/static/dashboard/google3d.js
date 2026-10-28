@@ -81,16 +81,22 @@ export function initGoogle3D(){
     const toMap=()=>{ const c=m3.center;
       return {center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0, zoom:zoomOf(c.lat, m3.range)}; };
     const turn=(a, b)=>Math.abs(((a-b)%360+540)%360-180);
-    const there=t=>{ const c=map.getCenter();     // the map is already at t: Google's change came from the map
-      return Math.abs(c.lng-t.center[0])<1e-7 && Math.abs(c.lat-t.center[1])<1e-7 && turn(map.getBearing(), t.bearing)<0.05 &&
-             Math.abs(map.getPitch()-t.pitch)<0.05 && Math.abs(map.getZoom()-t.zoom)<0.002; };
+    // the map is at t, to the eye: the centre within 0.05 m on the ground, the zoom within 0.01, the bearing and the pitch within 0.1 degree.
+    // Returns the name of the first thing that differs, or "" (the centre's altitude is not checked).
+    const miss=t=>{ const c=map.getCenter(), k=111320;
+      if(Math.hypot((c.lat-t.center[1])*k, (c.lng-t.center[0])*k*Math.cos(rad(c.lat)))>0.05) return "centre";
+      if(turn(map.getBearing(), t.bearing)>=0.1) return "bearing";
+      if(Math.abs(map.getPitch()-t.pitch)>=0.1) return "pitch";
+      if(Math.abs(map.getZoom()-t.zoom)>=0.01) return "zoom"; return ""; };
+    const there=t=>!miss(t);
     // TAGGED MOVES, NO GESTURE DETECTION (Google's element keeps its pointer events inside its own canvas, and its inertia goes on after the
     // pointer is up). Each camera is moved by the page in one place, and the echo is dropped where it comes back:
     //  - the 3D camera moves the map with map.jumpTo(cam, {rsSync:true}); the map's "move" handler ignores a move with rsSync, so it is not sent back;
     //  - the map moves the 3D camera with setGoogle(), which keeps the values it set for a second; a camera-change of Google within a small
     //    tolerance of one of them (1e-7 degrees, 0.5 m, 0.2 degrees) is the echo of that set, and is ignored.
     // Each direction runs at most once per frame. window.rsG3dCount counts both (the debug line shows them per second).
-    const COUNT=window.rsG3dCount={g2m:0, m2g:0}, sets=[];
+    const COUNT=window.rsG3dCount={g2m:0, m2g:0, back:0, lastMiss:""}, sets=[];
+    let lastGoogle=-1e9, ignoreUntil=0, rec=0;       // lastGoogle: the last camera change of Google that was not an echo
     const setGoogle=()=>{ if(!m3) return; const g=toGoogle(), now=performance.now(); Object.assign(m3, g); COUNT.m2g++;
       sets.push({t:now, lat:g.center.lat, lng:g.center.lng, range:g.range, heading:g.heading, tilt:g.tilt});
       while(sets.length && now-sets[0].t>1000) sets.shift(); };
@@ -99,16 +105,23 @@ export function initGoogle3D(){
     let toGQueued=false;
     map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows, once a frame
       if(!m3 || e.rsSync || e.rsG3d || toGQueued) return; toGQueued=true;
-      requestAnimationFrame(()=>{ toGQueued=false; setGoogle(); }); });
+      requestAnimationFrame(()=>{ toGQueued=false; if(performance.now()-lastGoogle>=300) setGoogle(); }); });   // while Google leads, the map's own moves are not sent
+    // WHILE GOOGLE LEADS, NOTHING GOES BACK. The map follows as far as it can (its limits: maxPitch, maxZoom, maxBounds). When Google has been
+    // still for 300 ms, a map that could not follow is reconciled once: Google flies to the map's camera in 250 ms.
+    const reconcile=()=>{ rec=0; if(!m3 || performance.now()-lastGoogle<300) return;
+      const t=toMap(), g=toGoogle(); if(!(m3.center && m3.range) || there(t)) return;
+      ignoreUntil=performance.now()+450; COUNT.m2g++;
+      try{ m3.flyCameraTo({endCamera:g, durationMillis:250}); }catch(e){ Object.assign(m3, g); }
+      sets.push({t:performance.now(), lat:g.center.lat, lng:g.center.lng, range:g.range, heading:g.heading, tilt:g.tilt}); };
     const fromGoogle=()=>{                       // Google moved: the map follows, once a frame
       if(queued) return; queued=true;
       requestAnimationFrame(()=>{ queued=false;
-        if(!m3 || !m3.center || !m3.range || echo()) return;
+        if(!m3 || !m3.center || !m3.range || echo() || performance.now()<ignoreUntil) return;
+        lastGoogle=performance.now();
         const t=toMap(); if(there(t)) return;
         map.jumpTo(t, {rsG3d:true, rsSync:true}); COUNT.g2m++;
-        // THE MAP IS THE JUDGE: where it cannot follow (its maxBounds box, its maximum pitch) it stops at its limit, and Google goes
-        // back to the map's camera.
-        if(!there(t)) setGoogle(); }); };
+        const m=miss(t); if(m){ COUNT.back++; COUNT.lastMiss=m; }       // the map could not follow: judged back (the debug line counts it)
+        clearTimeout(rec); rec=setTimeout(reconcile, 320); }); };
     // THE MAP'S CENTER BESIDE THE WINDOW: while the window is open, the map's padding puts its center (the
     // point the two cameras share, where a clicked road comes to) in the middle of the map's free side, so
     // the window does not cover it. Phones keep the plain center: there the window docks at the bottom.
@@ -125,18 +138,20 @@ export function initGoogle3D(){
     map.on("resize", pad);
     // THE LABELS. SATELLITE has no labels or pins, HYBRID has them. The page's "Labels" switch (the base-map box, window.rsLabelsOn) rules both
     // the map and this view; without that switch the view has no labels.
-    // The window always shows Google's photorealistic imagery: SATELLITE or HYBRID, nothing else (any other or unset mode makes Google draw its
-    // stylised map: dark blocks with pins). The enum's value, or its name when the library has no such enum. window.rsG3dLog keeps Google's
-    // last console warnings, and window.rsG3dMode() the mode the element reports (the debug line shows both).
+    // THE MODE. The page sets the mode when the window opens and when the Labels switch changes (SATELLITE, or HYBRID with labels), and otherwise
+    // leaves Google's own toggle alone (the round thumbnail at the top right of the window: imagery or Google's stylised 3D map). The reviewer's
+    // last choice is kept for the next opening. window.rsG3dLog keeps Google's last console warnings, and window.rsG3dMode() the mode the
+    // element reports (the debug line shows both).
     const modeOf=l=>{ const n=window.rsLabelsOn && window.rsLabelsOn() ? "HYBRID" : "SATELLITE"; return (l.MapMode && l.MapMode[n]) || n; };
-    const isImagery=v=>/^(HYBRID|SATELLITE)$/i.test(String(v));
+    const MODE_KEY="rs-g3d-mode:"+location.pathname;
+    const keptMode=()=>{ try{ return localStorage.getItem(MODE_KEY); }catch(e){ return null; } };
+    const keepMode=()=>{ if(m3 && m3.mode){ try{ localStorage.setItem(MODE_KEY, String(m3.mode)); }catch(e){} } };
     const LOG=window.rsG3dLog=[];
     for(const k of ["warn", "error"]){ const f=console[k]; console[k]=function(...a){ try{ const t=a.map(String).join(" ");
       if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>5) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
     window.rsG3dMode=()=>m3 ? String(m3.mode) : null;
-    const keepImagery=()=>{ if(m3 && lib && !isImagery(m3.mode)){ LOG.push("mode "+m3.mode+" set again"); m3.mode=modeOf(lib); } };
-    setInterval(keepImagery, 1000);
-    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib) m3.mode=modeOf(lib); });
+    const redraw=()=>{ if(m3 && line) line.forEach(x=>{ x.remove(); m3.appendChild(x); }); };      // the selected road is drawn again in the new mode
+    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ m3.mode=modeOf(lib); keepMode(); } });
     const open=()=>{
       if(location.protocol==="file:"){
         say("<b>Google 3D needs this page served, not opened from disk.</b>"+
@@ -145,7 +160,8 @@ export function initGoogle3D(){
       msg.textContent="Loading Google 3D…"; msg.hidden=false;
       _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
         if(w.hidden || m3) return;               // closed while it loaded
-        lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:modeOf(l)}));
+        lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:(k=>k && !/^(HYBRID|SATELLITE)$/i.test(k) ? k : modeOf(l))(keptMode())}));
+        m3.addEventListener("gmp-modechange", ()=>{ keepMode(); redraw(); });
         for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
         msg.hidden=true; w.appendChild(m3);
@@ -176,7 +192,7 @@ export function initGoogle3D(){
     rsSetGoogle3D=function(on){
       w.hidden=!on;
       if(on){ if(innerWidth>520) place(); if(!m3) open(); }
-      else { if(m3){ m3.remove(); m3=null; line=null; } ttl.textContent="Google 3D"; tun.hidden=true; }
+      else { keepMode(); if(m3){ m3.remove(); m3=null; line=null; } ttl.textContent="Google 3D"; tun.hidden=true; }
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on);
       document.dispatchEvent(new CustomEvent("rs:google3dchange", {detail:{open:!!on}}));
     };

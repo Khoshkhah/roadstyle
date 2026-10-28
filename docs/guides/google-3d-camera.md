@@ -47,6 +47,8 @@ By default, roadstyle moves the map center to the free part of the map while the
 
 A review page sets this option to false, because a drag of a window or a toggle of a panel must not move the map.
 
+While Google leads, the page sends nothing back to it: the map follows as far as it can. When Google has been still for 300 ms and the map could not follow (a limit such as the maximum pitch), the page sets the 3D camera to the map's once, with `flyCameraTo` over 250 ms. `rsG3dCount.back` counts the times the map could not follow, and `lastMiss` names the property.
+
 The page does not detect gestures, because Google's element keeps its pointer events inside its own canvas. It tags its own moves instead. The 3D camera moves the map with `map.jumpTo(camera, {rsSync: true})`, and the map ignores a move with that tag. The map moves the 3D camera, and the page keeps the values it set for one second. A camera change of Google that is within 1e-7 degrees, 0.5 m and 0.2 degrees of one of them is the echo of that set, and the page ignores it. Each direction runs once per frame at most. `window.rsG3dCount` counts both directions: `g2m` (3D to map) and `m2g` (map to 3D). During a drag in the 3D window `m2g` stays at 0. During a drag of the map `g2m` stays at 0.
 
 ## 5. Check the link in a browser
@@ -72,5 +74,5 @@ To check the link in ten minutes:
 - The window shows the same view as the map, but smaller.
 - A headless browser does not draw Google 3D. Use a browser with a screen.
 - The "Labels" switch of the base-map box rules the 3D view too: on gives Google's HYBRID mode (labels and pins), off gives SATELLITE. Without that switch the view has no labels.
-- The 3D view always shows Google's photorealistic imagery (SATELLITE or HYBRID). If Google reports an error, the window says "Google 3D imagery did not load".
+- The page sets the mode of the 3D view only when the window opens and when the Labels switch changes (SATELLITE, or HYBRID with labels). Google's own toggle (the round thumbnail at the top right of the window, imagery or Google's stylised 3D map) is allowed, and the page leaves it alone. A choice of the stylised map is kept for the next opening, and the selected road is drawn again after a change of mode. If Google reports an error, the window says "Google 3D imagery did not load".
 - A selected road lies on Google's photorealistic mesh (`RELATIVE_TO_MESH`, 0.5 m, a vertex every 5 m, 4 px wide), not on its terrain model. A tunnel (level below 0) is dashed, with a note in the bar.
