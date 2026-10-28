@@ -32,7 +32,7 @@ def _open(p, path, size=(1000, 700)):
     return browser, page, errors
 
 def _page(tmp_path, name, edges=None, **kw):
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / f"{name}.html"
     render(edges if edges is not None else _edges(), basemap="blank", **kw).save(path)
@@ -163,7 +163,7 @@ def test_side_panel_html(tmp_path):
 
 
 def test_side_panel_html_with_docked_panel_is_an_error(tmp_path):
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     with pytest.raises(ValueError, match="two panels"):
         render(_edges(), basemap="blank", side_panel_html="x", popup_mode="panel")
