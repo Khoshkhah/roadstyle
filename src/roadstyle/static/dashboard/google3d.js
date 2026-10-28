@@ -225,9 +225,10 @@ export function initGoogle3D(){
       return {type:"FeatureCollection", features:fs.filter(f=>f.properties && String(f.properties[c.match])===String(want_))}; }});
     // the geometry helpers
     // The altitude mode follows the view. Over the imagery (SATELLITE, HYBRID) a line lies on Google's mesh (RELATIVE_TO_MESH, 0.5 m). Google's drawn map
-    // (ROADMAP) does not show that mesh: its streets lie flat on the terrain, so there a line is clamped to the ground. Every kind uses this rule.
-    // ?g3dalt=relative (or window.rsG3dDrawnAltitude="RELATIVE_TO_GROUND") draws the drawn map's lines 1 m above the ground instead: a test, in case Google draws a clamped line thin.
-    const drawnAlt=()=>/[?&]g3dalt=relative/.test(location.search) ? "RELATIVE_TO_GROUND" : (window.rsG3dDrawnAltitude||"CLAMP_TO_GROUND");
+    // (ROADMAP) does not show that mesh: its streets lie flat on the terrain, so there a line is 1 m above the ground (RELATIVE_TO_GROUND). Every kind uses this rule.
+    // Google draws a CLAMP_TO_GROUND line as a thin draped line and does not honour its width (seen in the drawn map: 2 px for 8 px set). So in the drawn map a line is
+    // RELATIVE_TO_GROUND at 1 m: Google's drawn streets lie on its terrain, and the line keeps its width. window.rsG3dDrawnAltitude (or ?g3dalt=clamp) can change it.
+    const drawnAlt=()=>/[?&]g3dalt=clamp/.test(location.search) ? "CLAMP_TO_GROUND" : (window.rsG3dDrawnAltitude||"RELATIVE_TO_GROUND");
     const MESH=()=>drawnMode() ? ((lib.AltitudeMode||{})[drawnAlt()]||drawnAlt()) : ((lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH");
     const pts=r=>r.map(c=>({lat:c[1], lng:c[0], altitude:drawnMode() && drawnAlt()==='RELATIVE_TO_GROUND' ? 1 : 0.5}));
     // every original vertex is kept (a smooth arc stays an arc), and a segment longer than 5 m gets points in between
