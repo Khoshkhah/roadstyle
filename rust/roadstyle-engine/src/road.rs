@@ -1,6 +1,6 @@
 //! The roads that the stages draw: the input table (roadstyle-model's `RoadTable`) and the drawing values of each road (`Draw`), whose
-//! properties are the `__rs_*` marks and `lvl` in the order that the stages set them (render_web.render's order). A road's property is
-//! its mark, else its column: a mark takes the place of a column of the same name, as a dict's assignment does in Python. The output
+//! properties are the `__rs_*` marks and `lvl` in the order that the stages set them. A road's property is
+//! its mark, else its column: a mark takes the place of a column of the same name, as an assignment into a map does. The output
 //! writes the columns in their order and then the other marks, so the text is the text of the old JSON object of each road.
 
 use roadstyle_model::mark;
@@ -23,7 +23,7 @@ pub struct Roads {
     pub cls: String,
     /// the roles of the table's columns (the class, the edge id, the flags, the levels): the stages read a role's cell by its index
     pub roles: Roles,
-    /// the warnings of the stages (Python's warnings.warn in render_web), for the caller (`Styled::warnings`)
+    /// the warnings of the stages, for the caller (`Styled::warnings`)
     pub warnings: Vec<String>,
     /// the drawing positions that the engine solved (casing_start, casing_level, casing_end, fill_level of each road), given under the
     /// contract names after the road's columns; None: the input has them (lib.rs compute_levels)
@@ -34,7 +34,7 @@ pub struct Roads {
     topo: std::sync::OnceLock<Box<Topology>>,
 }
 
-/// A mark in another palette (render_web._merge_palettes): `<mark>@<palette>` with each road's value there (None: that road has no
+/// A mark in another palette: `<mark>@<palette>` with each road's value there (None: that road has no
 /// such mark in that palette).
 pub struct Extra {
     pub name: String,

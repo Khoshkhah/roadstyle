@@ -1,14 +1,14 @@
-//! The "slots" source: the names and the one-way arrows (render_web._annotation_slots, then the export's `__rs_arw` and _mark_cls), from
+//! The "slots" source: the names and the one-way arrows, from
 //! the roads after their stages (roads::mark_roads). Spike S6 (docs/design/rust-spike.md).
 //!
-//! The graph half (representatives, groups, chains, chain numbers) is the same as Python's. The geometry half replaces shapely: an R-tree
+//! The graph half (representatives, groups, chains, chain numbers) is the same's. The geometry half replaces shapely: an R-tree
 //! (rstar) for STRtree, and segment intersection, projection and point-to-line distance written as GEOS computes them where it matters
 //! (the first nearest segment wins a tie; lengths along a line are sums of `sqrt(dx * dx + dy * dy)`). Intersection points are not computed
-//! with GEOS's arithmetic, so a slot can differ from Python's by a rounding step of its 6 decimals.
+//! with GEOS's arithmetic, so a slot can differ from a GEOS-based result by a rounding step of its 6 decimals.
 
 use roadstyle_model::mark::Mark;
 use crate::road::Roads;
-use crate::roads::truthy;
+use crate::roads::is_yes;
 use roadstyle_model::{Cell, Role};
 use crate::simple::{Line, Pt, KY};
 use indexmap::IndexMap;
@@ -41,8 +41,8 @@ fn class_key(v: Option<Cell>) -> String {
     }
 }
 
-/// Python's divmod for floats (CPython float_divmod): the floor quotient and the modulo, as `length // slot_m` and `length % slot_m` give them.
-fn py_divmod(vx: f64, wx: f64) -> (f64, f64) {
+/// The floor quotient and the modulo of two floats (the sign of the divisor), as `length // slot_m` and `length % slot_m` give them.
+fn floor_divmod(vx: f64, wx: f64) -> (f64, f64) {
     let mut m = vx % wx;
     let mut div = (vx - m) / wx;
     if m != 0.0 {
@@ -203,32 +203,32 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
     let mut reps: Vec<Rep> = Vec::new();
     for (i, a, z) in lines {
         let p = roads.road(i);
-        if truthy(p.get(Mark::Dup.name())) {
+        if is_yes(p.get(Mark::Dup.name())) {
             continue;
         }
         let ck = class_key(hw_of(i));
         let twin = by_ends.get(&(z.0, a.0, ck.clone())).copied();
-        if truthy(p.get(Mark::Twoway.name())) {
-            let q_one = twin.is_some_and(|j| truthy(roads.get(j, Mark::Oneway.name())));
-            let mine = (!truthy(p.get(Mark::Oneway.name())), a.1, z.1);
+        if is_yes(p.get(Mark::Twoway.name())) {
+            let q_one = twin.is_some_and(|j| is_yes(roads.get(j, Mark::Oneway.name())));
+            let mine = (!is_yes(p.get(Mark::Oneway.name())), a.1, z.1);
             let other = (!q_one, z.1, a.1);
             if other.partial_cmp(&mine) == Some(std::cmp::Ordering::Less) {
                 continue;
             }
         }
-        let partner = if truthy(p.get(Mark::Twoway.name())) { twin } else { p.get(Mark::Edge2.name()).and_then(Cell::as_u64).and_then(crate::road::row_of) };
+        let partner = if is_yes(p.get(Mark::Twoway.name())) { twin } else { p.get(Mark::Edge2.name()).and_then(Cell::as_u64).and_then(crate::road::row_of) };
         reps.push(Rep { a, z, c: roads.line(i).unwrap().to_vec(), p: i, owner: (i, partner) });
     }
 
-    // groups by (name, level, one-way, class, fill number, tunnel), in the order Python's dict keeps
+    // groups by (name, level, one-way, class, fill number, tunnel), in the order of their first road
     let mut groups: IndexMap<String, (Option<String>, Value, bool, Value, bool, Vec<usize>)> = IndexMap::new();
     for (r, rep) in reps.iter().enumerate() {
         let p = roads.road(rep.p);
         let name = p.get("name").and_then(Cell::as_str).filter(|s| !s.is_empty()).map(String::from);
         let lvl = p.get("lvl").map_or(json!(0), Cell::to_value);
-        let one = truthy(p.get(Mark::Oneway.name()));
+        let one = is_yes(p.get(Mark::Oneway.name()));
         let fl = p.get(Mark::FillLevel.name()).map_or(Value::Null, Cell::to_value);
-        let tun = truthy(p.get(Mark::Tunnel.name()));
+        let tun = is_yes(p.get(Mark::Tunnel.name()));
         let key = json!([name, lvl, one as u8, class_key(hw_of(rep.p)), fl, tun]).to_string();
         groups.entry(key).or_insert_with(|| (name, lvl, one, fl, tun, Vec::new())).5.push(r);
     }
@@ -354,7 +354,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
             for &(lo, hi) in &free {
                 nxt += nxt % 2;
                 let length = hi - lo;
-                let (q, r) = py_divmod(length, slot_m);
+                let (q, r) = floor_divmod(length, slot_m);
                 let pieces = (q as i64 + if r > slot_m * 0.3 { 1 } else { 0 }).max(1);
                 for j in 0..pieces {
                     let (a, b) = (lo + j as f64 * slot_m, lo + ((j + 1) as f64 * slot_m).min(length));
@@ -415,7 +415,7 @@ pub fn slots_source(roads: &Roads, look: &SlotLook) -> Value {
             }
         }
     }
-    // _mark_cls, then the export: number the arrow slots (the odd ones, else the chain's only slot) of each one-way chain (render_web's
+    // _mark_cls, then the export: number the arrow slots (the odd ones, else the chain's only slot) of each one-way chain (
     // order: __rs_cls before __rs_arw)
     for f in feats.iter_mut() {
         let e = f["properties"][Mark::Edge.name()].as_u64().and_then(crate::road::row_of).expect("a slot has its road's key");

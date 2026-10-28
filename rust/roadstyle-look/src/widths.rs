@@ -1,4 +1,4 @@
-//! The road width model (render_web's _load_road_model: the look's "roads_model" and the theme's roads): the width of each class
+//! The road width model: the width of each class
 //! by zoom, its draw order and its two-way split. The engine builds the MapLibre expressions from it (roadstyle-engine `layers::Exprs`).
 
 use crate::options::MapOptions;
@@ -7,8 +7,8 @@ use crate::Error;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 
-/// Python's round(x, n) on a float: the nearest double to the correctly rounded decimal.
-pub fn py_round(x: f64, n: usize) -> f64 {
+/// Round x to n decimals: the nearest double to the correctly rounded decimal.
+pub fn round_to(x: f64, n: usize) -> f64 {
     let v: f64 = format!("{x:.n$}").parse().unwrap();
     if v == 0.0 { 0.0 } else { v }
 }
@@ -115,7 +115,7 @@ impl RoadModel {
         if link {
             w *= self.link_w;
         }
-        py_round(w, 2)
+        round_to(w, 2)
     }
 
     /// The width in px of a class (none or not in the tables: the fallback group) at the zoom stop `z`.

@@ -1,4 +1,4 @@
-//! The colour ramps of data colours (render_edges' cmap): branca's LinearColormap, as roadstyle's colors.py ColorRamp makes it. The ramps
+//! The colour ramps of data colours (render_edges' cmap): branca's LinearColormap ColorRamp makes it. The ramps
 //! are data, one file for both engines (roadstyle-assets' data/cmaps.json: branca's schemes and colour names, each matplotlib colormap at 9
 //! stops; made by roadstyle-rs's tests/make_goldens.py from branca and matplotlib).
 

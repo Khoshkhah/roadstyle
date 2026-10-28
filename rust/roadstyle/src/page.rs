@@ -1,8 +1,8 @@
-//! The page writer (render_web._page_html, docs/design/rust_library.md P6): the HTML page of a live style (state "live") and the options of
-//! its dashboard (`page`: the options of rsDashboard, as render_web.render's `page`). The frame, the popup, the dashboard bundle and the
+//! The page writer: the HTML page of a live style (state "live") and the options of
+//! its dashboard. The frame, the popup, the dashboard bundle and the
 //! page's scripts are roadstyle's static files, read when the crate is built. The JSON values are serde_json's text (the Rust API is
-//! the design, 2026-10-24: the page is not Python's byte for byte, its values are the same), each "<" as \u003c. MapLibre stays a
-//! placeholder (`__MAPLIBRE_JS__`, `__MAPLIBRE_CSS__`), as in Python's WebMap.html: the caller inlines it or loads it from a CDN.
+//! the design, 2026-10-24: the values of the page are the design, not its bytes), each "<" as \u003c. MapLibre stays a
+//! placeholder (`__MAPLIBRE_JS__`, `__MAPLIBRE_CSS__`): the caller inlines it or loads it from a CDN.
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -27,8 +27,8 @@ const TILES: &str = asset!("static/page/tiles.html");
 const SIDE: &str = asset!("static/page/side.html");
 const PMTILES_JS: &str = asset!("vendor/pmtiles.js");
 
-/// The options of rsDashboard that the page gives (render_web.render's `page`, static/dashboard/index.js), in the page's order. Each has
-/// the name of a `render` keyword. A number stays as the caller gave it (`55` or `55.0`: the page is Python's byte for byte).
+/// The options of rsDashboard that the page gives, in the page's order. Each has
+/// the name of a `render` keyword. A number stays as the caller gave it (`55` or `55.0`).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PageOptions {
@@ -90,7 +90,7 @@ pub struct Camera {
     pub max_pitch: Number,
 }
 
-/// What the page needs besides the style and the options (render_web._page_html's keywords).
+/// What the page needs besides the style and the options.
 pub struct PageParts<'a> {
     pub name: &'a str,
     pub cam: Camera,
@@ -98,7 +98,7 @@ pub struct PageParts<'a> {
     pub bounds: [f64; 4],
     pub side_panel_html: Option<&'a str>,
     pub host_panel_width: f64,
-    /// gzip the big GeoJSON sources (_compress_sources); `gz`: the blobs made by the caller (Python's zlib), else the crate gzips
+    /// gzip the big GeoJSON sources (_compress_sources); `gz`: the blobs made by the caller (the caller's zlib), else the crate gzips
     pub compress: bool,
     pub gz: Option<Map<String, Value>>,
     /// a tiled page: the PMTiles archive
@@ -111,7 +111,7 @@ pub struct PageParts<'a> {
     pub sources: Option<&'a Styled>,
 }
 
-/// The dashboard bundle (render_web: the modules without their import lines and the word export at a line start, one script).
+/// The dashboard bundle.
 fn dashboard_js() -> String {
     DASH_JS.iter().map(|src| {
         let mut out = String::with_capacity(src.len());
@@ -125,14 +125,14 @@ fn dashboard_js() -> String {
     }).collect()
 }
 
-/// render_web._HTML: the frame with the popup and the dashboard in it.
+/// the frame with the popup and the dashboard in it.
 fn frame() -> String {
     TEMPLATE.replace("__POPUP_CSS__", POPUP_CSS).replace("__POPUP_JS__", &POPUP_JS.replace("export ", ""))
         .replace("__DASHBOARD_CSS__", DASH_CSS).replace("__DASHBOARD_JS__", &dashboard_js())
 }
 
 /// JSON text for a <script> of the page (audit N23): each "<" as \u003c, the same value in JSON and in JavaScript. A data value with
-/// "</script>" in it (a legend's label, a road's field) cannot end the script and run what follows (render_web._script_json).
+/// "</script>" in it (a legend's label, a road's field) cannot end the script and run what follows.
 fn script_json(v: &Value) -> String {
     script_text(serde_json::to_string(&JsSafe(v)).expect("a JSON value"))
 }
@@ -199,7 +199,7 @@ fn host_panel(html: Option<&str>, width: f64, name: &str) -> String {
              <div class=\"rs-side-host\">{html}</div></div>", escape(name))
 }
 
-/// render_web._page_html: the page of `style` (the base map's and the roads' sources and layers) with the dashboard's options `page`.
+/// the page of `style` (the base map's and the roads' sources and layers) with the dashboard's options `page`.
 pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String {
     let gz = match (&p.gz, p.compress) {
         (Some(g), _) => g.clone(),
@@ -243,7 +243,7 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
     html
 }
 
-/// The page from JSON texts (the Python and the browser bindings): `style`, `page` (the options) and `parts` ({name, cam, bounds,
+/// The page from JSON texts (the Python binding and the browser): `style`, `page` (the options) and `parts` ({name, cam, bounds,
 /// side_panel_html, host_panel_width, compress, gz, side, side_b64, simple_js}); `pmtiles`: the archive of a tiled page.
 pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -> Result<String, crate::Error> {
     let read = |t: &str, what: &str| serde_json::from_str::<Value>(t).map_err(|e| crate::error::options(format!("{what}: not JSON: {e}")));

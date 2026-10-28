@@ -1,4 +1,4 @@
-//! The road flags, one rule (audit R6; the web map's rule, render_web._truthy, lower-cased and stripped): a yes/no tag (bridge, tunnel,
+//! The road flags, one rule: a yes/no tag (bridge, tunnel,
 //! oneway, driving, cycling, directed) is yes when it is set and not one of `NO` (OSM's "no", and "", "false", "0"); so bridge=viaduct
 //! is a bridge and oneway=-1 is one way. The layer, the level from the tags and is_directed follow, and the SQL form. It is here, in the
 //! leaf crate (N26), so that the levels need no other crate; roadstyle_model::flags re-exports it with the JSON and MapLibre forms.
@@ -11,7 +11,7 @@ pub fn yes_text(s: &str) -> bool {
     !NO.contains(&s.trim().to_lowercase().as_str())
 }
 
-/// The layer tag: its whole part (Python's int(float(layer)), truncated toward 0); 0 when it is not a number.
+/// The layer tag: its whole part (the whole part of the number, truncated toward 0); 0 when it is not a number.
 pub fn layer(s: Option<&str>) -> i64 {
     s.and_then(|s| s.trim().parse::<f64>().ok()).filter(|v| v.is_finite()).map_or(0, |v| v.trunc() as i64)
 }

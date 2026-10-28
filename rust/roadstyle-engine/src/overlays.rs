@@ -7,7 +7,7 @@ use roadstyle_look::options::{EdgeLink, Overlay as Spec, OverlayKind, Placement,
 use roadstyle_model::mark::{self, Mark};
 use crate::road::{Road, Roads};
 use roadstyle_model::{Cell, Role};
-use crate::roads::truthy;
+use crate::roads::is_yes;
 use crate::slots::point_line_dist;
 use roadstyle_model::feature_table::{FeatureTable, GeomType};
 use serde_json::{json, Map, Value};
@@ -120,7 +120,7 @@ pub fn edge_attach(tables: &mut [(String, FeatureTable)], roads: &Roads) -> Resu
         let g = t.geometries_of();
         let mut ids = Vec::with_capacity(t.len());
         for row in 0..t.len() {
-            // a point's coordinates (another geometry: 0, 0, as Python's coordinates[0] of a line is no number)
+            // a point's coordinates (another geometry: 0, 0[0] of a line is no number)
             let p = match g.kind(row) { Some(GeomType::Point) => g.parts(row).next().and_then(|mut r| r.next()).map_or([0.0, 0.0], |r| r[0]), _ => [0.0, 0.0] };
             let mut hits: Vec<usize> = within(p, 1e-5).into_iter().filter(|&i| street[i]).collect();
             if hits.is_empty() {
@@ -185,7 +185,7 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
                                tooltip_on: None, popup_on: None };
         // mapstyle's start values (clickable by the rule above, no tooltip, the popup), with the layer's `interaction` over them
         if let Some(i) = interaction.get(&name) {
-            let set = |k: &str| i.get(k).map(|v| truthy(Some(v)));
+            let set = |k: &str| i.get(k).map(|v| is_yes(Some(v)));
             ov.clickable = set("clickable").or(ov.clickable);
             (ov.tooltip_on, ov.popup_on) = (set("tooltip"), set("popup"));
         }
@@ -239,7 +239,7 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
             ov.color = p.get("color").cloned().unwrap_or(Value::Null);
             ov.radius = json!(4);
             l["min_zoom"] = p.get("min_zoom").cloned().unwrap_or(Value::Null);
-            if p.get("icon").is_some_and(|v| truthy(Some(v))) {
+            if p.get("icon").is_some_and(|v| is_yes(Some(v))) {
                 let id = format!("ms-icon-{name}");
                 if let Some(img) = all_images.get(&id) {
                     images.insert(id.clone(), img.clone());
@@ -345,7 +345,7 @@ fn wm_width_expr(min_zoom: &Value) -> Value {
     let zs: Vec<f64> = if z0 == 22.0 { vec![22.0] } else { vec![z0.min(22.0), z0.max(22.0)] };
     for z in zs {
         e.push(json!(z));
-        e.push(json!(["*", ["get", Mark::WidthM.name()], crate::layers::py_round(512.0 * 2f64.powf(z) / 40075016.686, 6)]));
+        e.push(json!(["*", ["get", Mark::WidthM.name()], crate::layers::round_to(512.0 * 2f64.powf(z) / 40075016.686, 6)]));
     }
     Value::Array(e)
 }
@@ -371,7 +371,7 @@ pub fn overlay_layers(sid: &str, ov: &Overlay, look: &crate::Look) -> Vec<Value>
     let lay = json!({"visibility": if ov.visible { "visible" } else { "none" }});
     let op = |d: &Num| or(&ov.opacity, &json!(d));
     let dash: Option<Value> = u.and_then(|u| u.dash.as_ref()).filter(|a| !a.is_empty()).map(|a| Value::Array(a.iter().map(|x| json!(x)).collect()));
-    // a layer's keys in Python's order: id, type, source, then the zoom range before or after the layout
+    // a layer's keys in a fixed order: id, type, source, then the zoom range before or after the layout
     let layer = |id: String, t: &str, zooms_first: bool, layout: Value, mut paint: Map<String, Value>, paint_dash: bool| {
         let mut l = Map::new();
         l.insert("id".into(), id.into());
@@ -471,7 +471,7 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
         let fl = r.get(Mark::FillLevel.name()).and_then(Cell::as_i64).unwrap_or(0);
         orders.insert((fl, o));
         Some([r.get(Mark::Edge.name()).map_or(Value::Null, Cell::to_value), fl.into(), o.into(), r.cls(), r.get("lvl").map_or(json!(0), Cell::to_value),
-              if truthy(r.get(Mark::Tunnel.name())) { true.into() } else { Value::Null }])
+              if is_yes(r.get(Mark::Tunnel.name())) { true.into() } else { Value::Null }])
     };
     const KEYS: [&str; 6] = [Mark::Edge.name(), Mark::FillLevel.name(), Mark::ItemOrder.name(), Mark::Class.name(), Mark::ItemLvl.name(), Mark::Tunnel.name()];
     match &mut ov.data {
@@ -499,7 +499,7 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
             }
         }
     }
-    if !unknown.is_empty() {        // Python's text: the names as its repr writes them
+    if !unknown.is_empty() {        // the names, each in quotes
         let label = ov.user.as_ref().and_then(|u| u.label.as_deref()).unwrap_or("");
         let first: Vec<String> = unknown.iter().take(5).map(|u| format!("'{u}'")).collect();
         return Err(crate::error::data(format!("overlay {label}: {} feature(s) have an '{col}' that is not an edge of the roads (first: [{}])", unknown.len(), first.join(", "))));
@@ -507,7 +507,7 @@ pub fn edge_overlay(ov: &mut Overlay, roads: &std::collections::HashMap<String, 
     Ok(orders.into_iter().collect())
 }
 
-/// Python's f"{x:g}" for a dash value: a whole number without its ".0".
+/// The text of a dash value: a whole number without its ".0".
 fn g_text(x: f64) -> String {
     if x.fract() == 0.0 && x.abs() < 1e15 { format!("{}", x as i64) } else { format!("{x}") }
 }
@@ -547,14 +547,14 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
         let lat = if line.is_empty() { 0.0 } else { line.iter().map(|c| c[1]).sum::<f64>() / line.len() as f64 };
         let sec = 1.0 / lat.to_radians().cos().max(0.01);
         let d = dcol.as_ref().and_then(|c| p.get(c)).filter(|d| !d.is_null()).cloned().unwrap_or_else(|| json!(u.dash));
-        p.insert(Mark::ItemWidthM.name().into(), json!(crate::layers::py_round(w * sec, 4)));
-        p.insert(Mark::ItemOffsetM.name().into(), o.map_or(json!(0), |o| json!(crate::layers::py_round(o * sec, 4))));
+        p.insert(Mark::ItemWidthM.name().into(), json!(crate::layers::round_to(w * sec, 4)));
+        p.insert(Mark::ItemOffsetM.name().into(), o.map_or(json!(0), |o| json!(crate::layers::round_to(o * sec, 4))));
         let mut q: crate::props::Props<'static> = p.iter().filter(|(k, _)| k.starts_with(mark::PREFIX)).map(|(k, v)| (std::borrow::Cow::Owned(k.clone()), v.clone())).collect();
         q.insert("lvl", p.get(Mark::ItemLvl.name()).cloned().unwrap_or(json!(0)));
         q.insert(Mark::PieceKind.name(), json!(5));
         q.insert(Mark::ItemOverlay.name(), json!(i));
         q.insert(Mark::Item.name(), json!(j));
-        let ic = ccol.as_ref().and_then(|c| p.get(c)).filter(|c| truthy(Some(c))).cloned().unwrap_or_else(|| or(&css(u.color.as_ref()), &default));
+        let ic = ccol.as_ref().and_then(|c| p.get(c)).filter(|c| is_yes(Some(c))).cloned().unwrap_or_else(|| or(&css(u.color.as_ref()), &default));
         q.insert(Mark::ItemColor.name(), ic);
         // the road layer's dash pattern is a text ("3,3"), as a dashed class's __rs_dash
         let dash: Vec<String> = match &d {
@@ -589,7 +589,7 @@ pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, e
     for q in out.iter_mut() {
         let j = q.props.get(Mark::Item.name()).and_then(Value::as_u64).unwrap_or(0) as usize;
         let src = feats[j]["properties"].as_object().cloned().unwrap_or_default();
-        if truthy(src.get("pick")) {
+        if is_yes(src.get("pick")) {
             for (c, v) in src.iter().filter(|(c, _)| !c.starts_with(mark::PREFIX) && *c != "pick") {
                 q.props.insert(c, v.clone());
             }

@@ -1,7 +1,7 @@
 //! roadstyle's rendering engine (docs/design/rust_library.md, "The crates"): the style of a map from the roads, the look, the
 //! data-driven paint, the legend data and the base-map layers. The vector tiles are in roadstyle-tiles, the levels in roadstyle-levels.
 
-// Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
+// Numeric code: index loops over parallel arrays and tuple types read as they are.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod colors;
@@ -28,7 +28,7 @@ pub use roadstyle_model::feature_table::FeatureTable;
 pub use error::{Error, Limit, Unsupported};
 
 /// A number that the caller gave (a map option), as JSON: a whole number as an integer, as the caller's keyword wrote it (`1` stays `1` in
-/// the outputs, as in Python); NaN or an infinity: null.
+/// the outputs; NaN or an infinity: null.
 pub(crate) fn given(v: f64) -> Value {
     if v.fract() == 0.0 && v.abs() < 9.0e15 { Value::from(v as i64) } else { serde_json::Number::from_f64(v).map_or(Value::Null, Value::Number) }
 }
@@ -68,7 +68,7 @@ pub struct Parts {
     pub glyphs: Option<Value>,
     /// state "live": MapLibre's global state, each name with its start value (`{"rs_co": {"default": 0}, ...}`)
     pub state: Option<Value>,
-    /// the warnings of the stages (Python's warnings.warn in render_web)
+    /// the warnings of the stages
     pub warnings: Vec<String>,
 }
 
@@ -172,7 +172,7 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
     let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks)
     let decks = if look.map.bridges.decks_3d {
-        // a casing slab names the user's own `highway` column (Python's props.get("highway")), whatever highway_col is
+        // a casing slab names the user's own `highway` column (the road's own `highway`), whatever highway_col is
         decks::bridge_decks(&roads.roads, &look.deck, &look.model, "highway")
     } else { Vec::new() };
     let (layers, info) = layers::road_layers(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
@@ -213,7 +213,7 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
         sources.push(("decks".into(), Src::Json(json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": decks}, "generateId": true}))));
     }
     sources.push(("simple".into(), Src::Simple(simple)));
-    if !source_features(&slots).is_empty() {        // as Python: no slots source without slots
+    if !source_features(&slots).is_empty() {        //: no slots source without slots
         let mut slots = slots;
         if !export {        // the arrow slots' numbers are for the export's thinning
             for f in slots["data"]["features"].as_array_mut().into_iter().flatten() {
@@ -256,7 +256,7 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
     if let Some((k, v)) = planned {
         metadata.insert(k.into(), v);
     }
-    // the legend data of a data-coloured map, as the page's COLOR_OPTIONS (render_web: {name, prop, legend} for each colour option)
+    // the legend data of a data-coloured map, as the page's COLOR_OPTIONS
     if !colors.meta.is_empty() {
         metadata.insert("roadstyle:color_options".into(), Value::Array(colors.meta));
     }
@@ -309,7 +309,7 @@ fn camera(feats: &Roads) -> (Value, Value) {
     let y = |lat: f64| (std::f64::consts::PI / 4.0 + lat.clamp(-85.0, 85.0).to_radians() / 2.0).tan().ln();
     let zx = (1024.0 / 256.0 * 360.0 / (x1 - x0).max(1e-9)).log2();
     let zy = (768.0 / 256.0 * 2.0 * std::f64::consts::PI / (y(y1) - y(y0)).max(1e-9)).log2();
-    (json!([(x0 + x1) / 2.0, (y0 + y1) / 2.0]), json!(layers::py_round(zx.min(zy).clamp(0.0, 18.0), 2)))
+    (json!([(x0 + x1) / 2.0, (y0 + y1) / 2.0]), json!(layers::round_to(zx.min(zy).clamp(0.0, 18.0), 2)))
 }
 
 
@@ -319,7 +319,7 @@ fn source_features(source: &Value) -> &[Value] {
 
 /// render's level step. The drawing positions come from, in this order: the columns that `casing_level_col` / `fill_level_col` name;
 /// else the contract columns `casing_level` / `fill_level` of the input (duckOSM's stored levels: an input column of the name is the
-/// level input); else `compute_levels(method="solve")` with its defaults (render_web.render), on the roads in their order. The keyword
+/// level input); else `compute_levels(method="solve")` with its defaults, on the roads in their order. The keyword
 /// `levels` (roads_sql.js makeRoads): "tags" computes them with the tags rule and "solve" with the solver, whatever the input has;
 /// `{edge_hash, n_edges}` (edge_levels_meta) checks that the stored levels are for these edges. Computed, they are not written into the
 /// table: they come back (casing_start, casing_level, casing_end, fill_level for each road), and the roads give them under the contract
@@ -368,7 +368,7 @@ pub(crate) fn export(look: &Look) -> bool {
 }
 
 
-/// render_web._boundary_fc for GeoJSON: a FeatureCollection as it is, a Feature in one, a geometry in a Feature with no properties.
+/// for GeoJSON: a FeatureCollection as it is, a Feature in one, a geometry in a Feature with no properties.
 fn boundary_fc(b: &Value) -> Option<Value> {
     match b["type"].as_str() {
         _ if b.is_null() || b == &Value::Bool(false) => None,
@@ -380,7 +380,7 @@ fn boundary_fc(b: &Value) -> Option<Value> {
 
 /// The roads as the level solver reads them, in their order (the edge id is the row: compute_levels works on the frame's rows). `cols`:
 /// the columns of the class, the layer, the bridge, the tunnel, the junction, the band and the order ("" for none). A value is the text
-/// that the tag rules read (Python's _truthy and int(float(layer)) on the GeoDataFrame's values).
+/// that the tag rules read (the yes rule and the whole part of the layer, on the values of the table).
 pub fn level_edges(table: &RoadTable, cols: [&str; 7]) -> roadstyle_levels::LevelEdges {
     let [hw, layer, bridge, tunnel, junction, band, order] = cols;
     let text = |v: Option<Cell>| -> Option<String> {

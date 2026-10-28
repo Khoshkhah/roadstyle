@@ -1,7 +1,7 @@
 //! Stage 2's rules (docs/rust/architecture.md, "The three stages and the one call"): which properties of each source go into the
 //! tiles, from which zoom, with which zooms and buffer. They come from the style alone (its layers, its `roadstyle:interaction`, and
 //! the `roadstyle:tiles` and `roadstyle:columns` that stage 1 writes into a saved style), so stage 2 needs neither the roads nor the
-//! look. The rules are tiles.py's (tile_props, the slots whole from their first zoom) and render(tiles=True)'s page's.
+//! look. The rules are (tile_props, the slots whole from their first zoom) and render(tiles=True)'s page's.
 
 use crate::Error;
 use serde_json::Value;
@@ -23,7 +23,7 @@ pub struct TileOptions {
     pub exact: Option<HashSet<String>>,
     /// render(tiles=True)'s page: the sources in the tiles (tile_layers; the page keeps the others inline)
     pub only: Option<Vec<String>>,
-    /// the first zoom of the names and arrows (`slots`), which go whole into the tiles (tiles.py: 14, their symbols' minzoom)
+    /// the first zoom of the names and arrows (`slots`), which go whole into the tiles
     pub slots_from: u32,
     /// the pieces of a `simple` source wait for their properties until a tile shows them (`Tiles::add_waiting`; the level editor's map)
     pub wait: bool,

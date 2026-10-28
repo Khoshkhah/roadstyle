@@ -208,7 +208,7 @@ pub fn piece_reads(layers: &[Value]) -> std::collections::HashSet<String> {
     read
 }
 
-/// The properties that a style's drawing reads (tiles.py's tile_props): the layers' expressions (`expression_reads`), the popup and
+/// The properties that a style's drawing reads: the layers' expressions (`expression_reads`), the popup and
 /// tooltip fields of `roadstyle:interaction`, the page's modules (`page_reads`), `name`, `kind` and the caller's `keep`. Every `__rs_*`
 /// property goes too, apart from this set.
 pub fn drawn(layers: &[Value], metadata: &Value, keep: &[String]) -> std::collections::HashSet<String> {

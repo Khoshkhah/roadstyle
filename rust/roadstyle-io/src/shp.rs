@@ -59,7 +59,7 @@ fn line(shape: &Shape) -> Option<Vec<[f64; 2]>> {
 }
 
 /// The roads of a Shapefile: `shp` and `dbf` its two files, `prj` the text of its .prj file (None: the file has none, an error, as in
-/// Python). `what` names the file in the errors.
+/// the Python binding). `what` names the file in the errors.
 pub fn read_roads(shp: &[u8], dbf: &[u8], prj: Option<&str>, what: &str) -> Result<RoadTable, Error> {
     let to84 = ToWgs84::new(prj.map(|w| Crs::Wkt(w.to_string())), what)?;
     let fields = whole_number_fields(dbf);

@@ -1,4 +1,4 @@
-//! A view's palette in one page (render_web._merge_palettes; docs/design/style_config.md, the view row `palette`). Stage 1 runs one
+//! A view's palette in one page. Stage 1 runs one
 //! time; each other palette restyles the same prepared roads (`crate::restyle`: no read and no level solve) and only what differs goes
 //! into the first output. A mark that differs becomes `<mark>@<palette>` on the roads (the road table and the pieces read it there), a
 //! property of a JSON source or of an item gets its copy, and a paint or layout value becomes one value for each palette (the state
@@ -94,7 +94,7 @@ pub fn merge(base: &mut Styled, base_name: &str, copies: &[(String, Styled)]) ->
     Ok(())
 }
 
-/// Two values of a road as Python's `!=` sees them (the same stages write both, so the same kinds).
+/// Two values of a road's `!=` sees them (the same stages write both, so the same kinds).
 fn same(a: Cell, b: Cell) -> bool {
     match (a, b) {
         (Cell::Null, Cell::Null) => true,

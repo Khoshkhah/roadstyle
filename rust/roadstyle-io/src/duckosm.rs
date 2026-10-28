@@ -1,6 +1,6 @@
 //! The SQL that reads a duckOSM file (docs/design/rust_library.md, the mapstyle merge): the roads of every mode (mapstyle's
 //! `_roads_union` and `load_roads`, with the stored levels and the columns that render_map adds) and the base map's tables
-//! (`features.*`, the queries of mapstyle's `load_layers`). One copy of the SQL: the browser (duckdb-wasm), Python (duckdb) and a
+//! (`features.*`, the queries of mapstyle's `load_layers`). One copy of the SQL: the browser (duckdb-wasm), the Python binding (duckdb) and a
 //! native caller run the same statements on their own connection. The SQL is the SQL of rust/roadstyle-wasm/js/roads_sql.js and
 //! features_sql.js. The caller reads the catalog first (`Catalog`, from `information_schema`), then runs the statements in order;
 //! the outputs are the engine's inputs (roads.parquet, features.parquet).

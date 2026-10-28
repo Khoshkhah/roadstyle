@@ -1,5 +1,5 @@
 //! `roadstyle-mcp`: roadstyle as tools for AI agents, an MCP server over stdio on the rmcp SDK (docs/design/agent-tools.md; plan step A2
-//! in docs/design/rust_library.md). The tools of the Python server (src/roadstyle/mcp_server.py) with the same names, inputs and
+//! in docs/design/rust_library.md). The tools with the names, inputs and
 //! outputs: render_file, render_place and snapshot. A map is saved to a file and only its path goes back to the agent (a page is
 //! megabytes). Nothing may print to stdout, which carries the protocol. An error goes back to the agent as the tool's result, with its
 //! message, so the agent can fix a wrong path, a missing column or a misspelt option.
@@ -25,7 +25,7 @@ roadstyle draws road networks as styled, interactive, offline HTML maps (MapLibr
 - Edges are directed: a two-way street is two edges drawn side by side. Don't merge them.
 Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: /reference/parameters/).";
 
-/// The Python server that has what this one does not have yet (render_place).
+/// The tool that this server does not have yet (render_place).
 const PYTHON: &str = "the Python server (pip install roadstyle-mcp==0.25.0)";
 
 /// The vendored MapLibre (WebMap.save and the CLI's `roadstyle page` put the same in), so a saved map works offline.
@@ -114,7 +114,7 @@ impl Server {
 }
 
 /// The PNG of a saved page beside it (<page>.png), as an image for the agent, and its warning (a map that did not load). Without a
-/// browser it is a note, not an error: the map still stands (as in the Python server).
+/// browser it is a note, not an error: the map still stands.
 fn preview(html: &Path, cam: &Camera) -> Vec<ContentBlock> {
     let png = html.with_extension("png");
     match roadstyle_snapshot::snapshot(html, &png, cam, &Shot::default()).and_then(|p| Ok((std::fs::read(&p.path)?, p.warning))) {
@@ -165,7 +165,7 @@ fn read_file(src: &Path) -> Result<(roadstyle::RoadTable, Option<String>), Strin
         "parquet" | "geoparquet" => Ok((roadstyle::read::read_roads(read(src)?, "geometry")?, None)),
         "geojson" | "json" => Ok((roadstyle::geojson::read_roads(&read(src)?)?, None)),
         "shp" => {
-            let prj = std::fs::read_to_string(src.with_extension("prj")).ok();     // no .prj: no CRS, the reader's error (as Python)
+            let prj = std::fs::read_to_string(src.with_extension("prj")).ok();     // no .prj: no CRS, the reader's error
             Ok((roadstyle::shp::read_roads(&read(src)?, &read(&src.with_extension("dbf"))?, prj.as_deref(), &what)?, None))
         }
         "gpkg" => Ok(roadstyle::gpkg::read_roads(&read(src)?, &what)?),
@@ -197,7 +197,7 @@ fn out_path(output_path: Option<&str>, stem: &str) -> Result<PathBuf, String> {
     Ok(expand("~/roadstyle-maps").join(format!("{}.html", if slug.is_empty() { "map" } else { slug })))
 }
 
-/// The summary for the agent: the edges, the most common classes, the bounds (as the Python server writes them).
+/// The summary for the agent: the edges, the most common classes, the bounds writes them).
 fn summary(roads: &roadstyle::read::RoadTable, class_col: &str) -> Result<String, String> {
     let col = roads.col(class_col)
         .ok_or_else(|| format!("no road-class column {class_col:?} (another name: options={{\"highway_col\": \"...\"}})"))?;
@@ -232,7 +232,7 @@ fn thousands(n: usize) -> String {
     out
 }
 
-/// The page of a road file, saved; its answer for the agent (Python's mcp_server._render) and the page's path (for the preview).
+/// The page of a road file, saved; its answer for the agent and the page's path (for the preview).
 fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
     let mut options = a.options.unwrap_or_default();
     check_options(&options)?;
@@ -241,7 +241,7 @@ fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
     let class_col = options.get("highway_col").and_then(Value::as_str).unwrap_or("highway").to_string();
     let text = summary(&roads, &class_col)?;
     let out = out_path(a.output_path.as_deref(), &src.file_stem().unwrap_or_default().to_string_lossy())?;
-    // the default CARTO tiles come back stamped "API KEY REQUIRED" without a key: then a keyless base map, as the Python server
+    // the default CARTO tiles come back stamped "API KEY REQUIRED" without a key: then a keyless base map
     let key = ["CARTO_API_KEY", "ROADSTYLE_API_KEY"].iter().find_map(|k| std::env::var(k).ok().filter(|v| !v.is_empty()));
     let mut notes = Vec::new();
     if !options.contains_key("basemap") && key.is_none() {

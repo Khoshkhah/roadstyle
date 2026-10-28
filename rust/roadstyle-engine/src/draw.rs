@@ -1,5 +1,5 @@
 //! The drawing values of each road (docs/design/rust_library.md, "The numbers and ends of a road: RoadDraw"): what the stages of
-//! render_web.render bake as `__rs_*` properties, as typed fields. `Draw::marks` gives them by their property names, in the order that
+//! bake as `__rs_*` properties, as typed fields. `Draw::marks` gives them by their property names, in the order that
 //! the stages set them, so the output text is the text of the old properties.
 
 use roadstyle_model::mark::Mark;
@@ -7,7 +7,7 @@ use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// The shape of a road end (render_web._cap_value): round (null), flat at the end point (true) or square.
+/// The shape of a road end: round (null), flat at the end point (true) or square.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Cap {
     Round,

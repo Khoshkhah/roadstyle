@@ -7,7 +7,7 @@ use arrow_schema::DataType;
 use serde_json::Value;
 use std::sync::Arc;
 
-/// An integer past 2**53 - 1: JavaScript rounds it, so the JSON forms write it as text (render_web._stringify_unsafe_ints; `JsSafe`).
+/// An integer past 2**53 - 1: JavaScript rounds it, so the JSON forms write it as text.
 /// The model and the Parquet files keep it as an integer (audit N1: duckOSM's edge ids stay BIGINT).
 pub const JS_MAX_SAFE_INT: u64 = (1 << 53) - 1;
 

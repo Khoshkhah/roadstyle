@@ -1,6 +1,6 @@
 //! The one WKB reader (audit N19): every reader of a geometry (the roads' lines, the base map's features, a stage-1 file's geometry, the
 //! engine's `geom::from_wkb`) reads WKB here. ISO WKB and EWKB (DuckDB, GeoPandas and shapely write them), in 2D: a Z or an M is left
-//! out, so a 3D line draws on its x and y, as Python draws it.
+//! out, so a 3D line draws on its x and y it.
 
 use crate::feature_table::GeomType;
 

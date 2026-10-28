@@ -79,7 +79,7 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, Error> {
 }
 
 /// A yes/no tag (crate::flags, the one rule).
-fn truthy(v: Option<&str>) -> bool {
+fn is_yes_tag(v: Option<&str>) -> bool {
     v.is_some_and(flags::yes_text)
 }
 
@@ -87,8 +87,8 @@ fn truthy(v: Option<&str>) -> bool {
 pub fn level(e: &LevelEdge) -> i64 {
     flags::level(
         flags::layer(e.layer.as_deref()),
-        truthy(e.bridge.as_deref()),
-        truthy(e.tunnel.as_deref()),
+        is_yes_tag(e.bridge.as_deref()),
+        is_yes_tag(e.tunnel.as_deref()),
     )
 }
 
@@ -150,9 +150,9 @@ fn priority(e: &LevelEdge, order: Order) -> Option<f64> {
         Some("roundabout" | "circular")
     ) {
         3.0
-    } else if truthy(a.tunnel.as_deref()) {
+    } else if is_yes_tag(a.tunnel.as_deref()) {
         2.0
-    } else if truthy(a.bridge.as_deref()) {
+    } else if is_yes_tag(a.bridge.as_deref()) {
         1.0
     } else {
         0.0

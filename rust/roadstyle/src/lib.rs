@@ -135,7 +135,7 @@ fn tile_source(tiled: &mut tiles::Tiles, s: &sources::Styled, o: &tiles::stage::
     }
 }
 
-/// tiles.py's rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
+/// rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
 /// whole into every tile their box touches, from the first zoom (its extra layers). A polygon at a tile's edge whose clipped part has
 /// no area was left out of that tile before (the sea at Monaco's west edge, 2026-10-24).
 fn whole_unless_lines(lines: bool, rule: (std::collections::HashSet<String>, bool, u32), first: u32) -> (std::collections::HashSet<String>, bool, u32) {
@@ -458,7 +458,7 @@ pub fn tile_made(s: &sources::Styled, prefix: &str, keep: &[String]) -> Result<(
 }
 
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of
-/// roadstyle's tiles.py, the zooms and the buffer from the look's `config.tiles`). The layers, the metadata and the camera are those of
+///, the zooms and the buffer from the look's `config.tiles`). The layers, the metadata and the camera are those of
 /// `make_style`; each layer draws the tile layer of its old source (`source-layer`). The tiles keep only the properties that are read:
 /// the texts in the layers (all their keys, and more), the popup and tooltip fields of the metadata, the overlays' popup fields (name,
 /// kind) and `keep` (the caller's own, for example its popup's). The warnings of stage 1 come back last.

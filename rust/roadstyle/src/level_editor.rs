@@ -135,7 +135,7 @@ impl Editor {
             } else {
                 Value::String(s)
             }
-        }; // a missing value is null, as Python's _txt
+        }; // a missing value is null
         let mut directions = Vec::new();
         for (k, (way, ids)) in [("along", &r.edges), ("against", &r.reversed)]
             .into_iter()

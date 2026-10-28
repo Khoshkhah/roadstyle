@@ -1,7 +1,7 @@
 //! roadstyle's road model (docs/design/rust_library.md, "The crates"): the roads as columns (`RoadTable`, module `table`), the typed
 //! properties of the engine's features (`props`), the geometry helpers (`geom`), and `Row`, a row of another table. No I/O: it builds for wasm32.
 
-// Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
+// Numeric code: index loops over parallel arrays and tuple types read as they are.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod error;

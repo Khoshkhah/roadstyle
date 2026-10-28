@@ -20,7 +20,7 @@ fn parquet(data: Vec<u8>) -> Result<ParquetRecordBatchReader, Error> {
         .map_err(|e| Error::Format(format!("not a Parquet file: {e}")))
 }
 
-/// The roads from Arrow batches: a Parquet file's, or an Arrow stream's from Python (GeoPandas' to_arrow, the geometry as WKB).
+/// The roads from Arrow batches: a Parquet file's, or an Arrow stream's from the Python binding (GeoPandas' to_arrow, the geometry as WKB).
 pub fn roads_from(reader: impl RecordBatchReader, geom_col: &str) -> Result<RoadTable, Error> {
     let mut lines = Lines::default();
     let (names, cols) = columns_from(reader, geom_col, |g| {
@@ -36,7 +36,7 @@ pub fn read_feature_table(data: Vec<u8>, geom_col: &str) -> Result<FeatureTable,
     feature_table_from(parquet(data)?, geom_col)
 }
 
-/// The features from Arrow batches (a Parquet file's, or an Arrow stream's from Python), as `read_feature_table`.
+/// The features from Arrow batches (a Parquet file's, or an Arrow stream's from the Python binding), as `read_feature_table`.
 pub fn feature_table_from(reader: impl RecordBatchReader, geom_col: &str) -> Result<FeatureTable, Error> {
     let mut geoms = FeatureTable::geometries();
     let (names, cols) = columns_from(reader, geom_col, |g| geoms.push_wkb(g).map_err(|e| Error::Format(format!("{geom_col}: {e}"))))?;

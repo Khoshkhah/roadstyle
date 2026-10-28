@@ -3,7 +3,7 @@
 //! file's CRS to EPSG:4326 (`crs`), the SQL that reads a duckOSM file (`duckosm`), a table or a source's features as Parquet or
 //! GeoParquet (`write`, stage 1's files), and a table of typed columns (`columns`). Each reader of a road file gives a `RoadTable`.
 
-// Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
+// Numeric code: index loops over parallel arrays and tuple types read as they are.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod columns;

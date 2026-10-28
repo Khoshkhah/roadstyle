@@ -2,7 +2,7 @@
 //! `compute_levels`, with `method="tags"` (a rule on the tags, the default) or `method="solve"` (its optimization,
 //! with the defaults of duckOSM's `duckosm levels` and no edits).
 
-// Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
+// Numeric code: index loops over parallel arrays and tuple types read as they are.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod area;
@@ -120,7 +120,7 @@ pub struct Levels {
     pub given_up: usize,
     pub orders_not_kept: usize,
     /// Solve only: the pairs themselves, as (upper road, lower road) and (higher road, lower road). A road is the id of its first edge, as
-    /// Python's road ids.
+    /// The road ids.
     pub given_up_pairs: Vec<(i64, i64)>,
     pub orders_not_kept_pairs: Vec<(i64, i64)>,
     /// Solve only: the near parts (upper road, lower road, part 0, 1 or 2) that are not over the lower road.
@@ -256,7 +256,7 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
             order_pairs = rules.orders.iter().collect::<HashSet<_>>().len();
             given_up = s.given_up.len();
             orders_not_kept = s.orders_not_kept.len();
-            let id = |r: usize| edges[roads.first[r]].edge_id; // a road by the id of its first edge, as Python's road ids
+            let id = |r: usize| edges[roads.first[r]].edge_id; // a road by the id of its first edge ids
             given_up_pairs = s.given_up.iter().map(|&(u, l)| (id(u), id(l))).collect();
             orders_not_kept_pairs = s
                 .orders_not_kept

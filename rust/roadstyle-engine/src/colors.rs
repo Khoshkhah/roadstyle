@@ -1,7 +1,7 @@
 //! Data-driven colour and width (docs/design/rust_engine.md): render_edges' color_by, colors, cmap, vmin, vmax, width_by, color_table,
 //! color_key, color_options, color_active and legend, read from look["args"]. Ports of roadstyle's stylers.py (ClassStyler,
 //! CategoricalStyler, NumericStyler, ColorTableStyler, bake_props, bake_color_options, build_styler), of render_edges' color_table step,
-//! and of render_web.render's colouring. The ramps (colors.py's ColorRamp) are the look's (roadstyle-look `Ramp`).
+//! colouring. The ramps are the look's (roadstyle-look `Ramp`).
 
 use roadstyle_model::mark::Mark;
 use crate::road::Roads;
@@ -70,9 +70,9 @@ impl<'a> Styler<'a> {
 
 use crate::given;
 
-/// Python's str() of a column value (pandas: integers stay integers with integer_object_nulls).
-/// ponytail: a float is written as Python writes it only without an exponent (no 1e-05 or 1e+16); add it if a categorical column has such floats.
-fn py_str(c: Cell) -> String {
+/// The label of a column value (null is "None", a boolean "True" or "False": the labels that legends have always had; integers stay integers).
+/// ponytail: a float is written writes it only without an exponent (no 1e-05 or 1e+16); add it if a categorical column has such floats.
+fn category_text(c: Cell) -> String {
     let v = match c {
         Cell::Null => return "None".into(),
         Cell::Bool(b) => return if b { "True" } else { "False" }.into(),
@@ -99,12 +99,12 @@ fn py_str(c: Cell) -> String {
 }
 
 /// _keystr: a categorical value as a key (str, stripped, lower case). A missing value is "" (2026-10-24): pandas holds it as None or
-/// as NaN by its version (Python 3.10's pandas gave "", newer ones "nan"), so both engines say so explicitly.
+/// as NaN by its version (one pandas version gave "", another "nan"), so the rule says so explicitly.
 fn keystr(v: Option<Cell>) -> String {
     match v {
         None => String::new(),
         Some(c) if c.is_null() => String::new(),        // a missing value is "" (stylers._keystr), on every pandas version
-        Some(c) => py_str(c).trim().to_lowercase(),
+        Some(c) => category_text(c).trim().to_lowercase(),
     }
 }
 
@@ -264,18 +264,18 @@ fn bake_props(fs: &mut Roads, f: &Frame) {
     }
 }
 
-/// render_edges' colouring and render_web.render's: the per-edge props of the class styles, of a data styler (color_by, color_table), or
+/// render_edges' colouring: the per-edge props of the class styles, of a data styler (color_by, color_table), or
 /// of colour options (color_options: one fill per option, the shared width and casing from the class styles or the data styler).
 /// A lone data styler's legend is always in the style (its "colour by" entry); the page option `legend` shows or hides it.
 pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<Baked, crate::Error> {
-    // render_edges: color_table, an edge_id -> colour map, as the column __rs_color (keys as text, as str(id) in Python)
+    // render_edges: color_table, an edge_id -> colour map, as the column __rs_color (keys as text)
     let main = if let Some(ct) = &m.color.table {
         let (key, t) = (ct.key.as_str(), &ct.colors);
         if fs.at(0).is_some_and(|f| !f.contains_key(key)) {
             return Err(crate::error::column(key, "color_key names it, and the edges do not have it"));
         }
         for i in 0..fs.len() {
-            let c = fs.get(i, key).and_then(|k| t.get(&py_str(k))).cloned().unwrap_or(Value::Null);
+            let c = fs.get(i, key).and_then(|k| t.get(&category_text(k))).cloned().unwrap_or(Value::Null);
             fs.draw[i].color = Some(fs.values.ix(&c));
         }
         Some(color_table(fs, look, Mark::Color.name()))

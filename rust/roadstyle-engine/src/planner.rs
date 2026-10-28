@@ -1,8 +1,8 @@
 //! The route planner's data (full port step 4): mapstyle.map.planner_data and _planner_ends, from the roads (in load_roads' order) and the
-//! tables the worker's SQL writes (planner.parquet: a `part` column, in the order Python reads them). The style's metadata
+//! tables the worker's SQL writes (planner.parquet: a `part` column). The style's metadata
 //! "roadstyle:planner"; mapstyle.export.export_inline puts "roadstyle:planner_skipped" (the number of roads) there instead past 150,000 roads.
 
-use crate::layers::py_round;
+use crate::layers::round_to;
 use crate::road::{Road, Roads};
 use crate::Row;
 use roadstyle_model::{Cell, Role};
@@ -41,7 +41,7 @@ fn point_at(c: &[[f64; 2]], d: f64) -> [f64; 2] {
 /// those roads, at half its length (interpolate(0.5, normalized=True)).
 fn planner_ends(roads: &Roads, mode: &str) -> Vec<Value> {
     let lines: Vec<&[[f64; 2]]> = {
-        let of_mode: Vec<&[[f64; 2]]> = roads.iter().filter(|r| crate::roads::truthy(r.get(mode))).filter_map(|r| r.line()).collect();
+        let of_mode: Vec<&[[f64; 2]]> = roads.iter().filter(|r| crate::roads::is_yes(r.get(mode))).filter_map(|r| r.line()).collect();
         if of_mode.is_empty() { roads.iter().filter_map(|r| r.line()).collect() } else { of_mode }
     };
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
@@ -107,7 +107,7 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, crate::Er
     data.insert("src".into(), json!(row.iter().map(|r| n_of[&r.0]).collect::<Vec<_>>()));
     data.insert("tgt".into(), json!(row.iter().map(|r| n_of[&r.1]).collect::<Vec<_>>()));
     data.insert("name".into(), json!(roads.iter().map(|r| r.get("name").map_or(Value::Null, Cell::to_value)).collect::<Vec<_>>()));
-    data.insert("len".into(), json!(row.iter().map(|r| py_round(r.2, 1)).collect::<Vec<_>>()));
+    data.insert("len".into(), json!(row.iter().map(|r| round_to(r.2, 1)).collect::<Vec<_>>()));
     data.insert("hw".into(), json!(roads.iter().map(|r| r.role(Role::Class).and_then(Cell::as_str).unwrap_or("").to_string()).collect::<Vec<_>>()));
     data.insert("rb".into(), json!(row.iter().enumerate().filter(|(_, r)| matches!(r.3.as_str(), Some("roundabout" | "circular"))).map(|(k, _)| k).collect::<Vec<_>>()));
     let mut graphs = Map::new();
@@ -120,8 +120,8 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, crate::Er
         }
         let es: Vec<&Map<String, Value>> = part("graph").filter(|r| r["grp"].as_i64() == Some(mi as i64)).collect();
         let ks: Vec<usize> = es.iter().map(|r| k_of.get(&i64_of(r, "e").unwrap_or(0)).copied().ok_or_else(|| crate::error::data("a mode's edge is not a road"))).collect::<Result<_, _>>()?;
-        graphs.insert(m.to_string(), json!({"k": ks, "cost": es.iter().map(|r| py_round(f64_or0(r, "cost"), 3)).collect::<Vec<_>>(),
-                                             "len": es.iter().map(|r| py_round(f64_or0(r, "len"), 2)).collect::<Vec<_>>(),
+        graphs.insert(m.to_string(), json!({"k": ks, "cost": es.iter().map(|r| round_to(f64_or0(r, "cost"), 3)).collect::<Vec<_>>(),
+                                             "len": es.iter().map(|r| round_to(f64_or0(r, "len"), 2)).collect::<Vec<_>>(),
                                              "next": ks.iter().map(|k| nxt.get(k).cloned().unwrap_or_default()).collect::<Vec<_>>()}));
     }
     data.insert("graphs".into(), Value::Object(graphs));
@@ -132,11 +132,11 @@ pub fn planner_data(roads: &Roads, planner: Vec<Row>) -> Result<Value, crate::Er
         let mode_of = |r: &Map<String, Value>, k: &str| r.get(k).and_then(Value::as_str).and_then(|m| mi.get(m)).copied();
         let edges: Vec<Value> = part("mme").filter_map(|r| {
             let (md, s, t, e) = (mode_of(r, "mode")?, n_of.get(&i64_of(r, "s")?)?, n_of.get(&i64_of(r, "t")?)?, k_of.get(&i64_of(r, "e")?)?);
-            Some(json!([md, s, t, e, py_round(f64_or0(r, "cost"), 3)]))
+            Some(json!([md, s, t, e, round_to(f64_or0(r, "cost"), 3)]))
         }).collect();
         let transfers: Vec<Value> = part("mmt").filter_map(|r| {
             let (fm, tm, n) = (mode_of(r, "fm")?, mode_of(r, "tm")?, n_of.get(&i64_of(r, "s")?)?);
-            Some(json!([n, fm, tm, py_round(f64_or0(r, "cost"), 3)]))
+            Some(json!([n, fm, tm, round_to(f64_or0(r, "cost"), 3)]))
         }).collect();
         mm = json!({"edges": edges, "transfers": transfers, "nodes": node_ids.len()});
     }

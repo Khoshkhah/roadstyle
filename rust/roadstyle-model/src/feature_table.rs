@@ -158,7 +158,7 @@ pub struct FeatureTable {
 }
 
 /// How a column goes into a GeoJSON feature: `nulls`: a null is written (`"name": null`), else the feature has no such key; `ints`: the
-/// rows of a Float64 column that hold an integer (Python's int beside its floats, as mapstyle's heights: 6 from the kind's table, 9.0
+/// rows of a Float64 column that hold an integer (an integer beside its floats, as mapstyle's heights: 6 from the kind's table, 9.0
 /// from a tag), written as integers.
 #[derive(Clone, Debug, Default)]
 struct Rule {

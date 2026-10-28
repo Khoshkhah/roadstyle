@@ -1,19 +1,19 @@
 //! Stage 3 of a page in one call (audit R3): `page_from` makes the page of a look's roads, as render_edges(backend="web") with the Rust
 //! engine (`_engine.render_page`). It runs stage 1 (`sources_of`), the page's arrows or its tiles, a view's palettes, and it builds the
 //! options of rsDashboard (`PageOptions`) from the style's interaction contract and the page's own keywords. Then `page::page_html`
-//! writes the page. Python, the CLI and the studio call it; the caller resolves only what it alone knows: a base map that is not in
+//! writes the page. The Python binding, the CLI and the studio call it; the caller resolves only what it alone knows: a base map that is not in
 //! data/basemaps.json, the base map's API key and the Google Maps key.
 
 use crate::look::Options;
 use crate::page::{escape, gzip_b64, page_html, Camera, PageOptions, PageParts};
 use crate::sources::Styled;
 use crate::tiles::stage::{TileOptions, COLUMNS, TILES};
-use crate::{layers::py_truth, FeatureTable, Look, RoadTable};
+use crate::{FeatureTable, Look, RoadTable};
 use serde_json::{json, Map, Value};
 
 const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 
-/// render_web.render's defaults of the keywords that only the page reads (tests/test_engine_parity.py checks them against render's
+/// defaults of the keywords that only the page reads (tests/test_engine_parity.py checks them against render's
 /// signature). The look's args are the caller's keywords only, so each one that the caller did not give takes its default here.
 const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "basemap_switcher": true, "name": "roadstyle", "pitch": null,
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
@@ -35,7 +35,7 @@ const SIDEBAR_YIELDS: [&str; 2] = ["name", "road_popup"];
 
 /// The page's keys of a call (render_edges' keywords), the `given` of page_from: the look's `other` (the call's keywords that are not map
 /// options; a look file has none) and `SIDEBAR_YIELDS` of the call's `args`. It has no API key (Look::other has none): the caller adds its
-/// own values (street_view_key, api_key, resolved_basemaps) over it. The one rule of Python's page_given and the wasm page.
+/// own values (street_view_key, api_key, resolved_basemaps) over it. The one rule of the Python binding and the wasm page.
 pub fn given_of(look: &Look, args: &Value) -> Map<String, Value> {
     let mut g = look.other.clone();
     for k in SIDEBAR_YIELDS {
@@ -60,12 +60,59 @@ fn add_sidebar(html: String, template: &str, name: &str) -> String {
     html.replacen("</body>", &(frag + "</body>"), 1)
 }
 
+/// The page's keys of a call, typed: a key that the call does not give has its default (DEFAULTS, put in before), a value of another
+/// type is an error.
+/// The keys that other parts read (`data_maxzoom`, `tile_keep`, ...) stay in the map that this is made from.
+#[derive(serde::Deserialize)]
+struct PageKeys {
+    basemap: Value,
+    basemaps: Option<Vec<Value>>,
+    api_key: Option<String>,
+    basemap_switcher: bool,
+    name: String,
+    pitch: Option<Value>,
+    bearing: Option<Value>,
+    max_pitch: Option<Value>,
+    find_control: bool,
+    zoom_readout: bool,
+    overlay_control: bool,
+    overlay_popup: bool,
+    side_panel_html: Option<String>,
+    host_panel_width: f64,
+    popup_mode: Option<String>,
+    street_view: Value,
+    street_view_key: Option<String>,
+    google_3d: bool,
+    compress: bool,
+    views: Value,
+    tiles: bool,
+    filter_control: bool,
+    legend: bool,
+    #[serde(default)]
+    hover_delay_ms: Option<f64>,
+    #[serde(default)]
+    box_layout: Value,
+    #[serde(default)]
+    resolved_basemaps: Vec<Value>,
+}
+
+/// A value that is there: not null, and not an empty text, list or mapping.
+fn present(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::String(s) => !s.is_empty(),
+        Value::Array(l) => !l.is_empty(),
+        Value::Object(m) => !m.is_empty(),
+        _ => true,
+    }
+}
+
 /// The page's own keywords and their defaults.
 pub fn page_defaults() -> Map<String, Value> {
     serde_json::from_str(DEFAULTS).expect("DEFAULTS is a JSON object")
 }
 
-/// A page and the warnings of its stages (Python's warnings.warn), for the caller to give.
+/// A page and the warnings of its stages (warnings of the host), for the caller to give.
 pub struct Page {
     pub html: String,
     pub warnings: Vec<String>,
@@ -74,7 +121,7 @@ pub struct Page {
 /// The page of `roads` with `look` (resolved from `options`, which a view's palette resolves again with its palette). `given`: the
 /// page's keys (render's keywords: name, basemap_switcher, sidebar, views, hover_delay_ms, ...; a look has none), over the base map's page
 /// defaults (`look.base_map_page`), and the caller's values: `street_view_key`, `api_key` (put into a base map's URL), and
-/// `resolved_basemaps`, the entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (Python: its key of
+/// `resolved_basemaps`, the entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (the caller's key of
 /// each provider). `features`: the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
 pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
                  -> Result<Page, crate::Error> {
@@ -104,27 +151,27 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     }
     let look = owned.as_ref().unwrap_or(look);
     a.extend(given.iter().map(|(k, v)| (k.clone(), v.clone())));
-    let on = |k: &str| py_truth(&a[k]);
+    let k: PageKeys = serde_json::from_value(Value::Object(a.clone())).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
     // the map options that the page reads too: the popup panel, the 3D view, the hover colour, the colour options, the columns
     let mo = &look.map;
-    let mode = if mo.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { a["popup_mode"].as_str().filter(|m| !m.is_empty()).unwrap_or("popup") };
-    if !a["side_panel_html"].is_null() && mode == "panel" {
+    let mode = if mo.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { k.popup_mode.as_deref().filter(|m| !m.is_empty()).unwrap_or("popup") };
+    if k.side_panel_html.is_some() && mode == "panel" {
         return Err(crate::error::options("side_panel_html and popup_mode='panel' are two panels on the right: use one"));
     }
-    if !a["street_view"].is_boolean() && a["street_view"] != "window" {
-        return Err(crate::error::options(format!("street_view must be True, False or \"window\", got {}", repr(&a["street_view"]))));
+    if !k.street_view.is_boolean() && k.street_view != "window" {
+        return Err(crate::error::options(format!("street_view must be True, False or \"window\", got {}", repr(&k.street_view))));
     }
-    let key = a["street_view_key"].as_str().filter(|k| !k.is_empty()).map(String::from);
-    if on("google_3d") && key.is_none() {
+    let key = k.street_view_key.clone().filter(|v| !v.is_empty());
+    if k.google_3d && key.is_none() {
         return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY"));
     }
     let bounds = bounds_of(&roads);
-    let tiled = on("tiles");
+    let tiled = k.tiles;
     let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
-    let (active, bms, base) = basemaps(&a, look, &mut src.warnings)?;
+    let (active, bms, base) = basemaps(&k, look, &mut src.warnings)?;
     let bg = bg_color(&active, look);
     let keys: Vec<Value> = bms.iter().map(|b| b["key"].clone()).collect();
-    let (views, pals) = if on("views") { views(&mut src, &a, look, options, &keys)? } else { (Vec::new(), Vec::new()) };
+    let (views, pals) = if present(&k.views) { views(&mut src, &k, look, options, &keys)? } else { (Vec::new(), Vec::new()) };
     if tiled && views.iter().any(|v| v["set"].get("palette").is_some()) {
         return Err(crate::Error::Engine(roadstyle_engine::Error::Unsupported(roadstyle_engine::Unsupported::TiledPalettes)));
     }
@@ -144,7 +191,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let mut layers = base["layers"].as_array().cloned().unwrap_or_default();
     for l in &mut layers {
         if let Some(o) = l.as_object_mut() {
-            o.entry("paint").or_insert_with(|| json!({}));         // as render_web._state_expressions gives every layer of the page
+            o.entry("paint").or_insert_with(|| json!({}));         // every layer of the page
         }
     }
     for mut l in st["layers"].as_array().cloned().unwrap_or_default() {
@@ -166,39 +213,39 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     if mo.bridges.decks_3d {
         cam["pitch"] = cam["pitch_3d"].clone();
     }
-    for k in ["pitch", "max_pitch", "bearing"] {
-        if !a[k].is_null() {
-            cam[k] = a[k].clone();
+    for key in ["pitch", "max_pitch", "bearing"] {
+        if let Some(v) = k_cam(&k, key) {
+            cam[key] = v.clone();
         }
     }
     let mut tunnel = ctl["tunnel"].clone();
     tunnel["bg"] = bg.into();
     let opts = PageOptions {
-        basemaps: bms, basemap_switcher: on("basemap_switcher"), tiles: tiled, simple: ctl["simple"].clone(),
+        basemaps: bms, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
-        popup_mode: mode.into(), find_control: on("find_control"), zoom_readout: on("zoom_readout"), pitch_3d: number(&ctl["pitch_3d"])?,
-        street_view: a["street_view"].clone(), street_view_key: key.unwrap_or_default(), google_3d: on("google_3d"),
-        select_color: ctl["select_color"].clone(), filter: ctl["filter"].clone(), filter_control: on("filter_control"),
-        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!([])), legend: on("legend"),
-        color_active: ctl["color_active"].clone(), overlays: ctl["overlays"].clone(), overlay_control: on("overlay_control"),
-        overlay_popup: on("overlay_popup"), tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
+        popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
+        street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d: k.google_3d,
+        select_color: ctl["select_color"].clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
+        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend,
+        color_active: ctl["color_active"].clone(), overlays: ctl["overlays"].clone(), overlay_control: k.overlay_control,
+        overlay_popup: k.overlay_popup, tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),
         // the page's hover_delay_ms, else the look's (roadstyle:interaction)
-        hover_delay_ms: a.get("hover_delay_ms").and_then(Value::as_f64).map(|d| d as i64).or_else(|| inter["hover_delay_ms"].as_i64())
+        hover_delay_ms: k.hover_delay_ms.map(|d| d as i64).or_else(|| inter["hover_delay_ms"].as_i64())
             .ok_or_else(|| crate::error::options("roadstyle:interaction has no hover_delay_ms"))?,
         edge_id_col: ctl["edge_id_col"].as_str().unwrap_or("edge_id").into(), arrow_icon: ctl["arrow_icon"].clone(),
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
-        modes: ctl["modes"].clone(), box_layout: a.get("box_layout").cloned().unwrap_or_default(),
+        modes: ctl["modes"].clone(), box_layout: k.box_layout.clone(),
     };
     let hover = json!(mo.interaction.hover_color.as_ref().unwrap_or(&ls.selection.hover).css());
     let simple_js = json!({"layer": "roads-simple", "bridge": ls.bridges.casing_color, "shadow": ls.bridges.shadow.color,
-                           "select": ctl["select_color"], "hover": hover, "tunnels": py_truth(&ctl["tunnel"]["layers"]),
+                           "select": ctl["select_color"], "hover": hover, "tunnels": present(&ctl["tunnel"]["layers"]),
                            "dashes": ctl["dashes"]});
     let side = gzip_b64(&table);
     let cam = Camera { pitch: number(&cam["pitch"])?, bearing: number(&cam["bearing"])?, max_pitch: number(&cam["max_pitch"])? };
     let parts = PageParts {
-        name: a["name"].as_str().unwrap_or("roadstyle"), cam, bounds, side_panel_html: a["side_panel_html"].as_str(),
-        host_panel_width: a["host_panel_width"].as_f64().unwrap_or(320.0), compress: on("compress"), gz: None, tiles: archive.as_deref(),
+        name: &k.name, cam, bounds, side_panel_html: k.side_panel_html.as_deref(),
+        host_panel_width: k.host_panel_width, compress: k.compress, gz: None, tiles: archive.as_deref(),
         side: Some((&Value::Null, Some(&side))), simple_js: Some(&simple_js), sources: Some(&src),
     };
     let mut html = page_html(page_style, &opts, &parts);
@@ -212,7 +259,7 @@ fn number(v: &Value) -> Result<serde_json::Number, crate::Error> {
     v.as_number().cloned().ok_or_else(|| crate::error::options(format!("not a number: {v}")))
 }
 
-/// Python's repr of a JSON value, for the messages that name a value as render_web's do.
+/// the name in quotes of a JSON value, for the messages that name a value.
 fn repr(v: &Value) -> String {
     match v {
         Value::Null => "None".into(),
@@ -279,7 +326,7 @@ fn basemap(v: &Value, api_key: Option<&str>, resolved: &[Value], warnings: &mut 
     Ok(bm)
 }
 
-/// render_web._tiles: the URL template as MapLibre's raster `tiles` (each subdomain, no @2x).
+/// the URL template as MapLibre's raster `tiles` (each subdomain, no @2x).
 fn tiles_of(bm: &Value) -> Vec<String> {
     let url = bm["url"].as_str().unwrap_or("");
     if url.is_empty() {
@@ -292,7 +339,7 @@ fn tiles_of(bm: &Value) -> Vec<String> {
     vec![url.replace("{r}", "")]
 }
 
-/// render_web._bg_color: the canvas colour behind the tiles.
+/// the canvas colour behind the tiles.
 fn bg_color(bm: &Value, look: &Look) -> String {
     let bg = bm["bg"].as_str().unwrap_or("#444");
     if bg.starts_with('#') {
@@ -303,22 +350,22 @@ fn bg_color(bm: &Value, look: &Look) -> String {
     (if dark { &b.dark } else { &b.light }).css().into()
 }
 
-/// render_web._page_basemaps: the active base map, the switcher's list (the active one first) and the style that draws it.
-fn basemaps(a: &Map<String, Value>, look: &Look, warnings: &mut Vec<String>) -> Result<(Value, Vec<Value>, Value), crate::Error> {
-    let api = a["api_key"].as_str();
-    let resolved = a.get("resolved_basemaps").and_then(Value::as_array).cloned().unwrap_or_default();
-    let active = Some(&a["basemap"]).filter(|v| py_truth(v)).cloned().unwrap_or_else(|| json!(look.sections.page.basemap));
+/// the active base map, the switcher's list (the active one first) and the style that draws it.
+fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Value, Vec<Value>, Value), crate::Error> {
+    let api = k.api_key.as_deref();
+    let resolved = k.resolved_basemaps.clone();
+    let active = Some(&k.basemap).filter(|v| present(v)).cloned().unwrap_or_else(|| json!(look.sections.page.basemap));
     let active_bm = basemap(&active, api, &resolved, warnings)?;
     let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
-    let keys = a["basemaps"].as_array().filter(|l| !l.is_empty()).cloned().unwrap_or_else(|| all["switcher"].as_array().cloned().unwrap_or_default());
+    let keys = k.basemaps.clone().filter(|l| !l.is_empty()).unwrap_or_else(|| all["switcher"].as_array().cloned().unwrap_or_default());
     let key_of = |v: &Value| if v.is_object() { v["key"].clone() } else { v.clone() };
     let mut list = vec![active_bm.clone()];
-    for k in keys.iter().filter(|k| key_of(k) != active_bm["key"] && key_of(k) != key_of(&active)) {
-        list.push(basemap(k, api, &resolved, warnings)?);
+    for b in keys.iter().filter(|b| key_of(b) != active_bm["key"] && key_of(b) != key_of(&active)) {
+        list.push(basemap(b, api, &resolved, warnings)?);
     }
     let mut bms: Vec<Value> = list.iter().map(|b| json!({"key": b["key"], "label": b["label"], "tiles": tiles_of(b), "bg": bg_color(b, look),
                                                          "maxzoom": b.get("maxzoom").cloned().unwrap_or(json!(19)), "attr": b["attr"]})).collect();
-    if !py_truth(&a["basemap_switcher"]) && !py_truth(&a["basemaps"]) {
+    if !k.basemap_switcher && k.basemaps.as_ref().is_none_or(|l| l.is_empty()) {
         bms.truncate(1);        // no switcher and no list given: only the fixed backdrop (window.rsSetBasemap reaches a given list)
     }
     let mut style = json!({"version": 8, "sources": {}, "layers": [{"id": "bg", "type": "background", "paint": {"background-color": bg_color(&active_bm, look)}}]});
@@ -327,7 +374,7 @@ fn basemaps(a: &Map<String, Value>, look: &Look, warnings: &mut Vec<String>) -> 
         style["sources"]["bm"] = json!({"type": "raster", "tiles": tiles, "tileSize": 256, "maxzoom": active_bm.get("maxzoom").cloned().unwrap_or(json!(19)),
                                         "attribution": active_bm["attr"]});
         style["layers"].as_array_mut().unwrap().push(json!({"id": "basemap", "type": "raster", "source": "bm"}));
-    } else if let Some(b) = bms.iter().find(|b| py_truth(&b["tiles"])) {
+    } else if let Some(b) = bms.iter().find(|b| present(&b["tiles"])) {
         // a blank base map is active but the switcher offers tiled ones: the raster layer is there, hidden (no tile is fetched)
         style["sources"]["bm"] = json!({"type": "raster", "tiles": b["tiles"], "tileSize": 256, "maxzoom": b["maxzoom"], "attribution": b["attr"]});
         style["layers"].as_array_mut().unwrap().push(json!({"id": "basemap", "type": "raster", "source": "bm", "layout": {"visibility": "none"}}));
@@ -337,7 +384,7 @@ fn basemaps(a: &Map<String, Value>, look: &Look, warnings: &mut Vec<String>) -> 
 
 const VIEW_BOOLS: [&str; 4] = ["road_fill", "bridges", "tunnels", "view3d"];
 
-/// render_web._check_views: `views` as the page reads it, [{name, set}]; a setting that is not known, or that names a colour option, an
+/// `views` as the page reads it, [{name, set}]; a setting that is not known, or that names a colour option, an
 /// overlay, a class, a base map or a palette that the page does not have, is an error.
 fn check_views(views: &Value, have: [(&str, Vec<Value>); 5]) -> Result<Vec<Value>, crate::Error> {
     let mut out = Vec::new();
@@ -373,7 +420,7 @@ fn check_views(views: &Value, have: [(&str, Vec<Value>); 5]) -> Result<Vec<Value
 
 /// _engine._views: the views as the page reads them, and the palettes that they name other than the page's. Each such palette is
 /// resolved with the look's options and map options (its colours), and merged into stage 1's output (palettes::add).
-fn views(src: &mut Styled, a: &Map<String, Value>, look: &Look, options: &Options, basemaps: &[Value]) -> Result<(Vec<Value>, Vec<String>), crate::Error> {
+fn views(src: &mut Styled, k: &PageKeys, look: &Look, options: &Options, basemaps: &[Value]) -> Result<(Vec<Value>, Vec<String>), crate::Error> {
     let meta = &src.metadata;
     let ctl = &meta["roadstyle:controls"];
     let colors: Vec<Value> = if !look.map.color.options.is_empty() {
@@ -382,7 +429,7 @@ fn views(src: &mut Styled, a: &Map<String, Value>, look: &Look, options: &Option
     let overlays: Vec<Value> = ctl["overlays"].as_array().into_iter().flatten().map(|o| o["label"].clone()).collect();
     let classes = ctl["filter"]["classes"].as_array().cloned().unwrap_or_default();
     let palettes: Vec<Value> = options.style_names("palettes").into_iter().map(Value::from).collect();
-    let views = check_views(&a["views"], [("color", colors), ("overlays", overlays), ("classes", classes), ("basemap", basemaps.to_vec()),
+    let views = check_views(&k.views, [("color", colors), ("overlays", overlays), ("classes", classes), ("basemap", basemaps.to_vec()),
                                            ("palette", palettes)])?;
     let mut pals: Vec<String> = Vec::new();
     for p in views.iter().filter_map(|v| v["set"]["palette"].as_str()) {
@@ -424,7 +471,7 @@ fn palette_swatches(style: &mut Value, rows: &[crate::sources::TableRow], pals: 
     for n in pals {
         let of: Map<String, Value> = classes.iter().map(|c| {
             let fill = roadstyle_model::mark::Mark::Fill.name();
-            let v = row(c).and_then(|r| get(r, &roadstyle_model::mark::in_palette(fill, n)).or_else(|| get(r, fill))).filter(|v| py_truth(v))
+            let v = row(c).and_then(|r| get(r, &roadstyle_model::mark::in_palette(fill, n)).or_else(|| get(r, fill))).filter(|v| present(v))
                 .unwrap_or_else(|| fb.clone());
             (c.as_str().unwrap_or_default().to_string(), v)
         }).collect();
@@ -483,4 +530,14 @@ mod tests {
         assert_eq!((&g["name"], &g["road_popup"]), (&json!("N"), &json!(["highway"])));   // a sidebar's defaults give way to them
         assert!(!g.contains_key("color_by") && !g.contains_key("state"), "map options are the look's: {g:?}");
     }
+}
+
+/// A camera key of the call, when it gave one.
+fn k_cam<'a>(k: &'a PageKeys, name: &str) -> Option<&'a Value> {
+    match name {
+        "pitch" => k.pitch.as_ref(),
+        "bearing" => k.bearing.as_ref(),
+        _ => k.max_pitch.as_ref(),
+    }
+    .filter(|v| !v.is_null())
 }

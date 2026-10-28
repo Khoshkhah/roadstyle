@@ -1,12 +1,12 @@
 //! The roads' topology, made one time for all the stages (audit R4): a node for each end of a road, the number of road ends at each
-//! node, and one R-tree of the roads' boxes. A node is an end point rounded to 6 decimal places as Python's round does it (the correctly
+//! node, and one R-tree of the roads' boxes. A node is an end point rounded to 6 decimal places does it (the correctly
 //! rounded decimal; -0 is 0), so two ends are one node when their rounded points are the same.
 
 use crate::table::RoadTable;
 use rstar::primitives::{GeomWithData, Rectangle};
 use rstar::{RTree, AABB};
 
-/// Python's round(x, 6) as a float: the nearest double to the correctly rounded decimal (no tie can occur at 6 places), and no -0.
+/// Round x to 6 decimals: the nearest double to the correctly rounded decimal (no tie can occur at 6 places), and no -0.
 pub fn round6(x: f64) -> f64 {
     // fast: away from a half, x * 1e6 (error below 1e-7 for a coordinate) rounds to the same integer n as the decimal, and n / 1e6 (n
     // and 1e6 exact) is the nearest double to it, as the parse gives; near a half, the decimal text decides

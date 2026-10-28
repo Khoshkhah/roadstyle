@@ -1,15 +1,15 @@
 //! The style's sources as vector tiles (Mapbox Vector Tile 2.1), made when the map asks for them, with the rules of roadstyle's
-//! tiles.py: the page gives MapLibre one source, `{"type": "vector", "tiles": ["<prefix>roads/{z}/{x}/{y}"]}`, and each of the
+//! the page gives MapLibre one source, `{"type": "vector", "tiles": ["<prefix>roads/{z}/{x}/{y}"]}`, and each of the
 //! style's sources is a layer in its tiles (the layers' `source-layer`). One GeoJSON text of all the roads (Tartu: 150 MB) is then
 //! not made, parsed and cut into tiles by MapLibre again.
 //!
-//! Each feature has its index in its source as its id (tiles.py), and its properties (a null
+//! Each feature has its index in its source as its id, and its properties (a null
 //! value is left out: MapLibre reads a missing one as null). Below the last zoom a line is simplified to half a tile unit, and a
 //! line shorter than that is left out. A feature is clipped to the tile and a buffer around it, except a feature of a whole layer
 //! (the name and arrow slots): it goes whole into every tile it touches, because MapLibre places a label only in the tile that has
 //! its anchor.
 
-// Ported numeric code: index loops over parallel arrays and tuple types of the Python stages read as they are in Python.
+// Numeric code: index loops over parallel arrays and tuple types read as they are.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod buffer;
@@ -154,7 +154,7 @@ fn line_geom(c: &[[f64; 2]]) -> Geom {
     Geom::Lines(vec![c.iter().filter_map(|p| merc_ll(p[0], p[1])).collect()])
 }
 
-/// The properties that a line layer's tiles keep: every `__rs_*` one and those in `keep`, all of them when `whole` (tiles.py's tile_props).
+/// The properties that a line layer's tiles keep: every `__rs_*` one and those in `keep`, all of them when `whole`.
 fn kept(k: &str, keep: &HashSet<String>, whole: bool) -> bool {
     whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k)
 }
@@ -214,14 +214,14 @@ fn val(v: &Value) -> Option<Val<'_>> {
         Value::String(s) => Val::Str(s.as_str().into()),
         Value::Bool(b) => Val::Bool(*b),
         Value::Number(n) => match (n.as_i64(), n.as_u64()) {
-            // an integer past 2**53 - 1 as text, as every JSON form writes it (JavaScript would round it; tiles.py's roads have text)
+            // an integer past 2**53 - 1 as text, as every JSON form writes it
             (Some(i), _) if i.unsigned_abs() > roadstyle_model::table::JS_MAX_SAFE_INT => Val::Str(i.to_string().into()),
             (_, Some(u)) if u > roadstyle_model::table::JS_MAX_SAFE_INT => Val::Str(u.to_string().into()),
             (Some(i), _) => Val::Int(i),
             (_, Some(u)) => Val::UInt(u),
             _ => Val::Dbl(n.as_f64()?),
         },
-        Value::Null | Value::Array(_) | Value::Object(_) => return None, // tiles.py (mapbox_vector_tile) leaves out a list or an object
+        Value::Null | Value::Array(_) | Value::Object(_) => return None, // (mapbox_vector_tile) leaves out a list or an object
     })
 }
 
@@ -301,15 +301,15 @@ impl Tiles {
     }
 
     /// Add a GeoJSON source of the style (`{"type": "geojson", "data": FeatureCollection, ...}`) as the layer `name`, and free its
-    /// tree. The properties in `keep` and every `__rs_*` property go into the tiles, all of a whole layer's (tiles.py's tile_props). `whole`: see the module; `min_zoom`: the layer's first zoom.
+    /// tree. The properties in `keep` and every `__rs_*` property go into the tiles, all of a whole layer's. `whole`: see the module; `min_zoom`: the layer's first zoom.
     pub fn add(&mut self, name: &str, source: &Value, keep: &HashSet<String>, whole: bool, min_zoom: u32) {
         let empty = Map::new();
         let mut b = self.builder(name);
         for (i, f) in source["data"]["features"].as_array().into_iter().flatten().enumerate() {
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
-            let id = Some(i as u64); // tiles.py: a feature's id is its index in its source
+            let id = Some(i as u64); // a feature's id is its index in its source
             let props = f["properties"].as_object().unwrap_or(&empty);
-            // tiles.py's tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
+            // tile_props: a whole layer (keep=None there) all its properties, else `keep` and every __rs_*
             b.push(id, g, props.iter().filter(|(k, _)| whole || k.starts_with(roadstyle_model::mark::PREFIX) || keep.contains(k.as_str())).map(|(k, v)| (k.as_str(), v.clone())));
         }
         self.put(name, b.layer(whole, min_zoom, self.max_zoom));
@@ -456,8 +456,8 @@ impl Tiles {
         for z in self.min_zoom..=self.max_zoom {
             let n = (1u64 << z) as f64;
             let last = (1u32 << z) - 1;
-            let cell = |v: f64| ((v * n).floor().max(0.0) as u32).min(last);      // tiles.py's _tile_range
-            // the bounds and the zoom's buffer: a tile whose buffer has a road's stroke has the road (tiles.py: the padded boxes)
+            let cell = |v: f64| ((v * n).floor().max(0.0) as u32).min(last);      // the tile index of this coordinate
+            // the bounds and the zoom's buffer: a tile whose buffer has a road's stroke has the road
             let b = self.buffers[z as usize] / EXTENT / n;
             let (x0, x1, y0, y1) = (cell(lo[0] - b), cell(hi[0] + b), cell(hi[1] - b), cell(lo[1] + b));
             for x in x0..=x1 {
@@ -563,7 +563,7 @@ impl Tiles {
                     (1, points_cmd(&ps))
                 }
                 Geom::Lines(ls) => {
-                    // ponytail: simplified for each tile (in the tile's units, tiles.py's rule); a cache for each (feature, zoom) was slower
+                    // ponytail: simplified for each tile; a cache for each (feature, zoom) was slower
                     // on Tartu (most lines lie in one tile of a zoom), so the tile bytes are cached instead
                     let ls: Vec<Vec<P>> = ls.iter().map(|l| {
                         let l: Vec<P> = l.iter().map(to).collect();
@@ -580,7 +580,7 @@ impl Tiles {
                     let mut rings = Vec::new();
                     for poly in ps {
                         for (k, r) in poly.iter().enumerate() {
-                            // tiles.py: a whole layer's polygon goes into every tile its box touches as it is, not clipped
+                            // a whole layer's polygon goes into every tile its box touches as it is, not clipped
                             let r: Vec<P> = r.iter().map(to).collect();
                             let mut r = dedup(if layer.whole { r } else { clip_ring(&r, lo, hi) }.into_iter().map(round));
                             if r.len() > 1 && r[0] == r[r.len() - 1] {
@@ -623,7 +623,7 @@ impl Tiles {
 impl Layer {
     /// The features in the tile z/x/y and its buffer (`buffer`, tile units) (of the trees of zoom z or less), in the order of the
     /// source: the drawing order of features in one layer. A feature out of the tile whose box is in the buffer is in the tile: its
-    /// stroke can reach into it (tiles.py took only the features whose box touches the tile).
+    /// stroke can reach into it.
     fn hits(&self, z: u32, x: u32, y: u32, buffer: f64) -> Vec<u32> {
         let n = (1u64 << z) as f64;
         let b = buffer / EXTENT;
@@ -745,11 +745,12 @@ const PX: f64 = EXTENT / 512.0;
 
 /// Rule B (docs/design/tile_v2_plan.md, step 3b), for the pieces of a tile below the last zoom: a road whose pieces together are under
 /// 1 px is left out (its casing and its fill each count: the longer one decides), unless it goes out of the tile (its length here is
-/// a cut); and a casing end piece (`__rs_seam`, with or without lap) under 1 px is left out. Every fill and every casing body stays.
+/// a cut); and a casing end piece (a seam, with or without lap) under 1 px is left out. Every fill and every casing body stays.
 fn drop_tiny(layer: &Layer, made: &mut Vec<(&Feat, u32, Vec<u32>, Vec<Vec<[i32; 2]>>)>) {
     let key = |k: &str| layer.keys.iter().position(|x| x == k).map(|k| k as u32);
-    let (Some(edge), kind) = (key("__rs_edge"), key("__rs_k")) else { return };
-    let seam = key("__rs_seam");
+    use roadstyle_model::mark::Mark;
+    let (Some(edge), kind) = (key(Mark::Edge.name()), key(Mark::PieceKind.name())) else { return };
+    let seam = key(Mark::Seam.name());
     let len = |parts: &Vec<Vec<[i32; 2]>>| parts.iter().map(|l| length(&l.iter().map(|p| [p[0] as f64, p[1] as f64]).collect::<Vec<P>>())).sum::<f64>();
     let get = |f: &Feat, k: u32| f.props.iter().find(|p| p.0 == k).map(|p| p.1);
     // by road (the value's number, one for each distinct value): the length of each kind of piece, and whether a point is out of the tile
@@ -769,10 +770,10 @@ fn drop_tiny(layer: &Layer, made: &mut Vec<(&Feat, u32, Vec<u32>, Vec<Vec<[i32; 
     });
 }
 
-/// The parts of a line (in the tile's units, simplified: `Tiles::kept`) in a tile: none when shorter than half a unit (tiles.py), then
+/// The parts of a line (in the tile's units, simplified: `Tiles::kept`) in a tile: none when shorter than half a unit, then
 /// clipped to the square [lo, hi]^2 when `clip` is given.
 fn line_parts(ls: Vec<Vec<P>>, clip: Option<(f64, f64)>) -> Vec<Vec<[i32; 2]>> {
-    // tiles.py: a line shorter than half a tile unit is left out at every zoom (a whole layer's lines are not checked)
+    // a line shorter than half a tile unit is left out at every zoom (a whole layer's lines are not checked)
     if clip.is_some() && ls.iter().map(|l| length(l)).sum::<f64>() < 0.5 {
         return Vec::new();
     }

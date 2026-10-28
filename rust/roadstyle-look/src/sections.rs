@@ -105,7 +105,7 @@ pub struct RoadsLook {
     pub fill_opacity: Num,
     /// each class of the palette as ClassStyler resolves it, plain and as a link, and the fallback
     pub styles: ClassStyles,
-    /// render_web's road tables
+    /// road tables
     pub model: RoadsModel,
     /// render's default head length in metres
     pub head_m: f64,
@@ -119,7 +119,7 @@ impl RoadsLook {
 
     /// The classes whose flag `key` is true (`no_casing`, `single_line`, `minor`), in the table's order.
     pub fn flagged(&self, key: &str) -> Vec<String> {
-        self.classes.iter().filter(|(_, e)| crate::resolve::truthy(e.get(key))).map(|(c, _)| c.clone()).collect()
+        self.classes.iter().filter(|(_, e)| crate::resolve::is_set(e.get(key))).map(|(c, _)| c.clone()).collect()
     }
 }
 
@@ -132,7 +132,7 @@ pub struct ClassStyles {
     pub fallback: [Value; 2],
 }
 
-/// render_web's road tables (_settings.roads()): the widths of each group by zoom, the zoom rate above the last stop, the casing ratio,
+/// road tables: the widths of each group by zoom, the zoom rate above the last stop, the casing ratio,
 /// each class's group, the link classes, the zoom stops and each class's drawing order.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -496,7 +496,7 @@ fn bad(what: &str, e: impl std::fmt::Display) -> Error {
     Error::Look(format!("look: {what}: {e}"))
 }
 
-/// Python's repr of a JSON value, for the messages that name a value as Python's do.
+/// the name in quotes of a JSON value, for the messages that name a value
 fn repr(v: &Value) -> String {
     match v {
         Value::Null => "None".into(),
@@ -508,8 +508,8 @@ fn repr(v: &Value) -> String {
     }
 }
 
-/// The tunnel look's rule (render_web._tun_settings): each colour of `towards` a "#rrggbb", `toward` one of their names or a "#rrggbb".
-/// It runs before the typed reader, so a value of another type has this message too (the texts of Python's _check_tunnels).
+/// The tunnel look's rule: each colour of `towards` a "#rrggbb", `toward` one of their names or a "#rrggbb".
+/// It runs before the typed reader, so a value of another type has this message too (the texts of the tunnel checks).
 fn check_tunnels(t: &Value) -> Result<(), Error> {
     let hex = |v: &Value| v.as_str().is_some_and(|c| c.len() == 7 && crate::color::hex_rgb(c).is_some());
     let empty = Map::new();

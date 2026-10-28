@@ -41,7 +41,7 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     let by_class = |field: &str, f: &dyn Fn(&Value) -> Value| {
         let mut vals = Vec::new();
         for (c, e) in &classes {
-            if e.get(field).is_some_and(crate::layers::py_truth) {
+            if e.get(field).is_some_and(crate::roads::yes) {
                 vals.push(json!(c));
                 vals.push(f(&e[field]));
             }
@@ -59,7 +59,7 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     let pair = tu.pair();
     let tun_dash = mixed(pair.map_or(&tu.to["dash"], |p| &p[0]));
     let casing = json!(["case", bri, s.bridges.casing_color, tun, tun_dash, by_class("casing", &same)]);
-    let mut no_casing: Vec<Value> = classes.iter().filter(|(_, e)| !e.get("casing").is_some_and(crate::layers::py_truth)).map(|(c, _)| json!(c)).collect();
+    let mut no_casing: Vec<Value> = classes.iter().filter(|(_, e)| !e.get("casing").is_some_and(crate::roads::yes)).map(|(c, _)| json!(c)).collect();
     let mut flagged = s.roads.flagged("no_casing");
     flagged.sort();        // the config's sorted minor_no_casing
     no_casing.extend(flagged.into_iter().map(Value::from));
@@ -111,7 +111,7 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
         size.push(zb[0].clone());
         size.push(json!(["*", zb[1], ["match", ["get", hw], minor, arw.size["minor"], 1.0]]));
     }
-    let fixed = lbl.size.as_ref().filter(|v| crate::layers::py_truth(v));
+    let fixed = lbl.size.as_ref().filter(|v| crate::roads::yes(v));
     let mut lf = vec![json!(["to-boolean", ["get", "name"]]), minor_or(&json!(lbl.minor_minzoom))];
     lf.extend(mz.clone());
     if fixed.is_none() {

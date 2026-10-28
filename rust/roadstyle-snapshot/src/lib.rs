@@ -1,7 +1,7 @@
 //! PNG pictures of saved roadstyle pages (plan step A4 in docs/design/rust_library.md). Chromium draws the page over CDP
-//! (headless_chrome), with the steps of roadstyle's Python snapshot (src/roadstyle/snapshot.py, Playwright): open the page, wait until
+//! (headless_chrome), with these steps: open the page, wait until
 //! MapLibre has loaded, move the camera, let the tiles and labels settle, write the viewport as a PNG. The same Chromium gives the same
-//! picture as Python. The browser is not downloaded: `find_browser` names where it looks.
+//! picture. The browser is not downloaded: `find_browser` names where it looks.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ pub struct Camera {
     pub bearing: Option<f64>,
 }
 
-/// The picture's size and times, with the defaults of Python's snapshot.
+/// The picture's size and times, with their defaults.
 #[derive(Clone, Debug)]
 pub struct Shot {
     /// the viewport in CSS pixels
@@ -75,7 +75,7 @@ impl From<std::io::Error> for SnapshotError {
     }
 }
 
-/// The time for the page and the browser to answer (open the page, run a script, take the picture): Playwright's default, as in Python.
+/// The time for the page and the browser to answer (open the page, run a script, take the picture): Playwright's default.
 /// `Shot::timeout` is only the time for the map to load.
 const ANSWER: Duration = Duration::from_secs(30);
 
@@ -119,7 +119,7 @@ pub fn find_browser() -> Result<PathBuf, SnapshotError> {
 #[derive(Debug)]
 pub struct Picture {
     pub path: PathBuf,
-    /// what the picture can be missing: a map that did not load in the time (the picture shows it as it was, as Python does)
+    /// what the picture can be missing: a map that did not load in the time (the picture shows it as it was
     pub warning: Option<String>,
 }
 
@@ -146,7 +146,7 @@ pub fn snapshot(page: &Path, out: &Path, camera: &Camera, shot: &Shot) -> Result
     }).map_err(page_err)?;
     tab.navigate_to(&url).map_err(page_err)?.wait_until_navigated().map_err(page_err)?;
     // a MapLibre page: wait until the map has loaded. A page with no `map` (folium, other pages) only gets the settle time, and a map that
-    // does not load in the time is taken as it is, with a warning, as in Python.
+    // does not load in the time is taken as it is, with a warning.
     let (start, mut warning) = (Instant::now(), None);
     loop {
         let state = tab.evaluate("window.map && typeof window.map.loaded === 'function' ? window.map.loaded() : null", false)

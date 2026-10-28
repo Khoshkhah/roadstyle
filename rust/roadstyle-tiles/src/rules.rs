@@ -75,7 +75,7 @@ fn span(c: &Value, p: &Map<String, Value>) -> (f64, f64) {
         Some([op, cs @ ..]) if op == "any" => {
             cs.iter().map(|c| span(c, p)).filter(|s| s.0 < s.1).fold(NONE, |a, s| (a.0.min(s.0), a.1.max(s.1)))
         }
-        _ if !reads_zoom(c) && known(c) => if truthy(&ev(c, p)) { ALL } else { NONE },
+        _ if !reads_zoom(c) && known(c) => if to_boolean(&ev(c, p)) { ALL } else { NONE },
         _ => ALL,
     }
 }
@@ -118,7 +118,8 @@ fn gets(e: &Value, out: &mut Vec<String>) {
     }
 }
 
-fn truthy(v: &Value) -> bool {
+/// MapLibre's `to-boolean`.
+fn to_boolean(v: &Value) -> bool {
     match v {
         Value::Bool(b) => *b,
         Value::Null => false,
@@ -145,17 +146,17 @@ fn ev(e: &Value, p: &Map<String, Value>) -> Value {
         "get" => a.get(1).and_then(Value::as_str).and_then(|k| p.get(k)).cloned().unwrap_or(Value::Null),
         "literal" => a.get(1).cloned().unwrap_or(Value::Null),
         "coalesce" => (1..a.len()).map(arg).find(|v| !v.is_null()).unwrap_or(Value::Null),
-        "to-boolean" => truthy(&arg(1)).into(),
-        "!" => (!truthy(&arg(1))).into(),
-        "all" => (1..a.len()).all(|i| truthy(&arg(i))).into(),
-        "any" => (1..a.len()).any(|i| truthy(&arg(i))).into(),
+        "to-boolean" => to_boolean(&arg(1)).into(),
+        "!" => (!to_boolean(&arg(1))).into(),
+        "all" => (1..a.len()).all(|i| to_boolean(&arg(i))).into(),
+        "any" => (1..a.len()).any(|i| to_boolean(&arg(i))).into(),
         "==" => same(&arg(1), &arg(2)).into(),
         "!=" => (!same(&arg(1), &arg(2))).into(),
         "at" => arg(1).as_f64().and_then(|i| arg(2).as_array().and_then(|l| l.get(i as usize)).cloned()).unwrap_or(Value::Null),
         "case" => {
             let mut i = 1;
             while i + 1 < a.len() {
-                if truthy(&arg(i)) {
+                if to_boolean(&arg(i)) {
                     return arg(i + 1);
                 }
                 i += 2;

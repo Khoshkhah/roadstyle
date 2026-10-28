@@ -1473,7 +1473,7 @@
           "$ref": "#/$defs/ClassStyles"
         },
         "model": {
-          "description": "render_web's road tables",
+          "description": "road tables",
           "$ref": "#/$defs/RoadsModel"
         },
         "head_m": {
@@ -1577,7 +1577,7 @@
       ]
     },
     "RoadsModel": {
-      "description": "render_web's road tables (_settings.roads()): the widths of each group by zoom, the zoom rate above the last stop, the casing ratio,\neach class's group, the link classes, the zoom stops and each class's drawing order.",
+      "description": "road tables: the widths of each group by zoom, the zoom rate above the last stop, the casing ratio,\neach class's group, the link classes, the zoom stops and each class's drawing order.",
       "type": "object",
       "properties": {
         "width": {

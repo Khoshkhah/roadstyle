@@ -1,5 +1,5 @@
 //! The resolution of the look (look.json): what roadstyle renders a map with, made from render_edges' palette, profile and settings, as
-//! Python makes it (docs/design/rust_engine.md). Ports of roadstyle's _settings.py (theme, style, roads: the profile and the palette merged, the palettes
+//! The look as the engine reads it (docs/design/rust_engine.md): the settings (theme, style, roads: the profile and the palette merged, the palettes
 //! of all classes, the settings in the older layout), of config.StyleConfig, of palettes.RoadStyle.from_dict with style._apply, and of the
 //! parts geolibre-roadstyle's look_of adds (the class styles, the slots' tables, the arrow image, the popup). The data is roadstyle's own:
 //! roadstyle-assets' data/ (profiles, palettes, defaults.json, sprite.png), read at build time, so there is one copy of it.
@@ -26,7 +26,7 @@ const PALETTES: [(&str, &str); 4] = [
 const DEFAULTS: &str = roadstyle_assets::text!("data/defaults.json");
 const SPRITE: &[u8] = roadstyle_assets::bytes!("data/sprite.png");
 
-/// render_web.render's defaults that the look holds, and DEFAULT_ROAD_POPUP.
+/// defaults that the look holds, and DEFAULT_ROAD_POPUP.
 const HEAD_M: f64 = 5.0;
 const HOVER_DELAY_MS: i64 = 300;
 const ROAD_POPUP: [&str; 7] = ["name", "edge_id", "edge_ref", "highway", "lanes", "bridge", "tunnel"];
@@ -79,7 +79,7 @@ fn yaml_value(y: &yaml_rust2::Yaml) -> Value {
     }
 }
 
-/// A mapping key as JSON writes it: a number's text (Python's json.dumps writes an int key 18 as "18").
+/// A mapping key as JSON writes it: a number's text (an int key 18 is "18").
 fn yaml_key(k: &yaml_rust2::Yaml) -> String {
     use yaml_rust2::Yaml;
     match k {
@@ -156,7 +156,7 @@ fn style_file(o: &Own, kind: &str, name: &str) -> Result<Value, Error> {
     let files: &[(&str, &str)] = if kind == "profiles" { &PROFILES } else { &PALETTES };
     let mine = own(o, kind, name);        // the user's own file first, as _style_dirs
     let text = mine.clone().or_else(|| files.iter().find(|f| f.0 == name).map(|f| f.1.to_string()))
-        .ok_or_else(|| Error::Unknown(format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(o, kind).join(", "))))?;     // Python's repr
+        .ok_or_else(|| Error::Unknown(format!("no {} named '{name}'; there are: {}", &kind[..kind.len() - 1], names(o, kind).join(", "))))?;     // the name in quotes
     let data = yaml(&text).map_err(|e| Error::File(format!("{} {name}: {e}", &kind[..kind.len() - 1])))?;
     let base = lookup(&BASE, kind).unwrap();
     if name == base && mine.is_none() {
@@ -196,7 +196,8 @@ pub(crate) fn carto_entries() -> Result<Value, Error> {
     }).collect()))
 }
 
-pub(crate) fn truthy(v: Option<&Value>) -> bool {
+/// Whether a setting is given: not null, false, 0, the empty text, list or mapping.
+pub(crate) fn is_set(v: Option<&Value>) -> bool {
     match v {
         None | Some(Value::Null) => false,
         Some(Value::Bool(b)) => *b,
@@ -216,7 +217,7 @@ fn items(v: Option<&Value>) -> Vec<(String, Value)> {
 fn old_style_keys(data: &Value) -> (Value, Vec<String>) {
     let mut out = json!({});
     let mut flags = Vec::new();
-    if truthy(data.get("palettes")) {
+    if is_set(data.get("palettes")) {
         let pals: Map<String, Value> = items(data.get("palettes")).into_iter()
             .map(|(n, v)| { let r = if v.is_object() { v.get("roads").cloned().unwrap_or(v) } else { v }; (n, r) }).collect();
         out["palettes"] = Value::Object(pals);
@@ -257,10 +258,10 @@ fn old_style_keys(data: &Value) -> (Value, Vec<String>) {
 pub fn theme(sources: &[Value], o: &Own) -> Result<Value, Error> {
     let (mut profile, mut palette) = (Value::from("default"), Value::from("amber"));
     for d in sources {
-        if truthy(d.get("profile")) {
+        if is_set(d.get("profile")) {
             profile = d["profile"].clone();
         }
-        if truthy(d.get("palette")) {
+        if is_set(d.get("palette")) {
             palette = d["palette"].clone();
         }
     }
@@ -299,7 +300,7 @@ fn style_config(theme: &Value, sources: &[Value]) -> Result<Map<String, Value>, 
         cfg.insert(k.into(), path(theme, p)?.clone());
     }
     let classes = theme["roads"]["classes"].as_object().cloned().unwrap_or_default();
-    let flagged = |f: &str| Value::Array(classes.iter().filter(|(_, e)| truthy(e.get(f))).map(|(c, _)| Value::from(c.as_str())).collect());
+    let flagged = |f: &str| Value::Array(classes.iter().filter(|(_, e)| is_set(e.get(f))).map(|(c, _)| Value::from(c.as_str())).collect());
     cfg.insert("minor_no_casing".into(), flagged("no_casing"));
     cfg.insert("single_line_classes".into(), flagged("single_line"));
     cfg.insert("minzoom".into(), Value::Object(classes.iter().filter_map(|(c, e)| Some((c.clone(), e.get("minzoom")?.clone()))).collect()));
@@ -353,8 +354,8 @@ fn float(v: &Value, what: &str) -> Result<f64, Error> {
     v.as_f64().ok_or_else(|| Error::Options(format!("{what}: not a number: {v}")))
 }
 
-/// Python's str() of a number in a dash pattern (_dash_str: "4,4").
-fn py_num(v: &Value) -> String {
+/// The text of a number in a dash pattern ("4,4").
+fn dash_number(v: &Value) -> String {
     match v.as_i64() {
         Some(i) => i.to_string(),
         None => {
@@ -380,7 +381,7 @@ fn class_styles(theme: &Value, palette: &str, config: &Value) -> Result<Value, E
         let (width, casing_width) = (float(&d["width"], "width")?, float(&d["casing_width"], "casing_width")?);
         let casing = d.get("casing").or_else(|| d.get("casing_dark")).unwrap_or(fb_casing);
         let dash = d.get("dash").and_then(Value::as_array).filter(|a| !a.is_empty())
-            .map_or(Value::Null, |a| Value::from(a.iter().map(py_num).collect::<Vec<_>>().join(",")));
+            .map_or(Value::Null, |a| Value::from(a.iter().map(dash_number).collect::<Vec<_>>().join(",")));
         let opacity = d.get("opacity").map_or(Ok(1.0), |o| float(o, "opacity"))?;
         let one = |scale: f64| json!({"fill": d["fill"], "width": width * scale, "casing": casing, "casing_width": casing_width * scale,
                                       "dash": dash, "opacity": fill_opacity * opacity, "casing_opacity": config["casing_opacity"]});
@@ -484,7 +485,7 @@ pub(crate) fn resolve(options: &Options) -> Result<(LookData, Map<String, Value>
     let styles = class_styles(&th, palette, &config)?;
     let roads_model = roads(&th);
     let mut args = if options.args.is_null() { json!({}) } else { options.args.clone() };
-    let stored = bm.is_some() && args["levels"].is_object();       // the stored levels of a duckOSM file: their columns
+    let stored = bm.is_some() && args.get("levels").is_some_and(Value::is_object);       // the stored levels of a duckOSM file: their columns
     let level_cols = crate::basemap::LEVEL_COLS.iter().filter(|_| stored).map(|c| (format!("{c}_col"), Value::from(*c)));
     for (k, v) in bm.iter().flat_map(|b| b.args.clone()).chain(level_cols) {      // the base map's map options, where the caller gives none
         if let Some(a) = args.as_object_mut().filter(|a| !a.contains_key(&k)) {

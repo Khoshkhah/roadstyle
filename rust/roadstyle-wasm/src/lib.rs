@@ -115,7 +115,7 @@ mod wasm {
         }
 
         /// withArg(key: string, value: string) -> Look: the same look with the map option `key` (a render_edges keyword: color_by, state,
-        /// live_data, levels, ...) set to `value` (JSON text), as the Python binding's Look.with_arg. An error is a thrown Error.
+        /// live_data, levels, ...) set to `value` (JSON text) binding's Look.with_arg. An error is a thrown Error.
         #[wasm_bindgen(js_name = withArg)]
         pub fn with_arg(&self, key: &str, value: &str) -> Result<JsLook, JsError> {
             let v: serde_json::Value = serde_json::from_str(value).map_err(|e| JsError::new(&format!("{key}: not JSON: {e}")))?;
@@ -324,7 +324,7 @@ mod wasm {
 
     #[wasm_bindgen]
     extern "C" {
-        /// console.warn: the warnings of a call's stages (Python's warnings.warn)
+        /// console.warn: the warnings of a call's stages (warnings of the host)
         #[wasm_bindgen(js_namespace = console, js_name = warn)]
         fn console_warn(s: &str);
     }
@@ -394,7 +394,7 @@ mod wasm {
 
     #[wasm_bindgen]
     impl Sources {
-        /// style(): the style's JSON text with its sources inline, as the Python binding's `style()`.
+        /// style(): the style's JSON text with its sources inline binding's `style()`.
         pub fn style(&self) -> String {
             let mut out = Vec::new();
             self.inner.write_style(&mut out, roadstyle::sources::SourceMode::INLINE).expect("a Vec takes every byte");
@@ -471,7 +471,7 @@ mod wasm {
     }
 
     /// duckosmPlan(catalog, mode, tags, specs, only?, run?) -> string: the SQL that reads a duckOSM file (roadstyle-io's duckosm.rs, the one copy that
-    /// Python runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
+    /// The Python binding runs too), as JSON text: {"catalog": the 2 queries of the catalog, "roads": 3 statements, "meta": the stored levels' query or
     /// null, "select": the roads of `mode` ("roads" is null when the file has no network of `mode`: "roads_error" says why), "layers": [{spec, name, sql: the
     /// queries in order}]}. `catalog`: the JSON text of {"name", "tables":
     /// [[schema, table]], "columns": [[schema, table, column]]} (with no tables: only "catalog" is in the answer); `specs`: layers.yaml's

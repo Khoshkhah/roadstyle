@@ -1,6 +1,6 @@
-//! A PMTiles v3 archive (the format of the `pmtiles` package's Writer, which tiles.py and the export use): the tiles gzipped, each
+//! A PMTiles v3 archive: the tiles gzipped, each
 //! content once (a run of one content on consecutive tile ids is one entry), the directory in one root (or a root of leaves when it is
-//! more than 16 KB), the metadata as gzipped JSON. The gzip streams have no time in them (the Python writer's have the time).
+//! more than 16 KB), the metadata as gzipped JSON. The gzip streams have no time in them.
 
 use std::collections::HashMap;
 use std::io::Write;

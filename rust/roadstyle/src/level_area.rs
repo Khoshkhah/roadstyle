@@ -167,7 +167,7 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
             out.push((name.into(), list_column(v)));
         }
     }
-    let flag = |c: &str, i: usize| table.get(i, c).filter(|v| !v.is_null()).map(|v| truthy(&v.to_value()));
+    let flag = |c: &str, i: usize| table.get(i, c).filter(|v| !v.is_null()).map(|v| roadstyle_model::flags::yes(&v.to_value()));
     let single: HashSet<String> = roadstyle_engine::look::Look::resolve(&Default::default())?.sections.roads.flagged("single_line").into_iter().collect();
     // directed (roadstyle's is_directed): open to cars or bikes and not a path; null when the edges have no driving or cycling column
     let directed = |i: usize| -> Option<bool> {
@@ -239,7 +239,7 @@ fn read_heads(text: &str) -> Result<Heads, crate::Error> {
     }).collect()
 }
 
-/// A cell as the text Python's str() gives (a whole number without ".0"); None when it is null.
+/// A cell as text (a whole number without ".0"); None when it is null.
 fn cell_text(c: Cell) -> Option<String> {
     match c.to_value() {
         Value::Null => None,
@@ -253,15 +253,6 @@ fn value(c: Option<Cell>) -> Value {
     c.map_or(Value::Null, |c| c.to_value())
 }
 
-/// _truthy: a value that is set and not "", "no", "false" or "0".
-fn truthy(v: &Value) -> bool {
-    match v {
-        Value::Bool(b) => *b,
-        Value::Number(n) => n.as_f64() != Some(0.0),
-        Value::String(s) => !matches!(s.as_str(), "" | "no" | "false" | "0"),
-        _ => false,
-    }
-}
 
 /// A column of the values' own type, as pandas makes it: booleans, whole numbers (numbers when one is null), numbers or text.
 fn column(v: Vec<Value>) -> Column {

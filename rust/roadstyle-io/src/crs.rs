@@ -1,4 +1,4 @@
-//! A road file's coordinates to EPSG:4326 (lon, lat), with the rule of Python's `validate.to_wgs84`: a file with no CRS is an error,
+//! A road file's coordinates to EPSG:4326 (lon, lat), with this rule: a file with no CRS is an error,
 //! EPSG:4326 stays as it is, another CRS is reprojected. proj4rs reprojects (pure Rust, also in wasm); an EPSG code becomes a proj string
 //! through crs-definitions, a WKT text (a .prj file, a GeoPackage definition) through proj4wkt. A CRS that they cannot read is an error
 //! that names it: the reader does not guess.
@@ -15,7 +15,7 @@ pub enum Crs {
 /// The reprojection of one file: None when its CRS is EPSG:4326 (or the same longlat WGS 84).
 pub struct ToWgs84(Option<(Proj, Proj)>);
 
-/// Whether a proj string is longlat on WGS 84 (Python's crs.to_epsg() == 4326: no reprojection): the datum or the ellipsoid WGS84, or
+/// Whether a proj string is longlat on WGS 84 (EPSG 4326: no reprojection): the datum or the ellipsoid WGS84, or
 /// its axis 6378137 and its flattening 298.257223563 (proj4wkt's form), with no datum shift and no other prime meridian.
 fn is_wgs84(proj: &str) -> bool {
     let p: std::collections::HashMap<&str, &str> = proj.split_whitespace().filter_map(|t| t.strip_prefix('+')?.split_once('=')).collect();

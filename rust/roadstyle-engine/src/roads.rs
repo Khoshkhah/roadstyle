@@ -1,5 +1,5 @@
-//! The "roads" source: the stages of roadstyle's render_web.render that bake the `__rs_*` properties of each road, in the same
-//! order. Each function names the Python function it ports; the columns are the ones mapstyle passes (docs/design/rust-spike.md, S2).
+//! The "roads" source: the stages that bake the `__rs_*` properties of each road, in the same
+//! order. The columns are the ones mapstyle passes (docs/design/rust-spike.md, S2).
 
 use roadstyle_look::options::MapOptions;
 use crate::draw::Cap;
@@ -23,7 +23,7 @@ pub(crate) fn class_style<'a>(look: &'a Look, highway: Option<Cell>) -> (&'a Val
     look.class_style(&h)
 }
 
-/// The stages of render_web.render on the roads, in its order; each road gets `__rs_edge`, its position. `args`: look["args"], with the
+/// The stages on the roads, in its order; each road gets `__rs_edge`, its position. `args`: look["args"], with the
 /// options of the colours (colors.rs).
 /// render's access_col: the kinds that have their own colour and row (_ACCESS); any other value is null.
 const ACCESS_KINDS: [&str; 4] = ["private", "bus", "pedestrian", "delivery"];
@@ -95,14 +95,14 @@ pub fn roads_source(mut fs: Roads) -> crate::road::RoadsSource {
     crate::road::RoadsSource { roads: fs, tolerance: 0.05, maxzoom: None, in_style: true, read: None }
 }
 
-// --- helpers: Python's values ---
+// --- helpers: the values of a cell ---
 
 fn missing(v: Option<Cell>) -> bool {
     v.is_none_or(Cell::is_null)
 }
 
-/// A yes/no value by the one road-flag rule (roadstyle_model::flags): not missing, not 0 or False, and not a text in `flags::NO`.
-pub(crate) fn truthy<'a, C: Into<Cell<'a>>>(v: Option<C>) -> bool {
+/// A yes/no value by the one road-flag rule (`yes` for a value that is there) (roadstyle_model::flags): not missing, not 0 or False, and not a text in `flags::NO`.
+pub(crate) fn is_yes<'a, C: Into<Cell<'a>>>(v: Option<C>) -> bool {
     match v.map(Into::into) {
         None => false,
         Some(c) if c.is_null() => false,        // NaN too
@@ -115,8 +115,13 @@ pub(crate) fn truthy<'a, C: Into<Cell<'a>>>(v: Option<C>) -> bool {
     }
 }
 
-/// Python's float(v): a number, or a text that is one; None where Python raises.
-fn py_float(v: Cell) -> Option<f64> {
+/// `is_yes` of a value that is there.
+pub(crate) fn yes<'a, C: Into<Cell<'a>>>(v: C) -> bool {
+    is_yes(Some(v))
+}
+
+/// A cell as a number: a number, or a text that is one; None for any other.
+fn cell_number(v: Cell) -> Option<f64> {
     match v {
         Cell::Bool(b) => Some(b as u8 as f64),
         Cell::Str(s) => s.trim().parse::<f64>().ok(),
@@ -146,7 +151,7 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
     let rev = |k: &EndKey| k.as_ref().map(|(a, z, c)| (*z, *a, c.clone()));
     let mut by: HashMap<EndKey, Vec<usize>> = HashMap::new();
     for (i, k) in keys.iter().enumerate() {
-        if k.is_some() {        // not a line: a key of its own (Python: id(ft)), never a twin
+        if k.is_some() {        // not a line: a key of its own (its own id), never a twin
             by.entry(k.clone()).or_default().push(i);
         }
     }
@@ -155,12 +160,12 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
         let r = rev(k);
         let n = count(&r);
         let two = if k.is_some() && r == *k { n >= 2 } else { n >= 1 };
-        let ow = if missing(fs.get(i, "oneway")) { !two } else { truthy(fs.get(i, "oneway")) };
+        let ow = if missing(fs.get(i, "oneway")) { !two } else { is_yes(fs.get(i, "oneway")) };
         (fs.draw[i].twoway, fs.draw[i].oneway) = (Some(two), Some(ow));
     }
     if directed {
         // directed_col: a pair is two lanes only when neither edge is undirected (null = directed)
-        let und = |f: crate::road::Road| !missing(f.role(Role::Directed)) && !truthy(f.role(Role::Directed));
+        let und = |f: crate::road::Road| !missing(f.role(Role::Directed)) && !is_yes(f.role(Role::Directed));
         let undirected: Vec<bool> = fs.iter().map(und).collect();
         for (i, k) in keys.iter().enumerate() {
             if fs.draw[i].twoway != Some(true) {
@@ -179,7 +184,7 @@ fn mark_twoway(fs: &mut Roads, directed: bool, driving: bool) {
     }
     if driving {
         for i in 0..fs.len() {        // driving_col: no arrows where cars may not drive (null = driving)
-            if !missing(fs.role(i, Role::Driving)) && !truthy(fs.role(i, Role::Driving)) {
+            if !missing(fs.role(i, Role::Driving)) && !is_yes(fs.role(i, Role::Driving)) {
                 fs.draw[i].oneway = Some(false);
             }
         }
@@ -211,8 +216,8 @@ fn mark_single_line(fs: &mut Roads, classes: &HashSet<String>) {
 /// _mark_lvl: lvl from the OSM layer (else 1 for a bridge, -1 for a tunnel), and the bridge and tunnel looks.
 fn mark_lvl(fs: &mut Roads) {
     for i in 0..fs.len() {
-        let ly = fs.role(i, Role::Layer).and_then(py_float).filter(|v| v.is_finite()).map_or(0, |v| v.trunc() as i64);
-        let (br, tu) = (truthy(fs.role(i, Role::Bridge)), truthy(fs.role(i, Role::Tunnel)));
+        let ly = fs.role(i, Role::Layer).and_then(cell_number).filter(|v| v.is_finite()).map_or(0, |v| v.trunc() as i64);
+        let (br, tu) = (is_yes(fs.role(i, Role::Bridge)), is_yes(fs.role(i, Role::Tunnel)));
         let lvl = if ly != 0 { ly } else if br { 1 } else if tu { -1 } else { 0 };
         let d = &mut fs.draw[i];
         (d.lvl, d.bridge, d.tunnel) = (Some(lvl.clamp(i16::MIN.into(), i16::MAX.into()) as i16), Some(br), Some(tu));
@@ -228,7 +233,7 @@ fn cap_value(v: Cell) -> Value {
             _ => {}
         }
     }
-    if truthy(Some(v)) { true.into() } else { Value::Null }
+    if is_yes(Some(v)) { true.into() } else { Value::Null }
 }
 
 /// _mark_caps (no cap_col; cap_start_col / cap_end_col): __rs_cap when the two ends agree, else __rs_cap0 / __rs_cap1 / __rs_split.
@@ -240,7 +245,7 @@ pub(crate) struct CapCols {
     end: bool,
 }
 
-/// A value is given: set, and not NaN (Python: not None and equal to itself).
+/// A value is given: set, and not NaN (not null and equal to itself).
 fn given(v: Option<Cell>) -> bool {
     !missing(v) && v.and_then(Cell::as_f64).is_none_or(|x| !x.is_nan())
 }
@@ -269,7 +274,7 @@ fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
         return;
     }
     for i in 0..fs.len() {
-        let head = |on: bool, role: Role| if on { fs.role(i, role).and_then(py_float).filter(|v| *v > 0.0) } else { None };
+        let head = |on: bool, role: Role| if on { fs.role(i, role).and_then(cell_number).filter(|v| *v > 0.0) } else { None };
         let (s, e) = (head(named[0], Role::HeadStartM), head(named[1], Role::HeadEndM));
         fs.draw[i].heads = [s, e].map(|h| h.map(|h| fs.values.ix(&serde_json::json!(h))));
     }
@@ -279,7 +284,7 @@ fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
 /// positions or from the input's columns casing_level, fill_level, casing_start and casing_end (the ones it has; a head that has none
 /// takes the main casing number).
 fn mark_levels(fs: &mut Roads) {
-    let num = |v: Option<Cell>| v.and_then(py_float).filter(|x| !x.is_nan()).map_or(0, |x| x.round_ties_even() as i64);
+    let num = |v: Option<Cell>| v.and_then(cell_number).filter(|x| !x.is_nan()).map_or(0, |x| x.round_ties_even() as i64);
     let has = [Role::CasingLevel, Role::FillLevel, Role::CasingStart, Role::CasingEnd].map(|r| fs.solved.is_some() || fs.roles.col(r).is_some());
     for i in 0..fs.len() {
         let r = fs.road(i);
@@ -333,7 +338,7 @@ fn twin_pairs(fs: &Roads) -> Vec<(usize, usize)> {
             continue;
         }
         let Some(c) = fs.line(i).filter(|c| c.len() >= 2) else { continue };
-        // each point rounded to 7 places (the correctly rounded decimal, as Python's round; -0 is 0), as the bits of its float
+        // each point rounded to 7 places (the correctly rounded decimal; -0 is 0), as the bits of its float
         let r7 = |x: f64| { let v: f64 = format!("{x:.7}").parse().unwrap(); if v == 0.0 { 0u64 } else { v.to_bits() } };
         let line: Vec<(u64, u64)> = c.iter().map(|x| (r7(x[0]), r7(x[1]))).collect();
         let back: Vec<(u64, u64)> = line.iter().rev().copied().collect();
@@ -352,14 +357,14 @@ fn twin_pairs(fs: &Roads) -> Vec<(usize, usize)> {
 /// above 0 (any other value keeps the class width). Then a pair with metres on both gets the other direction's in __rs_twm.
 fn mark_width_m(fs: &mut Roads, pairs: &[(usize, usize)], col: &str, casing_m: f64) {
     for i in 0..fs.len() {
-        let Some(w) = fs.get(i, col).and_then(py_float) else { continue };
+        let Some(w) = fs.get(i, col).and_then(cell_number) else { continue };
         let pts = fs.line(i).unwrap_or(&[]);
         if !(w > 0.0 && w.is_finite()) || pts.is_empty() {
             continue;
         }
         let sec = 1.0 / (pts.iter().map(|c| c[1]).sum::<f64>() / pts.len() as f64).to_radians().cos();
-        fs.draw[i].metres_mut().width = Some(crate::layers::py_round(w * sec, 4));
-        fs.draw[i].metres_mut().casing = Some(crate::layers::py_round(casing_m * sec, 4));
+        fs.draw[i].metres_mut().width = Some(crate::layers::round_to(w * sec, 4));
+        fs.draw[i].metres_mut().casing = Some(crate::layers::round_to(casing_m * sec, 4));
     }
     for &(i, j) in pairs {
         if let (Some(a), Some(b)) = (fs.draw[i].width_m(), fs.draw[j].width_m()) {
@@ -391,7 +396,7 @@ fn mark_twin_dead_ends(fs: &mut Roads, caps: &CapCols) {
                 new[k] = Cap::Square;
             }
         }
-        // a cap property set new comes after the twin's (Python's dict: a key put back goes to the end)
+        // a cap property set new comes after the twin's (a key put back goes to the end)
         if new[0] == new[1] {
             d.split = None;
             if new[0] != Cap::Round {

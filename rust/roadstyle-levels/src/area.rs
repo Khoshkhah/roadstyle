@@ -193,7 +193,7 @@ impl Area {
             .collect();
         let mut at: HashMap<Key, usize> = HashMap::new();
         for (i, (k, _, _)) in out.iter().enumerate() {
-            at.insert(*k, i); // a pair named twice: the last one, as a dict in Python
+            at.insert(*k, i); // a pair named twice: the last one
         }
         for e in edits {
             check(e, "edits")?;

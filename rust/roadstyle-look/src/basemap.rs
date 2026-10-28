@@ -90,8 +90,8 @@ fn style(text: &str) -> Value {
     yaml(text).expect("a bundled base-map style is YAML")
 }
 
-/// Python's round() of a float to an integer (round half to even).
-fn py_round(x: f64) -> i64 {
+/// Round a float to an integer (half to even).
+fn round_even(x: f64) -> i64 {
     x.round_ties_even() as i64
 }
 
@@ -100,7 +100,7 @@ fn hex(c: &str) -> Option<[f64; 3]> {
     crate::color::hex_rgb(c).map(|c| c.map(f64::from))
 }
 
-/// Python's x % 1.0 (the sign of the divisor).
+/// x % 1.0 (the sign of the divisor).
 fn frac(x: f64) -> f64 {
     let m = x % 1.0;
     if m < 0.0 { m + 1.0 } else { m }
@@ -147,7 +147,7 @@ pub fn recolor(v: &Value, saturation: f64, lighten: f64) -> Value {
     let Some(c) = v.as_str().and_then(hex) else { return v.clone() };
     let (h, l, s) = rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0);
     let rgb = hls_to_rgb(h, l, s * saturation).map(|x| x + (1.0 - x) * lighten);
-    json!(format!("#{}", rgb.iter().map(|x| format!("{:02x}", py_round(x * 255.0))).collect::<String>()))
+    json!(format!("#{}", rgb.iter().map(|x| format!("{:02x}", round_even(x * 255.0))).collect::<String>()))
 }
 
 /// _walk: `f` on every value of `o` that is not a mapping or a list.
@@ -276,7 +276,7 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
             (c, Value::Object(e))
         }).collect();
     // a class the base lacks (pedestrian, steps, platform, ...) starts from footway's entry without its dash: osm_carto.yaml gives the dash
-    // where a class has one. The classes in their first-seen order (Python makes them a set, whose order changes with each run)
+    // where a class has one. The classes in their first-seen order (a set would change the order with each run)
     let mut new = base["footway"].as_object().cloned().unwrap_or_default();
     new.insert("dash".into(), Value::Null);
     let mut palette = Map::new();
@@ -290,8 +290,8 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
         e.extend(over.get(&c).and_then(Value::as_object).cloned().unwrap_or_default());
         palette.insert(c, Value::Object(e));
     }
-    let truthy = |v: Option<&Value>| v.is_some_and(|v| !matches!(v, Value::Null | Value::Bool(false)) && v.as_f64() != Some(0.0));
-    if truthy(spec.get("fade")) && truthy(st.get("fade")) {
+    let is_set = |v: Option<&Value>| v.is_some_and(|v| !matches!(v, Value::Null | Value::Bool(false)) && v.as_f64() != Some(0.0));
+    if is_set(spec.get("fade")) && is_set(st.get("fade")) {
         let fade = st["fade"].as_f64().unwrap_or(0.0);
         for c in modes["cars"].as_array().into_iter().flatten().filter_map(Value::as_str) {
             for k in ["fill", "casing"] {

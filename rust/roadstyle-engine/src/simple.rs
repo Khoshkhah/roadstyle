@@ -1,14 +1,14 @@
-//! The "simple" source: simple mode's one road layer, every casing piece and every fill (render_web._casing_parts, _halves, _end_stub,
+//! The "simple" source: simple mode's one road layer, every casing piece and every fill (the casing heads, the halves, the end stubs,
 //! _simple_pieces), from the roads after their stages (roads::mark_roads). The geometry is computed as numpy computes it: a flat
 //! projection at the line's first point, sequential sums, `hypot`, and numpy's rounding (`rint(x * 10^d) / 10^d`).
 //! A piece is typed (`Piece`: its road, what it draws, its place in the road layer, its line); its JSON properties are made only at the
-//! output (`Piece::props`), from its road, with render_web's keys in render_web's order.
+//! output (`Piece::props`), from its road, with its keys in one fixed order.
 
 use roadstyle_model::mark::{self, Mark};
 use crate::draw::Cap;
 use crate::props::{Get, Props};
 use crate::road::{Road, Roads};
-use crate::roads::truthy;
+use crate::roads::is_yes;
 use roadstyle_model::Cell;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -187,7 +187,7 @@ impl Piece {
         }
     }
 
-    /// The properties of the piece as render_web makes them, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
+    /// The properties of the piece, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
     /// the edge's tie-breaker) and `__rs_cls`.
     pub fn props<'a>(&self, roads: &'a Roads, cols: &Cols) -> Props<'a> {
         self.over(roads, cols, self.base(roads, cols, None, None), None).to_values()
@@ -376,7 +376,7 @@ impl Line {
     }
 }
 
-/// `__rs_s`: the key in KEY_UNITs and the edge's tie-breaker (render_web._piece_key).
+/// `__rs_s`: the key in KEY_UNITs and the edge's tie-breaker.
 fn sort_key(key: f64, edge: i64) -> i64 {
     (key * KEY_UNIT).round() as i64 + edge
 }
@@ -431,7 +431,7 @@ pub(crate) fn casing_parts(roads: &Roads, head_m: f64) -> Vec<Piece> {
         cut_at.retain(|&x| x != 0.0 && x != n);
         cut_at.sort_by(f64::total_cmp);
         cut_at.dedup_by(|a, b| a == b);
-        let solid = !truthy(p.get(Mark::Dash.name())) && !truthy(p.get(Mark::Tunnel.name()));
+        let solid = !is_yes(p.get(Mark::Dash.name())) && !is_yes(p.get(Mark::Tunnel.name()));
         for &cut in &cut_at {
             let near: Vec<&(f64, f64, i64, u8)> = cuts.iter().filter(|(a, b, _, _)| b - a > 1e-9 && ((b - cut).abs() < 1e-9 || (a - cut).abs() < 1e-9)).collect();
             let half = near.iter().map(|(a, b, _, _)| (b - a) / 4.0).fold(SEAM_M, f64::min);
@@ -699,10 +699,10 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         let stub = q0.cap(roads) != Some(Cap::Flat) && !q0.seam();
         for q in if stub { end_stub(q0, roads) } else { vec![q0] } {
             let r = roads.road(q.edge as usize);
-            if truthy(r.get(Mark::Dash.name())) || (q.seam() && truthy(r.get(Mark::Tunnel.name()))) {
+            if is_yes(r.get(Mark::Dash.name())) || (q.seam() && is_yes(r.get(Mark::Tunnel.name()))) {
                 continue; // a dashed class has no casing; a tunnel's casing is its dashes alone
             }
-            let bridge = truthy(r.get(Mark::Bridge.name()));
+            let bridge = is_yes(r.get(Mark::Bridge.name()));
             let cl = q.cl(roads);
             let k = 2.0 * cl as f64 + if bridge { 0.25 } else { 0.0 };
             let [_, _, cs, ce] = r.draw().levels64().unwrap_or_default();
@@ -710,7 +710,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
             if shadows && bridge && (matches!(q.part, Part::Cut(1, _)) || whole) {
                 out.push(key(&q, 2, k - 0.1));
             }
-            if truthy(r.get(Mark::Tunnel.name())) && !bridge {
+            if is_yes(r.get(Mark::Tunnel.name())) && !bridge {
                 out.push(key(&q, 3, k));
                 out.push(key(&q, 4, k + 0.1));
             } else {
@@ -730,7 +730,7 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
                          coords: if p.line().is_some() { PieceLine::Road } else { PieceLine::None } }]
         };
         let fl = p.draw().levels.map_or(0, |l| l[1]);
-        let s = 2.0 * fl as f64 + if truthy(p.get(Mark::Dash.name())) { -0.5 } else { 1.0 };
+        let s = 2.0 * fl as f64 + if is_yes(p.get(Mark::Dash.name())) { -0.5 } else { 1.0 };
         out.extend(fills.into_iter().map(|h| Piece { draw: Some(DrawKey { kind: 1, key: s }), ..h }));
     }
     let mut items = items;
@@ -826,7 +826,7 @@ fn push(c: &mut Vec<Pt>, first: bool, m: f64) {
     let u = heading(c, first);
     let u = if first { (-u.0, -u.1) } else { u };
     let end = if first { c[0] } else { c[c.len() - 1] };
-    let pt = [crate::layers::py_round(end[0] + u.0 * m / (111320.0 * end[1].to_radians().cos()), 7), crate::layers::py_round(end[1] + u.1 * m / 111320.0, 7)];
+    let pt = [crate::layers::round_to(end[0] + u.0 * m / (111320.0 * end[1].to_radians().cos()), 7), crate::layers::round_to(end[1] + u.1 * m / 111320.0, 7)];
     if first { c.insert(0, pt) } else { c.push(pt) }
 }
 
@@ -835,7 +835,7 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
     let mut wide: indexmap::IndexMap<i64, (f64, f64)> = indexmap::IndexMap::new();
     for p in roads.iter() {
         let (Some(wm), Some(c)) = (p.get(Mark::WidthM.name()).and_then(Cell::as_f64), p.line().filter(|c| c.len() >= 2)) else { continue };
-        if truthy(p.get(Mark::Dup.name())) {
+        if is_yes(p.get(Mark::Dup.name())) {
             continue;
         }
         let k = c[0][1].to_radians().cos();
@@ -906,7 +906,7 @@ fn mitre_ends(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, items
     }
     // the items: an end with the items of its colour and dash that start within ITEM_JOIN_M (and a start with those that end there)
     let lines: Vec<usize> = (0..items.len()).filter(|&k| items[k].coords.as_ref().is_some_and(|c| c.len() >= 2)).collect();
-    let text = |f: &Item, k: &str| f.props.get(k).filter(|v| !v.is_null()).map(Value::to_string);     // Python's None: missing or null
+    let text = |f: &Item, k: &str| f.props.get(k).filter(|v| !v.is_null()).map(Value::to_string);     // missing or null
     let key = |f: &Item| (text(f, Mark::ItemColor.name()), text(f, Mark::Dash.name()));
     let cell = |p: &Pt| ((p[0] / 3e-5).floor() as i64, (p[1] / 3e-5).floor() as i64);
     let end_of = |c: &Vec<Pt>, first: bool| if first { c[0] } else { c[c.len() - 1] };

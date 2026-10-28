@@ -1,6 +1,6 @@
 //! The output side of the interaction contract (docs/design/rust_library.md, "The interaction contract"): what a page's dashboard reads
-//! from a style made with `state: "live"`. `roadstyle:state` has each global state's start value (render_web: style["state"]),
-//! `roadstyle:controls` the options of rsDashboard that come from the style (render_web.render's `page`: the filter panel, the overlays,
+//! from a style made with `state: "live"`. `roadstyle:state` has each global state's start value,
+//! `roadstyle:controls` the options of rsDashboard that come from the style (the filter panel, the overlays,
 //! the tunnel look, the road fill, the arrows' rules, ...). The page's own options (the base maps, Street View, the panel) are not here.
 
 use roadstyle_model::mark::Mark;
@@ -16,7 +16,7 @@ pub const CONTRACT: i64 = 1;
 /// _ACCESS: the access kinds and the text of their row in the filter panel.
 const ACCESS: [(&str, &str); 4] = [("private", "Private roads"), ("bus", "Bus lanes"), ("pedestrian", "Pedestrian streets"), ("delivery", "Delivery only")];
 
-/// The page's global state and the start value of each (render_web: style["state"]), in Python's order. `active`: the colour option.
+/// The page's global state and the start value of each, in a fixed order. `active`: the colour option.
 pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<String, Value> {
     let tu = &look.sections.tunnels;
     let pair = tu.pair();
@@ -37,7 +37,7 @@ pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<S
     state
 }
 
-/// The filter panel (render_web: `flt`): the classes present, most important first, a swatch for each (a road of the class that is not a
+/// The filter panel: the classes present, most important first, a swatch for each (a road of the class that is not a
 /// restricted one), the access kinds with their counts (access_col), and whether there are bridges and tunnels.
 fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
     let fb_fill = &look.sections.roads.fallback["fill"];
@@ -58,7 +58,7 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
             if restricted(p) {
                 by_access.insert(c.to_string());
             }
-            swatches.insert(c.into(), p.get(Mark::Fill.name()).filter(|v| crate::layers::py_truth(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
+            swatches.insert(c.into(), p.get(Mark::Fill.name()).filter(|v| crate::roads::yes(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
         }
     }
     classes.sort_by(|a, b| m.z_of(b).total_cmp(&m.z_of(a)).then_with(|| a.cmp(b)));
@@ -84,7 +84,7 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
 }
 
 /// roadstyle:sources: each road role of the page (a source's name in the GeoJSON way, a tile layer's in the tile way), in the order of
-/// its first layer, with its source and its source layer (null for a GeoJSON source); render_web._roles. The overlays are not roles
+/// its first layer, with its source and its source layer (null for a GeoJSON source) The overlays are not roles
 /// (their own list: `overlays`), and the boundary is not a road (R7).
 pub fn roles(layers: &[Value]) -> Value {
     const ROLES: [&str; 6] = ["roads", "simple", "slots", "arrows", "decks", "shadows"];
@@ -115,7 +115,7 @@ pub fn describe(style: &mut Value) {
     }
 }
 
-/// The layers that a road is picked on (clicked, hovered), render_web._pick_layers: the road layer (a style with no `roads-simple`: its
+/// The layers that a road is picked on (clicked, hovered): the road layer (a style with no `roads-simple`: its
 /// fill layers, not the halves'), and the 3D decks' tops (not their casing, roads-deck-casing). A caller's items are in `overlays`.
 pub fn pick_layers(layers: &[Value]) -> Value {
     let fill = |id: &str| ["roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill"].iter().any(|p| id.starts_with(p));
@@ -127,7 +127,7 @@ pub fn pick_layers(layers: &[Value]) -> Value {
 }
 
 /// roadstyle:arrows: "points" (the page puts one arrow on each one-way road in view: the source "arrows"), "line" (along the slots), or
-/// null (no arrows); render_web._arrow_kind.
+/// null (no arrows)
 pub fn arrow_kind(layers: &[Value]) -> Value {
     match layers.iter().find(|l| l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows"))) {
         None => Value::Null,
@@ -136,7 +136,7 @@ pub fn arrow_kind(layers: &[Value]) -> Value {
     }
 }
 
-/// roadstyle:controls: the options of rsDashboard that the style gives (render_web.render's `page`, in its order).
+/// roadstyle:controls: the options of rsDashboard that the style gives.
 pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize) -> Result<Value, crate::Error> {
     let s = &look.sections;
     let m = &look.model;

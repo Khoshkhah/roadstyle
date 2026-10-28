@@ -22,7 +22,7 @@ pub use options::MapOptions;
 pub use sections::{LookFile, Sections};
 pub use ramp::Ramp;
 pub use resolve::{make_look, theme, Options};
-pub use widths::{py_round, RoadModel};
+pub use widths::{round_to, RoadModel};
 
 /// The pixels of an 8-bit PNG: (width, height, channels, the rows), for the tests of the textures.
 pub use png::decode as png_pixels;
@@ -58,7 +58,7 @@ pub struct LookData {
     pub head_m: f64,
     /// the slots' tables: the class order and each class's width at zoom 20
     pub slots: Value,
-    /// render_web's road tables (_settings.roads())
+    /// road tables
     pub roads_model: Value,
     /// mapstyle's base-map part, as given (null: none)
     #[serde(default, skip_serializing_if = "Value::is_null")]
@@ -221,9 +221,8 @@ fn no_keys(data: &mut LookData) {
     }
 }
 
-/// Python's truth of a look value, as the engine's settings read it (`truthy`): false for null, false, 0 and the texts "", "no",
-/// "false" and "0"; true for the other values.
-fn truthy(v: Option<&Value>) -> bool {
+/// A flag of a look value: false for null, false, 0 and the texts "", "no", "false" and "0"; true for the other values.
+fn flag(v: Option<&Value>) -> bool {
     match v {
         None | Some(Value::Null) => false,
         Some(Value::Bool(b)) => *b,
@@ -265,7 +264,7 @@ impl RoadLook {
             classes: r.styles.classes.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             fallback: r.styles.fallback.clone(),
             // the classes flagged single_line (config single_line_classes)
-            single_line: r.classes.iter().filter(|(_, e)| truthy(e.get("single_line"))).map(|(c, _)| c.clone()).collect(),
+            single_line: r.classes.iter().filter(|(_, e)| flag(e.get("single_line"))).map(|(c, _)| c.clone()).collect(),
             twin_one: r.twin_casing == "one",
             head_m: map.roads.head_m.unwrap_or(r.head_m),
             bridge_shadow: s.bridges.shadow.show,

@@ -76,7 +76,7 @@ pub struct Styled {
     pub roads: RoadsSource,
     /// the metadata that only a saved style has (what stage 2 reads from it: `roadstyle:tiles`, `roadstyle:columns`)
     pub saved: serde_json::Map<String, Value>,
-    /// the warnings of the stages (Python's warnings.warn in render_web), for the caller to give
+    /// the warnings of the stages, for the caller to give
     pub warnings: Vec<String>,
 }
 
@@ -122,7 +122,7 @@ impl Styled {
         }
     }
 
-    /// The properties that the drawing reads (tiles.py's tile_props): every text in the layers, the popup and tooltip fields, `name`,
+    /// The properties that the drawing reads: every text in the layers, the popup and tooltip fields, `name`,
     /// `kind` and `keep`; every `__rs_*` property goes too.
     pub fn drawn(&self, keep: &[String]) -> HashSet<String> {
         roadstyle_model::props::drawn(&self.layers, &self.metadata, keep)

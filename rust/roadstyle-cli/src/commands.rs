@@ -1,5 +1,5 @@
 //! The commands of the roadstyle program (main.rs runs `run`): stage 1 (`sources`), stage 2 (`tiles`), a level area (`levels make`,
-//! `levels solve`) and the level editor (`serve`). The options have the names of roadstyle's Python keywords (`--color-by lanes` is
+//! `levels solve`) and the level editor (`serve`). The options have the names of the keywords of `render_edges` (`--color-by lanes` is
 //! `color_by="lanes"`, `--no-arrows` is `arrows=False`); a value that is JSON (a number, true, a list) is read as JSON.
 
 use crate::Error;
@@ -67,7 +67,7 @@ fn take(opts: &mut Vec<(String, Option<String>)>, name: &str) -> Option<String> 
     opts.remove(i).1
 }
 
-/// The vendored MapLibre (render_web.WebMap puts the same in), so a page works offline.
+/// The vendored MapLibre, so a page works offline.
 const MAPLIBRE_JS: &str = roadstyle::assets::text!("vendor/maplibre-gl.js");
 const MAPLIBRE_CSS: &str = roadstyle::assets::text!("vendor/maplibre-gl.css");
 
@@ -298,7 +298,7 @@ fn snapshot(_: &str, _: &str, _: Vec<(String, Option<String>)>) -> Result<(), Er
     Err(Error::Usage("snapshot: this roadstyle is built without the feature \"snapshot\"".into()))
 }
 
-/// `snapshot`: the PNG of a saved page; a map that did not load in the time is taken with a warning (on stderr), as in Python.
+/// `snapshot`: the PNG of a saved page; a map that did not load in the time is taken with a warning (on stderr).
 #[cfg(feature = "snapshot")]
 fn snapshot(page: &str, out: &str, mut opts: Vec<(String, Option<String>)>) -> Result<(), Error> {
     use roadstyle_snapshot::{Camera, Shot};
