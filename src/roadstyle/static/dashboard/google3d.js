@@ -86,7 +86,20 @@ export function initGoogle3D(){
     const paintFollow=()=>{ COUNT.follow=follow; fbtn.classList.toggle("on", follow); fbtn.setAttribute("aria-pressed", follow);
       fbtn.textContent=follow ? "Following" : "Follow the map";
       fbtn.title=follow ? "Following the map: a drag in this window stops it" : "Not following the map: click to follow again"; };
-    const setGoogle=()=>{ if(!m3) return; Object.assign(m3, toGoogle()); COUNT.m2g++; };
+    // WHAT IS "THE REVIEWER MOVED THE 3D VIEW": any change of Google's camera that the page did not set, whatever the input was (a right-button or Ctrl drag, two
+    // fingers, Google's compass or tilt control, a key). The page's own sets are remembered for 2 s: an event within 500 ms of one, or equal to one (1e-7
+    // degrees, 0.5 m, 0.2 degrees), is its echo. Nothing counts in the first second after a mode change (Google draws again). The input detection below is a second trigger.
+    const sets=[];
+    let quietUntil=0;
+    const setGoogle=()=>{ if(!m3 || !follow) return; const g=toGoogle(); Object.assign(m3, g); COUNT.m2g++; const now=performance.now();
+      sets.push({t:now, lat:g.center.lat, lng:g.center.lng, range:g.range, heading:g.heading, tilt:g.tilt}); while(sets.length && now-sets[0].t>2000) sets.shift(); };
+    const turn=(a, b)=>Math.abs(((a-b)%360+540)%360-180);
+    const ours=()=>{ const now=performance.now(), c=m3.center||{}, h=m3.heading||0, t=m3.tilt||0, r=m3.range;
+      return sets.some(x=>now-x.t<500 || (Math.abs(c.lat-x.lat)<1e-7 && Math.abs(c.lng-x.lng)<1e-7 && Math.abs(r-x.range)<0.5 && turn(h, x.heading)<0.2 && Math.abs(t-x.tilt)<0.2)); };
+    let camQ=false;
+    const onGoogleCamera=()=>{ if(camQ) return; camQ=true; requestAnimationFrame(()=>{ camQ=false;
+      if(!m3 || !follow || performance.now()<quietUntil || !m3.center || !m3.range || ours()) return;
+      follow=false; paintFollow(); }); };
     const setFollow=on=>{ follow=!!on; paintFollow(); if(follow) setGoogle(); };
     window.rsG3dFollow=setFollow;
     map.on("move", ()=>{ if(!m3 || !follow || setQueued) return; setQueued=true; requestAnimationFrame(()=>{ setQueued=false; if(follow) setGoogle(); }); });
@@ -145,7 +158,7 @@ export function initGoogle3D(){
     let redrawT=0, redrawNext=false;
     const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d").forEach(x=>x.remove()); line=null; };
     const redrawRoad=()=>{ try{ drawLayers(); }catch(e){ LOG.push("redraw: "+String(e&&e.message||e).slice(0, 120)); } };
-    const modeChanged=()=>{ keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
+    const modeChanged=()=>{ quietUntil=performance.now()+1000; keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
     document.addEventListener("rs:labelschange", ()=>{ if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); });
     let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes
     setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode) modeChanged(); lastMode=v; }, 200);
@@ -159,10 +172,10 @@ export function initGoogle3D(){
         if(w.hidden || m3) return;               // closed while it loaded
         lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:(k=>k && !/^(HYBRID|SATELLITE)$/i.test(k) ? k : modeOf(l))(keptMode())}));
         m3.addEventListener("gmp-modechange", ()=>{ modeChanged(); lastMode=String(m3.mode); });
-        for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"])           // only to draw the road again: nothing moves from Google's camera
-          m3.addEventListener(ev, ()=>{ if(redrawNext){ redrawNext=false; redrawRoad(); } });
+        for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"])           // nothing moves the map from Google's camera: they redraw the road once and stop Follow
+          m3.addEventListener(ev, ()=>{ if(redrawNext){ redrawNext=false; redrawRoad(); } onGoogleCamera(); });
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
-        msg.hidden=true; w.appendChild(m3); applyLabels(); document.dispatchEvent(new Event("rs:g3dmodechange"));
+        quietUntil=performance.now()+1500; msg.hidden=true; w.appendChild(m3); applyLabels(); document.dispatchEvent(new Event("rs:g3dmodechange"));
         setTimeout(()=>{ if(m3){ if(want) ttl.textContent=want.name||"Unnamed road"; try{ paintMenu(); drawLayers(); }catch(e){ LOG.push("open: "+String(e&&e.message||e).slice(0, 120)); } } }, 0);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
     };
@@ -204,7 +217,9 @@ export function initGoogle3D(){
       const want_=sel && sel.props && c.match in sel.props ? sel.props[c.match] : sel && sel.key;
       return {type:"FeatureCollection", features:fs.filter(f=>f.properties && String(f.properties[c.match])===String(want_))}; }});
     // the geometry helpers
-    const MESH=()=>(lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH";
+    // The altitude mode follows the view. Over the imagery (SATELLITE, HYBRID) a line lies on Google's mesh (RELATIVE_TO_MESH, 0.5 m). Google's drawn map
+    // (ROADMAP) does not show that mesh: its streets lie flat on the terrain, so there a line is clamped to the ground. Every kind uses this rule.
+    const MESH=()=>drawnMode() ? ((lib.AltitudeMode||{}).CLAMP_TO_GROUND||"CLAMP_TO_GROUND") : ((lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH");
     const pts=r=>r.map(c=>({lat:c[1], lng:c[0], altitude:0.5}));
     // every original vertex is kept (a smooth arc stays an arc), and a segment longer than 5 m gets points in between
     const densify=cs=>{ const out=[cs[0]], k=Math.cos(cs[0][1]*Math.PI/180);
