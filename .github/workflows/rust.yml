@@ -5,9 +5,9 @@ name: Rust
 on:
   push:
     branches: [main, rust-engine, "design-*"]
-    paths: ["rust/**", "src/roadstyle/**", "tests/test_engine_parity.py", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/roadstyle/**", ".github/workflows/rust.yml"]
   pull_request:
-    paths: ["rust/**", "src/roadstyle/**", "tests/test_engine_parity.py", ".github/workflows/rust.yml"]
+    paths: ["rust/**", "src/roadstyle/**", ".github/workflows/rust.yml"]
   schedule:
     - cron: "17 3 * * *"          # each night: the Tartu goldens too
   workflow_dispatch:
@@ -94,7 +94,7 @@ jobs:
           node roadstyle-wasm/cross_language.mjs target/cross-pkg/roadstyle_wasm.js
 
   python:
-    # the Python binding (phase P5): build roadstyle._rust and check that the two engines give the same style
+    # the Python binding (phase P5): build roadstyle._rust and run the Python suite on it
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -127,11 +127,8 @@ jobs:
           (cd rust && cargo fetch --locked)
           (cd rust && cargo clippy --offline -p roadstyle-py -- -D warnings)
 
-      - name: The two engines
-        run: pytest -q tests/test_engine_parity.py
-
-      - name: The whole suite with the Rust engine as the default, with the browser tests (docs/design/rust_library.md, P5's golden test)
-        run: ROADSTYLE_ENGINE=rust pytest -q
+      - name: The whole suite, with the browser tests (docs/design/rust_library.md, P5's golden test)
+        run: pytest -q
 
   tartu:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
