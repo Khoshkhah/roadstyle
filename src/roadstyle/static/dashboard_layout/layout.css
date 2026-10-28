@@ -77,3 +77,10 @@ html.rs-theme-in-bar #sb-th{display:none!important}
 #rs-scalebox .maplibregl-ctrl-scale{width:auto;max-width:140px}
 #rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{width:64px!important;text-align:right!important}
 html.rs-overlay #sb{bottom:0}
+/* thin overlay scrollbars for every scrollable box: 6 px, a rounded thumb in the theme's text colour at 30 %, no track, no arrows */
+html.rs-overlay *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--rs-tb-ink) 30%,transparent) transparent}
+html.rs-overlay ::-webkit-scrollbar{width:6px;height:6px;background:transparent}
+html.rs-overlay ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--rs-tb-ink) 30%,transparent);border-radius:3px}
+html.rs-overlay ::-webkit-scrollbar-track,html.rs-overlay ::-webkit-scrollbar-corner{background:transparent}
+html.rs-overlay ::-webkit-scrollbar-button{display:none}
+#rs-toolbar .bm-menu.rs-bm-box{max-height:calc(100vh - 16px)}
