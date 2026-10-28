@@ -51,12 +51,20 @@ export function initGoogle3D(){
       if(!t.px) return lastGround;
       const i=(Math.min(255, Math.floor(x%1*256))+Math.min(255, Math.floor(y%1*256))*256)*4;
       return lastGround=Math.max(0, t.px[i]*256+t.px[i+1]+t.px[i+2]/256-32768); };
+    // THE RANGE. By default the range is the map's own camera distance (the map's fov and canvas height). Google's 3D camera has
+    // its own, narrower field of view, and a window of its own height, so a page can set window.rsG3dFov (degrees, Google's
+    // vertical fov, measured): the range then gives the window the same metres per pixel as the map at the center.
+    const mpp=(lat, zoom)=>EARTH*Math.cos(rad(lat))/(512*Math.pow(2, zoom));
+    const fov=()=>typeof window.rsG3dFov==="number" && window.rsG3dFov>0 ? window.rsG3dFov : 0;
+    const winH=()=>Math.max(120, (m3 && m3.clientHeight) || w.clientHeight);
+    const rangeOf=(lat, zoom)=> fov() ? winH()*mpp(lat, zoom)/2/Math.tan(rad(fov())/2) : camPx()*mpp(lat, zoom);
+    const zoomOf=(lat, range)=> fov() ? Math.log2(EARTH*Math.cos(rad(lat))/(512*(2*range*Math.tan(rad(fov())/2)/winH())))
+                                       : Math.log2(EARTH*Math.cos(rad(lat))*camPx()/(512*range));
     const toGoogle=()=>{ const c=map.getCenter();
       return {center:{lat:c.lat, lng:c.lng, altitude:ground(c.lng, c.lat)}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
-              range:camPx()*EARTH*Math.cos(rad(c.lat))/(512*Math.pow(2, map.getZoom()))}; };
+              range:rangeOf(c.lat, map.getZoom())}; };
     const toMap=()=>{ const c=m3.center;
-      return {center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0,
-              zoom:Math.log2(EARTH*Math.cos(rad(c.lat))*camPx()/(512*m3.range))}; };
+      return {center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0, zoom:zoomOf(c.lat, m3.range)}; };
     const turn=(a, b)=>Math.abs(((a-b)%360+540)%360-180);
     const there=t=>{ const c=map.getCenter();     // the map is already at t: Google's change came from the map
       return Math.abs(c.lng-t.center[0])<1e-7 && Math.abs(c.lat-t.center[1])<1e-7 && turn(map.getBearing(), t.bearing)<0.05 &&
@@ -86,7 +94,8 @@ export function initGoogle3D(){
       const o=map.getPadding();
       if(Math.abs(o.left-p.left)>1 || Math.abs(o.right-p.right)>1) map.easeTo({padding:p, duration:300});
     };
-    new ResizeObserver(pad).observe(w);          // opened, closed or resized
+    new ResizeObserver(pad).observe(w);
+    new ResizeObserver(()=>{ if(m3 && fov()) Object.assign(m3, toGoogle()); }).observe(w);      // the window's height is part of the range          // opened, closed or resized
     bar.addEventListener("pointerup", pad);      // dragged
     map.on("resize", pad);
     const open=()=>{
