@@ -78,8 +78,19 @@ export function initGoogle3D(){
     const toGoogle=()=>{ const c=map.getCenter();
       return {center:{lat:c.lat, lng:c.lng, altitude:ground(c.lng, c.lat)}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
               range:rangeOf(c.lat, map.getZoom())}; };
-    const toMap=()=>{ const c=m3.center;
-      return {center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0, zoom:zoomOf(c.lat, m3.range)}; };
+    // GOOGLE'S TARGET IS ON ITS MESH, not on the ground: while a user drags in the 3D view, m3.center (and its altitude) hops between roofs,
+    // trees and the street, 0 to 40 m from frame to frame, and the range is measured from it. So the map's camera is not read from the target:
+    // the camera's position is (target minus the range along the view direction), the ray from it along the view direction meets the ground
+    // (the DEM) at the map's centre, and the zoom comes from the camera's distance to that ground point.
+    const KM=111320;
+    const toMap=()=>{ const c=m3.center, h=rad(m3.heading||0), t=rad(m3.tilt||0), r=m3.range, plain=()=>({center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0, zoom:zoomOf(c.lat, r)});
+      if(typeof c.altitude!=="number" || Math.cos(t)<0.05) return plain();                // no altitude, or a view near the horizon: the plain target
+      const kx=KM*Math.cos(rad(c.lat)), dx=Math.sin(t)*Math.sin(h), dy=Math.sin(t)*Math.cos(h);       // the view's horizontal step per metre of range
+      const cam={lng:c.lng-r*dx/kx, lat:c.lat-r*dy/KM, alt:c.altitude+r*Math.cos(t)};
+      let hit={lng:c.lng, lat:c.lat}, s=r;
+      for(let i=0; i<24; i++){ const g=ground(hit.lng, hit.lat); if(cam.alt-g<=1) return plain();       // a fixed point: the ground under the hit
+        s=(cam.alt-g)/Math.cos(t); const n={lng:cam.lng+s*dx/kx, lat:cam.lat+s*dy/KM}, d=Math.hypot((n.lng-hit.lng)*kx, (n.lat-hit.lat)*KM); hit=n; if(d<0.02) break; }
+      return {center:[hit.lng, hit.lat], bearing:m3.heading||0, pitch:m3.tilt||0, zoom:zoomOf(hit.lat, s)}; };
     const turn=(a, b)=>Math.abs(((a-b)%360+540)%360-180);
     // the map is at t, to the eye: the centre within 0.05 m on the ground, the zoom within 0.01, the bearing and the pitch within 0.1 degree.
     // Returns the name of the first thing that differs, or "" (the centre's altitude is not checked).
@@ -102,7 +113,7 @@ export function initGoogle3D(){
       while(sets.length && now-sets[0].t>1000) sets.shift(); };
     const echo=()=>{ const c=m3.center||{}, h=m3.heading||0, t=m3.tilt||0, r=m3.range;
       return sets.some(x=>Math.abs(c.lat-x.lat)<1e-7 && Math.abs(c.lng-x.lng)<1e-7 && Math.abs(r-x.range)<0.5 && turn(h, x.heading)<0.2 && Math.abs(t-x.tilt)<0.2); };
-    let toGQueued=false;
+    let toGQueued=false, smooth=null, rawLast=null, settleT=0;
     map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows, once a frame
       if(!m3 || e.rsSync || e.rsG3d || toGQueued) return; toGQueued=true;
       requestAnimationFrame(()=>{ toGQueued=false; if(performance.now()-lastGoogle>=300) setGoogle(); }); });   // while Google leads, the map's own moves are not sent
@@ -117,8 +128,13 @@ export function initGoogle3D(){
       if(queued) return; queued=true;
       requestAnimationFrame(()=>{ queued=false;
         if(!m3 || !m3.center || !m3.range || echo() || performance.now()<ignoreUntil) return;
-        lastGoogle=performance.now();
-        const t=toMap(); if(there(t)) return;
+        const now=performance.now(), raw=toMap(), dt=now-lastGoogle; lastGoogle=now; rawLast=raw;
+        // while Google leads, the centre and the zoom go through an exponential filter (100 ms); the first change after a rest goes straight
+        let t=raw;
+        if(smooth && dt<300){ const k=1-Math.exp(-dt/100);
+          t={...raw, center:[smooth.center[0]+(raw.center[0]-smooth.center[0])*k, smooth.center[1]+(raw.center[1]-smooth.center[1])*k], zoom:smooth.zoom+(raw.zoom-smooth.zoom)*k}; }
+        smooth=t; clearTimeout(settleT); settleT=setTimeout(()=>{ smooth=null; if(m3 && rawLast && !there(rawLast)) map.jumpTo(rawLast, {rsG3d:true, rsSync:true}); }, 120);
+        if(there(t)) return;
         map.jumpTo(t, {rsG3d:true, rsSync:true}); COUNT.g2m++;
         const m=miss(t); if(m){ COUNT.back++; COUNT.lastMiss=m; }       // the map could not follow: judged back (the debug line counts it)
         clearTimeout(rec); rec=setTimeout(reconcile, 320); }); };
