@@ -8,7 +8,10 @@
   window.rsToolbarShow = ()=>{ wanted = true; reveal(); };
   setTimeout(()=>{ wanted = true; reveal(); }, 6000);
   const start = setInterval(()=>{
-    if(!window.map || !window.map.loaded()) return;
+    // the bar is built when the style is in and the controls exist, not when every tile has loaded (map.loaded() waits for the tiles: on a slow
+    // network the bar came ten seconds late, and a click on its place went to the map)
+    const m0 = window.map;
+    if(!m0 || !(m0.loaded() || (m0.isStyleLoaded() && document.querySelector(".maplibregl-ctrl-top-right button") && (!(window.RS_BASEMAPS || []).length || document.querySelector(".bm-menu"))))) return;
     clearInterval(start);
     const map = window.map, root = document.documentElement;
     if(overlay){
