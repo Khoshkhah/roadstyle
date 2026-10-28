@@ -237,6 +237,19 @@ def test_labels_switch_only_where_it_works(tmp_path):
         pg.wait_for_timeout(300)
         gray = state()
         assert gray[0] is False and gray[2] is True and gray[3] is True, gray
+        # the switch is per base map and off by default on the Esri kinds; where it is on, one label layer of Esri's World_Boundaries_and_Places lies above the base map and below the roads
+        for name in ("Esri Satellite", "Blank"):
+            pg.click(f".rs-bm-row:has-text('{name}') input")
+            pg.wait_for_timeout(600)
+            assert pg.evaluate("[document.getElementById('rs-top-labels').checked, !!window.map.getLayer('rs-top-labels')]") == [False, False], name
+            pg.evaluate("document.getElementById('rs-top-labels').click()")
+            pg.wait_for_timeout(400)
+            lay = pg.evaluate("""() => { const ids = map.getStyle().layers.map(l => l.id), i = ids.indexOf('rs-top-labels'), r = ids.findIndex(x => /^roads/.test(x));
+                return [i > ids.indexOf('basemap'), i < r, map.getSource('rs-top-labels').tiles[0].includes('World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'), window.rsLabelsOn()]; }""")
+            assert lay == [True, True, True, True], (name, lay)
+        pg.click(".rs-bm-row:has-text('Esri Gray') input")
+        pg.wait_for_timeout(600)
+        assert pg.evaluate("document.getElementById('rs-top-labels').checked") is True       # Esri Gray kept its own choice
         pg.click(".rs-bm-row:has-text('Esri Streets') input")
         pg.wait_for_timeout(600)
         streets = state()

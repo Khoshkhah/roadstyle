@@ -153,16 +153,19 @@
         // and Blank it adds Esri's reference labels; on a raster map with labels baked in (OpenStreetMap, Esri Streets, CARTO) it is greyed, so no name
         // shows twice. "want" is the reviewer's choice; the Google 3D view follows it only where the switch works.
         const labelKind = ()=>vector() ? "style" : /^(satellite|esri_gray|esri_dark_gray|blank|blank_dark)$/.test(current) ? "esri" : "baked";
-        let want = ls("labels") == null ? null : ls("labels") === "1", lastOn = null;
-        const labelsOn = ()=>labelKind() !== "baked" && (want == null ? vector() : want);
+        // the choice is kept per base map (a map and its dark twin share it); the default is on for an OpenFreeMap style, off where Esri's labels are added
+        const baseKey = ()=>{ const t = bms.find(x=>x.dark === current); return t ? t.key : current; };
+        const wantOf = ()=>{ const v = ls("labels:" + baseKey()); return v == null ? vector() : v === "1"; };
+        let lastOn = null;
+        const labelsOn = ()=>labelKind() !== "baked" && wantOf();
         window.rsLabelsOn = labelsOn;          // one state for the map and the Google 3D view (HYBRID with labels, SATELLITE without)
         const apply = ()=>{
-          const vec = vector(), sat = current === "satellite", kind = labelKind(), on = labelsOn();
+          const vec = vector(), kind = labelKind(), on = labelsOn();
           raster("hillshade", tops.hillshade.c.checked);
-          raster("labels", kind === "esri" && !sat && on);
-          raster("satlabels", kind === "esri" && sat && on);
+          raster("labels", kind === "esri" && on);          // World_Boundaries_and_Places: the reference overlay of Esri's imagery has no tiles for many places
+          raster("satlabels", false);
           if(vec) for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
-          tops.labels.c.disabled = kind === "baked"; tops.labels.c.checked = on;
+          tops.labels.c.disabled = kind === "baked"; tops.labels.c.checked = on;         // the switch shows the state of the map that is on
           tops.labels.lab.title = kind === "baked" ? "This base map has its own labels" : ""; tops.labels.lab.classList.toggle("rs-bm-off", kind === "baked");
           tops.satlabels.lab.hidden = true;                  // the switch above does this one's work on Esri Satellite
           tops.buildings.c.disabled = !vec; tops.buildings.c.checked = vec && window.rsBuildings ? window.rsBuildings() : false;
@@ -171,7 +174,7 @@
         topRow("labels", "Labels");
         topRow("buildings", "3D buildings");
         topRow("satlabels", "Satellite labels");
-        for(const id of ["hillshade", "labels"]) tops[id].c.onchange = ()=>{ if(id === "labels") want = tops.labels.c.checked; ss(id, tops[id].c.checked); apply(); };
+        for(const id of ["hillshade", "labels"]) tops[id].c.onchange = ()=>{ ss(id === "labels" ? "labels:" + baseKey() : id, tops[id].c.checked); apply(); };
         tops.buildings.c.onchange = ()=>{ if(window.rsBuildings) window.rsBuildings(tops.buildings.c.checked); };
         const mark = ()=>{ rows.forEach(([b, r])=>{ r.checked = b.key === current || b.dark === current; }); };
         document.addEventListener("rs:basemapchange", e=>{ current = e.detail.basemap; mark(); setTimeout(apply, 0); });
