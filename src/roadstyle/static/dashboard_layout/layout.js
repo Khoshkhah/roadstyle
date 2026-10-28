@@ -49,8 +49,11 @@
       // the left edge of the free map: the right edge of an open left panel (a window never hides under it)
       const leftEdge = m=>{ const sb = document.getElementById("sb"), r = sb && getComputedStyle(sb).display !== "none" && sb.getBoundingClientRect();
         return r && r.width > 0 && r.left < innerWidth/2 && innerWidth > 520 ? Math.max(m.left, r.right) : m.left; };
+      // a window keeps the size it was given (w.__want): it shrinks to the free part, and grows back when the part grows
       const fit = w=>{ if(!w || w.hidden) return; const m = mapRect(), gap = 8, lim = barLeft(m), lo = leftEdge(m);
-        const W = Math.min(w.offsetWidth, lim - lo - gap), H = Math.min(w.offsetHeight, m.height - 28);
+        if(!w.__want || (w.__set && (Math.abs(w.offsetWidth - w.__set.w) > 1 || Math.abs(w.offsetHeight - w.__set.h) > 1))) w.__want = {w:w.offsetWidth, h:w.offsetHeight};       // the user sized it
+        const W = Math.min(w.__want.w, lim - lo - gap), H = Math.min(w.__want.h, m.height - 28);
+        w.__set = {w:W, h:H};
         Object.assign(w.style, {width:W+"px", height:H+"px"});
         const r = w.getBoundingClientRect();
         Object.assign(w.style, {left:Math.max(lo+gap, Math.min(r.left, lim-W))+"px", top:Math.max(m.top+gap, Math.min(r.top, m.bottom-H-gap))+"px", right:"auto", bottom:"auto"}); };
@@ -68,8 +71,12 @@
       const opened = new MutationObserver(l=>l.forEach(x=>setTimeout(()=>placeVisible(x.target), 120)));
       wins().forEach(w=>opened.observe(w, {attributes:true, attributeFilter:["hidden"]}));
       // the windows follow the bar: when it slides (a right panel opens or closes) or the window is resized, a window that reaches under it moves left
-      const keep = ()=>wins().forEach(w=>{ if(w.hidden || w.classList.contains("rs-drag")) return; const m = mapRect(), lim = barLeft(m), r = w.getBoundingClientRect();
-        if(r.right > lim + 0.5 || r.left < leftEdge(m) - 0.5) fit(w); });
+      let down = false;                      // a pointer is down: a window being dragged is left to the drag (a drag that ended without a pointerup does not stay)
+      for(const t of ["pointerdown"]) addEventListener(t, ()=>{ down = true; }, true);
+      for(const t of ["pointerup", "pointercancel"]) addEventListener(t, ()=>{ down = false; setTimeout(()=>document.querySelectorAll(".rs-svw.rs-drag").forEach(w=>w.classList.remove("rs-drag")), 0); }, true);
+      const keep = ()=>wins().forEach(w=>{ if(w.hidden || (down && w.classList.contains("rs-drag"))) return; const m = mapRect(), lim = barLeft(m), r = w.getBoundingClientRect();
+        const grow = w.__want && (w.__want.w > r.width + 1 && r.right < lim - 20);
+        if(r.right > lim + 0.5 || r.left < leftEdge(m) - 0.5 || grow) fit(w); });
       window.rsKeepWindows = keep;
       const sized = new ResizeObserver(()=>keep());                                      // a window enlarged by its corner never reaches under the bar
       wins().forEach(w=>sized.observe(w)); document.addEventListener("pointerup", ()=>setTimeout(keep, 0), true);
