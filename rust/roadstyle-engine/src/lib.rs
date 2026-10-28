@@ -145,10 +145,6 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
     for ov in ovs[first_user..].iter_mut() {
         ov.edge_id_col = look.map.columns.edge_id.clone();
     }
-    // render's simple=False (the full look: a layer for each drawing position) is the Python engine's only (plan decision 2)
-    if look.other.get("simple") == Some(&Value::Bool(false)) {
-        return Err(Error::Unsupported(Unsupported::FullLook));
-    }
     // the line items on the edges (an overlay's lines in metres, render's items=): pieces of the one road layer
     let mut items = Vec::new();
     if ovs.iter().any(overlays::metre_items) || look.map.items.is_some() {

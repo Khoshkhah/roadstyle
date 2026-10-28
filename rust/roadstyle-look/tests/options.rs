@@ -27,7 +27,7 @@ const NOT_MAP: &[(&str, &[&str])] = &[
     ("SourceMode", &["data_maxzoom", "data_tolerance"]),
     ("TileOptions", &["tiles", "tile_keep", "tile_layers"]),
     // the Python binding: it reads them before the engine (the look's sources, the filtering of the edges, a DataFrame's colour column)
-    ("Python", &["palette", "profile", "settings", "backend", "engine", "include", "exclude", "match_links", "selected", "color_col", "simple"]),
+    ("Python", &["palette", "profile", "settings", "backend", "engine", "include", "exclude", "match_links", "selected", "color_col"]),
 ];
 
 /// The keywords of render_edges in parameters.md: the first cell of each row of its section, and the names after "/" in it.

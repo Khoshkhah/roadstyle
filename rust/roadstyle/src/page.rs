@@ -36,7 +36,7 @@ pub struct PageOptions {
     pub basemap_switcher: bool,
     /// a tiled page (the roads in the embedded PMTiles archive)
     pub tiles: bool,
-    /// the road layer of simple mode ("roads-simple"), or false (the full look)
+    /// the road layer ("roads-simple")
     pub simple: Value,
     /// roadstyle:sources and roadstyle:arrows (contract::roles, contract::arrow_kind); live: roadstyle:live, or null
     pub sources: Value,

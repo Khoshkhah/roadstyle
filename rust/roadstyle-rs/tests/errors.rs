@@ -50,17 +50,12 @@ fn degenerate_lines_draw_and_tile_without_a_panic() {
 fn each_bad_option_has_its_kind() {
     let e = stage1(json!({"color_by": "speed"}));
     assert!(matches!(&e, EngineError::Column { column, .. } if column == "speed"), "{e}");
-    let e = stage1(json!({"simple": false}));
-    assert_eq!(e, EngineError::Unsupported(Unsupported::FullLook));
     // an overlay's keys are the look's to check (the typed look, T3): a key it does not know is a look error before the engine
     let mut l: Value = serde_json::from_slice(&std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json")).unwrap()).unwrap();
     l["args"]["overlays"] = json!([{"kind": "blob"}]);
     assert!(matches!(roadstyle_rs::Look::from_value(l), Err(roadstyle_rs::look::Error::Options(_))));
     let e = stage1(json!({"access_col": "who"}));
     assert!(matches!(&e, EngineError::Column { column, .. } if column == "who"), "{e}");
-    // the facade wraps the engine's kind
-    let e = roadstyle_rs::tiled_of(roads(), &look(json!({"simple": false})), None, None, "rs://", &[]).err();
-    assert_eq!(e, Some(Error::Engine(EngineError::Unsupported(Unsupported::FullLook))));
 }
 
 #[test]
@@ -71,7 +66,7 @@ fn a_limit_names_what_it_counts() {
 
 #[test]
 fn no_message_names_a_binding() {
-    let all = [EngineError::Unsupported(Unsupported::FullLook), EngineError::Unsupported(Unsupported::Styler),
+    let all = [EngineError::Unsupported(Unsupported::Styler),
                EngineError::Unsupported(Unsupported::Palette { palette: "p".into(), look: "q".into() }),
                EngineError::Unsupported(Unsupported::ItemPalette { palette: "p".into(), key: "k".into() }),
                EngineError::Unsupported(Unsupported::MultiLineItem { overlay: "o".into(), item: 0 }),

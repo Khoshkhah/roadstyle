@@ -18,7 +18,7 @@ const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "basemap_switcher": true, "name": "roadstyle", "pitch": null,
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
-    "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "simple": true, "views": null, "tiles": false,
+    "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": false,
     "sidebar": null, "filter_control": true, "legend": true}"#;
 
 /// The bundled sidebars (`sidebar=`, pages.render_dashboard and render_report): the template that goes on the page, and the keywords
@@ -199,7 +199,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let parts = PageParts {
         name: a["name"].as_str().unwrap_or("roadstyle"), cam, bounds, side_panel_html: a["side_panel_html"].as_str(),
         host_panel_width: a["host_panel_width"].as_f64().unwrap_or(320.0), compress: on("compress"), gz: None, tiles: archive.as_deref(),
-        side: Some((&Value::Null, Some(&side))), simple_js: on("simple").then_some(&simple_js), sources: Some(&src),
+        side: Some((&Value::Null, Some(&side))), simple_js: Some(&simple_js), sources: Some(&src),
     };
     let mut html = page_html(page_style, &opts, &parts);
     if let Some((_, template, _)) = sidebar {

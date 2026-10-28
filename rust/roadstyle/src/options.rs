@@ -3,9 +3,8 @@
 
 use serde_json::{Map, Value};
 
-/// The keys of the style writer and of stage 2, which the look keeps in `other` until T4 moves them (SourceMode::Inline, TileOptions),
-/// and `simple` (False: Unsupported::FullLook).
-const WRITER: [&str; 5] = ["data_maxzoom", "data_tolerance", "tile_keep", "tile_layers", "simple"];
+/// The keys of the style writer and of stage 2, which the look keeps in `other` until T4 moves them (SourceMode::Inline, TileOptions).
+const WRITER: [&str; 4] = ["data_maxzoom", "data_tolerance", "tile_keep", "tile_layers"];
 
 /// The page's keys that have no default in page_options' DEFAULTS: they come from the caller or from the base map's page defaults.
 const PAGE: [&str; 4] = ["hover_delay_ms", "box_layout", "copy_field", "resolved_basemaps"];

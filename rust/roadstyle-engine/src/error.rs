@@ -1,6 +1,6 @@
 //! The errors of the engine: one kind for each cause, with the text that the bindings show. The pattern of every crate's error: commit
 //! 3e366ee (roadstyle-look); the rules: docs/design/target_architecture.md, (e). A message names no binding: a binding adds its own
-//! advice (Python: "use engine='python'" for an `Unsupported` kind).
+//! advice.
 
 use std::fmt;
 
@@ -48,8 +48,6 @@ pub enum Limit {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Unsupported {
-    /// The full look (simple=False): the engine draws simple mode only.
-    FullLook,
     /// A Styler object: the engine takes color_by, colors, cmap, vmin, vmax and width_by.
     Styler,
     /// A palette other than the look's.
@@ -76,7 +74,6 @@ impl fmt::Display for Error {
                 Limit::Items { edge } => write!(f, "simple mode: edge {edge} has more than {max} items; they do not fit between its fill and the next casings"),
             },
             Error::Unsupported(u) => match u {
-                Unsupported::FullLook => f.write_str("simple=False (the full look) is not in this engine: simple mode (the default) draws the same order"),
                 Unsupported::Styler => f.write_str("a Styler object (style=) is not in this engine: use color_by, colors, cmap, vmin, vmax or width_by"),
                 Unsupported::Palette { palette, look } => write!(f, "palette {palette:?}: this engine has the look's palette ({look:?}) only"),
                 Unsupported::ItemPalette { palette, key } => write!(f, "palette {palette:?} changes {key} of an item and not of its road: not in this engine"),

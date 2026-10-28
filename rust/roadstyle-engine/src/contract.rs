@@ -87,7 +87,7 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
 /// its first layer, with its source and its source layer (null for a GeoJSON source); render_web._roles. The overlays are not roles
 /// (their own list: `overlays`), and the boundary is not a road (R7).
 pub fn roles(layers: &[Value]) -> Value {
-    const ROLES: [&str; 9] = ["roads", "simple", "slots", "arrows", "decks", "shadows", "casings", "halves", "ends"];
+    const ROLES: [&str; 6] = ["roads", "simple", "slots", "arrows", "decks", "shadows"];
     let mut out = Map::new();
     for l in layers {
         let (src, sl) = (l["source"].as_str(), l["source-layer"].as_str());
@@ -115,7 +115,7 @@ pub fn describe(style: &mut Value) {
     }
 }
 
-/// The layers that a road is picked on (clicked, hovered), render_web._pick_layers: the road layer of simple mode (the full look: its
+/// The layers that a road is picked on (clicked, hovered), render_web._pick_layers: the road layer (a style with no `roads-simple`: its
 /// fill layers, not the halves'), and the 3D decks' tops (not their casing, roads-deck-casing). A caller's items are in `overlays`.
 pub fn pick_layers(layers: &[Value]) -> Value {
     let fill = |id: &str| ["roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill"].iter().any(|p| id.starts_with(p));

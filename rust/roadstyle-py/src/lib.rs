@@ -14,12 +14,9 @@ thread_local! {
     static PENDING: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
-/// A facade error as Python's ValueError, with this binding's advice: a part that the Rust engine does not draw names the Python engine
-/// (the engine's message names no binding, target_architecture.md (e) item 5).
+/// A facade error as Python's ValueError.
 fn py_err(e: impl Into<roadstyle::Error>) -> PyErr {
-    let e = e.into();
-    let unsupported = matches!(&e, roadstyle::Error::Engine(roadstyle::EngineError::Unsupported(_)));
-    PyValueError::new_err(if unsupported { format!("engine='rust': {e}; use engine='python'") } else { e.to_string() })
+    PyValueError::new_err(e.into().to_string())
 }
 
 fn warned(w: &[String]) {
@@ -565,11 +562,20 @@ fn asset_names() -> Vec<&'static str> {
     roadstyle::assets::NAMES.to_vec()
 }
 
+/// tile_buffers(layers, max_zoom, fallback) -> [float]: the buffer round a tile at each zoom 0 to `max_zoom`, in px of the tile, from the
+/// style's layers (JSON text; roadstyle_tiles::buffer::buffers_px), for a writer of the tile folder.
+#[pyfunction]
+fn tile_buffers(layers: &str, max_zoom: u32, fallback: f64) -> PyResult<Vec<f64>> {
+    let layers: Vec<serde_json::Value> = serde_json::from_str(layers).map_err(|e| PyValueError::new_err(format!("layers: {e}")))?;
+    Ok(roadstyle::tiles::buffer::buffers_px(&layers, max_zoom, roadstyle::tiles::buffer::LIVE_WIDTH_MAX, fallback))
+}
+
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
     m.add_function(wrap_pyfunction!(asset, m)?)?;
     m.add_function(wrap_pyfunction!(asset_names, m)?)?;
+    m.add_function(wrap_pyfunction!(tile_buffers, m)?)?;
     m.add_function(wrap_pyfunction!(unknown_keywords, m)?)?;
     m.add_function(wrap_pyfunction!(given_of, m)?)?;
     m.add_function(wrap_pyfunction!(make_page, m)?)?;
