@@ -186,6 +186,9 @@
         let lastOn = null;
         const labelsOn = ()=>labelKind() !== "baked" && wantOf();
         window.rsLabelsOn = labelsOn;          // one state for the map and the Google 3D view (HYBRID with labels, SATELLITE without)
+        // the tooltip of the Labels switch; a window that cannot switch its labels (Google's drawn map) adds its line (window.rsLabelsTipExtra)
+        const labelTip = kind=>{ if(kind === "baked") return "This base map has its own labels"; const x = typeof window.rsLabelsTipExtra === "function" ? window.rsLabelsTipExtra() : ""; return TIPS.labels + (x ? " " + x + "." : ""); };
+        document.addEventListener("rs:g3dmodechange", ()=>{ if(tops.labels) tops.labels.lab.title = labelTip(labelKind()); });
         const apply = ()=>{
           const vec = vector(), kind = labelKind(), on = labelsOn();
           raster("hillshade", tops.hillshade.c.checked);
@@ -196,7 +199,7 @@
           raster("satlabels", false);
           if(vec) for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
           tops.labels.c.disabled = kind === "baked"; tops.labels.c.checked = on;         // the switch shows the state of the map that is on
-          tops.labels.lab.title = kind === "baked" ? "This base map has its own labels" : TIPS.labels; tops.labels.lab.classList.toggle("rs-bm-off", kind === "baked");
+          tops.labels.lab.title = labelTip(kind); tops.labels.lab.classList.toggle("rs-bm-off", kind === "baked");
           tops.satlabels.lab.hidden = true;                  // the switch above does this one's work on Esri Satellite
           tops.buildings.c.disabled = !vec; tops.buildings.c.checked = vec && window.rsBuildings ? window.rsBuildings() : false;
           if(lastOn !== on){ lastOn = on; document.dispatchEvent(new Event("rs:labelschange")); } };

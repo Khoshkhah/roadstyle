@@ -12,7 +12,6 @@ export function initGoogle3D(){
   if(O.google_3d){
     const w=document.createElement("div"); w.className="rs-svw rs-g3d"; w.hidden=true;
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
-      '<span class="rs-g3d-note" hidden></span>'+
       '<span class="rs-g3d-note rs-g3d-tun" hidden>This road is in a tunnel: Google shows the surface above it</span>'+
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
       '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
@@ -63,26 +62,15 @@ export function initGoogle3D(){
     const rangeOf=(lat, zoom)=> fov() ? winH()*mpp(lat, zoom)/2/Math.tan(rad(fov())/2) : camPx()*mpp(lat, zoom);
     const zoomOf=(lat, range)=> fov() ? Math.log2(EARTH*Math.cos(rad(lat))/(512*(2*range*Math.tan(rad(fov())/2)/winH())))
                                        : Math.log2(EARTH*Math.cos(rad(lat))*camPx()/(512*range));
-    // THE CAMERA ABOVE THE BUILDINGS. Google will not put its camera into its own 3D tiles: where the range set from the map's zoom puts the
-    // camera lower than the tiles (a roundabout with buildings of 20 to 40 m, zoom 19.9), Google keeps the camera above them,
-    // the view shows more than the map, and map3d.range still reports the value set. The camera's height above the ground is the range
-    // times cos(tilt). Below window.rsG3dMinAlt (metres, default MIN_ALT: 80) the title bar says so; the page does not stop the map's zoom.
-    const NOTE="Google keeps its camera above the buildings: the 3D view shows more than the map", note=w.querySelector(".rs-g3d-note");
-    note.textContent=NOTE; note.title=NOTE;
-    // The limit depends on the mode. Over the imagery (SATELLITE, HYBRID) it is the camera's height above the ground (MIN_ALT). Google's drawn 3D map
-    // (ROADMAP, the dark-blue blocks) keeps its camera much farther away whatever the range set, so there the note shows from a map zoom (MIN_ZOOM_DRAWN;
-    // a first value from one screenshot: the view showed 300 to 400 m at zoom 19.3; window.rsG3dMinZoomDrawn sets it).
-    const NOTE_DRAWN="Google's drawn 3D map does not come closer: the view shows more than the map; switch to the imagery for a close view";
+    // Google will not put its camera into its own 3D tiles (over the imagery), and its drawn 3D map keeps its camera far away: then the view shows more than
+    // the map. Nothing is shown on the window for it. window.rsG3dCamera() gives the numbers for a page's debug line: the camera's height above the ground
+    // (range times cos tilt), Google's mode, and whether the camera is below the limit of the mode (MIN_ALT, or MIN_ZOOM_DRAWN in the drawn map).
     const MIN_ALT=80, MIN_ZOOM_DRAWN=17;      // MIN_ALT: metres above the ground, seen at Sainte-Devote, zoom 19.9 (73 m), the view widened
     const drawnMode=()=>!!m3 && !!m3.mode && !/^(HYBRID|SATELLITE)$/i.test(String(m3.mode));
     window.rsG3dCamera=()=>{ const r=m3 && m3.range || rangeOf(map.getCenter().lat, map.getZoom()), t=m3 ? (m3.tilt||0) : map.getPitch(), c=map.getCenter(), drawn=drawnMode();
       const minAlt=typeof window.rsG3dMinAlt==="number" ? window.rsG3dMinAlt : MIN_ALT, minZoom=typeof window.rsG3dMinZoomDrawn==="number" ? window.rsG3dMinZoomDrawn : MIN_ZOOM_DRAWN;
       return {above:r*Math.cos(rad(t)), range:r, tilt:t, ground:ground(c.lng, c.lat), sea:(m3 && m3.center && m3.center.altitude || 0)+r*Math.cos(rad(t)),
               drawn, limit:drawn ? "zoom above "+minZoom : "camera under "+minAlt+" m", low:drawn ? map.getZoom()>minZoom : r*Math.cos(rad(t))<minAlt}; };
-    const lowCam=()=>{ const c=window.rsG3dCamera(), text=c.drawn ? NOTE_DRAWN : NOTE; note.hidden=w.hidden || !c.low;
-      if(note.textContent!==text){ note.textContent=text; note.title=text; } };
-    map.on("move", lowCam); map.on("zoom", lowCam); new MutationObserver(lowCam).observe(w, {attributes:true, attributeFilter:["hidden"]});
-    setInterval(()=>{ if(!w.hidden) lowCam(); }, 400);       // Google changes its own range without a map move
     const toGoogle=()=>{ const c=map.getCenter();
       return {center:{lat:c.lat, lng:c.lng, altitude:ground(c.lng, c.lat)}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
               range:rangeOf(c.lat, map.getZoom())}; };
@@ -145,10 +133,22 @@ export function initGoogle3D(){
     for(const k of ["warn", "error"]){ const f=console[k]; console[k]=function(...a){ try{ const t=a.map(String).join(" ");
       if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>24) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
     window.rsG3dMode=()=>m3 ? String(m3.mode) : null;
-    const redraw=()=>{ if(m3 && line) line.forEach(x=>{ x.remove(); m3.appendChild(x); }); };      // the selected road is drawn again in the new mode
-    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ m3.mode=modeOf(lib); keepMode(); afterSwitch(); } });
-    let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes; the page keeps the choice and draws the road again
-    setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode){ keepMode(); redraw(); afterSwitch(); } lastMode=v; }, 200);
+    // THE LABELS SWITCH only adds or removes labels, never the view. In the imagery: HYBRID with labels, SATELLITE without. In Google's drawn map: the API's
+    // label option (defaultLabelsDisabled) when the loaded version has one; if it has none the drawn map is left as it is, and the switch's tooltip says so.
+    const hasLabelOption=()=>!!m3 && "defaultLabelsDisabled" in m3;
+    window.rsLabelsTipExtra=()=>drawnMode() && !hasLabelOption() ? "Google's drawn 3D map keeps its labels" : "";
+    const applyLabels=()=>{ if(!m3 || !lib) return false;
+      if(drawnMode()){ if(hasLabelOption()) m3.defaultLabelsDisabled=!(window.rsLabelsOn && window.rsLabelsOn()); return false; }
+      const mode=modeOf(lib); if(String(m3.mode)===String(mode)) return false; m3.mode=mode; return true; };
+    // A MODE CHANGE (Google's own toggle or the page's): every polyline is removed from the 3D map and the selected entity's line is drawn again from the
+    // build's geometry, 300 ms after the switch and again after Google's first camera event in the new mode. One line, the build's, in both views.
+    let redrawT=0, redrawNext=false;
+    const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d").forEach(x=>x.remove()); line=null; };
+    const redrawRoad=()=>{ if(m3 && want) tryDraw(want.cs, want.name, want.lvl, true); };
+    const modeChanged=()=>{ keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
+    document.addEventListener("rs:labelschange", ()=>{ if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); });
+    let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes
+    setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode) modeChanged(); lastMode=v; }, 200);
     const open=()=>{
       if(location.protocol==="file:"){
         say("<b>Google 3D needs this page served, not opened from disk.</b>"+
@@ -158,20 +158,22 @@ export function initGoogle3D(){
       _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
         if(w.hidden || m3) return;               // closed while it loaded
         lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:(k=>k && !/^(HYBRID|SATELLITE)$/i.test(k) ? k : modeOf(l))(keptMode())}));
-        m3.addEventListener("gmp-modechange", ()=>{ keepMode(); redraw(); });
+        m3.addEventListener("gmp-modechange", ()=>{ modeChanged(); lastMode=String(m3.mode); });
+        for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"])           // only to draw the road again: nothing moves from Google's camera
+          m3.addEventListener(ev, ()=>{ if(redrawNext){ redrawNext=false; redrawRoad(); } });
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
-        msg.hidden=true; w.appendChild(m3);
-        if(want) setTimeout(()=>{ if(m3) tryDraw(want.cs, want.name, want.lvl); }, 0);
+        msg.hidden=true; w.appendChild(m3); applyLabels(); document.dispatchEvent(new Event("rs:g3dmodechange"));
+        if(want) setTimeout(()=>{ if(m3) tryDraw(want.cs, want.name, want.lvl, true); }, 0);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
     };
     // DRAW A ROAD in the 3D view. cs: the road's [lng, lat] points; lvl: its level. rs:select calls it for a click on a road;
     // a page with its own selection (a stepper, a list) calls window.rsG3dDraw(cs, name, lvl). A road asked for before the view exists is drawn when it opens.
     let want=null;
-    const draw=(any, name, lvl)=>{
+    const draw=(any, name, lvl, keep)=>{
       const parts=(Array.isArray(any[0]) && Array.isArray(any[0][0]) ? any : [any]).filter(c=>c.length>1);     // one line, or several
       want={cs:any, name, lvl};
       if(!m3 || !lib || !parts.length) return;
-      setFollow(true);                         // a road selection turns Follow on: the map leads
+      if(!keep) setFollow(true);               // a road selection turns Follow on: the map leads (a redraw after a mode change does not)
       ttl.textContent=name||"Unnamed road";
       if(line) line.forEach(x=>x.remove());
       m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove());       // one selection, one line: whatever an earlier draw left goes
@@ -196,7 +198,7 @@ export function initGoogle3D(){
         else line.push(mk(cs)); }
       line.forEach(x=>{ x.dataset.rsSel="1"; m3.appendChild(x); });
     };
-    const tryDraw=(cs, name, lvl)=>{ try{ draw(cs, name, lvl); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
+    const tryDraw=(cs, name, lvl, keep)=>{ try{ draw(cs, name, lvl, keep); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
     window.rsG3dDraw=tryDraw;
     document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
       const d=e.detail; if(d.overlay) return;

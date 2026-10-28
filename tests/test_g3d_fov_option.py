@@ -28,5 +28,6 @@ def test_range_and_zoom_are_inverse():
 def test_one_way_link():
     """The map leads: no code path moves the map from Google, and none of the two-way filters is left."""
     assert "THE MAP LEADS, ONE WAY ONLY" in SRC and "rs-g3d-follow" in SRC and "window.rsG3dFollow" in SRC
-    for gone in ("fromGoogle", "toMap", "rsSync", "echo()", "reconcile", "userNow", "notUser", "modeQuiet", "judged back", "map.jumpTo(", "gmp-centerchange", "gmp-rangechange"):
+    for gone in ("fromGoogle", "toMap", "rsSync", "echo()", "reconcile", "userNow", "notUser", "modeQuiet", "judged back", "map.jumpTo("):
         assert gone not in SRC, gone
+    assert "lowCam" not in SRC and "Google keeps its camera above the buildings" not in SRC       # no note on the window
