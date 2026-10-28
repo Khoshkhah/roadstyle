@@ -87,6 +87,9 @@ def test_attribution_is_the_last_button(tmp_path):
         pg.wait_for_function("window.map && window.map.loaded() && document.getElementById('rs-attr-btn')", timeout=60000)
         last = pg.evaluate("(() => { const bs = [...document.querySelectorAll('#rs-toolbar button')]; return bs[bs.length - 1].id; })()")
         assert last == "rs-attr-btn"
+        # the glyph is Material's filled "info": a disc in the icon colour with the i cut out, not a thin ring
+        g = pg.evaluate("(() => { const s = document.querySelector('#rs-attr-btn svg'); return [s.getAttribute('fill'), s.querySelector('path').getAttribute('d'), s.querySelector('circle') === null]; })()")
+        assert g[0] == "currentColor" and g[1].startswith("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10") and g[1].endswith("h-2V7h2v2z") and g[2], g
         pg.click("#rs-attr-btn")
         assert pg.evaluate("!document.getElementById('rs-attr-box').hidden")
         pg.mouse.click(300, 300)

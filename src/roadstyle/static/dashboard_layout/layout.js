@@ -70,7 +70,7 @@
       let tb = document.getElementById("rs-toolbar"); if(!tb){ tb = document.createElement("div"); tb.id = "rs-toolbar"; tb.className = "rs-tb-"+pos; document.body.appendChild(tb); }
       // the attribution is the last button of the bar: a box with the text of the base map (and Google's, where a Google window is open)
       const at = document.createElement("div"); at.className = "maplibregl-ctrl maplibregl-ctrl-group rs-attr-ctrl";
-      at.innerHTML = '<button type="button" id="rs-attr-btn" title="Attribution"><svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="9.25"/><path d="M12 11v5.5M12 7.8h.01"/></svg></button><div id="rs-attr-box" hidden></div>';
+      at.innerHTML = '<button type="button" id="rs-attr-btn" title="Attribution"><svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg></button><div id="rs-attr-box" hidden></div>';
       tb.appendChild(at);
       const box = at.querySelector("#rs-attr-box");
       at.querySelector("button").onclick = e=>{ e.stopPropagation();
