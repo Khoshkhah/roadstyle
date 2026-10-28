@@ -45,3 +45,5 @@ html.rs-has-toolbar .maplibregl-ctrl-bottom-right{display:none!important}
 #rs-toolbar.rs-tb-left #rs-attr-box{left:calc(100% + 12px);bottom:0}
 #rs-toolbar.rs-tb-top #rs-attr-box{top:calc(100% + 12px);right:0}
 #rs-toolbar.rs-tb-bottom #rs-attr-box{bottom:calc(100% + 12px);right:0}
+#rs-toolbar{visibility:hidden}
+#rs-toolbar.rs-ready{visibility:visible}

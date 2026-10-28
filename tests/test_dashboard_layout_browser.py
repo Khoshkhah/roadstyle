@@ -97,3 +97,22 @@ def test_attribution_is_the_last_button(tmp_path):
         # the corner is empty: roadstyle's own attribution does not show
         assert pg.evaluate("(() => { const a = document.querySelector('.maplibregl-ctrl-attrib'); return !a || a.getBoundingClientRect().width === 0; })()")
         b.close()
+
+
+def test_no_empty_bar_flashes(tmp_path):
+    """In every frame of the load, the bar is either invisible or complete (all its buttons)."""
+    path = _page(tmp_path, "right")
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.add_init_script("""window.__f = []; (function poll() { const t = document.getElementById('rs-toolbar');
+            if (t) { const r = t.getBoundingClientRect(); window.__f.push([getComputedStyle(t).visibility === 'visible' && r.width > 0, t.querySelectorAll('button').length]); }
+            requestAnimationFrame(poll); })();""")
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && window.map.loaded() && document.getElementById('rs-toolbar').classList.contains('rs-ready')", timeout=60000)
+        pg.wait_for_timeout(500)
+        frames = pg.evaluate("window.__f")
+        final = frames[-1][1]
+        shown = [f for f in frames if f[0]]
+        assert final > 5 and shown and all(n == final for _, n in shown), (final, shown[:3])
+        b.close()

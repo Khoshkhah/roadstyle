@@ -1,6 +1,12 @@
 // render_dashboard(layout="overlay", toolbar=...): see docs/guides/dashboard-layout.md. window.rsLayout = {layout, toolbar} is set by the page.
 (function(){
   const opt = window.rsLayout || {}, overlay = opt.layout === "overlay", pos = opt.toolbar || false;
+  // The bar is hidden until its buttons are in, so that no empty bar flashes at the load. A page that adds controls of its own sets
+  // window.rsToolbarHold = true early and calls window.rsToolbarShow() when its controls are in (a hold ends after 6 s at the latest).
+  let wanted = false, filled = false;
+  const reveal = ()=>{ const b = document.getElementById("rs-toolbar"); if(b && filled && (wanted || !window.rsToolbarHold)) b.classList.add("rs-ready"); };
+  window.rsToolbarShow = ()=>{ wanted = true; reveal(); };
+  setTimeout(()=>{ wanted = true; reveal(); }, 6000);
   const start = setInterval(()=>{
     if(!window.map || !window.map.loaded()) return;
     clearInterval(start);
@@ -64,6 +70,7 @@
         new MutationObserver(l=>l.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType === 1) take(n); }))).observe(col, {childList:true});   // a control that the page adds later
         col.classList.add("rs-emptied");
       }
+      filled = true; reveal();
       tb.querySelectorAll("button").forEach(b=>{ if(!b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; });
       // A panel on the toolbar's side never covers the bar: when the panel is open, the bar slides to 8 px beside it (150 ms); when the panel
       // closes, the bar goes back to the edge. The bar's position along the edge does not change.
