@@ -213,3 +213,32 @@ def test_floating_window_stays_left_of_the_bar(tmp_path):
         pg.wait_for_timeout(300)
         assert gap() >= 8 - 0.5, gap()
         b.close()
+
+
+def test_labels_switch_only_where_it_works(tmp_path):
+    """OpenStreetMap, Esri Streets and CARTO have their labels baked in: the Labels switch is greyed with a tooltip and the 3D view gets none. Esri Gray adds Esri's
+    labels (one layer); an OpenFreeMap style shows or hides its own symbols."""
+    g = gpd.GeoDataFrame({"edge_id": [1], "highway": ["primary"], "name": ["A"], "oneway": [False]},
+                         geometry=[LineString([(0, 0), (0.001, 0)])], crs="EPSG:4326")
+    path = tmp_path / "lb.html"
+    rs.render_dashboard(g, layout="overlay", toolbar="right", basemap="osm", basemap_switcher=True).save(path)
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && window.map.loaded() && document.querySelector('.rs-bm-row') && document.getElementById('rs-toolbar').classList.contains('rs-ready')", timeout=60000)
+        pg.click("#rs-toolbar .bm-icon")
+        state = lambda: pg.evaluate("[document.getElementById('rs-top-labels').disabled, document.getElementById('rs-top-labels').parentElement.title, !!window.map.getLayer('rs-top-labels'), window.rsLabelsOn()]")
+        osm = state()
+        assert osm == [True, "This base map has its own labels", False, False], osm
+        pg.click(".rs-bm-row:has-text('Esri Gray') input")
+        pg.wait_for_timeout(600)
+        pg.evaluate("document.getElementById('rs-top-labels').click()")
+        pg.wait_for_timeout(300)
+        gray = state()
+        assert gray[0] is False and gray[2] is True and gray[3] is True, gray
+        pg.click(".rs-bm-row:has-text('Esri Streets') input")
+        pg.wait_for_timeout(600)
+        streets = state()
+        assert streets[0] is True and streets[2] is False and streets[3] is False, streets
+        b.close()

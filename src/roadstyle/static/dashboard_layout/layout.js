@@ -149,24 +149,33 @@
           map.addSource(lid, {type:"raster", tiles:[RAS[id][0]], tileSize:256, maxzoom:16, attribution:RAS[id][2]});
           map.addLayer({id:lid, type:"raster", source:lid, paint:{"raster-opacity":RAS[id][1]}}, roadsFirst()); };
         const vector = ()=>{ const b = bms[byKey(current)]; return !!(b && b.style_url); };
+        // THE LABELS SWITCH works only where it can: on an OpenFreeMap style it shows or hides the style's own symbol layers; on Esri Satellite, Esri Gray
+        // and Blank it adds Esri's reference labels; on a raster map with labels baked in (OpenStreetMap, Esri Streets, CARTO) it is greyed, so no name
+        // shows twice. "want" is the reviewer's choice; the Google 3D view follows it only where the switch works.
+        const labelKind = ()=>vector() ? "style" : /^(satellite|esri_gray|esri_dark_gray|blank|blank_dark)$/.test(current) ? "esri" : "baked";
+        let want = ls("labels") == null ? null : ls("labels") === "1", lastOn = null;
+        const labelsOn = ()=>labelKind() !== "baked" && (want == null ? vector() : want);
+        window.rsLabelsOn = labelsOn;          // one state for the map and the Google 3D view (HYBRID with labels, SATELLITE without)
         const apply = ()=>{
-          const vec = vector(), sat = current === "satellite";
+          const vec = vector(), sat = current === "satellite", kind = labelKind(), on = labelsOn();
           raster("hillshade", tops.hillshade.c.checked);
-          raster("labels", !vec && tops.labels.c.checked);
-          raster("satlabels", sat && tops.satlabels.c.checked);
-          if(vec) for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", tops.labels.c.checked ? "visible" : "none");
-          tops.satlabels.lab.hidden = !sat;
-          tops.buildings.c.disabled = !vec; tops.buildings.c.checked = vec && window.rsBuildings ? window.rsBuildings() : false; };
+          raster("labels", kind === "esri" && !sat && on);
+          raster("satlabels", kind === "esri" && sat && on);
+          if(vec) for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
+          tops.labels.c.disabled = kind === "baked"; tops.labels.c.checked = on;
+          tops.labels.lab.title = kind === "baked" ? "This base map has its own labels" : ""; tops.labels.lab.classList.toggle("rs-bm-off", kind === "baked");
+          tops.satlabels.lab.hidden = true;                  // the switch above does this one's work on Esri Satellite
+          tops.buildings.c.disabled = !vec; tops.buildings.c.checked = vec && window.rsBuildings ? window.rsBuildings() : false;
+          if(lastOn !== on){ lastOn = on; document.dispatchEvent(new Event("rs:labelschange")); } };
         topRow("hillshade", "Hillshade").checked = ls("hillshade") === "1";
-        topRow("labels", "Labels").checked = ls("labels") === "1" || (ls("labels") == null && vector());
+        topRow("labels", "Labels");
         topRow("buildings", "3D buildings");
-        topRow("satlabels", "Satellite labels").checked = ls("satlabels") === "1";
-        window.rsLabelsOn = ()=>tops.labels.c.checked;          // one state for the map and the Google 3D view (HYBRID with labels, SATELLITE without)
-        for(const id of ["hillshade", "labels", "satlabels"]) tops[id].c.onchange = ()=>{ ss(id, tops[id].c.checked); apply(); if(id === "labels") document.dispatchEvent(new Event("rs:labelschange")); };
+        topRow("satlabels", "Satellite labels");
+        for(const id of ["hillshade", "labels"]) tops[id].c.onchange = ()=>{ if(id === "labels") want = tops.labels.c.checked; ss(id, tops[id].c.checked); apply(); };
         tops.buildings.c.onchange = ()=>{ if(window.rsBuildings) window.rsBuildings(tops.buildings.c.checked); };
         const mark = ()=>{ rows.forEach(([b, r])=>{ r.checked = b.key === current || b.dark === current; }); };
         document.addEventListener("rs:basemapchange", e=>{ current = e.detail.basemap; mark(); setTimeout(apply, 0); });
-        document.addEventListener("rs:basemapready", ()=>{ if(tops.labels.c.checked === false && ls("labels") == null) tops.labels.c.checked = true; apply(); });
+        document.addEventListener("rs:basemapready", apply);
         document.addEventListener("rs:buildingschange", apply);
         // the page's theme switch changes a map that has a twin at once, and leaves a map with no twin as it is
         const sbT = document.getElementById("sb");
