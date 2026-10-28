@@ -1,8 +1,6 @@
 """Filter edges by OSM ``highway`` type."""
 from __future__ import annotations
 
-from .style import normalize_highway
-
 
 def _as_set(types) -> set[str] | None:
     if types is None:
@@ -52,3 +50,12 @@ def highway_types(gdf, highway_col: str = "highway", normalize: bool = True):
     if normalize:
         col = col.map(lambda h: normalize_highway(h)[0])
     return sorted(col.dropna().unique().tolist())
+
+
+def normalize_highway(highway) -> tuple[str, bool]:
+    """Return (base_class, is_link): the class without its ``_link`` suffix, lower case."""
+    h = (str(highway) if highway is not None else "").strip().lower()
+    is_link = h.endswith("_link")
+    if is_link:
+        h = h[: -len("_link")]
+    return h, is_link

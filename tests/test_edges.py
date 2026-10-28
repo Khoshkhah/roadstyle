@@ -9,7 +9,6 @@ from roadstyle import (
     as_edges,
     from_arrow,
     from_duckdb,
-    from_geojson,
     normalize_edges,
     render_edges,
 )
@@ -105,11 +104,6 @@ def test_as_edges_from_geojson_dict():
     assert isinstance(e, RoadEdges) and len(e) == 2 and "highway" in e.columns
 
 
-def test_from_geojson_accepts_a_spec_dict():
-    from roadstyle import to_spec
-
-    e = from_geojson(to_spec(_named()))     # a roadstyle to_spec() dict round-trips back in
-    assert isinstance(e, RoadEdges) and len(e) == 2
 
 
 def test_from_arrow_decodes_wkb():

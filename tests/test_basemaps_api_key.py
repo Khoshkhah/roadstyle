@@ -4,7 +4,6 @@ import geopandas as gpd
 import pytest
 import shapely.geometry as sg
 
-import roadstyle
 from roadstyle.basemaps import (
     _SESSION_API_KEYS,
     get_api_key,
@@ -126,33 +125,5 @@ def test_xyzservices_with_env_var(monkeypatch):
     assert "access_token=env_tok_123" in bm.url
 
 
-def test_render_edges_with_api_key():
-    try:
-        import xyzservices.providers as xyz
-    except ImportError:
-        pytest.skip("xyzservices not installed")
-
-    g = _edges()
-
-    # Web backend
-    wm = roadstyle.render_edges(
-        g, backend="web", basemap=xyz.MapBox, api_key="web_test_token"
-    )
-    assert "access_token=web_test_token" in wm.html
-
-    # Folium backend
-    fm = roadstyle.render_edges(
-        g, backend="folium", basemap=xyz.MapBox, api_key="folium_test_token"
-    )
-    assert "access_token=folium_test_token" in fm.get_root().render()
 
 
-def test_to_spec_with_api_key():
-    try:
-        import xyzservices.providers as xyz
-    except ImportError:
-        pytest.skip("xyzservices not installed")
-
-    g = _edges()
-    spec = roadstyle.to_spec(g, basemap=xyz.MapBox, api_key="spec_test_token")
-    assert "access_token=spec_test_token" in spec["basemap"]["url"]

@@ -41,7 +41,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install docs dependencies
-        run: pip install mkdocs-material mkdocs-redirects ".[numeric]"
+        run: pip install mkdocs-material mkdocs-redirects "."
 
       # The Manual's live maps (docs/maps/*.html) are built here, not committed: CARTO tiles
       # need a key, which lives in the repo secret CARTO_API_KEY. It is not in git, but it is

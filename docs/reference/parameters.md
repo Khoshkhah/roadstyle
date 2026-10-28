@@ -9,7 +9,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | name | returns | what |
 |---|---|---|
 | **Render** | | |
-| `render_edges(gdf, **kw)` | `WebMap` / `folium.Map` / `lonboard.Map` | the main call; every keyword [below](#render_edges) |
+| `render_edges(gdf, **kw)` | `WebMap` | the main call; every keyword [below](#render_edges) |
 | `render_dashboard(gdf, **kw)` | `WebMap` | map + query sidebar ([Pages](#pages)) |
 | `render_report(gdf, **kw)` | `WebMap` | map + stats sidebar ([Pages](#pages)) |
 | `render_street_view(gdf, **kw)` | `WebMap` | map + Google Street View side by side ([Pages](#pages)) |
@@ -22,30 +22,20 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `as_edges(data, *, class_col="highway")` | `RoadEdges` | coerce any input below (`render_edges` does this for you) |
 | `normalize_edges(gdf, *, class_col, rename)` | `RoadEdges` | from a GeoDataFrame |
 | `load_edges(path, *, class_col, layer, rename)` | `RoadEdges` | from any geo file (`layer` for GPKG) |
-| `from_geojson(obj, *, class_col, crs=4326, rename)` | `RoadEdges` | from a GeoJSON mapping or a `to_spec` dict |
+| `from_geojson(obj, *, class_col, crs=4326, rename)` | `RoadEdges` | from a GeoJSON mapping |
 | `from_arrow(table, *, class_col, geometry, crs, rename)` | `RoadEdges` | from a pyarrow Table |
 | `from_duckdb(con_or_rel, query=None, *, geometry, class_col, crs=4326, rename)` | `RoadEdges` | from DuckDB; select the geometry as `ST_AsWKB(geom)` |
 | `filter_edges(gdf, include, exclude, highway_col, match_links)` | GeoDataFrame | keep / drop road classes |
 | `highway_types(gdf, highway_col="highway", normalize=True)` | `list` | the classes present |
 | **roadstyle.js / JSON output** ([Put it on a website](../guides/website.md)) | | |
-| `to_spec(gdf, **kw)` | `dict` | data + baked style + legend + metadata |
-| `to_geojson(gdf, **kw)` | `dict` | the styled FeatureCollection only |
 | `to_html(gdf_or_spec, *, full=True, div_id="rsmap", width="100%", height="500px", **kw)` | `str` | a full roadstyle.js page, or a `<div>+<script>` fragment (`full=False`) |
 | `to_iframe(gdf_or_spec, *, width="100%", height="500px", **kw)` | `str` | a self-contained `<iframe srcdoc=…>` |
 | `save(gdf_or_spec, path, **kw)` | | write the roadstyle.js page |
-| `save_spec(spec_or_gdf, path, **kw)` / `load_spec(path)` | / `dict` | the spec to / from a `.json` file |
-| **Stylers** ([below](#stylers)) | | |
-| `ClassStyler`, `CategoricalStyler`, `NumericStyler`, `ColorTableStyler` | | how each edge's colour and width is chosen |
-| `color_by_class`, `color_by`, `color_by_value` | styler | shortcuts for the first three |
-| `build_styler(**kw)` | styler | picks a styler from `render_edges`-style keywords |
-| `Styler`, `ResolvedFrame` | | the styler protocol and its output (per-edge style arrays) |
 | **Palettes, base maps, settings** ([Settings & palettes](settings.md)) | | |
 | `PALETTES`, `HIGHSAT`, `CARTO` | `dict` | the palette registry and two of its tables |
 | `RoadStyle(fill, width, casing_width, casing="#bcbcbc", dash=None, opacity=1.0)` | | one class's look |
 | `SELECTION` | `dict` | the selection colours (`core`, `glow`, `glow_opacity`, `casing`) |
-| `register_palette`, `save_palette`, `load_palette`, `palette_to_dict`, `palette_from_dict` | | add palettes, palette JSON I/O |
 | `BASEMAPS`, `Basemap`, `get_basemap`, `register_basemap` | | base maps ([below](#basemap)) |
-| `BaseLayerSwitcher` | folium element | the folium base-map switcher |
 | `set_api_key(key, provider=None)` / `get_api_key(provider=None)` | / `str` | base-map API keys |
 | `StyleConfig` | | global styling knobs ([below](#styleconfig)) |
 | `use_settings(*sources)` | | apply settings (path or dict) for the process; no argument drops them |
@@ -61,7 +51,6 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `base_style(highway, palette="amber")` | `RoadStyle` | the palette entry for a class |
 | `selection_style(base_width=4.0)` | `dict` | the selection profile scaled to a width |
 | `normalize_highway(value)` | `(base, is_link)` | strip OSM `_link` |
-| `make_legend(spec, position="bottomleft")` | folium element | a folium legend from a `ResolvedFrame.legend` |
 
 A `WebMap` has `.html` (the page as a string), `.save(path)`, and shows inline in a notebook (Jupyter Notebook 7, JupyterLab): the
 preview loads the bundled MapLibre version (5.24) from the jsDelivr CDN instead of inlining it, so it needs the network.
@@ -77,18 +66,17 @@ ignore it.
 | keyword | default | backends | what |
 |---|---|---|---|
 | `profile` | `None` | all | the name of a profile: every style value that is not a color (`default`, `highsat`, or `./profiles/<name>.yaml`); `None` = the one in force ([Profiles and palettes](settings.md#profiles-and-palettes)) |
-| `backend` | `"web"` | | `"web"` (MapLibre, one offline file), `"folium"`, `"lonboard"` ([Big networks](../guides/big-networks.md)) |
+| `backend` | `"web"` | | `"web"` (MapLibre, one offline file): the only backend ([Big networks](../guides/big-networks.md)) |
 | `palette` | `"amber"` | all | `"amber"` (orange to green main roads, slate-grey streets), `"carto"` (soft OSM Carto tones), `"highsat"` (bright), `"mono"` or a registered palette |
 | `basemap` | the `basemap` setting (`"voyager"`) | all | a `BASEMAPS` key, a `Basemap`, a `{z}/{x}/{y}` URL or an xyzservices provider |
-| `basemaps` | web: `esri_gray`, `positron`, `osm`, `satellite`, `voyager`, `dark_matter`, `blank` | web, folium | the base maps offered in the switcher |
+| `basemaps` | web: `esri_gray`, `positron`, `osm`, `satellite`, `voyager`, `dark_matter`, `blank` | web | the base maps offered in the switcher |
 | `basemap_switcher` | `True` | web | the base-map button (a map control, last in the top-right column) and its menu; `False` with a `basemaps=` list keeps them for `rsSetBasemap` |
 | `zoom_readout` | `True` | web | the small "z 13.2" zoom level beside the scale bar; `False` leaves it out |
 | `api_key` | `None` | all | key for a keyed tile provider ([order](settings.md#base-maps-api-keys)) |
 | `arrows` | `True` | web | one-way chevrons along each one-way edge |
 | `labels` | `True` | web | curved street names from the `name` column |
-| `legend` | `True` | web, folium | a legend for data colouring (class styling has none). Web: a page key; the style always has the legend data (`roadstyle:color_options`) |
-| `legend_position` | `"bottomleft"` | folium | legend corner |
-| `name` | web `"roadstyle"`, folium `"roads"` | web, folium | page title (web) / layer name (folium) |
+| `legend` | `True` | web | a legend for data colouring (class styling has none). Web: a page key; the style always has the legend data (`roadstyle:color_options`) |
+| `name` | web `"roadstyle"`, folium `"roads"` | web | page title (web) / layer name (folium) |
 | `hover_color` / `select_color` | `"#b388ff"` / `"#7c4dff"` | web | highlight of the hovered / selected road |
 | `minzoom` | `None` | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default), a dict overrides parts, `False` = all classes at all zooms |
 | `offset_frac` | `0.28` | web | two-way lane offset, fraction of the road's pixel width; `0` = no lane split |
@@ -102,7 +90,7 @@ ignore it.
 |---|---|---|---|
 | `include` / `exclude` | `None` | all | keep only / drop these classes (str or list) |
 | `match_links` | `True` | all | `primary` also matches `primary_link` |
-| `filter_control` | `True` | web, folium | the road-class filter panel (folium: only when there is no legend) |
+| `filter_control` | `True` | web | the road-class filter panel (folium: only when there is no legend) |
 | `filter_col` | `None` | web | the column the filter panel lists, when it differs from `highway_col` |
 | `find_control` | `False` | web | a "Search roads…" box in the top-left stack (the docked panel has its own); the JS `rsFind(text)` is always defined ([design](../design/sensor_matching_requests.md)) |
 | `overlay_control` | `True` | web | `False` hides the *Layers* box of the overlays; `rsSetOverlay` still works |
@@ -121,7 +109,6 @@ ignore it.
 | `color_table` | `None` | all | per-edge colour: `{id: colour}`, a Series, or a DataFrame; missing edges grey, class widths kept |
 | `color_key` | `"edge_id"` | all | the edges column matched against `color_table` |
 | `color_col` | `"color"` | all | the colour column when `color_table` is a DataFrame |
-| `style` | `None` | all | a styler object; overrides `palette` / `color_by` |
 | `color_options` | `None` | web | `{name: {styler kwargs}}`: a *Colour by* menu that recolours in the browser; the first entry shows on open |
 | `color_active` | `0` | web | the option shown on open (index or name) |
 | `sidebar` | `None` | web | `"dashboard"` or `"report"`: the bundled sidebar of `render_dashboard` or `render_report` on the page; it also sets `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none |
@@ -147,9 +134,7 @@ have, is an error. Each palette that a view names is built once more into the pa
 | `hover_delay_ms` | `300` | web | a road or an overlay item lights up and shows its tooltip once the mouse rests this long on it (a passing mouse lights nothing); `0`: at once |
 | `data_maxzoom` | `None` | web | the last zoom MapLibre cuts the GeoJSON sources into tiles at; above it, MapLibre enlarges those tiles and does not cut them again. Positions are as exact as the tile grid of that zoom. `None`: MapLibre's own |
 | `data_tolerance` | `None` | web | how far MapLibre simplifies the road geometry in the tiles it cuts. `None`: `0.05`, which keeps every vertex. A road is cut into tiles in the browser, and zoomed out one tile holds a whole district: `1` makes a sweep at zoom 12 about three times faster (687 to 226 ms on a 22,000-road page), and the page looks the same at zoom 14 and above (no pixel differs in a 760 x 560 view) and the same at zoom 12 to within a fraction of a pixel along road edges |
-| `tooltip` | `None` | web, folium | hover columns. Web: alias of `road_tooltip`, `None` = no tooltip. Folium: `None` = all columns |
-| `selected` | `None` | folium | a GeoDataFrame of edges to highlight (web: use `rsHighlight` / `rsColor`) |
-| `copy_field` | `"edge_id"` | folium | click copies this column's value; `None` = off |
+| `tooltip` | `None` | web | hover columns. Web: alias of `road_tooltip`, `None` = no tooltip. Folium: `None` = all columns |
 
 ### Street View
 
@@ -175,9 +160,8 @@ have, is an error. Each palette that a view names is built once more into the pa
 | `live_data` | `False` | web, Rust engine | the metadata `roadstyle:live` (the feature states `rs_c` and `rs_w`, the default ramp, the no-data colour; [contract](contract.md)) and the page's option `live`, which `rs.setData` reads. Every style's road layer reads its colour and its width factor from the feature state on the road's row (since 2026-10-24, audit N8). With the Python engine: a `ValueError` |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
 | `tunnel_control` | `False` | web | on a map with tunnels, a *Tunnels* box (a tool for choosing the look): the colour list (`tunnel_toward`), the tunnel slider (`tunnel_strength`: 0, 25, 50, 55, 60, 65, 70, 75, 100), the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
-| any other keyword | | folium | passed to `folium.Map(...)` (e.g. `location`, `zoom_start`) |
 
-Returns a `WebMap` (web, `.save()`), a `folium.Map` (`.save()`) or a `lonboard.Map` (`.to_html()`).
+Returns a `WebMap` (`.save()`).
 
 ### Column mapping
 
@@ -227,37 +211,6 @@ change the defaults below.
 | `resizable` | `True` | a divider the viewer can drag; the choice is remembered in their browser |
 | `street_view_key` | env `GOOGLE_MAPS_KEY` | a Google Maps JavaScript API key: the panel becomes a real panorama, the map marker walks and turns with the viewer, and it shows Google's own street imagery only. Written into the page; restrict it to your site's addresses |
 
-## Stylers
-
-`render_edges` builds a styler for you. Build one yourself and pass it as `style=` for full control.
-
-| styler | field | default | what |
-|---|---|---|---|
-| `ClassStyler` | `column` | `"highway"` | the class column |
-| | `palette` | `"amber"` | name or `{class: RoadStyle}` |
-| | `normalize_links` | `True` | draw `*_link` as the parent class, narrower |
-| | `fallback` | `"unclassified"` | class for unknown values |
-| | `tunnel_col` / `bridge_col` | `None` | tunnel / bridge columns |
-| | `config` | the settings | a `StyleConfig` |
-| `CategoricalStyler` | `column` | | the category column |
-| | `colors` | `{}` | `{value: hex}` |
-| | `fallback_color` | `"#cccccc"` | unmapped / missing values |
-| | `missing` | `"base"` | in `color_options`: unmapped edges keep the base fill (`"base"`) or use `fallback_color` (`"self"`) |
-| | `width` | `2.0` | px, or a column name |
-| | `casing`, `casing_width` | `None`, `0.0` | optional constant casing |
-| | `opacity`, `casing_opacity` | `0.9`, `0.75` | |
-| | `dash` | `None` | `(on, off)` px |
-| `NumericStyler` | `column` | | the numeric column |
-| | `cmap` | `"viridis"` | ramp name or list of hex stops |
-| | `vmin`, `vmax` | data min / max | |
-| | `width`, `width_by`, `width_column` | `2.0`, `None`, `None` | constant width, or `(min, max)` px over the value of `width_column` (default `column`) |
-| | `nan_color` | `"#cccccc"` | missing values |
-| | `missing` | `"base"` | as for `CategoricalStyler`, with `nan_color` |
-| | `casing`, `casing_width`, `opacity`, `casing_opacity` | `None`, `0.0`, `0.9`, `0.75` | |
-| `ColorTableStyler` | `color_column` | required | a column of colours, one per edge |
-| | `highway_col`, `palette` | `"highway"`, `"amber"` | where widths and casing come from |
-| | `fallback_color` | `"#bbbbbb"` | blank or invalid colours |
-
 ## Overlay
 
 `rs.Overlay(data, ...)`: your own geometry, drawn with one flat style (web only). Defaults come from
@@ -282,7 +235,6 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `order_col` | `None` | with `edge_col`: the property with the feature's order (whole number, lower first; null = 0) |
 | `select` | `"road"` | with `edge_col`: a hover or click picks the feature's road (`"road"`) or the feature itself (`"item"`: its own highlight and popup, `rs:select` with `item` and the road); anything else is an error |
 | `color_col` | `None` | the property with a colour per feature (null: `color`) |
-| `style` | `None` | the name of a style in the theme's `overlays.styles` (a library's theme; the older settings key `config.overlays.styles` still works); its fields fill what the overlay does not give |
 | `width_m` | `None` | a line's width in metres, exact from `min_zoom` on (replaces `width`) |
 | `dash` | `None` | a line's dash pattern in line widths, `[3, 3]` |
 | `min_zoom` / `max_zoom` | `None` | the zooms in which the overlay is drawn |
@@ -301,7 +253,6 @@ Built-ins: [Settings & palettes](settings.md#base-maps-api-keys).
 | `attr` | required | attribution |
 | `is_dark` | `False` | a dark canvas |
 | `satellite` | `False` | apply the satellite colour filter |
-| `lonboard` | `None` | the matching lonboard base map name |
 | `bg`, `preview`, `subdomains` | `"#444"`, three greys, `"abc"` | switcher thumbnail, tile subdomains |
 | `maxzoom` | `19` | the provider's last zoom level with real tiles; zoomed in further, the map scales that level up instead of showing missing tiles. Built-ins: Esri grey maps 16, CARTO 20, the rest 19; xyzservices providers bring their own `max_zoom` |
 

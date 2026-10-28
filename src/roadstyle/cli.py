@@ -4,9 +4,7 @@
     roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web
     roadstyle edges.gpkg --include motorway trunk primary -o major.html
 
-A thin wrapper over :func:`roadstyle.render_edges` (the ``web`` MapLibre backend — the default — and
-``folium``) and :func:`roadstyle.save` / :func:`roadstyle.save_spec` / :func:`roadstyle.to_geojson`
-(the ``rsjs`` roadstyle.js page / JSON outputs). Every styling flag mirrors the Python keyword of
+A thin wrapper over :func:`roadstyle.render_edges` (the ``web`` MapLibre page). Every styling flag mirrors the Python keyword of
 the same name, so the CLI and the library stay in lock-step.
 """
 from __future__ import annotations
@@ -17,10 +15,9 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .palettes import DEFAULT_PALETTE
 
 # output format → default file extension for the derived output name
-_EXT = {"web": ".html", "folium": ".html", "rsjs": ".html", "spec": ".json", "geojson": ".geojson"}
+_EXT = {"web": ".html"}
 # --page → the roadstyle.pages function that builds it
 _PAGES = {"dashboard": "render_dashboard", "report": "render_report",
           "street-view": "render_street_view"}
@@ -30,14 +27,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="roadstyle",
         description="Render a road-edge file (GPKG, GeoJSON, Shapefile, …) into a styled "
-                    "interactive map or a portable JSON spec.",
+                    "interactive map.",
         epilog="examples:\n"
                "  roadstyle edges.gpkg -o map.html --basemap dark_matter\n"
                "  roadstyle edges.gpkg --palette carto --basemap positron\n"
                "  roadstyle edges.gpkg --include motorway trunk primary -o major.html\n"
                "  roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web\n"
                "  roadstyle edges.gpkg --page street-view         # map + Google Street View\n"
-               "  roadstyle edges.gpkg -f spec -o map_data.json   # JSON for your own frontend\n"
                "  roadstyle studio [--server.port 8502 …]         # launch the Streamlit workbench",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -45,14 +41,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--output",
                    help="output path (default: input name with the format's extension).")
     p.add_argument("-f", "--format", default="web",
-                   choices=["web", "folium", "rsjs", "spec", "geojson"],
-                   help="web = self-contained MapLibre map (default); folium = interactive folium "
-                        "HTML; rsjs = standalone roadstyle.js page; spec = JSON spec; "
-                        "geojson = styled GeoJSON.")
+                   choices=["web"],
+                   help="web = self-contained MapLibre map (the only format).")
     p.add_argument("--version", action="version", version=f"roadstyle {__version__}")
 
     style = p.add_argument_group("styling")
-    style.add_argument("--palette", default=DEFAULT_PALETTE, choices=["amber", "carto", "highsat", "mono"],
+    style.add_argument("--palette", default="amber", choices=["amber", "carto", "highsat", "mono"],
                        help="class palette (default: amber).")
     style.add_argument("--basemap", help="the primary base map layer (a key in BASEMAPS; "
                        "default from settings: voyager).")
@@ -156,7 +150,6 @@ def main(argv: list[str] | None = None) -> int:
 
     # Imported lazily so `roadstyle --version` / `--help` stay fast and don't pull in geopandas.
     from .edges import load_edges
-    from .emit import save, save_spec, to_geojson
     from .filters import filter_edges
     from .render import render_edges
 
@@ -203,14 +196,6 @@ def main(argv: list[str] | None = None) -> int:
                 getattr(pages, _PAGES[args.page])(g, **style_kw, **web_kw).save(str(out_path))
             else:
                 render_edges(g, backend="web", **style_kw, **web_kw).save(str(out_path))
-        elif args.format == "folium":
-            render_edges(g, backend="folium", **style_kw).save(str(out_path))
-        elif args.format == "rsjs":
-            save(g, str(out_path), **style_kw)
-        elif args.format == "spec":
-            save_spec(g, str(out_path), **style_kw)
-        elif args.format == "geojson":
-            out_path.write_text(json.dumps(to_geojson(g, **style_kw)), encoding="utf-8")
     except (ValueError, KeyError, FileNotFoundError) as e:
         print(f"roadstyle: {e}", file=sys.stderr)
         return 1

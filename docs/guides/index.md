@@ -72,7 +72,7 @@
 
     ---
 
-    Vector tiles for ~10⁵ edges, lonboard for millions, and which backend to choose.
+    Vector tiles for ~10⁵ edges.
 
     [:octicons-arrow-right-24: Big networks](big-networks.md)
 

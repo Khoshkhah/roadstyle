@@ -24,10 +24,6 @@ keeps the keyword's default and your [settings](settings.md).
 | `-f` | writes | extension | Python equivalent |
 |---|---|---|---|
 | `web` | a self-contained MapLibre map | `.html` | `render_edges(g).save(...)` |
-| `folium` | a folium (Leaflet) map | `.html` | `render_edges(g, backend="folium").save(...)` |
-| `rsjs` | a standalone roadstyle.js page | `.html` | `rs.save(g, ...)` |
-| `spec` | the JSON spec for your own frontend | `.json` | `rs.save_spec(g, ...)` |
-| `geojson` | the styled FeatureCollection | `.geojson` | `rs.to_geojson(g)` |
 
 Only the styling, filtering and data-colour flags apply to every format; the web flags below need
 `-f web`.

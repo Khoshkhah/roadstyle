@@ -14,7 +14,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Kaveh" }]
 keywords = [
     "openstreetmap", "osm", "roads", "cartography", "map", "visualization",
-    "folium", "lonboard", "geopandas", "leaflet", "maplibre",
+    "geopandas", "leaflet", "maplibre",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -31,8 +31,6 @@ classifiers = [
 dependencies = [
     "geopandas",
     "shapely",
-    "folium",
-    "branca",                    # folium's page elements (MacroElement); the colour ramps are data/cmaps.json
     "pyyaml",                    # settings files in YAML (settings= takes a dict, a JSON file or a YAML file)
     "scipy",                     # the drawing order of every edge (compute_levels): stages 1-3, a sparse linear program (HiGHS)
     "ortools",                   # stage 0 of it, as a minimum-cost flow
@@ -40,14 +38,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-numeric = ["mapclassify"]                 # numeric styling: the class breaks (the colormaps are data/cmaps.json)
 basemaps = ["xyzservices"]                # use any XYZ tile provider as a base map
-lonboard = ["lonboard"]                   # WebGL (deck.gl) backend for very large edge sets
 duckdb = ["duckdb"]                        # read edges straight from a DuckDB relation / query
 arrow = ["pyarrow"]                        # read edges from a pyarrow Table
 studio = ["streamlit"]                     # the `roadstyle studio` Streamlit workbench
 mcp = ["mcp>=2.2,<3", "osmnx", "playwright"]  # `roadstyle-mcp`: tools for AI agents (+ playwright install chromium)
-all = ["roadstyle[numeric,basemaps,lonboard,duckdb,arrow,studio]"]  # every user-facing extra
+all = ["roadstyle[basemaps,duckdb,arrow,studio]"]  # every user-facing extra
 docs = ["mkdocs-material", "mkdocs-redirects"]
 dev = ["roadstyle[all]", "pytest", "ruff", "mypy"]  # everything a user can get + test/lint tools
 
@@ -66,7 +62,7 @@ Changelog = "https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md"
 python-source = "src"
 module-name = "roadstyle._rust"
 manifest-path = "rust/roadstyle-py/Cargo.toml"
-# the package's files are the Python files and folium's static/roadstyle.{js,css}. The look, the base map, the dashboard, the templates
+# the package's files are the Python files. The look, the base map, the dashboard, the templates
 # and MapLibre are in the module (roadstyle-assets; Python asks _assets). Not in the wheel: a development build of the module
 # (rust/roadstyle-py/build.py), and the generated copy of the old paths for duckosm-rust (rust/roadstyle-assets/sync_old_paths.py)
 exclude = ["src/roadstyle/_rust.abi3.so", "src/roadstyle/**/__pycache__/**", "src/roadstyle/static/dashboard/**",

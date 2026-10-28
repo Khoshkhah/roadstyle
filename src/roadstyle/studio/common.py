@@ -9,7 +9,7 @@ from pathlib import Path
 import streamlit as st
 
 import roadstyle as rs
-from roadstyle.colors import ColorRamp
+from roadstyle._engine import rust
 
 CMAPS = ["viridis", "plasma", "magma", "cividis", "coolwarm", "RdYlGn_r"]
 
@@ -34,7 +34,7 @@ def _colour_opt(edges, num_cols, col, cmap):
         # stepped colours → a categorical legend, one swatch per value; >5 values split into 5 even
         # groups so the top values share the top colour.
         k = min(5, n)
-        stops = ColorRamp(cmap).stops(k)
+        stops = rust().ramp_stops(cmap, k)
         groups = [vals[i * n // k:(i + 1) * n // k] for i in range(k)]
         return {"color_by": col, "missing": "self",
                 "colors": {v: stops[i] for i, g in enumerate(groups) for v in g}}

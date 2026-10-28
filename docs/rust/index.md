@@ -53,4 +53,3 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 - **Nightly pages.** The output is the same for the same input: the same style, options and data.
 - **The browser.** A page can make the style and the tiles itself, from a duckOSM file or a GeoParquet file, with no Python.
 
-The `folium` and `lonboard` backends are not part of the engine: they draw with Python. A `Styler` object (`style=`) is for them only.

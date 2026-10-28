@@ -13,6 +13,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   helpers that `levels` and the folium and lonboard backends use), `roadstyle.tiles`, the Python level editor (`roadstyle-levels
   edit` runs the Rust editor only; `--engine` and `--items` of that command are gone), and the extra `tiles`.
 - **`simple=False`, the full look.** The simple look is the only look. `simple=` is now an error, in Python and in the Rust engine.
+- **The folium and lonboard backends, and what only they used** (decision of 2026-10-28, a commit of its own so it can be reverted alone):
+  `backend="folium"` and `backend="lonboard"` (the only backend is `"web"`), the Styler classes and `build_styler`, `color_by_class`,
+  `color_by_value`, `style=`, the palette code (`PALETTES`, `RoadStyle`, `register_palette`, `load_palette`, `save_palette`, ...), `base_style`,
+  `resolve`, `selection_style`, `make_legend`, `BaseLayerSwitcher`, the Leaflet output (`to_spec`, `to_geojson`, `to_html`, `to_iframe`, `save`,
+  `save_spec`, `load_spec`) and the command-line formats `folium`, `rsjs`, `spec` and `geojson` (`roadstyle -f web` is the only one). The
+  extras `numeric` and `lonboard` and the dependencies `folium` and `branca` are gone. A palette is a settings file (`./palettes/<name>.yaml`).
 - **The keyword `engine=`** of `render_edges`, `export_style`, `export_inline` and `export_look`, and the environment variable
   `ROADSTYLE_ENGINE` for them. `engine=` is now an error. The drawing-order solver (`compute_levels`, `solve_levels`, `make_area`)
   keeps `engine=`; its default is now `"rust"`.

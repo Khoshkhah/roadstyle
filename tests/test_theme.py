@@ -32,8 +32,7 @@ def _layer(style, lid):
     return next(lyr for lyr in style["layers"] if lyr["id"] == lid)
 
 
-@pytest.mark.parametrize("name", ["render_web.py", "style.py", "palettes.py", "colors.py", "stylers.py", "config.py",
-                                  "levels.py", "render_lonboard.py", "overlays.py"])
+@pytest.mark.parametrize("name", ["render_web.py", "config.py", "levels.py", "overlays.py"])
 def test_no_color_literal_in_python(name):
     """Python holds no style color: every one is in the theme. ``rgba(0,0,0,0)`` (invisible) is not a color choice."""
     prev, found = None, []
@@ -100,14 +99,6 @@ def test_unknown_name_is_an_error_that_lists_the_names():
         rs.render_edges(_edges(), basemap="blank", profile="nope")
 
 
-def test_highsat_profile_gives_highsats_own_widths_and_dashes():
-    import roadstyle as rs
-    assert rs.PALETTES["highsat"]["cycleway"].dash == (3, 3)                      # palette alone: the default profile
-    rs.use_settings({"profile": "highsat"})
-    try:
-        assert rs.PALETTES["highsat"]["cycleway"].dash == (6, 4) and rs.PALETTES["highsat"]["service"].casing_width == 0.0
-    finally:
-        rs.use_settings()
 
 
 def test_older_settings_layout_still_works_and_warns():

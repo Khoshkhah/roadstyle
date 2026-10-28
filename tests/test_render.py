@@ -23,19 +23,8 @@ def _edges():
     )
 
 
-def test_folium_render_returns_map():
-    import folium
-    m = render_edges(_edges(), backend="folium", basemap="dark_matter")
-    assert isinstance(m, folium.Map)
 
 
-def test_folium_ignores_web_only_keywords():
-    """A web-only keyword (tiles=True clashed with folium.Map's own `tiles`) is dropped, not
-    forwarded, so one call can switch backends."""
-    import folium
-    m = render_edges(_edges(), tiles=True, view_3d=True, street_view=False, hover_color="#f00",
-                     color_options={"Class": {}}, compress=False)
-    assert isinstance(m, folium.Map)
 
 
 def test_lonboard_ignores_web_only_keywords():
@@ -48,38 +37,12 @@ def test_lonboard_ignores_web_only_keywords():
     assert m is not None
 
 
-def test_folium_render_all_basemaps_and_palettes():
-    import folium
-    for basemap in ("voyager", "dark_matter", "satellite"):
-        for palette in ("highsat", "carto"):
-            m = render_edges(_edges(), basemap=basemap, palette=palette)
-            assert isinstance(m, folium.Map)
 
 
-def test_render_with_filter():
-    import folium
-    m = render_edges(_edges(), include=["motorway", "trunk"])
-    assert isinstance(m, folium.Map)
 
 
-def test_render_with_selection():
-    import folium
-    g = _edges()
-    m = render_edges(g, selected=g[g["highway"] == "motorway"])
-    assert isinstance(m, folium.Map)
 
 
-def test_basemap_override_and_toggleable_basemaps():
-    import folium
-
-    from roadstyle import BASEMAPS
-    assert {"positron", "dark_matter", "satellite", "voyager", "osm"} <= set(BASEMAPS)
-    # single override
-    m = render_edges(_edges(), basemap="voyager")
-    assert isinstance(m, folium.Map)
-    # multiple toggleable base layers
-    m2 = render_edges(_edges(), basemaps=["positron", "dark_matter", "satellite"])
-    assert isinstance(m2, folium.Map)
 
 
 def test_unknown_basemap_raises():

@@ -11,8 +11,7 @@ Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: `/reference/paramet
 
 ## Install
 
-`pip install roadstyle`; extras as needed: `numeric` (`cmap` ramps), `tiles` (`tiles=True`), 
-`duckdb`, `lonboard`, `studio`, or `all`. Check the installed version with
+`pip install roadstyle`; extras as needed: `duckdb`, `studio`, or `all`. Check the installed version with
 `python -c "import roadstyle; print(roadstyle.__version__)"` before relying on a recent keyword.
 
 ## Data contract
@@ -147,5 +146,3 @@ inserting HTML before `</body>` in `m.html`.
   entry already uses.
 - **CARTO base maps are watermarked without a key** (`voyager`, `positron`, `dark_matter`). Use
   `osm` or `blank`, or set a free key: `rs.set_api_key("…", provider="carto")` / `CARTO_API_KEY`.
-- **folium / lonboard backends** support only part of this: the JS API, `color_options`, 3D and
-  overlays are web-backend (the default) only.

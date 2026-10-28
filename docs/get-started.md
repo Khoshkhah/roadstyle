@@ -15,7 +15,6 @@ pip install "roadstyle[numeric,tiles]"   # extras combine; "roadstyle[all]" take
 |---|---|
 | `numeric` | numeric colour ramps (`color_by` on numbers, `cmap`) |
 | `tiles` | `tiles=True`, vector tiles inside the file for big networks |
-| `lonboard` | the GPU backend for very large networks |
 | `duckdb` | `rs.from_duckdb`, edges from a DuckDB query |
 | `arrow` | edges from a pyarrow Table |
 | `basemaps` | any xyzservices tile provider as a base map |

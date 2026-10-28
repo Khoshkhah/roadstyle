@@ -29,13 +29,6 @@ def test_bundled_style_has_config_and_selection(fresh):
     assert "core" in st["selection"]
 
 
-def test_bundled_matches_python_tables(fresh):
-    # the data files are the source of truth for HIGHSAT/CARTO/DEFAULT — verify the round trip
-    from roadstyle import CARTO, HIGHSAT, palette_from_dict
-    from roadstyle.config import DEFAULT
-    assert palette_from_dict(_settings.palettes()["highsat"]) == HIGHSAT
-    assert palette_from_dict(_settings.palettes()["carto"]) == CARTO
-    assert DEFAULT.fill_opacity == _settings.style()["config"]["fill_opacity"]
 
 
 def test_user_override_retints_one_class(tmp_path, monkeypatch, fresh):
@@ -63,23 +56,6 @@ def test_user_override_config_and_selection(tmp_path, monkeypatch, fresh):
     assert "casing_opacity" in st["config"]   # untouched keys survive
 
 
-def test_override_propagates_into_reloaded_modules(tmp_path, monkeypatch, fresh):
-    # importing roadstyle.palettes fresh with an override in place yields the overridden table
-    override = tmp_path / "roadstyle.json"
-    override.write_text(json.dumps({"palettes": {"highsat": {"service": {"fill": "#abcdef"}}}}))
-    monkeypatch.setenv("ROADSTYLE_CONFIG", str(override))
-    _settings.refresh()
-
-    # the in-place rebuild that use_settings runs, not importlib.reload: a reload makes a second PALETTES dict, and the
-    # renderers, imported before, keep the first one (2026-10-19: later tests read stale palettes)
-    import roadstyle.palettes as palettes
-    palettes._reload()
-    try:
-        assert palettes.PALETTES["highsat"]["service"].fill == "#abcdef"      # what the renderers read
-    finally:
-        monkeypatch.delenv("ROADSTYLE_CONFIG", raising=False)
-        _settings.refresh()
-        palettes._reload()                # back to the unmodified tables for later tests
 
 
 def test_user_override_roads_tables_deep_merge(tmp_path, monkeypatch, fresh):
@@ -102,22 +78,3 @@ def test_user_override_roads_tables_deep_merge(tmp_path, monkeypatch, fresh):
     assert r["group"]["motorway"] == "major"       # untouched tables survive
 
 
-def test_use_settings_overrides_from_code_and_resets(fresh):
-    """rs.use_settings(dict|path) is the in-process roadstyle.json: it must reach the already-
-    imported tables (config, palettes, web road model) and a plain call must undo it."""
-    import roadstyle as rs
-    from roadstyle import render_web
-    from roadstyle.palettes import PALETTES
-
-    try:
-        rs.use_settings({"config": {"labels": {"color": "#ff00aa"}},
-                         "roads": {"z_order": {"service": 9}},
-                         "palettes": {"highsat": {"service": {"fill": "#0000ff"}}}})
-        assert render_web.CONFIG.labels["color"] == "#ff00aa"      # merged into the theme's labels (2026-10-19), the rest kept
-        assert render_web.ROAD_Z["service"] == 9
-        assert PALETTES["highsat"]["service"].fill == "#0000ff"
-    finally:
-        rs.use_settings()
-    assert render_web.ROAD_Z["service"] == 1.5         # back to bundled defaults
-    assert PALETTES["highsat"]["service"].fill != "#0000ff"
-    assert render_web.CONFIG.labels["color"] == "#5b5b5b"

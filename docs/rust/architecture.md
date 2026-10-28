@@ -593,12 +593,9 @@ features when decoded for the tiles. A difference is a bug in the engine, or an 
 | Part | Why it stays |
 |---|---|
 | The `render_edges` API, its keywords and `WebMap` | Python reads the data, converts it to GeoParquet and calls Rust |
-| The folium and lonboard backends | They are Python objects for notebooks |
-| A `Styler` object (`style=`) | It is Python code that the engine cannot run |
 | The readers (`load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`) and the filters | Python reads every format; the engine reads GeoParquet only |
 | The level areas, the level editor and the level store (`level_area.py`, `level_editor.py`, `levels_store.py`) | A local tool with an HTTP server and files. The engine has the solver with its defaults only |
 | `snapshot`, the CLI, the MCP server, the studio | Tools around a page: they need Python, a browser or the network |
-| The Leaflet output (`to_spec`, `to_html`, `save`) | Another output format |
 | mapstyle's part of the look | mapstyle makes its base-map part from its own data |
 
 ## Known design gaps

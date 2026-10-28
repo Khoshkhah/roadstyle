@@ -166,10 +166,7 @@ In every palette:
 
 | call | does |
 |---|---|
-| `rs.register_palette("mine", {"motorway": rs.RoadStyle("#f00", 6, 8), ...})` | add or replace a palette; then `palette="mine"` |
 | `rs.PALETTES["highsat"]["busway"] = rs.RoadStyle("#FF00AA", 2.0, 4.0)` | add one class to a palette |
-| `rs.save_palette("highsat", "mine.json", name="mine")` | write `{"name", "roads": {class: fields}}` to edit by hand |
-| `rs.load_palette("mine.json")` | read it back and register it under its `name` (`register=False` to skip) |
 | `rs.palette_to_dict(p)` / `rs.palette_from_dict(d)` | the same as plain dicts |
 
 A `RoadStyle` needs `fill`, `width`, `casing_width`; `casing` (default: the palette's `roads.fallback.palette_casing`, `None` = none),

@@ -105,17 +105,8 @@ rs.render_edges(edges, minzoom=True)                         # hide minor classe
 
 ## Your own road classes
 
-For a class column that is not OSM `highway` (say NVDB functional classes), register a palette of
-`RoadStyle(fill, width, casing_width)` per class and style by that column:
-
-```python
-from roadstyle import RoadStyle, color_by_class, register_palette
-
-register_palette("nvdb", {"0": RoadStyle("#00E5FF", 6, 8), "1": RoadStyle("#FF9100", 4.5, 6.5)})
-rs.render_edges(edges, style=color_by_class("functional_road_class", palette="nvdb",
-                                            normalize_links=False))
-```
-
-`save_palette` / `load_palette` keep it as JSON ([Settings & palettes](../reference/settings.md)).
+For a class column that is not OSM `highway` (say NVDB functional classes), give a palette file with a colour and widths for each class and
+style by that column: `render_edges(edges, highway_col="functional_road_class", palette="nvdb")`. How a palette file looks:
+[Settings & palettes](../reference/settings.md).
 
 **See also:** [Every parameter](../reference/parameters.md) · [Settings & palettes](../reference/settings.md) · [Gallery](../gallery.md) · [JavaScript API](../reference/javascript.md) (`rsSetBasemap`, `rsSetClasses`, `rsSetView3D`)

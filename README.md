@@ -45,7 +45,7 @@
 
 ```bash
 pip install roadstyle              # core
-pip install "roadstyle[all]"       # + studio, numeric ramps, vector tiles, lonboard, DuckDB, …
+pip install "roadstyle[all]"       # + studio, DuckDB, …
 ```
 
 Python ≥ 3.10. Individual extras and the dev setup: [Install](https://khoshkhah.github.io/roadstyle/get-started/#install).
@@ -259,9 +259,7 @@ More: [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/set
   **[openstreetmap-carto](https://github.com/gravitystorm/openstreetmap-carto)** style, whose road classes,
   colours and widths roadstyle follows.
 - **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), solves which road is drawn on top.
-- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry;
-  **[lonboard](https://developmentseed.org/lonboard/)** (deck.gl) and **[folium](https://python-visualization.github.io/folium/)**
-  for the notebook back-ends.
+- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry.
 
 ## License
 

@@ -3,13 +3,8 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Mapping
-from contextvars import ContextVar
 
 from .edges import as_edges
-from .filters import filter_edges
-from .palettes import DEFAULT_PALETTE
-from .stylers import build_styler
-from .validate import validate_edges
 
 
 def _color_map(table, key_col: str, color_col: str) -> dict:
@@ -59,15 +54,11 @@ def _warn_unclassed(g, col):
                   f"(area:highway) taken as a road ({idc or 'row'}: {', '.join(names)}{' ...' if len(bad) > 5 else ''})", stacklevel=3)
 
 
-# the inner render_edges call of a call with settings (the same keywords): it does not warn again
-_SCOPED: ContextVar[bool] = ContextVar("roadstyle_render_scoped", default=False)
-
-
 def _check_keywords(kwargs):
     """render_edges takes **kwargs. A keyword that no part of roadstyle reads (roadstyle::options::unknown) is an error, with the nearest
-    known one. The names that start with "_" are internal hooks, and ``styler`` is the folium and lonboard renderers' own."""
+    known one. The names that start with "_" are internal hooks."""
     from ._engine import rust
-    names = [k for k in kwargs if not k.startswith("_") and k != "styler"]
+    names = [k for k in kwargs if not k.startswith("_")]
     bad = [f"{k!r}" + (f" (did you mean {near!r}?)" if near else "") for k, near in rust().unknown_keywords(names)]
     if bad:
         raise ValueError(f"render_edges: unknown keyword {', '.join(bad)}")
@@ -77,7 +68,7 @@ def render_edges(
     gdf,
     *,
     backend: str = "web",
-    palette: str = DEFAULT_PALETTE,
+    palette: str = "amber",
     highway_col: str = "highway",
     include=None,
     exclude=None,
@@ -157,7 +148,7 @@ def render_edges(
     for k, why in (("engine", "roadstyle has one engine, the Rust engine"), ("simple", "the simple look is the only look")):
         if k in kwargs:
             raise ValueError(f"{k}= is removed: {why} (CHANGELOG, 0.26.0)")
-    if backend == "web" and not _SCOPED.get():          # folium and lonboard take keywords of their own
+    if backend == "web":
         _check_keywords(kwargs)
     if backend == "web":
         from . import _engine
@@ -171,67 +162,4 @@ def render_edges(
             data["color_table"] = _color_map(color_table, color_key, color_col)
         return _engine.render_page(gdf, palette=palette, profile=profile, settings=settings, highway_col=highway_col, include=include,
                                    exclude=exclude, match_links=match_links, levels_db=levels_db, api_key=api_key, **data, **kwargs)
-    from . import _settings as _st
-    pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _st.theme()["active"][k]
-            and (k == "profile" or v in _st.style_names("palettes"))}      # a palette made in code (register_palette) has no file
-    if pick:
-        # a profile / palette by name for THIS render (docs/design/style_config.md): a settings source after any settings= of the call
-        settings = [settings, pick] if settings is not None else pick
-        profile = None
-    if settings is not None:
-        # scoped settings: apply the override for THIS render only, then restore. Same layout as
-        # a roadstyle.json / use_settings source (dict or path); stacks on top of any overrides
-        # already active.
-        from . import _settings as _s
-        from . import use_settings as _use
-        call_args = {k: v for k, v in locals().items()
-                     if k not in ("gdf", "settings", "kwargs", "_s", "_use", "_st", "pick")}
-        prev = list(_s._EXTRA)
-        token = _SCOPED.set(True)
-        try:
-            _use(*prev, *(settings if isinstance(settings, list) else [settings]))
-            return render_edges(gdf, settings=None, **call_args, **kwargs)
-        finally:
-            _use(*prev)
-            _SCOPED.reset(token)
-
-    edges = as_edges(gdf, class_col=highway_col)   # canonical: RoadEdges (EPSG:4326, lines)
-    g = edges.gdf
-    col = edges.class_col
-
-    _warn_unclassed(g, col)
-
-    # Decide styling. No data-driven args => classic OSM path (validate the class column).
-    if color_table is not None:
-        # per-edge colour from an edge_id -> colour map; keep class widths/casing, gray fallback
-        from .stylers import ColorTableStyler
-        if color_key not in g.columns:
-            raise ValueError(
-                f"color_key {color_key!r} not found in the edges (columns: {list(g.columns)})")
-        mapping = _color_map(color_table, color_key, color_col)
-        g = g.copy()
-        g["__rs_color"] = [mapping.get(str(k)) for k in g[color_key]]
-        styler = ColorTableStyler(color_column="__rs_color", highway_col=col, palette=palette)
-    elif style is not None or color_by is not None:
-        validate_edges(g, color_by or col)
-        styler = build_styler(
-            style=style, palette=palette, highway_col=col,
-            color_by=color_by, colors=colors, cmap=cmap,
-            vmin=vmin, vmax=vmax, width_by=width_by,
-        )
-    else:
-        validate_edges(g, col)                      # clear error if the class column is missing
-        styler = None
-
-    if include is not None or exclude is not None:
-        g = filter_edges(g, include=include, exclude=exclude,
-                         highway_col=col, match_links=match_links)
-    if levels_db is not None:
-        raise ValueError("levels_db is for the web backend")
-    if backend == "folium":
-        from .render_folium import render
-    elif backend == "lonboard":
-        from .render_lonboard import render
-    else:
-        raise ValueError(f"unknown backend {backend!r}; use 'folium', 'lonboard', or 'web'")
-    return render(g, palette=palette, highway_col=col, styler=styler, api_key=api_key, **kwargs)
+    raise ValueError(f"unknown backend {backend!r}: the only backend is 'web' (the folium and lonboard backends are removed)")

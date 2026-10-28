@@ -148,7 +148,7 @@ With `state: baked` (the export, RustGIS), the engine writes the start values in
 
 67 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
 reads (the internal contract between the engine and the dashboard of the same version). "Leaflet" marks the names of the Leaflet spec
-(`emit.to_spec`, `static/roadstyle.js`). Each one goes into a typed field of the render model, and the engine writes the property only
+Each one goes into a typed field of the render model, and the engine writes the property only
 when a layer reads it.
 
 | Names | Meaning | Written by | Read by | Kind | Replaced by |
@@ -170,7 +170,6 @@ when a layer reads it.
 | `__rs_ord`, `__rs_ov`, `__rs_item`, `__rs_ic`, `__rs_iwm`, `__rs_iom`, `__rs_imz`, `__rs_pick` | an attached object's order, its overlay, its row, color, width and offset in metres, minzoom, and "pick it as itself" | `_edge_overlay`, `_item_pieces`, `_road_items` | engine, `select.js` (`__rs_pick`) | dashboard (`__rs_pick`) | `Attachment` |
 | `__rs_arw` | the number of an arrow slot (for the export's thinning) | `_annotation_slots`, `slots.rs` | engine | internal | the slot attachments |
 | `__rs_base`, `__rs_height`, `__rs_casing_slab`, `__rs_chain` | a 3D deck's base and height, its casing slab, its chain | `_bridge_decks` | engine, `select.js` (`__rs_casing_slab`) | dashboard (`__rs_casing_slab`) | the deck generator |
-| `__rs_fc_`, `__rs_fc_frame`, `__rs_fc_i`, `__rs_fc_id`, `__rs_fc_wkb` | not properties: temporary names in the DuckDB query of `fastjson.py` | `fastjson.py` | | internal | removed (the Rust readers) |
 | `__rs_gz`, `__rs_tiles`, `__rs_side` | not properties: the page's self-check globals (`window.__rs_gz`, `window.__rs_tiles`, `window.__rs_side`: the road table did not load) | `_INFLATE_JS`, `_TILES_JS`, `_SIDE_JS` | the page's banner | page | the page writer |
 | `__rs_fill__` | the prefix of `__rs_fill__<i>` in the code | | | | |
 

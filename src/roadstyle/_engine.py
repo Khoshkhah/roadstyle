@@ -41,12 +41,6 @@ def fallback(name: str | None, reason: str) -> bool:
     return True
 
 
-def web_keywords(names) -> set:
-    """The keywords among ``names`` that the Rust engine reads (the web page's): the other backends drop them."""
-    names = [k for k in names if not k.startswith("_")]
-    return set(names) - {k for k, _ in rust().unknown_keywords(names)}
-
-
 def rust():
     """The Rust extension module, or an ImportError that says how to build it."""
     try:

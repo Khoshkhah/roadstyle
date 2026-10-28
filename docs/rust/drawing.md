@@ -11,8 +11,6 @@ select the library with the keyword `backend` of `render_edges`:
 | `backend` | The library that draws | What `render_edges` gives |
 |---|---|---|
 | `"web"` (the default) | MapLibre GL JS, in the browser | one HTML file |
-| `"folium"` | Leaflet, in a notebook | a `folium.Map` |
-| `"lonboard"` | deck.gl, in a notebook | a `lonboard.Map` |
 
 The rest of this page is about `"web"`, the backend of almost all maps. The Rust engine makes only this backend.
 

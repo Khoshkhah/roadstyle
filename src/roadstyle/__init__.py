@@ -1,4 +1,4 @@
-"""roadstyle — OSM-style road/edge map styling; self-contained MapLibre maps (plus folium & lonboard).
+"""roadstyle — OSM-style road/edge map styling; self-contained MapLibre maps.
 
     import geopandas as gpd
     from roadstyle import render_edges
@@ -17,7 +17,6 @@ from .basemaps import (
     set_api_key,
 )
 from .config import StyleConfig
-from .controls import BaseLayerSwitcher
 from .edges import (
     RoadEdges,
     as_edges,
@@ -28,18 +27,8 @@ from .edges import (
     load_edges,
     normalize_edges,
 )
-from .emit import (
-    load_spec,
-    save,
-    save_spec,
-    to_geojson,
-    to_html,
-    to_iframe,
-    to_spec,
-)
 from .export import export_geojson, export_inline, export_look, export_style, tile_geojson
-from .filters import filter_edges, highway_types
-from .legend import make_legend
+from .filters import filter_edges, highway_types, normalize_highway
 from .levels import auto_ends, casing_parts, compute_levels, level_input, solve_levels
 from .levels_store import (
     load_area_levels,
@@ -50,33 +39,8 @@ from .levels_store import (
 )
 from .overlays import Overlay
 from .pages import render_dashboard, render_report, render_street_view, sidebar_html
-from .palettes import (
-    CARTO,
-    HIGHSAT,
-    PALETTES,
-    SELECTION,
-    RoadStyle,
-    load_palette,
-    palette_from_dict,
-    palette_to_dict,
-    register_palette,
-    save_palette,
-)
 from .render import render_edges
 from .snapshot import snapshot
-from .style import base_style, normalize_highway, resolve, selection_style
-from .stylers import (
-    CategoricalStyler,
-    ClassStyler,
-    ColorTableStyler,
-    NumericStyler,
-    ResolvedFrame,
-    Styler,
-    build_styler,
-    color_by,
-    color_by_class,
-    color_by_value,
-)
 
 
 def use_settings(*sources) -> None:
@@ -97,15 +61,12 @@ def use_settings(*sources) -> None:
         rs.render_edges(edges, backend="web").save("map.html")
 
     Two setting sets in one process = call it again between renders. Note the handful of legacy
-    class-level defaults (:class:`roadstyle.style.RoadStyle` field defaults) resolve at import and
-    are unaffected — palette entries always restate them, so rendering is unaffected too.
     """
-    from . import _settings, config, palettes, render_web, style, stylers
+    from . import _settings, config, render_web
 
     _settings.set_extra(*sources)
     config.DEFAULT = config._default_config()
-    style.DEFAULT = stylers.DEFAULT = render_web.CONFIG = config.DEFAULT
-    palettes._reload()
+    render_web.CONFIG = config.DEFAULT
     render_web._load_road_model()
 
 
@@ -151,25 +112,12 @@ __all__ = [
     "save_levels",
     "render_edges", "render_dashboard", "render_report", "render_street_view", "sidebar_html",
     "filter_edges", "highway_types", "use_settings", "snapshot",
-    "resolve", "base_style", "selection_style", "normalize_highway",
-    "PALETTES", "HIGHSAT", "CARTO", "SELECTION", "RoadStyle",
-    "BASEMAPS", "Basemap", "get_basemap", "BaseLayerSwitcher", "set_api_key", "get_api_key",
-    # generalization additions (Phase 0)
-    "StyleConfig", "register_palette", "register_basemap",
-    # styler abstraction (Phase 1)
-    "Styler", "ClassStyler", "ResolvedFrame",
-    # palette JSON I/O (Phase 2a)
-    "load_palette", "save_palette", "palette_to_dict", "palette_from_dict",
-    # data-driven styling (Phase 2)
-    "CategoricalStyler", "NumericStyler", "ColorTableStyler", "build_styler",
-    "color_by", "color_by_value", "color_by_class",
+    "normalize_highway",
+    "BASEMAPS", "Basemap", "get_basemap", "set_api_key", "get_api_key",
+    "StyleConfig", "register_basemap",
     # canonical input (Phase 3a)
     "RoadEdges", "normalize_edges", "load_edges", "as_edges",
     "from_geojson", "from_arrow", "from_duckdb", "is_directed",
-    # legends (Phase 3)
-    "make_legend",
     # extra overlay layers (zones / POIs / any geometry)
     "Overlay",
-    # web / JSON output (Phase 4)
-    "to_spec", "to_geojson", "to_html", "to_iframe", "save", "save_spec", "load_spec",
 ]

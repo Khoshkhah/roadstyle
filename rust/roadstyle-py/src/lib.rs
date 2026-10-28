@@ -621,11 +621,24 @@ fn tile_range(b: [f64; 4], z: u32) -> (u32, u32, u32, u32) {
     (i(b[0] + MERCATOR_R), i(b[2] + MERCATOR_R), i(MERCATOR_R - b[3]), i(MERCATOR_R - b[1]))
 }
 
+/// ramp_stops(cmap, n) -> [str]: `n` colours of a colour ramp (a colour scheme or a matplotlib colormap name, or the JSON text of a list of
+/// colours), from the first colour to the last (at least 2).
+#[pyfunction]
+fn ramp_stops(cmap: &str, n: usize) -> PyResult<Vec<String>> {
+    let c: serde_json::Value = if cmap.trim_start().starts_with('[') {
+        serde_json::from_str(cmap).map_err(|e| PyValueError::new_err(format!("cmap: not a JSON list: {e}")))?
+    } else {
+        cmap.into()
+    };
+    roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
 #[pymodule]
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
     m.add_function(wrap_pyfunction!(asset, m)?)?;
     m.add_function(wrap_pyfunction!(asset_names, m)?)?;
+    m.add_function(wrap_pyfunction!(ramp_stops, m)?)?;
     m.add_function(wrap_pyfunction!(unknown_keywords, m)?)?;
     m.add_function(wrap_pyfunction!(given_of, m)?)?;
     m.add_function(wrap_pyfunction!(page_of_json, m)?)?;

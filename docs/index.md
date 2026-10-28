@@ -100,9 +100,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
   **[openstreetmap-carto](https://github.com/gravitystorm/openstreetmap-carto)** style, whose road classes,
   colours and widths roadstyle follows.
 - **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), solves which road is drawn on top.
-- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry;
-  **[lonboard](https://developmentseed.org/lonboard/)** (deck.gl) and **[folium](https://python-visualization.github.io/folium/)**
-  for the notebook back-ends.
+- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry.
 
 [:material-image-multiple: Gallery](gallery.md) ·
 [:material-book-open-variant: Reference](reference/parameters.md) ·

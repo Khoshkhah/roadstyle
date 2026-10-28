@@ -43,10 +43,6 @@ def test_colors_self_literal_column():
     assert fills["a"] == "#111111" and fills["b"] == "#bbbbbb" and fills["d"] == "red"
 
 
-def test_color_table_folium_returns_map():
-    import folium
-    assert isinstance(rs.render_edges(_edges(), backend="folium",
-                                      color_table={"a": "#ff0000"}), folium.Map)
 
 
 def test_bad_color_table_raises():
