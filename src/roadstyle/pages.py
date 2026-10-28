@@ -73,8 +73,9 @@ def _with_layout(m, layout, toolbar):
     cls = ("rs-overlay " if layout == "overlay" else "") + ("rs-has-toolbar" if toolbar else "")
     bar = f'<div id="rs-toolbar" class="rs-tb-{toolbar}"></div>' if toolbar else ""
     head = (f"<style>{css}</style><script>window.rsLayout={opt};document.documentElement.className+=' {cls}';</script>" + bar)
-    assert "<body" in m._tpl, "the page has no body"
-    i = m._tpl.index(">", m._tpl.index("<body")) + 1
+    # the real <body> tag: the first "<body" of the text can be in a comment of the page's own CSS
+    assert "</head>" in m._tpl and "<body" in m._tpl[m._tpl.index("</head>"):], "the page has no body"
+    i = m._tpl.index(">", m._tpl.index("<body", m._tpl.index("</head>"))) + 1
     m._tpl = m._tpl[:i] + head + m._tpl[i:]
     m._tpl = m._tpl.replace("</body>", f"<script>{js}</script></body>", 1)
     return m
