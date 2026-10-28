@@ -143,7 +143,7 @@ export function initGoogle3D(){
     // A MODE CHANGE (Google's own toggle or the page's): every polyline is removed from the 3D map and the selected entity's line is drawn again from the
     // build's geometry, 300 ms after the switch and again after Google's first camera event in the new mode. One line, the build's, in both views.
     let redrawT=0, redrawNext=false;
-    const clearLines=()=>{ if(m3) m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove()); line=null; };
+    const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d").forEach(x=>x.remove()); line=null; };
     const redrawRoad=()=>{ try{ drawLayers(); }catch(e){ LOG.push("redraw: "+String(e&&e.message||e).slice(0, 120)); } };
     const modeChanged=()=>{ keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
     document.addEventListener("rs:labelschange", ()=>{ if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); });
@@ -230,8 +230,8 @@ export function initGoogle3D(){
       drawsOccludedSegments:true}));
     const arrowsOn=(cs, st)=>{ const {total, at}=along(cs), k=Math.cos(cs[0][1]*Math.PI/180);       // a chevron every 20 m, 3 m long, opening backward
       for(let d=10, n=0; d<total && n<40; d+=20, n++){ const tip=at(d), back=at(Math.max(0, d-3)), dx=(tip[0]-back[0])*111320*k, dy=(tip[1]-back[1])*111320, m=Math.hypot(dx, dy)||1, px=-dy/m*1.2, py=dx/m*1.2;
-        for(const sg of [1, -1]) polyline([tip, [back[0]+sg*px/(111320*k), back[1]+sg*py/111320]], st); } };
-    const drawFeature=(def, f, st)=>{ const g=f.geometry, pr=f.properties||{};
+        for(const sg of [1, -1]) polyline([tip, [back[0]+sg*px/(111320*k), back[1]+sg*py/111320]], st).dataset.rsArrow="1"; } };      // marked: an arrow is not a line of the layer
+    const drawFeature=(def, f, st0)=>{ const g=f.geometry, pr=f.properties||{}, st={...st0, ...(pr._style||{})};      // a feature can carry its own style in _style
       if(def.kind==="polygon"){ for(const r of ringsOf(g)) polygon(r, st); return; }
       if(def.kind==="points"){ for(const c of pointsOf(g)) polygon(circle(c, st.radius||2), st); return; }
       for(const raw of linesOf(g)){ if(raw.length<2) continue; const cs=densify(raw);
@@ -244,11 +244,11 @@ export function initGoogle3D(){
     const inView=(f, b)=>{ const g=f.geometry; return [...linesOf(g).flat(), ...ringsOf(g).flat(), ...pointsOf(g)].some(c=>c[0]>=b.getWest() && c[0]<=b.getEast() && c[1]>=b.getSouth() && c[1]<=b.getNorth()); };
     const drawLayers=()=>{
       if(!m3 || !lib) return;
-      m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove());       // one selection, one set of lines: whatever an earlier draw left goes
+      m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d").forEach(x=>x.remove());       // one selection, one set of lines: whatever an earlier draw left goes
       made=[]; line=made; tun.hidden=true;
       for(const def of REG.values()){ if(!avail(def) || !layerOn(def)) continue;
         try{ const view=def.scope==="view", b=map.getBounds(); if(!view && !want) continue;
-          let fs=(def.features(want && want.sel || {key:want && want.name, props:{}}, {bounds:b}) || {}).features || [];
+          let fs=(def.features(want && want.sel || {key:want && want.name, props:{}}, {bounds:b, parts:selParts(), level:want ? want.lvl : 0}) || {}).features || [];
           if(view){ fs=fs.filter(f=>inView(f, b)).slice(0, def.max||500); }
           const st=def.style||{}; for(const f of fs) drawFeature(def, f, st);
         }catch(e){ LOG.push("layer "+def.id+": "+String(e&&e.message||e).slice(0, 120)); console.warn("rs google 3d: the layer", def.id, "was not drawn:", e); } } };
