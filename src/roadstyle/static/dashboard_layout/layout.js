@@ -21,7 +21,9 @@
       const scale = document.querySelector(".maplibregl-ctrl-scale"), zoom = document.querySelector(".rs-zoom");
       if(scale || zoom){
         const box = document.createElement("div"); box.id = "rs-scalebox"; document.body.appendChild(box);
-        if(scale) box.appendChild(scale);
+        if(scale){ const slot = document.createElement("div"); slot.className = "rs-scale-slot"; slot.appendChild(scale); box.appendChild(slot);
+          // MapLibre's scale control has a longest bar (maxWidth); 140 px, so that the bar never leaves its slot of 150 px
+          const ctl = (map._controls || []).find(c=>c && c.options && "maxWidth" in c.options && c._onMove); if(ctl){ ctl.options.maxWidth = 140; ctl._onMove(); } }
         if(zoom){ zoom.classList.add("rs-zoom-slot"); box.appendChild(zoom); }
       }
       // a floating window stays inside the map at every drag move
