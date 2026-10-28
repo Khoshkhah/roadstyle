@@ -200,6 +200,7 @@ export function initGoogle3D(){
       if(!m3 || !lib || !parts.length) return;
       ttl.textContent=name||"Unnamed road";
       if(line) line.forEach(x=>x.remove());
+      m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove());       // one selection, one line: whatever an earlier draw left goes
       line=[]; tun.hidden=true;
       // THE LINE LIES ON GOOGLE'S MESH, not on its terrain model: RELATIVE_TO_MESH at 0.5 m, a vertex every 5 m so it follows the street between
       // the OSM nodes (streets cut into rock and built-up ground differ from the terrain, and a tilted camera showed the line shifted).
@@ -219,7 +220,7 @@ export function initGoogle3D(){
         if(lvl<0){ tun.hidden=false;
           for(let a=0; a<total; a+=12) line.push(mk(run(a, Math.min(a+7, total)), {strokeColor:"#7e57c2"})); }
         else line.push(mk(cs)); }
-      line.forEach(x=>m3.appendChild(x));
+      line.forEach(x=>{ x.dataset.rsSel="1"; m3.appendChild(x); });
       if(!fly) return;                        // a page with its own selection moves the map, and the 3D camera follows the map
       const cs=parts.reduce((a, c)=>_svDist(c).slice(-1)[0]>_svDist(a).slice(-1)[0] ? c : a), len=_svDist(cs).slice(-1)[0], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
       m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:ground(mid.lng, mid.lat)}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
@@ -229,6 +230,7 @@ export function initGoogle3D(){
     window.rsG3dDraw=tryDraw;
     document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
       const d=e.detail; if(d.overlay) return;
+      if(typeof window.rsG3dOwnDraw==="function" && window.rsG3dOwnDraw(d)) return;       // the page draws this road itself, from its own data
       const r=_road(d.id), cs=r ? _svLine(r) : []; if(cs.length<2) return;
       const p=d.properties||{}; tryDraw(cs, p.name||p.highway, (_rprops(d.id)||{}).lvl||0, true);
     });
