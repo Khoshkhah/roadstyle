@@ -124,10 +124,26 @@ export function initGoogle3D(){
       ignoreUntil=performance.now()+450; COUNT.m2g++;
       try{ m3.flyCameraTo({endCamera:g, durationMillis:250}); }catch(e){ Object.assign(m3, g); }
       sets.push({t:performance.now(), lat:g.center.lat, lng:g.center.lng, range:g.range, heading:g.heading, tilt:g.tilt}); };
+    // THE MAP FOLLOWS GOOGLE ONLY WHILE THE REVIEWER MOVES IT: from a pointerdown, a wheel, a touchstart or a keydown on the window (captured: these
+    // events are composed and cross Google's shadow root) until 1.5 s after the last pointerup or wheel (Google's inertia). Any other camera change of
+    // Google (a switch of the mode, its own limits, a tile load, a resize) is not followed: 300 ms after it Google is set back to the map's camera once
+    // (at most twice in a row), and the change goes into window.rsJumpLog with the reason "not user".
+    let userDown=false, userUntil=0, notUserT=0, resets=0;
+    const userNow=()=>userDown || performance.now()<userUntil;
+    const heard=(k, hold)=>()=>{ COUNT.input=(COUNT.input||0)+1; resets=0; if(k==="down") userDown=true; userUntil=Math.max(userUntil, performance.now()+(hold||0)); };
+    for(const t of ["pointerdown"]) w.addEventListener(t, heard("down", 1500), true);
+    for(const t of ["wheel", "touchstart", "keydown"]) w.addEventListener(t, heard("", 1500), true);
+    for(const t of ["pointerup", "pointercancel", "touchend"]) window.addEventListener(t, ()=>{ if(userDown){ userDown=false; userUntil=performance.now()+1500; } }, true);
+    const notUser=()=>{
+      COUNT.ignored=(COUNT.ignored||0)+1;
+      (window.rsJumpLog=window.rsJumpLog||[]).push({t:(performance.now()/1000).toFixed(1), reason:"not user", mode:String(m3.mode), range:Math.round(m3.range), tilt:Math.round(m3.tilt||0), heading:Math.round(m3.heading||0)});
+      clearTimeout(notUserT);
+      notUserT=setTimeout(()=>{ if(!m3 || userNow() || resets>=2) return; resets++; setGoogle(); }, 300); };
     const fromGoogle=()=>{                       // Google moved: the map follows, once a frame
       if(queued) return; queued=true;
       requestAnimationFrame(()=>{ queued=false;
         if(!m3 || !m3.center || !m3.range || echo() || performance.now()<ignoreUntil) return;
+        if(!userNow()) return notUser();
         const now=performance.now(), raw=toMap(), dt=now-lastGoogle; lastGoogle=now; rawLast=raw;
         // while Google leads, the centre and the zoom go through an exponential filter (100 ms); the first change after a rest goes straight
         let t=raw;
@@ -222,6 +238,7 @@ export function initGoogle3D(){
         else line.push(mk(cs)); }
       line.forEach(x=>{ x.dataset.rsSel="1"; m3.appendChild(x); });
       if(!fly) return;                        // a page with its own selection moves the map, and the 3D camera follows the map
+      userUntil=performance.now()+1700;       // this flight is the page's own: the map follows it
       const cs=parts.reduce((a, c)=>_svDist(c).slice(-1)[0]>_svDist(a).slice(-1)[0] ? c : a), len=_svDist(cs).slice(-1)[0], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
       m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:ground(mid.lng, mid.lat)}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
                       durationMillis:1500});
