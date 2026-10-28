@@ -170,7 +170,10 @@ export function initGoogle3D(){
     // A change of mode makes Google draw again, and it may report a stale or reset camera: for 1 s after the page sets the mode (or Google's own toggle
     // does) its camera changes are ignored, and then Google is set to the map's camera once. The map's camera never moves for a switch.
     const modeQuiet=()=>{ ignoreUntil=performance.now()+1000; clearTimeout(modeT); modeT=setTimeout(()=>{ if(m3) setGoogle(); }, 1050); };
-    let modeT=0;
+    let modeT=0, lastMode=null;
+    // Google's own toggle changes the mode without the page: a watcher (every 200 ms) opens the same quiet second, and keeps the choice
+    setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode);
+      if(lastMode!==null && v!==lastMode){ modeQuiet(); keepMode(); redraw(); } lastMode=v; }, 200);
     document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ modeQuiet(); m3.mode=modeOf(lib); keepMode(); } });
     const open=()=>{
       if(location.protocol==="file:"){

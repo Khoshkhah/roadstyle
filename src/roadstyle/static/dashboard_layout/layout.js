@@ -152,10 +152,11 @@
         const RAS = {hillshade: ["https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}", 0.4, "Tiles © Esri"],
                      labels: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", 1, "Tiles © Esri"],
                      satlabels: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Reference_Overlay/MapServer/tile/{z}/{y}/{x}", 1, "Tiles © Esri"]};
-        const raster = (id, on)=>{ const lid = "rs-top-"+id;
-          if(!on){ if(map.getLayer(lid)) map.removeLayer(lid); if(map.getSource(lid)) map.removeSource(lid); return; }
+        const raster = (id, on, url)=>{ const lid = "rs-top-"+id, src = url || RAS[id][0];
+          const old = map.getSource(lid), stale = on && old && old.tiles && old.tiles[0] !== src;      // another map needs other label tiles
+          if(!on || stale){ if(map.getLayer(lid)) map.removeLayer(lid); if(old) map.removeSource(lid); if(!on) return; }
           if(map.getLayer(lid)) return;
-          map.addSource(lid, {type:"raster", tiles:[RAS[id][0]], tileSize:256, maxzoom:16, attribution:RAS[id][2]});
+          map.addSource(lid, {type:"raster", tiles:[src], tileSize:256, maxzoom:16, attribution:RAS[id][2]});
           map.addLayer({id:lid, type:"raster", source:lid, paint:{"raster-opacity":RAS[id][1]}}, roadsFirst()); };
         const vector = ()=>{ const b = bms[byKey(current)]; return !!(b && b.style_url); };
         // THE LABELS SWITCH works only where it can: on an OpenFreeMap style it shows or hides the style's own symbol layers; on Esri Satellite, Esri Gray
@@ -171,7 +172,10 @@
         const apply = ()=>{
           const vec = vector(), kind = labelKind(), on = labelsOn();
           raster("hillshade", tops.hillshade.c.checked);
-          raster("labels", kind === "esri" && on);          // World_Boundaries_and_Places: the reference overlay of Esri's imagery has no tiles for many places
+          // Esri's labels: the gray maps have their own reference layer (the base has none); the imagery and a blank map take World_Boundaries_and_Places
+          // (the reference overlay of Esri's imagery has no tiles for many places)
+          const R = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/", g = baseKey() === "esri_gray" ? (current === "esri_dark_gray" ? "World_Dark_Gray_Reference" : "World_Light_Gray_Reference") : "";
+          raster("labels", kind === "esri" && on, g ? R + g + "/MapServer/tile/{z}/{y}/{x}" : null);
           raster("satlabels", false);
           if(vec) for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
           tops.labels.c.disabled = kind === "baked"; tops.labels.c.checked = on;         // the switch shows the state of the map that is on

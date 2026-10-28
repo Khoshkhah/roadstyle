@@ -71,6 +71,9 @@ export function initBasemap(){
   window.rsBuildings = rsBuildings;
   map.on("pitchend", paintBuildings);
   window.RS_BASEMAPS = BASEMAPS;
+  // a page that starts on a vector style (basemap="ofm_liberty") merges it as soon as the style is in, as a click on its row would
+  if(BASEMAPS[0] && BASEMAPS[0].style_url){ let done = false; const go = ()=>{ if(done || !map.isStyleLoaded()) return; done = true; rsSetBasemap(0); };
+    if(map.isStyleLoaded()) go(); else { map.on("load", go); map.on("styledata", go); } }
   if(O.basemap_switcher && BASEMAPS.length > 1){
     const menu=document.createElement("div"); menu.className="bm-menu";
     BASEMAPS.forEach((b,i)=>{ const o=document.createElement("div"); o.textContent=b.label;
