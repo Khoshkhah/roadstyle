@@ -221,15 +221,9 @@ fn no_keys(data: &mut LookData) {
     }
 }
 
-/// A flag of a look value: false for null, false, 0 and the texts "", "no", "false" and "0"; true for the other values.
+/// A flag of a look value: the one rule of roadstyle_model::flags.
 fn flag(v: Option<&Value>) -> bool {
-    match v {
-        None | Some(Value::Null) => false,
-        Some(Value::Bool(b)) => *b,
-        Some(Value::Number(n)) => n.as_f64() != Some(0.0),
-        Some(Value::String(s)) => !matches!(s.as_str(), "" | "no" | "false" | "0"),
-        Some(_) => true,
-    }
+    roadstyle_model::flags::is_yes(v)
 }
 
 /// The look values of the roads' stages: the resolved class styles and the render's defaults.

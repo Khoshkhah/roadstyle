@@ -172,7 +172,7 @@ impl Editor {
         let yes = |v: &Value| v.is_null() || v.as_bool().unwrap_or(true);
         let driving = flag("driving").iter().filter(|v| yes(v)).count();
         let two_way = !r.reversed.is_empty() && flag("directed").iter().all(yes);
-        let truthy = |k: &str| !matches!(get(k).as_str(), "" | "no" | "false" | "0");
+        let truthy = |k: &str| roadstyle_model::flags::yes_text(get(k).as_str());
         json!({
             "road": r.id.to_string(), "name": opt(get("name")), "highway": opt(get("highway")), "edge_ref": opt(get("edge_ref")), "lanes": opt(get("lanes")),
             "modes": opt(get("modes")), "bus_lines": opt(get("bus_lines")), "band": c.get("band").cloned().unwrap_or(Value::Null),
@@ -600,7 +600,7 @@ pub fn read_pairs(csv: &str) -> Result<Vec<PairRow>, crate::Error> {
             r => return Err(crate::error::edits(format!("pairs: the relation '{r}' is not meet, stack, crossing, near or order"))),
         };
         Ok(PairRow { relation, a: id(&col("a"))?, b: id(&col("b"))?, a_end: side(&col("a_end"))?, b_end: side(&col("b_end"))?,
-                     enabled: !matches!(col("enabled").to_lowercase().as_str(), "false" | "0" | "no") })
+                     enabled: col("enabled").is_empty() || roadstyle_model::flags::yes_text(col("enabled").as_str()) })
     }).collect()
 }
 

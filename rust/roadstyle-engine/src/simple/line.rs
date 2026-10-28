@@ -2,8 +2,9 @@
 
 use super::*;
 
-/// np.round(x, d) for d > 0: rint(x * 10^d) / 10^d.
-pub(crate) fn np_round(x: f64, scale: f64) -> f64 {
+/// `x` rounded to a decimal `scale` (1e6: six places), a tie to the even digit: OSM has 7 decimals, so a tie at the sixth is common,
+/// and half-to-even does not push all of them the same way (the integers elsewhere use `f64::round`).
+pub(crate) fn round_scaled(x: f64, scale: f64) -> f64 {
     (x * scale).round_ties_even() / scale
 }
 
@@ -67,7 +68,7 @@ impl Line {
 
     /// Back to lon / lat, rounded as numpy rounds (scale 1e7 or 1e8).
     pub(crate) fn lonlat(&self, pts: &[Pt], scale: f64) -> Vec<Pt> {
-        pts.iter().map(|p| [np_round(p[0] / self.kx + self.lon0, scale), np_round(p[1] / KY + self.lat0, scale)]).collect()
+        pts.iter().map(|p| [round_scaled(p[0] / self.kx + self.lon0, scale), round_scaled(p[1] / KY + self.lat0, scale)]).collect()
     }
 }
 

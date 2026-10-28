@@ -90,11 +90,6 @@ fn style(text: &str) -> Value {
     yaml(text).expect("a bundled base-map style is YAML")
 }
 
-/// Round a float to an integer (half to even).
-fn round_even(x: f64) -> i64 {
-    x.round_ties_even() as i64
-}
-
 /// A theme's hex colour as channels from 0 to 255 (crate::color).
 fn hex(c: &str) -> Option<[f64; 3]> {
     crate::color::hex_rgb(c).map(|c| c.map(f64::from))
@@ -147,7 +142,7 @@ pub fn recolor(v: &Value, saturation: f64, lighten: f64) -> Value {
     let Some(c) = v.as_str().and_then(hex) else { return v.clone() };
     let (h, l, s) = rgb_to_hls(c[0] / 255.0, c[1] / 255.0, c[2] / 255.0);
     let rgb = hls_to_rgb(h, l, s * saturation).map(|x| x + (1.0 - x) * lighten);
-    json!(format!("#{}", rgb.iter().map(|x| format!("{:02x}", round_even(x * 255.0))).collect::<String>()))
+    json!(format!("#{}", rgb.iter().map(|x| format!("{:02x}", (x * 255.0).round() as i64)).collect::<String>()))
 }
 
 /// _walk: `f` on every value of `o` that is not a mapping or a list.

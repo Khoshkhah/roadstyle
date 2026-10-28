@@ -79,11 +79,7 @@ fn band(r: Road) -> f64 {
     }
     .filter(|v| v.is_finite())
     .map_or(0.0, f64::trunc);
-    let yes = |k: &str| match p.get(k) {
-        None | Some(Value::Null) => false,
-        Some(Value::String(s)) => !matches!(s.as_str(), "" | "no" | "None" | "nan"),
-        Some(_) => true,
-    };
+    let yes = |k: &str| crate::roads::is_yes(p.get(k));
     if layer != 0.0 { layer } else if yes("bridge") { 1.0 } else if yes("tunnel") { -1.0 } else { 0.0 }
 }
 

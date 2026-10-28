@@ -73,8 +73,7 @@ impl Exprs for Model {
         let cls_e = self.width_expr(col, casing, if kind == "wings" { wing_scale } else { 1.0 });
         let cls: Vec<Value> = cls_e.as_array().unwrap()[4..].iter().step_by(2).cloned().collect();
         let k = match kind { "fill" => -2, "casing" => 0, _ => 2 };
-        let truthy_num = |v: &Value| v.as_f64().is_some_and(|x| x != 0.0);
-        let cm = if kind == "wings" && truthy_num(bridge_m) { json!(["max", ["get", Mark::CasingM.name()], bridge_m]) } else { json!(["get", Mark::CasingM.name()]) };
+        let cm = if kind == "wings" && crate::roads::yes(bridge_m) { json!(["max", ["get", Mark::CasingM.name()], bridge_m]) } else { json!(["get", Mark::CasingM.name()]) };
         let mut w = json!(["get", Mark::WidthM.name()]);
         if casing {     // a two-way pair's one casing with metres on both: both directions, their two casings in the middle once
             w = json!(["case", ["all", ["to-boolean", ["get", Mark::Pair.name()]], ["has", Mark::TwinWidthM.name()]], ["+", w, ["get", Mark::TwinWidthM.name()], ["*", -2, ["get", Mark::CasingM.name()]]], w]);
@@ -94,10 +93,10 @@ impl Exprs for Model {
             };
             let px = round_to(512.0 * 2f64.powf(z) / 40075016.686, 4);
             let mut m = json!(["*", wm, px]);
-            if kind == "casing" && truthy_num(casing_px) {     // a casing never thinner than casing_px each side of its fill
+            if kind == "casing" && crate::roads::yes(casing_px) {     // a casing never thinner than casing_px each side of its fill
                 m = json!(["max", m, ["+", ["*", ["max", ["+", w, ["*", -2, ["get", Mark::CasingM.name()]]], 0], px], twice(casing_px)]]);
             }
-            if kind == "wings" && truthy_num(bridge_px) {      // never thinner than the fill and bridge_px each side
+            if kind == "wings" && crate::roads::yes(bridge_px) {      // never thinner than the fill and bridge_px each side
                 let fill = json!(["max", ["+", ["get", Mark::WidthM.name()], ["*", -2, ["get", Mark::CasingM.name()]]], 0]);
                 m = json!(["max", m, ["+", ["*", fill, px], twice(bridge_px)]]);
             }

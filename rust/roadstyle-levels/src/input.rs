@@ -99,7 +99,7 @@ fn band(e: &LevelEdge) -> i64 {
         .as_deref()
         .and_then(|s| s.trim().parse::<f64>().ok())
         .filter(|v| v.is_finite())
-        .map_or(0, |v| v.round_ties_even() as i64)
+        .map_or(0, |v| v.round() as i64)
 }
 
 /// The class order of the map (`class_order`, roadstyle's theme): the classes of each rank.

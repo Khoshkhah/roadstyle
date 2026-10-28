@@ -9,6 +9,7 @@ description = "roadstyle's look: the typed, versioned config (palettes, profiles
 
 [dependencies]
 roadstyle-assets.workspace = true
+roadstyle-model.workspace = true     # the one yes/no rule (flags.rs)
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 yaml-rust2.workspace = true

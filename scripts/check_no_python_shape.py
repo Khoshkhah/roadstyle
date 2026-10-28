@@ -3,7 +3,7 @@
 The rules, each counted in every file of rust/*/src (the binding crate roadstyle-py may name Python):
   py_fn      a function named py_*, or a truthy / py_truth function: Python's rounding, text and truth
   untyped    an option read by name from untyped JSON: args["..."] or a["..."]
-  rs_literal a "__rs_ property name written as a string outside the one table (roadstyle-model/src/mark.rs); a test module may write them
+  rs_literal a `__rs_` property name in code (a string, a format! text, a concat) outside the one table (roadstyle-model/src/mark.rs); a comment and a test module may write them
   py_comment a comment that names Python, render_web or tiles.py (Python is not the reference; "the Python binding" is fine)
 
 No hit is allowed: the rules are at zero.
@@ -17,7 +17,7 @@ TABLE = "rust/roadstyle-model/src/mark.rs"
 RULES = {
     "py_fn": re.compile(r"\bfn (py_\w+|truthy|py_truth)\b"),
     "untyped": re.compile(r"\b(args|a)\[\"[a-z_0-9]+\"\]"),
-    "rs_literal": re.compile(r"\"__rs_"),
+    "rs_literal": re.compile(r"__rs_"),
     "py_comment": re.compile(r"//.*(\bPython\b(?! binding)|render_web|tiles\.py)"),
 }
 
@@ -29,10 +29,11 @@ def count() -> dict:
         if rel.startswith("rust/roadstyle-py/"):
             continue
         for line in f.read_text(errors="ignore").split("\n#[cfg(test)]")[0].splitlines():     # the tests may write names as text
+            code = line.split("//")[0]       # all rules but py_comment read code, not comments
             for name, rx in RULES.items():
                 if name == "rs_literal" and rel == TABLE:
                     continue
-                if rx.search(line):
+                if rx.search(line if name == "py_comment" else code):
                     out.setdefault(rel, {}).setdefault(name, 0)
                     out[rel][name] += 1
     return out

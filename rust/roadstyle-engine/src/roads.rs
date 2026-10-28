@@ -101,24 +101,7 @@ fn missing(v: Option<Cell>) -> bool {
     v.is_none_or(Cell::is_null)
 }
 
-/// A yes/no value by the one road-flag rule (`yes` for a value that is there) (roadstyle_model::flags): not missing, not 0 or False, and not a text in `flags::NO`.
-pub(crate) fn is_yes<'a, C: Into<Cell<'a>>>(v: Option<C>) -> bool {
-    match v.map(Into::into) {
-        None => false,
-        Some(c) if c.is_null() => false,        // NaN too
-        Some(Cell::Bool(b)) => b,
-        Some(Cell::Int(i)) => i != 0,
-        Some(Cell::Float(f)) => f != 0.0,
-        Some(Cell::Str(s)) => flags::yes_text(s),
-        Some(Cell::Json(v)) => flags::yes(v),
-        Some(Cell::Null) => false,
-    }
-}
-
-/// `is_yes` of a value that is there.
-pub(crate) fn yes<'a, C: Into<Cell<'a>>>(v: C) -> bool {
-    is_yes(Some(v))
-}
+pub(crate) use flags::{is_yes, yes};
 
 /// A cell as a number: a number, or a text that is one; None for any other.
 fn cell_number(v: Cell) -> Option<f64> {
@@ -284,7 +267,7 @@ fn mark_heads(fs: &mut Roads, named: [bool; 2]) {
 /// positions or from the input's columns casing_level, fill_level, casing_start and casing_end (the ones it has; a head that has none
 /// takes the main casing number).
 fn mark_levels(fs: &mut Roads) {
-    let num = |v: Option<Cell>| v.and_then(cell_number).filter(|x| !x.is_nan()).map_or(0, |x| x.round_ties_even() as i64);
+    let num = |v: Option<Cell>| v.and_then(cell_number).filter(|x| !x.is_nan()).map_or(0, |x| x.round() as i64);
     let has = [Role::CasingLevel, Role::FillLevel, Role::CasingStart, Role::CasingEnd].map(|r| fs.solved.is_some() || fs.roles.col(r).is_some());
     for i in 0..fs.len() {
         let r = fs.road(i);
