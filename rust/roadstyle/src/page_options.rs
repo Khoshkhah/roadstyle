@@ -471,7 +471,7 @@ fn palette_swatches(style: &mut Value, rows: &[crate::sources::TableRow], pals: 
     for n in pals {
         let of: Map<String, Value> = classes.iter().map(|c| {
             let fill = roadstyle_model::mark::Mark::Fill.name();
-            let v = row(c).and_then(|r| get(r, &roadstyle_model::mark::in_palette(fill, n)).or_else(|| get(r, fill))).filter(|v| present(v))
+            let v = row(c).and_then(|r| get(r, &roadstyle_model::mark::in_palette(fill, n)).or_else(|| get(r, fill))).filter(present)
                 .unwrap_or_else(|| fb.clone());
             (c.as_str().unwrap_or_default().to_string(), v)
         }).collect();
@@ -496,6 +496,16 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a))?;
     let archive = t.archive(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names())?;
     Ok((style, Some(archive)))
+}
+
+/// A camera key of the call, when it gave one.
+fn k_cam<'a>(k: &'a PageKeys, name: &str) -> Option<&'a Value> {
+    match name {
+        "pitch" => k.pitch.as_ref(),
+        "bearing" => k.bearing.as_ref(),
+        _ => k.max_pitch.as_ref(),
+    }
+    .filter(|v| !v.is_null())
 }
 
 #[cfg(test)]
@@ -530,14 +540,4 @@ mod tests {
         assert_eq!((&g["name"], &g["road_popup"]), (&json!("N"), &json!(["highway"])));   // a sidebar's defaults give way to them
         assert!(!g.contains_key("color_by") && !g.contains_key("state"), "map options are the look's: {g:?}");
     }
-}
-
-/// A camera key of the call, when it gave one.
-fn k_cam<'a>(k: &'a PageKeys, name: &str) -> Option<&'a Value> {
-    match name {
-        "pitch" => k.pitch.as_ref(),
-        "bearing" => k.bearing.as_ref(),
-        _ => k.max_pitch.as_ref(),
-    }
-    .filter(|v| !v.is_null())
 }
