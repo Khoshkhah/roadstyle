@@ -61,7 +61,7 @@ The window draws layers. A layer has one kind: `line`, `ribbon`, `polygon` or `p
 
 By default a layer draws the features that belong to the selection. A layer with `scope: "view"` draws the features in the visible area instead. It draws at most `max` features (500 by default).
 
-The built-in layer `selected` is the selected road's line. A page that registers no layer sees only this line, with no menu. When two or more layers are available, the window bar shows a "Show" menu with one checkbox for each. The choice is kept for each page. A page can register a layer with the id `selected` to replace the built-in one.
+The selection has one style, `window.rsG3dSelectionStyle` (keys `color`, `width`, `outline`, `outlineWidth`, `arrowColor`, `arrowWidth`, `arrowEvery`, `fill`). The default is the cyan of the map's selection (`#22d3ee`), 8 px wide, with a 2 px near-black outline (`#0b1020`) on both sides, and white arrows every 25 m. A layer with `selection: true` uses it for every kind. Other layers keep their own style. Google draws a covered part of a line fainter. The built-in layer `selected` is the selected road's line. A page that registers no layer sees only this line, with no menu. When two or more layers are available, the window bar shows a "Show" menu with one checkbox for each. The choice is kept for each page. A page can register a layer with the id `selected` to replace the built-in one.
 
 From Python, give the layers to `render_dashboard`. A feature belongs to the selection when its property `match` has the same value as that property of the selected feature:
 

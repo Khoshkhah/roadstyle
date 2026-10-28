@@ -201,9 +201,16 @@ export function initGoogle3D(){
         lab.append(c, document.createTextNode(" "+(d.label||d.id))); menu.appendChild(lab); } };
     showBtn.onclick=e=>{ e.stopPropagation(); menu.hidden=!menu.hidden; };
     document.addEventListener("click", e=>{ if(!e.target.closest || !e.target.closest(".rs-g3d-showwrap")) menu.hidden=true; }, true);
+    // THE SELECTION STYLE, in one place: window.rsG3dSelectionStyle (a page can set any of its keys). Every kind of a layer with `selection: true` (the built-in
+    // "selected" layer, and a page's layer that draws the selected entity) uses it; other layers keep their own style. The core is the map's own selection cyan,
+    // 8 px, with a near-black outline of 2 px on both sides, so it reads on dark, light and photo backgrounds; arrows are white with the same outline. Google
+    // draws a covered part of a line fainter (drawsOccludedSegments); its strength is Google's.
+    const SEL_DEFAULT={color:"#22d3ee", width:8, outline:"#0b1020", outlineWidth:2, arrowColor:"#ffffff", arrowWidth:5, arrowEvery:25, fill:"rgba(34,211,238,0.35)"};
+    const selStyle=()=>({...SEL_DEFAULT, ...(window.rsG3dSelectionStyle||{})});
+    window.rsG3dSelectionStyleDefault=SEL_DEFAULT;
     let want=null;
     const selParts=()=>want ? (Array.isArray(want.cs[0]) && Array.isArray(want.cs[0][0]) ? want.cs : [want.cs]).filter(c=>c.length>1) : [];
-    REG.set("selected", {id:"selected", label:"Selected road", kind:"line", style:{color:O.select_color, width:4},
+    REG.set("selected", {id:"selected", label:"Selected road", kind:"line", selection:true,
       features:()=>({type:"FeatureCollection", features:selParts().map(c=>({type:"Feature", geometry:{type:"LineString", coordinates:c}, properties:{lvl:want.lvl}}))})});
     const register=d=>{ if(!d || !d.id || typeof d.features!=="function") throw new Error("rsG3dLayers.register: a layer needs an id and a features(selection) function"); REG.set(d.id, {kind:"line", ...d}); paintMenu(); drawLayers(); };
     window.rsG3dLayers={register, list:()=>[...REG.values()].map(d=>({id:d.id, label:d.label, kind:d.kind, on:layerOn(d), available:avail(d)})),
@@ -239,21 +246,22 @@ export function initGoogle3D(){
     const circle=(c, r)=>{ const k=Math.cos(c[1]*Math.PI/180); return Array.from({length:8}, (_, i)=>[c[0]+Math.cos(i*Math.PI/4)*r/(111320*k), c[1]+Math.sin(i*Math.PI/4)*r/111320]); };
     let made=[];
     const add=el=>{ el.dataset.rsSel="1"; m3.appendChild(el); made.push(el); return el; };
-    const polyline=(r, st, o)=>add(new lib.Polyline3DElement({path:pts(r), altitudeMode:MESH(), strokeColor:st.color||O.select_color, strokeWidth:st.width||4, outerColor:"#202124", outerWidth:Math.min(0.5, 1/(st.width||4)),       // a 1 px dark outline: the line stands out on the dark drawn map and on the imagery
+    const polyline=(r, st, o)=>add(new lib.Polyline3DElement({path:pts(r), altitudeMode:MESH(), strokeColor:st.color||O.select_color, strokeWidth:st.width||4, outerColor:st.outline||"#202124", outerWidth:Math.min(0.5, (st.outlineWidth||1)/(st.width||4)),       // the outline, in px, as a fraction of the stroke: the line stands out on the dark drawn map and on the imagery
       drawsOccludedSegments:true, ...o}));
     const polygon=(ring, st)=>add(new lib.Polygon3DElement({outerCoordinates:pts(ring), altitudeMode:MESH(), fillColor:st.fill||"rgba(14,127,145,0.35)", strokeColor:st.color||"#0E7F91", strokeWidth:st.outlineWidth||2,
       drawsOccludedSegments:true}));
-    const arrowsOn=(cs, st)=>{ const {total, at}=along(cs), k=Math.cos(cs[0][1]*Math.PI/180);       // a chevron every 20 m, 3 m long, opening backward
-      for(let d=10, n=0; d<total && n<40; d+=20, n++){ const tip=at(d), back=at(Math.max(0, d-3)), dx=(tip[0]-back[0])*111320*k, dy=(tip[1]-back[1])*111320, m=Math.hypot(dx, dy)||1, px=-dy/m*1.2, py=dx/m*1.2;
+    const arrowsOn=(cs, st0)=>{ const {total, at}=along(cs), k=Math.cos(cs[0][1]*Math.PI/180), ev=st0.arrowEvery||20,     // a chevron every `arrowEvery` m, 3 m long, opening backward
+        st={...st0, color:st0.arrowColor||st0.color, width:st0.arrowWidth||st0.width};
+      for(let d=ev/2, n=0; d<total && n<40; d+=ev, n++){ const tip=at(d), back=at(Math.max(0, d-3)), dx=(tip[0]-back[0])*111320*k, dy=(tip[1]-back[1])*111320, m=Math.hypot(dx, dy)||1, px=-dy/m*1.2, py=dx/m*1.2;
         for(const sg of [1, -1]) polyline([tip, [back[0]+sg*px/(111320*k), back[1]+sg*py/111320]], st).dataset.rsArrow="1"; } };      // marked: an arrow is not a line of the layer
-    const drawFeature=(def, f, st0)=>{ const g=f.geometry, pr=f.properties||{}, st={...st0, ...(pr._style||{})};      // a feature can carry its own style in _style
+    const drawFeature=(def, f, st0)=>{ const g=f.geometry, pr=f.properties||{}, st={...(def.selection ? selStyle() : {}), ...st0, ...(pr._style||{})};      // a feature can carry its own style in _style; the selection style is the base of a selection layer
       if(def.kind==="polygon"){ for(const r of ringsOf(g)) polygon(r, st); return; }
       if(def.kind==="points"){ for(const c of pointsOf(g)) polygon(circle(c, st.radius||2), st); return; }
       for(const raw of linesOf(g)){ if(raw.length<2) continue; const cs=densify(raw);
         if(def.kind==="ribbon"){ const w=(st.widthProp && +pr[st.widthProp]) || st.widthM || 3; polygon(offsetRing(cs, w/2), st); continue; }
         const tunnel=pr.lvl<0, dash=tunnel ? [7, 5] : st.dash;
         if(dash){ const {total, run}=along(cs); if(tunnel) tun.hidden=false;
-          for(let a=0; a<total; a+=dash[0]+dash[1]) polyline(run(a, Math.min(a+dash[0], total)), tunnel ? {...st, color:"#7e57c2"} : st); }
+          for(let a=0; a<total; a+=dash[0]+dash[1]) polyline(run(a, Math.min(a+dash[0], total)), tunnel && !def.selection ? {...st, color:"#7e57c2"} : st); }
         else polyline(cs, st);
         if(def.arrows) arrowsOn(cs, st); } };
     const inView=(f, b)=>{ const g=f.geometry; return [...linesOf(g).flat(), ...ringsOf(g).flat(), ...pointsOf(g)].some(c=>c[0]>=b.getWest() && c[0]<=b.getEast() && c[1]>=b.getSouth() && c[1]<=b.getNorth()); };

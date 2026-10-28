@@ -126,3 +126,17 @@ def test_python_layers_reach_the_page(tmp_path):
         got = pg.evaluate("[rsG3dLayers.list().map(d => d.id).join(), document.querySelector('.rs-g3d-showwrap').hidden, document.querySelectorAll('gmp-map-3d gmp-polyline-3d').length]")
         assert got == ["selected,x,y", False, 1], got
         b.close()
+
+
+def test_selection_style_one_place_and_overridable(tmp_path):
+    """The selected entity is cyan, 8 px, with a 2 px near-black outline; a page can override it; another layer keeps its own colour."""
+    with sync_playwright() as p:
+        b, pg = _open(p, _page(tmp_path))
+        pg.evaluate("""(l) => { rsG3dLayers.register({id: 'other', label: 'Other', kind: 'line', style: {color: '#00aa00', width: 3}, features: () => ({type: 'FeatureCollection', features: [{type: 'Feature', geometry: {type: 'LineString', coordinates: l}, properties: {}}]})});
+          rsG3dDraw(l, 'A', 0, {key: 'k', props: {}}); }""", LINE)
+        got = pg.evaluate("[...document.querySelectorAll('gmp-map-3d gmp-polyline-3d')].map(p => [p.strokeColor, p.strokeWidth, p.outerColor, +(p.outerWidth * p.strokeWidth).toFixed(3)])")
+        assert ["#22d3ee", 8, "#0b1020", 2] in got and ["#00aa00", 3, "#202124", 1] in got, got
+        pg.evaluate("(l) => { window.rsG3dSelectionStyle = {color: '#ff0000', width: 10}; rsG3dDraw(l, 'A', 0, {key: 'k', props: {}}); }", LINE)
+        got = pg.evaluate("[...document.querySelectorAll('gmp-map-3d gmp-polyline-3d')].map(p => [p.strokeColor, p.strokeWidth])")
+        assert ["#ff0000", 10] in got and ["#00aa00", 3] in got, got
+        b.close()
