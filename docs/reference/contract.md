@@ -9,7 +9,7 @@ not have, or the reverse. The names in the section "Planned names" are not in th
 
 ## The style's metadata
 
-A style that the Rust engine makes with `state: "live"` (a page with the dashboard; `render_edges(engine="rust")`) has the contract.
+A style that the Rust engine makes with `state: "live"` (a page with the dashboard; `render_edges`) has the contract.
 The export's style (`export_style`, `export_inline`: `state` baked) has `roadstyle:interaction`, `roadstyle:images` and
 `roadstyle:color_options` only.
 
@@ -26,7 +26,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | layer `roadstyle:group` | the group of a layer: `roads`, or an overlay's label |
 | layer `roadstyle:over` | a base-map layer that goes over the roads (the 3D buildings) |
 | layer `roadstyle:position` | the drawing position of a layer of `export_look` |
-| `roadstyle:sources` | each road role of the style (`simple`, `slots`, `arrows`, `decks`, `shadows`; the full look also `roads`, `casings`, `halves`, `ends`) with its source and its source layer (null for GeoJSON), from its final layers (`contract::describe`; after tiling the tile layers); the page gives it to the dashboard as the option `sources` |
+| `roadstyle:sources` | each road role of the style (`simple`, `slots`, `arrows`, `decks`, `shadows`) with its source and its source layer (null for GeoJSON), from its final layers (`contract::describe`; after tiling the tile layers); the page gives it to the dashboard as the option `sources` |
 | `roadstyle:arrows` | `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null, from the final layers; the page's option `arrows` |
 | `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
 | `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
@@ -52,7 +52,7 @@ host gives them to `rsDashboard` itself.
 | `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]`; a base-map layer also has `kinds` (`[[kind, count], ...]`, most first) and, with a 3D layer, `extrude` (that layer's id) |
 | `tunnel` | the tunnel look: `{layers, dash, casing, strength, palette, palettes, ratio, bg, steps, ratios, toward, towards, to, control}` |
 | `fill_layers` | the road fill layers that the page recolours |
-| `pick` | the layers that a road is picked on (clicked, hovered): `roads-simple` (the full look: its fill layers) and the 3D decks' tops (`roads-bridge-decks`), not their casing. A caller's items are in `overlays` |
+| `pick` | the layers that a road is picked on (clicked, hovered): `roads-simple` and the 3D decks' tops (`roads-bridge-decks`), not their casing. A caller's items are in `overlays` |
 | `road_fill` | `{on, paint}`: the road fill switch and each fill layer's opacity without it |
 | `items` | `{label, popup, layer}` of render's `items=`, or null |
 | `edge_id_col` | the roads' id column |
@@ -132,8 +132,6 @@ such `state` block) has no step of its own (`core.js`, `_useState`).
 | Name | Type | Start value | Values | Read by | Set by | API |
 |---|---|---|---|---|---|---|
 | `rs_co` | integer | `color_active` | 0 to the number of options - 1 | the fill pieces and items (`match` on the option) | Colour by menu, views | `rsSetColorField`; `rs:colorchange` |
-| `rs_colors` | object: edge index to color | `{}` | colors | the full look only (`simple=False`): the fills, items, end caps, attached overlays (`_painted`). The simple look reads the feature state `rs_c` | host page | `rsColor`; `rs:colorchange` |
-| `rs_base` | object: edge index to color | `{}` | colors | the full look only: the same, under `rs_colors` | host page | `rsColorBase` |
 | `rs_top` | list of rows | `[]` | the rows that `rsColor` painted | the simple look's sort key: a painted road is drawn over the others of its level (the colour is the feature state `rs_c` of the row) | host page | `rsColor` |
 | `rs_fill_on` | bool | `road_fill` | | the fill pieces' opacity | road fill switch, views | `rsSetRoadFill`; `rs:roadfillchange` |
 | `rs_ov_<i>` | object: feature id to color | `{}` | colors | the paint of overlay `i` | host page | `rsColor(..., overlay)` |
@@ -156,7 +154,7 @@ when a layer reads it.
 | Names | Meaning | Written by | Read by | Kind | Replaced by |
 |---|---|---|---|---|---|
 | `__rs_fill`, `__rs_w`, `__rs_op`, `__rs_dash`, `__rs_casing`, `__rs_cw`, `__rs_cop`, `__rs_class` | the class style of the edge: fill color, width, opacity, dash, casing color, casing width, casing opacity, class | `stylers.bake_props`, `roads.rs` | engine layers, `color.js` (`__rs_fill`), Leaflet | dashboard (`__rs_fill`), Leaflet | `RoadDraw.class` + the look; the layer expressions read the class |
-| `__rs_fill__<i>` (`__rs_fill__1`, ...), `__rs_fill@<palette>`, `__rs_fill__b`, `__rs_color` | the fill of color option `i`, of a palette of a view, the twin's fill (end caps), the `color_table` column | `bake_color_options`, `_merge_palettes`, `render.py` | engine, `color.js` | dashboard (`__rs_fill__<i>`) | `RoadDraw.look` paint columns (task 1) |
+| `__rs_fill__<i>` (`__rs_fill__1`, ...), `__rs_fill@<palette>`, `__rs_color` | the fill of color option `i`, of a palette of a view, the `color_table` column | `simple.rs`, `render.py` | engine, `color.js` | dashboard (`__rs_fill__<i>`) | `RoadDraw.look` paint columns (task 1) |
 | `__rs_cl`, `__rs_fl`, `__rs_cs`, `__rs_ce` | the casing (main), fill, casing start and casing end numbers | `_mark_levels`, `roads.rs` | engine | internal | `RoadDraw.levels` |
 | `__rs_hs`, `__rs_he`, `__rs_cap`, `__rs_cap0`, `__rs_cap1`, `__rs_split` | the head lengths, the cap of both ends, of each end, two different ends | `render` (the head columns), `_mark_caps` | engine | internal | `RoadDraw.ends` |
 | `__rs_band` | always 0 since the positions | `_mark_levels` | engine | internal | removed |
@@ -167,7 +165,7 @@ when a layer reads it.
 | `__rs_kept_` (the prefix of `__rs_kept_<column>`) | the output name of an input column with one of the four level names (casing_start, casing_level, casing_end, fill_level) when the engine computes the levels: the computed ones take the four names | `road.rs` (`Roads::new`, `kept`) | the outputs | internal | |
 | `__rs_edge`, `__rs_edge2`, `__rs_edges` | the edge label: the road's key (`RoadKey`, `table << 32 \| row`; the row for one table), the twin's key, the keys of a shadow or a deck | every generator | `core.js`, `filter.js`, `select.js`, `arrows.js`, the level editor | dashboard | the edge label of each piece (render model) |
 | `__rs_k`, `__rs_s` | the kind of piece (0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item) and its sort key | `_simple_pieces`, `simple.rs` | engine, `core.js`, `svspot.js` (`__rs_k`) | dashboard (`__rs_k`) | `DrawKey` |
-| `__rs_main`, `__rs_seam`, `__rs_lap`, `__rs_stub`, `__rs_nocase` | the main casing piece, a seam, a lap, an end stub, an end cap with no casing ring | `_casing_parts`, `simple.rs`, `_twin_ends` | engine | internal | the piece generators |
+| `__rs_main`, `__rs_seam`, `__rs_lap`, `__rs_stub` | the main casing piece, a seam, a lap, an end stub | `simple.rs` | engine | internal | the piece generators |
 | `__rs_wm`, `__rs_cm`, `__rs_twm` | the width, the casing and the pair width in metres (over cos of the latitude) | `_mark_width_m` | engine | internal | `RoadDraw.look.width_m` |
 | `__rs_ord`, `__rs_ov`, `__rs_item`, `__rs_ic`, `__rs_iwm`, `__rs_iom`, `__rs_imz`, `__rs_pick` | an attached object's order, its overlay, its row, color, width and offset in metres, minzoom, and "pick it as itself" | `_edge_overlay`, `_item_pieces`, `_road_items` | engine, `select.js` (`__rs_pick`) | dashboard (`__rs_pick`) | `Attachment` |
 | `__rs_arw` | the number of an arrow slot (for the export's thinning) | `_annotation_slots`, `slots.rs` | engine | internal | the slot attachments |

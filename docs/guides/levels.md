@@ -76,7 +76,7 @@ the map. The order wishes that it did not keep are in `levels_orders_not_kept`.
 
 - **Python** (the default) solves each stage as an integer program with HiGHS. A stage that needs more than `time_limit` (60 s)
   keeps the best answer that it found, with a warning.
-- **Rust** (`engine="rust"`, or `ROADSTYLE_ENGINE=rust`) solves each stage as a minimum-cost flow: each rule "number A ≤ number B + w"
+- **Rust** (the default; `engine="rust"`, or `ROADSTYLE_ENGINE=rust`) solves each stage as a minimum-cost flow: each rule "number A ≤ number B + w"
   is one arc of a graph. It checks every hard rule of its answer before it gives it, and it has no time limit. Monaco (13,298 edges)
   takes 0.2 s, Tartu (64,828 edges) 3.1 s.
 

@@ -48,7 +48,7 @@ The engine runs in one of two places:
 
 | Case | Where the engine runs | What runs in the browser |
 |---|---|---|
-| Python: `render_edges(engine="rust")` | natively, in the Python process, before the page exists | MapLibre and the dashboard; the style is inside the HTML file |
+| Python: `render_edges(...)` | natively, in the Python process, before the page exists | MapLibre and the dashboard; the style is inside the HTML file |
 | The browser: the WebAssembly package | in the page or in a worker. `roadstyle_wasm.js` (made by `wasm-bindgen`) lets JavaScript call `makeStyle` and `new Tiler` as normal functions | the engine, MapLibre and the dashboard. MapLibre gets each tile from `tiler.tile(z, x, y)` through `maplibregl.addProtocol("rs", ...)` |
 
 The Python page and the browser pages use the same MapLibre version (5.24) and the same dashboard files.
@@ -395,7 +395,7 @@ one HTML file.
 
 | Stage | Crate | Input → output | Public call today |
 |---|---|---|---|
-| 1. The style and the sources | `roadstyle-engine` | the roads (GeoParquet) and the look → the style, its sources (the pieces of the roads) and the `roadstyle:*` metadata | Rust `make_style`, `make_parts`; Python `export_inline(engine="rust")`; the browser `makeStyle` |
+| 1. The style and the sources | `roadstyle-engine` | the roads (GeoParquet) and the look → the style, its sources (the pieces of the roads) and the `roadstyle:*` metadata | Rust `make_style`, `make_parts`; Python `export_inline(...)`; the browser `makeStyle` |
 | 2. The tiles | `roadstyle-tiles` | the sources → vector tiles on request, or one PMTiles archive | Rust `Tiles`; in Python and in the browser only with stage 1 (`export_style`, `tiles=True`, `new Tiler`) |
 | 3. The page | `roadstyle::page` | the style, the data and the options of the dashboard → one HTML file | Rust `page::make_page`; the browser `makePage`; Python through `render_edges` |
 | The one call | `roadstyle` (facade) | the roads and the look → the output of the way you ask for | Rust `make_tiled`; Python `render_edges`, `export_style`; the browser `new Tiler` |
@@ -586,7 +586,7 @@ How to use these files in a page: [Use roadstyle in the browser](browser.md).
 
 A Rust output is correct only when it is the same as the Python output: byte for byte for the style and the page, the same
 features when decoded for the tiles. A difference is a bug in the engine, or an item in a list with its cause and a decision
-([Parity and speed](parity.md#the-differences-that-stay)). Each module has golden tests from the Python engine.
+(the Python engine has been removed). Each module has golden tests from the Python engine.
 
 ## What stays in Python
 
@@ -647,4 +647,4 @@ flowchart TB
 
 *Green: done. Yellow: partly done. Grey, dashed: open.*
 
-**See also:** [Keywords by engine](keywords.md) · [Parity and speed](parity.md) · [Build from source](build.md)
+**See also:** [Build from source](build.md)

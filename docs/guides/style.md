@@ -81,8 +81,7 @@ rs.render_edges(edges, view_3d=True)                         # CLI: --view-3d
 
 ## Bridges and tunnels in 2D
 
-- A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`). In the full look the shadow is
-  shifted down and right. In simple mode, the default, it is blurred evenly around the bridge. Each part of the bridge casts it at its
+- A **bridge** has a slate casing (`bridge_casing_color`) and a soft **shadow** (`bridge_shadow`). The shadow is blurred evenly around the bridge. Each part of the bridge casts it at its
   own casing number, so it lies on what the bridge crosses, never on its own road. Hiding the bridges hides it too.
 - A **tunnel** fades toward a colour (`tunnel_toward`, default Sand): its fill, names, arrows and attached items. `tunnel_strength`
   (default 60) sets how much: 0 gives the normal colours, 100 the full tunnel colours. Its casing has two dashed colours

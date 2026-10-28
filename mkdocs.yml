@@ -72,18 +72,14 @@ nav:
       - rust/index.md
       - "Tutorial: your first map": rust/first-map.md
       - How-to guides:
-          - Switch the engine: rust/switch-engine.md
           - Use it in the browser: rust/browser.md
           - Tiles and PMTiles: rust/tiles.md
           - The roadstyle program: rust/cli.md
           - Build from source: rust/build.md
-      - Reference:
-          - Keywords by engine: rust/keywords.md
       - Explanation:
           - Architecture of the Rust version: rust/architecture.md
           - How a map is drawn: rust/drawing.md
           - How the levels are solved: rust/levels-solver.md
-          - Parity and speed: rust/parity.md
   - Studio: studio.md
 
 # Old pages; keep their URLs working.

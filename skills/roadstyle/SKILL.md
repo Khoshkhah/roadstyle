@@ -68,8 +68,7 @@ m.save("map.html")                        # m.html is the page as a string
 - Other useful keywords: `include=[...]` / `exclude=[...]` (road classes), `view_3d=True`,
   `tiles=True` (above ~50k edges), `boundary=geojson` (dashed outline),
   `overlays=[rs.Overlay(gdf, placement="under"|"over", label=..., popup=[...])]`, attached to edges: `rs.Overlay(gdf, edge_col="edge_id", order_col="order")` (drawn at its edge's fill number, by order; a click selects its road, or with `select="item"` the item itself: `rs:select` `detail.item` plus the road), look from a library's theme: `rs.Overlay(gdf, style="dashed")` with `settings={"config": {"overlays": {"styles": {...}}}}` (`width_m`, `dash`, `min_zoom`, kind `text`), `render_edges(road_fill=False)` (the road's casing without its fill),
-  `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`, `simple=` (default `True`: one road layer, fast on a big page;
-  names and arrows above all roads, no twin end caps; `simple=False` is the full look; both work with `tiles=True`).
+  `road_popup="panel"` (docked read-out instead of a popup), `arrows=`, `labels=`, (one road layer: fast on a big page; names and arrows above all roads; it works with `tiles=True`; `simple=` and `engine=` are removed).
 - The look is a profile (widths, zooms, sizes; bundled `default`, `highsat`) and a palette (colors; `amber`, `carto`, `highsat`,
   `mono`), picked by name: `render_edges(profile="highsat", palette="highsat")`. Own ones: `./profiles/<name>.yaml`,
   `./palettes/<name>.yaml`, stating only what changes. Old `settings={"config": {...}}` style keys warn.

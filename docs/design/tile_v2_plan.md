@@ -202,7 +202,7 @@ Sources:
 | | Decision | Result |
 |---|---|---|
 | D1 | 4 MapLibre workers, as a small page PR now | yes (the page session does it) |
-| D0 | The Python engine's road style and tiles stop; the binding gives the Rust output (the P7 switch) | yes; SonoFlow's `rs.setData` path ships first |
+| D0 | The Python engine's road style and tiles stop; the binding gives the Rust output (the P7 switch) | yes; SonoFlow's `rs.setData` path ships first. Done on branch `design-rust-only` (CHANGELOG, Unreleased) |
 | D5 | `export_style` without `roads`; the popup reads a props file by row | yes |
 | D9 | The id as a dense global row under 2^32 for more than one road table | yes, before the first planet build |
 | D2 | Phase 1's text form | out, with phase 1: "simple code and a good view are important; if it does not have much effect, leave it" |

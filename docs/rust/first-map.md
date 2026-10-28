@@ -1,7 +1,6 @@
 # Your first map with the Rust engine
 
-<p class="lead">In this tutorial, we draw the roads of Monaco with the Rust engine. Then we compare the page with the page of the
-Python engine, and we measure the two engines.</p>
+<p class="lead">In this tutorial, we draw the roads of Monaco with the Rust engine and put them in vector tiles.</p>
 
 You need Python 3.10 or newer and a connection to the internet (osmnx gets the roads from OpenStreetMap).
 
@@ -35,7 +34,7 @@ OpenStreetMap changes.
 Add these lines to the file:
 
 ```python
-m = rs.render_edges(edges, name="Monaco", engine="rust")
+m = rs.render_edges(edges, name="Monaco")
 m.save("monaco_rust.html")
 ```
 
@@ -47,40 +46,12 @@ bridges over tunnels. Move the mouse over a road: the road glows. Click a road: 
     "API KEY REQUIRED". The roads are not affected. To use a base map with no key, add `basemap="osm"`, or read
     [Base maps and API keys](../reference/settings.md#base-maps-api-keys).
 
-## Compare with the Python engine
-
-The default engine (Python) makes the same map: `rs.render_edges(edges, name="Monaco")`. The two pages have the same style, the same
-dashboard options and the same data, as JSON values. Their JSON text is not the same: the Rust engine writes `serde_json`'s compact
-text. So compare values, not text, as `tests/test_engine_parity.py` does (`_same_page`).
-
-## Measure the two engines
-
-Add these lines:
-
-```python
-import time
-
-for engine in ("python", "rust"):
-    t = time.perf_counter()
-    rs.render_edges(edges, name="Monaco", engine=engine)
-    print(engine, f"{time.perf_counter() - t:.1f} s")
-```
-
-Run the file. On the machine of [Parity and speed](parity.md) it writes this (the times change a little from run to run):
-
-```text
-python 0.9 s
-rust 0.3 s
-```
-
-Monaco is small. The difference is larger on a large area: Tartu (64,828 roads) takes 19.5 s with Python and 6.1 s with Rust.
-
 ## Put the roads in vector tiles
 
 For a large network, the page can keep the roads as vector tiles (an embedded PMTiles archive). Add these lines:
 
 ```python
-t = rs.render_edges(edges, name="Monaco", engine="rust", tiles=True)
+t = rs.render_edges(edges, name="Monaco", tiles=True)
 t.save("monaco_tiles.html")
 ```
 
@@ -90,9 +61,6 @@ MapLibre decodes only the tiles that it shows, so a large network opens fast. Th
 
 ## What we did
 
-We drew a map with the Rust engine, we saw that its page is the same as the page of the Python engine, and we measured the two
-engines. Next:
+We drew a map with the Rust engine and put its roads in vector tiles. Next:
 
-- [Switch the engine](switch-engine.md) for a whole program, with `ROADSTYLE_ENGINE`.
-- [Keywords by engine](keywords.md): what the Rust engine does and what stays in Python.
 - [Use roadstyle in the browser](browser.md): the same engine with no Python.

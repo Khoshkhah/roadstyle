@@ -18,12 +18,11 @@ To select a way, see [Three choices for the road data](drawing.md#three-choices-
 ## A. Put the tiles in one HTML file
 
 ```python
-rs.render_edges(edges, engine="rust", tiles=True).save("map.html")
+rs.render_edges(edges, tiles=True).save("map.html")
 ```
 
 The page has a PMTiles archive inside it, and it opens from disk with no server. The browser loads the whole file with the page;
-MapLibre then decodes only the tiles in view. The Rust engine writes the archive itself, so the `tiles` extra
-(`roadstyle[tiles]`) is not necessary.
+MapLibre then decodes only the tiles in view. The Rust engine writes the archive itself.
 
 ## B. Put the tiles on a server
 
@@ -37,7 +36,7 @@ The tiles can be in one of two forms. In both forms the map downloads only the t
 ### As a folder of XYZ tiles
 
 ```python
-rs.export_style(edges, "monaco_xyz", base_url="https://example.org/monaco", engine="rust")
+rs.export_style(edges, "monaco_xyz", base_url="https://example.org/monaco")
 ```
 
 The tiles are one file each: `tiles/<z>/<x>/<y>.pbf`. The map gets each tile with one request for its file. Every web server and
@@ -46,7 +45,7 @@ every map app can use this form.
 ### As one PMTiles file
 
 ```python
-rs.export_style(edges, "monaco_pm", base_url="https://example.org/monaco", format="pmtiles", engine="rust")
+rs.export_style(edges, "monaco_pm", base_url="https://example.org/monaco", format="pmtiles")
 ```
 
 All tiles are in one file, `roads.pmtiles`, with an index at its start. The map reads the index, then gets each tile with a

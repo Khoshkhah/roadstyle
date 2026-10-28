@@ -60,7 +60,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 | `--no-labels` | `labels=False` | no street names |
 | `--no-filter` | `filter_control=False` | no road-class filter panel |
 | `--no-basemap-switcher` | `basemap_switcher=False` | no base-map button |
-| `--tiles` | `tiles=True` | embedded PMTiles, for big networks (needs `roadstyle[tiles]`) |
+| `--tiles` | `tiles=True` | embedded PMTiles, for big networks |
 | `--no-compress` | `compress=False` | plain JSON data instead of gzip |
 
 ## `--page`

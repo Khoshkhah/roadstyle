@@ -30,13 +30,12 @@ Below ~10⁴ edges this is the simplest and just as fast as the options below.
 
 ## Towards ~10⁵ edges: `tiles=True`
 
-`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file. Both looks work with it: simple mode (the default) puts its road pieces in the tileset as one tile layer, `simple=False` its casing pieces and end caps.
+`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file. The road pieces are in the tileset as one tile layer.
 
 - The browser parses only the tiles in view, so a ~100k-edge map opens in seconds, not ~10 s.
 - Low zooms carry simplified geometry.
 - The JavaScript API, popups and selection work exactly as with inline data.
-- The file is somewhat larger and the Python build is slower (about a minute at ~100k edges).
-- Needs the `tiles` extra: `pip install "roadstyle[tiles]"`.
+- The file is somewhat larger.
 
 ## The drawing order of a big network
 

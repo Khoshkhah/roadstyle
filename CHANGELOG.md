@@ -6,6 +6,20 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Removed
+- **Python's own road-style and tile engine** (decision D0, 2026-10-27). The Rust engine is the only engine of the web page, the style,
+  the tiles and the exports. `render_edges(backend="web")`, `export_style`, `export_inline`, `export_look` and `export_geojson` call it.
+  Python is only the binding. Removed: the Python page and style code of `roadstyle.render_web` (what stays: `WebMap` and a few
+  helpers that `levels` and the folium and lonboard backends use), `roadstyle.tiles`, the Python level editor (`roadstyle-levels
+  edit` runs the Rust editor only; `--engine` and `--items` of that command are gone), and the extra `tiles`.
+- **`simple=False`, the full look.** The simple look is the only look. `simple=` is now an error, in Python and in the Rust engine.
+- **The keyword `engine=`** of `render_edges`, `export_style`, `export_inline` and `export_look`, and the environment variable
+  `ROADSTYLE_ENGINE` for them. `engine=` is now an error. The drawing-order solver (`compute_levels`, `solve_levels`, `make_area`)
+  keeps `engine=`; its default is now `"rust"`.
+- **What a Python user must change:** remove `simple=` and `engine=` from calls; use `color_by`, `colors`, `cmap`, `vmin`, `vmax` or
+  `width_by` in place of a `Styler` object (`style=`) for the web page; `pip install roadstyle` builds or loads the Rust module
+  (`roadstyle._rust`), so a source install needs a Rust toolchain.
+
 ### Fixed
 - **A casing gap on a tile edge** (2026-10-27): a wide road near the edge of a tile lost its casing in the next tile (Burnaby, z19.6).
   MapLibre draws each tile only inside its own edges, and the tiles had a buffer of 80 units (10 px) and only the features whose box

@@ -101,8 +101,7 @@ positions. A file without the positions is an error that says how to save them. 
 | `sprite.json`, `sprite.png` (and `@2x`) | the one-way arrow |
 
 - `base_url` is the URL where the folder is served. The server must send `Access-Control-Allow-Origin: *`.
-- Other keywords go to `render_edges` (`profile`, `palette`, `simple`, ...). `simple=False` (one layer per drawing position)
-  draws best in RustGIS, which reads no `line-sort-key`.
+- Other keywords go to `render_edges` (`profile`, `palette`, ...).
 - An app has no slider or menu: the page state (tunnel look, colour option) is baked at its start values.
 
 **GeoLibre** (web or desktop), with the plugin in `geolibre-plugin/` on the branch `geolibre` of this repository (not on `main`: it is the plugin's own branch):

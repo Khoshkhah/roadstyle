@@ -34,7 +34,7 @@ pip install "roadstyle[numeric,tiles]"   # extras combine; "roadstyle[all]" take
     The latest unreleased version without a clone:
     `pip install "roadstyle[all] @ git+https://github.com/Khoshkhah/roadstyle.git"`.
 
-    An install from the source (a clone or git) builds roadstyle's Rust engine (`engine="rust"`) with maturin, so it needs a Rust
+    An install from the source (a clone or git) builds roadstyle's Rust engine with maturin, so it needs a Rust
     toolchain ([rustup](https://rustup.rs)). The wheels on PyPI have the engine in them. To work on the engine without an install,
     use `PYTHONPATH=src` and build the module with `python rust/roadstyle-py/build.py`.
 

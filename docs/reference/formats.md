@@ -38,7 +38,7 @@ value.
 | any other column | any | no | | in the popup, and in `rs.query` |
 
 **The Rust engine** reads the roads as GeoParquet: the geometry as WKB in a column `geometry`, in EPSG:4326, and the columns above
-by the names that the keywords give. From Python, `render_edges(engine="rust")` writes this file for you. In the browser, write
+by the names that the keywords give. From Python, `render_edges` writes this file for you. In the browser, write
 it with GeoPandas (`rs.as_edges(edges).gdf.to_parquet(path, index=False)`), or with `writeRoads` from a duckOSM file.
 
 **The columns of `writeRoads`** (`rust/roadstyle-wasm/js/roads_sql.js`), one row for each edge of a duckOSM file:
@@ -224,7 +224,7 @@ are `render_edges`' keywords.
 
 The rendering gives three outputs: **the MapLibre style** (the rules), **the road data** (the pieces of the roads with their
 values) and, with `render_edges`, **the page** that holds both. The examples below come from Monaco (849 drive edges from osmnx,
-simple mode, `view_3d=True`), made with `rs.export_inline(edges, engine="rust")` on 2026-10-23.
+simple mode, `view_3d=True`), made with `rs.export_inline(edges)` on 2026-10-23.
 
 ### The output of each way
 
@@ -331,7 +331,6 @@ these is a layer in its tiles (a layer's `source-layer`).
 | `slots` | place of a street name or a one-way arrow along a road | 646 | `name`, `oneway`, `slot`, `rank`, `lvl`, `__rs_edge` |
 | `decks` | part of a 3D bridge deck (only with `view_3d=True`) | 588 | `__rs_height`, `__rs_base`, `__rs_edges` |
 
-In the full look (`simple=False`), the sources `casings`, `halves` and `shadows` take the place of `simple`.
 
 #### Its layers
 
@@ -346,7 +345,7 @@ The Monaco style has 7 layers, in this drawing order (the first is at the bottom
 | `roads-highlight` | line | `roads` | the glow of a hovered or selected road. Hidden in simple mode, where the pieces of `roads-simple` glow through their feature state |
 | `roads-deck-casing`, `roads-bridge-decks` | fill-extrusion | `decks` | the 3D bridge decks |
 
-In the full look, one casing layer and one fill layer for each drawing position take the place of `roads-simple`. Each layer has
+Each layer has
 `metadata["roadstyle:group"]`: `roads`, or the label of an overlay for the layers of an `Overlay`.
 
 #### The rules in a layer

@@ -1,22 +1,12 @@
 # The Rust engine
 
-<p class="lead">roadstyle 0.25 has a second engine, written in Rust. It makes the same maps as the Python engine, 3 to 30 times faster on a large area.</p>
-
-!!! warning "Experimental"
-    The Rust engine is experimental in 0.25. The Python API that selects it (`engine="rust"`, `ROADSTYLE_ENGINE`) is stable.
-    The engine's inside, the `roadstyle:*` metadata in the style and the `__rs_*` property names can change in the next
-    versions. The default engine stays Python.
+<p class="lead">roadstyle has one engine, written in Rust. Python is only a thin binding to it.</p>
 
 The Rust engine makes the style of a map, its vector tiles, the drawing levels and the HTML page. It is in the roadstyle wheel
-on PyPI, so `pip install roadstyle` gives you both engines. The default engine is Python. You select the Rust engine for each
-call or for the whole process:
+on PyPI, so `pip install roadstyle` gives it to you. A source install needs a Rust toolchain.
 
 ```python
-rs.render_edges(edges, engine="rust")     # one call
-```
-
-```bash
-export ROADSTYLE_ENGINE=rust              # every call in this process
+rs.render_edges(edges)
 ```
 
 The same engine is also a WebAssembly package for the browser, and a set of Rust crates.
@@ -27,7 +17,7 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     ---
 
-    Draw Monaco with the Rust engine, compare it with the Python engine and measure the time.
+    Draw Monaco and put its roads in vector tiles.
 
     [:octicons-arrow-right-24: Your first map with the Rust engine](first-map.md)
 
@@ -35,7 +25,6 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     ---
 
-    [Switch the engine](switch-engine.md) ·
     [Use roadstyle in the browser](browser.md) ·
     [Make tiles and PMTiles](tiles.md) ·
     [Build from source](build.md)
@@ -44,7 +33,6 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     ---
 
-    [Keywords by engine](keywords.md) ·
     [The `rs` object](../reference/javascript.md#the-rs-object) ·
     [Interaction contract](../reference/contract.md) ·
     [Inputs and outputs](../reference/formats.md)
@@ -55,18 +43,14 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     [Architecture of the Rust version](architecture.md) ·
     [How a map is drawn](drawing.md) ·
-    [How the levels are solved](levels-solver.md) ·
-    [Parity and speed](parity.md)
+    [How the levels are solved](levels-solver.md)
 
 </div>
 
-## When to use it
+## What it is good for
 
-- **Large networks.** On Tartu (64,828 roads) the page takes 6.1 s with Rust and 19.5 s with Python. With `tiles=True` it takes
-  13.4 s and 137.4 s, and a folder of tiles (`export_style`) 4.6 s and 152.0 s ([Parity and speed](parity.md#speed)).
-- **Nightly pages.** The output is the same map as the Python output (the same style, options and data), so you can change the
-  engine without a change to your pages.
+- **Large networks.** On Tartu (64,828 roads) the page takes 6.1 s. With `tiles=True` it takes 13.4 s.
+- **Nightly pages.** The output is the same for the same input: the same style, options and data.
 - **The browser.** A page can make the style and the tiles itself, from a duckOSM file or a GeoParquet file, with no Python.
 
-The Rust engine does not do everything that the Python engine does. For example, the `folium` and `lonboard` backends and a
-`Styler` object (`style=`) stay in Python. [Keywords by engine](keywords.md) gives the state of each keyword.
+The `folium` and `lonboard` backends are not part of the engine: they draw with Python. A `Styler` object (`style=`) is for them only.

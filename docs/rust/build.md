@@ -122,4 +122,4 @@ cd rust
 cargo doc --no-deps --open
 ```
 
-**See also:** [Architecture of the Rust version](architecture.md) · [Parity and speed](parity.md)
+**See also:** [Architecture of the Rust version](architecture.md)
