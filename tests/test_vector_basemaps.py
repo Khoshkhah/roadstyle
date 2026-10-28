@@ -16,7 +16,7 @@ def test_openfreemap_is_registered_and_offered():
 
 def test_page_options_carry_the_style_url():
     from roadstyle.render_web import _page_basemaps
-    _, bms, _ = _page_basemaps(None, ["osm", "ofm_liberty"], None, True)
+    _, bms, _ = _page_basemaps("osm", ["osm", "ofm_liberty"], None, True)
     assert [b.get("style_url") for b in bms] == [None, "https://tiles.openfreemap.org/styles/liberty"]
 
 
