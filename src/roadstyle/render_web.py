@@ -2766,7 +2766,7 @@ def _page_basemaps(basemap, basemaps, api_key, basemap_switcher):
     # maxzoom + attr: switching rebuilds the raster source, whose maxzoom is fixed at creation
     bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b),
             "maxzoom": b.maxzoom, "attr": b.attr, **({"style_url": b.style_url} if getattr(b, "style_url", None) else {}),
-            "swatch": getattr(b, "swatch", "") or _bg_color(b), "group": getattr(b, "group", ""), "title": getattr(b, "title", "") or b.label,
+            "swatch": (list(b.swatch) if isinstance(getattr(b, "swatch", ""), tuple) else (getattr(b, "swatch", "") or _bg_color(b))), "group": getattr(b, "group", ""), "title": getattr(b, "title", "") or b.label,
             "order": DEFAULT_SWITCHER.index(b.key) if b.key in DEFAULT_SWITCHER else 99,
             **({"dark": b.dark} if getattr(b, "dark", None) else {}), "twin": any(getattr(x, "dark", None) == b.key for x in _ALL_BASEMAPS.values())}
            for b in bms_list]

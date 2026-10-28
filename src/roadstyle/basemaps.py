@@ -131,7 +131,7 @@ class Basemap:
     #: the key of the dark twin of this map: the box lists the pair as one entry that follows the page's theme
     dark: str | None = None
     #: the colour of the map's swatch in the base-map box (any CSS background); empty: the map's `bg`
-    swatch: str = ""
+    swatch: "str | tuple[str, str, str]" = ""
 
 
 # NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
@@ -214,9 +214,11 @@ _MENU = [("ofm_liberty", "OpenFreeMap", "OpenFreeMap Liberty"), ("ofm_bright", "
          ("blank", "Blank", "Blank"), ("positron", "CARTO", "CARTO")]
 _TWINS = {"esri_gray": "esri_dark_gray", "blank": "blank_dark", "positron": "dark_matter"}
 _KEYED = {"positron": "carto"}                 # the maps that need a key, and the provider of the key
-_SWATCH = {"ofm_liberty": "#f2efe9", "ofm_bright": "#f8f4f0", "ofm_positron": "#e8e8e8",
-           "osm": "linear-gradient(135deg,#f2efe9 0 55%,#f4c542 55% 70%,#f2efe9 70%)", "esri_gray": "#e4e4e4", "esri_street": "#e9e5dc",
-           "satellite": "#3b4a32", "blank": "#ffffff", "blank_dark": "#14181d", "positron": "#fbf8f3", "dark_matter": "#0b0b0b", "esri_dark_gray": "#3a3f45"}
+# (land, road, water): the swatch of a map in the base-map box is drawn in CSS from these three colours; a plain colour is one flat swatch
+_SWATCH = {"ofm_liberty": ("#f2efe9", "#ffe16b", "#a0c8f0"), "ofm_bright": ("#f8f4f0", "#fff6b3", "#a0c8f0"), "ofm_positron": ("#e8e8e8", "#ffffff", "#cdd2d4"),
+           "osm": ("#f2efe9", "#f4c542", "#aad3df"), "esri_gray": ("#e4e4e4", "#ffffff", "#c8d3dc"), "esri_street": ("#e9e5dc", "#ffffff", "#bfd9e8"),
+           "satellite": ("#3b4a32", "#8a8f84", "#1d3b4f"), "blank": "#ffffff", "blank_dark": "#14181d", "positron": ("#fbf8f3", "#ffffff", "#d4dadc"),
+           "dark_matter": ("#0b0b0b", "#2c2c2c", "#1f2a33"), "esri_dark_gray": ("#3a3f45", "#6b7078", "#2a3138")}
 for _k, _g, _t in _MENU:
     BASEMAPS[_k] = dataclasses.replace(BASEMAPS[_k], group=_g, title=_t, dark=_TWINS.get(_k))
 for _k, _s in _SWATCH.items():

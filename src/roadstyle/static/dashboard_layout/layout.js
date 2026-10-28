@@ -114,12 +114,15 @@
         const ls = k=>{ try{ return localStorage.getItem("rs-top:"+k); }catch(e){ return null; } }, ss = (k, v)=>{ try{ localStorage.setItem("rs-top:"+k, v ? "1" : "0"); }catch(e){} };
         const isDark = ()=>root.dataset.rsTheme === "dark";
         const byKey = k=>bms.findIndex(b=>b.key === k);
+        // a swatch is [land, road, water]: the land colour, a diagonal road stroke, and a water triangle in the lower right corner (drawn in CSS)
+        const swatchCss = b=>{ const s = b.swatch; if(!Array.isArray(s)) return s || b.bg;
+          return "linear-gradient(to top left," + s[2] + " 0 32%,transparent 32%)," + "linear-gradient(135deg,transparent 0 40%," + s[1] + " 40% 54%,transparent 54%)," + s[0]; };
         let current = (bms[0] || {}).key;
         menu.appendChild(el("div", "rs-bm-h", "Base map"));
         const rows = [];
         bms.map((b, i)=>[b, i]).filter(([b])=>!b.twin).sort((x, y)=>(x[0].order ?? 99) - (y[0].order ?? 99) || x[1] - y[1]).forEach(([b, i])=>{
           const lab = el("label", "rs-bm-row"), r = el("input"); r.type = "radio"; r.name = "rs-bm"; r.value = b.key;
-          const sw = el("span", "rs-bm-sw"); sw.style.background = b.swatch || b.bg; sw.dataset.key = b.key;
+          const sw = el("span", "rs-bm-sw"); sw.style.background = swatchCss(b); sw.dataset.key = b.key;
           lab.append(r, sw, el("span", "rs-bm-n", b.title || b.label)); lab.dataset.key = b.key;
           r.onchange = ()=>{ window.rsSetBasemap(b.dark && isDark() ? b.dark : b.key); };
           menu.appendChild(lab); rows.push([b, r]);
@@ -162,7 +165,7 @@
           if(dark && b.dark) window.rsSetBasemap(b.dark);
           else if(!dark){ const light = bms.find(x=>x.dark === current); if(light) window.rsSetBasemap(light.key); } }).observe(sbT, {attributes:true, attributeFilter:["data-theme"]});
         // a map with a twin shows the swatch of the twin of the current theme
-        const swatches = ()=>{ rows.forEach(([b, r])=>{ const sw = r.parentElement.querySelector(".rs-bm-sw"), tw = b.dark && bms[byKey(b.dark)]; sw.style.background = (isDark() && tw ? tw.swatch || tw.bg : b.swatch || b.bg); }); };
+        const swatches = ()=>{ rows.forEach(([b, r])=>{ const sw = r.parentElement.querySelector(".rs-bm-sw"), tw = b.dark && bms[byKey(b.dark)]; sw.style.background = swatchCss(isDark() && tw ? tw : b); }); };
         new MutationObserver(()=>setTimeout(swatches, 0)).observe(root, {attributes:true, attributeFilter:["data-rs-theme"]}); swatches();
         mark(); apply();
         // the box opens inside the window: moved up or down by what it overhangs
