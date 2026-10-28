@@ -55,17 +55,42 @@ enum Kind {
     Gone,
 }
 
-/// The numbers are in a box of `steps + 1` values (roadstyle's `2 * max_level / margin`); `min_positions`: the span of the numbers is
-/// as small as possible.
-pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, Error> {
-    let n = rules.roads;
-    if n == 0 {
-        return Ok(Solved::default());
+type Arc = (usize, usize, i64, Kind);
+
+/// The column of the casing part `h` of road `r` (the road's fill is the column `r`).
+fn col(n: usize, r: usize, h: usize) -> usize {
+    n + 3 * r + h
+}
+
+/// The rules sorted and without doubles. A part that is a stack and a near rule is a stack.
+struct Cleaned {
+    lifts: Vec<(usize, usize, usize)>,
+    crossings: Vec<(usize, usize, usize)>,
+    orders: Vec<(usize, usize)>,
+    near: Vec<(usize, usize, usize)>,
+}
+
+fn sorted<T: Ord + Copy>(v: impl Iterator<Item = T>) -> Vec<T> {
+    let mut v: Vec<T> = v.collect();
+    v.sort_unstable();
+    v.dedup();
+    v
+}
+
+impl Cleaned {
+    fn new(rules: &Rules) -> Self {
+        let lifts = sorted(rules.lifts.iter().copied());
+        let near = sorted(rules.near.iter().copied().filter(|p| lifts.binary_search(p).is_err()));
+        Cleaned { lifts, crossings: sorted(rules.crossings.iter().copied()), orders: sorted(rules.orders.iter().copied()), near }
     }
-    let col = |r: usize, h: usize| n + 3 * r + h;
+}
+
+/// Every rule x_i - x_j <= w is an arc i -> j of cost w.
+fn rule_arcs(rules: &Rules, c: &Cleaned, steps: i64) -> Vec<Arc> {
+    let n = rules.roads;
+    let col = |r, h| col(n, r, h);
     let (hi, lo, z) = (4 * n, 4 * n + 1, 4 * n + 2);
-    // every rule x_i - x_j <= w is an arc i -> j of cost w
-    let mut arcs: Vec<(usize, usize, i64, Kind)> = Vec::new();
+    let mut arcs: Vec<Arc> = Vec::new();
     for r in 0..n {
         for h in 0..3 {
             arcs.push((col(r, h), r, 0, Kind::Hard)); // H1: a casing part not over its own fill
@@ -81,61 +106,40 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     }
     arcs.push((hi, z, steps, Kind::Hard)); // the box [0, steps]; z is 0
     arcs.push((z, lo, 0, Kind::Hard));
-    let mut lifts = rules.lifts.clone();
-    lifts.sort_unstable();
-    lifts.dedup();
-    let mut orders = rules.orders.clone();
-    orders.sort_unstable();
-    orders.dedup();
-    // a part that is a stack and a near rule is a stack
-    let mut near: Vec<(usize, usize, usize)> = rules
-        .near
-        .iter()
-        .copied()
-        .filter(|p| lifts.binary_search(p).is_err())
-        .collect();
-    near.sort_unstable();
-    near.dedup();
     for &(r, v) in &rules.fixed {
         for (c, x) in [col(r, 0), col(r, 1), col(r, 2), r].into_iter().zip(v) {
             arcs.push((c, z, x, Kind::Hard)); // x_c = x: x_c - x_z <= x and x_z - x_c <= -x
             arcs.push((z, c, -x, Kind::Hard));
         }
     }
-    for &(u, l, h) in &lifts {
+    for &(u, l, h) in &c.lifts {
         arcs.push((l, col(u, h), -1, Kind::Stack)); // H3: b_l + 1 <= a_(u, h)
     }
-    let mut crossings = rules.crossings.clone();
-    crossings.sort_unstable();
-    crossings.dedup();
-    for &(c, p, h) in &crossings {
-        arcs.push((p, col(c, h), -1, Kind::Crossing)); // b_p + 1 <= a_(c, h)
+    for &(cr, p, h) in &c.crossings {
+        arcs.push((p, col(cr, h), -1, Kind::Crossing)); // b_p + 1 <= a_(c, h)
     }
-    for &(u, l, h) in &near {
+    for &(u, l, h) in &c.near {
         arcs.push((l, col(u, h), -1, Kind::Near));
     }
-    for &(x, y) in &orders {
+    for &(x, y) in &c.orders {
         arcs.push((y, x, -1, Kind::Order)); // H4: b_y + 1 <= b_x
     }
-    let nodes = 4 * n + 3;
-    let mut pi = vec![0i64; nodes];
-    if !rules.fixed.is_empty() {
-        pi = potentials(&arcs, nodes)?; // the arcs of the fixed numbers have negative costs
-    }
-    let mut stages = [0i64; 5];
-    for (s, soft) in [Kind::Stack, Kind::Crossing, Kind::Order, Kind::Near]
-        .into_iter()
-        .enumerate()
-    {
+    arcs
+}
+
+/// The four soft stages, one after the other: each finds the least steps by which its rules are broken (`stages[0..4]`), then holds
+/// that answer for the next stage: a rule that is broken holds the other way, and one that is tight becomes an equality.
+fn soft_stages(arcs: &mut Vec<Arc>, nodes: usize, pi: &mut [i64], stages: &mut [i64; 5]) -> Result<(), Error> {
+    for (s, soft) in [Kind::Stack, Kind::Crossing, Kind::Order, Kind::Near].into_iter().enumerate() {
         if !arcs.iter().any(|a| a.3 == soft) {
             continue;
         }
-        let (g, idx) = network(&arcs, nodes, |k| match k {
+        let (g, idx) = network(arcs, nodes, |k| match k {
             Kind::Hard => Some(INF),
             k if k == soft => Some(1),
             _ => None,
         });
-        let flow = g.solve(&vec![0; nodes], &mut pi)?;
+        let flow = g.solve(&vec![0; nodes], pi)?;
         stages[s] = -(0..idx.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>(); // the value of the LP (duality)
         let mut more = Vec::new();
         for (e, &a) in idx.iter().enumerate() {
@@ -152,6 +156,26 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
         }
         arcs.extend(more);
     }
+    Ok(())
+}
+
+/// The numbers are in a box of `steps + 1` values (roadstyle's `2 * max_level / margin`); `min_positions`: the span of the numbers is
+/// as small as possible.
+pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, Error> {
+    let n = rules.roads;
+    if n == 0 {
+        return Ok(Solved::default());
+    }
+    let (hi, lo) = (4 * n, 4 * n + 1);
+    let c = Cleaned::new(rules);
+    let mut arcs = rule_arcs(rules, &c, steps);
+    let nodes = 4 * n + 3;
+    let mut pi = vec![0i64; nodes];
+    if !rules.fixed.is_empty() {
+        pi = potentials(&arcs, nodes)?; // the arcs of the fixed numbers have negative costs
+    }
+    let mut stages = [0i64; 5];
+    soft_stages(&mut arcs, nodes, &mut pi, &mut stages)?;
     // the cost: the sum of (b - a) over all casing parts, and a large weight w4 on the span H - L. The weight is larger
     // than any sum, so this is two steps: first the least span, then the least sum at that span. The least span is minus
     // the shortest distance from L to H in all the hard rules (also the rules through H, L and 0 that the stages made
@@ -167,7 +191,7 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     for r in 0..n {
         for h in 0..3 {
             supply[r] -= 1;
-            supply[col(r, h)] += 1;
+            supply[col(n, r, h)] += 1;
         }
     }
     let (g, _) = network(&arcs, nodes, |k| (k == Kind::Hard).then_some(INF));
@@ -176,42 +200,28 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     stages[4] = w4 * span - (0..g.from.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>();
     let x = least_numbers(&g, &flow, &pi);
     feasible(rules, &x, steps)?;
-    let parts = (0..n)
-        .map(|r| [x[col(r, 0)], x[col(r, 1)], x[col(r, 2)], x[r]])
-        .collect();
-    let given_up_parts: Vec<(usize, usize, usize)> = lifts
-        .iter()
-        .copied()
-        .filter(|&(u, l, h)| x[l] - x[col(u, h)] > -1)
-        .collect();
-    let mut given_up: Vec<(usize, usize)> =
-        given_up_parts.iter().map(|&(u, l, _)| (u, l)).collect();
+    Ok(report(n, &c, &x, stages))
+}
+
+/// The answer: the numbers of the parts and the rules that the numbers `x` do not keep.
+fn report(n: usize, c: &Cleaned, x: &[i64], stages: [i64; 5]) -> Solved {
+    let col = |r, h| col(n, r, h);
+    let parts = (0..n).map(|r| [x[col(r, 0)], x[col(r, 1)], x[col(r, 2)], x[r]]).collect();
+    let not_over = |&&(u, l, h): &&(usize, usize, usize)| x[l] - x[col(u, h)] > -1;
+    let given_up_parts: Vec<(usize, usize, usize)> = c.lifts.iter().filter(not_over).copied().collect();
+    let mut given_up: Vec<(usize, usize)> = given_up_parts.iter().map(|&(u, l, _)| (u, l)).collect();
     given_up.dedup();
-    let crossings_not_kept = crossings
-        .iter()
-        .copied()
-        .filter(|&(c, p, h)| x[p] - x[col(c, h)] > -1)
-        .collect();
-    let orders_not_kept = orders
-        .iter()
-        .copied()
-        .filter(|&(a, b)| x[b] - x[a] > -1)
-        .collect();
-    let near_not_kept = near
-        .iter()
-        .copied()
-        .filter(|&(u, l, h)| x[l] - x[col(u, h)] > -1)
-        .collect();
-    Ok(Solved {
+    Solved {
         parts,
         given_up,
         given_up_parts,
-        crossings_not_kept,
-        orders_not_kept,
-        near_not_kept,
+        crossings_not_kept: c.crossings.iter().filter(|&&(cr, p, h)| x[p] - x[col(cr, h)] > -1).copied().collect(),
+        orders_not_kept: c.orders.iter().filter(|&&(a, b)| x[b] - x[a] > -1).copied().collect(),
+        near_not_kept: c.near.iter().filter(not_over).copied().collect(),
         stages,
-    })
+    }
 }
+
 
 /// The check of an answer: every hard rule holds. Each casing part is not over its fill, the heads of two roads that meet are not
 /// over the other road's fill, the fixed numbers are as given, and every number is in the box `[0, steps]` (all against node 0,
