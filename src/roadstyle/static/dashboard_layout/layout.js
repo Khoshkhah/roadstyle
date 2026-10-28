@@ -34,13 +34,15 @@
       const tb = document.createElement("div"); tb.id = "rs-toolbar"; tb.className = "rs-tb-"+pos; document.body.appendChild(tb);
       const col = document.querySelector(".maplibregl-ctrl-top-right");
       if(col){
-        [...col.children].forEach(c=>{
+        const take = c=>{
           const show = c.querySelector("button[title='Show panel']");
           if(show){                           // the chevron of a hidden panel is not a control of the bar
             const f = document.createElement("div"); f.id = "rs-show-right"; f.appendChild(show); document.body.appendChild(f);
             const sync = ()=>{ f.style.display = c.style.display === "none" ? "none" : "block"; };
             new MutationObserver(sync).observe(c, {attributes:true, attributeFilter:["style"]}); sync(); c.remove(); return; }
-          tb.appendChild(c); });
+          tb.appendChild(c); const b = c.querySelector("button"); if(b && !b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; };
+        [...col.children].forEach(take);
+        new MutationObserver(l=>l.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType === 1) take(n); }))).observe(col, {childList:true});   // a control that the page adds later
         col.classList.add("rs-emptied");
       }
       tb.querySelectorAll("button").forEach(b=>{ if(!b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; });
