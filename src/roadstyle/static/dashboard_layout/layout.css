@@ -59,3 +59,6 @@ html.rs-has-toolbar .maplibregl-ctrl-bottom-right{display:none!important}
 .rs-bm-sw{box-sizing:border-box;width:32px;height:20px;border-radius:3px;border:1px solid rgba(0,0,0,.2);flex:none}
 .rs-bm-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:4px 0;width:100%}
 .rs-bm-row input:disabled+.rs-bm-n{opacity:.45}
+/* every pop-up of the bar takes the bar's own look: one rule set (the bar, the base-map box, the attribution box, and a page's own box such as a legend) */
+#rs-toolbar,#rs-toolbar .bm-menu.rs-bm-box,#rs-attr-box,.rs-pop{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-attr-box a{color:inherit}
