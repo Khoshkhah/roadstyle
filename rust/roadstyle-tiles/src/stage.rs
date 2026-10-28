@@ -87,9 +87,10 @@ impl TileOptions {
         Ok(tiles)
     }
 
-    /// The source goes into the tiles.
+    /// The source goes into the tiles. The whole roads (`roads`, an export's pick and highlight) are not a tile layer: a click reads the
+    /// pieces' row in the road table or in a props file (docs/design/tile_v2_plan.md, step 7).
     pub fn wants(&self, name: &str) -> bool {
-        self.only.as_ref().is_none_or(|o| o.iter().any(|n| n == name))
+        name != "roads" && self.only.as_ref().is_none_or(|o| o.iter().any(|n| n == name))
     }
 
     /// The properties of the source `name` in the tiles (one set for each tile layer: a property outside it is not in any piece), whether
@@ -99,8 +100,6 @@ impl TileOptions {
         use roadstyle_model::mark::{filter_keys, page_reads, Kind, Mark};
         let reads = |k: &str| self.source_reads.get(k).cloned().unwrap_or_default();
         match name {
-            // the roads layer's feature id is its index, the road's row: `__rs_edge` is not a key there
-            "roads" => (self.exact_or(&self.read).into_iter().filter(|k| k != Mark::Edge.name()).collect(), false, 0),
             "simple" => (self.exact_or(&self.pieces).into_iter().chain(reads(name)).chain(page_reads(Kind::Pieces)).chain([Mark::Edge.name().into()]).collect(), false, 0),
             // `__rs_edge` is the carrier of a file's slot id
             "slots" => (reads(name).into_iter().chain(page_reads(Kind::Slots)).chain(filter_keys().map(String::from)).chain([Mark::Edge.name().into()]).collect(), true, self.slots_from),

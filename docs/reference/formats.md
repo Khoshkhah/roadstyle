@@ -339,10 +339,10 @@ The Monaco style has 7 layers, in this drawing order (the first is at the bottom
 | Layer | Type | Source | What it draws |
 |---|---|---|---|
 | `roads-simple` | line | `simple` | every casing and fill piece of every road, in one layer, sorted by `r * 2^32 + id` |
-| `roads-fill` | line | `roads` | the whole roads, one line each. Hidden in simple mode (`visibility: none`), where `roads-simple` draws the roads |
+| `roads-fill` | line | `roads` | (inline export only; not in a tiled style) the whole roads, one line each. Hidden in simple mode (`visibility: none`), where `roads-simple` draws the roads |
 | `roads-arrows` | symbol | `slots` | the one-way arrows |
 | `roads-labels` | symbol | `slots` | the street names along the roads |
-| `roads-highlight` | line | `roads` | the glow of a hovered or selected road. Hidden in simple mode, where the pieces of `roads-simple` glow through their feature state |
+| `roads-highlight` | line | `roads` | (inline export only; not in a tiled style) the glow of a hovered or selected road. Hidden in simple mode, where the pieces of `roads-simple` glow through their feature state |
 | `roads-deck-casing`, `roads-bridge-decks` | fill-extrusion | `decks` | the 3D bridge decks |
 
 Each layer has
@@ -397,7 +397,7 @@ The road data is the features of the four sources above, with their properties. 
 ([Three choices for the road data](../rust/drawing.md#three-choices-for-the-road-data)):
 
 - **GeoJSON** inside the style (`sources.<name>.data`).
-- **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `roads`, `simple`, `slots` and `decks`, zooms
+- **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer since 2026-10-27: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page), zooms
   6 to 18 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` and a slot have their road's row as their id (all
   pieces of a road share it). A tile keeps the keys of the layer's one set (the keys that the style reads, the page's keys, the 3 filter keys
   and the columns named in `keep`), but not a `__rs_*` flag that is false: every reader takes a missing flag as false. Below the last zoom, a line is

@@ -155,9 +155,21 @@ fn json_lines(src: &Value) -> bool {
 pub fn tile_stage(s: &sources::Styled, o: &tiles::stage::TileOptions, at: &Value, inline: sources::SourceMode)
                   -> Result<(Value, tiles::Tiles), tiles::Error> {
     let tiles = tile_sources(s, o)?;
-    let style = s.style_with(inline, true);
+    let mut style = s.style_with(inline, true);
+    without_roads(&mut style);
     let tiled: Vec<String> = s.shown().filter(|(k, _)| o.wants(k)).map(|(k, _)| k.to_string()).collect();
     Ok((tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles))
+}
+
+/// An export's style without the whole roads (the source `roads` and the layers on it: the pick and the highlight): the pieces pick and
+/// glow, and a click reads the road's row in the road table (D5).
+fn without_roads(style: &mut Value) {
+    if let Some(s) = style["sources"].as_object_mut() {
+        s.shift_remove("roads");
+    }
+    if let Some(l) = style["layers"].as_array_mut() {
+        l.retain(|l| l["source"] != "roads");
+    }
 }
 
 /// A style of this Styled (`tile_stage`'s, `style_with`'s) as JSON text, each null `data` with its source's FeatureCollection.
@@ -220,6 +232,8 @@ pub fn tiles_of_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<V
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| crate::error::file("style.json", e))?;
     let o = match o { Some(o) => o, None => tiles::stage::TileOptions::from_style(&style, keep)? };
     let mut tiled = o.tiles()?;
+    let mut style = style;
+    without_roads(&mut style);
     let layers = style["layers"].as_array().map(Vec::as_slice).unwrap_or_default();
     tiled.drawn_by(layers);
     let mut names = Vec::new();
@@ -232,8 +246,6 @@ pub fn tiles_of_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<V
         // audit N5: a GeoParquet file of lines (the roads, the pieces) goes to the tiles as its Arrow columns, with no JSON per cell
         if let Some((t, json)) = if file.ends_with(".parquet") { read::line_table(read(file)?)? } else { None } {
             let cols: Vec<(usize, &String)> = t.names().iter().enumerate().filter(|(_, n)| *n != roadstyle_io::write::FID).collect();
-            // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
-            let table = if k == "roads" && (0..t.len()).any(|i| t.line(i).is_none()) { Some(read::read_roads(read(ROAD_TABLE)?, "geometry")?) } else { None };
             let (keep, whole, from) = o.rule(k, || cols.iter().map(|(_, n)| n.to_string()).collect());
             let cell = |c: usize, i: usize, n: &str| -> FileValue {
                 let v = t.cell(c, i);
@@ -245,25 +257,14 @@ pub fn tiles_of_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<V
             // a slot has its road's key as the file's feature id (`__fid`), the pieces as the property `__rs_edge`
             let fid = t.names().iter().position(|n| n == roadstyle_io::write::FID).filter(|_| k == "slots");
             let edge = roadstyle_model::mark::Mark::Edge.name();
-            let feats = (0..t.len()).map(|i| (t.line(i).or_else(|| table.as_ref().and_then(|r| r.line(i))),
+            let feats = (0..t.len()).map(|i| (t.line(i),
                                               cols.iter().map(move |&(c, n)| (n.as_str(), cell(c, i, n)))
                                                   .chain(fid.map(|c| (edge, FileValue::Cell(t.cell(c, i)))))));
             tiled.add_lines(k, feats, &keep, whole, first_drawn(layers, k, from, o.max_zoom));
             continue;
         }
-        let mut fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
+        let fc: Value = if file.ends_with(".parquet") { read::features(read(file)?)? }
                             else { serde_json::from_slice(&read(file)?).map_err(|e| crate::error::file(file, e))? };
-        // the roads' lines are in the road table when stage 1 left them out (no layer draws the roads)
-        let lineless = |fc: &Value| fc["features"].as_array().is_some_and(|f| f.iter().any(|x| x["geometry"].is_null()));
-        if k == "roads" && lineless(&fc) {
-            let table = read::features(read(ROAD_TABLE)?)?;
-            let lines = table["features"].as_array().map(Vec::as_slice).unwrap_or_default();
-            for (f, t) in fc["features"].as_array_mut().into_iter().flatten().zip(lines) {
-                if f["geometry"].is_null() {
-                    f["geometry"] = t["geometry"].clone();
-                }
-            }
-        }
         let src = json!({"type": "geojson", "data": fc});
         let rule = o.rule(k, || src["data"]["features"].as_array().into_iter().flatten()
             .filter_map(|f| f["properties"].as_object()).flat_map(|p| p.keys().cloned()).collect());

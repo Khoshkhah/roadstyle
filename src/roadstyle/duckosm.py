@@ -174,7 +174,7 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
     app that draws a MapLibre style (GeoLibre, RustGIS, QGIS). ``only``: the roads of ``mode`` alone (``read``). The path of style.json."""
     import shapely
 
-    from ._engine import _warn, _write_export, rust
+    from ._engine import _warn, _write_export, props_json, rust
 
     if format not in ("xyz", "pmtiles"):
         raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")
@@ -184,7 +184,7 @@ def export_style(db, out_dir, *, base_url: str, mode: str = "all", theme: str = 
     t = rust().Tiler(roads, lk, features, None, "", keep)
     _warn()
     bounds = tuple(float(v) for v in shapely.total_bounds(shapely.from_wkb(roads.column("geometry").to_numpy(zero_copy_only=False))))
-    return _write_export(t, out_dir, base_url, format, json.loads(lk.part("map"))["output"]["name"], bounds)
+    return _write_export(t, out_dir, base_url, format, json.loads(lk.part("map"))["output"]["name"], bounds, props_json(roads.drop_columns(["geometry"]).to_pandas()))
 
 
 def base_map(mode: str = "all", *, theme: str = "liberty", paths: str = "google") -> dict:

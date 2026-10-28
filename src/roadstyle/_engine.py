@@ -304,16 +304,25 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     name = kwargs.get("name") or "roads"
     kwargs.setdefault("view_3d", True)
     kwargs["tiles"] = True                                 # render's tiled look: the roads source draws (no lean mode)
-    kwargs["export"] = True                                # an app with no road table: the roads source, its pick and highlight (audit N2)
+    kwargs["export"] = True                                # an app with no road table: the arrows are numbered for its thinning (audit N2)
     lk = _look_of(kwargs)
     t = rust().Tiler(_arrow(edges), lk, None, name, "", [str(c) for c in edges.columns])   # every column: a click shows the data
     _warn()
-    return _write_export(t, out_dir, base_url, format, name, tuple(float(v) for v in edges.total_bounds))
+    props = props_json(edges.drop(columns=[edges.geometry.name]))
+    return _write_export(t, out_dir, base_url, format, name, tuple(float(v) for v in edges.total_bounds), props)
 
 
-def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
+def props_json(df) -> str:
+    """The fields of each road as JSON records, in row order (``props.json`` of export_style); an integer past 2**53 - 1 is text, as in a
+    tile (JavaScript holds no more)."""
+    big = [c for c in df.columns if str(df[c].dtype).lower().startswith(("int", "uint")) and df[c].abs().max() > 2 ** 53 - 1]
+    return df.astype({c: str for c in big}).to_json(orient="records")
+
+
+def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds, props: str):
     """The files of ``export_style`` from the Tiler ``t`` (its style and its tiles): style.json with the tiles at ``base_url``, the tiles in
-    ``bounds`` (lon / lat: the roads' box), the sprite and the popup's files; the path of style.json."""
+    ``bounds`` (lon / lat: the roads' box), the sprite and the popup's files, and ``props.json`` (``props``: the fields of each road as JSON records, in
+    the order of the rows: a click on a piece reads its row, the feature id); the path of style.json."""
     import gzip  # noqa: F401  (the same imports as export.py)
     from pathlib import Path
 
@@ -322,7 +331,9 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
 
     style, base = json.loads(t.style), base_url.rstrip("/")
     roads = style["sources"]["roads"]
-    at = {"tiles": [f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf"]} if format == "xyz" else {"url": f"pmtiles://{base}/roads.pmtiles"}
+    generation = style.get("metadata", {}).get("roadstyle:generation")           # a row is valid in one generation only: the URL carries it
+    tiles_url = f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf" + (f"?g={generation}" if generation else "")
+    at = {"tiles": [tiles_url]} if format == "xyz" else {"url": f"pmtiles://{base}/roads.pmtiles"}
     roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom", "promoteId") if k in roads}, **at, "bounds": list(bounds)}
     meta = style.pop("metadata", {})
     style = {k: style[k] for k in ("version", "sources", "layers", "glyphs") if k in style}     # Python's key order: the same bytes
@@ -344,10 +355,11 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
     if format == "xyz":                     # every tile with data, and an empty file for each other tile of the roads' bounds
         fallback = float(meta.get("roadstyle:tiles", {}).get("buffer_px", 80))
         t.write_xyz(str(d / "tiles"), list(bounds), ".pbf", (json.dumps(style["layers"]), fallback))
+    (d / "props.json").write_text(props)             # a click on a piece: its id is the row of the road in this file
     (d / "popup.css").write_text(_plugin_css())
     (d / "popup.js").write_text(_assets.text("static/popup.js"))
     style["metadata"]["roadstyle:interaction"] = {**style["metadata"].get("roadstyle:interaction", {}), "css": f"{base}/popup.css",
-                                                  "js": f"{base}/popup.js"}
+                                                  "js": f"{base}/popup.js", "props": f"{base}/props.json"}
     png = _assets.data("data/sprite.png")
     icon = _settings.theme_value("arrows.icon")
     index = json.dumps({"oneway": {"x": 0, "y": 0, "width": icon["width"], "height": icon["height"], "pixelRatio": icon["pixel_ratio"], "sdf": True}})

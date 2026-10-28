@@ -7,23 +7,11 @@
     43.73837
    ],
    "z12": {
-    "view_bytes": 1303101,
-    "view_features": 15063,
-    "max_tile_bytes": 1303101,
-    "max_tile_features": 15063,
+    "view_bytes": 60647,
+    "view_features": 1723,
+    "max_tile_bytes": 60647,
+    "max_tile_features": 1723,
     "layers": {
-     "roads": {
-      "features": 13340,
-      "bytes": 1242455,
-      "values": 30919,
-      "keys": 20,
-      "keys_unread": 14,
-      "no_id": 1,
-      "strings": 30909,
-      "string_bytes": 519611,
-      "short_segments": 15297,
-      "tiny": 8240
-     },
      "simple": {
       "features": 1723,
       "bytes": 60647,
@@ -39,23 +27,11 @@
     }
    },
    "z13": {
-    "view_bytes": 1847138,
-    "view_features": 23588,
-    "max_tile_bytes": 1014236,
-    "max_tile_features": 12963,
+    "view_bytes": 203893,
+    "view_features": 5796,
+    "max_tile_bytes": 116724,
+    "max_tile_features": 3322,
     "layers": {
-     "roads": {
-      "features": 9642,
-      "bytes": 897513,
-      "values": 22419,
-      "keys": 20,
-      "keys_unread": 14,
-      "no_id": 1,
-      "strings": 22409,
-      "string_bytes": 375878,
-      "short_segments": 9101,
-      "tiny": 4036
-     },
      "simple": {
       "features": 3322,
       "bytes": 116724,
@@ -71,23 +47,11 @@
     }
    },
    "z14": {
-    "view_bytes": 1802742,
-    "view_features": 24120,
-    "max_tile_bytes": 1044720,
-    "max_tile_features": 14118,
+    "view_bytes": 303953,
+    "view_features": 7990,
+    "max_tile_bytes": 189630,
+    "max_tile_features": 4972,
     "layers": {
-     "roads": {
-      "features": 9147,
-      "bytes": 855091,
-      "values": 21270,
-      "keys": 20,
-      "keys_unread": 14,
-      "no_id": 1,
-      "strings": 21259,
-      "string_bytes": 356469,
-      "short_segments": 4463,
-      "tiny": 1488
-     },
      "simple": {
       "features": 4106,
       "bytes": 146803,
@@ -115,23 +79,11 @@
     }
    },
    "z15": {
-    "view_bytes": 2357679,
-    "view_features": 39165,
-    "max_tile_bytes": 749793,
-    "max_tile_features": 12486,
+    "view_bytes": 826955,
+    "view_features": 22702,
+    "max_tile_bytes": 268535,
+    "max_tile_features": 7351,
     "layers": {
-     "roads": {
-      "features": 5136,
-      "bytes": 481259,
-      "values": 12039,
-      "keys": 20,
-      "keys_unread": 14,
-      "no_id": 1,
-      "strings": 12029,
-      "string_bytes": 201474,
-      "short_segments": 783,
-      "tiny": 283
-     },
      "simple": {
       "features": 6556,
       "bytes": 228351,
@@ -159,19 +111,14 @@
     }
    },
    "style": {
-    "layers": 6,
-    "expressions_total": 61833,
+    "layers": 4,
+    "expressions_total": 40489,
     "expressions": {
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2239,
       "paint.line-width": 26312,
       "paint.line-offset": 3033
-     },
-     "roads-fill": {
-      "filter": 852,
-      "paint.line-width": 4738,
-      "paint.line-offset": 5484
      },
      "roads-arrows": {
       "filter": 875,
@@ -182,10 +129,6 @@
       "filter": 1075,
       "layout.text-size": 3534,
       "layout.symbol-sort-key": 494
-     },
-     "roads-highlight": {
-      "paint.line-width": 4738,
-      "paint.line-offset": 5484
      }
     }
    }
@@ -196,23 +139,11 @@
     58.36462
    ],
    "z12": {
-    "view_bytes": 7165188,
-    "view_features": 82855,
-    "max_tile_bytes": 3532399,
-    "max_tile_features": 40902,
+    "view_bytes": 294245,
+    "view_features": 8704,
+    "max_tile_bytes": 151753,
+    "max_tile_features": 4517,
     "layers": {
-     "roads": {
-      "features": 36386,
-      "bytes": 3380647,
-      "values": 80787,
-      "keys": 21,
-      "keys_unread": 15,
-      "no_id": 1,
-      "strings": 80777,
-      "string_bytes": 1366055,
-      "short_segments": 24101,
-      "tiny": 12407
-     },
      "simple": {
       "features": 4517,
       "bytes": 151753,
@@ -228,23 +159,11 @@
     }
    },
    "z13": {
-    "view_bytes": 7009021,
-    "view_features": 90721,
-    "max_tile_bytes": 1758457,
-    "max_tile_features": 22514,
+    "view_bytes": 829643,
+    "view_features": 23783,
+    "max_tile_bytes": 193063,
+    "max_tile_features": 5512,
     "layers": {
-     "roads": {
-      "features": 17181,
-      "bytes": 1575685,
-      "values": 38156,
-      "keys": 21,
-      "keys_unread": 15,
-      "no_id": 1,
-      "strings": 38146,
-      "string_bytes": 643639,
-      "short_segments": 6308,
-      "tiny": 2851
-     },
      "simple": {
       "features": 5512,
       "bytes": 193063,
@@ -260,23 +179,11 @@
     }
    },
    "z14": {
-    "view_bytes": 3843528,
-    "view_features": 55003,
-    "max_tile_bytes": 736123,
-    "max_tile_features": 10260,
+    "view_bytes": 810621,
+    "view_features": 22027,
+    "max_tile_bytes": 132590,
+    "max_tile_features": 3709,
     "layers": {
-     "roads": {
-      "features": 6781,
-      "bytes": 625302,
-      "values": 14984,
-      "keys": 20,
-      "keys_unread": 14,
-      "no_id": 1,
-      "strings": 14977,
-      "string_bytes": 254731,
-      "short_segments": 1239,
-      "tiny": 252
-     },
      "simple": {
       "features": 3143,
       "bytes": 108236,
@@ -304,23 +211,11 @@
     }
    },
    "z15": {
-    "view_bytes": 1371727,
-    "view_features": 24155,
-    "max_tile_bytes": 287281,
-    "max_tile_features": 5108,
+    "view_bytes": 591096,
+    "view_features": 15615,
+    "max_tile_bytes": 127625,
+    "max_tile_features": 3398,
     "layers": {
-     "roads": {
-      "features": 1710,
-      "bytes": 159657,
-      "values": 3838,
-      "keys": 20,
-      "keys_unread": 14,
-      "no_id": 1,
-      "strings": 3831,
-      "string_bytes": 64991,
-      "short_segments": 94,
-      "tiny": 15
-     },
      "simple": {
       "features": 3062,
       "bytes": 111786,
@@ -348,19 +243,14 @@
     }
    },
    "style": {
-    "layers": 6,
-    "expressions_total": 61833,
+    "layers": 4,
+    "expressions_total": 40489,
     "expressions": {
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2239,
       "paint.line-width": 26312,
       "paint.line-offset": 3033
-     },
-     "roads-fill": {
-      "filter": 852,
-      "paint.line-width": 4738,
-      "paint.line-offset": 5484
      },
      "roads-arrows": {
       "filter": 875,
@@ -371,10 +261,6 @@
       "filter": 1075,
       "layout.text-size": 3534,
       "layout.symbol-sort-key": 494
-     },
-     "roads-highlight": {
-      "paint.line-width": 4738,
-      "paint.line-offset": 5484
      }
     }
    }

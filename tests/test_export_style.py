@@ -47,7 +47,8 @@ def test_style_points_at_its_own_files(tmp_path):
             assert lyr["source-layer"] in names, lyr["id"]
     assert "boundary" in names                                             # a GeoJSON source went into the archive
     assert "decks" in names and any(lyr["type"] == "fill-extrusion" for lyr in s["layers"])   # view_3d by default: the bridge decks
-    assert "roads-highlight" in {lyr["id"] for lyr in s["layers"]}         # kept for an app that sets feature-state (the GeoLibre plugin's hover)
+    assert "roads" not in names and not {"roads-fill", "roads-highlight"} & {lyr["id"] for lyr in s["layers"]}      # D5: the pieces pick and glow
+    assert s["metadata"]["roadstyle:contract"] == 2 and s["metadata"]["roadstyle:interaction"]["props"] == f"{BASE}/props.json"
     sprite = json.loads((tmp_path / "sprite.json").read_text())
     assert sprite["oneway"]["sdf"] is True
     arrows = [lyr for lyr in s["layers"] if lyr["id"].startswith("roads-arrows")]
@@ -83,10 +84,11 @@ def test_from_a_duckosm_geoparquet_file(tmp_path):
     lv.to_parquet(with_levels)
     g.to_parquet(without)
     rs.export_style(str(with_levels), tmp_path / "out", base_url=BASE)
-    props = [f["properties"] for t in (tmp_path / "out" / "tiles").rglob("15/*/*.pbf")
-             for f in mapbox_vector_tile.decode(t.read_bytes()).get("roads", {}).get("features", [])]
-    assert props and all("lanes" in p and "name" in p for p in props)
-    assert {p["edge_id"] for p in props} <= {str(2 ** 60 + i) for i in range(12)}
+    props = json.loads((tmp_path / "out" / "props.json").read_text())             # the fields of each road, by its row (the pieces' id)
+    assert len(props) == 12 and all("lanes" in p and "name" in p for p in props)
+    assert [p["edge_id"] for p in props] == [str(2 ** 60 + i) for i in range(12)]
+    ids = {f["id"] for t in (tmp_path / "out" / "tiles").rglob("15/*/*.pbf") for f in mapbox_vector_tile.decode(t.read_bytes()).get("simple", {}).get("features", [])}
+    assert ids and ids <= set(range(12))
     with pytest.raises(ValueError, match="save_levels"):
         rs.export_style(str(without), tmp_path / "out2", base_url=BASE)
 
@@ -120,7 +122,7 @@ def test_plain_maplibre_page_draws_the_export(tmp_path):
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.goto(base + "/index.html")
             page.wait_for_function("window.map && map.loaded() && map.areTilesLoaded()", timeout=30_000)
-            n = page.evaluate("map.querySourceFeatures('roads',{sourceLayer:'roads'}).length")
+            n = page.evaluate("map.querySourceFeatures('roads',{sourceLayer:'simple'}).length")
             errors += page.evaluate("errs")
             browser.close()
     finally:
@@ -163,7 +165,7 @@ def test_both_engines_give_an_app_the_road_roles_and_the_pick_layers(tmp_path):
     part = gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
     meta = {e: json.loads(rs.export_style(part, tmp_path / e, base_url=BASE, engine=e).read_text())["metadata"] for e in ("python", "rust")}
     for e, m in meta.items():
-        assert set(m["roadstyle:sources"]) >= {"roads", "simple", "slots"}, e
+        assert set(m["roadstyle:sources"]) >= {"simple", "slots"}, e
         assert "roads-simple" in m["roadstyle:controls"]["pick"] or "roads-fill" in m["roadstyle:controls"]["pick"], e
     assert meta["rust"]["roadstyle:sources"] == meta["python"]["roadstyle:sources"]
     assert meta["rust"]["roadstyle:controls"] == meta["python"]["roadstyle:controls"]
