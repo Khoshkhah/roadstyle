@@ -78,6 +78,7 @@
         const grow = w.__want && (w.__want.w > r.width + 1 && r.right < lim - 20);
         if(r.right > lim + 0.5 || r.left < leftEdge(m) - 0.5 || grow) fit(w); });
       window.rsKeepWindows = keep;
+      map.on("resize", ()=>setTimeout(keep, 0));          // a resize of the map puts a window back at its saved place (float.js): the clamp runs again after it
       const sized = new ResizeObserver(()=>keep());                                      // a window enlarged by its corner never reaches under the bar
       wins().forEach(w=>sized.observe(w)); document.addEventListener("pointerup", ()=>setTimeout(keep, 0), true);
       const sb0 = document.getElementById("sb");

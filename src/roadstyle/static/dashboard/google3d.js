@@ -17,7 +17,7 @@ export function initGoogle3D(){
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
       '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
       ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
-      '<button type="button" class="rs-g3d-follow on" title="Follow the map">Follow</button>'+
+      '<button type="button" class="rs-g3d-follow on" title="Follow the map">Following</button>'+
       '<button type="button" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
@@ -96,13 +96,26 @@ export function initGoogle3D(){
     let follow=true, setQueued=false;
     const fbtn=w.querySelector(".rs-g3d-follow");
     const paintFollow=()=>{ COUNT.follow=follow; fbtn.classList.toggle("on", follow); fbtn.setAttribute("aria-pressed", follow);
+      fbtn.textContent=follow ? "Following" : "Follow the map";
       fbtn.title=follow ? "Following the map: a drag in this window stops it" : "Not following the map: click to follow again"; };
     const setGoogle=()=>{ if(!m3) return; Object.assign(m3, toGoogle()); COUNT.m2g++; };
     const setFollow=on=>{ follow=!!on; paintFollow(); if(follow) setGoogle(); };
     window.rsG3dFollow=setFollow;
     map.on("move", ()=>{ if(!m3 || !follow || setQueued) return; setQueued=true; requestAnimationFrame(()=>{ setQueued=false; if(follow) setGoogle(); }); });
-    for(const t of ["pointerdown", "wheel", "touchstart", "keydown"]) w.addEventListener(t, e=>{
-      if(e.target && e.target.closest && e.target.closest(".rs-svw-bar")) return; if(follow){ follow=false; paintFollow(); } }, true);
+    // What turns Follow off: a drag (the pointer moves more than 6 px while down), a second finger (a pinch), a wheel, a touch with two fingers or a key, inside
+    // the picture. A plain click, and a click on Google's own controls (the view switch, the compass, the expand button), do not.
+    const inBar=e=>e.target && e.target.closest && e.target.closest(".rs-svw-bar");
+    const stop=()=>{ if(follow){ follow=false; paintFollow(); } };
+    const downs=new Map();
+    w.addEventListener("pointerdown", e=>{ if(inBar(e)) return; if(downs.size>=1) stop(); downs.set(e.pointerId, [e.clientX, e.clientY]); }, true);
+    w.addEventListener("pointermove", e=>{ const d=downs.get(e.pointerId); if(d && Math.hypot(e.clientX-d[0], e.clientY-d[1])>6) stop(); }, true);
+    for(const t of ["pointerup", "pointercancel"]) window.addEventListener(t, e=>downs.delete(e.pointerId), true);
+    w.addEventListener("wheel", e=>{ if(!inBar(e)) stop(); }, true);
+    w.addEventListener("touchstart", e=>{ if(!inBar(e) && e.touches && e.touches.length>1) stop(); }, true);
+    w.addEventListener("keydown", e=>{ if(!inBar(e)) stop(); }, true);
+    // after a change of the view (Google's own switch or the Labels switch) with Follow on, Google is set to the map's camera once, 300 ms later
+    let afterT=0;
+    const afterSwitch=()=>{ clearTimeout(afterT); afterT=setTimeout(()=>{ if(m3 && follow) setGoogle(); }, 300); };
     fbtn.onclick=()=>setFollow(true);
     // THE MAP'S CENTER BESIDE THE WINDOW: while the window is open, the map's padding puts its center (the
     // point the two cameras share, where a clicked road comes to) in the middle of the map's free side, so
@@ -133,9 +146,9 @@ export function initGoogle3D(){
       if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>24) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
     window.rsG3dMode=()=>m3 ? String(m3.mode) : null;
     const redraw=()=>{ if(m3 && line) line.forEach(x=>{ x.remove(); m3.appendChild(x); }); };      // the selected road is drawn again in the new mode
-    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ m3.mode=modeOf(lib); keepMode(); } });
+    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ m3.mode=modeOf(lib); keepMode(); afterSwitch(); } });
     let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes; the page keeps the choice and draws the road again
-    setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode){ keepMode(); redraw(); } lastMode=v; }, 200);
+    setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode){ keepMode(); redraw(); afterSwitch(); } lastMode=v; }, 200);
     const open=()=>{
       if(location.protocol==="file:"){
         say("<b>Google 3D needs this page served, not opened from disk.</b>"+

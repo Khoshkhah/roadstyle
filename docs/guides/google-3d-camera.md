@@ -46,9 +46,9 @@ Google moves its own camera by hidden rules: its limits, the mesh under its targ
 - On every map move, the page sets the 3D camera from the map. It coalesces the moves to one set per frame.
 - No code path moves the map from the 3D camera. A change of the 3D camera of any kind, with input or without, never changes the map.
 - The 3D window is a viewer. The reviewer can drag, turn and zoom in it. That moves only the 3D view.
-- The window bar has a "Follow" button. It is on by default. The first input in the window turns it off: a `pointerdown`, `wheel`, `touchstart` or `keydown` on the window. Input on the title bar does not count. While it is off, the map does not set the 3D camera.
+- The window bar has a "Follow" button: "Following" (filled) when it is on, "Follow the map" (outlined) when it is off. It is on by default. A drag in the picture (the pointer moves more than 6 px while down), a second finger, a wheel or a key turns it off. A plain click, a click on Google's own controls (the view switch, the compass, the expand button) and input on the title bar do not. While it is off, the map does not set the 3D camera.
 - A click on the "Follow" button turns it on and sets the 3D camera to the map once. A road selection and a Guide step also turn it on. The window turns it on when it opens.
-- Google's own view switch changes only the picture. The page sets nothing after it, and the map does not move.
+- Google's own view switch changes only the picture, and the map does not move. With Follow on, the page sets the 3D camera to the map's once, 300 ms after the switch (also after the Labels switch). With Follow off it sets nothing.
 - A click on a road never flies the 3D camera alone. The page flies the map, and the 3D view follows the map while Follow is on.
 
 By default, roadstyle moves the map center to the free part of the map while the window is open. The option `window.rsWindowRecentre = false` switches this off. A review page sets it to false, because a drag of a window or a toggle of a panel must not move the map.
