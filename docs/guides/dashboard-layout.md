@@ -46,3 +46,7 @@ The chevron of a hidden right panel is not a control of the bar. It stays at the
 ## Check it
 
 The tests are in `tests/test_dashboard_layout.py`. They check that the default page does not change, that the overlay adds its style and script, and that each of the four positions adds its rules. A browser test of a page that uses these options is `tools/test_map.py` in the simready repository.
+
+## OpenFreeMap base maps
+
+The base-map list offers three vector styles with no key: "OpenFreeMap Liberty", "OpenFreeMap Bright" and "OpenFreeMap Positron". The page merges the style under the roads. Its extruded buildings draw after the roads in 3D, and its flat buildings show in 2D. `window.rsBuildings(false)` hides the buildings, and `window.rsBuildings(true)` shows them. The event `rs:basemapready` tells the page that the style is in, so the page can put its own top layers back on top.

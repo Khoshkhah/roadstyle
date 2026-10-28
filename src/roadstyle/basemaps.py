@@ -123,6 +123,8 @@ class Basemap:
     #: answers beyond its levels with HTTP 200 and a "Map data not yet available" image, so the
     #: browser can't tell a tile is missing: without this the map goes grey (measured 2026-09-29)
     maxzoom: int = 19
+    #: a MapLibre vector style (a keyless one such as OpenFreeMap's): the page merges its sources and layers under the roads
+    style_url: str | None = None
 
 
 # NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
@@ -188,8 +190,17 @@ BASEMAPS: dict[str, Basemap] = {
         preview=("#22d3a3", "#9ec5fe", "#5b6573")),
 }
 
+# OpenFreeMap: vector styles with no key. The dashboard merges the style under the roads (static/dashboard/basemap.js): its building
+# extrusion draws after the roads, in 3D only, and window.rsBuildings(on) hides the buildings.
+_OFM_ATTR = "OpenFreeMap © OpenMapTiles Data from OpenStreetMap"
+for _key, _label, _bg, _prev in (("ofm_liberty", "OpenFreeMap Liberty", "linear-gradient(180deg,#f8f4f0,#e9e4dc)", ("#f9a23a", "#fff", "#9ec5fe")),
+                                 ("ofm_bright", "OpenFreeMap Bright", "linear-gradient(180deg,#f5f1ea,#e6e0d4)", ("#ffd166", "#fff", "#9ec5fe")),
+                                 ("ofm_positron", "OpenFreeMap Positron", "linear-gradient(180deg,#f3f5f7,#e3e8ed)", ("#888", "#bbb", "#888"))):
+    BASEMAPS[_key] = Basemap(_key, _label, "", _OFM_ATTR, bg=_bg, preview=_prev, maxzoom=20,
+                             style_url="https://tiles.openfreemap.org/styles/" + _key.split("_")[1])
+
 # default set offered by the switcher when the caller doesn't specify one
-DEFAULT_SWITCHER = ["esri_gray", "positron", "osm", "satellite", "voyager", "dark_matter", "blank"]
+DEFAULT_SWITCHER = ["esri_gray", "positron", "osm", "satellite", "voyager", "dark_matter", "blank", "ofm_liberty", "ofm_bright", "ofm_positron"]
 
 
 def register_basemap(bm: Basemap) -> None:
