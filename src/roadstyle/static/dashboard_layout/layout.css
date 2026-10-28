@@ -37,3 +37,11 @@ html[data-rs-theme=dark] #rs-toolbar .maplibregl-ctrl-icon{filter:invert(.85)}
 html.rs-has-toolbar .maplibregl-ctrl-top-right{display:none!important}
 #rs-toolbar .bm-ctrl{position:relative!important;overflow:visible}
 #rs-toolbar .bm-menu{position:absolute!important;z-index:9}
+html.rs-has-toolbar .maplibregl-ctrl-bottom-right{display:none!important}
+#rs-attr-box{position:absolute;box-sizing:border-box;width:max-content;max-width:300px;padding:8px 10px;border-radius:6px;background:var(--rs-pop-bg);color:var(--rs-pop-ink);box-shadow:0 2px 10px rgba(0,0,0,.2);font:11px/1.4 system-ui,sans-serif;text-align:left;z-index:9}
+#rs-attr-box a{color:inherit}
+#rs-toolbar .rs-attr-ctrl{position:relative}
+#rs-toolbar.rs-tb-right #rs-attr-box{right:calc(100% + 12px);bottom:0}
+#rs-toolbar.rs-tb-left #rs-attr-box{left:calc(100% + 12px);bottom:0}
+#rs-toolbar.rs-tb-top #rs-attr-box{top:calc(100% + 12px);right:0}
+#rs-toolbar.rs-tb-bottom #rs-attr-box{bottom:calc(100% + 12px);right:0}

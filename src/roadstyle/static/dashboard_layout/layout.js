@@ -40,6 +40,17 @@
     theme();
     if(pos){
       let tb = document.getElementById("rs-toolbar"); if(!tb){ tb = document.createElement("div"); tb.id = "rs-toolbar"; tb.className = "rs-tb-"+pos; document.body.appendChild(tb); }
+      // the attribution is the last button of the bar: a box with the text of the base map (and Google's, where a Google window is open)
+      const at = document.createElement("div"); at.className = "maplibregl-ctrl maplibregl-ctrl-group rs-attr-ctrl";
+      at.innerHTML = '<button type="button" id="rs-attr-btn" title="Attribution">i</button><div id="rs-attr-box" hidden></div>';
+      tb.appendChild(at);
+      const box = at.querySelector("#rs-attr-box");
+      at.querySelector("button").onclick = e=>{ e.stopPropagation();
+        if(box.hidden){ const inner = document.querySelector(".maplibregl-ctrl-attrib-inner"), g = [".rs-g3d", ".rs-svw:not(.rs-g3d)"].some(s=>{ const w = document.querySelector(s); return w && !w.hidden; });
+          box.innerHTML = (inner ? inner.innerHTML : "") + (g ? "<div>Google Maps: map data \u00a9 Google</div>" : ""); }
+        box.hidden = !box.hidden; };
+      document.addEventListener("click", e=>{ if(!e.target.closest || !e.target.closest(".rs-attr-ctrl")) box.hidden = true; }, true);
+      document.addEventListener("keydown", e=>{ if(e.key === "Escape") box.hidden = true; }, true);
       const col = document.querySelector(".maplibregl-ctrl-top-right");
       if(col){
         const take = c=>{
@@ -48,7 +59,7 @@
             const f = document.createElement("div"); f.id = "rs-show-right"; f.appendChild(show); document.body.appendChild(f);
             const sync = ()=>{ f.style.display = c.style.display === "none" ? "none" : "block"; };
             new MutationObserver(sync).observe(c, {attributes:true, attributeFilter:["style"]}); sync(); c.remove(); return; }
-          tb.appendChild(c); const b = c.querySelector("button"); if(b && !b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; };
+          tb.insertBefore(c, at); const b = c.querySelector("button"); if(b && !b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; };
         [...col.children].forEach(take);
         new MutationObserver(l=>l.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType === 1) take(n); }))).observe(col, {childList:true});   // a control that the page adds later
         col.classList.add("rs-emptied");

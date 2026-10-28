@@ -76,3 +76,24 @@ def test_old_control_column_never_shows(tmp_path):
         seen = pg.evaluate("window.__seen")
         assert seen["frames"] > 5 and seen["column"] == 0 and seen["noBar"] == 0, seen
         b.close()
+
+
+def test_attribution_is_the_last_button(tmp_path):
+    path = _page(tmp_path, "right")
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && window.map.loaded() && document.getElementById('rs-attr-btn')", timeout=60000)
+        last = pg.evaluate("(() => { const bs = [...document.querySelectorAll('#rs-toolbar button')]; return bs[bs.length - 1].id; })()")
+        assert last == "rs-attr-btn"
+        pg.click("#rs-attr-btn")
+        assert pg.evaluate("!document.getElementById('rs-attr-box').hidden")
+        pg.mouse.click(300, 300)
+        assert pg.evaluate("document.getElementById('rs-attr-box').hidden")
+        pg.click("#rs-attr-btn")
+        pg.keyboard.press("Escape")
+        assert pg.evaluate("document.getElementById('rs-attr-box').hidden")
+        # the corner is empty: roadstyle's own attribution does not show
+        assert pg.evaluate("(() => { const a = document.querySelector('.maplibregl-ctrl-attrib'); return !a || a.getBoundingClientRect().width === 0; })()")
+        b.close()
