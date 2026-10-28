@@ -31,6 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: No Python design in the Rust crates (docs/design/python_shape_left.md)
+        run: python3 scripts/check_no_python_shape.py
+
       - name: Toolchain
         run: |
           rustup toolchain install "$RUST" --profile minimal --component clippy --target wasm32-unknown-unknown
