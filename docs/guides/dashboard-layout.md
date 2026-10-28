@@ -39,7 +39,7 @@ The bar is half transparent: white at 70 %, with a slight blur, a 1 px border an
 
 The bar never changes its size. The scale bar, the zoom level and the attribution stay where roadstyle puts them.
 
-A panel on the same side as the bar leaves it a strip of 60 px. The list of base maps opens toward the centre of the map.
+A panel on the same side as the bar never covers it: when the panel opens, the bar slides 8 px beside it (150 ms), and it slides back when the panel closes. The list of base maps opens toward the centre of the map.
 
 The chevron of a hidden right panel is not a control of the bar. It stays at the top right corner of the map.
 

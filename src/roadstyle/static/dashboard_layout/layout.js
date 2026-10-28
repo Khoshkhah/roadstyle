@@ -54,12 +54,19 @@
         col.classList.add("rs-emptied");
       }
       tb.querySelectorAll("button").forEach(b=>{ if(!b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; });
-      // a panel on the toolbar's side leaves the bar its strip
-      if(overlay){
-        const strip = "60px";
-        document.querySelectorAll("#sb, .rs-side").forEach(p=>{ const r = p.getBoundingClientRect(); if(!r.width) return;
-          const side = r.left + r.width/2 < innerWidth/2 ? "left" : "right";
-          if(side === pos) p.style.setProperty(side, strip, "important"); });
+      // A panel on the toolbar's side never covers the bar: when the panel is open, the bar slides to 8 px beside it (150 ms); when the panel
+      // closes, the bar goes back to the edge. The bar's position along the edge does not change.
+      if(overlay && (pos === "right" || pos === "left")){
+        const panels = [...document.querySelectorAll("#sb, .rs-side")].filter(p=>{ const r = p.getBoundingClientRect(); return !r.width || (r.left + r.width/2 < innerWidth/2 ? "left" : "right") === pos; });
+        const follow = ()=>{
+          let off = 8;
+          for(const p of panels){ const r = p.getBoundingClientRect(), shown = getComputedStyle(p).display !== "none" && r.width > 0;
+            if(shown) off = Math.max(off, (pos === "right" ? innerWidth - r.left : r.right) + 8); }
+          tb.style[pos] = off + "px"; root.style.setProperty("--rs-tb-off", (off - 8) + "px"); };
+        const all = [...document.querySelectorAll("#sb, .rs-side")];
+        all.forEach(p=>new MutationObserver(follow).observe(p, {attributes:true, attributeFilter:["style", "class"]}));
+        new MutationObserver(follow).observe(document.body, {attributes:true, attributeFilter:["class"]});
+        window.addEventListener("resize", follow); follow();
       }
     }
   }, 150);

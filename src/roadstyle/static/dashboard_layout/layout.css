@@ -23,8 +23,8 @@ html[data-rs-theme=dark] #rs-toolbar .maplibregl-ctrl-icon{filter:invert(.85)}
 #rs-toolbar button:hover{background:var(--rs-tb-hover)}
 #rs-toolbar.rs-tb-right,#rs-toolbar.rs-tb-left{flex-direction:column;width:44px;top:50%;transform:translateY(-50%);max-height:calc(100% - 128px)}
 #rs-toolbar.rs-tb-right .maplibregl-ctrl-group,#rs-toolbar.rs-tb-left .maplibregl-ctrl-group{flex-direction:column}
-#rs-toolbar.rs-tb-right{right:8px}
-#rs-toolbar.rs-tb-left{left:8px}
+#rs-toolbar.rs-tb-right{right:8px;transition:right .15s}
+#rs-toolbar.rs-tb-left{left:8px;transition:left .15s}
 #rs-toolbar.rs-tb-top,#rs-toolbar.rs-tb-bottom{flex-direction:row;height:44px;left:50%;transform:translateX(-50%)}
 #rs-toolbar.rs-tb-top{top:8px}
 #rs-toolbar.rs-tb-bottom{bottom:8px}
