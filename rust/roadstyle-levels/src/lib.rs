@@ -10,6 +10,7 @@ mod error;
 pub mod flags;
 pub mod flow;
 mod input;
+mod plane;
 pub mod solve;
 
 pub use error::Error;
