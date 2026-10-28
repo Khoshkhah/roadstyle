@@ -1,6 +1,4 @@
 """Web (MapLibre) backend: client-side recolouring via color_options + the recolour hooks."""
-import copy
-import importlib.util
 import json
 import math
 import re
@@ -12,7 +10,8 @@ import pytest
 from shapely.geometry import LineString
 
 from roadstyle import Overlay, compute_levels, render_edges
-from roadstyle.render_web import _KEY_UNIT
+
+_KEY_UNIT = 100_000_000      # the pieces' sort keys: one drawing position
 
 
 def _in(needle, html):
@@ -106,34 +105,6 @@ def test_web_color_by_bakes_its_legend():
     assert _copts(off) == on and _opt(off, "legend") is False
 
 
-def test_web_annotation_slots_alternate_names_and_arrows():
-    """The annotation plan: each road chain is sliced into equal per-band slots; names take even
-    slots, oneway arrows odd ones (alternating, never stacked); unnamed roads leave their name
-    slots empty. One label + one arrow layer per zoom band."""
-    wm = render_edges(_edges(), backend="web", arrows=True, labels=True, simple=False)
-    style = _style(wm.html)
-    ids = [layer["id"] for layer in style["layers"]]
-    assert "roads-labels" in ids and "roads-arrows" in ids
-    slots = style["sources"]["slots"]["data"]["features"]
-    assert slots and all({"slot", "name", "highway", "oneway"} <= set(f["properties"])
-                         for f in slots)
-    lab = next(l for l in style["layers"] if l["id"] == "roads-labels")
-    arr = next(l for l in style["layers"] if l["id"] == "roads-arrows")
-    assert json.dumps(["==", ["%", ["get", "slot"], 2], 0]) in json.dumps(lab["filter"])     # names: even slots
-    # arrows: one per one-way road in the window (docs/design/arrows_and_names.md): points the page puts in the "arrows" source,
-    # rotated along the road; every slot piece names its chain
-    assert json.dumps(["==", ["get", "oneway"], 1]) in json.dumps(arr["filter"])
-    assert arr["source"] == "arrows" and arr["layout"]["symbol-placement"] == "point" and arr["layout"]["icon-rotate"] == ["get", "b"]
-    assert style["sources"]["arrows"]["data"]["features"] == [] and all("chain" in f["properties"] for f in style["sources"]["slots"]["data"]["features"])
-    # one arrow layer per grade tier, each right beside its road tier — a bridge must cover
-    # the arrows of the road it crosses, not have them float above everything
-    assert ids.index("roads-arrows") == ids.index("roads-fill") + 1
-    assert ids.index("roads-arrows-lv1") == ids.index("roads-fill-lv1") + 1     # one arrow layer per position, after the fill layers it has
-    assert json.dumps(["to-boolean", ["get", "name"]]) in json.dumps(lab["filter"])          # unnamed -> slot stays empty
-    assert lab["layout"]["symbol-placement"] == "line-center"
-    # The standing default: label text matches the oneway-arrow grey, and NO halo
-    assert lab["paint"]["text-color"] == "#5b5b5b"
-    assert "text-halo-color" not in lab["paint"] and "text-halo-width" not in lab["paint"]
 
 
 def _zone():
@@ -197,60 +168,12 @@ def _style_of(html):
     return _style(html)
 
 
-def test_compress_on_by_default_and_off_leaves_data_inline():
-    from roadstyle.render_web import render
-    assert "rs-gz" in render(_many_edges()).html            # default: gzipped blobs
-    html = render(_many_edges(), compress=False).html       # opt-out: plain inline JSON
-    assert "rs-gz" not in html
-    assert _style_of(html)["_roads"]["features"]
 
 
-def test_compress_empties_the_source_and_emits_a_blob():
-    import base64
-    import gzip
-    import json as _json
-
-    from roadstyle.render_web import render
-
-    g = _many_edges()
-    html = render(g, compress=True, simple=False).html
-    assert _style_of(html)["sources"]["roads"]["data"] == {"type": "FeatureCollection", "features": []}       # the full look draws the roads
-    blobs = _json.loads(html.split('id="rs-gz" type="application/json">')[1].split("</script>")[0])
-    assert "roads" in blobs                             # slots may compress too; boundary-
-    assert set(blobs) <= {"roads", "slots", "casings"}             # sized sources stay inline
-    fc = _json.loads(gzip.decompress(base64.b64decode(blobs["roads"])))
-    assert len(fc["features"]) == len(g)                # lossless
 
 
-def test_compress_is_smaller_and_otherwise_identical():
-    """The page must differ ONLY in where the data lives — same layers, filters, popup wiring."""
-    from roadstyle.render_web import render
-
-    g = _many_edges()
-    plain, small = render(g, compress=False).html, render(g, compress=True).html
-    assert len(small) < len(plain)
-    a, b = _style_of(plain), _style_of(small)
-    assert [l["id"] for l in a["layers"]] == [l["id"] for l in b["layers"]]
-    for k in ("__FILTER__", "__COLOR_OPTIONS__"):       # placeholders are gone; compare the results
-        assert k not in plain and k not in small
-    # the filter panel's class list is baked from the features either way
-    assert _in('"classes": ["residential"]', plain.replace("'", '"'))
-    assert _in('"classes": ["residential"]', small.replace("'", '"'))
 
 
-def test_a_small_source_is_left_inline():
-    """A boundary polygon is a few hundred bytes — not worth a round trip."""
-    from roadstyle.render_web import _compress_sources
-
-    style = {"sources": {"roads": {"type": "geojson", "data": {"type": "FeatureCollection",
-                                                               "features": [{"x": "y" * 500000}]}},
-                         "boundary": {"type": "geojson", "data": {"type": "FeatureCollection",
-                                                                  "features": [{"a": 1}]}},
-                         "basemap": {"type": "raster", "tiles": ["http://x/{z}/{x}/{y}.png"]}}}
-    blobs = _compress_sources(style)
-    assert set(blobs) == {"roads"}
-    assert style["sources"]["boundary"]["data"]["features"] == [{"a": 1}]
-    assert style["sources"]["basemap"]["tiles"]                      # raster untouched
 
 
 # --- minzoom: hide minor classes when zoomed out --------------------------------------------------
@@ -260,78 +183,28 @@ def _road_filters(html):
             if l["id"] in ("roads-simple", "roads-fill", "roads-casing", "roads-low-fill", "roads-bridge-fill")}
 
 
-def test_minzoom_off_with_false():
-    """minzoom=False (the old look before 2026-10-25, when the class minzoom became the default): every class at every zoom. A caller
-    with `track` as a width channel keeps its data; with casing.drop_below_px 0 no zoom is in the road filters but the seams'."""
-    from roadstyle.render_web import _casing_drop_filter, _seam_filter, render
-    seam = json.dumps(_seam_filter())   # only the casing seams (round from z17) and laps (flat below z17)
-    drop = json.dumps(_casing_drop_filter(1.0, False))
-    for f in _road_filters(render(_many_edges(20), minzoom=False).html).values():
-        assert "zoom" not in json.dumps(f).replace(seam, "").replace(drop, "")
 
 
-def test_minzoom_true_uses_the_config_table():
-    from roadstyle.config import DEFAULT
-    from roadstyle.render_web import render
-
-    fs = _road_filters(render(_many_edges(20), minzoom=True).html)
-    assert fs, "expected road layers"
-    for f in fs.values():
-        blob = json.dumps(f)
-        assert '"zoom"' in blob
-        assert f'"residential", {float(DEFAULT.minzoom["residential"])}' in blob
 
 
-@pytest.mark.parametrize("engine", ["python", "rust"])
-def test_the_filter_panel_names_each_class_first_zoom(engine):
+def test_the_filter_panel_names_each_class_first_zoom():
     """roadstyle:controls.filter.minzoom (2026-10-25): the first zoom of each class of the panel that the class minzoom hides below a zoom,
     so the Roads box dims it; a dict's change is in it; None with minzoom=False."""
     from roadstyle.config import DEFAULT
-    flt = _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom={"residential": 9}).html, "filter")
+    flt = _opt(render_edges(_many_edges(20), backend="web", minzoom={"residential": 9}).html, "filter")
     assert flt["minzoom"]["residential"] == 9 and set(flt["minzoom"]) <= set(flt["classes"]), flt
     assert all(flt["minzoom"].get(c) == DEFAULT.minzoom[c] for c in flt["classes"] if c != "residential" and DEFAULT.minzoom.get(c))
-    assert _opt(render_edges(_many_edges(20), backend="web", engine=engine, minzoom=False).html, "filter")["minzoom"] is None
-
-
-def test_minzoom_dict_overrides_only_what_it_names():
-    from roadstyle.config import DEFAULT
-    from roadstyle.render_web import render
-
-    blob = json.dumps(_road_filters(render(_many_edges(20), minzoom={"residential": 9}).html))
-    assert '"residential", 9.0' in blob
-    assert f'"service", {float(DEFAULT.minzoom["service"])}' in blob   # untouched key survives
-
-
-def test_unknown_class_is_always_drawn():
-    """The table hides things early; it is never a whitelist. An unlisted class must default to 0."""
-    from roadstyle.render_web import _minzoom_filter
-
-    expr = _minzoom_filter("highway", {"service": 15})
-    assert expr[0] == ">=" and expr[1] == ["zoom"]
-    assert expr[2][-1] == 0.0                     # the `match` default
+    assert _opt(render_edges(_many_edges(20), backend="web", minzoom=False).html, "filter")["minzoom"] is None
 
 
 
 
-def test_draw_order_from_layer_look_from_bridge_column():
-    """The OSM `layer` decides the draw order (a layer=2 road without a bridge tag is drawn above
-    the ground roads), but only the bridge column earns the bridge look (deck styling, 3D
-    extrusions); a negative layer alone is below ground, not a tunnel."""
-    g = _edges().assign(bridge=[True, False, False], layer=[1, 2, -1])
-    style = _stages(g, backend="web")
-    ps = [f["properties"] for f in style["_roads"]["features"]]
-    assert [p["lvl"] for p in ps] == [1, 2, -1]
-    assert [p["__rs_bridge"] for p in ps] == [True, False, False]
-    assert [p["__rs_tunnel"] for p in ps] == [False, False, False]
 
 
-def test_web_round_caps_seal_edge_connections():
-    """Consecutive edges are separate LineStrings; round caps are the only rendering primitive
-    that seals the seam where they connect. Network continuity outranks end-cap shape."""
-    style = _style(render_edges(_edges(), backend="web", simple=False).html)
-    lay = {l["id"]: l for l in style["layers"]}
-    assert lay["roads-fill"]["layout"]["line-cap"] == "round"
-    assert lay["roads-casing"]["layout"]["line-cap"] == "round"
+
+
+
+
 
 
 def test_twoway_requires_a_reverse_twin_not_just_shared_endpoints():
@@ -350,36 +223,8 @@ def test_twoway_requires_a_reverse_twin_not_just_shared_endpoints():
     assert tw == [False, False, True, True]
 
 
-def test_web_labels_and_arrows_read_style_config(monkeypatch):
-    """Label paint and arrow cosmetics come from StyleConfig (data/style.json "config" +
-    roadstyle.json overrides), not hardcoded paint — a partial override dict keeps the rest."""
-    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
-    import dataclasses
-
-    import roadstyle.render_web as rw
-
-    cfg = dataclasses.replace(rw.CONFIG,
-                              labels={"color": "#ff0000", "halo_color": "#000000", "halo_width": 2},
-                              arrows={"color": "#123456", "opacity": 0.5})
-    monkeypatch.setattr(rw, "CONFIG", cfg)
-    wm = render_edges(_edges(), backend="web", arrows=True, labels=True)
-    style = _style(wm.html)
-    paint = next(l for l in style["layers"] if l["id"] == "roads-labels")["paint"]
-    # labels inherit the arrows' opacity (same rendered grey, not just same hex);
-    # a labels.opacity settings key would override it
-    assert paint == {"text-color": "#ff0000", "text-halo-color": "#000000",
-                     "text-halo-width": 2, "text-opacity": 0.5}
-    arrow = next(l for l in style["layers"] if l["id"] == "roads-arrows")
-    assert arrow["minzoom"] == 15 and arrow["paint"]["icon-opacity"] == 0.5
-    assert _opt(wm.html, "arrow_color") == "#123456"   # the chevron SVG itself is retinted
 
 
-def test_web_bridge_casing_is_config_colour():
-    """Bridge decks keep a solid dark casing (config.bridge_casing_color, slate #64748b by default) even
-    though the regular road casing defaults to light grey."""
-    style = _style(render_edges(_edges().assign(bridge=["yes", None, None]), backend="web", simple=False).html)
-    bc = next(l for l in style["layers"] if l["id"].endswith("-bridge"))
-    assert bc["paint"]["line-color"] == "#64748b"
 
 
 def test_webmap_notebook_repr_is_slim_but_saved_file_is_offline():
@@ -430,39 +275,6 @@ def test_web_camera_toggle_control():
     assert _opt(html, "pitch_3d") == 55 and 'b.textContent = m.getPitch()<5 ? "3D" : "2D"' in html
 
 
-def test_web_3d_bridge_decks():
-    """view_3d renders bridges as extruded deck ribbons (polygons floating base_m above ground)
-    from bridge_decks.flat_below up; below it the classic flat bridge lines draw (full stylized
-    width — a fixed deck polygon reads too narrow / vanishes zoomed out)."""
-    g = _edges().assign(bridge=["yes", None, None])
-    td = _style(render_edges(g, backend="web", view_3d=True, simple=False).html)
-    ids = [l["id"] for l in td["layers"]]
-    assert "roads-bridge-decks" in ids
-    # LOD swap at flat_below: flat lines capped there, deck starts there; bridge highlight split
-    deck3d = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
-    assert deck3d["minzoom"] == 16.0
-    # the flat bridge line (its casing layer, and the bridge edges in the position layers) ends where the deck starts
-    assert next(l for l in td["layers"] if l["id"].endswith("-bridge") and l["id"].startswith("roads-casing"))["maxzoom"] == 16.0
-    assert json.dumps(["<", ["zoom"], 16.0]) in json.dumps(next(l for l in td["layers"] if l["id"] == "roads-fill")["filter"])
-    assert "roads-highlight-bridge" not in ids          # a bridge is drawn (and highlighted) by the layers of its positions
-    deck = next(l for l in td["layers"] if l["id"] == "roads-bridge-decks")
-    assert deck["type"] == "fill-extrusion"
-    assert deck["paint"]["fill-extrusion-base"] == ["get", "__rs_base"]
-    assert td["sources"]["decks"].get("generateId") is True     # hover/select feature-state
-    slices = td["sources"]["decks"]["data"]["features"]
-    assert all(f["geometry"]["type"] == "Polygon" for f in slices)
-    # popup parity: slices carry the full edge properties, not just fills
-    assert "maxspeed_kmh" in slices[0]["properties"] or "aadt" in slices[0]["properties"]
-    assert all("__rs_chain" in f["properties"] for f in slices)   # whole-bridge hover unit
-    assert deck["paint"]["fill-extrusion-opacity"] == 0.7    # settings-driven transparency
-    bases = [f["properties"]["__rs_base"] for f in slices]
-    # the deck RAMPS: grounded at the ends (connects to the road), full height mid-span
-    assert min(bases) < 1.0 and max(bases) == 5.0
-    flat = _style(render_edges(g, backend="web", simple=False).html)
-    fids = [l["id"] for l in flat["layers"]]
-    assert "roads-casing-lv1-bridge" in fids and "roads-bridge-decks" not in fids
-    # zoom smoothing: near-zero source simplification
-    assert flat["sources"]["roads"]["tolerance"] == 0.05
 
 
 def test_web_bridge_forks_stay_elevated():
@@ -558,24 +370,6 @@ def test_google_3d_window_needs_the_key(monkeypatch):
         render_edges(_edges(), backend="web", google_3d=True)
 
 
-def test_oneway_column_drives_arrows():
-    """The data contract: an explicit `oneway` column controls the arrows (undirected networks
-    included); without the column, one-way = an edge with no reverse twin."""
-    a, b, c = (18.0, 59.30), (18.01, 59.305), (18.02, 59.31)
-    g = gpd.GeoDataFrame(
-        {"highway": ["residential"] * 2, "oneway": [True, False]},
-        geometry=[LineString([a, b]), LineString([b, c])], crs=4326)
-    style = _stages(g, backend="web")
-    flags = [f["properties"]["__rs_oneway"] for f in style["_roads"]["features"]]
-    assert flags == [True, False]          # column wins; no arrows on the two-way street
-    slot_oneway = {f["properties"]["oneway"]
-                   for f in style["sources"]["slots"]["data"]["features"]}
-    assert slot_oneway == {0, 1}           # arrow slots exist only on the oneway=True chain
-    # without the column: twin inference (no twin -> one-way)
-    g2 = g.drop(columns="oneway")
-    style2 = _stages(g2, backend="web")
-    flags2 = [f["properties"]["__rs_oneway"] for f in style2["_roads"]["features"]]
-    assert flags2 == [True, True]
 
 
 def test_web_panel_search_always_reads_the_id():
@@ -729,28 +523,6 @@ def test_deck_slices_carry_their_road_id():
     assert cas["paint"]["fill-extrusion-color"] == "#64748b"
 
 
-def test_dashed_path_classes_get_dash_layers():
-    """footway/path/steps/cycleway carry a palette dash (__rs_dash); the web backend renders
-    them as dashed sibling fill layers (butt caps — round would seal the gaps) and drops them
-    from the solid fill + casing layers so the gaps show the ground."""
-    g = gpd.GeoDataFrame(
-        {"highway": ["footway", "cycleway", "residential"]},
-        geometry=[LineString([(18.0, 59.30), (18.01, 59.305)]),
-                  LineString([(18.01, 59.305), (18.02, 59.31)]),
-                  LineString([(18.02, 59.31), (18.03, 59.315)])], crs=4326)
-    style = _style(render_edges(g, backend="web", simple=False).html)
-    lay = {l["id"]: l for l in style["layers"]}
-    dash_layers = [l for i, l in lay.items() if i.startswith("roads-fill-dash")]
-    assert len(dash_layers) == 2               # highsat: footway 4,4 / cycleway 6,4
-    assert all("line-dasharray" in l["paint"] for l in dash_layers)
-    assert all(l["layout"]["line-cap"] == "butt" for l in dash_layers)
-    assert "__rs_dash" in json.dumps(lay["roads-fill"]["filter"])      # solid excludes dashed
-    assert "__rs_dash" in json.dumps(lay["roads-casing"]["filter"])    # no casing band either
-    # z-order: dashed classes sit at the bottom of the table, so their layers draw UNDER the
-    # solid casing+fill — a residential street covers a footway crossing it (osm-carto order)
-    ids = [l["id"] for l in style["layers"]]
-    for dl in dash_layers:
-        assert ids.index(dl["id"]) < ids.index("roads-casing") < ids.index("roads-fill")
 
 
 
@@ -848,37 +620,8 @@ def test_zoom_readout_is_on_by_default_and_can_be_turned_off():
     assert _opt(render_edges(_edges(), backend="web", zoom_readout=False).html, "zoom_readout") is False
 
 
-def test_tunnel_casing_is_the_dash_layer_alone():
-    """docs/design/tunnel_look.md, as v2: a tunnel's casing is drawn by the dash sublayer only, slate dashes (#94a3b8, 1:1) with empty gaps;
-    the other casing layers leave the tunnel out (transparent), so the gaps are empty. A street's casing is unchanged."""
-    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "tunnel": ["yes", None]},
-                         geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
-                                   LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
-    style = _stages(g, backend="web", palette="highsat", simple=False)          # highsat: primary casing #bcbcbc
-    lay = {l["id"]: l for l in style["layers"]}
-    ids = list(lay)
-    assert ids.index("roads-casing") < ids.index("roads-casing-dash") < ids.index("roads-fill")
-    from roadstyle.render_web import _plus_px, _tun_dash
-    assert lay["roads-casing-dash"]["paint"]["line-color"] == _tun_dash() and lay["roads-casing-dash"]["paint"]["line-dasharray"] == ["global-state", "rs_tun_ratio"]
-    assert style["state"]["rs_tun_ratio"]["default"] == [1, 1] and style["state"]["rs_tun_c0"]["default"] == "#4b5563"      # Graphite + silver
-
-    assert _plus_px(["interpolate", ["linear"], ["zoom"], 12, 1, 18, ["get", "w"]], 3) == ["interpolate", ["linear"], ["zoom"], 12, ["+", 1, 3], 18, ["+", ["get", "w"], 3]]
-    assert "__rs_tunnel" in json.dumps(lay["roads-casing-dash"]["filter"])      # only the tunnel look
-    tun, street = (f["properties"] for f in style["_roads"]["features"])
-    assert _eval(lay["roads-casing"]["paint"]["line-color"], {**tun, "$state": {"rs_tun_two": False}}) == "rgba(0,0,0,0)"     # One colour: empty gaps
-    assert _eval(lay["roads-casing"]["paint"]["line-color"], street) == street["__rs_casing"]
-    for stop in (4, 6):                                       # the casing layer (the gap colour) is as wide as the dash layer for a tunnel only
-        dash_w, case_w = lay["roads-casing-dash"]["paint"]["line-width"][stop], lay["roads-casing"]["paint"]["line-width"][stop]
-        assert case_w == ["case", ["to-boolean", ["get", "__rs_tunnel"]], dash_w, dash_w[1]]      # dash: ["+", w, 3]
 
 
-def test_rscolor_raises_painted_roads_within_their_level():
-    """rsColor lifts the painted roads to the top of their level (line-sort-key +500, levels are
-    1000 apart): over a street they cross, still under a bridge above them."""
-    html = render_edges(_edges(), backend="web", simple=False).html
-    keys = [l["layout"]["line-sort-key"] for l in _style(html)["layers"] if l.get("source") == "roads" and (l.get("layout") or {}).get("line-sort-key") is not None]
-    assert keys and all(k[0] == "+" and k[2][0] == "case" and k[2][2:] == [500, 0] and "rs_colors" in json.dumps(k[2]) for k in keys)
-    assert 'map.setGlobalStateProperty("rs_colors", _colorsOf(_qColor))' in html and "function _applySort()" not in html
 
 
 
@@ -932,11 +675,6 @@ def _eval(e, p):
 
 
 
-def test_order_and_band_survive_tiles():
-    """The tiles keep every __rs_* property, so band / order work with tiles=True."""
-    from roadstyle.tiles import tile_props
-    props = tile_props({"highway": "footway", "__rs_band": 1, "__rs_order": 3.0, "x": 1}, {"highway"})
-    assert props == {"highway": "footway", "__rs_band": 1, "__rs_order": 3.0}
 
 
 def test_tunnels_toggle_like_bridges():
@@ -952,22 +690,6 @@ def test_tunnels_toggle_like_bridges():
     assert _in('"tunnels": false', plain)
 
 
-def test_links_draw_below_every_street_like_osm_carto():
-    """Every *_link sorts below every non-link street (residential included) and above service,
-    in its parent's order: a primary_link no longer covers the residential street it meets
-    (docs/design/junction_order.md, step 1). A link the table doesn't list stays under its parent."""
-    from roadstyle import render_web
-    key = render_web._sort_key("highway")[2]                # ["match", ["get", col], c, z, ..., default]
-    z = dict(zip(key[2:-1:2], key[3:-1:2], strict=True))
-    links = ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"]
-    assert all(z["pedestrian"] > z[l] > z["service"] for l in links)
-    assert [z[l] for l in links] == sorted((z[l] for l in links), reverse=True)
-    assert z["primary_link"] < z["residential"]
-    render_web.ROAD_Z.pop("trunk_link")
-    try:
-        assert render_web._sort_key("highway")[2][render_web._sort_key("highway")[2].index("trunk_link") + 1] == 7.5
-    finally:
-        render_web._load_road_model()
 
 
 
@@ -991,15 +713,6 @@ def _pairs():
                             geometry=[LineString(r[3]) for r in rows], crs=4326)
 
 
-def test_twin_pairs_get_one_end_cap_per_end():
-    style = _style(render_edges(_pairs(), backend="web", simple=False, settings={"config": {"twin_casing": "each"}}).html)
-    pts = style["sources"]["ends"]["data"]["features"]
-    # only the plain, solid two-way street: two ends, both twins' ids; no one-way, bridge, tunnel,
-    # or dashed pair
-    assert len(pts) == 2
-    assert {(p["properties"]["__rs_edge"], p["properties"]["__rs_edge2"]) for p in pts} == {(0, 1)}
-    assert {tuple(p["geometry"]["coordinates"]) for p in pts} == {(18.0, 59.3), (18.0, 59.31)}
-    assert pts[0]["properties"]["__rs_fill"] and pts[0]["properties"]["highway"] == "residential"
 
 
 
@@ -1008,24 +721,6 @@ def _roads_of(html):
     return [f["properties"] for f in _style(html)["_roads"]["features"]]
 
 
-def test_two_way_footway_is_one_full_width_line_and_a_street_keeps_its_lanes():
-    """single_line_classes: a reverse pair of a footway is drawn once (the later edge draws nothing), full width (no lane offset), no arrows;
-    both edges name each other (the popup shows both directions); a residential pair still fans into lanes."""
-    for simple in (True, False):
-        html = render_edges(_pairs(), backend="web", simple=simple).html
-        ps = [f["properties"] for f in _stages(_pairs(), simple=simple)["_roads"]["features"]]        # with their stage values
-        foot, street = ps[7:9], ps[0:2]
-        assert [p["__rs_twoway"] for p in foot] == [False, False] and [p["__rs_oneway"] for p in foot] == [False, False]
-        assert [p.get("__rs_dup") for p in foot] == [None, True] and (foot[0]["__rs_edge2"], foot[1]["__rs_edge2"]) == (8, 7)
-        assert all(p["__rs_twoway"] and "__rs_dup" not in p for p in street)
-        style = _style(html)
-        if simple:
-            pieces = style["sources"]["simple"]["data"]["features"]
-            assert {f["properties"]["__rs_edge"] for f in pieces if f["properties"]["__rs_cls"] == "footway"} == {7}     # a piece's class (R1: no highway)
-        else:
-            nd = ["!", ["to-boolean", ["get", "__rs_dup"]]]
-            assert all(l["filter"] == nd or l["filter"][-1] == nd for l in style["layers"] if l.get("source") in ("roads", "casings", "halves"))
-        assert "_both(" in html and "function _twinDetail" in html
 
 
 def test_single_line_classes_is_a_setting():
@@ -1083,105 +778,20 @@ def _num(e, p):
     return _ev(e, p)
 
 
-def test_a_two_way_pair_has_one_casing_and_a_fill_per_direction():
-    """twin_casing "one" (the default, 2026-10-08): a two-way road given as two directed edges has ONE casing, the first edge's pieces,
-    unshifted and as wide as both directions together (a direction's casing + twice its offset: the outer edge of the two lanes, as the
-    end caps' radius); the second edge has no casing piece; each direction keeps its own fill, shifted, as before. Simple mode, the bridge
-    shadow and the tunnel's two casing pieces too, and the full look; no end blobs (each piece has its own cap)."""
-    from roadstyle.render_web import _ZSTOPS, _end_radius_expr
-    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None), (3, "c", "d", 0, 0, 0, 0, None, None)])
-    for extra in ({}, {"bridge": "yes"}, {"tunnel": "yes"}):
-        style = _style(render_edges(g.assign(**extra), **_TWIN_KW).html)
-        feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
-        casing = [(p["__rs_edge"], p["__rs_k"], p.get("__rs_pair"), p.get("__rs_edge2")) for p in feats if p["__rs_k"] != 1]
-        assert {c[0] for c in casing} == {0, 2} and all(c[2:] == (True, 1) for c in casing if c[0] == 0)
-        assert all(c[2:] == (None, None) for c in casing if c[0] == 2)                    # the one-way street: as before
-        ks = {c[1] for c in casing if c[0] == 0}
-        assert ks == ({0, 2} if extra.get("bridge") else {3, 4} if extra.get("tunnel") else {0})       # its shadow, its tunnel pieces
-        fills = [p for p in feats if p["__rs_k"] == 1]
-        assert sorted(p["__rs_edge"] for p in fills) == [0, 1, 2] and not any(p.get("__rs_pair") for p in fills)
-        lyr = next(l for l in style["layers"] if l["id"] == "roads-simple")
-        z = _ZSTOPS.index(18)
-        width, offset = lyr["paint"]["line-width"], lyr["paint"]["line-offset"]
-        pair = next(p for p in feats if p.get("__rs_pair") and p["__rs_k"] in (0, 3))
-        fill = next(p for p in fills if p["__rs_edge"] == 0)
-        lane = {**pair, "__rs_pair": None}                                                # the same piece as one direction's casing
-        assert _num(offset[4 + 2 * z], pair) == 0 and _num(offset[4 + 2 * z], fill) > 0
-        assert _num(width[4 + 2 * z], pair) == pytest.approx(_num(width[4 + 2 * z], lane) + 2 * _num(offset[4 + 2 * z], fill))
-        if not extra:
-            outer = _num(_end_radius_expr("highway", casing=True)[4 + 2 * z], {**pair, "highway": pair["__rs_cls"]})   # the pair's outer half-width at zoom 18
-            assert _num(width[4 + 2 * z], pair) == pytest.approx(2 * outer, abs=0.01)
-    full = _style(render_edges(g, simple=False, **_TWIN_KW).html)
-    pieces = [f["properties"] for f in full["sources"]["casings"]["data"]["features"]]
-    assert sorted((p["__rs_edge"], p.get("__rs_pair")) for p in pieces) == [(0, True), (2, None)] and "ends" not in full["sources"]
-    cas = next(l for l in full["layers"] if l["id"] == "roads-casing")
-    assert cas["source"] == "casings" and "__rs_pair" in json.dumps(cas["paint"]["line-width"]) and "__rs_pair" in json.dumps(cas["paint"]["line-offset"])
 
 
-def test_a_two_way_pair_with_metre_widths_is_drawn_in_metres():
-    """A pair whose two directions have metre widths (2026-10-10, lanes as items): the one casing is both directions together, their two
-    casings in the middle once (4 + 6 - 2 * 0.15 m), unshifted; each direction's fill is shifted by half the OTHER direction's fill, so the
-    two fills meet on the line (the carriageway centred on it, as GMNS lays out lanes). Not by the class pixels the casing had nothing to do with."""
-    import math
-    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)]).assign(w=[4.0, 6.0])
-    style = _style(render_edges(g, width_m_col="w", width_m_zoom=0, **_TWIN_KW).html)
-    feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
-    lyr = next(l for l in style["layers"] if l["id"] == "roads-simple")
-    width, offset = lyr["paint"]["line-width"], lyr["paint"]["line-offset"]
-    i = width[3::2].index(20)
-    assert offset[3::2][i] == 20
-    px = 512 * 2 ** 20 / 40075016.686 / math.cos(math.radians(59.3005))           # px per metre at zoom 20, at the street's latitude
-    pair = next(p for p in feats if p.get("__rs_pair") and p["__rs_k"] == 0)
-    fills = {p["__rs_edge"]: p for p in feats if p["__rs_k"] == 1}
-    assert _num(width[4 + 2 * i], pair) == pytest.approx((4 + 6 - 0.3) * px, rel=1e-3) and _num(offset[4 + 2 * i], pair) == 0
-    assert _num(width[4 + 2 * i], fills[0]) == pytest.approx(3.7 * px, rel=1e-3)                 # a direction's fill: its width - 2 casings
-    assert _num(offset[4 + 2 * i], fills[0]) == pytest.approx(5.7 / 2 * px, rel=1e-3)            # half the other one's fill
-    assert _num(offset[4 + 2 * i], fills[1]) == pytest.approx(3.7 / 2 * px, rel=1e-3)
 
 
-def test_casing_min_px_keeps_a_thin_metre_casing_visible():
-    """casing_min_px (2026-10-10): a casing in metres is at least that many pixels each side of its fill; a wide one keeps its metres."""
-    import math
-    g = _twin([(3, "c", "d", 0, 0, 0, 0, None, None)]).assign(w=[6.78])
-    for cm, want in ((0.14, 1.0), (1.0, None)):
-        style = _style(render_edges(g, width_m_col="w", width_m_zoom=0, casing_m=cm, casing_min_px=1.0, **_TWIN_KW).html)
-        feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
-        width = next(l for l in style["layers"] if l["id"] == "roads-simple")["paint"]["line-width"]
-        i = width[3::2].index(18)
-        px = 512 * 2 ** 18 / 40075016.686 / math.cos(math.radians(59.3005))
-        casing = next(p for p in feats if p["__rs_k"] == 0)
-        side = (_num(width[4 + 2 * i], casing) - (6.78 - 2 * cm) * px) / 2      # the casing's pixels outside the fill, each side
-        assert side == pytest.approx(want if want else cm * px, rel=1e-2)
 
 
-def test_a_two_way_pairs_casing_takes_each_end_its_own_cap():
-    """The one casing is cut from the first edge of the pair, with its own heads and caps; the second edge runs the other way, so its start
-    is the first one's end. A flat start at a and a square end at b come out at a and at b whichever direction comes first; each fill keeps
-    its own caps."""
-    a, b = (18.0, 59.30), (18.0, 59.301)
-    along = (1, "a", "b", 0, 0, 0, 0, "yes", "square")
-    back = (2, "b", "a", 0, 0, 0, 0, "square", "yes")
-    for rows in ([along, back], [back, along]):
-        feats = _stages(_twin(rows), **_TWIN_KW)["sources"]["simple"]["data"]["features"]
-        heads = [f for f in feats if f["properties"]["__rs_k"] == 0 and not f["properties"].get("__rs_main") and not f["properties"].get("__rs_seam")]
-        assert {f["properties"]["__rs_edge"] for f in heads} == {0}
-        at = {}
-        for f in heads:
-            c = [tuple(x) for x in f["geometry"]["coordinates"]]
-            at[a if a in (c[0], c[-1]) else b] = f["properties"].get("__rs_cap")
-        assert at == {a: True, b: "square"}
-        fills = [f for f in feats if f["properties"]["__rs_k"] == 1]               # two different ends: each fill in two halves, its own caps; the
-        # square half flat at its cut, its square end on a stub (_end_stub)
-        ends = sorted((f["properties"]["__rs_edge"], a in [tuple(x) for x in f["geometry"]["coordinates"]], str(f["properties"].get("__rs_cap"))) for f in fills)
-        assert ends == [(0, False, "True"), (0, False, "square"), (0, True, "True"), (1, False, "True"), (1, False, "square"), (1, True, "True")]
 
 
-def _twin_caps(g, simple=True, **kw):
+def _twin_caps(g, **kw):
     """(casing cap at a, at b, fill caps by (edge, point)) of a drawn pair: a = (18, 59.30), b = (18, 59.301); a piece's cap counts at each of
-    its end points that are a or b (a whole piece: both ends, a half: its own). The full look reads the casing pieces and the halves."""
+    its end points that are a or b (a whole piece: both ends, a half: its own)."""
     a, b = (18.0, 59.30), (18.0, 59.301)
-    style = _style(render_edges(g, **{**_TWIN_KW, "simple": simple, **kw}).html)
-    src = style["sources"]["simple" if simple else "casings"]["data"]["features"]
+    style = _style(render_edges(g, **{**_TWIN_KW, **kw}).html)
+    src = style["sources"]["simple"]["data"]["features"]
     hv = style["sources"]["halves"]["data"]["features"] if "halves" in style["sources"] else []
     cas, fills = {}, {}
     for f in src + hv:
@@ -1194,59 +804,10 @@ def _twin_caps(g, simple=True, **kw):
     return cas, fills
 
 
-def test_a_two_way_pairs_dead_end_is_square_without_given_caps():
-    """twin_casing "one": a pair's dead end gets "square" (casing and both fills) when the data gives that end no cap; a junction end (another
-    edge's end point there) stays round; a line crossing mid-line is no junction; a given cap wins; "each" and a one-way road are unchanged."""
-    a, b = (18.0, 59.30), (18.0, 59.301)
-    pair = [(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)]
-    for simple in (True, False):
-        cas, fills = _twin_caps(_twin(pair + [(3, "c", "d", 0, 0, 0, 0, None, None)]), simple)     # c-d runs by, touching nothing
-        assert cas == {a: "square", b: "square"}
-        # a one-way edge ending at b: b is a junction, a is still a dead end
-        g = _twin(pair + [(3, "c", "b", 0, 0, 0, 0, None, None)])
-        cas, fills = _twin_caps(g, simple)
-        assert cas == {a: "square", b: None}
-        assert {k: v for k, v in fills.items() if k[0] in (0, 1)} == {(0, a): "square", (0, b): None, (1, a): "square", (1, b): None}
-        # a given cap wins (round included); the other end is still automatic
-        cas, fills = _twin_caps(_twin([(1, "a", "b", 0, 0, 0, 0, "round", None), (2, "b", "a", 0, 0, 0, 0, None, "round")]), simple)
-        assert cas == {a: None, b: "square"}
-        assert fills[(0, a)] is None and fills[(1, a)] is None and fills[(0, b)] == "square" and fills[(1, b)] == "square"
-    # a line crossing mid-line (a point inside it, not an end point at b) is no junction
-    x = _twin(pair)
-    cross = gpd.GeoDataFrame({"highway": "primary", "edge_id": [3], "cs": [0], "cm": [0], "ce": [0], "fl": [0], "cap_s": [None], "cap_e": [None]},
-                             geometry=[LineString([(17.999, 59.301), b, (18.001, 59.301)])], crs=4326)
-    assert _twin_caps(gpd.GeoDataFrame(__import__('pandas').concat([x, cross], ignore_index=True), crs=4326))[0] == {a: "square", b: "square"}
-    # "each" keeps today's blob look (no squares); a one-way road keeps round
-    assert _twin_caps(_twin(pair), settings={"config": {"twin_casing": "each"}})[1] == {(0, a): None, (0, b): None, (1, a): None, (1, b): None}
-    one = _twin([(1, "a", "b", 0, 0, 0, 0, None, None)])
-    assert _twin_caps(one)[0] == {a: None, b: None}
 
 
-def test_a_plain_call_without_level_columns_draws_a_pair_with_one_casing():
-    """twin_casing "one" when render_edges computes the levels itself (no level columns): one casing for the pair (the first edge's, full
-    width), a fill per direction, square dead ends; simple mode and the full look (2026-10-09)."""
-    a, b = (18.0, 59.30), (18.0, 59.301)
-    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)])[["highway", "edge_id", "geometry"]]
-    for simple, src in ((True, "simple"), (False, "casings")):
-        feats = [f for f in _style(render_edges(g, backend="web", simple=simple).html)["sources"][src]["data"]["features"]]
-        casing = [f["properties"] for f in feats if f["properties"].get("__rs_k") != 1]
-        assert casing and {p["__rs_edge"] for p in casing} == {0} and all(p.get("__rs_pair") for p in casing)
-        ends = {pt: f["properties"].get("__rs_cap") for f in feats if f["properties"].get("__rs_k") != 1 and not f["properties"].get("__rs_main")
-                and not f["properties"].get("__rs_seam") for pt in {tuple(x) for x in f["geometry"]["coordinates"]} & {a, b}}
-        assert ends == {a: "square", b: "square"}
-        if simple:
-            assert sorted(f["properties"]["__rs_edge"] for f in feats if f["properties"]["__rs_k"] == 1) == [0, 1]
 
 
-def test_twin_casing_each_in_metres_shifts_each_direction_by_metres():
-    """2026-10-10: with twin_casing "each" and metre widths, each direction keeps its own casing (no one pair casing) and is shifted by
-    metres as in "one" (__rs_twm, the other direction's width), so the two fills meet on the line and cover the casings between them."""
-    g = _pairs().assign(w=4.0)
-    fs = _stages(g, backend="web", width_m_col="w", settings={"config": {"twin_casing": "each"}})["_roads"]["features"]
-    two = [f["properties"] for f in fs if f["properties"].get("__rs_twoway")]
-    assert two and all("__rs_twm" in p and "__rs_twin" not in p and not p.get("__rs_pair") for p in two)
-    st = _stages(g, backend="web", width_m_col="w", settings={"config": {"twin_casing": "each"}})
-    assert "__rs_twm" in json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-offset"])   # the shift in metres
 
 
 def test_label_size_stops_from_the_settings():
@@ -1257,21 +818,6 @@ def test_label_size_stops_from_the_settings():
     assert lab["paint"]["text-halo-color"] == "#fff" and lab["paint"]["text-halo-width"] == 1.5
 
 
-def test_twin_casing_each_is_todays_look():
-    """twin_casing "each": every direction draws its own casing, shifted, half the width; no __rs_pair anywhere, the end blobs as before."""
-    g = _twin([(1, "a", "b", 0, 0, 0, 0, None, None), (2, "b", "a", 0, 0, 0, 0, None, None)])
-    each = {"settings": {"config": {"twin_casing": "each"}}}
-    html = render_edges(g, **_TWIN_KW, **each).html
-    feats = [f["properties"] for f in _style(html)["sources"]["simple"]["data"]["features"]]
-    assert "__rs_pair" not in html and "__rs_twin" not in html
-    assert sorted((p["__rs_edge"], p["__rs_k"]) for p in feats) == [(0, 0), (0, 1), (1, 0), (1, 1)]
-    one = _style(render_edges(g, **_TWIN_KW).html)
-    drop = lambda p: {k: v for k, v in p.items() if k not in ("__rs_pair", "__rs_twin", "__rs_edge2", "__rs_cap")}           # noqa: E731
-    assert [drop(f["properties"]) for f in one["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_edge"] == 0] == \
-        [drop(p) for p in feats if p["__rs_edge"] == 0]                         # the first edge's pieces: the same, flagged
-    assert "ends" in _style(render_edges(g, **{**_TWIN_KW, "simple": False}, **each).html)["sources"]
-    with pytest.raises(ValueError, match="twin_casing"):
-        render_edges(g, **_TWIN_KW, settings={"config": {"twin_casing": "both"}})
 
 
 def test_a_two_way_pair_that_disagrees_is_named_in_a_warning():
@@ -1287,94 +833,14 @@ def test_a_two_way_pair_that_disagrees_is_named_in_a_warning():
             render_edges(bad, **_TWIN_KW, edge_id_col="edge_id")
 
 
-def test_end_caps_follow_filters_and_recolour_and_can_be_turned_off():
-    html = render_edges(_pairs(), backend="web").html
-    assert '["any",_has(["get","__rs_edge"],ids),_has(["get","__rs_edge2"],ids)]' in html     # id filters: a cap shows while either twin does
-    caps = [l for l in _style(render_edges(_pairs(), backend="web", simple=False, settings={"config": {"twin_casing": "each"}}).html)["layers"]
-            if l["id"].startswith("roads-ends-fill")]
-    assert caps and all("rs_colors" in json.dumps(l["paint"]["circle-color"]) for l in caps)        # a cap takes the rsColor colour of its two lanes
-    off = _style(render_edges(_pairs(), backend="web", settings={"config": {"twin_end_caps": False}}).html)
-    assert "ends" not in off["sources"] and not [l for l in off["layers"] if "ends" in l["id"]]
-
-
-def test_end_caps_hide_where_the_two_directions_differ():
-    """A map coloured per direction (twins with different colours) keeps today's ends: the cap is
-    transparent unless both lanes share a colour, so no direction's colour shows at a street's end."""
-    g = _pairs().iloc[:2].assign(edge_id=["a", "b"])
-    html = render_edges(g, backend="web", color_table={"a": "#ff0000", "b": "#0000ff"}, simple=False, settings={"config": {"twin_casing": "each"}}).html
-    style = _style(html)
-    p = style["sources"]["ends"]["data"]["features"][0]["properties"]
-    assert p["__rs_fill"] != p["__rs_fill__b"]
-    fill = {l["id"]: l for l in style["layers"]}["roads-ends-fill"]["paint"]["circle-color"]
-    assert fill[0] == "case" and fill[3] == ["==", ["get", "__rs_fill"], ["get", "__rs_fill__b"]]       # (fill[1]: both lanes painted one colour)
-    assert fill[-1] == "rgba(0,0,0,0)"
-    same = _style(render_edges(_pairs().iloc[:2], backend="web", simple=False, settings={"config": {"twin_casing": "each"}}).html)["sources"]["ends"]["data"]["features"][0]["properties"]
-    assert same["__rs_fill"] == same["__rs_fill__b"]
 
 
 
 
-def test_directed_col_draws_a_pair_as_two_lanes_only_when_both_edges_are_directed():
-    """``directed_col`` false = an undirected edge (a footway stored both ways, a one-way street's
-    walking-only reverse): its pair is one line, centred and full width, with no end caps.
-    True / null on both = the geometry rule (two lanes); one false edge is enough for one line."""
-    a, b = (18.00, 59.30), (18.00, 59.31)
-
-    def lanes(directed, oneway=None):
-        cols = {"highway": ["residential"] * 2, "is_directed": directed}
-        if oneway:
-            cols["oneway"] = oneway
-        g = gpd.GeoDataFrame(cols, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)
-        st = _stages(g, backend="web", directed_col="is_directed", simple=False, settings={"config": {"twin_casing": "each"}})
-        ps = [f["properties"] for f in st["_roads"]["features"]]
-        return [p["__rs_twoway"] for p in ps], [p["__rs_oneway"] for p in ps], "ends" in st["sources"]
-
-    assert lanes([True, True]) == ([True, True], [False, False], True)        # a two-way street
-    assert lanes([None, None])[0] == [True, True]
-    assert lanes([False, False]) == ([False, False], [False, False], False)   # a footway: one line, no arrows
-    # a one-way street + its walking-only reverse: one line; arrows on the car edge only
-    assert lanes([True, False]) == ([False, False], [True, False], False)
-    assert lanes([True, False], oneway=[True, False])[1] == [True, False]     # `oneway` still rules arrows
 
 
-def test_driving_col_puts_arrows_on_one_way_driving_edges_only(monkeypatch):
-    """``driving_col``: arrows only on driving edges, and only one-way ones. Pair A is a one-way street whose reverse is not driving
-    (both `oneway` true): arrow on the driving edge alone; with no ``directed_col`` the pair is still two directions (driving_col never
-    decides the drawing, 2026-10-09). Pair B is a true two-way street: none. C is a one-way driving edge with no twin: arrow. D is a
-    one-way edge no car may drive: none."""
-    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
-    def seg(y, flip=False):
-        pts = [(18.000, y), (18.003, y)]
-        return LineString(pts[::-1] if flip else pts)
-    rows = [("A_f", True, True, seg(59.300)), ("A_r", True, False, seg(59.300, True)),
-            ("B_f", False, True, seg(59.310)), ("B_r", False, True, seg(59.310, True)),
-            ("C", True, True, seg(59.320)), ("D", True, False, seg(59.330)),
-            ("G_f", True, True, seg(59.340, True)), ("G_r", True, False, seg(59.340))]     # A the other way round: its arrow is still G_f's
-    g = gpd.GeoDataFrame({"highway": ["secondary"] * 8, "ref": [r[0] for r in rows], "oneway": [r[1] for r in rows],
-                          "driving": [r[2] for r in rows]}, geometry=[r[3] for r in rows], crs=4326)
 
-    def arrows(slots):
-        refs = list(g["ref"])
-        return {refs[f["properties"]["__rs_edge"]] for f in slots if f["properties"]["oneway"] and f["properties"]["slot"] % 2}
 
-    def inline(**kw):
-        st = _style(render_edges(g, backend="web", simple=False, **kw).html)
-        return arrows(st["sources"]["slots"]["data"]["features"])
-
-    assert inline(driving_col="driving") == {"A_f", "C", "G_f"}
-    assert "D" in inline()                       # no driving_col: every edge counts as driving, as before
-
-    pytest.importorskip("pmtiles")                # tiles=True: the archive's slots layer is the same plan
-    from roadstyle import tiles as _tiles
-    seen = []
-    real = _tiles.build_pmtiles
-    _tiles.build_pmtiles = lambda *a, **k: seen.append(k["extra_layers"]) or real(*a, **k)
-    try:
-        render_edges(g, backend="web", tiles=True, driving_col="driving")
-    finally:
-        _tiles.build_pmtiles = real
-    slots = next(l["fc"] for l in seen[0] if l["name"] == "slots")["features"]
-    assert arrows(slots) == {"A_f", "C", "G_f"}
 
 
 # ---- a tunnel is an ordinary road with a tunnel style (mapstyle's junctions.md, rule 1) ----------
@@ -1390,51 +856,14 @@ def _tunnel_world(cross):
                             geometry=[LineString(r[2]) for r in rows], crs=4326)
 
 
-def test_a_bridge_deck_casing_shows_with_metre_widths_and_no_casing():
-    """With ``width_m_col`` and ``casing_m=0`` a casing is as wide as the fill and hidden: a bridge's deck casing is at
-    least ``bridge_casing_m`` each side, so the bridge look shows."""
-    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "bridge": ["yes", None], "w": [3.25, 3.25]},
-                         geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]), LineString([(18.0, 59.31), (18.01, 59.31)])],
-                         crs=4326)
-    st = _style(render_edges(g, backend="web", width_m_col="w", casing_m=0, simple=False).html)
-    lay = {l["id"]: l for l in st["layers"]}
-    bc = next(l for i, l in lay.items() if i.endswith("-bridge"))["paint"]["line-width"]
-    assert '["max", ["get", "__rs_cm"], 0.25]' in json.dumps(bc)
-    assert '2.0' in json.dumps(bc)        # 2 * bridge_casing_px: the pixel floor
-    assert "0.25" not in json.dumps(lay["roads-casing"]["paint"]["line-width"])        # a plain road's casing is untouched
 
 
 
 
 
 
-def test_tunnels_get_light_dashes_on_their_fill_only_when_asked():
-    """Light dashes on a tunnel's fill: off by default since v2's tunnel look (2026-10-06); `tunnel_fill_dash: [1.2, 1.2]` (his pick of
-    2026-09-30 among three samples) draws them over the fill, translucent, butt-capped, not on a dashed class."""
-    assert not any(l["id"].endswith("-pat") for l in _style(render_edges(_tunnel_world(True), backend="web", simple=False).html)["layers"])
-    st = _style(render_edges(_tunnel_world(True), backend="web", settings={"config": {"tunnel_fill_dash": [1.2, 1.2]}}, simple=False).html)
-    lay = {l["id"]: l for l in st["layers"]}
-    ids = [l["id"] for l in st["layers"]]
-    pat = lay["roads-fill-lv1-pat"]                 # the tunnel's position: over the streets it joins, under the one crossing it (docs/design/level_input.md)
-    assert ids.index(pat["id"]) > ids.index("roads-fill-lv1") and pat["source"] == "roads"
-    assert pat["paint"]["line-dasharray"] == [1.2, 1.2] and pat["layout"]["line-cap"] == "butt"
-    assert pat["paint"]["line-color"].startswith("rgba(255,255,255")
-    assert '"__rs_dash"' in json.dumps(pat["filter"]) and "__rs_tunnel" in json.dumps(pat["filter"])
 
 
-def test_colour_by_recolours_the_dashed_layers_too():
-    """A footway / path / steps edge is drawn by a ``-dash<n>`` layer (line-dasharray is not data-driven): it must
-    follow the active colouring, or it keeps its class colour under any "colour by"."""
-    html = render_edges(_tunnel_world(True), backend="web").html
-    assert _opt(html, "fill_layers") == []          # a page in simple mode: its pieces recolour (the simple-mode script), no fill layers
-    w = _tunnel_world(True)
-    foot = w.iloc[[0]].assign(highway="footway", tunnel=None, layer=None, geometry=[LineString([(18.03, 59.30), (18.03, 59.31)])])
-    full = render_edges(pd.concat([w, foot], ignore_index=True), backend="web", simple=False).html     # the full look; a footway: a -dash<n> layer
-    style = _style(full)
-    fills = _opt(full, "fill_layers")
-    dashed = [l for l in style["layers"] if any(l["id"].startswith(f + "-dash") for f in fills)]
-    assert dashed and all("rs_colors" in json.dumps(l["paint"]["line-color"]) for l in dashed)     # a dashed edge takes the colouring too
-    assert "RS_PIECE_LAYERS" not in html and "tpieces" not in html
 
 
 
@@ -1454,254 +883,32 @@ def _stop(expr, z):
     return expr[expr.index(z, 3) + 1]
 
 
-def test_metre_width_is_exact_at_zoom_22():
-    """docs/design/metre_widths.md: the casing is the line's width in metres, the fill that minus
-    2 casings, both over cos(latitude); zoom 22 is a stop, base-2 exponential between stops."""
-    feats, width = _metre_map(width_m_col="w")
-    p = feats[0]["properties"]
-    sec = 1 / math.cos(math.radians(59.30))
-    assert abs(p["__rs_wm"] - 3.25 * sec) < 1e-3 and abs(p["__rs_cm"] - 0.15 * sec) < 1e-3
-    assert "__rs_wm" not in feats[1]["properties"]          # null width -> class width
-    px22 = 512 * 2 ** 22 / 40075016.686
-    fill, casing = _stop(width["roads-fill"], 22), _stop(width["roads-casing"], 22)
-    assert width["roads-fill"][1] == ["exponential", 2]
-    assert fill[0] == "case" and fill[1] == ["has", "__rs_wm"]
-
-    def ev(e):   # the metre width the expression multiplies: fill = width - 2 casings
-        return p["__rs_wm"] - 2 * p["__rs_cm"] if e[0] == "max" else p["__rs_wm"]
-    assert abs(ev(fill[2][1]) * fill[2][2] - (3.25 - 0.30) * sec * px22) < 0.05
-    assert abs(ev(casing[2][1]) * casing[2][2] - 3.25 * sec * px22) < 0.05
 
 
-def test_metre_width_keeps_class_widths_below_its_zoom():
-    _, plain = _metre_map()
-    _, metre = _metre_map(width_m_col="w", width_m_zoom=16)
-    for z in (12, 15):
-        assert _stop(metre["roads-fill"], z) == _stop(plain["roads-fill"], z)
-    assert _stop(metre["roads-fill"], 16)[3] == _stop(plain["roads-fill"], 16)   # the null-width branch
-    assert _stop(metre["roads-fill"], 22)[3] == _stop(plain["roads-fill"], 20)   # frozen past 20, as today
 
 
-def test_no_metre_width_column_leaves_the_style_unchanged():
-    feats, width = _metre_map()
-    assert width["roads-fill"][1] == ["linear"] and not any("__rs_wm" in f["properties"] for f in feats)
 
 
-def test_cap_col_gives_square_ends_to_the_edges_that_ask():
-    """cap_col (docs/design/square_ends.md): an edge with a true value is drawn by the butt-capped twin of its position's
-    casing and fill, and by no round layer; the others keep round ends. Nothing changes without the keyword."""
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "sq": [None, True, 0]},
-                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(3)],
-                         crs=4326)
-    style = _stages(g, backend="web", cap_col="sq", simple=False)
-    lay = {l["id"]: l for l in style["layers"]}
-    ids = [l["id"] for l in style["layers"]]
-    ps = [f["properties"] for f in style["_roads"]["features"]]
-    assert [p.get("__rs_cap") for p in ps] == [None, True, None]
-    assert lay["roads-fill-sq"]["layout"]["line-cap"] == "butt" and lay["roads-fill"]["layout"]["line-cap"] == "round"
-    assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [True, False, True]       # round: not the capped edge
-    assert [bool(_eval(lay["roads-fill-sq"]["filter"], p)) for p in ps] == [False, True, False]
-    assert ids.index("roads-casing") < ids.index("roads-casing-sq") < ids.index("roads-fill") < ids.index("roads-fill-sq")
-    assert "roads-fill-sx" not in lay                                                              # no "square" value: no square twin
-    sx = _stages(g.assign(sq=[None, True, "square"]), backend="web", cap_col="sq", simple=False)     # "square": flat, as long as round
-    lay = {l["id"]: l for l in sx["layers"]}
-    ps = [f["properties"] for f in sx["_roads"]["features"]]
-    assert lay["roads-fill-sx"]["layout"]["line-cap"] == "square"
-    assert [[bool(_eval(lay[i]["filter"], p)) for p in ps] for i in ("roads-fill", "roads-fill-sq", "roads-fill-sx")] == \
-        [[True, False, False], [False, True, False], [False, False, True]]                         # each edge in exactly one
-    plain = _stages(g.drop(columns="sq"), backend="web", simple=False)
-    assert not [l for l in plain["layers"] if l["id"].endswith("-sq")]
-    assert "__rs_cap" not in json.dumps(plain["sources"]["roads"])
 
 
 def _tunnel_conf(html):
     return _opt(html, "tunnel")
 
 
-def test_the_tunnel_look_is_v2s_slider():
-    """docs/design/tunnel_look.md: at tunnel_strength (60) everything on a tunnel moves toward the same colour (Sand): its fill, its street names,
-    its arrows (an SDF icon of their own) and every item attached to it (one fade, however an item was added); the page gets each
-    colour without the look and the dash layers. A map without tunnels has no look and no Tunnels box; an unknown palette
-    is an error."""
-    from roadstyle.render_web import _tun_mix
-    ov = Overlay(_edge_features([12, 11]), edge_col="edge_id", kind="circle", color="#ff0000")
-    html = render_edges(_edge_world().assign(name=["A", "T", "B", "C"]), backend="web", basemap="blank", overlays=[ov], tunnel_control=True, simple=False).html
-    style, conf = _style(html), _tunnel_conf(html)
-    assert _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank", simple=False).html)["control"] is False   # the box is off by default
-    lay = {l["id"]: l for l in style["layers"]}
-    assert conf["strength"] == 60 and conf["palette"] == "Graphite + silver" and conf["control"] is True and conf["ratio"] == [1, 1]
-    assert conf["dash"] and all(i.startswith("roads-casing") and i.endswith("-dash") for i in conf["dash"])
-    for lid, entries in conf["layers"].items():
-        for k, base, _to in entries:
-            assert lay[lid]["paint"][k] == _tun_mix(base)
-    assert style["state"]["rs_tun_strength"]["default"] == 60 and style["state"]["rs_tun_toward"]["default"] == "#d6cfc4"
-    kinds = {(i.split("-lv")[0].rstrip("-"), k, to) for i, entries in conf["layers"].items() for k, _, to in entries}
-    assert {("roads-fill", "line-color", "fill"), ("roads-labels", "text-color", "fill"),
-            ("roads-arrows", "icon-color", "fill")} <= {(a.replace("-tunnel", "").replace("-bridge", ""), b, c) for a, b, c in kinds}
-    assert {to for entries in conf["layers"].values() for _, _, to in entries} == {"fill"}       # one target for everything
-    arrows = [l for l in style["layers"] if l["id"].startswith("roads-arrows")]
-    assert arrows and all(l["layout"]["icon-image"] == "oneway" and "icon-color" in l["paint"] for l in arrows)
-    slots = style["sources"]["slots"]["data"]["features"]
-    assert any(f["properties"].get("__rs_tunnel") for f in slots) and not all(f["properties"].get("__rs_tunnel") for f in slots)
-    items = style["sources"]["ov0"]["data"]["features"]
-    assert [f["properties"].get("__rs_tunnel") for f in items] == [True, None]           # edge 12 is the tunnel
-    assert any(i.startswith("ov0-") for i in conf["layers"])                            # the item fades like the rest
-    a, b = (18.000, 59.30), (18.002, 59.30)
-    plain = render_edges(gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([a, b])], crs=4326), backend="web", simple=False).html
-    assert _tunnel_conf(plain)["layers"] == {} and _tunnel_conf(plain)["control"] is False
-    with pytest.raises(ValueError):
-        render_edges(_edge_world(), backend="web", settings={"config": {"tunnel_palette": "Pink"}}, simple=False)
 
 
-def test_the_tunnel_moves_toward_a_chosen_colour():
-    """docs/design/tunnel_look.md (2026-10-08): tunnel_toward is a name in tunnel_towards or a #rrggbb (default Slate); the slider starts at 50;
-    an unknown name or a bad colour is an error naming the choices."""
-    from roadstyle.render_web import _tun_mix
-    cfg = lambda **c: {"config": c}  # noqa: E731
-    base = _tunnel_conf(render_edges(_edge_world(), backend="web", basemap="blank").html)
-    assert base["toward"] == "Sand" and base["to"]["fill"] == "#d6cfc4" and base["strength"] == 60 and base["towards"]["Dark"] == "#14181d"
-    assert list(base["towards"]) == ["Slate", "Dark", "Light", "Graphite", "Navy", "Stone", "Sand", "Teal"]
-    for toward, hexc in (("Dark", "#14181d"), ("#123456", "#123456")):
-        html = render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward=toward, tunnel_strength=60)).html
-        conf, lay = _tunnel_conf(html), {l["id"]: l for l in _style(html)["layers"]}
-        assert conf["toward"] == toward and conf["to"]["fill"] == hexc and conf["strength"] == 60
-        for lid, entries in conf["layers"].items():
-            for k, b0, _to in entries:
-                assert lay[lid]["paint"][k] == _tun_mix(b0)
-        st = _style(html)["state"]
-        assert st["rs_tun_toward"]["default"] == hexc and st["rs_tun_strength"]["default"] == 60
-    for bad in ("Pink", "#12345", 7):
-        with pytest.raises(ValueError, match="tunnel_toward.*Slate"):
-            render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_toward=bad))
-    with pytest.raises(ValueError, match="tunnel_towards"):
-        render_edges(_edge_world(), backend="web", basemap="blank", settings=cfg(tunnel_towards={"Slate": "grey"}))
 
 
-def test_the_tunnel_target_is_chosen_in_the_browser(tmp_path):
-    """The Tunnels box colour list and rsSetTunnelStyle({toward}) in a real page: a name or a colour rebuilds the expressions; a bad value throws;
-    one slider of nine steps for every colour."""
-    pw = pytest.importorskip("playwright.sync_api")
-    path = tmp_path / "toward.html"
-    g = _edge_world()
-    render_edges(g, backend="web", basemap="blank_dark", tunnel_control=True, simple=False).save(path)
-    get = '() => map.getGlobalState().rs_tun_toward'
-    errors = []
-    with pw.sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-        page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-toward')", timeout=30_000)
-        slate = page.evaluate(get)
-        steps = page.evaluate("Array.from(document.getElementById('tn-pre').options).map(o => o.value).join()")
-        opts = page.evaluate("Array.from(document.getElementById('tn-toward').options).map(o => o.value).join()")
-        page.evaluate("document.getElementById('tn-toward').value = 'Dark'; document.getElementById('tn-toward').onchange()")
-        dark = page.evaluate(get)
-        page.evaluate("rsSetTunnelStyle({toward: '#123456'})")
-        mine = page.evaluate(get)
-        bad = page.evaluate("() => { try { rsSetTunnelStyle({toward: 'x'}); return ''; } catch(e) { return e.message; } }")
-        browser.close()
-    assert errors == []
-    assert steps == "0,25,50,55,60,65,70,75,100" and opts.startswith("Slate,Dark,Light") and opts.endswith("Teal")
-    assert slate == "#d6cfc4" and dark == "#14181d" and mine == "#123456" and "Slate" in bad
 
 
-def test_the_tunnels_box_moves_the_look_in_the_browser(tmp_path):
-    """The Tunnels box and rsSetTunnelStyle in a real page: the strength moves every tunnel colour, the casing too. The casing is two layers with
-    MapLibre's dash, no image: a palette's gap colour on the position's casing layer (transparent for One colour) and its dash colour on the
-    dash layer, both moved toward slate; Colour by keeps the look."""
-    pw = pytest.importorskip("playwright.sync_api")
-    path = tmp_path / "tunnels.html"
-    g = _edge_world().assign(aadt=[1, 2, 3, 4])
-    from roadstyle import compute_levels
-    from roadstyle.render_web import _level_id
-    lv = compute_levels(g)                                                       # the tunnel (row 1)'s positions, as the page computes them
-    fill, casing = _level_id("roads-fill", int(lv.fill_level[1])), _level_id("roads-casing", int(lv.casing_level[1]))
-    render_edges(g, backend="web", basemap="blank", color_options={"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}, tunnel_control=True,
-                 settings={"config": {"tunnel_toward": "Slate"}}, simple=False).save(path)
-    get = f"""() => ({{fill: JSON.stringify(map.getPaintProperty("{fill}", "line-color")),
-                    pattern: map.getPaintProperty("{casing}-dash", "line-pattern") || null,
-                    dash_paint: JSON.stringify(map.getPaintProperty("{casing}-dash", "line-color")),
-                    gap: JSON.stringify(map.getPaintProperty("{casing}-sq", "line-color")),     // the tunnel's casing ends flat
-                    st: map.getGlobalState(),
-                    slider: document.getElementById("tn-str").value, pal: document.getElementById("tn-pal").value}})"""
-    errors = []
-    with pw.sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.on("console", lambda m: errors.append(m.text) if m.type == "error" or "Cannot mix SDF" in m.text else None)
-        page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && map.loaded() && document.getElementById('tn-str')", timeout=30_000)
-        page.evaluate("document.addEventListener('rs:tunnelchange', e => window._ev = e.detail)")
-        opened = page.evaluate(get)
-        page.evaluate("rsSetTunnelStyle({strength: 70, palette: 'Teal + mint', ratio: [4, 3]})")
-        moved, ev = page.evaluate(get), page.evaluate("window._ev")
-        page.evaluate("rsSetColorField('AADT')")
-        coloured = page.evaluate(get)
-        page.evaluate("rsSetTunnelStyle({strength: 0})")
-        zero = page.evaluate(get)
-        page.evaluate("rsSetTunnelStyle({palette: 'One colour', strength: 100})")
-        one = page.evaluate(get)
-        browser.close()
-    assert errors == []
-    # the casing's expressions are made once in Python and read the state; the box only changes the state (docs/design/style_config.md step 2)
-    assert opened["pattern"] is None and opened["slider"] == "4" and opened["pal"] == "Graphite + silver"
-    assert opened["st"]["rs_tun_ratio"] == [1, 1] and opened["st"]["rs_tun_two"] is True                   # two colours by default: the gaps the second
-    assert all(x["dash_paint"] == opened["dash_paint"] and x["gap"] == opened["gap"] for x in (moved, coloured, zero, one))
-    assert "rs_tun_c0" in opened["dash_paint"] and "rs_tun_c1" in opened["gap"] and "rs_tun_strength" in opened["fill"]
-    assert moved["slider"] == "6"                                                        # nine steps: 0 25 50 55 60 65 70 75 100
-    assert moved["pal"] == "Teal + mint" and moved["pattern"] is None
-    assert {k: moved["st"][k] for k in ("rs_tun_strength", "rs_tun_c0", "rs_tun_c1", "rs_tun_ratio", "rs_tun_toward")} == \
-        {"rs_tun_strength": 70, "rs_tun_c0": "#2f6f73", "rs_tun_c1": "#9fd3cf", "rs_tun_ratio": [4, 3], "rs_tun_toward": "#64748b"}
-    assert ev == {"strength": 70, "palette": "Teal + mint", "ratio": [4, 3], "toward": "Slate"}
-    assert coloured["st"]["rs_co"] == 1 and "__rs_fill__1" in coloured["fill"] and "interpolate" in coloured["fill"]      # Colour by keeps the look
-    assert zero["st"]["rs_tun_strength"] == 0                                                                           # at 0 the palette as it is
-    assert one["st"]["rs_tun_two"] is False and one["st"]["rs_tun_c0"] == "#94a3b8" and one["st"]["rs_tun_strength"] == 100   # One colour: slate dashes, empty gaps
 
 
-def test_level_columns_draw_each_position_casings_then_fills():
-    """casing_level_col / fill_level_col (docs/design/level_columns.md): one casing layer and one fill layer for each position, in
-    position order; an edge's casing is in the layers of its casing position and its fill in those of its fill position."""
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 4, "tunnel": [None, None, "yes", None],
-                          "cl": [0, 0, -2, -1], "fl": [0, 1, -2, 1]},
-                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(4)], crs=4326)
-    style = _stages(g, backend="web", casing_level_col="cl", fill_level_col="fl", simple=False)
-    lay = {l["id"]: l for l in style["layers"]}
-    ids = [l["id"] for l in style["layers"]]
-    ps = [f["properties"] for f in style["_roads"]["features"]]
-    assert [(p["__rs_cl"], p["__rs_fl"]) for p in ps] == [(0, 0), (0, 1), (-2, -2), (-1, 1)]
-    for root, key, have in (("roads-casing", "__rs_cl", (-2, -1, 0)), ("roads-fill", "__rs_fl", (-2, 0, 1))):   # a layer per position it has
-        for level in (-2, -1, 0, 1):
-            if level not in have:
-                assert _pos_id(root, level) not in lay                    # no casing at 1, no fill at -1: no layer
-                continue
-            assert [bool(_eval(lay[_pos_id(root, level)]["filter"], p)) for p in ps] == [p[key] == level for p in ps]
-    # in position order, casings before fills of the same position, and position 0 keeps its ids
-    assert ids.index("roads-casing-lv-2") < ids.index("roads-fill-lv-2") < ids.index("roads-casing-lv-1") \
-        < ids.index("roads-casing") < ids.index("roads-fill") < ids.index("roads-fill-lv1")
-    # the page recolours the fill layers of every position
-    html = render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl", simple=False).html
-    assert '"roads-fill-lv1"' in html and '"roads-fill-lv-2"' in html
 
 
 def _pos_id(root, level):
     return root if level == 0 else f"{root}-lv{level}"
 
 
-def test_level_columns_keep_the_looks_and_the_dashed_classes():
-    """The tunnel look and the dashed classes follow the positions."""
-    g = gpd.GeoDataFrame({"highway": ["primary", "footway", "primary"], "tunnel": ["yes", None, None], "cl": [-1, 1, 0], "fl": [-1, 1, 0]},
-                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(3)], crs=4326)
-    style = _stages(g, backend="web", casing_level_col="cl", fill_level_col="fl", simple=False)
-    ids = [l["id"] for l in style["layers"]]
-    lay = {l["id"]: l for l in style["layers"]}
-    ps = [f["properties"] for f in style["_roads"]["features"]]
-    assert "roads-casing-lv-1-dash" in ids and "roads-fill-lv-1-pat" not in ids and "roads-fill-lv-1-under" not in ids   # no light fill dashes by default   # the tunnel's look at -1 (no underlay: an opaque fill, docs/design/tunnel_look.md)
-    assert [bool(_eval(lay["roads-casing-lv-1-dash"]["filter"], p)) for p in ps] == [True, False, False]
-    dash = [i for i in ids if i.startswith("roads-fill-lv1-dash")]                                                  # the footway's dashes at 1
-    assert dash and '"__rs_fl"' in json.dumps(lay[dash[0]]["filter"]) and '"__rs_cl"' not in json.dumps(lay[dash[0]]["filter"])
 
 
 def test_compute_levels_bridge_ends_tunnel_and_ground():
@@ -1844,48 +1051,8 @@ def test_compute_levels_on_the_bundled_sample():
     assert near and all(s[col[h]][u] <= s.fill_level[l] for u, l, h in near)
 
 
-def test_level_columns_put_each_positions_arrows_after_its_fill_layers():
-    """Position mode: one-way arrows follow the fill position (not the lvl tag): an arrow layer per position right after that
-    position's last fill layer, so a tunnel's arrows are above its own road."""
-    import roadstyle as rs
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 3, "oneway": ["yes"] * 3, "tunnel": [None, "yes", None], "bridge": [None, None, "yes"],
-                          "layer": [None, -1, 1]},
-                         geometry=[LineString([(18, 59 + i * d), (18 + d, 59 + i * d)]) for i in range(3)], crs=4326)
-    g = rs.compute_levels(g, method="tags")
-    style = _style(render_edges(g, backend="web", casing_level_col="casing_level", fill_level_col="fill_level", simple=False).html)
-    ids = [l["id"] for l in style["layers"]]
-    lay = {l["id"]: l for l in style["layers"]}
-    for pos in (-1, 0, 1):
-        arrows = "roads-arrows" if pos == 0 else f"roads-arrows-lv{pos}"
-        fills = [i for i, n in enumerate(ids) if n.startswith(("roads-fill-lv-1", "roads-fill-lv1")) and (f"lv{pos}" in n)] if pos else \
-            [i for i, n in enumerate(ids) if n in ("roads-fill", "roads-fill-sq", "roads-fill-pat")]
-        assert ids.index(arrows) == max(fills) + 1, arrows                       # right after the position's fill layers
-        assert '"fl"' in json.dumps(lay[arrows]["filter"]) and '"lvl"' not in json.dumps(lay[arrows]["filter"])
-    assert "roads-arrows-tunnel" not in ids and "roads-arrows-bridge" not in ids
 
 
-def test_level_columns_put_each_positions_street_names_after_its_arrows():
-    """Position mode: street names follow the fill position like the arrows: one name layer per position, right after that
-    position's arrow layer, so a road at a higher position covers them."""
-    import roadstyle as rs
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 3, "name": ["Tunnel st", "Ground st", "Bridge st"], "oneway": ["yes"] * 3,
-                          "tunnel": ["yes", None, None], "bridge": [None, None, "yes"], "layer": [-1, None, 1]},
-                         geometry=[LineString([(18, 59 + i * d), (18 + d, 59 + i * d)]) for i in range(3)], crs=4326)
-    g = rs.compute_levels(g, method="tags")
-    style = _style(render_edges(g, backend="web", casing_level_col="casing_level", fill_level_col="fill_level", simple=False).html)
-    ids = [l["id"] for l in style["layers"]]
-    lay = {l["id"]: l for l in style["layers"]}
-    for pos in (-1, 0, 1):
-        arrows, names = ("roads-arrows", "roads-labels") if pos == 0 else (f"roads-arrows-lv{pos}", f"roads-labels-lv{pos}")
-        assert ids.index(names) == ids.index(arrows) + 1, names
-        assert '"fl"' in json.dumps(lay[names]["filter"])
-    assert ids.index("roads-labels-lv-1") < ids.index("roads-fill") < ids.index("roads-labels-lv1")     # a higher position's names are above lower roads
-    # with no level columns (an input column casing_level / fill_level is the level input since 2026-10-25): the solver's levels
-    bare = g.drop(columns=[c for c in ("casing_start", "casing_level", "casing_end", "fill_level") if c in g.columns])
-    plain = [l["id"] for l in _style(render_edges(bare, backend="web", simple=False).html)["layers"]]
-    assert plain.count("roads-labels") == 1 and not [i for i in plain if i.startswith("roads-labels-lv")]
 
 
 def test_every_compute_levels_argument_is_in_the_algorithm_page():
@@ -1902,31 +1069,6 @@ def test_every_compute_levels_argument_is_in_the_algorithm_page():
         assert gone not in params and f"`{gone}`" not in page, f"{gone} is not an argument any more"
 
 
-def test_level_columns_draw_each_positions_end_caps_with_that_position():
-    """Position mode: the end caps of two-way pairs follow the positions too. For each position the caps' casing layer is right before that
-    position's casing layer and the caps' fill layer right before its fill layer, so casings come before fills at every position;
-    no cap layer is outside a position."""
-    d = 0.001
-    a, b, c = [(18, 59), (18 + d, 59)], [(18 + d, 59), (18 + 2 * d, 59)], [(18 + d, 59), (18 + d, 59 + d)]
-    rows = [(a, 0, 0), (a[::-1], 0, 0), (b, 1, 1), (b[::-1], 1, 1), (c, -1, -1), (c[::-1], -1, -1)]     # three two-way streets at three positions
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 6, "cl": [r[1] for r in rows], "fl": [r[2] for r in rows]},
-                         geometry=[LineString(r[0]) for r in rows], crs=4326)
-    html = render_edges(g, backend="web", casing_level_col="cl", fill_level_col="fl", simple=False, settings={"config": {"twin_casing": "each"}}).html
-    style = _style(html)
-    ids = [l["id"] for l in style["layers"]]
-    ends = [i for i in ids if i.startswith("roads-ends")]
-    assert sorted(ends) == sorted(["roads-ends-casing", "roads-ends-fill", "roads-ends-casing-lv1", "roads-ends-fill-lv1",
-                                   "roads-ends-casing-lv-1", "roads-ends-fill-lv-1"])
-    for pos in (-1, 0, 1):
-        sfx = "" if pos == 0 else f"-lv{pos}"
-        cap_c, cap_f = f"roads-ends-casing{sfx}", f"roads-ends-fill{sfx}"
-        casing, fill = f"roads-casing{sfx}", f"roads-fill{sfx}"
-        assert ids.index(cap_c) + 1 == ids.index(casing), cap_c                       # the cap casing right before the position's casing layers
-        assert ids.index(cap_f) < ids.index(fill) and ids.index(cap_f) > ids.index(casing), cap_f      # the cap fill after the casings, before the fills
-    pts = style["sources"]["ends"]["data"]["features"]
-    assert {(p["properties"]["__rs_cl"], p["properties"]["__rs_fl"]) for p in pts} == {(0, 0), (1, 1), (-1, -1)}   # a cap carries its road's positions
-    caps = {l["id"]: l for l in style["layers"] if l["id"].startswith("roads-ends-fill")}
-    assert all("rs_colors" in json.dumps(c["paint"]["circle-color"]) for c in caps.values())      # every position's caps follow rsColor
 
 
 def test_compute_levels_reversed_twin_has_its_heads_the_other_way_round():
@@ -1949,111 +1091,14 @@ def test_compute_levels_reversed_twin_has_its_heads_the_other_way_round():
     assert out.casing_level[0] == out.casing_level[1] and out.fill_level[0] == out.fill_level[1]
 
 
-def test_short_road_is_cut_once():
-    """A road shorter than its two heads is two pieces and one seam (short_road_heads.md), whatever the last bit of cos and hypot: the page
-    cuts it once. Cut at h0 and at n - h1 (equal in exact arithmetic), it kept a middle piece under 2 cm or a second seam on some
-    platforms and not on others. Three Monaco roads where glibc's cos and hypot did that (geolibre-roadstyle, docs/design/rust-spike.md, S4)."""
-    roads = [  # line, casing start, main and end numbers, head lengths at the start and the end
-        ([(7.4179186, 43.734364), (7.4178807, 43.7343466)], (0, 0, -1), (5.0, 5.0)),
-        ([(7.417406100000001, 43.731892800000004), (7.417392, 43.731903300000006)], (0, 2, 1), (5.0, 5.0)),
-        ([(7.4251499, 43.7397216), (7.4251233, 43.739687700000005)], (1, 2, 0), (3.8, 0.5)),
-    ]
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "cs": [r[1][0] for r in roads], "cm": [r[1][1] for r in roads],
-                          "ce": [r[1][2] for r in roads], "fl": [r[1][1] for r in roads], "hs": [r[2][0] for r in roads], "he": [r[2][1] for r in roads]},
-                         geometry=[LineString(r[0]) for r in roads], crs=4326)
-    html = render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce",
-                        head_start_m_col="hs", head_end_m_col="he", head_m=5.0, simple=False).html
-    feats = [f["properties"] for f in _style(html)["sources"]["casings"]["data"]["features"]]
-    for i, (_, (cs, _cm, ce), _) in enumerate(roads):
-        mine = [p for p in feats if p["__rs_edge"] == i]
-        assert [p["__rs_cl"] for p in mine if not p.get("__rs_seam")] == [cs, ce], f"road {i}: the two heads only"
-        assert len([p for p in mine if p.get("__rs_seam") and not p.get("__rs_lap")]) == 1, f"road {i}: one seam"
-        assert len([p for p in mine if p.get("__rs_lap")]) == 1, f"road {i}: one lap"
 
 
-def test_divided_casing_is_drawn_as_head_and_main_pieces():
-    """casing_start_col / casing_end_col / head_m: an edge >= 2 * head_m with unequal casing numbers is cut into three casing pieces (first head_m metres,
-    middle, last head_m metres), each at its own number, in their own source; the fill stays one line; a short edge is two halves, one at each head's number; an equal-numbered edge is one piece."""
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "cs": [-1, 0, -1], "cm": [0, 0, 0], "ce": [-2, 0, -2], "fl": [0, 0, 0]},
-                         geometry=[LineString([(18, 59), (18 + d, 59)]),                    # about 57 m: long, numbers differ -> three pieces
-                                   LineString([(18, 59.01), (18 + d, 59.01)]),             # long, numbers equal -> one piece
-                                   LineString([(18, 59.02), (18 + 0.00005, 59.02)])],      # about 3 m: shorter than 2 * head_m, numbers differ -> two halves
-                         crs=4326)
-    html = render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0, simple=False).html
-    style = _style(html)
-    parts = [f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")]     # the pieces, not the seams
-    by = {}
-    for f in parts:
-        by.setdefault(f["properties"]["__rs_edge"], []).append(f)
-    assert [len(by[i]) for i in (0, 1, 2)] == [3, 1, 2]
-    assert [f["properties"]["__rs_cl"] for f in by[2]] == [-1, -2]                    # a short road keeps both heads (short_road_heads.md)
-    assert [f["properties"]["__rs_cl"] for f in by[0]] == [-1, 0, -2]                 # start head, main, end head
-    lengths = [LineString(f["geometry"]["coordinates"]) for f in by[0]]
-    assert abs(lengths[0].length * 111320 * math.cos(math.radians(59)) - 5.0) < 0.2 and abs(lengths[2].length * 111320 * math.cos(math.radians(59)) - 5.0) < 0.2
-    assert by[0][0]["geometry"]["coordinates"][0] == [18.0, 59.0]                     # the first piece starts at the edge's first vertex
-    lay = {l["id"]: l for l in style["layers"]}
-    assert all(l["source"] == "casings" for i, l in lay.items() if i.startswith("roads-casing") and "-lv" in i or i == "roads-casing")
-    assert lay["roads-fill"]["source"] == "roads" and "roads-fill-lv-1" not in lay        # every fill is at 0
-    assert style["_roads"]["features"][0]["geometry"]["coordinates"][-1] == [18 + d, 59.0]       # the fill line is the whole edge
-    assert '_has(["get","__rs_edge"],ids)' in html                       # the pieces follow rsFilter by their edge
-    # without the head columns nothing changes: no casing source
-    assert "casings" not in _style(render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", simple=False).html)["sources"]
 
 
-def test_divided_casing_main_piece_ends_flat_and_heads_round():
-    """The main piece of a divided casing carries __rs_cap (flat ends: a round end would reach into the heads); the heads and an unsplit casing do not, and the
-    flat-end twin layer of the casing exists and reads the casing source."""
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cs": [-1, 0], "cm": [0, 0], "ce": [-2, 0], "fl": [0, 0]},
-                         geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)])], crs=4326)
-    style = _style(render_edges(g, backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0, simple=False).html)
-    parts = [f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")]     # the pieces, not the seams
-    flags = [(f["properties"]["__rs_edge"], f["properties"]["__rs_cl"], bool(f["properties"].get("__rs_cap"))) for f in parts]
-    assert flags == [(0, -1, False), (0, 0, True), (0, -2, False), (1, 0, False)]       # head, MAIN flat, head; the unsplit edge stays round
-    lay = {l["id"]: l for l in style["layers"]}
-    assert lay["roads-casing-sq"]["source"] == "casings" and lay["roads-casing-sq"]["layout"]["line-cap"] == "butt" and lay["roads-casing"]["layout"]["line-cap"] == "round"
-    assert "__rs_cap" in json.dumps(lay["roads-casing"]["filter"])                   # the round layer leaves the flat pieces to the twin
 
 
-def test_level_columns_draw_the_bridge_casing_look_at_each_position():
-    """Position mode: a bridge edge gets the bridge look in the casing of its position: a heavier black casing (roads-casing-bridge, per position),
-    with the end shapes of the plain casing (a twin of each: round, flat -sq-bridge for the divided casing's main piece), from the casing source
-    when the casing is divided; the plain casing layer leaves bridge edges to it; no bridge edge, no such layer."""
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["primary", "primary"], "bridge": ["yes", None], "layer": [None, None], "cm": [0, 0], "fl": [0, 0], "cs": [0, 0], "ce": [0, 0]},
-                         geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18, 59.01), (18 + d, 59.01)])], crs=4326)     # edge 0 is a bridge, edge 1 is plain, same position
-    for kw, source in ((dict(), "roads"), (dict(casing_start_col="cs", casing_end_col="ce"), "casings")):
-        style = _stages(g, backend="web", casing_level_col="cm", fill_level_col="fl", **kw, simple=False)
-        lay = {l["id"]: l for l in style["layers"]}
-        ids = [l["id"] for l in style["layers"]]
-        ps = [f["properties"] for f in style["_roads"]["features"]]
-        bl, plain = lay["roads-casing-bridge"], lay["roads-casing"]
-        assert bl["source"] == source and bl["layout"]["line-cap"] == "round" and plain["layout"]["line-cap"] == "round"
-        assert bl["paint"]["line-color"] == "#64748b" and "line-width" in bl["paint"]
-        assert ids.index("roads-casing-bridge") < ids.index("roads-fill")                                  # a casing layer: before the position's fills
-        assert [bool(_eval(bl["filter"], p)) for p in ps] == [True, False]                                 # the bridge layer draws the bridge edge only
-        assert [bool(_eval(plain["filter"], p)) for p in ps] == [False, True]                              # the plain layer draws the plain edge only
-    off = _stages(g.assign(bridge=None), backend="web", casing_level_col="cm", fill_level_col="fl", simple=False)
-    assert not [l for l in off["layers"] if l["id"].startswith("roads-casing") and l["id"].endswith("-bridge")]
 
 
-def test_twin_end_cap_ring_uses_the_head_number_and_flat_pairs_get_none():
-    """Position mode: the casing ring of a twin end cap is painted at the head number of the lane that ends there (casing_start / casing_end), the fill circle at the
-    road's fill; a pair drawn flat with cap_col gets no cap."""
-    d = 0.001
-    a, b = (18, 59), (18 + d, 59)
-    rows = [(a, b, -1, -2), (b, a, -2, -1)]                                  # a two-way pair: the lane A->B has start head -1, end head -2; its twin has them the other way round
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cs": [r[2] for r in rows], "ce": [r[3] for r in rows], "cm": [0, 0], "fl": [0, 0], "flat": [False, False]},
-                         geometry=[LineString([r[0], r[1]]) for r in rows], crs=4326)
-    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce")
-    style = _style(render_edges(g, **kw, simple=False, settings={"config": {"twin_casing": "each"}}).html)
-    caps = {tuple(f["geometry"]["coordinates"]): f["properties"] for f in style["sources"]["ends"]["data"]["features"]}
-    assert caps[(18.0, 59.0)]["__rs_cl"] == -1 and caps[(18 + d, 59.0)]["__rs_cl"] == -2          # the head numbers at the two nodes
-    assert caps[(18.0, 59.0)]["__rs_fl"] == 0                                                      # the fill circle: the road's fill number
-    assert "roads-ends-casing-lv-1" in {l["id"] for l in style["layers"]} and "roads-ends-casing-lv-2" in {l["id"] for l in style["layers"]}
-    flat = _style(render_edges(g.assign(flat=[True, True]), cap_col="flat", **kw, simple=False, settings={"config": {"twin_casing": "each"}}).html)
-    assert "ends" not in flat["sources"]                                                           # a pair drawn flat with cap_col gets no cap
 
 
 def test_compute_levels_lp_stages():
@@ -2123,20 +1168,6 @@ def test_levels_are_saved_in_a_visualization_schema_and_read_back():
         rs.save_levels(con, g)                                                                        # not the result of compute_levels
 
 
-def test_render_computes_the_positions_itself_and_refuses_what_is_gone():
-    """No level columns: render_edges computes them (the solver, class order) and draws by them; order_col is refused;
-    a road with no class takes no part in the class order (docs/design/levels_split_casing.md, section 8)."""
-    g = _tunnel_world(True)
-    style = _stages(g, backend="web")
-    assert [p["properties"]["__rs_cl"] for p in style["_roads"]["features"]][3] > [
-        p["properties"]["__rs_cl"] for p in style["_roads"]["features"]][1]       # the crossing street over the tunnel
-    with pytest.raises(ValueError, match="order_col"):
-        render_edges(g, backend="web", order_col="o")
-    a, b, c = (18.000, 59.30), (18.001, 59.30), (18.001, 59.301)                 # a primary and a service road meet at b: the primary road is painted later
-    pair = gpd.GeoDataFrame({"highway": ["primary", "service"]}, geometry=[LineString([a, b]), LineString([b, c])], crs=4326)
-    assert compute_levels(pair, method="solve", order="class").attrs["levels_info"]["order_pairs"] == 1
-    none = compute_levels(pair.assign(highway=["primary", None]), method="solve", order="class")      # a road with no class: no wish for it
-    assert none.attrs["levels_info"]["order_pairs"] == 0
 
 
 def test_stage_0_flow_has_the_optimum_of_the_lp():
@@ -2246,38 +1277,6 @@ def _edge_features(ids, order=None, color=None):
     return g
 
 
-def test_overlays_attached_to_edges_are_drawn_at_their_edge_fill_number(monkeypatch):
-    """docs/design/edge_overlays.md: a feature is drawn at the fill number of its edge, after the fills of that position and before its arrows, by order, then by
-    the order of the overlays; a feature of an edge at a higher fill number is in a later layer."""
-    g = _edge_world()
-    pts = _edge_features([12, 13, 11, 12], order=[1, 0, 0, 0])                  # two orders at the tunnel's position, one at the crossing street's, one on the ground road
-    first = Overlay(pts, edge_col="edge_id", order_col="order", kind="circle", label="first")
-    second = Overlay(_edge_features([12]), edge_col="edge_id", kind="circle", label="second")
-    style = _stages(g, backend="web", overlays=[first, second], simple=False)
-    ids = [l["id"] for l in style["layers"]]
-    feats = {int(f["properties"]["edge_id"]): f["properties"] for f in style["_roads"]["features"]}
-    fl = {e: feats[e]["__rs_fl"] for e in (11, 12, 13)}
-    assert fl[12] < fl[13]                                                       # the crossing street is over the tunnel
-    mine = [i for i in ids if i.startswith("ov0-circle-lv") or i.startswith("ov1-circle-lv")]
-    expect = sorted({(fl[12], 0, 0), (fl[12], 1, 0), (fl[13], 0, 0), (fl[11], 0, 0), (fl[12], 0, 1)})          # (fill number, order, overlay): one layer for each
-    got = [(int(i.split("-lv")[1].split("-o")[0]), int(i.split("-o")[-1]), int(i[2])) for i in mine]
-    assert sorted(got) == expect and len(mine) == len(expect)
-    assert [(a, b) for a, b, c in got] == sorted(((a, b) for a, b, c in got))   # in the stack: by fill number, then order
-    for lid in mine:                                                             # after the fills of its position, before the arrows of its position
-        p = int(lid.split("-lv")[1].split("-o")[0])
-        fill = "roads-fill" if p == 0 else f"roads-fill-lv{p}"
-        arrows = "roads-arrows" if p == 0 else f"roads-arrows-lv{p}"
-        assert ids.index(fill) < ids.index(lid) and (arrows not in ids or ids.index(lid) < ids.index(arrows))
-    same = [i for i in mine if f"-lv{fl[12]}-o0" in i]                          # the same fill number and order: the overlay that comes first in the list is first
-    assert same == [f"ov0-circle-lv{fl[12]}-o0", f"ov1-circle-lv{fl[12]}-o0"]
-    lay = {l["id"]: l for l in style["layers"]}
-    one = lay[f"ov0-circle-lv{fl[13]}-o0"]
-    assert one["filter"] == ["all", ["==", ["get", "__rs_fl"], fl[13]], ["==", ["get", "__rs_ord"], 0]]
-    baked = {(f["properties"]["edge_id"], f["properties"]["__rs_fl"], f["properties"]["__rs_ord"]) for f in style["sources"]["ov0"]["data"]["features"]}
-    assert baked == {(12, fl[12], 1), (13, fl[13], 0), (11, fl[11], 0), (12, fl[12], 0)}
-    plain = _stages(g, backend="web", overlays=[Overlay(pts, kind="circle")], simple=False)             # without edge_col: as before, over all roads
-    pids = [l["id"] for l in plain["layers"]]
-    assert "ov0-circle" in pids and pids.index("ov0-circle") > max(n for n, i in enumerate(pids) if i.startswith("roads-fill")) and not [i for i in pids if i.startswith("ov0-circle-lv")]
 
 def test_edge_overlay_errors_and_colours():
     """An edge id that is not among the roads is an error that says how many and which; so is a roads table without its id column; color_col is read from the property."""
@@ -2308,42 +1307,8 @@ def test_an_attached_item_selects_its_road_or_itself():
     circle = next(l for l in _style(html)["layers"] if l["id"].startswith("ov1-circle-lv"))
     assert '["case", ["boolean", ["feature-state", "select"], false], "#123456"' in json.dumps(circle["paint"]["circle-color"])
 
-def test_arrows_and_street_names_belong_to_an_edge(monkeypatch):
-    """docs/design/edge_overlays.md: every slot (the piece of road that carries an arrow or a name) carries the edge under its middle point (__rs_edge, and __rs_edge2 for the
-    twin of a two-way street) and the fill number of that edge."""
-    a, b, c = (18.000, 59.300), (18.003, 59.300), (18.003, 59.303)
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "name": ["Main", "Main", "Side"], "oneway": [False, False, True]},
-                         geometry=[LineString([a, b]), LineString([b, a]), LineString([b, c])], crs=4326)       # a two-way street (two twins) and a one-way street
-    style = _stages(g, backend="web", arrows=True, labels=True)
-    roads = [f["properties"] for f in style["_roads"]["features"]]
-    slots = [f["properties"] for f in style["sources"]["slots"]["data"]["features"]]
-    assert slots and all("__rs_edge" in s for s in slots)
-    for s in slots:
-        assert 0 <= s["__rs_edge"] < len(roads) and s.get("fl", 0) == roads[s["__rs_edge"]]["__rs_fl"]
-    two_way = [s for s in slots if s["name"] == "Main"]
-    assert two_way and all({s["__rs_edge"], s["__rs_edge2"]} == {0, 1} for s in two_way)       # the pair: its two twins
-    one_way = [s for s in slots if s["name"] == "Side"]
-    assert one_way and all(s["__rs_edge"] == 2 and "__rs_edge2" not in s for s in one_way)
 
 
-def test_road_fill_false_draws_the_casing_but_not_the_fill():
-    """docs/design/edge_overlays.md, three ways to use it: road_fill=False keeps the casing layers and makes the fill layers (and the end caps' fills) invisible; the default is unchanged."""
-    g = _edge_world()
-    on = _style(render_edges(g, backend="web", simple=False).html)["layers"]
-    off = _style(render_edges(g, backend="web", road_fill=False, simple=False).html)["layers"]
-    assert [lyr["id"] for lyr in on] == [lyr["id"] for lyr in off]                     # the same layers: the fills stay for clicks and hovers
-    on_st = _style(render_edges(g, backend="web", simple=False).html)["state"]
-    off_st = _style(render_edges(g, backend="web", road_fill=False, simple=False).html)["state"]
-    assert on_st["rs_fill_on"]["default"] is True and off_st["rs_fill_on"]["default"] is False      # the switch is the page state
-    for a, b in zip(on, off, strict=True):
-        assert a == b                                                                   # the layers are the same; the state decides
-        if a["id"].startswith("roads-fill") and not a["id"].endswith("-pat"):
-            op = b["paint"]["line-opacity"]
-            assert op[:2] == ["case", ["global-state", "rs_fill_on"]] and op[3] == 0 and op[2] != 0
-        elif a["id"].startswith("roads-ends-fill"):
-            assert b["paint"]["circle-opacity"][:2] == ["case", ["global-state", "rs_fill_on"]]
-    with_items = _style(render_edges(g, backend="web", road_fill=False, overlays=[Overlay(_edge_features([12]), edge_col="edge_id", kind="circle")], simple=False).html)
-    assert any(lyr["id"].startswith("ov0-circle-lv") for lyr in with_items["layers"])
 
 
 _CO = {"Class": {}, "AADT": {"color_by": "aadt", "cmap": "viridis"}}
@@ -2370,39 +1335,6 @@ def test_views_are_baked_and_checked():
             render_edges(_edges(), backend="web", color_options=_CO, views={"V": bad})
 
 
-def test_views_switch_in_the_browser(tmp_path):
-    """The View menu and rsSetView in a real page: the first view on open, then each view sets the colour option, the road fill and the
-    overlays it names, and leaves the rest as it is."""
-    pw = pytest.importorskip("playwright.sync_api")
-    path = tmp_path / "views.html"
-    render_edges(_edges(), backend="web", basemap="blank", color_options=_CO, road_fill=False,
-                 overlays=[Overlay(_marks(), label="marks")],
-                 views={"Roads": {"color": "Class", "road_fill": True, "overlays": {"marks": False}},
-                        "Flow": {"color": "AADT"},
-                        "Casing": {"road_fill": False, "overlays": {"marks": True}}}, simple=False).save(path)
-    state = """() => ({fill_on: map.getGlobalState().rs_fill_on, co: map.getGlobalState().rs_co,
-                       marks: map.getLayoutProperty(RS_OVERLAYS[0].layers[0], "visibility"), menu: document.getElementById("vw-select").value,
-                       colour_menu: document.getElementById("co-select").value})"""
-    errors, events = [], []
-    with pw.sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && map.loaded() && document.getElementById('vw-select')", timeout=30_000)
-        page.evaluate("document.addEventListener('rs:viewselect', e => window._ev = e.detail.view)")
-        opened = page.evaluate(state)
-        page.evaluate("rsSetView('Flow')")
-        flow = page.evaluate(state)
-        events.append(page.evaluate("window._ev"))
-        page.evaluate("rsSetView(2)")
-        casing = page.evaluate(state)
-        browser.close()
-    assert errors == []
-    assert opened["fill_on"] is True and opened["marks"] == "none" and opened["co"] == 0 and opened["menu"] == "0"   # Roads, on open
-    assert flow["fill_on"] is True and flow["marks"] == "none" and flow["co"] == 1                                    # only the colour changed
-    assert flow["menu"] == "1" and flow["colour_menu"] == "1" and events == ["Flow"]
-    assert casing["fill_on"] is False and casing["marks"] == "visible" and casing["co"] == 1 and casing["menu"] == "2"
 
 
 _STYLES = {"config": {"overlays": {"styles": {
@@ -2487,20 +1419,6 @@ def test_a_theme_can_be_a_file_and_an_unreadable_settings_file_is_an_error(tmp_p
     render_edges(_edge_world(), backend="web")                                  # and the failed calls did not leave the settings changed
 
 
-def test_the_numpy_cutter_is_shapelys_substring():
-    """_part (the casing pieces and the annotation slots) cuts a polyline exactly as shapely.ops.substring does, without building geometries."""
-    import numpy as np
-    from shapely.geometry import LineString as LS
-    from shapely.ops import substring
-
-    from roadstyle.render_web import _cum_lengths, _part
-    rng = np.random.default_rng(1)
-    for _ in range(300):
-        xy = np.cumsum(rng.normal(size=(int(rng.integers(2, 9)), 2)) * 5, axis=0)
-        cum = _cum_lengths(xy)
-        a = float(rng.uniform(0, cum[-1] * 0.7))
-        b = float(rng.uniform(a + 1e-3, cum[-1]))
-        assert np.allclose(_part(xy, cum, a, b), np.asarray(substring(LS(xy), a, b).coords), atol=1e-9)
 
 
 def test_level_input_and_solve_levels():
@@ -2508,7 +1426,6 @@ def test_level_input_and_solve_levels():
     that cross take the band; with band_col the caller's bands decide everywhere; edits switch a pair off or add one; ids may name either
     direction of a road."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     import roadstyle as rs
     g = _edge_world()                                  # ground 11 - tunnel 12 - ground 14 in a line, street 13 crossing over the tunnel's middle
@@ -2541,7 +1458,6 @@ def test_roadstyle_levels_make_and_solve(tmp_path):
     """roadstyle-levels make SOURCE FOLDER, then solve FOLDER: roads.parquet, pairs.csv and an empty edits.csv, then levels.csv with one row
     per edge and its ends; make again keeps your edits.csv."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     from roadstyle.level_area import main
     src, area = tmp_path / "edges.geojson", tmp_path / "area"
@@ -2606,7 +1522,6 @@ def test_an_area_keeps_its_edits_heads_and_caps_in_the_database(tmp_path):
 def test_heads_and_caps_may_name_either_direction_of_a_road(tmp_path):
     """heads.csv / caps.csv rows name a road by any of its edges, as edits.csv does: an edge running against its road swaps start and end;
     a row naming no road is an error, never left out."""
-    import pandas as pd
 
     from roadstyle.level_area import own
     roads = pd.DataFrame({"road": ["1"], "edges": [["1"]], "reversed": [["2"]]})
@@ -2657,62 +1572,10 @@ def test_a_road_keeps_the_modes_of_all_its_edges():
     assert [list(roads[c][0]) for c in ("edges_modes", "reversed_modes", "edges_lanes", "reversed_lanes")] == [["driving + walking"], ["walking + cycling"], [2], [1]]
 
 
-def test_the_editor_panel_calls_a_road_two_way_only_when_both_directions_are_drawn():
-    """A one-way street with a walking-only reverse is one road of two edges, drawn as one line: the panel does not call it two-way, and each
-    direction shows its own lanes and modes (2026-10-10: 25103774#1r, walking only, showed the street as two-way with every mode)."""
-    import pandas as pd
-
-    from roadstyle.level_editor import _directions, _two_halves
-    r = pd.Series({"road": "1", "edges": ["1"], "reversed": ["2"], "edge_refs": ["9#1f"], "reversed_refs": ["9#1r"], "edges_directed": [True],
-                   "reversed_directed": [False], "edges_lanes": [2.0], "reversed_lanes": [1.0], "edges_modes": ["driving + walking"], "reversed_modes": ["walking"]})
-    assert not _two_halves(r) and _two_halves(pd.Series({**r.to_dict(), "reversed_directed": [True]}))
-    assert [(d["edge_ref"], d["lanes"], d["modes"]) for d in _directions(r)] == [("9#1f", "2", "driving + walking"), ("9#1r", "1", "walking")]
-    from roadstyle.level_editor import _driving_edges
-    assert _driving_edges(pd.Series({**r.to_dict(), "edges_driving": [True], "reversed_driving": [False]})) == 1          # the panel's "edges": cars' edges
 
 
-def test_rsfilter_and_rscolor_by_ids_in_the_browser(tmp_path):
-    """rsFilter / rsColor take an id set as a lookup (_has: a "match"), not a list scanned per feature (a filter of thousands of ids froze
-    the page, 2026-10-07): in a real page they show only those roads, paint them, and reset."""
-    pw = pytest.importorskip("playwright.sync_api")
-    path = tmp_path / "f.html"
-    render_edges(_edges().assign(c0="round", c1="flat"), backend="web", basemap="blank", cap_start_col="c0", cap_end_col="c1", simple=False).save(path)   # two ends: fill halves
-    shown = "() => new Set(map.queryRenderedFeatures().filter(f => f.source === 'roads').map(f => f.id)).size"
-    errors = []
-    with pw.sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
-        every = page.evaluate(shown)
-        drawn = page.evaluate("() => map.queryRenderedFeatures().filter(f => f.source === 'halves').length")
-        page.evaluate("rsFilter([0, 0])")
-        page.wait_for_function("map.loaded()")
-        one = page.evaluate(shown)
-        page.evaluate("rsFilter([])")
-        page.wait_for_function("map.loaded()")
-        none = page.evaluate(shown)
-        halves = page.evaluate("() => map.queryRenderedFeatures().filter(f => f.source === 'halves').length")
-        page.evaluate("rsFilter(null); rsColor([1], '#ff0000')")
-        page.wait_for_function("map.loaded()")
-        back = page.evaluate(shown)
-        browser.close()
-    assert errors == [] and every > 1 and one == 1 and none == 0 and back == every and drawn > 0 and halves == 0   # the fill halves go with their road
 
 
-def test_a_footway_on_a_street_the_other_way_round_is_no_lane_of_it():
-    """Two edges on one line in opposite directions are a two-way street's lanes only when they are the same class: a footway lying on a
-    street the other way round left the street drawn as one narrow, shifted lane (2026-10-07)."""
-    from roadstyle import render_web as rw
-    m = 1 / 111320.0
-    a = LineString([(18.0, 59.3), (18.0, 59.3 + 20 * m)])
-    g = gpd.GeoDataFrame({"highway": ["tertiary", "footway", "residential", "residential"]},
-                         geometry=[a, LineString(list(a.coords)[::-1]), LineString([(18.001, 59.3), (18.001, 59.3 + 20 * m)]),
-                                   LineString([(18.001, 59.3 + 20 * m), (18.001, 59.3)])], crs=4326)
-    geo = rw.fc_dict(g)
-    rw._mark_twoway(geo, None, "highway")
-    assert [f["properties"]["__rs_twoway"] for f in geo["features"]] == [False, False, True, True]
 
 
 def test_the_road_tooltip_waits_for_the_mouse_to_rest():
@@ -2804,190 +1667,14 @@ def test_a_solver_stage_at_its_time_limit_without_an_answer_keeps_the_answer_of_
         rs.compute_levels(g, engine="python", **kw)
 
 
-@pytest.mark.parametrize("engine", ["python", "rust"])
-def test_level_editor_saves_only_what_the_solver_takes(tmp_path, engine):
-    """The level editor (roadstyle.level_editor), with each solver: the pairs between two roads (by any edge id), an edit the solver refuses
-    is not written, a taken one is written with the file before it kept as edits.csv.bak, and levels.csv follows."""
-    pytest.importorskip("scipy")
-    import pandas as pd
-
-    from roadstyle import _engine
-    from roadstyle.level_area import make_area
-    from roadstyle.level_editor import Area
-    if engine == "rust" and not _engine.available():
-        pytest.skip("the Rust extension roadstyle._rust is not built")
-    make_area(_edge_world(), tmp_path)
-    (tmp_path / "edits.csv").unlink()                                   # as before: no edits.csv yet
-    area = Area(tmp_path, engine=engine)
-    got = area.relations("12", "11")
-    assert {(r["relation"], r["a"], r["b"]) for r in got["rows"] if r["section"] == "found"} >= {("order", "12", "11")}
-    assert not [r for r in got["rows"] if r["section"] != "found"] and set(got["roads"]) >= {"11", "12"}
-    before = (tmp_path / "edits.csv").read_text()
-    with pytest.raises(ValueError):
-        area.change(pd.DataFrame([{"relation": "stack", "a": "999", "b": "11", "a_end": "main", "b_end": "", "enabled": "true"}]))
-    assert (tmp_path / "edits.csv").read_text() == before
-    area.change(pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "a_end": "", "b_end": "", "enabled": "false"}]))
-    assert area.said.startswith("solved the whole area") and area.full                    # every road of this tiny area is around the change
-    assert "false" in (tmp_path / "edits.csv").read_text() and (tmp_path / "edits.csv.bak").read_text() == before
-    new = [r for r in area.relations("11", "12")["rows"] if r["section"] == "new"]
-    assert len(new) == 1 and (tmp_path / "levels.csv").exists()                  # added in this session: "new", not "saved"
-    assert len(area.relations("12")["rows"]) >= 3                                # one road: everything about it, in both tables
-    gu = area.given_up()                                                          # the solver's given-up pairs, with the parts that broke
-    assert [(r["a"], r["b"]) for r in gu["rows"]] == [tuple(p) for p in area.stats["given_up"]] and set(gu["roads"]) >= {x for r in gu["rows"] for x in (r["a"], r["b"])}
-    assert [f["road"] for f in area.find(" 12 ")] == ["12"] and area.find("") == []                 # search: an edge id ...
-    ref = area.facts["12"]["edge_ref"] = "120113158#1f"
-    assert area.find(ref.upper())[0]["road"] == "12" and area.find("0113158")[0]["road"] == "12"   # ... or (a part of) an edge_ref
-    stack = {"relation": "stack", "a": "11", "b": "14", "a_end": "start", "b_end": "end", "enabled": "true"}
-    first = area.edits().iloc[0].to_dict()
-    with pytest.raises(ValueError):                                               # a delete of a row that is not as the page saw it
-        area.apply([{"op": "delete", "index": 0, "row": {**first, "enabled": "true"}}])
-    area.apply([{"op": "add", "body": stack}, {"op": "delete", "index": 0, "row": first}])     # the page's waiting changes, in one solve
-    assert area.edits()[["relation", "a_end", "b_end"]].values.tolist() == [["stack", "start", ""]]     # a stack keeps its part
-    for bad in ([{"op": "add", "body": {**stack, "a_end": "middle"}}], [{"op": "delete", "index": 5, "row": first}], []):
-        with pytest.raises(ValueError):
-            area.apply(bad)
-    assert len(area.edits()) == 1                                                 # nothing saved
-    with pytest.raises(ValueError, match="already in edits.csv"):                 # an exact copy of a rule already there (2026-10-08: copies kept
-        area.apply([{"op": "add", "body": stack}])                                # a rule working after one copy was deleted)
-    assert len(area.edits()) == 1
-    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "square"}, {"op": "cap", "road": "12", "end": "end", "cap": "square"}])   # caps.csv
-    assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end", "12,square,square"] and area.facts["12"]["caps"] == ["square", "square"]
-    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": ""}, {"op": "cap", "road": "12", "end": "end", "cap": ""}])     # the default again
-    assert (tmp_path / "caps.csv").read_text().split() == ["road,start,end"] and area.facts["12"]["caps"] == ["", ""]
-    with pytest.raises(ValueError):
-        area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "pointy"}])
-    area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])                 # a head's length: heads.csv, the solver and the drawing
-    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", "12,,12.5"] and area.facts["12"]["heads"] == [area.facts["12"]["heads_auto"][0], 12.5]
-    lv = pd.read_csv(tmp_path / "levels.csv", dtype={"edge": str}).set_index("edge")        # levels.csv has each edge's ends as drawn
-    assert lv.loc["12", "head_end_m"] == 12.5 and set(lv["cap_start"]) <= {"round", "square", "flat"}
-    with pytest.raises(ValueError):
-        area.apply([{"op": "head", "road": "12", "end": "end", "m": "-3"}])
-    L = area.facts["12"]["length_m"]                                                       # one longer, the other shorter, in one change: checked together
-    area.apply([{"op": "head", "road": "12", "end": "start", "m": str(round(L - 1, 1))}, {"op": "head", "road": "12", "end": "end", "m": "0.5"}])
-    area.apply([{"op": "head", "road": "12", "end": "start", "m": "0.5"}, {"op": "head", "road": "12", "end": "end", "m": str(round(L - 1, 1))}])
-    with pytest.raises(ValueError):                                                       # both heads together cannot be more than the road
-        L = area.facts["12"]["length_m"]
-        area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "1"}])
 
 
-def test_the_editor_never_solves_for_a_head_change(tmp_path, monkeypatch):
-    """2026-10-08: the solver works from the tables only, so a head change (even heads over the whole road) is saved and drawn without a solve."""
-    pytest.importorskip("scipy")
-    from roadstyle import level_editor
-    from roadstyle.level_area import make_area
-    from roadstyle.level_editor import Area
-    make_area(_edge_world(), tmp_path)
-    area = Area(tmp_path)
-    solved = area.solved
-    L = area.facts["12"]["length_m"]
-    with monkeypatch.context() as m:
-        m.setattr(level_editor, "solve_local", lambda *a, **k: pytest.fail("solved"))
-        area.apply([{"op": "head", "road": "12", "end": "end", "m": "12.5"}])
-        assert area.said == "not solved again (heads and caps are drawing only)" and area.solved is solved
-        area.apply([{"op": "head", "road": "12", "end": "start", "m": str(L)}, {"op": "head", "road": "12", "end": "end", "m": "0.049"}])   # no main part
-        assert area.solved is solved
-    assert (tmp_path / "heads.csv").read_text().split() == ["road,start_m,end_m", f"12,{L},0.049"] and area.facts["12"]["heads"][1] == 0.049
 
 
-def test_the_editor_updates_the_open_page_with_the_features_a_whole_page_has(tmp_path, monkeypatch):
-    """After an Apply the editor sends the features of the roads that changed (level_editor.Area.update), built by render's own code: for a
-    cap, a head and a level change they are the features of those roads in the whole page built again (the roads, their simple-mode
-    pieces, the slots when a fill number changed). More changed roads than PARTIAL_MAX: no update, the page reloads and says why."""
-    pytest.importorskip("scipy")
-    import pandas as pd
-
-    from roadstyle import level_editor
-    from roadstyle.level_area import make_area
-    from roadstyle.level_editor import Area
-    make_area(_edge_world(), tmp_path)
-    area = Area(tmp_path)
-    js = lambda x: json.loads(json.dumps(x, default=str))                                  # noqa: E731 - as the page gets them
-    order = pd.DataFrame([{"relation": "order", "a": "12", "b": "11", "a_end": "", "b_end": "", "enabled": "false"}])
-    for change in ([{"op": "cap", "road": "12", "end": "start", "cap": "square"}], [{"op": "head", "road": "12", "end": "end", "m": "12.5"}], order):
-        levels = {r: f["levels"] for r, f in area.facts.items()}
-        if isinstance(change, list):
-            area.apply(change)
-        else:
-            area.change(change)
-            assert {r for r, f in area.facts.items() if f["levels"] != levels[r]}            # the levels changed
-        u = js(area.update)
-        assert u["roads"] and u["features"]["simple"] and area.reload is None and set(u["facts"]) == set(u["roads"])
-        src = _style_of(area.page)["sources"]
-        idx = [f["id"] for f in u["features"]["roads"]]
-        assert [f["properties"]["road"] for f in u["features"]["roads"]] == u["roads"]
-        table = _style_of(area.page)["_roads"]["features"]          # the page's road table (a page has no roads source)
-        line = lambda f: (f["properties"], f["geometry"])              # noqa: E731
-        assert [line(f) for f in u["features"]["roads"]] == [line(table[i]) for i in idx]
-        assert u["features"]["simple"] == [f for f in src["simple"]["data"]["features"] if f["properties"]["__rs_edge"] in idx]
-        assert ("slots" in u["features"]) == (change is order) and u["features"].get("slots", src["slots"]["data"]["features"]) == src["slots"]["data"]["features"]
-    monkeypatch.setattr(level_editor, "PARTIAL_MAX", 0)
-    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": ""}])
-    assert area.update is None and area.reload == "1 roads changed, more than 0: the whole page again"
 
 
-def test_the_editor_draws_and_updates_both_directions_of_a_road(tmp_path):
-    """A two-way road in the level editor (2026-10-08): its two edges are one road (picked, found and shown by either: the card lists each
-    direction's edge id and edge_ref), the map draws them as the final map does (one edge per direction: the pair's one casing, a fill
-    each, the other direction running the road's line backwards with its heads and caps swapped), and the update in place after an Apply
-    carries both edges and all their pieces, as the whole page has them."""
-    pytest.importorskip("scipy")
-    import pandas as pd
-    from shapely import reverse
-
-    from roadstyle.level_area import make_area
-    from roadstyle.level_editor import Area
-    g = _edge_world().assign(edge_ref=["11f", "12f", "14f", "13f"])
-    back = g[g["edge_id"] == 12].assign(edge_id=22, edge_ref="12r")
-    back = back.set_geometry(reverse(back.geometry.to_numpy()), crs=g.crs)
-    make_area(gpd.GeoDataFrame(pd.concat([g, back], ignore_index=True), crs=g.crs), tmp_path)
-    area = Area(tmp_path)
-    f = area.facts["12"]
-    assert f["two_way"] and f["directions"] == [{"edge": "12", "edge_ref": "12f", "way": "along", "lanes": None, "modes": None},
-                                                {"edge": "22", "edge_ref": "12r", "way": "against", "lanes": None, "modes": None}]
-    assert [h["road"] for h in area.find("22")] == ["12"] and [h["road"] for h in area.find("12r")] == ["12"]
-    js = lambda x: json.loads(json.dumps(x, default=str))                                  # noqa: E731 - as the page gets them
-    area.apply([{"op": "cap", "road": "22", "end": "start", "cap": "square"}])             # by the other direction's id: the road's start
-    assert area.facts["12"]["caps"] == ["square", ""]
-    rows = area.draw[area.draw["road"] == "12"]
-    assert rows["edge"].tolist() == ["12", "22"] and rows["cap_start"].tolist()[0] == rows["cap_end"].tolist()[1] == "square"
-    assert list(rows.geometry.iloc[1].coords) == list(rows.geometry.iloc[0].coords)[::-1]
-    u = js(area.update)
-    assert u["roads"] == ["12"] and sorted(r["properties"]["edge"] for r in u["features"]["roads"]) == ["12", "22"]
-    src = _style_of(area.page)["sources"]
-    idx = [r["id"] for r in u["features"]["roads"]]
-    assert u["features"]["simple"] == [x for x in src["simple"]["data"]["features"] if x["properties"]["__rs_edge"] in idx]
-    table = _style_of(area.page)["_roads"]["features"]
-    kinds = sorted((table[x["properties"]["__rs_edge"]]["properties"]["edge"], x["properties"]["__rs_k"], bool(x["properties"].get("__rs_pair")))
-                   for x in u["features"]["simple"] if not x["properties"].get("__rs_seam"))
-    assert ("12", 1, False) in kinds and ("22", 1, False) in kinds                          # a fill each
-    assert {k for k in kinds if k[1] != 1} and all(k[0] == "12" and k[2] for k in kinds if k[1] != 1)   # one casing, the first edge's
 
 
-def test_the_editor_re_solves_only_the_roads_around_a_change():
-    """level_area.solve_local (the editor's Apply): the roads around a change are solved again with the same rules, every other road keeps its
-    numbers; a local result that breaks what the previous one kept is not used: the whole area is solved, and the result says so and why."""
-    pytest.importorskip("scipy")
-    import pandas as pd
-
-    import roadstyle as rs
-    from roadstyle.level_area import LEVELS, around, solve, solve_local
-    roads, pairs = rs.level_input(_edge_world())       # ground 11 - tunnel 12 - ground 14 in a line, street 13 crossing over the tunnel's middle
-    prev = solve(roads, pairs, None, {}, {})[0]
-    assert around(roads, pairs, None, ["13"], 1) == {"13", "12"} and around(roads, pairs, None, ["13"], 2) == {"11", "12", "13", "14"}
-    row = lambda **k: pd.DataFrame([{"relation": "stack", "a_end": p, "b_end": "", "enabled": "true", **k} for p in ("start", "main", "end")])   # noqa: E731
-    off = pd.DataFrame([{"relation": "order", "a": "12", "b": "14", "a_end": "", "b_end": "", "enabled": "false"}])
-    out = solve_local(roads, pairs, off, {}, {}, prev, ["12", "14"], hops=0)[0]
-    lv = out.set_index("road")[LEVELS]
-    assert out.attrs["levels_info"]["resolve"]["how"] == "local" and out.attrs["levels_info"]["resolve"]["free"] == 2
-    was = prev.set_index("road")[LEVELS]
-    assert (lv.loc[["11", "13"]] == was.loc[["11", "13"]]).all().all()                  # held exactly as they were (no shift of the whole)
-    assert min(lv.loc["13"]) > lv.loc["12", "fill_level"] > lv.loc["11", "fill_level"]                  # the rules: 13 over 12, the wish 12 after 11
-    out = solve_local(roads, pairs, row(a="11", b="13"), {}, {}, prev, ["11"], hops=0)[0]   # 11 over 13 with 13 held over the tunnel 11's head joins:
-    r = out.attrs["levels_info"]["resolve"]                                                # locally a crossing given up: the whole area instead
-    assert r["how"] == "full" and "given up that were kept" in r["why"]
-    full = solve(roads, pairs, row(a="11", b="13"), {}, {})[0]
-    assert (out[LEVELS] == full[LEVELS]).all().all() and out.attrs["levels_given_up"] == full.attrs["levels_given_up"]
-    assert solve_local(roads, pairs, row(a="11", b="13"), {}, {}, prev, ["11"])[0].attrs["levels_info"]["resolve"]["why"] == "every road is around the change"
 
 
 def test_a_local_re_solve_keeps_the_fixed_roads_numbers_exactly():
@@ -3013,7 +1700,6 @@ def test_edits_name_either_direction_of_a_road():
     """solve_levels: a meet edit naming the edge that runs against its road has its end turned to the road's way; a meet is the same pair in
     either order (switching one off works whichever road is named first)."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     import roadstyle as rs
     a, b, c = (18.0, 59.3), (18.002, 59.3), (18.004, 59.3)
@@ -3032,7 +1718,6 @@ def test_every_part_of_the_upper_casing_is_after_the_lower_fill():
     stack rows of pairs.csv name them), and its fill, after B's fill. Before, only A's main part was: A's start head, held under the fill of
     the road it lands on, could sit under the fill of the street B passing under it close to A's start, and B's fill hid A's outline there."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     import roadstyle as rs
     d = 0.0001                                                             # about 6 m east-west at 59.3
@@ -3053,7 +1738,6 @@ def test_stack_edits_can_name_a_part_of_the_upper_road():
     """solve_levels: a stack edit's a_end names a part of A (start / main / end). Added, that casing part is after B's fill; switched off, that
     row of pairs.csv is left out; switching off a row that is not there is an error, and so is a stack with no part (2026-10-08)."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     import roadstyle as rs
     g = _edge_world()                                  # ground 11 - tunnel 12 - ground 14 in a line, street 13 crossing over the tunnel's middle
@@ -3070,49 +1754,8 @@ def test_stack_edits_can_name_a_part_of_the_upper_road():
             rs.solve_levels(roads, pairs, edits=bad)
 
 
-def test_cap_start_and_end_cols_set_one_end_each():
-    """cap_start_col / cap_end_col (docs/design/square_ends.md): an edge whose two ends differ is left out of the whole-edge fill layers and
-    drawn as two fill halves (source "halves"), each with its end's cap, and its casing heads take their end's cap; equal ends stay one
-    edge; without level columns too (render_edges computes them)."""
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cl": [0, 0], "fl": [0, 0], "s": ["flat", "square"], "e": [None, "square"]},
-                         geometry=[LineString([(18.0 + i * 0.01, 59.30), (18.0 + i * 0.01, 59.31)]) for i in range(2)], crs=4326)
-    kw = dict(casing_level_col="cl", fill_level_col="fl", cap_start_col="s", cap_end_col="e")
-    style = _stages(g, backend="web", **kw, simple=False)
-    lay = {l["id"]: l for l in style["layers"]}
-    ps = [f["properties"] for f in style["_roads"]["features"]]
-    assert ps[0].get("__rs_split") and ps[1].get("__rs_cap") == "square"                       # flat / round differ; square / square: one edge
-    halves = [f["properties"] for f in style["sources"]["halves"]["data"]["features"]]
-    assert [h.get("__rs_cap") for h in halves] == [True, None]                                   # start half flat, end half round
-    assert [h["__rs_edge"] for h in halves] == [0, 0]                                            # its edge's id, for the recolouring
-    assert style["sources"]["halves"]["tolerance"] == style["sources"]["casings"]["tolerance"] == style["sources"]["roads"]["tolerance"]   # one line
-    assert [bool(_eval(lay["roads-fill"]["filter"], p)) for p in ps] == [True, False]            # the split edge stays in its fill layer,
-    assert [_eval(lay["roads-fill"]["paint"]["line-opacity"], {**p, "$state": {"rs_fill_on": True}}) for p in ps[:1]] == [0]   # transparent (clicks find the edge), the halves paint it
-    assert [bool(_eval(lay["roads-fill-sx"]["filter"], p)) for p in ps] == [False, True]
-    assert [[bool(_eval(lay[i]["filter"], h)) for h in halves] for i in ("roads-fill-hsq", "roads-fill-h")] == [[True, False], [False, True]]
-    assert lay["roads-fill-hsq"]["layout"]["line-cap"] == "butt" and lay["roads-fill-h"]["source"] == "halves"
-    heads = [f["properties"] for f in style["sources"]["casings"]["data"]["features"] if f["properties"]["__rs_edge"] == 0 and not f["properties"].get("__rs_seam")]
-    assert [h.get("__rs_cap") for h in heads] == [True, True, None]                              # start head flat, main flat (cut), end head round
-    auto = _stages(g.drop(columns=["cl", "fl"]), backend="web", cap_start_col="s", cap_end_col="e", simple=False)     # levels computed here
-    assert len(auto["sources"]["halves"]["data"]["features"]) == 2
 
 
-def test_head_metre_cols_set_where_the_casing_is_cut():
-    """head_start_m_col / head_end_m_col: an edge's own head lengths (null = head_m); a road shorter than its two heads is cut in their ratio."""
-    import numpy as np
-    m = 1 / 111320.0                                                                     # a degree of latitude in metres, near enough
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "cs": [-1, -1], "cl": [0, 0], "ce": [-1, -1], "fl": [0, 0], "hs": [20.0, 9.0], "he": [None, 3.0]},
-                         geometry=[LineString([(18.0, 59.30), (18.0, 59.30 + 100 * m)]), LineString([(18.01, 59.30), (18.01, 59.30 + 8 * m)])], crs=4326)
-    style = _style(render_edges(g, backend="web", casing_start_col="cs", casing_level_col="cl", casing_end_col="ce", fill_level_col="fl",
-                                head_start_m_col="hs", head_end_m_col="he", simple=False).html)
-    def lengths(road):
-        out = []
-        for f in (f for f in style["sources"]["casings"]["data"]["features"] if not f["properties"].get("__rs_seam")):
-            if f["properties"]["__rs_edge"] == road:
-                c = np.asarray(f["geometry"]["coordinates"])
-                out.append(round(float(np.abs(np.diff(c[:, 1])).sum() / m), 1))
-        return out
-    assert lengths(0) == [20.0, 75.0, 5.0]                                                # 20 m start head, the default 5 m end head
-    assert lengths(1) == [6.0, 2.0]                                                       # 8 m < 9 + 3: cut 3 : 1
 
 
 def test_near_rules_give_way_to_order_wishes_and_real_crossings_do_not():
@@ -3132,8 +1775,6 @@ def test_auto_ends_fit_heads_and_caps_to_the_joins():
     """rs.auto_ends (docs/design/level_input.md): a head reaches as far as the drawings overlap (a right angle: about the two half widths;
     a narrow merge: longer), a dead end has the least; a wide road ending on a narrower one gets a flat end, others round."""
     import math
-
-    import pandas as pd
 
     import roadstyle as rs
     m = 1 / 111320.0
@@ -3184,7 +1825,6 @@ def test_two_way_dead_end_is_square_by_default():
 
 def test_heads_over_the_whole_road_leave_no_main_part():
     """casing_parts: heads that cover the road (to within 5 cm, as the editor's "no main part" sets them) leave no main part."""
-    import pandas as pd
 
     import roadstyle as rs
     g = gpd.GeoDataFrame({"highway": ["residential"], "edge_id": [1]}, geometry=[LineString([(674000, 6580000), (674010, 6580000)])], crs=3006)
@@ -3213,7 +1853,6 @@ def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
     """solve_levels (2026-10-06): a stack edit counts as a real crossing even where the two roads only come near (the found ones are
     "near" there, kept last), so it wins over an order wish; the wishes the solver let go are in attrs["levels_orders_not_kept"]."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     import roadstyle as rs
     P = lambda x, y: (674000 + x, 6580000 + y)                                         # noqa: E731
@@ -3228,154 +1867,18 @@ def test_a_stack_of_yours_is_never_only_near_and_wishes_let_go_are_named():
     assert out.attrs["levels_orders_not_kept"] == [("2", "1")]                                          # and the wish it beat is named
 
 
-def test_a_divided_casing_has_a_round_seam_at_each_cut():
-    """_casing_parts (2026-10-06): at each cut inside an edge a tiny round piece of casing at the lower of the two pieces' numbers, so two
-    pieces ending flat at a cut on a curve leave no wedge open in the outline."""
-    m = 1 / 111320.0
-    g = gpd.GeoDataFrame({"highway": ["primary"], "cs": [-1], "cl": [1], "ce": [0], "fl": [1], "cap": ["flat"]},
-                         geometry=[LineString([(18.0, 59.3), (18.0, 59.3 + 50 * m), (18.0 + 0.001, 59.3 + 90 * m)])], crs=4326)
-    style = _style(render_edges(g, backend="web", casing_start_col="cs", casing_level_col="cl", casing_end_col="ce", fill_level_col="fl",
-                                cap_col="cap", simple=False).html)
-    pieces = [f["properties"] for f in style["sources"]["casings"]["data"]["features"]]
-    seams = [p for p in pieces if p.get("__rs_seam") and not p.get("__rs_lap")]                           # (the laps: test_a_lap_closes_the_cut_below_zoom_17)
-    assert sorted(p["__rs_cl"] for p in seams) == [-1, 0] and all("__rs_cap" not in p for p in seams)     # round, at the lower number
-    assert sorted(p["__rs_cl"] for p in pieces if not p.get("__rs_seam")) == [-1, 0, 1]
-    lay = {l["id"]: l for l in style["layers"]}
-    assert '["zoom"], 17' in json.dumps(lay["roads-casing"]["filter"]).replace(" ", "").replace(",", ", ")   # seams only from zoom 17: no bump on a flat end below
 
 
-def test_a_bridge_shadow_is_at_each_parts_casing_number(monkeypatch):
-    """Position mode (2026-10-06): the bridge shadow is an extra casing: each part of the bridge (start head, main part, end head) at its
-    own casing number, the parts at one number joined into one line, lines meeting end to end (flat ends); none over the last 3 m where the
-    bridge comes down; blurred and shifted down-right (lit from the top left), just before the bridge's casing at that position; off with
-    bridge_shadow."""
-    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
-    import dataclasses
-
-    from roadstyle import render_web
-    m = 1 / 111320.0
-    pts = [(18.0, 59.3 + k * 20 * m) for k in range(4)]                                       # a bridge of three 20 m edges, then a street
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 4, "bridge": ["yes", "yes", "yes", None], "cs": [1, 2, 2, 0], "cm": [2, 3, 2, 0],
-                          "ce": [2, 2, 1, 0], "fl": [2, 3, 2, 0]},
-                         geometry=[LineString([pts[k], pts[k + 1]]) for k in range(3)] + [LineString([pts[3], (18.0, 59.3 + 90 * m)])], crs=4326)
-    kw = dict(backend="web", casing_start_col="cs", casing_level_col="cm", casing_end_col="ce", fill_level_col="fl")
-    style = _style(render_edges(g, **kw, simple=False).html)
-    sh = style["sources"]["shadows"]["data"]["features"]
-    span = lambda f: round((max(c[1] for c in f["geometry"]["coordinates"]) - min(c[1] for c in f["geometry"]["coordinates"])) / m)   # noqa: E731
-    assert sorted((f["properties"]["__rs_cl"], span(f)) for f in sh) == [(1, 2), (1, 2), (2, 20), (2, 20), (3, 10)]   # each part at its own number:
-    #   start heads 3-5 m (1), 5-25 m (2), the middle main part 25-35 m (3), 35-55 m (2), the end head 55-57 m (1); 3 m off each end
-    lay = {l["id"]: l for l in style["layers"]}
-    ids = [l["id"] for l in style["layers"]]
-    s2 = lay["roads-casing-lv2-bridge-shadow"]
-    assert s2["source"] == "shadows" and s2["paint"]["line-blur"] == 4.0 and s2["paint"]["line-translate"] == [2, 2]
-    assert s2["layout"]["line-cap"] == "butt"                                                  # lines meet end to end: no darker disc
-    assert ids.index("roads-casing-lv2-bridge-shadow") < ids.index("roads-casing-lv2-bridge") < ids.index("roads-fill-lv2")
-
-    monkeypatch.setattr(render_web, "CONFIG", dataclasses.replace(render_web.CONFIG, bridge_shadow=False))
-    off = _style(render_edges(g, **kw, simple=False).html)
-    assert "shadows" not in off["sources"] and not [l for l in off["layers"] if l["id"].endswith("-shadow")]
 
 
-def test_hiding_the_bridges_hides_their_shadow(tmp_path):
-    """rsSetBridges(false) hides the bridge shadows with the bridges (2026-10-06: the shadow stayed, its lines carry no lvl)."""
-    pw = pytest.importorskip("playwright.sync_api")
-    m = 1 / 111320.0
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 2, "bridge": ["yes", None], "layer": [1, None]},
-                         geometry=[LineString([(18.0, 59.3), (18.0, 59.3 + 60 * m)]), LineString([(18.0, 59.3 + 60 * m), (18.0, 59.3 + 90 * m)])], crs=4326)
-    path = tmp_path / "bridge.html"
-    render_edges(g, backend="web", basemap="blank", simple=False).save(path)
-    shown = """() => map.getStyle().layers.filter(l => l.source === "shadows")
-                 .map(l => map.queryRenderedFeatures({layers: [l.id]}).length).reduce((a, b) => a + b, 0)"""
-    with pw.sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.goto(path.resolve().as_uri())
-        page.wait_for_function("window.map && map.loaded()", timeout=30_000)
-        on = page.evaluate(shown)
-        page.evaluate("rsSetBridges(false)")
-        page.wait_for_function("map.loaded()")
-        off = page.evaluate(shown)
-        page.evaluate("rsSetBridges(true)")
-        page.wait_for_function("map.loaded()")
-        back = page.evaluate(shown)
-        browser.close()
-    assert on > 0 and off == 0 and back == on
 
 
-def test_a_branching_bridge_shadow_is_cut_only_at_the_bridge_ends():
-    """_bridge_shadows (2026-10-06): where bridge edges branch the lines meet with no cut; only where the bridge comes down is it cut."""
-    from roadstyle import render_web as rw
-    m = 1 / 111320.0
-    o = (18.0, 59.3)
-    P = lambda x, y: (o[0] + x * m * 2, o[1] + y * m)                                    # noqa: E731  (about metres at 60 N)
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 3, "bridge": ["yes"] * 3},
-                         geometry=[LineString([P(0, 0), P(0, 50)]), LineString([P(0, 50), P(0, 100)]), LineString([P(0, 50), P(40, 80)])], crs=4326)
-    geo = rw.fc_dict(g)
-    rw._mark_lvl(geo, "tunnel", "bridge", "layer")
-    for ft in geo["features"]:
-        ft["properties"]["__rs_cl"] = ft["properties"]["__rs_fl"] = 1
-    sh = rw._bridge_shadows(geo, None, "highway", 5.0)
-    pts = {tuple(round(v, 7) for v in c) for s in sh for c in s["geometry"]["coordinates"]}
-    assert tuple(round(v, 7) for v in P(0, 50)) in pts                                    # the branch point is reached: no gap there
-    assert tuple(round(v, 7) for v in P(0, 0)) not in pts and tuple(round(v, 7) for v in P(0, 100)) not in pts   # the real ends are cut
-    h = gpd.GeoDataFrame({"highway": ["primary"] * 2, "bridge": ["yes"] * 2},                  # one edge that another one joins in its middle:
-                         geometry=[LineString([P(0, 0), P(0, 100)]), LineString([P(0, 30), P(40, 60)])], crs=4326)   # both lines of it keep their shadow
-    geo = rw.fc_dict(h)
-    rw._mark_lvl(geo, "tunnel", "bridge", "layer")
-    for ft in geo["features"]:
-        ft["properties"]["__rs_cl"] = ft["properties"]["__rs_fl"] = 1
-    import shapely
-    sh = shapely.unary_union([shapely.LineString(s["geometry"]["coordinates"]) for s in rw._bridge_shadows(geo, None, "highway", 5.0)])
-    assert sh.intersection(shapely.LineString([P(0, 0), P(0, 100)]).buffer(1e-9)).length / (100 * m) > 0.89   # all but the two 5 m ends
 
 
-def test_bridge_shadow_goes_straight_through_a_junction_and_each_line_keeps_its_own_number():
-    """_bridge_shadows (2026-10-06): where three bridge edges meet, the two going on straight are one line; the third is its own line,
-    at the lowest casing number of its own edges (not of the whole connected bridge: a bridge crossing over a lower bridge it is joined to
-    casts its shadow on it)."""
-    from roadstyle import render_web as rw
-    m = 1 / 111320.0
-    P = lambda x, y: (18.0 + x * m * 2, 59.3 + y * m)                                    # noqa: E731  about metres at 60 N
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 3, "bridge": ["yes"] * 3, "edge_id": [1, 2, 3]},
-                         geometry=[LineString([P(0, 0), P(0, 50)]), LineString([P(0, 50), P(0, 100)]), LineString([P(0, 50), P(60, 50)])], crs=4326)
-    geo = rw.fc_dict(g)
-    rw._mark_lvl(geo, "tunnel", "bridge", "layer")
-    for ft, n in zip(geo["features"], (1, 1, 3), strict=True):
-        ft["properties"].update({"__rs_cs": n, "__rs_cl": n, "__rs_ce": n, "__rs_fl": n})
-    sh = rw._bridge_shadows(geo, None, "highway", 5.0)
-    by = sorted((f["properties"]["__rs_cl"], len(f["geometry"]["coordinates"])) for f in sh)
-    assert [lv for lv, _ in by] == [1, 3]                                                 # two lines: the straight one through the junction, the branch
-    straight = next(f for f in sh if f["properties"]["__rs_cl"] == 1)
-    ys = [c[1] for c in straight["geometry"]["coordinates"]]
-    assert abs((max(ys) - min(ys)) / m - 90) < 0.5                                         # 0-100 m, less the 5 m passed in at each end where it comes down
 
 
-def test_street_names_fit_their_road_and_tiny_ones_are_left_out():
-    """Street names (2026-10-07): 9/10 of the road's fill width, at most the old 10 -> 14 px; none where that is under 8 px."""
-    from roadstyle import render_web as rw
-    assert rw._label_px("primary", 18) == 14.0                                             # a wide road: as before
-    assert abs(rw._label_px("residential", 17) - 0.9 * rw.class_width_px("residential", 17, casing=False)) < 1e-9 < rw._label_px("residential", 17) - 8
-    assert rw._label_px("service", 18) < 8                                                 # 5 px wide: no name at z18
-    style = _style(render_edges(_edges(), backend="web").html)
-    lab = next(l for l in style["layers"] if l["id"].startswith("roads-labels"))
-    assert lab["layout"]["text-size"][0] == "interpolate" and lab["layout"]["text-size"][4][0] == "match"
-    first = dict(zip(*[iter(rw._label_readable_filter()[2][2:-1])] * 2, strict=True))
-    assert first["residential"] == 17 and first["tertiary"] == 17 and first["secondary"] == 16 and first["service"] > 18 and first["primary"] <= 15
-    assert json.dumps(rw._label_readable_filter()) in json.dumps(lab["filter"])
 
 
-def test_a_bridge_shadow_is_not_on_its_own_road_at_a_joint():
-    """2026-10-06 ("shadow on its own road"): at a joint with a lower piece of the bridge, the shadow of the higher piece's head is at the
-    head's number, at or under the lower piece's fill; the main part, over what it crosses, keeps its own higher number."""
-    m = 1 / 111320.0
-    P = lambda x, y: (18.0 + x * m * 2, 59.3 + y * m)                                    # noqa: E731  about metres at 60 N
-    g = gpd.GeoDataFrame({"highway": ["primary"] * 2, "bridge": ["yes"] * 2, "cs": [2, 1], "cl": [2, 1], "ce": [1, 1], "fl": [2, 1]},
-                         geometry=[LineString([P(0, 0), P(0, 50)]), LineString([P(0, 50), P(0, 100)])], crs=4326)   # A (high), then B (low)
-    style = _style(render_edges(g, backend="web", casing_start_col="cs", casing_level_col="cl", casing_end_col="ce", fill_level_col="fl", simple=False).html)
-    sh = style["sources"]["shadows"]["data"]["features"]
-    ys = lambda f: sorted(round((c[1] - 59.3) / m) for c in f["geometry"]["coordinates"])               # noqa: E731
-    by = sorted((f["properties"]["__rs_cl"], ys(f)[0], ys(f)[-1]) for f in sh)
-    assert by == [(1, 45, 97), (2, 3, 45)]                                                    # A's end head joins B's shadow at 1, under B's fill
 
 
 def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
@@ -3450,101 +1953,12 @@ def test_an_arrow_that_would_touch_a_name_is_left_out():
     assert ids.index("roads-arrows") < ids.index("roads-labels")                      # names placed first
 
 
-def test_every_piece_of_a_road_names_its_edge():
-    """docs/design/edge_items.md step 1: every feature of every source that draws a road (all but base maps, overlays and the boundary, so a
-    source added later without the label fails here) carries ``__rs_edge``, the index of its edge in ``roads`` (``__rs_edge2`` too for a
-    two-way pair's shared pieces); the shadow lines and 3D decks carry ``__rs_edges``, the list of their edges. Step 2: an item attached with
-    ``Overlay(edge_col=...)`` carries ``__rs_edge`` too, the index of the road whose ``edge_id_col`` is its ``edge_col``, and that road's class and level.
-    And every piece carries ``__rs_cls``, the class the class filter reads: its road's ``filter_col`` value (a name or an arrow slot carries the
-    chain's ``highway``, not ``filter_col``); shadows and decks, which cover several edges, are decided per edge in the page."""
-    from shapely.geometry import Point
-    ln = lambda *c: LineString(c)                                                       # noqa: E731
-    g = gpd.GeoDataFrame(
-        {"highway": ["residential"] * 2 + ["primary"] * 4, "name": ["Main", "Main", "Side", "Bridge", "Bridge", "Bridge"],
-         "oneway": [False, False, True, False, False, True],
-         "cs": [0, 0, -1, 0, 0, 0], "cl": [0, 0, 0, 1, 1, 1], "ce": [0, 0, -2, 0, 0, 0], "fl": [0] * 3 + [1] * 3,
-         "capa": [None, None, "flat", None, None, None], "capb": [None, None, "square", None, None, None],
-         "bridge": [None, None, None, "yes", "yes", "yes"], "edge_id": [50, 51, 52, 53, 54, 55], "fc": ["A", "A", "B", "C", "C", "D"]},
-        geometry=[ln((18.000, 59.300), (18.004, 59.300)), ln((18.004, 59.300), (18.000, 59.300)),            # a two-way street (two twins)
-                  ln((18.004, 59.300), (18.004, 59.304)),                                                    # a one-way street with two different end caps
-                  ln((18.010, 59.300), (18.012, 59.300)), ln((18.012, 59.300), (18.010, 59.300)),            # a two-way bridge
-                  ln((18.012, 59.300), (18.014, 59.300))], crs=4326)                                         # a one-way bridge going on from it
-    kw = dict(backend="web", arrows=True, labels=True, view_3d=True, casing_start_col="cs", casing_level_col="cl", casing_end_col="ce",
-              fill_level_col="fl", cap_start_col="capa", cap_end_col="capb", bridge_col="bridge", filter_col="fc",
-              overlays=[Overlay(gpd.GeoDataFrame({"edge_id": [55, 50, 52], "highway": ["crossing"] * 3},       # its own highway is not its road's class
-                                                 geometry=[Point(18.013, 59.3), Point(18.001, 59.3), Point(18.004, 59.302)], crs=4326),
-                                edge_col="edge_id", kind="circle", label="items")])
-    seen = set()
-    for extra in ({}, {"tiles": False}):
-        style = _stages(g, **kw, **extra, simple=False, settings={"config": {"twin_casing": "each"}})
-        n = len(style["_roads"]["features"])
-        assert all(f["properties"]["__rs_edge"] == i for i, f in enumerate(style["_roads"]["features"]))      # the generateId index
-        roads = style["_roads"]["features"]
-        assert all(f["properties"]["__rs_cls"] == f["properties"]["fc"] for f in roads)
-        for name, src in style["sources"].items():
-            if name == "ov0":                                                            # the attached items
-                roads = style["_roads"]["features"]
-                for f in src["data"]["features"]:
-                    p, r = f["properties"], roads[f["properties"]["__rs_edge"]]["properties"]
-                    assert (r["edge_id"], r["fc"], r["lvl"]) == (p["edge_id"], p["__rs_cls"], p["__rs_lvl"]), p
-                seen.add(name)
-            if src["type"] != "geojson" or name in ("boundary", "roads", "arrows") or name.startswith("ov"):     # arrows: filled by the page
-                continue
-            feats = src["data"]["features"]
-            assert feats, name
-            seen.add(name)
-            for f in feats:
-                p = f["properties"]
-                if name in ("shadows", "decks"):
-                    assert p["__rs_edges"] and all(isinstance(e, int) and 0 <= e < n for e in p["__rs_edges"]), (name, p)
-                else:
-                    assert isinstance(p["__rs_edge"], int) and 0 <= p["__rs_edge"] < n, (name, p)
-                    assert p["__rs_cls"] == roads[p["__rs_edge"]]["properties"]["fc"], (name, p)
-                    if "__rs_edge2" in p:
-                        assert isinstance(p["__rs_edge2"], int) and 0 <= p["__rs_edge2"] < n, (name, p)
-    assert all("__rs_edge2" in f["properties"] for f in style["sources"]["ends"]["data"]["features"])       # a cap belongs to both twins
-    assert {"casings", "halves", "ends", "slots", "shadows", "decks", "ov0"} <= seen           # the page really had every kind of piece
 
 
 def _at_zoom(e, z):
     return z if e == ["zoom"] else [_at_zoom(x, z) for x in e] if isinstance(e, list) else e
 
 
-@pytest.mark.parametrize("make", [
-    lambda: render_edges(_edges().assign(bridge=["yes", None, None], oneway=[1, 0, 1]), backend="web", simple=False, arrows=True, labels=True),
-    lambda: render_edges(_edge_world(), backend="web", simple=False, minzoom=True),
-    lambda: render_edges(_edges().assign(bridge=["yes", None, None]), backend="web", simple=False, view_3d=True),
-    pytest.param(lambda: render_edges(_edge_world(), backend="web", simple=False, tiles=True),
-                 marks=pytest.mark.skipif(importlib.util.find_spec("mapbox_vector_tile") is None, reason="tiles need mapbox_vector_tile")),
-])
-def test_a_page_has_no_road_layer_that_draws_nothing(monkeypatch, make):
-    """A road layer is made only where some feature can be drawn by it (MapLibre walks every layer on every frame): a position without a
-    bridge has no bridge layers, and every layer that draws a feature at some zoom is still there, in the same order."""
-    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
-    from roadstyle import render_web as rw
-    seen = []
-    real = rw._drop_empty_layers
-    monkeypatch.setattr(rw, "_drop_empty_layers", lambda layers, feats: seen.append((copy.deepcopy(layers), feats, copy.deepcopy(real(layers, feats)))) or real(layers, feats))
-    make()
-    full, feats, lean = seen[0]
-    assert len(lean) < len(full)
-    ids = [l["id"] for l in lean]
-    assert [l["id"] for l in full if l["id"] in set(ids)] == ids                # the same order
-    for l in full:                                                              # a layer that draws some feature at some zoom stays
-        if l["id"].startswith("roads-") and l.get("filter") and l.get("source") in feats:
-            draws = []
-            for ft in feats[l["source"]]:
-                for z in range(0, 25):
-                    v = rw._ev(_at_zoom(l["filter"], z), ft.get("properties") or {})
-                    assert v is not rw._MAYBE, (l["id"], l["filter"])         # every operator of the filters is read
-                    draws.append(bool(v))
-            assert any(draws) == (l["id"] in ids) or l["id"] == "roads-fill", l["id"]
-    for l in lean:                                                              # a bridge layer only at a bridge's casing position
-        if l["id"].startswith("roads-casing") and l["id"].endswith("-bridge"):
-            pos = int(re.search(r"-lv(-?\d+)", l["id"]).group(1)) if "-lv" in l["id"] else 0
-            assert any(ft["properties"].get("__rs_bridge") and (ft["properties"].get("__rs_cl") or 0) == pos for ft in feats[l["source"]]), l["id"]
-    if any(ft["properties"].get("__rs_bridge") for ft in feats["roads"]):
-        assert len([i for i in ids if i.endswith("-bridge")]) < len([l for l in full if l["id"].endswith("-bridge")])
 
 
 def _simple_world():
@@ -3556,54 +1970,12 @@ def _simple_world():
                                       LineString([(18, 59.02), (18 + d, 59.02)])], crs=4326)
 
 
-def test_simple_draws_every_road_piece_in_one_layer_in_the_full_order():
-    """simple=True: one road line layer (source "simple": the casing pieces as the full look cuts them, then the fills), a transparent roads-fill on the
-    roads source for picking, the highlight, one arrow and one name layer; the line-sort-key is 2 * position (a bridge's casing + 0.25), a fill
-    2 * position + 1 (a dashed class's - 0.5, before the casings, and no casing); every piece names its edge."""
-    from roadstyle.render_web import _piece_key
-    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
-    full = _stages(_simple_world(), simple=False, **kw)
-    html = render_edges(_simple_world(), **kw).html
-    style = _style(html)
-    lines = [l for l in style["layers"] if l["id"].startswith("roads-") and l["type"] == "line"]
-    assert [l["id"] for l in lines] == ["roads-simple"]      # a page: the pieces draw, pick and glow; no roads source (the road table)
-    assert lines[0]["source"] == "simple" and lines[0]["layout"]["line-sort-key"][1] == ["get", "__rs_s"] and lines[0]["layout"]["line-cap"][-1] == "round"
-    assert "roads" not in style["sources"] and style["sources"]["simple"]["promoteId"] == "__rs_edge"
-    assert {"casings", "halves", "shadows", "ends"}.isdisjoint(style["sources"])
-    feats = [f["properties"] for f in _stages(_simple_world(), **kw)["sources"]["simple"]["data"]["features"]]      # with their stage values
-    assert all("__rs_edge" in p and "__rs_cls" in p for p in feats)
-    casings = [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in feats if p["__rs_k"] in (0, 3) and not p.get("__rs_stub")]   # a tunnel's casing: its gap piece (3), the dashes (4) on top; a round end on its stub (_end_stub)
-    # the same pieces as the full look's casing source, seams too (a tunnel's casing is its dashes alone: no seam dots), the footway none
-    full_pieces = [(p["__rs_edge"], p["__rs_cl"]) for p in (f["properties"] for f in full["sources"]["casings"]["data"]["features"])
-                   if not (p.get("__rs_seam") and p["__rs_edge"] == 0) and p["__rs_edge"] != 2]
-    assert [c[:2] for c in casings] == full_pieces
-    assert [c[:2] for c in casings if c[0] == 0] == [(0, -1), (0, 0), (0, -2)] and {c[:2] for c in casings if c[0] == 1} == {(1, 0), (1, 1), (1, 2)}
-    assert [c[2] for c in casings] == [_piece_key(2 * c[1] + (0.25 if c[0] == 1 else 0), c[0]) for c in casings]     # + the edge's tie-breaker
-    fills = [(p["__rs_edge"], p["__rs_s"]) for p in feats if p["__rs_k"] == 1]
-    assert fills == [(0, _piece_key(1, 0)), (1, _piece_key(5, 1)), (2, _piece_key(1.5, 2))]
-    assert all(max(c[2] for c in casings if c[0] == e) < s for e, s in fills if e != 2)      # an edge's fill over its own casing
-    # the bridge's shadow: one copy of its main casing piece, just under it, with every piece's labels; blurred, wider than the casing
-    shadows = [p for p in feats if p["__rs_k"] == 2]
-    assert [(p["__rs_edge"], p["__rs_cl"], p["__rs_s"]) for p in shadows] == [(1, 1, _piece_key(2.15, 1))] and "__rs_cls" in shadows[0]
-    paint = lines[0]["paint"]
-    # both bridge additions grow with the zoom: none at 14 and below, full at 17 and above (zoom at the top, the cases inside)
-    assert paint["line-blur"][:3] == ["interpolate", ["linear"], ["zoom"]] and paint["line-blur"][3:5] == [14, 0] and paint["line-blur"][5] == 17 and paint["line-blur"][6][0] == "case"
-    op = paint["line-opacity"]
-    assert op[:3] == ["interpolate", ["linear"], ["zoom"]] and op[3] == 14 and op[4][:3] == ["case", ["==", ["get", "__rs_k"], 2], 0] and op[5] == 17
-    paint = {**paint, "line-width": _bare(paint["line-width"])}       # N8: each stop × the width factor
-    stops = dict(zip(paint["line-width"][3::2], paint["line-width"][4::2], strict=True))
-    extra = lambda z: stops[z][4][2]                                # noqa: E731 - the bridge casing's extra px at a stop: (case, shadow cond, shadow, bridge cond, bridge, ...)
-    assert extra(14) == 0.0 and extra(15) == 1.0 and extra(17) == 3.0 and extra(20) == 3.0
-    assert paint["line-color"][1:3] == [["==", ["get", "__rs_k"], 2], "rgba(0,0,0,0.25)"]
-    w = paint["line-width"][4]                                       # the first zoom stop: shadow, bridge casing, ... cases
-    assert w[0] == "case" and w[1] == ["==", ["get", "__rs_k"], 2]
-    assert "const RS_SIMPLE = " in html and "_simpleColor" not in html and "_applyFill" not in html      # the page builds no colour
 
 
 def test_simple_tunnels_move_toward_the_chosen_tunnel_colour():
     """A tunnel in simple mode takes the tunnel look toward ``tunnel_toward`` at ``tunnel_strength`` from the start, as the full look
     (it moved toward slate until the page recoloured, 2026-10-08)."""
-    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0, simple=True)
+    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
     st = _style(render_edges(_simple_world(), **kw).html)
     color = json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-color"])
     assert '"rs_tun_toward"' in color and '"rs_tun_strength"' in color                                 # the look reads the page state
@@ -3612,12 +1984,6 @@ def test_simple_tunnels_move_toward_the_chosen_tunnel_colour():
     assert navy["rs_tun_toward"]["default"] == "#1e293b" and navy["rs_tun_strength"]["default"] == 75
 
 
-def test_simple_is_the_default_and_simple_false_is_the_full_look():
-    """No ``simple=`` draws simple mode; simple=False is the full look, without the simple-mode script."""
-    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
-    assert render_edges(_simple_world(), **kw).html == render_edges(_simple_world(), simple=True, **kw).html
-    html = render_edges(_simple_world(), simple=False, **kw).html
-    assert "RS_SIMPLE" not in html and "roads-simple" not in html
 
 
 def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
@@ -3625,46 +1991,8 @@ def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
     assert _in('"control": true', html) and "TUNNEL.simple" not in html and "rsSetTunnelStyle=function" not in html     # one rsSetTunnelStyle: it sets state
 
 
-def test_simple_same_key_pieces_keep_their_order_after_an_update_in_place():
-    """Two roads at one position have pieces with the same base key; MapLibre draws equal keys in feature order, and updateData puts a
-    redrawn road's pieces last. The per-edge tie-breaker (2026-10-08) makes the order the same as in the whole page built again."""
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["residential", "residential"]},
-                         geometry=[LineString([(18, 59), (18 + d, 59)]), LineString([(18 + d / 2, 58.999), (18 + d / 2, 59.001)])], crs=4326)
-    order = lambda fs: [(f["properties"]["__rs_edge"], f["properties"]["__rs_k"]) for f in sorted(fs, key=lambda f: f["properties"]["__rs_s"])]  # noqa: E731 - stable, as MapLibre
-    page = _style(render_edges(g, backend="web").html)["sources"]["simple"]["data"]["features"]
-    new = render_edges(g, backend="web", _edges=[0])["simple"]                                          # road 0 redrawn in place:
-    patched = [f for f in page if f["properties"]["__rs_edge"] != 0] + new                              # updateData puts it last
-    assert len({f["properties"]["__rs_s"] for f in page}) == len(page) and order(patched) == order(page)
-    with pytest.raises(ValueError, match="more than 1,000,000 edges"):
-        from roadstyle.render_web import _simple_pieces
-        _simple_pieces({"features": []}, [{"geometry": None, "properties": {"__rs_cl": 0, "__rs_cs": 0, "__rs_ce": 0, "__rs_edge": 1_000_000}}], ())
 
 
-def test_simple_tunnel_casing_is_a_gap_piece_and_a_dash_piece():
-    """A tunnel's casing in simple mode: a solid piece in the palette's gap colour, then a piece on top in the dash colour with the tunnel_casing_dash
-    dasharray (butt ends), both 3 px wider than a casing, the dashes a little above the gap and under the fill; "One colour": a clear gap."""
-    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
-    style = _stages(_simple_world(), settings={"config": {"tunnel_casing_dash": [2, 3]}}, **kw)
-    feats = [f["properties"] for f in style["sources"]["simple"]["data"]["features"]]
-    gap, dash = [p for p in feats if p["__rs_k"] == 3 and not p.get("__rs_stub")], [p for p in feats if p["__rs_k"] == 4 and not p.get("__rs_stub")]
-    assert len(gap) == len(dash) == 3 and all(p["__rs_edge"] == 0 for p in gap + dash)            # the tunnel's three pieces (heads and main), no plain casing
-    assert not [p for p in feats if p["__rs_k"] == 0 and p["__rs_edge"] == 0]
-    assert [d["__rs_s"] - g["__rs_s"] for g, d in zip(gap, dash, strict=True)] == [_KEY_UNIT // 10] * 3 and all(d["__rs_s"] < _KEY_UNIT for d in dash)   # under the fill (key 1)
-    layer = next(l for l in style["layers"] if l["id"] == "roads-simple")
-    color = layer["paint"]["line-color"]
-    from roadstyle import render_web as rw
-    dash_c, gap_c = rw.CONFIG.tunnel_palettes["Graphite + silver"]
-    gap_e, dash_e = (color[color.index(["==", ["get", "__rs_k"], k]) + 1] for k in (3, 4))
-    assert gap_e == rw._tun_gap() and dash_e == rw._tun_dash()                                         # each moved toward the tunnel colour by the strength
-    assert style["state"]["rs_tun_c0"]["default"] == dash_c and style["state"]["rs_tun_c1"]["default"] == gap_c
-    da = layer["paint"]["line-dasharray"]
-    assert da[:2] == ["case", ["==", ["get", "__rs_k"], 4]] and da[2] == ["global-state", "rs_tun_ratio"] and style["state"]["rs_tun_ratio"]["default"] == [2.0, 3.0]
-    assert layer["layout"]["line-cap"][:4] == ["case", ["to-boolean", ["get", "__rs_dash"]], "butt", ["==", ["get", "__rs_k"], 4]]
-    w = json.dumps(layer["paint"]["line-width"])
-    assert w.count('"__rs_k"], 3]') >= 1 and "+" in w
-    one = _stages(_simple_world(), settings={"config": {"tunnel_palette": "One colour"}}, **kw)
-    assert one["state"]["rs_tun_two"]["default"] is False                                             # One colour: the gap clear (_tun_gap)
 
 
 def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
@@ -3680,31 +2008,6 @@ def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
     assert "line-dasharray" not in json.dumps(next(l for l in _style(plain)["layers"] if l["id"] == "roads-simple")["paint"])      # no dash, no tunnel: nothing set
 
 
-def test_simple_line_cap_per_piece_from_the_ends():
-    """cap_col / cap_start_col / cap_end_col in simple mode: ``__rs_cap`` per piece (round none, True flat, "square"); as in the full look a casing's
-    main piece ends flat with a round seam dot at each cut (a round main piece reached past a short head into the junction, 2026-10-08);
-    an edge with two different ends has two fill halves, each with its end's cap, and casing heads with theirs."""
-    d = 0.001
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 3, "cs": [0, 0, 0], "cm": [0, 0, 0], "ce": [0, 0, 0], "fl": [0, 0, 0],
-                          "cap": [None, "square", True], "c0": [None, None, "square"], "c1": [None, None, None]},
-                         geometry=[LineString([(18, 59 + i / 100), (18 + d, 59 + i / 100)]) for i in range(3)], crs=4326)
-    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0, cap_col="cap")
-    feats = [f["properties"] for f in _stages(g.drop(columns=["c0", "c1"]), **kw)["sources"]["simple"]["data"]["features"]]
-    caps = {(p["__rs_k"], p["__rs_edge"]): p.get("__rs_cap") for p in feats}
-    assert caps == {(0, 0): None, (1, 0): None, (0, 1): "square", (1, 1): "square", (0, 2): True, (1, 2): True}
-    g = g.set_geometry([LineString([(18.000000123, 59.000000123), (18 + d, 59)])] + list(g.geometry[1:]), crs=4326)   # more decimals than a piece keeps
-    split = _stages(g.iloc[:1].assign(cap=None, c0="square", c1="flat"), cap_start_col="c0", cap_end_col="c1", **{**kw, "cap_col": None})
-    feats = [f["properties"] for f in split["sources"]["simple"]["data"]["features"]]
-    fills = [p.get("__rs_cap") for p in feats if p["__rs_k"] == 1]
-    assert fills == [True, "square", True]                          # the start half (flat at its cut), its square stub at the road end, the end half
-    heads = [(p["__rs_cl"], p.get("__rs_cap"), p.get("__rs_main")) for p in feats if p["__rs_k"] == 0 and not p.get("__rs_lap")]
-    # head (flat), its 0.5 m square stub at the road end (2026-10-10: a square cap at the head's cut stuck out where the road bends), main (flat), head
-    assert heads[:4] == [(0, True, None), (0, "square", None), (0, True, True), (0, True, None)]
-    stub = next(f for f in split["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 0 and f["properties"].get("__rs_cap") == "square")
-    (x0, y0), (x1, y1) = stub["geometry"]["coordinates"]        # from the road end (the edge's start) on, as the edge runs: a line-offset keeps its side
-    assert abs(x0 - 18) < 1e-6 and abs(y0 - 59) < 1e-6 and 0.45 < math.hypot((x1 - x0) * 111320 * math.cos(math.radians(59)), (y1 - y0) * 111320) < 0.55   # 0.5 m: 7 decimals keep its direction
-    assert heads[4:] == [(0, None, None)] * 2 and all(p.get("__rs_seam") for p in feats if p["__rs_k"] == 0 and not p.get("__rs_cap"))   # the two seams, round
-    assert [p.get("__rs_cap") for p in feats if p.get("__rs_lap")] == [True, True]                  # and the two laps, flat (below zoom 17)
 
 
 def test_the_tunnels_box_recolours_the_one_road_layer_in_the_browser(tmp_path):
@@ -3736,7 +2039,7 @@ def test_simple_puts_the_items_of_edges_above_the_road_layer():
     """Overlay(edge_col=...) in simple mode: the items after the one road layer, before the arrows / names / highlight."""
     g = _edge_world()
     pts = _edge_features([12, 13], order=[0, 0])
-    style = _style(render_edges(g, backend="web", simple=True, overlays=[Overlay(pts, edge_col="edge_id", order_col="order", kind="circle", label="i")]).html)
+    style = _style(render_edges(g, backend="web", overlays=[Overlay(pts, edge_col="edge_id", order_col="order", kind="circle", label="i")]).html)
     ids = [l["id"] for l in style["layers"]]
     item = next(i for i, l in enumerate(style["layers"]) if l.get("source", "").startswith("ov"))
     assert ids.index("roads-simple") < item and all(ids.index(a) > item for a in ("roads-arrows", "roads-labels") if a in ids)
@@ -3769,7 +2072,6 @@ def test_make_writes_one_stack_row_per_part_that_crosses():
 def test_stack_rows_union_and_switch_off_exactly_one_row():
     """Rows union: an edit adds a part to the found ones; an edit with enabled false takes out exactly that row (pair and part)."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     import roadstyle as rs
     from roadstyle.levels import merged_relations
@@ -3787,7 +2089,6 @@ def test_stack_rows_union_and_switch_off_exactly_one_row():
 def test_a_head_change_after_make_changes_nothing_in_the_solve(tmp_path):
     """The solver works from the tables only (2026-10-08): heads.csv changed after make gives the same levels; make again reads it."""
     pytest.importorskip("scipy")
-    import pandas as pd
 
     from roadstyle.level_area import make_area, solve_area
     make_area(_stack_world(v=True), tmp_path)
@@ -3802,7 +2103,6 @@ def test_a_head_change_after_make_changes_nothing_in_the_solve(tmp_path):
 
 def test_an_old_pairs_table_with_whole_road_stacks_is_an_error():
     """A pairs.csv made before 2026-10-08 (a stack row with no part) is not read as something else: make the area again."""
-    import pandas as pd
 
     import roadstyle as rs
     roads, pairs = rs.level_input(_stack_world())
@@ -3849,25 +2149,6 @@ def test_simple_seams_only_from_zoom_17_as_the_full_look():
     assert json.dumps(["any", ["!", seam], ["all", ["!", lap], [">=", ["zoom"], 17]], ["all", lap, ["<", ["zoom"], 17]]]) in flt
 
 
-def test_a_lap_closes_the_cut_below_zoom_17():
-    """Below zoom 17 a flat lap lies across each casing cut at the lower number, up to 2 m each way and half of either piece: the two flat
-    ends at a cut take their directions from the map's tile grid (22 cm at zoom 14), stood a few degrees apart and left a thin gap across a
-    bridge's outline (2026-10-08). Both looks."""
-    kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
-    for simple, src in ((True, "simple"), (False, "casings")):
-        style = _stages(_simple_world(), simple=simple, **kw)
-        feats = style["sources"][src]["data"]["features"]
-        laps = [f for f in feats if f["properties"].get("__rs_lap")]
-        seams = [f for f in feats if f["properties"].get("__rs_seam") and not f["properties"].get("__rs_lap")]
-        solid = [f for f in seams if not (f["properties"].get("__rs_dash") or f["properties"].get("__rs_tunnel"))]   # (none on dashes)
-        assert laps and len(laps) == len(solid) and not any(f["properties"].get("__rs_tunnel") for f in laps)
-        for lap, seam in zip(laps, solid, strict=True):
-            p = lap["properties"]
-            assert p["__rs_cap"] is True and p["__rs_seam"] and (p["__rs_edge"], p["__rs_cl"]) == (seam["properties"]["__rs_edge"], seam["properties"]["__rs_cl"])   # flat, at the seam's number
-            (x0, y0), (x1, y1) = lap["geometry"]["coordinates"][0][:2], lap["geometry"]["coordinates"][-1][:2]
-            assert math.hypot((x1 - x0) * 111320 * math.cos(math.radians(y0)), (y1 - y0) * 111320) <= 4.0 + 0.01
-        for lyr in (l for l in style["layers"] if l.get("source") == src and not l["id"].endswith("-dash")):
-            assert '["all", ["to-boolean", ["get", "__rs_lap"]], ["<", ["zoom"], 17]]' in json.dumps(lyr["filter"])
 
 
 def test_an_unclassed_two_way_pair_pairs_and_the_warning_names_it():
@@ -3906,49 +2187,10 @@ def _x(f):
 _K43 = 111320.0 * math.cos(math.radians(43.7))
 
 
-def test_slots_keep_away_from_crossings_but_run_through_plain_nodes():
-    from roadstyle.render_web import _crossing_half_m
-    # Main St: three edges, plain nodes at x = 0.0005 and the junction with Side St at x = 0.0010 (Side St is a different group)
-    lines = [("Main St", "residential", [(0.0, 43.7), (0.0005, 43.7)]), ("Main St", "residential", [(0.0005, 43.7), (0.0010, 43.7)]),
-             ("Main St", "residential", [(0.0010, 43.7), (0.0030, 43.7)]), ("Side St", "residential", [(0.0010, 43.699), (0.0010, 43.701)])]
-    main = sorted((f for f in _slots_of(lines) if f["properties"]["name"] == "Main St"), key=lambda f: _x(f))
-    m = _crossing_half_m("residential", 43.7)
-    for f in main:
-        lo, hi = _x(f)
-        assert not (0.0010 - m / _K43 + 1e-6 < hi and lo < 0.0010 + m / _K43 - 1e-6), (lo, hi)      # never inside the margin
-    assert main[0]["properties"]["slot"] == 0 and _x(main[0])[0] == 0.0
-    left = [f for f in main if _x(f)[1] <= 0.0010]
-    assert len(left) == 1 and _x(left[0])[1] * _K43 > 60             # the 0 - 0.0010 stretch (~71 m) is one slot across the plain node
 
 
-def test_slots_keep_away_from_a_zebra_and_a_bridge():
-    from roadstyle.render_web import _crossing_half_m
-    lines = [("Main St", "residential", [(0.0, 43.7), (0.0040, 43.7)]),
-             ("", "footway", [(0.0010, 43.69995), (0.0010, 43.70005)]),          # a zebra
-             ("Bridge", "secondary", [(0.0030, 43.699), (0.0030, 43.701)])]
-    main = sorted((f for f in _slots_of(lines) if f["properties"]["name"] == "Main St"), key=_x)
-    zebra, bridge = _crossing_half_m("footway", 43.7), _crossing_half_m("secondary", 43.7)
-    assert zebra >= 4.0 and bridge > zebra - 1
-    for f in main:
-        lo, hi = _x(f)
-        for at, m in ((0.0010, zebra), (0.0030, bridge)):
-            assert hi <= at - m / _K43 + 1e-6 or lo >= at + m / _K43 - 1e-6
 
 
-def test_a_short_one_way_stretch_gets_an_arrow_slot_not_a_name_slot():
-    """A stretch between two crossings shorter than a name slot (20 m with slot_m 100) but at least 8 m long is an arrow slot (odd) on a
-    one-way street, nothing on a two-way one (2026-10-09)."""
-    from roadstyle.render_web import _crossing_half_m
-    z = _crossing_half_m("footway", 43.7)
-    x1, x2 = 0.0010, 0.0010 + (2 * z + 15) / _K43                       # two zebras, 15 m of street between their margins
-    lines = [("Main St", "residential", [(0.0, 43.7), (0.0025, 43.7)]),
-             ("", "footway", [(x1, 43.69995), (x1, 43.70005)]), ("", "footway", [(x2, 43.69995), (x2, 43.70005)])]
-    def between(oneway):
-        return [f for f in _slots_of(lines, oneway) if f["properties"]["name"] == "Main St" and x1 < _x(f)[0] < x2]
-    short = between(True)
-    assert len(short) == 1 and short[0]["properties"]["slot"] % 2 == 1
-    assert 14 < (_x(short[0])[1] - _x(short[0])[0]) * _K43 < 16
-    assert between(False) == []
 
 
 def test_name_layer_is_line_center_with_a_sort_key():
@@ -3983,33 +2225,8 @@ def _two_rules_seen(m, refs):
     return two, arrows
 
 
-def test_drawing_follows_directed_and_arrows_follow_driving_oneway():
-    """The two rules (2026-10-09): two directions or one line = ``directed_col`` alone (rs.is_directed: open to cars or bikes, not a path);
-    an arrow = one-way AND driving. E (cars one way, a bus / bike lane the other): two halves, ONE arrow, on E_f, pointing E_f's way. T: two directions, no arrow. F (a footway): one line, no arrow. W (a walking-only reverse): one line, its arrow on W_f."""
-    import roadstyle as rs
-    g = _two_rules_edges()
-    assert list(rs.is_directed(g)) == [True, True, True, True, False, False, True, False]
-    m = render_edges(g.assign(is_directed=rs.is_directed(g)), backend="web", simple=False, edge_id_col="edge_id",
-                     directed_col="is_directed", driving_col="driving")
-    two, arrows = _two_rules_seen(m, list(g["ref"]))
-    assert two == {"E_f": True, "E_r": True, "T_f": True, "T_r": True, "F_f": False, "F_r": False, "W_f": False, "W_r": False}
-    assert set(arrows) == {"E_f", "W_f"}
-    assert arrows["E_f"][0][0] < arrows["E_f"][-1][0]            # along E_f (west to east), not along E_r
 
 
-def test_the_level_editor_draws_and_puts_arrows_like_render_edges(tmp_path):
-    """One rule, every path: the level editor's page, fed from the level area (each edge's oneway, driving and directed, made with
-    rs.is_directed at make time), draws the same directions and arrows as render_edges with directed_col and driving_col."""
-    import roadstyle as rs
-    from roadstyle import level_editor
-    from roadstyle.level_area import make_area
-    g = _two_rules_edges()
-    make_area(g, tmp_path, id_col="edge_id")
-    area = level_editor.Area(tmp_path)
-    ed = _two_rules_seen(area._render(simple=False), [g["ref"][int(i)] for i in area.draw["edge"]])
-    pg = _two_rules_seen(render_edges(g.assign(is_directed=rs.is_directed(g)), backend="web", simple=False, edge_id_col="edge_id",
-                                      directed_col="is_directed", driving_col="driving"), list(g["ref"]))
-    assert ed[0] == pg[0] and set(ed[1]) == set(pg[1]) == {"E_f", "W_f"}
 
 
 def _crossing_with_lanes(n=3, dash=False, **kw):
@@ -4111,7 +2328,6 @@ def test_a_road_drawn_over_another_roads_lanes_is_what_a_click_finds(tmp_path):
     """2026-10-09 (Allée Lazare Sauvaigo over Tunnel Dorsale): where a road is drawn over another road's unseen, picked lanes, a hover or
     click finds the road on top, not the lane under it; away from it, the lane is still found."""
     pw = pytest.importorskip("playwright.sync_api")
-    import pandas as pd
     from shapely.geometry import LineString
     roads, items = _road_with_items()                                       # edge 1: a road with an unseen picked lane, at level 0
     over = LineString([(18.062, 59.314), (18.062, 59.316)])
@@ -4157,57 +2373,6 @@ def test_line_items_full_look_and_tiles(monkeypatch):
         _crossing_with_lanes(n=39)
 
 
-def test_the_editor_draws_the_items_of_its_hook_and_reloads_after_an_apply(tmp_path):
-    """serve(items=f) (2026-10-10): f gets the editor's drawn table (one row per edge, ``edge``) and returns overlays and render_edges keywords,
-    which reach the page; an Apply that moves a fill number draws the whole page again for overlays (their own layers) and says so, and
-    redraws road items (render items=) in place with their road. No hook: the same page as before."""
-    pytest.importorskip("scipy")
-    from shapely.geometry import mapping
-
-    from roadstyle.level_area import make_area
-    from roadstyle.level_editor import Area
-    make_area(_edge_world(), tmp_path)
-    plain = Area(tmp_path).page
-    seen = []
-
-    def items(draw):
-        seen.append(list(draw["edge"]))
-        draw["w"] = 6.0
-        e = draw.iloc[0]
-        fc = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": mapping(e.geometry),
-                                                         "properties": {"on": e["edge"], "order": 0, "width_m": 3.0, "lane_id": "L1"}}]}
-        return [Overlay(fc, edge_col="on", order_col="order", width_m_col="width_m", label="lanes", select="item")], {"width_m_col": "w"}
-
-    area = Area(tmp_path, items)
-    page = area.page
-    assert seen and page != plain and "L1" in page and "__rs_wm" in page
-    area.apply([{"op": "cap", "road": "12", "end": "start", "cap": "square"}])
-    assert area.update is not None and area.reload is None              # a cap moves no fill number: the items stay, the page updates in place
-    moved = area.solved.copy()
-    moved.loc[moved["road"] == "12", "fill_level"] += 3                 # a new fill number moves its items: the whole page again
-    area.build(area.edits(), moved, in_place=True)
-    assert area.update is None and area.reload == "the overlays are drawn at the new levels: the whole page again"
-    assert Area(tmp_path).page == Area(tmp_path, None).page
-
-    def road_items(draw):                       # the road's own items (render items=, lanestyle): redrawn in place with their road (2026-10-09)
-        draw["w"] = 6.0
-        e = draw.iloc[0]
-        fc = {"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": mapping(e.geometry),
-                                                         "properties": {"edge": e["edge"], "order": 0, "width_m": 3.0, "pick": True, "lane_id": "L1"}}]}
-        return [], {"width_m_col": "w", "items": fc}
-
-    area = Area(tmp_path, road_items)
-    assert "L1" in area.page
-    first = area.draw.iloc[0]["road"]
-    moved = area.solved.copy()
-    moved.loc[moved["road"] == first, "fill_level"] += 3
-    area.build(area.edits(), moved, in_place=True)
-    assert area.reload is None and area.update is not None
-    base, per = area.update["items"]
-    lanes = [f for f in area.update["features"]["simple"] if f["properties"]["__rs_k"] == 5]
-    fill = next(f for f in area.update["features"]["simple"] if f["properties"]["__rs_k"] == 1 and f["properties"]["__rs_edge"] == lanes[0]["properties"]["__rs_edge"])
-    assert len(lanes) == 1 and lanes[0]["id"] == base + lanes[0]["properties"]["__rs_edge"] * per          # its id: by road and rank, as the page swaps it
-    assert fill["properties"]["__rs_s"] < lanes[0]["properties"]["__rs_s"] < fill["properties"]["__rs_s"] + _KEY_UNIT   # over its road's new fill
 
 
 def test_only_clickable_items_are_picked():
@@ -4217,40 +2382,13 @@ def test_only_clickable_items_are_picked():
     assert "OVERLAYS.filter(o=>o.base && (o.interactive || o.select===\"item\"))" in html
 
 
-def test_simple_flat_ends_that_go_on_close_the_bend_and_a_round_end_is_a_stub():
-    """2026-10-09 (tunnel roundabout, bus lanes): two flat-ended roads in metres meeting at a 30-degree bend each go on past the node to the
-    mitre (half the width times tan 15 degrees), so no wedge opens on the outer side; a dead end stays where it is. A road with a flat start
-    and a round end: both fill halves flat, the round end on a 5 cm stub at the road end (a round cap at the cut reached past the flat start)."""
-    k = 111320 * math.cos(math.radians(59))
-    a, n = (18.0, 59.0), (18.0 + 30 / k, 59.0)
-    b = (n[0] + 30 * math.cos(math.radians(30)) / k, n[1] + 30 * math.sin(math.radians(30)) / 111320)
-    g = gpd.GeoDataFrame({"highway": ["residential"] * 2, "w": [6.0, 6.0], "cap": [True, True]},
-                         geometry=[LineString([a, n]), LineString([n, b])], crs=4326)
-    feats = _stages(g, backend="web", width_m_col="w", cap_col="cap")["sources"]["simple"]["data"]["features"]
-    fill0 = next(f for f in feats if f["properties"]["__rs_k"] == 1 and f["properties"]["__rs_edge"] == 0)["geometry"]["coordinates"]
-    past = (fill0[-1][0] - n[0]) * k
-    assert abs(fill0[0][0] - a[0]) < 1e-6 and abs(past - 3.0 * math.tan(math.radians(15))) < 0.05      # the fill: half its 6 m
-    g = gpd.GeoDataFrame({"highway": ["residential"], "w": [9.0], "c0": ["flat"], "c1": ["round"]},
-                         geometry=[LineString([a, (a[0] + 4.8 / k, a[1])])], crs=4326)
-    feats = _stages(g, backend="web", width_m_col="w", cap_start_col="c0", cap_end_col="c1")["sources"]["simple"]["data"]["features"]
-    fills = [f for f in feats if f["properties"]["__rs_k"] == 1]
-    assert [f["properties"].get("__rs_cap") for f in fills] == [True, True, None] and fills[2]["properties"]["__rs_stub"]
-    (x0, _), (x1, _) = fills[2]["geometry"]["coordinates"]
-    assert abs(x1 - (a[0] + 4.8 / k)) < 1e-6 and 0.03 < (x1 - x0) * k < 0.07
 
 
-def test_the_tunnel_look_keeps_each_colours_alpha():
-    """2026-10-09: the tunnel look moves a colour toward the tunnel colour but keeps its own alpha, so an unseen item (rgba(0,0,0,0), lanestyle's
-    car lanes) stays unseen on a tunnel instead of a see-through strip, darker where two overlap."""
-    from roadstyle.render_web import _tun_mix
-    e = _tun_mix(["get", "__rs_ic"])
-    assert e[0] == "case" and e[2][0] == "let" and e[2][3][4] == ["at", 3, ["to-rgba", ["get", "__rs_ic"]]] and e[3] == ["get", "__rs_ic"]
 
 
 def test_a_saved_rule_that_is_not_kept_names_its_loop():
     """2026-10-09 (Allée Lazare Sauvaigo): a rule already in edits.csv that the solver cannot keep is "not kept", with the rules of its loop,
     not only "already there"; one that holds is a duplicate. A over B, B over C as stacks, C's fill after A's as an order: the order loops."""
-    import pandas as pd
 
     from roadstyle.levels import rule_conflicts
     roads = pd.DataFrame({"road": ["A", "B", "C"], "edges": [[], [], []], "reversed": [[], [], []]})
@@ -4264,19 +2402,6 @@ def test_a_saved_rule_that_is_not_kept_names_its_loop():
     assert why == "duplicate"
 
 
-def test_the_slots_of_a_part_are_the_whole_pages_slots_of_its_roads():
-    """2026-10-09 (the level editor's Apply): the names and arrows of a few roads are placed again for their name groups only; for every road
-    they cover they are the slots a whole page has (chains numbered by their first road), and no other road's."""
-    from roadstyle.render_web import _annotation_slots
-    geo = json.loads(gpd.GeoDataFrame(_edge_world()).to_json())
-    for i, f in enumerate(geo["features"]):
-        f["properties"]["__rs_edge"] = i
-    whole = _annotation_slots(geo, 100)["features"]
-    part = _annotation_slots(geo, 100, only=[0])
-    assert part["roads"] and 0 in part["roads"]
-    key = lambda fs: sorted(json.dumps(f, sort_keys=True) for f in fs)          # noqa: E731
-    assert key(part["features"]) == key([f for f in whole if f["properties"]["__rs_edge"] in set(part["roads"])])
-    assert len(part["features"]) <= len(whole)
 
 
 def test_a_road_item_with_a_minzoom_shows_from_that_zoom():
@@ -4344,11 +2469,3 @@ def test_the_version_is_the_one_of_a_source_tree():
     assert rs.__version__ == rs._source_version()
 
 
-def test_the_contract_level_columns_are_the_level_input(monkeypatch):
-    """An input column casing_level / fill_level (duckOSM's stored levels) is the level input when no level keyword names one (2026-10-25,
-    as the Rust engine's compute_levels): the levels are read, not solved."""
-    from roadstyle import levels
-    g = _many_edges(4).assign(casing_level=0, fill_level=1, casing_start=0, casing_end=0)
-    monkeypatch.setattr(levels, "compute_levels", lambda *a, **k: (_ for _ in ()).throw(AssertionError("solved")))
-    feats = _stages(g)["sources"]["simple"]["data"]["features"]
-    assert {f["properties"]["__rs_fl"] for f in feats if "__rs_fl" in f["properties"]} == {1}

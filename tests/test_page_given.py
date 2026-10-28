@@ -52,7 +52,7 @@ writeFileSync({json.dumps(str(tmp_path / "wasm.html"))}, makePage(readFileSync({
     wasm = (tmp_path / "wasm.html").read_text()
     df = pq.read_table(DATA).to_pandas(integer_object_nulls=True)
     g = gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
-    py = rs.render_edges(g, engine="rust", **{k: v for k, v in ARGS.items() if k != "state"}).html
+    py = rs.render_edges(g, **{k: v for k, v in ARGS.items() if k != "state"}).html
     assert 'id="sb"' in wasm and 'id="sb"' in py, "both pages have the dashboard's sidebar"
     a, b = _opts(wasm), _opts(py)
     assert {k: a.get(k) for k in KEYS} == {k: b.get(k) for k in KEYS}

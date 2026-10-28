@@ -19,4 +19,4 @@ def test_a_3d_line_draws_as_its_2d_line():
     flat = gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_wkb(df["geometry"]), crs=4326)
     tall = flat.set_geometry(shapely.force_3d(flat.geometry.values, 5.0))
     assert tall.geometry.has_z.all() and not flat.geometry.has_z.any()
-    assert rs.export_inline(tall, engine="rust") == rs.export_inline(flat, engine="rust")
+    assert rs.export_inline(tall) == rs.export_inline(flat)

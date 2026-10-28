@@ -73,13 +73,10 @@ def colour_by_section(edges, *, default=()):
 
 
 def tiles_available() -> bool:
-    """Whether the `tiles` extra (mapbox-vector-tile + pmtiles) is installed."""
-    try:
-        import mapbox_vector_tile  # noqa: F401
-        import pmtiles  # noqa: F401
-        return True
-    except ImportError:
-        return False
+    """The tiles are the Rust engine's, in every install."""
+    return True
+
+
 OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"]
 
 # Sample networks + overlays live in the repo (ui/studio/samples/), not the wheel — the studio

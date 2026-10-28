@@ -106,12 +106,11 @@ def render(
 
     from lonboard import Map, PathLayer
 
+    from ._engine import web_keywords
     from .basemaps import get_basemap
-    from .render_web import render as _web_render
 
-    # web-only keywords (arrows, view_3d, tiles, street_view, ...) would reach lonboard.Map() and
-    # raise; the set comes from the web renderer's signature, so a new web option cannot slip through
-    for _k in inspect.signature(_web_render).parameters.keys() - inspect.signature(render).parameters.keys():
+    # web-only keywords (arrows, view_3d, tiles, street_view, ...) would reach lonboard.Map() and raise
+    for _k in web_keywords(kwargs) - inspect.signature(render).parameters.keys():
         kwargs.pop(_k, None)
 
     bm = get_basemap(basemap or CONFIG.basemap, api_key=api_key)

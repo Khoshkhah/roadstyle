@@ -23,7 +23,7 @@ def test_a_class_hidden_at_this_zoom_is_dimmed_in_the_roads_box(tmp_path):
     df = pq.read_table(TARTU).to_pandas(integer_object_nulls=True)
     g = gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
     page = tmp_path / "tartu.html"
-    rs.render_edges(g, engine="rust", basemap="blank").save(str(page))
+    rs.render_edges(g, basemap="blank").save(str(page))
     html = page.read_text()
     flt = json.JSONDecoder().raw_decode(html, html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]["filter"]
     mz = flt["minzoom"]

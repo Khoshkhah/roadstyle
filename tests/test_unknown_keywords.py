@@ -8,7 +8,6 @@ import pytest
 from shapely.geometry import LineString
 
 from roadstyle import _engine, render_edges
-from roadstyle.render_web import render
 
 pytestmark = pytest.mark.skipif(not _engine.available(), reason="no roadstyle._rust")
 
@@ -16,7 +15,6 @@ pytestmark = pytest.mark.skipif(not _engine.available(), reason="no roadstyle._r
 PY_ONLY = {
     "gdf": "the roads",
     "backend": "the renderer (web, folium, lonboard)",
-    "engine": "the engine (python, rust)",
     "palette": "the look's palette (resolveLook's own option)",
     "profile": "the look's profile (resolveLook's own option)",
     "settings": "the look's settings (resolveLook's own option)",
@@ -25,7 +23,6 @@ PY_ONLY = {
     "match_links": "a filter of the GeoDataFrame before the map",
     "color_col": "the colour column of a color_table DataFrame, read in Python",
     "levels_db": "the stored levels of a duckOSM file, read in Python",
-    "styler": "the Python renderer's styler object",
 }
 
 
@@ -56,7 +53,7 @@ def test_every_keyword_of_the_python_functions_is_known_or_python_only():
     """No keyword drifts: each keyword of render_edges and render_web.render is a keyword that roadstyle reads, or one of PY_ONLY.
     A new Python keyword needs its place in the Rust side (MapOptions, PageOptions) or a line in PY_ONLY with its reason."""
     kinds = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    names = sorted({p.name for f in (render_edges, render) for p in inspect.signature(f).parameters.values()
+    names = sorted({p.name for f in (render_edges,) for p in inspect.signature(f).parameters.values()
                     if p.kind in kinds and not p.name.startswith("_")})
     unknown = [k for k, _ in _engine.rust().unknown_keywords(names)]
     assert sorted(set(unknown) - set(PY_ONLY)) == [], "keywords that roadstyle does not read"

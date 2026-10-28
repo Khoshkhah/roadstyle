@@ -25,7 +25,7 @@ with st.sidebar:
         tiles = st.checkbox("Vector tiles (big networks)", value=False,
                             disabled=not tiles_available(),
                             help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge "
-                                 "maps stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
+                                 "maps stay responsive.")
     kw = {"palette": palette, "basemap": basemap}
     if view_3d:
         kw["view_3d"] = True

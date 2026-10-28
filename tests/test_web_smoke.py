@@ -24,7 +24,7 @@ def _edges(n=40):
 
 
 def test_saved_map_boots_and_draws_roads(tmp_path):
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "smoke.html"
     render(_edges(), basemap="blank").save(path)   # blank basemap: zero network requests
@@ -49,7 +49,7 @@ def test_saved_map_boots_and_draws_roads(tmp_path):
 
 def test_compressed_map_inflates_and_attaches(tmp_path):
     """The gzip path (the default for real-size data): blobs inflate and land in the source."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "smoke_gz.html"
     g = _edges(4000)             # clears the 256 KB compression threshold
@@ -81,7 +81,7 @@ def test_tiled_map_boots_draws_and_queries(tmp_path):
     """tiles=True: embedded PMTiles serve the roads, the sidecar serves the JS API."""
     pytest.importorskip("mapbox_vector_tile")
     pytest.importorskip("pmtiles")
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "smoke_tiles.html"
     g = _edges()
@@ -111,7 +111,7 @@ def test_map_boots_with_street_view_window_left_open(tmp_path):
     """A Street View window left open last time is reopened on load, and the page still draws.
     0.7.0 reopened it mid-script, before the marker state existed: a ReferenceError stopped the
     page before any road was drawn, so every later visit showed a map nothing could be clicked on."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "sv.html"
     render(_edges(), basemap="blank").save(path)
@@ -139,7 +139,7 @@ def test_map_boots_with_street_view_window_left_open(tmp_path):
 def test_google_3d_window_opens_with_the_street_view_window(tmp_path):
     """google_3d=True: its map button opens its window next to the Street View window; from disk it says the page must be served
     (Google refuses a key there), and nothing on the page throws. The camera link reads the map's field of view."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "g3d.html"
     render(_edges(), basemap="blank", google_3d=True, street_view_key="AIzaTEST").save(path)
@@ -164,7 +164,7 @@ def test_google_3d_window_opens_with_the_street_view_window(tmp_path):
 def test_basemap_switch_rebuilds_source_with_its_maxzoom(tmp_path):
     """rsSetBasemap rebuilds the raster source (maxzoom and attribution are fixed at creation) and
     puts the layer back in the same place, under the roads."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "bm.html"
     render(_edges(), basemap="osm", basemaps=["osm", "esri_gray", "blank"]).save(path)
@@ -203,7 +203,7 @@ def test_map_that_starts_late_still_gets_its_roads(tmp_path):
     """MapLibre builds its sources on an animation frame; browsers pause those off screen (a
     notebook output scrolled away). The data loader used to stop looking after 60 s, leaving a map
     with no roads. Fake 61 s of timers with frames withheld, then release them."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "late.html"
     render(_edges(4000), basemap="blank").save(path)   # big enough for the compressed path
@@ -243,7 +243,7 @@ def test_edge_overlay_page_boots_and_rsfilter_keeps_position_and_order(tmp_path)
     from shapely.geometry import Point
 
     from roadstyle import Overlay
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     g = _edges().assign(edge_id=range(100, 140))
     pts = gpd.GeoDataFrame({"edge_id": [100, 101, 102]}, geometry=[Point(18.0 + i * 1e-3, 59.3005) for i in range(3)], crs=4326)
@@ -273,7 +273,7 @@ def test_edge_overlay_page_boots_and_rsfilter_keeps_position_and_order(tmp_path)
 
 def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
     """docs/design/edge_overlays.md: after rsFilter(ids) on the roads, the arrow and name layers show only the slots of those edges (their __rs_edge / __rs_edge2)."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "slots.html"
     render(_edges(), basemap="blank", arrows=True, labels=True).save(path)
@@ -299,7 +299,7 @@ def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
 
 def test_a_road_without_its_fill_is_still_found_by_a_click(tmp_path):
     """road_fill=False: the fill layers are invisible but still query the road, so a click and a hover find it (docs/design/edge_overlays.md)."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "nofill.html"
     render(_edges(), basemap="blank", road_fill=False).save(path)
@@ -351,7 +351,7 @@ def test_an_item_attached_to_a_road_follows_its_road(tmp_path):
     from shapely.geometry import LineString, Point
 
     from roadstyle import Overlay
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     ys = [59.300, 59.3015, 59.303]
     g = gpd.GeoDataFrame({"highway": ["primary", "primary", "residential"], "tunnel": [None, "yes", None], "edge_id": [100, 101, 102]},
@@ -419,7 +419,7 @@ def test_each_direction_and_each_item_selects_its_own_edge_or_itself(tmp_path):
     from shapely.geometry import LineString, Point
 
     from roadstyle import Overlay
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     y0, y1 = 59.300, 59.3003
     g = gpd.GeoDataFrame({"highway": ["primary", "primary", "residential"], "oneway": [False, False, True], "edge_id": [10, 11, 12]},
@@ -473,7 +473,7 @@ def test_the_class_filter_hides_the_names_and_arrows_of_a_class(tmp_path):
     import geopandas as gpd
     from shapely.geometry import LineString
 
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     ys = [59.3000, 59.3006]
     g = gpd.GeoDataFrame({"highway": ["primary"] * 2, "fc": ["A", "B"], "name": ["Alpha", "Beta"], "oneway": [True, True]},
@@ -496,7 +496,7 @@ def test_the_class_filter_hides_the_names_and_arrows_of_a_class(tmp_path):
 
 def test_a_tilted_map_keeps_its_arrows(tmp_path):
     """The arrows are placed by road length on screen; the tilt of the 3D view squashed the scale (8 times at zoom 17) and thinned them out."""
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     path = tmp_path / "arrows.html"
     render(_edges(12), basemap="blank").save(path)
@@ -520,7 +520,7 @@ def test_a_phone_starts_with_the_boxes_folded(tmp_path, width, folded):
     """On a screen 700 px wide or less, the Roads and Layers boxes start folded (as the side panel starts closed), so that they do not
     cover the map; a tap on a box's title opens it. A wider screen starts them open, as before."""
     from roadstyle import Overlay
-    from roadstyle.render_web import render
+    from roadstyle import render_edges as render
 
     g = _edges()
     g["highway"] = ["primary", "residential"] * (len(g) // 2)

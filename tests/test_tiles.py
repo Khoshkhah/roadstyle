@@ -31,7 +31,6 @@ def _fc(g):
 def test_build_pmtiles_round_trip():
     import mapbox_vector_tile
     from pmtiles.reader import MemorySource, Reader
-
     from roadstyle.tiles import build_pmtiles
     fc = _fc(_edges())
     # the style's rule (zoom_rules): the one layer on the roads hides service below zoom 13
@@ -60,7 +59,6 @@ def test_build_pmtiles_round_trip():
 def test_extra_layers_ride_along_from_their_minzoom():
     import mapbox_vector_tile
     from pmtiles.reader import MemorySource, Reader
-
     from roadstyle.tiles import build_pmtiles
     fc = _fc(_edges(10))
     slots = {"type": "FeatureCollection", "features": [

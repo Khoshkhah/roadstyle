@@ -209,61 +209,9 @@ def solve(roads, pairs, edits, heads, caps, auto=False, **kw):
     return solved, ends(base, heads, caps), base
 
 
-HOPS = 3        # the local re-solve frees the changed roads and their neighbours this many relations away (see resolve)
 LEVELS = ["casing_start", "casing_level", "casing_end", "fill_level"]
 
 
-def around(roads, pairs, edits, changed, hops=HOPS):
-    """The roads within ``hops`` relations (meet, stack, order: the pairs and the edits) of the roads of ``changed`` (any edge ids)."""
-    from collections import defaultdict
-
-    from .levels import _read_pairs
-    of = {}
-    for r, fw, bw in zip(roads["road"], roads["edges"], roads["reversed"], strict=True):
-        of.update({str(x): str(r) for x in [r, *fw, *bw]})
-    nb = defaultdict(set)
-    for row in _read_pairs(pairs) + (_read_pairs(edits) if edits is not None else []):
-        a, b = of.get(row["a"]), of.get(row["b"])
-        if a and b:
-            nb[a].add(b)
-            nb[b].add(a)
-    seen = ring = {of[str(x)] for x in changed if str(x) in of}
-    for _ in range(hops):
-        ring = {y for x in ring for y in nb[x]} - seen
-        seen = seen | ring
-    return seen
-
-
-def solve_local(roads, pairs, edits, heads, caps, previous, changed, hops=HOPS, engine=None):
-    """The level editor's solve after a change: the roads within ``hops`` relations of the ``changed`` ones are solved again, every other road
-    keeps its numbers of ``previous`` (the solved roads before the change), with the same rules as :func:`solve` (solve_levels(fixed=...)).
-    Three relations deep, since a rule reaches its roads' neighbours through the meets (a head under the fills it joins) and the next ring is
-    what gives them room; the free part is still a few hundred roads of thousands. No silent fallback: when the local result breaks a rule
-    the previous one kept or did not have (a crossing given up, an order wish not kept, a near warning), uses more drawing positions, or the
-    solver fails, the whole area is solved (:func:`solve`) and ``levels_info["resolve"]`` says so and why. Returns what :func:`solve` does."""
-    import time
-    t0 = time.time()
-    free = around(roads, pairs, edits, changed, hops)
-    if len(free) == len(roads):                         # the whole area is around the change: the whole solve, once
-        out = solve(roads, pairs, edits, heads, caps, engine=engine)
-        out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": "every road is around the change", "free": len(free), "hops": hops,
-                                                  "seconds": round(time.time() - t0, 1)}
-        return out
-    prev = previous.set_index("road")[LEVELS]
-    fixed = {r: tuple(int(x) for x in v) for r, v in zip(prev.index, prev.to_numpy().tolist(), strict=True) if r not in free}
-    why = None
-    try:
-        out = solve(roads, pairs, edits, heads, caps, fixed=fixed, engine=engine)
-        why = _worse(out[0], previous)
-    except RuntimeError as err:                         # the solver failed (a time limit): not an error of the change
-        why = f"the local solve failed ({err})"
-    if why is None:
-        _keep_fixed(out[0], fixed)
-        out[0].attrs["levels_info"]["resolve"] = {"how": "local", "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
-        return out
-    out = solve(roads, pairs, edits, heads, caps, engine=engine)
-    out[0].attrs["levels_info"]["resolve"] = {"how": "full", "why": why, "free": len(free), "hops": hops, "seconds": round(time.time() - t0, 1)}
-    return out
 
 
 def _keep_fixed(local, fixed):
@@ -316,14 +264,12 @@ def write(solved, folder, ends_table):
             con.close()
 
 
-def serve_rust(folder, port=8780, items=None):
+def serve_rust(folder, port=8780):
     """The level editor in Rust: the solver runs in the page, and the Rust server (roadstyle-serve, in the extension with the
     editor's page files) gives it the area's files and saves your changes. Waits until Ctrl+C."""
     import time
 
     from ._engine import rust
-    if items is not None:
-        raise ValueError("--items is in the Python editor only: use --engine python")
     if not (Path(folder) / "roads.parquet").exists():
         raise ValueError(f"{folder}: no roads.parquet: make the area first (roadstyle-levels make)")
     rust().serve(str(Path(folder).resolve()), port)
@@ -358,9 +304,6 @@ def main(argv=None):
     ed.add_argument("--port", type=int, default=8780)
     sv.add_argument("--engine", choices=["python", "rust"], help="the solver (default: ROADSTYLE_ENGINE, else python); rust: a "
                                                                   "minimum-cost flow, no time limit, no --max-positions")
-    ed.add_argument("--engine", choices=["python", "rust"], default="rust", help="rust (default): the editor in Rust, the solver in the "
-                                                                                 "page; python: the Python server and solver")
-    ed.add_argument("--items", metavar="MODULE:FUNCTION", help="items drawn on the edges: FUNCTION(roads) -> (overlays, render_edges keywords), see level_editor")
     a = ap.parse_args(argv)
     if a.cmd == "make":
         edges = read_edges(a.source, a.query, a.geometry)
@@ -374,16 +317,8 @@ def main(argv=None):
         print(f"{len(solved)} roads -> {a.folder / 'levels.csv'}: {len(solved.attrs['levels_given_up'])} stack pair(s) given up, "
               f"{len({(u, lo) for u, lo, _ in solved.attrs.get('levels_near', [])})} near warning(s), "
               f"{info.get('order_violations', 0)} order wish(es) not kept, {info.get('seconds')} s")
-    elif a.engine == "rust":
-        serve_rust(a.folder, a.port, a.items)
     else:
-        from .level_editor import serve
-        items = None
-        if a.items:
-            import importlib
-            mod, _, fn = a.items.partition(":")
-            items = getattr(importlib.import_module(mod), fn)
-        serve(a.folder, a.port, items, engine=a.engine)
+        serve_rust(a.folder, a.port)
 
 
 if __name__ == "__main__":

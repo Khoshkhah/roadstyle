@@ -22,15 +22,13 @@ def _roads():
     return g
 
 
-ENGINES = ["python"] + (["rust"] if __import__("roadstyle._engine", fromlist=["available"]).available() else [])
 
 
-@pytest.mark.parametrize("engine", ENGINES)
 @pytest.mark.parametrize("popup_mode", ["popup", "panel"])
-def test_a_road_name_is_text_not_markup(tmp_path, engine, popup_mode):
+def test_a_road_name_is_text_not_markup(tmp_path, popup_mode):
     import roadstyle as rs
     page = tmp_path / "xss.html"
-    rs.render_edges(_roads(), engine=engine, basemap="blank", find_control=True, popup_mode=popup_mode, tooltip=["name"],
+    rs.render_edges(_roads(), basemap="blank", find_control=True, popup_mode=popup_mode, tooltip=["name"],
                     color_options={"Class": {}, "kind": {"color_by": "kind", "colors": {"ok": "#00aa00", EVIL: "#aa0000"}}},
                     legend=True).save(str(page))
     with pw.sync_playwright() as p:
@@ -60,8 +58,7 @@ def test_a_road_name_is_text_not_markup(tmp_path, engine, popup_mode):
         assert EVIL in shown["search"]
 
 
-@pytest.mark.parametrize("engine", ENGINES)
-def test_a_value_cannot_end_the_pages_script(tmp_path, engine):
+def test_a_value_cannot_end_the_pages_script(tmp_path):
     """The page writers put the style and the dashboard's options into a <script> as JSON, and a legend's labels are data values. A value
     with "</script>" in it is "\\u003c/script>" there (render_web._script_json, page.rs script_json): it cannot end the script and run."""
     import roadstyle as rs
@@ -69,7 +66,7 @@ def test_a_value_cannot_end_the_pages_script(tmp_path, engine):
     g = _roads()
     g.loc[g.index[1], "kind"] = close
     page = tmp_path / "close.html"
-    page.write_text(rs.render_edges(g, engine=engine, basemap="blank", legend=True,
+    page.write_text(rs.render_edges(g, basemap="blank", legend=True,
                                     color_options={"Class": {}, "kind": {"color_by": "kind", "colors": {"ok": "#00aa00", close: "#0000aa"}}}).html)
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()

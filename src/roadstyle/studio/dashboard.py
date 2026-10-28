@@ -27,7 +27,7 @@ with st.sidebar:
         tiles = st.checkbox("Vector tiles (big networks)", value=False,
                             disabled=not tiles_available(),
                             help="Embedded-PMTiles tileset in the same single file — ~10⁵-edge "
-                                 "maps stay responsive. Needs `pip install \"roadstyle[tiles]\"`.")
+                                 "maps stay responsive.")
         minzoom = st.checkbox("Hide minor roads when zoomed out", value=False,
                               help="The built-in per-class `minzoom` table — residential/service "
                                    "appear as you zoom in (thins low-zoom tiles too).")

@@ -34,11 +34,6 @@ def test_color_table_dataframe():
     assert p["a"]["__rs_fill"] == "#bbbbbb"
 
 
-def test_color_table_keeps_casing_sandwich():
-    # fill comes from the table; casing stays class/theme so junctions still read cleanly
-    geo = rs.render_edges(_edges(), backend="web", color_table={"a": "#ff0000"}, _palette_copy=True)["geo"]      # the roads with their stage values
-    p = {f["properties"]["edge_id"]: f["properties"] for f in geo["features"]}
-    assert p["a"]["__rs_casing"] not in (None, "#bbbbbb")
 
 
 def test_colors_self_literal_column():
@@ -59,17 +54,3 @@ def test_bad_color_table_raises():
         rs.render_edges(_edges(), color_table=pd.DataFrame({"x": [1]}))   # no edge_id/color cols
 
 
-def test_a_missing_category_is_empty_text_in_both_engines():
-    """A missing category (None or NaN: pandas gives either, by its version) has the class text "" in both engines, on every Python
-    version (2026-10-24: Python 3.10's pandas gave "" and Rust "nan")."""
-    import math
-
-    from roadstyle.stylers import _keystr
-
-    assert _keystr(None) == _keystr(math.nan) == _keystr(float("nan")) == "" and _keystr(" Primary ") == "primary"
-    g = _edges().assign(cat=pd.Series(["x", None, math.nan, "y"], dtype=object))
-    kw = {"color_by": "cat", "colors": {"x": "#ff0000", "y": "#0000ff"}}
-    geo = rs.render_edges(g, backend="web", _palette_copy=True, **kw)["geo"]          # the roads with their stage values
-    assert [f["properties"]["__rs_class"] for f in geo["features"]] == ["x", "", "", "y"]
-    py, rust = (rs.export_inline(g, engine=e, **kw) for e in ("python", "rust"))
-    assert py == rust

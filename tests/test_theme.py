@@ -148,24 +148,6 @@ def test_styleconfig_defaults_come_from_the_theme():
         rs.use_settings()
 
 
-def test_a_view_can_switch_the_palette():
-    """A view's ``palette`` (docs/design/style_config.md): the page holds each view's palette; a colour that differs is chosen by the state
-    rs_palette, a road's baked fill and casing get a copy per palette; an unknown palette is an error."""
-    import roadstyle as rs
-    views = {"Day": {"palette": "amber"}, "Night": {"palette": "mono"}}
-    m = rs.render_edges(_edges(), basemap="blank", views=views, simple=False)
-    s = _style(m)
-    assert s["state"]["rs_palette"]["default"] == "amber"
-    feats = s["_roads"]["features"]
-    assert all("__rs_fill@mono" in f["properties"] for f in feats)
-    mono = rs.render_edges(_edges(), basemap="blank", palette="mono", simple=False)
-    assert [f["properties"]["__rs_fill@mono"] for f in feats] == [f["properties"]["__rs_fill"] for f in _style(mono)["_roads"]["features"]]
-    fill = json.dumps(_layer(s, "roads-fill")["paint"]["line-color"])
-    assert '["global-state", "rs_palette"], "mono", ["get", "__rs_fill@mono"]' in fill
-    assert '"palettes": {"mono":' in m.html                                           # the Roads panel's swatches per palette
-    with pytest.raises(ValueError, match="palette"):
-        rs.render_edges(_edges(), basemap="blank", views={"X": {"palette": "nope"}})
-
 
 def test_a_view_switches_the_palette_in_the_browser(tmp_path):
     pw = pytest.importorskip("playwright.sync_api")

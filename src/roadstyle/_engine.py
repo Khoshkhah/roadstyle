@@ -1,13 +1,13 @@
-"""The choice of the engine, and the calls into roadstyle's Rust engine (docs/design/rust_library.md, phase P5).
+"""The calls into roadstyle's Rust engine, the extension module ``roadstyle._rust`` (built from ``rust/roadstyle-py``).
 
-``engine="python"`` (the default) runs the Python code. ``engine="rust"`` runs the Rust engine, the extension module
-``roadstyle._rust`` (built from ``rust/roadstyle-py``). The environment variable ``ROADSTYLE_ENGINE`` sets the default. A part that
-the Rust engine does not have gives an error with ``engine="rust"``; it never goes back to Python without a message. Without level
-columns the Rust engine computes the levels, as ``render`` does (``compute_levels``, method "solve").
+The page, the style, the tiles and the exports are the Rust engine's. The drawing-order solver of ``roadstyle.levels`` also has a Python
+form (``engine="python"``, or ``ROADSTYLE_ENGINE=python``) for the parts the Rust solver does not have. Without level columns the Rust
+engine computes the levels (``compute_levels``, method "solve").
 """
 from __future__ import annotations
 
 import json
+import math
 import os
 
 ENGINES = ("python", "rust")
@@ -17,8 +17,8 @@ RUST_COLUMNS = ("highway",)
 
 
 def engine(name: str | None = None) -> str:
-    """The engine to use: ``name``, else ``ROADSTYLE_ENGINE``, else "python"."""
-    e = (name or os.environ.get("ROADSTYLE_ENGINE") or "python").lower()
+    """The engine of the level solver: ``name``, else ``ROADSTYLE_ENGINE``, else "rust"."""
+    e = (name or os.environ.get("ROADSTYLE_ENGINE") or "rust").lower()
     if e not in ENGINES:
         raise ValueError(f"engine={e!r}: use one of {', '.join(ENGINES)}")
     return e
@@ -39,6 +39,12 @@ def fallback(name: str | None, reason: str) -> bool:
     import warnings
     warnings.warn(f"roadstyle: {reason}: the Python engine makes this one (ROADSTYLE_ENGINE=rust)", stacklevel=3)
     return True
+
+
+def web_keywords(names) -> set:
+    """The keywords among ``names`` that the Rust engine reads (the web page's): the other backends drop them."""
+    names = [k for k in names if not k.startswith("_")]
+    return set(names) - {k for k, _ in rust().unknown_keywords(names)}
 
 
 def rust():
@@ -98,7 +104,7 @@ def export_inline(edges, **kwargs) -> dict:
     """``roadstyle.export_inline`` made by the Rust engine: the same style, from the same keywords."""
     missing = [c for c in RUST_COLUMNS if (kwargs.get(f"{c}_col") or c) not in edges.columns]
     if missing:
-        raise ValueError(f"engine='rust': the roads have no column {', '.join(missing)}")
+        raise ValueError(f"the roads have no column {', '.join(missing)}")
     kwargs = dict(kwargs)
     kwargs.pop("engine", None)
     kwargs.setdefault("view_3d", True)      # as export_inline
@@ -127,11 +133,26 @@ def export_geojson(edges, out_dir, *, format="geojson", keep=None, **kwargs) -> 
     return dict(files)
 
 
+_R = 20037508.342789244       # the web-mercator world half-width (m): the tile (z, x, y) spans 2 * _R / 2**z from (-_R, _R)
+
+
+def _merc(lon, lat):
+    x = lon * _R / 180.0
+    lat = max(-89.9, min(89.9, lat))
+    return x, math.log(math.tan((90 + lat) * math.pi / 360.0)) * _R / math.pi
+
+
+def _tile_range(bounds, z):
+    """The tile x / y index range that covers a mercator box at zoom z."""
+    s = 2 * _R / (1 << z)
+    n = (1 << z) - 1
+    return (max(0, min(n, int((bounds[0] + _R) // s))), max(0, min(n, int((bounds[2] + _R) // s))),
+            max(0, min(n, int((_R - bounds[3]) // s))), max(0, min(n, int((_R - bounds[1]) // s))))
+
+
 def tile_geojson(src_dir, out, *, format="pmtiles", keep=None, base_url=""):
     """``roadstyle.tile_geojson``: stage 2 of the Rust engine from ``export_geojson``'s files; the path written."""
     from pathlib import Path
-
-    from .tiles import _merc, _tile_range
 
     if format not in ("pmtiles", "xyz"):
         raise ValueError(f"format must be 'pmtiles' or 'xyz', got {format!r}")
@@ -332,7 +353,6 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
 
     from . import _assets, _settings
     from .export import _camera, _plugin_css
-    from .tiles import _R, _merc, _tile_range, buffers_px
 
     style, base = json.loads(t.style), base_url.rstrip("/")
     roads = style["sources"]["roads"]
@@ -360,7 +380,7 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
     every = t.bounds() or bounds
     elo, ehi = _merc(*every[:2]), _merc(*every[2:])
     # a tile whose buffer has a road's stroke has the road (Tiles::hits): the data's box widened by each zoom's buffer (Tiles::archive)
-    bufs = buffers_px(style["layers"], int(roads["maxzoom"]), fallback=meta.get("roadstyle:tiles", {}).get("buffer_px", 80))
+    bufs = rust().tile_buffers(json.dumps(style["layers"]), int(roads["maxzoom"]), float(meta.get("roadstyle:tiles", {}).get("buffer_px", 80)))
     for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():
         x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
         pad = 2 * _R / (1 << z) * bufs[z] / 512
@@ -388,8 +408,8 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
 
 
 def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="highway", include=None, exclude=None, match_links=True,
-                levels_db=None, engine=None, **kwargs):
-    """``render_edges(backend="web", engine="rust")``: the page in one call of the Rust engine (roadstyle::page_options::page_from, audit
+                levels_db=None, **kwargs):
+    """``render_edges(backend="web")``: the page in one call of the Rust engine (roadstyle::page_options::page_from, audit
     R3): the roads' style (state "live"), the base map, the views and their palettes, the dashboard's options and the page. ``tiles=True``:
     the roads, their pieces and their names in an embedded PMTiles archive. Python gives what only it knows: the data steps (include,
     exclude, levels_db), the look's options, and the keys (base maps, Google Maps)."""
@@ -401,9 +421,9 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
         if k in kwargs:
             raise ValueError(f"render_edges takes no {k}: compute the levels first (rs.compute_levels(edges, {k}=...), or rs.level_input + "
                              "rs.solve_levels) and pass casing_level_col / fill_level_col / casing_start_col / casing_end_col")
-    for k, why in (("style", "a Styler object is Python's"), ("styler", "a Styler object is Python's")):
+    for k, why in (("style", "a Styler object"), ("styler", "a Styler object")):
         if kwargs.get(k):
-            raise ValueError(f"engine='rust': {k}= ({why}); use engine='python'")
+            raise ValueError(f"{k}= ({why}); use color_by, colors, cmap, vmin, vmax or width_by")
     g = as_edges(gdf, class_col=highway_col).gdf
     if include is not None or exclude is not None:
         g = filter_edges(g, include=include, exclude=exclude, highway_col=highway_col, match_links=match_links)

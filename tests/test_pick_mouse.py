@@ -1,5 +1,5 @@
 """A road is picked by the real mouse (page.mouse, not window.rsSelect): the hover (the cursor and the tooltip) and a click's rs:select,
-on a page whose style has the interaction contract (render_edges, engine="rust") and on a host page whose style has none (a style of
+on a page whose style has the interaction contract (render_edges) and on a host page whose style has none (a style of
 make_style, as a host's makeStyle or the level editor's): there the dashboard picks on the road layer of simple mode, because the
 style gives no `pick` (roadstyle:controls)."""
 import contextlib
@@ -64,7 +64,7 @@ def test_a_road_is_picked_on_a_page_with_the_contract(tmp_path):
     if not __import__("roadstyle._engine", fromlist=["available"]).available():
         pytest.skip("no roadstyle._rust")
     page = tmp_path / "contract.html"
-    rs.render_edges(_roads(), engine="rust", basemap="blank", tooltip=["name"]).save(str(page))
+    rs.render_edges(_roads(), basemap="blank", tooltip=["name"]).save(str(page))
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         pg = browser.new_page(viewport={"width": 900, "height": 700})

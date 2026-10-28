@@ -15,14 +15,13 @@ def _edges(n=12):
         geometry=[LineString([(18.0 + i * 1e-3, 59.3), (18.0 + i * 1e-3, 59.301)]) for i in range(n)], crs=4326)
 
 
-@pytest.mark.parametrize("engine", ["python", "rust"])
-def test_the_page_has_one_object_for_its_state(tmp_path, engine):
+def test_the_page_has_one_object_for_its_state(tmp_path):
     import roadstyle as rs
     from roadstyle import _engine
-    if engine == "rust" and not _engine.available():
+    if not _engine.available():
         pytest.skip("the Rust extension is not built")
     path = tmp_path / "api.html"
-    rs.render_edges(_edges(), engine=engine, basemap="blank", color_options={"class": {}, "lanes": {"color_by": "lanes", "cmap": "Blues"}}).save(path)
+    rs.render_edges(_edges(), basemap="blank", color_options={"class": {}, "lanes": {"color_by": "lanes", "cmap": "Blues"}}).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()

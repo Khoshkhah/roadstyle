@@ -70,12 +70,12 @@ def render(
 
     import folium
 
-    from .render_web import render as _web_render
+    from ._engine import web_keywords
 
     # web-backend-only kwargs may arrive via render_edges(**kwargs); drop them so they don't
-    # reach folium.Map() (tiles=True, view_3d=True, ... would raise there). Derived from the web
-    # renderer's signature so a new web option can't slip through.
-    for _k in inspect.signature(_web_render).parameters.keys() - inspect.signature(render).parameters.keys():
+    # reach folium.Map() (tiles=True, view_3d=True, ... would raise there). The Rust engine says which
+    # keywords are the web page's.
+    for _k in web_keywords(map_kwargs) - inspect.signature(render).parameters.keys():
         map_kwargs.pop(_k, None)
 
     g = gdf.to_crs(4326)

@@ -9,7 +9,6 @@ tool result instead, where the agent can act on them.
 """
 from __future__ import annotations
 
-import difflib
 import functools
 import inspect
 import re
@@ -21,7 +20,6 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from . import as_edges, get_api_key, load_edges, render_edges
 from . import snapshot as _snapshot
-from .render_web import render as _render_web
 
 OUT_DIR = Path.home() / "roadstyle-maps"
 OSMNX_CACHE = Path.home() / ".cache" / "roadstyle" / "osmnx"
@@ -62,23 +60,15 @@ def _tool(fn):
     return mcp.tool()(run)
 
 
-def _option_names() -> set[str]:
-    kinds = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-    names = set()
-    for f in (render_edges, _render_web):
-        names |= {p.name for p in inspect.signature(f).parameters.values() if p.kind in kinds}
-    return names - {"gdf", "backend"}
-
-
 def _check_options(options: dict | None) -> dict:
-    """render_edges silently ignores a misspelt keyword; an agent needs to hear about it."""
+    """render_edges warns about a misspelt keyword; an agent needs an error (the Rust engine says which keywords it reads)."""
+    from ._engine import rust
     options = dict(options or {})
-    valid = _option_names()
-    bad = sorted(set(options) - valid)
+    own = set(inspect.signature(render_edges).parameters) - {"gdf", "backend"}
+    bad = [(k, near) for k, near in rust().unknown_keywords(sorted(options)) if k not in own]
     if bad:
-        hints = [f"{k!r} (did you mean {', '.join(map(repr, m))}?)" if (m := difflib.get_close_matches(k, valid, 3))
-                 else repr(k) for k in bad]
-        raise ValueError(f"unknown option(s): {'; '.join(hints)}. Valid options: {', '.join(sorted(valid))}")
+        hints = [f"{k!r} (did you mean {near!r}?)" if near else repr(k) for k, near in bad]
+        raise ValueError(f"unknown option(s): {'; '.join(hints)}. The options are the keywords of render_edges (docs/reference/parameters.md)")
     return options
 
 

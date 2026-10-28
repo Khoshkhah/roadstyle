@@ -27,6 +27,25 @@ def _color_map(table, key_col: str, color_col: str) -> dict:
             f"{color_col!r} columns") from e
 
 
+def _named_basemaps(kwargs, api_key):
+    """A base map given as an object (a ``Basemap``, an xyzservices ``TileProvider``) is registered under its key, and the call names it
+    by that key: the page's base maps are names."""
+    from .basemaps import get_basemap, register_basemap
+
+    def named(b):
+        if b is None or isinstance(b, str):
+            return b
+        bm = get_basemap(b, api_key=api_key)
+        register_basemap(bm)
+        return bm.key
+    out = dict(kwargs)
+    if "basemap" in out:
+        out["basemap"] = named(out["basemap"])
+    if out.get("basemaps") is not None:
+        out["basemaps"] = [named(b) for b in out["basemaps"]]
+    return out
+
+
 def _warn_unclassed(g, col):
     """Warn once when edges have no class (None, NaN or ""): they are drawn with the default style."""
     if col not in g.columns:
@@ -80,7 +99,6 @@ def render_edges(
     profile: str | None = None,
     api_key: str | None = None,
     levels_db=None,
-    engine: str | None = None,
     **kwargs,
 ):
     """Render styled road edges on a map.
@@ -137,29 +155,23 @@ def render_edges(
         from .pages import SIDEBAR_DEFAULTS
         for k, v in SIDEBAR_DEFAULTS.get(kwargs["sidebar"], {}).items():
             kwargs.setdefault(k, v)
+    for k, why in (("engine", "roadstyle has one engine, the Rust engine"), ("simple", "the simple look is the only look")):
+        if k in kwargs:
+            raise ValueError(f"{k}= is removed: {why} (CHANGELOG, 0.26.0)")
     if backend == "web" and not _SCOPED.get():          # folium and lonboard take keywords of their own
         _warn_unknown(kwargs)
-    from . import _engine
-    hooks = [k for k in ("_export", "_parts", "_edges", "_palette_copy") if kwargs.get(k) is not None and kwargs.get(k) is not False]
-    # ``engine``: "python" (default) or "rust" (the roads' style from the Rust engine, the page from Python). The internal hooks of the
-    # export and the level editor are Python's; folium and lonboard are other renderers, for which the engine does not apply
-    rust_page = _engine.engine(engine) == "rust" and not hooks and backend == "web"
-    if engine == "rust" and backend != "web":
-        raise ValueError(f"engine='rust' makes the web page only, not backend={backend!r}")
-    if rust_page:
-        why = (["a Styler object (style=)"] if style is not None else []) + (["simple=False (the full look)"] if kwargs.get("simple") is False else [])
-        if why and _engine.fallback(engine, ", ".join(why) + " is Python's"):
-            rust_page = False
-    if kwargs.get("live_data") and not rust_page:
-        raise ValueError("live_data=True needs the Rust engine's web page (engine='rust', backend='web', no style= and no simple=False)")
-    if rust_page:
+    if backend == "web":
+        from . import _engine
+        if style is not None:
+            raise ValueError("a Styler object (style=) is not in the web page: use color_by, colors, cmap, vmin, vmax or width_by")
         _warn_unclassed(as_edges(gdf, class_col=highway_col).gdf, highway_col)
-        data = {k: v for k, v in (("style", style), ("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
+        kwargs = _named_basemaps(kwargs, api_key)
+        data = {k: v for k, v in (("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
                                   ("width_by", width_by), ("color_table", color_table)) if v is not None}
-        if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}, as the Python path reads it
+        if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}
             data["color_table"] = _color_map(color_table, color_key, color_col)
         return _engine.render_page(gdf, palette=palette, profile=profile, settings=settings, highway_col=highway_col, include=include,
-                                   exclude=exclude, match_links=match_links, levels_db=levels_db, api_key=api_key, engine=engine, **data, **kwargs)
+                                   exclude=exclude, match_links=match_links, levels_db=levels_db, api_key=api_key, **data, **kwargs)
     from . import _settings as _st
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _st.theme()["active"][k]
             and (k == "profile" or v in _st.style_names("palettes"))}      # a palette made in code (register_palette) has no file
@@ -216,19 +228,11 @@ def render_edges(
         g = filter_edges(g, include=include, exclude=exclude,
                          highway_col=col, match_links=match_links)
     if levels_db is not None:
-        if backend != "web":
-            raise ValueError("levels_db is for the web backend")
-        if any(kwargs.get(k) for k in ("casing_level_col", "fill_level_col", "casing_start_col", "casing_end_col")):
-            raise ValueError("levels_db and level columns of your own (casing_level_col, fill_level_col, ...) are two drawing orders: use one")
-        from .levels_store import stored_levels
-        g, level_kw = stored_levels(levels_db, g, kwargs.get("edge_id_col", "edge_id"))
-        kwargs = {**kwargs, **level_kw}
+        raise ValueError("levels_db is for the web backend")
     if backend == "folium":
         from .render_folium import render
     elif backend == "lonboard":
         from .render_lonboard import render
-    elif backend == "web":
-        from .render_web import render
     else:
         raise ValueError(f"unknown backend {backend!r}; use 'folium', 'lonboard', or 'web'")
     return render(g, palette=palette, highway_col=col, styler=styler, api_key=api_key, **kwargs)
