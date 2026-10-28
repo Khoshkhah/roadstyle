@@ -25,8 +25,8 @@ def test_range_and_zoom_are_inverse():
     assert abs(z - 16.3) < 1e-9 and r > 0
 
 
-def test_tagged_moves_and_the_user_gate():
-    assert "TAGGED MOVES" in SRC and "{rsG3d:true, rsSync:true}" in SRC and "e.rsSync" in SRC and "owner" not in SRC
-    # the map follows Google only while the reviewer moves it (input on the window), and logs the other changes as "not user"
-    assert "THE MAP FOLLOWS GOOGLE ONLY WHILE THE REVIEWER MOVES IT" in SRC and "userNow" in SRC and 'reason:"not user"' in SRC
-    assert "Math.abs(c.lat-x.lat)<1e-7" in SRC and "Math.abs(r-x.range)<0.5" in SRC and "turn(h, x.heading)<0.2" in SRC
+def test_one_way_link():
+    """The map leads: no code path moves the map from Google, and none of the two-way filters is left."""
+    assert "THE MAP LEADS, ONE WAY ONLY" in SRC and "rs-g3d-follow" in SRC and "window.rsG3dFollow" in SRC
+    for gone in ("fromGoogle", "toMap", "rsSync", "echo()", "reconcile", "userNow", "notUser", "modeQuiet", "judged back", "map.jumpTo(", "gmp-centerchange", "gmp-rangechange"):
+        assert gone not in SRC, gone

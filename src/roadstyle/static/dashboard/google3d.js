@@ -1,8 +1,7 @@
 // GOOGLE 3D window (google_3d=True, with a key): Google's photorealistic 3D view in a floating window,
-// opened by its map button (or rsSetGoogle3D(true)). Its camera and the map's are linked both ways:
-// center = center, bearing = heading, pitch = tilt, and zoom <-> range (the metres from Google's camera
-// to its center: the map's own camera distance at that zoom). A clicked road is drawn in the 3D view
-// and the camera flies along it (the map follows). Google's 3D map exists only while the window is
+// opened by its map button (or rsSetGoogle3D(true)). The map leads, one way only: the page sets Google's camera from the map's
+// (center = center, bearing = heading, pitch = tilt, zoom -> range: the metres from Google's camera to its center), and nothing moves the
+// map from Google. A selected road is drawn in the 3D view. Google's 3D map exists only while the window is
 // open: closing it drops it, as nothing is loaded from Google while it is closed.
 import {map, O, _road, _rprops} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
@@ -18,11 +17,12 @@ export function initGoogle3D(){
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
       '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
       ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
+      '<button type="button" class="rs-g3d-follow on" title="Follow the map">Follow</button>'+
       '<button type="button" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
-    let m3=null, lib=null, line=null, btn=null, queued=false;
+    let m3=null, lib=null, line=null, btn=null;
     const say=html=>{ msg.innerHTML=html; msg.hidden=false; if(m3){ m3.remove(); m3=null; line=null; } };
     const SETUP='<a href="https://khoshkhah.github.io/roadstyle/guides/google-key/" target="_blank" rel="noopener">How to set up the key ↗</a>';
     const prevAuth=window.gm_authFailure;       // Google calls this when it refuses the key on this address
@@ -47,7 +47,7 @@ export function initGoogle3D(){
         const img=new Image(); img.crossOrigin="anonymous";
         img.onload=()=>{ const c=document.createElement("canvas"); c.width=c.height=256;
           const g=c.getContext("2d", {willReadFrequently:true}); g.drawImage(img, 0, 0);
-          t.px=g.getImageData(0, 0, 256, 256).data; if(m3) setGoogle(); };
+          t.px=g.getImageData(0, 0, 256, 256).data; if(m3 && follow) setGoogle(); };
         img.onerror=()=>{ warn.hidden=false; console.warn("rs google 3d: no ground heights from", img.src); };
         img.src="https://s3.amazonaws.com/elevation-tiles-prod/terrarium/"+key+".png"; }
       if(!t.px) return lastGround;
@@ -86,82 +86,24 @@ export function initGoogle3D(){
     const toGoogle=()=>{ const c=map.getCenter();
       return {center:{lat:c.lat, lng:c.lng, altitude:ground(c.lng, c.lat)}, heading:(map.getBearing()+360)%360, tilt:map.getPitch(),
               range:rangeOf(c.lat, map.getZoom())}; };
-    // GOOGLE'S TARGET IS ON ITS MESH, not on the ground: while a user drags in the 3D view, m3.center (and its altitude) hops between roofs,
-    // trees and the street, 0 to 40 m from frame to frame, and the range is measured from it. So the map's camera is not read from the target:
-    // the camera's position is (target minus the range along the view direction), the ray from it along the view direction meets the ground
-    // (the DEM) at the map's centre, and the zoom comes from the camera's distance to that ground point.
-    const KM=111320;
-    const toMap=()=>{ const c=m3.center, h=rad(m3.heading||0), t=rad(m3.tilt||0), r=m3.range, plain=()=>({center:[c.lng, c.lat], bearing:m3.heading||0, pitch:m3.tilt||0, zoom:zoomOf(c.lat, r)});
-      if(typeof c.altitude!=="number" || Math.cos(t)<0.05) return plain();                // no altitude, or a view near the horizon: the plain target
-      const kx=KM*Math.cos(rad(c.lat)), dx=Math.sin(t)*Math.sin(h), dy=Math.sin(t)*Math.cos(h);       // the view's horizontal step per metre of range
-      const cam={lng:c.lng-r*dx/kx, lat:c.lat-r*dy/KM, alt:c.altitude+r*Math.cos(t)};
-      let hit={lng:c.lng, lat:c.lat}, s=r;
-      for(let i=0; i<24; i++){ const g=ground(hit.lng, hit.lat); if(cam.alt-g<=1) return plain();       // a fixed point: the ground under the hit
-        s=(cam.alt-g)/Math.cos(t); const n={lng:cam.lng+s*dx/kx, lat:cam.lat+s*dy/KM}, d=Math.hypot((n.lng-hit.lng)*kx, (n.lat-hit.lat)*KM); hit=n; if(d<0.02) break; }
-      return {center:[hit.lng, hit.lat], bearing:m3.heading||0, pitch:m3.tilt||0, zoom:zoomOf(hit.lat, s)}; };
-    const turn=(a, b)=>Math.abs(((a-b)%360+540)%360-180);
-    // the map is at t, to the eye: the centre within 0.05 m on the ground, the zoom within 0.01, the bearing and the pitch within 0.1 degree.
-    // Returns the name of the first thing that differs, or "" (the centre's altitude is not checked).
-    const miss=t=>{ const c=map.getCenter(), k=111320;
-      if(Math.hypot((c.lat-t.center[1])*k, (c.lng-t.center[0])*k*Math.cos(rad(c.lat)))>0.05) return "centre";
-      if(turn(map.getBearing(), t.bearing)>=0.1) return "bearing";
-      if(Math.abs(map.getPitch()-t.pitch)>=0.1) return "pitch";
-      if(Math.abs(map.getZoom()-t.zoom)>=0.01) return "zoom"; return ""; };
-    const there=t=>!miss(t);
-    // TAGGED MOVES, NO GESTURE DETECTION (Google's element keeps its pointer events inside its own canvas, and its inertia goes on after the
-    // pointer is up). Each camera is moved by the page in one place, and the echo is dropped where it comes back:
-    //  - the 3D camera moves the map with map.jumpTo(cam, {rsSync:true}); the map's "move" handler ignores a move with rsSync, so it is not sent back;
-    //  - the map moves the 3D camera with setGoogle(), which keeps the values it set for a second; a camera-change of Google within a small
-    //    tolerance of one of them (1e-7 degrees, 0.5 m, 0.2 degrees) is the echo of that set, and is ignored.
-    // Each direction runs at most once per frame. window.rsG3dCount counts both (the debug line shows them per second).
-    const COUNT=window.rsG3dCount={g2m:0, m2g:0, back:0, lastMiss:""}, sets=[];
-    let lastGoogle=-1e9, ignoreUntil=0, rec=0;       // lastGoogle: the last camera change of Google that was not an echo
-    const setGoogle=()=>{ if(!m3) return; const g=toGoogle(), now=performance.now(); Object.assign(m3, g); COUNT.m2g++;
-      sets.push({t:now, lat:g.center.lat, lng:g.center.lng, range:g.range, heading:g.heading, tilt:g.tilt});
-      while(sets.length && now-sets[0].t>1000) sets.shift(); };
-    const echo=()=>{ const c=m3.center||{}, h=m3.heading||0, t=m3.tilt||0, r=m3.range;
-      return sets.some(x=>Math.abs(c.lat-x.lat)<1e-7 && Math.abs(c.lng-x.lng)<1e-7 && Math.abs(r-x.range)<0.5 && turn(h, x.heading)<0.2 && Math.abs(t-x.tilt)<0.2); };
-    let toGQueued=false, smooth=null, rawLast=null, settleT=0;
-    map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows, once a frame
-      if(!m3 || e.rsSync || e.rsG3d || toGQueued) return; toGQueued=true;
-      requestAnimationFrame(()=>{ toGQueued=false; if(performance.now()-lastGoogle>=300) setGoogle(); }); });   // while Google leads, the map's own moves are not sent
-    // WHILE GOOGLE LEADS, NOTHING GOES BACK. The map follows as far as it can (its limits: maxPitch, maxZoom, maxBounds). When Google has been
-    // still for 300 ms, a map that could not follow is reconciled once: Google flies to the map's camera in 250 ms.
-    const reconcile=()=>{ rec=0; if(!m3 || performance.now()-lastGoogle<300 || leave()) return;
-      const t=toMap(), g=toGoogle(); if(!(m3.center && m3.range) || there(t)) return;
-      ignoreUntil=performance.now()+450; COUNT.m2g++;
-      try{ m3.flyCameraTo({endCamera:g, durationMillis:250}); }catch(e){ Object.assign(m3, g); }
-      sets.push({t:performance.now(), lat:g.center.lat, lng:g.center.lng, range:g.range, heading:g.heading, tilt:g.tilt}); };
-    // THE MAP FOLLOWS GOOGLE ONLY WHILE THE REVIEWER MOVES IT: from a pointerdown, a wheel, a touchstart or a keydown on the window (captured: these
-    // events are composed and cross Google's shadow root) until 1.5 s after the last pointerup or wheel (Google's inertia). Any other camera change of
-    // Google (a switch of the mode, its own limits, a tile load, a resize) is not followed: 300 ms after it Google is set back to the map's camera once
-    // (at most twice in a row), and the change goes into window.rsJumpLog with the reason "not user".
-    let userDown=false, userUntil=0, notUserT=0, resets=0;
-    const userNow=()=>userDown || performance.now()<userUntil;
-    const heard=(k, hold)=>()=>{ COUNT.input=(COUNT.input||0)+1; resets=0; if(k==="down") userDown=true; userUntil=Math.max(userUntil, performance.now()+(hold||0)); };
-    for(const t of ["pointerdown"]) w.addEventListener(t, heard("down", 1500), true);
-    for(const t of ["wheel", "touchstart", "keydown"]) w.addEventListener(t, heard("", 1500), true);
-    for(const t of ["pointerup", "pointercancel", "touchend"]) window.addEventListener(t, ()=>{ if(userDown){ userDown=false; userUntil=performance.now()+1500; } }, true);
-    const notUser=()=>{
-      COUNT.ignored=(COUNT.ignored||0)+1;
-      (window.rsJumpLog=window.rsJumpLog||[]).push({t:(performance.now()/1000).toFixed(1), reason:"not user", mode:String(m3.mode), range:Math.round(m3.range), tilt:Math.round(m3.tilt||0), heading:Math.round(m3.heading||0)});
-      clearTimeout(notUserT);
-      notUserT=setTimeout(()=>{ if(!m3 || userNow() || resets>=2 || leave()) return; resets++; setGoogle(); }, 300); };
-    const fromGoogle=()=>{                       // Google moved: the map follows, once a frame
-      if(queued) return; queued=true;
-      requestAnimationFrame(()=>{ queued=false;
-        if(!m3 || !m3.center || !m3.range || echo() || performance.now()<ignoreUntil) return;
-        if(!userNow()) return notUser();
-        const now=performance.now(), raw=toMap(), dt=now-lastGoogle; lastGoogle=now; rawLast=raw;
-        // while Google leads, the centre and the zoom go through an exponential filter (100 ms); the first change after a rest goes straight
-        let t=raw;
-        if(smooth && dt<300){ const k=1-Math.exp(-dt/100);
-          t={...raw, center:[smooth.center[0]+(raw.center[0]-smooth.center[0])*k, smooth.center[1]+(raw.center[1]-smooth.center[1])*k], zoom:smooth.zoom+(raw.zoom-smooth.zoom)*k}; }
-        smooth=t; clearTimeout(settleT); settleT=setTimeout(()=>{ smooth=null; if(m3 && rawLast && !there(rawLast)) map.jumpTo(rawLast, {rsG3d:true, rsSync:true}); }, 120);
-        if(there(t)) return;
-        map.jumpTo(t, {rsG3d:true, rsSync:true}); COUNT.g2m++;
-        const m=miss(t); if(m){ COUNT.back++; COUNT.lastMiss=m; }       // the map could not follow: judged back (the debug line counts it)
-        clearTimeout(rec); rec=setTimeout(reconcile, 320); }); };
+    // THE MAP LEADS, ONE WAY ONLY. On every map move (coalesced to one per frame) the page sets Google's camera from the map: centre with the ground height,
+    // heading, tilt, and the range from rsG3dFov. No code path moves the map from Google: Google moves its own camera by hidden rules (its limits, the mesh
+    // under its target, inertia) and does not report it, so following it made an echo. The window is a viewer: the reviewer can drag, turn and zoom inside
+    // it, and that moves only the 3D view. "Follow" (on by default) goes off at the reviewer's first input inside the window (a pointerdown, a wheel, a
+    // touchstart or a keydown, captured on the window; its title bar is not "inside"). It goes on by a click on it (Google is then set to the map once),
+    // by a road selection, or by a Guide step. Google's own view switch changes only the picture.
+    const COUNT=window.rsG3dCount={m2g:0, follow:true};
+    let follow=true, setQueued=false;
+    const fbtn=w.querySelector(".rs-g3d-follow");
+    const paintFollow=()=>{ COUNT.follow=follow; fbtn.classList.toggle("on", follow); fbtn.setAttribute("aria-pressed", follow);
+      fbtn.title=follow ? "Following the map: a drag in this window stops it" : "Not following the map: click to follow again"; };
+    const setGoogle=()=>{ if(!m3) return; Object.assign(m3, toGoogle()); COUNT.m2g++; };
+    const setFollow=on=>{ follow=!!on; paintFollow(); if(follow) setGoogle(); };
+    window.rsG3dFollow=setFollow;
+    map.on("move", ()=>{ if(!m3 || !follow || setQueued) return; setQueued=true; requestAnimationFrame(()=>{ setQueued=false; if(follow) setGoogle(); }); });
+    for(const t of ["pointerdown", "wheel", "touchstart", "keydown"]) w.addEventListener(t, e=>{
+      if(e.target && e.target.closest && e.target.closest(".rs-svw-bar")) return; if(follow){ follow=false; paintFollow(); } }, true);
+    fbtn.onclick=()=>setFollow(true);
     // THE MAP'S CENTER BESIDE THE WINDOW: while the window is open, the map's padding puts its center (the
     // point the two cameras share, where a clicked road comes to) in the middle of the map's free side, so
     // the window does not cover it. Phones keep the plain center: there the window docks at the bottom.
@@ -191,25 +133,9 @@ export function initGoogle3D(){
       if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>24) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
     window.rsG3dMode=()=>m3 ? String(m3.mode) : null;
     const redraw=()=>{ if(m3 && line) line.forEach(x=>{ x.remove(); m3.appendChild(x); }); };      // the selected road is drawn again in the new mode
-    // A change of mode makes Google draw again, and it may report a stale or reset camera: for 1 s after the page sets the mode (or Google's own toggle
-    // does) its camera changes are ignored, and then Google is set to the map's camera once. The map's camera never moves for a switch.
-    // WHO CHANGES THE VIEW AFTER A MODE CHANGE? 0.2 s, 1 s and 3 s after it, Google's range, tilt and centre altitude go into window.rsG3dLog with the number of
-    // sets the page made (m2g), of Google's changes it did not follow (ignored) and of input (input) since the change. With ?g3d=leave the page sets nothing
-    // in Google's drawn map (the first view of Google stays).
-    const leave=()=>/[?&]g3d=leave/.test(location.search) && drawnMode();
-    let probeAt=-1e9;
-    const probe=why=>{ const now=performance.now(); if(now-probeAt<600) return; probeAt=now; const c0={m2g:COUNT.m2g, ign:COUNT.ignored||0, inp:COUNT.input||0};
-      const mapz=map.getZoom();
-      for(const d of [200, 1000, 3000]) setTimeout(()=>{ if(!m3) return; const c=m3.center||{};
-        LOG.push("mode "+String(m3.mode)+" +"+d/1000+"s ("+why+"): range "+Math.round(m3.range)+" tilt "+Math.round(m3.tilt||0)+" alt "+Math.round(c.altitude||0)+" | page sets "+(COUNT.m2g-c0.m2g)+", not followed "+((COUNT.ignored||0)-c0.ign)+", input "+((COUNT.input||0)-c0.inp)+" | map zoom "+mapz.toFixed(2)+", set range "+Math.round(rangeOf(map.getCenter().lat, mapz)));
-        if(LOG.length>24) LOG.shift(); }, d); };
-    window.rsG3dProbe=probe;
-    const modeQuiet=()=>{ probe("mode change"); ignoreUntil=performance.now()+1000; clearTimeout(modeT); modeT=setTimeout(()=>{ if(m3 && !leave()) setGoogle(); }, 1050); };
-    let modeT=0, lastMode=null;
-    // Google's own toggle changes the mode without the page: a watcher (every 200 ms) opens the same quiet second, and keeps the choice
-    setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode);
-      if(lastMode!==null && v!==lastMode){ modeQuiet(); keepMode(); redraw(); } lastMode=v; }, 200);
-    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ modeQuiet(); m3.mode=modeOf(lib); keepMode(); } });
+    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ m3.mode=modeOf(lib); keepMode(); } });
+    let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes; the page keeps the choice and draws the road again
+    setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode){ keepMode(); redraw(); } lastMode=v; }, 200);
     const open=()=>{
       if(location.protocol==="file:"){
         say("<b>Google 3D needs this page served, not opened from disk.</b>"+
@@ -219,20 +145,20 @@ export function initGoogle3D(){
       _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
         if(w.hidden || m3) return;               // closed while it loaded
         lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:(k=>k && !/^(HYBRID|SATELLITE)$/i.test(k) ? k : modeOf(l))(keptMode())}));
-        m3.addEventListener("gmp-modechange", ()=>{ modeQuiet(); keepMode(); redraw(); });
-        for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
+        m3.addEventListener("gmp-modechange", ()=>{ keepMode(); redraw(); });
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
         msg.hidden=true; w.appendChild(m3);
-        if(want) setTimeout(()=>{ if(m3) tryDraw(want.cs, want.name, want.lvl, false); }, 0);
+        if(want) setTimeout(()=>{ if(m3) tryDraw(want.cs, want.name, want.lvl); }, 0);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
     };
-    // DRAW A ROAD in the 3D view and fly along it. cs: the road's [lng, lat] points; lvl: its level. rs:select calls it for a click on a road;
+    // DRAW A ROAD in the 3D view. cs: the road's [lng, lat] points; lvl: its level. rs:select calls it for a click on a road;
     // a page with its own selection (a stepper, a list) calls window.rsG3dDraw(cs, name, lvl). A road asked for before the view exists is drawn when it opens.
     let want=null;
-    const draw=(any, name, lvl, fly)=>{
+    const draw=(any, name, lvl)=>{
       const parts=(Array.isArray(any[0]) && Array.isArray(any[0][0]) ? any : [any]).filter(c=>c.length>1);     // one line, or several
       want={cs:any, name, lvl};
       if(!m3 || !lib || !parts.length) return;
+      setFollow(true);                         // a road selection turns Follow on: the map leads
       ttl.textContent=name||"Unnamed road";
       if(line) line.forEach(x=>x.remove());
       m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove());       // one selection, one line: whatever an earlier draw left goes
@@ -256,23 +182,18 @@ export function initGoogle3D(){
           for(let a=0; a<total; a+=12) line.push(mk(run(a, Math.min(a+7, total)), {strokeColor:"#7e57c2"})); }
         else line.push(mk(cs)); }
       line.forEach(x=>{ x.dataset.rsSel="1"; m3.appendChild(x); });
-      if(!fly) return;                        // a page with its own selection moves the map, and the 3D camera follows the map
-      userUntil=performance.now()+1700;       // this flight is the page's own: the map follows it
-      const cs=parts.reduce((a, c)=>_svDist(c).slice(-1)[0]>_svDist(a).slice(-1)[0] ? c : a), len=_svDist(cs).slice(-1)[0], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
-      m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:ground(mid.lng, mid.lat)}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
-                      durationMillis:1500});
     };
-    const tryDraw=(cs, name, lvl, fly)=>{ try{ draw(cs, name, lvl, fly); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
+    const tryDraw=(cs, name, lvl)=>{ try{ draw(cs, name, lvl); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
     window.rsG3dDraw=tryDraw;
     document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
       const d=e.detail; if(d.overlay) return;
       if(typeof window.rsG3dOwnDraw==="function" && window.rsG3dOwnDraw(d)) return;       // the page draws this road itself, from its own data
       const r=_road(d.id), cs=r ? _svLine(r) : []; if(cs.length<2) return;
-      const p=d.properties||{}; tryDraw(cs, p.name||p.highway, (_rprops(d.id)||{}).lvl||0, true);
+      const p=d.properties||{}; tryDraw(cs, p.name||p.highway, (_rprops(d.id)||{}).lvl||0);
     });
     rsSetGoogle3D=function(on){
       w.hidden=!on;
-      if(on){ if(innerWidth>520) place(); if(!m3) open(); }
+      if(on){ follow=true; paintFollow(); if(innerWidth>520) place(); if(!m3) open(); }
       else { keepMode(); if(m3){ m3.remove(); m3=null; line=null; } ttl.textContent="Google 3D"; tun.hidden=true; }
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on);
       document.dispatchEvent(new CustomEvent("rs:google3dchange", {detail:{open:!!on}}));

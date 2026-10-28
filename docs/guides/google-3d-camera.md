@@ -1,10 +1,10 @@
 # The Google 3D camera link
 
-<p class="lead">How the map camera and the Google 3D camera follow each other, and how to check it.</p>
+<p class="lead">How the map camera sets the Google 3D camera, one way only, and how to check it.</p>
 
 ## 1. The four links
 
-When the map moves, the 3D camera gets these values. When the 3D camera moves, the map gets them back.
+When the map moves, the 3D camera gets these values. The map never gets values from the 3D camera.
 
 | Map | Google 3D | Rule |
 |---|---|---|
@@ -39,17 +39,21 @@ The option is not set by default. Without it, the range is unchanged.
 
 If the window is narrower than the map, it shows less ground at the sides. The vertical extent stays the same.
 
-## 4. One camera
+## 4. The map leads, one way only
 
-The 3D camera follows the map at all times. A page that wants this rule must never fly the 3D camera alone. In the simready review page, a click on a road flies the map to the road, and the 3D view follows.
+Google moves its own camera by hidden rules: its limits, the mesh under its target, and inertia. It does not report them. A link in both directions made an echo, jumps and mismatches. So the link goes one way.
 
-By default, roadstyle moves the map center to the free part of the map while the window is open. The option `window.rsWindowRecentre = false` switches this off. The map then never moves when the window opens, closes, or is dragged.
+- On every map move, the page sets the 3D camera from the map. It coalesces the moves to one set per frame.
+- No code path moves the map from the 3D camera. A change of the 3D camera of any kind, with input or without, never changes the map.
+- The 3D window is a viewer. The reviewer can drag, turn and zoom in it. That moves only the 3D view.
+- The window bar has a "Follow" button. It is on by default. The first input in the window turns it off: a `pointerdown`, `wheel`, `touchstart` or `keydown` on the window. Input on the title bar does not count. While it is off, the map does not set the 3D camera.
+- A click on the "Follow" button turns it on and sets the 3D camera to the map once. A road selection and a Guide step also turn it on. The window turns it on when it opens.
+- Google's own view switch changes only the picture. The page sets nothing after it, and the map does not move.
+- A click on a road never flies the 3D camera alone. The page flies the map, and the 3D view follows the map while Follow is on.
 
-A review page sets this option to false, because a drag of a window or a toggle of a panel must not move the map.
+By default, roadstyle moves the map center to the free part of the map while the window is open. The option `window.rsWindowRecentre = false` switches this off. A review page sets it to false, because a drag of a window or a toggle of a panel must not move the map.
 
-While Google leads, the page sends nothing back to it: the map follows as far as it can. When Google has been still for 300 ms and the map could not follow (a limit such as the maximum pitch), the page sets the 3D camera to the map's once, with `flyCameraTo` over 250 ms. `rsG3dCount.back` counts the times the map could not follow, and `lastMiss` names the property.
-
-The page does not detect gestures, because Google's element keeps its pointer events inside its own canvas. It tags its own moves instead. The 3D camera moves the map with `map.jumpTo(camera, {rsSync: true})`, and the map ignores a move with that tag. The map moves the 3D camera, and the page keeps the values it set for one second. A camera change of Google that is within 1e-7 degrees, 0.5 m and 0.2 degrees of one of them is the echo of that set, and the page ignores it. Each direction runs once per frame at most. `window.rsG3dCount` counts both directions: `g2m` (3D to map) and `m2g` (map to 3D). During a drag in the 3D window `m2g` stays at 0. During a drag of the map `g2m` stays at 0.
+`window.rsG3dCount` holds `m2g` (the number of sets of the 3D camera) and `follow`. `window.rsG3dFollow(on)` sets the Follow state from the page.
 
 ## 5. Check the link in a browser
 
@@ -57,7 +61,7 @@ The simready page has a debug line. Open the page with `?debug=1` and open the G
 
 - the map center, zoom, bearing, pitch, canvas size and the width of ground in metres;
 - the 3D center, altitude, range, heading, tilt and window size;
-- the range that the page sets, and the distance in metres between the two centres.
+- the range that the page sets, the distance in metres between the two centres, the Follow state, and the number of sets of the 3D camera per second.
 
 To check the link in ten minutes:
 
@@ -70,11 +74,11 @@ To check the link in ten minutes:
 ## 6. The limits
 
 - A difference under 10 % is normal.
-- The map limits the tilt. Where the map cannot follow, it stops at its limit, and Google goes back to the map camera.
+- The map limits the tilt. The 3D camera gets the map's value, so it stops at the same limit.
 - The window shows the same view as the map, but smaller.
 - A headless browser does not draw Google 3D. Use a browser with a screen.
 - The "Labels" switch of the base-map box rules the 3D view too: on gives Google's HYBRID mode (labels and pins), off gives SATELLITE. Without that switch the view has no labels.
 - The page sets the mode of the 3D view only when the window opens and when the Labels switch changes (SATELLITE, or HYBRID with labels). Google's own toggle (the round thumbnail at the top right of the window, imagery or Google's stylised 3D map) is allowed, and the page leaves it alone. A choice of the stylised map is kept for the next opening, and the selected road is drawn again after a change of mode. If Google reports an error, the window says "Google 3D imagery did not load".
 - A selected road lies on Google's photorealistic mesh (`RELATIVE_TO_MESH`, 0.5 m, a vertex every 5 m, 4 px wide), not on its terrain model. A tunnel (level below 0) is dashed, with a note in the bar.
 - Google's drawn 3D map (the dark-blue blocks, mode ROADMAP) keeps its camera much farther away than over the imagery, whatever the range the page sets. Over the imagery the title bar shows a note when the camera is lower than 80 m above the ground (`MIN_ALT`, or `window.rsG3dMinAlt`). In the drawn map it shows a note when the map's zoom is above 17 (`MIN_ZOOM_DRAWN`, or `window.rsG3dMinZoomDrawn`; a first value from one screenshot). The debug line of a review page shows the limit of the mode that is on.
-- After a change of the mode, the page logs into `window.rsG3dLog`, at 0.2 s, 1 s and 3 s, Google's range, tilt and centre altitude, how many times the page set the 3D camera itself, how many Google changes it did not follow, and the range it would set. With `?g3d=leave` in the address the page sets nothing in Google's drawn map, so Google's first view stays.
+- Google's own limits are shown, not fought. The note in the title bar says when the 3D view shows more than the map.
