@@ -119,7 +119,7 @@
         const rows = [];
         bms.map((b, i)=>[b, i]).filter(([b])=>!b.twin).sort((x, y)=>(x[0].order ?? 99) - (y[0].order ?? 99) || x[1] - y[1]).forEach(([b, i])=>{
           const lab = el("label", "rs-bm-row"), r = el("input"); r.type = "radio"; r.name = "rs-bm"; r.value = b.key;
-          const sw = el("span", "rs-bm-sw"); sw.style.background = b.bg;
+          const sw = el("span", "rs-bm-sw"); sw.style.background = b.swatch || b.bg; sw.dataset.key = b.key;
           lab.append(r, sw, el("span", "rs-bm-n", b.title || b.label)); lab.dataset.key = b.key;
           r.onchange = ()=>{ window.rsSetBasemap(b.dark && isDark() ? b.dark : b.key); };
           menu.appendChild(lab); rows.push([b, r]);
@@ -161,6 +161,9 @@
         if(sbT) new MutationObserver(()=>{ const dark = sbT.dataset.theme === "dark", b = bms[byKey(current)]; if(!b) return;
           if(dark && b.dark) window.rsSetBasemap(b.dark);
           else if(!dark){ const light = bms.find(x=>x.dark === current); if(light) window.rsSetBasemap(light.key); } }).observe(sbT, {attributes:true, attributeFilter:["data-theme"]});
+        // a map with a twin shows the swatch of the twin of the current theme
+        const swatches = ()=>{ rows.forEach(([b, r])=>{ const sw = r.parentElement.querySelector(".rs-bm-sw"), tw = b.dark && bms[byKey(b.dark)]; sw.style.background = (isDark() && tw ? tw.swatch || tw.bg : b.swatch || b.bg); }); };
+        new MutationObserver(()=>setTimeout(swatches, 0)).observe(root, {attributes:true, attributeFilter:["data-rs-theme"]}); swatches();
         mark(); apply();
         // the box opens inside the window: moved up or down by what it overhangs
         new MutationObserver(()=>{ if(!menu.classList.contains("open")) return; menu.style.marginTop = "0px";

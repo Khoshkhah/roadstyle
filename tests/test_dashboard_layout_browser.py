@@ -136,6 +136,8 @@ def test_basemap_box(tmp_path):
         assert pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=radio]')].every(e => { const s = e.parentElement.querySelector('.rs-bm-sw').getBoundingClientRect(); return Math.round(s.width) === 32 && Math.round(s.height) === 20; })")
         tops = pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=checkbox]')].map(e => e.parentElement.querySelector('.rs-bm-n').textContent)")
         assert tops == ["Hillshade", "Labels", "3D buildings", "Satellite labels"], tops
+        sw = pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=radio]')].map(e => { const s = getComputedStyle(e.parentElement.querySelector('.rs-bm-sw')); return s.backgroundColor + '|' + s.backgroundImage; })")
+        assert all(a != b for a, b in zip(sw, sw[1:])), sw
         assert pg.evaluate("document.querySelector('input[value=osm]').checked")
         # Blank follows the theme: white on light, the dark blank on dark; a map with no twin stays
         pg.click("label.rs-bm-row[data-key=blank]")

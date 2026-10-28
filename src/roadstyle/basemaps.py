@@ -130,6 +130,8 @@ class Basemap:
     title: str = ""
     #: the key of the dark twin of this map: the box lists the pair as one entry that follows the page's theme
     dark: str | None = None
+    #: the colour of the map's swatch in the base-map box (any CSS background); empty: the map's `bg`
+    swatch: str = ""
 
 
 # NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
@@ -212,8 +214,13 @@ _MENU = [("ofm_liberty", "OpenFreeMap", "OpenFreeMap Liberty"), ("ofm_bright", "
          ("blank", "Blank", "Blank"), ("positron", "CARTO", "CARTO")]
 _TWINS = {"esri_gray": "esri_dark_gray", "blank": "blank_dark", "positron": "dark_matter"}
 _KEYED = {"positron": "carto"}                 # the maps that need a key, and the provider of the key
+_SWATCH = {"ofm_liberty": "#f2efe9", "ofm_bright": "#f8f4f0", "ofm_positron": "#e8e8e8",
+           "osm": "linear-gradient(135deg,#f2efe9 0 55%,#f4c542 55% 70%,#f2efe9 70%)", "esri_gray": "#e4e4e4", "esri_street": "#e9e5dc",
+           "satellite": "#3b4a32", "blank": "#ffffff", "blank_dark": "#14181d", "positron": "#fbf8f3", "dark_matter": "#0b0b0b", "esri_dark_gray": "#3a3f45"}
 for _k, _g, _t in _MENU:
     BASEMAPS[_k] = dataclasses.replace(BASEMAPS[_k], group=_g, title=_t, dark=_TWINS.get(_k))
+for _k, _s in _SWATCH.items():
+    BASEMAPS[_k] = dataclasses.replace(BASEMAPS[_k], swatch=_s)
 for _k, _d in _TWINS.items():
     BASEMAPS[_d] = dataclasses.replace(BASEMAPS[_d], group=BASEMAPS[_k].group, title=BASEMAPS[_d].label)
 #: the maps that need no key, in the box's order
