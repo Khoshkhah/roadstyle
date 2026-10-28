@@ -207,13 +207,18 @@ export function initGoogle3D(){
       const MESH=(lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH";
       const mk=(r, o)=>new lib.Polyline3DElement(Object.assign({path:r.map(c=>({lat:c[1], lng:c[0], altitude:0.5})), altitudeMode:MESH, strokeColor:O.select_color,
         strokeWidth:4, outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true}, o));
-      for(const cs of parts){
-        const dd=_svDist(cs), total=dd[dd.length-1];
+      // every original vertex is kept (a smooth arc stays an arc), and a segment longer than 5 m gets points in between
+      const densify=cs=>{ const out=[cs[0]], k=Math.cos(cs[0][1]*Math.PI/180);
+        for(let i=1; i<cs.length; i++){ const [x0, y0]=cs[i-1], [x1, y1]=cs[i], m=Math.hypot((x1-x0)*111320*k, (y1-y0)*111320), n=Math.ceil(m/5);
+          for(let j=1; j<n; j++) out.push([x0+(x1-x0)*j/n, y0+(y1-y0)*j/n]); out.push(cs[i]); }
+        return out; };
+      for(const raw of parts){
+        const cs=densify(raw), dd=_svDist(cs), total=dd[dd.length-1];
         const at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
-        const run=(a, b)=>{ const r=[at(a)]; for(let t=a+5; t<b; t+=5) r.push(at(t)); r.push(at(b)); return r; };      // the part from a to b metres, a vertex every 5 m
+        const run=(a, b)=>[at(a)].concat(cs.filter((c, i)=>dd[i]>a && dd[i]<b), [at(b)]);          // the part from a to b metres, with the line's own vertices
         if(lvl<0){ tun.hidden=false;
           for(let a=0; a<total; a+=12) line.push(mk(run(a, Math.min(a+7, total)), {strokeColor:"#7e57c2"})); }
-        else line.push(mk(run(0, total))); }
+        else line.push(mk(cs)); }
       line.forEach(x=>m3.appendChild(x));
       if(!fly) return;                        // a page with its own selection moves the map, and the 3D camera follows the map
       const cs=parts.reduce((a, c)=>_svDist(c).slice(-1)[0]>_svDist(a).slice(-1)[0] ? c : a), len=_svDist(cs).slice(-1)[0], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
