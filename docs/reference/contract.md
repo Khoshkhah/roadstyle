@@ -15,7 +15,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 
 | Key | Content |
 |---|---|
-| `roadstyle:contract` | the version of the contract: 1. The dashboard reads it (`core.js`, `CONTRACT`): a newer version is an error (the console, `rs.error`), and the dashboard adds no road interaction for that style; a style with `roadstyle:*` keys and no version is read as version 1, with a note |
+| `roadstyle:contract` | the version of the contract: 2 (version 2: the road's row is the feature id of the pieces and the slots, not a property; the sort key is `r * 2^32 + id`). The dashboard reads it (`core.js`, `CONTRACT`): a newer version is an error (the console, `rs.error`), and the dashboard adds no road interaction for that style; a style with `roadstyle:*` keys and no version is read as version 1, with a note |
 | `roadstyle:state` | each global state `rs_*` and its start value |
 | `roadstyle:controls` | the options of `rsDashboard` that come from the style (the next table), and `dashes`: the sorted dash patterns of the road layer's features, for the page's simple-mode script (not an option) |
 | `roadstyle:interaction` | `{popup, tooltip, hover_delay_ms}`: the road popup's fields, the hover tooltip, the hover delay |
@@ -30,6 +30,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | `roadstyle:arrows` | `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null, from the final layers; the page's option `arrows` |
 | `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
 | `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
+| `roadstyle:generation` | the generation of the road set: the first 16 hex characters of the hash of the sorted edge ids (`edge_hash`). A row is valid in one generation only. The tile URL (`?g=`) and the PMTiles metadata carry it |
 | `roadstyle:base` | the names of the base-map layers, if the map has any. The tiles of such a layer keep only the properties that its style layers and the popup read |
 | Parquet field `roadstyle:json` | stage 1's Parquet files (`write_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |
 
@@ -164,8 +165,8 @@ when a layer reads it.
 | `__rs_ci` | the class index of every feature of `simple` (R8): its class's place in the profile's class list, else the list's length; the road layer reads its width and offset tables with `["at", ["get", "__rs_ci"], ["literal", [...]]]` | `layers::class_index`, `simple.rs`, `_class_index` | the layers | engine | |
 | `__rs_cls` | the class column of the edge on every piece, name and arrow (for the class filter) | `_mark_cls`, `roads.rs`, `slots.rs` | `filter.js` | dashboard | the edge label: the dashboard reads the class through the edge |
 | `__rs_kept_` (the prefix of `__rs_kept_<column>`) | the output name of an input column with one of the four level names (casing_start, casing_level, casing_end, fill_level) when the engine computes the levels: the computed ones take the four names | `road.rs` (`Roads::new`, `kept`) | the outputs | internal | |
-| `__rs_edge`, `__rs_edge2`, `__rs_edges` | the edge label: the road's key (`RoadKey`, `table << 32 \| row`; the row for one table), the twin's key, the keys of a shadow or a deck | every generator | `core.js`, `filter.js`, `select.js`, `arrows.js`, the level editor | dashboard | the edge label of each piece (render model) |
-| `__rs_k`, `__rs_s` | the kind of piece (0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item) and its sort key | `_simple_pieces`, `simple.rs` | engine, `core.js`, `svspot.js` (`__rs_k`) | dashboard (`__rs_k`) | `DrawKey` |
+| `__rs_edge2`, `__rs_edges` (and the feature id) | the edge label: the road's key is the feature id of a piece and of a slot (the engine's carrier property `__rs_edge` is not in a style or a tile). `__rs_edge2` is (`RoadKey`, `table << 32 \| row`; the row for one table), the twin's key, the keys of a shadow or a deck | every generator | `core.js`, `filter.js`, `select.js`, `arrows.js`, the level editor | dashboard | the edge label of each piece (render model) |
+| `__rs_k`, `r` | the kind of piece (0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item) and its rank (an integer; the line-sort-key adds the road's key as `r * 2^32 + id`) | `_simple_pieces`, `simple.rs` | engine, `core.js`, `svspot.js` (`__rs_k`) | dashboard (`__rs_k`) | `DrawKey` |
 | `__rs_main`, `__rs_seam`, `__rs_lap`, `__rs_stub` | the main casing piece, a seam, a lap, an end stub | `simple.rs` | engine | internal | the piece generators |
 | `__rs_wm`, `__rs_cm`, `__rs_twm` | the width, the casing and the pair width in metres (over cos of the latitude) | `_mark_width_m` | engine | internal | `RoadDraw.look.width_m` |
 | `__rs_ord`, `__rs_ov`, `__rs_item`, `__rs_ic`, `__rs_iwm`, `__rs_iom`, `__rs_imz`, `__rs_pick` | an attached object's order, its overlay, its row, color, width and offset in metres, minzoom, and "pick it as itself" | `_edge_overlay`, `_item_pieces`, `_road_items` | engine, `select.js` (`__rs_pick`) | dashboard (`__rs_pick`) | `Attachment` |

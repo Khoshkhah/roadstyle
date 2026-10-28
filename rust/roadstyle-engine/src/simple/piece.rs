@@ -45,8 +45,8 @@ impl Piece {
         }
     }
 
-    /// The properties of the piece, with its keys in its order, and the road layer's `__rs_k`, `__rs_s` (with
-    /// the edge's tie-breaker) and `__rs_cls`.
+    /// The properties of the piece, with its keys in its order, and the road layer's `__rs_k`, `r` (the style
+    /// adds the road's key, the feature id, as the tie-breaker) and `__rs_cls`.
     pub fn props<'a>(&self, roads: &'a Roads, cols: &Cols) -> Props<'a> {
         self.over(roads, cols, self.base(roads, cols, None, None), None).to_values()
     }
@@ -75,7 +75,7 @@ impl Piece {
         };
         let r = self.road(roads);
         let d = r.draw();
-        let (edge, key) = (self.edge as i64, crate::road::key(self.edge as usize).get() as i64);      // the row (the sort key's tie-breaker), the road's key
+        let key = crate::road::key(self.edge as usize).get() as i64;      // the road's key
         match self.part {
             Part::Fill => {}
             Part::Half(k) => {
@@ -128,7 +128,7 @@ impl Piece {
         }
         if let Some(dk) = self.draw {
             put(&mut q, Mark::PieceKind, Cell::Int(dk.kind));
-            put(&mut q, Mark::Sort, Cell::Int(sort_key(dk.key, edge)));
+            put(&mut q, Mark::Rank, Cell::Int(rank(dk.key)));
         }
         put(&mut q, Mark::Class, r.cls_cell());
         q

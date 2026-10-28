@@ -797,10 +797,10 @@ def _twin_caps(g, **kw):
     for f in src + hv:
         p, c = f["properties"], [tuple(x) for x in f["geometry"]["coordinates"]]
         into = fills if p.get("__rs_k") == 1 or f in hv else cas
-        if into is cas and (p.get("__rs_edge") != 0 or p.get("__rs_main") or p.get("__rs_seam")):
+        if into is cas and (f["id"] != 0 or p.get("__rs_main") or p.get("__rs_seam")):
             continue
         for pt in {c[0], c[-1]} & {a, b}:
-            into[(p["__rs_edge"], pt) if into is fills else pt] = p.get("__rs_cap")
+            into[(f["id"], pt) if into is fills else pt] = p.get("__rs_cap")
     return cas, fills
 
 
@@ -1999,7 +1999,7 @@ def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
     """The footway's fill (``__rs_dash`` "4,4" from the palette) is dashed per feature, butt ended; a solid road gets [1, 0]."""
     style = _style(render_edges(_simple_world(), backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce").html)
     layer = next(l for l in style["layers"] if l["id"] == "roads-simple")
-    foot = next(f["properties"] for f in style["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_edge"] == 2)
+    foot = next(f["properties"] for f in style["sources"]["simple"]["data"]["features"] if f["id"] == 2)
     da = layer["paint"]["line-dasharray"]
     by = da[3]
     assert by[0] == "match" and foot["__rs_dash"] in by and by[by.index(foot["__rs_dash"]) + 1] == ["literal", [float(v) for v in foot["__rs_dash"].split(",")]]
@@ -2159,9 +2159,9 @@ def test_an_unclassed_two_way_pair_pairs_and_the_warning_names_it():
                           "cap_s": None, "cap_e": None}, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)   # _TWIN_KW's columns
     with pytest.warns(UserWarning, match=r"2 edges have no 'highway' value.*w#2f, w#2r"):
         html = render_edges(g, **_TWIN_KW).html
-    feats = [f["properties"] for f in _style(html)["sources"]["simple"]["data"]["features"]]
-    assert {p["__rs_edge"] for p in feats if p["__rs_k"] != 1} == {0}                  # one casing, the first edge's
-    assert all(p.get("__rs_twoway", True) for p in feats) and sorted(p["__rs_edge"] for p in feats if p["__rs_k"] == 1) == [0, 1]
+    feats = _style(html)["sources"]["simple"]["data"]["features"]
+    assert {f["id"] for f in feats if f["properties"]["__rs_k"] != 1} == {0}                  # one casing, the first edge's
+    assert all(f["properties"].get("__rs_twoway", True) for f in feats) and sorted(f["id"] for f in feats if f["properties"]["__rs_k"] == 1) == [0, 1]
 
 
 def _slots_of(lines, oneway=False):
@@ -2220,7 +2220,7 @@ def _two_rules_seen(m, refs):
     st = _style(m.html)
     ps = [f["properties"] for f in st["_roads"]["features"]]
     two = {refs[i]: bool(p.get("__rs_twoway")) for i, p in enumerate(ps)}
-    arrows = {refs[f["properties"]["__rs_edge"]]: f["geometry"]["coordinates"]
+    arrows = {refs[f["id"]]: f["geometry"]["coordinates"]
               for f in st["sources"]["slots"]["data"]["features"] if f["properties"]["oneway"] and f["properties"]["slot"] % 2}
     return two, arrows
 
@@ -2254,8 +2254,8 @@ def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
     plain = _style(_crossing_with_lanes(n=0).html)["sources"]["simple"]["data"]["features"]
     assert sum(f["properties"]["__rs_k"] == 1 for f in plain) == 2      # no items: both edges keep their fill
     fs = st["sources"]["simple"]["data"]["features"]
-    key = lambda e, k: sorted(f["properties"]["__rs_s"] for f in fs if f["properties"]["__rs_edge"] == e and f["properties"]["__rs_k"] == k)  # noqa: E731
-    lo, hi = (min(f["properties"]["__rs_edge"] for f in fs), max(f["properties"]["__rs_edge"] for f in fs))
+    key = lambda e, k: sorted(f["properties"]["r"] * 2 ** 32 + f["id"] for f in fs if f["id"] == e and f["properties"]["__rs_k"] == k)  # noqa: E731
+    lo, hi = (min(f["id"] for f in fs), max(f["id"] for f in fs))
     assert len(key(lo, 5)) == len(key(hi, 5)) == 3
     assert len(key(lo, 1)) == len(key(hi, 1)) == 1    # an edge with items keeps its fill, under them
     assert max(key(lo, 1)) < min(key(lo, 5)) and max(key(hi, 1)) < min(key(hi, 5))
@@ -2290,7 +2290,8 @@ def test_road_items_are_pieces_of_the_road_layer_with_no_source_of_their_own():
     html = render_edges(roads, backend="web", items=items, items_popup=["lane_id"]).html
     st = _style(html)
     assert not [k for k in st["sources"] if k.startswith("ov")] and not [l for l in st["layers"] if l["id"].startswith("ov")]
-    k5 = sorted((f["properties"] for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5), key=lambda p: p["__rs_s"])
+    k5 = [f["properties"] for f in sorted((f for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5),
+                                          key=lambda f: (f["properties"]["r"], f["id"]))]
     assert [p.get("__rs_pick") for p in k5] == [True, None] and k5[0]["lane_id"] == "1_1" and "lane_id" not in k5[1]
     assert sum(f["properties"]["__rs_k"] == 1 for f in st["sources"]["simple"]["data"]["features"]) == 1        # the road keeps its fill
     assert _opt(html, "items") == {"label": "items", "popup": ["lane_id"], "layer": "roads-simple"}

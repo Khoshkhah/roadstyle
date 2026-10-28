@@ -28,9 +28,11 @@ use piece::*;
 const SEAM_M: f64 = 0.5; // a seam reaches this far each way from its cut, at most a quarter of either piece
 const LAP_M: f64 = 2.0; // a lap (the flat seam below zoom 17) reaches this far each way, at most half of either piece
 const PIECES: usize = 24; // the most pieces of one edge (the feature id is edge * PIECES + n)
-// the line-sort-key `__rs_s` is an integer, KEY_UNIT for each unit of the key (2 * position + the kind's step) and 1 for each edge: the
-// tie-breaker per edge, so that a road redrawn in place keeps its place. An integer is a varint in a tile, a double 9 bytes.
-pub(crate) const KEY_UNIT: f64 = 1e8;
+// the line-sort-key is `r * 2^32 + id`: `r` is an integer, RANK_UNIT for each unit of the key (2 * position + the kind's step), and the
+// road's key (the feature id) is the tie-breaker, so that a road redrawn in place keeps its place. An integer is a varint in a tile.
+pub(crate) const RANK_UNIT: f64 = 100.0;
+/// 2^32: the shift of `r` in the sort key (a road's key is under it, D9).
+pub(crate) const RANK_SHIFT: f64 = 4294967296.0;
 const MAX_EDGES: usize = 1_000_000;
 const ITEM_STEP: f64 = 0.01; // an item's step above its edge's fill, by its rank on the edge
 const MAX_ITEMS: usize = 38; // the most items of one edge between its fill and the next casings

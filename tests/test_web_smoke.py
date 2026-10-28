@@ -242,7 +242,7 @@ def test_edge_overlay_page_boots_and_rsfilter_keeps_position_and_order(tmp_path)
 
 
 def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
-    """docs/design/edge_overlays.md: after rsFilter(ids) on the roads, the arrow and name layers show only the slots of those edges (their __rs_edge / __rs_edge2)."""
+    """docs/design/edge_overlays.md: after rsFilter(ids) on the roads, the arrow and name layers show only the slots of those edges (their id / __rs_edge2)."""
     from roadstyle import render_edges as render
 
     path = tmp_path / "slots.html"

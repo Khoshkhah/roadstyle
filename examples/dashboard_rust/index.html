@@ -30,7 +30,6 @@ const withArgs = (look, args) => Object.entries(args).reduce((l, [k, v]) => l.wi
 const lk = withArgs(Look.fromJson(lookText), {state: "live", color_by: "lanes", cmap: "YlOrRd", vmin: 1, vmax: 4,
                                                levels: {edge_hash: "615c9155ab37a030dbfa80da2f7fcc09", n_edges: 13298}});
 const style = JSON.parse(inlineStyle(roads, lk, undefined, undefined, "Monaco"));
-style.sources.simple.promoteId = "__rs_edge";   // the pieces' row as their id: the glow by row (the engine sets it only on its own pages)
 // the road table of stage 1 (each road's fields, midpoint, bbox, heading and line, by row): the popup, the search and Street View read it
 const road_table = JSON.parse(new TextDecoder().decode(styleSources(roads, lk, undefined, undefined, "Monaco").roadTable()));
 

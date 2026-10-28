@@ -168,10 +168,9 @@ pub fn style_text(s: &sources::Styled, style: &Value) -> String {
 }
 
 /// The style that draws stage 2's tiles: the sources `tiled` become the tile layers of one vector source `roads` (first, at `at`, with the
-/// tiles' zooms and the pieces' `promoteId`), and each layer on one of them draws its tile layer (`source-layer`); the other sources stay.
+/// tiles' zooms), and each layer on one of them draws its tile layer (`source-layer`); the other sources stay.
 pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, u32)) -> Value {
     let is_tiled = |v: &Value| v.as_str().is_some_and(|s| tiled.iter().any(|t| t == s));
-    let promote = if tiled.iter().any(|t| t == "simple") { style["sources"]["simple"]["promoteId"].as_str().map(|p| json!({"simple": p})) } else { None };
     for l in style["layers"].as_array_mut().into_iter().flatten() {
         if let Some(src) = l.get("source").cloned().filter(is_tiled) {
             l["source-layer"] = src;
@@ -183,9 +182,13 @@ pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, 
     vector.extend(at.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
     vector.insert("minzoom".into(), zooms.0.into());
     vector.insert("maxzoom".into(), zooms.1.into());
-    if let Some(p) = promote {          // the pieces' row as the feature id, as on the GeoJSON source
-        vector.insert("promoteId".into(), p);
+    // the generation of the road set is in the tile URL: a row is valid in one generation only (and the browser's cache keeps no old tile)
+    if let Some(g) = style["metadata"][roadstyle_model::props::GENERATION].as_str() {
+        for t in vector.get_mut("tiles").and_then(Value::as_array_mut).into_iter().flatten() {
+            *t = format!("{}?g={g}", t.as_str().unwrap_or_default()).into();
+        }
     }
+    style["metadata"][roadstyle_model::props::CONTRACT_KEY] = roadstyle_model::props::CONTRACT.into();
     let mut sources = serde_json::Map::new();
     sources.insert(tiles::SOURCE.into(), Value::Object(vector));
     for (k, v) in style["sources"].as_object().into_iter().flatten() {
@@ -239,8 +242,12 @@ pub fn tiles_of_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<V
                     None => FileValue::Cell(v),
                 }
             };
+            // a slot has its road's key as the file's feature id (`__fid`), the pieces as the property `__rs_edge`
+            let fid = t.names().iter().position(|n| n == roadstyle_io::write::FID).filter(|_| k == "slots");
+            let edge = roadstyle_model::mark::Mark::Edge.name();
             let feats = (0..t.len()).map(|i| (t.line(i).or_else(|| table.as_ref().and_then(|r| r.line(i))),
-                                              cols.iter().map(move |&(c, n)| (n.as_str(), cell(c, i, n)))));
+                                              cols.iter().map(move |&(c, n)| (n.as_str(), cell(c, i, n)))
+                                                  .chain(fid.map(|c| (edge, FileValue::Cell(t.cell(c, i)))))));
             tiled.add_lines(k, feats, &keep, whole, first_drawn(layers, k, from, o.max_zoom));
             continue;
         }

@@ -63,10 +63,9 @@ rs.setStyle(style, {road_table});
   source and layer id that it uses. The names in the style itself stay as they are: a layer's `source-layer`, the metadata.
 - **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
 - **The glow on tiles.** The engine's tiled style has one vector source `roads`; each layer names its source layer (`simple`,
-  `slots`), as in Python's tiles. Every style of the engine gives the pieces `promoteId` `"__rs_edge"` (on the vector source
-  `{simple: "__rs_edge"}`) and has the select and hover glow in its road layer (2026-10-24), so all the pieces of a road have the
+  `slots`), as in Python's tiles. Every style of the engine gives the pieces the road's row as their id (the MVT id; contract 2) and has the select and hover glow in its road layer (2026-10-24), so all the pieces of a road have the
   road's row as their id, and one feature state (`{source: "rs-roads", sourceLayer: "simple", id: row}`) lights the whole road,
-  also in tiles that load later. Without `promoteId`, `setStyle` writes an error in the console. A road is picked on its fill
+  also in tiles that load later. A style with a newer `roadstyle:contract` than the dashboard reads gives an error. A road is picked on its fill
   pieces (`__rs_k` 1).
 - **The road table.** The page gives each style's road table (`setStyle(style, {road_table})`, from `makeSources(...).roadTable()`).
   A road's fields, its line (Street View, Google 3D), its midpoint and its bbox come from it, so `rsQuery`, `rsFind` and `rsFocus`
@@ -96,7 +95,7 @@ editor's end marks (the engine's `roadEnds()`). A click and `rsSelect` load the 
   feature with the road's whole line for Street View and Google 3D. `rsQuery`, `rsFind`, `rsGetProps` and `rsFocus` read the
   table, so they work with tiles when the page has the table.
 - **The glow (`_fs`).** The feature state of a road by its row. In simple mode the state goes on the pieces of the role
-  `simple`, which all have the row as their id (the source has `promoteId` `"__rs_edge"`, GeoJSON and vector alike). In
+  `simple`, which all have the row as their id (the feature id, GeoJSON and vector alike). In
   Python's full look it goes on the road in the role `roads`. Simple mode and its one road layer come from the style (a line
   layer of the role `simple`), so a later style can change them. A road's 3D decks come from one
   index road to decks, made again when the decks' data changes.

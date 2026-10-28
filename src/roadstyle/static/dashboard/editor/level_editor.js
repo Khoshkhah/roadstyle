@@ -297,7 +297,7 @@ if(host){                                                        // the host's m
       if(!map.hasImage(P + id)){ map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio}); mine.images.push(P + id); }
     // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none)
     for(const [k, v] of Object.entries(st.state || {})) map.setGlobalStateProperty(k, v.default ?? null);
-    for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, id === "lv-roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
+    for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, src);
     for(const l of st.layers){
       const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));
       map.addLayer({...layer, id: P + l.id, source: P + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks
@@ -521,7 +521,7 @@ document.addEventListener("rs:select", heardPick);
 function tap(e){
   if(host || !sheetOn()) return;
   const f = map.queryRenderedFeatures(e.point, {layers: [P + "lv-tap"]})[0];
-  const p = f && window.RS_SIDE?.props[f.id ?? f.properties.__rs_edge];
+  const p = f && window.RS_SIDE?.props[f.id];
   const t = performance.now();
   setTimeout(() => {                                             // ponytail: one gesture = 300 ms around the click
     if(p?.road != null && lastPick < t - 300) document.dispatchEvent(new CustomEvent("rs:select", {detail: {properties: p, lvTap: true}}));

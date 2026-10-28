@@ -12,7 +12,8 @@ pick = function(p){
   const hit = map.queryRenderedFeatures([p.x, p.y], {layers:[RS_SIMPLE.layer]})
     .filter(f=>f.properties.__rs_k!==5 || (ITEM_PICK && f.properties.__rs_pick));
   if(!hit.length) return own;
-  const top = hit.reduce((a, b)=>b.properties.__rs_s > a.properties.__rs_s ? b : a);
+  const rank = f=>f.properties.r * 4294967296 + f.id;      // the style's line-sort-key
+  const top = hit.reduce((a, b)=>rank(b) > rank(a) ? b : a);
   if(top.properties.__rs_k===5) return _roadOf(top);
   return _roadOfPiece(top);
 };

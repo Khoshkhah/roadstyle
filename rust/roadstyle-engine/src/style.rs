@@ -43,7 +43,7 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     // audit N2 (2026-10-24): stage 1 gives the road-table form for every style (the pieces draw and glow, by their road's row; the road
     // table has the roads); only an export (render's export_inline, export_style: an app with no road table) asks for the roads source
     let export = export(look);
-    (roads.in_style, simple.promote) = (export, true);
+    roads.in_style = export;
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look.map.output.state == roadstyle_look::options::State::Live;
@@ -115,11 +115,17 @@ fn overlay_source(ov: overlays::Overlay) -> Src {
     }
 }
 
-/// The slots source for the style: only the export keeps the arrow slots' numbers (they are for its thinning).
+/// The slots source for the style: the road's key is each slot's feature id (every slot of a road has it), not a property; only the
+/// export keeps the arrow slots' numbers (they are for its thinning).
 fn slots_for(mut slots: Value, export: bool) -> Value {
-    if !export {
-        for f in slots["data"]["features"].as_array_mut().into_iter().flatten() {
-            f["properties"].as_object_mut().map(|p| p.shift_remove(Mark::SlotArrow.name()));
+    for f in slots["data"]["features"].as_array_mut().into_iter().flatten() {
+        let Some(p) = f["properties"].as_object_mut() else { continue };
+        let edge = p.shift_remove(Mark::Edge.name());
+        if !export {
+            p.shift_remove(Mark::SlotArrow.name());
+        }
+        if let Some(e) = edge {
+            f["id"] = e;
         }
     }
     slots

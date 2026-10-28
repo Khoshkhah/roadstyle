@@ -1,6 +1,6 @@
 """The dashboard reads the interaction contract's version (roadstyle:contract; docs/design/contract_schema.md, step 4): a newer version
 than core.js' CONTRACT is an error on the console and in rsDashboard's result, and the dashboard adds no road interaction for that
-style; a style with roadstyle:* metadata and no version was made before every style had it: it is read as version 1, with a note."""
+style; a style with roadstyle:* metadata and no version was made before every style had it: it is read as version 1, with a note (version 1 is older than the dashboard's: contract 2 has the road's row as the feature id)."""
 import functools
 import http.server
 import json
@@ -43,8 +43,8 @@ def live_style():
 
 
 @pytest.mark.parametrize("version, picked, error, note", [
-    (1, True, False, False),
-    (2, False, True, False),
+    (2, True, False, False),
+    (3, False, True, False),
     (None, True, False, True),
 ], ids=["this version", "a newer version", "no version"])
 def test_the_dashboard_reads_the_contracts_version(tmp_path, live_style, version, picked, error, note):
@@ -86,6 +86,6 @@ def test_the_dashboard_reads_the_contracts_version(tmp_path, live_style, version
     finally:
         server.shutdown()
     assert got[0] == picked and got[1] == picked, got
-    errors = [t for k, t in console if k == "error" and "interaction contract is version 2" in t]
-    assert (got[2] is not None and "version 2" in got[2]) == error and bool(errors) == error, (got, console)
+    errors = [t for k, t in console if k == "error" and "interaction contract is version 3" in t]
+    assert (got[2] is not None and "version 3" in got[2]) == error and bool(errors) == error, (got, console)
     assert any(k == "info" and "no roadstyle:contract" in t for k, t in console) == note, console

@@ -241,7 +241,7 @@ fn road_pick_highlight(cx: &Ctx, w: &Widths, flt: &Value, paint: Value) -> (Valu
     let lay = json!({"line-cap": s.roads.cap, "line-join": s.roads.join, "line-sort-key": 0});
     let mut simple_layout = lay.as_object().unwrap().clone();
     simple_layout.insert("line-cap".into(), simple_cap());
-    simple_layout.insert("line-sort-key".into(), json!(["get", Mark::Sort.name()]));
+    simple_layout.insert("line-sort-key".into(), json!(["+", ["*", ["get", Mark::Rank.name()], crate::simple::RANK_SHIFT as i64], ["id"]]));
     let road = json!({"id": "roads-simple", "type": "line", "source": "simple", "layout": simple_layout, "filter": flt, "paint": paint});
     let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": flt,
                       "paint": {"line-color": ["coalesce", ["get", Mark::Fill.name()], fb_fill], "line-width": w.fill, "line-offset": w.offset, "line-opacity": 0}});
@@ -464,7 +464,7 @@ fn place_overlays(layers: &mut Vec<Value>, mut edge: Vec<(i64, i64, usize, Vec<V
 fn state_expressions(cx: &Ctx, layers: &mut [Value], fills: &[String]) {
     let fb_fill = cx.fb_fill();
     let base = json!(["coalesce", ["get", Mark::Fill.name()], fb_fill]);
-    let top = json!(["in", ["get", Mark::Edge.name()], gs("rs_top")]);
+    let top = json!(["in", ["id"], gs("rs_top")]);
     // the road fill layers (_fill_layer_ids: in simple mode the export's pick layer roads-fill) and their dashed fills
     const FILLS: [&str; 6] = ["roads-fill", "roads-fill-sq", "roads-fill-sx", "roads-fill-h", "roads-fill-hsq", "roads-fill-hsx"];
     let is_fill = |lid: &str| FILLS.contains(&lid) || FILLS.iter().any(|b| lid.starts_with(&format!("{b}-dash")));
@@ -479,7 +479,7 @@ fn state_expressions(cx: &Ctx, layers: &mut [Value], fills: &[String]) {
             if l["source"] == "roads" {
                 l["layout"]["line-sort-key"] = json!(["+", key, ["case", top, 500, 0]]);
             } else if l["id"] == "roads-simple" {
-                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", piece_kind(1), piece_kind(5)], top], (0.5 * crate::simple::KEY_UNIT) as i64, 0]]);
+                l["layout"]["line-sort-key"] = json!(["+", key, ["case", ["all", ["any", piece_kind(1), piece_kind(5)], top], (0.5 * crate::simple::RANK_UNIT * crate::simple::RANK_SHIFT) as i64, 0]]);
             }
         }
     }

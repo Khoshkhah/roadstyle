@@ -9,14 +9,14 @@ export let RS_PREFIX = "";
 // source map (_src) and the road table (RoadTable).
 export let RS_TILED = false;
 // simple mode (the style has the role simple): the id of its one road layer in the map, else false (Python's full look). A road is picked
-// on the fill pieces of that layer (__rs_k 1, their __rs_edge is the road's row), and its hover / select glow is the feature-state of those
+// on the fill pieces of that layer (__rs_k 1, their id is the road's row), and its hover / select glow is the feature-state of those
 // pieces (_fs).
 // RS_LEAN: the simple look's road layer (the id), or false for the full look (simple=False). The full look's paths (RS_LEAN false: core.js
 // _fs and _roadOfPiece, select.js's pick layers, svspot.js's road layer) go with simple=False in N16 (branch n16-full-look-js).
 export let RS_LEAN = false;
 // the newest version of the interaction contract (the metadata roadstyle:contract) that this dashboard reads: the engine's
 // contract::CONTRACT (tests/test_contract_names.py checks the two)
-export const CONTRACT = 1;
+export const CONTRACT = 2;
 // the error of a style whose contract is newer than this dashboard's, else null (docs/design/contract_schema.md, step 4). A style with
 // roadstyle:* metadata and no version was made before every style had it: it is read as version 1, with a note. A page's own style (the
 // page gives the options in RS_OPTIONS) has no metadata, and no note.
@@ -38,7 +38,6 @@ export function initCore(m, opts){
   map = m; O = opts; RS_PREFIX = opts.prefix;
   RS_TILED = opts.tiles; OVERLAYS = opts.overlays;
   useStyle(opts.style);
-  map.once("load", _checkPromote);
   map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; if(_SRC.decks && e.sourceId===RS_PREFIX+_SRC.decks.source) _decks=null; });
   window.rsQuery = rsQuery; window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight; window.rsFocus = rsFocus;
 }
@@ -53,7 +52,6 @@ export function useStyle(st){
   RS_LEAN = lean ? RS_PREFIX+lean.id : false;
   RS_ROLES = new Set(Object.keys(O.sources || (style.metadata || {})["roadstyle:sources"] || {}));
   _decks = null;
-  _checkPromote();
   _useState();
 }
 // the style's global state (roadstyle:state: rs_co, rs_fill_on, ...): the start value of each name that the map does not have yet. A
@@ -64,12 +62,6 @@ function _useState(){
   if(!st) return;
   const set = () => { const have = map.getGlobalState(); for(const k in st) if(!(k in have)) map.setGlobalStateProperty(k, st[k]); };
   try { set(); } catch(e){ if(!/not done loading/.test(e.message)) throw e; map.once("style.load", set); }
-}
-// simple mode needs the pieces' row as their id (promoteId "__rs_edge"): else the glow by row lights other pieces. Checked when the map has
-// the source (at the start: on "load")
-function _checkPromote(){
-  if(RS_LEAN && map.getSource(_src("simple").source) && !_promoted("simple"))
-    console.error('rs: the source of the role simple needs promoteId "__rs_edge" (addSource), or a road does not glow');
 }
 // THE ROADS STYLE'S SOURCES BY ROLE: role -> {source, layer}. The roles are the names of the roads style's sources (simple, slots, arrows,
 // decks, shadows, boundary, ov<i>, and roads in Python's full look); with tiles a role is a source layer of a vector source. The option
@@ -86,9 +78,6 @@ export function _src(role){ const s = _SRC[role]; if(!s) return null;
   const r = {source:RS_PREFIX+s.source}; if(s.layer) r.sourceLayer = s.layer; return r; }
 // the role of a layer of the map
 export function _role(l){ return l["source-layer"] || (l.source && l.source.indexOf(RS_PREFIX)===0 ? l.source.slice(RS_PREFIX.length) : l.source); }
-// whether a role's features have the road's row as their id (promoteId "__rs_edge": a GeoJSON source's, or a vector source's for that layer)
-function _promoted(role){ const s = _src(role), m = s && map.getSource(s.source), p = m && m.promoteId;
-  return !!p && (typeof p === "string" ? p : p[s.sourceLayer]) === "__rs_edge"; }
 // whether a feature's value is one of ids: a "match" on the sorted, distinct ids (a lookup); an "in" on a literal list scanned the whole list for
 // every feature in every layer, and a filter of thousands of ids froze the page (2026-10-07)
 export function _has(expr, ids){ const u=[...new Set(Array.from(ids))].filter(v=>v!=null).sort((a,b)=>a<b?-1:a>b?1:0);
@@ -134,11 +123,11 @@ export function _rprops(i){ return RoadTable.props(i); }
 // a road as a feature with its whole line ({id, properties, geometry}), for Street View and Google 3D; null without a line
 export function _road(i){ const c=RoadTable.line(i); return c ? {id:i, get properties(){ return RoadTable.props(i); }, geometry:{type:"LineString", coordinates:c}} : null; }
 // a fill piece, as the road feature it belongs to (its line: the road's whole line, from the road table)
-export function _roadOfPiece(f){ const e=f.properties.__rs_edge;
+export function _roadOfPiece(f){ const e=f.id;
   return {id:e, properties:_rprops(e), layer:{id:RS_PREFIX+"roads-fill"}, get geometry(){ const r=_road(e); if(!r) RoadTable.load(e); return r && r.geometry; }}; }
 export const _FILL_PIECE = ["any", ["==", ["get", "__rs_k"], 1], ["!", ["has", "__rs_k"]]];   // the fill pieces of the road layer, and what has no piece kind (overlays, decks)
 // THE GLOW: the feature state of a road by its row. ref.source: "roads" or "decks" (roles of the roads style), or an overlay's source id.
-// Simple mode: the road's pieces in the role simple, which all have the row as their id (promoteId "__rs_edge"); the full look: the road in
+// Simple mode: the road's pieces in the role simple, which all have the row as their id (contract 2: the MVT id, or the GeoJSON feature id); the full look: the road in
 // the role roads. The source layer only where the role is in a vector source.
 export function _fs(ref, st){
   if(ref.source==="roads" && RS_LEAN){ const s=_src("simple"); if(s) map.setFeatureState({...s, id:ref.id}, st); return; }

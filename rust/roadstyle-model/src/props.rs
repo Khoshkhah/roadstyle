@@ -202,7 +202,8 @@ pub fn expression_reads(v: &Value, out: &mut std::collections::HashSet<String>, 
 /// What a road piece keeps (R1): the reads of the layers on the source `simple` (the road layer) and the page's declaration for a piece
 /// (PAGE_READS's `pieces`). A road's popup reads the road table, not its pieces.
 pub fn piece_reads(layers: &[Value]) -> std::collections::HashSet<String> {
-    let mut read: std::collections::HashSet<String> = page_reads().into_iter().collect();
+    // `__rs_edge` is the carrier of the pieces' feature id (the tiles and the page write it as the id)
+    let mut read: std::collections::HashSet<String> = page_reads().into_iter().chain([crate::mark::Mark::Edge.name().to_string()]).collect();
     let mut unknown = Vec::new();
     layers.iter().filter(|l| l["source"] == "simple").for_each(|l| expression_reads(l, &mut read, &mut unknown));
     read
@@ -219,6 +220,17 @@ pub fn source_reads(layers: &[Value], source: &str) -> std::collections::HashSet
 /// The metadata key of the names of the base-map layers (stage 1 writes it): the tiles of such a layer keep what its layers and the
 /// popup read, not all its properties.
 pub const BASE_LAYERS: &str = "roadstyle:base";
+
+/// The version of the contract between the tiles (and the inline sources) and the page (metadata `roadstyle:contract`; docs/design/
+/// tile_v2_plan.md, section 8): the row as the feature id of the pieces and the slots, the layer's one key set, the sort key
+/// `r * 2^32 + id`, no colour text in a piece. A change is a new version.
+pub const CONTRACT: i64 = 2;
+/// The metadata key of `CONTRACT`.
+pub const CONTRACT_KEY: &str = "roadstyle:contract";
+
+/// The metadata key of the generation of the road set: the first 16 hex characters of `roadstyle_levels::edge_hash` of its edge ids. A
+/// road's row (the tiles' feature id) is valid in one generation only; the tile URL and the archive carry it.
+pub const GENERATION: &str = "roadstyle:generation";
 
 /// The fields of `roadstyle:interaction`'s popup and tooltip.
 pub fn interaction_fields(metadata: &Value) -> std::collections::HashSet<String> {
@@ -321,11 +333,11 @@ mod tests {
 
     #[test]
     fn the_text_of_a_source_is_the_text_of_its_json_tree() {
-        let props: Props = [("highway", json!("primary")), ("lvl", json!(0)), (Mark::Sort.name(), json!(1.5)), ("name", json!("A \"B\""))]
+        let props: Props = [("highway", json!("primary")), ("lvl", json!(0)), (Mark::Rank.name(), json!(1.5)), ("name", json!("A \"B\""))]
             .into_iter().collect();
         let mut p2 = props.clone();
         assert_eq!(p2.insert("lvl", json!(2)), Some(json!(0)), "an insert of a key that is there keeps its place");
-        assert_eq!(p2.iter().map(|(k, _)| k).collect::<Vec<_>>(), ["highway", "lvl", Mark::Sort.name(), "name"]);
+        assert_eq!(p2.iter().map(|(k, _)| k).collect::<Vec<_>>(), ["highway", "lvl", Mark::Rank.name(), "name"]);
         assert_eq!(p2.shift_remove("lvl"), Some(json!(2)));
         assert!(!p2.contains_key("lvl") && p2.get("never seen").is_none());
         for id_first in [true, false] {

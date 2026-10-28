@@ -21,6 +21,8 @@ pub struct TileOptions {
     pub source_reads: HashMap<String, HashSet<String>>,
     /// the fields of the popup and tooltip, and the caller's `keep`: what a base-map layer keeps besides its layers' reads
     pub shown: HashSet<String>,
+    /// the generation of the road set (`props::GENERATION`; None: the roads have no edge ids)
+    pub generation: Option<String>,
     /// the base-map layers (`BASE_LAYERS`): a layer outside it and outside the roads, pieces and slots keeps all its properties
     pub base: HashSet<String>,
     /// the pieces' own columns: the class, lvl, the metre width and the class filter
@@ -59,8 +61,9 @@ impl TileOptions {
         let source_reads = layers.iter().filter_map(|l| l["source"].as_str())
             .map(|k| (k.to_string(), roadstyle_model::props::source_reads(layers, k))).collect();
         let base = metadata[roadstyle_model::props::BASE_LAYERS].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
+        let generation = metadata[roadstyle_model::props::GENERATION].as_str().map(String::from);
         let shown = roadstyle_model::props::interaction_fields(metadata).into_iter().chain(keep.iter().cloned()).collect();
-        Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, shown, base,
+        Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, shown, base, generation,
                          pieces, exact: None, only: None, slots_from, wait: false })
     }
 
@@ -79,7 +82,9 @@ impl TileOptions {
     /// that tile: each tile is drawn only inside its own edges, and with a buffer of 80 units (10 px) a primary road near a tile edge
     /// lost its casing in the next tile from the tiles' last zoom on (Burnaby, z19.6, 2026-10-27).
     pub fn tiles(&self) -> Result<crate::Tiles, Error> {
-        crate::Tiles::with_buffers(self.min_zoom, self.max_zoom, self.buffers.iter().map(|b| b * crate::EXTENT / TILE_PX).collect())
+        let mut tiles = crate::Tiles::with_buffers(self.min_zoom, self.max_zoom, self.buffers.iter().map(|b| b * crate::EXTENT / TILE_PX).collect())?;
+        tiles.generation = self.generation.clone();
+        Ok(tiles)
     }
 
     /// The source goes into the tiles.
@@ -94,10 +99,11 @@ impl TileOptions {
         use roadstyle_model::mark::{filter_keys, page_reads, Kind, Mark};
         let reads = |k: &str| self.source_reads.get(k).cloned().unwrap_or_default();
         match name {
-            "roads" => (self.exact_or(&self.read), false, 0),
-            "simple" => (self.exact_or(&self.pieces).into_iter().chain(reads(name)).chain(page_reads(Kind::Pieces)).collect(), false, 0),
-            // the arrows' and names' filters take the twin from `__rs_edge2` (filter.js)
-            "slots" => (reads(name).into_iter().chain(page_reads(Kind::Slots)).chain(filter_keys().map(String::from)).chain([Mark::Edge2.name().into()]).collect(), true, self.slots_from),
+            // the roads layer's feature id is its index, the road's row: `__rs_edge` is not a key there
+            "roads" => (self.exact_or(&self.read).into_iter().filter(|k| k != Mark::Edge.name()).collect(), false, 0),
+            "simple" => (self.exact_or(&self.pieces).into_iter().chain(reads(name)).chain(page_reads(Kind::Pieces)).chain([Mark::Edge.name().into()]).collect(), false, 0),
+            // the arrows' and names' filters take the twin from `__rs_edge2` (filter.js); `__rs_edge` is the carrier of a file's slot id
+            "slots" => (reads(name).into_iter().chain(page_reads(Kind::Slots)).chain(filter_keys().map(String::from)).chain([Mark::Edge2.name().into(), Mark::Edge.name().into()]).collect(), true, self.slots_from),
             _ if self.base.contains(name) => (self.base_keys(name), false, 0),
             _ => (self.read.iter().cloned().chain(props()).collect(), false, 0),
         }

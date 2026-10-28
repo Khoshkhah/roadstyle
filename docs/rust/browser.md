@@ -191,7 +191,7 @@ async function showRoads(args) {
   // the start value of each global state that the layers read: the map's own style has no "state" block for them
   for (const [k, v] of Object.entries(style.metadata["roadstyle:state"] || {})) map.setGlobalStateProperty(k, v);
   for (const [id, src] of Object.entries(style.sources))
-    map.addSource("rs-" + id, id === "roads" ? {...src, promoteId: {simple: "__rs_edge"}} : src);
+    map.addSource("rs-" + id, src);
   for (const id of Object.keys(style.sources)) map.getSource("rs-" + id).calculateTileZoom = (z) => z;   // one tile zoom
   for (const l of style.layers) {
     const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"rs-oneway"'));   // the image name
@@ -212,8 +212,8 @@ The parts of this page:
   in `roadstyle:state`. Without this step, MapLibre writes errors and draws the roads in black.
 - **`calculateTileZoom`.** One tile zoom on the whole screen, so a road keeps one width in a view tilted more than 60°
   ([One tile zoom or several](drawing.md#one-tile-zoom-or-several)).
-- **`promoteId: {simple: "__rs_edge"}`.** All the pieces of a road get the road's id, so the hover glow and the selection light
-  the whole road.
+- **The feature id.** All the pieces of a road have the road's row as their MVT id (contract 2), so the hover glow and the selection
+  light the whole road. There is no `promoteId`.
 - **`style: null`, `prefix: "rs-"`.** The dashboard starts with no roads, and adds `rs-` to each source and layer id that it uses.
 - **`engine.props`.** The dashboard asks the engine for one road's properties at a click, at `rsSelect` and for the tooltip.
 - **`rs.setStyle(style)`.** The controls stay. The Colour by menu and the legend are made again, and the selection is cleared.

@@ -28,8 +28,8 @@
 //!   buildings and points, drawn from zoom 15 or 16, are not in the tiles of zoom 6 to 14 (the style does not change).
 //! - R7 (2026-10-25): every style has `roadstyle:sources` and `roadstyle:controls.pick` (contract::describe), the inline style of an
 //!   export too, not only its tiled style (N27).
-//! - the tile size (2026-10-25): the sort key `__rs_s` is an integer (100,000,000 for each step of the key and 1 for each road, the same
-//!   order), a tile has no `__rs_*` flag that is false, and the pieces of the tiles have no MVT id (the source's promoteId is their id).
+//! - the tile size (2026-10-25): the rank `r` is an integer (100 for each step of the key; the style adds the road's key), and a tile has
+//!   no `__rs_*` flag that is false. Step 4 of the tile plan (2026-10-27): the pieces and the slots have their road's key as their MVT id.
 //! - the look's defaults (2026-10-25): the class minzoom is on (the roads, arrow and label layers' filters; the pieces keep `highway`,
 //!   which the filter reads) and casing.drop_below_px is 1 (the casing clause); the tiles leave out what the filters hide.
 //!
@@ -60,7 +60,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "925e33c7b260a5101b88c16bd313d590207f8c578d0db79b872f2a158f5e6b0b");
+    assert_eq!(style_hash(&area), "3d050f69258e5dbbf5f658162d00bb0ee5f332ccb835dab0bf39623fd7e9b7ca");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -69,7 +69,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(style_hash(&area), "62af1f19f6d46c938f10ef8ab429d7d98aa662e6219501ca0de26ac040005056");
+    assert_eq!(style_hash(&area), "0f02846b775799258ad2ddee2253167487505e41f068e7865053660c4d02bb09");
 }
 
 /// The vector tiles (tiled_from_parquet): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
@@ -109,7 +109,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "026154a5533d32c4b3f068d8a2f0dea329231a7a6ef62f5eabb82247c8391cee");
+    assert_eq!(tiles_hash(&area), "3e9bf397ec4859cc73ef9ddeabdf380aac3ad366ad3e605a108a7270013cb0d7");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at
@@ -134,5 +134,5 @@ fn the_sea_is_cut_at_the_boundary() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "6ed42a64206633f7c47bbdc3192d036dc66f2d7d05e5bf84b34fcf8061ff059e");
+    assert_eq!(tiles_hash(&area), "e059c213fe4c3663d633a58193ff540681419e1b0ea0300abe96fd7edac9ab5c");
 }

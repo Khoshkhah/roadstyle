@@ -79,6 +79,8 @@ pub(crate) struct Builder {
     pub(crate) feats: Vec<Feat>,
     pub(crate) boxes: Vec<(f32, GeomWithData<Rectangle<P>, u32>)>,
     pub(crate) rules: rules::ZoomRules,
+    /// the layer is the pieces': a property `__rs_edge` is a feature's id, not a key
+    pub(crate) road_id: bool,
     /// the numbers of the last feature's properties, by place: the pieces of one road come one after another and have most of their
     /// properties the same, which then take their numbers with no lookup
     pub(crate) last: Vec<(u32, u32)>,
@@ -90,9 +92,9 @@ impl Builder {
     /// A feature without a point (bounds) is left out; a null value is not in the tiles.
     pub(crate) fn push<K: AsRef<str>, V: TileValue>(&mut self, id: Option<u64>, g: Geom, props: impl Iterator<Item = (K, V)>) {
         let Some((lo, hi)) = bounds(&g) else { return };
-        let (props, from, until) = self.intern(props);
+        let (props, from, until, road) = self.intern(props);
         self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
-        self.feats.push(Feat { id, from, until, geom: g, props, wait: None });
+        self.feats.push(Feat { id: road.or(id), from, until, geom: g, props, wait: None });
     }
 
     /// A feature that waits for its line and properties (`Tiles::add_waiting`): its box and its first zoom, from `rule_props`.
@@ -105,19 +107,24 @@ impl Builder {
             (a as f32, b as f32)
         };
         self.boxes.push((from, GeomWithData::new(Rectangle::from_corners(lo, hi), self.feats.len() as u32)));
-        self.feats.push(Feat { id: Some(id), from, until, geom: Geom::Lines(Vec::new()), props: Vec::new(), wait: Some(wait) });
+        self.feats.push(Feat { id: Some(if self.road_id { wait.0 } else { id }), from, until, geom: Geom::Lines(Vec::new()), props: Vec::new(), wait: Some(wait) });
     }
 
     /// The numbers of the properties' keys and values (a key or a value seen first gets the next number), and the first zoom that
     /// the rules give them.
-    pub(crate) fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32, f32) {
+    pub(crate) fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32, f32, Option<u64>) {
         let (keys, key_at, vals, encoded, val_at, scratch) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at, &mut self.scratch);
-        let (rules, last) = (&self.rules, &self.last);
+        let (rules, last, road_id) = (&self.rules, &self.last, self.road_id);
         let mut read = Map::new();        // the values that the first-zoom rules read
         let mut j = 0;
+        let (mut road, edge) = (None, roadstyle_model::mark::Mark::Edge.name());
         let props: Vec<(u32, u32)> = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
+                if road_id && k.as_ref() == edge {
+                    road = match v { Val::Int(i) => u64::try_from(i).ok(), Val::UInt(u) => Some(u), _ => None };
+                    return None;
+                }
                 if rules.reads(k.as_ref()) {
                     read.insert(k.as_ref().to_string(), json_of(&v));
                 }
@@ -152,7 +159,7 @@ impl Builder {
             .collect();
         self.last.clone_from(&props);
         let (from, until) = if rules.is_empty() { (0.0, f32::INFINITY) } else { let (a, b) = rules.span(&read); (a as f32, b as f32) };
-        (props, from, until)
+        (props, from, until, road)
     }
 
     pub(crate) fn layer(self, whole: bool, min_zoom: u32, max_zoom: u32) -> Layer {
@@ -179,15 +186,15 @@ pub(crate) const PX: f64 = EXTENT / 512.0;
 pub(crate) fn drop_tiny(layer: &Layer, made: &mut Vec<(&Feat, u32, Vec<u32>, Vec<Vec<[i32; 2]>>)>) {
     let key = |k: &str| layer.keys.iter().position(|x| x == k).map(|k| k as u32);
     use roadstyle_model::mark::Mark;
-    let (Some(edge), kind) = (key(Mark::Edge.name()), key(Mark::PieceKind.name())) else { return };
+    let kind = key(Mark::PieceKind.name());
     let seam = key(Mark::Seam.name());
     let len = |parts: &Vec<Vec<[i32; 2]>>| parts.iter().map(|l| length(&l.iter().map(|p| [p[0] as f64, p[1] as f64]).collect::<Vec<P>>())).sum::<f64>();
     let get = |f: &Feat, k: u32| f.props.iter().find(|p| p.0 == k).map(|p| p.1);
-    // by road (the value's number, one for each distinct value): the length of each kind of piece, and whether a point is out of the tile
-    let mut roads: HashMap<u32, (HashMap<Option<u32>, f64>, bool)> = HashMap::new();
+    // by road (a feature's id): the length of each kind of piece, and whether a point is out of the tile
+    let mut roads: HashMap<u64, (HashMap<Option<u32>, f64>, bool)> = HashMap::new();
     let lens: Vec<f64> = made.iter().map(|m| len(&m.3)).collect();
     for (m, l) in made.iter().zip(&lens) {
-        let Some(e) = get(m.0, edge) else { continue };
+        let Some(e) = m.0.id else { continue };
         let r = roads.entry(e).or_default();
         *r.0.entry(kind.and_then(|k| get(m.0, k))).or_default() += l;
         r.1 |= m.3.iter().flatten().any(|p| p[0] < 0 || p[0] > EXTENT as i32 || p[1] < 0 || p[1] > EXTENT as i32);
@@ -195,7 +202,7 @@ pub(crate) fn drop_tiny(layer: &Layer, made: &mut Vec<(&Feat, u32, Vec<u32>, Vec
     let mut lens = lens.into_iter();
     made.retain(|m| {
         let l = lens.next().unwrap();
-        let tiny_road = get(m.0, edge).is_some_and(|e| { let r = &roads[&e]; !r.1 && r.0.values().all(|&v| v < PX) });
+        let tiny_road = m.0.id.is_some_and(|e| { let r = &roads[&e]; !r.1 && r.0.values().all(|&v| v < PX) });
         !tiny_road && !(seam.is_some_and(|s| get(m.0, s).is_some()) && l < PX)
     });
 }

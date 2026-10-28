@@ -215,7 +215,7 @@ def test_overlay_hover_lights_one_feature(tmp_path):
 
 def test_simple_mode_cuts_no_tiles_of_the_roads_source(tmp_path):
     """Simple mode (inline data) draws the roads from their pieces: the page has no roads source (no tiles of it, each one cost the page a
-    freeze), a road is picked on a fill piece, and its select glow is one feature-state: its row, the id of all its pieces (promoteId)."""
+    freeze), a road is picked on a fill piece, and its select glow is one feature-state: its row, the id of all its pieces."""
     path = _page(tmp_path, "lean")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
@@ -225,7 +225,7 @@ def test_simple_mode_cuts_no_tiles_of_the_roads_source(tmp_path):
         tiles = page.evaluate("""Object.fromEntries(['roads', 'simple'].map(k => { const t = (map.style.sourceCaches || map.style.tileManagers)[k];
             return [k, Object.keys((t && t._inViewTiles && t._inViewTiles._tiles) || {}).length]; }))""")
         hit = page.evaluate("(() => { const f = pick(map.project([18.0, 59.305])); return f && [f.id, f.layer.id, Object.keys(f.properties).length > 3]; })()")
-        ids = page.evaluate("[...new Set(map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).map(f => f.id))]")
+        ids = page.evaluate("[...new Set(map.querySourceFeatures('simple').filter(f => f.id === 0).map(f => f.id))]")
         page.evaluate("rsSelect(0)")
         lit = page.evaluate("!!map.getFeatureState({source: 'simple', id: 0}).select")
         page.evaluate("rsDeselect()")
@@ -250,18 +250,18 @@ def test_one_tile_zoom_in_a_tilted_view(tmp_path):
 
 
 def test_simple_mode_glow_follows_the_pieces_after_an_update_in_place(tmp_path):
-    """The level editor replaces the area's pieces (setData: updateData cannot take the pieces' shared id, promoteId "__rs_edge"): the road
+    """The level editor replaces the area's pieces (setData: updateData cannot take the pieces' shared id): the road
     still glows, through its new pieces (the glow is the state of the row, which every piece of the road has as its id)."""
     path = _page(tmp_path, "inplace")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         page.evaluate("map.jumpTo({center: [18.0005, 59.305], zoom: 15, pitch: 0})")
         page.wait_for_function("map.loaded()", timeout=60_000)
-        old = page.evaluate("map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).length")
+        old = page.evaluate("map.querySourceFeatures('simple').filter(f => f.id === 0).length")
         page.evaluate("""map.getSource('simple').setData({type: 'FeatureCollection', features: _sfeats('simple').map(x =>
-            x.properties.__rs_edge === 0 ? {...x, properties: {...x.properties, __rs_new: true}} : x)})""")
+            x.id === 0 ? {...x, properties: {...x.properties, __rs_new: true}} : x)})""")
         page.wait_for_timeout(1500)
-        new = page.evaluate("map.querySourceFeatures('simple').filter(f => f.properties.__rs_edge === 0).map(f => !!f.properties.__rs_new)")
+        new = page.evaluate("map.querySourceFeatures('simple').filter(f => f.id === 0).map(f => !!f.properties.__rs_new)")
         page.evaluate("rsSelect(0)")
         lit = page.evaluate("!!map.getFeatureState({source: 'simple', id: 0}).select")
         browser.close()

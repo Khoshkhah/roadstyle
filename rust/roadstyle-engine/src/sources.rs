@@ -3,7 +3,6 @@
 //! the base map, ...) and the road table (every field of each road, by its row). Nothing here is about tiles: stage 2 (roadstyle-tiles)
 //! cuts the sources, from memory or from the files that this output is saved as (GeoJSON or GeoParquet: the facade and roadstyle-io).
 
-use roadstyle_model::mark::Mark;
 use crate::features::FeatureSource;
 use crate::road::RoadsSource;
 use crate::simple::SimpleSource;
@@ -80,12 +79,26 @@ pub struct Styled {
     pub warnings: Vec<String>,
 }
 
+/// The generation of a road set (`props::GENERATION`); None: the roads have no whole-number edge ids.
+fn generation(roads: &crate::Roads) -> Option<String> {
+    use roadstyle_model::Role;
+    let ids = (0..roads.table.len()).map(|i| match roads.roles.cell(&roads.table, Role::EdgeId, i).map(Cell::to_value) {
+        Some(Value::Number(n)) => n.as_i64(),
+        Some(Value::String(s)) => s.parse().ok(),
+        _ => None,
+    }).collect::<Option<Vec<i64>>>()?;
+    Some(roadstyle_levels::edge_hash(&ids)[..16].to_string())
+}
+
 impl Styled {
     pub fn new(p: Parts) -> Styled {
         let mut s = Styled { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
                              sources: p.sources, roads: p.roads, saved: serde_json::Map::new(), warnings: p.warnings };
         s.set_reads();
-        let base: Vec<&str> = s.shown().filter(|(_, v)| matches!(v, Source::Features(_))).map(|(k, _)| k).collect();
+        let base: Vec<String> = s.shown().filter(|(_, v)| matches!(v, Source::Features(_))).map(|(k, _)| k.to_string()).collect();
+        if let Some(g) = generation(&s.roads.roads) {
+            s.metadata[roadstyle_model::props::GENERATION] = g.into();
+        }
         if !base.is_empty() {
             s.metadata[roadstyle_model::props::BASE_LAYERS] = base.into();
         }
@@ -161,22 +174,19 @@ impl Styled {
     pub fn style_with(&self, mode: SourceMode, saved: bool) -> Value {
         let data = |k: &str| match mode { SourceMode::Inline { .. } => Value::Null, SourceMode::Files(ext) => format!("{k}.{ext}").into() };
         let (maxzoom, tolerance) = match mode { SourceMode::Inline { maxzoom, tolerance } => (maxzoom, tolerance), SourceMode::Files(_) => (None, None) };
-        let spec = |tolerance: f64, promote: bool, maxzoom: Option<i64>, data: Value| {
+        let spec = |tolerance: f64, maxzoom: Option<i64>, data: Value| {
             let mut s = serde_json::Map::new();
             s.insert("type".into(), "geojson".into());
             s.insert("data".into(), data);
             s.insert("tolerance".into(), tolerance.into());
-            if promote {
-                s.insert("promoteId".into(), Mark::Edge.name().into());
-            }
             if let Some(z) = maxzoom {
                 s.insert("maxzoom".into(), z.into());
             }
             Value::Object(s)
         };
         let sources: serde_json::Map<String, Value> = self.shown().map(|(k, s)| (k.to_string(), match s {
-            Source::Roads(r) => spec(tolerance.unwrap_or(r.tolerance), false, maxzoom.or(r.maxzoom), data(k)),
-            Source::Simple(s) => spec(tolerance.unwrap_or(s.tolerance), s.promote, maxzoom.or(s.maxzoom), data(k)),
+            Source::Roads(r) => spec(tolerance.unwrap_or(r.tolerance), maxzoom.or(r.maxzoom), data(k)),
+            Source::Simple(s) => spec(tolerance.unwrap_or(s.tolerance), maxzoom.or(s.maxzoom), data(k)),
             Source::Features(f) => f.spec(data(k), maxzoom),
             // the source's other members, `data` in its place, and the mode's tolerance (where it has one) and maxzoom (a GeoJSON source)
             Source::Json(v) => v.as_object().map_or_else(|| v.clone(), |o| {

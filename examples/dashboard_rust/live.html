@@ -31,8 +31,6 @@ const sources = styleSources(roads, withArgs(Look.fromJson(lookText), {live_data
 const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
 const tiler = tilesOfSources(sources, "rs://1/", ["name", "edge_id", "highway"]);
 const style = JSON.parse(tiler.style());
-// the pieces' row as their id (the feature states are by row): the engine does not set it on tilesOfSources' style yet
-style.sources.roads.promoteId = {simple: "__rs_edge"};
 maplibregl.addProtocol("rs", async (p) => {
   const [, source, z, x, y] = p.url.slice("rs://".length).split("/");
   return {data: tiler.tile(source, +z, +x, +y)};

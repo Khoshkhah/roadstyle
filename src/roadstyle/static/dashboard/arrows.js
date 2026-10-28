@@ -27,7 +27,7 @@ export const _rsArrowAt = new Map();                  // chain -> its arrow feat
 // half as drawn at this zoom, right of travel by the half's offset (roads-fill's line-offset, _svLanePx), not on the pair's centre line.
 // ft._c is the point on the centre line, ft._a -> ft._z the chain's segment there (the travel direction)
 function _rsArrowLane(ft){
-  const p = RoadTable.props(ft.properties.__rs_edge), px = p.__rs_twoway ? _svLanePx(p) : 0;
+  const p = RoadTable.props(ft.id), px = p.__rs_twoway ? _svLanePx(p) : 0;
   if(!px){ ft.geometry.coordinates = ft._c; return ft; }
   const a = map.project(ft._a), b = map.project(ft._z), c = map.project(ft._c);
   const dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy) || 1;     // screen: y down, right of travel = (-dy, dx)

@@ -16,7 +16,7 @@
       "simple",
       "f400c3887e0b8239",
       "d26af327faadf901",
-      "32554e5658942863"
+      "f61343b045b32d9b"
     ],
     [
       "roads-fill",
@@ -24,7 +24,7 @@
       "roads",
       "3a1b5d6463213abf",
       "97344518adf6cfa0",
-      "9fcf0e01ba5670e6"
+      "477f326fbc86a340"
     ],
     [
       "roads-arrows",
@@ -48,7 +48,7 @@
       "roads",
       "62d60bed28084788",
       "e9f1c56944c60b6e",
-      "9fcf0e01ba5670e6"
+      "477f326fbc86a340"
     ]
   ],
   "sources": {
@@ -60,21 +60,22 @@
     "simple": [
       "geojson",
       17830,
-      "c353e39117899afb"
+      "33ce05556bf4a8d7"
     ],
     "slots": [
       "geojson",
       2252,
-      "f424ad234781eb7b"
+      "767fa6705ada36b9"
     ]
   },
   "metadata": {
     "roadstyle:interaction": "a911c29a8eeae5d8",
     "roadstyle:images": "e9049aa3d5b18840",
     "roadstyle:sources": "de9ed92a2cabe7fc",
-    "roadstyle:controls": "7ad47e2cab264f27"
+    "roadstyle:controls": "7ad47e2cab264f27",
+    "roadstyle:generation": "960db97f1bd34c71"
   },
-  "hash": "2e032977d0e9ab8a",
+  "hash": "b242d36c128fb48b",
   "road_table": {
     "rows": 13298,
     "columns": [
@@ -116,7 +117,7 @@
     }
   },
   "text": {
-    "bytes": 19547788,
-    "sha16": "2e032977d0e9ab8a"
+    "bytes": 19029187,
+    "sha16": "b242d36c128fb48b"
   }
 }

@@ -117,7 +117,7 @@ impl LiveTiles {
                     if !old.items.is_empty() {
                         return Err(crate::error::edits(format!("redraw: the source {k} has line items, which a redraw does not make: draw the map again")));
                     }
-                    (now.read, now.palette, now.classes, now.promote, now.cols) = (old.read.clone(), old.palette.clone(), old.classes.clone(), old.promote, old.cols.clone());
+                    (now.read, now.palette, now.classes, now.cols) = (old.read.clone(), old.palette.clone(), old.classes.clone(), old.cols.clone());
                     let (was, is) = (by_edge(old.features_of(&self.styled.roads.roads, &ring)), by_edge(now.features_of(&new.roads.roads, &ring)));
                     let changed: HashSet<u64> = was.keys().chain(is.keys()).filter(|e| was.get(e) != is.get(e)).copied().collect();
                     if !changed.is_empty() {

@@ -11,7 +11,7 @@ use roadstyle_look::sections::Num;
 use serde_json::{json, Map, Value};
 
 /// The version of the contract (metadata roadstyle:contract).
-pub const CONTRACT: i64 = 1;
+pub const CONTRACT: i64 = roadstyle_model::props::CONTRACT;
 
 /// _ACCESS: the access kinds and the text of their row in the filter panel.
 const ACCESS: [(&str, &str); 4] = [("private", "Private roads"), ("bus", "Bus lanes"), ("pedestrian", "Pedestrian streets"), ("delivery", "Delivery only")];

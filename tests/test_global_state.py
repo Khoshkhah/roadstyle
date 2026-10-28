@@ -26,7 +26,7 @@ map.on("error", e => window.errors.push(String(e.error && e.error.message || e))
 const rs = rsDashboard(map, {style: null, prefix: "rs-"});
 await map.once("load");
 map.setGlobalStateProperty("rs_fill_on", false);            // a value of the host's own: it stays
-for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, id === "simple" ? {...src, promoteId: "__rs_edge"} : src);
+for (const [id, src] of Object.entries(style.sources)) map.addSource("rs-" + id, src);
 for (const l of style.layers) map.addLayer({...l, id: "rs-" + l.id, source: "rs-" + l.source});
 rs.setStyle(style);
 map.once("idle", () => { window.done = true; });

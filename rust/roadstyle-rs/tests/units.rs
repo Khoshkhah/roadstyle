@@ -22,7 +22,7 @@ fn reach(cap: &str) -> f64 {
     let s = style(json!([road(1, json!([[7.42, 43.73], [7.421, 43.73]]), cap), road(2, json!([[7.421, 43.73], [7.4215, 43.7305]]), cap)]),
                   json!({"width_m_col": "w", "cap_col": "cap"}));
     let feats = s["sources"]["simple"]["data"]["features"].as_array().expect("a simple source");
-    feats.iter().filter(|f| f["properties"]["__rs_edge"] == 0)
+    feats.iter().filter(|f| f["id"] == 0)
         .flat_map(|f| f["geometry"]["coordinates"].as_array().cloned().unwrap_or_default())
         .filter_map(|p| p[0].as_f64()).fold(f64::MIN, f64::max)
 }

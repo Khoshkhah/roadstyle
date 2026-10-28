@@ -72,9 +72,9 @@ impl Line {
     }
 }
 
-/// `__rs_s`: the key in KEY_UNITs and the edge's tie-breaker.
-pub(crate) fn sort_key(key: f64, edge: i64) -> i64 {
-    (key * KEY_UNIT).round() as i64 + edge
+/// `r`: the key in RANK_UNITs. The style's line-sort-key adds the road's key (the feature id) as the tie-breaker.
+pub(crate) fn rank(key: f64) -> i64 {
+    (key * RANK_UNIT).round() as i64
 }
 
 pub(crate) fn int(p: &Props, k: &str) -> i64 {

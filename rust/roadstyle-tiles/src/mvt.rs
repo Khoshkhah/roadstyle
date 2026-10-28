@@ -114,7 +114,7 @@ pub(crate) struct Encoder {
 }
 
 impl Encoder {
-    pub(crate) fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String], with_id: bool) {
+    pub(crate) fn feature(&mut self, f: &Feat, kind: u32, geometry: &[u32], names: &[String]) {
         let mut tags = Vec::with_capacity(f.props.len() * 2);
         for (k, v) in &f.props {
             let key = *self.key_at.entry(*k).or_insert_with(|| {
@@ -129,7 +129,7 @@ impl Encoder {
             tags.push(at);
         }
         let mut msg = Vec::new();
-        if let Some(id) = f.id.filter(|_| with_id) {
+        if let Some(id) = f.id {
             msg.push(1 << 3);
             varint(&mut msg, id);
         }

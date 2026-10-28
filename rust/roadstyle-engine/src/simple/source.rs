@@ -10,8 +10,6 @@ pub struct SimpleSource {
     pub tolerance: f64,
     /// render's data_maxzoom (None: MapLibre's default)
     pub maxzoom: Option<i64>,
-    /// a page: `promoteId` Mark::Edge.name() (every piece of a road has its row, so one feature state lights them all)
-    pub promote: bool,
     /// a view's palettes (palettes.rs): the roads' `Extra` that the pieces differ in, in the order of the copies on each piece
     pub palette: Vec<usize>,
     /// R1: the only properties that a piece keeps (what the layers and the page read; `Styled::set_reads`), None: all
@@ -22,7 +20,7 @@ pub struct SimpleSource {
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, promote: false, palette: Vec::new(), read: None, classes: None }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -132,15 +130,12 @@ impl SimpleSource {
         }
     }
 
-    /// The JSON text, written to `w` a part at a time: each feature as `{"type", "geometry", "properties", "id"}`.
+    /// The JSON text, written to `w` a part at a time: each feature as `{"type", "geometry", "properties", "id"}`, its id the road's key.
     pub fn write_json<W: std::io::Write>(&self, w: &mut W, roads: &Roads) -> std::io::Result<()> {
         w.write_all(br#"{"type":"geojson","data":"#)?;
         self.write_data(w, roads)?;
         w.write_all(br#","tolerance":"#)?;
         serde_json::to_writer(&mut *w, &self.tolerance)?;
-        if self.promote {
-            w.write_all(br#","promoteId":Mark::Edge.name()"#)?;
-        }
         if let Some(z) = self.maxzoom {
             write!(w, r#","maxzoom":{z}"#)?;
         }
@@ -151,7 +146,9 @@ impl SimpleSource {
     pub fn write_data<W: std::io::Write>(&self, w: &mut W, roads: &Roads) -> std::io::Result<()> {
         let mut out = Vec::new();
         out.extend_from_slice(br#"{"type":"FeatureCollection","features":["#);
-        for (i, (id, props, coords)) in self.features(roads).enumerate() {
+        for (i, (id, mut props, coords)) in self.features(roads).enumerate() {
+            // the road's key is the feature id (every piece of a road has it, so one feature state lights them all), not a property
+            let id = props.shift_remove(Mark::Edge.name()).and_then(|e| e.as_u64()).unwrap_or(id as u64);
             if out.len() > 1 << 16 {
                 w.write_all(&out)?;
                 out.clear();
@@ -266,18 +263,17 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
     }
     // the items, by edge, order, overlay and feature: an id per edge and rank, and a sort key over the edge's fill
     items.sort_by_key(|f| [Mark::Edge.name(), Mark::ItemOrder.name(), Mark::ItemOverlay.name(), Mark::Item.name()].map(|k| f.props.get(k).and_then(Value::as_i64).unwrap_or(0)));
-    let mut rank: HashMap<i64, usize> = HashMap::new();
+    let mut per_edge: HashMap<i64, usize> = HashMap::new();
     let mut placed = Vec::with_capacity(items.len());
     for mut f in items {
         let e = f.props.get(Mark::Edge.name()).and_then(Value::as_u64).and_then(crate::road::row_of).unwrap_or(0) as i64;
-        let r = rank.entry(e).or_default();
+        let r = per_edge.entry(e).or_default();
         *r += 1;
         if *r > MAX_ITEMS {
             return Err(crate::Error::Limit { what: crate::Limit::Items { edge: e as usize }, found: *r, max: MAX_ITEMS });
         }
         let id = MAX_EDGES * PIECES + e as usize * MAX_ITEMS + *r - 1;
-        let s = sort_key(2.0 * int(&f.props, Mark::FillLevel.name()) as f64 + 1.0 + *r as f64 * ITEM_STEP, e);
-        f.props.insert(Mark::Sort.name(), s.into());
+        f.props.insert(Mark::Rank.name(), rank(2.0 * int(&f.props, Mark::FillLevel.name()) as f64 + 1.0 + *r as f64 * ITEM_STEP).into());
         // _mark_cls: the class and the access of the item's road
         let road = roads.at(e as usize);
         f.props.insert(Mark::Class.name(), road.map(Road::cls).unwrap_or(Value::Null));
@@ -286,5 +282,5 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, promote: false, palette: Vec::new(), read: None, classes: None })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None })
 }

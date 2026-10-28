@@ -81,16 +81,17 @@ macro_rules! marks {
 }
 
 marks! {
-    /// the road's key (RoadKey): the pieces' feature id (promoteId) and a slot's road
-    Edge = "__rs_edge" [Pieces, Slots];
+    /// the road's key (RoadKey): the carrier of the pieces' and slots' feature id in the engine (a page and a tile have it as the feature
+    /// id, not as a property); an overlay's item keeps it as a property
+    Edge = "__rs_edge" [Pieces];
     /// the key of a two-way road's other edge
     Edge2 = "__rs_edge2" [Pieces, Table];
     /// the keys of a deck's roads
     Edges = "__rs_edges" [Decks];
     /// a piece's kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item
     PieceKind = "__rs_k" [Pieces];
-    /// a piece's sort key (an integer)
-    Sort = "__rs_s" [Pieces];
+    /// a piece's draw rank (an integer): the line-sort-key is `r * 2^32 + id`, so the roads of a rank are in the order of their keys
+    Rank = "r";
     /// the class filter's value
     Class = "__rs_cls" [Pieces, Table];
     /// the class index of the road layer's lookups

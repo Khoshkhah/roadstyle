@@ -34,13 +34,13 @@ def keywords():
 
 def test_live_data_reads_the_feature_state_of_the_road(part, keywords):
     """R22: with live_data the road layer reads its colour (rs_c) and its width factor (rs_w) from the feature state of the road's row,
-    over the baked values (the pieces have the row as their id, promoteId, in every style), and roadstyle:live names the states. Off, the
+    over the baked values (the pieces have the row as their id in every style), and roadstyle:live names the states. Off, the
     style is as before."""
     off = rs.export_inline(part, **keywords)
     on = rs.export_inline(part, live_data=True, **keywords)
     road = lambda st: next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]      # noqa: E731
     assert "roadstyle:live" not in off["metadata"]
-    assert on["sources"]["simple"]["promoteId"] == off["sources"]["simple"]["promoteId"] == "__rs_edge"
+    assert "promoteId" not in on["sources"]["simple"] and "promoteId" not in off["sources"]["simple"]
     live = on["metadata"]["roadstyle:live"]
     assert (live["color"], live["width"], live["types"]) == ("rs_c", "rs_w", {"rs_c": "color", "rs_w": "factor"})
     assert len(live["ramp"]) == 9 and live["nodata"].startswith("#")
@@ -110,7 +110,7 @@ def test_the_parquet_files_keep_big_ids_as_integers(part, keywords, tmp_path):
 
 
 def test_the_tiled_style_says_its_tile_layers(part, keywords):
-    """N3, N7: stage 2's one style (tile_stage) has the pieces' promoteId on its vector source, and roadstyle:sources and
+    """N3, N7: stage 2's one style (tile_stage) has a vector source with no promoteId (the MVT id is the road's row), and roadstyle:sources and
     roadstyle:arrows say the final layers: the road layer on the tile layer simple of the source roads."""
     from roadstyle import _engine
 
@@ -120,7 +120,8 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     assert inline["roadstyle:sources"]["simple"] == {"source": "simple", "layer": None}
     text, t = src.tile_stage(only=["roads", "simple", "slots"], at=json.dumps({"url": "pmtiles://roads"}))      # as a page
     st = json.loads(text)
-    assert st["sources"]["roads"]["promoteId"] == {"simple": "__rs_edge"} and st["sources"]["roads"]["url"] == "pmtiles://roads"
+    assert "promoteId" not in st["sources"]["roads"] and st["sources"]["roads"]["url"] == "pmtiles://roads"
+    assert st["metadata"]["roadstyle:contract"] == 2
     assert st["metadata"]["roadstyle:sources"]["simple"] == {"source": "roads", "layer": "simple"}
     assert st["metadata"]["roadstyle:arrows"] == inline["roadstyle:arrows"] and "simple" in t.layers()
     assert json.loads(src.style())["metadata"] == inline          # stage 2 borrows the sources (N6)
@@ -128,7 +129,7 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
 
 def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, keywords):
     """N2 (2026-10-24): stage 1 reads neither `state` nor `tiles`. A host's style (live or not) has no roads source, no pick or highlight
-    layer, and the pieces' promoteId; only an export (export_inline, export_style: an app with no road table) has the roads source with
+    layer, and no promoteId; only an export (export_inline, export_style: an app with no road table) has the roads source with
     its pick and highlight layers; the inline page's stage 3 makes the arrows points (page_arrows)."""
     from roadstyle import _engine
 
@@ -139,7 +140,7 @@ def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, k
         st = style(**kw)
         ids = [lyr["id"] for lyr in st["layers"]]
         assert "roads" not in st["sources"] and "roads-fill" not in ids and "roads-highlight" not in ids, kw
-        assert st["sources"]["simple"]["promoteId"] == "__rs_edge"
+        assert "promoteId" not in st["sources"]["simple"]
         assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "slots", kw
     ex = rs.export_inline(part, **keywords)
     assert "roads" in ex["sources"] and {"roads-fill", "roads-highlight"} <= {lyr["id"] for lyr in ex["layers"]}

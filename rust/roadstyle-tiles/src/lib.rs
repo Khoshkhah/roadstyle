@@ -48,9 +48,16 @@ fn check_zooms(min_zoom: f64, max_zoom: f64) -> Result<(), Error> {
 }
 /// The name of the one vector source.
 pub const SOURCE: &str = "roads";
-/// The pieces' tile layer: the vector source's `promoteId` (`__rs_edge`, the road's row) is their feature id, so their tiles have no MVT
-/// id (MapLibre does not read it there).
-const PROMOTED: &str = "simple";
+/// The pieces' tile layer: the MVT id of a piece is its road's key (the engine's `__rs_edge`, which is not a tile key), so all pieces of a
+/// road share it and one feature state lights them all (docs/design/tile_v2_plan.md, step 4).
+const PIECES: &str = "simple";
+/// The slots' tile layer: the MVT id of a slot is its road's key too (the feature's own `id`).
+const SLOTS: &str = "slots";
+
+/// A layer whose features have a road's key as their MVT id (the pieces and the slots).
+fn road_layer(name: &str) -> bool {
+    name == PIECES || name == SLOTS
+}
 
 /// The last tiles asked for, up to `TILE_CACHE_BYTES` (audit R14: a map asks for the same tiles again).
 #[derive(Default)]
@@ -75,6 +82,8 @@ pub struct Tiles {
     /// the buffer of each zoom (index: the zoom), in tile units
     buffers: Vec<f64>,
     cache: std::sync::Mutex<TileCache>,
+    /// the generation of the road set (the archive's metadata carries it; `stage::TileOptions::tiles` sets it)
+    generation: Option<String>,
 }
 
 /// The properties that a layer's tiles keep: those in `keep`, the one key set of the layer (stage::TileOptions::rule).
@@ -98,7 +107,7 @@ impl Tiles {
         if buffers.len() != max_zoom as usize + 1 {
             return Err(Error::Options(format!("{} tile buffers for the zooms 0 to {max_zoom}", buffers.len())));
         }
-        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default() })
+        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default(), generation: None })
     }
 
     /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom
@@ -108,7 +117,7 @@ impl Tiles {
     }
 
     fn builder(&self, name: &str) -> Builder {
-        Builder { rules: rules::ZoomRules::of(&self.style, name), ..Default::default() }
+        Builder { rules: rules::ZoomRules::of(&self.style, name), road_id: road_layer(name), ..Default::default() }
     }
 
     /// A new layer: the caches of the old tiles go.
@@ -124,7 +133,8 @@ impl Tiles {
         let mut b = self.builder(name);
         for (i, f) in source["data"]["features"].as_array().into_iter().flatten().enumerate() {
             let Some(g) = f.get("geometry").and_then(geom) else { continue };
-            let id = Some(i as u64); // a feature's id is its index in its source
+            // a feature's id is its index in its source; a piece's or a slot's is its road's key (the feature's own id)
+            let id = f.get("id").and_then(Value::as_u64).filter(|_| road_layer(name)).or(Some(i as u64));
             let props = f["properties"].as_object().unwrap_or(&empty);
             b.push(id, g, props.iter().filter(|(k, _)| kept(k, keep)).map(|(k, v)| (k.as_str(), v.clone())));
         }
@@ -207,7 +217,7 @@ impl Tiles {
         let Some(layer) = self.layers.get_mut(name) else { return };
         let Some((key_at, val_at)) = layer.at.take() else { return };
         let mut b = Builder { keys: std::mem::take(&mut layer.keys), key_at, vals: std::mem::take(&mut layer.vals),
-                              encoded: std::mem::take(&mut layer.encoded), val_at, ..Default::default() };
+                              encoded: std::mem::take(&mut layer.encoded), val_at, road_id: road_layer(name), ..Default::default() };
         for (i, c, props) in feats {
             let (props, ..) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep)));
             let f = &mut layer.feats[i as usize];
@@ -225,13 +235,11 @@ impl Tiles {
     where L: AsRef<[[f64; 2]]>, K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
         let rules = rules::ZoomRules::of(&self.style, name);
         let layer = self.layers.get_mut(name).ok_or_else(|| Error::Options(format!("replace: the tiles have no layer {name}")))?;
-        let edge = layer.keys.iter().position(|k| k == roadstyle_model::mark::Mark::Edge.name()).map(|k| k as u32);
         // ponytail: one pass over the features' keys (no index of each road's features); an index if a large area is slow
         let mut gone = vec![false; layer.feats.len()];
         let mut n = 0;
         for (i, f) in layer.feats.iter_mut().enumerate() {
-            let e = f.props.iter().find(|(k, _)| Some(*k) == edge).and_then(|(_, v)| match layer.vals[*v as usize] { Val::Int(x) => u64::try_from(x).ok(), Val::UInt(x) => Some(x), _ => None });
-            if e.or(f.wait.map(|w| w.0)).is_some_and(|e| edges.contains(&e)) {
+            if f.id.is_some_and(|e| edges.contains(&e)) {
                 (gone[i], f.id, f.geom, f.props, f.wait) = (true, None, Geom::Lines(Vec::new()), Vec::new(), None);
                 n += 1;
             }
@@ -243,7 +251,8 @@ impl Tiles {
         let encoded = std::mem::take(&mut layer.encoded);
         let (key_at, val_at) = layer.at.take().unwrap_or_else(|| (keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
                                                                   encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect()));
-        let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules, last: Vec::new(), scratch: Vec::new() };
+        let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules,
+                              road_id: road_layer(name), last: Vec::new(), scratch: Vec::new() };
         for (j, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep)));
@@ -255,7 +264,7 @@ impl Tiles {
     }
 
     /// The properties of the feature `id` of the source `name` (those in the tiles), as JSON; `null` when there is no such feature.
-    /// The map draws the roads from other sources, so a click on a road asks for its properties here (`__rs_edge` is its id).
+    /// The map draws the roads from other sources, so a click on a road asks for its properties here.
     pub fn props(&self, name: &str, id: u64) -> String {
         let Some(layer) = self.layers.get(name) else { return "null".into() };
         let Some(f) = layer.by_id.get(&id).map(|&i| &layer.feats[i as usize]) else { return "null".into() };
@@ -289,7 +298,8 @@ impl Tiles {
         let place = pmtiles::Place { min_lon_e7: e7[0], min_lat_e7: e7[1], max_lon_e7: e7[2], max_lat_e7: e7[3],
                                      center_zoom: ((self.min_zoom + self.max_zoom) / 2) as u8,
                                      center_lon_e7: (e7[0] + e7[2]) / 2, center_lat_e7: (e7[1] + e7[3]) / 2 };
-        let meta = serde_json::json!({"vector_layers": layers.iter().map(|n| serde_json::json!({"id": n, "fields": {}})).collect::<Vec<_>>()});
+        let meta = serde_json::json!({"vector_layers": layers.iter().map(|n| serde_json::json!({"id": n, "fields": {}})).collect::<Vec<_>>(),
+                                      "contract": roadstyle_model::props::CONTRACT, "generation": self.generation});
         w.finish(&place, &meta.to_string()).ok_or(Error::Empty)
     }
 
@@ -366,7 +376,7 @@ impl Tiles {
         let to = |p: &P| [(p[0] * n - x as f64) * EXTENT, (p[1] * n - y as f64) * EXTENT];
         let (lo, hi) = (-buffer, EXTENT + buffer);
         let simplify = !layer.whole && z < self.max_zoom;
-        let tiny = name == PROMOTED && simplify;
+        let tiny = name == PIECES && simplify;
         let mut made: Vec<(&Feat, u32, Vec<u32>, Vec<Vec<[i32; 2]>>)> = Vec::new();
         for i in hits {
             let f = &layer.feats[i as usize];
@@ -429,7 +439,7 @@ impl Tiles {
         let mut enc = Encoder::default();
         for (f, kind, geometry, _) in &made {
             if !geometry.is_empty() {
-                enc.feature(f, *kind, geometry, &layer.keys, name != PROMOTED);
+                enc.feature(f, *kind, geometry, &layer.keys);
             }
         }
         enc.finish(name, &layer.encoded)
@@ -477,7 +487,7 @@ mod tests {
         let mut t = Tiles::new(0, 3, 80.0).unwrap();
         let features: Vec<Value> = fs.iter().map(|(e, k, seam, c)| json!({"type": "Feature", "properties": {(Mark::Edge.name()): e, (Mark::PieceKind.name()): k, (Mark::Seam.name()): seam},
             "geometry": {"type": "LineString", "coordinates": c}})).collect();
-        t.add("simple", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": features}}), &keys(&[]), false, 0);
+        t.add("simple", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": features}}), &keys(&[Mark::Edge.name(), Mark::PieceKind.name(), Mark::Seam.name()]), false, 0);
         String::from_utf8_lossy(&t.tile(z, x, y)).into_owned()
     }
 

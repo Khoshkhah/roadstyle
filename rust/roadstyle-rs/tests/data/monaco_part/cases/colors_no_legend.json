@@ -17,7 +17,7 @@
         "simple",
         "f400c3887e0b8239",
         "b777cc0b01f83546",
-        "32554e5658942863"
+        "f61343b045b32d9b"
       ],
       [
         "roads-fill",
@@ -25,7 +25,7 @@
         "roads",
         "3a1b5d6463213abf",
         "97344518adf6cfa0",
-        "9fcf0e01ba5670e6"
+        "477f326fbc86a340"
       ],
       [
         "roads-arrows",
@@ -49,7 +49,7 @@
         "roads",
         "62d60bed28084788",
         "e9f1c56944c60b6e",
-        "9fcf0e01ba5670e6"
+        "477f326fbc86a340"
       ]
     ],
     "sources": {
@@ -61,12 +61,12 @@
       "simple": [
         "geojson",
         1899,
-        "15bc1b6a8fc102b6"
+        "aed5f3a71a11e4d3"
       ],
       "slots": [
         "geojson",
         243,
-        "9a43080bf8d9f796"
+        "09cdfb926249de12"
       ]
     },
     "metadata": {
@@ -74,9 +74,10 @@
       "roadstyle:images": "e9049aa3d5b18840",
       "roadstyle:color_options": "66c6f425f6da8ba6",
       "roadstyle:sources": "de9ed92a2cabe7fc",
-      "roadstyle:controls": "7ad47e2cab264f27"
+      "roadstyle:controls": "7ad47e2cab264f27",
+      "roadstyle:generation": "18db75a661ad967c"
     },
-    "hash": "708b6b322e5eabfc"
+    "hash": "81e0ce47b7e57e33"
   },
   "color_options": {
     "names": [

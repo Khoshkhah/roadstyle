@@ -327,8 +327,8 @@ these is a layer in its tiles (a layer's `source-layer`).
 | Source (or tile layer) | One feature for each | Monaco | Main properties |
 |---|---|---|---|
 | `roads` | edge (the whole road) | 849 | the class style (`__rs_fill`, `__rs_w`, `__rs_casing`, `__rs_cw`, `__rs_dash`, `__rs_op`), the levels (`__rs_cl`, `__rs_fl`, `__rs_cs`, `__rs_ce`), `__rs_bridge`, `__rs_tunnel`, `__rs_oneway`, `__rs_edge` (its row), and every column of your data |
-| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `__rs_s` (the sort number: an integer, 100,000,000 for each step of the key and 1 for each road), `__rs_cap`, `__rs_edge` and `__rs_edge2` (its road and the road's twin), `highway` |
-| `slots` | place of a street name or a one-way arrow along a road | 646 | `name`, `oneway`, `slot`, `rank`, `lvl`, `__rs_edge` |
+| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `r` (the rank: an integer, 100 for each step of the key), `__rs_cap`, `__rs_edge2` (the road's twin); the feature id is its road's row, `highway` |
+| `slots` | place of a street name or a one-way arrow along a road | 646 | `name`, `oneway`, `slot`, `rank`, `lvl`; the feature id is its road's row |
 | `decks` | part of a 3D bridge deck (only with `view_3d=True`) | 588 | `__rs_height`, `__rs_base`, `__rs_edges` |
 
 
@@ -338,7 +338,7 @@ The Monaco style has 7 layers, in this drawing order (the first is at the bottom
 
 | Layer | Type | Source | What it draws |
 |---|---|---|---|
-| `roads-simple` | line | `simple` | every casing and fill piece of every road, in one layer, sorted by `__rs_s` |
+| `roads-simple` | line | `simple` | every casing and fill piece of every road, in one layer, sorted by `r * 2^32 + id` |
 | `roads-fill` | line | `roads` | the whole roads, one line each. Hidden in simple mode (`visibility: none`), where `roads-simple` draws the roads |
 | `roads-arrows` | symbol | `slots` | the one-way arrows |
 | `roads-labels` | symbol | `slots` | the street names along the roads |
@@ -352,7 +352,7 @@ Each layer has
 
 A layer's rules are MapLibre expressions that read the properties of each piece. For example, in `roads-simple`:
 
-- `"line-sort-key": ["get", "__rs_s"]` draws each piece by its sort number, so a bridge goes over the road under it.
+- `"line-sort-key": ["+", ["*", ["get", "r"], 4294967296], ["id"]]` draws each piece by its rank and then by its road's row, so a bridge goes over the road under it.
 - `"line-color"` picks by the kind: a casing piece (`__rs_k` 0) takes `__rs_casing` (or the bridge casing color on a bridge), a
   shadow (2) a transparent black, a tunnel dash (4) the tunnel color, and so on.
 - `"line-width"` interpolates on the zoom for the class of the piece, and `"line-offset"` moves each direction of a two-way road
@@ -398,9 +398,9 @@ The road data is the features of the four sources above, with their properties. 
 
 - **GeoJSON** inside the style (`sources.<name>.data`).
 - **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `roads`, `simple`, `slots` and `decks`, zooms
-  6 to 18 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` has no id in the tiles:
-  the source's `promoteId` (`__rs_edge`, the road's row) is its feature id. A tile keeps every `__rs_*` property and the columns
-  named in `keep`, but not a `__rs_*` flag that is false: every reader takes a missing flag as false. Below the last zoom, a line is
+  6 to 18 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` and a slot have their road's row as their id (all
+  pieces of a road share it). A tile keeps the keys of the layer's one set (the keys that the style reads, the page's keys, the 3 filter keys
+  and the columns named in `keep`), but not a `__rs_*` flag that is false: every reader takes a missing flag as false. Below the last zoom, a line is
   simplified to half a tile unit.
 
 Each piece carries its values as `__rs_*` properties, and the style's rules read them

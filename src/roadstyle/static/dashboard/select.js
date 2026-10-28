@@ -17,7 +17,7 @@ let ITEM_LAYERS = new Set();
 // render(items=...): the road's own items are pieces of the one road layer; a picked one (__rs_pick) is clicked and highlighted as itself there
 let ROAD_ITEMS = null;   // {label, popup, layer: the one road layer} or null
 let ITEM_PICK = null, PICK_LAYERS = [];
-export function _roadOf(f){ const e=f.properties.__rs_edge;   // the road an item belongs to, as a picked road feature
+export function _roadOf(f){ const e=f.properties.__rs_edge ?? f.id;   // the road an item belongs to (an overlay's item names it; a piece's id is it), as a picked road feature
   return {id:e, properties:_rprops(e), layer:f.layer, item:f,
           get geometry(){ const r=_road(e); return r && r.geometry; }}; }
 // the feature right under the cursor first, the tolerance box only when there is none: a two-way road's two directions lie side by

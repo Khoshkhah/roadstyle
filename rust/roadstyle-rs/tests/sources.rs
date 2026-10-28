@@ -77,7 +77,7 @@ fn the_layers_read_properties_by_name() {
     let (mut read, mut unknown) = (std::collections::HashSet::new(), Vec::new());
     s.layers.iter().for_each(|l| roadstyle_rs::props::expression_reads(l, &mut read, &mut unknown));
     assert!(unknown.is_empty(), "a layer reads a property whose name is not a literal: {unknown:?}");
-    assert!(read.contains("__rs_fill") && read.contains("__rs_s"), "{read:?}");
+    assert!(read.contains("__rs_fill") && read.contains("r"), "{read:?}");
 }
 
 /// R7: every style has the road roles and the pick layers (contract::describe), also with no interaction contract: with view_3d the
@@ -96,26 +96,25 @@ fn a_style_with_no_contract_has_the_pick() {
     assert!(!pick.iter().any(|p| p.starts_with("roads-deck-casing")), "{pick:?}");
 }
 
-/// The pieces' sort keys (`__rs_s`) of an area's style: (the integer, its road).
+/// The pieces' ranks (`r`) of an area's style: (the rank, its road's key, the feature id).
 fn sort_keys(area: &str) -> Vec<(i64, i64)> {
     let look = roadstyle_rs::Look::from_value(serde_json::from_slice(&data("look.json")).unwrap()).unwrap();
     let style: Value = serde_json::from_str(&roadstyle_rs::inline_style(data(&format!("{area}/roads.parquet")), &look, None, None, None).unwrap()).unwrap();
     style["sources"]["simple"]["data"]["features"].as_array().unwrap().iter()
-        .map(|f| (f["properties"]["__rs_s"].as_i64().expect("an integer __rs_s"), f["properties"]["__rs_edge"].as_i64().unwrap())).collect()
+        .map(|f| (f["properties"]["r"].as_i64().expect("an integer r"), f["id"].as_i64().expect("the road's key as the id"))).collect()
 }
 
-/// The integer sort key (2026-10-25) has the order of the double before it (the key + the road * 1e-8): its key part is on the keys'
-/// grid of 0.01, the road's tie-breaker never reaches the next key, and every value is a safe integer in JavaScript.
+/// The sort key of the style is `r * 2^32 + id`: the rank is on the grid of 0.01 of the key, the road's key is under 2^32 (it never
+/// reaches the next rank), and every sort key is a safe integer in JavaScript, so the doubles order like (rank, road).
 fn the_sort_key_keeps_its_order(keys: &[(i64, i64)]) {
-    const UNIT: i64 = 100_000_000;
-    for &(s, e) in keys {
-        assert!((0..1_000_000).contains(&e) && s.unsigned_abs() < 1 << 53, "{s} {e}");
-        assert_eq!((s - e) % (UNIT / 100), 0, "the key of {s} (road {e}) is not on the grid of 0.01");
+    const SHIFT: i64 = 1 << 32;
+    for &(r, e) in keys {
+        assert!((0..SHIFT).contains(&e) && r.abs() < 1 << 20, "{r} {e}");
     }
-    let double = |&(s, e): &(i64, i64)| ((s - e) / (UNIT / 100)) as f64 / 100.0 + e as f64 * 1e-8;
+    let double = |&(r, e): &(i64, i64)| (r * SHIFT + e) as f64;
     let mut by_int: Vec<usize> = (0..keys.len()).collect();
     let mut by_double = by_int.clone();
-    by_int.sort_by_key(|&i| (keys[i].0, i));
+    by_int.sort_by_key(|&i| (keys[i], i));
     by_double.sort_by(|&a, &b| double(&keys[a]).total_cmp(&double(&keys[b])).then(a.cmp(&b)));
     assert_eq!(by_int, by_double);
 }
