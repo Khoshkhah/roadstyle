@@ -73,4 +73,4 @@ To check the link in ten minutes:
 - A headless browser does not draw Google 3D. Use a browser with a screen.
 - The "Labels" switch of the base-map box rules the 3D view too: on gives Google's HYBRID mode (labels and pins), off gives SATELLITE. Without that switch the view has no labels.
 - The 3D view always shows Google's photorealistic imagery (SATELLITE or HYBRID). If Google reports an error, the window says "Google 3D imagery did not load".
-- A selected road is drawn by its level: on the ground (level 0), at its deck height (a bridge, 6 m a level unless `window.rsG3dDeckM(props, level)` says otherwise), or dashed on the surface above it with a note in the bar (a tunnel).
+- A selected road lies on Google's photorealistic mesh (`RELATIVE_TO_MESH`, 0.5 m, a vertex every 5 m, 4 px wide), not on its terrain model. A tunnel (level below 0) is dashed, with a note in the bar.

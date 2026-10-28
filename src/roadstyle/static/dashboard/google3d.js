@@ -157,17 +157,18 @@ export function initGoogle3D(){
       const p=d.properties||{}; ttl.textContent=p.name||p.highway||"Unnamed road";
       if(line) line.forEach(x=>x.remove());
       line=[]; tun.hidden=true;
-      const lvl=(_rprops(d.id)||{}).lvl||0, ps=(r, a)=>({path:r.map(c=>({lat:c[1], lng:c[0], altitude:a||0})), strokeColor:O.select_color, strokeWidth:8, outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true});
-      if(lvl>0){            // a bridge: at its deck height above the ground (window.rsG3dDeckM(props, level) sets it; default 6 m a level)
-        const h=typeof window.rsG3dDeckM==="function" ? window.rsG3dDeckM(_rprops(d.id), lvl) : 6*lvl;
-        line.push(new lib.Polyline3DElement(Object.assign(ps(cs, h), {altitudeMode:(lib.AltitudeMode||{}).RELATIVE_TO_GROUND||"RELATIVE_TO_GROUND"}))); }
-      else if(lvl<0){       // a tunnel: dashed, in the tunnel colour, on the surface above it (Google cannot show the inside)
-        tun.hidden=false;
-        const dd=_svDist(cs), at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
-        for(let a=0, on=7, off=5; a<dd[dd.length-1]; a+=on+off){ const b=Math.min(a+on, dd[dd.length-1]);
-          const seg=[at(a)].concat(cs.filter((c, i)=>dd[i]>a && dd[i]<b), [at(b)]);
-          line.push(new lib.Polyline3DElement(Object.assign(ps(seg), {strokeColor:"#7e57c2", outerColor:"#ffffff"}))); } }
-      else line.push(new lib.Polyline3DElement(ps(cs)));
+      // THE LINE LIES ON GOOGLE'S MESH, not on its terrain model: RELATIVE_TO_MESH at 0.5 m, a vertex every 5 m so it follows the street between
+      // the OSM nodes (streets cut into rock and built-up ground differ from the terrain, and a tilted camera showed the line shifted).
+      // A hidden part shows faintly (drawsOccludedSegments). A tunnel (level below 0) is dashed, with a note: Google shows the surface only.
+      const lvl=(_rprops(d.id)||{}).lvl||0, MESH=(lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH";
+      const dd=_svDist(cs), total=dd[dd.length-1];
+      const at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
+      const run=(a, b)=>{ const r=[at(a)]; for(let t=a+5; t<b; t+=5) r.push(at(t)); r.push(at(b)); return r; };      // the part from a to b metres, a vertex every 5 m
+      const mk=(r, o)=>new lib.Polyline3DElement(Object.assign({path:r.map(c=>({lat:c[1], lng:c[0], altitude:0.5})), altitudeMode:MESH, strokeColor:O.select_color,
+        strokeWidth:4, outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true}, o));
+      if(lvl<0){ tun.hidden=false;
+        for(let a=0; a<total; a+=12) line.push(mk(run(a, Math.min(a+7, total)), {strokeColor:"#7e57c2"})); }
+      else line.push(mk(run(0, total)));
       const dist=_svDist(cs), len=dist[dist.length-1], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
       m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:ground(mid.lng, mid.lat)}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
                       durationMillis:1500});
