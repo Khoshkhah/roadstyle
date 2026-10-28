@@ -408,6 +408,9 @@ impl Tiles {
                         if simplify { douglas_peucker_kept(&l, 0.5).iter().map(|&j| l[j as usize]).collect() } else { l }
                     }).collect();
                     let parts = line_parts(ls, (!layer.whole).then_some((lo, hi)));
+                    if flat && small::short_line(&parts) {
+                        continue;
+                    }
                     if tiny {
                         made.push((f, 2, lines_cmd(&parts), parts));
                         continue;
@@ -639,6 +642,28 @@ mod tests {
         assert!(whole[0].iter().flatten().any(|c| (*c as f64) < -buffer || (*c as f64) > 4096.0 + buffer));
         // the last zoom is as it was
         assert_eq!(land(true, 5, 12, 10, &ring), land(false, 5, 12, 10, &ring));
+    }
+
+    /// The tile z/x/y of a line `ways` (a flat layer when `flat`: only a line layer draws it) from `a` to `b` in longitude and latitude.
+    fn ways(flat: bool, z: u32, x: u32, y: u32, a: [f64; 2], b: [f64; 2]) -> Vec<u8> {
+        let mut t = Tiles::new(0, 5, 80.0).unwrap();
+        t.drawn_by(&[json!({"type": if flat { "line" } else { "circle" }, "source": "ways"})]);
+        let source = json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
+            {"type": "Feature", "properties": {}, "geometry": {"type": "LineString", "coordinates": [a, b]}}]}});
+        t.add("ways", &source, &keys(&[]), false, 0);
+        t.tile(z, x, y)
+    }
+
+    #[test]
+    fn a_flat_layers_line_under_half_a_pixel_is_left_out() {
+        // zoom 2 has 1 px for 0.18 degree: a line of 0.05 degree is under half a pixel, one of 0.1 degree is not
+        assert!(ways(true, 2, 2, 1, [10.0, 10.0], [10.05, 10.0]).is_empty());
+        assert!(!ways(true, 2, 2, 1, [10.0, 10.0], [10.1, 10.0]).is_empty());
+        assert!(!ways(false, 2, 2, 1, [10.0, 10.0], [10.05, 10.0]).is_empty(), "a layer that a circle layer draws keeps it");
+        assert!(!ways(true, 5, 16, 15, [10.0, 10.0], [10.05, 10.0]).is_empty(), "the last zoom keeps every line");
+        // a short line across the edge of two tiles has its stroke in both
+        assert!(!ways(true, 2, 1, 1, [-0.02, 10.0], [0.02, 10.0]).is_empty());
+        assert!(!ways(true, 2, 2, 1, [-0.02, 10.0], [0.02, 10.0]).is_empty());
     }
 
     #[test]

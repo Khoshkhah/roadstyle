@@ -33,7 +33,8 @@
 //! - the look's defaults (2026-10-25): the class minzoom is on (the roads, arrow and label layers' filters; the pieces keep `highway`,
 //!   which the filter reads) and casing.drop_below_px is 1 (the casing clause); the tiles leave out what the filters hide.
 //! - the tiles of the low zooms (2026-10-28, docs/design/tile_speed.md): below the last zoom, the polygons of a layer that only fill and
-//!   line layers draw (the base map's land, water and paved areas) are cut to the tile and its buffer and simplified to 1/8 px (a tile unit).
+//!   line layers draw (the base map's land, water and paved areas) are cut to the tile and its buffer and simplified to 1/8 px (a tile unit),
+//!   and a line of such a layer that is together under half a pixel long and stays in the tile is left out.
 //!
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
@@ -111,7 +112,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "3192f570a5107f9c516bfc91e97c0426263bcdd68c3c85a6988613b3e2d52cb8");
+    assert_eq!(tiles_hash(&area), "45cc0aa2ae3491a3befa843e36e0a9e44d6622477e610c7940693efb251cff07");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at
@@ -136,5 +137,5 @@ fn the_sea_is_cut_at_the_boundary() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "957d7d32e3787f10c8168646f55f5e4636e462719baca942f00f67de960171f2");
+    assert_eq!(tiles_hash(&area), "a5fb203fd160e8f381b9734bf8b6b717cfdbe2e47df0684802c02ff0a828faa4");
 }
