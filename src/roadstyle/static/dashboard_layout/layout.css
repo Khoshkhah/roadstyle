@@ -71,9 +71,9 @@ html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-cont
 #rs-scalebox .maplibregl-ctrl-scale{flex:none;width:100px;margin:0!important;background:none!important;color:var(--rs-tb-ink)!important;border-color:var(--rs-tb-ink)!important;padding:0 2px;text-align:left}
 #rs-scalebox .maplibregl-ctrl-scale[style]{max-width:100px}
 #rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:56px;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 monospace;text-align:right;border-radius:0}
-html.rs-overlay #sb{bottom:48px}
 html.rs-theme-in-bar #sb-th{display:none!important}
 #rs-scalebox{width:250px;gap:8px}
 #rs-scalebox .rs-scale-slot{flex:none;width:150px;overflow:hidden}
 #rs-scalebox .maplibregl-ctrl-scale{width:auto;max-width:140px}
 #rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{width:64px!important;text-align:right!important}
+html.rs-overlay #sb{bottom:0}

@@ -16,6 +16,17 @@
       window.rsWindowRecentre = false;        // a window never moves the map
       // the map's box never changes: a panel is an overlay, so only the window's own resize resizes the map
       new ResizeObserver(()=>map.resize()).observe(map.getContainer());
+      // the side of a panel: by its own CSS (a hidden panel has no box), left when it is anchored to the left edge
+      const sideOf = p=>{ const cs = getComputedStyle(p); return parseFloat(cs.left) === 0 && cs.left !== "auto" ? "left" : "right"; };
+      window.rsFollow = (box, side)=>{
+        const panels = [...document.querySelectorAll("#sb, .rs-side")].filter(p=>sideOf(p) === side);
+        const run = ()=>{ let off = 8;
+          for(const p of panels){ const r = p.getBoundingClientRect(); if(getComputedStyle(p).display !== "none" && r.width > 0) off = Math.max(off, (side === "right" ? innerWidth - r.left : r.right) + 8); }
+          box.style[side] = off + "px"; if(side === "right") root.style.setProperty("--rs-tb-off", (off - 8) + "px"); };
+        panels.forEach(p=>new MutationObserver(run).observe(p, {attributes:true, attributeFilter:["style", "class"]}));
+        new MutationObserver(run).observe(document.body, {attributes:true, attributeFilter:["class"]});
+        window.addEventListener("resize", run); box.style.transition = side + " .15s"; run(); };
+      window.followPanels = (box, p)=>{ if(p === "right" || p === "left") window.rsFollow(box, p); };
       // the scale bar and the zoom level: one small box in the bottom left corner, 28 px high, of a fixed width (the scale bar's longest state and a 56 px
       // slot for "z 15.7"), so that it never jumps on a zoom; its text cannot be selected and it ignores the pointer
       const scale = document.querySelector(".maplibregl-ctrl-scale"), zoom = document.querySelector(".rs-zoom");
@@ -25,6 +36,7 @@
           // MapLibre's scale control has a longest bar (maxWidth); 140 px, so that the bar never leaves its slot of 150 px
           const ctl = (map._controls || []).find(c=>c && c.options && "maxWidth" in c.options && c._onMove); if(ctl){ ctl.options.maxWidth = 140; ctl._onMove(); } }
         if(zoom){ zoom.classList.add("rs-zoom-slot"); box.appendChild(zoom); }
+        window.rsFollow(box, "left");       // beside an open left panel
       }
       // a floating window stays inside the map at every drag move
       const mapRect = ()=>map.getContainer().getBoundingClientRect();
@@ -158,20 +170,9 @@
       }
       filled = true; reveal();
       tb.querySelectorAll("button").forEach(b=>{ if(!b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; });
-      // A panel on the toolbar's side never covers the bar: when the panel is open, the bar slides to 8 px beside it (150 ms); when the panel
-      // closes, the bar goes back to the edge. The bar's position along the edge does not change.
-      if(overlay && (pos === "right" || pos === "left")){
-        const panels = [...document.querySelectorAll("#sb, .rs-side")].filter(p=>{ const r = p.getBoundingClientRect(); return !r.width || (r.left + r.width/2 < innerWidth/2 ? "left" : "right") === pos; });
-        const follow = ()=>{
-          let off = 8;
-          for(const p of panels){ const r = p.getBoundingClientRect(), shown = getComputedStyle(p).display !== "none" && r.width > 0;
-            if(shown) off = Math.max(off, (pos === "right" ? innerWidth - r.left : r.right) + 8); }
-          tb.style[pos] = off + "px"; root.style.setProperty("--rs-tb-off", (off - 8) + "px"); };
-        const all = [...document.querySelectorAll("#sb, .rs-side")];
-        all.forEach(p=>new MutationObserver(follow).observe(p, {attributes:true, attributeFilter:["style", "class"]}));
-        new MutationObserver(follow).observe(document.body, {attributes:true, attributeFilter:["class"]});
-        window.addEventListener("resize", follow); follow();
-      }
+      // A panel on the side of a corner box or of the bar never covers it: when the panel is open, the box slides to 8 px beside it (150 ms); when the
+      // panel closes, it goes back to the edge. The position along the edge does not change.
+      if(overlay) window.followPanels(tb, pos);
     }
   }, 150);
 })();
