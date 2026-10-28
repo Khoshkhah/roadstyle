@@ -30,6 +30,14 @@
       const opened = new MutationObserver(l=>l.forEach(x=>setTimeout(()=>placeVisible(x.target), 120)));
       wins().forEach(w=>opened.observe(w, {attributes:true, attributeFilter:["hidden"]}));
     }
+    // the theme: the dashboard's light/dark switch (#sb[data-theme]) and a dark base map give the bar its dark colours
+    const theme = ()=>{ const sb = document.getElementById("sb"), bm = (window.RS_BASEMAPS || []).find(b=>document.querySelector(".bm-menu .on") && b.label === document.querySelector(".bm-menu .on").textContent);
+      const dark = (sb && sb.dataset.theme === "dark") || (bm && /dark|black/i.test(bm.key + " " + bm.label));
+      root.dataset.rsTheme = dark ? "dark" : "light"; };
+    const sbEl = document.getElementById("sb");
+    if(sbEl) new MutationObserver(theme).observe(sbEl, {attributes:true, attributeFilter:["data-theme"]});
+    document.addEventListener("rs:basemapchange", ()=>setTimeout(theme, 0));
+    theme();
     if(pos){
       const tb = document.createElement("div"); tb.id = "rs-toolbar"; tb.className = "rs-tb-"+pos; document.body.appendChild(tb);
       const col = document.querySelector(".maplibregl-ctrl-top-right");

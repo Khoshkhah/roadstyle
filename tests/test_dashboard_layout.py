@@ -35,3 +35,8 @@ def test_bad_values_stop():
         rs.render_dashboard(_edges(), layout="float")
     with pytest.raises(ValueError):
         rs.render_dashboard(_edges(), toolbar="middle")
+
+
+def test_theme_variables():
+    html = rs.render_dashboard(_edges(), toolbar="right").html
+    assert "html[data-rs-theme=dark]" in html and "--rs-tb-bg" in html and "data-rs-theme" not in html.split("<style>")[0]

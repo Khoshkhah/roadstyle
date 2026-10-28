@@ -5,14 +5,21 @@ html.rs-overlay,html.rs-overlay body{overflow:hidden}
 /* the chevron that brings a hidden right panel back: a small square at the top right, not a control of the bar */
 #rs-show-right{position:fixed;top:10px;right:10px;z-index:6;width:32px;height:32px;display:none}
 #rs-show-right button{width:32px;height:32px;background:#fff;border:1px solid #ccc;border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.2);cursor:pointer;font:700 14px/1 system-ui}
+/* the colours of the bar, its lists and its boxes: one rule set, two themes (html[data-rs-theme]: light or dark) */
+:root{--rs-tb-bg:rgba(255,255,255,.7);--rs-tb-border:rgba(0,0,0,.12);--rs-tb-ink:#333;--rs-tb-hover:rgba(0,0,0,.08);--rs-tb-on:rgba(26,107,214,.18);--rs-pop-bg:#fff;--rs-pop-ink:#16181d}
+html[data-rs-theme=dark]{--rs-tb-bg:rgba(0,0,0,.6);--rs-tb-border:rgba(255,255,255,.15);--rs-tb-ink:#d6d9de;--rs-tb-hover:rgba(255,255,255,.12);--rs-tb-on:rgba(255,255,255,.28);--rs-pop-bg:#1c2026;--rs-pop-ink:#e9ecf1}
+.bm-menu{background:var(--rs-pop-bg)!important;color:var(--rs-pop-ink)!important}
 /* the toolbar */
 #rs-toolbar{position:fixed;z-index:8;box-sizing:border-box;display:flex;align-items:center;gap:4px;padding:8px;
-  background:rgba(255,255,255,.7);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid rgba(0,0,0,.12);border-radius:10px;font:11px/1.2 system-ui,sans-serif}
+  background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border);border-radius:10px;font:11px/1.2 system-ui,sans-serif}
 #rs-toolbar .maplibregl-ctrl{margin:0!important;float:none!important}
 #rs-toolbar .maplibregl-ctrl-group{display:flex;background:none;box-shadow:none;border-radius:0;gap:4px}
-#rs-toolbar button{width:32px;height:32px;background:none;border:0;border-radius:6px;font:700 13px/32px system-ui,sans-serif;color:#333;padding:0;cursor:pointer}
+#rs-toolbar button{width:32px;height:32px;background:none;border:0;border-radius:6px;font:700 13px/32px system-ui,sans-serif;color:var(--rs-tb-ink);padding:0;cursor:pointer}
+#rs-toolbar button svg,#rs-toolbar button .maplibregl-ctrl-icon{filter:none}
+html[data-rs-theme=dark] #rs-toolbar .maplibregl-ctrl-icon{filter:invert(.85)}
+#rs-toolbar button.on,#rs-toolbar button.rs-on{background:var(--rs-tb-on)}
 #rs-toolbar .maplibregl-ctrl-group button+button{border:0}
-#rs-toolbar button:hover{background:rgba(0,0,0,.08)}
+#rs-toolbar button:hover{background:var(--rs-tb-hover)}
 #rs-toolbar.rs-tb-right,#rs-toolbar.rs-tb-left{flex-direction:column;width:44px;top:50%;transform:translateY(-50%);max-height:calc(100% - 128px)}
 #rs-toolbar.rs-tb-right .maplibregl-ctrl-group,#rs-toolbar.rs-tb-left .maplibregl-ctrl-group{flex-direction:column}
 #rs-toolbar.rs-tb-right{right:8px}
