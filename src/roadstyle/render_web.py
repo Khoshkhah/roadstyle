@@ -2799,7 +2799,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
            access_col: str = None, side_panel_html: str = None, host_panel_width: int = 320,
            basemap_switcher: bool = True, zoom_readout: bool = True,
            road_popup=True, road_tooltip=False, hover_delay_ms: int = 300, data_maxzoom: int = None, data_tolerance: float = None, popup_mode: str = None,
-           street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False,
+           street_view: bool | str = "window", street_view_key: str | None = None, google_3d: bool = False, google_3d_layers: list | None = None,
            tooltip=None, hover_color: str = None, select_color: str = None, boundary=None,
            color_options=None, color_active=0, views=None, overlays=None, items=None, items_popup=None, compress: bool = True, tunnel_control: bool = False,
            tiles: bool = False, simple: bool = True,
@@ -2870,9 +2870,15 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
         is written into the page - restrict it to your site's addresses. Default: the environment
         variable ``GOOGLE_MAPS_KEY``, so every map built where it is set has it. Without a key, unchanged.
       - ``google_3d`` — ``True``: a Google 3D button on the map opening a floating window with
-        Google's photorealistic 3D view, its camera linked both ways with the map's (center,
-        rotation, tilt, zoom); a clicked road is drawn in it and the camera flies along it. Needs
+        Google's photorealistic 3D view. The map leads: its camera sets the 3D camera, one way
+        only (center, rotation, tilt, zoom); a selected road is drawn in it. Needs
         ``street_view_key`` (the same key; docs/guides/google-key.md). Default ``False``.
+      - ``google_3d_layers`` — a list of what the 3D window can draw besides the selected road, each
+        ``{"id", "label", "kind": "line" | "ribbon" | "polygon" | "points", "source": <a GeoJSON
+        source id of the page>, "match": <a property that ties a feature to the selection>, "style":
+        {...}, "arrows": bool, "scope": "view", "max": 500}``; a "Show" menu in the window's bar has
+        one checkbox for each. A page that builds its features itself uses ``window.rsG3dLayers.register``
+        (docs/guides/google-3d-camera.md). Default ``None``.
       - ``hover_color`` / ``select_color`` — the highlight colours for a hovered / selected road (the
         ``roads-highlight`` feature-state); default light-violet ``#b388ff`` / violet ``#7c4dff``.
 
@@ -3862,7 +3868,7 @@ def render(gdf, palette: str = DEFAULT_PALETTE, highway_col: str = "highway",
     page = {"basemaps": bms, "basemap_switcher": bool(basemap_switcher), "tiles": bool(tiles), "simple": "roads-simple" if lean else False,
             "sources": _roles(style["layers"]), "arrows": _arrow_kind(style["layers"]), "live": None,     # live_data: the Rust engine only
             "popup_mode": mode, "find_control": bool(find_control), "zoom_readout": bool(zoom_readout), "pitch_3d": cam["pitch_3d"],
-            "street_view": street_view, "street_view_key": street_view_key or "", "google_3d": bool(google_3d), "select_color": select_color,
+            "street_view": street_view, "street_view_key": street_view_key or "", "google_3d": bool(google_3d), "google_3d_layers": list(google_3d_layers or []), "select_color": select_color,
             "filter": flt, "color_options": color_opts_meta or [], "color_active": _active, "overlays": ov_meta,
             "overlay_control": bool(overlay_control), "overlay_popup": bool(overlay_popup),
             "tunnel": {"layers": tun_paint, "dash": tun_dash, "casing": tun_casing, "strength": tun_strength,
@@ -3932,6 +3938,7 @@ def _page_html(style, page, *, name, cam, bounds, side_panel_html, host_panel_wi
             .replace("__STREET_VIEW__", J("street_view"))
             .replace("__SV_WINDOW_KEY__", J("street_view_key"))
             .replace("__GOOGLE_3D__", J("google_3d"))
+            .replace("__GOOGLE_3D_LAYERS__", J("google_3d_layers"))
             .replace("__RS_TILED__", J("tiles"))
             .replace("__RS_LEAN__", J("simple"))
             .replace("__RS_SOURCES__", J("sources"))

@@ -143,3 +143,9 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
   width:auto!important;height:45%!important;border-radius:10px 10px 0 0;resize:none}}
 .rs-svw-bar button.rs-g3d-follow{font:11px/1 system-ui;padding:3px 7px;border-radius:4px;color:#cbd5e1;background:none;border:1px solid rgba(255,255,255,.45);white-space:nowrap}
 .rs-svw-bar button.rs-g3d-follow.on{background:#0E7F91;color:#fff;border-color:#0E7F91}
+.rs-g3d-showwrap{position:relative}
+.rs-g3d-showwrap[hidden]{display:none}
+.rs-svw-bar button.rs-g3d-show{font:11px/1 system-ui;padding:3px 7px;border-radius:4px;color:#cbd5e1;background:none;border:1px solid rgba(255,255,255,.45);white-space:nowrap}
+.rs-g3d-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:5;min-width:140px;background:#23262d;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:6px 8px;font:12px/1.8 system-ui;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.rs-g3d-menu[hidden]{display:none}
+.rs-g3d-menu label{display:block;white-space:nowrap;cursor:pointer}

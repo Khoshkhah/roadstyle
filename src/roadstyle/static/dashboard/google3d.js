@@ -143,8 +143,8 @@ export function initGoogle3D(){
     // A MODE CHANGE (Google's own toggle or the page's): every polyline is removed from the 3D map and the selected entity's line is drawn again from the
     // build's geometry, 300 ms after the switch and again after Google's first camera event in the new mode. One line, the build's, in both views.
     let redrawT=0, redrawNext=false;
-    const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d").forEach(x=>x.remove()); line=null; };
-    const redrawRoad=()=>{ if(m3 && want) tryDraw(want.cs, want.name, want.lvl, true); };
+    const clearLines=()=>{ if(m3) m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove()); line=null; };
+    const redrawRoad=()=>{ try{ drawLayers(); }catch(e){ LOG.push("redraw: "+String(e&&e.message||e).slice(0, 120)); } };
     const modeChanged=()=>{ keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
     document.addEventListener("rs:labelschange", ()=>{ if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); });
     let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes
@@ -163,48 +163,115 @@ export function initGoogle3D(){
           m3.addEventListener(ev, ()=>{ if(redrawNext){ redrawNext=false; redrawRoad(); } });
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
         msg.hidden=true; w.appendChild(m3); applyLabels(); document.dispatchEvent(new Event("rs:g3dmodechange"));
-        if(want) setTimeout(()=>{ if(m3) tryDraw(want.cs, want.name, want.lvl, true); }, 0);
+        setTimeout(()=>{ if(m3){ if(want) ttl.textContent=want.name||"Unnamed road"; try{ paintMenu(); drawLayers(); }catch(e){ LOG.push("open: "+String(e&&e.message||e).slice(0, 120)); } } }, 0);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
     };
-    // DRAW A ROAD in the 3D view. cs: the road's [lng, lat] points; lvl: its level. rs:select calls it for a click on a road;
-    // a page with its own selection (a stepper, a list) calls window.rsG3dDraw(cs, name, lvl). A road asked for before the view exists is drawn when it opens.
+    // WHAT THE 3D WINDOW DRAWS: a registry of layers. A layer is {id, label, kind, features(selection, {bounds}) -> GeoJSON, style, arrows, available(), scope, max, on}.
+    // kind: "line" (a polyline: style.color, style.width px, style.dash [on, off] metres, arrows: direction arrows along it), "ribbon" (a band around a line:
+    // style.widthM metres, or the feature's property style.widthProp, style.fill, style.color for its edge), "polygon" (style.fill, style.color outline),
+    // "points" (an octagon of style.radius metres). Every kind lies on Google's mesh (RELATIVE_TO_MESH, 0.5 m), keeps every original vertex of a line,
+    // gets points only on segments longer than 5 m, is drawn once per selection, and is drawn again on a mode change. By default a layer draws the features
+    // tied to the selection; scope:"view" draws those in the visible area instead, at most `max` (500). The built-in layer "selected" is the selected road's
+    // line; a page can register a layer of the same id to replace it. A "Show" menu in the window's bar has one checkbox per available layer (shown when
+    // there are two or more), and the choice is kept per page. From Python: render_dashboard(google_3d_layers=[{id, label, kind, source, match, style, ...}]).
+    const REG=new Map(), LKEY="rs-g3d-layers:"+location.pathname;
+    const stored=()=>{ try{ return JSON.parse(localStorage.getItem(LKEY))||{}; }catch(e){ return {}; } };
+    const layerOn=d=>{ const v=stored(); return d.id in v ? !!v[d.id] : d.on!==false; };
+    const avail=d=>{ try{ return typeof d.available==="function" ? !!d.available() : true; }catch(e){ return false; } };
+    const showWrap=document.createElement("span"); showWrap.className="rs-g3d-showwrap"; showWrap.hidden=true;
+    showWrap.innerHTML='<button type="button" class="rs-g3d-show" title="What the window draws">Show ▾</button><div class="rs-g3d-menu" hidden></div>';
+    bar.insertBefore(showWrap, fbtn);
+    const showBtn=showWrap.querySelector(".rs-g3d-show"), menu=showWrap.querySelector(".rs-g3d-menu");
+    const paintMenu=()=>{ const list=[...REG.values()].filter(avail); showWrap.hidden=list.length<2;
+      menu.innerHTML=""; for(const d of list){ const lab=document.createElement("label"), c=document.createElement("input"); c.type="checkbox"; c.checked=layerOn(d); c.dataset.id=d.id;
+        c.onchange=()=>{ const v=stored(); v[d.id]=c.checked; try{ localStorage.setItem(LKEY, JSON.stringify(v)); }catch(e){} drawLayers(); };
+        lab.append(c, document.createTextNode(" "+(d.label||d.id))); menu.appendChild(lab); } };
+    showBtn.onclick=e=>{ e.stopPropagation(); menu.hidden=!menu.hidden; };
+    document.addEventListener("click", e=>{ if(!e.target.closest || !e.target.closest(".rs-g3d-showwrap")) menu.hidden=true; }, true);
     let want=null;
-    const draw=(any, name, lvl, keep)=>{
+    const selParts=()=>want ? (Array.isArray(want.cs[0]) && Array.isArray(want.cs[0][0]) ? want.cs : [want.cs]).filter(c=>c.length>1) : [];
+    REG.set("selected", {id:"selected", label:"Selected road", kind:"line", style:{color:O.select_color, width:4},
+      features:()=>({type:"FeatureCollection", features:selParts().map(c=>({type:"Feature", geometry:{type:"LineString", coordinates:c}, properties:{lvl:want.lvl}}))})});
+    const register=d=>{ if(!d || !d.id || typeof d.features!=="function") throw new Error("rsG3dLayers.register: a layer needs an id and a features(selection) function"); REG.set(d.id, {kind:"line", ...d}); paintMenu(); drawLayers(); };
+    window.rsG3dLayers={register, list:()=>[...REG.values()].map(d=>({id:d.id, label:d.label, kind:d.kind, on:layerOn(d), available:avail(d)})),
+      isOn:id=>REG.has(id) && layerOn(REG.get(id)), setOn:(id, on)=>{ const v=stored(); v[id]=!!on; try{ localStorage.setItem(LKEY, JSON.stringify(v)); }catch(e){} paintMenu(); drawLayers(); },
+      refresh:()=>{ paintMenu(); drawLayers(); }};
+    // a layer from Python: its features are those of a GeoJSON source of the page whose property `match` equals the same property of the selected feature (or the selection's key)
+    for(const c of (O.google_3d_layers||[])) REG.set(c.id, {kind:"line", ...c, features:(sel, ctx)=>{
+      const src=map.getSource(c.source), data=src && src.serialize ? src.serialize().data : null; if(!data || typeof data==="string") return {type:"FeatureCollection", features:[]};
+      const fs=data.features||[];
+      if(c.scope==="view") return {type:"FeatureCollection", features:fs};
+      const want_=sel && sel.props && c.match in sel.props ? sel.props[c.match] : sel && sel.key;
+      return {type:"FeatureCollection", features:fs.filter(f=>f.properties && String(f.properties[c.match])===String(want_))}; }});
+    // the geometry helpers
+    const MESH=()=>(lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH";
+    const pts=r=>r.map(c=>({lat:c[1], lng:c[0], altitude:0.5}));
+    // every original vertex is kept (a smooth arc stays an arc), and a segment longer than 5 m gets points in between
+    const densify=cs=>{ const out=[cs[0]], k=Math.cos(cs[0][1]*Math.PI/180);
+      for(let i=1; i<cs.length; i++){ const [x0, y0]=cs[i-1], [x1, y1]=cs[i], m=Math.hypot((x1-x0)*111320*k, (y1-y0)*111320), n=Math.ceil(m/5);
+        for(let j=1; j<n; j++) out.push([x0+(x1-x0)*j/n, y0+(y1-y0)*j/n]); out.push(cs[i]); }
+      return out; };
+    const along=cs=>{ const dd=_svDist(cs), total=dd[dd.length-1];
+      const at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
+      return {dd, total, at, run:(a, b)=>[at(a)].concat(cs.filter((c, i)=>dd[i]>a && dd[i]<b), [at(b)])}; };     // run: the part from a to b metres, with the line's own vertices
+    const linesOf=g=>!g ? [] : g.type==="LineString" ? [g.coordinates] : g.type==="MultiLineString" ? g.coordinates : [];
+    const ringsOf=g=>!g ? [] : g.type==="Polygon" ? [g.coordinates[0]] : g.type==="MultiPolygon" ? g.coordinates.map(p=>p[0]) : [];
+    const pointsOf=g=>!g ? [] : g.type==="Point" ? [g.coordinates] : g.type==="MultiPoint" ? g.coordinates : [];
+    const offsetRing=(cs, half)=>{ const k=Math.cos(cs[0][1]*Math.PI/180), L=[], R=[];       // the two edges of a band of half-width `half` metres around the line
+      for(let i=0; i<cs.length; i++){ const a=cs[Math.max(0, i-1)], b=cs[Math.min(cs.length-1, i+1)], dx=(b[0]-a[0])*111320*k, dy=(b[1]-a[1])*111320, n=Math.hypot(dx, dy)||1, nx=-dy/n*half, ny=dx/n*half;
+        L.push([cs[i][0]+nx/(111320*k), cs[i][1]+ny/111320]); R.push([cs[i][0]-nx/(111320*k), cs[i][1]-ny/111320]); }
+      return L.concat(R.reverse()); };
+    const circle=(c, r)=>{ const k=Math.cos(c[1]*Math.PI/180); return Array.from({length:8}, (_, i)=>[c[0]+Math.cos(i*Math.PI/4)*r/(111320*k), c[1]+Math.sin(i*Math.PI/4)*r/111320]); };
+    let made=[];
+    const add=el=>{ el.dataset.rsSel="1"; m3.appendChild(el); made.push(el); return el; };
+    const polyline=(r, st, o)=>add(new lib.Polyline3DElement({path:pts(r), altitudeMode:MESH(), strokeColor:st.color||O.select_color, strokeWidth:st.width||4, outerColor:"#ffffff", outerWidth:0.3,
+      drawsOccludedSegments:true, ...o}));
+    const polygon=(ring, st)=>add(new lib.Polygon3DElement({outerCoordinates:pts(ring), altitudeMode:MESH(), fillColor:st.fill||"rgba(14,127,145,0.35)", strokeColor:st.color||"#0E7F91", strokeWidth:st.outlineWidth||2,
+      drawsOccludedSegments:true}));
+    const arrowsOn=(cs, st)=>{ const {total, at}=along(cs), k=Math.cos(cs[0][1]*Math.PI/180);       // a chevron every 20 m, 3 m long, opening backward
+      for(let d=10, n=0; d<total && n<40; d+=20, n++){ const tip=at(d), back=at(Math.max(0, d-3)), dx=(tip[0]-back[0])*111320*k, dy=(tip[1]-back[1])*111320, m=Math.hypot(dx, dy)||1, px=-dy/m*1.2, py=dx/m*1.2;
+        for(const sg of [1, -1]) polyline([tip, [back[0]+sg*px/(111320*k), back[1]+sg*py/111320]], st); } };
+    const drawFeature=(def, f, st)=>{ const g=f.geometry, pr=f.properties||{};
+      if(def.kind==="polygon"){ for(const r of ringsOf(g)) polygon(r, st); return; }
+      if(def.kind==="points"){ for(const c of pointsOf(g)) polygon(circle(c, st.radius||2), st); return; }
+      for(const raw of linesOf(g)){ if(raw.length<2) continue; const cs=densify(raw);
+        if(def.kind==="ribbon"){ const w=(st.widthProp && +pr[st.widthProp]) || st.widthM || 3; polygon(offsetRing(cs, w/2), st); continue; }
+        const tunnel=pr.lvl<0, dash=tunnel ? [7, 5] : st.dash;
+        if(dash){ const {total, run}=along(cs); if(tunnel) tun.hidden=false;
+          for(let a=0; a<total; a+=dash[0]+dash[1]) polyline(run(a, Math.min(a+dash[0], total)), tunnel ? {...st, color:"#7e57c2"} : st); }
+        else polyline(cs, st);
+        if(def.arrows) arrowsOn(cs, st); } };
+    const inView=(f, b)=>{ const g=f.geometry; return [...linesOf(g).flat(), ...ringsOf(g).flat(), ...pointsOf(g)].some(c=>c[0]>=b.getWest() && c[0]<=b.getEast() && c[1]>=b.getSouth() && c[1]<=b.getNorth()); };
+    const drawLayers=()=>{
+      if(!m3 || !lib) return;
+      m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove());       // one selection, one set of lines: whatever an earlier draw left goes
+      made=[]; line=made; tun.hidden=true;
+      for(const def of REG.values()){ if(!avail(def) || !layerOn(def)) continue;
+        try{ const view=def.scope==="view", b=map.getBounds(); if(!view && !want) continue;
+          let fs=(def.features(want && want.sel || {key:want && want.name, props:{}}, {bounds:b}) || {}).features || [];
+          if(view){ fs=fs.filter(f=>inView(f, b)).slice(0, def.max||500); }
+          const st=def.style||{}; for(const f of fs) drawFeature(def, f, st);
+        }catch(e){ LOG.push("layer "+def.id+": "+String(e&&e.message||e).slice(0, 120)); console.warn("rs google 3d: the layer", def.id, "was not drawn:", e); } } };
+    let viewT=0;
+    map.on("moveend", ()=>{ if(m3 && [...REG.values()].some(d=>d.scope==="view" && avail(d) && layerOn(d))){ clearTimeout(viewT); viewT=setTimeout(drawLayers, 400); } });
+    // DRAW THE SELECTION in the 3D view. cs: the road's [lng, lat] points (or an array of lines); lvl: its level; sel: {key, props} for the layers tied to the selection.
+    // rs:select calls it for a click on a road; a page with its own selection (a stepper, a list) calls window.rsG3dDraw(cs, name, lvl, sel).
+    // A selection asked for before the view exists is drawn when it opens.
+    const draw=(any, name, lvl, keep, sel)=>{
       const parts=(Array.isArray(any[0]) && Array.isArray(any[0][0]) ? any : [any]).filter(c=>c.length>1);     // one line, or several
-      want={cs:any, name, lvl};
+      want={cs:any, name, lvl, sel:sel||(keep && want ? want.sel : null)};
       if(!m3 || !lib || !parts.length) return;
       if(!keep) setFollow(true);               // a road selection turns Follow on: the map leads (a redraw after a mode change does not)
       ttl.textContent=name||"Unnamed road";
-      if(line) line.forEach(x=>x.remove());
-      m3.querySelectorAll("[data-rs-sel]").forEach(x=>x.remove());       // one selection, one line: whatever an earlier draw left goes
-      line=[]; tun.hidden=true;
-      // THE LINE LIES ON GOOGLE'S MESH, not on its terrain model: RELATIVE_TO_MESH at 0.5 m, a vertex every 5 m so it follows the street between
-      // the OSM nodes (streets cut into rock and built-up ground differ from the terrain, and a tilted camera showed the line shifted).
-      // A hidden part shows faintly (drawsOccludedSegments). A tunnel (level below 0) is dashed, with a note: Google shows the surface only.
-      const MESH=(lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH";
-      const mk=(r, o)=>new lib.Polyline3DElement(Object.assign({path:r.map(c=>({lat:c[1], lng:c[0], altitude:0.5})), altitudeMode:MESH, strokeColor:O.select_color,
-        strokeWidth:4, outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true}, o));
-      // every original vertex is kept (a smooth arc stays an arc), and a segment longer than 5 m gets points in between
-      const densify=cs=>{ const out=[cs[0]], k=Math.cos(cs[0][1]*Math.PI/180);
-        for(let i=1; i<cs.length; i++){ const [x0, y0]=cs[i-1], [x1, y1]=cs[i], m=Math.hypot((x1-x0)*111320*k, (y1-y0)*111320), n=Math.ceil(m/5);
-          for(let j=1; j<n; j++) out.push([x0+(x1-x0)*j/n, y0+(y1-y0)*j/n]); out.push(cs[i]); }
-        return out; };
-      for(const raw of parts){
-        const cs=densify(raw), dd=_svDist(cs), total=dd[dd.length-1];
-        const at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
-        const run=(a, b)=>[at(a)].concat(cs.filter((c, i)=>dd[i]>a && dd[i]<b), [at(b)]);          // the part from a to b metres, with the line's own vertices
-        if(lvl<0){ tun.hidden=false;
-          for(let a=0; a<total; a+=12) line.push(mk(run(a, Math.min(a+7, total)), {strokeColor:"#7e57c2"})); }
-        else line.push(mk(cs)); }
-      line.forEach(x=>{ x.dataset.rsSel="1"; m3.appendChild(x); });
+      drawLayers();
     };
-    const tryDraw=(cs, name, lvl, keep)=>{ try{ draw(cs, name, lvl, keep); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
-    window.rsG3dDraw=tryDraw;
-    document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
+    const tryDraw=(cs, name, lvl, keep, sel)=>{ try{ draw(cs, name, lvl, keep, sel); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
+    window.rsG3dDraw=(cs, name, lvl, sel)=>tryDraw(cs, name, lvl, false, sel);
+    document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view
       const d=e.detail; if(d.overlay) return;
       if(typeof window.rsG3dOwnDraw==="function" && window.rsG3dOwnDraw(d)) return;       // the page draws this road itself, from its own data
       const r=_road(d.id), cs=r ? _svLine(r) : []; if(cs.length<2) return;
-      const p=d.properties||{}; tryDraw(cs, p.name||p.highway, (_rprops(d.id)||{}).lvl||0);
+      const p=d.properties||{}; tryDraw(cs, p.name||p.highway, (_rprops(d.id)||{}).lvl||0, false, {key:String(d.id), props:p});
     });
     rsSetGoogle3D=function(on){
       w.hidden=!on;

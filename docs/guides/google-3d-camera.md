@@ -55,7 +55,40 @@ By default, roadstyle moves the map center to the free part of the map while the
 
 `window.rsG3dCount` holds `m2g` (the number of sets of the 3D camera) and `follow`. `window.rsG3dFollow(on)` sets the Follow state from the page.
 
-## 5. Check the link in a browser
+## 5. What the 3D window draws
+
+The window draws layers. A layer has one kind: `line`, `ribbon`, `polygon` or `points`. Every kind lies on Google's mesh (`RELATIVE_TO_MESH`, 0.5 m). A line keeps every original vertex and gets extra points only on segments longer than 5 m. The window draws each layer once for each selection. It draws them again after a change of mode.
+
+By default a layer draws the features that belong to the selection. A layer with `scope: "view"` draws the features in the visible area instead. It draws at most `max` features (500 by default).
+
+The built-in layer `selected` is the selected road's line. A page that registers no layer sees only this line, with no menu. When two or more layers are available, the window bar shows a "Show" menu with one checkbox for each. The choice is kept for each page. A page can register a layer with the id `selected` to replace the built-in one.
+
+From Python, give the layers to `render_dashboard`. A feature belongs to the selection when its property `match` has the same value as that property of the selected feature:
+
+```python
+rs.render_dashboard(edges, google_3d=True, google_3d_layers=[
+    {"id": "centre", "label": "Centre line", "kind": "line", "source": "centre-src", "match": "road_id",
+     "style": {"color": "#1565c0", "width": 4}, "arrows": True},
+])
+```
+
+From JavaScript, register a layer that builds its own features. `features(selection, {bounds})` returns a GeoJSON feature collection. `selection` is `{key, props}`. `available()` is optional:
+
+```js
+// line, with direction arrows every 20 m
+rsG3dLayers.register({id: "centre", label: "Centre line", kind: "line", arrows: true, style: {color: "#1565c0", width: 4, dash: [6, 3]},
+  features: sel => featuresOf(sel.key)});
+// ribbon: a band of a width in metres, from a constant or from a property of the feature
+rsG3dLayers.register({id: "band", label: "Width", kind: "ribbon", style: {widthProp: "width_m", widthM: 6, fill: "rgba(0,0,255,.3)"}, features});
+// polygon: a fill and an outline
+rsG3dLayers.register({id: "lanes", label: "Lanes", kind: "polygon", style: {fill: "rgba(255,160,0,.4)", color: "#e65100"}, features});
+// points: an octagon of a radius in metres; in the view, at most 500
+rsG3dLayers.register({id: "signs", label: "Signs", kind: "points", scope: "view", max: 500, style: {radius: 2, fill: "#d32f2f"}, features});
+```
+
+`rsG3dLayers.list()`, `isOn(id)`, `setOn(id, on)` and `refresh()` read and change the state. A page calls `refresh()` when what is available changes, for example when the reviewer chooses another milestone. A page draws its own selection with `window.rsG3dDraw(coordinates, name, level, {key, props})`.
+
+## 6. Check the link in a browser
 
 The simready page has a debug line. Open the page with `?debug=1` and open the Google 3D window. The line shows:
 
@@ -71,7 +104,7 @@ To check the link in ten minutes:
 4. Compare the vertical extents. They must agree within 10 %.
 5. Read the distance between the centres. It must be less than 5 m.
 
-## 6. The limits
+## 7. The limits
 
 - A difference under 10 % is normal.
 - The map limits the tilt. The 3D camera gets the map's value, so it stops at the same limit.

@@ -198,7 +198,7 @@ Both engines write only what is read (R1, 2026-10-24), in the GeoJSON, the GeoPa
 `__TITLE__`, `__MAPLIBRE_CSS__`, `__MAPLIBRE_JS__`, `__RS_TILES__`, `__DASHBOARD_CSS__`, `__POPUP_CSS__`, `__HOST_PANEL_HTML__`,
 `__POPUP_JS__`, `__DASHBOARD_JS__`, `__STYLE__`, `__CENTER__`, `__PITCH__`, `__BEARING__`, `__MAX_PITCH__`, `__BASEMAPS__`,
 `__BM_SWITCHER__`, `__RS_TILED__`, `__RS_LEAN__`, `__RS_SOURCES__`, `__RS_ARROWS__`, `__RS_LIVE__`, `__ROAD_POPUP_MODE__`, `__FIND_CONTROL__`, `__ZOOM_READOUT__`, `__PITCH3D__`,
-`__STREET_VIEW__`, `__SV_WINDOW_KEY__`, `__GOOGLE_3D__`, `__SELECT_COLOR__`, `__FILTER__`, `__COLOR_OPTIONS__`, `__CO_ACTIVE__`,
+`__STREET_VIEW__`, `__SV_WINDOW_KEY__`, `__GOOGLE_3D__`, `__GOOGLE_3D_LAYERS__`, `__SELECT_COLOR__`, `__FILTER__`, `__COLOR_OPTIONS__`, `__CO_ACTIVE__`,
 `__OVERLAYS__`, `__OVERLAY_CONTROL__`, `__OVERLAY_POPUP__`, `__TUNNEL__`, `__RS_FILL_LAYERS__`, `__RS_ROAD_FILL__`, `__VIEWS__`,
 `__ROAD_ITEMS__`, `__ROAD_POPUP__`, `__ROAD_TOOLTIP__`, `__HOVER_DELAY_MS__`, `__EDGE_ID_COL__`, `__ARROW_ICON__`, `__ARROW_COLOR__`,
 `__ARROW_RULES__`, `__BOUNDS__`.
