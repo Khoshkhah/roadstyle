@@ -17,6 +17,27 @@ pub struct Baked {
     pub props: Vec<String>,
     pub active: usize,
     pub meta: Vec<Value>,
+    /// every road has its class's colours (no data styler, no colour option, no colour table): a piece needs no colour of its own unless
+    /// a road deviates (an access kind), and the road layer reads the class's colour by its class index
+    pub class_only: bool,
+}
+
+/// The fill and the casing colour of each class of `classes`, as the class styles give them; `fallback` for another class.
+pub struct ClassColours {
+    pub by_class: HashMap<String, [Value; 2]>,
+    pub fallback: [Value; 2],
+}
+
+impl ClassColours {
+    pub fn of(look: &Look, classes: &[String]) -> ClassColours {
+        let colours = |h: Option<Cell>| { let s = crate::roads::class_style(look, h).0; [s["fill"].clone(), s["casing"].clone()] };
+        ClassColours { by_class: classes.iter().map(|c| (c.clone(), colours(Some(Cell::Str(c))))).collect(), fallback: colours(None) }
+    }
+
+    /// The colours of the class `c` that the road layer draws when a piece has none: (fill, casing).
+    pub fn of_class(&self, c: Option<&str>) -> &[Value; 2] {
+        c.and_then(|c| self.by_class.get(c)).unwrap_or(&self.fallback)
+    }
 }
 
 /// ResolvedFrame: each edge's style values, as roadstyle writes them (a value given by the caller keeps its JSON form).
@@ -315,8 +336,9 @@ pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<Baked, crate:
             Some(Active::Name(s)) => named.iter().position(|o| o.name == *s).unwrap_or(0),
             None => 0,
         };
-        return Ok(Baked { props, active, meta });
+        return Ok(Baked { props, active, meta, class_only: false });
     }
+    let class_only = main.is_none();
     let f = main.unwrap_or_else(|| class_frame(fs, look));
     bake_props(fs, &f);
     // a data styler's legend as the one "colour by" entry (no menu, only the key)
@@ -324,7 +346,7 @@ pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<Baked, crate:
         Some(l) => vec![json!({"name": get(l, "title").cloned().unwrap_or_else(|| json!("data")), "prop": Mark::Fill.name(), "legend": l})],
         None => Vec::new(),
     };
-    Ok(Baked { props: vec![Mark::Fill.name().into()], active: 0, meta })
+    Ok(Baked { props: vec![Mark::Fill.name().into()], active: 0, meta, class_only })
 }
 
 #[cfg(test)]

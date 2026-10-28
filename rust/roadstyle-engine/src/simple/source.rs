@@ -16,11 +16,14 @@ pub struct SimpleSource {
     pub read: Option<std::collections::HashSet<String>>,
     /// R8: the classes of the road layer's class index (`__rs_ci`, the last property of every feature), None: no index
     pub classes: Option<Vec<String>>,
+    /// the road layer draws the class's colours for a piece that has no colour of its own: a piece whose fill or casing is its class's
+    /// has none (tile_v2_plan.md, step 6)
+    pub class_colours: Option<crate::colors::ClassColours>,
 }
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -101,6 +104,14 @@ impl SimpleSource {
         }
         if let Some(i) = index.filter(|_| run.marks.as_ref().is_none_or(|r| r[Mark::ClassIndex as usize])) {
             q.insert_name(crate::layers::CLASS_INDEX, Cell::Int(i as i64));
+        }
+        if let Some(colours) = &self.class_colours {
+            let of = colours.of_class(q.get(&self.cols.class).and_then(|c| c.as_str()));
+            for (mark, own) in [(Mark::Fill, &of[0]), (Mark::Casing, &of[1])] {
+                if q.get(mark.name()).is_some_and(|v| v.to_value() == *own) {
+                    q.shift_remove(mark.name());
+                }
+            }
         }
         if !run.class {
             q.shift_remove(&self.cols.class);      // the class index read it
@@ -282,5 +293,5 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None })
 }

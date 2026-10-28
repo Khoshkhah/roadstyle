@@ -7,9 +7,9 @@
     43.73837
    ],
    "z12": {
-    "view_bytes": 1308338,
+    "view_bytes": 1303101,
     "view_features": 15063,
-    "max_tile_bytes": 1308338,
+    "max_tile_bytes": 1303101,
     "max_tile_features": 15063,
     "layers": {
      "roads": {
@@ -26,22 +26,22 @@
      },
      "simple": {
       "features": 1723,
-      "bytes": 65883,
-      "values": 65,
-      "keys": 15,
+      "bytes": 60647,
+      "values": 55,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 23,
-      "string_bytes": 218,
+      "strings": 13,
+      "string_bytes": 126,
       "short_segments": 1730,
       "tiny": 169
      }
     }
    },
    "z13": {
-    "view_bytes": 1865102,
+    "view_bytes": 1847138,
     "view_features": 23588,
-    "max_tile_bytes": 1024354,
+    "max_tile_bytes": 1014236,
     "max_tile_features": 12963,
     "layers": {
      "roads": {
@@ -58,22 +58,22 @@
      },
      "simple": {
       "features": 3322,
-      "bytes": 126842,
-      "values": 64,
-      "keys": 15,
+      "bytes": 116724,
+      "values": 53,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 26,
-      "string_bytes": 247,
+      "strings": 15,
+      "string_bytes": 146,
       "short_segments": 3100,
       "tiny": 253
      }
     }
    },
    "z14": {
-    "view_bytes": 1823485,
+    "view_bytes": 1802742,
     "view_features": 24120,
-    "max_tile_bytes": 1057168,
+    "max_tile_bytes": 1044720,
     "max_tile_features": 14118,
     "layers": {
      "roads": {
@@ -90,13 +90,13 @@
      },
      "simple": {
       "features": 4106,
-      "bytes": 159251,
-      "values": 72,
-      "keys": 17,
+      "bytes": 146803,
+      "values": 58,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 31,
-      "string_bytes": 302,
+      "strings": 17,
+      "string_bytes": 174,
       "short_segments": 2338,
       "tiny": 140
      },
@@ -115,9 +115,9 @@
     }
    },
    "z15": {
-    "view_bytes": 2420093,
+    "view_bytes": 2357679,
     "view_features": 39165,
-    "max_tile_bytes": 769526,
+    "max_tile_bytes": 749793,
     "max_tile_features": 12486,
     "layers": {
      "roads": {
@@ -134,13 +134,13 @@
      },
      "simple": {
       "features": 6556,
-      "bytes": 248084,
-      "values": 82,
-      "keys": 17,
+      "bytes": 228351,
+      "values": 68,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 34,
-      "string_bytes": 327,
+      "strings": 20,
+      "string_bytes": 198,
       "short_segments": 914,
       "tiny": 253
      },
@@ -164,7 +164,7 @@
     "expressions": {
      "roads-simple": {
       "filter": 803,
-      "paint.line-color": 1767,
+      "paint.line-color": 2239,
       "paint.line-width": 26312,
       "paint.line-offset": 3033
      },
@@ -196,9 +196,9 @@
     58.36462
    ],
    "z12": {
-    "view_bytes": 7192580,
+    "view_bytes": 7165188,
     "view_features": 82855,
-    "max_tile_bytes": 3546402,
+    "max_tile_bytes": 3532399,
     "max_tile_features": 40902,
     "layers": {
      "roads": {
@@ -215,22 +215,22 @@
      },
      "simple": {
       "features": 4517,
-      "bytes": 165756,
-      "values": 35,
-      "keys": 15,
+      "bytes": 151753,
+      "values": 27,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 19,
-      "string_bytes": 182,
+      "strings": 11,
+      "string_bytes": 109,
       "short_segments": 1972,
       "tiny": 188
      }
     }
    },
    "z13": {
-    "view_bytes": 7086008,
+    "view_bytes": 7009021,
     "view_features": 90721,
-    "max_tile_bytes": 1775538,
+    "max_tile_bytes": 1758457,
     "max_tile_features": 22514,
     "layers": {
      "roads": {
@@ -247,22 +247,22 @@
      },
      "simple": {
       "features": 5512,
-      "bytes": 210883,
-      "values": 40,
-      "keys": 15,
+      "bytes": 193063,
+      "values": 32,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 21,
-      "string_bytes": 206,
+      "strings": 13,
+      "string_bytes": 132,
       "short_segments": 1294,
       "tiny": 252
      }
     }
    },
    "z14": {
-    "view_bytes": 3902885,
+    "view_bytes": 3843528,
     "view_features": 55003,
-    "max_tile_bytes": 746119,
+    "max_tile_bytes": 736123,
     "max_tile_features": 10260,
     "layers": {
      "roads": {
@@ -279,13 +279,13 @@
      },
      "simple": {
       "features": 3143,
-      "bytes": 118232,
-      "values": 50,
-      "keys": 17,
+      "bytes": 108236,
+      "values": 37,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 27,
-      "string_bytes": 260,
+      "strings": 14,
+      "string_bytes": 140,
       "short_segments": 182,
       "tiny": 46
      },
@@ -304,9 +304,9 @@
     }
    },
    "z15": {
-    "view_bytes": 1415669,
+    "view_bytes": 1371727,
     "view_features": 24155,
-    "max_tile_bytes": 296874,
+    "max_tile_bytes": 287281,
     "max_tile_features": 5108,
     "layers": {
      "roads": {
@@ -323,13 +323,13 @@
      },
      "simple": {
       "features": 3062,
-      "bytes": 121378,
-      "values": 40,
-      "keys": 17,
+      "bytes": 111786,
+      "values": 32,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 22,
-      "string_bytes": 200,
+      "strings": 12,
+      "string_bytes": 109,
       "short_segments": 415,
       "tiny": 269
      },
@@ -353,7 +353,7 @@
     "expressions": {
      "roads-simple": {
       "filter": 803,
-      "paint.line-color": 1767,
+      "paint.line-color": 2239,
       "paint.line-width": 26312,
       "paint.line-offset": 3033
      },
@@ -385,60 +385,60 @@
     43.73837
    ],
    "z12": {
-    "view_bytes": 65883,
+    "view_bytes": 60647,
     "view_features": 1723,
-    "max_tile_bytes": 65883,
+    "max_tile_bytes": 60647,
     "max_tile_features": 1723,
     "layers": {
      "simple": {
       "features": 1723,
-      "bytes": 65883,
-      "values": 65,
-      "keys": 15,
+      "bytes": 60647,
+      "values": 55,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 23,
-      "string_bytes": 218,
+      "strings": 13,
+      "string_bytes": 126,
       "short_segments": 1730,
       "tiny": 169
      }
     }
    },
    "z13": {
-    "view_bytes": 221858,
+    "view_bytes": 203893,
     "view_features": 5796,
-    "max_tile_bytes": 126842,
+    "max_tile_bytes": 116724,
     "max_tile_features": 3322,
     "layers": {
      "simple": {
       "features": 3322,
-      "bytes": 126842,
-      "values": 64,
-      "keys": 15,
+      "bytes": 116724,
+      "values": 53,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 26,
-      "string_bytes": 247,
+      "strings": 15,
+      "string_bytes": 146,
       "short_segments": 3100,
       "tiny": 253
      }
     }
    },
    "z14": {
-    "view_bytes": 323962,
+    "view_bytes": 303219,
     "view_features": 7990,
-    "max_tile_bytes": 201547,
+    "max_tile_bytes": 189099,
     "max_tile_features": 4972,
     "layers": {
      "simple": {
       "features": 4106,
-      "bytes": 159251,
-      "values": 72,
-      "keys": 17,
+      "bytes": 146803,
+      "values": 58,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 31,
-      "string_bytes": 302,
+      "strings": 17,
+      "string_bytes": 174,
       "short_segments": 2338,
       "tiny": 140
      },
@@ -457,20 +457,20 @@
     }
    },
    "z15": {
-    "view_bytes": 888485,
+    "view_bytes": 826071,
     "view_features": 22702,
-    "max_tile_bytes": 287905,
+    "max_tile_bytes": 268172,
     "max_tile_features": 7351,
     "layers": {
      "simple": {
       "features": 6556,
-      "bytes": 248084,
-      "values": 82,
-      "keys": 17,
+      "bytes": 228351,
+      "values": 68,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 34,
-      "string_bytes": 327,
+      "strings": 20,
+      "string_bytes": 198,
       "short_segments": 914,
       "tiny": 253
      },
@@ -494,7 +494,7 @@
     "expressions": {
      "roads-simple": {
       "filter": 803,
-      "paint.line-color": 1767,
+      "paint.line-color": 2239,
       "paint.line-width": 26312,
       "paint.line-offset": 3033
      },
@@ -517,60 +517,60 @@
     58.36462
    ],
    "z12": {
-    "view_bytes": 321637,
+    "view_bytes": 294245,
     "view_features": 8704,
-    "max_tile_bytes": 165756,
+    "max_tile_bytes": 151753,
     "max_tile_features": 4517,
     "layers": {
      "simple": {
       "features": 4517,
-      "bytes": 165756,
-      "values": 35,
-      "keys": 15,
+      "bytes": 151753,
+      "values": 27,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 19,
-      "string_bytes": 182,
+      "strings": 11,
+      "string_bytes": 109,
       "short_segments": 1972,
       "tiny": 188
      }
     }
    },
    "z13": {
-    "view_bytes": 906630,
+    "view_bytes": 829643,
     "view_features": 23783,
-    "max_tile_bytes": 210883,
+    "max_tile_bytes": 193063,
     "max_tile_features": 5512,
     "layers": {
      "simple": {
       "features": 5512,
-      "bytes": 210883,
-      "values": 40,
-      "keys": 15,
+      "bytes": 193063,
+      "values": 32,
+      "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 21,
-      "string_bytes": 206,
+      "strings": 13,
+      "string_bytes": 132,
       "short_segments": 1294,
       "tiny": 252
      }
     }
    },
    "z14": {
-    "view_bytes": 869042,
+    "view_bytes": 809685,
     "view_features": 22027,
-    "max_tile_bytes": 142405,
+    "max_tile_bytes": 132409,
     "max_tile_features": 3709,
     "layers": {
      "simple": {
       "features": 3143,
-      "bytes": 118232,
-      "values": 50,
-      "keys": 17,
+      "bytes": 108236,
+      "values": 37,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 27,
-      "string_bytes": 260,
+      "strings": 14,
+      "string_bytes": 140,
       "short_segments": 182,
       "tiny": 46
      },
@@ -589,20 +589,20 @@
     }
    },
    "z15": {
-    "view_bytes": 634789,
+    "view_bytes": 590848,
     "view_features": 15615,
-    "max_tile_bytes": 137108,
+    "max_tile_bytes": 127516,
     "max_tile_features": 3398,
     "layers": {
      "simple": {
       "features": 3062,
-      "bytes": 121378,
-      "values": 40,
-      "keys": 17,
+      "bytes": 111786,
+      "values": 32,
+      "keys": 15,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 22,
-      "string_bytes": 200,
+      "strings": 12,
+      "string_bytes": 109,
       "short_segments": 415,
       "tiny": 269
      },
@@ -626,7 +626,7 @@
     "expressions": {
      "roads-simple": {
       "filter": 803,
-      "paint.line-color": 1767,
+      "paint.line-color": 2239,
       "paint.line-width": 26312,
       "paint.line-offset": 3033
      },
@@ -985,6 +985,16 @@
     "tartu-full.z15.layers.slots.string_bytes: new, 301",
     "tartu-full.z15.layers.slots.short_segments: new, 50",
     "tartu-full.z15.layers.slots.tiny: new, 1"
+   ]
+  },
+  {
+   "date": "2026-10-27",
+   "why": "roads-simple paint.line-color: +428 characters (1,767 to 2,195 on the page's look): the style holds the class fill and casing colours once, as lookups by class index, in place of a colour text in each piece. The tiles lose the values (Monaco z15 simple: 2,103 to 66) and 5 % of their bytes; the style's total characters are lower than before.",
+   "changes": [
+    "monaco.style.expressions.roads-simple.paint.line-color: 1767 -> 2239",
+    "monaco-full.style.expressions.roads-simple.paint.line-color: 1767 -> 2239",
+    "tartu.style.expressions.roads-simple.paint.line-color: 1767 -> 2239",
+    "tartu-full.style.expressions.roads-simple.paint.line-color: 1767 -> 2239"
    ]
   }
  ]
