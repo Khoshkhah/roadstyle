@@ -257,3 +257,23 @@ def test_labels_switch_only_where_it_works(tmp_path):
         streets = state()
         assert streets[0] is True and streets[2] is False and streets[3] is False, streets
         b.close()
+
+
+def test_floating_window_stays_right_of_the_left_panel(tmp_path):
+    """A window never hides under an open left panel: its left edge is at least 8 px right of the panel's right edge."""
+    path = _page(tmp_path, "right")
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && window.map.loaded() && document.getElementById('rs-toolbar')", timeout=60000)
+        sb = pg.evaluate("(() => { const s = document.getElementById('sb'), r = s.getBoundingClientRect(); return [getComputedStyle(s).display, r.left, r.right]; })()")
+        if sb[0] == "none" or sb[1] > W / 2:
+            b.close()
+            pytest.skip("this page has no open left panel")
+        pg.evaluate("""() => { const w = document.createElement('div'); w.className = 'rs-svw'; w.id = 'fake-win'; w.style.cssText = 'left:0;top:100px;width:300px;height:200px';
+            document.body.appendChild(w); window.dispatchEvent(new Event('resize')); }""")
+        pg.wait_for_timeout(300)
+        left = pg.evaluate("document.getElementById('fake-win').getBoundingClientRect().left")
+        assert left >= sb[2] + 8 - 0.5, (left, sb)
+        b.close()

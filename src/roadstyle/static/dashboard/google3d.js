@@ -188,29 +188,44 @@ export function initGoogle3D(){
         for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
         msg.hidden=true; w.appendChild(m3);
+        if(want) setTimeout(()=>{ if(m3) tryDraw(want.cs, want.name, want.lvl, false); }, 0);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
     };
-    document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
-      const d=e.detail; if(d.overlay || !m3) return;
-      const cs=_svLine(_road(d.id)); if(cs.length<2) return;
-      const p=d.properties||{}; ttl.textContent=p.name||p.highway||"Unnamed road";
+    // DRAW A ROAD in the 3D view and fly along it. cs: the road's [lng, lat] points; lvl: its level. rs:select calls it for a click on a road;
+    // a page with its own selection (a stepper, a list) calls window.rsG3dDraw(cs, name, lvl). A road asked for before the view exists is drawn when it opens.
+    let want=null;
+    const draw=(any, name, lvl, fly)=>{
+      const parts=(Array.isArray(any[0]) && Array.isArray(any[0][0]) ? any : [any]).filter(c=>c.length>1);     // one line, or several
+      want={cs:any, name, lvl};
+      if(!m3 || !lib || !parts.length) return;
+      ttl.textContent=name||"Unnamed road";
       if(line) line.forEach(x=>x.remove());
       line=[]; tun.hidden=true;
       // THE LINE LIES ON GOOGLE'S MESH, not on its terrain model: RELATIVE_TO_MESH at 0.5 m, a vertex every 5 m so it follows the street between
       // the OSM nodes (streets cut into rock and built-up ground differ from the terrain, and a tilted camera showed the line shifted).
       // A hidden part shows faintly (drawsOccludedSegments). A tunnel (level below 0) is dashed, with a note: Google shows the surface only.
-      const lvl=(_rprops(d.id)||{}).lvl||0, MESH=(lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH";
-      const dd=_svDist(cs), total=dd[dd.length-1];
-      const at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
-      const run=(a, b)=>{ const r=[at(a)]; for(let t=a+5; t<b; t+=5) r.push(at(t)); r.push(at(b)); return r; };      // the part from a to b metres, a vertex every 5 m
+      const MESH=(lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH";
       const mk=(r, o)=>new lib.Polyline3DElement(Object.assign({path:r.map(c=>({lat:c[1], lng:c[0], altitude:0.5})), altitudeMode:MESH, strokeColor:O.select_color,
         strokeWidth:4, outerColor:"#ffffff", outerWidth:0.3, drawsOccludedSegments:true}, o));
-      if(lvl<0){ tun.hidden=false;
-        for(let a=0; a<total; a+=12) line.push(mk(run(a, Math.min(a+7, total)), {strokeColor:"#7e57c2"})); }
-      else line.push(mk(run(0, total)));
-      const dist=_svDist(cs), len=dist[dist.length-1], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
+      for(const cs of parts){
+        const dd=_svDist(cs), total=dd[dd.length-1];
+        const at=t=>{ let i=1; while(i<dd.length-1 && dd[i]<t) i++; const u=(t-dd[i-1])/((dd[i]-dd[i-1])||1); return [cs[i-1][0]+(cs[i][0]-cs[i-1][0])*u, cs[i-1][1]+(cs[i][1]-cs[i-1][1])*u]; };
+        const run=(a, b)=>{ const r=[at(a)]; for(let t=a+5; t<b; t+=5) r.push(at(t)); r.push(at(b)); return r; };      // the part from a to b metres, a vertex every 5 m
+        if(lvl<0){ tun.hidden=false;
+          for(let a=0; a<total; a+=12) line.push(mk(run(a, Math.min(a+7, total)), {strokeColor:"#7e57c2"})); }
+        else line.push(mk(run(0, total))); }
+      line.forEach(x=>m3.appendChild(x));
+      if(!fly) return;                        // a page with its own selection moves the map, and the 3D camera follows the map
+      const cs=parts.reduce((a, c)=>_svDist(c).slice(-1)[0]>_svDist(a).slice(-1)[0] ? c : a), len=_svDist(cs).slice(-1)[0], mid=_svAt({geometry:{type:"LineString", coordinates:cs}}, len/2);
       m3.flyCameraTo({endCamera:{center:{lat:mid.lat, lng:mid.lng, altitude:ground(mid.lng, mid.lat)}, heading:mid.h, tilt:62, range:Math.max(180, len*1.6)},
                       durationMillis:1500});
+    };
+    const tryDraw=(cs, name, lvl, fly)=>{ try{ draw(cs, name, lvl, fly); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
+    window.rsG3dDraw=tryDraw;
+    document.addEventListener("rs:select", e=>{  // a road: draw it in the 3D view and fly along it
+      const d=e.detail; if(d.overlay) return;
+      const r=_road(d.id), cs=r ? _svLine(r) : []; if(cs.length<2) return;
+      const p=d.properties||{}; tryDraw(cs, p.name||p.highway, (_rprops(d.id)||{}).lvl||0, true);
     });
     rsSetGoogle3D=function(on){
       w.hidden=!on;

@@ -46,11 +46,14 @@
       // the right edge of the free map: the toolbar's left edge less 8 px (the bar slides beside an open right panel, and so does this edge)
       const barLeft = m=>{ const t = document.getElementById("rs-toolbar"), r = t && getComputedStyle(t).display !== "none" && t.getBoundingClientRect();
         return r && r.width > 0 && pos === "right" && innerWidth > 520 ? Math.min(m.right - 8, r.left - 8) : m.right - 8; };
-      const fit = w=>{ if(!w || w.hidden) return; const m = mapRect(), gap = 8, lim = barLeft(m);
-        const W = Math.min(w.offsetWidth, lim - m.left - gap), H = Math.min(w.offsetHeight, m.height - 28);
+      // the left edge of the free map: the right edge of an open left panel (a window never hides under it)
+      const leftEdge = m=>{ const sb = document.getElementById("sb"), r = sb && getComputedStyle(sb).display !== "none" && sb.getBoundingClientRect();
+        return r && r.width > 0 && r.left < innerWidth/2 && innerWidth > 520 ? Math.max(m.left, r.right) : m.left; };
+      const fit = w=>{ if(!w || w.hidden) return; const m = mapRect(), gap = 8, lim = barLeft(m), lo = leftEdge(m);
+        const W = Math.min(w.offsetWidth, lim - lo - gap), H = Math.min(w.offsetHeight, m.height - 28);
         Object.assign(w.style, {width:W+"px", height:H+"px"});
         const r = w.getBoundingClientRect();
-        Object.assign(w.style, {left:Math.max(m.left+gap, Math.min(r.left, lim-W))+"px", top:Math.max(m.top+gap, Math.min(r.top, m.bottom-H-gap))+"px", right:"auto", bottom:"auto"}); };
+        Object.assign(w.style, {left:Math.max(lo+gap, Math.min(r.left, lim-W))+"px", top:Math.max(m.top+gap, Math.min(r.top, m.bottom-H-gap))+"px", right:"auto", bottom:"auto"}); };
       const wins = ()=>document.querySelectorAll(".rs-svw");
       document.addEventListener("pointermove", ()=>document.querySelectorAll(".rs-svw.rs-drag").forEach(fit), true);
       // a window opens in the visible part: right of an open left panel, left of an open right panel and the toolbar's strip
@@ -65,8 +68,11 @@
       wins().forEach(w=>opened.observe(w, {attributes:true, attributeFilter:["hidden"]}));
       // the windows follow the bar: when it slides (a right panel opens or closes) or the window is resized, a window that reaches under it moves left
       const keep = ()=>wins().forEach(w=>{ if(w.hidden || w.classList.contains("rs-drag")) return; const m = mapRect(), lim = barLeft(m), r = w.getBoundingClientRect();
-        if(r.right > lim + 0.5) fit(w); });
-      window.rsKeepWindows = keep;           // the bar is made later: it calls this when it exists
+        if(r.right > lim + 0.5 || r.left < leftEdge(m) - 0.5) fit(w); });
+      window.rsKeepWindows = keep;
+      const sb0 = document.getElementById("sb");
+      if(sb0){ new MutationObserver(keep).observe(sb0, {attributes:true, attributeFilter:["style", "class"]});          // the left panel opens or closes
+        sb0.addEventListener("transitionrun", ()=>{ const t0 = performance.now(); (function f(){ keep(); if(performance.now() - t0 < 500) requestAnimationFrame(f); })(); }); }           // the bar is made later: it calls this when it exists
       addEventListener("resize", keep);
     }
     // the theme: the dashboard's light/dark switch (#sb[data-theme]) and a dark base map give the bar its dark colours
