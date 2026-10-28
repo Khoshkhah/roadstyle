@@ -63,15 +63,14 @@ def _warn_unclassed(g, col):
 _SCOPED: ContextVar[bool] = ContextVar("roadstyle_render_scoped", default=False)
 
 
-def _warn_unknown(kwargs):
-    """render_edges takes **kwargs, so a misspelt keyword did nothing, with no message. Each keyword that no part of roadstyle reads
-    (roadstyle::options::unknown) gives a warning with the nearest known one. From roadstyle 0.27.0 it is an error. The names that start
-    with "_" are the internal hooks (the export, the level editor), and ``styler`` is the Python renderer's own."""
+def _check_keywords(kwargs):
+    """render_edges takes **kwargs. A keyword that no part of roadstyle reads (roadstyle::options::unknown) is an error, with the nearest
+    known one. The names that start with "_" are internal hooks, and ``styler`` is the folium and lonboard renderers' own."""
     from ._engine import rust
     names = [k for k in kwargs if not k.startswith("_") and k != "styler"]
-    for k, near in rust().unknown_keywords(names):
-        warnings.warn(f"render_edges: unknown keyword {k!r}" + (f" (did you mean {near!r}?)" if near else "")
-                      + "; it does nothing. From roadstyle 0.27.0 it is an error.", UserWarning, stacklevel=3)
+    bad = [f"{k!r}" + (f" (did you mean {near!r}?)" if near else "") for k, near in rust().unknown_keywords(names)]
+    if bad:
+        raise ValueError(f"render_edges: unknown keyword {', '.join(bad)}")
 
 
 def render_edges(
@@ -159,7 +158,7 @@ def render_edges(
         if k in kwargs:
             raise ValueError(f"{k}= is removed: {why} (CHANGELOG, 0.26.0)")
     if backend == "web" and not _SCOPED.get():          # folium and lonboard take keywords of their own
-        _warn_unknown(kwargs)
+        _check_keywords(kwargs)
     if backend == "web":
         from . import _engine
         if style is not None:

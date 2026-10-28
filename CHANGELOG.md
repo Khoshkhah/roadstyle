@@ -29,6 +29,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **An unknown keyword is an error** in `render_edges` (a `ValueError` that names the nearest known keyword). It was a warning.
+  The page's own keys are typed: a value of another type is an error too.
+- **Rust's own names** (the Rust API is the design). The functions of the Rust facade, the browser package and the Python module
+  `roadstyle._rust` have names that say what they do. Browser package (`roadstyle-wasm`): `makeStyle` is `inlineStyle`,
+  `makeSources` is `styleSources`, `tileSources` is `tilesOfSources`, `tileFiles` is `tilesOfFiles`, `makePage` is `pageFrom`.
+  Rust facade and `_rust`: `make_style` is `inline_style`, `make_sources` is `style_sources`, `save_sources` is `write_sources`,
+  `file_names` is `source_file_names`, `tile_files(_with)` is `tiles_of_files(_with)`, `make_tiled` is `tiled_from_parquet`,
+  `tile_made` is `tiles_of_sources`, `make_page` is `page_of_json` (the typed call is `page_from`), `page_defaults` is
+  `page_key_defaults`, `sidebar_defaults` is `sidebar_keys`.
+- **The Rust crates have no Python design.** No `py_*` function (the helpers are `round_to`, `floor_divmod`, `category_text`,
+  `cell_number`, `dash_number`), one yes rule for a road flag, one for a style expression and one for a setting, and no comment that
+  names Python as the reference. `scripts/check_no_python_shape.py` runs in the Rust workflow and fails when one comes back.
 - **Tiny pieces at low zoom** (2026-10-27, rule B, tile standard rule 7): below the last zoom, a tile leaves out a road whose pieces are
   together under 1 px (8 of 4096 units) unless it leaves the tile, and a casing end piece (`__rs_seam`) under 1 px. Every fill and every
   casing body piece stays. `roadstyle_tiles::drop_tiny`. The Python tile engine does not have it (D0 removes that engine). Burnaby (4 workers): z12 480 → 362 ms

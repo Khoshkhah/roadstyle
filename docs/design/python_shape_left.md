@@ -7,6 +7,26 @@ architecture document. The rule of 2026-10-24 is that the Rust API is the design
 decisions). Each kind below is Python's design that the Rust side still copies. The counts are of the code in `rust/*/src/`, not of
 the tests. The last column names the held item that removes it.
 
+## Status after design-rust-shape (2026-10-28)
+
+`scripts/check_no_python_shape.py` runs in the Rust workflow and finds nothing: no `py_*` or `truthy` function, no untyped option read by
+name (`args["…"]`), no `"__rs_` name written as text outside `roadstyle-model/src/mark.rs` (a test module may), and no comment that names
+Python or `render_web` as the reference. The table below is the list of 2026-10-24; this is what happened to each row.
+
+| Kind | State |
+|---|---|
+| Map options as `Value` | Done. The map options were typed already (`MapOptions`); the page's keys are the typed `PageKeys` (a value of another type is an error); `render_edges` gives an error for an unknown keyword. |
+| Python's truth | Done. Three named rules: `roads::yes` (a road's flag), `to_boolean` (a style expression), `is_set` and `flag` (a setting). |
+| `"__rs_*"` as strings | Done. One table: `roadstyle-model/src/mark.rs`. |
+| `ColumnMap` | Kept, with a reason: the output carries the user's column names (a click shows them), so the engine renames at its border. The change is the typed role enum of the road columns; it is a follow-up. |
+| Files from `src/roadstyle/` | Done before (the crate `roadstyle-assets`). |
+| Python's rounding and number text | Done. `round_to`, `round_even`, `floor_divmod`, `category_text`, `cell_number`, `dash_number`. The numbers are the same, so no style hash changed. `category_text` keeps the labels "None", "True" and "False" of the legends. |
+| Facade names | Done: see the CHANGELOG (Unreleased, Changed) for the old and new names. |
+| Options that only Python's paths set | Done in design-rust-only (the full look, `simple`). |
+| JSON shapes for Python's page | Kept, with a reason: the road table `{props, mids, bboxes, lines}` is the page's data contract (docs/reference/formats.md). |
+| Bindings' own composition | Done by the names: each stage call says what it makes. |
+| Comments | Done (the guard). |
+
 ## The summary
 
 | Kind | Where (the most) | Count | Removed by |

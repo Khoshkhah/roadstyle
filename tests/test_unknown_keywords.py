@@ -1,7 +1,6 @@
 """A keyword that no part of roadstyle reads (roadstyle::options::unknown, the one rule of the Python binding and the MCP server): before
 0.26.0 render_edges ignored it with no message. Now each one gives a warning with the nearest known name; from 0.27.0 it is an error."""
 import inspect
-import warnings
 
 import geopandas as gpd
 import pytest
@@ -31,22 +30,21 @@ def _edges():
                             geometry=[LineString([(18.0, 59.3), (18.001, 59.301)]), LineString([(18.001, 59.301), (18.002, 59.3)])], crs=4326)
 
 
-def _unknown_warnings(**kw):
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+def _unknown(**kw):
+    try:
         render_edges(_edges(), basemap="blank", **kw)
-    return [str(x.message) for x in w if "unknown keyword" in str(x.message)]
+    except ValueError as e:
+        return str(e)
+    return None
 
 
-def test_an_unknown_keyword_is_a_warning_with_the_nearest_name():
-    got = _unknown_warnings(colour_by="x", zzz=1)
-    assert got == ["render_edges: unknown keyword 'colour_by' (did you mean 'color_by'?); it does nothing. From roadstyle 0.27.0 it is an error.",
-                   "render_edges: unknown keyword 'zzz'; it does nothing. From roadstyle 0.27.0 it is an error."]
+def test_an_unknown_keyword_is_an_error_with_the_nearest_name():
+    assert _unknown(colour_by="x", zzz=1) == "render_edges: unknown keyword 'colour_by' (did you mean 'color_by'?), 'zzz'"
 
 
-def test_known_keywords_give_no_warning_and_settings_give_one():
-    assert _unknown_warnings(view_3d=True, legend=False, popup_mode="panel", tooltip=["highway"]) == []
-    assert len(_unknown_warnings(palette="mono", zzz=1)) == 1        # palette by name: render_edges calls itself again, one warning
+def test_known_keywords_give_no_error():
+    assert _unknown(view_3d=True, legend=False, popup_mode="panel", tooltip=["highway"]) is None
+    assert "zzz" in _unknown(palette="mono", zzz=1)
 
 
 def test_every_keyword_of_the_python_functions_is_known_or_python_only():
