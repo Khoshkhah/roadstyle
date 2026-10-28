@@ -232,6 +232,16 @@ pub const CONTRACT_KEY: &str = "roadstyle:contract";
 /// road's row (the tiles' feature id) is valid in one generation only; the tile URL and the archive carry it.
 pub const GENERATION: &str = "roadstyle:generation";
 
+/// The metadata key of the popup fields of each overlay that has some, by its source: `{source: [field]}`. They are not in the
+/// overlay's tiles: its props file holds them by row (the tiles' feature id).
+pub const POPUPS: &str = "roadstyle:popups";
+
+/// `POPUPS` of a style.
+pub fn overlay_popups(metadata: &Value) -> std::collections::HashMap<String, Vec<String>> {
+    metadata[POPUPS].as_object().into_iter().flatten()
+        .map(|(k, v)| (k.clone(), v.as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect())).collect()
+}
+
 /// The fields of `roadstyle:interaction`'s popup and tooltip.
 pub fn interaction_fields(metadata: &Value) -> std::collections::HashSet<String> {
     let i = &metadata["roadstyle:interaction"];

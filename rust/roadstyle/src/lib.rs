@@ -121,7 +121,9 @@ fn tile_source(tiled: &mut tiles::Tiles, s: &sources::Styled, o: &tiles::stage::
         }
         Source::Json(v) => {
             let (keep, whole, from) = whole_unless_lines(json_lines(v), o.rule(k, || keys(v)), o.min_zoom);
-            tiled.add(k, v, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
+            tiled.add(k, v, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom));
+            let features = v["data"]["features"].as_array().into_iter().flatten();
+            props_file(tiled, o, k, features.map(|f| f["properties"].clone()));
         }
         // a base-map layer, from its table (audit R10)
         Source::Features(f) => {
@@ -130,9 +132,20 @@ fn tile_source(tiled: &mut tiles::Tiles, s: &sources::Styled, o: &tiles::stage::
             let lines = (0..t.len()).all(|r| matches!(t.geometries_of().kind(r), Some(GeomType::LineString | GeomType::MultiLineString)));
             let keys = || t.names().iter().filter(|n| (0..t.len()).any(|r| t.has_key(r, n))).cloned().collect();
             let (keep, whole, from) = whole_unless_lines(lines, o.rule(k, keys), o.min_zoom);
-            tiled.add_features(k, t, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom))
+            tiled.add_features(k, t, &keep, whole, first_drawn(&s.layers, k, from, o.max_zoom));
+            props_file(tiled, o, k, (0..t.len()).map(|r| t.to_geojson(r)["properties"].clone()));
         }
     }
+}
+
+/// The props file of the layer `k`, if it has popup fields: for each row (the tiles' feature id), the fields, as JSON. The tile has none
+/// of them (`TileOptions::rule`).
+fn props_file(tiled: &mut tiles::Tiles, o: &tiles::stage::TileOptions, k: &str, rows: impl Iterator<Item = Value>) {
+    let Some(fields) = o.popups.get(k) else { return };
+    let rows: Vec<Value> = rows.map(|p| Value::Object(fields.iter().filter_map(|f| Some((f.clone(), p.get(f)?.clone()))).collect())).collect();
+    let mut text = Vec::new();
+    serde_json::to_writer(&mut text, &roadstyle_model::table::JsSafe(&Value::Array(rows))).expect("a Vec takes every byte");
+    tiled.props_files.push((k.to_string(), String::from_utf8(text).expect("JSON text is UTF-8")));
 }
 
 /// rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go

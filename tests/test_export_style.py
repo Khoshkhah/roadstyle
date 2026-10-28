@@ -169,3 +169,12 @@ def test_both_engines_give_an_app_the_road_roles_and_the_pick_layers(tmp_path):
         assert "roads-simple" in m["roadstyle:controls"]["pick"] or "roads-fill" in m["roadstyle:controls"]["pick"], e
     assert meta["rust"]["roadstyle:sources"] == meta["python"]["roadstyle:sources"]
     assert meta["rust"]["roadstyle:controls"] == meta["python"]["roadstyle:controls"]
+
+
+def test_an_overlay_with_popup_fields_has_a_props_file_by_row(tmp_path):
+    import roadstyle as rs
+    zones = gpd.GeoDataFrame({"name": ["A", "B"]}, geometry=[box(18.0, 59.3, 18.001, 59.301), box(18.002, 59.3, 18.003, 59.301)], crs=4326)
+    p, s = _export(tmp_path, overlays=[rs.Overlay(zones, label="zones", popup=["name"])])
+    assert json.loads((tmp_path / "props" / "ov0.json").read_text()) == [{"name": "A"}, {"name": "B"}]     # the row is the feature id
+    assert s["metadata"]["roadstyle:interaction"]["base_props"] == {"ov0": f"{BASE}/props/ov0.json"}
+    assert not (tmp_path / "props" / "ov1.json").exists()

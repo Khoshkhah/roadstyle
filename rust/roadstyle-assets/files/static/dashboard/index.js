@@ -53,6 +53,7 @@ function fromStyle(o, given){
   if(!given.has("overlays") && ctl.overlays && P)
     o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit, extrude: ov.extrude && P+ov.extrude,
                                         base: ov.base && Object.fromEntries(Object.entries(ov.base).map(([id, f])=>[P+id, f]))}));
+  for(const ov of o.overlays || []) ov.props = (it.base_props || {})[P ? ov.source.slice(P.length) : ov.source];   // the popup fields by row
   if(!given.has("road_popup")) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
   if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;

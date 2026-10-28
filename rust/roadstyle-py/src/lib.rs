@@ -147,6 +147,11 @@ impl Tiler {
         PyBytes::new(py, &t)
     }
 
+    /// props_files() -> [(layer, JSON text)]: the popup fields of each layer that has some, by row (the tile's feature id)
+    fn props_files(&self) -> Vec<(String, String)> {
+        self.tiles.props_files.clone()
+    }
+
     fn props(&self, layer: &str, id: u64) -> String {
         self.tiles.props(layer, id)
     }

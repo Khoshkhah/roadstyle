@@ -51,6 +51,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
     PMTiles metadata has `generation` and `contract`.
   - `export_style` has no `roads` source, no `roads-fill` and no `roads-highlight` layer in the tiled style, and no `roads` tile layer. It
     writes `props.json` (the fields of each road by row; `roadstyle:interaction.props`): a click on a piece reads `props[feature.id]`.
+  - The same for the base map: the feature id of a base-map or overlay feature is its row in its layer. The popup fields of an overlay (`roadstyle:popups`)
+    are not in its tiles; `export_style` writes `props/<source>.json` (the fields by row) and names it in `roadstyle:interaction.base_props`. An overlay with no popup fields has no file. A base-map layer keeps only the keys that its style layers read (the caller's `keep` no longer adds keys to it).
     The inline export (`export_inline`) keeps the `roads` source. The tiles of its Tartu z12 view go from 8.1 MB to 0.29 MB.
   - **What a page that has its own copy of the dashboard must change (the page PR, step 8 of the plan):** (1) take the new dashboard and
     `level_editor.js` together; (2) remove `promoteId` from the `addSource` of the vector source `roads`; (3) read `f.id` for the road of a

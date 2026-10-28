@@ -84,6 +84,8 @@ pub struct Tiles {
     cache: std::sync::Mutex<TileCache>,
     /// the generation of the road set (the archive's metadata carries it; `stage::TileOptions::tiles` sets it)
     generation: Option<String>,
+    /// the props files of the layers with popup fields: (layer, JSON array of the fields by row, the row being the feature id)
+    pub props_files: Vec<(String, String)>,
 }
 
 /// The properties that a layer's tiles keep: those in `keep`, the one key set of the layer (stage::TileOptions::rule).
@@ -107,7 +109,7 @@ impl Tiles {
         if buffers.len() != max_zoom as usize + 1 {
             return Err(Error::Options(format!("{} tile buffers for the zooms 0 to {max_zoom}", buffers.len())));
         }
-        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default(), generation: None })
+        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default(), generation: None, props_files: Vec::new() })
     }
 
     /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom

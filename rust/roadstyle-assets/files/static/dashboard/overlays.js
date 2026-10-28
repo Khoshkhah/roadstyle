@@ -14,13 +14,17 @@ function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:r
 export function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
 // the interactive overlay features at a screen point: [{label, fields, properties}] — one entry
 // per overlay (its topmost hit). Feeds rs:select's `overlays` payload and the popup/panel.
+// A layer's popup fields are not in its tiles: its props file (roadstyle:interaction.base_props, by source) holds them by row, the feature id.
+const _ovRows = {};
+function _ovFetch(ov){ if(ov.props && !_ovRows[ov.props]) fetch(ov.props).then(r=>r.json()).then(j=>{ _ovRows[ov.props] = j; }, ()=>{}); }
+const _ovProps = (ov, f) => ({...f.properties, ...(_ovRows[ov.props] || [])[f.id]});
 export function _ovAt(pt){
   const out=[];
   for(const ov of OVERLAYS){
     if(!ov.interactive) continue;
     const ids = ov.layers.filter(id=>map.getLayer(id));
     const hits = ids.length ? map.queryRenderedFeatures(pt, {layers:ids}) : [];
-    if(hits.length) out.push({label:ov.label, fields:ov.popup, properties:hits[0].properties||{}, shown:_ovWin(ov)});
+    if(hits.length) out.push({label:ov.label, fields:ov.popup, properties:_ovProps(ov, hits[0]), shown:_ovWin(ov)});
   }
   return out;
 }
@@ -36,7 +40,7 @@ export function handleOverlayClick(e, tier){                      // info popup 
     const ids = ov.layers.filter(id=>map.getLayer(id));
     const hits = ids.length ? map.queryRenderedFeatures(e.point, {layers:ids}) : [];
     if(hits.length){
-      const f = hits[0], p = f.properties||{};
+      const f = hits[0], p = _ovProps(ov, f);
       rsDeselect();                                        // road selection yields to the overlay
       _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
@@ -84,6 +88,7 @@ export function initOverlays(){
   // ov.tooltip on each move
   const tips = ov=>ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
   OVERLAYS.forEach(ov=>{
+   _ovFetch(ov);
    ov.layers.forEach(id=>{
     map.on("mousemove", id, e=>{ if(!(ov.interactive || tips(ov))) return;
       map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)

@@ -397,7 +397,7 @@ The road data is the features of the four sources above, with their properties. 
 ([Three choices for the road data](../rust/drawing.md#three-choices-for-the-road-data)):
 
 - **GeoJSON** inside the style (`sources.<name>.data`).
-- **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer since 2026-10-27: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page), zooms
+- **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer since 2026-10-27: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page; the popup fields of an overlay are in `props/<source>.json` of `export_style`, by row, not in its tiles), zooms
   6 to 18 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` and a slot have their road's row as their id (all
   pieces of a road share it). A tile keeps the keys of the layer's one set (the keys that the style reads, the page's keys, the 3 filter keys
   and the columns named in `keep`), but not a `__rs_*` flag that is false: every reader takes a missing flag as false. Below the last zoom, a line is

@@ -19,8 +19,8 @@ pub struct TileOptions {
     pub read: HashSet<String>,
     /// the properties that the layers on each source read (props::source_reads)
     pub source_reads: HashMap<String, HashSet<String>>,
-    /// the fields of the popup and tooltip, and the caller's `keep`: what a base-map layer keeps besides its layers' reads
-    pub shown: HashSet<String>,
+    /// the popup fields of each overlay that has some, by source (`props::overlay_popups`): not in its tiles, but in its props file
+    pub popups: HashMap<String, Vec<String>>,
     /// the generation of the road set (`props::GENERATION`; None: the roads have no edge ids)
     pub generation: Option<String>,
     /// the base-map layers (`BASE_LAYERS`): a layer outside it and outside the roads, pieces and slots keeps all its properties
@@ -62,8 +62,8 @@ impl TileOptions {
             .map(|k| (k.to_string(), roadstyle_model::props::source_reads(layers, k))).collect();
         let base = metadata[roadstyle_model::props::BASE_LAYERS].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
         let generation = metadata[roadstyle_model::props::GENERATION].as_str().map(String::from);
-        let shown = roadstyle_model::props::interaction_fields(metadata).into_iter().chain(keep.iter().cloned()).collect();
-        Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, shown, base, generation,
+        let popups = roadstyle_model::props::overlay_popups(metadata);
+        Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, base, generation,
                          pieces, exact: None, only: None, slots_from, wait: false })
     }
 
@@ -103,7 +103,8 @@ impl TileOptions {
             "simple" => (self.exact_or(&self.pieces).into_iter().chain(reads(name)).chain(page_reads(Kind::Pieces)).chain([Mark::Edge.name().into()]).collect(), false, 0),
             // `__rs_edge` is the carrier of a file's slot id
             "slots" => (reads(name).into_iter().chain(page_reads(Kind::Slots)).chain(filter_keys().map(String::from)).chain([Mark::Edge.name().into()]).collect(), true, self.slots_from),
-            _ if self.base.contains(name) => (self.base_keys(name), false, 0),
+            // a base-map layer and a layer with popup fields keep what its layers read: a popup reads its props file by row
+            _ if self.base.contains(name) || self.popups.contains_key(name) => (reads(name), false, 0),
             _ => (self.read.iter().cloned().chain(props()).collect(), false, 0),
         }
     }
@@ -115,11 +116,6 @@ impl TileOptions {
             None => others.clone(),
         }
     }
-
-    /// The properties of a base-map layer `name` in the tiles: those that its layers read, the popup's and the caller's.
-    fn base_keys(&self, name: &str) -> HashSet<String> {
-        self.source_reads.get(name).into_iter().flatten().chain(&self.shown).cloned().collect()
-    }
 }
 
 #[cfg(test)]
@@ -128,7 +124,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn a_base_map_layer_keeps_what_its_layers_and_the_popup_read() {
+    fn a_base_map_layer_keeps_what_its_layers_read() {
         let layers = [json!({"id": "b", "source": "ov4", "paint": {"fill-extrusion-height": ["get", "height"], "fill-extrusion-base": ["get", "base"]}}),
                       json!({"id": "o", "source": "ov5", "paint": {"fill-color": ["get", "kind"]}})];
         let tiles = json!({"minzoom": 0, "maxzoom": 15, "buffer_px": 10, "extent": crate::EXTENT});

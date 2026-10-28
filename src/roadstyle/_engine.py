@@ -356,10 +356,16 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds, pro
         fallback = float(meta.get("roadstyle:tiles", {}).get("buffer_px", 80))
         t.write_xyz(str(d / "tiles"), list(bounds), ".pbf", (json.dumps(style["layers"]), fallback))
     (d / "props.json").write_text(props)             # a click on a piece: its id is the row of the road in this file
+    base_props = {}
+    for layer, text in t.props_files():          # a layer's popup fields are not in its tiles: by row, the feature id
+        (d / "props").mkdir(exist_ok=True)
+        (d / "props" / f"{layer}.json").write_text(text)
+        base_props[layer] = f"{base}/props/{layer}.json"
     (d / "popup.css").write_text(_plugin_css())
     (d / "popup.js").write_text(_assets.text("static/popup.js"))
     style["metadata"]["roadstyle:interaction"] = {**style["metadata"].get("roadstyle:interaction", {}), "css": f"{base}/popup.css",
-                                                  "js": f"{base}/popup.js", "props": f"{base}/props.json"}
+                                                  "js": f"{base}/popup.js", "props": f"{base}/props.json",
+                                                  **({"base_props": base_props} if base_props else {})}
     png = _assets.data("data/sprite.png")
     icon = _settings.theme_value("arrows.icon")
     index = json.dumps({"oneway": {"x": 0, "y": 0, "width": icon["width"], "height": icon["height"], "pixelRatio": icon["pixel_ratio"], "sdf": True}})

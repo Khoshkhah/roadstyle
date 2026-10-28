@@ -45,6 +45,8 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     // table has the roads); only an export (render's export_inline, export_style: an app with no road table) asks for the roads source
     let export = export(look);
     roads.in_style = export;
+    let popups: Map<String, Value> = info.overlays.iter().filter(|o| o["popup"].as_array().is_some_and(|a| !a.is_empty()))
+        .filter_map(|o| Some((o["source"].as_str()?.to_string(), o["popup"].clone()))).collect();
     // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
     // and the style says what the controls show
     let live = look.map.output.state == roadstyle_look::options::State::Live;
@@ -68,7 +70,10 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     }
     add_boundary(look, &mut sources, &mut layers);
     images.insert("oneway".into(), look.sections.arrows.image.clone());
-    let metadata = metadata(look, images, planned, colors.meta, &layers, contract)?;
+    let mut metadata = metadata(look, images, planned, colors.meta, &layers, contract)?;
+    if !popups.is_empty() {
+        metadata.insert(roadstyle_model::props::POPUPS.into(), popups.into());
+    }
     let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
     Ok(Parts { name, center, zoom, layers, roads, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
 }
