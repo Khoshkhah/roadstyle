@@ -68,7 +68,15 @@ def _with_layout(m, layout, toolbar):
     css = (_LAYOUT_DIR / "layout.css").read_text(encoding="utf-8")
     js = (_LAYOUT_DIR / "layout.js").read_text(encoding="utf-8")
     opt = json.dumps({"layout": layout, "toolbar": toolbar or False})
-    m._tpl = m._tpl.replace("</body>", f"<style>{css}</style><script>window.rsLayout={opt};</script><script>{js}</script></body>", 1)
+    # the style, the options and an empty bar are the first things of the body, so that the first paint has the layout and no old control column:
+    # the class on <html> hides the column from the start, and the script at the end of the body fills the bar
+    cls = ("rs-overlay " if layout == "overlay" else "") + ("rs-has-toolbar" if toolbar else "")
+    bar = f'<div id="rs-toolbar" class="rs-tb-{toolbar}"></div>' if toolbar else ""
+    head = (f"<style>{css}</style><script>window.rsLayout={opt};document.documentElement.className+=' {cls}';</script>" + bar)
+    assert "<body" in m._tpl, "the page has no body"
+    i = m._tpl.index(">", m._tpl.index("<body")) + 1
+    m._tpl = m._tpl[:i] + head + m._tpl[i:]
+    m._tpl = m._tpl.replace("</body>", f"<script>{js}</script></body>", 1)
     return m
 
 

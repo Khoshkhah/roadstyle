@@ -29,8 +29,11 @@ html[data-rs-theme=dark] #rs-toolbar .maplibregl-ctrl-icon{filter:invert(.85)}
 #rs-toolbar.rs-tb-top{top:8px}
 #rs-toolbar.rs-tb-bottom{bottom:8px}
 /* the lists of a button open toward the centre of the map */
-.rs-tb-right .bm-menu{top:0!important;bottom:auto!important;left:auto!important;right:calc(100% + 12px)!important}
-.rs-tb-left .bm-menu{top:0!important;bottom:auto!important;right:auto!important;left:calc(100% + 12px)!important}
-.rs-tb-top .bm-menu{top:calc(100% + 12px)!important;bottom:auto!important;left:0!important;right:auto!important}
-.rs-tb-bottom .bm-menu{bottom:calc(100% + 12px)!important;top:auto!important;left:0!important;right:auto!important}
+#rs-toolbar.rs-tb-right .bm-menu{top:0!important;bottom:auto!important;left:auto!important;right:calc(100% + 12px)!important}
+#rs-toolbar.rs-tb-left .bm-menu{top:0!important;bottom:auto!important;right:auto!important;left:calc(100% + 12px)!important}
+#rs-toolbar.rs-tb-top .bm-menu{top:calc(100% + 12px)!important;bottom:auto!important;left:0!important;right:auto!important}
+#rs-toolbar.rs-tb-bottom .bm-menu{bottom:calc(100% + 12px)!important;top:auto!important;left:0!important;right:auto!important}
 .maplibregl-ctrl-top-right.rs-emptied{display:none}
+html.rs-has-toolbar .maplibregl-ctrl-top-right{display:none!important}
+#rs-toolbar .bm-ctrl{position:relative!important;overflow:visible}
+#rs-toolbar .bm-menu{position:absolute!important;z-index:9}

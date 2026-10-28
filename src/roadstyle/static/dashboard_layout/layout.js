@@ -39,7 +39,7 @@
     document.addEventListener("rs:basemapchange", ()=>setTimeout(theme, 0));
     theme();
     if(pos){
-      const tb = document.createElement("div"); tb.id = "rs-toolbar"; tb.className = "rs-tb-"+pos; document.body.appendChild(tb);
+      let tb = document.getElementById("rs-toolbar"); if(!tb){ tb = document.createElement("div"); tb.id = "rs-toolbar"; tb.className = "rs-tb-"+pos; document.body.appendChild(tb); }
       const col = document.querySelector(".maplibregl-ctrl-top-right");
       if(col){
         const take = c=>{
