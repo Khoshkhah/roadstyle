@@ -167,7 +167,11 @@ export function initGoogle3D(){
       if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>5) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
     window.rsG3dMode=()=>m3 ? String(m3.mode) : null;
     const redraw=()=>{ if(m3 && line) line.forEach(x=>{ x.remove(); m3.appendChild(x); }); };      // the selected road is drawn again in the new mode
-    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ m3.mode=modeOf(lib); keepMode(); } });
+    // A change of mode makes Google draw again, and it may report a stale or reset camera: for 1 s after the page sets the mode (or Google's own toggle
+    // does) its camera changes are ignored, and then Google is set to the map's camera once. The map's camera never moves for a switch.
+    const modeQuiet=()=>{ ignoreUntil=performance.now()+1000; clearTimeout(modeT); modeT=setTimeout(()=>{ if(m3) setGoogle(); }, 1050); };
+    let modeT=0;
+    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib){ modeQuiet(); m3.mode=modeOf(lib); keepMode(); } });
     const open=()=>{
       if(location.protocol==="file:"){
         say("<b>Google 3D needs this page served, not opened from disk.</b>"+
@@ -177,7 +181,7 @@ export function initGoogle3D(){
       _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
         if(w.hidden || m3) return;               // closed while it loaded
         lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:(k=>k && !/^(HYBRID|SATELLITE)$/i.test(k) ? k : modeOf(l))(keptMode())}));
-        m3.addEventListener("gmp-modechange", ()=>{ keepMode(); redraw(); });
+        m3.addEventListener("gmp-modechange", ()=>{ modeQuiet(); keepMode(); redraw(); });
         for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
         msg.hidden=true; w.appendChild(m3);

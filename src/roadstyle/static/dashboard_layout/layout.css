@@ -86,3 +86,4 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 #rs-toolbar .bm-menu.rs-bm-box{max-height:calc(100vh - 16px)}
 
 #rs-toolbar .bm-menu .rs-bm-row.rs-bm-off{opacity:.45;cursor:not-allowed}
+#rs-toolbar .bm-menu .rs-bm-i{margin-left:auto;flex:none;width:14px;height:14px;line-height:12px;border:1px solid currentColor;border-radius:50%;font:italic 700 10px Georgia,serif;text-align:center;opacity:.65;cursor:help;box-sizing:border-box}

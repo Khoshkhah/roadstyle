@@ -137,6 +137,8 @@ def test_basemap_box(tmp_path):
         names = pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=radio]')].map(e => e.parentElement.querySelector('.rs-bm-n').textContent)")
         assert names == ["OpenFreeMap Liberty", "OpenFreeMap Bright", "OpenFreeMap Positron", "OpenStreetMap", "Esri Gray", "Esri Streets", "Esri Satellite", "Blank"], names
         assert pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=radio]')].every(e => { const s = e.parentElement.querySelector('.rs-bm-sw').getBoundingClientRect(); return Math.round(s.width) === 32 && Math.round(s.height) === 20; })")
+        tips = pg.evaluate("[...document.querySelectorAll('.rs-bm-row')].filter(r => r.querySelector('input[type=checkbox]') && r.querySelector('.rs-bm-i')).map(r => [r.querySelector('.rs-bm-n').textContent, r.querySelector('.rs-bm-i').title.length > 30])")
+        assert tips == [["Hillshade", True], ["Labels", True], ["3D buildings", True]], tips
         tops = pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=checkbox]')].map(e => e.parentElement.querySelector('.rs-bm-n').textContent)")
         assert tops == ["Hillshade", "Labels", "3D buildings", "Satellite labels"], tops
         sw = pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=radio]')].map(e => { const s = getComputedStyle(e.parentElement.querySelector('.rs-bm-sw')); return s.backgroundColor + '|' + s.backgroundImage; })")

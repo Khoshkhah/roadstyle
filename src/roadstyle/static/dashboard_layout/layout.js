@@ -141,7 +141,13 @@
         menu.appendChild(el("hr"));
         menu.appendChild(el("div", "rs-bm-h", "On top"));
         const tops = {};
-        const topRow = (id, label)=>{ const lab = el("label", "rs-bm-row"), c = el("input"); c.type = "checkbox"; c.id = "rs-top-"+id; lab.append(c, el("span", "rs-bm-n", label)); menu.appendChild(lab); tops[id] = {lab, c}; return c; };
+        // each switch has a tooltip and a small "i" with one plain sentence
+        const TIPS = {hillshade: "Shaded relief: the hills drawn with shadows from the terrain heights, as if lit from the north-west, so slopes and valleys show.",
+                      labels: "Place and street names over the base map; greyed where the base map has its own.",
+                      buildings: "The buildings of OpenFreeMap raised to their heights; needs an OpenFreeMap base map and the tilted view."};
+        const topRow = (id, label)=>{ const lab = el("label", "rs-bm-row"), c = el("input"); c.type = "checkbox"; c.id = "rs-top-"+id; lab.append(c, el("span", "rs-bm-n", label));
+          if(TIPS[id]){ lab.title = TIPS[id]; const i = el("span", "rs-bm-i", "i"); i.title = TIPS[id]; lab.append(i); }
+          menu.appendChild(lab); tops[id] = {lab, c}; return c; };
         const roadsFirst = ()=>{ const l = map.getStyle().layers.find(x=>/^roads/.test(x.id)); return l ? l.id : undefined; };
         const RAS = {hillshade: ["https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}", 0.4, "Tiles © Esri"],
                      labels: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", 1, "Tiles © Esri"],
@@ -169,7 +175,7 @@
           raster("satlabels", false);
           if(vec) for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
           tops.labels.c.disabled = kind === "baked"; tops.labels.c.checked = on;         // the switch shows the state of the map that is on
-          tops.labels.lab.title = kind === "baked" ? "This base map has its own labels" : ""; tops.labels.lab.classList.toggle("rs-bm-off", kind === "baked");
+          tops.labels.lab.title = kind === "baked" ? "This base map has its own labels" : TIPS.labels; tops.labels.lab.classList.toggle("rs-bm-off", kind === "baked");
           tops.satlabels.lab.hidden = true;                  // the switch above does this one's work on Esri Satellite
           tops.buildings.c.disabled = !vec; tops.buildings.c.checked = vec && window.rsBuildings ? window.rsBuildings() : false;
           if(lastOn !== on){ lastOn = on; document.dispatchEvent(new Event("rs:labelschange")); } };
