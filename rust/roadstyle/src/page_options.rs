@@ -123,13 +123,20 @@ pub struct Page {
 /// defaults (`look.base_map_page`), and the caller's values: `street_view_key`, `api_key` (put into a base map's URL), and
 /// `resolved_basemaps`, the entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (the caller's key of
 /// each provider). `features`: the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
-pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
-                 -> Result<Page, crate::Error> {
-    let sidebar = match given.get("sidebar").filter(|v| !v.is_null()) {
-        None => None,
-        Some(v) => Some(SIDEBARS.iter().find(|s| v == s.0).ok_or_else(|| crate::error::options(format!("sidebar must be \"dashboard\" or \"report\", got {}", repr(v))))?),
-    };
-    // a sidebar's keywords, where the caller gave none: the page's keys, and one map option (the popup), which stage 1 reads
+type Sidebar = (&'static str, &'static str, &'static str);
+
+/// The sidebar the call names (`sidebar=`), if any.
+fn sidebar_of(given: &Map<String, Value>) -> Result<Option<&'static Sidebar>, crate::Error> {
+    match given.get("sidebar").filter(|v| !v.is_null()) {
+        None => Ok(None),
+        Some(v) => SIDEBARS.iter().find(|s| v == s.0).map(Some)
+            .ok_or_else(|| crate::error::options(format!("sidebar must be \"dashboard\" or \"report\", got {}", repr(v)))),
+    }
+}
+
+/// The page's keywords: the defaults of the page keys, the base map's, the name, a sidebar's where the caller gave none, then the caller's.
+/// With a sidebar, the look too (it sets the popup, which stage 1 reads).
+fn page_args(look: &Look, given: &Map<String, Value>, sidebar: Option<&Sidebar>) -> Result<(Map<String, Value>, Option<Look>), crate::Error> {
     let mut owned = None;
     let mut a = page_key_defaults();
     a.extend(look.base_map_page.iter().map(|(k, v)| (k.clone(), v.clone())));
@@ -149,12 +156,13 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         }
         owned = Some(l);
     }
-    let look = owned.as_ref().unwrap_or(look);
     a.extend(given.iter().map(|(k, v)| (k.clone(), v.clone())));
-    let k: PageKeys = serde_json::from_value(Value::Object(a.clone())).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
-    // the map options that the page reads too: the popup panel, the 3D view, the hover colour, the colour options, the columns
-    let mo = &look.map;
-    let mode = if mo.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { k.popup_mode.as_deref().filter(|m| !m.is_empty()).unwrap_or("popup") };
+    Ok((a, owned))
+}
+
+/// The checks of the page keys that need two of them or the look: the popup mode ("panel" from the look or the key) and the Google key.
+fn check_keys<'a>(k: &'a PageKeys, look: &Look) -> Result<(&'a str, Option<String>), crate::Error> {
+    let mode = if look.map.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { k.popup_mode.as_deref().filter(|m| !m.is_empty()).unwrap_or("popup") };
     if k.side_panel_html.is_some() && mode == "panel" {
         return Err(crate::error::options("side_panel_html and popup_mode='panel' are two panels on the right: use one"));
     }
@@ -165,6 +173,61 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     if k.google_3d && key.is_none() {
         return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY"));
     }
+    Ok((mode, key))
+}
+
+/// The page's style: the base map's layers and sources, then the map's (without its metadata, which the page gives the dashboard as
+/// options). The map's metadata is taken out of `style` and returned.
+fn page_style(style: &mut Value, base: &Value) -> Result<(Value, Value), crate::Error> {
+    let st = style.as_object_mut().ok_or_else(|| crate::error::options("the style is not a JSON object"))?;
+    let meta = st.shift_remove("metadata").unwrap_or_default();
+    let mut layers = base["layers"].as_array().cloned().unwrap_or_default();
+    for l in &mut layers {
+        if let Some(o) = l.as_object_mut() {
+            o.entry("paint").or_insert_with(|| json!({}));         // every layer of the page
+        }
+    }
+    for mut l in st["layers"].as_array().cloned().unwrap_or_default() {
+        if let Some(o) = l.as_object_mut() {
+            o.shift_remove("metadata");
+        }
+        layers.push(l);
+    }
+    let mut sources = base["sources"].as_object().cloned().unwrap_or_default();
+    sources.extend(st["sources"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
+    let mut page_style = json!({"version": 8, "sources": sources, "layers": layers});
+    for k in ["glyphs", "state"] {
+        if let Some(v) = st.get(k) {
+            page_style[k] = v.clone();
+        }
+    }
+    Ok((meta, page_style))
+}
+
+/// The camera: the look's, the 3D view's pitch with decks, then the page keys.
+fn page_camera(look: &Look, k: &PageKeys) -> Result<Camera, crate::Error> {
+    let c = &look.sections.camera;
+    let mut cam = json!({"pitch": c.pitch, "bearing": c.bearing, "pitch_3d": c.pitch_3d, "max_pitch": c.max_pitch});
+    if look.map.bridges.decks_3d {
+        cam["pitch"] = cam["pitch_3d"].clone();
+    }
+    for key in ["pitch", "max_pitch", "bearing"] {
+        if let Some(v) = k_cam(k, key) {
+            cam[key] = v.clone();
+        }
+    }
+    Ok(Camera { pitch: number(&cam["pitch"])?, bearing: number(&cam["bearing"])?, max_pitch: number(&cam["max_pitch"])? })
+}
+
+pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
+                 -> Result<Page, crate::Error> {
+    let sidebar = sidebar_of(given)?;
+    let (a, owned) = page_args(look, given, sidebar)?;
+    let look = owned.as_ref().unwrap_or(look);
+    let k: PageKeys = serde_json::from_value(Value::Object(a.clone())).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
+    // the map options that the page reads too: the popup panel, the 3D view, the hover colour, the colour options, the columns
+    let mo = &look.map;
+    let (mode, key) = check_keys(&k, look)?;
     let bounds = bounds_of(&roads);
     let tiled = k.tiles;
     let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
@@ -185,39 +248,8 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     if !pals.is_empty() {
         palette_swatches(&mut style, &src.table_rows(), &pals, look);       // the rows, not the written table parsed again (N29)
     }
-    let st = style.as_object_mut().ok_or_else(|| crate::error::options("the style is not a JSON object"))?;
-    let meta = st.shift_remove("metadata").unwrap_or_default();
+    let (meta, page_style) = page_style(&mut style, &base)?;
     let (ctl, inter) = (&meta["roadstyle:controls"], &meta["roadstyle:interaction"]);
-    let mut layers = base["layers"].as_array().cloned().unwrap_or_default();
-    for l in &mut layers {
-        if let Some(o) = l.as_object_mut() {
-            o.entry("paint").or_insert_with(|| json!({}));         // every layer of the page
-        }
-    }
-    for mut l in st["layers"].as_array().cloned().unwrap_or_default() {
-        if let Some(o) = l.as_object_mut() {
-            o.shift_remove("metadata");                             // the page gives the dashboard its options; its style has no metadata
-        }
-        layers.push(l);
-    }
-    let mut sources = base["sources"].as_object().cloned().unwrap_or_default();
-    sources.extend(st["sources"].as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
-    let mut page_style = json!({"version": 8, "sources": sources, "layers": layers});
-    for k in ["glyphs", "state"] {
-        if let Some(v) = st.get(k) {
-            page_style[k] = v.clone();
-        }
-    }
-    let (ls, c) = (&look.sections, &look.sections.camera);
-    let mut cam = json!({"pitch": c.pitch, "bearing": c.bearing, "pitch_3d": c.pitch_3d, "max_pitch": c.max_pitch});
-    if mo.bridges.decks_3d {
-        cam["pitch"] = cam["pitch_3d"].clone();
-    }
-    for key in ["pitch", "max_pitch", "bearing"] {
-        if let Some(v) = k_cam(&k, key) {
-            cam[key] = v.clone();
-        }
-    }
     let mut tunnel = ctl["tunnel"].clone();
     tunnel["bg"] = bg.into();
     let opts = PageOptions {
@@ -237,14 +269,13 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         arrow_color: ctl["arrow_color"].clone(), arrow_rules: ctl["arrow_rules"].clone(),
         modes: ctl["modes"].clone(), box_layout: k.box_layout.clone(),
     };
-    let hover = json!(mo.interaction.hover_color.as_ref().unwrap_or(&ls.selection.hover).css());
+    let (ls, hover) = (&look.sections, json!(mo.interaction.hover_color.as_ref().unwrap_or(&look.sections.selection.hover).css()));
     let simple_js = json!({"layer": "roads-simple", "bridge": ls.bridges.casing_color, "shadow": ls.bridges.shadow.color,
                            "select": ctl["select_color"], "hover": hover, "tunnels": present(&ctl["tunnel"]["layers"]),
                            "dashes": ctl["dashes"]});
     let side = gzip_b64(&table);
-    let cam = Camera { pitch: number(&cam["pitch"])?, bearing: number(&cam["bearing"])?, max_pitch: number(&cam["max_pitch"])? };
     let parts = PageParts {
-        name: &k.name, cam, bounds, side_panel_html: k.side_panel_html.as_deref(),
+        name: &k.name, cam: page_camera(look, &k)?, bounds, side_panel_html: k.side_panel_html.as_deref(),
         host_panel_width: k.host_panel_width, compress: k.compress, gz: None, tiles: archive.as_deref(),
         side: Some((&Value::Null, Some(&side))), simple_js: Some(&simple_js), sources: Some(&src),
     };
