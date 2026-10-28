@@ -254,3 +254,36 @@ pub fn levels_summary(lv: &roadstyle_rs::levels::Levels) -> Value {
     }
     s
 }
+
+
+fn data_path(p: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(p)
+}
+
+/// The case's keywords (make_goldens.py's CASES, until 2026-10-24).
+pub fn colour_args(case: &str) -> Value {
+    match case {
+        "plain" => json!({}),
+        "numeric" => json!({"color_by": "lanes", "cmap": "YlOrRd", "vmin": 1, "vmax": 4}),
+        "numeric_width" => json!({"color_by": "lanes", "cmap": "viridis", "width_by": [1.0, 6.0]}),
+        "categorical" => json!({"color_by": "access", "colors": {"private": "#d62728", "destination": "#ff7f0e", "no": "#7f7f7f"}}),
+        "color_table" => json!({"color_table": table_of_colours()}),
+        "color_options" => json!({"color_options": {"class": {}, "lanes": {"color_by": "lanes", "cmap": "Blues", "vmin": 1, "vmax": 3},
+                                                    "access": {"color_by": "access", "colors": {"private": "#d62728"}, "missing": "self"}},
+                                  "color_active": "lanes"}),
+        "no_legend" => json!({"color_by": "lanes", "cmap": "magma", "legend": false}),
+        _ => unreachable!("no case {case}"),
+    }
+}
+
+/// Every third road: one of three colours, by its edge_id (the keys as text, as a JSON object has them).
+pub fn table_of_colours() -> Value {
+    let t = roadstyle_rs::read::read_roads(std::fs::read(data_path("monaco_part/roads.parquet")).unwrap(), "geometry").unwrap();
+    let cols = ["#e41a1c", "#377eb8", "#4daf4a"];
+    let id = |r: usize| {
+        let c = t.get(r, "edge_id").unwrap();
+        c.as_i64().map(|i| i.to_string()).or_else(|| c.as_str().map(String::from)).unwrap()
+    };
+    Value::Object((0..t.len()).step_by(3).map(|r| (id(r), json!(cols[r % 3]))).collect())
+}
+

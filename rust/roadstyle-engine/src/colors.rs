@@ -40,6 +40,72 @@ impl ClassColours {
     }
 }
 
+/// The colours of the pieces when they are not the classes' (a colour by a column, colour options, a colour table): each distinct colour
+/// is in a table of the style, and a piece holds the place of its colour. A table has the fallback colour at place 0, so a piece that
+/// has no colour reads place 0.
+#[derive(Clone)]
+pub struct ColourTable {
+    /// the property of each fill (the colour options', in order) and of the casing
+    pub fills: Vec<String>,
+    pub fill: Colours,
+    pub casing: Colours,
+}
+
+#[derive(Clone)]
+pub struct Colours {
+    pub list: Vec<Value>,
+    at: HashMap<String, i64>,
+}
+
+impl Colours {
+    fn new(fallback: &Value) -> Colours {
+        Colours { list: vec![fallback.clone()], at: HashMap::new() }
+    }
+
+    fn add(&mut self, v: &Value) {
+        if !v.is_null() && !self.at.contains_key(&v.to_string()) {
+            self.at.insert(v.to_string(), self.list.len() as i64);
+            self.list.push(v.clone());
+        }
+    }
+
+    /// The place of the colour `v` (None: null, or not in the table).
+    pub fn place(&self, v: &Value) -> Option<i64> {
+        self.at.get(&v.to_string()).copied()
+    }
+}
+
+impl ColourTable {
+    /// The table of the roads after `bake`: the colours in the order that the roads first have them.
+    pub fn of(fs: &Roads, look: &crate::Look, fills: &[String]) -> ColourTable {
+        let r = &look.sections.roads.fallback;
+        let (mut fill, mut casing) = (Colours::new(&r["fill"]), Colours::new(&r["casing"]));
+        let mut seen = HashSet::new();
+        for d in fs.draw.iter().filter(|d| d.style.is_some_and(|s| seen.insert(s))) {
+            let s = fs.values.style(d.style.expect("a style"));
+            fill.add(fs.values.get(s[0]));
+            casing.add(fs.values.get(s[4]));
+        }
+        for d in &fs.draw {
+            d.fills.iter().for_each(|&f| fill.add(fs.values.get(f)));
+        }
+        ColourTable { fills: fills.to_vec(), fill, casing }
+    }
+
+    /// The piece's colour properties as places in the tables; `palette`: the places of a view palette's copies (`<property>@<palette>`).
+    pub fn put_places(&self, q: &mut roadstyle_model::props::Props<'_, Cell<'_>>, palette: Option<&str>) {
+        let name = |p: &str| palette.map_or_else(|| p.to_string(), |n| roadstyle_model::mark::in_palette(p, n));
+        let casing = Mark::Casing.name();
+        for (prop, colours) in self.fills.iter().map(|f| (f.as_str(), &self.fill)).chain([(casing, &self.casing)]) {
+            if let Some(c) = q.get_mut(&name(prop)) {
+                if let Some(i) = colours.place(&c.to_value()) {
+                    *c = Cell::Int(i);
+                }
+            }
+        }
+    }
+}
+
 /// ResolvedFrame: each edge's style values, as roadstyle writes them (a value given by the caller keeps its JSON form).
 struct Frame {
     fill: Vec<Value>,

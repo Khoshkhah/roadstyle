@@ -46,7 +46,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
     row as the feature id too. The overlay items keep the property `__rs_edge`.
   - `__rs_edge2` is a field of the road table only. `rsFilter` adds the twin of each row from the table.
   - With the class colours only, a piece has no `__rs_fill` and no `__rs_casing` unless its road has another colour; the road layer reads the
-    class colour by `__rs_ci`.
+    class colour by `__rs_ci`. The other colour modes (a colour by a column, a colour table, colour options) have no colour text in a piece
+    either: the distinct fill colours and the distinct casing colours are two tables in the style, and a piece holds the place of its colour
+    (`__rs_fill`, `__rs_fill__<i>`, `__rs_casing`). A page that reads these properties of a tile feature as colours must read the style's
+    tables (the `let` variables of the layer `roads-simple`) or the road table.
   - `roadstyle:generation` (the first 16 hex characters of `edge_hash`) is in the style metadata. The tile URL has `?g=<generation>`, and the
     PMTiles metadata has `generation` and `contract`.
   - `export_style` has no `roads` source, no `roads-fill` and no `roads-highlight` layer in the tiled style, and no `roads` tile layer. It

@@ -150,19 +150,33 @@ pub(super) fn gs(name: &str) -> Value {
     json!(["global-state", name])
 }
 
-/// _fill_base: a road's fill under the active colour option (state rs_co); `props`: the baked fill property of each option, in order.
-pub(super) fn fill_base(props: &[String], fb_fill: &Value) -> Value {
-    let opts: Vec<Value> = props.iter().map(|p| json!(["coalesce", ["get", p], fb_fill])).collect();
-    if opts.len() == 1 {
-        return opts[0].clone();
+/// `each(p)` for the property of the active colour option (state rs_co); `props`: the baked fill property of each option, in order.
+fn by_option(props: &[String], each: impl Fn(&str) -> Value) -> Value {
+    if props.len() == 1 {
+        return each(&props[0]);
     }
     let mut m = vec![json!("match"), gs("rs_co")];
-    for (i, o) in opts.iter().enumerate().skip(1) {
+    for (i, p) in props.iter().enumerate().skip(1) {
         m.push(i.into());
-        m.push(o.clone());
+        m.push(each(p));
     }
-    m.push(opts[0].clone());
+    m.push(each(&props[0]));
     Value::Array(m)
+}
+
+/// _fill_base: a road's fill under the active colour option.
+pub(super) fn fill_base(props: &[String], fb_fill: &Value) -> Value {
+    by_option(props, |p| json!(["coalesce", ["get", p], fb_fill]))
+}
+
+/// A colour that a piece holds as a place in the style's table (the let variable `table`; place 0 is the fallback colour).
+pub(super) fn place_colour(place: Value, table: &str) -> Value {
+    json!(["to-color", ["at", ["number", place, 0], ["var", table]]])
+}
+
+/// The place of a road's fill colour under the active colour option.
+pub(super) fn fill_place(props: &[String], table: &str) -> Value {
+    place_colour(by_option(props, |p| json!(["get", p])), table)
 }
 
 /// _tun_mix: a tunnel feature's colour moved toward the tunnel colour by the strength, keeping its own alpha.

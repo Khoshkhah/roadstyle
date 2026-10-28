@@ -43,6 +43,8 @@ struct Ctx<'a> {
     mz: Option<Map<String, Value>>,
     /// the road layer draws the class's fill and casing colours (by class index) of a piece that has none (`colors::Baked::class_only`)
     class_colours: bool,
+    /// the road layer reads the fill and the casing colours of a piece as places in these tables (`colors::ColourTable`), bound as let variables
+    places: Option<[Value; 2]>,
 }
 
 impl<'a> Ctx<'a> {
@@ -71,6 +73,7 @@ impl<'a> Ctx<'a> {
             h_on: json!(["boolean", ["feature-state", "hover"], false]),
             mz: class_minzoom(look),
             class_colours: false,
+            places: None,
         })
     }
 
@@ -199,13 +202,12 @@ fn line_color(cx: &Ctx, fills: &[String]) -> Value {
     let (s, fb_fill) = (&cx.look.sections, cx.fb_fill());
     let (s_on, h_on) = (&cx.s_on, &cx.h_on);
     let class_colour = |i: usize, fallback: &Value| class_table(cx, i, fallback);
-    let own_fill = if cx.class_colours { json!(["coalesce", ["get", fills[0]], class_colour(0, fb_fill)]) } else { fill_base(fills, fb_fill) };
+    let own_fill = if cx.places.is_some() { fill_place(fills, FILL_TABLE) } else if cx.class_colours { json!(["coalesce", ["get", fills[0]], class_colour(0, fb_fill)]) } else { fill_base(fills, fb_fill) };
     let mut fill = json!(["coalesce", ["feature-state", LIVE_COLOR], own_fill]);
     let mut item = json!(["coalesce", ["feature-state", LIVE_COLOR], ["coalesce", ["get", Mark::ItemColor.name()], fb_fill]]);
     let is_b = json!(["to-boolean", ["get", Mark::Bridge.name()]]);
     let mut cases = vec![piece_kind(2), json!(s.bridges.shadow.color), piece_kind(0),
-                         json!(["case", is_b, s.bridges.casing_color, ["coalesce", ["get", Mark::Casing.name()],
-                                                           if cx.class_colours { class_colour(1, &s.roads.fallback["casing"]) } else { s.roads.fallback["casing"].clone() }]])];
+                         json!(["case", is_b, s.bridges.casing_color, casing_colour(cx, class_colour)])];
     if cx.any_tunnel {
         fill = tun_mix(&fill);
         item = tun_mix(&item);
@@ -217,7 +219,23 @@ fn line_color(cx: &Ctx, fills: &[String]) -> Value {
     let mut color = vec![json!("case")];
     color.extend(cases);
     color.extend([piece_kind(5), item, fill]);
-    Value::Array(color)
+    match &cx.places {
+        Some([f, c]) => json!(["let", FILL_TABLE, ["literal", f], CASING_TABLE, ["literal", c], Value::Array(color)]),
+        None => Value::Array(color),
+    }
+}
+
+/// The names of the let variables that hold the colour tables.
+const FILL_TABLE: &str = "fill_colours";
+const CASING_TABLE: &str = "casing_colours";
+
+/// The casing colour of a piece that is not a bridge: its own (a place in the table, or the colour of its class), else the theme's.
+fn casing_colour(cx: &Ctx, class_colour: impl Fn(usize, &Value) -> Value) -> Value {
+    let fallback = &cx.look.sections.roads.fallback["casing"];
+    if cx.places.is_some() {
+        return json!(["case", ["has", Mark::Casing.name()], place_colour(json!(["get", Mark::Casing.name()]), CASING_TABLE), fallback]);
+    }
+    json!(["coalesce", ["get", Mark::Casing.name()], if cx.class_colours { class_colour(1, fallback) } else { fallback.clone() }])
 }
 
 /// The colour of a class (0: its fill, 1: its casing) as a table over the classes (`class_index` makes it one lookup by class index).
@@ -586,6 +604,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let mut info = PageInfo::default();
     let mut cx = Ctx::new(look, roads, decks)?;
     cx.class_colours = simple.class_colours.is_some() && fills.len() == 1;
+    cx.places = simple.colours.as_ref().map(|t| [json!(t.fill.list), json!(t.casing.list)]);
     let items: Vec<&Props> = simple.items.iter().map(|(_, it)| &it.props).filter(|p| p.get(Mark::PieceKind.name()) == Some(&json!(5))).collect();
     let w = widths(&cx, !items.is_empty());
     let flt = road_filter(&cx, &items);

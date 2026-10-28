@@ -38,6 +38,7 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     // render's view_3d: the bridges' extruded decks (_bridge_decks); a casing slab names the user's own `highway` column, whatever highway_col is
     let decks = if look.map.bridges.decks_3d { decks::bridge_decks(&roads.roads, &look.deck, &look.model, "highway") } else { Vec::new() };
     simple.class_colours = colors.class_only.then(|| crate::colors::ClassColours::of(&look.road, &look.model.classes));
+    simple.colours = (!colors.class_only).then(|| crate::colors::ColourTable::of(&roads.roads, look, &colors.props)).map(Box::new);
     let (mut layers, info) = layers::road_layers(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
                                                  &colors.props, colors.active)?;
     simple.classes = Some(look.model.classes.clone());     // R8: the road layer reads each feature's class index

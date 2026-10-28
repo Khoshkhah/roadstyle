@@ -130,6 +130,7 @@ fn roads(base: &mut Roads, cp: &Roads, n: &str) -> Vec<String> {
 fn simple(b: &mut SimpleSource, c: &SimpleSource, roads: &Roads, cp: &Roads, from: usize, n: &str) -> Result<Vec<String>, crate::Error> {
     let mut keys: Vec<String> = Vec::new();
     let ex = from..roads.extra.len();
+    b.palette_colours.extend(c.colours.as_deref().cloned().map(|t| (n.to_string(), t)));
     for (_, p) in &b.pieces {
         if keys.len() == ex.len() {
             break;          // every mark that differs is found

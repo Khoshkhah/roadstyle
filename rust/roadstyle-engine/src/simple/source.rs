@@ -19,11 +19,15 @@ pub struct SimpleSource {
     /// the road layer draws the class's colours for a piece that has no colour of its own: a piece whose fill or casing is its class's
     /// has none (tile_v2_plan.md, step 6)
     pub class_colours: Option<crate::colors::ClassColours>,
+    /// the other colour modes: a piece holds the place of its fill and casing colour in a table of the style, never the colour text
+    pub colours: Option<Box<crate::colors::ColourTable>>,
+    /// the colour tables of a view's other palettes (palettes.rs), for the pieces' copies of the colours that differ
+    pub palette_colours: Vec<(String, crate::colors::ColourTable)>,
 }
 
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None, colours: None, palette_colours: Vec::new() }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -112,6 +116,12 @@ impl SimpleSource {
                     q.shift_remove(mark.name());
                 }
             }
+        }
+        if let Some(t) = &self.colours {
+            t.put_places(&mut q, None);
+        }
+        for (n, t) in &self.palette_colours {
+            t.put_places(&mut q, Some(n));
         }
         if !run.class {
             q.shift_remove(&self.cols.class);      // the class index read it
@@ -293,5 +303,5 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None, colours: None, palette_colours: Vec::new() })
 }
