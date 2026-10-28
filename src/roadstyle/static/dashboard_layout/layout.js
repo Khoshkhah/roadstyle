@@ -165,7 +165,7 @@
         const labelKind = ()=>vector() ? "style" : /^(satellite|esri_gray|esri_dark_gray|blank|blank_dark)$/.test(current) ? "esri" : "baked";
         // the choice is kept per base map (a map and its dark twin share it); the default is on for an OpenFreeMap style, off where Esri's labels are added
         const baseKey = ()=>{ const t = bms.find(x=>x.dark === current); return t ? t.key : current; };
-        const wantOf = ()=>{ const v = ls("labels:" + baseKey()); return v == null ? vector() : v === "1"; };
+        const wantOf = ()=>{ const v = ls("labels2:" + baseKey()); return v == null ? vector() : v === "1"; };
         let lastOn = null;
         const labelsOn = ()=>labelKind() !== "baked" && wantOf();
         window.rsLabelsOn = labelsOn;          // one state for the map and the Google 3D view (HYBRID with labels, SATELLITE without)
@@ -187,7 +187,7 @@
         topRow("labels", "Labels");
         topRow("buildings", "3D buildings");
         topRow("satlabels", "Satellite labels");
-        for(const id of ["hillshade", "labels"]) tops[id].c.onchange = ()=>{ ss(id === "labels" ? "labels:" + baseKey() : id, tops[id].c.checked); apply(); };
+        for(const id of ["hillshade", "labels"]) tops[id].c.onchange = ()=>{ ss(id === "labels" ? "labels2:" + baseKey() : id, tops[id].c.checked); apply(); };
         tops.buildings.c.onchange = ()=>{ if(window.rsBuildings) window.rsBuildings(tops.buildings.c.checked); };
         const mark = ()=>{ rows.forEach(([b, r])=>{ r.checked = b.key === current || b.dark === current; }); };
         document.addEventListener("rs:basemapchange", e=>{ current = e.detail.basemap; mark(); setTimeout(apply, 0); });
