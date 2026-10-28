@@ -20,6 +20,7 @@ pub mod stage;
 mod geom;
 mod layer;
 mod mvt;
+mod small;
 mod val;
 
 pub use error::Error;
@@ -115,7 +116,13 @@ impl Tiles {
     /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom
     /// of that tile (rules.rs: the class minzoom, `casing.drop_below_px`).
     pub fn drawn_by(&mut self, layers: &[Value]) {
-        self.style = layers.iter().map(|l| serde_json::json!({"source": l["source"], "source-layer": l["source-layer"], "filter": l["filter"]})).collect();
+        self.style = layers.iter().map(|l| serde_json::json!({"source": l["source"], "source-layer": l["source-layer"], "type": l["type"], "filter": l["filter"]})).collect();
+    }
+
+    /// Only `fill` and `line` style layers draw the layer `name` (small.rs): a point, a symbol or an extrusion needs its shape as it is.
+    fn flat(&self, name: &str) -> bool {
+        let mut types = self.style.iter().filter(|l| l["source-layer"].as_str().or(l["source"].as_str()) == Some(name)).peekable();
+        types.peek().is_some() && types.all(|l| matches!(l["type"].as_str(), Some("fill" | "line")))
     }
 
     fn builder(&self, name: &str) -> Builder {
@@ -379,6 +386,9 @@ impl Tiles {
         let (lo, hi) = (-buffer, EXTENT + buffer);
         let simplify = !layer.whole && z < self.max_zoom;
         let tiny = name == PIECES && simplify;
+        // the base map's shapes below the last zoom (small.rs); the pieces have rule B
+        let flat = z < self.max_zoom && !road_layer(name) && self.flat(name);
+        let reach = self.buffers[z as usize];
         let mut made: Vec<(&Feat, u32, Vec<u32>, Vec<Vec<[i32; 2]>>)> = Vec::new();
         for i in hits {
             let f = &layer.feats[i as usize];
@@ -410,7 +420,7 @@ impl Tiles {
                         for (k, r) in poly.iter().enumerate() {
                             // a whole layer's polygon goes into every tile its box touches as it is, not clipped
                             let r: Vec<P> = r.iter().map(to).collect();
-                            let mut r = dedup(if layer.whole { r } else { clip_ring(&r, lo, hi) }.into_iter().map(round));
+                            let mut r = dedup(if flat { small::ring(&r, -reach, EXTENT + reach) } else if layer.whole { r } else { clip_ring(&r, lo, hi) }.into_iter().map(round));
                             if r.len() > 1 && r[0] == r[r.len() - 1] {
                                 r.pop();
                             }
@@ -534,6 +544,101 @@ mod tests {
         let r: Vec<[i32; 2]> = ps[0][0].iter().map(|p| round([p[0] * 4096.0 * 64.0, p[1] * 4096.0 * 64.0])).collect();
         assert!(area(&r) < 0, "lon / lat counterclockwise is negative in the tile's units");
         assert!(!t.tile(0, 0, 0).is_empty());
+    }
+
+    /// The fields of a protobuf message: (field number, varint value, bytes).
+    fn fields(b: &[u8]) -> Vec<(u64, u64, &[u8])> {
+        let (mut i, mut out) = (0, Vec::new());
+        let varint = |i: &mut usize| {
+            let (mut v, mut s) = (0u64, 0);
+            loop {
+                let x = b[*i];
+                *i += 1;
+                v |= ((x & 0x7f) as u64) << s;
+                s += 7;
+                if x < 0x80 {
+                    return v;
+                }
+            }
+        };
+        while i < b.len() {
+            let k = varint(&mut i);
+            if k & 7 == 2 {
+                let n = varint(&mut i) as usize;
+                out.push((k >> 3, 0, &b[i..i + n]));
+                i += n;
+            } else {
+                out.push((k >> 3, varint(&mut i), &b[0..0]));
+            }
+        }
+        out
+    }
+
+    /// The points of every feature of the tile's layer `name`, in the tile's units: (feature's points, as the commands give them).
+    fn points_of(tile: &[u8], name: &str) -> Vec<Vec<[i32; 2]>> {
+        let unzig = |v: u64| ((v >> 1) as i64 ^ -((v & 1) as i64)) as i32;
+        let layers = fields(tile).into_iter().filter(|f| f.0 == 3).map(|f| fields(f.2));
+        let layer = layers.into_iter().find(|l| l.iter().any(|f| f.0 == 1 && f.2 == name.as_bytes())).unwrap_or_default();
+        layer.iter().filter(|f| f.0 == 2).map(|f| {
+            let geometry = fields(f.2).into_iter().find(|g| g.0 == 4).map_or(&b""[..], |g| g.2);
+            let (mut i, mut nums) = (0, Vec::new());
+            while i < geometry.len() {
+                let (mut v, mut s) = (0u64, 0);
+                loop {
+                    let x = geometry[i];
+                    i += 1;
+                    v |= ((x & 0x7f) as u64) << s;
+                    s += 7;
+                    if x < 0x80 {
+                        break;
+                    }
+                }
+                nums.push(v);
+            }
+            let (mut at, mut pts, mut k) = ([0i32, 0i32], Vec::new(), 0);
+            while k < nums.len() {
+                let (id, count) = (nums[k] & 7, (nums[k] >> 3) as usize);
+                k += 1;
+                if id == 7 {
+                    continue;
+                }
+                for _ in 0..count {
+                    at = [at[0] + unzig(nums[k]), at[1] + unzig(nums[k + 1])];
+                    pts.push(at);
+                    k += 2;
+                }
+            }
+            pts
+        }).collect()
+    }
+
+    /// The tile z/x/y of a polygon `land` (a flat layer when `flat`: only a fill layer draws it), with these points in longitude and latitude.
+    fn land(flat: bool, z: u32, x: u32, y: u32, ring: &[[f64; 2]]) -> Vec<u8> {
+        let mut t = Tiles::new(0, 5, 80.0).unwrap();
+        let layers = [json!({"type": if flat { "fill" } else { "circle" }, "source": "land"})];
+        t.drawn_by(&layers);
+        let source = json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
+            {"type": "Feature", "properties": {}, "geometry": {"type": "Polygon", "coordinates": [ring]}}]}});
+        t.add("land", &source, &keys(&[]), true, 0);
+        t.tile(z, x, y)
+    }
+
+    #[test]
+    fn a_flat_layers_polygon_is_cut_to_the_tile_and_simplified() {
+        // a square of 40 degrees with a point every 0.1 degree on each side. The tile 4/6/5 holds the square's west side and not its corners:
+        // the straight side needs its two ends only, and the points out of the tile and its buffer go.
+        let side = |a: [f64; 2], b: [f64; 2]| (0..400).map(move |i| [a[0] + (b[0] - a[0]) * i as f64 / 400.0, a[1] + (b[1] - a[1]) * i as f64 / 400.0]);
+        let (a, b, c, d) = ([-60.0, 20.0], [-20.0, 20.0], [-20.0, 60.0], [-60.0, 60.0]);
+        let ring: Vec<[f64; 2]> = side(a, b).chain(side(b, c)).chain(side(c, d)).chain(side(d, a)).chain([a]).collect();
+        let flat = points_of(&land(true, 4, 6, 5, &ring), "land");
+        let whole = points_of(&land(false, 4, 6, 5, &ring), "land");
+        assert_eq!(whole[0].len(), 1600, "the layer that a circle layer draws keeps every point");
+        assert!(flat[0].len() <= 8, "the straight sides need their corners only: {}", flat[0].len());
+        let buffer = 80.0 / 512.0 * 4096.0;
+        assert!(flat[0].iter().flatten().all(|c| (-buffer..=4096.0 + buffer).contains(&(*c as f64))), "{:?}", flat[0]);
+        assert!(whole[0].iter().flatten().any(|c| (*c as f64) < -buffer || (*c as f64) > 4096.0 + buffer));
+        // the last zoom is as it was
+        assert_eq!(land(true, 5, 12, 10, &ring), land(false, 5, 12, 10, &ring));
     }
 
     #[test]
