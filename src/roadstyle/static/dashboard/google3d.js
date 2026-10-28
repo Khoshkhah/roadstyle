@@ -22,7 +22,7 @@ export function initGoogle3D(){
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
-    let m3=null, lib=null, line=null, btn=null, lastMap=0, queued=false;
+    let m3=null, lib=null, line=null, btn=null, queued=false;
     const say=html=>{ msg.innerHTML=html; msg.hidden=false; if(m3){ m3.remove(); m3=null; line=null; } };
     const SETUP='<a href="https://khoshkhah.github.io/roadstyle/guides/google-key/" target="_blank" rel="noopener">How to set up the key ↗</a>';
     const prevAuth=window.gm_authFailure;       // Google calls this when it refuses the key on this address
@@ -47,7 +47,7 @@ export function initGoogle3D(){
         const img=new Image(); img.crossOrigin="anonymous";
         img.onload=()=>{ const c=document.createElement("canvas"); c.width=c.height=256;
           const g=c.getContext("2d", {willReadFrequently:true}); g.drawImage(img, 0, 0);
-          t.px=g.getImageData(0, 0, 256, 256).data; if(m3) Object.assign(m3, toGoogle()); };
+          t.px=g.getImageData(0, 0, 256, 256).data; if(m3) setGoogle(); };
         img.onerror=()=>{ warn.hidden=false; console.warn("rs google 3d: no ground heights from", img.src); };
         img.src="https://s3.amazonaws.com/elevation-tiles-prod/terrarium/"+key+".png"; }
       if(!t.px) return lastGround;
@@ -84,31 +84,31 @@ export function initGoogle3D(){
     const there=t=>{ const c=map.getCenter();     // the map is already at t: Google's change came from the map
       return Math.abs(c.lng-t.center[0])<1e-7 && Math.abs(c.lat-t.center[1])<1e-7 && turn(map.getBearing(), t.bearing)<0.05 &&
              Math.abs(map.getPitch()-t.pitch)<0.05 && Math.abs(map.getZoom()-t.zoom)<0.002; };
-    // ONE OWNER PER GESTURE. While the pointer is down in the 3D window, the 3D view leads: the map follows with one jumpTo per frame, and
-    // the map's moves are not sent back. While the map is dragged, the map leads. The owner is released one frame after the pointer goes up,
-    // and the two cameras are then made equal once. Each direction sends at most one update per frame.
-    let owner=null, toGQueued=false;
-    const release=()=>{ if(!owner) return; requestAnimationFrame(()=>requestAnimationFrame(()=>{ owner=null;
-      if(m3 && m3.center && m3.range && !there(toMap())) Object.assign(m3, toGoogle()); })); };
-    w.addEventListener("pointerdown", ()=>{ owner="3d"; }, true);
-    map.getContainer().addEventListener("pointerdown", ()=>{ owner="map"; }, true);
-    window.addEventListener("pointerup", release, true);
-    window.addEventListener("pointercancel", release, true);
-    map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows
-      if(!m3 || e.rsG3d || owner==="3d") return;
-      lastMap=performance.now();
-      if(toGQueued) return; toGQueued=true;
-      requestAnimationFrame(()=>{ toGQueued=false; if(m3 && owner!=="3d") Object.assign(m3, toGoogle()); }); });
+    // TAGGED MOVES, NO GESTURE DETECTION (Google's element keeps its pointer events inside its own canvas, and its inertia goes on after the
+    // pointer is up). Each camera is moved by the page in one place, and the echo is dropped where it comes back:
+    //  - the 3D camera moves the map with map.jumpTo(cam, {rsSync:true}); the map's "move" handler ignores a move with rsSync, so it is not sent back;
+    //  - the map moves the 3D camera with setGoogle(), which keeps the values it set for a second; a camera-change of Google within a small
+    //    tolerance of one of them (1e-7 degrees, 0.5 m, 0.2 degrees) is the echo of that set, and is ignored.
+    // Each direction runs at most once per frame. window.rsG3dCount counts both (the debug line shows them per second).
+    const COUNT=window.rsG3dCount={g2m:0, m2g:0}, sets=[];
+    const setGoogle=()=>{ if(!m3) return; const g=toGoogle(), now=performance.now(); Object.assign(m3, g); COUNT.m2g++;
+      sets.push({t:now, lat:g.center.lat, lng:g.center.lng, range:g.range, heading:g.heading, tilt:g.tilt});
+      while(sets.length && now-sets[0].t>1000) sets.shift(); };
+    const echo=()=>{ const c=m3.center||{}, h=m3.heading||0, t=m3.tilt||0, r=m3.range;
+      return sets.some(x=>Math.abs(c.lat-x.lat)<1e-7 && Math.abs(c.lng-x.lng)<1e-7 && Math.abs(r-x.range)<0.5 && turn(h, x.heading)<0.2 && Math.abs(t-x.tilt)<0.2); };
+    let toGQueued=false;
+    map.on("move", e=>{                          // the map moved (mouse, keys, buttons): Google follows, once a frame
+      if(!m3 || e.rsSync || e.rsG3d || toGQueued) return; toGQueued=true;
+      requestAnimationFrame(()=>{ toGQueued=false; setGoogle(); }); });
     const fromGoogle=()=>{                       // Google moved: the map follows, once a frame
       if(queued) return; queued=true;
       requestAnimationFrame(()=>{ queued=false;
-        if(!m3 || !m3.center || !m3.range || owner==="map") return;
-        if(owner===null && performance.now()-lastMap<300) return;     // late reports of a map move would pull the map back
+        if(!m3 || !m3.center || !m3.range || echo()) return;
         const t=toMap(); if(there(t)) return;
-        map.jumpTo(t, {rsG3d:true});
+        map.jumpTo(t, {rsG3d:true, rsSync:true}); COUNT.g2m++;
         // THE MAP IS THE JUDGE: where it cannot follow (its maxBounds box, its maximum pitch) it stops at its limit, and Google goes
-        // back to the map's camera. Not while the pointer is down in the 3D window: the release makes the two equal.
-        if(owner!=="3d" && !there(t)) Object.assign(m3, toGoogle()); }); };
+        // back to the map's camera.
+        if(!there(t)) setGoogle(); }); };
     // THE MAP'S CENTER BESIDE THE WINDOW: while the window is open, the map's padding puts its center (the
     // point the two cameras share, where a clicked road comes to) in the middle of the map's free side, so
     // the window does not cover it. Phones keep the plain center: there the window docks at the bottom.

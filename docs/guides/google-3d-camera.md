@@ -47,7 +47,7 @@ By default, roadstyle moves the map center to the free part of the map while the
 
 A review page sets this option to false, because a drag of a window or a toggle of a panel must not move the map.
 
-One owner leads each gesture. While the pointer is down in the 3D window, the 3D view leads. The map follows with one `jumpTo` per frame, and the map's moves do not go back to the 3D view. While the map is dragged, the map leads. The page releases the owner one frame after the pointer goes up, and then makes the two cameras equal once. This stops the map from shaking in a swipe.
+The page does not detect gestures, because Google's element keeps its pointer events inside its own canvas. It tags its own moves instead. The 3D camera moves the map with `map.jumpTo(camera, {rsSync: true})`, and the map ignores a move with that tag. The map moves the 3D camera, and the page keeps the values it set for one second. A camera change of Google that is within 1e-7 degrees, 0.5 m and 0.2 degrees of one of them is the echo of that set, and the page ignores it. Each direction runs once per frame at most. `window.rsG3dCount` counts both directions: `g2m` (3D to map) and `m2g` (map to 3D). During a drag in the 3D window `m2g` stays at 0. During a drag of the map `g2m` stays at 0.
 
 ## 5. Check the link in a browser
 

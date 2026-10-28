@@ -25,5 +25,6 @@ def test_range_and_zoom_are_inverse():
     assert abs(z - 16.3) < 1e-9 and r > 0
 
 
-def test_one_owner_per_gesture():
-    assert "ONE OWNER PER GESTURE" in SRC and 'owner="3d"' in SRC and 'owner==="map"' in SRC
+def test_tagged_moves_not_gesture_detection():
+    assert "TAGGED MOVES" in SRC and "{rsG3d:true, rsSync:true}" in SRC and "e.rsSync" in SRC and "owner" not in SRC and "pointerdown" not in SRC
+    assert "Math.abs(c.lat-x.lat)<1e-7" in SRC and "Math.abs(r-x.range)<0.5" in SRC and "turn(h, x.heading)<0.2" in SRC
