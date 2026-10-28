@@ -66,8 +66,8 @@ ol.src { font-size: 13px; }
 <main>
 
 <h1>Tiles v2: the review and the plan</h1>
-<p class="lead decided">Status: <strong>decided</strong> (Kaveh, 2026-10-27: D0, D1, D5 and D9 yes; phase 1 and D2 out). No code yet. roadstyle branch
-<code>design-tile-v2</code>, from <code>rust-engine</code> at <code>7dbf59d</code>. Two reviews and a web research are applied. The same text:
+<p class="lead decided">Status: <strong>decided</strong> (Kaveh, 2026-10-27: D0, D1, D5 and D9 yes; phase 1 and D2 out). Steps 0 to 7 are done on roadstyle branch
+<code>design-tile-steps</code>, from <code>rust-engine</code> at <code>6317dd7</code> (<a href="#results">section 12</a>); step 8, the page PR, waits. The plan came from branch <code>design-tile-v2</code> (<code>rust-engine</code> at <code>7dbf59d</code>). Two reviews and a web research are applied. The same text:
 <code>docs/design/tile_v2_plan.md</code>.</p>
 
 <p><strong>The rule of this plan:</strong> a step is in it only if a measurement shows a real gain (time on the Burnaby tilted view above the
@@ -90,6 +90,7 @@ differ by up to 0.15 s.</p>
 <li><a href="#not-done">Not done, and why</a></li>
 <li><a href="#practice">Against established practice</a></li>
 <li><a href="#review">The reviews</a></li>
+<li><a href="#results">Results</a></li>
 <li><a href="#decisions">Decisions</a></li>
 <li><a href="#sources">Sources</a></li>
 </ol>
@@ -440,6 +441,45 @@ with one id: the tiles are for MapLibre clients.</p>
 <li>Step 1 on phones: <strong>accepted</strong>; the phone check measures the time.</li>
 <li>Shared ids: <strong>accepted</strong> (section 7).</li>
 </ol>
+
+<h2 id="results">12. Results of steps 0 to 7 (2026-10-27, branch <code>design-tile-steps</code>)</h2>
+<p>Each step is one commit. After each, <code>cargo test</code>, clippy, the Python suite, the guard and the tile budget pass; the budget only went down,
+with one reason-listed raise (step 6). The wasm cross-language test needs a new editor package (<code>rust/roadstyle-wasm/build_editor.sh</code>) after
+each step: the package in the shared target folder is the one of the last build.</p>
+<div class="box"><table>
+<tr><th>Step</th><th>Commit</th><th>What changed</th></tr>
+<tr><td>0</td><td><code>c7b2531</code></td><td>Tests of removed modules (<code>roadstyle.tiles</code>, the full look, the <code>mapstyle</code> project) are gone. The guard reads the tests: a <code>"__rs_</code> name only in <code>mark.rs</code>.</td></tr>
+<tr><td>3</td><td><code>233b792</code></td><td>One key set for each tile layer (<code>TileOptions::rule</code>). A base-map layer (<code>roadstyle:base</code>) keeps the keys that its style layers and the popup read: <code>ov4</code> has <code>height</code> and <code>base</code> only. The slot key <code>fl</code> is gone.</td></tr>
+<tr><td>4</td><td><code>546aaee</code></td><td>The road's row is the MVT id of the pieces and the slots. <code>promoteId</code>, the tile keys <code>__rs_edge</code> and <code>__rs_s</code> are gone; <code>r</code> and the sort key <code>r * 2<sup>32</sup> + id</code>. The contract is version 2, the generation is in the style metadata (<code>roadstyle:generation</code>), in the tile URL (<code>?g=</code>) and in the PMTiles metadata.</td></tr>
+<tr><td>5</td><td><code>196b5d8</code></td><td><code>__rs_edge2</code> is a field of the road table only; <code>rsFilter</code> adds the twin from the table.</td></tr>
+<tr><td>6</td><td><code>fe5efa2</code></td><td>The class colours are not in the pieces: the road layer reads them by <code>__rs_ci</code>. A piece has <code>__rs_fill</code> or <code>__rs_casing</code> only when its road has another colour (an access kind). Colour by a column, colour options and a colour table keep the colour text (not done: a number key or <code>rs_c</code>).</td></tr>
+<tr><td>7</td><td><code>185dfbc</code></td><td>A tiled style has no <code>roads</code> source and no <code>roads-fill</code> or <code>roads-highlight</code> layer. <code>export_style</code> writes <code>props.json</code> (the fields of each road by row, <code>roadstyle:interaction.props</code>). The inline export keeps the <code>roads</code> source.</td></tr>
+</table></div>
+<p>The page's look, the tiles of the budget views (the 3 x 3 tiles of Monaco and of Tartu at zoom 12 to 15; the numbers are the budget limits,
+the measured number plus 2 %):</p>
+<div class="box"><table>
+<tr><th>Number</th><th>Before (<code>6317dd7</code>)</th><th>After</th></tr>
+<tr><td>Bytes of the tiles of a view</td><td>Monaco 84,569 / 280,951 / 412,244 / 1,184,014; Tartu 398,764 / 1,149,502 / 1,113,303 / 798,981</td><td>&minus;26 % to &minus;30 % in every view</td></tr>
+<tr><td><code>simple</code>, largest tile, distinct values (Monaco z15)</td><td>8,713</td><td>68</td></tr>
+<tr><td><code>simple</code> features without an MVT id (Monaco z15)</td><td>6,556</td><td>0 (the budget limit is 1)</td></tr>
+<tr><td><code>simple</code> keys (z14 / z15)</td><td>19</td><td>15</td></tr>
+<tr><td><code>simple</code> unread keys</td><td>4</td><td>1</td></tr>
+<tr><td>Full look (<code>export_style</code>), bytes of a view (Tartu z12 / Monaco z15)</td><td>8,126,709 / 2,888,569</td><td>294,245 / 826,955 (the <code>roads</code> layer is gone)</td></tr>
+<tr><td>Style, <code>roads-simple</code> <code>line-color</code>, characters</td><td>1,767</td><td>2,239 (the class tables, once; the budget has the raise and its reason)</td></tr>
+</table></div>
+<p>Burnaby (the duckOSM file <code>burnaby.duckdb</code>, 40,872 directed roads; the 151,770-road data of the earlier runs is not on this machine), the
+tiles of the Python binding, MapLibre 5.24.0 with 4 workers, headless Chromium with software GL, the median of 5 runs, a new page for each run:</p>
+<div class="box"><table>
+<tr><th>View</th><th>Tiles</th><th>Bytes before</th><th>Bytes after</th><th>ms to idle before</th><th>ms to idle after</th><th>Pixels that differ</th></tr>
+<tr><td>Tilted, pitch 60, z14</td><td>28</td><td>1,146,626</td><td>850,147 (&minus;26 %)</td><td>324</td><td>335</td><td>0</td></tr>
+<tr><td>Flat z12</td><td>9</td><td>626,385</td><td>458,406 (&minus;27 %)</td><td>210</td><td>221</td><td>0</td></tr>
+<tr><td>Flat z13</td><td>8</td><td>1,171,479</td><td>856,388 (&minus;27 %)</td><td>270</td><td>293</td><td>0</td></tr>
+</table></div>
+<p>The times are inside the batch noise (0.15 s): these steps are a size and a contract gain, as the plan said. On this data the whole
+tilted view takes about 0.3 s, so a time gain is not visible.</p>
+<p><strong>What the page PR (step 8) must change:</strong> see the list in the CHANGELOG, "Tiles, contract 2". <strong>Not done:</strong> a number key or the feature
+state <code>rs_c</code> for a colour by a column (step 6 handles the class colours only); a check of the generation in the dashboard (it checks the
+contract version, 2); the planet-scale count of directed edges against 2<sup>32</sup> (D9).</p>
 
 <h2 id="decisions">11. Decisions (Kaveh, 2026-10-27)</h2>
 <div class="box"><table>

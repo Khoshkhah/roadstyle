@@ -33,7 +33,7 @@ map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bo
 // the tiles of the roads style now on the map: rs://<generation>/<source>/<z>/<x>/<y>, a new generation for each style
 let tiler = null, gen = 0;
 maplibregl.addProtocol("rs", async (params) => {
-  const [g, source, z, x, y] = params.url.slice("rs://".length).split("/");
+  const [g, source, z, x, y] = params.url.slice("rs://".length).split("?")[0].split("/")     // the URL has ?g=<generation>;
   return {data: +g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array()};
 });
 // the dashboard before the roads: no style yet

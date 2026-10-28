@@ -41,7 +41,7 @@ answer({
     return {style: tiler.style(), table: rows, transfer: [rows.buffer]};
   },
   tile({url}){
-    const [g, source, z, x, y] = url.slice("lv://".length).split("/");
+    const [g, source, z, x, y] = url.slice("lv://".length).split("?")[0].split("/")     // the style's URL has ?g=<generation>;
     return bytes(+g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array());
   },
 });

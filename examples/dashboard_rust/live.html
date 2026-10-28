@@ -32,7 +32,7 @@ const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
 const tiler = tilesOfSources(sources, "rs://1/", ["name", "edge_id", "highway"]);
 const style = JSON.parse(tiler.style());
 maplibregl.addProtocol("rs", async (p) => {
-  const [, source, z, x, y] = p.url.slice("rs://".length).split("/");
+  const [, source, z, x, y] = p.url.slice("rs://".length).split("?")[0].split("/")     // the URL has ?g=<generation>;
   return {data: tiler.tile(source, +z, +x, +y)};
 });
 const map = new maplibregl.Map({container: "map", style, attributionControl: {compact: true}});

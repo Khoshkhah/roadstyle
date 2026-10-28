@@ -35,6 +35,30 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **Tiles, contract 2** (steps 3 to 7 of `docs/design/tile_v2_plan.md`, 2026-10-27; the tile bytes of the page's look are 26 to 30 % smaller,
+  the picture is the same). The style metadata `roadstyle:contract` is 2: a dashboard of contract 1 refuses it; the new dashboard reads
+  contract 1 and 2.
+  - A key set for each tile layer: the pieces keep the style's keys, the page's keys and the 3 filter keys (`__rs_cls`, `lvl`,
+    `__rs_access`); a base-map layer (`roadstyle:base` names them) keeps the keys that its style layers and the popup read (`ov4`: `height`
+    and `base`, not `osm_id`, `kind`, `name`); the slots lose `fl`.
+  - The road's row is the MVT id of the pieces and the slots. The keys `__rs_edge` and `__rs_s` and the `promoteId` of the vector source are
+    gone; the new key `r` (the rank) and the sort key `["+", ["*", ["get", "r"], 4294967296], ["id"]]`. The inline GeoJSON of the pieces has the
+    row as the feature id too. The overlay items keep the property `__rs_edge`.
+  - `__rs_edge2` is a field of the road table only. `rsFilter` adds the twin of each row from the table.
+  - With the class colours only, a piece has no `__rs_fill` and no `__rs_casing` unless its road has another colour; the road layer reads the
+    class colour by `__rs_ci`.
+  - `roadstyle:generation` (the first 16 hex characters of `edge_hash`) is in the style metadata. The tile URL has `?g=<generation>`, and the
+    PMTiles metadata has `generation` and `contract`.
+  - `export_style` has no `roads` source, no `roads-fill` and no `roads-highlight` layer in the tiled style, and no `roads` tile layer. It
+    writes `props.json` (the fields of each road by row; `roadstyle:interaction.props`): a click on a piece reads `props[feature.id]`.
+    The inline export (`export_inline`) keeps the `roads` source. The tiles of its Tartu z12 view go from 8.1 MB to 0.29 MB.
+  - **What a page that has its own copy of the dashboard must change (the page PR, step 8 of the plan):** (1) take the new dashboard and
+    `level_editor.js` together; (2) remove `promoteId` from the `addSource` of the vector source `roads`; (3) read `f.id` for the road of a
+    piece or a slot; (4) a tile protocol handler (`rs://`, `lv://`) must ignore the query of the URL (`?g=<generation>`): split the URL at `?`
+    first; (5) make the new wasm package (`build_editor.sh`); the names of the wasm functions have not changed; (6) a page of the
+    contract 1 style with the new dashboard still works (inline GeoJSON with `promoteId`), a page of the new style with the old dashboard
+    shows an error.
+- **Housekeeping.** Tests of removed modules are gone; the guard `scripts/check_no_python_shape.py` reads the tests for `"__rs_` names too.
 - **An unknown keyword is an error** in `render_edges` (a `ValueError` that names the nearest known keyword). It was a warning.
   The page's own keys are typed: a value of another type is an error too.
 - **Rust's own names** (the Rust API is the design). The functions of the Rust facade, the browser package and the Python module

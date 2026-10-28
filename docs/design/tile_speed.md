@@ -131,6 +131,24 @@ The gain is in the low zooms that MapLibre parses and draws. The tilted view at 
   the work that the engine did again.
 - **Pieces sorted by road before the make.** The pieces of a road are already one after another. A sort gave no gain.
 
+## Tiles v2, steps 3 to 7 (2026-10-27)
+
+The steps of `tile_v2_plan.md` (the row as the MVT id, one key set for each tile layer, no `__rs_edge2`, no class colour text, no `roads`
+tile layer) make the tiles smaller and the style simpler. They do not change a pixel. MapLibre 5.24.0 with 4 workers, headless Chromium
+with software GL, the median of 5 runs, a new page for each run, the tiles of the Python binding. Burnaby here is the duckOSM file
+`burnaby.duckdb` (40,872 directed roads; no overlay layers), before = `6317dd7`, after = the end of `design-tile-steps`.
+
+| View | Tiles | Bytes before | Bytes after | ms to idle before | ms to idle after | Pixels that differ |
+|---|---|---|---|---|---|---|
+| Tilted, pitch 60, z14 | 28 | 1,146,626 | 850,147 (−26 %) | 324 | 335 | 0 |
+| Flat z12 | 9 | 626,385 | 458,406 (−27 %) | 210 | 221 | 0 |
+| Flat z13 | 8 | 1,171,479 | 856,388 (−27 %) | 270 | 293 | 0 |
+
+The time did not change (the difference is inside the batch noise of 0.15 s; on this small area the parse of the roads is a small part of
+0.3 s). The gain is the size, the simpler contract and the full look: its Tartu z12 view goes from 8.1 MB to 0.29 MB because the
+`roads` tile layer is gone. In the budget (`tile_budget.json`), the largest `simple` tile of Monaco z15 has 68 distinct values (was 8,713),
+15 keys (was 19) and an MVT id on every piece.
+
 ## The next levers
 
 The Node profile of the tilted view after this change: interning about 90 ms, tile encoding (`Tiles::build`) about 60 ms of its

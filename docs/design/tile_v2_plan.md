@@ -1,7 +1,7 @@
 # Tiles v2: the review and the plan
 
-Status: **decided** (Kaveh, 2026-10-27: D0, D1, D5 and D9 yes; phase 1 and D2 out). No code yet. Branch `design-tile-v2`, from
-`rust-engine` at `7dbf59d` (phase 0, the tile size standard, is in). Two reviews (`.claude/tile-lag/plan-review.md` and
+Status: **steps 0 to 7 are done** on branch `design-tile-steps` (from `rust-engine` at `6317dd7`, 2026-10-27; section 12 has the results). Step 8, the
+page PR, waits. Decided by Kaveh, 2026-10-27: D0, D1, D5 and D9 yes; phase 1 and D2 out. The plan came from branch `design-tile-v2` (`rust-engine` at `7dbf59d`). Two reviews (`.claude/tile-lag/plan-review.md` and
 `final-review-fable.md`) and a web research (`research.md`) are applied (sections 10 and 11). The same plan with diagrams:
 `tile_v2_plan.html`.
 
@@ -196,6 +196,50 @@ Sources:
 14. The vector tile spec 2.1: https://raw.githubusercontent.com/mapbox/vector-tile-spec/master/2.1/README.md
 15. Planetiler config: https://raw.githubusercontent.com/onthegomap/planetiler/main/planetiler-core/src/main/java/com/onthegomap/planetiler/config/PlanetilerConfig.java
 16. Shortbread schema: https://shortbread-tiles.org/schema/1.0/
+
+## 12. Results of steps 0 to 7 (2026-10-27, branch `design-tile-steps`)
+
+Each step is one commit. After each, `cargo test`, clippy, the Python suite, the guard and the tile budget pass; the budget only went down,
+with one reason-listed raise (step 6). The wasm cross-language test needs a new editor package (`rust/roadstyle-wasm/build_editor.sh`) after
+each step: the package in the shared target folder is the one of the last build.
+
+| Step | Commit | What changed |
+|---|---|---|
+| 0 | `c7b2531` | Tests of removed modules (`roadstyle.tiles`, the full look, the `mapstyle` project) are gone. The guard reads the tests: a `"__rs_` name only in `mark.rs`. |
+| 3 | `233b792` | One key set for each tile layer (`TileOptions::rule`). A base-map layer (`roadstyle:base`) keeps the keys that its style layers and the popup read: `ov4` has `height` and `base` only. The slot key `fl` is gone. |
+| 4 | `546aaee` | The road's row is the MVT id of the pieces and the slots. `promoteId`, the tile keys `__rs_edge` and `__rs_s` are gone; `r` and the sort key `r * 2^32 + id`. The contract is version 2, the generation is in the style metadata (`roadstyle:generation`), in the tile URL (`?g=`) and in the PMTiles metadata. |
+| 5 | `196b5d8` | `__rs_edge2` is a field of the road table only; `rsFilter` adds the twin from the table. |
+| 6 | `fe5efa2` | The class colours are not in the pieces: the road layer reads them by `__rs_ci`. A piece has `__rs_fill` or `__rs_casing` only when its road has another colour (an access kind). Colour by a column, colour options and a colour table keep the colour text (not done: a number key or `rs_c`, see below). |
+| 7 | `185dfbc` | A tiled style has no `roads` source and no `roads-fill` or `roads-highlight` layer. `export_style` writes `props.json` (the fields of each road by row, `roadstyle:interaction.props`). The inline export keeps the `roads` source. |
+
+The page's look, the tiles of the budget views (the 3 x 3 tiles of Monaco and of Tartu at zoom 12 to 15; the numbers are the budget limits,
+the measured number plus 2 %):
+
+| Number | Before (`6317dd7`) | After |
+|---|---|---|
+| Bytes of the tiles of a view | Monaco 84,569 / 280,951 / 412,244 / 1,184,014; Tartu 398,764 / 1,149,502 / 1,113,303 / 798,981 | −26 % to −30 % in every view |
+| `simple`, largest tile, distinct values (Monaco z15) | 8,713 | 68 |
+| `simple` features without an MVT id (Monaco z15) | 6,556 | 0 (the budget limit is 1) |
+| `simple` keys (z14 / z15) | 19 | 15 |
+| `simple` unread keys | 4 | 1 |
+| Full look (`export_style`), bytes of a view (Tartu z12 / Monaco z15) | 8,126,709 / 2,888,569 | 294,245 / 826,955 (the `roads` layer is gone) |
+| Style, `roads-simple` `line-color`, characters | 1,767 | 2,239 (the class tables, once; the budget has the raise and its reason) |
+
+Burnaby (the duckOSM file `burnaby.duckdb`, 40,872 directed roads; the 151,770-road data of the earlier runs is not on this machine), the
+tiles of the Python binding, MapLibre 5.24.0 with 4 workers, headless Chromium with software GL, the median of 5 runs, a new page for each run:
+
+| View | Tiles | Bytes before | Bytes after | ms to idle before | ms to idle after | Pixels that differ |
+|---|---|---|---|---|---|---|
+| Tilted, pitch 60, z14 | 28 | 1,146,626 | 850,147 (−26 %) | 324 | 335 | 0 |
+| Flat z12 | 9 | 626,385 | 458,406 (−27 %) | 210 | 221 | 0 |
+| Flat z13 | 8 | 1,171,479 | 856,388 (−27 %) | 270 | 293 | 0 |
+
+The times are inside the batch noise (0.15 s): these steps are a size and a contract gain, as the plan said. On this data the whole
+tilted view takes about 0.3 s, so a time gain is not visible.
+
+**What the page PR (step 8) must change:** see the list in the CHANGELOG, "Tiles, contract 2". **Not done:** a number key or the feature
+state `rs_c` for a colour by a column (step 6 handles the class colours only); a check of the generation in the dashboard (it checks the
+contract version, 2); the planet-scale count of directed edges against 2^32 (D9).
 
 ## Decisions (Kaveh, 2026-10-27)
 
