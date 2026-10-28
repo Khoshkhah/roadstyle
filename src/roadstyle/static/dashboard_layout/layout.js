@@ -65,6 +65,18 @@
         box.hidden = !box.hidden; };
       document.addEventListener("click", e=>{ if(!e.target.closest || !e.target.closest(".rs-attr-ctrl")) box.hidden = true; }, true);
       document.addEventListener("keydown", e=>{ if(e.key === "Escape") box.hidden = true; }, true);
+      // the theme switch: the first button of the bar (above zoom in); it presses the dashboard's own "Light / dark" button, which is then hidden
+      const thBtn = document.getElementById("sb-th"), sbTh = document.getElementById("sb");
+      if(thBtn && sbTh){
+        const th = document.createElement("div"); th.className = "maplibregl-ctrl maplibregl-ctrl-group rs-theme-ctrl";
+        const SUN = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+        const MOON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg>';
+        th.innerHTML = '<button type="button" id="rs-theme-btn" title="Light / dark"></button>';
+        const tb2 = th.querySelector("button"), paint = ()=>{ const dark = sbTh.dataset.theme === "dark"; tb2.innerHTML = dark ? MOON : SUN; tb2.dataset.theme = dark ? "dark" : "light"; };
+        tb2.onclick = ()=>thBtn.click();
+        new MutationObserver(paint).observe(sbTh, {attributes:true, attributeFilter:["data-theme"]}); paint();
+        tb.insertBefore(th, tb.firstChild); document.documentElement.classList.add("rs-theme-in-bar");
+      }
       const col = document.querySelector(".maplibregl-ctrl-top-right");
       if(col){
         const take = c=>{

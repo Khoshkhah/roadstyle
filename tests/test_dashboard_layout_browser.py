@@ -155,3 +155,21 @@ def test_basemap_box(tmp_path):
         pg.uncheck("#rs-top-hillshade")
         assert pg.evaluate("!map.getLayer('rs-top-hillshade')")
         b.close()
+
+
+def test_theme_button_on_the_bar(tmp_path):
+    path = _page(tmp_path, "right")
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && document.getElementById('rs-theme-btn') && document.getElementById('rs-toolbar').classList.contains('rs-ready')", timeout=60000)
+        order = pg.evaluate("[...document.querySelectorAll('#rs-toolbar button')].map(b => b.id)")
+        assert order[0] == "rs-theme-btn" and order[-1] == "rs-attr-btn", order
+        assert pg.evaluate("getComputedStyle(document.getElementById('sb-th')).display") == "none"
+        assert pg.evaluate("document.getElementById('rs-theme-btn').dataset.theme") == "light"
+        pg.click("#rs-theme-btn")
+        assert pg.evaluate("[document.getElementById('sb').dataset.theme, document.getElementById('rs-theme-btn').dataset.theme, document.getElementById('rs-theme-btn').innerHTML.includes('<circle')]") == ["dark", "dark", False]
+        pg.click("#rs-theme-btn")
+        assert pg.evaluate("[document.getElementById('sb').dataset.theme, document.getElementById('rs-theme-btn').innerHTML.includes('<circle')]") == ["light", True]
+        b.close()
