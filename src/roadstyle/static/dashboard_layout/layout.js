@@ -128,6 +128,10 @@
           if(dark && b.dark) window.rsSetBasemap(b.dark);
           else if(!dark){ const light = bms.find(x=>x.dark === current); if(light) window.rsSetBasemap(light.key); } }).observe(sbT, {attributes:true, attributeFilter:["data-theme"]});
         mark(); apply();
+        // the box opens inside the window: moved up or down by what it overhangs
+        new MutationObserver(()=>{ if(!menu.classList.contains("open")) return; menu.style.marginTop = "0px";
+          const r = menu.getBoundingClientRect(), over = r.bottom - (innerHeight - 8), under = 8 - r.top;
+          menu.style.marginTop = (over > 0 ? -over : under > 0 ? under : 0) + "px"; }).observe(menu, {attributes:true, attributeFilter:["class"]});
         document.addEventListener("keydown", e=>{ if(e.key === "Escape") menu.classList.remove("open"); }, true);
       }
       filled = true; reveal();
