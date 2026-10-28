@@ -239,7 +239,7 @@ export function initGoogle3D(){
     const circle=(c, r)=>{ const k=Math.cos(c[1]*Math.PI/180); return Array.from({length:8}, (_, i)=>[c[0]+Math.cos(i*Math.PI/4)*r/(111320*k), c[1]+Math.sin(i*Math.PI/4)*r/111320]); };
     let made=[];
     const add=el=>{ el.dataset.rsSel="1"; m3.appendChild(el); made.push(el); return el; };
-    const polyline=(r, st, o)=>add(new lib.Polyline3DElement({path:pts(r), altitudeMode:MESH(), strokeColor:st.color||O.select_color, strokeWidth:st.width||4, outerColor:"#ffffff", outerWidth:0.3,
+    const polyline=(r, st, o)=>add(new lib.Polyline3DElement({path:pts(r), altitudeMode:MESH(), strokeColor:st.color||O.select_color, strokeWidth:st.width||4, outerColor:"#202124", outerWidth:Math.min(0.5, 1/(st.width||4)),       // a 1 px dark outline: the line stands out on the dark drawn map and on the imagery
       drawsOccludedSegments:true, ...o}));
     const polygon=(ring, st)=>add(new lib.Polygon3DElement({outerCoordinates:pts(ring), altitudeMode:MESH(), fillColor:st.fill||"rgba(14,127,145,0.35)", strokeColor:st.color||"#0E7F91", strokeWidth:st.outlineWidth||2,
       drawsOccludedSegments:true}));
@@ -272,12 +272,18 @@ export function initGoogle3D(){
     // DRAW THE SELECTION in the 3D view. cs: the road's [lng, lat] points (or an array of lines); lvl: its level; sel: {key, props} for the layers tied to the selection.
     // rs:select calls it for a click on a road; a page with its own selection (a stepper, a list) calls window.rsG3dDraw(cs, name, lvl, sel).
     // A selection asked for before the view exists is drawn when it opens.
+    // the title of a road with no name: its class and length, "Service road, 42 m" or "Primary link, 120 m"
+    const ROADY=new Set(["service", "residential", "tertiary", "secondary", "primary", "trunk", "motorway", "unclassified"]);
+    const roadTitle=p=>{ p=p||{}; const h=String(p.highway||""), len=+(p.length_m ?? p.length ?? NaN);
+      if(!h && !isFinite(len)) return "Unnamed road";
+      const cls=h ? (h[0].toUpperCase()+h.slice(1)).replace(/_/g, " ")+(ROADY.has(h) ? " road" : "") : "Road";
+      return cls+(isFinite(len) ? ", "+Math.round(len)+" m" : ""); };
     const draw=(any, name, lvl, keep, sel)=>{
       const parts=(Array.isArray(any[0]) && Array.isArray(any[0][0]) ? any : [any]).filter(c=>c.length>1);     // one line, or several
       want={cs:any, name, lvl, sel:sel||(keep && want ? want.sel : null)};
       if(!m3 || !lib || !parts.length) return;
       if(!keep) setFollow(true);               // a road selection turns Follow on: the map leads (a redraw after a mode change does not)
-      ttl.textContent=name||"Unnamed road";
+      ttl.textContent=name || roadTitle(want.sel && want.sel.props);
       drawLayers();
     };
     const tryDraw=(cs, name, lvl, keep, sel)=>{ try{ draw(cs, name, lvl, keep, sel); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };
@@ -286,7 +292,7 @@ export function initGoogle3D(){
       const d=e.detail; if(d.overlay) return;
       if(typeof window.rsG3dOwnDraw==="function" && window.rsG3dOwnDraw(d)) return;       // the page draws this road itself, from its own data
       const r=_road(d.id), cs=r ? _svLine(r) : []; if(cs.length<2) return;
-      const p=d.properties||{}; tryDraw(cs, p.name||p.highway, (_rprops(d.id)||{}).lvl||0, false, {key:String(d.id), props:p});
+      const p=d.properties||{}; tryDraw(cs, p.name||null, (_rprops(d.id)||{}).lvl||0, false, {key:String(d.id), props:p});
     });
     rsSetGoogle3D=function(on){
       w.hidden=!on;
