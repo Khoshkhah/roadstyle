@@ -161,7 +161,8 @@
         topRow("labels", "Labels").checked = ls("labels") === "1" || (ls("labels") == null && vector());
         topRow("buildings", "3D buildings");
         topRow("satlabels", "Satellite labels").checked = ls("satlabels") === "1";
-        for(const id of ["hillshade", "labels", "satlabels"]) tops[id].c.onchange = ()=>{ ss(id, tops[id].c.checked); apply(); };
+        window.rsLabelsOn = ()=>tops.labels.c.checked;          // one state for the map and the Google 3D view (HYBRID with labels, SATELLITE without)
+        for(const id of ["hillshade", "labels", "satlabels"]) tops[id].c.onchange = ()=>{ ss(id, tops[id].c.checked); apply(); if(id === "labels") document.dispatchEvent(new Event("rs:labelschange")); };
         tops.buildings.c.onchange = ()=>{ if(window.rsBuildings) window.rsBuildings(tops.buildings.c.checked); };
         const mark = ()=>{ rows.forEach(([b, r])=>{ r.checked = b.key === current || b.dark === current; }); };
         document.addEventListener("rs:basemapchange", e=>{ current = e.detail.basemap; mark(); setTimeout(apply, 0); });

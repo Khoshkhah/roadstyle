@@ -71,3 +71,4 @@ To check the link in ten minutes:
 - The map limits the tilt. Where the map cannot follow, it stops at its limit, and Google goes back to the map camera.
 - The window shows the same view as the map, but smaller.
 - A headless browser does not draw Google 3D. Use a browser with a screen.
+- The "Labels" switch of the base-map box rules the 3D view too: on gives Google's HYBRID mode (labels and pins), off gives SATELLITE. Without that switch the view has no labels.

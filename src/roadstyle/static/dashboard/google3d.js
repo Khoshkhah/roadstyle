@@ -120,6 +120,10 @@ export function initGoogle3D(){
     new ResizeObserver(pad).observe(w);          // opened, closed or resized
     bar.addEventListener("pointerup", pad);      // dragged
     map.on("resize", pad);
+    // THE LABELS. SATELLITE has no labels or pins, HYBRID has them. The page's "Labels" switch (the base-map box, window.rsLabelsOn) rules both
+    // the map and this view; without that switch the view has no labels.
+    const modeOf=l=>window.rsLabelsOn && window.rsLabelsOn() ? l.MapMode.HYBRID : l.MapMode.SATELLITE;
+    document.addEventListener("rs:labelschange", ()=>{ if(m3 && lib) m3.mode=modeOf(lib); });
     const open=()=>{
       if(location.protocol==="file:"){
         say("<b>Google 3D needs this page served, not opened from disk.</b>"+
@@ -128,7 +132,7 @@ export function initGoogle3D(){
       msg.textContent="Loading Google 3D…"; msg.hidden=false;
       _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
         if(w.hidden || m3) return;               // closed while it loaded
-        lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:l.MapMode.HYBRID}));
+        lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:modeOf(l)}));
         for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"]) m3.addEventListener(ev, fromGoogle);
         msg.hidden=true; w.appendChild(m3);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+String(e.message||e)+"</span>"+SETUP); });
