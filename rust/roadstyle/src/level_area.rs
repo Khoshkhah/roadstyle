@@ -5,7 +5,7 @@
 
 use roadstyle_engine::{level_edges, Cell, RoadTable};
 use roadstyle_io::columns::{write_columns, Column};
-use roadstyle_levels::{make, Options, Order};
+use roadstyle_levels::{make, AreaInput, Options, Order};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::Path;
@@ -72,45 +72,10 @@ pub fn make_area(table: &RoadTable, folder: &Path, o: &MakeOptions) -> Result<Ar
 
 /// The solver's input of the edges `table` in memory (a page with no server makes its area so): `heads` is heads.csv's text ("" for none),
 /// which gives a road's own head lengths.
-pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<AreaFiles, crate::Error> {
-    let mut warnings = Vec::new();
+/// The fields the editor shows: the first edge's, modes and bus lines of all the road's edges.
+fn shown_columns(table: &RoadTable, o: &MakeOptions, input: &AreaInput) -> Vec<(String, Column)> {
     let has = |c: &str| table.names().iter().any(|n| n == c);
-    let (order, order_col) = match o.order.as_deref() {
-        None => (Order::None, ""),
-        Some("priority") => (Order::Priority, ""),
-        Some("class") => (Order::Class, ""),
-        Some(c) => (Order::Column, c),
-    };
-    if order == Order::Priority && !has(&o.junction_col) {
-        warnings.push(format!("the edges have no {:?} column: no road is known as a roundabout, so none is put on top where roads meet (add the \
-                               OSM junction tag as {:?}, or pass junction_col=...)", o.junction_col, o.junction_col));
-    }
-    let band = o.band_col.as_deref().unwrap_or("");
-    let cols = [o.highway_col.as_str(), &o.layer_col, &o.bridge_col, &o.tunnel_col, &o.junction_col, band, order_col];
-    let mut edges = level_edges(table, cols).into_edges();
-    // the ids: the id column's values (whole numbers, duckOSM's BIGINT), else the row numbers
-    let ids: Vec<i64> = (0..table.len()).map(|i| match has(&o.id_col) {
-        false => Ok(i as i64),
-        true => table.get(i, &o.id_col).and_then(|c| cell_text(c)).and_then(|t| t.parse().ok())
-            .ok_or_else(|| crate::Error::Model(roadstyle_model::Error::Column { column: o.id_col.clone(), message: format!("make: row {i} is not a whole number") })),
-    }).collect::<Result<_, _>>()?;
-    for (e, &id) in edges.iter_mut().zip(&ids) {
-        e.edge_id = id;
-    }
-    let heads = read_heads(heads)?;
-    let lo = Options { band_col: o.band_col.is_some(), order, band_dist: o.band_dist, head_m: o.head_m, near_rules: o.near_rules, ..Default::default() };
-    let input = make(&edges, &lo, &heads)?;
-    let id = |i: usize| ids[i];
-    let n = input.roads.len();
-    let mut out: Vec<(String, Column)> = vec![
-        // the ids as Int64 (duckOSM's BIGINT edge ids; roadstyle.level_area.write_roads does the same)
-        ("road".into(), Column::Int(input.roads.iter().map(|r| Some(id(r.first))).collect())),
-        ("edges".into(), Column::IntList(input.roads.iter().map(|r| r.edges.iter().map(|&e| Some(id(e))).collect()).collect())),
-        ("reversed".into(), Column::IntList(input.roads.iter().map(|r| r.reversed.iter().map(|&e| Some(id(e))).collect()).collect())),
-        ("band".into(), Column::Int(input.band.iter().map(|&b| Some(b)).collect())),
-        ("priority".into(), Column::Float(input.priority.clone())),
-    ];
-    // the fields the editor shows: the first edge's, modes and bus lines of all the road's edges
+    let mut out = Vec::new();
     let mut shown: Vec<&str> = Vec::new();
     for c in [o.highway_col.as_str(), "name", "edge_ref", "lanes", "modes", &o.tunnel_col, &o.bridge_col, &o.layer_col] {
         if has(c) && !shown.contains(&c) {
@@ -150,7 +115,13 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
             (!lines.is_empty()).then(|| lines.join(", "))
         }).collect())));
     }
-    // each edge's own values, its way and the other way
+    out
+}
+
+/// Each edge's own values, its way and the other way: the lists of lanes, modes, refs and the flags oneway, driving and directed.
+fn way_columns(table: &RoadTable, o: &MakeOptions, input: &AreaInput) -> Result<Vec<(String, Column)>, crate::Error> {
+    let has = |c: &str| table.names().iter().any(|n| n == c);
+    let mut out = Vec::new();
     let ways = |f: &dyn Fn(usize) -> Value| -> [Vec<Vec<Value>>; 2] {
         [input.roads.iter().map(|r| r.edges.iter().map(|&i| f(i)).collect()).collect(),
          input.roads.iter().map(|r| r.reversed.iter().map(|&i| f(i)).collect()).collect()]
@@ -191,10 +162,12 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
             out.push((name.into(), Column::BoolList(v.into_iter().map(|r| r.iter().map(Value::as_bool).collect()).collect())));
         }
     }
-    let wkb = |i: usize| table.line(i).map(roadstyle_io::columns::line_wkb);
-    out.push(("geometry".into(), Column::Wkb(input.roads.iter().map(|r| wkb(r.first)).collect())));
-    // pairs.csv: the meets, the stacks (one row for each part), the near rules (near_rules), the order wishes, the crossings (a path at a
-    // node where a car road goes on: the road's end in a_end)
+    Ok(out)
+}
+
+/// pairs.csv: the meets, the stacks (one row for each part), the near rules (near_rules), the order wishes, the crossings (a path at a
+/// node where a car road goes on: the road's end in a_end). `id`: the edge id of an edge number. Returns the text and the number of rows.
+fn pairs_csv(input: &AreaInput, id: &dyn Fn(usize) -> i64) -> (String, usize) {
     let road = |r: usize| id(input.roads[r].first);
     let (end, part) = (["start", "", "end"], ["start", "main", "end"]);
     let mut pairs = String::from("relation,a,b,a_end,b_end\n");
@@ -214,6 +187,52 @@ pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<Are
         pairs += &format!("crossing,{},{},{},\n", road(c), road(p), end[h]);
     }
     let count = r.meets.len() + r.lifts.len() + r.near.len() + r.orders.len() + r.crossings.len();
+    (pairs, count)
+}
+
+pub fn make_files(table: &RoadTable, o: &MakeOptions, heads: &str) -> Result<AreaFiles, crate::Error> {
+    let mut warnings = Vec::new();
+    let has = |c: &str| table.names().iter().any(|n| n == c);
+    let (order, order_col) = match o.order.as_deref() {
+        None => (Order::None, ""),
+        Some("priority") => (Order::Priority, ""),
+        Some("class") => (Order::Class, ""),
+        Some(c) => (Order::Column, c),
+    };
+    if order == Order::Priority && !has(&o.junction_col) {
+        warnings.push(format!("the edges have no {:?} column: no road is known as a roundabout, so none is put on top where roads meet (add the \
+                               OSM junction tag as {:?}, or pass junction_col=...)", o.junction_col, o.junction_col));
+    }
+    let band = o.band_col.as_deref().unwrap_or("");
+    let cols = [o.highway_col.as_str(), &o.layer_col, &o.bridge_col, &o.tunnel_col, &o.junction_col, band, order_col];
+    let mut edges = level_edges(table, cols).into_edges();
+    // the ids: the id column's values (whole numbers, duckOSM's BIGINT), else the row numbers
+    let ids: Vec<i64> = (0..table.len()).map(|i| match has(&o.id_col) {
+        false => Ok(i as i64),
+        true => table.get(i, &o.id_col).and_then(|c| cell_text(c)).and_then(|t| t.parse().ok())
+            .ok_or_else(|| crate::Error::Model(roadstyle_model::Error::Column { column: o.id_col.clone(), message: format!("make: row {i} is not a whole number") })),
+    }).collect::<Result<_, _>>()?;
+    for (e, &id) in edges.iter_mut().zip(&ids) {
+        e.edge_id = id;
+    }
+    let heads = read_heads(heads)?;
+    let lo = Options { band_col: o.band_col.is_some(), order, band_dist: o.band_dist, head_m: o.head_m, near_rules: o.near_rules, ..Default::default() };
+    let input = make(&edges, &lo, &heads)?;
+    let id = |i: usize| ids[i];
+    let n = input.roads.len();
+    let mut out: Vec<(String, Column)> = vec![
+        // the ids as Int64 (duckOSM's BIGINT edge ids; roadstyle.level_area.write_roads does the same)
+        ("road".into(), Column::Int(input.roads.iter().map(|r| Some(id(r.first))).collect())),
+        ("edges".into(), Column::IntList(input.roads.iter().map(|r| r.edges.iter().map(|&e| Some(id(e))).collect()).collect())),
+        ("reversed".into(), Column::IntList(input.roads.iter().map(|r| r.reversed.iter().map(|&e| Some(id(e))).collect()).collect())),
+        ("band".into(), Column::Int(input.band.iter().map(|&b| Some(b)).collect())),
+        ("priority".into(), Column::Float(input.priority.clone())),
+    ];
+    out.extend(shown_columns(table, o, &input));
+    out.extend(way_columns(table, o, &input)?);
+    let wkb = |i: usize| table.line(i).map(roadstyle_io::columns::line_wkb);
+    out.push(("geometry".into(), Column::Wkb(input.roads.iter().map(|r| wkb(r.first)).collect())));
+    let (pairs, count) = pairs_csv(&input, &id);
     Ok(AreaFiles { roads: write_columns(out)?, pairs, edits: EDITS_HEADER.into(), made: Made { roads: n, pairs: count, warnings } })
 }
 

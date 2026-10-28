@@ -248,23 +248,12 @@ fn images(st: &Value, specs: &[Value]) -> Result<Map<String, Value>, Error> {
 }
 
 /// mode_settings and the base map's part of the look for one choice (render_map's mode, theme and paths).
-pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
-    if !LOOKS.contains(&b.mode.as_str()) {
-        return Err(Error::Unknown(format!("unknown mode '{}'; choose from {}", b.mode, pyrepr(&LOOKS))));
-    }
-    let styles = style(PATHS);
-    let st = styles.get(&b.paths).ok_or_else(|| {
-        let names: Vec<&str> = styles.as_object().into_iter().flatten().map(|(k, _)| k.as_str()).collect();
-        Error::Unknown(format!("unknown path style '{}'; choose from {}", b.paths, pyrepr(&names)))
-    })?;
-    let modes = style(MODES);
-    let spec = modes.get(&b.mode).filter(|s| !s.is_null()).cloned().unwrap_or_else(|| json!({}));
-    let (themed, th, tr) = load_theme(&b.theme)?;
-    let color = |v: &Value| recolor(v, tr.0, tr.1);
-    let base = walk(&carto_entries()?, &color);
+/// The palette of the base map: the carto classes recoloured for the theme, the theme's colours, the path style's, and the cars faded.
+fn base_palette(themed: &Value, th: &Value, color: &dyn Fn(&Value) -> Value, st: &Value, spec: &Value, modes: &Value) -> Result<Map<String, Value>, Error> {
+    let base = walk(&carto_entries()?, color);
     let colors = &themed["roads"]["colors"];
     let theme_paths = th.get("paths").filter(|p| p.is_object()).cloned().unwrap_or_else(|| json!({}));
-    let over: Map<String, Value> = walk(st.get("palette").filter(|p| !p.is_null()).unwrap_or(&json!({})), &color).as_object().cloned()
+    let over: Map<String, Value> = walk(st.get("palette").filter(|p| !p.is_null()).unwrap_or(&json!({})), color).as_object().cloned()
         .unwrap_or_default().into_iter().map(|(c, v)| {
             let mut e = v.as_object().cloned().unwrap_or_default();
             e.extend(theme_paths.get(&c).and_then(Value::as_object).cloned().unwrap_or_default());
@@ -296,33 +285,11 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
             }
         }
     }
-    let mut roads = spec.get("roads").and_then(Value::as_object).cloned().unwrap_or_default();
-    let mut group = Map::new();
-    group.insert("ferry".into(), "path".into());     // a ferry line: path width
-    for c in spec.get("em").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
-        group.insert(c.into(), "em".into());
-    }
-    group.extend(st.get("group").and_then(Value::as_object).cloned().unwrap_or_default());
-    for (k, v) in [("width", json!({"em": st["em"]["width"]})), ("width_zoom_rate", json!({"em": 1.3})),
-                   ("casing_ratio", json!({"em": st["em"]["casing_ratio"]})), ("group", Value::Object(group))] {
-        let e = roads.entry(k).or_insert_with(|| json!({}));
-        if let (Some(e), Some(v)) = (e.as_object_mut(), v.as_object()) {
-            e.extend(v.clone());
-        }
-    }
-    let mut config = Map::new();
-    if let Some(m) = st.get("minor_no_casing") {
-        config.insert("minor_no_casing".into(), m.clone());
-    }
-    config.extend(th.get("roadstyle").and_then(Value::as_object).cloned().unwrap_or_default());
-    let name = format!("ms_{}_{}{}", b.mode, b.paths, if b.theme == "osm" { String::new() } else { format!("_{}", b.theme) });
-    let mut pals = Map::new();
-    pals.insert(name.clone(), Value::Object(palette));
-    let settings = json!({"palettes": pals, "roads": roads, "config": config});
-    let layers = style(LAYERS);
-    let specs = layers["layers"].as_array().cloned().unwrap_or_default();
-    let features = json!({"layers_yaml": layers, "buildings_3d": style(CARTO)["features"]["buildings_3d"], "style": themed["features"],
-                          "images": images(&themed, &specs)?});
+    Ok(palette)
+}
+
+/// The keywords of the base map's page: the name, the tooltip, the columns of duckOSM's roads, the modes and the blank base map.
+fn base_map_args(b: &BaseMap, th: &Value, spec: &Value) -> Map<String, Value> {
     let mut args = Map::new();
     if let Some(place) = &b.place {
         let theme = if b.theme == "osm" { String::new() } else { format!(", {}", b.theme) };
@@ -360,6 +327,51 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
         args.insert("offset_frac".into(), 0.into());
         args.insert("width_frac".into(), 1.into());
     }
+    args
+}
+
+pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
+    if !LOOKS.contains(&b.mode.as_str()) {
+        return Err(Error::Unknown(format!("unknown mode '{}'; choose from {}", b.mode, pyrepr(&LOOKS))));
+    }
+    let styles = style(PATHS);
+    let st = styles.get(&b.paths).ok_or_else(|| {
+        let names: Vec<&str> = styles.as_object().into_iter().flatten().map(|(k, _)| k.as_str()).collect();
+        Error::Unknown(format!("unknown path style '{}'; choose from {}", b.paths, pyrepr(&names)))
+    })?;
+    let modes = style(MODES);
+    let spec = modes.get(&b.mode).filter(|s| !s.is_null()).cloned().unwrap_or_else(|| json!({}));
+    let (themed, th, tr) = load_theme(&b.theme)?;
+    let color = |v: &Value| recolor(v, tr.0, tr.1);
+    let palette = base_palette(&themed, &th, &color, st, &spec, &modes)?;
+    let mut roads = spec.get("roads").and_then(Value::as_object).cloned().unwrap_or_default();
+    let mut group = Map::new();
+    group.insert("ferry".into(), "path".into());     // a ferry line: path width
+    for c in spec.get("em").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
+        group.insert(c.into(), "em".into());
+    }
+    group.extend(st.get("group").and_then(Value::as_object).cloned().unwrap_or_default());
+    for (k, v) in [("width", json!({"em": st["em"]["width"]})), ("width_zoom_rate", json!({"em": 1.3})),
+                   ("casing_ratio", json!({"em": st["em"]["casing_ratio"]})), ("group", Value::Object(group))] {
+        let e = roads.entry(k).or_insert_with(|| json!({}));
+        if let (Some(e), Some(v)) = (e.as_object_mut(), v.as_object()) {
+            e.extend(v.clone());
+        }
+    }
+    let mut config = Map::new();
+    if let Some(m) = st.get("minor_no_casing") {
+        config.insert("minor_no_casing".into(), m.clone());
+    }
+    config.extend(th.get("roadstyle").and_then(Value::as_object).cloned().unwrap_or_default());
+    let name = format!("ms_{}_{}{}", b.mode, b.paths, if b.theme == "osm" { String::new() } else { format!("_{}", b.theme) });
+    let mut pals = Map::new();
+    pals.insert(name.clone(), Value::Object(palette));
+    let settings = json!({"palettes": pals, "roads": roads, "config": config});
+    let layers = style(LAYERS);
+    let specs = layers["layers"].as_array().cloned().unwrap_or_default();
+    let features = json!({"layers_yaml": layers, "buildings_3d": style(CARTO)["features"]["buildings_3d"], "style": themed["features"],
+                          "images": images(&themed, &specs)?});
+    let args = base_map_args(b, &th, &spec);
     Ok(BaseMapLook { palette: name, settings, features, args })
 }
 

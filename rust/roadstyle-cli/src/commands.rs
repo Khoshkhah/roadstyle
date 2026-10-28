@@ -119,91 +119,104 @@ fn roads(path: &str) -> Result<roadstyle::RoadTable, Error> {
 }
 
 /// Runs one command (`args` without the program's name).
+/// A comma-separated option as a list of names.
+fn list(v: Option<String>) -> Vec<String> {
+    v.map(|s| s.split(',').map(str::trim).filter(|c| !c.is_empty()).map(String::from).collect()).unwrap_or_default()
+}
+
+/// `sources <roads> <out>`: the style's sources as files.
+fn sources_cmd(roads: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Error> {
+    let format = match take(opts, "format").as_deref().unwrap_or("geojson") {
+        "geojson" => roadstyle::Format::GeoJson,
+        "geoparquet" => roadstyle::Format::GeoParquet,
+        f => return Err(Error::Usage(format!("--format must be geojson or geoparquet, not {f}"))),
+    };
+    let keep = list(take(opts, "keep"));
+    let name = take(opts, "name");
+    let o = look_options(opts, |kw| {
+        kw.entry("view_3d").or_insert(Value::Bool(true)); // as export_inline and export_geojson
+    })?;
+    let look = roadstyle::Look::resolve(&o)?;
+    let s = roadstyle::sources_of(self::roads(roads)?, &look, None, None, name)?;
+    for (file, size) in roadstyle::write_sources(&s, Path::new(out), format, &keep)? {
+        println!("{file} {size} bytes");
+    }
+    Ok(())
+}
+
+/// `page <roads> <out>`: one HTML file with the map.
+fn page_cmd(roads: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Error> {
+    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).map(Value::String);
+    let mut given = Map::new();         // the page's keys: the call's keywords (a look has none), and the keys
+    given.insert("api_key".into(), take(opts, "api_key").map(Value::String).or_else(|| env("ROADSTYLE_API_KEY")).unwrap_or_default());
+    given.insert("street_view_key".into(), take(opts, "street_view_key").map(Value::String).or_else(|| env("GOOGLE_MAPS_KEY"))
+        .unwrap_or_default());
+    let o = look_options(opts, |kw| {
+        kw.insert("state".into(), "live".into()); // a page's style: the state in the expressions, the interaction contract
+    })?;
+    let look = roadstyle::Look::resolve(&o)?;
+    given.extend(o.args.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
+    let page = roadstyle::page_options::page_from(self::roads(roads)?, None, &look, &o, &given)?;
+    for w in &page.warnings {
+        eprintln!("warning: {w}");
+    }
+    let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1)
+        .replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
+    std::fs::write(out, &html).map_err(|e| Error::File(format!("{out}: {e}")))?;
+    println!("{out} {} bytes", html.len());
+    Ok(())
+}
+
+/// `tiles <src> <out>`: the tiles of a folder of sources, as a PMTiles file or a folder of xyz tiles.
+fn tiles_cmd(src: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Error> {
+    let format = take(opts, "format").unwrap_or_else(|| "pmtiles".into());
+    let keep = list(take(opts, "keep"));
+    let base = take(opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
+    no_more(opts)?;
+    let (style, tiles) = roadstyle::tiles_of_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
+    let bounds = tiles.bounds().ok_or(Error::Engine(format!("tiles: no feature in the files of {src}")))?;
+    let out = PathBuf::from(out);
+    match format.as_str() {
+        "pmtiles" => {
+            let bytes = tiles.archive(bounds, &tiles.layer_names()).map_err(|e| Error::Engine(format!("tiles: {e}")))?;
+            if let Some(d) = out.parent().filter(|d| !d.as_os_str().is_empty()) {
+                std::fs::create_dir_all(d).map_err(|e| Error::File(format!("{}: {e}", d.display())))?;
+            }
+            std::fs::write(&out, &bytes).map_err(|e| Error::File(format!("{}: {e}", out.display())))?;
+            println!("{} {} bytes", out.display(), bytes.len());
+        }
+        "xyz" => {
+            let (z0, z1) = tiles.zooms();
+            let mut n = 0;
+            for z in z0..=z1 {
+                let ([x0, y0], [x1, y1]) = (tile_of(bounds[0], bounds[3], z), tile_of(bounds[2], bounds[1], z));
+                for x in x0..=x1 {
+                    for y in y0..=y1 {
+                        let b = tiles.build(z, x, y);        // each tile once: no cache (review 4, D9)
+                        if !b.is_empty() {
+                            let p = out.join("roads").join(z.to_string()).join(x.to_string());
+                            std::fs::create_dir_all(&p).map_err(|e| Error::File(format!("{}: {e}", p.display())))?;
+                            std::fs::write(p.join(y.to_string()), &b).map_err(|e| Error::File(e.to_string()))?;
+                            n += 1;
+                        }
+                    }
+                }
+            }
+            std::fs::write(out.join("style.json"), style.to_string()).map_err(|e| Error::File(e.to_string()))?;
+            println!("{} tiles and style.json in {}", n, out.display());
+        }
+        f => return Err(Error::Usage(format!("--format must be pmtiles or xyz, not {f}"))),
+    }
+    Ok(())
+}
+
 pub fn run(args: &[String]) -> Result<(), Error> {
     let (cmd, rest) = args.split_first().ok_or(Error::Usage(USAGE.into()))?;
     let (pos, mut opts) = split(rest);
-    let list = |v: Option<String>| v.map(|s| s.split(',').map(str::trim).filter(|c| !c.is_empty()).map(String::from).collect::<Vec<_>>()).unwrap_or_default();
     match (cmd.as_str(), pos.as_slice()) {
-        ("sources", [roads, out]) => {
-            let format = match take(&mut opts, "format").as_deref().unwrap_or("geojson") {
-                "geojson" => roadstyle::Format::GeoJson,
-                "geoparquet" => roadstyle::Format::GeoParquet,
-                f => return Err(Error::Usage(format!("--format must be geojson or geoparquet, not {f}"))),
-            };
-            let keep = list(take(&mut opts, "keep"));
-            let name = take(&mut opts, "name");
-            let o = look_options(&mut opts, |kw| {
-                kw.entry("view_3d").or_insert(Value::Bool(true)); // as export_inline and export_geojson
-            })?;
-            let look = roadstyle::Look::resolve(&o)?;
-            let s = roadstyle::sources_of(self::roads(roads)?, &look, None, None, name)?;
-            for (file, size) in roadstyle::write_sources(&s, Path::new(out), format, &keep)? {
-                println!("{file} {size} bytes");
-            }
-            Ok(())
-        }
-        ("page", [roads, out]) => {
-            let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty()).map(Value::String);
-            let mut given = Map::new();         // the page's keys: the call's keywords (a look has none), and the keys
-            given.insert("api_key".into(), take(&mut opts, "api_key").map(Value::String).or_else(|| env("ROADSTYLE_API_KEY")).unwrap_or_default());
-            given.insert("street_view_key".into(), take(&mut opts, "street_view_key").map(Value::String).or_else(|| env("GOOGLE_MAPS_KEY"))
-                .unwrap_or_default());
-            let o = look_options(&mut opts, |kw| {
-                kw.insert("state".into(), "live".into()); // a page's style: the state in the expressions, the interaction contract
-            })?;
-            let look = roadstyle::Look::resolve(&o)?;
-            given.extend(o.args.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
-            let page = roadstyle::page_options::page_from(self::roads(roads)?, None, &look, &o, &given)?;
-            for w in &page.warnings {
-                eprintln!("warning: {w}");
-            }
-            let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1)
-                .replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
-            std::fs::write(out, &html).map_err(|e| Error::File(format!("{out}: {e}")))?;
-            println!("{out} {} bytes", html.len());
-            Ok(())
-        }
-        ("tiles", [src, out]) => {
-            let format = take(&mut opts, "format").unwrap_or_else(|| "pmtiles".into());
-            let keep = list(take(&mut opts, "keep"));
-            let base = take(&mut opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
-            no_more(&opts)?;
-            let (style, tiles) = roadstyle::tiles_of_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
-            let bounds = tiles.bounds().ok_or(Error::Engine(format!("tiles: no feature in the files of {src}")))?;
-            let out = PathBuf::from(out);
-            match format.as_str() {
-                "pmtiles" => {
-                    let bytes = tiles.archive(bounds, &tiles.layer_names()).map_err(|e| Error::Engine(format!("tiles: {e}")))?;
-                    if let Some(d) = out.parent().filter(|d| !d.as_os_str().is_empty()) {
-                        std::fs::create_dir_all(d).map_err(|e| Error::File(format!("{}: {e}", d.display())))?;
-                    }
-                    std::fs::write(&out, &bytes).map_err(|e| Error::File(format!("{}: {e}", out.display())))?;
-                    println!("{} {} bytes", out.display(), bytes.len());
-                }
-                "xyz" => {
-                    let (z0, z1) = tiles.zooms();
-                    let mut n = 0;
-                    for z in z0..=z1 {
-                        let ([x0, y0], [x1, y1]) = (tile_of(bounds[0], bounds[3], z), tile_of(bounds[2], bounds[1], z));
-                        for x in x0..=x1 {
-                            for y in y0..=y1 {
-                                let b = tiles.build(z, x, y);        // each tile once: no cache (review 4, D9)
-                                if !b.is_empty() {
-                                    let p = out.join("roads").join(z.to_string()).join(x.to_string());
-                                    std::fs::create_dir_all(&p).map_err(|e| Error::File(format!("{}: {e}", p.display())))?;
-                                    std::fs::write(p.join(y.to_string()), &b).map_err(|e| Error::File(e.to_string()))?;
-                                    n += 1;
-                                }
-                            }
-                        }
-                    }
-                    std::fs::write(out.join("style.json"), style.to_string()).map_err(|e| Error::File(e.to_string()))?;
-                    println!("{} tiles and style.json in {}", n, out.display());
-                }
-                f => return Err(Error::Usage(format!("--format must be pmtiles or xyz, not {f}"))),
-            }
-            Ok(())
-        }
+        ("sources", [roads, out]) => sources_cmd(roads, out, &mut opts),
+        ("page", [roads, out]) => page_cmd(roads, out, &mut opts),
+        ("tiles", [src, out]) => tiles_cmd(src, out, &mut opts),
         ("levels", [sub, rest @ ..]) => levels(sub, rest, opts),
         ("serve", [area]) => {
             let port: u16 = take(&mut opts, "port").map_or(Ok(8780), |p| p.parse().map_err(|_| Error::Usage("--port needs a number".into())))?;

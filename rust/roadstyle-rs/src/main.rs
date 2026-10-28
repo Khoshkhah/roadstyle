@@ -103,111 +103,93 @@ fn features(source: &Value) -> &[Value] {
     source["data"]["features"].as_array().map_or(&[][..], |v| v.as_slice())
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() == 5 && args[1] == "--bench" {
-        bench(&args[2], &args[3], &args[4]);
-        return;
+/// --sources: stage 1.
+fn sources_mode(args: &[String]) {
+    // stage 1: the sources as files (geojson or geoparquet) in a folder, with the time and each file's size
+    let opt = |p: &str| (p != "-").then(|| fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}"))));
+    let format = if args[6] == "geoparquet" { roadstyle_rs::Format::GeoParquet } else { roadstyle_rs::Format::GeoJson };
+    let t = Instant::now();
+    let s = roadstyle_rs::style_sources(fs::read(&args[3]).unwrap(), &look_file(&args[2]), opt(&args[4]), None, None)
+        .unwrap_or_else(|e| fail(e));
+    let made = t.elapsed();
+    let files = roadstyle_rs::write_sources(&s, std::path::Path::new(&args[5]), format, &[]).unwrap_or_else(|e| fail(e));
+    eprintln!("style_sources {:.0} ms, save {:.0} ms", made.as_secs_f64() * 1e3, (t.elapsed() - made).as_secs_f64() * 1e3);
+    for (f, n) in &files {
+        println!("{f}\t{n}");
     }
-    if args.len() == 7 && args[1] == "--sources" {
-        // stage 1: the sources as files (geojson or geoparquet) in a folder, with the time and each file's size
-        let opt = |p: &str| (p != "-").then(|| fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}"))));
-        let format = if args[6] == "geoparquet" { roadstyle_rs::Format::GeoParquet } else { roadstyle_rs::Format::GeoJson };
-        let t = Instant::now();
-        let s = roadstyle_rs::style_sources(fs::read(&args[3]).unwrap(), &look_file(&args[2]), opt(&args[4]), None, None)
-            .unwrap_or_else(|e| fail(e));
-        let made = t.elapsed();
-        let files = roadstyle_rs::write_sources(&s, std::path::Path::new(&args[5]), format, &[]).unwrap_or_else(|e| fail(e));
-        eprintln!("style_sources {:.0} ms, save {:.0} ms", made.as_secs_f64() * 1e3, (t.elapsed() - made).as_secs_f64() * 1e3);
-        for (f, n) in &files {
-            println!("{f}\t{n}");
+    println!("total\t{}", files.iter().map(|f| f.1).sum::<usize>());
+}
+
+/// --tile-files.
+fn tile_files_mode(args: &[String]) {
+    // stage 2 from stage 1's files: the time, and the tiles of zoom 15 around the roads (their number and size)
+    let t = Instant::now();
+    let (style, tiles) = roadstyle_rs::tiles_of_files(std::path::Path::new(&args[2]), &[], None, &roadstyle_rs::xyz_at("")).unwrap_or_else(|e| fail(e));
+    let made = t.elapsed();
+    let c = &style["center"];
+    let (lon, lat) = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
+    let n = (1u64 << 15) as f64;
+    let (x, y) = (((lon + 180.0) / 360.0 * n) as i64, ((1.0 - lat.to_radians().tan().asinh() / std::f64::consts::PI) / 2.0 * n) as i64);
+    let t2 = Instant::now();
+    let (mut count, mut bytes) = (0, 0);
+    for dx in -8..=8 {
+        for dy in -8..=8 {
+            let b = tiles.tile(15, (x + dx) as u32, (y + dy) as u32);
+            count += !b.is_empty() as usize;
+            bytes += b.len();
         }
-        println!("total\t{}", files.iter().map(|f| f.1).sum::<usize>());
-        return;
     }
-    if args.len() == 3 && args[1] == "--tile-files" {
-        // stage 2 from stage 1's files: the time, and the tiles of zoom 15 around the roads (their number and size)
+    eprintln!("tiles_of_files {:.0} ms; z15 around the centre: {count} tiles, {:.1} MB, {:.0} ms", made.as_secs_f64() * 1e3,
+              bytes as f64 / 1e6, t2.elapsed().as_secs_f64() * 1e3);
+}
+
+/// --features.
+fn features_mode(args: &[String]) {
+    // step 3 check: the base-map feature collections from the worker's features.parquet, as {name: FeatureCollection}
+    let data = fs::read(&args[3]).unwrap_or_else(|e| fail(format!("{}: {e}", args[3])));
+    let t = roadstyle_rs::read_features(data).unwrap_or_else(|e| fail(e));
+    let tables = roadstyle_rs::features::feature_tables(&t, &look_file(&args[2])).unwrap_or_else(|e| fail(e));
+    let fcs: serde_json::Map<String, serde_json::Value> = tables.iter().map(|(n, t)| (n.clone(), t.to_value())).collect();
+    println!("{}", serde_json::to_string(&fcs).unwrap());
+}
+
+/// --tiles.
+fn tiles_mode(args: &[String]) {
+    // the map with vector tiles (tiled_from_parquet), then every tile around the centre at zooms 12, 14 and 15: the times and sizes
+    let read = |p: &str| if p == "-" { None } else { Some(fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}")))) };
+    let t = Instant::now();
+    let (style, tiles, _) = roadstyle_rs::tiled_from_parquet(read(&args[3]).unwrap(), &look_file(&args[2]), read(&args[4]), None,
+                                                    "rs://", &["osm_id".into(), "access".into()]).unwrap_or_else(|e| fail(e));
+    eprintln!("tiled_from_parquet {:.0} ms (style {:.1} KB)", t.elapsed().as_secs_f64() * 1e3, style.len() as f64 / 1e3);
+    let style: Value = serde_json::from_str(&style).unwrap();
+    let c = &style["center"];
+    let (lon, lat) = (c[0].as_f64().unwrap(), c[1].as_f64().unwrap());
+    for z in [12u32, 14, 15] {
+        let n = (1u64 << z) as f64;
+        let (x, y) = ((lon + 180.0) / 360.0 * n, (1.0 - (lat.to_radians().tan() + 1.0 / lat.to_radians().cos()).ln() / std::f64::consts::PI) / 2.0 * n);
+        let r = (8u32 << (z - 12)) / 2; // about 8 km around the centre
         let t = Instant::now();
-        let (style, tiles) = roadstyle_rs::tiles_of_files(std::path::Path::new(&args[2]), &[], None, &roadstyle_rs::xyz_at("")).unwrap_or_else(|e| fail(e));
-        let made = t.elapsed();
-        let c = &style["center"];
-        let (lon, lat) = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
-        let n = (1u64 << 15) as f64;
-        let (x, y) = (((lon + 180.0) / 360.0 * n) as i64, ((1.0 - lat.to_radians().tan().asinh() / std::f64::consts::PI) / 2.0 * n) as i64);
-        let t2 = Instant::now();
-        let (mut count, mut bytes) = (0, 0);
-        for dx in -8..=8 {
-            for dy in -8..=8 {
-                let b = tiles.tile(15, (x + dx) as u32, (y + dy) as u32);
-                count += !b.is_empty() as usize;
-                bytes += b.len();
-            }
-        }
-        eprintln!("tiles_of_files {:.0} ms; z15 around the centre: {count} tiles, {:.1} MB, {:.0} ms", made.as_secs_f64() * 1e3,
-                  bytes as f64 / 1e6, t2.elapsed().as_secs_f64() * 1e3);
-        return;
-    }
-    if args.len() == 4 && args[1] == "--features" {
-        // step 3 check: the base-map feature collections from the worker's features.parquet, as {name: FeatureCollection}
-        let data = fs::read(&args[3]).unwrap_or_else(|e| fail(format!("{}: {e}", args[3])));
-        let t = roadstyle_rs::read_features(data).unwrap_or_else(|e| fail(e));
-        let tables = roadstyle_rs::features::feature_tables(&t, &look_file(&args[2])).unwrap_or_else(|e| fail(e));
-        let fcs: serde_json::Map<String, serde_json::Value> = tables.iter().map(|(n, t)| (n.clone(), t.to_value())).collect();
-        println!("{}", serde_json::to_string(&fcs).unwrap());
-        return;
-    }
-    if args.len() == 5 && args[1] == "--tiles" {
-        // the map with vector tiles (tiled_from_parquet), then every tile around the centre at zooms 12, 14 and 15: the times and sizes
-        let read = |p: &str| if p == "-" { None } else { Some(fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}")))) };
-        let t = Instant::now();
-        let (style, tiles, _) = roadstyle_rs::tiled_from_parquet(read(&args[3]).unwrap(), &look_file(&args[2]), read(&args[4]), None,
-                                                        "rs://", &["osm_id".into(), "access".into()]).unwrap_or_else(|e| fail(e));
-        eprintln!("tiled_from_parquet {:.0} ms (style {:.1} KB)", t.elapsed().as_secs_f64() * 1e3, style.len() as f64 / 1e3);
-        let style: Value = serde_json::from_str(&style).unwrap();
-        let c = &style["center"];
-        let (lon, lat) = (c[0].as_f64().unwrap(), c[1].as_f64().unwrap());
-        for z in [12u32, 14, 15] {
-            let n = (1u64 << z) as f64;
-            let (x, y) = ((lon + 180.0) / 360.0 * n, (1.0 - (lat.to_radians().tan() + 1.0 / lat.to_radians().cos()).ln() / std::f64::consts::PI) / 2.0 * n);
-            let r = (8u32 << (z - 12)) / 2; // about 8 km around the centre
-            let t = Instant::now();
-            let (mut count, mut bytes, mut most) = (0, 0usize, 0usize);
-            for tx in (x as u32).saturating_sub(r)..=(x as u32 + r) {
-                for ty in (y as u32).saturating_sub(r)..=(y as u32 + r) {
-                    let all = tiles.tile(z, tx, ty).len();
-                    if all > 0 {
-                        count += 1;
-                        bytes += all;
-                        most = most.max(all);
-                    }
+        let (mut count, mut bytes, mut most) = (0, 0usize, 0usize);
+        for tx in (x as u32).saturating_sub(r)..=(x as u32 + r) {
+            for ty in (y as u32).saturating_sub(r)..=(y as u32 + r) {
+                let all = tiles.tile(z, tx, ty).len();
+                if all > 0 {
+                    count += 1;
+                    bytes += all;
+                    most = most.max(all);
                 }
             }
-            eprintln!("z{z}: {count} tiles with data, {:.1} MB, the largest {:.0} KB, {:.2} ms a tile", bytes as f64 / 1e6, most as f64 / 1e3,
-                      t.elapsed().as_secs_f64() * 1e3 / count.max(1) as f64);
         }
-        return;
+        eprintln!("z{z}: {count} tiles with data, {:.1} MB, the largest {:.0} KB, {:.2} ms a tile", bytes as f64 / 1e6, most as f64 / 1e3,
+                  t.elapsed().as_secs_f64() * 1e3 / count.max(1) as f64);
     }
-    let layers_only = args.len() == 4 && args[1] == "--layers";
-    if !layers_only && args.len() != 6 {
-        fail("usage: roadstyle-rs <look.json> <roads.parquet> <features.parquet | -> <planner.parquet | -> <out.json>  |  \
-              roadstyle-rs --layers <look.json> <roads.parquet>");
-    }
-    let (look_path, roads_path) = if layers_only { (&args[2], &args[3]) } else { (&args[1], &args[2]) };
+}
+
+/// --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map).
+fn layers_mode(args: &[String]) {
+    let (look_path, roads_path) = (&args[2], &args[3]);
     let look = look_file(look_path);
     let data = fs::read(roads_path).unwrap_or_else(|e| fail(format!("{roads_path}: {e}")));
-    let opt = |i: usize| if layers_only || args[i] == "-" { None } else { Some(fs::read(&args[i]).unwrap_or_else(|e| fail(format!("{}: {e}", args[i])))) };
-    let (fdata, pdata) = (opt(3), opt(4));
-
-    if !layers_only {
-        // the whole style, as the worker makes it (inline_style), with the total time
-        let t = Instant::now();
-        let text = roadstyle_rs::inline_style(data, &look, fdata, pdata, None).unwrap_or_else(|e| fail(e));
-        let dt = t.elapsed();
-        fs::write(&args[5], &text).unwrap_or_else(|e| fail(format!("{}: {e}", args[5])));
-        eprintln!("inline_style {:.0} ms ({:.1} MB)", dt.as_secs_f64() * 1e3, text.len() as f64 / 1e6);
-        return;
-    }
-    // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)
     let mut feats = with_roles(read::read_roads(data, "geometry").unwrap_or_else(|e| fail(format!("{roads_path}: {e}"))));
     let colors = roads::mark_roads(&mut feats, &look.road, &look.map).unwrap_or_else(|e| fail(e));
     let simple = simple::simple_source(&feats, look.road.head_m, look.road.bridge_shadow, None, Vec::new()).unwrap_or_else(|e| fail(e));
@@ -215,4 +197,32 @@ fn main() {
     let roads = roads::roads_source(feats);
     let layers = layers::road_layers(&look, &roads.roads, &simple, features(&slots), false, &mut [], &colors.props, colors.active).unwrap_or_else(|e| fail(e)).0;
     println!("{}", json!({"layers": layers}));
+}
+
+/// The whole style, as the worker makes it (inline_style), with the total time.
+fn style_mode(args: &[String]) {
+    let look = look_file(&args[1]);
+    let data = fs::read(&args[2]).unwrap_or_else(|e| fail(format!("{}: {e}", args[2])));
+    let opt = |i: usize| if args[i] == "-" { None } else { Some(fs::read(&args[i]).unwrap_or_else(|e| fail(format!("{}: {e}", args[i])))) };
+    let (fdata, pdata) = (opt(3), opt(4));
+    let t = Instant::now();
+    let text = roadstyle_rs::inline_style(data, &look, fdata, pdata, None).unwrap_or_else(|e| fail(e));
+    let dt = t.elapsed();
+    fs::write(&args[5], &text).unwrap_or_else(|e| fail(format!("{}: {e}", args[5])));
+    eprintln!("inline_style {:.0} ms ({:.1} MB)", dt.as_secs_f64() * 1e3, text.len() as f64 / 1e6);
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    match (args.len(), args.get(1).map(String::as_str)) {
+        (5, Some("--bench")) => bench(&args[2], &args[3], &args[4]),
+        (7, Some("--sources")) => sources_mode(&args),
+        (3, Some("--tile-files")) => tile_files_mode(&args),
+        (4, Some("--features")) => features_mode(&args),
+        (5, Some("--tiles")) => tiles_mode(&args),
+        (4, Some("--layers")) => layers_mode(&args),
+        (6, _) => style_mode(&args),
+        _ => fail("usage: roadstyle-rs <look.json> <roads.parquet> <features.parquet | -> <planner.parquet | -> <out.json>  |  \
+                   roadstyle-rs --layers <look.json> <roads.parquet>"),
+    }
 }
