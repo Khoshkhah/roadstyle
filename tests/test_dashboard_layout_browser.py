@@ -118,7 +118,9 @@ def test_no_empty_bar_flashes(tmp_path):
         b.close()
 
 
-def test_basemap_box_lists_the_default_maps_in_order(tmp_path):
+def test_basemap_box(tmp_path):
+    """The box: eight keyless radio rows (CARTO only with a key) in the default order with a swatch each, the 'On top' checkboxes, a themed pair that
+    follows the theme, and the hillshade layer below the roads."""
     g = gpd.GeoDataFrame({"edge_id": [1], "highway": ["primary"], "name": ["A"], "oneway": [False]},
                          geometry=[LineString([(0, 0), (0.001, 0)])], crs="EPSG:4326")
     path = tmp_path / "bm.html"
@@ -127,20 +129,29 @@ def test_basemap_box_lists_the_default_maps_in_order(tmp_path):
         b = p.chromium.launch()
         pg = b.new_page(viewport={"width": W, "height": H})
         pg.goto(path.as_uri())
-        pg.wait_for_function("window.map && window.map.loaded() && document.querySelector('.rs-bm-item') && document.getElementById('rs-toolbar').classList.contains('rs-ready')", timeout=60000)
+        pg.wait_for_function("window.map && window.map.loaded() && document.querySelector('.rs-bm-row') && document.getElementById('rs-toolbar').classList.contains('rs-ready')", timeout=60000)
         pg.click("#rs-toolbar .bm-icon")
-        names = pg.evaluate("[...document.querySelectorAll('.rs-bm-item .rs-bm-n')].map(e => e.textContent)")
-        heads = pg.evaluate("[...document.querySelectorAll('.rs-bm-h')].map(e => e.textContent)")
-        swatches = pg.evaluate("[...document.querySelectorAll('.rs-bm-item .rs-bm-th')].every(e => getComputedStyle(e).backgroundImage !== 'none' || getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)')")
-        assert names == ["OpenFreeMap Liberty", "OpenFreeMap Bright", "OpenFreeMap Positron", "OpenStreetMap", "CARTO Voyager", "CARTO Voyager (no labels)",
-                         "CARTO Positron", "CARTO Dark Matter", "Esri Light Gray", "Esri Streets", "Esri Dark Gray", "Esri Satellite", "Blank", "Blank dark"], names
-        assert heads == ["OpenFreeMap", "OpenStreetMap", "CARTO", "Esri", "Blank"] and swatches
-        # the current map is outlined, the arrows move and Enter chooses, Escape closes
-        assert pg.evaluate("document.querySelector('.rs-bm-item.on .rs-bm-n').textContent") == "OpenStreetMap"
-        pg.keyboard.press("ArrowRight"); pg.keyboard.press("Enter")
+        names = pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=radio]')].map(e => e.parentElement.querySelector('.rs-bm-n').textContent)")
+        assert names == ["OpenFreeMap Liberty", "OpenFreeMap Bright", "OpenFreeMap Positron", "OpenStreetMap", "Esri Gray", "Esri Streets", "Esri Satellite", "Blank"], names
+        assert pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=radio]')].every(e => { const s = e.parentElement.querySelector('.rs-bm-sw').getBoundingClientRect(); return Math.round(s.width) === 32 && Math.round(s.height) === 20; })")
+        tops = pg.evaluate("[...document.querySelectorAll('.rs-bm-row input[type=checkbox]')].map(e => e.parentElement.querySelector('.rs-bm-n').textContent)")
+        assert tops == ["Hillshade", "Labels", "3D buildings", "Satellite labels"], tops
+        assert pg.evaluate("document.querySelector('input[value=osm]').checked")
+        # Blank follows the theme: white on light, the dark blank on dark; a map with no twin stays
+        pg.click("label.rs-bm-row[data-key=blank]")
+        pg.keyboard.press("Escape")
+        assert pg.evaluate("document.querySelector('.rs-bm-row input[value=blank]').checked")
+        pg.evaluate("document.getElementById('sb').dataset.theme = 'dark'")
         pg.wait_for_timeout(300)
-        assert pg.evaluate("!document.querySelector('.bm-menu').classList.contains('open')")
-        assert pg.evaluate("document.querySelector('.rs-bm-item.on .rs-bm-n').textContent") == "CARTO Voyager"
-        pg.click("#rs-toolbar .bm-icon"); pg.keyboard.press("Escape")
-        assert pg.evaluate("!document.querySelector('.bm-menu').classList.contains('open')")
+        assert pg.evaluate("window.map.getPaintProperty('bg', 'background-color')").lower().replace(" ", "") in ("#14181d", "rgb(20,24,29)")
+        pg.evaluate("document.getElementById('sb').dataset.theme = 'light'")
+        pg.wait_for_timeout(300)
+        assert pg.evaluate("window.map.getPaintProperty('bg', 'background-color')").lower() in ("#efede8", "rgb(239,237,232)", "rgb(239, 237, 232)")
+        # the hillshade is a raster layer below the roads, and it goes away
+        pg.click("#rs-toolbar .bm-icon")
+        pg.check("#rs-top-hillshade")
+        order = pg.evaluate("(() => { const ids = map.getStyle().layers.map(l => l.id); return [ids.indexOf('rs-top-hillshade'), ids.findIndex(i => i.startsWith('roads'))]; })()")
+        assert 0 <= order[0] < order[1], order
+        pg.uncheck("#rs-top-hillshade")
+        assert pg.evaluate("!map.getLayer('rs-top-hillshade')")
         b.close()

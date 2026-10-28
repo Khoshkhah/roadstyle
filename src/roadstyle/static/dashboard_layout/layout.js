@@ -70,30 +70,65 @@
         new MutationObserver(l=>l.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType === 1) take(n); }))).observe(col, {childList:true});   // a control that the page adds later
         col.classList.add("rs-emptied");
       }
-      // The base-map box: two columns of 96x64 thumbnails (a swatch of the map's colour when there is no picture) with the name under each,
-      // grouped under small headings; arrows move, Enter chooses. window.rsBasemapThumbs is the folder of the pictures, one PNG per key.
+      // The base-map box (design of duckOSM's #basepop): the heading "Base map", one radio row per map with a swatch (32x20) and its name, a divider, and
+      // "On top": checkbox rows for the reference layers between the base map and the roads. A map with a dark twin is one entry that follows the page's
+      // theme. The order on the map: base map, hillshade, labels, roadstyle's roads, the model, the buildings, the selection.
       const menu = document.querySelector(".bm-menu"), bms = window.RS_BASEMAPS || [];
       if(menu && bms.length){
-        menu.classList.add("rs-bm-grid"); const on0 = menu.querySelector(".on"); menu.innerHTML = "";
-        let group = null, cur = -1;
-        bms.map((b, i)=>[b, i]).sort((x, y)=>(x[0].order ?? 99) - (y[0].order ?? 99) || x[1] - y[1]).forEach(([b, i])=>{       // the box lists the maps in the default order; the index is the page's own
-          if(b.group && b.group !== group){ group = b.group; const h = document.createElement("div"); h.className = "rs-bm-h"; h.textContent = group; menu.appendChild(h); }
-          const it = document.createElement("div"); it.className = "rs-bm-item"; it.dataset.i = i;
-          const th = document.createElement("div"); th.className = "rs-bm-th"; th.style.background = b.bg;
-          if(window.rsBasemapThumbs){ const im = document.createElement("img"); im.alt = ""; im.src = window.rsBasemapThumbs + b.key + ".png"; im.onerror = ()=>im.remove(); th.appendChild(im); }
-          const n = document.createElement("div"); n.className = "rs-bm-n"; n.textContent = b.title || b.label;
-          it.append(th, n); it.onclick = ()=>{ window.rsSetBasemap(i); menu.classList.remove("open"); }; menu.appendChild(it);
+        menu.classList.add("rs-bm-box"); menu.innerHTML = "";
+        const el = (tag, cls, txt)=>{ const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
+        const ls = k=>{ try{ return localStorage.getItem("rs-top:"+k); }catch(e){ return null; } }, ss = (k, v)=>{ try{ localStorage.setItem("rs-top:"+k, v ? "1" : "0"); }catch(e){} };
+        const isDark = ()=>root.dataset.rsTheme === "dark";
+        const byKey = k=>bms.findIndex(b=>b.key === k);
+        let current = (bms[0] || {}).key;
+        menu.appendChild(el("div", "rs-bm-h", "Base map"));
+        const rows = [];
+        bms.map((b, i)=>[b, i]).filter(([b])=>!b.twin).sort((x, y)=>(x[0].order ?? 99) - (y[0].order ?? 99) || x[1] - y[1]).forEach(([b, i])=>{
+          const lab = el("label", "rs-bm-row"), r = el("input"); r.type = "radio"; r.name = "rs-bm"; r.value = b.key;
+          const sw = el("span", "rs-bm-sw"); sw.style.background = b.bg;
+          lab.append(r, sw, el("span", "rs-bm-n", b.title || b.label)); lab.dataset.key = b.key;
+          r.onchange = ()=>{ window.rsSetBasemap(b.dark && isDark() ? b.dark : b.key); };
+          menu.appendChild(lab); rows.push([b, r]);
         });
-        const items = ()=>[...menu.querySelectorAll(".rs-bm-item")];
-        const mark = ()=>items().forEach((e, k)=>e.classList.toggle("rs-bm-cur", k === cur));
-        const act = on0 && on0.dataset && on0.dataset.i ? +on0.dataset.i : 0; items().forEach(e=>e.classList.toggle("on", +e.dataset.i === act));
-        document.addEventListener("keydown", e=>{
-          if(!menu.classList.contains("open")) return;
-          if(e.key === "Escape"){ menu.classList.remove("open"); return; }
-          const n = items().length, step = {ArrowRight:1, ArrowLeft:-1, ArrowDown:2, ArrowUp:-2}[e.key];
-          if(step){ e.preventDefault(); cur = Math.max(0, Math.min(n - 1, (cur < 0 ? items().findIndex(x=>x.classList.contains("on")) : cur) + step)); mark(); items()[cur].scrollIntoView({block:"nearest"}); }
-          else if(e.key === "Enter" && cur >= 0){ e.preventDefault(); items()[cur].click(); cur = -1; mark(); }
-        }, true);
+        menu.appendChild(el("hr"));
+        menu.appendChild(el("div", "rs-bm-h", "On top"));
+        const tops = {};
+        const topRow = (id, label)=>{ const lab = el("label", "rs-bm-row"), c = el("input"); c.type = "checkbox"; c.id = "rs-top-"+id; lab.append(c, el("span", "rs-bm-n", label)); menu.appendChild(lab); tops[id] = {lab, c}; return c; };
+        const roadsFirst = ()=>{ const l = map.getStyle().layers.find(x=>/^roads/.test(x.id)); return l ? l.id : undefined; };
+        const RAS = {hillshade: ["https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}", 0.4, "Tiles © Esri"],
+                     labels: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", 1, "Tiles © Esri"],
+                     satlabels: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Reference_Overlay/MapServer/tile/{z}/{y}/{x}", 1, "Tiles © Esri"]};
+        const raster = (id, on)=>{ const lid = "rs-top-"+id;
+          if(!on){ if(map.getLayer(lid)) map.removeLayer(lid); if(map.getSource(lid)) map.removeSource(lid); return; }
+          if(map.getLayer(lid)) return;
+          map.addSource(lid, {type:"raster", tiles:[RAS[id][0]], tileSize:256, maxzoom:16, attribution:RAS[id][2]});
+          map.addLayer({id:lid, type:"raster", source:lid, paint:{"raster-opacity":RAS[id][1]}}, roadsFirst()); };
+        const vector = ()=>{ const b = bms[byKey(current)]; return !!(b && b.style_url); };
+        const apply = ()=>{
+          const vec = vector(), sat = current === "satellite";
+          raster("hillshade", tops.hillshade.c.checked);
+          raster("labels", !vec && tops.labels.c.checked);
+          raster("satlabels", sat && tops.satlabels.c.checked);
+          if(vec) for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", tops.labels.c.checked ? "visible" : "none");
+          tops.satlabels.lab.hidden = !sat;
+          tops.buildings.c.disabled = !vec; tops.buildings.c.checked = vec && window.rsBuildings ? window.rsBuildings() : false; };
+        topRow("hillshade", "Hillshade").checked = ls("hillshade") === "1";
+        topRow("labels", "Labels").checked = ls("labels") === "1" || (ls("labels") == null && vector());
+        topRow("buildings", "3D buildings");
+        topRow("satlabels", "Satellite labels").checked = ls("satlabels") === "1";
+        for(const id of ["hillshade", "labels", "satlabels"]) tops[id].c.onchange = ()=>{ ss(id, tops[id].c.checked); apply(); };
+        tops.buildings.c.onchange = ()=>{ if(window.rsBuildings) window.rsBuildings(tops.buildings.c.checked); };
+        const mark = ()=>{ rows.forEach(([b, r])=>{ r.checked = b.key === current || b.dark === current; }); };
+        document.addEventListener("rs:basemapchange", e=>{ current = e.detail.basemap; mark(); setTimeout(apply, 0); });
+        document.addEventListener("rs:basemapready", ()=>{ if(tops.labels.c.checked === false && ls("labels") == null) tops.labels.c.checked = true; apply(); });
+        document.addEventListener("rs:buildingschange", apply);
+        // the page's theme switch changes a map that has a twin at once, and leaves a map with no twin as it is
+        const sbT = document.getElementById("sb");
+        if(sbT) new MutationObserver(()=>{ const dark = sbT.dataset.theme === "dark", b = bms[byKey(current)]; if(!b) return;
+          if(dark && b.dark) window.rsSetBasemap(b.dark);
+          else if(!dark){ const light = bms.find(x=>x.dark === current); if(light) window.rsSetBasemap(light.key); } }).observe(sbT, {attributes:true, attributeFilter:["data-theme"]});
+        mark(); apply();
+        document.addEventListener("keydown", e=>{ if(e.key === "Escape") menu.classList.remove("open"); }, true);
       }
       filled = true; reveal();
       tb.querySelectorAll("button").forEach(b=>{ if(!b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; });

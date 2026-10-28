@@ -27,7 +27,7 @@ from collections.abc import Mapping
 
 from . import _settings
 from ._na import missing
-from .basemaps import DEFAULT_SWITCHER, get_basemap
+from .basemaps import BASEMAPS as _ALL_BASEMAPS, DEFAULT_SWITCHER, default_switcher, get_basemap
 from .config import DEFAULT as CONFIG
 from .fastjson import fc_dict
 from .overlays import Overlay, detect_kind, to_fc
@@ -2760,13 +2760,15 @@ def _page_basemaps(basemap, basemaps, api_key, basemap_switcher):
     source and layers, before the roads')."""
     active = basemap or CONFIG.basemap
     active_bm = get_basemap(active, api_key=api_key)
-    bkeys = list(basemaps) if basemaps else list(DEFAULT_SWITCHER)
+    bkeys = list(basemaps) if basemaps else default_switcher()
+    bkeys += [get_basemap(k).dark for k in list(bkeys) if get_basemap(k).dark and get_basemap(k).dark not in bkeys]      # the dark twins: not listed, but addressable
     bms_list = [active_bm] + [get_basemap(k, api_key=api_key) for k in bkeys if k != active_bm.key and k != active]
     # maxzoom + attr: switching rebuilds the raster source, whose maxzoom is fixed at creation
     bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b),
             "maxzoom": b.maxzoom, "attr": b.attr, **({"style_url": b.style_url} if getattr(b, "style_url", None) else {}),
             "group": getattr(b, "group", ""), "title": getattr(b, "title", "") or b.label,
-            "order": DEFAULT_SWITCHER.index(b.key) if b.key in DEFAULT_SWITCHER else 99}
+            "order": DEFAULT_SWITCHER.index(b.key) if b.key in DEFAULT_SWITCHER else 99,
+            **({"dark": b.dark} if getattr(b, "dark", None) else {}), "twin": any(getattr(x, "dark", None) == b.key for x in _ALL_BASEMAPS.values())}
            for b in bms_list]
     if not basemap_switcher and not basemaps:
         # no dropdown and no explicit set -> bake only the fixed backdrop. An explicit

@@ -128,6 +128,8 @@ class Basemap:
     #: the group and the name of the entry in the dashboard's base-map box (the toolbar option): "CARTO", "CARTO Voyager"
     group: str = ""
     title: str = ""
+    #: the key of the dark twin of this map: the box lists the pair as one entry that follows the page's theme
+    dark: str | None = None
 
 
 # NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
@@ -202,17 +204,48 @@ for _key, _label, _bg, _prev in (("ofm_liberty", "OpenFreeMap Liberty", "linear-
     BASEMAPS[_key] = Basemap(_key, _label, "", _OFM_ATTR, bg=_bg, preview=_prev, maxzoom=20,
                              style_url="https://tiles.openfreemap.org/styles/" + _key.split("_")[1])
 
-# The default list of the switcher, in this order, with the group and the name of each entry in the base-map box. No entry twice.
+# The box of the dashboard's toolbar lists these maps, in this order, each once, with its attribution. A map with a dark twin (`dark=`) is one
+# entry that follows the page's theme. The twins themselves are not listed. A provider that needs a key (CARTO) is listed only when its key is set.
 _MENU = [("ofm_liberty", "OpenFreeMap", "OpenFreeMap Liberty"), ("ofm_bright", "OpenFreeMap", "OpenFreeMap Bright"),
          ("ofm_positron", "OpenFreeMap", "OpenFreeMap Positron"), ("osm", "OpenStreetMap", "OpenStreetMap"),
-         ("voyager", "CARTO", "CARTO Voyager"), ("voyager_nolabels", "CARTO", "CARTO Voyager (no labels)"),
-         ("positron", "CARTO", "CARTO Positron"), ("dark_matter", "CARTO", "CARTO Dark Matter"),
-         ("esri_gray", "Esri", "Esri Light Gray"), ("esri_street", "Esri", "Esri Streets"),
-         ("esri_dark_gray", "Esri", "Esri Dark Gray"), ("satellite", "Esri", "Esri Satellite"),
-         ("blank", "Blank", "Blank"), ("blank_dark", "Blank", "Blank dark")]
+         ("esri_gray", "Esri", "Esri Gray"), ("esri_street", "Esri", "Esri Streets"), ("satellite", "Esri", "Esri Satellite"),
+         ("blank", "Blank", "Blank"), ("positron", "CARTO", "CARTO")]
+_TWINS = {"esri_gray": "esri_dark_gray", "blank": "blank_dark", "positron": "dark_matter"}
+_KEYED = {"positron": "carto"}                 # the maps that need a key, and the provider of the key
 for _k, _g, _t in _MENU:
-    BASEMAPS[_k] = dataclasses.replace(BASEMAPS[_k], group=_g, title=_t)
-DEFAULT_SWITCHER = [k for k, _, _ in _MENU]
+    BASEMAPS[_k] = dataclasses.replace(BASEMAPS[_k], group=_g, title=_t, dark=_TWINS.get(_k))
+for _k, _d in _TWINS.items():
+    BASEMAPS[_d] = dataclasses.replace(BASEMAPS[_d], group=BASEMAPS[_k].group, title=BASEMAPS[_d].label)
+#: the maps that need no key, in the box's order
+DEFAULT_SWITCHER = [k for k, _, _ in _MENU if k not in _KEYED]
+_ALIVE: dict = {}
+
+
+def _answers(bm) -> bool:
+    """One tile request (Monaco, zoom 10): False when the provider answers 401 or 403. No network: True (the entry stays)."""
+    if bm.key in _ALIVE:
+        return _ALIVE[bm.key]
+    import urllib.error
+    import urllib.request
+    url = bm.style_url or (bm.url.replace("{s}", (bm.subdomains or "a")[0]).replace("{r}", "").replace("{z}", "10").replace("{x}", "533").replace("{y}", "373") if bm.url else None)
+    ok = True
+    if url:
+        try:
+            urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "roadstyle"}), timeout=6).close()
+        except urllib.error.HTTPError as e:
+            ok = e.code not in (401, 403)
+            if not ok:
+                print(f"roadstyle: the base map {bm.key!r} answers {e.code}: left out of the box")
+        except OSError:
+            pass
+    _ALIVE[bm.key] = ok
+    return ok
+
+
+def default_switcher(check: bool = True) -> list[str]:
+    """The keys of the dashboard's base-map box: the keyless ones, then each keyed one whose key is set; a map whose tile answers 401 or 403 is left out."""
+    keys = [k for k, _, _ in _MENU if k not in _KEYED or get_api_key(_KEYED[k])]
+    return [k for k in keys if not check or _answers(BASEMAPS[k])]
 
 
 def register_basemap(bm: Basemap) -> None:
