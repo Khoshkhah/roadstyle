@@ -69,10 +69,18 @@ export function initGoogle3D(){
     // times cos(tilt). Below window.rsG3dMinAlt (metres, default MIN_ALT: 80) the title bar says so; the page does not stop the map's zoom.
     const NOTE="Google keeps its camera above the buildings: the 3D view shows more than the map", note=w.querySelector(".rs-g3d-note");
     note.textContent=NOTE; note.title=NOTE;
-    window.rsG3dCamera=()=>{ const r=m3 && m3.range || rangeOf(map.getCenter().lat, map.getZoom()), t=m3 ? (m3.tilt||0) : map.getPitch(), c=map.getCenter();
-      return {above:r*Math.cos(rad(t)), range:r, tilt:t, ground:ground(c.lng, c.lat), sea:(m3 && m3.center && m3.center.altitude || 0)+r*Math.cos(rad(t))}; };
-    const MIN_ALT=80;      // metres above the ground: seen at Sainte-Devote, zoom 19.9 (73 m), the view widened; a page can set window.rsG3dMinAlt
-    const lowCam=()=>{ const c=window.rsG3dCamera(), min=typeof window.rsG3dMinAlt==="number" ? window.rsG3dMinAlt : MIN_ALT; note.hidden=w.hidden || !(c.above<min); };
+    // The limit depends on the mode. Over the imagery (SATELLITE, HYBRID) it is the camera's height above the ground (MIN_ALT). Google's drawn 3D map
+    // (ROADMAP, the dark-blue blocks) keeps its camera much farther away whatever the range set, so there the note shows from a map zoom (MIN_ZOOM_DRAWN;
+    // a first value from one screenshot: the view showed 300 to 400 m at zoom 19.3; window.rsG3dMinZoomDrawn sets it).
+    const NOTE_DRAWN="Google's drawn 3D map does not come closer: the view shows more than the map; switch to the imagery for a close view";
+    const MIN_ALT=80, MIN_ZOOM_DRAWN=17;      // MIN_ALT: metres above the ground, seen at Sainte-Devote, zoom 19.9 (73 m), the view widened
+    const drawnMode=()=>!!m3 && !!m3.mode && !/^(HYBRID|SATELLITE)$/i.test(String(m3.mode));
+    window.rsG3dCamera=()=>{ const r=m3 && m3.range || rangeOf(map.getCenter().lat, map.getZoom()), t=m3 ? (m3.tilt||0) : map.getPitch(), c=map.getCenter(), drawn=drawnMode();
+      const minAlt=typeof window.rsG3dMinAlt==="number" ? window.rsG3dMinAlt : MIN_ALT, minZoom=typeof window.rsG3dMinZoomDrawn==="number" ? window.rsG3dMinZoomDrawn : MIN_ZOOM_DRAWN;
+      return {above:r*Math.cos(rad(t)), range:r, tilt:t, ground:ground(c.lng, c.lat), sea:(m3 && m3.center && m3.center.altitude || 0)+r*Math.cos(rad(t)),
+              drawn, limit:drawn ? "zoom above "+minZoom : "camera under "+minAlt+" m", low:drawn ? map.getZoom()>minZoom : r*Math.cos(rad(t))<minAlt}; };
+    const lowCam=()=>{ const c=window.rsG3dCamera(), text=c.drawn ? NOTE_DRAWN : NOTE; note.hidden=w.hidden || !c.low;
+      if(note.textContent!==text){ note.textContent=text; note.title=text; } };
     map.on("move", lowCam); map.on("zoom", lowCam); new MutationObserver(lowCam).observe(w, {attributes:true, attributeFilter:["hidden"]});
     setInterval(()=>{ if(!w.hidden) lowCam(); }, 400);       // Google changes its own range without a map move
     const toGoogle=()=>{ const c=map.getCenter();
