@@ -30,7 +30,7 @@ The export's style (`export_style`, `export_inline`: `state` baked) has `roadsty
 | `roadstyle:arrows` | `"points"` (the page's own arrows, the source `arrows`), `"line"` (along the slots) or null, from the final layers; the page's option `arrows` |
 | `roadstyle:tiles` | in stage 1's saved `style.json` only: the tile settings that stage 2 reads (`minzoom`, `maxzoom`, `buffer_px`, `extent`) |
 | `roadstyle:columns` | in stage 1's saved `style.json` only: the user's class, filter and metre width columns (`class`, `filter`, `width`) |
-| Parquet field `roadstyle:json` | stage 1's Parquet files (`save_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |
+| Parquet field `roadstyle:json` | stage 1's Parquet files (`write_sources`): a column whose values are JSON text (values of more than one type, lists or objects) |
 
 ## The dashboard's options from the style
 
@@ -220,7 +220,7 @@ The table is not renamed: the column keywords (`highway_col`, `bridge_col`, ...)
 `static/web_template.html` has these placeholders:
 
 - `__TITLE__`, `__STYLE__` (the style, as `const style = ...`), `__RS_OPTIONS__` and `__HOST_PANEL_HTML__`. The page writer
-  (`render_web._page_html`, `roadstyle::page::page_html`) fills in these four in one pass, so it does not read a value again.
+  (`roadstyle::page::page_html`) fills in these four in one pass, so it does not read a value again.
 - `__RS_OPTIONS__` is one JSON object: the options of `rsDashboard` (each with the name of a `render` keyword) and `camera`
   (`center`, `pitch`, `bearing`, `max_pitch`, `bounds`), which the page's own script reads. The template calls
   `rsDashboard(map, {...RS_OPTIONS, style})`.

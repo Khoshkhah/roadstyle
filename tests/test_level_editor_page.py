@@ -95,10 +95,10 @@ map.addLayer({id: "host-water", type: "fill", source: "host-water", paint: {"fil
 // its roads as vector tiles, in one tile source with its base map (duckosm-rust's page: the base map's layers are other source
 // layers of the roads' source)
 const edges = new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer());
-const hostSources = pkg.makeSources(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "host");
+const hostSources = pkg.styleSources(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "host");
 window.hostTable = () => JSON.parse(new TextDecoder().decode(hostSources.roadTable()));   // the host's road table (its RS_SIDE)
 const hostSide = window.hostTable();
-const hostTiles = pkg.tileSources(hostSources, "hostt://", ["edge_id", "name", "highway"]);
+const hostTiles = pkg.tilesOfSources(hostSources, "hostt://", ["edge_id", "name", "highway"]);
 maplibregl.addProtocol("hostt", async (q) => { const [source, z, x, y] = q.url.slice("hostt://".length).split("/");
   return {data: hostTiles.tile(source, +z, +x, +y)}; });
 const own = JSON.parse(hostTiles.style());

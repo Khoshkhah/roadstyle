@@ -39,7 +39,7 @@ export class LevelArea {
      */
     check(edits: string, rows: string): string;
     /**
-     * The map's table (GeoParquet, one row for each edge) for makeStyle: 4 numbers for each road.
+     * The map's table (GeoParquet, one row for each edge) for inlineStyle: 4 numbers for each road.
      */
     draw(levels: Int32Array, heads: string, caps: string): Uint8Array;
     /**
@@ -111,7 +111,7 @@ export class Projection {
 
 /**
  * Roads that a reader of a road file gave (roadstyle-io: a RoadTable, one row for each road): `readGeoJson(bytes)` makes them. `length`
- * and `columns()` describe them; `sources(look, features?, planner?, name?)` is stage 1 of them (makeSources' arguments after the roads).
+ * and `columns()` describe them; `sources(look, features?, planner?, name?)` is stage 1 of them (styleSources' arguments after the roads).
  */
 export class Roads {
     private constructor();
@@ -122,11 +122,11 @@ export class Roads {
      */
     columns(): string[];
     /**
-     * page(look, options, given?, features?): the page of these roads in one call, as makePage (its arguments after the roads).
+     * page(look, options, given?, features?): the page of these roads in one call, as pageFrom (its arguments after the roads).
      */
     page(look: Look, options: string, given?: string | null, features?: Uint8Array | null): string;
     /**
-     * sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
+     * sources(look, features?, planner?, name?): stage 1 of these roads, as styleSources; `features` and `planner` are Parquet bytes.
      */
     sources(look: Look, features?: Uint8Array | null, planner?: Uint8Array | null, name?: string | null): Sources;
     /**
@@ -233,22 +233,22 @@ export function main(): void;
 export function makeArea(edges: Uint8Array, options?: string | null): AreaFiles;
 
 /**
- * makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
+ * pageFrom(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
  * call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
  * `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values
  * over the look's args (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base map (Parquet bytes).
  */
-export function makePage(roads: Uint8Array, look: Look, options: string, given?: string | null, features?: Uint8Array | null): string;
+export function pageFrom(roads: Uint8Array, look: Look, options: string, given?: string | null, features?: Uint8Array | null): string;
 
 /**
- * makeSources(parquet, look, features, planner, name): stage 1, with makeStyle's arguments.
+ * styleSources(parquet, look, features, planner, name): stage 1, with inlineStyle's arguments.
  */
-export function makeSources(parquet: Uint8Array, look: Look, features?: Uint8Array | null, planner?: Uint8Array | null, name?: string | null): Sources;
+export function styleSources(parquet: Uint8Array, look: Look, features?: Uint8Array | null, planner?: Uint8Array | null, name?: string | null): Sources;
 
 /**
- * makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
+ * inlineStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
  */
-export function makeStyle(parquet: Uint8Array, look: Look, features?: Uint8Array | null, planner?: Uint8Array | null, name?: string | null): string;
+export function inlineStyle(parquet: Uint8Array, look: Look, features?: Uint8Array | null, planner?: Uint8Array | null, name?: string | null): string;
 
 /**
  * The size of the module's memory, in bytes.
@@ -269,7 +269,7 @@ export function rampStops(cmap: string, n: number): string[];
 export function readGeoJson(bytes: Uint8Array): Roads;
 
 /**
- * readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as makeSources
+ * readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as styleSources
  * reads it). An error is a thrown Error.
  */
 export function readGeoParquet(bytes: Uint8Array): Roads;
@@ -287,16 +287,16 @@ export function readShp(shp: Uint8Array, dbf: Uint8Array, prj?: string | null, n
 export function resolveLook(options: string): Look;
 
 /**
- * tileFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
+ * tilesOfFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
  * style is the saved style with the one vector source (roadstyle::tiled_style).
  */
-export function tileFiles(files: FileSet, prefix: string, keep: string[]): Tiler;
+export function tilesOfFiles(files: FileSet, prefix: string, keep: string[]): Tiler;
 
 /**
- * tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
+ * tilesOfSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
  * Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
  */
-export function tileSources(sources: Sources, prefix: string, keep: string[]): Tiler;
+export function tilesOfSources(sources: Sources, prefix: string, keep: string[]): Tiler;
 
 export function toProjstring(src: string): string;
 
@@ -348,9 +348,9 @@ export interface InitOutput {
     readonly look_toJson: (a: number) => [number, number];
     readonly main: () => void;
     readonly makeArea: (a: number, b: number, c: number, d: number) => [number, number, number];
-    readonly makePage: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
-    readonly makeSources: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
-    readonly makeStyle: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
+    readonly pageFrom: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
+    readonly styleSources: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number];
+    readonly inlineStyle: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => [number, number, number, number];
     readonly memoryBytes: () => number;
     readonly point_new: (a: number, b: number, c: number) => number;
     readonly projection_axis: (a: number) => [number, number];
@@ -373,8 +373,8 @@ export interface InitOutput {
     readonly sources_file: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
     readonly sources_fileNames: (a: number, b: number, c: number) => [number, number, number, number];
     readonly sources_roadTable: (a: number) => [number, number];
-    readonly tileFiles: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
-    readonly tileSources: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly tilesOfFiles: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+    readonly tilesOfSources: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
     readonly tiler_archive: (a: number, b: number, c: number, d: number, e: number) => [number, number, number, number];
     readonly tiler_new: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => [number, number, number];
     readonly tiler_props: (a: number, b: number, c: number, d: number) => [number, number];

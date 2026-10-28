@@ -16,7 +16,7 @@
 <div id="bar"><button id="a" type="button">Value A</button><button id="b" type="button">Value B, width C</button>
   <button id="c" type="button">Clear</button><span id="ms"></span></div>
 <script type="module">
-import init, {Look, makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
+import init, {Look, styleSources, tilesOfSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../../rust/roadstyle-assets/files/static/dashboard/index.js";
 
 const area = new URLSearchParams(location.search).get("area") || "monaco";
@@ -27,11 +27,11 @@ const [, roads, lookText] = await Promise.all([init(), bytes(DATA + area + "/roa
 // keywords, each through Look.withArg
 const withArgs = (look, args) => Object.entries(args).reduce((l, [k, v]) => l.withArg(k, JSON.stringify(v)), look);
 // live_data: the road layer reads the feature states rs_c and rs_w (metadata roadstyle:live)
-const sources = makeSources(roads, withArgs(Look.fromJson(lookText), {live_data: true}), undefined, undefined, area);
+const sources = styleSources(roads, withArgs(Look.fromJson(lookText), {live_data: true}), undefined, undefined, area);
 const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
-const tiler = tileSources(sources, "rs://1/", ["name", "edge_id", "highway"]);
+const tiler = tilesOfSources(sources, "rs://1/", ["name", "edge_id", "highway"]);
 const style = JSON.parse(tiler.style());
-// the pieces' row as their id (the feature states are by row): the engine does not set it on tileSources' style yet
+// the pieces' row as their id (the feature states are by row): the engine does not set it on tilesOfSources' style yet
 style.sources.roads.promoteId = {simple: "__rs_edge"};
 maplibregl.addProtocol("rs", async (p) => {
   const [, source, z, x, y] = p.url.slice("rs://".length).split("/");

@@ -14,7 +14,7 @@
 </head><body>
 <div id="map"></div><button id="next" type="button">Colour by lanes</button>
 <script type="module">
-import init, {Look, makeSources, tileSources} from "./pkg/roadstyle_wasm.js";
+import init, {Look, styleSources, tilesOfSources} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "../../rust/roadstyle-assets/files/static/dashboard/index.js";
 
 const DATA = "../../rust/roadstyle-rs/tests/data/";
@@ -50,9 +50,9 @@ window.rs = rs;
 async function showRoads(colorBy) {
   // state "live": the dashboard takes its controls (the selection colour, ...) from the style's metadata roadstyle:controls
   const look = withArgs(Look.fromJson(lookText), {state: "live", ...colorBy});
-  const sources = makeSources(roads, look, undefined, undefined, "Monaco");
+  const sources = styleSources(roads, look, undefined, undefined, "Monaco");
   const road_table = JSON.parse(new TextDecoder().decode(sources.roadTable()));
-  tiler = tileSources(sources, `rs://${++gen}/`, ["name", "edge_id", "highway"]);
+  tiler = tilesOfSources(sources, `rs://${++gen}/`, ["name", "edge_id", "highway"]);
   const style = JSON.parse(tiler.style());
   for (const l of map.getStyle().layers) if (l.id.startsWith("rs-")) map.removeLayer(l.id);
   for (const id of Object.keys(map.getStyle().sources)) if (id.startsWith("rs-")) map.removeSource(id);

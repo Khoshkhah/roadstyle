@@ -245,7 +245,7 @@ fn center_of(roads: &[u8]) -> [f64; 2] {
 /// The numbers of an area: for each view, its tiles' sizes and the numbers of the reduction rules; and the style's. `views`: the name and the
 /// tiles of each. A rule that is done and not 0 (rules 1 and 5) is in `broken`.
 fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look, center: [f64; 2], views: Vec<View>, broken: &mut Vec<String>) -> Value {
-    let (style, tiles, _) = roadstyle_rs::make_tiled(roads, look, features, None, "rs://", &[]).unwrap();
+    let (style, tiles, _) = roadstyle_rs::tiled_from_parquet(roads, look, features, None, "rs://", &[]).unwrap();
     let style: Value = serde_json::from_str(&style).unwrap();
     let reads = style_reads(&style);
     let layers_json = style["layers"].as_array().cloned().unwrap_or_default();

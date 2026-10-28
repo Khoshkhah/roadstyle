@@ -37,7 +37,7 @@ def live_style():
     import shapely
     df = pq.read_table(DATA).to_pandas(integer_object_nulls=True)
     g = gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
-    style = json.loads(_engine.rust().make_style(_engine._arrow(g), _engine._look_of({"state": "live"}), None, None, "roads"))
+    style = json.loads(_engine.rust().inline_style(_engine._arrow(g), _engine._look_of({"state": "live"}), None, None, "roads"))
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] != "symbol"]    # the arrows and names need a sprite and glyphs
     return style, [list(g.total_bounds[:2]), list(g.total_bounds[2:])]
 

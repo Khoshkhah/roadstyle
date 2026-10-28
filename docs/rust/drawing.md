@@ -58,7 +58,7 @@ how they get to the browser. Each choice comes after the one before it.
 | | GeoJSON (the default) | Vector tiles (MVT) |
 |---|---|---|
 | Who cuts the roads into tiles | MapLibre, in the browser, for all roads when the page opens | roadstyle, before the browser |
-| Calls | `render_edges(edges)`, `export_inline`, `makeStyle` | `tiles=True`, `export_style`, `Tiler` |
+| Calls | `render_edges(edges)`, `export_inline`, `inlineStyle` | `tiles=True`, `export_style`, `Tiler` |
 | Good for | up to about 10⁴ edges | about 10⁵ edges |
 
 With GeoJSON, roadstyle makes no tiles. The page gives MapLibre all the roads, and MapLibre cuts them; `data_maxzoom` and

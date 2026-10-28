@@ -1,6 +1,6 @@
 // The level editor as a module that any page can hold (the level editor's files: roadstyle's level area; docs/rust/browser.md, "The level
 // editor in a page"): levelEditor({map, container, pkg, store}) loads the area's files from `store`, solves in the page (the roadstyle-wasm
-// package `pkg`, initialised: LevelArea, resolveLook, makeSources, tileSources), draws the area on `map` (a MapLibre map of the host, else
+// package `pkg`, initialised: LevelArea, resolveLook, styleSources, tilesOfSources), draws the area on `map` (a MapLibre map of the host, else
 // one of its own in `container`) and puts the panel (static/level_editor.html) in `container`. It saves your edits, heads and caps and the
 // solved levels.csv to `store`, and after each solve it sends the event "solved" ({levelsCsv, levelsInfo, draw()}: draw gives the map's
 // table, GeoParquet, one row for each edge) so that the host can apply it. A store is {load(name, bytes) -> {body, mtime} | null,

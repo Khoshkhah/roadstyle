@@ -1,4 +1,4 @@
-//! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `Look`, `makeStyle`, `makePage`, `Tiler` and `memoryBytes` through
+//! The browser's front-end of roadstyle-rs (docs/design/rust_engine.md): `Look`, `inlineStyle`, `pageFrom`, `Tiler` and `memoryBytes` through
 //! wasm-bindgen, and the allocator that grows the memory in large steps. Natively the crate is empty.
 
 /// The allocator in the browser: the standard one (dlmalloc), but when it grows the memory, the memory grows once more by a quarter of its
@@ -49,7 +49,7 @@ mod grow {
 
     // Every function of the allocator is out of line (#[inline(never)]): with fat LTO they were inlined at each allocation site, thousands of
     // copies, 1.31 MB of the package (12,312,335 to 11,006,948 bytes; parity.md, "Size"). The cost is one call for each allocation:
-    // Tartu's makeSources and tileSources in Node took about 2 % longer, about the noise between runs.
+    // Tartu's styleSources and tilesOfSources in Node took about 2 % longer, about the noise between runs.
 
     unsafe impl GlobalAlloc for Ahead {
         #[inline(never)]
@@ -144,10 +144,10 @@ mod wasm {
         roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| JsError::new(&e.to_string()))
     }
 
-    /// makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
-    #[wasm_bindgen(js_name = makeStyle)]
-    pub fn make_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
-        roadstyle::make_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e.to_string()))
+    /// inlineStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
+    #[wasm_bindgen(js_name = inlineStyle)]
+    pub fn inline_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {
+        roadstyle::inline_style(parquet, &look.0, features, planner, name).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// makeArea(edges: Uint8Array, options?: string) -> AreaFiles: a level area's files in memory (roadstyle::level_area::make_files), for
@@ -288,25 +288,25 @@ mod wasm {
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
             self.0.levels_csv(&levels, heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
-        /// The map's table (GeoParquet, one row for each edge) for makeStyle: 4 numbers for each road.
+        /// The map's table (GeoParquet, one row for each edge) for inlineStyle: 4 numbers for each road.
         pub fn draw(&self, levels: Vec<i32>, heads: &str, caps: &str) -> Result<Vec<u8>, JsError> {
             let levels: Vec<i64> = levels.into_iter().map(i64::from).collect();
             self.0.draw(&levels, heads, caps).map_err(|e| JsError::new(&e.to_string()))
         }
     }
 
-    /// makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
+    /// pageFrom(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
     /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
     /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args. The page's keys (sidebar,
     /// popup_mode, ...) come from the call's args (page_options::given_of: the keywords that are not map options, name, road_popup);
     /// `given`: the caller's values over them (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base
     /// map (Parquet bytes).
-    #[wasm_bindgen(js_name = makePage)]
-    pub fn make_page(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
+    #[wasm_bindgen(js_name = pageFrom)]
+    pub fn page_html(roads: Vec<u8>, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
         page_of(roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e.to_string()))?, features, look, options, given)
     }
 
-    /// makePage and Roads.page: the page of read roads.
+    /// pageFrom and Roads.page: the page of read roads.
     fn page_of(roads: roadstyle::RoadTable, features: Option<Vec<u8>>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
         let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: {e}")))?;
         // the page's keys of the call (the look's other keywords, name, road_popup: page_options::given_of), under the caller's
@@ -353,7 +353,7 @@ mod wasm {
         #[wasm_bindgen(constructor)]
         pub fn new(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: Vec<String>)
                    -> Result<Tiler, JsError> {
-            let (style, tiles, _) = roadstyle::make_tiled(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
+            let (style, tiles, _) = roadstyle::tiled_from_parquet(parquet, &look.0, features, name, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
             Ok(Tiler { style, tiles })
         }
 
@@ -403,8 +403,8 @@ mod wasm {
 
         /// fileNames(format): the names of stage 1's files (style.json, a file for each source, road_table.parquet).
         #[wasm_bindgen(js_name = fileNames)]
-        pub fn file_names(&self, format: &str) -> Result<Vec<String>, JsError> {
-            Ok(roadstyle::file_names(&self.inner, self::format(format)?))
+        pub fn source_file_names(&self, format: &str) -> Result<Vec<String>, JsError> {
+            Ok(roadstyle::source_file_names(&self.inner, self::format(format)?))
         }
 
         /// roadTable(fields?, lines?): the road table as the page loads it, JSON text (props, mids, bboxes, and with `lines` the
@@ -431,15 +431,15 @@ mod wasm {
         }
     }
 
-    /// makeSources(parquet, look, features, planner, name): stage 1, with makeStyle's arguments.
-    #[wasm_bindgen(js_name = makeSources)]
-    pub fn make_sources(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
+    /// styleSources(parquet, look, features, planner, name): stage 1, with inlineStyle's arguments.
+    #[wasm_bindgen(js_name = styleSources)]
+    pub fn style_sources(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>)
                         -> Result<Sources, JsError> {
-        roadstyle::make_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e.to_string()))
+        roadstyle::style_sources(parquet, &look.0, features, planner, name).map(|inner| Sources { inner }).map_err(|e| JsError::new(&e.to_string()))
     }
 
     /// Roads that a reader of a road file gave (roadstyle-io: a RoadTable, one row for each road): `readGeoJson(bytes)` makes them. `length`
-    /// and `columns()` describe them; `sources(look, features?, planner?, name?)` is stage 1 of them (makeSources' arguments after the roads).
+    /// and `columns()` describe them; `sources(look, features?, planner?, name?)` is stage 1 of them (styleSources' arguments after the roads).
     #[wasm_bindgen]
     pub struct Roads(roadstyle::RoadTable);
 
@@ -456,12 +456,12 @@ mod wasm {
             self.0.names().to_vec()
         }
 
-        /// page(look, options, given?, features?): the page of these roads in one call, as makePage (its arguments after the roads).
+        /// page(look, options, given?, features?): the page of these roads in one call, as pageFrom (its arguments after the roads).
         pub fn page(&self, look: &JsLook, options: &str, given: Option<String>, features: Option<Vec<u8>>) -> Result<String, JsError> {
             page_of(self.0.clone(), features, look, options, given)
         }
 
-        /// sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
+        /// sources(look, features?, planner?, name?): stage 1 of these roads, as styleSources; `features` and `planner` are Parquet bytes.
         pub fn sources(&self, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<Sources, JsError> {
             let err = |e: roadstyle::Error| JsError::new(&e.to_string());
             let features = features.map(roadstyle::read_features).transpose().map_err(err)?;
@@ -546,7 +546,7 @@ mod wasm {
         Ok(roadstyle::duckosm::features_select(&specs.into_iter().map(|i| i as usize).collect::<Vec<_>>(), &run))
     }
 
-    /// readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as makeSources
+    /// readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as styleSources
     /// reads it). An error is a thrown Error.
     #[wasm_bindgen(js_name = readGeoParquet)]
     pub fn read_geoparquet(bytes: Vec<u8>) -> Result<Roads, JsError> {
@@ -567,11 +567,11 @@ mod wasm {
         roadstyle::shp::read_roads(shp, dbf, prj.as_deref(), name.as_deref().unwrap_or("the Shapefile")).map(Roads).map_err(|e| JsError::new(&e.to_string()))
     }
 
-    /// tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
+    /// tilesOfSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
     /// Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
-    #[wasm_bindgen(js_name = tileSources)]
+    #[wasm_bindgen(js_name = tilesOfSources)]
     pub fn tile_sources(sources: &Sources, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
-        let (style, tiles) = roadstyle::tile_made(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
+        let (style, tiles) = roadstyle::tiles_of_sources(&sources.inner, prefix, &keep).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Tiler { style, tiles })
     }
 
@@ -653,12 +653,12 @@ mod wasm {
         }
     }
 
-    /// tileFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
+    /// tilesOfFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
     /// style is the saved style with the one vector source (roadstyle::tiled_style).
-    #[wasm_bindgen(js_name = tileFiles)]
-    pub fn tile_files(files: &FileSet, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
+    #[wasm_bindgen(js_name = tilesOfFiles)]
+    pub fn tiles_of_files(files: &FileSet, prefix: &str, keep: Vec<String>) -> Result<Tiler, JsError> {
         let read = |n: &str| files.files.get(n).cloned().ok_or_else(|| format!("{n}: not in the files"));
-        let (style, tiles) = roadstyle::tile_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e.to_string()))?;
+        let (style, tiles) = roadstyle::tiles_of_files_with(read, &keep, None, &roadstyle::xyz_at(prefix)).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(Tiler { style: style.to_string(), tiles })
     }
 

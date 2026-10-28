@@ -293,11 +293,11 @@ const tiler = new Tiler(roads, look, undefined, "Monaco", "rs://1/", ["name", "h
 
 - The style: **tiled**, and **live** when the look has `args.state = "live"` (else baked). Its source `roads` points to
   `rs://1/roads/{z}/{x}/{y}`, and the page answers this address with `tiler.tile`.
-- Nothing is written to a file. The page can write a whole HTML file with `makePage`, as `render_edges` does.
+- Nothing is written to a file. The page can write a whole HTML file with `pageFrom`, as `render_edges` does.
 
 #### Only the style
 
-`rs.export_inline(edges)` (in the browser: `makeStyle`) gives the style alone, as a dict or JSON text: **inline** and **baked**,
+`rs.export_inline(edges)` (in the browser: `inlineStyle`) gives the style alone, as a dict or JSON text: **inline** and **baked**,
 with no page. A map app adds it to its own map.
 
 ### The output style
@@ -381,7 +381,7 @@ Two separate choices give the form of a style.
 
 | Form | Made by | Sources |
 |---|---|---|
-| **Inline** | `export_inline`, `makeStyle`, `render_edges` | GeoJSON sources with all the data inside the style |
+| **Inline** | `export_inline`, `inlineStyle`, `render_edges` | GeoJSON sources with all the data inside the style |
 | **Tiled** | `export_style` (`style.json`), `tiler.style()`, `render_edges(tiles=True)` | one vector source `roads` with the address of the tiles: `<base_url>/tiles/{z}/{x}/{y}.pbf`, `pmtiles://...` or `rs://...`; zooms 6 to 18 |
 
 **Whether the controls can change it:**
@@ -410,7 +410,7 @@ The road fields are in the source `roads` (GeoJSON) or in the side table (tiles)
 
 ### The page
 
-`render_edges` and `makePage` write one HTML file. It holds:
+`render_edges` and `pageFrom` write one HTML file. It holds:
 
 - the live style, with the data inline (gzipped, `compress=True`) or with the PMTiles archive (`tiles=True`);
 - MapLibre GL JS 5.24 (inside the file, or from a CDN);

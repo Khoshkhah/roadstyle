@@ -117,7 +117,7 @@ def export_inline(db, mode: str = "all", *, theme: str = "liberty", paths: str =
 
     roads, features, level_kw = read(db, mode, levels=levels, layers=layers, only=only)
     lk = look(db, mode, theme=theme, paths=paths, levels=level_kw, **{"view_3d": True, "export": True, **kwargs})
-    style = json.loads(rust().make_style(roads, lk, features, None, None))
+    style = json.loads(rust().inline_style(roads, lk, features, None, None))
     _warn()
     return style
 

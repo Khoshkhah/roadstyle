@@ -19,7 +19,7 @@ fn a_geojson_file_makes_the_style_of_its_geoparquet_file() {
         s.write_style(&mut out, roadstyle_rs::sources::SourceMode::INLINE).unwrap();
         serde_json::from_slice::<serde_json::Value>(&out).unwrap()
     };
-    let want = style(roadstyle_rs::make_sources(pq, &look, None, None, None).unwrap());
+    let want = style(roadstyle_rs::style_sources(pq, &look, None, None, None).unwrap());
     let got = style(roadstyle_rs::sources_of(roads, &look, None, None, None).unwrap());
     assert!(got == want, "the GeoJSON roads make another style");
 }

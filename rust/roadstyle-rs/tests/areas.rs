@@ -34,7 +34,7 @@ fn text(b: &[u8]) -> Value {
 
 /// The style of an area (stage 1, export_inline's) as a summary, with its road table's rows, columns and hash, and the two texts.
 fn style(area: &str) -> Value {
-    let s = roadstyle_rs::make_sources(roads(area), &look(area), None, None, None).unwrap();
+    let s = roadstyle_rs::style_sources(roads(area), &look(area), None, None, None).unwrap();
     let (mut out, mut table) = (Vec::new(), Vec::new());
     s.write_style(&mut out, roadstyle_rs::sources::SourceMode::INLINE).unwrap();
     roadstyle_rs::write_road_table(&s, None, true, &mut table).unwrap();
@@ -59,7 +59,7 @@ fn page(area: &str) -> Value {
     json!({"page": text(p.html.as_bytes()), "warnings": p.warnings})
 }
 
-/// The tiles of an area (make_tiled, every column of the roads kept): the 3 x 3 tiles around the roads' centre at zooms 12, 14 and 15,
+/// The tiles of an area (tiled_from_parquet, every column of the roads kept): the 3 x 3 tiles around the roads' centre at zooms 12, 14 and 15,
 /// and for each zoom and tile layer the number of tiles with it, of its features and a hash of them (decoded: ids, properties and
 /// geometry), with the tiled style's summary.
 fn tiles(area: &str) -> Value {
@@ -70,7 +70,7 @@ fn tiles(area: &str) -> Value {
         (lo, hi) = ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]);
     }
     let (lon, lat) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
-    let (style, tiles, _) = roadstyle_rs::make_tiled(roads(area), &look(area), None, None, "rs://", &keep).unwrap();
+    let (style, tiles, _) = roadstyle_rs::tiled_from_parquet(roads(area), &look(area), None, None, "rs://", &keep).unwrap();
     let mut out = serde_json::Map::new();
     for z in [12u32, 14, 15] {
         let n = (1u64 << z) as f64;

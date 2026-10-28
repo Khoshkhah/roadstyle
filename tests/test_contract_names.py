@@ -109,5 +109,5 @@ def test_the_dashboards_contract_is_the_engines():
     core = (ROOT / "rust/roadstyle-assets/files/static/dashboard/core.js").read_text()
     js = int(re.search(r"^export const CONTRACT = (\d+);", core, re.M).group(1))
     g = gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([(18.0, 59.3), (18.001, 59.301)])], crs=4326)
-    style = json.loads(_engine.rust().make_style(_engine._arrow(g), _engine._look_of({"state": "live"}), None, None, "roads"))
+    style = json.loads(_engine.rust().inline_style(_engine._arrow(g), _engine._look_of({"state": "live"}), None, None, "roads"))
     assert style["metadata"]["roadstyle:contract"] == js

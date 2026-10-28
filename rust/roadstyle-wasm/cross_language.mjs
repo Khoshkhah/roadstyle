@@ -17,7 +17,7 @@ const data = new URL("../roadstyle-rs/tests/data/monaco/", import.meta.url);
 const text = t => { const b = Buffer.from(t); return {bytes: b.length, sha16: createHash("sha256").update(b).digest("hex").slice(0, 16)}; };
 // areas.rs's look: the area's options, resolved, as an export (args.export = true after the resolution)
 const look = pkg.resolveLook(gunzipSync(readFileSync(new URL("golden_options.json.gz", data))).toString()).withArg("export", "true");
-const s = pkg.makeSources(readFileSync(new URL("roads.parquet", data)), look);
+const s = pkg.styleSources(readFileSync(new URL("roads.parquet", data)), look);
 const got = {text: text(s.style()), road_table: text(s.roadTable(undefined, true))};
 const want = JSON.parse(readFileSync(new URL("rust_style.json", data), "utf8"));
 const same = JSON.stringify(got) === JSON.stringify({text: want.text, road_table: want.road_table.text});

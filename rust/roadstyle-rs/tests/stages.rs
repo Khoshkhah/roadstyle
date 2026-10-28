@@ -1,5 +1,5 @@
-//! Stage 2 from stage 1's files (docs/rust/architecture.md, "The three stages and the one call"): the tiles that tile_files makes from
-//! the saved GeoJSON files and from the saved GeoParquet files are the tiles of make_tiled (the one call), decoded: each tile layer's
+//! Stage 2 from stage 1's files (docs/rust/architecture.md, "The three stages and the one call"): the tiles that tiles_of_files makes from
+//! the saved GeoJSON files and from the saved GeoParquet files are the tiles of tiled_from_parquet (the one call), decoded: each tile layer's
 //! features with their ids, properties and geometry, in every tile of the roads' box at zooms 12, 14 and 15.
 
 mod common;
@@ -19,13 +19,13 @@ fn same_tiles(area: &str) {
     let look = roadstyle_rs::Look::from_value(look).unwrap();
     let (roads, features) = (data(&format!("{area}/roads.parquet")), data(&format!("{area}/features.parquet")));
     let keep = ["osm_id".to_string(), "access".to_string()];
-    let (_, one, _) = roadstyle_rs::make_tiled(roads.clone(), &look, Some(features.clone()), None, "rs://", &keep).unwrap();
-    let s = roadstyle_rs::make_sources(roads.clone(), &look, Some(features), None, None).unwrap();
+    let (_, one, _) = roadstyle_rs::tiled_from_parquet(roads.clone(), &look, Some(features.clone()), None, "rs://", &keep).unwrap();
+    let s = roadstyle_rs::style_sources(roads.clone(), &look, Some(features), None, None).unwrap();
     let dir = std::env::temp_dir().join(format!("roadstyle-stages-{area}-{}", std::process::id()));
     let mut by_file = Vec::new();
     for (f, sub) in [(roadstyle_rs::Format::GeoJson, "geojson"), (roadstyle_rs::Format::GeoParquet, "geoparquet")] {
-        roadstyle_rs::save_sources(&s, &dir.join(sub), f, &keep).unwrap();
-        by_file.push((sub, roadstyle_rs::tile_files(&dir.join(sub), &keep, None, &roadstyle_rs::xyz_at("")).unwrap().1));
+        roadstyle_rs::write_sources(&s, &dir.join(sub), f, &keep).unwrap();
+        by_file.push((sub, roadstyle_rs::tiles_of_files(&dir.join(sub), &keep, None, &roadstyle_rs::xyz_at("")).unwrap().1));
     }
     let t = roadstyle_rs::read::read_roads(roads, "geometry").unwrap();
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);

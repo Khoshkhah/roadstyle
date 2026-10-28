@@ -15,7 +15,7 @@ fn landcover(interaction: Value) -> (Value, Vec<String>) {
     look["args"]["state"] = "live".into();
     look["args"]["interaction"] = interaction;
     let look = roadstyle_rs::Look::from_value(look).unwrap();
-    let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let s = roadstyle_rs::style_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
     let ovs = s.metadata["roadstyle:controls"]["overlays"].as_array().unwrap();
     (ovs.iter().find(|o| o["label"] == "landcover").unwrap().clone(), s.warnings)
 }
@@ -37,7 +37,7 @@ fn the_buildings_entry_names_its_3d_layer() {
     let mut look: Value = serde_json::from_slice(&data("look.json")).unwrap();
     look["args"]["state"] = "live".into();
     let look = roadstyle_rs::Look::from_value(look).unwrap();
-    let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let s = roadstyle_rs::style_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
     let ovs = s.metadata["roadstyle:controls"]["overlays"].as_array().unwrap();
     let with: Vec<&Value> = ovs.iter().filter(|o| o.get("extrude").is_some()).collect();
     assert_eq!(with.len(), 1, "only the buildings have heights");

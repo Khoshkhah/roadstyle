@@ -5,7 +5,7 @@ repository.workspace = true
 homepage.workspace = true
 edition = "2021"
 license = "MIT"
-description = "The browser's front-end of roadstyle-rs: makeStyle, Tiler, memoryBytes (docs/design/rust_engine.md)"
+description = "The browser's front-end of roadstyle-rs: inlineStyle, Tiler, memoryBytes (docs/design/rust_engine.md)"
 
 [lib]
 crate-type = ["cdylib"]

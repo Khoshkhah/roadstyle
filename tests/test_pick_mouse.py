@@ -1,6 +1,6 @@
 """A road is picked by the real mouse (page.mouse, not window.rsSelect): the hover (the cursor and the tooltip) and a click's rs:select,
 on a page whose style has the interaction contract (render_edges) and on a host page whose style has none (a style of
-make_style, as a host's makeStyle or the level editor's): there the dashboard picks on the road layer of simple mode, because the
+inline_style, as a host's inlineStyle or the level editor's): there the dashboard picks on the road layer of simple mode, because the
 style gives no `pick` (roadstyle:controls)."""
 import contextlib
 import functools
@@ -81,7 +81,7 @@ def test_a_road_is_picked_on_a_host_page_with_no_contract(tmp_path, old):
     if not _engine.available():
         pytest.skip("no roadstyle._rust")
     g = _roads()
-    style = json.loads(_engine.rust().make_style(_engine._arrow(g), _engine._look_of({}), None, None, "roads"))
+    style = json.loads(_engine.rust().inline_style(_engine._arrow(g), _engine._look_of({}), None, None, "roads"))
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] != "symbol"]    # the arrows and names need a sprite and glyphs
     assert style["metadata"]["roadstyle:controls"]["pick"] == ["roads-simple"]
     if old:
@@ -127,7 +127,7 @@ def test_a_3d_deck_is_picked_on_a_host_page_with_no_contract(tmp_path):
     if not _engine.available():
         pytest.skip("no roadstyle._rust")
     g = _roads()
-    style = json.loads(_engine.rust().make_style(_engine._arrow(g), _engine._look_of({"view_3d": True}), None, None, "roads"))
+    style = json.loads(_engine.rust().inline_style(_engine._arrow(g), _engine._look_of({"view_3d": True}), None, None, "roads"))
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] != "symbol"]
     pick = style["metadata"]["roadstyle:controls"]["pick"]
     assert "roadstyle:contract" not in style["metadata"] and any(i.startswith("roads-bridge-decks") for i in pick)

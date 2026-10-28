@@ -1,5 +1,5 @@
 """The page's keys of a call (sidebar, popup_mode, ...) go into page_from's `given` by one rule, roadstyle::page_options::given_of: the
-look's other keywords, and name and road_popup of the call. Python's page (_engine.page_given) and the wasm page (makePage, Roads.page:
+look's other keywords, and name and road_popup of the call. Python's page (_engine.page_given) and the wasm page (pageFrom, Roads.page:
 the studio) use it, so the same keywords give the same page. Before, the wasm page lost them (the studio's Dashboard and Report pages had
 no sidebar)."""
 import json
@@ -41,11 +41,11 @@ def test_a_python_page_and_a_wasm_page_of_the_same_keywords_have_the_same_page_k
 
     import roadstyle as rs
     script = f"""
-import {{initSync, resolveLook, makePage}} from {json.dumps(PKG.as_uri())};
+import {{initSync, resolveLook, pageFrom}} from {json.dumps(PKG.as_uri())};
 import {{readFileSync, writeFileSync}} from "node:fs";
 initSync({{module: readFileSync({json.dumps(str(PKG.with_name("roadstyle_wasm_bg.wasm")))})}});
 const options = JSON.stringify({{args: {json.dumps(ARGS)}}});
-writeFileSync({json.dumps(str(tmp_path / "wasm.html"))}, makePage(readFileSync({json.dumps(str(DATA))}), resolveLook(options), options));
+writeFileSync({json.dumps(str(tmp_path / "wasm.html"))}, pageFrom(readFileSync({json.dumps(str(DATA))}), resolveLook(options), options));
 """
     (tmp_path / "page.mjs").write_text(script)
     subprocess.run(["node", str(tmp_path / "page.mjs")], check=True, capture_output=True, text=True, timeout=120)

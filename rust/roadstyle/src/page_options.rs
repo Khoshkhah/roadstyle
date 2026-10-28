@@ -47,7 +47,7 @@ pub fn given_of(look: &Look, args: &Value) -> Map<String, Value> {
 }
 
 /// The keywords that each sidebar changes, and their values.
-pub fn sidebar_defaults() -> Map<String, Value> {
+pub fn sidebar_keys() -> Map<String, Value> {
     SIDEBARS.iter().map(|(k, _, d)| (k.to_string(), serde_json::from_str(d).expect("a sidebar's defaults are JSON"))).collect()
 }
 
@@ -108,7 +108,7 @@ fn present(v: &Value) -> bool {
 }
 
 /// The page's own keywords and their defaults.
-pub fn page_defaults() -> Map<String, Value> {
+pub fn page_key_defaults() -> Map<String, Value> {
     serde_json::from_str(DEFAULTS).expect("DEFAULTS is a JSON object")
 }
 
@@ -131,7 +131,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     };
     // a sidebar's keywords, where the caller gave none: the page's keys, and one map option (the popup), which stage 1 reads
     let mut owned = None;
-    let mut a = page_defaults();
+    let mut a = page_key_defaults();
     a.extend(look.base_map_page.iter().map(|(k, v)| (k.clone(), v.clone())));
     let named = look.map.output.name.as_ref();         // the map's name: the call's or the base map's, over a sidebar's
     if let Some(n) = named {

@@ -13,8 +13,8 @@ const look = rs.Look.fromJson(readFileSync(join(area, "..", "look.json"), "utf8"
 const roads = new Uint8Array(readFileSync(join(area, "roads.parquet")));
 const features = new Uint8Array(readFileSync(join(area, "features.parquet")));
 let t = performance.now();
-const sources = rs.makeSources(roads, look, features, undefined, undefined);
-console.log(`makeSources: ${(performance.now() - t).toFixed(0)} ms`);
+const sources = rs.styleSources(roads, look, features, undefined, undefined);
+console.log(`styleSources: ${(performance.now() - t).toFixed(0)} ms`);
 t = performance.now();
 const live = new rs.LiveMap(sources, look, "", []);
 console.log(`new LiveMap: ${(performance.now() - t).toFixed(0)} ms`);

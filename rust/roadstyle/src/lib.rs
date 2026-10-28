@@ -1,6 +1,6 @@
 //! roadstyle as a Rust library (docs/design/rust_library.md): the facade. It re-exports the crates of the core with the module paths
-//! of the old single crate (`roadstyle::props`, `roadstyle::read`, `roadstyle::levels`, `roadstyle::tiles`, `roadstyle::make_style`,
-//! ...), and it has the functions that read GeoParquet bytes (roadstyle-io) and call the engine: `make_style` and `make_tiled`, which
+//! of the old single crate (`roadstyle::props`, `roadstyle::read`, `roadstyle::levels`, `roadstyle::tiles`, `roadstyle::inline_style`,
+//! ...), and it has the functions that read GeoParquet bytes (roadstyle-io) and call the engine: `inline_style` and `tiled_from_parquet`, which
 //! needs both the engine and the tiles. A Rust user adds only this crate.
 
 pub use roadstyle_engine::*;
@@ -47,21 +47,21 @@ pub fn features_of(t: FeatureTable) -> Result<FeatureTable, crate::Error> {
 }
 
 /// The style as one JSON text (roadstyle's export_inline), from the roads and the other tables as GeoParquet bytes: the engine's
-/// `make_style` after roadstyle-io's readers.
-pub fn make_style(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, crate::Error> {
+/// `inline_style` after roadstyle-io's readers.
+pub fn inline_style(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, crate::Error> {
     let (feats, features, planner) = tables(parquet, features, planner)?;
-    Ok(roadstyle_engine::make_style(feats, look, features, planner, name)?)
+    Ok(roadstyle_engine::inline_style(feats, look, features, planner, name)?)
 }
 
 /// Stage 1 from GeoParquet bytes: the style and its sources, typed in memory (docs/rust/architecture.md, "The three stages and the one
-/// call"). `save_sources` writes them as files; the saved style has what stage 2 reads (`roadstyle:tiles`: the look's tile settings,
+/// call"). `write_sources` writes them as files; the saved style has what stage 2 reads (`roadstyle:tiles`: the look's tile settings,
 /// `roadstyle:columns`: the class, filter and metre width columns).
-pub fn make_sources(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<sources::Styled, crate::Error> {
+pub fn style_sources(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<sources::Styled, crate::Error> {
     let (feats, features, planner) = tables(parquet, features, planner)?;
     sources_of(feats, look, features, planner, name)
 }
 
-/// Stage 1 of roads that a reader gave (`read::read_roads`, `geojson::read_roads`, ...), as `make_sources`.
+/// Stage 1 of roads that a reader gave (`read::read_roads`, `geojson::read_roads`, ...), as `style_sources`.
 pub fn sources_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>)
                   -> Result<sources::Styled, crate::Error> {
     let mut s = sources::Styled::new(make_parts(roads, look, features, planner, name)?);
@@ -205,13 +205,13 @@ pub fn xyz_at(prefix: &str) -> Value {
 
 /// Stage 2 from stage 1's files in `dir` (GeoJSON or GeoParquet, as style.json names them): the style that draws the tiles
 /// (`tiled_style`, the tiles at `at`) and the tiles. `o`: other rules than the style's.
-pub fn tile_files(dir: &std::path::Path, keep: &[String], o: Option<tiles::stage::TileOptions>, at: &Value) -> Result<(Value, tiles::Tiles), crate::Error> {
-    tile_files_with(|name| std::fs::read(dir.join(name)), keep, o, at)
+pub fn tiles_of_files(dir: &std::path::Path, keep: &[String], o: Option<tiles::stage::TileOptions>, at: &Value) -> Result<(Value, tiles::Tiles), crate::Error> {
+    tiles_of_files_with(|name| std::fs::read(dir.join(name)), keep, o, at)
 }
 
 /// Stage 2 from stage 1's files, each read by `read` (a file name: its bytes; its error is an `Error::File` of that name), as
-/// `tile_files` does.
-pub fn tile_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<Vec<u8>, E>, keep: &[String], o: Option<tiles::stage::TileOptions>,
+/// `tiles_of_files` does.
+pub fn tiles_of_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<Vec<u8>, E>, keep: &[String], o: Option<tiles::stage::TileOptions>,
                                              at: &Value) -> Result<(Value, tiles::Tiles), crate::Error> {
     let read = |name: &str| read(name).map_err(|e| crate::error::file(name, e));
     let style: Value = serde_json::from_slice(&read("style.json")?).map_err(|e| crate::error::file("style.json", e))?;
@@ -294,7 +294,7 @@ pub enum Format {
 pub const ROAD_TABLE: &str = "road_table.parquet";
 
 /// The names of stage 1's files: style.json, one file for each source (`<name>.geojson` or `<name>.parquet`) and the road table.
-pub fn file_names(s: &sources::Styled, format: Format) -> Vec<String> {
+pub fn source_file_names(s: &sources::Styled, format: Format) -> Vec<String> {
     let ext = ext(format);
     ["style.json".to_string()].into_iter().chain(s.shown().map(|(n, _)| format!("{n}.{ext}"))).chain([ROAD_TABLE.to_string()]).collect()
 }
@@ -303,7 +303,7 @@ fn ext(format: Format) -> &'static str {
     match format { Format::GeoJson => "geojson", Format::GeoParquet => "parquet" }
 }
 
-/// One of stage 1's files (a name of `file_names`), in memory (`write_source_file`).
+/// One of stage 1's files (a name of `source_file_names`), in memory (`write_source_file`).
 pub fn source_file(s: &sources::Styled, file: &str, format: Format, drawn: &std::collections::HashSet<String>) -> Result<Vec<u8>, crate::Error> {
     write_source_file(s, file, format, drawn, Vec::new())
 }
@@ -434,12 +434,12 @@ pub fn road_ends(s: &sources::Styled) -> Vec<f64> {
     }).collect()
 }
 
-/// Stage 1's files in `dir` (`file_names`, `source_file`). `keep`: more columns for the roads' file. Gives each file's name and size.
-pub fn save_sources(s: &sources::Styled, dir: &std::path::Path, format: Format, keep: &[String]) -> Result<Vec<(String, usize)>, crate::Error> {
+/// Stage 1's files in `dir` (`source_file_names`, `source_file`). `keep`: more columns for the roads' file. Gives each file's name and size.
+pub fn write_sources(s: &sources::Styled, dir: &std::path::Path, format: Format, keep: &[String]) -> Result<Vec<(String, usize)>, crate::Error> {
     std::fs::create_dir_all(dir).map_err(|e| crate::error::file(dir.display(), e))?;
     let drawn = s.drawn(keep);
     let mut files = Vec::new();
-    for name in file_names(s, format) {
+    for name in source_file_names(s, format) {
         let path = dir.join(&name);
         let f = std::fs::File::create(&path).map_err(|e| crate::error::file(&name, e))?;
         let mut w = write_source_file(s, &name, format, &drawn, std::io::BufWriter::new(f))?;
@@ -449,9 +449,9 @@ pub fn save_sources(s: &sources::Styled, dir: &std::path::Path, format: Format, 
     Ok(files)
 }
 
-/// Stage 2 from memory, with the rules of the look that made `s` (make_sources saves them): the tiled style (the tiles in a folder at
+/// Stage 2 from memory, with the rules of the look that made `s` (style_sources saves them): the tiled style (the tiles in a folder at
 /// `prefix`) and the tiles.
-pub fn tile_made(s: &sources::Styled, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), crate::Error> {
+pub fn tiles_of_sources(s: &sources::Styled, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), crate::Error> {
     let o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
     let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix), sources::SourceMode::INLINE)?;
     Ok((style_text(s, &style), tiled))
@@ -459,16 +459,16 @@ pub fn tile_made(s: &sources::Styled, prefix: &str, keep: &[String]) -> Result<(
 
 /// The style with one vector-tile source, `roads` (`<prefix>roads/{z}/{x}/{y}`), and the tiles to answer it with (tiles.rs: the rules of
 ///, the zooms and the buffer from the look's `config.tiles`). The layers, the metadata and the camera are those of
-/// `make_style`; each layer draws the tile layer of its old source (`source-layer`). The tiles keep only the properties that are read:
+/// `inline_style`; each layer draws the tile layer of its old source (`source-layer`). The tiles keep only the properties that are read:
 /// the texts in the layers (all their keys, and more), the popup and tooltip fields of the metadata, the overlays' popup fields (name,
 /// kind) and `keep` (the caller's own, for example its popup's). The warnings of stage 1 come back last.
-pub fn make_tiled(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
+pub fn tiled_from_parquet(parquet: Vec<u8>, look: &Look, features: Option<Vec<u8>>, name: Option<String>, prefix: &str, keep: &[String])
                   -> Result<(String, tiles::Tiles, Vec<String>), crate::Error> {
     let (feats, features, _) = tables(parquet, features, None)?;
     tiled_of(feats, look, features, name, prefix, keep)
 }
 
-/// The map with vector tiles of roads and base-map rows that a reader gave, as `make_tiled`.
+/// The map with vector tiles of roads and base-map rows that a reader gave, as `tiled_from_parquet`.
 pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, name: Option<String>, prefix: &str, keep: &[String])
                 -> Result<(String, tiles::Tiles, Vec<String>), crate::Error> {
     let s = sources::Styled::new(make_parts(roads, look, features, None, name)?);

@@ -110,7 +110,7 @@ def export_inline(edges, **kwargs) -> dict:
     kwargs.setdefault("view_3d", True)      # as export_inline
     kwargs["export"] = True                 # an app with no road table: the roads source, its pick and highlight (audit N2)
     lk = _look_of(kwargs)
-    text = rust().make_style(_arrow(edges), lk, None, None, kwargs.get("name") or "roads")     # export_inline's name
+    text = rust().inline_style(_arrow(edges), lk, None, None, kwargs.get("name") or "roads")     # export_inline's name
     _warn()
     return json.loads(text)
 
@@ -127,27 +127,10 @@ def export_geojson(edges, out_dir, *, format="geojson", keep=None, **kwargs) -> 
     kwargs.setdefault("view_3d", True)      # as export_inline
     kwargs["export"] = True                 # stage 1 of export_style: the roads source too (audit N2)
     lk = _look_of(kwargs)
-    s = rust().make_sources(_arrow(edges), lk, None, None, kwargs.get("name") or "roads")
+    s = rust().style_sources(_arrow(edges), lk, None, None, kwargs.get("name") or "roads")
     files = s.save(str(out_dir), format, [str(c) for c in (keep or [])])
     _warn()
     return dict(files)
-
-
-_R = 20037508.342789244       # the web-mercator world half-width (m): the tile (z, x, y) spans 2 * _R / 2**z from (-_R, _R)
-
-
-def _merc(lon, lat):
-    x = lon * _R / 180.0
-    lat = max(-89.9, min(89.9, lat))
-    return x, math.log(math.tan((90 + lat) * math.pi / 360.0)) * _R / math.pi
-
-
-def _tile_range(bounds, z):
-    """The tile x / y index range that covers a mercator box at zoom z."""
-    s = 2 * _R / (1 << z)
-    n = (1 << z) - 1
-    return (max(0, min(n, int((bounds[0] + _R) // s))), max(0, min(n, int((bounds[2] + _R) // s))),
-            max(0, min(n, int((_R - bounds[3]) // s))), max(0, min(n, int((_R - bounds[1]) // s))))
 
 
 def tile_geojson(src_dir, out, *, format="pmtiles", keep=None, base_url=""):
@@ -157,7 +140,7 @@ def tile_geojson(src_dir, out, *, format="pmtiles", keep=None, base_url=""):
     if format not in ("pmtiles", "xyz"):
         raise ValueError(f"format must be 'pmtiles' or 'xyz', got {format!r}")
     prefix = f"{base_url.rstrip('/')}/" if base_url else ""
-    t = rust().tile_files(str(src_dir), [str(c) for c in (keep or [])], prefix)
+    t = rust().tiles_of_files(str(src_dir), [str(c) for c in (keep or [])], prefix)
     _warn()
     bounds = t.bounds()
     if bounds is None:
@@ -167,17 +150,7 @@ def tile_geojson(src_dir, out, *, format="pmtiles", keep=None, base_url=""):
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(t.archive(list(bounds), t.layers()))
         return out
-    z0, z1 = t.zooms()
-    lo, hi = _merc(*bounds[:2]), _merc(*bounds[2:])
-    for z in range(z0, z1 + 1):              # the style's tile URL: <base_url>/roads/{z}/{x}/{y}
-        x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
-        for x in range(x0, x1 + 1):
-            for y in range(y0, y1 + 1):
-                b = t.tile(z, x, y)
-                if b:
-                    p = out / "roads" / str(z) / str(x) / str(y)
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    p.write_bytes(b)
+    t.write_xyz(str(out / "roads"), list(bounds), "")          # the style's tile URL: <base_url>/roads/{z}/{x}/{y}
     (out / "style.json").write_text(t.style)
     return out
 
@@ -312,7 +285,6 @@ def solve_intervals(n, meets, stacks, orders, max_level, margin, min_positions, 
     """``levels._solve_intervals`` by the Rust solver: the same rules on road indexes, the same ``(parts, given_up, info)``. ``fixed``:
     {road index: its four numbers around the ground 0}. The parts are in steps of ``margin`` (only their order matters: solve_levels
     makes them small consecutive numbers)."""
-    import math
     import time
     t0 = time.time()
     ends, part = {"start": 0, "end": 2}, {"s": 0, "m": 1, "e": 2}
@@ -372,26 +344,12 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds):
         style["metadata"]["roadstyle:images"] = images
     d = Path(out_dir)
     d.mkdir(parents=True, exist_ok=True)
-    lo, hi = _merc(*bounds[:2]), _merc(*bounds[2:])
     if format == "pmtiles":
         names = sorted({lyr["source-layer"] for lyr in style["layers"] if "source-layer" in lyr})
         (d / "roads.pmtiles").write_bytes(_pmtiles(t, int(roads["minzoom"]), int(roads["maxzoom"]), bounds, names))
-    # every tile with data (a base map can reach past the roads), and an empty file for each other tile in the roads' bounds, as export.py
-    every = t.bounds() or bounds
-    elo, ehi = _merc(*every[:2]), _merc(*every[2:])
-    # a tile whose buffer has a road's stroke has the road (Tiles::hits): the data's box widened by each zoom's buffer (Tiles::archive)
-    bufs = rust().tile_buffers(json.dumps(style["layers"]), int(roads["maxzoom"]), float(meta.get("roadstyle:tiles", {}).get("buffer_px", 80)))
-    for z in range(int(roads["minzoom"]), int(roads["maxzoom"]) + 1) if format == "xyz" else ():
-        x0, x1, y0, y1 = _tile_range((lo[0], lo[1], hi[0], hi[1]), z)
-        pad = 2 * _R / (1 << z) * bufs[z] / 512
-        ex0, ex1, ey0, ey1 = _tile_range((elo[0] - pad, elo[1] - pad, ehi[0] + pad, ehi[1] + pad), z)
-        for x in range(min(x0, ex0), max(x1, ex1) + 1):
-            for y in range(min(y0, ey0), max(y1, ey1) + 1):
-                b = t.tile(z, x, y)
-                if b or (x0 <= x <= x1 and y0 <= y <= y1):
-                    p = d / "tiles" / str(z) / str(x) / f"{y}.pbf"
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    p.write_bytes(b)
+    if format == "xyz":                     # every tile with data, and an empty file for each other tile of the roads' bounds
+        fallback = float(meta.get("roadstyle:tiles", {}).get("buffer_px", 80))
+        t.write_xyz(str(d / "tiles"), list(bounds), ".pbf", (json.dumps(style["layers"]), fallback))
     (d / "popup.css").write_text(_plugin_css())
     (d / "popup.js").write_text(_assets.text("static/popup.js"))
     style["metadata"]["roadstyle:interaction"] = {**style["metadata"].get("roadstyle:interaction", {}), "css": f"{base}/popup.css",

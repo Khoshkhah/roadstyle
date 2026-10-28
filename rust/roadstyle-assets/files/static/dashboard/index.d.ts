@@ -9,7 +9,7 @@ export interface DashboardOptions {
   style?: StyleSpecification | null;
   /** The prefix of the roads style's source and layer ids in the map, when the page added them with one ("rs-"). */
   prefix?: string;
-  /** The road table of stage 1, by row: each road's fields, midpoint, bbox, heading and line (makeSources(...).roadTable()). null:
+  /** The road table of stage 1, by row: each road's fields, midpoint, bbox, heading and line (styleSources(...).roadTable()). null:
    *  window.RS_SIDE (every page of roadstyle has it). */
   road_table?: RoadTableData | null;
   /** The roads are a vector source (tiles). Simple mode and its road layer come from the style. */

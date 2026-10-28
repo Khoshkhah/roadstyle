@@ -45,13 +45,13 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `resolveLook(options)` | a `Look` | the look: `render_edges`' `palette`, `profile`, `settings` and keywords (`args`), from the JSON text `options` |
 | `look.withArg(key, value)` | a `Look` | the same look with the keyword `key` (`color_by`, `state`, `live_data`, ...) set to `value` (JSON text) |
 | `look.toJson()`, `Look.fromJson(text)` | JSON text, a `Look` | save a look and load it again (version 2; `fromJson` also reads 1 and 0) |
-| `makeStyle(roads, look, features?, planner?, name?)` | JSON text | the style with the roads in it (as `export_inline`) |
+| `inlineStyle(roads, look, features?, planner?, name?)` | JSON text | the style with the roads in it (as `export_inline`) |
 | `new Tiler(roads, look, features?, name?, prefix, keep)` | a `Tiler` | the style with vector-tile sources, and the tiles on request |
 | `tiler.style()` | JSON text | the style of the `Tiler` |
 | `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
-| `makePage(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it. The page's keys (`sidebar`, `popup_mode`, ...) come from `options`' args; `given` adds your values (`street_view_key`, `api_key`) |
+| `pageFrom(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it. The page's keys (`sidebar`, `popup_mode`, ...) come from `options`' args; `given` adds your values (`street_view_key`, `api_key`) |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
 | `makeArea(edges, options?)` | an `AreaFiles` | a level area's files in memory ([The level editor in a page](#the-level-editor-in-a-page)) |
 | `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
@@ -75,14 +75,14 @@ rs.as_edges(edges).gdf.to_parquet("monaco_roads.parquet", index=False)   # edges
 ```html
 <div id="map" style="position:absolute;inset:0"></div>
 <script type="module">
-import init, {resolveLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, inlineStyle} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "./dashboard/index.js";
 
 await init();
 const roads = new Uint8Array(await (await fetch("monaco_roads.parquet")).arrayBuffer());
 // the look: render_edges' palette, profile, settings and keywords; state "live" keeps the controls' state in the style
 const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live", color_by: "lanes", cmap: "YlOrRd"}}));
-const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
+const style = JSON.parse(inlineStyle(roads, look, undefined, undefined, "Monaco"));
 
 const map = new maplibregl.Map({container: "map", style});
 for (const [id, im] of Object.entries(style.metadata["roadstyle:images"] || {}))
@@ -111,7 +111,7 @@ too. duckosm-rust and the GeoLibre plugin use the same file. Load the module (`i
 ```js
 import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
 import {makeRoads, writeRoads} from "./js/roads_sql.js";
-import init, {resolveLook, makeStyle} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, inlineStyle} from "./pkg/roadstyle_wasm.js";
 
 await init();                                       // roads_sql.js asks the module for its SQL
 
@@ -134,7 +134,7 @@ const roads = await db.copyFileToBuffer("roads.parquet");
 // levels: the engine checks that the stored levels are for these edges
 const look = resolveLook(JSON.stringify({args: {state: "live", casing_level_col: "casing_level", fill_level_col: "fill_level",
                                                  casing_start_col: "casing_start", casing_end_col: "casing_end", levels}}));
-const style = JSON.parse(makeStyle(roads, look, undefined, undefined, "Monaco"));
+const style = JSON.parse(inlineStyle(roads, look, undefined, undefined, "Monaco"));
 ```
 
 `makeRoads(q, catalog, opts)` runs one time for each file. It makes the run's temporary table (`duckosm_r_<run>`, from `duckosmPlan`'s
@@ -152,7 +152,7 @@ tables; `writeFeatures` drops its tables when it has written `features.parquet`.
   hold exactly as text.
 
 `writeFeatures(q, catalog, specs)` in `js/features_sql.js` writes `features.parquet`, the base-map layers of mapstyle, for the
-argument `features` of `makeStyle` and `Tiler`. It runs the layers' queries of `duckosmPlan`; a layer whose queries all fail is skipped,
+argument `features` of `inlineStyle` and `Tiler`. It runs the layers' queries of `duckosmPlan`; a layer whose queries all fail is skipped,
 as mapstyle's `load_layers` does. The background is the whole boundary: the engine cuts the sea out of it when it reads
 `features.parquet`, so duckdb-wasm needs no spatial extension.
 
@@ -226,14 +226,14 @@ page.
 
 ## Write the whole page
 
-`makePage` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
+`pageFrom` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
 dashboard's options and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same
 `options` text again: a view with another palette resolves its look from it. The page has placeholders for MapLibre, which you
 replace:
 
 ```js
 const options = JSON.stringify({palette: "amber", args: {state: "live", name: "Monaco", basemap: "osm", views: {plain: {road_fill: false}}}});
-const html = makePage(roads, resolveLook(options), options)
+const html = pageFrom(roads, resolveLook(options), options)
   .replace("<style>__MAPLIBRE_CSS__</style>", '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">')
   .replace("<script>__MAPLIBRE_JS__</script>", '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>');
 ```
@@ -323,7 +323,7 @@ const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
 - After an apply, `replaceRoads(rows)` gets the rows of levels.csv (one object for each edge, its fields as text: `edge`,
   `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`, `head_end_m`, `cap_start`, `cap_end`) of only the edges
   whose levels, heads or caps changed. Draw them, then resolve the Promise. The `"solved"` event comes too.
-- To draw the rows fast, make your map's tiles with `LiveMap` in place of `tileSources`: `new LiveMap(makeSources(roads, look), look,
+- To draw the rows fast, make your map's tiles with `LiveMap` in place of `tilesOfSources`: `new LiveMap(styleSources(roads, look), look,
   prefix, keep)` has the Tiler's `style()` and `tile(source, z, x, y)`, and `relevel(JSON.stringify(rows))` gives the edges their new
   values. It runs stage 1 again and replaces in the tiles only the pieces of the edges that changed and of the edges at their end
   nodes. The answer is `{edges, pieces_gone, sources, style_changed}`: then load the visible tiles again (with `style_changed`, set

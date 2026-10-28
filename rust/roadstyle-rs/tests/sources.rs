@@ -1,5 +1,5 @@
-//! Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): make_sources and save_sources on Monaco. The GeoJSON file
-//! of each source is the data of that source in make_style's style; the roads' file has only their drawing values; the road table has
+//! Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): style_sources and write_sources on Monaco. The GeoJSON file
+//! of each source is the data of that source in inline_style's style; the roads' file has only their drawing values; the road table has
 //! one row for each road with every field; the GeoParquet files have one row for each feature.
 
 use serde_json::{json, Value};
@@ -20,10 +20,10 @@ fn data(p: &str) -> Vec<u8> {
 #[test]
 fn monaco_sources_as_files() {
     let look = export_look();
-    let style: Value = serde_json::from_str(&roadstyle_rs::make_style(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap()).unwrap();
-    let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let style: Value = serde_json::from_str(&roadstyle_rs::inline_style(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap()).unwrap();
+    let s = roadstyle_rs::style_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
     let dir = std::env::temp_dir().join(format!("roadstyle-sources-{}", std::process::id()));
-    let files = roadstyle_rs::save_sources(&s, &dir.join("geojson"), roadstyle_rs::Format::GeoJson, &[]).unwrap();
+    let files = roadstyle_rs::write_sources(&s, &dir.join("geojson"), roadstyle_rs::Format::GeoJson, &[]).unwrap();
     let names: Vec<&String> = style["sources"].as_object().unwrap().keys().collect();
     assert_eq!(files.len(), names.len() + 2, "a file for each source, the road table and style.json");
     let drawn = s.drawn(&[]);
@@ -61,7 +61,7 @@ fn monaco_sources_as_files() {
     assert!(cols.iter().any(|n| *n == "__rs_dup") && cols.iter().all(|n| *n != "__rs_cl"), "{cols:?}");
     assert!((0..table.len()).all(|i| table.line(i).is_some()), "the road table has every road's line");
     // GeoParquet: a row for each feature of each source
-    roadstyle_rs::save_sources(&s, &dir.join("geoparquet"), roadstyle_rs::Format::GeoParquet, &[]).unwrap();
+    roadstyle_rs::write_sources(&s, &dir.join("geoparquet"), roadstyle_rs::Format::GeoParquet, &[]).unwrap();
     for n in &names {
         let rows = roadstyle_rs::read::read_table(std::fs::read(dir.join(format!("geoparquet/{n}.parquet"))).unwrap(), "geometry").unwrap();
         assert_eq!(rows.len(), style["sources"][n.as_str()]["data"]["features"].as_array().unwrap().len(), "{n}.parquet");
@@ -73,7 +73,7 @@ fn monaco_sources_as_files() {
 #[test]
 fn the_layers_read_properties_by_name() {
     let look = export_look();
-    let s = roadstyle_rs::make_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let s = roadstyle_rs::style_sources(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
     let (mut read, mut unknown) = (std::collections::HashSet::new(), Vec::new());
     s.layers.iter().for_each(|l| roadstyle_rs::props::expression_reads(l, &mut read, &mut unknown));
     assert!(unknown.is_empty(), "a layer reads a property whose name is not a literal: {unknown:?}");
@@ -87,7 +87,7 @@ fn a_style_with_no_contract_has_the_pick() {
     let mut look: Value = serde_json::from_slice(&data("look.json")).unwrap();
     look["args"]["view_3d"] = true.into();
     let look = roadstyle_rs::Look::from_value(look).unwrap();
-    let style: Value = serde_json::from_str(&roadstyle_rs::make_style(data("monaco_decks/roads.parquet"), &look, None, None, None).unwrap()).unwrap();
+    let style: Value = serde_json::from_str(&roadstyle_rs::inline_style(data("monaco_decks/roads.parquet"), &look, None, None, None).unwrap()).unwrap();
     let m = &style["metadata"];
     assert!(m["roadstyle:contract"].is_null());
     assert!(m["roadstyle:sources"].is_object());
@@ -99,7 +99,7 @@ fn a_style_with_no_contract_has_the_pick() {
 /// The pieces' sort keys (`__rs_s`) of an area's style: (the integer, its road).
 fn sort_keys(area: &str) -> Vec<(i64, i64)> {
     let look = roadstyle_rs::Look::from_value(serde_json::from_slice(&data("look.json")).unwrap()).unwrap();
-    let style: Value = serde_json::from_str(&roadstyle_rs::make_style(data(&format!("{area}/roads.parquet")), &look, None, None, None).unwrap()).unwrap();
+    let style: Value = serde_json::from_str(&roadstyle_rs::inline_style(data(&format!("{area}/roads.parquet")), &look, None, None, None).unwrap()).unwrap();
     style["sources"]["simple"]["data"]["features"].as_array().unwrap().iter()
         .map(|f| (f["properties"]["__rs_s"].as_i64().expect("an integer __rs_s"), f["properties"]["__rs_edge"].as_i64().unwrap())).collect()
 }
@@ -143,7 +143,7 @@ fn a_missing_flag_is_false_for_every_layer() {
         look["args"][k] = true.into();
     }
     let look = roadstyle_rs::Look::from_value(look).unwrap();
-    let style: Value = serde_json::from_str(&roadstyle_rs::make_style(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap()).unwrap();
+    let style: Value = serde_json::from_str(&roadstyle_rs::inline_style(data("monaco/roads.parquet"), &look, Some(data("monaco/features.parquet")), None, None).unwrap()).unwrap();
     let mut flags = std::collections::BTreeSet::new();
     for s in style["sources"].as_object().unwrap().values() {
         for f in s["data"]["features"].as_array().into_iter().flatten() {

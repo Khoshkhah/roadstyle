@@ -164,7 +164,7 @@ export class LevelArea {
         }
     }
     /**
-     * The map's table (GeoParquet, one row for each edge) for makeStyle: 4 numbers for each road.
+     * The map's table (GeoParquet, one row for each edge) for inlineStyle: 4 numbers for each road.
      * @param {Int32Array} levels
      * @param {string} heads
      * @param {string} caps
@@ -571,7 +571,7 @@ if (Symbol.dispose) Projection.prototype[Symbol.dispose] = Projection.prototype.
 
 /**
  * Roads that a reader of a road file gave (roadstyle-io: a RoadTable, one row for each road): `readGeoJson(bytes)` makes them. `length`
- * and `columns()` describe them; `sources(look, features?, planner?, name?)` is stage 1 of them (makeSources' arguments after the roads).
+ * and `columns()` describe them; `sources(look, features?, planner?, name?)` is stage 1 of them (styleSources' arguments after the roads).
  */
 export class Roads {
     static __wrap(ptr) {
@@ -609,7 +609,7 @@ export class Roads {
         return ret >>> 0;
     }
     /**
-     * page(look, options, given?, features?): the page of these roads in one call, as makePage (its arguments after the roads).
+     * page(look, options, given?, features?): the page of these roads in one call, as pageFrom (its arguments after the roads).
      * @param {Look} look
      * @param {string} options
      * @param {string | null} [given]
@@ -642,7 +642,7 @@ export class Roads {
         }
     }
     /**
-     * sources(look, features?, planner?, name?): stage 1 of these roads, as makeSources; `features` and `planner` are Parquet bytes.
+     * sources(look, features?, planner?, name?): stage 1 of these roads, as styleSources; `features` and `planner` are Parquet bytes.
      * @param {Look} look
      * @param {Uint8Array | null} [features]
      * @param {Uint8Array | null} [planner]
@@ -1070,7 +1070,7 @@ export function makeArea(edges, options) {
 }
 
 /**
- * makePage(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
+ * pageFrom(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
  * call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
  * `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args; `given`: the caller's values
  * over the look's args (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base map (Parquet bytes).
@@ -1081,7 +1081,7 @@ export function makeArea(edges, options) {
  * @param {Uint8Array | null} [features]
  * @returns {string}
  */
-export function makePage(roads, look, options, given, features) {
+export function pageFrom(roads, look, options, given, features) {
     let deferred6_0;
     let deferred6_1;
     try {
@@ -1094,7 +1094,7 @@ export function makePage(roads, look, options, given, features) {
         var len2 = WASM_VECTOR_LEN;
         var ptr3 = isLikeNone(features) ? 0 : passArray8ToWasm0(features, wasm.__wbindgen_malloc);
         var len3 = WASM_VECTOR_LEN;
-        const ret = wasm.makePage(ptr0, len0, look.__wbg_ptr, ptr1, len1, ptr2, len2, ptr3, len3);
+        const ret = wasm.pageFrom(ptr0, len0, look.__wbg_ptr, ptr1, len1, ptr2, len2, ptr3, len3);
         var ptr5 = ret[0];
         var len5 = ret[1];
         if (ret[3]) {
@@ -1110,7 +1110,7 @@ export function makePage(roads, look, options, given, features) {
 }
 
 /**
- * makeSources(parquet, look, features, planner, name): stage 1, with makeStyle's arguments.
+ * styleSources(parquet, look, features, planner, name): stage 1, with inlineStyle's arguments.
  * @param {Uint8Array} parquet
  * @param {Look} look
  * @param {Uint8Array | null} [features]
@@ -1118,7 +1118,7 @@ export function makePage(roads, look, options, given, features) {
  * @param {string | null} [name]
  * @returns {Sources}
  */
-export function makeSources(parquet, look, features, planner, name) {
+export function styleSources(parquet, look, features, planner, name) {
     const ptr0 = passArray8ToWasm0(parquet, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     _assertClass(look, Look);
@@ -1128,7 +1128,7 @@ export function makeSources(parquet, look, features, planner, name) {
     var len2 = WASM_VECTOR_LEN;
     var ptr3 = isLikeNone(name) ? 0 : passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     var len3 = WASM_VECTOR_LEN;
-    const ret = wasm.makeSources(ptr0, len0, look.__wbg_ptr, ptr1, len1, ptr2, len2, ptr3, len3);
+    const ret = wasm.styleSources(ptr0, len0, look.__wbg_ptr, ptr1, len1, ptr2, len2, ptr3, len3);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -1136,7 +1136,7 @@ export function makeSources(parquet, look, features, planner, name) {
 }
 
 /**
- * makeStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
+ * inlineStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
  * @param {Uint8Array} parquet
  * @param {Look} look
  * @param {Uint8Array | null} [features]
@@ -1144,7 +1144,7 @@ export function makeSources(parquet, look, features, planner, name) {
  * @param {string | null} [name]
  * @returns {string}
  */
-export function makeStyle(parquet, look, features, planner, name) {
+export function inlineStyle(parquet, look, features, planner, name) {
     let deferred6_0;
     let deferred6_1;
     try {
@@ -1157,7 +1157,7 @@ export function makeStyle(parquet, look, features, planner, name) {
         var len2 = WASM_VECTOR_LEN;
         var ptr3 = isLikeNone(name) ? 0 : passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         var len3 = WASM_VECTOR_LEN;
-        const ret = wasm.makeStyle(ptr0, len0, look.__wbg_ptr, ptr1, len1, ptr2, len2, ptr3, len3);
+        const ret = wasm.inlineStyle(ptr0, len0, look.__wbg_ptr, ptr1, len1, ptr2, len2, ptr3, len3);
         var ptr5 = ret[0];
         var len5 = ret[1];
         if (ret[3]) {
@@ -1218,7 +1218,7 @@ export function readGeoJson(bytes) {
 }
 
 /**
- * readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as makeSources
+ * readGeoParquet(bytes: Uint8Array) -> Roads: the roads of a GeoParquet file (the geometry in the column `geometry`, as styleSources
  * reads it). An error is a thrown Error.
  * @param {Uint8Array} bytes
  * @returns {Roads}
@@ -1275,20 +1275,20 @@ export function resolveLook(options) {
 }
 
 /**
- * tileFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
+ * tilesOfFiles(files, prefix, keep): stage 2 from stage 1's files (GeoJSON or GeoParquet, as style.json names them); the Tiler's
  * style is the saved style with the one vector source (roadstyle::tiled_style).
  * @param {FileSet} files
  * @param {string} prefix
  * @param {string[]} keep
  * @returns {Tiler}
  */
-export function tileFiles(files, prefix, keep) {
+export function tilesOfFiles(files, prefix, keep) {
     _assertClass(files, FileSet);
     const ptr0 = passStringToWasm0(prefix, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArrayJsValueToWasm0(keep, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.tileFiles(files.__wbg_ptr, ptr0, len0, ptr1, len1);
+    const ret = wasm.tilesOfFiles(files.__wbg_ptr, ptr0, len0, ptr1, len1);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
@@ -1296,20 +1296,20 @@ export function tileFiles(files, prefix, keep) {
 }
 
 /**
- * tileSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
+ * tilesOfSources(sources, prefix, keep): stage 2 from memory (the typed pieces, no GeoJSON text; the sources stay as they are). The
  * Tiler's style has the one vector source `<prefix>roads/{z}/{x}/{y}`, with the pieces' promoteId (roadstyle::tile_stage).
  * @param {Sources} sources
  * @param {string} prefix
  * @param {string[]} keep
  * @returns {Tiler}
  */
-export function tileSources(sources, prefix, keep) {
+export function tilesOfSources(sources, prefix, keep) {
     _assertClass(sources, Sources);
     const ptr0 = passStringToWasm0(prefix, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArrayJsValueToWasm0(keep, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.tileSources(sources.__wbg_ptr, ptr0, len0, ptr1, len1);
+    const ret = wasm.tilesOfSources(sources.__wbg_ptr, ptr0, len0, ptr1, len1);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }

@@ -114,11 +114,11 @@ fn main() {
         let opt = |p: &str| (p != "-").then(|| fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}"))));
         let format = if args[6] == "geoparquet" { roadstyle_rs::Format::GeoParquet } else { roadstyle_rs::Format::GeoJson };
         let t = Instant::now();
-        let s = roadstyle_rs::make_sources(fs::read(&args[3]).unwrap(), &look_file(&args[2]), opt(&args[4]), None, None)
+        let s = roadstyle_rs::style_sources(fs::read(&args[3]).unwrap(), &look_file(&args[2]), opt(&args[4]), None, None)
             .unwrap_or_else(|e| fail(e));
         let made = t.elapsed();
-        let files = roadstyle_rs::save_sources(&s, std::path::Path::new(&args[5]), format, &[]).unwrap_or_else(|e| fail(e));
-        eprintln!("make_sources {:.0} ms, save {:.0} ms", made.as_secs_f64() * 1e3, (t.elapsed() - made).as_secs_f64() * 1e3);
+        let files = roadstyle_rs::write_sources(&s, std::path::Path::new(&args[5]), format, &[]).unwrap_or_else(|e| fail(e));
+        eprintln!("style_sources {:.0} ms, save {:.0} ms", made.as_secs_f64() * 1e3, (t.elapsed() - made).as_secs_f64() * 1e3);
         for (f, n) in &files {
             println!("{f}\t{n}");
         }
@@ -128,7 +128,7 @@ fn main() {
     if args.len() == 3 && args[1] == "--tile-files" {
         // stage 2 from stage 1's files: the time, and the tiles of zoom 15 around the roads (their number and size)
         let t = Instant::now();
-        let (style, tiles) = roadstyle_rs::tile_files(std::path::Path::new(&args[2]), &[], None, &roadstyle_rs::xyz_at("")).unwrap_or_else(|e| fail(e));
+        let (style, tiles) = roadstyle_rs::tiles_of_files(std::path::Path::new(&args[2]), &[], None, &roadstyle_rs::xyz_at("")).unwrap_or_else(|e| fail(e));
         let made = t.elapsed();
         let c = &style["center"];
         let (lon, lat) = (c[0].as_f64().unwrap_or(0.0), c[1].as_f64().unwrap_or(0.0));
@@ -143,7 +143,7 @@ fn main() {
                 bytes += b.len();
             }
         }
-        eprintln!("tile_files {:.0} ms; z15 around the centre: {count} tiles, {:.1} MB, {:.0} ms", made.as_secs_f64() * 1e3,
+        eprintln!("tiles_of_files {:.0} ms; z15 around the centre: {count} tiles, {:.1} MB, {:.0} ms", made.as_secs_f64() * 1e3,
                   bytes as f64 / 1e6, t2.elapsed().as_secs_f64() * 1e3);
         return;
     }
@@ -157,12 +157,12 @@ fn main() {
         return;
     }
     if args.len() == 5 && args[1] == "--tiles" {
-        // the map with vector tiles (make_tiled), then every tile around the centre at zooms 12, 14 and 15: the times and sizes
+        // the map with vector tiles (tiled_from_parquet), then every tile around the centre at zooms 12, 14 and 15: the times and sizes
         let read = |p: &str| if p == "-" { None } else { Some(fs::read(p).unwrap_or_else(|e| fail(format!("{p}: {e}")))) };
         let t = Instant::now();
-        let (style, tiles, _) = roadstyle_rs::make_tiled(read(&args[3]).unwrap(), &look_file(&args[2]), read(&args[4]), None,
+        let (style, tiles, _) = roadstyle_rs::tiled_from_parquet(read(&args[3]).unwrap(), &look_file(&args[2]), read(&args[4]), None,
                                                         "rs://", &["osm_id".into(), "access".into()]).unwrap_or_else(|e| fail(e));
-        eprintln!("make_tiled {:.0} ms (style {:.1} KB)", t.elapsed().as_secs_f64() * 1e3, style.len() as f64 / 1e3);
+        eprintln!("tiled_from_parquet {:.0} ms (style {:.1} KB)", t.elapsed().as_secs_f64() * 1e3, style.len() as f64 / 1e3);
         let style: Value = serde_json::from_str(&style).unwrap();
         let c = &style["center"];
         let (lon, lat) = (c[0].as_f64().unwrap(), c[1].as_f64().unwrap());
@@ -199,12 +199,12 @@ fn main() {
     let (fdata, pdata) = (opt(3), opt(4));
 
     if !layers_only {
-        // the whole style, as the worker makes it (make_style), with the total time
+        // the whole style, as the worker makes it (inline_style), with the total time
         let t = Instant::now();
-        let text = roadstyle_rs::make_style(data, &look, fdata, pdata, None).unwrap_or_else(|e| fail(e));
+        let text = roadstyle_rs::inline_style(data, &look, fdata, pdata, None).unwrap_or_else(|e| fail(e));
         let dt = t.elapsed();
         fs::write(&args[5], &text).unwrap_or_else(|e| fail(format!("{}: {e}", args[5])));
-        eprintln!("make_style {:.0} ms ({:.1} MB)", dt.as_secs_f64() * 1e3, text.len() as f64 / 1e6);
+        eprintln!("inline_style {:.0} ms ({:.1} MB)", dt.as_secs_f64() * 1e3, text.len() as f64 / 1e6);
         return;
     }
     // --layers: the road layers alone, for the 12 subsets of tools/make_layer_goldens.py (no base map)

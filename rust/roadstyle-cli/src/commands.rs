@@ -137,7 +137,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
             })?;
             let look = roadstyle::Look::resolve(&o)?;
             let s = roadstyle::sources_of(self::roads(roads)?, &look, None, None, name)?;
-            for (file, size) in roadstyle::save_sources(&s, Path::new(out), format, &keep)? {
+            for (file, size) in roadstyle::write_sources(&s, Path::new(out), format, &keep)? {
                 println!("{file} {size} bytes");
             }
             Ok(())
@@ -168,7 +168,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
             let keep = list(take(&mut opts, "keep"));
             let base = take(&mut opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
             no_more(&opts)?;
-            let (style, tiles) = roadstyle::tile_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
+            let (style, tiles) = roadstyle::tiles_of_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
             let bounds = tiles.bounds().ok_or(Error::Engine(format!("tiles: no feature in the files of {src}")))?;
             let out = PathBuf::from(out);
             match format.as_str() {

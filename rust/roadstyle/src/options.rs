@@ -11,7 +11,7 @@ const PAGE: [&str; 4] = ["hover_delay_ms", "box_layout", "copy_field", "resolved
 
 /// Each keyword of `args` that no part of roadstyle reads, in order, with the known keyword nearest it (none when none is near).
 pub fn unknown(args: &Map<String, Value>) -> Vec<(String, Option<String>)> {
-    let mut known: Vec<String> = crate::page_options::page_defaults().into_iter().map(|(k, _)| k).collect();
+    let mut known: Vec<String> = crate::page_options::page_key_defaults().into_iter().map(|(k, _)| k).collect();
     known.extend(roadstyle_engine::look::options::keywords().chain(PAGE).chain(WRITER).map(String::from));
     args.keys().filter(|k| !known.contains(k))
         .map(|k| (k.clone(), roadstyle_engine::look::options::nearest_name(k, known.iter().map(String::as_str)).map(String::from))).collect()

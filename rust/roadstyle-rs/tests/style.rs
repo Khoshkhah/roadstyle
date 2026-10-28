@@ -1,4 +1,4 @@
-//! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `make_style`, natively, from the
+//! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `inline_style`, natively, from the
 //! same inputs), with fifteen changes:
 //! - the building heights follow rule C (the higher of the height tag and the levels, features.rs), not 0806ac2's rule A (the height
 //!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
@@ -53,7 +53,7 @@ fn style_hash(area: &Path) -> String {
     let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data");
     let read = |p: PathBuf| std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
     let look = plugin_look(&read(data.join("look.json")));
-    let style = roadstyle_rs::make_style(read(area.join("roads.parquet")), &look, Some(read(area.join("features.parquet"))), None, None).unwrap();
+    let style = roadstyle_rs::inline_style(read(area.join("roads.parquet")), &look, Some(read(area.join("features.parquet"))), None, None).unwrap();
     Sha256::digest(style.as_bytes()).iter().map(|b| format!("{b:02x}")).collect()
 }
 
@@ -72,7 +72,7 @@ fn tartu_style() {
     assert_eq!(style_hash(&area), "29769cce6c4dd1f86fc0ccbb3ec290e65ed283671a3c57247ece61ebd50cc844");
 }
 
-/// The vector tiles (make_tiled): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
+/// The vector tiles (tiled_from_parquet): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
 /// its zoom, x and y), so a change in the memory use cannot change a tile. The tiles follow tiles.py; tests/areas.rs compares them
 /// with Python's (P0: the tile range, the ids and the properties changed to tiles.py's rules on 2026-10-23).
 fn tiles_hash(area: &Path) -> String {
@@ -86,7 +86,7 @@ fn tiles_hash(area: &Path) -> String {
         (x0, y0, x1, y1) = (x0.min(c[0]), y0.min(c[1]), x1.max(c[0]), y1.max(c[1]));
     }
     let keep = ["osm_id".to_string(), "access".to_string()];
-    let (style, tiles, _) = roadstyle_rs::make_tiled(roads, &look, Some(read(area.join("features.parquet"))), None, "rs://", &keep).unwrap();
+    let (style, tiles, _) = roadstyle_rs::tiled_from_parquet(roads, &look, Some(read(area.join("features.parquet"))), None, "rs://", &keep).unwrap();
     let mut h = Sha256::new();
     h.update(style.as_bytes());
     for z in [12u32, 14, 15] {
@@ -121,7 +121,7 @@ fn the_sea_is_cut_at_the_boundary() {
     let mut look: serde_json::Value = serde_json::from_slice(&read(data.join("look.json"))).unwrap();
     look["args"]["export"] = true.into();
     let look = roadstyle_rs::Look::from_value(look).unwrap();
-    let (_, tiles, _) = roadstyle_rs::make_tiled(read(data.join("monaco/roads.parquet")), &look, Some(read(data.join("monaco/features.parquet"))),
+    let (_, tiles, _) = roadstyle_rs::tiled_from_parquet(read(data.join("monaco/roads.parquet")), &look, Some(read(data.join("monaco/features.parquet"))),
                                                  None, "rs://", &[]).unwrap();
     for (z, x, y) in [(14, 8528, 5973), (14, 8528, 5974), (15, 17057, 11946), (15, 17057, 11947), (15, 17057, 11948)] {
         let t = tiles.tile(z, x, y);

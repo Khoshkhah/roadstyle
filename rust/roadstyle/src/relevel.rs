@@ -48,11 +48,11 @@ pub struct LiveTiles {
 }
 
 impl LiveTiles {
-    /// Stage 2 of `s` (`tile_made`'s), made by the look `look`, which a redraw runs stage 1 with again.
+    /// Stage 2 of `s` (`tiles_of_sources`'s), made by the look `look`, which a redraw runs stage 1 with again.
     pub fn new(s: sources::Styled, look: Look, prefix: &str, keep: &[String]) -> Result<LiveTiles, crate::Error> {
         let mut options = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
         options.wait = true;
-        // tile_made's stage 2, with the pieces that wait
+        // tiles_of_sources's stage 2, with the pieces that wait
         let (style, tiles) = crate::tile_stage(&s, &options, &crate::xyz_at(prefix), sources::SourceMode::INLINE)?;
         let style = crate::style_text(&s, &style);
         let r = &s.roads.roads;

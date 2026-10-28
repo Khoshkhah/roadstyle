@@ -1,5 +1,5 @@
 // The level editor's map (LiveMap) in WebAssembly, measured in Node: the first tiles of each view on a new map (the page's
-// makeSources and LiveMap), with their size and a hash of their bytes. The views: 1280 x 800 at the roads' centre, z11-z15 flat and
+// styleSources and LiveMap), with their size and a hash of their bytes. The views: 1280 x 800 at the roads' centre, z11-z15 flat and
 // z14 at pitch 60 (MapLibre's rule for the tiles of a tilted view). [views.json]: the views' tiles, for examples/bench_live.rs.
 //
 //   node roadstyle-wasm/bench_live_views.mjs roadstyle-wasm/pkg <roads.parquet> <levels.json> <look.json> [views.json]
@@ -42,7 +42,7 @@ const rs = await import(pathToFileURL(resolve(pkg, "roadstyle_wasm.js")));
 rs.initSync({ module: readFileSync(join(pkg, "roadstyle_wasm_bg.wasm")) });
 const look = rs.Look.fromJson(readFileSync(lookPath, "utf8")).withArg("levels", readFileSync(levelsPath, "utf8").trim());
 const roads = readFileSync(roadsPath);
-const live = () => new rs.LiveMap(rs.makeSources(new Uint8Array(roads), look, undefined, undefined, undefined), look, "", []);
+const live = () => new rs.LiveMap(rs.styleSources(new Uint8Array(roads), look, undefined, undefined, undefined), look, "", []);
 let m = live();
 const [lon, lat] = JSON.parse(m.style()).center;
 const vs = views(lon, lat);

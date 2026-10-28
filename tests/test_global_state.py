@@ -42,7 +42,7 @@ def test_set_style_gives_a_host_map_the_styles_global_state(tmp_path):
     import shapely
     df = pq.read_table(DATA).to_pandas(integer_object_nulls=True)
     g = gpd.GeoDataFrame(df.drop(columns="geometry"), geometry=shapely.from_wkb(df["geometry"]), crs="EPSG:4326")
-    style = json.loads(_engine.rust().make_style(_engine._arrow(g), _engine._look_of({"state": "live"}), None, None, "roads"))
+    style = json.loads(_engine.rust().inline_style(_engine._arrow(g), _engine._look_of({"state": "live"}), None, None, "roads"))
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] != "symbol"]    # the arrows and names need a sprite and glyphs
     start = style["metadata"]["roadstyle:state"]
     assert "rs_fill_on" in start and start["rs_fill_on"] is True

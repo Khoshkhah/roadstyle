@@ -115,7 +115,7 @@ def test_the_tiled_style_says_its_tile_layers(part, keywords):
     from roadstyle import _engine
 
     lk = _engine._look_of({**keywords, "state": "live", "live_data": True})
-    src = _engine.rust().make_sources(_engine._arrow(part), lk, None, None, "x")
+    src = _engine.rust().style_sources(_engine._arrow(part), lk, None, None, "x")
     inline = json.loads(src.style())["metadata"]
     assert inline["roadstyle:sources"]["simple"] == {"source": "simple", "layer": None}
     text, t = src.tile_stage(only=["roads", "simple", "slots"], at=json.dumps({"url": "pmtiles://roads"}))      # as a page
@@ -133,7 +133,7 @@ def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, k
     from roadstyle import _engine
 
     def style(**kw):
-        return json.loads(_engine.rust().make_style(_engine._arrow(part), _engine._look_of({**keywords, **kw}), None, None, None))
+        return json.loads(_engine.rust().inline_style(_engine._arrow(part), _engine._look_of({**keywords, **kw}), None, None, None))
 
     for kw in ({}, {"state": "live"}, {"state": "live", "tiles": True}):
         st = style(**kw)
@@ -143,7 +143,7 @@ def test_stage_1_is_the_road_table_form_and_only_an_export_has_the_roads(part, k
         assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "slots", kw
     ex = rs.export_inline(part, **keywords)
     assert "roads" in ex["sources"] and {"roads-fill", "roads-highlight"} <= {lyr["id"] for lyr in ex["layers"]}
-    src = _engine.rust().make_sources(_engine._arrow(part), _engine._look_of({**keywords, "state": "live"}), None, None, None)
+    src = _engine.rust().style_sources(_engine._arrow(part), _engine._look_of({**keywords, "state": "live"}), None, None, None)
     src.page_arrows()
     st = json.loads(src.style())
     assert next(lyr for lyr in st["layers"] if lyr["id"] == "roads-arrows")["source"] == "arrows" and st["metadata"]["roadstyle:arrows"] == "points"
@@ -172,6 +172,6 @@ def test_the_binding_takes_arrow_tables_only(part, keywords):
 
     lk = _engine._look_of(keywords)
     t = _engine._arrow(part)
-    assert _engine.rust().make_style(pa.table(t), lk, None, None, None) == _engine.rust().make_style(t, lk, None, None, None)
+    assert _engine.rust().inline_style(pa.table(t), lk, None, None, None) == _engine.rust().inline_style(t, lk, None, None, None)
     with pytest.raises(TypeError, match="__arrow_c_stream__"):
-        _engine.rust().make_style(b"PAR1", lk, None, None, None)
+        _engine.rust().inline_style(b"PAR1", lk, None, None, None)

@@ -245,7 +245,7 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
 
 /// The page from JSON texts (the Python binding and the browser): `style`, `page` (the options) and `parts` ({name, cam, bounds,
 /// side_panel_html, host_panel_width, compress, gz, side, side_b64, simple_js}); `pmtiles`: the archive of a tiled page.
-pub fn make_page(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -> Result<String, crate::Error> {
+pub fn page_of_json(style: &str, page: &str, parts: &str, pmtiles: Option<&[u8]>) -> Result<String, crate::Error> {
     let read = |t: &str, what: &str| serde_json::from_str::<Value>(t).map_err(|e| crate::error::options(format!("{what}: not JSON: {e}")));
     let (style, p) = (read(style, "style")?, read(parts, "parts")?);
     let page: PageOptions = serde_json::from_str(page).map_err(|e| crate::error::options(format!("page: {e}")))?;

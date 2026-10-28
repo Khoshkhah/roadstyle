@@ -1,5 +1,5 @@
 // The time of the tiles of one view in WebAssembly, measured in Node (review: the page's tiles come slowly on a large area): after
-// makeSources and tileSources (the page's map worker), tile() for each tile that a 1280 x 800 view at the roads' centre shows, at
+// styleSources and tilesOfSources (the page's map worker), tile() for each tile that a 1280 x 800 view at the roads' centre shows, at
 // zooms 10 to 15 (the tiles' last zoom; MapLibre scales z15 up), cold (the first time) and warm (again: the tile cache).
 //
 //   node roadstyle-wasm/bench_tiles.mjs <pkg> roadstyle-rs/tests/data/tartu
@@ -13,8 +13,8 @@ const rs = createRequire(import.meta.url)(resolve(pkg, "roadstyle_wasm.js"));
 const look = rs.Look.fromJson(readFileSync(join(area, "..", "look.json"), "utf8"));
 const roads = new Uint8Array(readFileSync(join(area, "roads.parquet")));
 const features = new Uint8Array(readFileSync(join(area, "features.parquet")));
-const sources = rs.makeSources(roads, look, features, undefined, undefined);
-const tiler = rs.tileSources(sources, "", []);
+const sources = rs.styleSources(roads, look, features, undefined, undefined);
+const tiler = rs.tilesOfSources(sources, "", []);
 const [lon, lat] = JSON.parse(tiler.style()).center;      // the roads' centre (the wasm Tiler has no bounds())
 const tileOf = (z) => [(lon + 180) / 360 * 2 ** z, (1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * 2 ** z];
 for (const z of [10, 11, 12, 13, 14, 15]) {

@@ -101,12 +101,12 @@ fn resolve_look(py: Python<'_>, options: String) -> PyResult<PyLook> {
     .map_err(PyValueError::new_err)
 }
 
-/// make_style(roads, look, features=None, planner=None, name=None) -> str: the style's JSON text (roadstyle.export_inline's
+/// inline_style(roads, look, features=None, planner=None, name=None) -> str: the style's JSON text (roadstyle.export_inline's
 /// style). `roads`, `features` and `planner` are Arrow tables (`__arrow_c_stream__`; the geometry as WKB), `look` a Look. An error is
 /// a ValueError; a value that is not an Arrow table is a TypeError.
 #[pyfunction]
 #[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_style(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, features: Option<&Bound<'_, PyAny>>,
+fn inline_style(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, features: Option<&Bound<'_, PyAny>>,
               planner: Option<&Bound<'_, PyAny>>, name: Option<String>) -> PyResult<String> {
     let look = &look.0;
     let (r, f, p) = (stream(roads)?, features.map(stream).transpose()?, planner.map(stream).transpose()?);
@@ -157,6 +157,49 @@ impl Tiler {
         Ok(PyBytes::new(py, &a))
     }
 
+    /// write_xyz(dir, bounds, ext, padded=None) -> int: the folder `dir/<z>/<x>/<y><ext>` of every zoom, a file for each tile with data in
+    /// `bounds` (lon / lat). `padded` = (layers, fallback): the export's folder: a tile whose buffer has a road's stroke has the road, so the
+    /// box of the data is widened by each zoom's buffer (`layers`: the style's layers as JSON text, `fallback`: the buffer in px of a zoom
+    /// where a layer's reach cannot be bounded), and each other tile in `bounds` gets an empty file. Returns the number of files.
+    #[pyo3(signature = (dir, bounds, ext, padded=None))]
+    fn write_xyz(&self, py: Python<'_>, dir: String, bounds: [f64; 4], ext: &str, padded: Option<(String, f64)>) -> PyResult<usize> {
+        let (z0, z1) = self.tiles.zooms();
+        let buffers = match &padded {
+            Some((layers, fallback)) => {
+                let layers: Vec<serde_json::Value> = serde_json::from_str(layers).map_err(|e| PyValueError::new_err(format!("layers: {e}")))?;
+                Some(roadstyle::tiles::buffer::buffers_px(&layers, z1, roadstyle::tiles::buffer::LIVE_WIDTH_MAX, *fallback))
+            }
+            None => None,
+        };
+        let every = self.tiles.bounds().unwrap_or(bounds);
+        let (lo, hi) = (mercator(bounds[0], bounds[1]), mercator(bounds[2], bounds[3]));
+        let (elo, ehi) = (mercator(every[0], every[1]), mercator(every[2], every[3]));
+        let mut n = 0;
+        for z in z0..=z1 {
+            let (x0, x1, y0, y1) = tile_range([lo.0, lo.1, hi.0, hi.1], z);
+            let (ex0, ex1, ey0, ey1) = match &buffers {
+                Some(b) => {
+                    let pad = 2.0 * MERCATOR_R / f64::from(1u32 << z) * b[z as usize] / 512.0;
+                    tile_range([elo.0 - pad, elo.1 - pad, ehi.0 + pad, ehi.1 + pad], z)
+                }
+                None => (x0, x1, y0, y1),
+            };
+            for x in x0.min(ex0)..=x1.max(ex1) {
+                for y in y0.min(ey0)..=y1.max(ey1) {
+                    let t = py.detach(|| self.tiles.tile(z, x, y));
+                    let inside = (x0..=x1).contains(&x) && (y0..=y1).contains(&y);
+                    if !t.is_empty() || (buffers.is_some() && inside) {
+                        let path = std::path::Path::new(&dir).join(z.to_string()).join(x.to_string()).join(format!("{y}{ext}"));
+                        std::fs::create_dir_all(path.parent().expect("a tile path has a folder")).and_then(|()| std::fs::write(&path, &t))
+                            .map_err(|e| PyValueError::new_err(format!("{}: {e}", path.display())))?;
+                        n += 1;
+                    }
+                }
+            }
+        }
+        Ok(n)
+    }
+
     /// bounds() -> [min lon, min lat, max lon, max lat] | None: the box of every feature in the tiles.
     fn bounds(&self) -> Option<[f64; 4]> {
         self.tiles.bounds()
@@ -173,7 +216,7 @@ impl Tiler {
     }
 }
 
-/// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory (make_sources).
+/// Stage 1 (docs/rust/architecture.md, "The three stages and the one call"): the style and its sources in memory (style_sources).
 #[pyclass]
 struct Sources {
     inner: roadstyle::sources::Styled,
@@ -194,16 +237,16 @@ impl Sources {
     #[pyo3(signature = (dir, format="geojson", keep=Vec::new()))]
     fn save(&self, py: Python<'_>, dir: String, format: &str, keep: Vec<String>) -> PyResult<Vec<(String, usize)>> {
         let f = self::format(format)?;
-        py.detach(|| roadstyle::save_sources(&self.inner, std::path::Path::new(&dir), f, &keep)).map_err(py_err)
+        py.detach(|| roadstyle::write_sources(&self.inner, std::path::Path::new(&dir), f, &keep)).map_err(py_err)
     }
 
-    /// file_names(format="geojson") -> list[str]: the names of stage 1's files.
+    /// source_file_names(format="geojson") -> list[str]: the names of stage 1's files.
     #[pyo3(signature = (format="geojson"))]
-    fn file_names(&self, format: &str) -> PyResult<Vec<String>> {
-        Ok(roadstyle::file_names(&self.inner, self::format(format)?))
+    fn source_file_names(&self, format: &str) -> PyResult<Vec<String>> {
+        Ok(roadstyle::source_file_names(&self.inner, self::format(format)?))
     }
 
-    /// style() -> str: the style as one JSON text with each source's GeoJSON in it (make_style's).
+    /// style() -> str: the style as one JSON text with each source's GeoJSON in it (inline_style's).
     fn style(&self, py: Python<'_>) -> String {
         let mut out = Vec::new();
         py.detach(|| self.inner.write_style(&mut out, roadstyle::sources::SourceMode::INLINE)).expect("a Vec takes every byte");
@@ -211,7 +254,7 @@ impl Sources {
     }
 
     /// tile_stage(only=None, exact=None, keep=[], at=None) -> (style, Tiler): stage 2 from memory (roadstyle::tile_stage), with the
-    /// look's tile settings (make_sources saves them): the style that draws the tiles (JSON text) and the tiles. `only`: the sources in
+    /// look's tile settings (style_sources saves them): the style that draws the tiles (JSON text) and the tiles. `only`: the sources in
     /// the tiles (render(tiles=True)'s tile_layers; the others stay in the style), `exact`: the columns of the roads and the pieces
     /// (its tile_keep), `keep`: more columns, `at`: where the tiles are, as JSON text (`{"url": "pmtiles://roads"}`; None: a folder,
     /// `roads/{z}/{x}/{y}`). These Sources stay as they are.
@@ -276,10 +319,10 @@ impl Sources {
     }
 }
 
-/// make_sources(roads, look, features=None, planner=None, name=None) -> Sources: stage 1, as make_style's arguments.
+/// style_sources(roads, look, features=None, planner=None, name=None) -> Sources: stage 1, as inline_style's arguments.
 #[pyfunction]
 #[pyo3(signature = (roads, look, features=None, planner=None, name=None))]
-fn make_sources(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, features: Option<&Bound<'_, PyAny>>,
+fn style_sources(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, features: Option<&Bound<'_, PyAny>>,
                 planner: Option<&Bound<'_, PyAny>>, name: Option<String>) -> PyResult<Sources> {
     let look = &look.0;
     let (r, f, p) = (stream(roads)?, features.map(stream).transpose()?, planner.map(stream).transpose()?);
@@ -288,12 +331,12 @@ fn make_sources(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook
     Ok(Sources { inner })
 }
 
-/// tile_files(dir, keep=[], prefix="") -> Tiler: stage 2 from stage 1's files in dir (GeoJSON or GeoParquet, as style.json names
+/// tiles_of_files(dir, keep=[], prefix="") -> Tiler: stage 2 from stage 1's files in dir (GeoJSON or GeoParquet, as style.json names
 /// them); the Tiler's style is the saved style with the one vector source.
 #[pyfunction]
 #[pyo3(signature = (dir, keep=Vec::new(), prefix=String::new()))]
-fn tile_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) -> PyResult<Tiler> {
-    let (style, tiles) = py.detach(|| roadstyle::tile_files(std::path::Path::new(&dir), &keep, None, &roadstyle::xyz_at(&prefix))).map_err(py_err)?;
+fn tiles_of_files(py: Python<'_>, dir: String, keep: Vec<String>, prefix: String) -> PyResult<Tiler> {
+    let (style, tiles) = py.detach(|| roadstyle::tiles_of_files(std::path::Path::new(&dir), &keep, None, &roadstyle::xyz_at(&prefix))).map_err(py_err)?;
     Ok(Tiler { style: style.to_string(), tiles })
 }
 
@@ -354,12 +397,12 @@ fn solve_rules(py: Python<'_>, roads: usize, meets: Vec<(usize, usize, usize, us
     Ok((s.parts, s.given_up_parts, s.orders_not_kept, s.near_not_kept))
 }
 
-/// render_web._page_html in Rust (roadstyle::page): the page of a live style with the dashboard's options. `parts`: name, cam, bounds,
+/// The page (roadstyle::page): the page of a live style with the dashboard's options. `parts`: name, cam, bounds,
 /// side_panel_html, host_panel_width, compress, gz (the blobs, made by Python's zlib), side_b64, side, simple_js; `pmtiles`: a tiled page.
 #[pyfunction]
 #[pyo3(signature = (style, page, parts, pmtiles=None))]
-fn make_page(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>>) -> PyResult<String> {
-    roadstyle::page::make_page(&style, &page, &parts, pmtiles.as_deref()).map_err(py_err)
+fn page_of_json(style: String, page: String, parts: String, pmtiles: Option<Vec<u8>>) -> PyResult<String> {
+    roadstyle::page::page_of_json(&style, &page, &parts, pmtiles.as_deref()).map_err(py_err)
 }
 
 /// page_from(roads, look, options, given) -> str: the page of the roads (an Arrow table) in one call (roadstyle::page_options), as
@@ -384,17 +427,17 @@ fn page_from(py: Python<'_>, roads: &Bound<'_, PyAny>, look: PyRef<'_, PyLook>, 
     Ok(page.html)
 }
 
-/// page_defaults() -> str: the defaults of the keywords that only the page reads (JSON text), which page_from takes for a keyword that
+/// page_key_defaults() -> str: the defaults of the keywords that only the page reads (JSON text), which page_from takes for a keyword that
 /// the caller did not give.
 #[pyfunction]
-fn page_defaults() -> String {
-    serde_json::Value::Object(roadstyle::page_options::page_defaults()).to_string()
+fn page_key_defaults() -> String {
+    serde_json::Value::Object(roadstyle::page_options::page_key_defaults()).to_string()
 }
 
-/// sidebar_defaults() -> str: the keywords that each sidebar (sidebar=) changes when the caller gives none (JSON text).
+/// sidebar_keys() -> str: the keywords that each sidebar (sidebar=) changes when the caller gives none (JSON text).
 #[pyfunction]
-fn sidebar_defaults() -> String {
-    serde_json::Value::Object(roadstyle::page_options::sidebar_defaults()).to_string()
+fn sidebar_keys() -> String {
+    serde_json::Value::Object(roadstyle::page_options::sidebar_keys()).to_string()
 }
 
 /// export_look(look, cols, positions) -> str: the simple look for another app's data layer (roadstyle_engine::export_look); `cols`: the
@@ -562,12 +605,20 @@ fn asset_names() -> Vec<&'static str> {
     roadstyle::assets::NAMES.to_vec()
 }
 
-/// tile_buffers(layers, max_zoom, fallback) -> [float]: the buffer round a tile at each zoom 0 to `max_zoom`, in px of the tile, from the
-/// style's layers (JSON text; roadstyle_tiles::buffer::buffers_px), for a writer of the tile folder.
-#[pyfunction]
-fn tile_buffers(layers: &str, max_zoom: u32, fallback: f64) -> PyResult<Vec<f64>> {
-    let layers: Vec<serde_json::Value> = serde_json::from_str(layers).map_err(|e| PyValueError::new_err(format!("layers: {e}")))?;
-    Ok(roadstyle::tiles::buffer::buffers_px(&layers, max_zoom, roadstyle::tiles::buffer::LIVE_WIDTH_MAX, fallback))
+/// The web-mercator half of the world (m): the tile (z, x, y) spans 2 * R / 2^z from (-R, R).
+const MERCATOR_R: f64 = 20037508.342789244;
+
+fn mercator(lon: f64, lat: f64) -> (f64, f64) {
+    let lat = lat.clamp(-89.9, 89.9);
+    (lon * MERCATOR_R / 180.0, ((90.0 + lat) * std::f64::consts::PI / 360.0).tan().ln() * MERCATOR_R / std::f64::consts::PI)
+}
+
+/// The tile index range (x0, x1, y0, y1) that covers a mercator box [min x, min y, max x, max y] at zoom z.
+fn tile_range(b: [f64; 4], z: u32) -> (u32, u32, u32, u32) {
+    let s = 2.0 * MERCATOR_R / f64::from(1u32 << z);
+    let n = f64::from((1u32 << z) - 1);
+    let i = |v: f64| v.div_euclid(s).clamp(0.0, n) as u32;
+    (i(b[0] + MERCATOR_R), i(b[2] + MERCATOR_R), i(MERCATOR_R - b[3]), i(MERCATOR_R - b[1]))
 }
 
 #[pymodule]
@@ -575,15 +626,14 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
     m.add_function(wrap_pyfunction!(asset, m)?)?;
     m.add_function(wrap_pyfunction!(asset_names, m)?)?;
-    m.add_function(wrap_pyfunction!(tile_buffers, m)?)?;
     m.add_function(wrap_pyfunction!(unknown_keywords, m)?)?;
     m.add_function(wrap_pyfunction!(given_of, m)?)?;
-    m.add_function(wrap_pyfunction!(make_page, m)?)?;
+    m.add_function(wrap_pyfunction!(page_of_json, m)?)?;
     m.add_function(wrap_pyfunction!(page_from, m)?)?;
-    m.add_function(wrap_pyfunction!(page_defaults, m)?)?;
-    m.add_function(wrap_pyfunction!(sidebar_defaults, m)?)?;
+    m.add_function(wrap_pyfunction!(page_key_defaults, m)?)?;
+    m.add_function(wrap_pyfunction!(sidebar_keys, m)?)?;
     m.add_function(wrap_pyfunction!(export_look, m)?)?;
-    m.add_function(wrap_pyfunction!(make_style, m)?)?;
+    m.add_function(wrap_pyfunction!(inline_style, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_look, m)?)?;
     m.add_class::<PyLook>()?;
     m.add_function(wrap_pyfunction!(compute_levels, m)?)?;
@@ -599,8 +649,8 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(duckosm_features_select, m)?)?;
     m.add_class::<Tiler>()?;
     m.add_class::<Sources>()?;
-    m.add_function(wrap_pyfunction!(make_sources, m)?)?;
-    m.add_function(wrap_pyfunction!(tile_files, m)?)?;
+    m.add_function(wrap_pyfunction!(style_sources, m)?)?;
+    m.add_function(wrap_pyfunction!(tiles_of_files, m)?)?;
     m.add("MAX_ROADS", roadstyle::MAX_ROADS)?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())

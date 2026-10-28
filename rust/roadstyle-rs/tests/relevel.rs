@@ -102,13 +102,13 @@ fn a_redraw_has_the_features_of_a_new_map() {
     }
 }
 
-/// The map whose pieces wait for their properties (LiveTiles) has the bytes of tile_made's tiles, at every tile of Monaco, the high
+/// The map whose pieces wait for their properties (LiveTiles) has the bytes of tiles_of_sources's tiles, at every tile of Monaco, the high
 /// zooms asked first.
 #[test]
 fn the_waiting_pieces_give_the_tiles_of_tile_made() {
     let look = look();
     let s = roadstyle_rs::sources_of(roads(), &look, None, None, None).unwrap();
-    let (_, made) = roadstyle_rs::tile_made(&s, "x://", &[]).unwrap();
+    let (_, made) = roadstyle_rs::tiles_of_sources(&s, "x://", &[]).unwrap();
     let mut m = LiveTiles::new(s, look, "x://", &[]).unwrap();
     let [w, so, e, no] = made.bounds().unwrap();
     let (z0, z1) = made.zooms();

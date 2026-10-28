@@ -289,7 +289,7 @@ fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i16; 4]>>, lo
 }
 
 /// The style as one JSON text, with each source's GeoJSON in it (roadstyle's export_inline): stage 1 (`sources::Styled`), written.
-pub fn make_style(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, Error> {
+pub fn inline_style(table: RoadTable, look: &Look, features: Option<FeatureTable>, planner: Option<Vec<Row>>, name: Option<String>) -> Result<String, Error> {
     let s = sources::Styled::new(make_parts(table, look, features, planner, name)?);
     let mut out = Vec::new();
     // the call's data_maxzoom and data_tolerance (keys of the writer): the look keeps them in `other` until the bindings give the mode

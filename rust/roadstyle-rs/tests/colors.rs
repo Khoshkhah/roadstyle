@@ -48,7 +48,7 @@ fn check(case: &str) {
         look["args"][k] = v.clone();
     }
     let roads = std::fs::read(data("monaco_part/roads.parquet")).unwrap();
-    let style = roadstyle_rs::make_style(roads, &roadstyle_rs::Look::from_value(look).unwrap(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
+    let style = roadstyle_rs::inline_style(roads, &roadstyle_rs::Look::from_value(look).unwrap(), None, None, None).unwrap_or_else(|e| panic!("{case}: {e}"));
     let style: Value = serde_json::from_str(&style).unwrap();
     let options = style["metadata"].get("roadstyle:color_options").cloned().unwrap_or(json!([]));
     let names: Vec<Value> = options.as_array().into_iter().flatten().map(|o| o["name"].clone()).collect();

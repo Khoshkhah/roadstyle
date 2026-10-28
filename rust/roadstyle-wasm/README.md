@@ -7,11 +7,11 @@ then draws the roads with MapLibre GL JS. The package `roadstyle-dashboard` adds
 ## Use it
 
 ```js
-import init, { Look, resolveLook, makeStyle, Tiler } from "roadstyle-wasm";
+import init, { Look, resolveLook, inlineStyle, Tiler } from "roadstyle-wasm";
 
 await init();                                            // loads pkg/roadstyle_wasm_bg.wasm
 const look = resolveLook(JSON.stringify({ palette: "carto" }));   // or Look.fromJson(text): a saved look.json (version 2, 1 or 0)
-const style = JSON.parse(makeStyle(roadsParquet, look));          // one style, the roads in it as GeoJSON
+const style = JSON.parse(inlineStyle(roadsParquet, look));          // one style, the roads in it as GeoJSON
 
 // or vector tiles, made when the map asks for them
 const tiler = new Tiler(roadsParquet, look, undefined, "Monaco", "rs://1/", ["name"]);
@@ -25,7 +25,7 @@ const tiled = JSON.parse(tiler.style());
 - `readGeoParquet(bytes)`: the roads of a GeoParquet file as a `Roads` handle (the geometry in the column `geometry`).
 - `readGeoJson(bytes)`: the roads of a GeoJSON file as a `Roads` handle; `roads.sources(look)` is stage 1 of them.
 - `readShp(shp, dbf, prj?, name?)`: the roads of a Shapefile (its .shp and .dbf bytes and its .prj text), in EPSG:4326, as a `Roads` handle. A GeoPackage is read only by the native programs (SQLite is C).
-- `Look` (`resolveLook`, `Look.fromJson`, `toJson`, `withArg`), `makeStyle`, `Tiler`, `makeSources` (`style()`, `roadTable(fields?)`), `tileSources`, `tileFiles`, `makePage`,
+- `Look` (`resolveLook`, `Look.fromJson`, `toJson`, `withArg`), `inlineStyle`, `Tiler`, `styleSources` (`style()`, `roadTable(fields?)`), `tilesOfSources`, `tilesOfFiles`, `pageFrom`,
   `exportLook` and `memoryBytes`: the types (`index.d.ts`) come from the Rust signatures, with their descriptions. The calls take a
   `Look`, not the look's text.
 - `roadstyle-wasm/roads_sql.js` (`makeRoads`, `writeRoads`) and `roadstyle-wasm/features_sql.js` (`writeFeatures`): the SQL that writes the

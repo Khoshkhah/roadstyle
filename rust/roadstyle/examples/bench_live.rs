@@ -31,7 +31,7 @@ fn main() {
     let views: Vec<(String, Vec<[u32; 3]>)> = serde_json::from_slice(&read(&a[3])).unwrap();
     let roads = read(&a[0]);
     for (name, tiles) in &views {
-        let s = roadstyle::make_sources(roads.clone(), &look, None, None, None).unwrap();
+        let s = roadstyle::style_sources(roads.clone(), &look, None, None, None).unwrap();
         let mut live = roadstyle::relevel::LiveTiles::new(s, look.clone(), "", &[]).unwrap();
         let (before, t) = (NOW.load(Relaxed), Instant::now());
         let bytes: usize = tiles.iter().map(|&[z, x, y]| live.tile(z, x, y).len()).sum();

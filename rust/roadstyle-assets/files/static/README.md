@@ -12,12 +12,12 @@ The page must have MapLibre GL JS 5.8 or later as the global `maplibregl`.
 <link rel="stylesheet" href="node_modules/roadstyle-dashboard/dashboard/dashboard.css">
 <link rel="stylesheet" href="node_modules/roadstyle-dashboard/popup.css">
 <script type="module">
-import init, { makeStyle, makeSources } from "roadstyle-wasm";
+import init, { inlineStyle, styleSources } from "roadstyle-wasm";
 import { rsDashboard } from "roadstyle-dashboard";
 
 await init();
-const style = JSON.parse(makeStyle(roadsParquet, lookJson));   // a style of roadstyle's Rust engine
-const road_table = JSON.parse(new TextDecoder().decode(makeSources(roadsParquet, lookJson).roadTable()));
+const style = JSON.parse(inlineStyle(roadsParquet, lookJson));   // a style of roadstyle's Rust engine
+const road_table = JSON.parse(new TextDecoder().decode(styleSources(roadsParquet, lookJson).roadTable()));
 const map = new maplibregl.Map({ container: "map", style });
 const rs = rsDashboard(map, { style, road_table, street_view: "window" });
 rs.on("select", (e) => console.log(e.properties));
