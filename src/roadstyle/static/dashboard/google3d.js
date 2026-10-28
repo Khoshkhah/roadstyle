@@ -127,7 +127,7 @@ export function initGoogle3D(){
       requestAnimationFrame(()=>{ toGQueued=false; if(performance.now()-lastGoogle>=300) setGoogle(); }); });   // while Google leads, the map's own moves are not sent
     // WHILE GOOGLE LEADS, NOTHING GOES BACK. The map follows as far as it can (its limits: maxPitch, maxZoom, maxBounds). When Google has been
     // still for 300 ms, a map that could not follow is reconciled once: Google flies to the map's camera in 250 ms.
-    const reconcile=()=>{ rec=0; if(!m3 || performance.now()-lastGoogle<300) return;
+    const reconcile=()=>{ rec=0; if(!m3 || performance.now()-lastGoogle<300 || leave()) return;
       const t=toMap(), g=toGoogle(); if(!(m3.center && m3.range) || there(t)) return;
       ignoreUntil=performance.now()+450; COUNT.m2g++;
       try{ m3.flyCameraTo({endCamera:g, durationMillis:250}); }catch(e){ Object.assign(m3, g); }
@@ -146,7 +146,7 @@ export function initGoogle3D(){
       COUNT.ignored=(COUNT.ignored||0)+1;
       (window.rsJumpLog=window.rsJumpLog||[]).push({t:(performance.now()/1000).toFixed(1), reason:"not user", mode:String(m3.mode), range:Math.round(m3.range), tilt:Math.round(m3.tilt||0), heading:Math.round(m3.heading||0)});
       clearTimeout(notUserT);
-      notUserT=setTimeout(()=>{ if(!m3 || userNow() || resets>=2) return; resets++; setGoogle(); }, 300); };
+      notUserT=setTimeout(()=>{ if(!m3 || userNow() || resets>=2 || leave()) return; resets++; setGoogle(); }, 300); };
     const fromGoogle=()=>{                       // Google moved: the map follows, once a frame
       if(queued) return; queued=true;
       requestAnimationFrame(()=>{ queued=false;
@@ -188,12 +188,23 @@ export function initGoogle3D(){
     const keepMode=()=>{ if(m3 && m3.mode){ try{ localStorage.setItem(MODE_KEY, String(m3.mode)); }catch(e){} } };
     const LOG=window.rsG3dLog=[];
     for(const k of ["warn", "error"]){ const f=console[k]; console[k]=function(...a){ try{ const t=a.map(String).join(" ");
-      if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>5) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
+      if(/google|maps|3d|gmp|tile/i.test(t)){ LOG.push(k+": "+t.slice(0, 160)); if(LOG.length>24) LOG.shift(); } }catch(e){} return f.apply(this, a); }; }
     window.rsG3dMode=()=>m3 ? String(m3.mode) : null;
     const redraw=()=>{ if(m3 && line) line.forEach(x=>{ x.remove(); m3.appendChild(x); }); };      // the selected road is drawn again in the new mode
     // A change of mode makes Google draw again, and it may report a stale or reset camera: for 1 s after the page sets the mode (or Google's own toggle
     // does) its camera changes are ignored, and then Google is set to the map's camera once. The map's camera never moves for a switch.
-    const modeQuiet=()=>{ ignoreUntil=performance.now()+1000; clearTimeout(modeT); modeT=setTimeout(()=>{ if(m3) setGoogle(); }, 1050); };
+    // WHO CHANGES THE VIEW AFTER A MODE CHANGE? 0.2 s, 1 s and 3 s after it, Google's range, tilt and centre altitude go into window.rsG3dLog with the number of
+    // sets the page made (m2g), of Google's changes it did not follow (ignored) and of input (input) since the change. With ?g3d=leave the page sets nothing
+    // in Google's drawn map (the first view of Google stays).
+    const leave=()=>/[?&]g3d=leave/.test(location.search) && drawnMode();
+    let probeAt=-1e9;
+    const probe=why=>{ const now=performance.now(); if(now-probeAt<600) return; probeAt=now; const c0={m2g:COUNT.m2g, ign:COUNT.ignored||0, inp:COUNT.input||0};
+      const mapz=map.getZoom();
+      for(const d of [200, 1000, 3000]) setTimeout(()=>{ if(!m3) return; const c=m3.center||{};
+        LOG.push("mode "+String(m3.mode)+" +"+d/1000+"s ("+why+"): range "+Math.round(m3.range)+" tilt "+Math.round(m3.tilt||0)+" alt "+Math.round(c.altitude||0)+" | page sets "+(COUNT.m2g-c0.m2g)+", not followed "+((COUNT.ignored||0)-c0.ign)+", input "+((COUNT.input||0)-c0.inp)+" | map zoom "+mapz.toFixed(2)+", set range "+Math.round(rangeOf(map.getCenter().lat, mapz)));
+        if(LOG.length>24) LOG.shift(); }, d); };
+    window.rsG3dProbe=probe;
+    const modeQuiet=()=>{ probe("mode change"); ignoreUntil=performance.now()+1000; clearTimeout(modeT); modeT=setTimeout(()=>{ if(m3 && !leave()) setGoogle(); }, 1050); };
     let modeT=0, lastMode=null;
     // Google's own toggle changes the mode without the page: a watcher (every 200 ms) opens the same quiet second, and keeps the choice
     setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode);
