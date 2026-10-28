@@ -243,7 +243,7 @@ export function initGoogle3D(){
       btn.onclick=()=>rsSetGoogle3D(w.hidden);
       d.appendChild(btn); return d;
     }, onRemove(){}});
-    if(st.open) map.once("load", ()=>rsSetGoogle3D(true));
+    if(st.open) map.once("load", ()=>{ if(window.rsRestoreWindows!==false) rsSetGoogle3D(true); });      // a page can start with its windows closed: window.rsRestoreWindows=false
   }
   window.rsSetGoogle3D = rsSetGoogle3D;
 }

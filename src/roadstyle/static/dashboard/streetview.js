@@ -112,7 +112,7 @@ export function initStreetView(){
     }, onRemove(){}});
     // reopen a window left open last time only once the map is up: this code runs before the Street View
     // spot (svspot.js) is set up, and throwing here stopped the page before any road was drawn
-    if(st.open) map.once("load", ()=>rsSetStreetView(true));
+    if(st.open) map.once("load", ()=>{ if(window.rsRestoreWindows!==false) rsSetStreetView(true); });      // a page can start with its windows closed: window.rsRestoreWindows=false
   }
   window.rsSetStreetView = rsSetStreetView;
 }

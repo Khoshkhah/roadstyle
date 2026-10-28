@@ -62,14 +62,17 @@
         const left = vis(sb) && sb.getBoundingClientRect().left < innerWidth/2 ? sb.getBoundingClientRect().right : m.left;
         const right = Math.min(barLeft(m) + 8, vis(side) ? side.getBoundingClientRect().left : m.right);
         const r = w.getBoundingClientRect(), gap = 12;
-        if(r.left >= left && r.right <= right) return;
-        Object.assign(w.style, {left:Math.max(left+gap, Math.min(r.left, right-r.width-gap))+"px", top:Math.max(m.top+gap, r.top)+"px", right:"auto", bottom:"auto"}); };
+        if(!(r.left >= left && r.right <= right))
+          Object.assign(w.style, {left:Math.max(left+gap, Math.min(r.left, right-r.width-gap))+"px", top:Math.max(m.top+gap, r.top)+"px", right:"auto", bottom:"auto"});
+        fit(w); };                       // and a window wider than the free part shrinks to it
       const opened = new MutationObserver(l=>l.forEach(x=>setTimeout(()=>placeVisible(x.target), 120)));
       wins().forEach(w=>opened.observe(w, {attributes:true, attributeFilter:["hidden"]}));
       // the windows follow the bar: when it slides (a right panel opens or closes) or the window is resized, a window that reaches under it moves left
       const keep = ()=>wins().forEach(w=>{ if(w.hidden || w.classList.contains("rs-drag")) return; const m = mapRect(), lim = barLeft(m), r = w.getBoundingClientRect();
         if(r.right > lim + 0.5 || r.left < leftEdge(m) - 0.5) fit(w); });
       window.rsKeepWindows = keep;
+      const sized = new ResizeObserver(()=>keep());                                      // a window enlarged by its corner never reaches under the bar
+      wins().forEach(w=>sized.observe(w)); document.addEventListener("pointerup", ()=>setTimeout(keep, 0), true);
       const sb0 = document.getElementById("sb");
       if(sb0){ new MutationObserver(keep).observe(sb0, {attributes:true, attributeFilter:["style", "class"]});          // the left panel opens or closes
         sb0.addEventListener("transitionrun", ()=>{ const t0 = performance.now(); (function f(){ keep(); if(performance.now() - t0 < 500) requestAnimationFrame(f); })(); }); }           // the bar is made later: it calls this when it exists
