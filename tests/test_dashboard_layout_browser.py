@@ -194,3 +194,22 @@ def test_base_map_button_has_the_layers_icon(tmp_path):
         got = pg.evaluate("[document.querySelector('#rs-toolbar .bm-icon').title, document.querySelectorAll('#rs-toolbar .bm-icon svg .rs-sheet').length]")
         assert got == ["Base map and layers", 3]
         b.close()
+
+
+def test_floating_window_stays_left_of_the_bar(tmp_path):
+    """A floating window (Google 3D, Street View) never runs under the bar: its right edge is 8 px left of the bar's left edge, and it moves when the bar slides."""
+    path = _page(tmp_path, "right")
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && window.map.loaded() && document.getElementById('rs-toolbar')", timeout=60000)
+        pg.evaluate("""() => { const w = document.createElement('div'); w.className = 'rs-svw'; w.id = 'fake-win'; w.style.cssText = 'right:0;bottom:40px;width:380px;height:260px';
+            document.body.appendChild(w); window.dispatchEvent(new Event('resize')); }""")
+        pg.wait_for_timeout(300)
+        gap = lambda: pg.evaluate("document.getElementById('rs-toolbar').getBoundingClientRect().left - document.getElementById('fake-win').getBoundingClientRect().right")
+        assert gap() >= 8 - 0.5, gap()
+        pg.evaluate("document.getElementById('rs-toolbar').style.right = '300px'")        # the bar slides beside an open right panel
+        pg.wait_for_timeout(300)
+        assert gap() >= 8 - 0.5, gap()
+        b.close()

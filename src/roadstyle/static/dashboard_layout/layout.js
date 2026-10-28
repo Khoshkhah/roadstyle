@@ -40,23 +40,31 @@
       }
       // a floating window stays inside the map at every drag move
       const mapRect = ()=>map.getContainer().getBoundingClientRect();
-      const fit = w=>{ if(!w || w.hidden) return; const m = mapRect(), gap = 8;
-        const W = Math.min(w.offsetWidth, m.width - 2*gap), H = Math.min(w.offsetHeight, m.height - 28);
+      // the right edge of the free map: the toolbar's left edge less 8 px (the bar slides beside an open right panel, and so does this edge)
+      const barLeft = m=>{ const t = document.getElementById("rs-toolbar"), r = t && getComputedStyle(t).display !== "none" && t.getBoundingClientRect();
+        return r && r.width > 0 && pos === "right" && innerWidth > 520 ? Math.min(m.right - 8, r.left - 8) : m.right - 8; };
+      const fit = w=>{ if(!w || w.hidden) return; const m = mapRect(), gap = 8, lim = barLeft(m);
+        const W = Math.min(w.offsetWidth, lim - m.left - gap), H = Math.min(w.offsetHeight, m.height - 28);
         Object.assign(w.style, {width:W+"px", height:H+"px"});
         const r = w.getBoundingClientRect();
-        Object.assign(w.style, {left:Math.max(m.left+gap, Math.min(r.left, m.right-W-gap))+"px", top:Math.max(m.top+gap, Math.min(r.top, m.bottom-H-gap))+"px", right:"auto", bottom:"auto"}); };
+        Object.assign(w.style, {left:Math.max(m.left+gap, Math.min(r.left, lim-W))+"px", top:Math.max(m.top+gap, Math.min(r.top, m.bottom-H-gap))+"px", right:"auto", bottom:"auto"}); };
       const wins = ()=>document.querySelectorAll(".rs-svw");
       document.addEventListener("pointermove", ()=>document.querySelectorAll(".rs-svw.rs-drag").forEach(fit), true);
       // a window opens in the visible part: right of an open left panel, left of an open right panel and the toolbar's strip
       const vis = e=>e && getComputedStyle(e).display !== "none" && e.getBoundingClientRect().width > 0;
       const placeVisible = w=>{ if(!w || w.hidden) return; const m = mapRect(), sb = document.getElementById("sb"), side = document.querySelector(".rs-side");
         const left = vis(sb) && sb.getBoundingClientRect().left < innerWidth/2 ? sb.getBoundingClientRect().right : m.left;
-        const right = vis(side) ? Math.min(m.right, side.getBoundingClientRect().left) : m.right - (pos === "right" ? 60 : 0);
+        const right = Math.min(barLeft(m) + 8, vis(side) ? side.getBoundingClientRect().left : m.right);
         const r = w.getBoundingClientRect(), gap = 12;
         if(r.left >= left && r.right <= right) return;
         Object.assign(w.style, {left:Math.max(left+gap, Math.min(r.left, right-r.width-gap))+"px", top:Math.max(m.top+gap, r.top)+"px", right:"auto", bottom:"auto"}); };
       const opened = new MutationObserver(l=>l.forEach(x=>setTimeout(()=>placeVisible(x.target), 120)));
       wins().forEach(w=>opened.observe(w, {attributes:true, attributeFilter:["hidden"]}));
+      // the windows follow the bar: when it slides (a right panel opens or closes) or the window is resized, a window that reaches under it moves left
+      const keep = ()=>wins().forEach(w=>{ if(w.hidden || w.classList.contains("rs-drag")) return; const m = mapRect(), lim = barLeft(m), r = w.getBoundingClientRect();
+        if(r.right > lim + 0.5) fit(w); });
+      window.rsKeepWindows = keep;           // the bar is made later: it calls this when it exists
+      addEventListener("resize", keep);
     }
     // the theme: the dashboard's light/dark switch (#sb[data-theme]) and a dark base map give the bar its dark colours
     const theme = ()=>{ const sb = document.getElementById("sb"), bm = (window.RS_BASEMAPS || []).find(b=>document.querySelector(".bm-menu .on") && b.label === document.querySelector(".bm-menu .on").textContent);
@@ -182,6 +190,8 @@
       // A panel on the side of a corner box or of the bar never covers it: when the panel is open, the box slides to 8 px beside it (150 ms); when the
       // panel closes, it goes back to the edge. The position along the edge does not change.
       if(overlay) window.followPanels(tb, pos);
+      if(window.rsKeepWindows){ const keep = window.rsKeepWindows; new MutationObserver(keep).observe(tb, {attributes:true, attributeFilter:["style", "class"]});
+        tb.addEventListener("transitionrun", ()=>{ const t0 = performance.now(); (function f(){ keep(); if(performance.now() - t0 < 500) requestAnimationFrame(f); })(); }); }
     }
   }, 150);
 })();
