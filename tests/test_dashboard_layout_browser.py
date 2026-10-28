@@ -116,3 +116,31 @@ def test_no_empty_bar_flashes(tmp_path):
         shown = [f for f in frames if f[0]]
         assert final > 5 and shown and all(n == final for _, n in shown), (final, shown[:3])
         b.close()
+
+
+def test_basemap_box_lists_the_default_maps_in_order(tmp_path):
+    g = gpd.GeoDataFrame({"edge_id": [1], "highway": ["primary"], "name": ["A"], "oneway": [False]},
+                         geometry=[LineString([(0, 0), (0.001, 0)])], crs="EPSG:4326")
+    path = tmp_path / "bm.html"
+    rs.render_dashboard(g, layout="overlay", toolbar="right", basemap="osm", basemap_switcher=True).save(path)
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": W, "height": H})
+        pg.goto(path.as_uri())
+        pg.wait_for_function("window.map && window.map.loaded() && document.querySelector('.rs-bm-item') && document.getElementById('rs-toolbar').classList.contains('rs-ready')", timeout=60000)
+        pg.click("#rs-toolbar .bm-icon")
+        names = pg.evaluate("[...document.querySelectorAll('.rs-bm-item .rs-bm-n')].map(e => e.textContent)")
+        heads = pg.evaluate("[...document.querySelectorAll('.rs-bm-h')].map(e => e.textContent)")
+        swatches = pg.evaluate("[...document.querySelectorAll('.rs-bm-item .rs-bm-th')].every(e => getComputedStyle(e).backgroundImage !== 'none' || getComputedStyle(e).backgroundColor !== 'rgba(0, 0, 0, 0)')")
+        assert names == ["OpenFreeMap Liberty", "OpenFreeMap Bright", "OpenFreeMap Positron", "OpenStreetMap", "CARTO Voyager", "CARTO Voyager (no labels)",
+                         "CARTO Positron", "CARTO Dark Matter", "Esri Light Gray", "Esri Streets", "Esri Dark Gray", "Esri Satellite", "Blank", "Blank dark"], names
+        assert heads == ["OpenFreeMap", "OpenStreetMap", "CARTO", "Esri", "Blank"] and swatches
+        # the current map is outlined, the arrows move and Enter chooses, Escape closes
+        assert pg.evaluate("document.querySelector('.rs-bm-item.on .rs-bm-n').textContent") == "OpenStreetMap"
+        pg.keyboard.press("ArrowRight"); pg.keyboard.press("Enter")
+        pg.wait_for_timeout(300)
+        assert pg.evaluate("!document.querySelector('.bm-menu').classList.contains('open')")
+        assert pg.evaluate("document.querySelector('.rs-bm-item.on .rs-bm-n').textContent") == "CARTO Voyager"
+        pg.click("#rs-toolbar .bm-icon"); pg.keyboard.press("Escape")
+        assert pg.evaluate("!document.querySelector('.bm-menu').classList.contains('open')")
+        b.close()

@@ -62,7 +62,7 @@ export function rsSetBasemap(keyOrIdx){
   } else if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility","none");
   map.setPaintProperty("bg","background-color", b.bg);
   const m = document.querySelector(".bm-menu");
-  if(m) Array.from(m.children).forEach((el,i)=>el.classList.toggle("on", i===idx));
+  if(m) m.querySelectorAll("[data-i]").forEach(el=>el.classList.toggle("on", +el.dataset.i===idx));
   document.dispatchEvent(new CustomEvent("rs:basemapchange",{detail:{basemap:b.key, index:idx}}));
 }
 export function initBasemap(){
@@ -75,7 +75,7 @@ export function initBasemap(){
     const menu=document.createElement("div"); menu.className="bm-menu";
     BASEMAPS.forEach((b,i)=>{ const o=document.createElement("div"); o.textContent=b.label;
       if(i===0) o.className="on";
-      o.onclick=()=>{ rsSetBasemap(i); menu.classList.remove("open"); };
+      o.dataset.i=i; o.onclick=()=>{ rsSetBasemap(i); menu.classList.remove("open"); };
       menu.appendChild(o); });
     menu.addEventListener("click", (e)=>e.stopPropagation());
     document.addEventListener("click", ()=>menu.classList.remove("open"));

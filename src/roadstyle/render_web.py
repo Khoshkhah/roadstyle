@@ -2764,7 +2764,9 @@ def _page_basemaps(basemap, basemaps, api_key, basemap_switcher):
     bms_list = [active_bm] + [get_basemap(k, api_key=api_key) for k in bkeys if k != active_bm.key and k != active]
     # maxzoom + attr: switching rebuilds the raster source, whose maxzoom is fixed at creation
     bms = [{"key": b.key, "label": b.label, "tiles": _tiles(b), "bg": _bg_color(b),
-            "maxzoom": b.maxzoom, "attr": b.attr, **({"style_url": b.style_url} if getattr(b, "style_url", None) else {})}
+            "maxzoom": b.maxzoom, "attr": b.attr, **({"style_url": b.style_url} if getattr(b, "style_url", None) else {}),
+            "group": getattr(b, "group", ""), "title": getattr(b, "title", "") or b.label,
+            "order": DEFAULT_SWITCHER.index(b.key) if b.key in DEFAULT_SWITCHER else 99}
            for b in bms_list]
     if not basemap_switcher and not basemaps:
         # no dropdown and no explicit set -> bake only the fixed backdrop. An explicit

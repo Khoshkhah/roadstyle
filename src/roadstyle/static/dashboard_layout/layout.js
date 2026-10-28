@@ -70,6 +70,31 @@
         new MutationObserver(l=>l.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType === 1) take(n); }))).observe(col, {childList:true});   // a control that the page adds later
         col.classList.add("rs-emptied");
       }
+      // The base-map box: two columns of 96x64 thumbnails (a swatch of the map's colour when there is no picture) with the name under each,
+      // grouped under small headings; arrows move, Enter chooses. window.rsBasemapThumbs is the folder of the pictures, one PNG per key.
+      const menu = document.querySelector(".bm-menu"), bms = window.RS_BASEMAPS || [];
+      if(menu && bms.length){
+        menu.classList.add("rs-bm-grid"); const on0 = menu.querySelector(".on"); menu.innerHTML = "";
+        let group = null, cur = -1;
+        bms.map((b, i)=>[b, i]).sort((x, y)=>(x[0].order ?? 99) - (y[0].order ?? 99) || x[1] - y[1]).forEach(([b, i])=>{       // the box lists the maps in the default order; the index is the page's own
+          if(b.group && b.group !== group){ group = b.group; const h = document.createElement("div"); h.className = "rs-bm-h"; h.textContent = group; menu.appendChild(h); }
+          const it = document.createElement("div"); it.className = "rs-bm-item"; it.dataset.i = i;
+          const th = document.createElement("div"); th.className = "rs-bm-th"; th.style.background = b.bg;
+          if(window.rsBasemapThumbs){ const im = document.createElement("img"); im.alt = ""; im.src = window.rsBasemapThumbs + b.key + ".png"; im.onerror = ()=>im.remove(); th.appendChild(im); }
+          const n = document.createElement("div"); n.className = "rs-bm-n"; n.textContent = b.title || b.label;
+          it.append(th, n); it.onclick = ()=>{ window.rsSetBasemap(i); menu.classList.remove("open"); }; menu.appendChild(it);
+        });
+        const items = ()=>[...menu.querySelectorAll(".rs-bm-item")];
+        const mark = ()=>items().forEach((e, k)=>e.classList.toggle("rs-bm-cur", k === cur));
+        const act = on0 && on0.dataset && on0.dataset.i ? +on0.dataset.i : 0; items().forEach(e=>e.classList.toggle("on", +e.dataset.i === act));
+        document.addEventListener("keydown", e=>{
+          if(!menu.classList.contains("open")) return;
+          if(e.key === "Escape"){ menu.classList.remove("open"); return; }
+          const n = items().length, step = {ArrowRight:1, ArrowLeft:-1, ArrowDown:2, ArrowUp:-2}[e.key];
+          if(step){ e.preventDefault(); cur = Math.max(0, Math.min(n - 1, (cur < 0 ? items().findIndex(x=>x.classList.contains("on")) : cur) + step)); mark(); items()[cur].scrollIntoView({block:"nearest"}); }
+          else if(e.key === "Enter" && cur >= 0){ e.preventDefault(); items()[cur].click(); cur = -1; mark(); }
+        }, true);
+      }
       filled = true; reveal();
       tb.querySelectorAll("button").forEach(b=>{ if(!b.title) b.title = b.getAttribute("aria-label") || b.textContent.trim() || "Control"; });
       // A panel on the toolbar's side never covers the bar: when the panel is open, the bar slides to 8 px beside it (150 ms); when the panel

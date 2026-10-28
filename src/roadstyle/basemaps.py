@@ -125,6 +125,9 @@ class Basemap:
     maxzoom: int = 19
     #: a MapLibre vector style (a keyless one such as OpenFreeMap's): the page merges its sources and layers under the roads
     style_url: str | None = None
+    #: the group and the name of the entry in the dashboard's base-map box (the toolbar option): "CARTO", "CARTO Voyager"
+    group: str = ""
+    title: str = ""
 
 
 # NOTE: every basemaps.cartocdn.com entry below (voyager, voyager_nolabels, positron,
@@ -199,8 +202,17 @@ for _key, _label, _bg, _prev in (("ofm_liberty", "OpenFreeMap Liberty", "linear-
     BASEMAPS[_key] = Basemap(_key, _label, "", _OFM_ATTR, bg=_bg, preview=_prev, maxzoom=20,
                              style_url="https://tiles.openfreemap.org/styles/" + _key.split("_")[1])
 
-# default set offered by the switcher when the caller doesn't specify one
-DEFAULT_SWITCHER = ["esri_gray", "positron", "osm", "satellite", "voyager", "dark_matter", "blank", "ofm_liberty", "ofm_bright", "ofm_positron"]
+# The default list of the switcher, in this order, with the group and the name of each entry in the base-map box. No entry twice.
+_MENU = [("ofm_liberty", "OpenFreeMap", "OpenFreeMap Liberty"), ("ofm_bright", "OpenFreeMap", "OpenFreeMap Bright"),
+         ("ofm_positron", "OpenFreeMap", "OpenFreeMap Positron"), ("osm", "OpenStreetMap", "OpenStreetMap"),
+         ("voyager", "CARTO", "CARTO Voyager"), ("voyager_nolabels", "CARTO", "CARTO Voyager (no labels)"),
+         ("positron", "CARTO", "CARTO Positron"), ("dark_matter", "CARTO", "CARTO Dark Matter"),
+         ("esri_gray", "Esri", "Esri Light Gray"), ("esri_street", "Esri", "Esri Streets"),
+         ("esri_dark_gray", "Esri", "Esri Dark Gray"), ("satellite", "Esri", "Esri Satellite"),
+         ("blank", "Blank", "Blank"), ("blank_dark", "Blank", "Blank dark")]
+for _k, _g, _t in _MENU:
+    BASEMAPS[_k] = dataclasses.replace(BASEMAPS[_k], group=_g, title=_t)
+DEFAULT_SWITCHER = [k for k, _, _ in _MENU]
 
 
 def register_basemap(bm: Basemap) -> None:
