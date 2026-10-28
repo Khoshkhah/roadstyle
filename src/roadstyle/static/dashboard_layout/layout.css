@@ -60,8 +60,15 @@ html.rs-has-toolbar .maplibregl-ctrl-bottom-right{display:none!important}
 .rs-bm-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:4px 0;width:100%}
 .rs-bm-row input:disabled+.rs-bm-n{opacity:.45}
 /* every pop-up of the bar takes the bar's own look: one rule set (the bar, the base-map box, the attribution box, and a page's own box such as a legend) */
-#rs-toolbar,#rs-toolbar .bm-menu.rs-bm-box,#rs-attr-box,.rs-pop{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-toolbar,#rs-toolbar .bm-menu.rs-bm-box,#rs-attr-box,#rs-scalebox,.rs-pop{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 #rs-attr-box a{color:inherit}
 /* the chevrons of the panels (show and hide) take the bar's look too */
 #rs-show-right button,#sb-show,#sb-hide,html.rs-overlay .rs-side-min{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important;box-shadow:none!important}
 html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;box-sizing:border-box;padding:0!important;font-size:16px;cursor:pointer}
+/* the scale box */
+#rs-scalebox{position:fixed;left:8px;bottom:8px;height:28px;width:176px;box-sizing:border-box;z-index:7;display:flex;align-items:center;padding:0 8px;gap:8px;
+  user-select:none;-webkit-user-select:none;pointer-events:none;font:11px/1 system-ui,sans-serif}
+#rs-scalebox .maplibregl-ctrl-scale{flex:none;width:100px;margin:0!important;background:none!important;color:var(--rs-tb-ink)!important;border-color:var(--rs-tb-ink)!important;padding:0 2px;text-align:left}
+#rs-scalebox .maplibregl-ctrl-scale[style]{max-width:100px}
+#rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:56px;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 monospace;text-align:right;border-radius:0}
+html.rs-overlay #sb{bottom:48px}

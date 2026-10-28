@@ -16,6 +16,14 @@
       window.rsWindowRecentre = false;        // a window never moves the map
       // the map's box never changes: a panel is an overlay, so only the window's own resize resizes the map
       new ResizeObserver(()=>map.resize()).observe(map.getContainer());
+      // the scale bar and the zoom level: one small box in the bottom left corner, 28 px high, of a fixed width (the scale bar's longest state and a 56 px
+      // slot for "z 15.7"), so that it never jumps on a zoom; its text cannot be selected and it ignores the pointer
+      const scale = document.querySelector(".maplibregl-ctrl-scale"), zoom = document.querySelector(".rs-zoom");
+      if(scale || zoom){
+        const box = document.createElement("div"); box.id = "rs-scalebox"; document.body.appendChild(box);
+        if(scale) box.appendChild(scale);
+        if(zoom){ zoom.classList.add("rs-zoom-slot"); box.appendChild(zoom); }
+      }
       // a floating window stays inside the map at every drag move
       const mapRect = ()=>map.getContainer().getBoundingClientRect();
       const fit = w=>{ if(!w || w.hidden) return; const m = mapRect(), gap = 8;
