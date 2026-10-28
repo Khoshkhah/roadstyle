@@ -226,8 +226,10 @@ export function initGoogle3D(){
     // the geometry helpers
     // The altitude mode follows the view. Over the imagery (SATELLITE, HYBRID) a line lies on Google's mesh (RELATIVE_TO_MESH, 0.5 m). Google's drawn map
     // (ROADMAP) does not show that mesh: its streets lie flat on the terrain, so there a line is clamped to the ground. Every kind uses this rule.
-    const MESH=()=>drawnMode() ? ((lib.AltitudeMode||{}).CLAMP_TO_GROUND||"CLAMP_TO_GROUND") : ((lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH");
-    const pts=r=>r.map(c=>({lat:c[1], lng:c[0], altitude:0.5}));
+    // ?g3dalt=relative (or window.rsG3dDrawnAltitude="RELATIVE_TO_GROUND") draws the drawn map's lines 1 m above the ground instead: a test, in case Google draws a clamped line thin.
+    const drawnAlt=()=>/[?&]g3dalt=relative/.test(location.search) ? "RELATIVE_TO_GROUND" : (window.rsG3dDrawnAltitude||"CLAMP_TO_GROUND");
+    const MESH=()=>drawnMode() ? ((lib.AltitudeMode||{})[drawnAlt()]||drawnAlt()) : ((lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH");
+    const pts=r=>r.map(c=>({lat:c[1], lng:c[0], altitude:drawnMode() && drawnAlt()==='RELATIVE_TO_GROUND' ? 1 : 0.5}));
     // every original vertex is kept (a smooth arc stays an arc), and a segment longer than 5 m gets points in between
     const densify=cs=>{ const out=[cs[0]], k=Math.cos(cs[0][1]*Math.PI/180);
       for(let i=1; i<cs.length; i++){ const [x0, y0]=cs[i-1], [x1, y1]=cs[i], m=Math.hypot((x1-x0)*111320*k, (y1-y0)*111320), n=Math.ceil(m/5);
