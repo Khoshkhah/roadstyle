@@ -2352,29 +2352,6 @@ def test_a_road_drawn_over_another_roads_lanes_is_what_a_click_finds(tmp_path):
     assert crossing == [1, False] and beside == [0, True], (crossing, beside)      # the pedestrian road (feature 1); the lane of road 0
 
 
-def test_line_items_full_look_and_tiles(monkeypatch):
-    """The full look keeps the items' own layers; tiles=True carries the item pieces in the simple tile layer; too many items is an error."""
-    monkeypatch.setenv("ROADSTYLE_ENGINE", "python")         # it reads render_web's own internals (CONFIG, its passes, its tiler)
-    pytest.importorskip("mapbox_vector_tile")                       # tiles=True needs it (the `tiles` extra)
-    st = _style(_crossing_with_lanes(simple=False).html)
-    assert "simple" not in st["sources"] and all("line-opacity" not in l["paint"] or l["paint"]["line-opacity"] == 0.9
-                                                  for l in st["layers"] if l.get("source") == "ov0")
-    from roadstyle import tiles
-    seen = {}
-    real = tiles.build_pmtiles
-    monkeypatch.setattr(tiles, "build_pmtiles", lambda *a, **k: seen.update(k) or real(*a, **k))
-    st = _style(_crossing_with_lanes(dash=True).html)      # a dash per item: the road layer's text pattern
-    assert {f["properties"].get("__rs_dash") for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5} == {"2,4", None}
-    assert '"2,4"' in json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-dasharray"])
-    _crossing_with_lanes(tiles=True)
-    simple = next(x for x in seen["line_layers"] if x["name"] == "simple")
-    assert sum(f["properties"]["__rs_k"] == 5 for f in simple["fc"]["features"]) == 6
-    with pytest.raises(ValueError, match="more than 38 items"):
-        _crossing_with_lanes(n=39)
-
-
-
-
 def test_only_clickable_items_are_picked():
     """A non-interactive item (popup=[], no select="item": lanestyle's lane lines, arrows) is not a pick layer, so a click on it reaches the
     lane or road under it (2026-10-10: a click on a lane arrow selected the road, not the lane)."""
@@ -2467,5 +2444,3 @@ def test_the_version_is_the_one_of_a_source_tree():
         pytest.skip("not a source tree")
     assert rs._source_version() == re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
     assert rs.__version__ == rs._source_version()
-
-

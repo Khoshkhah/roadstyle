@@ -302,15 +302,16 @@ impl Source {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mark::Mark;
     use serde_json::json;
 
     #[test]
     fn the_text_of_a_source_is_the_text_of_its_json_tree() {
-        let props: Props = [("highway", json!("primary")), ("lvl", json!(0)), ("__rs_s", json!(1.5)), ("name", json!("A \"B\""))]
+        let props: Props = [("highway", json!("primary")), ("lvl", json!(0)), (Mark::Sort.name(), json!(1.5)), ("name", json!("A \"B\""))]
             .into_iter().collect();
         let mut p2 = props.clone();
         assert_eq!(p2.insert("lvl", json!(2)), Some(json!(0)), "an insert of a key that is there keeps its place");
-        assert_eq!(p2.iter().map(|(k, _)| k).collect::<Vec<_>>(), ["highway", "lvl", "__rs_s", "name"]);
+        assert_eq!(p2.iter().map(|(k, _)| k).collect::<Vec<_>>(), ["highway", "lvl", Mark::Sort.name(), "name"]);
         assert_eq!(p2.shift_remove("lvl"), Some(json!(2)));
         assert!(!p2.contains_key("lvl") && p2.get("never seen").is_none());
         for id_first in [true, false] {

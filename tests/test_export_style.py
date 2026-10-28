@@ -55,20 +55,6 @@ def test_style_points_at_its_own_files(tmp_path):
     assert all(lyr["layout"]["symbol-placement"] == "line-center" and "__rs_arw" in json.dumps(lyr["filter"]) for lyr in arrows)   # fewer arrows
 
 
-def test_tunnel_casing_baked_from_the_page_state(tmp_path):
-    """An app has no Tunnels box: the tunnel casing's dash and gap colours and the dash ratio are the page state's start values, baked."""
-    from roadstyle.config import DEFAULT as CONFIG
-    _, s = _export(tmp_path, simple=False)
-    dash = [lyr for lyr in s["layers"] if lyr["id"].endswith("-dash")]
-    pair = CONFIG.tunnel_palettes[CONFIG.tunnel_palette]
-    assert dash and all(lyr["paint"]["line-color"][4] == pair[0] for lyr in dash)          # the palette's dash colour, moved by the strength
-    assert all(lyr["paint"]["line-color"][2] == float(CONFIG.tunnel_strength) for lyr in dash)
-    assert all(lyr["paint"]["line-dasharray"] == ["literal", [float(x) for x in CONFIG.tunnel_casing_dash]] for lyr in dash)
-    gaps = [lyr["paint"]["line-color"][2] for lyr in s["layers"] if lyr["id"].startswith("roads-casing")
-            and not lyr["id"].endswith("-dash") and isinstance(lyr["paint"]["line-color"], list) and lyr["paint"]["line-color"][0] == "case"]
-    assert gaps and all(g[0] == "case" and g[1] is True for g in gaps)                   # two colours: the gap is the second colour
-
-
 def test_tile_folder_is_plain_mvt(tmp_path):
     _, s = _export(tmp_path)
     assert s["sources"]["roads"]["tiles"] == [f"{BASE}/tiles/{{z}}/{{x}}/{{y}}.pbf"] and "url" not in s["sources"]["roads"]

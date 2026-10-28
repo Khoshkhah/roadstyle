@@ -185,22 +185,23 @@ fn ev(e: &Value, p: &Map<String, Value>) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use roadstyle_model::mark::Mark;
     use serde_json::json;
 
     #[test]
     fn the_first_zoom_of_a_class_and_of_a_casing() {
         let layers = [json!({"source": "simple", "filter": ["all", ["all",
             [">=", ["zoom"], ["match", ["coalesce", ["get", "highway"], ""], "residential", 13.0, "service", 15.0, 0.0]],
-            ["any", ["!", ["to-boolean", ["get", "__rs_seam"]]], [">=", ["zoom"], 17]],
-            [">=", ["zoom"], ["case", ["all", ["==", ["get", "__rs_k"], 0], ["!", ["to-boolean", ["get", "__rs_bridge"]]]],
-                              ["at", ["get", "__rs_ci"], ["literal", [3, 12, 9]]], 0]]]]})];
+            ["any", ["!", ["to-boolean", ["get", Mark::Seam.name()]]], [">=", ["zoom"], 17]],
+            [">=", ["zoom"], ["case", ["all", ["==", ["get", Mark::PieceKind.name()], 0], ["!", ["to-boolean", ["get", Mark::Bridge.name()]]]],
+                              ["at", ["get", Mark::ClassIndex.name()], ["literal", [3, 12, 9]]], 0]]]]})];
         let r = ZoomRules::of(&layers, "simple");
         let z = |p: Value| r.span(p.as_object().unwrap()).0;
-        assert_eq!(z(json!({"highway": "residential", "__rs_k": 1, "__rs_ci": 1})), 13.0);
-        assert_eq!(z(json!({"highway": "primary", "__rs_k": 0, "__rs_ci": 1})), 12.0);       // the casing: from 12
-        assert_eq!(z(json!({"highway": "primary", "__rs_k": 0, "__rs_ci": 1, "__rs_bridge": true})), 0.0);
-        assert_eq!(z(json!({"highway": "service", "__rs_k": 0, "__rs_ci": 2})), 15.0);
-        assert_eq!(r.span(json!({"highway": "primary", "__rs_k": 1}).as_object().unwrap()), (0.0, f64::INFINITY));
+        assert_eq!(z(json!({"highway": "residential", (Mark::PieceKind.name()): 1, (Mark::ClassIndex.name()): 1})), 13.0);
+        assert_eq!(z(json!({"highway": "primary", (Mark::PieceKind.name()): 0, (Mark::ClassIndex.name()): 1})), 12.0);       // the casing: from 12
+        assert_eq!(z(json!({"highway": "primary", (Mark::PieceKind.name()): 0, (Mark::ClassIndex.name()): 1, (Mark::Bridge.name()): true})), 0.0);
+        assert_eq!(z(json!({"highway": "service", (Mark::PieceKind.name()): 0, (Mark::ClassIndex.name()): 2})), 15.0);
+        assert_eq!(r.span(json!({"highway": "primary", (Mark::PieceKind.name()): 1}).as_object().unwrap()), (0.0, f64::INFINITY));
         // a second layer on the source with no clause draws every feature from zoom 0
         let more = [layers[0].clone(), json!({"source": "simple", "filter": ["has", "x"]})];
         assert!(ZoomRules::of(&more, "simple").is_empty());
@@ -211,15 +212,15 @@ mod tests {
     fn the_zooms_of_a_seam() {
         // the casing's seam (_simple_pieces): an end without lap from zoom 17, an end with lap below 17
         let layers = [json!({"source-layer": "simple", "filter": ["all", [">=", ["zoom"], ["match", ["get", "highway"], "residential", 13, 0]],
-            ["any", ["!", ["to-boolean", ["get", "__rs_seam"]]],
-                    ["all", ["!", ["to-boolean", ["get", "__rs_lap"]]], [">=", ["zoom"], 17]],
-                    ["all", ["to-boolean", ["get", "__rs_lap"]], ["<", ["zoom"], 17]]]]})];
+            ["any", ["!", ["to-boolean", ["get", Mark::Seam.name()]]],
+                    ["all", ["!", ["to-boolean", ["get", Mark::Lap.name()]]], [">=", ["zoom"], 17]],
+                    ["all", ["to-boolean", ["get", Mark::Lap.name()]], ["<", ["zoom"], 17]]]]})];
         let r = ZoomRules::of(&layers, "simple");
         let s = |p: Value| r.span(p.as_object().unwrap());
         assert_eq!(s(json!({"highway": "residential"})), (13.0, f64::INFINITY));
-        assert_eq!(s(json!({"highway": "residential", "__rs_seam": true})), (17.0, f64::INFINITY));
-        assert_eq!(s(json!({"highway": "primary", "__rs_seam": true, "__rs_lap": true})), (0.0, 17.0));
-        assert_eq!(s(json!({"highway": "residential", "__rs_seam": true, "__rs_lap": true})), (13.0, 17.0));
+        assert_eq!(s(json!({"highway": "residential", (Mark::Seam.name()): true})), (17.0, f64::INFINITY));
+        assert_eq!(s(json!({"highway": "primary", (Mark::Seam.name()): true, (Mark::Lap.name()): true})), (0.0, 17.0));
+        assert_eq!(s(json!({"highway": "residential", (Mark::Seam.name()): true, (Mark::Lap.name()): true})), (13.0, 17.0));
         // a clause of an operator that the rules do not know keeps the feature at every zoom
         let other = [json!({"source": "s", "filter": ["any", ["in", ["get", "a"], ["literal", [1]]], [">=", ["zoom"], 17]]})];
         assert_eq!(ZoomRules::of(&other, "s").span(json!({"a": 2}).as_object().unwrap()), (0.0, f64::INFINITY));

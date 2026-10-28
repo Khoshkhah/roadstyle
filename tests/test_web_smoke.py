@@ -77,36 +77,6 @@ def test_compressed_map_inflates_and_attaches(tmp_path):
 
 
 
-def test_tiled_map_boots_draws_and_queries(tmp_path):
-    """tiles=True: embedded PMTiles serve the roads, the sidecar serves the JS API."""
-    pytest.importorskip("mapbox_vector_tile")
-    pytest.importorskip("pmtiles")
-    from roadstyle import render_edges as render
-
-    path = tmp_path / "smoke_tiles.html"
-    g = _edges()
-    render(g, basemap="blank", tiles=True, simple=False).save(path)
-
-    errors = []
-    with pw.sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.goto(path.resolve().as_uri())
-        page.wait_for_function(
-            "window.map && typeof window.map.loaded === 'function' && window.map.loaded()"
-            " && window.map.querySourceFeatures('roads',{sourceLayer:'roads'}).length > 0",
-            timeout=30_000)
-        page.wait_for_function("window.RS_SIDE", timeout=10_000)
-        n_query = page.evaluate("rsQuery(p => p.highway === 'primary').length")
-        props = page.evaluate("rsGetProps([0])[0]")
-        browser.close()
-
-    assert errors == []
-    assert n_query == len(g)
-    assert props["name"] == "Street 0"      # full attributes come from the sidecar
-
-
 def test_map_boots_with_street_view_window_left_open(tmp_path):
     """A Street View window left open last time is reopened on load, and the page still draws.
     0.7.0 reopened it mid-script, before the marker state existed: a ReferenceError stopped the

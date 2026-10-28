@@ -440,6 +440,7 @@ impl Tiles {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use roadstyle_model::mark::Mark;
     use serde_json::json;
 
     fn keys(k: &[&str]) -> HashSet<String> {
@@ -475,7 +476,7 @@ mod tests {
     /// The text of the tile z/x/y of a "simple" layer with these pieces: (edge, kind, seam, coordinates); the tile is empty when no piece stays.
     fn pieces(z: u32, x: u32, y: u32, fs: &[(i64, i64, bool, [[f64; 2]; 2])]) -> String {
         let mut t = Tiles::new(0, 3, 80.0).unwrap();
-        let features: Vec<Value> = fs.iter().map(|(e, k, seam, c)| json!({"type": "Feature", "properties": {"__rs_edge": e, "__rs_k": k, "__rs_seam": seam},
+        let features: Vec<Value> = fs.iter().map(|(e, k, seam, c)| json!({"type": "Feature", "properties": {(Mark::Edge.name()): e, (Mark::PieceKind.name()): k, (Mark::Seam.name()): seam},
             "geometry": {"type": "LineString", "coordinates": c}})).collect();
         t.add("simple", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": features}}), &keys(&[]), false, 0);
         String::from_utf8_lossy(&t.tile(z, x, y)).into_owned()
@@ -503,10 +504,10 @@ mod tests {
     #[test]
     fn a_casing_end_piece_under_1_px_is_left_out_and_a_short_fill_stays() {
         let t = pieces(0, 0, 0, &[(1, 0, false, LONG), (1, 0, true, SHORT)]);
-        assert!(!t.is_empty() && !t.contains("__rs_seam"), "the short seam goes, the casing body stays");
+        assert!(!t.is_empty() && !t.contains(Mark::Seam.name()), "the short seam goes, the casing body stays");
         let t = pieces(0, 0, 0, &[(1, 0, false, LONG), (1, 1, false, SHORT)]);
-        assert!(t.contains("__rs_k"), "a short fill of a long road stays");
-        assert!(pieces(0, 0, 0, &[(1, 0, true, LONG)]).contains("__rs_seam"), "a long seam stays");
+        assert!(t.contains(Mark::PieceKind.name()), "a short fill of a long road stays");
+        assert!(pieces(0, 0, 0, &[(1, 0, true, LONG)]).contains(Mark::Seam.name()), "a long seam stays");
     }
 
     #[test]
