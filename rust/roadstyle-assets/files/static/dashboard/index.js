@@ -34,7 +34,7 @@ import {initTunnel} from "./tunnel.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
 import {initSelect, useSelect} from "./select.js";
-import {makeApi, fromUrl} from "./api.js";
+import {makeApi, fromUrl, refreshState} from "./api.js";
 import {setData, clearData} from "./live.js";
 // an option left out: render's default. The theme's values (select_color, arrow_icon, arrow_color, arrow_rules) have none:
 // they come from the look (roadstyle's profile and palette).
@@ -64,10 +64,12 @@ const RS_DEFAULTS = {
 // engine, when the map has data colours), and the other controls of a style made with state "live" (roadstyle:controls, the interaction
 // contract of docs/design/rust_library.md: the filter panel, the overlays, the tunnel look, the road fill, the arrows' rules, ...).
 // The overlays' sources and layers there have no prefix: the page's prefix goes on them.
+let _fromCtl = [];            // the options that the last style's controls gave
 function fromStyle(o, given){
   const meta = (o.style && o.style.metadata) || {}, it = meta["roadstyle:interaction"] || {};
   const ctl = meta["roadstyle:controls"] || {}, P = o.prefix || "";
-  if(!given.has("overlays")) o.overlays = [];          // the layers of the style of the moment: a later style without them takes the old ones away
+  for(const k of _fromCtl) if(!given.has(k)) o[k] = RS_DEFAULTS[k];      // a later style without a control takes the old style's value away (the filter, the overlays, the tunnels, ...)
+  _fromCtl = Object.keys(ctl);
   for(const k in ctl) if(!given.has(k)) o[k] = ctl[k];
   if(!given.has("overlays") && ctl.overlays && P)
     o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit, extrude: ov.extrude && P+ov.extrude,
@@ -133,7 +135,7 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); useColor(); useLegend(); useColorBox();
+      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); initFilterBox(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); refreshState();
     },
     // the phone's bottom sheet: rs.sheet() is its height (0 closed, 1 40 %, 2 full; null: no sheet), rs.sheet(n) sets it; rs.freeArea() is the part of
     // the map that the bar, the panel and the sheet leave free, in window coordinates ({lo, hi, top, bottom}): a host pads its map with it

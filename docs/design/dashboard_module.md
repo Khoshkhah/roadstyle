@@ -59,6 +59,14 @@ rs.setStyle(style, {road_table});
   Colour by menu and the legend are made again in their place. The selection, the hover and the fetched properties go, because
   they are the old roads'. A switch that is off (a class, Bridges, Tunnels) applies to the new roads too.
 - **`style: null`.** The dashboard starts with no roads: nothing to pick until `setStyle`.
+- **Every control that a style gives follows `rs.setStyle`.** The options that the old style's `roadstyle:controls` gave go (they take the default
+  again), and the new style's come. `setStyle` then runs, for the new style: the base-map layers (`useOverlays`, `useFeatures`), the pick layers and the
+  id fields (`useSelect`, `useSpot`), the Roads box with its class, Bridges, Tunnels and access rows, and the globals `RS_CLASSES`, `RS_MODES`, `RS_KINDS`,
+  `RS_ACCESS` (`useFilter`, `initFilterBox`), the Tunnels box (`initTunnel`; the look that the person chose stays), the arrows' icon and rules
+  (`initArrows`), the boundary's shade and limits (`initBoundary`; a GeoJSON boundary source, not a tile layer), the colour menu, the legend and the tool
+  (`useColor`, `useLegend`, `useColorBox`), and the parts of `rs.getState()` (`refreshState`). A switch that the person turned off (a class, Bridges,
+  Tunnels, an overlay) stays off, and a box that has no rows for the new style goes. A new control module that reads the style at the start must do the same,
+  and `tests/test_host_page_gaps_browser.py` (the style of the engine, through the Python binding) must show it.
 - **The style's base-map layers (`ov<i>`).** They come with each style, so `setStyle` reads them again (`useOverlays`, `useFeatures`): the hover
   handlers are made once for each layer id of the map (they find the overlay of the layer at each move), the Layers box and its rows are made
   again (and taken away when the new style has no overlay), the 3D switch and the tool `buildings` follow the layers with an `extrude`

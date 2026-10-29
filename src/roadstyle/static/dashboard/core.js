@@ -38,8 +38,12 @@ export function _contractError(st){
 export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...
 export let OVERLAYS = [];
+// true from the map's first `load` event: a style that comes later (rs.setStyle) is added to a loaded map, and no `load` comes again for it
+// (isStyleLoaded is false while the new sources load)
+export let RS_LOADED = false;
 export function initCore(m, opts){
   map = m; O = opts; RS_PREFIX = opts.prefix;
+  RS_LOADED = map.loaded() && map.isStyleLoaded(); if(!RS_LOADED) map.once("load", ()=>{ RS_LOADED = true; });
   RS_TILED = opts.tiles;
   useStyle(opts.style);
   map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; if(_SRC.decks && e.sourceId===RS_PREFIX+_SRC.decks.source) _decks=null; });

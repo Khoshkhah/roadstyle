@@ -31,8 +31,12 @@ export function rsSetTunnelStyle(o){
 }
 let _TN_STEPS = [];       // one slider for every colour (the profile's tunnels.steps)
 const _tnStep = v => _TN_STEPS.reduce((b, [x], i)=> Math.abs(x - v) < Math.abs(_TN_STEPS[b][0] - v) ? i : b, 0);   // the nearest step
+let _tnBox = null;
+// the tunnel look of the style of the moment: at the start, and again for a new style (rs.setStyle). The look that the person chose stays
 export function initTunnel(){
+  const old = _tunOn && TUNNEL;
   TUNNEL = O.tunnel; _tunOn = Object.keys(TUNNEL.layers).length > 0;
+  if(_tnBox){ _tnBox.remove(); _tnBox = null; }
   window.rsSetTunnelStyle = rsSetTunnelStyle;
   window.RS_TUNNEL_PALETTES = TUNNEL.palettes;
   window.RS_TUNNEL_TOWARDS = TUNNEL.towards;
@@ -59,5 +63,7 @@ export function initTunnel(){
     r3.appendChild(sel("tn-ratio", TUNNEL.ratios.map(r=>[r.join(":"), r.join(":")]), TUNNEL.ratio.join(":"),
                        v=>rsSetTunnelStyle({ratio:v.split(":")})));
     _tlHost().appendChild(w);
+    _tnBox = w;
   }
+  if(old && _tunOn) rsSetTunnelStyle({strength: old.strength, palette: old.palette, ratio: old.ratio, toward: old.toward});
 }

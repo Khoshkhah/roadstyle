@@ -26,6 +26,7 @@ HOST = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name=
 <script src="FILES/vendor/maplibre-gl.js"></script>
 <script>
 const OPTS = __OPTS__;
+if (location.search.includes("boundary")) { OPTS.dashboard.boundary.dim = true; OPTS.dashboard.boundary.limit = true; }
 const d = OPTS.dashboard, c = document.documentElement.classList;
 c.add("rs-tpl-dashboard", "rs-overlay", "rs-has-toolbar", "rs-tb-" + d.toolbar.position, "rs-panel-left", "rs-hide-scale");
 document.documentElement.style.setProperty("--rs-panel-w", d.panel.width_px + "px");
@@ -38,7 +39,7 @@ if (matchMedia("(max-width:" + d.phone.max_width_px + "px)").matches) c.add("rs-
 import {rsDashboard} from "FILES/static/dashboard/index.js";
 window.errors = [];
 const baseLayers = [{id: "bg", type: "background", paint: {"background-color": "#efede8"}}, {id: "basemap", type: "raster", source: "bm", layout: {visibility: "none"}}];
-window.map = new maplibregl.Map({container: "map", center: [18.005, 59.305], zoom: 12, style: {version: 8, sprite: "http://rs.test/own", sources: {bm: {type: "raster", tiles: ["http://rs.test/t/{z}/{x}/{y}.png"], tileSize: 256}}, layers: baseLayers}});
+window.map = new maplibregl.Map({container: "map", center: [18.005, 59.305], zoom: 12, style: {version: 8, sprite: "http://rs.test/own", glyphs: "http://rs.test/fonts/{fontstack}/{range}.pbf", sources: {bm: {type: "raster", tiles: ["http://rs.test/t/{z}/{x}/{y}.png"], tileSize: 256}}, layers: baseLayers}});
 map.on("error", e => window.errors.push(String(e.error && e.error.message || e)));
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 window.rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, basemaps: OPTS.basemaps, ontop: OPTS.ontop, basemap_switcher: true, dashboard: OPTS.dashboard});
@@ -79,7 +80,7 @@ def host():
 
     class Files(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
-            if self.path == "/page.html":
+            if self.path.split("?")[0] == "/page.html":
                 body = page.encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html")
@@ -185,3 +186,98 @@ def test_boxes_stay_inside_a_phone_and_the_sheet_and_the_free_part_of_the_map_ar
     assert [heights[n]["sheet"] for n in (0, 1, 2)] == [0, 1, 2], heights
     assert heights[0]["bottom"] > heights[1]["bottom"] > heights[2]["bottom"], heights
     assert heights[1]["bottom"] < 844 * 0.7 and heights[0]["bottom"] > 844 - 60 and heights[1]["top"] > 40, heights
+
+
+def _engine_style():
+    """The tiled style that a host's map worker makes (roadstyle-wasm's styleSources and tilesOfSources; here the same engine through the Python binding): Monaco's roads
+    and base-map rows, a live look with the colour options, the tunnel control and the arrows. Its tiles are served by the test."""
+    import pyarrow.parquet as pq
+
+    from roadstyle import _engine
+    if not _engine.available():
+        pytest.skip("no roadstyle._rust")
+    data = ROOT / "rust" / "roadstyle-rs" / "tests" / "data"
+    rust = _engine.rust()
+    look = rust.Look.from_json((data / "look.json").read_text())
+    for key, value in {"state": '"live"', "color_options": '{"Road class": {}}', "tunnel_control": "true", "arrows": "true"}.items():
+        look = look.with_arg(key, value)
+    sources = rust.style_sources(pq.read_table(data / "monaco" / "roads.parquet"), look, pq.read_table(data / "monaco" / "features.parquet"), None, "monaco")
+    style, tiler = sources.tile_stage(None, None, [], json.dumps({"tiles": ["http://rs.test/t/{z}/{x}/{y}"]}))
+    return json.loads(style), tiler
+
+
+# what the page finds with a style of the engine: each box, tool and global that follows the style (rs.setStyle), and goes with a style that has none
+_TOOLS = """() => ({
+  roads: [...document.querySelectorAll('.flt-ctrl label')].map(l => l.textContent.trim()),
+  roadsOff: [...document.querySelectorAll('.flt-ctrl input')].filter(i => !i.checked).length,
+  layers: [...document.querySelectorAll('.ov-ctrl label')].map(l => l.textContent.trim()),
+  tunnel: !!document.querySelector('.tn-ctrl #tn-pre'),
+  legend: !rs.tools.list().find(t => t.id === 'legend').disabled,
+  classes: window.RS_CLASSES.length, arrowImage: map.hasImage('oneway'), colourOptions: window.RS_COLOR_OPTIONS.length,
+})"""
+
+
+def test_every_control_that_a_style_gives_follows_a_later_style_of_the_engine(host):
+    base, vec = host
+    style, tiler = _engine_style()
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+
+        def serve(route):
+            url = route.request.url
+            if "/t/" in url:
+                z, x, y = (int(v) for v in url.rsplit("/t/", 1)[1].split("?")[0].split("/"))
+                route.fulfill(content_type="application/x-protobuf", body=bytes(tiler.tile(z, x, y)))
+            elif ".png" in url:
+                route.fulfill(content_type="image/png", body=PNG)
+            else:
+                route.fulfill(content_type="application/json", body="{}")
+        page.route("http://rs.test/**", serve)
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        start = page.evaluate(_TOOLS)
+        assert not start["roads"] and not start["layers"] and not start["tunnel"] and not start["legend"] and not start["arrowImage"], start
+        page.evaluate("(s) => addStyle(s)", style)
+        page.wait_for_selector(".flt-ctrl")
+        page.wait_for_function("map.hasImage('oneway')", timeout=20_000)
+        first = page.evaluate(_TOOLS)
+        assert "primary" in first["roads"] and first["classes"] > 3, first
+        assert "buildings" in first["layers"] and first["tunnel"] and first["legend"] and first["colourOptions"] == 1, first
+        # a class that the person switched off stays off with the next style, and the box has it unchecked
+        page.evaluate("() => rsSetClasses(RS_CLASSES.filter(c => c !== 'primary'))")
+        page.evaluate("(s) => addStyle(s)", style)
+        page.wait_for_selector(".flt-ctrl")
+        again = page.evaluate(_TOOLS)
+        assert again["roadsOff"] == 1 and again["roads"] == first["roads"] and again["layers"] == first["layers"], (first, again)
+        # a style with none of the controls takes every one of them away
+        page.evaluate("(s) => addStyle(s)", _style(overlays=False))
+        gone = page.evaluate(_TOOLS)
+        assert not gone["roads"] and not gone["layers"] and not gone["tunnel"] and not gone["legend"] and gone["classes"] == 0, gone
+        browser.close()
+    assert not errors, errors
+
+
+def test_the_boundary_follows_a_later_style(host):
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html?boundary=1")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        min_zoom = page.evaluate("() => map.getMinZoom()")
+        with_boundary = _style(overlays=False)
+        with_boundary["sources"]["boundary"] = {"type": "geojson", "data": SQUARE}
+        with_boundary["layers"].append({"id": "boundary", "type": "line", "source": "boundary", "paint": {"line-color": "#333"}})
+        page.evaluate("(s) => addStyle(s)", with_boundary)
+        page.wait_for_function("!!map.getLayer('rs-boundary-dim') && map.getMinZoom() > 0")      # the shade and the limit of the style's boundary
+        page.evaluate("(s) => addStyle(s)", _style(overlays=False))
+        assert page.evaluate("() => !map.getLayer('rs-boundary-dim') && !map.getSource('rs-boundary-dim')")
+        assert page.evaluate("() => map.getMinZoom()") == min_zoom           # a style with no boundary takes the limit away
+        browser.close()
+    assert not errors, errors

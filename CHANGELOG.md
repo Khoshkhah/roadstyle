@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Every control that a style gives follows a later `rs.setStyle`.** The Roads box (classes, Bridges, Tunnels, access kinds), the Tunnels box, the arrows' icon and rules,
+  the boundary's shade and limits, the arrow and the fill-layer facts of Street View, the pick layers, the id fields and the parts of `rs.getState()` were made once, at
+  the start, so a page that starts with `style: null` had none of them. They are made again for each style now, and go with a style that has none; a switch that was off
+  stays off. The options that the old style's controls gave go back to their defaults. A host's look must be live (`state="live"`) for the style to have the controls.
 - **A JavaScript host page needs no adapters** (`rsDashboard(map, {style: null, prefix, ...})` and `rs.setStyle` after each build):
   - The style's own base-map layers (`ov<i>`) get their switch, their hover and the 3D switch with each `rs.setStyle`; the rows of the old style go, a switch that was
     off stays off.
