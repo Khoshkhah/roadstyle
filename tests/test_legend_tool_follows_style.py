@@ -42,7 +42,7 @@ def test_the_legend_tool_comes_with_a_later_style_and_goes_with_a_style_that_has
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
         page.goto(_URL)
-        page.wait_for_function("window.map && window.map.loaded() && !!window.rs", timeout=60_000)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
         steps = page.evaluate(_STEPS, style)
         browser.close()
     assert not errors, errors

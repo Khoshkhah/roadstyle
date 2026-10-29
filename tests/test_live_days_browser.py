@@ -55,7 +55,7 @@ def test_a_day_picker_gives_each_day_its_numbers_and_the_next_day_replaces_them(
             page.route(f"http://rs.test/flow-{day}.json", lambda route, request, d=day: route.fulfill(content_type="application/json", body=json.dumps(
                 [{"edge_id": str(i + 1), "flow": v} for i, v in enumerate(_ROWS[d])])))
         page.goto(_URL)
-        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded()", timeout=60_000)
         legend = """() => { rs.tools.open('legend'); const t = document.querySelector('.rs-cb-lg').textContent.replace(/\\\\s+/g, ' ').trim(); rs.tools.close('legend'); return t; }"""
         page.wait_for_function("document.querySelector('#day') && rs.legend", timeout=30_000)
         page.wait_for_timeout(800)
@@ -87,7 +87,7 @@ def test_the_picker_select_is_the_themed_list_and_ids_must_be_text(tmp_path):
         page = browser.new_page(viewport={"width": 1280, "height": 800})
         page.route(_URL, lambda route, request: route.fulfill(content_type="text/html", body=html))
         page.goto(_URL)
-        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded()", timeout=60_000)
         page.wait_for_function("window.rsReady === true", timeout=30_000)
         themed = page.evaluate("!!document.querySelector('#day').closest('.rs-sel') || !!document.querySelector('[data-rs-section=day] .rs-sel-btn')")
         text = page.evaluate("rows => rs.setData(JSON.parse(rows), {colorBy: 'flow'}).then(r => r.matched)", rows_text)
@@ -105,7 +105,7 @@ def test_a_number_goes_in_one_of_n_sets_by_natural_breaks_and_the_legend_counts_
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
         page.goto(_URL)
-        page.wait_for_function("window.map && window.map.loaded() && !!(window.rs && rs.setData)", timeout=60_000)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!(window.rs && rs.setData)", timeout=60_000)
         legend = """async (o) => { await rs.setData(ROWS, Object.assign({colorBy: "flow"}, o)); rs.tools.open('legend');
           const t = document.querySelector('.rs-cb-lg').textContent.replace(/\\s+/g, ' ').trim(); rs.tools.close('legend'); return t; }""".replace("ROWS", json.dumps(rows))
         three = page.evaluate(legend, {"classes": 3})
@@ -115,3 +115,27 @@ def test_a_number_goes_in_one_of_n_sets_by_natural_breaks_and_the_legend_counts_
         assert "(" not in page.evaluate(legend, {"classes": 0}) and errors == []
         assert page.evaluate("rs.naturalBreaks([1, 2, 3, 100, 110, 120], 2)") == [100] and page.evaluate("rs.naturalBreaks([5, 5, 5], 4)") == []
         browser.close()
+
+
+def test_the_page_gives_the_legend_box_its_own_colour_modes():
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", live_data=True).html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!(window.rs && rs.colorModes)", timeout=60_000)
+        got = page.evaluate("""() => { window.picked = []; document.addEventListener("rs:colormode", e => picked.push("event:" + e.detail.name));
+            rs.colorModes.set(["Traffic", "Counted?", "How sure?"], {onChange: (n, i) => picked.push(n + "@" + i)});
+            rs.tools.open("legend"); const box = document.querySelector("#rs-color-box"), opts = [...box.querySelectorAll(".rs-cb-opt")].map(b => b.textContent);
+            box.querySelectorAll(".rs-cb-opt")[1].click();
+            const on = [...document.querySelectorAll("#rs-color-box .rs-cb-opt.on")].map(b => b.textContent);
+            rs.colorModes.select("How sure?"); let bad = null; try { rs.colorModes.select("x"); } catch (e) { bad = String(e.message); }
+            const out = {opts, on, picked, active: rs.colorModes.active, bad, title: rs.tools.list().find(t => t.id === "legend").title};
+            rs.colorModes.clear(); out.after = rs.colorModes.active; return out; }""")
+        browser.close()
+    assert not errors, errors
+    assert got["opts"] == ["Traffic", "Counted?", "How sure?"] and got["on"] == ["Counted?"]
+    assert got["picked"] == ["event:Counted?", "Counted?@1", "event:How sure?", "How sure?@2"] and got["active"] == "How sure?" and got["after"] is None
+    assert "no mode" in got["bad"] and got["title"] == "Colour by and legend"

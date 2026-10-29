@@ -41,6 +41,15 @@ The legend shows the lowest and the highest number of each set, and how many roa
 The cut points come from the data of the call, so each day has its own. To compare two days by colour, give the same `breaks` to both. The default ramp goes
 from blue through green and yellow to red. Its colours have a medium brightness, so they show on the light map and on the dark map.
 
+## Several ways to colour
+
+A page that can show the same data in more than one way (for example the flow, then who was counted) gives the names to the legend box. The box shows
+them as its "Colour by" list, above the legend:
+
+```javascript
+rs.colorModes.set(["Traffic", "Counted"], {onChange: name => show(name)});    // show() calls rs.setData with that mode's column
+```
+
 ## A day picker
 
 The picker is a section of the panel (it follows both themes). Its code is the page's own script: `page_script=` adds it, with no edit of the HTML.
