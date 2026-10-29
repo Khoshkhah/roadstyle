@@ -10,7 +10,8 @@ import {layoutNow} from "./placement.js";
 const ICON = {
   sun: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   moon: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg>',
-  info: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>',
+  // the attribution: an italic serif "i" in a ring (the filled "info" icon looked like the help's "?" of a page)
+  info: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><text x="12" y="16.7" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="700" font-size="13.5" fill="currentColor">i</text></svg>',
 };
 const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text) e.textContent = text; return e; };
 const button = (title, html) => { const b = el("button"); b.type = "button"; b.title = title; b.innerHTML = html; return b; };

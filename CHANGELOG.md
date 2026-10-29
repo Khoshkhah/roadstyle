@@ -20,6 +20,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **The compass button also changes the tilt**: dragging it turns the map (left and right) and tilts it (up and down); a click sets north and the tilt back (`visualizePitch`).
+  The attribution button has an italic serif "i" in a ring, so it does not look like a page's help button ("?").
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
 - **The dashboard shows every road class at every zoom.** The template `dashboard` gives `minzoom=False` where the call gives none (a data page shows every road; the
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.

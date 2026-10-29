@@ -62,3 +62,29 @@ def test_a_tooltip_of_the_bar_does_not_cover_the_bar_after_an_earlier_one():
         browser.close()
     assert not errors, errors
     assert all(s["tipRight"] <= s["barLeft"] + 1 and s["w"] <= 222 for s in seen), seen
+
+
+def test_dragging_the_compass_changes_the_tilt_and_a_click_sets_north_and_the_tilt_back():
+    html, errors = rs.render_dashboard(_edges(), basemap="blank").html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
+        box = page.locator(".maplibregl-ctrl-compass").bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(x, y)
+        page.mouse.down()
+        page.mouse.move(x + 20, y - 60, steps=8)          # right turns the map, up tilts it
+        page.mouse.up()
+        page.wait_for_timeout(300)
+        moved = page.evaluate("[map.getPitch(), map.getBearing()]")
+        page.locator(".maplibregl-ctrl-compass").click()
+        page.wait_for_timeout(1200)
+        reset = page.evaluate("[map.getPitch(), map.getBearing()]")
+        browser.close()
+    assert not errors, errors
+    assert moved[0] > 5 and abs(moved[1]) > 1, moved
+    assert reset[0] < 1 and abs(reset[1]) < 1, reset
