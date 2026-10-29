@@ -7,6 +7,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **A legend row has a shape** (`square`, the default, `circle` or `line`): `dashboard={"legend": {"rows": [{"color": ..., "label": ..., "shape": "circle"}]}}` and `rs.legend.add`. The legend then
+  explains the colour of a circle on the map (a sensor) as well as the colour of a road. A wrong shape is an error.
 - **Live data colours a number in sets by natural breaks** (`rs.setData`). `classes` (default 7) is the number of sets; the cut points are the Fisher-Jenks
   natural breaks of the call's numbers, so one very busy street does not use up the colour bar. `breaks` gives your own cut points (the same colours on every day).
   The legend lists each set with its lowest and highest number and its number of roads. `classes: 0`, or a `vmin` / `vmax`, keeps the smooth ramp.
@@ -14,6 +16,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- The value of a transparency slider is in the row of its label (two rows for a slider, not three).
 - **The dashboard shows every road class at every zoom.** The template `dashboard` gives `minzoom=False` where the call gives none (a data page shows every road; the
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
@@ -26,7 +29,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
   inside the window, as the others do.
 
 ### Removed
-- The value of a transparency slider is in the row of its label (two rows for a slider, not three).
 - The settings have no "Reset transparency" button and no note about the key ("A key is saved in this browser only...").
 
 ### Changed

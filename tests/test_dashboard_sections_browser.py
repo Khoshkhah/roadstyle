@@ -11,7 +11,7 @@ _PANEL = {"sections": [
     {"id": "notes", "label": "Notes", "html": '<p>Page text</p><p class="sb-note">Small print</p><a href="#x">a link</a>'
                                               '<div class="rs-sec-box">in a box</div>', "after": "legend"},
     {"id": "last", "html": "<p>The end</p>"}], "hide": ["base_map"]}
-_LEGEND = {"rows": [{"color": "#ff0066", "label": "Events"}]}
+_LEGEND = {"rows": [{"color": "#ff0066", "label": "Events"}, {"color": "#16a34a", "label": "Sensors", "shape": "circle"}, {"color": "#2563eb", "label": "Bus route", "shape": "line"}]}
 
 
 def _edges(n=6):
@@ -55,11 +55,13 @@ def test_the_typed_sections_are_in_the_panel_in_order_and_the_hidden_one_is_hidd
         got = page.evaluate("""() => ({ids: rs.sections.list(), hidden: rs.sections.get('base_map').hidden,
             visible: getComputedStyle(document.getElementById('bm').closest('.sb-sec')).display,
             shown: rs.sections.get('legend').hidden, notes: !!document.querySelector('[data-rs-section=notes] label'),
-            panelRows: document.querySelectorAll('#sb-legend-extra .sb-lgrow').length})""")
+            panelRows: document.querySelectorAll('#sb-legend-extra .sb-lgrow').length,
+            panelShapes: [...document.querySelectorAll('#sb-legend-extra .sb-lgrow i')].map(i => i.className)})""")
         browser.close()
     assert not errors
     assert got["ids"] == ["base_map", "colour_by", "legend", "notes", "query", "selected_road", "last"]
-    assert got["hidden"] is True and got["visible"] == "none" and got["shown"] is False and got["notes"] and got["panelRows"] == 1
+    assert got["hidden"] is True and got["visible"] == "none" and got["shown"] is False and got["notes"] and got["panelRows"] == 3
+    assert got["panelShapes"] == ["square", "circle", "line"]
 
 
 def test_the_run_time_calls_add_move_and_remove(tmp_path):
@@ -206,3 +208,17 @@ def test_the_toolbox_is_fixed_and_a_tool_that_the_page_cannot_use_is_greyed_out(
     assert all(t[2] for t in bare if t[1])                                   # the button is disabled in the page
     assert "street_view=False" in titles["street_view"] and "google_3d=True" in titles["google_3d"] and "one base map" in titles["basemap"]
     assert not any(t[1] for t in rich if t[0] in ("street_view", "google_3d", "legend"))
+
+
+def test_a_legend_row_has_a_mark_in_the_colour_box_too_and_a_wrong_shape_is_an_error(tmp_path):
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, _page(tmp_path, legend=_LEGEND))
+        got = page.evaluate("""() => { rs.tools.open('legend');
+            const marks = [...document.querySelectorAll('.rs-cb-lg .lg-sw')].map(e => ({c: e.className, r: getComputedStyle(e).borderRadius, w: e.getBoundingClientRect().width, h: e.getBoundingClientRect().height}));
+            let bad = null; try { rs.legend.add({id: 'x', color: '#f00', label: 'X', shape: 'star'}); } catch (e) { bad = String(e.message); }
+            return {marks, bad}; }""")
+        browser.close()
+    assert not errors
+    circle = next(m for m in got["marks"] if "circle" in m["c"])
+    assert circle["w"] == circle["h"] and circle["r"] in ("50%", "5.5px", "5px") and any("line" in m["c"] and m["h"] < 6 for m in got["marks"])
+    assert "square, circle or line" in got["bad"]

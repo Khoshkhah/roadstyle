@@ -38,3 +38,27 @@ def test_the_boxes_of_the_bar_stay_inside_the_window_and_the_settings_have_no_re
             page.close()
         browser.close()
     assert not errors, errors
+
+
+def test_a_tooltip_of_the_bar_does_not_cover_the_bar_after_an_earlier_one():
+    """The tooltip is measured at the corner of the window. It was measured where the last one stood: at the right edge it wrapped narrower, then grew over the bar."""
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", dashboard={"toolbar": {"position": "right"}}).html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded() && !!window.rs", timeout=60_000)
+        seen = []
+        for title in ("Zoom in", "Google 3D is off", "Zoom in", "Drag to rotate"):
+            button = page.locator(f"#rs-toolbar button[title^='{title}'], #rs-toolbar button[data-rs-tip^='{title}']").first
+            button.hover()
+            page.wait_for_selector("#rs-tip:not([hidden])", timeout=3000)
+            seen.append(page.evaluate("""() => { const t = document.querySelector('#rs-tip').getBoundingClientRect(), b = document.querySelector('#rs-toolbar').getBoundingClientRect();
+                return {tipRight: t.right, tipLeft: t.left, barLeft: b.left, w: t.width}; }"""))
+            page.mouse.move(5, 5)
+            page.wait_for_selector("#rs-tip", state="hidden", timeout=3000)
+        browser.close()
+    assert not errors, errors
+    assert all(s["tipRight"] <= s["barLeft"] + 1 and s["w"] <= 222 for s in seen), seen

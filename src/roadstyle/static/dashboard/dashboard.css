@@ -98,6 +98,8 @@ padding:8px 11px;font:12px system-ui,sans-serif;color:#334155}
 .co-lg .lg-title{font-weight:600;margin-bottom:5px;color:#334155}
 .co-lg .lg-row{display:flex;align-items:center;gap:7px;white-space:nowrap;padding:1px 0}
 .co-lg .lg-sw{width:14px;height:8px;border-radius:2px;display:inline-block;flex:none}
+.co-lg .lg-sw.circle{width:10px;height:10px;margin:0 2px;border-radius:50%}
+.co-lg .lg-sw.line{height:3px}
 .co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:3px 0}
 .co-lg .lg-ends{display:flex;justify-content:space-between;color:#767c88;font-size:11px}
 .co-lg .co-lg-hd{cursor:pointer;user-select:none;padding-bottom:5px;
@@ -269,6 +271,8 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-cb-lg .lg-title{grid-column:1/-1;font-weight:600;margin-bottom:2px}
 .rs-cb-lg .lg-row{display:flex;align-items:center;gap:7px;white-space:nowrap;min-width:0}
 .rs-cb-lg .lg-sw{width:16px;height:10px;border-radius:3px;display:inline-block;flex:none;box-shadow:inset 0 0 0 1px rgba(128,128,128,.35)}
+.rs-cb-lg .lg-sw.circle{width:11px;height:11px;margin:0 2.5px;border-radius:50%}
+.rs-cb-lg .lg-sw.line{height:4px;border-radius:2px;box-shadow:none}
 .rs-cb-lg .lg-bar{grid-column:1/-1;height:10px;border-radius:5px;margin:4px 0 2px}
 .rs-cb-lg .lg-ends{grid-column:1/-1;display:flex;justify-content:space-between;opacity:.7;font-size:11px}
 html.rs-has-toolbar .co-ctrl,html.rs-has-toolbar .co-lg{display:none!important}
@@ -398,8 +402,8 @@ html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!i
 .rs-set-key .rs-set-note{padding:4px 0 0}
 html.rs-phone .rs-set-layout,html.rs-phone .rs-set-layout+hr{display:none}
 /* ---- the explanation of a button (tip.js): a box of the page's look, instead of the browser's own ---- */
-#rs-tip{position:fixed;z-index:80;box-sizing:border-box;max-width:240px;padding:6px 11px;border-radius:10px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  color:var(--rs-tb-ink);box-shadow:0 4px 16px rgba(0,0,0,.25);font:12px/1.35 system-ui,sans-serif;pointer-events:none}
+#rs-tip{position:fixed;z-index:80;box-sizing:border-box;width:max-content;max-width:220px;padding:5px 9px;border-radius:8px;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  border:1px solid var(--rs-tb-border);color:var(--rs-tb-ink);box-shadow:0 2px 8px rgba(0,0,0,.18);font:500 12px/1.35 system-ui,sans-serif;pointer-events:none}
 #rs-tip[hidden]{display:none}
 /* the person can hide the scale and the zoom number (settings.js: "Scale and zoom") */
 html.rs-hide-scale #rs-scalebox,html.rs-hide-scale .maplibregl-ctrl-scale,html.rs-hide-scale .rs-zoom{display:none!important}

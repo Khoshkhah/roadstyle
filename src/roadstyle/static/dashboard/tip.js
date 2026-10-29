@@ -16,7 +16,8 @@ function _tpShow(el){
   const text = _tpTake(el); if(!text || !document.body.contains(el)) return;
   if(!_tpBox){ _tpBox = document.createElement("div"); _tpBox.id = "rs-tip"; _tpBox.setAttribute("role", "tooltip"); document.body.append(_tpBox); }
   _tpBox.textContent = text; _tpBox.hidden = false; _tpFor = el;
-  const r = el.getBoundingClientRect(), t = _tpBox.getBoundingClientRect(), gap = 10;
+  _tpBox.style.left = "0px"; _tpBox.style.top = "0px";      // measured at the corner: a box that still stands where the last one was has less room, wraps narrower, and grows over the bar when it moves
+  const r = el.getBoundingClientRect(), t = _tpBox.getBoundingClientRect(), gap = 8;
   const bar = el.closest("#rs-toolbar"), edge = bar ? bar.dataset.edge : "top";
   // the side that faces the map's center: a bar at the right opens its explanations to the left, and so on
   let x, y;

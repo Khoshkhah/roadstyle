@@ -16,7 +16,7 @@ rs.render_dashboard(edges, google_3d=True, dashboard={
         ],
         "hide": ["base_map", "colour_by", "legend", "query"],      # this list replaces the default list
     },
-    "legend": {"rows": [{"color": "#ff0066", "label": "Events"}]},
+    "legend": {"rows": [{"color": "#ff0066", "label": "Events"}, {"color": "#16a34a", "label": "Sensors", "shape": "circle"}]},
 })
 ```
 
@@ -29,7 +29,7 @@ A wrong `id`, an `after` or `before` that is not a section, or a name in `hide` 
 | `rs.sections.add({id, html, el, label, after, before})` | adds a section; it returns its box |
 | `rs.sections.list()` / `get(id)` | the ids in order; the box of a section (move it into your own tab) |
 | `rs.sections.hide(id)` / `show(id)` / `remove(id)` | hide or show any section; remove only your own |
-| `rs.legend.add({id, color, label})` or `{id, html}` | a row of the legend; `remove(id)`, `list()` |
+| `rs.legend.add({id, color, label, shape})` or `{id, html}` | a row of the legend; `shape` is the mark of what the page draws in this colour: `square` (default), `circle` or `line`. `remove(id)`, `list()` |
 
 The event `rs:sectionchange` has `detail.id` and `detail.state`.
 

@@ -77,12 +77,24 @@ pub struct Panel {
     pub hide: Vec<String>,
 }
 
-/// A row that the page adds to the legend (the legend box of the bar, and the panel's legend): a colour swatch and a text.
+/// The mark of a legend row: what the page draws in this colour (a road is a line, a sensor a circle).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LegendShape {
+    #[default]
+    Square,
+    Circle,
+    Line,
+}
+
+/// A row that the page adds to the legend (the legend box of the bar, and the panel's legend): a colour mark and a text.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LegendRow {
     pub color: String,
     pub label: String,
+    #[serde(default)]
+    pub shape: LegendShape,
 }
 
 /// The legend: the rows that the page adds after the colour option's own.
@@ -553,8 +565,9 @@ mod tests {
     fn the_sections_of_the_panel_are_checked() {
         let base = Template::Dashboard.dashboard(Overlay);
         let ok = merge(&base, &serde_json::json!({"panel": {"sections": [{"id": "notes", "html": "<p>x</p>", "label": "Notes", "after": "legend"},
-            {"id": "more", "html": "<p>y</p>", "before": "notes"}], "hide": ["base_map", "notes"]}, "legend": {"rows": [{"color": "#f00", "label": "Events"}]}})).unwrap();
+            {"id": "more", "html": "<p>y</p>", "before": "notes"}], "hide": ["base_map", "notes"]}, "legend": {"rows": [{"color": "#f00", "label": "Events", "shape": "circle"}]}})).unwrap();
         assert_eq!((ok.panel.as_ref().unwrap().sections.len(), ok.legend.rows.len()), (2, 1));
+        assert_eq!(ok.legend.rows[0].shape, LegendShape::Circle);
         for (bad, said) in [(serde_json::json!([{"id": "legend", "html": ""}]), "used twice"), (serde_json::json!([{"id": "a", "html": "", "after": "zzz"}]), "not a section here"),
                             (serde_json::json!([{"id": "a", "html": "", "after": "legend", "before": "query"}]), "use one"),
                             (serde_json::json!([{"id": "a", "html": ""}, {"id": "a", "html": ""}]), "used twice"),

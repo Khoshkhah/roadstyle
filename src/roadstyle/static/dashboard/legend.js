@@ -14,10 +14,12 @@ const _lgRows = () => {
   if(!_lgLoaded){ _lgLoaded = true; _lgExtra.push(...((O.dashboard && O.dashboard.legend && O.dashboard.legend.rows) || []).map((r, i) => ({id: "row" + i, ...r}))); }
   return _lgExtra;
 };
+// the mark of a row: a square (the default), a circle or a line (the css class; a name that is not one of them is an error)
+const _shape = r => { const k = r.shape || "square"; if(!["square", "circle", "line"].includes(k)) throw new Error("legend row '" + r.id + "': shape must be square, circle or line, not '" + k + "'"); return k; };
 // the colour box's rows (.lg-row) or the panel's (.sb-lgrow: the panel has its own style, in the theme of the panel)
 const _lgExtraHtml = panel => _lgRows().map(r => r.html || (panel
-  ? '<div class="sb-lgrow"><i style="background:' + _esc(r.color) + '"></i>' + _esc(r.label) + "</div>"
-  : '<div class="lg-row"><span class="lg-sw" style="background:' + _esc(r.color) + '"></span>' + _esc(r.label) + "</div>")).join("");
+  ? '<div class="sb-lgrow"><i class="' + _shape(r) + '" style="background:' + _esc(r.color) + '"></i>' + _esc(r.label) + "</div>"
+  : '<div class="lg-row"><span class="lg-sw ' + _shape(r) + '" style="background:' + _esc(r.color) + '"></span>' + _esc(r.label) + "</div>")).join("");
 export function coLegendHtml(lg){
   if(!lg) return "";
   let h = lg.title ? '<div class="lg-title">'+_esc(lg.title)+'</div>' : "";
@@ -64,7 +66,7 @@ export function legendRefresh(){
 // rs.legend: the page's own rows
 export const rsLegend = {
   add(row){
-    if(!row || !row.id || !(row.html || (row.color && row.label))) throw new Error("rs.legend.add: a row needs an id and {color, label} or {html}");
+    if(!row || !row.id || !(row.html || (row.color && row.label))) throw new Error("rs.legend.add: a row needs an id and {color, label, shape} or {html}");
     if(_lgRows().some(r => r.id === row.id)) throw new Error("rs.legend.add: the row '" + row.id + "' exists");
     _lgExtra.push({...row}); legendRefresh();
   },
