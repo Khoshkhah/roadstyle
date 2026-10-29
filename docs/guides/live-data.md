@@ -28,6 +28,7 @@ The ids of duckOSM are 64-bit numbers, and a JSON number above 2^53 is not exact
 | `ramp`, `stepped` | your own list of colours (the default is `data.live_ramp` of the palette); `stepped: true` takes the nearest colour of a smooth ramp, with hard edges |
 | `nodata` | the colour of a road with no row (default: the page's no-data colour) |
 | `key` | the column that names the road (default `edge_id`; `"row"` for the number of the road's row) |
+| `fields` | the columns of the rows that the popup, the tooltip and the panel show, for example `["flow"]`. Default: every column except the key column |
 | `legend` | `false`: no legend; `{title: "..."}`: change the legend |
 
 ## The colour sets

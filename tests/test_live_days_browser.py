@@ -139,3 +139,24 @@ def test_the_page_gives_the_legend_box_its_own_colour_modes():
     assert got["opts"] == ["Traffic", "Counted?", "How sure?"] and got["on"] == ["Counted?"]
     assert got["picked"] == ["event:Counted?", "Counted?@1", "event:How sure?", "How sure?@2"] and got["active"] == "How sure?" and got["after"] is None
     assert "no mode" in got["bad"] and got["title"] == "Colour by and legend"
+
+
+def test_fields_chooses_the_columns_that_the_popup_shows_from_the_rows():
+    html, errors, texts = rs.render_dashboard(_edges(), basemap="blank", live_data=True, road_popup=["name"]).html, [], []
+    rows = [{"edge_id": str(i + 1), "flow": 100 * (i + 1), "hidden": "x"} for i in range(6)]
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        for options in ({}, {"fields": ["flow"]}):
+            page = browser.new_page(viewport={"width": 1280, "height": 800})        # a page for each call: the popup of the first would stay in the second
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
+            page.goto(_URL)
+            page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!(window.rs && rs.setData)", timeout=60_000)
+            texts.append(page.evaluate("""async (o) => { await rs.setData(ROWS, Object.assign({colorBy: "flow"}, o)); rs.select(1);
+              await new Promise(r => setTimeout(r, 500)); return (document.querySelector('.maplibregl-popup-content') || {}).innerText; }""".replace("ROWS", json.dumps(rows)), options))
+            page.close()
+        browser.close()
+    assert not errors, errors
+    every, only = texts
+    assert "flow: 100" in every and "hidden: x" in every
+    assert "flow: 100" in only and "hidden: x" not in only

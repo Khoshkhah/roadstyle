@@ -69,7 +69,7 @@ export async function setData(table, opts){
   ws.forEach((v, i) => map.setFeatureState({...s, id: i}, {[L.width]: v}));
   _liveRows = [...ws.keys()];
   setLiveColors(cols);
-  _setJoined(joined);
+  _setJoined(joined, o.fields, key);
   setLiveLegend(o.legend === false ? null : legend && {...legend, ...(o.legend || {})});
   const ms = performance.now() - t0;
   _emit("rs:datachange", {rows: rows.length, matched: joined.size, colorBy: o.colorBy || null, widthBy: o.widthBy || null, ms});

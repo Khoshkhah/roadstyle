@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`rs.setData` takes `fields`**: the columns of the rows that the popup, the tooltip and the panel show. The key column (`edge_id`) never shows: the road has it.
 - **`rs.colorModes`**: a page gives the legend box its own "Colour by" list (`set(names, {active, onChange})`, `select`, `clear`, `active`; event `rs:colormode`). A live-data page has no colour
   options of the style, so its modes (Traffic, Counted, How sure) go in the toolbox, next to the legend, and not in a bar of its own.
 - **`rs.naturalBreaks(values, k)`** gives the cut points that `rs.setData` uses, so a page can give the same `breaks` to many calls (an hour slider: the breaks of the whole day).
