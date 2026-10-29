@@ -100,6 +100,9 @@ fn present(v: &Value) -> bool {
     }
 }
 
+/// The number of roads from which an inline (GeoJSON) page gets a warning to use `tiles=True`.
+const GEOJSON_ROADS_WARN: usize = 10_000;
+
 /// The page's own keywords and their defaults.
 pub fn page_key_defaults() -> Map<String, Value> {
     serde_json::from_str(DEFAULTS).expect("DEFAULTS is a JSON object")
@@ -242,7 +245,13 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let (mode, key) = check_keys(&k, look, &dashboard)?;
     let bounds = bounds_of(&roads);
     let tiled = k.tiles;
+    let n_roads = roads.len();
     let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
+    if !tiled && n_roads >= GEOJSON_ROADS_WARN {
+        src.warnings.push(format!("this page draws {n_roads} roads from GeoJSON: MapLibre cuts them into tiles in the browser, keeps every vertex, and draws about 2.5 times \
+            the triangles of tiles=True at zoom 11 to 13 (22,000 roads, measured 2026-10-29). Pan and zoom lag and the map can blank while new tiles are made. \
+            tiles=True makes the page about 3 times larger and draws the same picture"));
+    }
     let (active, bms, base) = basemaps(&k, look, &mut src.warnings)?;
     let bg = bg_color(&active, look);
     let keys: Vec<Value> = bms.iter().map(|b| b["key"].clone()).collect();

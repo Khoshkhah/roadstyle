@@ -17,6 +17,14 @@ function _at(ramp, t, stepped){
   if(stepped) return ramp[Math.round(x)];
   const a = _hex(ramp[i]), b = _hex(ramp[i + 1]);
   return _toHex(a.map((v, k) => v + (b[k] - v) * f)); }
+// the road's key -> its row, made once for a road table (every call of rs.setData asks for it)
+let _rowOfCache = null;
+function _rowOf(){
+  const n = RoadTable.rows(), c = _rowOfCache;
+  if(c && c.n === n && c.col === O.edge_id_col && c.first === RoadTable.own(0)) return c.map;
+  const map = new Map(); for(let i = 0; i < n; i++){ const p = RoadTable.own(i), v = p && p[O.edge_id_col]; if(v != null) map.set(String(v), i); }
+  _rowOfCache = {n, col: O.edge_id_col, first: RoadTable.own(0), map};
+  return map; }
 function _rows(table){
   if(Array.isArray(table)) return table;
   if(table && typeof table.toArray === "function") return table.toArray().map(r => r && typeof r.toJSON === "function" ? r.toJSON() : {...r});   // an Arrow table
@@ -33,8 +41,7 @@ export async function setData(table, opts){
   const joined = new Map();
   if(key === "row") rows.forEach(r => { if(r.row != null) joined.set(+r.row, r); });
   else {
-    const at = new Map(); for(let i = 0, n = RoadTable.rows(); i < n; i++){ const v = RoadTable.props(i)[O.edge_id_col]; if(v != null) at.set(String(v), i); }
-    rows.forEach(r => { const i = at.get(String(r[key])); if(i != null) joined.set(i, r); }); }
+    const at = _rowOf(); rows.forEach(r => { const i = at.get(String(r[key])); if(i != null) joined.set(i, r); }); }
   // the colour: a number goes in one of `classes` sets (natural breaks of this data, default 7; or the `breaks` that the page gives), each set one
   // colour of the ramp; a smooth ramp from vmin to vmax instead (`classes: 0`, or vmin / vmax given). A text: a ramp colour for each value. No value: nodata
   const ramp = o.ramp || L.ramp, nodata = o.nodata !== undefined ? o.nodata : L.nodata, cols = new Map(), ws = new Map();
@@ -47,7 +54,7 @@ export async function setData(table, opts){
       legend = {kind: "continuous", title: o.colorBy, ramp: ramp, vmin: lo, vmax: hi, stepped: !!o.stepped}; }
     else if(num){        // sets: natural breaks of this data (classes, default 7), or the cut points that the page gives (breaks)
       const nums = vals.filter(v => typeof v === "number" && isFinite(v)), cuts = o.breaks ? [...o.breaks].sort((a, b) => a - b) : naturalBreaks(nums, o.classes || 7), k = cuts.length + 1;
-      const col = n => _at(ramp, k > 1 ? n / (k - 1) : 0.5), min = Array(k).fill(Infinity), max = Array(k).fill(-Infinity), count = Array(k).fill(0);
+      const colors = Array.from({length: k}, (_, n) => _at(ramp, k > 1 ? n / (k - 1) : 0.5)), col = n => colors[n], min = Array(k).fill(Infinity), max = Array(k).fill(-Infinity), count = Array(k).fill(0);
       joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)){ const n = setOf(cuts, v);
         cols.set(i, col(n)); count[n]++; min[n] = Math.min(min[n], v); max[n] = Math.max(max[n], v); } });
       const fmt = v => String(+v.toPrecision(3)), entries = [];

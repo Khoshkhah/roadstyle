@@ -157,7 +157,7 @@ have, is an error. Each palette that a view names is built once more into the pa
 
 | keyword | default | backends | what |
 |---|---|---|---|
-| `tiles` | `False` | web | pack the roads, the casing pieces and the end caps as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]` |
+| `tiles` | `False` | web | pack the roads, the casing pieces and the end caps as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]`. Without it, MapLibre cuts the roads into tiles in the browser and keeps every vertex. From 10,000 roads this gives a warning: on 22,000 roads (Nacka, 173,000 pieces) the GeoJSON page draws 2.4 to 2.6 times the triangles of `tiles=True` at zoom 11 to 13 (556,000 against 234,000 at zoom 11), and the page is about 3 times smaller (9 MB against 31 MB) |
 | `live_data` | `False` | web, Rust engine | the metadata `roadstyle:live` (the feature states `rs_c` and `rs_w`, the default ramp, the no-data colour; [contract](contract.md)) and the page's option `live`, which `rs.setData` reads. Every style's road layer reads its colour and its width factor from the feature state on the road's row (since 2026-10-24, audit N8). With the Python engine: a `ValueError` |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
 | `tunnel_control` | `False` | web | on a map with tunnels, a *Tunnels* box (a tool for choosing the look): the colour list (`tunnel_toward`), the tunnel slider (`tunnel_strength`: 0, 25, 50, 55, 60, 65, 70, 75, 100), the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
