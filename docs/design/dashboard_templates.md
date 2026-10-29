@@ -183,7 +183,7 @@ and the SimReady brief (sections 7j to 7m, 8 to 10):
 |---|---|
 | Bar | 4 positions; same box after 5 zooms; each button clickable (`elementFromPoint`) with the panel open; no old column or empty bar at 100, 300, 1000 ms |
 | Boxes | Close on an outside click and on Escape; inside the window; the base-map box fits at 703 px height |
-| Panel | Open and close: the map's container, the camera and an open window do not change; the bar is 8 px beside the open panel and comes back |
+| Panel | Open and close: the map's container, the camera and an open window do not change; the bar touches the open panel (no gap) and comes back |
 | Windows | Inside the free area at a drag, a resize and a panel change; keeps its size; `restore_open: false` |
 | Base maps | The default list in order; a themed pair follows the theme; the Labels rule; a vector style under the roads; 3D buildings follow the pitch and the toggle |
 | Google 3D | A Google camera change never changes the map's camera; a map move sets Google only with Follow on; input turns Follow off; the button and a selection turn it on; range and zoom are inverse |

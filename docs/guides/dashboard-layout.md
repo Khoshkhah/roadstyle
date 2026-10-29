@@ -29,6 +29,8 @@ Google 3D, base map, 3D buildings, colour and legend, settings, attribution. A t
 A button that opens a box (base map, colour and legend, settings, attribution) opens it toward the map. One box is open at a time.
 A click outside the box, or the Escape key, closes it.
 
+An older script? See [Move a dashboard to the new version](migrating-dashboard.md).
+
 To add a tool of your own, use `rs.tools`:
 
 ```javascript

@@ -27,6 +27,8 @@ export function toolList(){
   return [...known, ...[...tools.values()].filter(t => !ORDER.includes(t.id) && !LAST.includes(t.id)), ...LAST.filter(id => tools.has(id)).map(id => tools.get(id))];
 }
 export const getTool = id => tools.get(id);
+// the open boxes close: a change of the layout (the bar's edge, the panel's side or look) moves what they opened toward
+export function closeBoxes(){ for(const t of toolList()) if(t.kind === "box" && t.isOpen && t.isOpen()) t.close(); }
 // MapLibre's navigation control (zoom in, zoom out, compass) is the host's: its three buttons become three tools of the group "nav"
 function adoptNav(){
   const c = map.getContainer().querySelector(".maplibregl-ctrl-zoom-in");
