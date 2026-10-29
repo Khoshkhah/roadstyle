@@ -69,14 +69,8 @@ def _style(overlays=True):
 
 @pytest.fixture(scope="module")
 def host():
-    import geopandas as gpd
-    import shapely.geometry as sg
-
-    import roadstyle as rs
-    g = gpd.GeoDataFrame({"highway": ["primary"], "edge_id": [1]}, crs=4326, geometry=[sg.LineString([(18.0, 59.3), (18.001, 59.301)])])
-    html = rs.render_dashboard(g, basemap="blank", basemaps=["blank", "osm"]).html
-    at = html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = ")
-    opts, _ = json.JSONDecoder().raw_decode(html, at)
+    opts = json.loads((ROOT / "rust" / "roadstyle-assets" / "files" / "data" / "host_options.json").read_text())
+    opts["basemaps"] = [b for b in opts["basemaps"] if b["key"] in ("blank", "osm", "blank_dark")]
     opts["basemaps"].append({"key": "vec", "label": "Vector", "title": "Vector", "group": "", "swatch": None, "order": 90, "tiles": [], "bg": "#ffffff", "maxzoom": 19,
                              "attr": "", "is_dark": False, "style_url": "http://rs.test/vec.json", "dark": None})
     opts["dashboard"]["panel"]["hide"] = []         # the host has none of roadstyle's own panel sections (the duckOSM page says so in its `dashboard` key)

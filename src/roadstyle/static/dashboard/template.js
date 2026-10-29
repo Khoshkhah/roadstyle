@@ -10,7 +10,7 @@ export function getSheet(){
   const c = document.documentElement.classList, i = [...Array(SHEETS).keys()].find(i => c.contains("rs-sheet-" + i));
   return c.contains("rs-phone") && i !== undefined ? i : null;
 }
-// The first paint of a host page that writes its own HTML: the `first_paint` of roadstyle-wasm's `hostOptions` (the classes of <html>, the panel's width, the
+// The first paint of a host page that writes its own HTML: the `first_paint` of `data/host_options.json` (the classes of <html>, the panel's width, the
 // phone width). Call it before the first paint, as the script that a page of roadstyle writes does; initTemplate keeps `rs-phone` current after it.
 export function rsFirstPaint(first){
   const root = document.documentElement;

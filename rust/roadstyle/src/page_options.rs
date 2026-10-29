@@ -463,6 +463,8 @@ fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Va
 /// `dashboard` of the template `dashboard` (with the layout and the `dashboard` keys of `given`, as `page_from` merges them), its first paint, and the
 /// base maps (`basemaps`, `ontop` and the active key, as `page_from` gives them to the page). `given` has the keys of a call: `layout`, `dashboard`,
 /// `basemap`, `basemaps`, `api_key`, `basemap_switcher`. The same rules as a page that roadstyle writes, so the host has no copy of them.
+/// `data/host_options.json` is its answer for the default look and no keys (a test keeps it current): a host page fetches the file, changes what it needs
+/// (the panel's width, `hide`, the order of the base maps) and loads no WebAssembly module on its main thread for it.
 pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, Vec<String>), crate::Error> {
     let mut given = given.clone();
     given.entry("template").or_insert_with(|| "dashboard".into());
@@ -646,6 +648,21 @@ mod tests {
         assert!(o["ontop"]["hillshade"].is_object());
         // a form that is not the dashboard is an error here, as for a page
         assert!(host_options(&look, json!({"template": "map"}).as_object().unwrap()).is_err());
+    }
+
+    /// data/host_options.json is what a JavaScript host page fetches (the typed dashboard, its first paint and the base maps), so that the page
+    /// has no copy and loads no wasm module for it. `ROADSTYLE_BLESS=1 cargo test host_options` writes it again.
+    #[test]
+    fn the_host_options_file_is_what_host_options_gives() {
+        let look = Look::resolve(&Options::from_value(&json!({"args": {"state": "live"}})).unwrap()).unwrap();
+        let (o, warnings) = host_options(&look, &Map::new()).unwrap();
+        assert!(warnings.is_empty(), "{warnings:?}");
+        let want = serde_json::to_string_pretty(&o).unwrap() + "\n";
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../roadstyle-assets/files/data/host_options.json");
+        if std::env::var_os("ROADSTYLE_BLESS").is_some() {
+            std::fs::write(&path, &want).unwrap();
+        }
+        assert!(std::fs::read_to_string(&path).is_ok_and(|have| have == want), "data/host_options.json is not what host_options gives; ROADSTYLE_BLESS=1 writes it again");
     }
 
     #[test]

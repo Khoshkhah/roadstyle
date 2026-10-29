@@ -13,7 +13,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   - A raster base map goes under the roads that carry the page's prefix (the module reads the map's layer order, not the roads style).
   - `rsSetBasemap("blank")` is the dark twin in the dark theme, for the page as for the box.
   - A vector base map's `sprite` is merged (OpenFreeMap's place icons); the map's own sprite comes back with a raster base map.
-  - `hostOptions(look, given)` of roadstyle-wasm gives the typed `dashboard`, its `first_paint`, the `basemaps`, `ontop` and the active key, by the rules of `pageFrom`;
+  - The file `data/host_options.json` (Rust writes it; a test keeps it current) has the typed `dashboard`, its `first_paint`, the `basemaps`, `ontop` and the active key,
+    by the rules of `pageFrom`: a host fetches it and loads no WebAssembly module on its main thread;
     `rsFirstPaint(first)` (`dashboard/template.js`) sets the first paint. The panel's shell rules moved from the template `dashboard` to the end of `dashboard.css`.
   - `rs.sheet()` / `rs.sheet(n)` (the phone sheet's height) and `rs.freeArea()` (the free part of the map; on a phone it counts the bar and the sheet).
   - The element of a tool has `data-rs-tool="<id>"`, which stays after the `title` went to the tooltip.

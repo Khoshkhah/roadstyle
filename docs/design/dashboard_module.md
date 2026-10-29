@@ -68,8 +68,12 @@ rs.setStyle(style, {road_table});
   host added with a prefix. A vector style's `sprite` replaces the map's sprite for as long as it is the base map (its places' icons); the map's
   own comes back with a raster base map. `rsSetBasemap(key)` of a map with a dark twin is the twin in the dark theme, for any caller.
 - **A host page's panel and options.** The shell of the panel (`#sb`, `.sb-top`, `#sb-hide`, `#sb-show`) is at the end of `dashboard.css`, so a
-  host page that has its own panel needs no copy of it. roadstyle-wasm's `hostOptions(look, given)` gives it the typed `dashboard`, the
-  `first_paint` (`rsFirstPaint`), and the `basemaps`, `ontop` and active key, by the same rules as `pageFrom`.
+  host page that has its own panel needs no copy of it. The file `data/host_options.json` (written by Rust, `page_options::host_options`; a
+  test keeps it current) has the typed `dashboard`, the `first_paint` (`rsFirstPaint`), and the `basemaps`, `ontop` and active key, by the same
+  rules as `pageFrom`. A host fetches it, changes what it needs (the panel's width, `hide`, the order of the base maps) and loads no WebAssembly
+  module on its main thread for it. The host's look must have state `live` (`withArg("state", "\"live\"")`) for the dashboard to find the style's
+  controls (the base-map layers `overlays`, the filter, the tunnels) and `color_options` for its colour tool: a style of a static look has the
+  pick layers only (`roadstyle-rs/tests/host_style.rs`).
 - **The phone's sheet.** `rs.sheet()` and `rs.sheet(n)` read and set its height; `freeArea()` (also `rs.freeArea()`) ends at its upper edge on a phone and starts under the bar.
   The boxes of the bar keep 12 px from every edge of the window, sideways too.
 - **`prefix`.** The page adds the roads style's sources and layers with this prefix (`"rs-"`). The dashboard adds it to each
