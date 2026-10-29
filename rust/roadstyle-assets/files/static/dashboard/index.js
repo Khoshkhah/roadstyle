@@ -12,6 +12,7 @@ import {initSelectBox} from "./selectbox.js";
 import {initToolbar} from "./toolbar.js";
 import {initSettings} from "./settings.js";
 import {initPlacement} from "./placement.js";
+import {initSections} from "./sections.js";
 import {initWindows} from "./windows.js";
 import {initTip} from "./tip.js";
 import {initPanelScroll} from "./panelscroll.js";
@@ -117,6 +118,7 @@ export function rsDashboard(map, options){
   initPanelScroll();
   initPlacement();
   initSettings();
+  initSections();
   initWindows();
   initTip();
   initToolbar() || mountColumn();  // every control module has defined its tool: the bar or the column shows them (tools.js)

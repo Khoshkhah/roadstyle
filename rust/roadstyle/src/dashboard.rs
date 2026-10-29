@@ -43,13 +43,54 @@ pub enum PanelLook {
     Frame,
 }
 
-/// The side panel: its edge, its width and its look. The panel's HTML is the template's.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+/// The ids of the panel's own sections, in their order: a section of the page goes `after` or `before` one of them, and `hide` can name them.
+pub const PANEL_SECTIONS: [&str; 5] = ["base_map", "colour_by", "legend", "query", "selected_road"];
+
+/// A section that the page adds to the panel: a block of HTML, with an optional heading (a `<label>`), at the end of the panel or beside another
+/// section. The HTML is the page's own: it is written into the page as it is.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Section {
+    pub id: String,
+    pub html: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// the id of a section (the panel's or an earlier one of the page): this one goes after it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<String>,
+    /// the same, before it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+}
+
+/// The side panel: its edge, its width, its look, the sections that the page adds, and the panel's own sections that it hides. The panel's HTML is
+/// the template's.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Panel {
     pub side: Edge,
     pub width_px: u32,
     pub look: PanelLook,
+    #[serde(default)]
+    pub sections: Vec<Section>,
+    #[serde(default)]
+    pub hide: Vec<String>,
+}
+
+/// A row that the page adds to the legend (the legend box of the bar, and the panel's legend): a colour swatch and a text.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LegendRow {
+    pub color: String,
+    pub label: String,
+}
+
+/// The legend: the rows that the page adds after the colour option's own.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LegendOptions {
+    #[serde(default)]
+    pub rows: Vec<LegendRow>,
 }
 
 /// The toolbar: one bar of the map's tools at an edge.
@@ -273,6 +314,8 @@ pub struct Dashboard {
     pub windows: WindowRules,
     pub boundary: BoundaryRules,
     pub google_3d: Google3d,
+    #[serde(default)]
+    pub legend: LegendOptions,
     pub phone: Phone,
 }
 
@@ -289,16 +332,16 @@ impl Template {
 
     /// The defaults of the template with a layout (`Map` has no panel, so the layout does not change it).
     pub fn dashboard(self, layout: Layout) -> Dashboard {
-        let right = Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame });
+        let right = Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame, sections: Vec::new(), hide: Vec::new() });
         let free = WindowRules { clamp: false, recenter_map: true, restore_open: true, remember: true };
         let phone = Phone { max_width_px: 700, toolbar: Edge::Top };
         let (layout, panel, toolbar, windows) = match (self, layout) {
             (Template::Map, _) => (Layout::Dock, None, None, free),
-            (Template::Dashboard, Layout::Dock) => (Layout::Dock, right, None, free),
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, right, Some(Toolbar { position: Edge::Right, settings: true, hold: false }),
+            (Template::Dashboard, Layout::Dock) => (Layout::Dock, right.clone(), None, free),
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, right.clone(), Some(Toolbar { position: Edge::Right, settings: true, hold: false }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
-        Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), phone }
+        Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(), phone }
     }
 }
 
@@ -356,7 +399,37 @@ pub fn merge(base: &Dashboard, over: &Value) -> Result<Dashboard, crate::Error> 
     }
     let mut v = serde_json::to_value(base).expect("a Dashboard is JSON");
     deep(&mut v, over);
-    serde_json::from_value(v).map_err(|e| crate::error::options(format!("dashboard=: {e}")))
+    let merged: Dashboard = serde_json::from_value(v).map_err(|e| crate::error::options(format!("dashboard=: {e}")))?;
+    merged.check()?;
+    Ok(merged)
+}
+
+impl Dashboard {
+    /// The checks of the panel's sections: an id is used once and is not one of the panel's own; `after` and `before` name a section that is there
+    /// (the panel's, or an earlier one of the page), and not both; `hide` names a section that is there.
+    pub fn check(&self) -> Result<(), crate::Error> {
+        let Some(p) = &self.panel else { return Ok(()) };
+        let mut known: Vec<&str> = PANEL_SECTIONS.to_vec();
+        let bad = |m: String| Err(crate::error::options(format!("dashboard=: panel.{m}")));
+        for s in &p.sections {
+            if s.id.is_empty() || PANEL_SECTIONS.contains(&s.id.as_str()) || known.contains(&s.id.as_str()) {
+                return bad(format!("sections: the id '{}' is empty or used twice (the panel's own ids: {})", s.id, PANEL_SECTIONS.join(", ")));
+            }
+            if s.after.is_some() && s.before.is_some() {
+                return bad(format!("sections: '{}' has `after` and `before`: use one", s.id));
+            }
+            for at in s.after.iter().chain(s.before.iter()) {
+                if !known.contains(&at.as_str()) {
+                    return bad(format!("sections: '{}' goes beside '{at}', which is not a section here (it is one of {}, or an earlier section)", s.id, PANEL_SECTIONS.join(", ")));
+                }
+            }
+            known.push(&s.id);
+        }
+        match p.hide.iter().find(|h| !known.contains(&h.as_str())) {
+            Some(h) => bad(format!("hide: '{h}' is not a section (the panel's own: {})", PANEL_SECTIONS.join(", "))),
+            None => Ok(()),
+        }
+    }
 }
 
 /// The keywords that the template with a sidebar changes, and their values (`page_options`' `template_keys`).
@@ -376,7 +449,7 @@ mod tests {
     #[test]
     fn each_form_has_its_defaults() {
         let d = Template::Dashboard.dashboard(Dock);
-        assert_eq!((d.layout, d.panel, d.toolbar), (Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame }), None));
+        assert_eq!((d.layout, d.panel, d.toolbar), (Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame, sections: Vec::new(), hide: Vec::new() }), None));
         let r = Template::Dashboard.dashboard(Overlay);
         assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
@@ -408,7 +481,7 @@ mod tests {
         assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock")"#));
         // the width of the panel, and a side and a look that are not the default
         let mut wide = Template::Dashboard.dashboard(Overlay);
-        wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card });
+        wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card, sections: Vec::new(), hide: Vec::new() });
         let w = wide.first_paint();
         assert!(w.contains(r#""rs-panel-left","rs-panel-card""#) && w.contains(r#"setProperty("--rs-panel-w","420px")"#), "{w}");
     }
@@ -463,6 +536,22 @@ mod tests {
                             (serde_json::json!({"windows": {"clamp": "yes"}}), "invalid type"), (serde_json::json!([1]), "must be a mapping")] {
             assert!(merge(&base, &bad).unwrap_err().to_string().contains(said), "{bad}");
         }
+    }
+
+    #[test]
+    fn the_sections_of_the_panel_are_checked() {
+        let base = Template::Dashboard.dashboard(Overlay);
+        let ok = merge(&base, &serde_json::json!({"panel": {"sections": [{"id": "notes", "html": "<p>x</p>", "label": "Notes", "after": "legend"},
+            {"id": "more", "html": "<p>y</p>", "before": "notes"}], "hide": ["base_map", "notes"]}, "legend": {"rows": [{"color": "#f00", "label": "Events"}]}})).unwrap();
+        assert_eq!((ok.panel.as_ref().unwrap().sections.len(), ok.legend.rows.len()), (2, 1));
+        for (bad, said) in [(serde_json::json!([{"id": "legend", "html": ""}]), "used twice"), (serde_json::json!([{"id": "a", "html": "", "after": "zzz"}]), "not a section here"),
+                            (serde_json::json!([{"id": "a", "html": "", "after": "legend", "before": "query"}]), "use one"),
+                            (serde_json::json!([{"id": "a", "html": ""}, {"id": "a", "html": ""}]), "used twice"),
+                            (serde_json::json!([{"id": "a", "html": "", "colour": 1}]), "colour")] {
+            let e = merge(&base, &serde_json::json!({"panel": {"sections": bad}})).unwrap_err().to_string();
+            assert!(e.contains(said), "{e}");
+        }
+        assert!(merge(&base, &serde_json::json!({"panel": {"hide": ["nope"]}})).unwrap_err().to_string().contains("not a section"));
     }
 
     fn layer(v: serde_json::Value) -> Result<Layer3d, serde_json::Error> { serde_json::from_value(v) }

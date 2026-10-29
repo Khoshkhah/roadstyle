@@ -10,7 +10,7 @@
 | `template="classic"` | `render_dashboard(..., layout="dock")` |
 | `layout="overlay"` | The default. You can leave it out |
 | `toolbar="right"` | `dashboard={"toolbar": {"position": "right"}}` |
-| `edit=function` | Removed. Change the page text after the call (see below) |
+| `edit=function` | Removed. Use `dashboard={"panel": {"sections": [...]}}` ([Add to the panel](dashboard-panel.md)) |
 | panel width (a string replace in the HTML) | `dashboard={"panel": {"width_px": 400}}` |
 | `window.rsG3dSelectionStyle = {...}` | `dashboard={"google_3d": {"selection_style": {...}}}` |
 | `window.rsG3dMeshAltitude = 1.5` | `dashboard={"google_3d": {"mesh_altitude_m": 1.5}}` |
@@ -45,12 +45,8 @@ rs.tools.ready();          // with toolbar.hold: show the bar now
 
 ## Your own panel content
 
-There is no edit hook. Build the page, then change its text. The panel is `<div id="sb">`. These ids stay stable, and the page script
-uses them: `sb-hide`, `sb-show`, `sb-th` (theme), `bm` (base map), `co` (colour by), `sb-legend`, `q` (query), `tbl`, `count`, `detail`.
-Keep them in your panel, or hide them. Do not remove them.
+There is no edit hook, and you do not need one. Add blocks to the panel, hide the panel's own, and add rows to the legend: see
+[Add to the panel](dashboard-panel.md). Your HTML follows the light and the dark theme when it uses the panel's variables.
 
-```python
-html = m.html.replace("</body>", my_panel_script + "</body>")
-```
-
-Check the result in a browser. The page also has a `rs.tools` and a `window.rs*` API for your script.
+If you must change the template's text, build the page and change `m.html`. The panel is `<div id="sb">`. These ids stay stable, and the
+page script uses them: `sb-hide`, `sb-show`, `sb-th`, `bm`, `co`, `sb-legend`, `q`, `tbl`, `count`, `detail`. Keep them, or hide them.

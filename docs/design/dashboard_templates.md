@@ -57,11 +57,12 @@ pub enum Edge { Right, Left, Top, Bottom }
 pub struct Dashboard {
     pub template: Template,
     pub layout: Layout,
-    pub panel: Option<Panel>,            // side, width_px; the HTML is the template's
+    pub panel: Option<Panel>,            // side, width_px, look, sections (the page's blocks), hide (the panel's own); the template's HTML
     pub toolbar: Option<Toolbar>,        // None: the MapLibre control column
     pub windows: WindowRules,
     pub basemap_box: BasemapBox,
     pub google_3d: Google3d,
+    pub legend: LegendOptions,           // rows: the page's own rows after the legend's
     pub phone: Phone,                    // max_width_px: 700, toolbar: Edge::Top
 }
 pub struct Toolbar { pub position: Edge, pub tools: Vec<Tool> }

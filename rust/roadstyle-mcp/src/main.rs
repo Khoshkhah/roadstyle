@@ -150,8 +150,8 @@ fn check_options(options: &Map<String, Value>) -> Result<(), String> {
     if bad.is_empty() {
         return Ok(());
     }
-    let hints: Vec<String> = bad.iter().map(|(k, near)| match near {
-        Some(n) => format!("'{k}' (did you mean '{n}'?)"),
+    let hints: Vec<String> = bad.iter().map(|(k, hint)| match hint {
+        Some(h) => format!("'{k}' ({h})"),
         None => format!("'{k}'"),
     }).collect();
     Err(format!("unknown option(s): {}. The options are render_edges keywords (docs/reference/parameters.md)", hints.join("; ")))
