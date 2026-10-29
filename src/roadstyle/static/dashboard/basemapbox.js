@@ -43,7 +43,7 @@ export function buildBox(menu){
   const tops = {};
   const topRow = (id, label) => {
     const lab = _bxEl("label", "rs-bm-row"), c = _bxEl("input"); c.type = "checkbox"; c.id = "rs-top-" + id; lab.append(c, _bxEl("span", "rs-bm-n", label));
-    lab.title = _bxTips[id]; const i = _bxEl("span", "rs-bm-i", "i"); i.title = _bxTips[id]; lab.append(i);
+    lab.title = _bxTips[id]; const i = _bxEl("span", "rs-bm-i", "?"); i.title = _bxTips[id]; lab.append(i);
     menu.appendChild(lab); tops[id] = {lab, c}; return c;
   };
   // the first layer of the page that is not the backdrop, the base map or a layer of this box: the layers on top go under it

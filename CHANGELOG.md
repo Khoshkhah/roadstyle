@@ -25,6 +25,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **The explanation marks in the base map box are a "?"** (they were an italic "i"): the "i" is only the credits button.
 - **The compass button also changes the tilt**: dragging it turns the map (left and right) and tilts it (up and down); a click sets north and the tilt back (`visualizePitch`).
   The attribution button has an italic serif "i" in a ring, so it does not look like a page's help button ("?").
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).

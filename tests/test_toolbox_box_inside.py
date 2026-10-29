@@ -196,3 +196,20 @@ def test_the_credits_button_has_no_tooltip_but_a_label_for_a_screen_reader():
         browser.close()
     assert not errors, errors
     assert got["title"] is None and got["label"] == "Attribution" and got["tip"] is False and got["tool"] == "Attribution", got
+
+
+def test_the_explanation_marks_of_the_base_map_box_are_a_question_mark():
+    html, errors = rs.render_dashboard(_edges(), basemap="ofm_liberty").html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, _serve(html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=90_000)
+        page.evaluate("rs.tools.open('basemap')")
+        page.wait_for_timeout(500)
+        marks = page.evaluate("[...document.querySelectorAll('.rs-bm-i')].map(e => e.textContent)")
+        browser.close()
+    assert not errors, errors
+    assert marks and set(marks) == {"?"}, marks
