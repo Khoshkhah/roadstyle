@@ -98,8 +98,6 @@ def test_maplibre_draws_the_mlt_tiles_as_the_mvt_tiles(served):
         browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
         for f in ("mvt", "mlt"):
             page = browser.new_page(viewport={"width": 800, "height": 600})
-            errors = []
-            page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
             page.goto(f"{base}/view.html")
             page.evaluate("""async f => {
               const style = await (await fetch('/' + f + '/style.json')).json();
