@@ -1,6 +1,7 @@
 """A JavaScript host page that starts with `rsDashboard(map, {style: null, prefix: "rs-", ...})` and gets its roads style later with `rs.setStyle` (the
 duckOSM page). The standard dashboard gives it, with no adapter of the page's:
-- a switch for the style's own base-map layers (`ov<i>`) and a 3D switch, for each style that comes, and the old ones go (gap 3);
+- the style's own base-map layers (`ov<i>`): one switch in the base-map box, their list with the colours in the legend box, no floating Layers box, and the 3D
+  tool; each for every style that comes, and they go with a style that has none (gap 3);
 - a raster base map under the roads, whose layers have the page's prefix (gap 4);
 - the dark twin of a base map in the dark theme, whoever asks (gap 6), and the sprite of a vector base map (gap 7);
 - the panel's shell, with no copy of its rules in the page (gap 8);
@@ -64,7 +65,7 @@ def _style(overlays=True):
         style["layers"] += [{"id": "ov0-fill", "type": "fill", "source": "ov0", "paint": {"fill-color": "#39c", "fill-opacity": 0.5}},
                             {"id": "ov0-3d", "type": "fill-extrusion", "source": "ov0", "layout": {"visibility": "none"}, "paint": {"fill-extrusion-height": 20}}]
         style["metadata"]["roadstyle:controls"] = {"overlays": [{"label": "Water", "source": "ov0", "layers": ["ov0-fill", "ov0-3d"], "extrude": "ov0-3d",
-                                                                  "interactive": False, "popup": [], "tooltip": None}]}
+                                                                  "interactive": False, "popup": [], "tooltip": None, "color": "#f4f4f4"}]}
     return style
 
 
@@ -117,22 +118,30 @@ def test_a_later_style_brings_its_base_map_layers_a_raster_map_goes_under_the_ro
         # gap 8: the panel's shell is dashboard.css (the host has no rule for #sb)
         shell = page.evaluate("""() => { const s = getComputedStyle(document.getElementById("sb")); return {position: s.position, width: s.width}; }""")
         assert shell["position"] == "fixed" and shell["width"] == "340px", shell
-        # gap 3: no overlay at the start, a Layers box and a 3D tool with the style that has them
+        # gap 3: no overlay at the start; the style that has them brings the switch (base-map box), the list (legend box) and the 3D tool, and no Layers box
         buildings = "() => rs.tools.list().find(t => t.id === 'buildings').title"
+        switch = "() => { rs.tools.open('basemap'); const r = document.querySelector('.rs-bm-layers'); const out = {hidden: r.hidden, label: r.textContent.trim(), on: r.querySelector('input').checked}; rs.tools.close('basemap'); return out; }"
         assert page.evaluate("() => !document.querySelector('.ov-ctrl')") and "vector base map" in page.evaluate(buildings)       # the base map's own tool
+        assert page.evaluate(switch)["hidden"]
         page.evaluate("(s) => addStyle(s)", _style())
-        page.wait_for_selector(".ov-ctrl")
-        assert page.evaluate("() => [...document.querySelectorAll('.ov-ctrl label')].map(l => l.textContent.trim())") == ["Water", "Buildings 3D"]
+        assert page.evaluate("() => document.querySelectorAll('.ov-ctrl').length + document.querySelectorAll('#rs-b3d').length") == 0
+        assert page.evaluate(switch) == {"hidden": False, "label": "Map layers", "on": True}
         assert page.evaluate(buildings) == "Buildings in 3D"
-        page.evaluate("() => rs.setOverlay('Water', false)")
-        page.evaluate("(s) => addStyle(s)", _style())           # the same overlays again: the switch that the person turned off stays off
+        page.evaluate("() => { rs.tools.open('legend'); }")
+        assert page.evaluate("() => document.querySelector('.rs-cb-layers .lg-row').textContent") == "Water"
+        assert page.evaluate("() => getComputedStyle(document.querySelector('.rs-cb-layers .lg-sw')).boxShadow") != "none"      # the swatch has its border
+        page.evaluate("() => rs.tools.close('legend')")
+        # the one switch hides all the layers together; the next style has them hidden too
+        page.evaluate("() => rsSetOverlays(false)")
+        page.evaluate("(s) => addStyle(s)", _style())
         assert page.evaluate("() => map.getLayoutProperty('rs-ov0-fill', 'visibility')") == "none"
-        assert not page.evaluate("() => document.querySelector('.ov-ctrl input').checked")
-        page.evaluate("() => rs.setOverlay('Water', true)")
-        page.check("#rs-b3d")
+        assert not page.evaluate(switch)["on"]
+        page.evaluate("() => rsSetOverlays(true)")
+        assert page.evaluate("() => map.getLayoutProperty('rs-ov0-fill', 'visibility')") == "visible"
+        page.evaluate("() => rsSetBuildings3D(true)")
         assert page.evaluate("() => map.getLayoutProperty('rs-ov0-3d', 'visibility')") == "visible"
         page.evaluate("(s) => addStyle(s)", _style(overlays=False))
-        assert page.evaluate("() => document.querySelectorAll('.ov-ctrl').length + document.querySelectorAll('#rs-b3d').length") == 0
+        assert page.evaluate(switch)["hidden"]
         assert "vector base map" in page.evaluate(buildings)           # the base map's own tool again
         # gap 4: a raster base map goes under the roads of the page, which have the prefix
         page.evaluate("() => rsSetBasemap('osm')")
@@ -210,7 +219,8 @@ def _engine_style():
 _TOOLS = """() => ({
   roads: [...document.querySelectorAll('.flt-ctrl label')].map(l => l.textContent.trim()),
   roadsOff: [...document.querySelectorAll('.flt-ctrl input')].filter(i => !i.checked).length,
-  layers: [...document.querySelectorAll('.ov-ctrl label')].map(l => l.textContent.trim()),
+  floating: document.querySelectorAll('.ov-ctrl').length, switchShown: !document.querySelector('.rs-bm-layers').hidden,
+  layers: (() => { rs.tools.open('legend'); const l = [...document.querySelectorAll('.rs-cb-layers .lg-row')].map(r => r.textContent.trim()); rs.tools.close('legend'); return l; })(),
   tunnel: !!document.querySelector('.tn-ctrl #tn-pre'),
   legend: !rs.tools.list().find(t => t.id === 'legend').disabled,
   classes: window.RS_CLASSES.length, arrowImage: map.hasImage('oneway'), colourOptions: window.RS_COLOR_OPTIONS.length,
@@ -239,13 +249,13 @@ def test_every_control_that_a_style_gives_follows_a_later_style_of_the_engine(ho
         page.goto(base + "/page.html")
         page.wait_for_function("window.ready === true", timeout=60_000)
         start = page.evaluate(_TOOLS)
-        assert not start["roads"] and not start["layers"] and not start["tunnel"] and not start["legend"] and not start["arrowImage"], start
+        assert not start["roads"] and not start["layers"] and not start["switchShown"] and not start["tunnel"] and not start["legend"] and not start["arrowImage"], start
         page.evaluate("(s) => addStyle(s)", style)
         page.wait_for_selector(".flt-ctrl")
         page.wait_for_function("map.hasImage('oneway')", timeout=20_000)
         first = page.evaluate(_TOOLS)
         assert "primary" in first["roads"] and first["classes"] > 3, first
-        assert "buildings" in first["layers"] and first["tunnel"] and first["legend"] and first["colourOptions"] == 1, first
+        assert "buildings" in first["layers"] and len(first["layers"]) == 17 and first["floating"] == 0 and first["switchShown"] and first["tunnel"] and first["legend"] and first["colourOptions"] == 1, first
         # a class that the person switched off stays off with the next style, and the box has it unchecked
         page.evaluate("() => rsSetClasses(RS_CLASSES.filter(c => c !== 'primary'))")
         page.evaluate("(s) => addStyle(s)", style)
@@ -255,7 +265,7 @@ def test_every_control_that_a_style_gives_follows_a_later_style_of_the_engine(ho
         # a style with none of the controls takes every one of them away
         page.evaluate("(s) => addStyle(s)", _style(overlays=False))
         gone = page.evaluate(_TOOLS)
-        assert not gone["roads"] and not gone["layers"] and not gone["tunnel"] and not gone["legend"] and gone["classes"] == 0, gone
+        assert not gone["roads"] and not gone["layers"] and not gone["switchShown"] and not gone["tunnel"] and not gone["legend"] and gone["classes"] == 0, gone
         browser.close()
     assert not errors, errors
 
@@ -281,3 +291,29 @@ def test_the_boundary_follows_a_later_style(host):
         assert page.evaluate("() => map.getMinZoom()") == min_zoom           # a style with no boundary takes the limit away
         browser.close()
     assert not errors, errors
+
+
+def test_the_boxes_with_the_layers_stay_inside_a_phone(host):
+    base, vec = host
+    style, tiler = _engine_style()
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="application/x-protobuf", body=bytes(tiler.tile(*(int(v) for v in r.request.url.rsplit("/t/", 1)[1].split("?")[0].split("/")))))
+                   if "/t/" in r.request.url else r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        page.evaluate("(s) => addStyle(s)", style)
+        page.wait_for_selector(".flt-ctrl")
+        seen = {}
+        for tool, box in (("basemap", ".bm-menu"), ("legend", "#rs-color-box")):
+            page.evaluate("(t) => rs.tools.open(t)", tool)
+            page.wait_for_timeout(300)
+            seen[tool] = page.evaluate("(b) => { const r = document.querySelector(b).getBoundingClientRect(); return {left: r.left, right: r.right, top: r.top, bottom: r.bottom, scrolls: document.querySelector(b).scrollHeight > document.querySelector(b).clientHeight + 1}; }", box)
+            page.evaluate("(t) => rs.tools.close(t)", tool)
+        browser.close()
+    assert not errors, errors
+    for tool, r in seen.items():
+        assert r["left"] >= 11 and r["right"] <= 390 - 11 and r["top"] >= 0 and r["bottom"] <= 844 - 11, (tool, r)

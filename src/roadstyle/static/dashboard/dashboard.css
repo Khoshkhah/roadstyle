@@ -271,6 +271,9 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-cb-lg .lg-title{grid-column:1/-1;font-weight:600;margin-bottom:2px}
 .rs-cb-lg .lg-row{display:flex;align-items:center;gap:7px;white-space:nowrap;min-width:0}
 .rs-cb-lg .lg-sw{width:16px;height:10px;border-radius:3px;display:inline-block;flex:none;box-shadow:inset 0 0 0 1px rgba(128,128,128,.35)}
+.rs-cb-layers .lg-sw{box-shadow:inset 0 0 0 1px rgba(128,128,128,.55)}      /* a map layer's colour can be white or near white (land, paved): the border shows it */
+.rs-cb-layers .lg-off{opacity:.45}
+.rs-bm-layers[hidden]{display:none}
 .rs-cb-lg .lg-sw.circle{width:11px;height:11px;margin:0 2.5px;border-radius:50%}
 .rs-cb-lg .lg-sw.line{height:4px;border-radius:2px;box-shadow:none}
 .rs-cb-lg .lg-bar{grid-column:1/-1;height:10px;border-radius:5px;margin:4px 0 2px}

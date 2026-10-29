@@ -5,6 +5,7 @@
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields, _esc} from "../popup.js";
 import {map, O, OVERLAYS, _emit} from "./core.js";
+import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
@@ -106,11 +107,21 @@ function _ovBind(id){
 // The Layers box: one row for each overlay, in the panel's Roads card (panel mode) or in a box of its own; a new style takes the rows of the old one away
 // and brings its own (a box with no row is taken away). The labels that the person turned off stay off.
 const _ovOff = new Set();
-let _ovBox = null;
+let _ovBox = null, _ovGroupOff = false;
+// A page with a toolbar has no Layers box: one switch for all the layers is in the base-map box (basemapbox.js), and the legend box lists them
+// (colorbox.js). A page with no base-map box keeps the Layers box.
+const _ovInToolbox = () => !!(O.dashboard && O.dashboard.toolbar && getTool("basemap"));
+// rsSetOverlays(on): every layer of the style together. On: each layer as the style starts it (the points of a base map start off); off: all of them hidden
+export function rsSetOverlays(on){
+  _ovGroupOff = !on;
+  OVERLAYS.forEach(ov=>rsSetOverlay(ov.label, on ? ov.visible0 : false));
+  _emit("rs:overlayschange", {visible: !!on});
+}
+export const rsGetOverlays = () => OVERLAYS.length > 0 && !_ovGroupOff;
 function _ovBoxRows(){
   if(_ovBox){ _ovBox.remove(); _ovBox = null; }
   for(const k of Object.keys(_ovCbs)){ _ovCbs[k].closest("label")?.remove(); delete _ovCbs[k]; }
-  if(!OVERLAYS.length || !O.overlay_control) return;       // overlay_control=False: no Layers box (rsSetOverlay still works)
+  if(!OVERLAYS.length || !O.overlay_control || _ovInToolbox()) return;       // overlay_control=False: no Layers box (rsSetOverlay still works)
   // panel mode: overlay toggles join the panel's Roads card, right after its Bridges row — a
   // second floating "Layers" box on the map competes with the panel that hosts everything else.
   // Non-panel keeps the standalone Layers control.
@@ -128,11 +139,14 @@ export function useOverlays(){
   _OV_POPUP = O.overlay_popup;
   clearOvSel(); _ovHov = null; _ovUnder = null;
   if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
-  OVERLAYS.forEach(ov=>{ _ovFetch(ov); ov.layers.forEach(_ovBind); if(_ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
+  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; _ovFetch(ov); ov.layers.forEach(_ovBind); if(_ovGroupOff || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
   _ovBoxRows();
+  _emit("rs:overlayschange", {visible: rsGetOverlays()});       // the base-map box and the legend box read the layers again
 }
 export function initOverlays(){
   window.rsSetOverlay = rsSetOverlay;
+  window.rsSetOverlays = rsSetOverlays;
+  window.rsGetOverlays = rsGetOverlays;
   useOverlays();
 }

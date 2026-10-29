@@ -6,7 +6,7 @@
 // THE LABELS SWITCH is one state for the 2D map and the Google 3D window (window.rsLabelsOn): the window always follows it. The 2D map gets
 // labels only from a base map that can show them: the style's own labels (a vector style), or Esri's label tiles (Esri Gray, Esri Satellite).
 // Blank, OpenStreetMap, Esri Streets and CARTO get no label layer from the page. The choice is kept for each base map.
-import {map, O, _emit} from "./core.js";
+import {map, O, OVERLAYS, _emit} from "./core.js";
 import {rsBuildings} from "./basemap.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
@@ -77,6 +77,13 @@ export function buildBox(menu){
   topRow("hillshade", "Hillshade").checked = _bxGet("hillshade") === "1";
   topRow("labels", "Labels");
   topRow("buildings", "3D buildings");
+  // the style's own base-map layers (the overlays of roadstyle:controls): one switch for all of them, in a group of its own, and only for a style that has them
+  const layers = _bxEl("div", "rs-bm-layers"), lrow = _bxEl("label", "rs-bm-row"), lc = _bxEl("input"), lname = _bxEl("span", "rs-bm-n");
+  lc.type = "checkbox"; lrow.append(lc, lname); layers.append(_bxEl("hr"), lrow); menu.appendChild(layers);
+  lc.onchange = () => window.rsSetOverlays(lc.checked);
+  const syncLayers = () => { layers.hidden = !OVERLAYS.length || O.overlay_control === false; lname.textContent = O.overlays_label; lc.checked = window.rsGetOverlays ? window.rsGetOverlays() : false; };
+  for(const ev of ["rs:overlayschange", "rs:overlaychange"]) document.addEventListener(ev, syncLayers);
+  syncLayers();
   tops.hillshade.c.onchange = () => { _bxSet("hillshade", tops.hillshade.c.checked); apply(); };
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
   tops.buildings.c.onchange = () => rsBuildings(tops.buildings.c.checked);

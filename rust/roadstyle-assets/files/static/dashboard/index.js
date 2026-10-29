@@ -55,6 +55,7 @@ const RS_DEFAULTS = {
   filter_control: true,         // the Roads box (render's keyword; a page key, not the style's)
   legend: true,                 // the legend box of the colour options (render's keyword; the style always has the legend data)
   overlays: [], overlay_control: true, overlay_popup: true,
+  overlays_label: "Map layers",  // the label of the one switch for the style's base-map layers (the base-map box) and of their list (the legend box)
   modes: [], box_layout: "corner",   // roadstyle:controls.modes [[mode, count], ...]; "stack": a base map's page (Layers under Roads, folded)
   tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], pick: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,

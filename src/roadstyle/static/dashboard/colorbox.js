@@ -3,7 +3,7 @@
 // (rs.setStyle) shows its own options. A page with no colour option has no such tool. The map's own "Colour by" and legend are hidden when
 // the page has a bar (dashboard.css).
 import {_esc} from "../popup.js";
-import {O, _emit} from "./core.js";
+import {O, OVERLAYS, _emit} from "./core.js";
 import {COLOR_OPTIONS, _coActive, rsSetColorField} from "./color.js";
 import {coLegendNow, coLegendExtra} from "./legend.js";
 import {replaceTool, greyTool, getTool, wrap, LEGEND_ICON} from "./tools.js";
@@ -13,6 +13,10 @@ function _cbClasses(){
   const f = O.filter || {}, sw = f.swatches || {};
   return (f.classes || []).map(c => '<div class="lg-row"><span class="lg-sw" style="background:' + _esc(sw[c] || "#888") + '"></span>' + _esc(c) + "</div>").join("");
 }
+// the style's own base-map layers, one row for each with its colour and no switch (the one switch is in the base-map box); a row of a layer that is hidden is dimmed
+const _cbLayers = () => !OVERLAYS.length || O.overlay_control === false ? "" :
+  '<div class="rs-bm-h">' + _esc(O.overlays_label) + '</div><div class="rs-cb-lg rs-cb-layers">' +
+  OVERLAYS.map(ov => '<div class="lg-row' + (ov.visible === false ? " lg-off" : "") + '">' + (ov.color ? '<span class="lg-sw" style="background:' + _esc(ov.color) + '"></span>' : "") + _esc(ov.label) + "</div>").join("") + "</div>";
 let _cb = null;                // the box of the tool now: {box, fill}
 let _cbModes = null;             // the page's own colour modes (rs.colorModes): {names, active, onChange}; they take the place of the style's colour options in the box
 const _cbOptList = () => _cbModes ? _cbModes.names.map(name => ({name})) : COLOR_OPTIONS, _cbOptActive = () => _cbModes ? _cbModes.active : _coActive;
@@ -21,7 +25,7 @@ const _cbHasOpts = () => !!(COLOR_OPTIONS.length || _cbModes);
 // new style (rs.setStyle); the tool keeps its place in the bar
 export function useColorBox(){
   if(!(O.dashboard && O.dashboard.toolbar)) return;
-  const want = _cbHasOpts() || O.live, has = getTool("legend") && !getTool("legend").disabled;       // a live-data page has the legend of its data, with no colour option
+  const want = _cbHasOpts() || O.live || OVERLAYS.length > 0, has = getTool("legend") && !getTool("legend").disabled;       // a live-data page has the legend of its data, with no colour option
   if(!want){ _cb = null; if(has) greyTool("legend"); return; }
   if(has){ const t = getTool("legend"); t.title = t.el.querySelector("button").title = _cbHasOpts() ? "Colour by and legend" : "Legend"; return; }
   const b = document.createElement("button"), d = wrap(b), box = document.createElement("div");
@@ -31,9 +35,10 @@ export function useColorBox(){
     const list = _cbOptList(), now = _cbOptActive();
     const opts = list.map((o, i) => '<button type="button" class="rs-cb-opt' + (i === now ? " on" : "") + '" role="radio" aria-checked="' + (i === now) + '" data-i="' + i +
                                     '">' + _esc(o.name) + "</button>").join("");
-    const lg = (coLegendNow() || _cbClasses()) + coLegendExtra();
+    const lg = (list.length || O.live ? coLegendNow() || _cbClasses() : "") + coLegendExtra(), layers = _cbLayers();
     box.innerHTML = (list.length ? '<div class="rs-bm-h">Colour by</div><div class="rs-cb-opts" role="radiogroup">' + opts + "</div>" : "") +
-      (lg ? (list.length ? "<hr>" : "") + '<div class="rs-bm-h">Legend</div><div class="rs-cb-lg">' + lg + "</div>" : "");
+      (lg ? (list.length ? "<hr>" : "") + '<div class="rs-bm-h">Legend</div><div class="rs-cb-lg">' + lg + "</div>" : "") +
+      (layers ? (list.length || lg ? "<hr>" : "") + layers : "");
     box.querySelectorAll(".rs-cb-opt").forEach(o => { o.onclick = () => { const i = parseInt(o.dataset.i, 10); if(_cbModes) _cbPickMode(i); else rsSetColorField(i); fill(); }; });
   };
   const open = () => { fill(); box.hidden = false; };
@@ -69,5 +74,6 @@ export const rsColorModes = {
 export function initColorBox(){
   document.addEventListener("rs:colorchange", () => { if(_cb && !_cb.box.hidden) _cb.fill(); });
   document.addEventListener("rs:datachange", () => { if(_cb && !_cb.box.hidden) _cb.fill(); });                // live data: a new day, a new legend
+  for(const ev of ["rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, () => { if(_cb && !_cb.box.hidden) _cb.fill(); });      // a layer that is shown or hidden: its row
   useColorBox();
 }

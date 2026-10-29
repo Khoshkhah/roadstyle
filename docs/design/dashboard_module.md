@@ -195,7 +195,8 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window, kinds}]` (`kinds`: a base-map layer's `[[kind, count], ...]`, most first) | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js`, `features.js` |
 | `modes` | a duckOSM map's modes: `[[mode, count], ...]` (`roadstyle:controls.modes`) | `[]` | `filter.js` |
 | `box_layout` | `"stack"`: a base map's page (the Roads and Layers boxes folded, Layers under Roads); `"corner"`: the Layers box alone in its corner. On a screen 700 px wide or less (`panel._narrow`), every box (Roads, Layers, Legend) starts folded in both layouts, as the side panel starts closed | `"corner"` | `filter.js`, `overlays.js`, `panel.js` |
-| `overlay_control` | `overlay_control` | `true` | `overlays.js` |
+| `overlay_control` | `overlay_control` | `true`: on a page with a bar, the base-map box has the one switch for all the layers and the legend box lists them; on a page with no bar (or no base-map box) the Layers box has a row for each. `false`: none of them | `overlays.js`, `basemapbox.js`, `colorbox.js` |
+| `overlays_label` | `roadstyle:controls.overlays_label`, else the page's option | `"Map layers"`: the label of the one switch (a duckOSM page: `"duckOSM layers"`) and of the list in the legend box | `basemapbox.js`, `colorbox.js` |
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
 | `tunnel` | `tunnel_control` and the theme's tunnels: `{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}` | `{layers: {}, steps: [], control: false}` | `tunnel.js`, `arrows.js` |
 | `fill_layers` | the road fill layer ids | `[]` | `svspot.js` |

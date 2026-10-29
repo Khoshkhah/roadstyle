@@ -35,6 +35,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **A page with a bar has no floating Layers box.** The style's own base-map layers (the duckOSM layers: landcover, water, buildings, ...) have one switch for all of them in the
+  base-map box (`overlays_label`, default "Map layers"; `rsSetOverlays(on)`), and the legend box lists them with their colours, each swatch with a thin border so that a white
+  or near-white colour shows. A page with no bar, or with no base-map box, keeps the Layers box.
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
 - **The dashboard shows every road class at every zoom.** The template `dashboard` gives `minzoom=False` where the call gives none (a data page shows every road; the
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.

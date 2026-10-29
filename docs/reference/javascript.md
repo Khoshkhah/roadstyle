@@ -25,6 +25,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rs.select(id)`, `rs.highlight(ids)`, `rs.focus(ids)` | as `rsSelect`, `rsHighlight`, `rsFocus`, with edge ids (`null`: deselect) |
 | `rs.query({column: value})`, `rs.find(text)`, `rs.props(id)` | edge ids of the roads that match; one road's properties |
 | `rs.setColorBy(name)`, `rs.color([{color, ids}])`, `rs.setFilter({classes, bridges, tunnels, access, ids})` | as the controls |
+| `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box. Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()`, and `ready()` (with `toolbar.hold`). The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
 | `rs.sections` | the dashboard panel's sections: `add({id, html, el, label, after, before})`, `get`, `list`, `hide`, `show`, `remove`; event `rs:sectionchange` ([guide](../guides/dashboard-panel.md)) |
