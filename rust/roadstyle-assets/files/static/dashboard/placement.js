@@ -7,8 +7,13 @@ const _plRead = () => { try{ return JSON.parse(localStorage.getItem(_plKey)) || 
 export const EDGES = ["left", "top", "right", "bottom"];
 // the place now: the person's choice, else the template's
 export function layoutNow(){
-  const d = O.dashboard, s = _plRead();
+  const d = O.dashboard, s = d && d.toolbar && d.toolbar.settings ? _plRead() : {};       // no settings button: no saved choice (an old one would still win)
   return {toolbar: s.toolbar || (d && d.toolbar && d.toolbar.position), panel: s.panel || (d && d.panel && d.panel.side), scale: s.scale !== false, look: s.look || (d && d.panel && d.panel.look)};
+}
+// the place of the panel and the scale box at the start: the page's, or the person's saved choice. Always, not only with the settings button
+export function initPlacement(){
+  const p = layoutNow();
+  setPanelSide(p.panel); setPanelLook(p.look); setScaleShown(p.scale);
 }
 export function savePlace(part, value){
   const s = _plRead(); s[part] = value;

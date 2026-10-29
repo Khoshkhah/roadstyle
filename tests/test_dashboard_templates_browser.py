@@ -141,3 +141,37 @@ def test_changing_the_layout_closes_the_open_settings_box(tmp_path):
         edge = page.evaluate("document.getElementById('rs-toolbar').dataset.edge")
         browser.close()
     assert not errors and got == [(True, False)] * 3 and edge == "left"
+
+
+def test_the_typed_panel_options_work_without_the_settings_button(tmp_path):
+    """panel.width_px, panel.side and panel.look are read at the start, also in the dock layout (no toolbar, so no settings button), and a saved choice of
+    an earlier visit does not override a page that has no settings button."""
+    import roadstyle as rs
+    path = tmp_path / "typed.html"
+    rs.render_dashboard(_edges(), basemap="blank", layout="dock", dashboard={"panel": {"side": "left", "width_px": 420}}).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.add_init_script("localStorage.setItem('rs-settings:layout', JSON.stringify({panel: 'right'}))")      # an old choice
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.wait_for_timeout(300)
+        sb, mp = _box(page, "#sb"), _box(page, "#map")
+        left = page.evaluate("document.documentElement.classList.contains('rs-panel-left')")
+        browser.close()
+    assert left and sb["w"] == 420 and sb["l"] == 0 and mp["l"] == 420 and mp["w"] == 1280 - 420
+
+
+def test_a_wider_panel_in_the_overlay_layout(tmp_path):
+    import roadstyle as rs
+    path = tmp_path / "wide.html"
+    rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"width_px": 420}}).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.wait_for_timeout(300)
+        sb, card, bar = _box(page, "#sb"), _box(page, "#sb .sb-card"), _box(page, "#rs-toolbar")
+        browser.close()
+    assert sb["w"] == 420 and abs(bar["r"] - card["l"]) <= 1.01
