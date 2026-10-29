@@ -35,8 +35,8 @@ gives the defaults. A page can change each field, except the panel's template HT
 | Form | Called by | Desktop form | Phone form (width 700 px or less) |
 |---|---|---|---|
 | `map` | `render_edges` (default) | The map and the MapLibre control column, as today. A host panel (`side_panel_html`) is possible | The column as today; the boxes fold (`panel._narrow`) |
-| `dashboard`, `layout="overlay"` | `render_dashboard` (default) | The sidebar `templates/dashboard.html` floats at the right, toolbar at the right, window rules on | Toolbar horizontal at the top; the sidebar is a bottom sheet; a window is a bottom sheet, and one sheet is open at a time |
-| `dashboard`, `layout="dock"` | `render_dashboard(layout="dock")` | The same sidebar docked at the right, 340 px. No toolbar | The sidebar is a bottom sheet (3 heights: closed, 40 %, full). The map stays full width |
+| `dashboard`, `layout="overlay"` | `render_dashboard` (default) | The sidebar `templates/dashboard.html` floats at the left, the toolbar at the left, window rules on | Toolbar horizontal at the top; the sidebar is a bottom sheet; a window is a bottom sheet, and one sheet is open at a time |
+| `dashboard`, `layout="dock"` | `render_dashboard(layout="dock")` | The same sidebar docked at the left, 340 px. No toolbar | The sidebar is a bottom sheet (3 heights: closed, 40 %, full). The map stays full width |
 
 **Decided 2026-10-29: there is one template, `dashboard`.** There is no `classic` and there is no report page. The old docked form is
 `layout="dock"`, a setting of the dashboard. The names `classic` and `report` are errors of `template=`; a caller of `render_report` uses

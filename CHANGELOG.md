@@ -23,6 +23,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
 ### Changed
+- **New defaults of the dashboard** (set them back with `dashboard={...}`, see `guides/migrating-dashboard.md`): the panel and the toolbox are at the **left**; the scale and zoom
+  box is **hidden** (`scale_box`; the settings can show it); the base map is **blank** and the switcher is on, so the toolbox lists the base maps that need no key and a default
+  page has no CARTO key warning; the panel hides the sections that the toolbox has (`base_map`, `colour_by`, `legend`), so it shows the query and the selected road.
 - **The panel's scrollbar** is at its outer edge (at the left for a left panel, at the right for a right panel), shows only while the pointer is over the panel or
   the body scrolls, and has a soft fade at the bottom edge while more is below. The thumb is the text color at 47 % (light) or 40 % (dark): 3:1 against the panel.
 

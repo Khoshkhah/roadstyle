@@ -1,6 +1,6 @@
 # Dashboard layout
 
-A dashboard is a map with a side panel. `render_dashboard` makes it from your road data.
+A dashboard is a map with a side panel. `render_dashboard` makes it from your road data. It starts with a blank map (no key), the panel and the toolbox at the left, and no scale box.
 
 ```python
 import roadstyle as rs
@@ -14,8 +14,8 @@ There is one template with a panel: `dashboard`. A future template follows its s
 
 | Keyword | What you get |
 |---|---|
-| `layout="overlay"` (default) | The map fills the window. The panel floats over it. The toolbox is a bar at the right |
-| `layout="dock"` | The panel is docked at the right and takes its own space. No toolbox: the tools are the MapLibre buttons |
+| `layout="overlay"` (default) | The map fills the window. The panel floats over it, at the left, with the toolbox next to it |
+| `layout="dock"` | The panel is docked at the left and takes its own space. No toolbox: the tools are the MapLibre buttons |
 
 `template="map"` is the map only (the default of `render_edges`). There is no `classic` and no report page: use `render_dashboard`.
 
@@ -26,7 +26,7 @@ colour and legend, settings, attribution. A tool that the page does not use is n
 
 A button that opens a box opens it toward the map. One box is open at a time. A click outside the box, or the Escape key, closes it.
 
-The panel scrolls under its title, with the scrollbar at its outer edge. Your own blocks and legend rows: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard to the new version](migrating-dashboard.md).
+The panel scrolls under its title. Your own blocks and legend rows: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard](migrating-dashboard.md).
 
 To add a tool of your own, use `rs.tools`:
 
@@ -34,15 +34,15 @@ To add a tool of your own, use `rs.tools`:
 rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => save()});
 ```
 
-To hide the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` when they are added (the bar
-shows after 6 s at the latest). The keyword `dashboard=` changes any option of the template, for example the bar's `position` or the panel's `look`.
+To hide the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` (the bar shows after 6 s at the latest).
+`dashboard=` changes any option of the template, for example the bar's `position` or the panel's `look`.
 
 ## The settings
 
 The gear button opens the settings. They are kept in the browser, not in the page file.
 
 - **Layout.** The bar can be at the left, the top, the right or the bottom. The panel can be at the left or the right,
-  as a frame (default) or as a card. The scale and zoom box can be hidden.
+  as a frame (default) or as a card. The scale and zoom box can be shown.
 - **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
 - **Keys.** A Google Maps key (Street View and Google 3D) and a CARTO key. A key that you save is used instead of the key of the page.
   A page with a toolbox needs no Google key at build time: the person adds it.

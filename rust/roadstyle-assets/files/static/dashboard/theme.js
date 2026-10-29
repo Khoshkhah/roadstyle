@@ -12,13 +12,14 @@ export function initTheme(){
   document.documentElement.dataset.rsTheme = "light";
   // a base map with a dark twin (`dark` in data/basemaps.json) follows the theme: the twin in the dark theme, the light map again in the
   // light theme; and a dark base map that the person picks turns the page dark
-  let current = (window.RS_BASEMAPS || [])[0] || null;
+  let current = null;         // the base map now: the first of the list (the page's own) until a change; the list is not there yet when this runs
   document.addEventListener("rs:basemapchange", e => {
     current = (window.RS_BASEMAPS || []).find(b => b.key === e.detail.basemap) || current;
     if(current && current.is_dark) rsSetTheme("dark");
   });
   document.addEventListener("rs:themechange", e => {
     const all = window.RS_BASEMAPS || [];
+    current = current || all[0] || null;
     if(!current || !window.rsSetBasemap) return;
     if(e.detail.theme === "dark" && current.dark) window.rsSetBasemap(current.dark);
     else if(e.detail.theme === "light"){ const light = all.find(b => b.dark === current.key); if(light) window.rsSetBasemap(light.key); }

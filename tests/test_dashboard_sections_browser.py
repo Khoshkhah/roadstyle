@@ -110,9 +110,9 @@ def test_the_scrollbar_of_the_panel_is_at_its_outer_edge(tmp_path, side):
     rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"side": side, "sections": [tall]}}).save(path)
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path, scrollbars=True)
-        got = page.evaluate("""() => { const b = document.querySelector('#sb .sb-body'), l = b.querySelector('label').getBoundingClientRect(), r = b.getBoundingClientRect();
+        got = page.evaluate("""() => { const b = document.querySelector('#sb .sb-body'), l = b.querySelector('[data-rs-section=tall] label').getBoundingClientRect(), r = b.getBoundingClientRect();
             return {bar: b.offsetWidth - b.clientWidth, scrolls: b.scrollHeight > b.clientHeight, gapLeft: l.left - r.left, gapRight: r.right - l.right,
-                    dir: getComputedStyle(b.querySelector('label')).direction}; }""")
+                    dir: getComputedStyle(b.querySelector('[data-rs-section=tall] label')).direction}; }""")
         browser.close()
     assert not errors and got["scrolls"] and got["bar"] > 0 and got["dir"] == "ltr"
     assert (got["gapLeft"] > got["gapRight"]) == (side == "left")        # the scrollbar's width is on the outer side
@@ -149,3 +149,36 @@ def test_the_panel_scrollbar_is_hidden_at_rest_has_enough_contrast_and_the_fade_
     assert rest.startswith("rgba(0, 0, 0, 0)"), rest                       # at rest the thumb is transparent
     assert more_top is True and more_end is False
     assert light["ratio"] >= 3.0 and dark["ratio"] >= 3.0, (light, dark)
+
+
+def test_the_default_panel_shows_only_the_query_and_the_selected_road_and_the_toolbox_has_the_rest(tmp_path):
+    """The toolbox has boxes for the base map, the colour and the legend, so the panel hides their sections; the page starts with no scale box."""
+    path = tmp_path / "default.html"
+    rs.render_dashboard(_edges(), color_options={"Road class": {}}).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        got = page.evaluate("""() => ({shown: rs.sections.list().filter(id => !rs.sections.get(id).hidden), tools: rs.tools.list().map(t => t.id),
+            scale: getComputedStyle(document.querySelector('.maplibregl-ctrl-scale')).display, rows: document.querySelectorAll('#bm option').length})""")
+        browser.close()
+    assert not errors and got["shown"] == ["query", "selected_road"]
+    assert {"basemap", "legend"} <= set(got["tools"]) and got["scale"] == "none"
+
+
+def test_the_base_map_follows_the_theme_from_the_start(tmp_path):
+    """The blank map (and any base map with a dark twin) turns dark with the theme, and light again, with no earlier choice of a base map."""
+    path = tmp_path / "theme.html"
+    rs.render_dashboard(_edges(), color_options={"Road class": {}}).save(path)
+    probe = "({key: rs.getState().basemap, bg: getComputedStyle(map.getContainer()).backgroundColor})"
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        light = page.evaluate(probe)
+        page.evaluate("rsSetTheme('dark')")
+        page.wait_for_timeout(600)
+        dark = page.evaluate(probe)
+        page.evaluate("rsSetTheme('light')")
+        page.wait_for_timeout(600)
+        back = page.evaluate(probe)
+        browser.close()
+    assert not errors
+    assert (light["key"], dark["key"], back["key"]) == ("blank", "blank_dark", "blank")
+    assert dark["bg"] != light["bg"] and back["bg"] == light["bg"]

@@ -316,6 +316,9 @@ pub struct Dashboard {
     pub google_3d: Google3d,
     #[serde(default)]
     pub legend: LegendOptions,
+    /// the scale bar and the zoom number: shown at the start. The dashboard hides them (the person can show them in the settings)
+    #[serde(default)]
+    pub scale_box: bool,
     pub phone: Phone,
 }
 
@@ -326,22 +329,25 @@ impl Template {
         match self {
             Template::Map => None,
             Template::Dashboard => Some((roadstyle_assets::text!("templates/dashboard.html"),
-                r#"{"name": "Roads dashboard", "basemap_switcher": false, "filter_control": false, "road_popup": false}"#)),
+                r#"{"name": "Roads dashboard", "basemap": "blank", "basemap_switcher": true, "filter_control": false, "road_popup": false}"#)),
         }
     }
 
     /// The defaults of the template with a layout (`Map` has no panel, so the layout does not change it).
     pub fn dashboard(self, layout: Layout) -> Dashboard {
-        let right = Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame, sections: Vec::new(), hide: Vec::new() });
+        // the panel at the left, with the sections that the bar's boxes already have (the base map, the colour and the legend) hidden (decided 2026-10-29)
+        let panel0 = Some(Panel { side: Edge::Left, width_px: 340, look: PanelLook::Frame, sections: Vec::new(),
+                                  hide: ["base_map", "colour_by", "legend"].map(String::from).to_vec() });
         let free = WindowRules { clamp: false, recenter_map: true, restore_open: true, remember: true };
         let phone = Phone { max_width_px: 700, toolbar: Edge::Top };
         let (layout, panel, toolbar, windows) = match (self, layout) {
             (Template::Map, _) => (Layout::Dock, None, None, free),
-            (Template::Dashboard, Layout::Dock) => (Layout::Dock, right.clone(), None, free),
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, right.clone(), Some(Toolbar { position: Edge::Right, settings: true, hold: false }),
+            (Template::Dashboard, Layout::Dock) => (Layout::Dock, panel0.clone(), None, free),
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone(), Some(Toolbar { position: Edge::Left, settings: true, hold: false }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
-        Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(), phone }
+        Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(),
+                    scale_box: self == Template::Map, phone }
     }
 }
 
@@ -375,6 +381,9 @@ impl Dashboard {
                 classes.push("rs-panel-card".into());
             }
             width = format!("document.documentElement.style.setProperty(\"--rs-panel-w\",\"{}px\");", p.width_px);
+        }
+        if !self.scale_box {
+            classes.push("rs-hide-scale".into());
         }
         let list = classes.iter().map(|c| format!("\"{c}\"")).collect::<Vec<_>>().join(",");
         format!("<script>(function(){{var c=document.documentElement.classList;c.add({list});{width}\
@@ -449,9 +458,10 @@ mod tests {
     #[test]
     fn each_form_has_its_defaults() {
         let d = Template::Dashboard.dashboard(Dock);
-        assert_eq!((d.layout, d.panel, d.toolbar), (Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame, sections: Vec::new(), hide: Vec::new() }), None));
+        assert_eq!((d.layout, d.panel.as_ref().map(|p| (p.side, p.width_px, p.look)), d.toolbar), (Dock, Some((Edge::Left, 340, PanelLook::Frame)), None));
+        assert_eq!(d.panel.as_ref().unwrap().hide, ["base_map", "colour_by", "legend"]);
         let r = Template::Dashboard.dashboard(Overlay);
-        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false })));
+        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Left, settings: true, hold: false })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
         for layout in [Dock, Overlay] {         // the map has no panel, whatever the layout is
             let free = Template::Map.dashboard(layout);
@@ -477,8 +487,8 @@ mod tests {
     #[test]
     fn the_first_paint_script_names_the_classes_of_the_form() {
         let r = Template::Dashboard.dashboard(Overlay).first_paint();
-        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right")"#) && r.contains("(max-width:700px)"), "{r}");
-        assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock")"#));
+        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-left","rs-panel-left","rs-hide-scale")"#) && r.contains("(max-width:700px)"), "{r}");
+        assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock","rs-panel-left","rs-hide-scale")"#));
         // the width of the panel, and a side and a look that are not the default
         let mut wide = Template::Dashboard.dashboard(Overlay);
         wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card, sections: Vec::new(), hide: Vec::new() });
@@ -511,7 +521,8 @@ mod tests {
     fn the_defaults_are_the_json_that_the_page_reads() {
         let v = serde_json::to_value(Template::Dashboard.dashboard(Overlay)).unwrap();
         assert_eq!(v["template"], "dashboard");
-        assert_eq!(v["toolbar"], serde_json::json!({"position": "right", "settings": true, "hold": false}));
+        assert_eq!(v["toolbar"], serde_json::json!({"position": "left", "settings": true, "hold": false}));
+        assert_eq!(v["scale_box"], false);
         assert_eq!(v["phone"], serde_json::json!({"max_width_px": 700, "toolbar": "top"}));
         assert!(serde_json::from_value::<Dashboard>(serde_json::json!({"template": "map", "layout": "dock", "panel": null, "toolbar": null,
             "windows": {"clamp": false, "recenter_map": true, "restore_open": true, "remember": true}, "boundary": v["boundary"],

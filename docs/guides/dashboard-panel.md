@@ -4,8 +4,8 @@
 
 ## The panel's sections
 
-The panel has five sections, in this order: `base_map`, `colour_by`, `legend`, `query`, `selected_road`. A section of your page
-goes at the end of the panel, or `after` or `before` any section.
+The panel has five sections, in this order: `base_map`, `colour_by`, `legend`, `query`, `selected_road`. The first three are hidden at the
+start, because the toolbox has boxes for them. Show one with `"hide": []`. A section of your page goes at the end of the panel, or `after` or `before` any section.
 
 ```python
 rs.render_dashboard(edges, google_3d=True, dashboard={
@@ -14,7 +14,7 @@ rs.render_dashboard(edges, google_3d=True, dashboard={
             {"id": "notes", "label": "Notes", "after": "legend",
              "html": '<p>Your text</p><p class="sb-note">Small print</p><div class="rs-sec-box">In a box</div>'},
         ],
-        "hide": ["base_map"],                  # the toolbox has the base map
+        "hide": ["base_map", "colour_by", "legend", "query"],      # this list replaces the default list
     },
     "legend": {"rows": [{"color": "#ff0066", "label": "Events"}]},
 })

@@ -125,8 +125,8 @@ def _dashboard(html):
 def test_each_page_has_its_template():
     assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
     d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
-    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "right", "width_px": 340, "look": "frame", "sections": [], "hide": []},
-                                                                       {"position": "right", "settings": True, "hold": False})
+    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "left", "width_px": 340, "look": "frame", "sections": [], "hide": ["base_map", "colour_by", "legend"]},
+                                                                       {"position": "left", "settings": True, "hold": False})
     c = _dashboard(rs.render_dashboard(_edges(), layout="dock").html)
     assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("dashboard", "dock", "frame", None)
 
@@ -180,10 +180,10 @@ def test_the_boundary_shade_and_limit_are_the_pages_choice():
 def test_the_dashboard_template_is_the_overlay_form():
     h = rs.render_dashboard(_edges()).html
     d = _dashboard(h)
-    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True, "hold": False})
+    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "left", "settings": True, "hold": False})
     assert d["windows"]["clamp"] is True and d["windows"]["recenter_map"] is False
     assert '<div id="sb"' in h and "<h2>Roads dashboard</h2>" in h
-    assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right")' in h   # the first paint has the form
+    assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-left","rs-panel-left","rs-hide-scale")' in h   # the first paint has the form
 
 
 def test_a_template_name_is_checked_and_sidebar_is_gone():
@@ -192,3 +192,17 @@ def test_a_template_name_is_checked_and_sidebar_is_gone():
         rs.render_dashboard(_edges(), template="wide")
     with pytest.raises(ValueError, match="unknown keyword .sidebar."):
         rs.render_edges(_edges(), backend="web", sidebar="dashboard")
+
+
+def test_the_dashboard_starts_with_a_blank_map_that_needs_no_key_and_with_no_scale_box():
+    import json
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")             # no "CARTO base map requested with no API key"
+        h = rs.render_dashboard(_edges()).html
+    opts = json.JSONDecoder().raw_decode(h, h.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]
+    d = opts["dashboard"]
+    assert d["scale_box"] is False and d["panel"]["side"] == "left" and d["toolbar"]["position"] == "left"
+    got = [b["key"] for b in opts["basemaps"]]
+    assert got[0] == "blank" and len(got) > 1 and not {"voyager", "positron", "dark_matter"} & set(got), got
+    assert "cartocdn" not in "".join(t for b in opts["basemaps"] for t in b.get("tiles", []))

@@ -204,7 +204,7 @@ change the defaults below.
 
 | function | page | changed defaults | own keywords |
 |---|---|---|---|
-| `render_dashboard` | map + sidebar: base map and colour-by menus, class filter with legend, query box, results table, read-out | `template="dashboard"`, `name="Roads dashboard"`, `basemap_switcher=False`, `filter_control=False`, `road_popup=False` | `layout="dock"`: the old form, with the sidebar docked at the right and no toolbar. The default `"overlay"` floats the sidebar over a full map ([Dashboard layout](../guides/dashboard-layout.md)) |
+| `render_dashboard` | map + sidebar: query box, results table, read-out (the base map, the colour and the legend are in the toolbox; the panel hides their sections) | `template="dashboard"`, `name="Roads dashboard"`, `basemap="blank"` (no key), `basemap_switcher=True`, `filter_control=False`, `road_popup=False`; the panel and the toolbox at the left, no scale box | `layout="dock"`: the old form, with the sidebar docked at the left and no toolbar. The default `"overlay"` floats the sidebar over a full map ([Dashboard layout](../guides/dashboard-layout.md)) |
 | `render_street_view` | map + Google Street View of the clicked road | `name="Roads and Street View"`, `road_popup=False`, `street_view=True` | see below |
 
 | `render_street_view` keyword | default | what |
