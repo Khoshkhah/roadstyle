@@ -21,10 +21,10 @@ export function fillToolbox(){
   for(const id of Object.keys(FIXED)) if(!tools.has(id)) greyTool(id);
 }
 // the default order of the bar and of the column; a page tool goes after these, and `attribution` is the last one of a bar
-export const ORDER = ["theme", "zoom_in", "zoom_out", "compass", "view3d", "panel_show", "street_view", "google_3d", "basemap", "buildings", "legend"];
+export const ORDER = ["theme", "zoom_in", "zoom_out", "compass", "navigate", "view3d", "panel_show", "street_view", "google_3d", "basemap", "buildings", "legend"];
 // the compass: a fixed ring, and a needle that turns with the map (the north half is solid and the south half is light, all in the text color; chosen
 // 2026-10-29: a dial with ticks was too small to read at 20 px). MapLibre turns the whole icon element, so the page cancels that (dashboard.css) and turns the needle.
-const COMPASS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><g class="rs-needle"><path d="M12 4.6 15.7 12H8.3z" fill="currentColor"/><path d="M12 19.4 8.3 12h7.4z" fill="currentColor" opacity=".3"/></g></svg>';
+export const COMPASS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><g class="rs-needle"><path d="M12 4.6 15.7 12H8.3z" fill="currentColor"/><path d="M12 19.4 8.3 12h7.4z" fill="currentColor" opacity=".3"/></g></svg>';
 // the icon of the tool `basemap`: three tilted sheets, the top one filled
 export const LAYERS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3 3 8l9 5 9-5-9-5z" fill="currentColor"/><path d="M3 12.5l9 5 9-5" fill="none"/><path d="M3 17l9 5 9-5" fill="none"/></svg>';
 // the icon of the tool `buildings`
@@ -67,26 +67,29 @@ export function toolList(){
 export const getTool = id => tools.get(id);
 // the open boxes close: a change of the layout (the bar's edge, the panel's side or look) moves what they opened toward
 export function closeBoxes(){ for(const t of toolList()) if(t.kind === "box" && t.isOpen && t.isOpen()) t.close(); }
+// the needle turns with the bearing and is foreshortened by the tilt (it lies flat, seen from a low angle); the ring stays as it is. At a very low angle the needle keeps
+// a third of its height, so it can still be seen
+export function animateNeedle(root){
+  const needle = root.querySelector(".rs-needle");
+  const turn = () => needle.setAttribute("transform", "translate(12 12) scale(1 " + Math.max(0.35, Math.cos(map.getPitch() * Math.PI / 180)).toFixed(3) + ") rotate(" + (-map.getBearing()) + ") translate(-12 -12)");
+  map.on("rotate", turn); map.on("pitch", turn); turn();
+}
 // MapLibre's navigation control (zoom in, zoom out, compass) is the host's: its three buttons become three tools of the group "nav"
 function adoptNav(){
   const c = map.getContainer().querySelector(".maplibregl-ctrl-zoom-in");
   const ctrl = c && c.closest(".maplibregl-ctrl");
   if(!ctrl) return;
+  if(O.dashboard && O.dashboard.toolbar && O.dashboard.toolbar.navigation === "box"){ ctrl.remove(); return; }       // one button, `navigate`, takes the place of the four (navbox.js)
   for(const [id, sel, title] of [["zoom_in", ".maplibregl-ctrl-zoom-in", "Zoom in"], ["zoom_out", ".maplibregl-ctrl-zoom-out", "Zoom out"],
                                  ["compass", ".maplibregl-ctrl-compass", "Reset bearing"]]){
     const b = ctrl.querySelector(sel);
     if(id === "compass" && b){                      // our ring and needle in place of MapLibre's pale picture; the needle turns with the map and leans with its tilt, the ring does not
       const icon = b.querySelector(".maplibregl-ctrl-icon");
-      if(icon){
-        icon.innerHTML = COMPASS_ICON;
-        // the needle turns with the bearing and is foreshortened by the tilt (it lies flat, seen from a low angle); the ring stays as it is. At a very low
-        // angle the needle keeps a third of its height, so it can still be seen
-        const needle = icon.querySelector(".rs-needle");
-        const turn = () => needle.setAttribute("transform", "translate(12 12) scale(1 " + Math.max(0.35, Math.cos(map.getPitch() * Math.PI / 180)).toFixed(3) + ") rotate(" + (-map.getBearing()) + ") translate(-12 -12)");
-        map.on("rotate", turn); map.on("pitch", turn); turn();
-      }
+      if(icon){ icon.innerHTML = COMPASS_ICON; animateNeedle(icon); }
     }
-    if(b){ b.dataset.rsTool = id; tools.set(id, {id, kind: "button", el: b, title, group: "nav"}); }
+    const label = id === "compass" ? "Drag to turn and tilt the map, click to set north and the tilt back" : title;
+    if(id === "compass" && b) b.setAttribute("title", label);
+    if(b){ b.dataset.rsTool = id; tools.set(id, {id, kind: "button", el: b, title: label, group: "nav"}); }
   }
   ctrl.remove();
 }

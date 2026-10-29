@@ -89,12 +89,13 @@ The `window.rs*` switches of the old `main` become fields:
 
 | Kind | Tools (default order) | Rules |
 |---|---|---|
-| `button` | `zoom_in`, `zoom_out`, `compass` | One action |
+| `button` | `zoom_in`, `zoom_out`, `compass` | One action (the compass: drag = turn and tilt) |
+| `box` | `navigate` | The default (`toolbar.navigation = "box"`): one button (the compass needle) in place of `zoom_in`, `zoom_out`, `compass` and `view3d`: a zoom, a turn and a tilt slider and a reset button; Ctrl + drag on the map turns and tilts it |
 | `toggle` | `theme`, `view3d`, `buildings` | A pressed state; `buildings` needs a vector base map |
 | `box` | `basemap`, `legend`, `attribution` | One open at a time; opens toward the map's center, stays inside the window, closes on an outside click or Escape |
 | `window` | `street_view`, `google_3d` | Section 3.3 |
 
-The default order on the bar: `theme`, `zoom_in`, `zoom_out`, `compass`, `view3d`, `street_view`, `google_3d`, `basemap`, `buildings`,
+The default order on the bar: `theme`, [`zoom_in`, `zoom_out`, `compass`, `view3d` with `navigation = "buttons"`; else `navigate`], `street_view`, `google_3d`, `basemap`, `buildings`,
 `legend`, the page's tools, `attribution`. The toolbox is fixed (decided 2026-10-29): a tool that the page cannot use (`google_3d` off, `street_view` off, one base map, no vector base map for 3D buildings, no colour option and no live data) stays in its place, greyed out, with a title that says why.
 
 In Rust, a `Tool` is a built-in name or a page tool `{id, icon, title}`. A page adds or removes a tool in `toolbar.tools`. `page.rs`

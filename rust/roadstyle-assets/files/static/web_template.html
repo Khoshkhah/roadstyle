@@ -26,7 +26,7 @@ const map = new maplibregl.Map({container:"map", style:style, center:cam.center,
 // It does nothing up to 60 degrees of tilt (MapLibre uses one tile zoom there); above it, it loads more tiles (2 to 3.6 times as many at 66 to 70 degrees).
 function _flatTiles(){ Object.keys(style.sources).forEach(id=>{ const s=map.getSource(id); if(s && s.type!=="raster") s.calculateTileZoom=z=>z; }); }
 map.on("styledata", _flatTiles);
-map.addControl(new maplibregl.NavigationControl({visualizePitch:false}));   // the compass turns flat with the map; it does not lean back with the tilt (a leaning icon swings and squashes)
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));    // dragging the compass turns the map and, up or down, changes its tilt; a click sets north and the tilt back. The icon does not lean: the page cancels MapLibre's transform (dashboard.css)
 map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
 rsDashboard(map, {...RS_OPTIONS, style: style});
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY

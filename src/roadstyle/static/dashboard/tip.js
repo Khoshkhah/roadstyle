@@ -1,7 +1,7 @@
 // The explanation of a button (docs/design/dashboard_templates.md, 3.3): the browser draws a `title` itself, in the system's style, so the page
 // takes the `title` of a button of the bar, the boxes, the panels and the windows when the pointer comes (or the key focus), keeps its text in
 // `data-rs-tip` and shows it in a box of the page's look. The box opens on the side of the button that faces the map's center, after 350 ms.
-const _tpScope = ["#rs-toolbar", ".bm-menu", "#rs-attr-box", "#rs-color-box", "#rs-settings-box", "#sb", "#rp", ".rs-side", ".rs-svw", "#rs-show-right", "#sb-show", "#rp-show"].join(",");
+const _tpScope = ["#rs-toolbar", "#rs-scalebox", ".bm-menu", "#rs-attr-box", "#rs-color-box", "#rs-settings-box", "#sb", "#rp", ".rs-side", ".rs-svw", "#rs-show-right", "#sb-show", "#rp-show"].join(",");
 let _tpBox = null, _tpTimer = 0, _tpFor = null;
 function _tpTake(el){                                  // the text of the explanation: the `title`, moved
   if(el.hasAttribute("title")){
@@ -12,8 +12,10 @@ function _tpTake(el){                                  // the text of the explan
   return el.dataset.rsTip || "";
 }
 function _tpHide(){ clearTimeout(_tpTimer); _tpFor = null; if(_tpBox) _tpBox.hidden = true; }
+// a button whose box is open shows no explanation: the box is what the person looks at, and the explanation would lie over it
+const _tpOpenBox = el => { const w = el.closest(".maplibregl-ctrl"); return !!(w && w.querySelector("#rs-attr-box:not([hidden]), #rs-color-box:not([hidden]), #rs-nav-box:not([hidden]), #rs-settings-box:not([hidden]), .bm-menu.open")); };
 function _tpShow(el){
-  const text = _tpTake(el); if(!text || !document.body.contains(el)) return;
+  const text = _tpTake(el); if(!text || !document.body.contains(el) || _tpOpenBox(el)) return;
   if(!_tpBox){ _tpBox = document.createElement("div"); _tpBox.id = "rs-tip"; _tpBox.setAttribute("role", "tooltip"); document.body.append(_tpBox); }
   _tpBox.textContent = text; _tpBox.hidden = false; _tpFor = el;
   _tpBox.style.left = "0px"; _tpBox.style.top = "0px";      // measured at the corner: a box that still stands where the last one was has less room, wraps narrower, and grows over the bar when it moves

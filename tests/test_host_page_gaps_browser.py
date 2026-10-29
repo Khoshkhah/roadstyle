@@ -158,7 +158,7 @@ def test_a_later_style_brings_its_base_map_layers_a_raster_map_goes_under_the_ro
         page.evaluate("() => rsSetBasemap('blank')")
         assert page.evaluate("() => RS_BASEMAPS.find(b => b.key === 'blank_dark') && map.getPaintProperty('bg', 'background-color')") == "#14181d"
         # gap 11: a tool is found by its id, before and after the first hover
-        tool = "[data-rs-tool='zoom_in']"
+        tool = "[data-rs-tool='basemap']"
         assert page.locator(tool).count() == 1
         page.hover(tool + " , " + tool + " button")
         page.wait_for_selector("#rs-tip:not([hidden])", timeout=3000)
@@ -178,7 +178,7 @@ def test_boxes_stay_inside_a_phone_and_the_sheet_and_the_free_part_of_the_map_ar
         page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
         page.goto(base + "/page.html")
         page.wait_for_function("window.ready === true", timeout=60_000)
-        for tool, box in (("basemap", ".bm-menu"), ("attribution", "#rs-attr-box"), ("settings", "#rs-settings-box")):
+        for tool, box in (("basemap", ".bm-menu"), ("attribution", "#rs-attr-box"), ("settings", "#rs-settings-box"), ("navigate", "#rs-nav-box")):
             page.evaluate("(t) => rs.tools.open(t)", tool)
             page.wait_for_timeout(300)
             r = page.evaluate("(b) => { const r = document.querySelector(b).getBoundingClientRect(); return {left: r.left, right: r.right}; }", box)

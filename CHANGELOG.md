@@ -22,6 +22,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
     `rsFirstPaint(first)` (`dashboard/template.js`) sets the first paint. The panel's shell rules moved from the template `dashboard` to the end of `dashboard.css`.
   - `rs.sheet()` / `rs.sheet(n)` (the phone sheet's height) and `rs.freeArea()` (the free part of the map; on a phone it counts the bar and the sheet).
   - The element of a tool has `data-rs-tool="<id>"`, which stays after the `title` went to the tooltip.
+- **`dashboard={"toolbar": {"navigation": "box"}}`**: one button with the compass needle (it turns with the map and flattens with the tilt) in place of the + and - buttons, the
+  compass and the 2D/3D button. A click opens a box with a zoom slider (with - and +), a turn slider, a tilt slider and a button that sets north and the tilt back. Ctrl + drag on the
+  map turns and tilts it. **This is the default** (`"buttons"` brings the earlier buttons back; the compass button then has the tooltip "Drag to turn and tilt").
+- **The credits button is in the bottom corner box** with the scale and the zoom number, on the side opposite to the panel (the box is always shown; the scale and the zoom number are the person's choice). On a phone
+  the credits stay in the bar. The credits button has no tooltip (its icon and its click are clear); it has an `aria-label` for screen readers.
 - **`rs.setData` takes `fields`**: the columns of the rows that the popup, the tooltip and the panel show. The key column (`edge_id`) never shows: the road has it.
 - **`rs.colorModes`**: a page gives the legend box its own "Colour by" list (`set(names, {active, onChange})`, `select`, `clear`, `active`; event `rs:colormode`). A live-data page has no colour
   options of the style, so its modes (Traffic, Counted, How sure) go in the toolbox, next to the legend, and not in a bar of its own.
@@ -38,6 +43,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **A page with a bar has no floating Layers box.** The style's own base-map layers (the duckOSM layers: landcover, water, buildings, ...) have one switch for all of them in the
   base-map box (`overlays_label`, default "Map layers"; `rsSetOverlays(on)`), and the legend box lists them with their colours, each swatch with a thin border so that a white
   or near-white colour shows. A page with no bar, or with no base-map box, keeps the Layers box.
+- **The compass button also changes the tilt**: dragging it turns the map (left and right) and tilts it (up and down); a click sets north and the tilt back (`visualizePitch`).
+  The attribution button has an italic serif "i" in a ring, so it does not look like a page's help button ("?").
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
 - **The dashboard shows every road class at every zoom.** The template `dashboard` gives `minzoom=False` where the call gives none (a data page shows every road; the
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.

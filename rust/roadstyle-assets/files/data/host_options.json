@@ -16,7 +16,8 @@
     "toolbar": {
       "position": "left",
       "settings": true,
-      "hold": false
+      "hold": false,
+      "navigation": "box"
     },
     "windows": {
       "clamp": true,

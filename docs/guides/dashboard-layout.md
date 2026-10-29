@@ -21,10 +21,12 @@ There is one template with a panel: `dashboard`. A future template follows its s
 
 ## The toolbox
 
-The bar has one button for each tool: theme, zoom in, zoom out, compass, 2D/3D, Street View, Google 3D, base map, 3D buildings,
-colour and legend, settings, attribution. The toolbox is fixed: a tool that the page cannot use stays in its place, greyed out, and its tooltip says why.
+The bar has one button for each tool: theme, navigate, Street View, Google 3D, base map, 3D buildings,
+colour and legend, settings, attribution. The toolbox is fixed: a tool that the page cannot use is greyed out, and its tooltip says why.
+The map is navigated with **one button** (the compass needle): a click opens a box with a zoom, a turn and a tilt slider, and Ctrl + drag on the map turns and tilts it.
+`dashboard={"toolbar": {"navigation": "buttons"}}` brings the buttons back (+, -, compass, 2D/3D). The credits button is in the bottom corner, with the scale and the zoom number.
 
-A box opens toward the map. One box is open at a time. A click outside it, or the Escape key, closes it.
+A box opens toward the map; one box is open at a time. A click outside it, or Escape, closes it.
 
 Your own blocks and legend rows: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard](migrating-dashboard.md).
 
@@ -34,34 +36,29 @@ To add a tool of your own, use `rs.tools`:
 rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => save()});
 ```
 
-To hide the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` (the bar shows after 6 s at the latest).
+To hide the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` (after 6 s at the latest the bar shows).
 `dashboard=` changes any option, for example the bar's `position`.
 
 ## The settings
 
-The gear button opens the settings. They are kept in the browser, not in the page file.
+The gear button opens the settings. The browser keeps them, not the page file.
 
-- **Layout.** The bar can be at the left, the top, the right or the bottom. The panel can be at the left or the right,
-  as a frame (default) or as a card. The scale and zoom box can be shown.
+- **Layout.** The bar: left, top, right or bottom. The panel: left or right, as a frame (default) or a card. The scale box can show.
 - **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
-- **Keys.** A Google Maps key (Street View and Google 3D) and a CARTO key. A key that you save is used instead of the key of the page.
-  A page with a toolbox needs no Google key at build time: the person adds it.
+- **Keys.** A Google Maps key (Street View, Google 3D) and a CARTO key. A saved key replaces the page's key. A page needs no Google key at build time.
 
 ## The windows
 
-Street View and Google 3D open in the free part of the map, which the panel and the bar do not cover.
-A window keeps the size that you give it. Google 3D has a view switch, **Imagery** or **Map**, and **Follow** is on at the start.
+Street View and Google 3D open in the free part of the map. A window keeps the size that you give it. Google 3D has a view switch, **Imagery** or **Map**, and **Follow** is on at the start.
 
 ## A phone
 
-At 700 px or less, the bar is at the top. The panel is a bottom sheet with three heights: closed, 40 % and full.
-A window is a bottom sheet too. Only one sheet is open at a time.
+At 700 px or less, the bar is at the top and the panel is a bottom sheet (closed, 40 % or full). A window is a bottom sheet too; one sheet is open at a time.
 
 ## The area boundary
 
-`boundary=` (GeoJSON, or a shapely geometry) is an input of the page: the map shows a dashed line along it. `boundary_dim=True` shades the
-outside. `boundary_limit=True` keeps the camera near it. Both are off by default, because a page can show a general map.
+`boundary=` (GeoJSON or a shapely geometry) is an input of the page: a dashed line shows it. `boundary_dim=True` shades the outside, `boundary_limit=True` keeps the camera near it (both off by default).
 
 ## Style
 
-Every part uses the same tokens and works in both themes. The rules are in `docs/design/dashboard_templates.md`, section 3.4.
+Every part uses the same tokens and works in both themes (rules: `docs/design/dashboard_templates.md`, 3.4).
