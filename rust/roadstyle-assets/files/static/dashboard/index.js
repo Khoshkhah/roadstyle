@@ -1,7 +1,7 @@
 // roadstyle's map dashboard, the entry: rsDashboard(map, options) adds the map controls and the road interaction of roadstyle's page
 // to a MapLibre map (docs/design/dashboard_module.md). The options have the names of render_web.render's keywords; the values are
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
-import {initCore, useStyle, _contractError} from "./core.js";
+import {initCore, useStyle, _contractError, _emit} from "./core.js";
 import {initGeneration, useGeneration} from "./generation.js";
 import {initTemplate} from "./template.js";
 import {initBoundary} from "./boundary.js";
@@ -139,6 +139,10 @@ export function rsDashboard(map, options){
   rs.error = error;               // null, or the text of the contract error of the style (setStyle sets it again)
   window.rsTools = rsTools;       // the alias of rs.tools
   window.rs = rs;                 // the page's one object (the window.rs* functions stay as they are)
+  // `rs:ready`: window.rs is there and the panel's sections are in place (initSections runs at DOMContentLoaded, before this listener); window.rsReady is true
+  // from then on, for a script that runs later. A page's own script (`page_script=`) waits for it.
+  const ready = () => { window.rsReady = true; _emit("rs:ready", {}); };
+  document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", ready) : ready();
   fromUrl(rs);
   return rs;
 }

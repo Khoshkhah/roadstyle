@@ -15,21 +15,22 @@ function _cbClasses(){
   return (f.classes || []).map(c => '<div class="lg-row"><span class="lg-sw" style="background:' + _esc(sw[c] || "#888") + '"></span>' + _esc(c) + "</div>").join("");
 }
 export function initColorBox(){
-  if(!(O.dashboard && O.dashboard.toolbar) || !COLOR_OPTIONS.length) return;
+  if(!(O.dashboard && O.dashboard.toolbar) || !(COLOR_OPTIONS.length || O.live)) return;       // a live-data page has the legend of its data, with no colour option
   const b = document.createElement("button"), d = wrap(b), box = document.createElement("div");
-  b.type = "button"; b.title = "Colour by and legend"; b.innerHTML = _cbIcon;
+  b.type = "button"; b.title = COLOR_OPTIONS.length ? "Colour by and legend" : "Legend"; b.innerHTML = _cbIcon;
   d.classList.add("rs-color-ctrl"); box.id = "rs-color-box"; box.hidden = true; d.appendChild(box);
   const fill = () => {
     const opts = COLOR_OPTIONS.map((o, i) => '<button type="button" class="rs-cb-opt' + (i === _coActive ? " on" : "") + '" role="radio" aria-checked="' + (i === _coActive) + '" data-i="' + i +
                                            '">' + _esc(o.name) + "</button>").join("");
     const lg = (coLegendNow() || _cbClasses()) + coLegendExtra();
-    box.innerHTML = '<div class="rs-bm-h">Colour by</div><div class="rs-cb-opts" role="radiogroup">' + opts + "</div>" +
-      (lg ? '<hr><div class="rs-bm-h">Legend</div><div class="rs-cb-lg">' + lg + "</div>" : "");
+    box.innerHTML = (COLOR_OPTIONS.length ? '<div class="rs-bm-h">Colour by</div><div class="rs-cb-opts" role="radiogroup">' + opts + "</div>" : "") +
+      (lg ? (COLOR_OPTIONS.length ? "<hr>" : "") + '<div class="rs-bm-h">Legend</div><div class="rs-cb-lg">' + lg + "</div>" : "");
     box.querySelectorAll(".rs-cb-opt").forEach(o => { o.onclick = () => { rsSetColorField(parseInt(o.dataset.i, 10)); fill(); }; });
   };
   const open = () => { fill(); box.hidden = false; };
   b.onclick = e => { e.stopPropagation(); box.hidden ? open() : (box.hidden = true); };
   box.addEventListener("click", e => e.stopPropagation());                 // a click inside the box does not close it
   document.addEventListener("rs:colorchange", () => { if(!box.hidden) fill(); });
+  document.addEventListener("rs:datachange", () => { if(!box.hidden) fill(); });                // live data: a new day, a new legend
   defineTool("legend", "box", d, {title: b.title, open, close: () => { box.hidden = true; }, isOpen: () => !box.hidden});
 }

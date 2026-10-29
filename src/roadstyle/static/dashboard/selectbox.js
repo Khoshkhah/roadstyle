@@ -69,4 +69,5 @@ function _sbEnhance(sel){
 export function initSelectBox(){
   const run = () => document.querySelectorAll("#sb select, .rs-side select, .rs-host select").forEach(_sbEnhance);
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();
+  document.addEventListener("rs:sectionchange", run);          // a section that the page adds (rs.sections, the typed `panel.sections`) can have a select: the same list as the others
 }

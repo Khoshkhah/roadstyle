@@ -195,6 +195,8 @@ Returns a `WebMap` (`.save()`).
 | `boundary` | `None` | web | a dashed outline on top: shapely geometry, GeoDataFrame or GeoJSON. It is an input: the caller says where it comes from (a duckOSM `main.boundary`, a city limit, a drawn shape) |
 | `boundary_dim` | `False` | web | `True`: shade the outside of `boundary` (the opacity is in the template's `boundary` options) |
 | `dashboard` | `None` | web | a partial dashboard option merged over the template's: `{"toolbar": {"position": "left", "hold": True}, "windows": {...}, "google_3d": {"selection_style": {"width": 12}, "mesh_altitude_m": 1.5, "follow": False}, ...}`. Mappings merge field by field. A wrong key or value is an error; the template cannot change. Also `{"panel": {"sections": [...], "hide": [...]}, "legend": {"rows": [...]}}`: the page's blocks in the panel and rows in the legend ([Add to the panel](../guides/dashboard-panel.md)). All fields: `docs/design/dashboard_templates.md` 3.1. `template="dashboard"` only |
+| `page_script` | `None` | web | JavaScript text that the page runs, the last script of the body: it sees the panel and `rs`. Wait for the event `rs:ready` (`window.rs` and the panel's sections are there; `window.rsReady` is true after it) ([Live data](../guides/live-data.md)) |
+| `page_style` | `None` | web | CSS text of the page, the last style of the body |
 | `boundary_limit` | `False` | web | `True`: the camera stays near `boundary` (the center inside its bounds grown by `limit_pad`, and the lowest zoom `zoom_out` levels under the fit) |
 
 ## Pages

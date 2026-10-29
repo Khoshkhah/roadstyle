@@ -20,7 +20,7 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": false,
-    "template": null, "layout": null, "dashboard": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
+    "template": null, "layout": null, "dashboard": null, "page_script": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
 
 /// The two map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
 const SIDEBAR_YIELDS: [&str; 2] = ["name", "road_popup"];
@@ -74,6 +74,8 @@ struct PageKeys {
     boundary_dim: bool,
     boundary_limit: bool,
     dashboard: Option<Value>,
+    page_script: Option<String>,
+    page_style: Option<String>,
     compress: bool,
     views: Value,
     tiles: bool,
@@ -300,6 +302,12 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let mut html = page_html(page_style, &opts, &parts);
     if let Some((sidebar, _)) = template.sidebar() {
         html = add_sidebar(html, sidebar, parts.name);
+    }
+    // the page's own CSS and JavaScript, the last things of the body: they see the panel and `rs` (the event `rs:ready` says when `window.rs` is there)
+    for (tag, text) in [("style", &k.page_style), ("script", &k.page_script)] {
+        if let Some(t) = text.as_deref().filter(|t| !t.is_empty()) {
+            html = html.replacen("</body>", &format!("<{tag}>{}</{tag}></body>", t.replace(&format!("</{tag}"), &format!("<\\/{tag}"))), 1);
+        }
     }
     Ok(Page { html, warnings: std::mem::take(&mut src.warnings) })
 }

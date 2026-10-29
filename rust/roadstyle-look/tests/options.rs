@@ -22,7 +22,7 @@ fn json(p: &str) -> Value {
 const NOT_MAP: &[(&str, &[&str])] = &[
     ("PageOptions", &["basemap", "basemaps", "basemap_switcher", "zoom_readout", "api_key", "legend", "legend_position", "filter_control",
                       "find_control", "overlay_control", "overlay_popup", "template", "views", "popup_mode", "side_panel_html",
-                      "host_panel_width", "hover_delay_ms", "copy_field", "street_view", "street_view_key", "google_3d", "google_3d_layers", "layout", "boundary_dim", "boundary_limit", "dashboard", "pitch",
+                      "host_panel_width", "hover_delay_ms", "copy_field", "street_view", "street_view_key", "google_3d", "google_3d_layers", "layout", "boundary_dim", "boundary_limit", "dashboard", "page_script", "page_style", "pitch",
                       "max_pitch", "bearing", "compress", "box_layout"]),
     ("SourceMode", &["data_maxzoom", "data_tolerance"]),
     ("TileOptions", &["tiles", "tile_keep", "tile_layers"]),

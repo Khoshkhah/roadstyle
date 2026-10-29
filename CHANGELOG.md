@@ -30,6 +30,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   the body scrolls, and has a soft fade at the bottom edge while more is below. The thumb is the text color at 47 % (light) or 40 % (dark): 3:1 against the panel.
 
 ### Added
+- **Live data for a new day, with a guide.** `guides/live-data.md` shows the day picker: `live_data=True`, a picker in the panel (`dashboard={"panel": {"sections": ...}}`) and the new keywords
+  `page_script=` and `page_style=` (the page's own JavaScript and CSS, the last of the body: no string edit of the HTML), which wait for the new event `rs:ready` (`window.rsReady`).
+  `rs.setData` takes the URL of a JSON file; `edge_id` must be text (a 64-bit id is not exact as a JSON number). A live-data page has the legend tool (the toolbox box) with
+  no colour option, and the box follows a new day. A select that a page adds to the panel gets the dashboard's own list.
 - **Sections for the dashboard panel and rows for its legend.** `dashboard={"panel": {"sections": [{id, html, label, after, before}], "hide": [...]},
   "legend": {"rows": [{color, label}]}}` and the run-time `rs.sections` and `rs.legend` replace the string edits of the template's HTML (the old `edit=`). A section
   has a stable id (`base_map`, `colour_by`, `legend`, `query`, `selected_road`). The page's HTML follows the light and the dark theme: a kit for text, links, tables and

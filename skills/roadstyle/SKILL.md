@@ -77,7 +77,7 @@ m.save("map.html")                        # m.html is the page as a string
   (main roads from zoom 15-16, side streets from 17); one-way arrows on main roads from zoom 15, side streets from 17: check
   with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed. `settings={"config": {"tunnel_toward": "Dark"}}` (a name in `tunnel_towards`, or a `#rrggbb`) picks the colour they fade toward (default Sand; Dark or Light matching the base map keeps each class hue).
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (query sidebar; `layout="dock"` docks the panel with no toolbar, the
-  default `"overlay"` floats it; `boundary_dim=True` / `boundary_limit=True` shade and limit the map to `boundary=`; there is no report page; `dashboard={...}` changes any typed option, also the page's own panel blocks `panel.sections` / `hide` and `legend.rows`, which follow the light and the dark theme: docs `guides/dashboard-panel.md`) and
+  default `"overlay"` floats it; `boundary_dim=True` / `boundary_limit=True` shade and limit the map to `boundary=`; there is no report page; `page_script=` / `page_style=` add the page's own JS and CSS (wait for the event `rs:ready`); live data for a new day: `live_data=True` + `rs.setData(url, ...)` with `edge_id` as TEXT, guide `guides/live-data.md`; `dashboard={...}` changes any typed option, also the page's own panel blocks `panel.sections` / `hide` and `legend.rows`, which follow the light and the dark theme: docs `guides/dashboard-panel.md`) and
   `rs.render_street_view(edges, ...)` (Google
   Street View beside the map, or under it with `layout="below"`, following the clicked road;
   `panel_width=42`, `resizable=True`)
