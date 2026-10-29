@@ -4,10 +4,10 @@
      piece is safe to rip out, restyle, or extend. Uses the shared design tokens
      (--bg / --ink / --mut / --line / --card / --accent + a light/dark toggle). Build:  python build.py  -->
 <style>
-#map{right:340px}
-body{--rs-side:340px}   /* shift the map's right-anchored controls left of the panel */
+#map{right:var(--rs-panel-w,340px)}
+body{--rs-side:var(--rs-panel-w,340px)}   /* shift the map's right-anchored controls left of the panel */
 .co-ctrl,.co-lg{display:none}  /* the sidebar owns the colour-by select + legend; hide the built-in ones */
-#sb{position:fixed;top:0;right:0;bottom:0;width:340px;box-sizing:border-box;overflow:auto;
+#sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,340px);box-sizing:border-box;overflow:auto;
   padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
   --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
   background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
@@ -95,8 +95,8 @@ document.getElementById("sb-th").onclick = () => sb.dataset.theme = sb.dataset.t
 function panel(show){
   sb.classList.toggle("hidden", !show);
   document.getElementById("sb-show").style.display = show ? "none" : "flex";
-  const mp = document.getElementById("map"); if (mp) mp.style.right = show ? "340px" : "0";
-  document.body.style.setProperty("--rs-side", show ? "340px" : "0px");
+  const mp = document.getElementById("map"); if (mp) mp.style.right = show ? "var(--rs-panel-w,340px)" : "0";
+  document.body.style.setProperty("--rs-side", show ? "var(--rs-panel-w,340px)" : "0px");
   try { map.resize(); } catch (e) {}
 }
 document.getElementById("sb-hide").onclick = () => panel(false);

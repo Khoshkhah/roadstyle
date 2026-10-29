@@ -358,7 +358,7 @@ html.rs-panel-left #sb,html.rs-panel-left .rs-side{left:0;right:auto}
 html.rs-panel-left #sb{border-left:0;border-right:1px solid var(--line,var(--rs-tb-border))}
 html.rs-panel-left #sb-show,html.rs-panel-left #rs-show-right{left:10px;right:auto}
 html.rs-panel-left :is(#sb-hide,#sb-show,.rs-side-min) svg,html.rs-panel-left #rs-show-right svg{transform:scaleX(-1)}
-html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:340px!important;right:0!important}
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:var(--rs-panel-w,340px)!important;right:0!important}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!important}
 /* the compass: our needle (tools.js) instead of MapLibre's picture, which is pale on a translucent bar */
 /* the icon fills its button and is centered in it (MapLibre's own box is 29 px high and sat at the top of a 32 px button) */

@@ -88,5 +88,5 @@ export function initSettings(){
   // a window that needs a key asks for it here
   window.rsOpenSettings = () => { const t = tool; box.hidden = false; fill(); };
   const saved = layoutNow();
-  setPanelSide(saved.panel); setPanelLook(saved.look); setScaleShown(saved.scale); if(saved.toolbar !== d.toolbar.position) setToolbarEdge(saved.toolbar);
+  if(saved.toolbar !== d.toolbar.position) setToolbarEdge(saved.toolbar);
 }

@@ -322,8 +322,19 @@ impl Dashboard {
             classes.push("rs-has-toolbar".into());
             classes.push(format!("rs-tb-{}", word(&t.position)));
         }
+        // the panel's side and look, and its width: the person's saved choice (placement.js) can change the side and the look after the load
+        let mut width = String::new();
+        if let Some(p) = &self.panel {
+            if p.side == Edge::Left {
+                classes.push("rs-panel-left".into());
+            }
+            if p.look == PanelLook::Card {
+                classes.push("rs-panel-card".into());
+            }
+            width = format!("document.documentElement.style.setProperty(\"--rs-panel-w\",\"{}px\");", p.width_px);
+        }
         let list = classes.iter().map(|c| format!("\"{c}\"")).collect::<Vec<_>>().join(",");
-        format!("<script>(function(){{var c=document.documentElement.classList;c.add({list});\
+        format!("<script>(function(){{var c=document.documentElement.classList;c.add({list});{width}\
                  if(matchMedia(\"(max-width:{}px)\").matches)c.add(\"rs-phone\")}})()</script>", self.phone.max_width_px)
     }
 }
@@ -395,6 +406,11 @@ mod tests {
         let r = Template::Dashboard.dashboard(Overlay).first_paint();
         assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right")"#) && r.contains("(max-width:700px)"), "{r}");
         assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock")"#));
+        // the width of the panel, and a side and a look that are not the default
+        let mut wide = Template::Dashboard.dashboard(Overlay);
+        wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card });
+        let w = wide.first_paint();
+        assert!(w.contains(r#""rs-panel-left","rs-panel-card""#) && w.contains(r#"setProperty("--rs-panel-w","420px")"#), "{w}");
     }
 
     #[test]

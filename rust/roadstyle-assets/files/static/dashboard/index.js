@@ -11,6 +11,7 @@ import {initColorBox} from "./colorbox.js";
 import {initSelectBox} from "./selectbox.js";
 import {initToolbar} from "./toolbar.js";
 import {initSettings} from "./settings.js";
+import {initPlacement} from "./placement.js";
 import {initWindows} from "./windows.js";
 import {initTip} from "./tip.js";
 import {initPanelScroll} from "./panelscroll.js";
@@ -114,6 +115,7 @@ export function rsDashboard(map, options){
   initColorBox();
   initSelectBox();
   initPanelScroll();
+  initPlacement();
   initSettings();
   initWindows();
   initTip();

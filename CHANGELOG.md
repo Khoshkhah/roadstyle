@@ -10,6 +10,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
+### Fixed
+- **`panel.width_px` had no effect** (the template wrote 340 px in five places): the panel, the map and the controls now use `--rs-panel-w`, which the first-paint script
+  sets from the typed option.
+- **`panel.side`, `panel.look` and the scale box were applied only by the settings button.** A page with no settings button (`layout="dock"`, or
+  `toolbar.settings` false) ignored them. They are applied at the start, and a saved choice of an earlier visit is read only when the page has the settings button.
+
 ### Changed
 - **The panel's frame look is the default** (`dashboard={"panel": {"look": "frame"}}`): full height, a translucent frame round the card, the corners on the
   map side curved. The card look stays a choice (`"look": "card"`, or the settings).
