@@ -10,7 +10,7 @@
 
 ```javascript
 await rs.setData([{edge_id: 17, flow: 840}, {edge_id: 18, flow: 120}],
-                 {colorBy: "flow", widthBy: "flow", legend: {title: "Flow, 2026-10-29"}});
+                 {colorBy: "flow", legend: {title: "Flow, 2026-10-29"}});
 rs.clearData();                      // take the data away
 ```
 
@@ -22,7 +22,7 @@ The ids of duckOSM are 64-bit numbers, and a JSON number above 2^53 is not exact
 | Option | Meaning |
 |---|---|
 | `colorBy` | the column that gives the colour: a number goes on the ramp from `vmin` to `vmax` (the range of the data when you leave them out), a text gets one colour for each value |
-| `widthBy`, `widthRange` | the column that gives the width, as a factor of the drawn width, from `widthRange[0]` at the smallest value to `widthRange[1]` at the largest (default `[1, 3]`) |
+| `widthBy`, `widthRange` | a column that gives a **factor** of the drawn width (from `widthRange[0]` to `widthRange[1]`, default `[1, 3]`). Do not use it for numbers like the flow: the two carriageways of a street have the same width, and the factor makes one cover the other. Show the flow in the colour |
 | `ramp`, `stepped` | your own list of colours; `stepped: true` takes the nearest colour, with hard edges |
 | `nodata` | the colour of a road with no row (default: the page's no-data colour) |
 | `key` | the column that names the road (default `edge_id`; `"row"` for the number of the road's row) |
@@ -42,7 +42,7 @@ m = rs.render_dashboard(
     page_script="""
       function start() {
         const pick = document.getElementById("day");
-        const show = day => rs.setData(`flow-${day}.json`, {colorBy: "flow", widthBy: "flow", legend: {title: "Flow, " + day}});
+        const show = day => rs.setData(`flow-${day}.json`, {colorBy: "flow", legend: {title: "Flow, " + day}});
         pick.onchange = () => show(pick.value);
         show(pick.value);
       }

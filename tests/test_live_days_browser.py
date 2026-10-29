@@ -15,7 +15,7 @@ _ROWS = {"2026-10-27": [100, 400, 900, 200, 600, 50], "2026-10-28": [800, 100, 3
 _SCRIPT = """
   function start() {
     const pick = document.getElementById("day");
-    const show = day => rs.setData(`flow-${day}.json`, {colorBy: "flow", widthBy: "flow", legend: {title: "Flow, " + day}});
+    const show = day => rs.setData(`flow-${day}.json`, {colorBy: "flow", legend: {title: "Flow, " + day}});
     pick.onchange = () => show(pick.value);
     show(pick.value);
   }
