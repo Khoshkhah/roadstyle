@@ -206,3 +206,17 @@ def test_the_dashboard_starts_with_a_blank_map_that_needs_no_key_and_with_no_sca
     got = [b["key"] for b in opts["basemaps"]]
     assert got[0] == "blank" and len(got) > 1 and not {"voyager", "positron", "dark_matter"} & set(got), got
     assert "cartocdn" not in "".join(t for b in opts["basemaps"] for t in b.get("tiles", []))
+
+
+def _page_option(html, key):
+    import json
+    at = html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = ")
+    return json.JSONDecoder().raw_decode(html, at)[0][key]
+
+
+def test_the_dashboard_shows_every_road_class_at_every_zoom_and_a_call_can_still_hide_minor_classes():
+    edges = _edges()
+    assert _page_option(rs.render_dashboard(edges).html, "filter")["minzoom"] is None
+    assert _page_option(rs.render_dashboard(edges, minzoom=True).html, "filter")["minzoom"]["residential"] == 13
+    assert _page_option(rs.render_dashboard(edges, minzoom={"residential": 9}).html, "filter")["minzoom"]["residential"] == 9
+    assert _page_option(rs.render_edges(edges, backend="web").html, "filter")["minzoom"]["residential"] == 13      # the map template: as before

@@ -22,8 +22,8 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": false,
     "template": null, "layout": null, "dashboard": null, "page_script": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
 
-/// The two map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
-const SIDEBAR_YIELDS: [&str; 2] = ["name", "road_popup"];
+/// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
+const SIDEBAR_YIELDS: [&str; 3] = ["name", "road_popup", "minzoom"];
 
 /// The page's keys of a call (render_edges' keywords), the `given` of page_from: the look's `other` (the call's keywords that are not map
 /// options; a look file has none) and `SIDEBAR_YIELDS` of the call's `args`. It has no API key (Look::other has none): the caller adds its
@@ -156,7 +156,7 @@ fn page_args(look: &Look, given: &Map<String, Value>, template: Template) -> Res
         let mut l = look.clone();
         let mine = |k: &str| given.contains_key(k) || (k == "name" && named.is_some());
         for (k, v) in serde_json::from_str::<Map<String, Value>>(d).expect("a template's defaults are JSON").into_iter().filter(|(k, _)| !mine(k)) {
-            if k == "road_popup" {
+            if k == "road_popup" || k == "minzoom" {
                 l = l.with_arg(&k, v)?;
             } else {
                 a.insert(k, v);

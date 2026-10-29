@@ -1,6 +1,6 @@
 # Dashboard layout
 
-A dashboard is a map with a side panel. `render_dashboard` makes it from your road data. It starts with a blank map (no key), the panel and the toolbox at the left, and no scale box.
+A dashboard is a map with a side panel. `render_dashboard` makes it from your road data. It starts with a blank map (no key), the panel and the toolbox at the left, and no scale box. Every road class shows at every zoom (`minzoom=True` hides the minor ones when zoomed out).
 
 ```python
 import roadstyle as rs
@@ -24,9 +24,9 @@ There is one template with a panel: `dashboard`. A future template follows its s
 The bar has one button for each tool: theme, zoom in, zoom out, compass, 2D/3D, Street View, Google 3D, base map, 3D buildings,
 colour and legend, settings, attribution. The toolbox is fixed: a tool that the page cannot use stays in its place, greyed out, and its tooltip says why.
 
-A button that opens a box opens it toward the map. One box is open at a time. A click outside the box, or the Escape key, closes it.
+A box opens toward the map. One box is open at a time. A click outside it, or the Escape key, closes it.
 
-The panel scrolls under its title. Your own blocks and legend rows: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard](migrating-dashboard.md).
+Your own blocks and legend rows: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard](migrating-dashboard.md).
 
 To add a tool of your own, use `rs.tools`:
 
@@ -35,7 +35,7 @@ rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => sav
 ```
 
 To hide the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` (the bar shows after 6 s at the latest).
-`dashboard=` changes any option of the template, for example the bar's `position` or the panel's `look`.
+`dashboard=` changes any option, for example the bar's `position`.
 
 ## The settings
 
@@ -49,7 +49,7 @@ The gear button opens the settings. They are kept in the browser, not in the pag
 
 ## The windows
 
-Street View and Google 3D open in the middle of the free part of the map. The panel and the bar do not cover them.
+Street View and Google 3D open in the free part of the map, which the panel and the bar do not cover.
 A window keeps the size that you give it. Google 3D has a view switch, **Imagery** or **Map**, and **Follow** is on at the start.
 
 ## A phone

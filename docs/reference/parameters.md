@@ -77,7 +77,7 @@ ignore it.
 | `legend` | `True` | web | a legend for data colouring (class styling has none). Web: a page key; the style always has the legend data (`roadstyle:color_options`) |
 | `name` | web `"roadstyle"`, folium `"roads"` | web | page title (web) / layer name (folium) |
 | `hover_color` / `select_color` | `"#b388ff"` / `"#7c4dff"` | web | highlight of the hovered / selected road |
-| `minzoom` | `None` | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default), a dict overrides parts, `False` = all classes at all zooms |
+| `minzoom` | `None` (`False` for `render_dashboard`) | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default of `render_edges`), a dict overrides parts, `False` = all classes at all zooms (the default of `render_dashboard`: a data page shows every road) |
 | `offset_frac` | `0.28` | web | two-way lane offset, fraction of the road's pixel width; `0` = no lane split |
 | `width_frac` | `0.6` | web | each lane's width, fraction of the full road width |
 | `offset_zoom` | `15` | web | zoom where the two directions start to fan apart |

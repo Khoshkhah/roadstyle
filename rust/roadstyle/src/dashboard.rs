@@ -329,7 +329,7 @@ impl Template {
         match self {
             Template::Map => None,
             Template::Dashboard => Some((roadstyle_assets::text!("templates/dashboard.html"),
-                r#"{"name": "Roads dashboard", "basemap": "blank", "basemap_switcher": true, "filter_control": false, "road_popup": false}"#)),
+                r#"{"name": "Roads dashboard", "basemap": "blank", "basemap_switcher": true, "filter_control": false, "road_popup": false, "minzoom": false}"#)),
         }
     }
 
