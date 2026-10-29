@@ -154,7 +154,7 @@ mod tests {
         for (pairs, tunnel) in [(false, false), (true, false), (true, true)] {
             let mut cx = Ctx::new(&look, &roads, false).unwrap();
             (cx.pairs, cx.any_tunnel) = (pairs, tunnel);
-            let (paint, _) = line_paint(&cx, &widths(&cx, false), &[], &["__rs_fill".to_string()]);
+            let (paint, _) = line_paint(&cx, &widths(&cx, false), &[], &[Mark::Fill.name().to_string()]);
             let one = json!({"id": "roads-simple", "type": "line", "source": "simple", "paint": paint});
             let bands = split(one.clone());
             assert!(bands.len() >= 3, "{} layers", bands.len());
@@ -164,8 +164,8 @@ mod tests {
                 for kind in 0..=4 {
                     for flags in 0..8 {
                         for class in 0..=classes.len() {
-                            let p = json!({"highway": classes.get(class).cloned().unwrap_or_else(|| "other".into()), "__rs_ci": class, "__rs_k": kind,
-                                           "__rs_bridge": flags & 1 == 1, "__rs_twoway": flags & 2 == 2, "__rs_pair": flags & 4 == 4});
+                            let p = json!({"highway": classes.get(class).cloned().unwrap_or_else(|| "other".into()), (Mark::ClassIndex.name()): class, (Mark::PieceKind.name()): kind,
+                                           (Mark::Bridge.name()): flags & 1 == 1, (Mark::Twoway.name()): flags & 2 == 2, (Mark::Pair.name()): flags & 4 == 4});
                             let p = p.as_object().unwrap();
                             for z in (0..48).map(|i| i as f64 / 2.0).filter(|z| (lo..hi).contains(z)) {
                                 for fill_on in [true, false] {
@@ -209,7 +209,8 @@ mod tests {
         assert_eq!(two.iter().map(|l| l["id"].as_str().unwrap()).collect::<Vec<_>>(), ["roads-simple-z14-dash", "roads-simple-z14"], "the dash layer is under");
         assert!(two[1]["paint"].get("line-dasharray").is_none() && two[0]["paint"].get("line-dasharray").is_some());
         let shows = |l: &Value, p: Value| matches!(ev(&l["filter"], p.as_object().unwrap()), Ev::V(v) if to_boolean(&v));
-        let pieces = [json!({"__rs_k": 0}), json!({"__rs_k": 1}), json!({"__rs_k": 3}), json!({"__rs_k": 4}), json!({"__rs_k": 1, "__rs_dash": "2,2"}), json!({"__rs_k": 0, "__rs_dash": ""})];
+        let (k, dash) = (Mark::PieceKind.name(), Mark::Dash.name());
+        let pieces = [json!({k: 0}), json!({k: 1}), json!({k: 3}), json!({k: 4}), json!({k: 1, dash: "2,2"}), json!({k: 0, dash: ""})];
         let in_dash: Vec<bool> = pieces.iter().map(|p| shows(&two[0], p.clone())).collect();
         assert_eq!(in_dash, [false, false, true, true, true, false], "the tunnel gaps and dashes and the pieces with a pattern");
         assert!(pieces.iter().all(|p| shows(&two[0], p.clone()) != shows(&two[1], p.clone())), "each piece is in one layer");
