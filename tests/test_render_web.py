@@ -1997,9 +1997,11 @@ def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
 
 
 def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
-    """The footway's fill (``__rs_dash`` "4,4" from the palette) is dashed per feature, butt ended; a solid road gets [1, 0]."""
+    """The footway's fill (``__rs_dash`` "4,4" from the palette) is dashed per feature, butt ended, in the dash layer; a solid road has no
+    dash (2f: only the dashed pieces are in a layer with line-dasharray)."""
     style = _style(render_edges(_simple_world(), backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce").html)
-    layer = next(l for l in style["layers"] if l["id"] == "roads-simple")
+    layer = next(l for l in style["layers"] if l["id"] == "roads-simple-dash")
+    assert "line-dasharray" not in next(l for l in style["layers"] if l["id"] == "roads-simple")["paint"]
     foot = next(f["properties"] for f in style["sources"]["simple"]["data"]["features"] if f["id"] == 2)
     da = layer["paint"]["line-dasharray"]
     by = da[3]

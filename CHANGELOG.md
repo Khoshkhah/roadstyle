@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **`line-dasharray` is only on the dashed pieces** (docs/design/tile_speed.md). The pieces that have a dash (a tunnel's gap and dashes,
+  `__rs_k` 3 and 4, and a piece with its own pattern, `__rs_dash`) are drawn by a layer of their own for each band (`roads-simple-dash`,
+  `roads-simple-z14-dash`, ...), under the layer of the other pieces: a tunnel is under the roads that cross it and under its own fill. The
+  other pieces have no `line-dasharray`, so MapLibre looks up no dash pattern for them. The base look had a faint dotted fringe on the
+  casing that this removes (about 1 % of the pixels).
 - **The road layer is one layer for each band of zooms** (`roads-simple` below z14, `roads-simple-z14` from z14, `roads-simple-z15` from z15;
   docs/design/tile_speed.md, "The road layer in MapLibre"). MapLibre evaluates each data-driven paint property for each feature. In a band, a
   property whose zoom curve is one value is that value: `line-offset` is 0 below z15, `line-blur` is 0 and `line-opacity` is a short `case`

@@ -185,21 +185,37 @@
     }
    },
    "style": {
-    "layers": 6,
-    "expressions_total": 39822,
+    "layers": 9,
+    "expressions_total": 72350,
     "expressions": {
+     "roads-simple-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 4513
+     },
      "roads-simple": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2239,
       "paint.line-width": 4513
      },
-     "roads-simple-z14": {
-      "filter": 803,
+     "roads-simple-z14-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 3468
      },
+     "roads-simple-z14": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
+     },
      "roads-simple-z15": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2279,
       "paint.line-width": 10861,
       "paint.line-offset": 2112
@@ -401,21 +417,37 @@
     }
    },
    "style": {
-    "layers": 6,
-    "expressions_total": 39822,
+    "layers": 9,
+    "expressions_total": 72350,
     "expressions": {
+     "roads-simple-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 4513
+     },
      "roads-simple": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2239,
       "paint.line-width": 4513
      },
-     "roads-simple-z14": {
-      "filter": 803,
+     "roads-simple-z14-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 3468
      },
+     "roads-simple-z14": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
+     },
      "roads-simple-z15": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2279,
       "paint.line-width": 10861,
       "paint.line-offset": 2112
@@ -617,21 +649,37 @@
     }
    },
    "style": {
-    "layers": 6,
-    "expressions_total": 39576,
+    "layers": 9,
+    "expressions_total": 72104,
     "expressions": {
+     "roads-simple-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 4513
+     },
      "roads-simple": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2239,
       "paint.line-width": 4513
      },
-     "roads-simple-z14": {
-      "filter": 803,
+     "roads-simple-z14-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 3468
      },
+     "roads-simple-z14": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
+     },
      "roads-simple-z15": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2279,
       "paint.line-width": 10861,
       "paint.line-offset": 2112
@@ -833,21 +881,37 @@
     }
    },
    "style": {
-    "layers": 6,
-    "expressions_total": 39576,
+    "layers": 9,
+    "expressions_total": 72104,
     "expressions": {
+     "roads-simple-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 4513
+     },
      "roads-simple": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2239,
       "paint.line-width": 4513
      },
-     "roads-simple-z14": {
-      "filter": 803,
+     "roads-simple-z14-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 3468
      },
+     "roads-simple-z14": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
+     },
      "roads-simple-z15": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2279,
       "paint.line-width": 10861,
       "paint.line-offset": 2112
@@ -1913,8 +1977,8 @@
     }
    },
    "style": {
-    "layers": 40,
-    "expressions_total": 43010,
+    "layers": 43,
+    "expressions_total": 75538,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -1925,18 +1989,34 @@
      "ov0-outline": {
       "paint.line-color": 305
      },
-     "roads-simple": {
-      "filter": 803,
+     "roads-simple-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 4513
      },
-     "roads-simple-z14": {
-      "filter": 803,
+     "roads-simple": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 3468
      },
+     "roads-simple-z14": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
+     },
      "roads-simple-z15": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2279,
       "paint.line-width": 10861,
       "paint.line-offset": 2112
@@ -2884,8 +2964,8 @@
     }
    },
    "style": {
-    "layers": 40,
-    "expressions_total": 43005,
+    "layers": 43,
+    "expressions_total": 75533,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -2896,18 +2976,34 @@
      "ov0-outline": {
       "paint.line-color": 305
      },
-     "roads-simple": {
-      "filter": 803,
+     "roads-simple-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 4513
      },
-     "roads-simple-z14": {
-      "filter": 803,
+     "roads-simple": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14-dash": {
+      "filter": 908,
       "paint.line-color": 2279,
       "paint.line-width": 3468
      },
+     "roads-simple-z14": {
+      "filter": 914,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15-dash": {
+      "filter": 908,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
+     },
      "roads-simple-z15": {
-      "filter": 803,
+      "filter": 914,
       "paint.line-color": 2279,
       "paint.line-width": 10861,
       "paint.line-offset": 2112
@@ -5211,6 +5307,144 @@
     "tartu-base.style.expressions.roads-simple-z15.paint.line-color: new, 2279",
     "tartu-base.style.expressions.roads-simple-z15.paint.line-width: new, 10861",
     "tartu-base.style.expressions.roads-simple-z15.paint.line-offset: new, 2112"
+   ]
+  },
+  {
+   "date": "2026-10-29",
+   "why": "The dash (2f): the road layer keeps line-dasharray only in a layer of the dashed pieces (the tunnels' dashes and the pieces with a pattern), so each band has a second layer. The style has three more layers. The tiles do not change.",
+   "changes": [
+    "monaco.style.layers: 6 -> 9",
+    "monaco.style.expressions_total: 39576 -> 72104",
+    "monaco.style.expressions.roads-simple.filter: 803 -> 888",
+    "monaco.style.expressions.roads-simple-dash.filter: new, 882",
+    "monaco.style.expressions.roads-simple-dash.paint.line-color: new, 2279",
+    "monaco.style.expressions.roads-simple-dash.paint.line-width: new, 4513",
+    "monaco.style.expressions.roads-simple-z14.filter: 803 -> 888",
+    "monaco.style.expressions.roads-simple-z14-dash.filter: new, 882",
+    "monaco.style.expressions.roads-simple-z14-dash.paint.line-color: new, 2279",
+    "monaco.style.expressions.roads-simple-z14-dash.paint.line-width: new, 3468",
+    "monaco.style.expressions.roads-simple-z15.filter: 803 -> 888",
+    "monaco.style.expressions.roads-simple-z15-dash.filter: new, 882",
+    "monaco.style.expressions.roads-simple-z15-dash.paint.line-color: new, 2279",
+    "monaco.style.expressions.roads-simple-z15-dash.paint.line-width: new, 10861",
+    "monaco.style.expressions.roads-simple-z15-dash.paint.line-offset: new, 2112",
+    "monaco-full.style.layers: 6 -> 9",
+    "monaco-full.style.expressions_total: 39822 -> 72350",
+    "monaco-full.style.expressions.roads-simple.filter: 803 -> 888",
+    "monaco-full.style.expressions.roads-simple-dash.filter: new, 882",
+    "monaco-full.style.expressions.roads-simple-dash.paint.line-color: new, 2279",
+    "monaco-full.style.expressions.roads-simple-dash.paint.line-width: new, 4513",
+    "monaco-full.style.expressions.roads-simple-z14.filter: 803 -> 888",
+    "monaco-full.style.expressions.roads-simple-z14-dash.filter: new, 882",
+    "monaco-full.style.expressions.roads-simple-z14-dash.paint.line-color: new, 2279",
+    "monaco-full.style.expressions.roads-simple-z14-dash.paint.line-width: new, 3468",
+    "monaco-full.style.expressions.roads-simple-z15.filter: 803 -> 888",
+    "monaco-full.style.expressions.roads-simple-z15-dash.filter: new, 882",
+    "monaco-full.style.expressions.roads-simple-z15-dash.paint.line-color: new, 2279",
+    "monaco-full.style.expressions.roads-simple-z15-dash.paint.line-width: new, 10861",
+    "monaco-full.style.expressions.roads-simple-z15-dash.paint.line-offset: new, 2112",
+    "monaco-base.style.layers: 40 -> 43",
+    "monaco-base.style.expressions_total: 43010 -> 75538",
+    "monaco-base.style.expressions.roads-simple.filter: 803 -> 888",
+    "monaco-base.style.expressions.roads-simple-dash.filter: new, 882",
+    "monaco-base.style.expressions.roads-simple-dash.paint.line-color: new, 2279",
+    "monaco-base.style.expressions.roads-simple-dash.paint.line-width: new, 4513",
+    "monaco-base.style.expressions.roads-simple-z14.filter: 803 -> 888",
+    "monaco-base.style.expressions.roads-simple-z14-dash.filter: new, 882",
+    "monaco-base.style.expressions.roads-simple-z14-dash.paint.line-color: new, 2279",
+    "monaco-base.style.expressions.roads-simple-z14-dash.paint.line-width: new, 3468",
+    "monaco-base.style.expressions.roads-simple-z15.filter: 803 -> 888",
+    "monaco-base.style.expressions.roads-simple-z15-dash.filter: new, 882",
+    "monaco-base.style.expressions.roads-simple-z15-dash.paint.line-color: new, 2279",
+    "monaco-base.style.expressions.roads-simple-z15-dash.paint.line-width: new, 10861",
+    "monaco-base.style.expressions.roads-simple-z15-dash.paint.line-offset: new, 2112",
+    "tartu.style.layers: 6 -> 9",
+    "tartu.style.expressions_total: 39576 -> 72104",
+    "tartu.style.expressions.roads-simple.filter: 803 -> 888",
+    "tartu.style.expressions.roads-simple-dash.filter: new, 882",
+    "tartu.style.expressions.roads-simple-dash.paint.line-color: new, 2279",
+    "tartu.style.expressions.roads-simple-dash.paint.line-width: new, 4513",
+    "tartu.style.expressions.roads-simple-z14.filter: 803 -> 888",
+    "tartu.style.expressions.roads-simple-z14-dash.filter: new, 882",
+    "tartu.style.expressions.roads-simple-z14-dash.paint.line-color: new, 2279",
+    "tartu.style.expressions.roads-simple-z14-dash.paint.line-width: new, 3468",
+    "tartu.style.expressions.roads-simple-z15.filter: 803 -> 888",
+    "tartu.style.expressions.roads-simple-z15-dash.filter: new, 882",
+    "tartu.style.expressions.roads-simple-z15-dash.paint.line-color: new, 2279",
+    "tartu.style.expressions.roads-simple-z15-dash.paint.line-width: new, 10861",
+    "tartu.style.expressions.roads-simple-z15-dash.paint.line-offset: new, 2112",
+    "tartu-full.style.layers: 6 -> 9",
+    "tartu-full.style.expressions_total: 39822 -> 72350",
+    "tartu-full.style.expressions.roads-simple.filter: 803 -> 888",
+    "tartu-full.style.expressions.roads-simple-dash.filter: new, 882",
+    "tartu-full.style.expressions.roads-simple-dash.paint.line-color: new, 2279",
+    "tartu-full.style.expressions.roads-simple-dash.paint.line-width: new, 4513",
+    "tartu-full.style.expressions.roads-simple-z14.filter: 803 -> 888",
+    "tartu-full.style.expressions.roads-simple-z14-dash.filter: new, 882",
+    "tartu-full.style.expressions.roads-simple-z14-dash.paint.line-color: new, 2279",
+    "tartu-full.style.expressions.roads-simple-z14-dash.paint.line-width: new, 3468",
+    "tartu-full.style.expressions.roads-simple-z15.filter: 803 -> 888",
+    "tartu-full.style.expressions.roads-simple-z15-dash.filter: new, 882",
+    "tartu-full.style.expressions.roads-simple-z15-dash.paint.line-color: new, 2279",
+    "tartu-full.style.expressions.roads-simple-z15-dash.paint.line-width: new, 10861",
+    "tartu-full.style.expressions.roads-simple-z15-dash.paint.line-offset: new, 2112",
+    "tartu-base.style.layers: 40 -> 43",
+    "tartu-base.style.expressions_total: 43005 -> 75533",
+    "tartu-base.style.expressions.roads-simple.filter: 803 -> 888",
+    "tartu-base.style.expressions.roads-simple-dash.filter: new, 882",
+    "tartu-base.style.expressions.roads-simple-dash.paint.line-color: new, 2279",
+    "tartu-base.style.expressions.roads-simple-dash.paint.line-width: new, 4513",
+    "tartu-base.style.expressions.roads-simple-z14.filter: 803 -> 888",
+    "tartu-base.style.expressions.roads-simple-z14-dash.filter: new, 882",
+    "tartu-base.style.expressions.roads-simple-z14-dash.paint.line-color: new, 2279",
+    "tartu-base.style.expressions.roads-simple-z14-dash.paint.line-width: new, 3468",
+    "tartu-base.style.expressions.roads-simple-z15.filter: 803 -> 888",
+    "tartu-base.style.expressions.roads-simple-z15-dash.filter: new, 882",
+    "tartu-base.style.expressions.roads-simple-z15-dash.paint.line-color: new, 2279",
+    "tartu-base.style.expressions.roads-simple-z15-dash.paint.line-width: new, 10861",
+    "tartu-base.style.expressions.roads-simple-z15-dash.paint.line-offset: new, 2112"
+   ]
+  },
+  {
+   "date": "2026-10-29",
+   "why": "The dash (2f): the road layer keeps line-dasharray only in a layer of the dashed pieces (the tunnels' gaps and dashes and the pieces with a pattern), so each band has a second layer. The style has three more layers. The tiles do not change.",
+   "changes": [
+    "monaco.style.expressions.roads-simple-dash.filter: 882 -> 908",
+    "monaco.style.expressions.roads-simple.filter: 888 -> 914",
+    "monaco.style.expressions.roads-simple-z14-dash.filter: 882 -> 908",
+    "monaco.style.expressions.roads-simple-z14.filter: 888 -> 914",
+    "monaco.style.expressions.roads-simple-z15-dash.filter: 882 -> 908",
+    "monaco.style.expressions.roads-simple-z15.filter: 888 -> 914",
+    "monaco-full.style.expressions.roads-simple-dash.filter: 882 -> 908",
+    "monaco-full.style.expressions.roads-simple.filter: 888 -> 914",
+    "monaco-full.style.expressions.roads-simple-z14-dash.filter: 882 -> 908",
+    "monaco-full.style.expressions.roads-simple-z14.filter: 888 -> 914",
+    "monaco-full.style.expressions.roads-simple-z15-dash.filter: 882 -> 908",
+    "monaco-full.style.expressions.roads-simple-z15.filter: 888 -> 914",
+    "monaco-base.style.expressions.roads-simple-dash.filter: 882 -> 908",
+    "monaco-base.style.expressions.roads-simple.filter: 888 -> 914",
+    "monaco-base.style.expressions.roads-simple-z14-dash.filter: 882 -> 908",
+    "monaco-base.style.expressions.roads-simple-z14.filter: 888 -> 914",
+    "monaco-base.style.expressions.roads-simple-z15-dash.filter: 882 -> 908",
+    "monaco-base.style.expressions.roads-simple-z15.filter: 888 -> 914",
+    "tartu.style.expressions.roads-simple-dash.filter: 882 -> 908",
+    "tartu.style.expressions.roads-simple.filter: 888 -> 914",
+    "tartu.style.expressions.roads-simple-z14-dash.filter: 882 -> 908",
+    "tartu.style.expressions.roads-simple-z14.filter: 888 -> 914",
+    "tartu.style.expressions.roads-simple-z15-dash.filter: 882 -> 908",
+    "tartu.style.expressions.roads-simple-z15.filter: 888 -> 914",
+    "tartu-full.style.expressions.roads-simple-dash.filter: 882 -> 908",
+    "tartu-full.style.expressions.roads-simple.filter: 888 -> 914",
+    "tartu-full.style.expressions.roads-simple-z14-dash.filter: 882 -> 908",
+    "tartu-full.style.expressions.roads-simple-z14.filter: 888 -> 914",
+    "tartu-full.style.expressions.roads-simple-z15-dash.filter: 882 -> 908",
+    "tartu-full.style.expressions.roads-simple-z15.filter: 888 -> 914",
+    "tartu-base.style.expressions.roads-simple-dash.filter: 882 -> 908",
+    "tartu-base.style.expressions.roads-simple.filter: 888 -> 914",
+    "tartu-base.style.expressions.roads-simple-z14-dash.filter: 882 -> 908",
+    "tartu-base.style.expressions.roads-simple-z14.filter: 888 -> 914",
+    "tartu-base.style.expressions.roads-simple-z15-dash.filter: 882 -> 908",
+    "tartu-base.style.expressions.roads-simple-z15.filter: 888 -> 914"
    ]
   }
  ]
