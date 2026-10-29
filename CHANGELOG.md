@@ -20,6 +20,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **A page of 10,000 roads or more without `tiles=True` gives a warning.** MapLibre cuts GeoJSON roads into tiles in the browser and keeps every vertex, so on 22,000 roads
+  (Nacka) the map draws 2.4 to 2.6 times the triangles of the tiled page at zoom 11 to 13, pan and zoom stall for twice as long, and the map can be empty while new
+  tiles are made. The picture is the same. The default of `tiles` is not changed (the tiled page is about 3 times larger).
+- **`rs.setData` is about 3 times faster on 22,000 roads** (17 ms to 6 ms; 71 ms to 23 ms with the CPU 4 times slower): the key-to-row index is made once and not for each call, a
+  road's own fields are read with no copy, and the colour of a set is made once and not for each road.
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
 - **The dashboard shows every road class at every zoom.** The template `dashboard` gives `minzoom=False` where the call gives none (a data page shows every road; the
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.

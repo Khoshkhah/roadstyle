@@ -117,6 +117,8 @@ export function _setJoined(m, fields, key){ _joined = m;
 export const RoadTable = {
   has(i){ const t=_table(); return !!t && t.props[i]!=null; },
   props(i){ const t=_table(), p=(t && t.props[i]) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
+  // the road's own fields, with no joined row (rs.setData reads every road's key: no object for each road)
+  own(i){ const t=_table(); return (t && t.props[i]) || null; },
   line(i){ const t=_table(); return (t && ((t.lines && t.lines[i]) || (t._lines && t._lines.get(i)))) || null; },
   // a Promise that the line of row i is loaded (linesOf); null when there is nothing to load
   load(i){ const t=_table(); if(!t || t.lines || !t.linesOf || i==null || (t._lines && t._lines.has(i))) return null;
