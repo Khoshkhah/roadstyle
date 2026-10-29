@@ -60,7 +60,7 @@ def _check_keywords(kwargs):
     known one. The names that start with "_" are internal hooks."""
     from ._engine import rust
     names = [k for k in kwargs if not k.startswith("_")]
-    bad = [f"{k!r}" + (f" (did you mean {near!r}?)" if near else "") for k, near in rust().unknown_keywords(names)]
+    bad = [f"{k!r}" + (f" ({hint})" if hint else "") for k, hint in rust().unknown_keywords(names)]
     if bad:
         raise ValueError(f"render_edges: unknown keyword {', '.join(bad)}")
 

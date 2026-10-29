@@ -67,7 +67,7 @@ def _check_options(options: dict | None) -> dict:
     own = set(inspect.signature(render_edges).parameters) - {"gdf", "backend"}
     bad = [(k, near) for k, near in rust().unknown_keywords(sorted(options)) if k not in own]
     if bad:
-        hints = [f"{k!r} (did you mean {near!r}?)" if near else repr(k) for k, near in bad]
+        hints = [f"{k!r} ({hint})" if hint else repr(k) for k, hint in bad]
         raise ValueError(f"unknown option(s): {'; '.join(hints)}. The options are the keywords of render_edges (docs/reference/parameters.md)")
     return options
 

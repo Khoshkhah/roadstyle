@@ -2,7 +2,7 @@
 // theme. The template gives the edge (`dashboard.toolbar.position`, and `phone.toolbar` on a phone). Two tools are the bar's own: `theme`, the
 // first, and `attribution`, the last. A box (the base map, the attribution) opens toward the map's center, and one box is open at a time.
 import {map, O} from "./core.js";
-import {defineTool, mountTools, toolList, wrap} from "./tools.js";
+import {closeBoxes, defineTool, mountTools, toolList, wrap} from "./tools.js";
 import {rsSetTheme} from "./theme.js";
 import {followPanels} from "./overlay.js";
 import {layoutNow} from "./placement.js";
@@ -84,7 +84,11 @@ function keepInside(box){
 }
 let _tbPlace = null, _tbRerun = null, _tbEdge = null;
 // the edge that the person chose (settings.js); the phone form is the template's
-export function setToolbarEdge(edge){ _tbEdge = edge; if(_tbPlace) _tbPlace(); if(_tbRerun) _tbRerun(); }
+// the open box (the settings, from where the person chose the edge) closes first: it opened toward the map from the old edge
+export function setToolbarEdge(edge){
+  closeBoxes();
+  _tbEdge = edge; if(_tbPlace) _tbPlace(); if(_tbRerun) _tbRerun();
+}
 export function initToolbar(){
   const d = O.dashboard;
   if(!d || !d.toolbar) return false;

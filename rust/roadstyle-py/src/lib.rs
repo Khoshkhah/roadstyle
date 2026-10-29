@@ -604,7 +604,7 @@ fn asset<'py>(py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyBytes>> {
 }
 
 /// unknown_keywords(names) -> [(str, str | None)]: each of the call's keyword names that no part of roadstyle reads, in order, with the
-/// nearest known keyword (roadstyle::options::unknown). Only the names: a keyword's value can be a Python object.
+/// hint (where a keyword of the old dashboard went, or the nearest known keyword; roadstyle::options::unknown). Only the names: a keyword's value can be a Python object.
 #[pyfunction]
 fn unknown_keywords(names: Vec<String>) -> Vec<(String, Option<String>)> {
     let args: serde_json::Map<String, serde_json::Value> = names.into_iter().map(|n| (n, serde_json::Value::Null)).collect();

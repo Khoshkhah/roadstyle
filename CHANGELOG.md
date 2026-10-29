@@ -11,6 +11,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
 ### Changed
+- **An old dashboard keyword says where it went.** `toolbar=`, `edit=`, `panel=` and `sidebar=` stop with a hint (not "did you mean `tooltip`"). The new guide
+  `guides/migrating-dashboard.md` lists every old keyword and its new place.
 - **One dashboard template.** `render_dashboard` is the only page with a panel. The names `template="classic"` and `template="report"` are errors,
   and **`render_report` and `--page report` are removed** (also the Report page of the studio, `sidebar_html("report")` and `ui/report`): use
   `render_dashboard`. The old docked form is `layout="dock"` (default `"overlay"`: the panel floats, with the toolbar). `duckosm.page(dashboard=True)`

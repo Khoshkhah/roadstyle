@@ -99,3 +99,45 @@ def test_a_held_toolbar_shows_when_the_page_has_added_its_tools(tmp_path):
         after = vis()
         browser.close()
     assert (before, after) == ("hidden", "visible")
+
+
+@pytest.mark.parametrize("look", ["card", "frame"])
+@pytest.mark.parametrize("bar", ["right", "left"])
+def test_a_left_panel_keeps_the_bar_beside_it_and_the_show_marker_at_the_left(tmp_path, bar, look):
+    """panel.side "left": the bar is in the window (at the right edge, or beside the panel when it is at the left too), and the marker that brings
+    the closed panel back is at the left."""
+    import roadstyle as rs
+    path = tmp_path / "left.html"
+    rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"side": "left", "look": look}, "toolbar": {"position": bar}}).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.wait_for_timeout(500)
+        sb, tb, card = _box(page, "#sb"), _box(page, "#rs-toolbar"), _box(page, "#sb .sb-card")
+        page.click("#sb-hide")
+        page.wait_for_timeout(500)
+        show, tb2 = _box(page, "#sb-show"), _box(page, "#rs-toolbar")
+        browser.close()
+    assert sb["l"] < 20 and 0 <= tb["l"] and tb["r"] <= 1280                    # the panel is at the left, the bar is in the window
+    assert abs(tb["l"] - card["r"]) <= 1.01 if bar == "left" else tb["r"] > 1200      # at the left: on the card's edge (no gap, 1 px overlap); at the right: at the edge
+    assert show["l"] < 100 and tb2["l"] >= 0 and tb2["r"] <= 1280              # the marker at the left; the bar is still in the window
+
+
+def test_changing_the_layout_closes_the_open_settings_box(tmp_path):
+    """The settings box opens toward the map from the bar's edge: a choice in it that moves the bar or the panel closes it first."""
+    pick = """([row, name]) => { const r = [...document.querySelectorAll('.rs-set-row')].find(r => r.querySelector('.rs-set-l').textContent === row);
+        [...r.querySelectorAll('button')].find(b => b.textContent.trim() === name).click(); }"""
+    is_open = "rs.tools.list().find(t => t.id === 'settings').open"
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, tmp_path, "dashboard", viewport={"width": 1280, "height": 800})
+        got = []
+        for row, name in [("Toolbar", "Left"), ("Panel", "Left"), ("Panel", "Right")]:
+            page.evaluate("rs.tools.open('settings')")
+            was = page.evaluate(is_open)
+            page.evaluate(pick, [row, name])
+            got.append((was, page.evaluate(is_open)))
+        edge = page.evaluate("document.getElementById('rs-toolbar').dataset.edge")
+        browser.close()
+    assert not errors and got == [(True, False)] * 3 and edge == "left"

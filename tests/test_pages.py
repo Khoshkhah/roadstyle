@@ -144,6 +144,19 @@ def test_one_template_with_a_layout():
     assert not hasattr(rs, "render_report")
 
 
+def test_an_old_keyword_says_where_it_went():
+    import pytest
+    for old, hint in [("toolbar", 'dashboard={"toolbar"'), ("edit", "no edit hook"), ("panel", "no report panel")]:
+        with pytest.raises(ValueError, match=hint.replace("{", r"\{").replace("}", r"\}").replace("(", r"\(")):
+            rs.render_dashboard(_edges(), **{old: 1})
+
+
+def test_the_ids_that_the_migration_guide_keeps_stable_are_in_the_panel():
+    h = rs.render_dashboard(_edges()).html
+    for i in ("sb", "sb-hide", "sb-show", "sb-th", "bm", "co", "sb-legend", "q", "tbl", "count", "detail"):
+        assert f'id="{i}"' in h, i
+
+
 def test_the_dashboard_keyword_merges_typed_options():
     import pytest
     d = _dashboard(rs.render_dashboard(_edges(), dashboard={"toolbar": {"position": "left", "hold": True},
