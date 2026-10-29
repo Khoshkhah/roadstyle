@@ -34,7 +34,8 @@ pub enum Edge {
 }
 
 /// How the panel looks in the overlay layout (decided 2026-10-29). `Card`: a floating card with a margin and rounded corners all round, like the bar
-/// and the boxes. `Frame`: full height, with a translucent frame around the card and the corners on the map side curved.
+/// and the boxes. `Frame`: full height, with a translucent frame around the card and the corners on the map side curved. The frame is the default
+/// (decided 2026-10-29).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PanelLook {
@@ -288,7 +289,7 @@ impl Template {
 
     /// The defaults of the template with a layout (`Map` has no panel, so the layout does not change it).
     pub fn dashboard(self, layout: Layout) -> Dashboard {
-        let right = Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Card });
+        let right = Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame });
         let free = WindowRules { clamp: false, recenter_map: true, restore_open: true, remember: true };
         let phone = Phone { max_width_px: 700, toolbar: Edge::Top };
         let (layout, panel, toolbar, windows) = match (self, layout) {
@@ -364,7 +365,7 @@ mod tests {
     #[test]
     fn each_form_has_its_defaults() {
         let d = Template::Dashboard.dashboard(Dock);
-        assert_eq!((d.layout, d.panel, d.toolbar), (Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Card }), None));
+        assert_eq!((d.layout, d.panel, d.toolbar), (Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Frame }), None));
         let r = Template::Dashboard.dashboard(Overlay);
         assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false })));
         assert!(r.windows.clamp && !r.windows.recenter_map);

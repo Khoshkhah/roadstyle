@@ -11,6 +11,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
 ### Changed
+- **The panel's frame look is the default** (`dashboard={"panel": {"look": "frame"}}`): full height, a translucent frame round the card, the corners on the
+  map side curved. The card look stays a choice (`"look": "card"`, or the settings).
 - **An old dashboard keyword says where it went.** `toolbar=`, `edit=`, `panel=` and `sidebar=` stop with a hint (not "did you mean `tooltip`"). The new guide
   `guides/migrating-dashboard.md` lists every old keyword and its new place.
 - **One dashboard template.** `render_dashboard` is the only page with a panel. The names `template="classic"` and `template="report"` are errors,

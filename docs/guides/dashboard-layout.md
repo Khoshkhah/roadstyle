@@ -10,16 +10,14 @@ rs.render_dashboard(edges, color_options={"Road class": {}}).save("dashboard.htm
 
 ## The form
 
-There is one template with a panel: `dashboard` (the default of `render_dashboard`). A future template follows its style.
-`layout` changes the frame:
+There is one template with a panel: `dashboard`. A future template follows its style. `layout` changes the frame:
 
 | Keyword | What you get |
 |---|---|
 | `layout="overlay"` (default) | The map fills the window. The panel floats over it. The toolbox is a bar at the right |
 | `layout="dock"` | The panel is docked at the right and takes its own space. No toolbox: the tools are the MapLibre buttons |
 
-`template="map"` is the map only (the default of `render_edges`). The old names `classic` and `report` are errors.
-There is no report page: use `render_dashboard`.
+`template="map"` is the map only (the default of `render_edges`). There is no `classic` and no report page: use `render_dashboard`.
 
 ## The toolbox
 
@@ -37,16 +35,15 @@ To add a tool of your own, use `rs.tools`:
 rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => save()});
 ```
 
-To hide the bar until your tools are in, build the page with `dashboard={"toolbar": {"hold": True}}` and call
-`rs.tools.ready()` when they are added (the bar shows after 6 s at the latest). The keyword `dashboard=` changes any option of the template, for
-example the bar's `position`.
+To hide the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` when they are added (the bar
+shows after 6 s at the latest). The keyword `dashboard=` changes any option of the template, for example the bar's `position` or the panel's `look`.
 
 ## The settings
 
 The gear button opens the settings. They are kept in the browser. They are not in the page file.
 
 - **Layout.** The bar can be at the left, the top, the right or the bottom. The panel can be at the left or the right,
-  as a card or as a frame. The scale and zoom box can be hidden.
+  as a frame (default) or as a card. The scale and zoom box can be hidden.
 - **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
 - **Keys.** A Google Maps key (Street View and Google 3D) and a CARTO key. A key that you save is used instead of the key of the page.
   A page with a toolbox can be built with no Google key. The person who opens it adds the key in the settings.
