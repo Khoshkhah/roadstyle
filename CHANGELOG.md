@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`dashboard={"toolbar": {"navigation": "box"}}`**: one button with the compass needle (it turns with the map and flattens with the tilt) in place of the + and - buttons, the
+  compass and the 2D/3D button. A click opens a box with a zoom slider (with - and +), a turn slider, a tilt slider and a button that sets north and the tilt back. Ctrl + drag on the
+  map turns and tilts it. **This is the default** (`"buttons"` brings the earlier buttons back; the compass button then has the tooltip "Drag to turn and tilt").
+- **The credits button is in the bottom corner box** with the scale and the zoom number, on the side opposite to the panel (the box is always shown; the scale and the zoom number are the person's choice). On a phone
+  the credits stay in the bar. The credits button has no tooltip (its icon and its click are clear); it has an `aria-label` for screen readers.
 - **`rs.setData` takes `fields`**: the columns of the rows that the popup, the tooltip and the panel show. The key column (`edge_id`) never shows: the road has it.
 - **`rs.colorModes`**: a page gives the legend box its own "Colour by" list (`set(names, {active, onChange})`, `select`, `clear`, `active`; event `rs:colormode`). A live-data page has no colour
   options of the style, so its modes (Traffic, Counted, How sure) go in the toolbox, next to the legend, and not in a bar of its own.

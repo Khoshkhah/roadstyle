@@ -8,6 +8,7 @@ import {initBoundary} from "./boundary.js";
 import {initTheme} from "./theme.js";
 import {mountColumn, rsTools} from "./tools.js";
 import {initColorBox, useColorBox} from "./colorbox.js";
+import {initNavBox} from "./navbox.js";
 import {naturalBreaks} from "./breaks.js";
 import {initSelectBox} from "./selectbox.js";
 import {initToolbar} from "./toolbar.js";
@@ -115,6 +116,7 @@ export function rsDashboard(map, options){
   initArrows();
   initSelect();
   initColorBox();
+  initNavBox();
   initSelectBox();
   initPanelScroll();
   initPlacement();

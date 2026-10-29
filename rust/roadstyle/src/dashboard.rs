@@ -116,6 +116,19 @@ pub struct Toolbar {
     /// without them flashes at the load
     #[serde(default)]
     pub hold: bool,
+    /// how the map is navigated: `box` (the default: one button, with the compass needle, that opens a box with a zoom, a turn and a tilt slider; Ctrl + drag on the map
+    /// turns and tilts it) or `buttons` (the buttons zoom in, zoom out, compass and 2D/3D)
+    #[serde(default)]
+    pub navigation: Navigation,
+}
+
+/// The way the map is navigated from the bar.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Navigation {
+    Buttons,
+    #[default]
+    Box,
 }
 
 /// The rules of the floating windows (Street View, Google 3D).
@@ -355,7 +368,7 @@ impl Template {
         let (layout, panel, toolbar, windows) = match (self, layout) {
             (Template::Map, _) => (Layout::Dock, None, None, free),
             (Template::Dashboard, Layout::Dock) => (Layout::Dock, panel0.clone(), None, free),
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone(), Some(Toolbar { position: Edge::Left, settings: true, hold: false }),
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone(), Some(Toolbar { position: Edge::Left, settings: true, hold: false, navigation: Navigation::Box }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
         Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(),
@@ -473,7 +486,7 @@ mod tests {
         assert_eq!((d.layout, d.panel.as_ref().map(|p| (p.side, p.width_px, p.look)), d.toolbar), (Dock, Some((Edge::Left, 340, PanelLook::Frame)), None));
         assert_eq!(d.panel.as_ref().unwrap().hide, ["base_map", "colour_by", "legend"]);
         let r = Template::Dashboard.dashboard(Overlay);
-        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Left, settings: true, hold: false })));
+        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Left, settings: true, hold: false, navigation: Navigation::Box })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
         for layout in [Dock, Overlay] {         // the map has no panel, whatever the layout is
             let free = Template::Map.dashboard(layout);
@@ -533,7 +546,7 @@ mod tests {
     fn the_defaults_are_the_json_that_the_page_reads() {
         let v = serde_json::to_value(Template::Dashboard.dashboard(Overlay)).unwrap();
         assert_eq!(v["template"], "dashboard");
-        assert_eq!(v["toolbar"], serde_json::json!({"position": "left", "settings": true, "hold": false}));
+        assert_eq!(v["toolbar"], serde_json::json!({"position": "left", "settings": true, "hold": false, "navigation": "box"}));
         assert_eq!(v["scale_box"], false);
         assert_eq!(v["phone"], serde_json::json!({"max_width_px": 700, "toolbar": "top"}));
         assert!(serde_json::from_value::<Dashboard>(serde_json::json!({"template": "map", "layout": "dock", "panel": null, "toolbar": null,
@@ -552,7 +565,7 @@ mod tests {
     fn a_partial_dashboard_is_merged_over_the_defaults() {
         let base = Template::Dashboard.dashboard(Overlay);
         let d = merge(&base, &serde_json::json!({"toolbar": {"position": "left", "hold": true}, "google_3d": {"selection_style": {"width": 12.0}, "mesh_altitude_m": 2.0}})).unwrap();
-        assert_eq!(d.toolbar, Some(Toolbar { position: Edge::Left, settings: true, hold: true }));
+        assert_eq!(d.toolbar, Some(Toolbar { position: Edge::Left, settings: true, hold: true, navigation: Navigation::Box }));
         assert_eq!((d.google_3d.selection_style.width, d.google_3d.selection_style.color.as_str(), d.google_3d.mesh_altitude_m), (12.0, "#22d3ee", 2.0));
         assert_eq!(merge(&base, &serde_json::json!({"toolbar": null})).unwrap().toolbar, None);
         for (bad, said) in [(serde_json::json!({"toolbar": {"colour": 1}}), "colour"), (serde_json::json!({"template": "map"}), "cannot change the template"),

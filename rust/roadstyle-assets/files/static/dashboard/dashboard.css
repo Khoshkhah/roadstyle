@@ -212,15 +212,23 @@ html.rs-has-toolbar .maplibregl-ctrl-top-right,html.rs-has-toolbar .maplibregl-c
 #rs-toolbar.rs-tb-bottom #rs-attr-box{bottom:calc(100% + 12px);right:0}
 #rs-toolbar .bm-menu.open{display:block}
 /* every pop-up of the bar takes the bar's own look: one rule set (the bar, the boxes, the scale box) */
-#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,.rs-pop{background:var(--rs-box-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,.rs-pop{background:var(--rs-box-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 /* the chevrons of the panels (show and hide) take the bar's look too */
 #rs-show-right button,#sb-show,#sb-hide,html.rs-overlay .rs-side-min{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important;box-shadow:none!important}
 html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;box-sizing:border-box;padding:0!important;font-size:16px;cursor:pointer}
 /* the scale box */
-#rs-scalebox{position:fixed;left:8px;bottom:8px;height:28px;width:160px;box-sizing:border-box;z-index:7;display:flex;align-items:center;padding:0 8px;gap:6px;
+#rs-scalebox{position:fixed;left:8px;bottom:8px;height:28px;box-sizing:border-box;z-index:7;display:flex;align-items:center;padding:0 8px;gap:6px;
   user-select:none;-webkit-user-select:none;pointer-events:none;font:11px/1 system-ui,sans-serif}
 #rs-scalebox .maplibregl-ctrl-scale{flex:none;width:auto;max-width:80px;margin:0!important;background:none!important;color:var(--rs-tb-ink)!important;border-color:var(--rs-tb-ink)!important;padding:0 2px;text-align:left}
 #rs-scalebox .rs-scale-slot{flex:none;width:90px;overflow:hidden}
+/* the credits in the corner box: a small round button with the italic i; its list opens upward, toward the middle of the window */
+#rs-scalebox .rs-attr-ctrl{pointer-events:auto;position:relative!important;overflow:visible;flex:none;float:none;margin:0;width:22px;height:22px;background:none!important;border:0;box-shadow:none!important;border-radius:0}
+#rs-scalebox .rs-attr-ctrl button{width:22px;height:22px;padding:0;border:0;background:none;color:var(--rs-tb-ink);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#rs-scalebox .rs-attr-ctrl button:hover{background:var(--rs-tb-hover)}
+#rs-scalebox .rs-attr-ctrl button svg{width:16px;height:16px}
+html:not(.rs-panel-left) #rs-scalebox .rs-attr-ctrl{order:-1}
+#rs-scalebox #rs-attr-box{position:absolute;top:auto;bottom:calc(100% + 8px);left:auto;right:-8px;width:264px}
+html:not(.rs-panel-left) #rs-scalebox #rs-attr-box{left:-8px;right:auto}
 #rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:46px!important;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 monospace;text-align:right!important;border-radius:0}
 html.rs-theme-in-bar #sb-th{display:none!important}
 html.rs-phone #rs-scalebox{display:none}
@@ -254,7 +262,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-g3d-menu[hidden]{display:none}
 .rs-g3d-menu label{display:block;white-space:nowrap;cursor:pointer}
 /* ---- the tool `legend` (colorbox.js): "Colour by" as radio rows, then the legend in two columns; the look of the base-map box ---- */
-#rs-toolbar .rs-color-ctrl{position:relative!important;overflow:visible}
+#rs-toolbar .rs-color-ctrl,#rs-toolbar .rs-nav-ctrl{position:relative!important;overflow:visible}
 #rs-color-box{position:absolute;z-index:9}
 #rs-color-box[hidden]{display:none}
 #rs-toolbar.rs-tb-right #rs-color-box{right:calc(100% + 12px);top:0}
@@ -262,6 +270,21 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 #rs-toolbar.rs-tb-top #rs-color-box{top:calc(100% + 12px);right:0}
 #rs-toolbar.rs-tb-bottom #rs-color-box{bottom:calc(100% + 12px);right:0}
 #rs-color-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:8px 0 6px}
+/* ---- the box of the tool `navigate` (navbox.js): zoom, turn and tilt ---- */
+#rs-nav-box{position:absolute;z-index:9}
+#rs-nav-box[hidden]{display:none}
+#rs-toolbar.rs-tb-right #rs-nav-box{right:calc(100% + 12px);top:0}
+#rs-toolbar.rs-tb-left #rs-nav-box{left:calc(100% + 12px);top:0}
+#rs-toolbar.rs-tb-top #rs-nav-box{top:calc(100% + 12px);right:0}
+#rs-toolbar.rs-tb-bottom #rs-nav-box{bottom:calc(100% + 12px);right:0}
+.rs-nb-row{display:grid;grid-template-columns:40px 1fr 36px;gap:6px;align-items:center;margin:7px 0}
+.rs-nb-row span{opacity:.8} .rs-nb-row b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.rs-nb-row input[type=range]{width:100%;margin:0;accent-color:var(--accent,#1a6bd6)}
+.rs-nb-zoom{display:grid;grid-template-columns:22px 1fr 22px;gap:4px;align-items:center}
+#rs-nav-box button{width:22px;height:22px;padding:0;border:1px solid var(--rs-tb-border);border-radius:6px;background:none;color:inherit;font:600 14px/1 system-ui,sans-serif;cursor:pointer}
+#rs-nav-box button:hover{background:var(--rs-tb-hover)}
+#rs-nav-box .rs-nb-hint{font-size:11px;opacity:.7;margin-top:8px}
+#rs-nav-box .rs-nb-reset{width:100%;height:auto;padding:5px 8px;margin-top:4px;font:12px system-ui,sans-serif}
 .rs-cb-opts{display:grid;gap:2px}
 .rs-cb-opt{display:block;width:100%;padding:6px 8px;border:0;border-radius:6px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 #rs-toolbar .rs-cb-opt{width:100%;height:auto;padding:7px 10px;border-radius:6px;font:12px/1.3 system-ui,sans-serif;color:var(--rs-tb-ink);text-align:left}
@@ -277,8 +300,8 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-cb-lg .lg-ends{grid-column:1/-1;display:flex;justify-content:space-between;opacity:.7;font-size:11px}
 html.rs-has-toolbar .co-ctrl,html.rs-has-toolbar .co-lg{display:none!important}
 /* every box of the bar (the base-map box, the colour box, the attribution): the same padding, shadow, font and text side; the base-map and colour boxes the same width */
-#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto}
-#rs-toolbar .bm-menu.rs-bm-box,#rs-color-box,#rs-attr-box{width:264px!important}
+#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto}
+#rs-toolbar .bm-menu.rs-bm-box,#rs-color-box,#rs-attr-box,#rs-nav-box{width:264px!important}
 /* ---- one background for everything that floats over the map: the bar's (--rs-tb-bg in popup.css, 90 % opaque), with the same blur, border and text color ---- */
 .rs-zoom,.flt-ctrl,.rs-find,.co-ctrl,.tn-ctrl,.vw-ctrl,.co-lg,.ov-ctrl,.maplibregl-ctrl .bm-menu,html.rs-overlay #sb,html.rs-overlay .rs-side,
 html.rs-phone.rs-tpl-dashboard .rs-grip,html.rs-phone.rs-tpl-dashboard #sb{
@@ -406,7 +429,7 @@ html.rs-phone .rs-set-layout,html.rs-phone .rs-set-layout+hr{display:none}
   border:1px solid var(--rs-tb-border);color:var(--rs-tb-ink);box-shadow:0 2px 8px rgba(0,0,0,.18);font:500 12px/1.35 system-ui,sans-serif;pointer-events:none}
 #rs-tip[hidden]{display:none}
 /* the person can hide the scale and the zoom number (settings.js: "Scale and zoom") */
-html.rs-hide-scale #rs-scalebox,html.rs-hide-scale .maplibregl-ctrl-scale,html.rs-hide-scale .rs-zoom{display:none!important}
+html.rs-hide-scale #rs-scalebox .rs-scale-slot,html.rs-hide-scale #rs-scalebox .rs-zoom-slot,html.rs-hide-scale .maplibregl-ctrl-scale,html.rs-hide-scale .rs-zoom{display:none!important}
 /* the view switch of the Google 3D window: the same look as the Street View mode switch (Imagery or Map) */
 .rs-g3d-view button:disabled{opacity:.45;cursor:default}
 /* ---- the shape of the panel in the overlay layout: the same panel (full height, its translucent frame, its card), with the corners on the map side

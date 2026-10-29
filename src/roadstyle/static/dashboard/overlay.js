@@ -2,6 +2,7 @@
 // changes, so a panel does not resize the map. A box at the edge of the window (the bar, the scale box) slides beside an open panel (no gap, decided 2026-10-29)
 // on its side, and goes back when the panel closes.
 import {map, O} from "./core.js";
+import {getTool} from "./tools.js";
 
 const root = document.documentElement;
 const phone = () => root.classList.contains("rs-phone");
@@ -38,13 +39,13 @@ export function followPanels(box, edge){
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", watch) : watch();
   return run;
 }
-// the scale bar and the zoom level: one small box at the bottom left, of a fixed width (so it never jumps on a zoom); its text cannot be
+// the scale bar, the zoom level and the credits: one small box in a bottom corner, of a fixed width (so it never jumps on a zoom); its text cannot be
 // selected and it ignores the pointer
 export function initOverlay(){
   const d = O.dashboard;
   if(!d || d.layout !== "overlay") return;
-  const scale = document.querySelector(".maplibregl-ctrl-scale"), zoom = document.querySelector(".rs-zoom");
-  if(!scale && !zoom) return;
+  const scale = document.querySelector(".maplibregl-ctrl-scale"), zoom = document.querySelector(".rs-zoom"), credits = getTool("attribution");
+  if(!scale && !zoom && !credits) return;
   const box = document.createElement("div"); box.id = "rs-scalebox"; document.body.appendChild(box);
   if(scale){
     const slot = document.createElement("div"); slot.className = "rs-scale-slot"; slot.appendChild(scale); box.appendChild(slot);
@@ -52,5 +53,12 @@ export function initOverlay(){
     if(ctl){ ctl.options.maxWidth = 80; ctl._onMove(); }
   }
   if(zoom){ zoom.classList.add("rs-zoom-slot"); box.appendChild(zoom); }
+  // the credits (the tool `attribution`) are in this corner box on a desktop, always shown (the scale and the zoom number are the person's choice); on a phone this box
+  // is not drawn, so the credits go back to the bar
+  if(credits){
+    const w = credits.el.closest(".maplibregl-ctrl") || credits.el, bar = document.getElementById("rs-toolbar"), phone = matchMedia("(max-width:" + d.phone.max_width_px + "px)");
+    const put = () => (phone.matches && bar ? bar : box).appendChild(w);
+    put(); phone.addEventListener("change", put);
+  }
   followPanels(box, () => root.classList.contains("rs-panel-left") ? "right" : "left");       // always on the side opposite to the panel
 }

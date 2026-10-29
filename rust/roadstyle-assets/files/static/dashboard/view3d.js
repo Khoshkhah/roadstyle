@@ -17,5 +17,6 @@ export function initView3D(){
   b.onclick=()=>{ rsSetView3D(map.getPitch()<5); };
   map.on("pitchend", upd); map.on("pitch", upd); upd();
   d.appendChild(b);
+  if(O.dashboard && O.dashboard.toolbar && O.dashboard.toolbar.navigation === "box") return;       // the tool `navigate` tilts the map: no 2D / 3D button
   defineTool("view3d", "toggle", d, {isOpen: ()=>map.getPitch()>=5});
 }

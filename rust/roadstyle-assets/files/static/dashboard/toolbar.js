@@ -46,7 +46,8 @@ const _tbCredits = () => {
   return rows.filter((r, i) => rows.findIndex(x => x.text === r.text) === i);
 };
 function attributionTool(){
-  const b = button("Attribution", ICON.info), box = el("div"), d = wrap(b);
+  const b = button("", ICON.info), box = el("div"), d = wrap(b);
+  b.setAttribute("aria-label", "Attribution");               // no tooltip: the icon and the click on it are clear (a screen reader reads the label)
   d.classList.add("rs-attr-ctrl"); box.id = "rs-attr-box"; box.hidden = true; d.appendChild(box);
   const open = () => {
     box.replaceChildren(el("div", "rs-bm-h", "Attribution"));
@@ -59,7 +60,7 @@ function attributionTool(){
     box.hidden = false;
   };
   b.onclick = e => { e.stopPropagation(); box.hidden ? open() : (box.hidden = true); };
-  defineTool("attribution", "box", d, {title: b.title, open, close: () => { box.hidden = true; }, isOpen: () => !box.hidden});
+  defineTool("attribution", "box", d, {title: "Attribution", open, close: () => { box.hidden = true; }, isOpen: () => !box.hidden});
 }
 // one box is open at a time: a click outside the open box and the Escape key close it, and so does the click on another box's button
 function boxRules(bar){
@@ -117,11 +118,11 @@ export function initToolbar(){
       }
       const w = wrap(t.el);
       if(t.id === "attribution") attr = w;
-      attr && t.id !== "attribution" ? bar.insertBefore(w, attr) : bar.appendChild(w);
+      attr && attr.parentNode === bar && t.id !== "attribution" ? bar.insertBefore(w, attr) : bar.appendChild(w);       // the credits can be in the corner box (overlay.js)
     }
   });
   boxRules(bar);
-  const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
+  const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-nav-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
   toolList().forEach(fitBox); setOnReplace(fitBox);
   _tbRerun = followPanels(bar, () => bar.dataset.edge);
   return true;
