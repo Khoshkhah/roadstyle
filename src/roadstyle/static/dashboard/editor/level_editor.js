@@ -1,9 +1,15 @@
 // The level editor as a module that any page can hold (the level editor's files: roadstyle's level area; docs/rust/browser.md, "The level
-// editor in a page"): levelEditor({map, container, pkg, store}) loads the area's files from `store`, solves in the page (the roadstyle-wasm
-// package `pkg`, initialised: LevelArea, resolveLook, styleSources, tilesOfSources), draws the area on `map` (a MapLibre map of the host, else
-// one of its own in `container`) and puts the panel (static/level_editor.html) in `container`. It saves your edits, heads and caps and the
+// editor in a page"): levelEditor({map, panel, pkgUrl, store}) loads the area's files from `store`, solves in the page (the roadstyle-wasm
+// package at `pkgUrl`: LevelArea, resolveLook, styleSources, tilesOfSources), draws the area on `map` (a MapLibre map of the host, else
+// one of its own in `container`) and draws the editor into `panel`, the host's standard dashboard panel (#sb > .sb-card with .sb-top and
+// .sb-body): the panel's body is kept and hidden, the title in .sb-top is swapped for "← <backLabel>" and "Edit levels", the editor's tabs and
+// its apply bar fill the rest of the card, and destroy() puts the host's panel back. The editor has no frame, side, width or fold button of
+// its own: they are the panel's. It saves your edits, heads and caps and the
 // solved levels.csv to `store`, and after each solve it sends the event "solved" ({levelsCsv, levelsInfo, draw()}: draw gives the map's
-// table, GeoParquet, one row for each edge) so that the host can apply it. A store is {load(name, bytes) -> {body, mtime} | null,
+// table, GeoParquet, one row for each edge) so that the host can apply it. The event "back" comes when the person leaves with "← <backLabel>"
+// (with changes waiting, after "Apply, discard or stay" has an answer that leaves): the host then calls destroy() and shows its own steps.
+// `backLabel: null` has no "← ..." button (a page with no steps). `template` is the dashboard template of the editor's own map's dashboard.
+// A store is {load(name, bytes) -> {body, mtime} | null,
 // save(name, text | bytes)} with an optional `name` (the area's, shown in the panel) and `key`: httpStore for roadstyle serve,
 // browserStore for a page with no server.
 // The option `levels` ({csv, edge_hash}: the levels that the host's map has) is the answer to start from with no solve; saveArea and
@@ -18,7 +24,7 @@ import {caller} from "../worker/call.js";
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
 const EMPTY = COLS.join(",") + "\n";
 // the keywords of the editor's map (level_editor.Area._render)
-const LOOK = {state: "live", edge_id_col: "edge", directed_col: "directed", driving_col: "driving", road_popup: false, select_color: "rgba(0,0,0,0)",
+const LOOK = {state: "live", edge_id_col: "edge", directed_col: "directed", driving_col: "driving", road_popup: false,
   filter_control: false, tunnel_control: false, casing_start_col: "casing_start", casing_level_col: "casing_level", casing_end_col: "casing_end",
   fill_level_col: "fill_level", cap_start_col: "cap_start", cap_end_col: "cap_end", head_start_m_col: "head_start_m", head_end_m_col: "head_end_m"};
 const KEEP = ["edge", "road", "name", "highway", "edge_ref", "modes", "s_lon", "s_lat", "e_lon", "e_lat"];   // the road fields in the tiles
@@ -95,12 +101,15 @@ const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
-export async function levelEditor({map = null, container = document.body, pkgUrl, store, maplibregl: ml = globalThis.maplibregl, dashboard = null,
-                                   prefix = dashboard ? null : "lv-rs-", layout = "auto", levels: given = null, host = null,
-                                   colors = {}}){
+export async function levelEditor({map = null, container = document.body, panel, backLabel = "Steps", template = null, pkgUrl, store,
+                                   maplibregl: ml = globalThis.maplibregl, dashboard = null, prefix = dashboard ? null : "lv-rs-",
+                                   levels: given = null, host = null, colors = {}}){
 // the picked roads and the hover (`colors`: {select, hover, second}): road 1 in the selection's colour, road 2 darker, the hover lighter
 const COLORS = {select: "#7c4dff", hover: "#b388ff", second: "#4527a0", ...colors};
-if(!["auto", "sheet", "side"].includes(layout)) throw new Error(`level editor: layout must be "auto", "sheet" or "side", not ${JSON.stringify(layout)}`);
+// the host's panel: the card, its title line (the title first, then the hide button) and its body
+const hostCard = panel?.querySelector?.(".sb-card"), hostBar = hostCard?.querySelector(".sb-top"), hostBody = hostCard?.querySelector(".sb-body");
+if(!hostBar?.firstElementChild || !hostBody)
+  throw new Error("level editor: give `panel`, the host's dashboard panel: an element with .sb-card, in it .sb-top (the title first, then the hide button) and .sb-body");
 if(map && !dashboard && window.rs)
   throw new Error("level editor: this page has a dashboard (window.rs): give it as levelEditor({dashboard, prefix}), so that the editor uses it; a second dashboard takes the first one's state");
 if(host && !(map && dashboard && typeof host.replaceRoads === "function"))
@@ -275,7 +284,12 @@ if(host){                                                        // the host's m
   window.map = map;                                                // the panel (level_editor.html) draws on the global map
   // the page's one dashboard: the host's, else one for the editor (the road fields: the road table RS_SIDE)
   rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
-    select_color: "rgba(0,0,0,0)"});
+    dashboard: template});
+  if(own){                                                         // the area in the part of the map that the panel and the bar leave free
+    const f = rs.freeArea(), r = map.getContainer().getBoundingClientRect();
+    map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {duration: 0, padding: {left: f.lo - r.left + 40, right: r.right - f.hi + 40, top: f.top - r.top + 40,
+      bottom: r.bottom - f.bottom + 40}});
+  }
   let first = true;
   showRoads = async function(st){                                      // the roads style on the map (prefix P), in place of the one before
     const layers = st.layers.map(l => P + l.id), sources = Object.keys(st.sources).map(id => P + id);
@@ -302,7 +316,7 @@ if(host){                                                        // the host's m
       const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));
       map.addLayer({...layer, id: P + l.id, source: P + l.source}, map.getLayer("lv-ends") ? "lv-ends" : undefined);   // under the panel's end marks
     }
-    // the taps of a finger: a wide line on the roads that draws nothing (the sheet's layout picks a road with it)
+    // the taps of a finger: a wide line on the roads that draws nothing (a finger on a phone picks a road with it)
     map.addLayer({id: P + "lv-tap", type: "line", source: P + "lv-roads", "source-layer": "simple", paint: {"line-width": 28, "line-opacity": 0}},
       map.getLayer("lv-ends") ? "lv-ends" : undefined);
     mine.layers.push(P + "lv-tap");
@@ -471,55 +485,39 @@ window.lvApi = async (path, body) => {
   throw new Error("not found: " + path);
 };
 
-// --- the panel (static/level_editor.html, the Python editor's too), with its scripts run
-const panel = (await (await fetch(new URL("../../level_editor.html", import.meta.url))).text()).replace("__STATS__", JSON.stringify(stats()));
+// --- the panel (static/level_editor.html), with its scripts run, in the host's panel: the host's body and title are kept and hidden
+const html = (await (await fetch(new URL("../../level_editor.html", import.meta.url))).text()).replace("__STATS__", JSON.stringify(stats()));
 window.lvColors = [COLORS.select, COLORS.second];
+window.lvDownload = download;                                    // the History tab's button
 const holder = document.createElement("div");
-holder.innerHTML = panel;
+holder.innerHTML = html;
 // the panel's nodes, and the listeners that its scripts add to the document and the map as they run (destroy takes them off)
 const nodes = [], heard = [];
 const [docOn, mapOn] = [document.addEventListener, map.on];
 document.addEventListener = function(...a){ heard.push(() => document.removeEventListener(...a)); return docOn.apply(this, a); };
 map.on = function(...a){ heard.push(() => map.off(...a)); return mapOn.apply(this, a); };
+const hostTitle = hostBar.firstElementChild, hostWas = {title: hostTitle.style.display, body: hostBody.style.display, scroll: hostBody.scrollTop};
+hostTitle.style.display = hostBody.style.display = "none";
 try {
   for(const n of [...holder.childNodes]){
     const node = n.tagName === "SCRIPT" ? Object.assign(document.createElement("script"), {textContent: n.textContent}) : n;
     nodes.push(node);
-    container.appendChild(node);                                 // a script runs here, at once
+    if(node.classList?.contains("lv-title")) hostBar.prepend(node);   // the top line, before the host's hide button
+    else hostCard.appendChild(node);                              // a script runs here, at once
   }
 } finally { [document.addEventListener, map.on] = [docOn, mapOn]; }
+if(backLabel == null) document.getElementById("lv-back").remove();      // a page with no steps to go back to
+else document.getElementById("lv-back").textContent = "← " + backLabel;
+document.getElementById("lv").addEventListener("lv:back", () => events.dispatchEvent(new CustomEvent("back")));
 
-// --- the phone's layout: a sheet at the bottom of the map (layout "sheet", or "auto" up to 700 px wide: the dashboard panel's width)
-const narrow = matchMedia("(max-width: 700px)"), body = document.body, root = document.documentElement;
-const sheetOn = () => layout === "sheet" || (layout === "auto" && narrow.matches);
-function sheet(state){                                           // "fold" (one row), "half" or "full"; the map's camera keeps the top
-  body.dataset.lvSheet = state;
-  setTimeout(() => sheetOn() && map.setPadding({...map.getPadding(), bottom: document.getElementById("lv").getBoundingClientRect().height}), 220);
-}
-function useLayout(){
-  const on = sheetOn();
-  body.classList.toggle("lv-sheet", on);
-  if(on) sheet(body.dataset.lvSheet || "half");
-  else { delete body.dataset.lvSheet; map.setPadding({...map.getPadding(), bottom: 0}); }
-  setTimeout(() => map.resize(), 220);
-}
-const NEXT = {half: "full", full: "fold", fold: "half"};
-const handle = document.getElementById("lv-handle");
-handle.onclick = () => sheet(NEXT[body.dataset.lvSheet] || "half");
-// the phone's keyboard: the sheet goes up above it (the visual viewport is the part of the page the keyboard leaves)
-const keyboard = () => root.style.setProperty("--lv-kb", `${Math.max(0, innerHeight - visualViewport.height - visualViewport.offsetTop)}px`);
-// a Street View or Google 3D window at the bottom (the dashboard's, up to 520 px wide): the sheet folds to its one row
-const windows = new MutationObserver(() => {
-  if(sheetOn() && innerWidth <= 520 && [...document.querySelectorAll(".rs-svw")].some(w => !w.hidden)) sheet("fold");
-});
-windows.observe(body, {subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"]});
-// a tap on a road: the wide tap line, when the dashboard picked nothing for this tap (its pick box can be wider than the road layers
+// a finger's tap on a phone: the wide tap line, when the dashboard picked nothing for this tap (its pick box can be wider than the road layers
 // under the finger, and its pick comes before the map's click); the road table's row of the piece, which has the road
+const narrow = matchMedia("(max-width: 700px)");                 // the dashboard's phone width
 let lastPick = -1e9;
 const heardPick = (e) => { if(!e.detail.lvTap) lastPick = performance.now(); };
 document.addEventListener("rs:select", heardPick);
 function tap(e){
-  if(host || !sheetOn()) return;
+  if(host || !narrow.matches) return;
   const f = map.queryRenderedFeatures(e.point, {layers: [P + "lv-tap"]})[0];
   const p = f && window.RS_SIDE?.props[f.id];
   const t = performance.now();
@@ -527,10 +525,7 @@ function tap(e){
     if(p?.road != null && lastPick < t - 300) document.dispatchEvent(new CustomEvent("rs:select", {detail: {properties: p, lvTap: true}}));
   });
 }
-narrow.addEventListener("change", useLayout);
-visualViewport?.addEventListener("resize", keyboard);
 map.on("click", tap);
-useLayout();
 // the files of the area as the page has them now, to download (a page with no server keeps them in the browser)
 const files = {"edits.csv": async () => editsText, "heads.csv": async () => headsText, "caps.csv": async () => capsText,
   "levels.csv": async () => (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv};
@@ -546,18 +541,14 @@ async function download(name){
  * files stay in the store. A map of its own is removed. */
 function destroy(){
   worker.terminate();
-  narrow.removeEventListener("change", useLayout);
-  visualViewport?.removeEventListener("resize", keyboard);
-  windows.disconnect();
   map.off("click", tap);
   document.removeEventListener("rs:select", heardPick);
-  if(!own) map.setPadding({...map.getPadding(), bottom: 0});
-  body.classList.remove("lv-sheet");
-  delete body.dataset.lvSheet;
-  root.style.removeProperty("--lv-kb");
+  window.rsColor?.(null);                                        // the colour of the picked roads (the panel's paint) and their glow stay on the map otherwise
+  window.rsDeselect?.();
   heard.forEach(off => off());
   nodes.forEach(n => n.remove());
-  document.body.classList.remove("lv-open");
+  [hostTitle.style.display, hostBody.style.display] = [hostWas.title, hostWas.body];     // the host's panel as it was
+  hostBody.scrollTop = hostWas.scroll;
   for(const id of [...mine.layers, "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
   for(const id of [...mine.sources, "lv-ends"]) if(map.getSource(id)) map.removeSource(id);
   mine.images.forEach(id => map.hasImage(id) && map.removeImage(id));
@@ -565,7 +556,7 @@ function destroy(){
     const t = window.RS_SIDE;
     if(t && t.lvFields){ t.props.forEach(p => { if(p) for(const k of added) delete p[k]; }); delete t.lvFields; }
     if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
-    delete window.lvColors;
+    delete window.lvColors; delete window.lvDownload;
     return;
   }
   ml.removeProtocol("lv");
@@ -582,7 +573,7 @@ function destroy(){
   }
   // window.map stays the host's map (the panel's last timers read it)
   if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
-  delete window.lvColors;
+  delete window.lvColors; delete window.lvDownload;
 }
 return Object.assign(events, {map, roads: order, facts: roadsOf, download, destroy, files: Object.keys(files), answer: () => res});
 }

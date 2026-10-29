@@ -13,7 +13,7 @@ include!(concat!(env!("OUT_DIR"), "/pkg.rs"));
 
 /// A page file in the program, by its path under the page: the editor's WebAssembly package (`PKG`, build.rs), or roadstyle-assets'
 /// `static/<path>` for the page's own files (level_editor/, level_editor.html, the dashboard with its editor/ and worker/ modules, the
-/// popup files). None for any other path.
+/// popup files), and `host_options.json` (the dashboard's template). None for any other path.
 /// Whether this build has the editor's WebAssembly package (rust/roadstyle-wasm/build_editor.sh made it before the build).
 pub fn has_package() -> bool {
     PKG.iter().any(|(n, _)| n.ends_with("_bg.wasm"))
@@ -22,6 +22,9 @@ pub fn has_package() -> bool {
 fn embedded(rel: &str) -> Option<&'static [u8]> {
     if let Some((_, b)) = PKG.iter().find(|(n, _)| *n == rel) {
         return Some(b);
+    }
+    if rel == "host_options.json" {                                   // the dashboard's template, for the page's standard panel (level_editor/app.js)
+        return roadstyle_assets::get("data/host_options.json");
     }
     let page = matches!(rel, "level_editor.html" | "popup.css" | "popup.js") || rel.starts_with("level_editor/") || rel.starts_with("dashboard/");
     if page { roadstyle_assets::get(&format!("static/{rel}")) } else { None }
@@ -201,7 +204,7 @@ mod tests {
 
     #[test]
     fn the_editor_files_are_in_the_program() {
-        for f in ["level_editor/index.html", "level_editor/app.js", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/editor/level_worker.js", "dashboard/worker/call.js", "dashboard/dashboard.css", "popup.css", "popup.js"] {
+        for f in ["level_editor/index.html", "level_editor/app.js", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/editor/level_worker.js", "dashboard/worker/call.js", "dashboard/dashboard.css", "host_options.json", "popup.css", "popup.js"] {
             assert!(embedded(f).is_some_and(|b| !b.is_empty()), "{f}");
         }
     }

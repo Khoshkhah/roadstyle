@@ -3,7 +3,7 @@
 <title>Level editor</title>
 <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <!-- The level editor in Rust (docs/guides/levels.md, "Fix it by hand"): the solver runs in the page (roadstyle-wasm LevelArea), the map is
-     the engine's vector tiles with roadstyle's dashboard, and the panel is static/level_editor.html. `roadstyle serve <area folder>` serves
+     the engine's vector tiles with roadstyle's dashboard, and the panel is static/level_editor.html, drawn into the standard dashboard panel below. `roadstyle serve <area folder>` serves
      this folder and the area under /area/, and saves your changes; on any other host the page shows the area and saves nothing. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
@@ -13,5 +13,9 @@
 #lv-boot{position:absolute;inset:0;display:grid;place-items:center;font:14px system-ui,sans-serif;color:#555;background:#f6f7f9;z-index:9}</style>
 </head><body>
 <div id="lv-boot">Loading the area …</div>
+<div id="sb" data-theme="light"><div class="sb-card"><div class="sb-top"><h2>Level editor</h2>
+  <button id="sb-hide" title="Hide the panel" aria-label="Hide the panel"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m8.5 9.5 2.5 2.5-2.5 2.5"/></svg></button></div>
+  <div class="sb-body"></div></div></div>
+<button id="sb-show" title="Show the panel" aria-label="Show the panel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m10.5 9.5-2.5 2.5 2.5 2.5"/></svg></button>
 <script type="module" src="app.js"></script>
 </body></html>

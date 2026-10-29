@@ -277,9 +277,10 @@ if (!(await areaIsFor(store, meta.edge_hash))) {
   a.free();
 }
 const pkgUrl = new URL("roadstyle-wasm/pkg/roadstyle_wasm.js", import.meta.url);   // the package's module, for the editor's worker
-const editor = await levelEditor({map, container: document.getElementById("panel"), pkgUrl, store,
+const editor = await levelEditor({map, panel: document.getElementById("sb"), backLabel: "Steps", pkgUrl, store,
                                   levels: {csv: levelsCsv, edge_hash: meta.edge_hash}});
 editor.addEventListener("solved", async (e) => apply(e.detail.levelsCsv, await e.detail.draw()));
+editor.addEventListener("back", () => { editor.destroy(); showSteps(); });   // "← Steps" (the editor asked first, if changes waited)
 ```
 
 The editor starts from, in this order: the stored levels.csv, when `levels_info.json` names the same inputs (the SHA-256 of
@@ -289,27 +290,45 @@ area's (roadstyle's edge_hash of the area's edge ids) and they have a row for ea
 editor saves it at once, with no solve. A rule (an order wish, a stack part, a rule switched off) is solved again around the change
 (`solveLocal`), and the whole area only when the local answer would keep fewer rules.
 
-`levelEditor({map, container, pkgUrl, store})` runs the engine (the solver, the map's sources and its tiles) in a Web Worker
+`levelEditor({map, panel, pkgUrl, store})` runs the engine (the solver, the map's sources and its tiles) in a Web Worker
 (`editor/level_worker.js`, which loads the package from `pkgUrl`), so the page does not stop while it works. It draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
-and puts the editor's panel in `container`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
+and draws the editor into `panel`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
 is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
 then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`, by source and source layer; your base
 map stays, also when it shares a tile source with your roads), draws its roads with your prefix and its own sources (`<prefix>lv-roads`,
 apart from yours) and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
-the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel,
-its listeners, its roads, tiles and images, and puts your roads, your road table and your dashboard's style back. Your files stay in
+the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel parts,
+its listeners, its roads, tiles and images, clears the colour and the glow of the picked roads, and puts your panel, your roads, your road table and your dashboard's style back. Your files stay in
 the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
 in this browser (in the origin's private file system: pairs.csv of a large area is more than localStorage's 5 MB; a text that an
 older version kept in localStorage moves there when it is read), `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
 (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the map's
-table, GeoParquet). `editor.roads` is the area's road ids, in their order; `editor.facts(ids)` gives a Promise of what the panel shows of those roads (any edge or road id), by road id. The editor reads a road's facts from the worker only when the panel needs them. On a phone the panel is a sheet at the bottom of the map:
-`layout` is `"auto"` (a sheet up to 700 px wide, the dashboard panel's width; a column at the right above it), `"sheet"` or `"side"`. The
-sheet's handle folds it to one row and opens it full, a tap on a road picks it, the targets are 44 px, the sheet goes up above the phone's
-keyboard, and it folds when a Street View or Google 3D window opens at the bottom. Give your page `<meta name="viewport"
-content="width=device-width">`, so that a phone lays it out at its own width. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now. The panel follows the
-page's theme: dark when the system is dark, unless the page sets `data-theme="light"` or `"dark"` on `<html>`. The module needs the files
+table, GeoParquet). `editor.roads` is the area's road ids, in their order; `editor.facts(ids)` gives a Promise of what the panel shows of those roads (any edge or road id), by road id. The editor reads a road's facts from the worker only when the panel needs them. The editor has no frame, fold button, side, width or phone layout of its own: it draws into the host's panel (see "The editor in the host's panel").
+Give your page `<meta name="viewport" content="width=device-width">`, so that a phone lays it out at its own width. A tap on a road picks it, and the
+targets are 44 px on a phone. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now (the History tab has a button for edits.csv). The panel follows the
+theme of the host's panel (`#sb[data-theme]`). The module needs the files
 of `rust/roadstyle-assets/files/static/` beside it, in the same layout: `dashboard/` with its subfolders, `level_editor.html` (the panel),
 `dashboard.css` and `popup.css`.
+
+### The editor in the host's panel
+
+`panel` is the host's standard dashboard panel: an element with `.sb-card`, in it `.sb-top` (the title first, then the hide button) and
+`.sb-body` (`levelEditor` throws an error when a part is missing). The editor changes only these parts, and `destroy()` puts them back:
+
+- the host's `.sb-body` is hidden (its scroll place is kept), and the host's title in `.sb-top` is hidden. The top line is "← Steps"
+  and "Edit levels" before the host's hide button; under it are the tabs Edit, History and Issues. `backLabel` is the label (default
+  `"Steps"`); `backLabel: null` has no button (a page with no steps).
+- the apply bar is at the bottom of the panel (on a phone: of the sheet) and shows only when changes wait: "N waiting", Discard and
+  Apply and solve. "N waiting" opens the list of the changes, and each can be taken out. The bar stays when the panel scrolls.
+- "← Steps" with no change waiting sends the event `"back"` at once. With changes waiting, the bar asks: Apply (solves, then sends
+  `"back"`), Discard (drops the changes, then sends `"back"`) or Stay. The host answers `"back"` with `editor.destroy()` and shows its
+  steps.
+- the map keeps all roads. The picked roads have the dashboard's own selection glow (`rsSelect`), and the editor's colours tell road 1
+  from road 2. The toolbar is the dashboard's and does not change.
+
+The colours are the panel's tokens (`--bg --ink --mut --line --card --accent`). Without a map of its own (`map` not given), give
+`template` (the `dashboard` of `data/host_options.json`) so that the editor's dashboard has the template's panel and bar; `roadstyle
+serve` does this in `level_editor/app.js`.
 
 ### The editor on your map, with no map of its own
 

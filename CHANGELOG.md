@@ -7,6 +7,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The level editor draws into the host's standard panel.** `levelEditor({map, panel, backLabel, ...})` takes the host's `#sb` (`.sb-card` with `.sb-top` and
+  `.sb-body`): the host's body is hidden, the top line is "← Steps" and "Edit levels" before the host's hide button, and `destroy()` puts the host's panel back. The
+  editor's own frame, fold buttons (`lv-toggle`, `lv-handle`), phone sheet and `layout` option are gone; the panel's side, width, look and phone sheet are the host's. A bar
+  at the bottom of the panel ("N waiting", Discard, Apply and solve) replaces the "Waiting to apply" box and shows only when changes wait; "← Steps" with changes waiting
+  asks apply, discard or stay, then sends the event `"back"`. The picked roads have the dashboard's selection glow; `destroy()` clears their colour (`rsColor(null)`) and
+  glow. The History tab has the edits.csv download. The colours are the panel's tokens. `roadstyle serve` serves `host_options.json`, and its page is a host of the
+  standard dashboard (template, panel, hide and show buttons).
 - **Every control that a style gives follows a later `rs.setStyle`.** The Roads box (classes, Bridges, Tunnels, access kinds), the Tunnels box, the arrows' icon and rules,
   the boundary's shade and limits, the arrow and the fill-layer facts of Street View, the pick layers, the id fields and the parts of `rs.getState()` were made once, at
   the start, so a page that starts with `style: null` had none of them. They are made again for each style now, and go with a style that has none; a switch that was off
