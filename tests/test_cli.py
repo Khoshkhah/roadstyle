@@ -33,8 +33,7 @@ def test_each_format_writes_a_file(tmp_path, fmt):
     assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--basemap", "dark_matter"]) == 0
 
 
-@pytest.mark.parametrize("page,marker", [("dashboard", '<div id="sb"'), ("report", '<div id="rp"'),
-                                         ("street-view", '<div id="sv"')])
+@pytest.mark.parametrize("page,marker", [("dashboard", '<div id="sb"'), ("street-view", '<div id="sv"')])
 def test_page_writes_that_page(tmp_path, page, marker):
     out = tmp_path / "page.html"
     assert main([str(SAMPLE), "-o", str(out), "--page", page]) == 0

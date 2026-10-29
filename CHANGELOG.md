@@ -10,6 +10,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
+### Changed
+- **One dashboard template.** `render_dashboard` is the only page with a panel. The names `template="classic"` and `template="report"` are errors,
+  and **`render_report` and `--page report` are removed** (also the Report page of the studio, `sidebar_html("report")` and `ui/report`): use
+  `render_dashboard`. The old docked form is `layout="dock"` (default `"overlay"`: the panel floats, with the toolbar). `duckosm.page(dashboard=True)`
+  gives the docked dashboard. `phone.panel` is gone from the typed `dashboard` option (the panel is always a bottom sheet on a phone).
+- **The boundary is a choice of the page.** `boundary=` is an input (roadstyle does not read it from a file). Its shade and its camera limit are
+  off until `boundary_dim=True` and `boundary_limit=True`.
+
 ### Added
 - **Typed layers for the Google 3D window.** The new keyword `google_3d_layers=[{id, kind, source, match, scope, max, on, arrows, style}]`
   draws the features of a GeoJSON source of the page in the window (kinds `line`, `ribbon`, `polygon`, `points`); the window's Show menu turns

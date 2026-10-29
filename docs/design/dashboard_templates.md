@@ -32,19 +32,25 @@ Layers tab of the model, `#sr-focus`, `rsJumpLog`, the four 3D layer registratio
 One typed option, `Dashboard`, in a new module `rust/roadstyle/src/dashboard.rs`. `PageOptions` gets a field `dashboard`. The template
 gives the defaults. A page can change each field, except the panel's template HTML (the template is that HTML).
 
-| Template | Called by | Desktop form | Phone form (width 700 px or less) |
+| Form | Called by | Desktop form | Phone form (width 700 px or less) |
 |---|---|---|---|
 | `map` | `render_edges` (default) | The map and the MapLibre control column, as today. A host panel (`side_panel_html`) is possible | The column as today; the boxes fold (`panel._narrow`) |
-| `classic` | `render_dashboard(template="classic")` | Dock layout: the map, and the sidebar `templates/dashboard.html` at the right, 340 px. No toolbar | The sidebar is a bottom sheet (3 heights: closed, 40 %, full). The map stays full width |
-| `dashboard` | `render_dashboard` (default) | Overlay layout, the same sidebar floats at the right, toolbar at the right, window rules on | Toolbar horizontal at the top; the sidebar is a bottom sheet; a window is a bottom sheet, and one sheet is open at a time |
-| `report` | `render_report` | Dock layout, the sidebar `templates/report.html`. No toolbar | The report under the map: the map 55 % of the height, the report scrolls |
+| `dashboard`, `layout="overlay"` | `render_dashboard` (default) | The sidebar `templates/dashboard.html` floats at the right, toolbar at the right, window rules on | Toolbar horizontal at the top; the sidebar is a bottom sheet; a window is a bottom sheet, and one sheet is open at a time |
+| `dashboard`, `layout="dock"` | `render_dashboard(layout="dock")` | The same sidebar docked at the right, 340 px. No toolbar | The sidebar is a bottom sheet (3 heights: closed, 40 %, full). The map stays full width |
+
+**Decided 2026-10-29: there is one template, `dashboard`.** There is no `classic` and there is no report page. The old docked form is
+`layout="dock"`, a setting of the dashboard. The names `classic` and `report` are errors of `template=`; a caller of `render_report` uses
+`render_dashboard`. A future template is built in the style of the dashboard (3.4), never in another style.
+
+The boundary is an input of the page (`boundary=`), not read from a file by roadstyle. Its shade and its camera limit are off until the page
+asks (`boundary_dim`, `boundary_limit`): a fixed area is a choice of the page, because a page can show a general map.
 
 Each template has one panel at most (Kaveh, 2026-10-28: "the design was wrong from the beginning by adding two side panels").
 
 The Rust types (serde, `deny_unknown_fields`; the defaults come from the template):
 
 ```rust
-pub enum Template { Map, Dashboard, Dashboard, Report }
+pub enum Template { Map, Dashboard }
 pub enum Layout { Dock, Overlay }
 pub enum Edge { Right, Left, Top, Bottom }
 
@@ -56,7 +62,7 @@ pub struct Dashboard {
     pub windows: WindowRules,
     pub basemap_box: BasemapBox,
     pub google_3d: Google3d,
-    pub phone: Phone,                    // max_width_px: 700, toolbar: Edge::Top, panel: Sheet | Below
+    pub phone: Phone,                    // max_width_px: 700, toolbar: Edge::Top
 }
 pub struct Toolbar { pub position: Edge, pub tools: Vec<Tool> }
 pub struct WindowRules { pub clamp: bool, pub recenter_map: bool, pub restore_open: bool, pub remember: bool }
@@ -150,7 +156,7 @@ not a git merge of the old branch. Each step lands alone, with its desktop form,
 | D6 | The base-map box, the `basemaps.json` fields, the OpenFreeMap merge, "On top" | The base-map checks |
 | D7 | Google 3D from the last form of the old `main`: one-way link, Follow, the note, modes and labels | The Google 3D checks, with the `gmp-map-3d` stub |
 | D8 (done) | The 3D layers and the "Show" selector: `Layer3d` in Rust (`Google3d.layers`, the page keyword `google_3d_layers`), read by `google3d.js` | The 3D layer checks (`tests/test_google3d_layers_browser.py`, with a stub of Google's `maps3d` library) |
-| D9 | The area boundary: `Boundary` in Rust, `main.boundary` read from the duckOSM file, the outline, the dim and the limit in JS | The boundary checks: the line is under the roads; a pan cannot leave the bounds; each field can be turned off |
+| D9 | The area boundary: `Boundary` in Rust, the outline, the dim and the limit in JS. The polygon is the page's input (`boundary=`); the dim and the limit are off until `boundary_dim` and `boundary_limit` | The boundary checks: the line is under the roads; a pan cannot leave the bounds when the limit is on; each field can be turned off |
 
 What happens to the old `main` (the tag `python-engine-final`, which no branch follows):
 
@@ -183,7 +189,7 @@ not cover the bar; a window is a bottom sheet; 40 % of the height or more shows 
 
 | Question | Recommendation |
 |---|---|
-| 1. Must `render_dashboard` use the new form by default? | **Yes (decided 2026-10-29).** The new form is `dashboard`, the old docked form is `classic`; a project that wants the old look writes `template="classic"`. The name `review` is gone: it came from the SimReady page and did not describe the form |
+| 1. Must `render_dashboard` use the new form by default? | **Yes (decided 2026-10-29).** The new form is `dashboard`, the old docked form is `classic`; a project that wants the old look writes `layout="dock"`. The name `review` is gone: it came from the SimReady page and did not describe the form |
 | 2. One phone width for every rule? Today windows change at 520 px and boxes at 700 px | Yes, 700 px for all, in `phone.max_width_px` |
 | 3. Where is the bar on a phone? | At the top, horizontal, for every desktop position; the panel and the windows are bottom sheets |
 | 4. Keep the 401/403 tile check of each base map when the page is built? | No. The engine makes no network requests. A provider that stops answering is removed from `basemaps.json` |

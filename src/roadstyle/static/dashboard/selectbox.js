@@ -65,8 +65,8 @@ function _sbEnhance(sel){
   btn.addEventListener("keydown", e => { if(!list && (e.key === "ArrowDown" || e.key === "ArrowUp")){ e.preventDefault(); open(); } });
   sync();
 }
-// every select of a panel (the dashboard's and the report's sidebar, the docked panel, a host panel)
+// every select of a panel (the dashboard sidebar, the docked panel, a host panel)
 export function initSelectBox(){
-  const run = () => document.querySelectorAll("#sb select, #rp select, .rs-side select, .rs-host select").forEach(_sbEnhance);
+  const run = () => document.querySelectorAll("#sb select, .rs-side select, .rs-host select").forEach(_sbEnhance);
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();
 }

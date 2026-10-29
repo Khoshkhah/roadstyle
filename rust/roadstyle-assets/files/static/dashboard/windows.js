@@ -14,7 +14,7 @@ export function freeArea(){
   const m = map.getContainer().getBoundingClientRect();
   let lo = m.left, hi = m.right, top = m.top, bottom = m.bottom;
   if(_wPhone()) return {lo, hi, top, bottom};
-  for(const p of document.querySelectorAll("#sb, #rp, .rs-side")){
+  for(const p of document.querySelectorAll("#sb, .rs-side")){
     if(!_wVis(p)) continue;
     const r = p.getBoundingClientRect();
     (r.left + r.right) / 2 < innerWidth / 2 ? lo = Math.max(lo, r.right) : hi = Math.min(hi, r.left);
@@ -53,11 +53,11 @@ export function initWindows(){
   // the free part changes: a panel opens or closes (with its slide), the bar moves or slides, the window is resized, the layout changes
   const watch = () => {
     const mo = new MutationObserver(keep);
-    for(const e of document.querySelectorAll("#sb, #rp, .rs-side, #rs-toolbar")) mo.observe(e, {attributes: true, attributeFilter: ["style", "class", "data-edge"]});
+    for(const e of document.querySelectorAll("#sb, .rs-side, #rs-toolbar")) mo.observe(e, {attributes: true, attributeFilter: ["style", "class", "data-edge"]});
     mo.observe(document.documentElement, {attributes: true, attributeFilter: ["class"]});
     mo.observe(document.body, {attributes: true, attributeFilter: ["class"]});
     const slide = () => { const t0 = performance.now(); (function f(){ keep(); if(performance.now() - t0 < 500) requestAnimationFrame(f); })(); };
-    for(const e of document.querySelectorAll("#sb, #rp, .rs-side, #rs-toolbar")) e.addEventListener("transitionrun", slide);
+    for(const e of document.querySelectorAll("#sb, .rs-side, #rs-toolbar")) e.addEventListener("transitionrun", slide);
     const ro = new ResizeObserver(keep); wins().forEach(w => ro.observe(w));
     // a window being dragged is clamped at each move; one that ended without a pointerup does not stay in the drag state
     document.addEventListener("pointermove", () => document.querySelectorAll(".rs-svw.rs-drag").forEach(_wFit), true);

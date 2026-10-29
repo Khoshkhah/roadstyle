@@ -18,7 +18,6 @@ download on first run; in a git checkout it uses `ui/studio/samples/` directly.
 |---|---|---|
 | **Map** | a map with its built-in controls | `rs.render_edges(edges, ...)` |
 | **Dashboard** | the map with a query sidebar: query box, filter and colour buttons, results table, detail panel | `rs.render_dashboard(edges, ...)` |
-| **Report** | the map with a stats sidebar: KPI cards, colour legend, layer and road-type filter, search, selected-road read-out | `rs.render_report(edges, ...)` |
 
 Each page has a download button for the self-contained HTML, and shows the Python call so you can
 copy it out when you outgrow the knobs.
@@ -31,7 +30,5 @@ copy it out when you outgrow the knobs.
 - **Decorations**: street labels, one-way arrows.
 - **Popup & hover**: the click popup (curated, chosen columns, side panel, all, off) and a hover tooltip.
 - **Overlays**: zones, points or lines as extra layers.
-
-![The report sidebar: KPI cards, colour legend, and a layer and road-type filter over a live map](img/gallery/report.png)
 
 **See also:** [Dashboards & JavaScript](guides/dashboards.md) · [Every parameter](reference/parameters.md)

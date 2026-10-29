@@ -11,8 +11,8 @@ export function initTemplate(){
   const q = matchMedia("(max-width:" + d.phone.max_width_px + "px)");
   const set = ()=>{ document.documentElement.classList.toggle("rs-phone", q.matches); };
   set(); q.addEventListener("change", set);
-  new ResizeObserver(()=>map.resize()).observe(map.getContainer());       // the map's box changes with the form (the sheet, the report below)
-  if(d.panel && d.phone.panel === "sheet"){
+  new ResizeObserver(()=>map.resize()).observe(map.getContainer());       // the map's box changes with the form (the sheet)
+  if(d.panel){
     // the sidebar is injected after this script runs: the grip is made when the page is parsed
     const grip = ()=>makeGrip();
     document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", grip) : grip();

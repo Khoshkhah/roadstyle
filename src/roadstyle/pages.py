@@ -1,8 +1,8 @@
-"""One-call **dashboard** / **report** / **street view** pages.
+"""One-call **dashboard** / **street view** pages.
 
 Each renders the styled road map with the built-in map controls off and a bundled sidebar template
 injected on top, wired to the map only through the public ``window.rs*`` API. The sidebars ship
-inside the package (``roadstyle/templates/{dashboard,report,street_view}.html``), so ``pip install roadstyle``
+inside the package (``roadstyle/templates/{dashboard,street_view}.html``), so ``pip install roadstyle``
 can build these pages with no repo checkout::
 
     import geopandas as gpd, roadstyle as rs
@@ -10,10 +10,9 @@ can build these pages with no repo checkout::
     rs.render_dashboard(edges, color_options={"Class": {},
                                               "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"}}
                        ).save("dashboard.html")
-    rs.render_report(edges).save("report.html")
     rs.render_street_view(edges).save("street_view.html")
 
-All three return a :class:`~roadstyle.render_web.WebMap` — ``.save(path)`` writes the self-contained
+Both return a :class:`~roadstyle.render_web.WebMap` — ``.save(path)`` writes the self-contained
 page, and it previews inline in a notebook. Every :func:`~roadstyle.render_edges` keyword passes
 through (``color_options=`` populates the sidebar's *Colour by* picker); the injected sidebar is
 plain HTML/CSS/JS, safe to copy out and reshape.
@@ -27,7 +26,7 @@ from .render import render_edges
 
 
 def sidebar_html(name: str) -> str:
-    """The bundled sidebar template (``"dashboard"``, ``"report"`` or ``"street_view"``) as an HTML
+    """The bundled sidebar template (``"dashboard"`` or ``"street_view"``) as an HTML
     string — the exact fragment the matching ``render_*`` page injects. Handy to tweak and re-inject."""
     from . import _assets
     return _assets.text(f"templates/{name}.html")
@@ -62,20 +61,9 @@ def render_dashboard(gdf, *, template="dashboard", **kw):
     ``.save("dashboard.html")`` writes the page.
 
     ``template="dashboard"`` (the default) is the overlay form: the map fills the window, the sidebar floats, a toolbar at the right with
-    the settings and the windows (docs/guides/dashboard-layout.md). ``template="classic"`` docks the sidebar at the right and has no toolbar."""
+    the settings and the windows (docs/guides/dashboard-layout.md). ``layout="dock"`` docks the sidebar at the right and has no toolbar (the old form)."""
     kw.pop("backend", None)                       # web only: the sidebar drives a MapLibre map
     return render_edges(gdf, backend="web", template=template, **kw)
-
-
-def render_report(gdf, **kw):
-    """A self-contained **report** page: the styled map with a stats-forward sidebar — headline KPI
-    cards, the active colour-by legend, a checkbox filter (overlay layers + road types), search, and
-    a selected-road read-out. The base map keeps its own on-map switcher.
-
-    Same ``color_options=`` / ``render_edges`` keywords as :func:`render_dashboard`. Returns a
-    :class:`WebMap`; ``.save("report.html")`` writes the page."""
-    kw.pop("backend", None)
-    return render_edges(gdf, backend="web", template="report", **kw)
 
 
 def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,

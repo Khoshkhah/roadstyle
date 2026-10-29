@@ -1,4 +1,4 @@
-"""The phone form of each dashboard template (docs/design/dashboard_templates.md, section 5): a phone of 390 x 844 px with touch.
+"""The phone form of each layout of the dashboard template (docs/design/dashboard_templates.md, section 5): a phone of 390 x 844 px with touch.
 
 Each test saves a page, opens it in headless Chromium and reads the DOM. Skipped when playwright is not installed.
 """
@@ -21,8 +21,8 @@ def _edges(n=12):
 def _open(p, tmp_path, template, **ctx):
     import roadstyle as rs
     path = tmp_path / f"{template}.html"
-    (rs.render_report if template == "report" else rs.render_dashboard)(_edges(), basemap="blank",
-                                                                         **({} if template == "report" else {"template": template})).save(path)
+    kw = {"dock": {"layout": "dock"}}.get(template, {})                    # the two layouts of the one template
+    rs.render_dashboard(_edges(), basemap="blank", **kw).save(path)
     browser = p.chromium.launch(args=_ARGS)
     page = browser.new_context(**ctx).new_page()
     errors = []
@@ -36,7 +36,7 @@ def _box(page, sel):
     return page.evaluate("s=>{const r=document.querySelector(s).getBoundingClientRect();return {t:r.top,b:r.bottom,l:r.left,r:r.right,w:r.width,h:r.height}}", sel)
 
 
-@pytest.mark.parametrize("template", ["dashboard", "classic", "report"])
+@pytest.mark.parametrize("template", ["dashboard", "dock"])
 def test_a_phone_has_no_horizontal_scroll(tmp_path, template):
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, tmp_path, template, **PHONE)
@@ -47,7 +47,7 @@ def test_a_phone_has_no_horizontal_scroll(tmp_path, template):
     assert phone and not wide and not errors and map_box["w"] == 390
 
 
-@pytest.mark.parametrize("template", ["dashboard", "classic"])
+@pytest.mark.parametrize("template", ["dashboard", "dock"])
 def test_the_sidebar_is_a_sheet_of_three_heights(tmp_path, template):
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, tmp_path, template, **PHONE)
@@ -73,17 +73,9 @@ def test_the_sheet_starts_at_40_percent_and_the_map_stays_full(tmp_path):
     assert mp["h"] == 844 and mp["w"] == 390                                 # the sheet floats over the map
 
 
-def test_the_report_goes_under_the_map(tmp_path):
-    with pw.sync_playwright() as p:
-        browser, page, _ = _open(p, tmp_path, "report", **PHONE)
-        rp, mp = _box(page, "#rp"), _box(page, "#map")
-        browser.close()
-    assert abs(mp["h"] - 0.55 * 844) < 2 and abs(rp["t"] - mp["b"]) < 2 and rp["b"] == 844 and rp["w"] == 390
-
-
 def test_a_desktop_keeps_the_docked_sidebar(tmp_path):
     with pw.sync_playwright() as p:
-        browser, page, _ = _open(p, tmp_path, "classic", viewport={"width": 1280, "height": 800})
+        browser, page, _ = _open(p, tmp_path, "dock", viewport={"width": 1280, "height": 800})
         phone = page.evaluate("document.documentElement.classList.contains('rs-phone')")
         sb, mp = _box(page, "#sb"), _box(page, "#map")
         browser.close()

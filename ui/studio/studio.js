@@ -1,4 +1,4 @@
-// roadstyle studio in the browser: the knobs of the Python studio's Map, Dashboard and Report pages (src/roadstyle/studio/), roadstyle's
+// roadstyle studio in the browser: the knobs of the Python studio's Map and Dashboard pages (src/roadstyle/studio/), roadstyle's
 // Rust engine in a Web Worker (worker.js: the whole page for each change of the knobs, page_from) and that page in an iframe. The page in
 // the iframe is the page that "Download" saves; the code panel is the Python call that makes it.
 import {pythonCode, pyrepr} from "./code.js";
@@ -10,10 +10,9 @@ const OVERLAY_SAMPLES = {sensors: "sensors.geojson", zones: "zones.geojson"};
 const CMAPS = ["viridis", "plasma", "magma", "cividis", "coolwarm", "RdYlGn_r"];
 const OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"];
 const ID_COLS = new Set(["id", "fid", "gid", "uid", "objectid"]);
-// the pages (pages.render_dashboard, render_report: template=), their Python call, title and base maps offered (studio/dashboard.py, report.py)
+// the pages (pages.render_dashboard: template=), their Python call, title and base maps offered (studio/dashboard.py)
 const PAGES = {map: {fn: "render_edges", file: "map.html"},
-               dashboard: {fn: "render_dashboard", file: "dashboard.html", title: "Roads dashboard"},
-               report: {fn: "render_report", file: "report.html", title: "Roads report"}};
+               dashboard: {fn: "render_dashboard", file: "dashboard.html", title: "Roads dashboard"}};
 const OFFERED = ["voyager", "positron", "dark_matter", "osm", "satellite", "blank"];
 const MAPLIBRE = "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist";   // render_web._MAPLIBRE_CDN: the preview's MapLibre (a page's _repr_html_)
 
@@ -45,7 +44,7 @@ function keywords(co){
   if (st.overlays.length) kw.overlays = st.overlays;
   return kw;
 }
-// the look's options (resolveLook's and page_from's): the keywords as JSON, with the sidebar of a Dashboard or Report page; the classes
+// the look's options (resolveLook's and page_from's): the keywords as JSON, with the sidebar of a Dashboard page; the classes
 // are the dashboard's filter (include= is Python's filter before the engine), the overlays their GeoJSON
 function lookOptions(co){
   const {palette, include, ...kw} = keywords(co), args = {...kw, name: kw.name || "roadstyle", state: "live"};
@@ -202,7 +201,7 @@ const knob = (id, key, prop = "value") => { $(id).onchange = () => { st[key] = $
 knob("palette", "palette"); knob("view3d", "view3d", "checked"); knob("tiles", "tiles", "checked"); knob("minzoom", "minzoom", "checked");
 knob("labels", "labels", "checked"); knob("arrows", "arrows", "checked"); knob("basemap", "basemap"); knob("title", "title");
 $("popup").onchange = () => { st.popup = $("popup").value; $("popupcols").hidden = st.popup !== "choose"; later(); };
-// the page: a Dashboard or Report page has its sidebar, a title, the base maps offered, and no road popup (its sidebar shows the road)
+// the page: a Dashboard page has its sidebar, a title, the base maps offered, and no road popup (its sidebar shows the road)
 $("page").onchange = () => {
   st.page = $("page").value; const P = PAGES[st.page];
   st.title = P.title || ""; $("title").value = st.title;

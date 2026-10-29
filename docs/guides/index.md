@@ -80,7 +80,7 @@
 
     ---
 
-    Ready-made dashboard and report pages, and driving the map from your own panel.
+    The ready-made dashboard page, and driving the map from your own panel.
 
     [:octicons-arrow-right-24: Dashboards & JavaScript](dashboards.md)
 

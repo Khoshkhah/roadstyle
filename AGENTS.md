@@ -53,4 +53,4 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   key in the profile or in every palette (with its comment) + the code that reads it.
 - The JS side has no unit tests. Check a rendering change in a real browser: `rs.snapshot(m,
   "x.png")` and look at the PNG, or drive the page with Playwright.
-- Gallery and README images: screenshots taken by hand (see `docs/build_gallery.py`, which still makes the report picture).
+- Gallery and README images: screenshots taken by hand.

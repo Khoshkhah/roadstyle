@@ -8,16 +8,18 @@ import roadstyle as rs
 rs.render_dashboard(edges, color_options={"Road class": {}}).save("dashboard.html")
 ```
 
-## The forms
+## The form
 
-The keyword `template` chooses the form of the page.
+There is one template with a panel: `dashboard` (the default of `render_dashboard`). A future template follows its style.
+`layout` changes the frame:
 
-| `template` | What you get |
+| Keyword | What you get |
 |---|---|
-| `"dashboard"` (the default) | The map fills the window. The panel floats over it. The toolbox is a bar at the right |
-| `"classic"` | The panel is docked at the right. No toolbox |
-| `"report"` | The panel has the numbers of the roads. On a phone, the report goes under the map |
-| `"map"` | The map only (the default of `render_edges`) |
+| `layout="overlay"` (default) | The map fills the window. The panel floats over it. The toolbox is a bar at the right |
+| `layout="dock"` | The panel is docked at the right and takes its own space. No toolbox: the tools are the MapLibre buttons |
+
+`template="map"` is the map only (the default of `render_edges`). The old names `classic` and `report` are errors.
+There is no report page: use `render_dashboard`.
 
 ## The toolbox
 

@@ -1,6 +1,6 @@
 # Dashboards & JavaScript
 
-<p class="lead">Get a finished dashboard or report page in one call, or put your own panel next to the map and drive it from JavaScript.</p>
+<p class="lead">Get a finished dashboard page in one call, or put your own panel next to the map and drive it from JavaScript.</p>
 
 === "Python"
 
@@ -11,7 +11,6 @@
         "Road class": {},
         "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
     }).save("dashboard.html")
-    rs.render_report(edges).save("report.html")
     rs.render_street_view(edges).save("street_view.html")
     ```
 
@@ -19,7 +18,6 @@
 
     ```bash
     roadstyle edges.gpkg --page dashboard -o dashboard.html
-    roadstyle edges.gpkg --page report -o report.html
     roadstyle edges.gpkg --page street-view -o street_view.html
     ```
 
@@ -28,16 +26,14 @@
 | call | sidebar |
 |---|---|
 | `rs.render_dashboard` | base-map and colour selects, a class filter, a query box with a results table, a selected-road read-out |
-| `rs.render_report` | headline numbers, the colour legend, a layer and class filter, search, a selected-road read-out |
 | `rs.render_street_view` | Google Street View beside or below the map ([Google Street View](street-view.md)) |
 
 Each takes every `render_edges` keyword and returns the same map object (`.save()`, `.html`).
 `color_options` fills the *Colour by* picker; `name=` sets the page title.
 
 ![The dashboard page](../img/gallery/dashboard.jpg)
-![The report page](../img/gallery/report.png)
 
-To reshape a sidebar, `rs.sidebar_html("dashboard")` (or `"report"`) returns its HTML. Edit it
+To reshape a sidebar, `rs.sidebar_html("dashboard")` returns its HTML. Edit it
 and insert it before `</body>` of a plain `render_edges` map.
 
 ## Views: several settings in one menu

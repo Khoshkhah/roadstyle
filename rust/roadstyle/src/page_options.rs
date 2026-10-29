@@ -20,7 +20,7 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": false,
-    "template": null, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
+    "template": null, "layout": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
 
 /// The two map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
 const SIDEBAR_YIELDS: [&str; 2] = ["name", "road_popup"];
@@ -71,6 +71,8 @@ struct PageKeys {
     street_view_key: Option<String>,
     google_3d: bool,
     google_3d_layers: Vec<crate::dashboard::Layer3d>,
+    boundary_dim: bool,
+    boundary_limit: bool,
     compress: bool,
     views: Value,
     tiles: bool,
@@ -111,14 +113,29 @@ pub struct Page {
 /// defaults (`look.base_map_page`), and the caller's values: `street_view_key`, `api_key` (put into a base map's URL), and
 /// `resolved_basemaps`, the entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (the caller's key of
 /// each provider). `features`: the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
-/// The template the call names (`template=`); none: `map`. The keyword `sidebar` of the old form is an error.
-fn template_of(given: &Map<String, Value>) -> Result<Template, crate::Error> {
+/// The form of the page from `template=` (`map`: no panel; `dashboard`) and `layout=` (`overlay`, the default, or `dock`); none given: `map`.
+/// The old forms are errors: `sidebar=`, and the templates `classic` and `report`.
+fn form_of(given: &Map<String, Value>) -> Result<(Template, crate::dashboard::Layout), crate::Error> {
+    use crate::dashboard::Layout;
     if given.contains_key("sidebar") {
-        return Err(crate::error::options("sidebar= is now template=: use \"dashboard\", \"classic\", \"report\" or \"map\""));
+        return Err(crate::error::options("sidebar= is now template=\"dashboard\" (with layout=) or template=\"map\""));
     }
-    match given.get("template").filter(|v| !v.is_null()) {
-        None => Ok(Template::Map),
-        Some(v) => Template::parse(v.as_str().ok_or_else(|| crate::error::options(format!("template must be a name, got {}", repr(v))))?),
+    let word = |k: &str| -> Result<Option<&str>, crate::Error> {
+        match given.get(k).filter(|v| !v.is_null()) {
+            None => Ok(None),
+            Some(v) => v.as_str().map(Some).ok_or_else(|| crate::error::options(format!("{k} must be a name, got {}", repr(v)))),
+        }
+    };
+    let layout = word("layout")?.map(Layout::parse).transpose()?;
+    match word("template")? {
+        None | Some("map") => match layout {
+            None => Ok((Template::Map, Layout::Dock)),
+            Some(_) => Err(crate::error::options("layout= is for template=\"dashboard\"; template=\"map\" has no panel")),
+        },
+        Some("dashboard") => Ok((Template::Dashboard, layout.unwrap_or(Layout::Overlay))),
+        Some(old @ ("classic" | "report")) => Err(crate::error::options(format!(
+            "template=\"{old}\" is gone: there is one template, \"dashboard\" (layout=\"dock\" is the docked form; there is no report page)"))),
+        Some(other) => Err(crate::error::options(format!("template must be \"map\" or \"dashboard\", got '{other}'"))),
     }
 }
 
@@ -149,7 +166,7 @@ fn page_args(look: &Look, given: &Map<String, Value>, template: Template) -> Res
 }
 
 /// The checks of the page keys that need two of them or the look: the popup mode ("panel" from the look or the key) and the Google key.
-fn check_keys<'a>(k: &'a PageKeys, look: &Look, template: Template) -> Result<(&'a str, Option<String>), crate::Error> {
+fn check_keys<'a>(k: &'a PageKeys, look: &Look, dashboard: &crate::dashboard::Dashboard) -> Result<(&'a str, Option<String>), crate::Error> {
     let mode = if look.map.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { k.popup_mode.as_deref().filter(|m| !m.is_empty()).unwrap_or("popup") };
     if k.side_panel_html.is_some() && mode == "panel" {
         return Err(crate::error::options("side_panel_html and popup_mode='panel' are two panels on the right: use one"));
@@ -160,7 +177,7 @@ fn check_keys<'a>(k: &'a PageKeys, look: &Look, template: Template) -> Result<(&
     crate::dashboard::check_layers(&k.google_3d_layers).map_err(crate::error::options)?;
     let key = k.street_view_key.clone().filter(|v| !v.is_empty());
     // a page with a toolbar has the settings tool, where the person can type the key; a page without one has no place for it
-    if k.google_3d && key.is_none() && template.dashboard().toolbar.is_none() {
+    if k.google_3d && key.is_none() && dashboard.toolbar.is_none() {
         return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY \
                                           (the template \"dashboard\" lets the person add it in the settings)"));
     }
@@ -212,13 +229,14 @@ fn page_camera(look: &Look, k: &PageKeys) -> Result<Camera, crate::Error> {
 
 pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
                  -> Result<Page, crate::Error> {
-    let template = template_of(given)?;
+    let (template, layout) = form_of(given)?;
+    let dashboard = template.dashboard(layout);
     let (a, owned) = page_args(look, given, template)?;
     let look = owned.as_ref().unwrap_or(look);
     let k: PageKeys = serde_json::from_value(Value::Object(a.clone())).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
     // the map options that the page reads too: the popup panel, the 3D view, the hover colour, the colour options, the columns
     let mo = &look.map;
-    let (mode, key) = check_keys(&k, look, template)?;
+    let (mode, key) = check_keys(&k, look, &dashboard)?;
     let bounds = bounds_of(&roads);
     let tiled = k.tiles;
     let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
@@ -244,8 +262,10 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let mut tunnel = ctl["tunnel"].clone();
     tunnel["bg"] = bg.into();
     let ontop = if bms.len() > 1 { ontop_layers() } else { Value::Null };
-    let mut dashboard = template.dashboard();
+    let mut dashboard = dashboard;
     dashboard.google_3d.layers = k.google_3d_layers.clone();
+    dashboard.boundary.dim = k.boundary_dim;
+    dashboard.boundary.limit = k.boundary_limit;
     let opts = PageOptions {
         dashboard, basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),

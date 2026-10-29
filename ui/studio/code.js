@@ -1,4 +1,4 @@
-// The code panel: the render_edges(...), render_dashboard(...) or render_report(...) call that makes the page of the knobs, as Python text
+// The code panel: the render_edges(...) or render_dashboard(...) call that makes the page of the knobs, as Python text
 // (the same text as the Python studio, src/roadstyle/studio/), so a user can copy it when the knobs are not enough.
 
 // a JSON value as Python writes it with repr(): strings in single quotes, True / False / None
@@ -14,7 +14,7 @@ export function pyrepr(v){
 }
 
 // kw: the keywords in the order of the knobs; loader: the line that reads the edges; overlays: [{path, args}] (args: Python text);
-// fn: the call (render_edges, render_dashboard, render_report); file: the saved page's name
+// fn: the call (render_edges, render_dashboard); file: the saved page's name
 export function pythonCode(kw, loader, overlays, fn = "render_edges", file = "map.html"){
   const ovs = "[" + overlays.map((_, i) => `ov${i}`).join(", ") + "]";
   const args = Object.entries(kw).map(([k, v]) => `,\n                     ${k}=${k === "overlays" ? ovs : pyrepr(v)}`).join("");

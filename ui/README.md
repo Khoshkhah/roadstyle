@@ -2,8 +2,8 @@
 
 Copyable starting points for building your own frontend over a roadstyle web map. The library
 keeps **data and logic** (the baked features, the `window.rs*` API, the `rs:*` events); the UI
-layer is deliberately yours. The `dashboard/` and `report/` templates here are the forkable source
-of the sidebars the package ships (`rs.render_dashboard` / `rs.render_report`). The studio ships
+layer is deliberately yours. The `dashboard/` template here is the forkable source
+of the sidebar the package ships (`rs.render_dashboard`). The studio ships
 inside the package too (`roadstyle studio`); this dir keeps only its `samples/`.
 
 Each template is a plain **HTML/CSS/JS fragment** (no frameworks, no build step, no server)
@@ -33,11 +33,10 @@ Both wrap the packaged one-call helpers — no repo checkout needed after `pip i
 rs.render_dashboard(edges, color_options={"Class": {},
                                           "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"}}
                    ).save("dashboard.html")
-rs.render_report(edges).save("report.html")
 ```
 
-The sidebars ship inside the package. Grab one to reshape — `rs.sidebar_html("dashboard")` (or
-`"report"`) returns the fragment; edit its CSS/HTML freely and re-inject before `</body>`. As long
+The sidebars ship inside the package. Grab one to reshape — `rs.sidebar_html("dashboard")`
+returns the fragment; edit its CSS/HTML freely and re-inject before `</body>`. As long
 as you only call the documented `rs*` functions and listen to `rs:*` events, library upgrades
 won't break it.
 The full API reference lives in [`docs/web-backend.md`](../docs/web-backend.md).

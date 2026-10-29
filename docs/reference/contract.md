@@ -116,7 +116,7 @@ contract makes changeable (or a value that is not used).
 | the place of the two windows | `{left, top, width, height}` | `localStorage` `rs-street-view-window:<path>`, `rs-google-3d-window:<path>` | `float.js` | yes | |
 | `side_panel_html`, `host_panel_width` | HTML, 320 px | `render` | the page, `panel.js` | open or closed: yes | `rsPanelShow`; `localStorage` `rs-host-panel:<path>` |
 | `--rs-side` | CSS length | `panel.js` | `dashboard.css` (the controls on the right move with the panel) | yes | |
-| the theme of the page (light, dark) | none on the map page; `data-theme` on the sidebars of `render_dashboard` and `render_report` | `templates/*.html` | the sidebars | the sidebars: yes | gap: `dashboard.css` and `popup.css` have literal colors and one CSS variable (`--rs-side`) |
+| the theme of the page (light, dark) | none on the map page; `data-theme` on the sidebars of `render_dashboard` | `templates/*.html` | the sidebars | the sidebars: yes | gap: `dashboard.css` and `popup.css` have literal colors and one CSS variable (`--rs-side`) |
 | `simple`, `tiles`, `fill_layers` | the mode and the road fill layer ids | `render`; option | `core.js`, `select.js`, `svspot.js` | no | |
 | `compress`, `data_maxzoom`, `data_tolerance` | | `render` | engine | no | |
 | `boundary` | the outline | `render` | engine | no | |

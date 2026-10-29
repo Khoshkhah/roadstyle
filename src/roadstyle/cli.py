@@ -19,8 +19,7 @@ from . import __version__
 # output format → default file extension for the derived output name
 _EXT = {"web": ".html"}
 # --page → the roadstyle.pages function that builds it
-_PAGES = {"dashboard": "render_dashboard", "report": "render_report",
-          "street-view": "render_street_view"}
+_PAGES = {"dashboard": "render_dashboard", "street-view": "render_street_view"}
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -71,7 +70,7 @@ def _build_parser() -> argparse.ArgumentParser:
     web = p.add_argument_group("web backend (-f web)")
     web.add_argument("--page", choices=sorted(_PAGES),
                      help="a ready-made page instead of the plain map: dashboard (query "
-                          "sidebar), report (stats sidebar), street-view (Google Street View "
+                          "sidebar), street-view (Google Street View "
                           "beside the map, following the clicked road).")
     web.add_argument("--panel-width", type=float, metavar="PCT",
                      help="--page street-view: Street View's share of the width, 20-80%% "

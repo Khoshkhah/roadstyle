@@ -11,9 +11,8 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | **Render** | | |
 | `render_edges(gdf, **kw)` | `WebMap` | the main call; every keyword [below](#render_edges) |
 | `render_dashboard(gdf, **kw)` | `WebMap` | map + query sidebar ([Pages](#pages)) |
-| `render_report(gdf, **kw)` | `WebMap` | map + stats sidebar ([Pages](#pages)) |
 | `render_street_view(gdf, **kw)` | `WebMap` | map + Google Street View side by side ([Pages](#pages)) |
-| `sidebar_html(name)` | `str` | a bundled sidebar fragment: `"dashboard"`, `"report"`, `"street_view"` |
+| `sidebar_html(name)` | `str` | a bundled sidebar fragment: `"dashboard"`, `"street_view"` |
 | `export_style(gdf, out_dir, *, base_url, format="xyz", basemap=<render_edges'>, **kw)` | path of `style.json` | the roads as a MapLibre style + vector tiles (`"xyz"` folder or `"pmtiles"`) + sprite, for other map apps ([Put it on a website](../guides/website.md#a-style-for-other-map-apps)); `basemap=None`: no base map; `kw` go to `render_edges` |
 | `export_look(path=None, *, profile=None, palette=None, edges=None, positions=None)` | the look (dict) | MapLibre layers with no source for a data layer in another app (the GeoLibre plugin's "Style a layer with roadstyle"); one casing and one fill layer per drawing position (`positions`, else those of `edges`, else -10 to 10) |
 | `snapshot(map_or_html, out_path, *, center, zoom, pitch, bearing, width=1200, height=800, scale=1, settle=2.5, timeout=40)` | path | a PNG via headless Chromium (needs `playwright`) |
@@ -111,7 +110,8 @@ ignore it.
 | `color_col` | `"color"` | all | the colour column when `color_table` is a DataFrame |
 | `color_options` | `None` | web | `{name: {styler kwargs}}`: a *Colour by* menu that recolours in the browser; the first entry shows on open |
 | `color_active` | `0` | web | the option shown on open (index or name) |
-| `template` | `None` | web | `"map"`, `"dashboard"`, `"classic"` or `"report"`: the form of the page (`None` is `"map"`). A template sets the panel, the layout, the toolbar and the window rules; the three with a sidebar also set `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none. `render_dashboard` and `render_report` set it. The old `sidebar=` is an error |
+| `template` | `None` | web | `"map"` (no panel; the default of `render_edges`) or `"dashboard"` (the default of `render_dashboard`). The dashboard sets the panel, the toolbar and the window rules; it also sets `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none. A future template follows the style of the dashboard. The old `sidebar=` and the names `"classic"` and `"report"` are errors (there is no report page) |
+| `layout` | `None` | web | the dashboard's frame: `"overlay"` (default: the map fills the window, the panel floats, a toolbar) or `"dock"` (the old form: the panel is docked at the right, no toolbar). `template="dashboard"` only |
 | `views` | `None` | web | `{name: {setting: value}}`: a *View* menu next to *Colour by*; each view sets several things at once, the first shows on open |
 
 Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `width_by`,
@@ -192,7 +192,9 @@ Returns a `WebMap` (`.save()`).
 | `overlays` | `None` | web | a list of [`Overlay`](#overlay): zones, points, lines |
 | `items` | `None` | web, simple | the road's own line items (lanes, lane lines, marks): a GeoDataFrame or FeatureCollection whose features name their road in the edge id column (`edge_id_col`), with `width_m` (metres) and optional `order` (lower first), `offset_m` (metres, + = right), `color`, `dash`, `pick` and `minzoom` (shown from that zoom on). Drawn in the one road layer above their road's fill, with no source or layer of their own; a `pick` item is clicked and highlighted as itself (`rs:select` `detail.item`), the others let a click through to their road |
 | `items_popup` | `None` | web, simple | the fields a clicked `pick` item shows (`None`: all of its fields) |
-| `boundary` | `None` | web | a dashed outline on top: shapely geometry, GeoDataFrame or GeoJSON |
+| `boundary` | `None` | web | a dashed outline on top: shapely geometry, GeoDataFrame or GeoJSON. It is an input: the caller says where it comes from (a duckOSM `main.boundary`, a city limit, a drawn shape) |
+| `boundary_dim` | `False` | web | `True`: shade the outside of `boundary` (the opacity is in the template's `boundary` options) |
+| `boundary_limit` | `False` | web | `True`: the camera stays near `boundary` (the center inside its bounds grown by `limit_pad`, and the lowest zoom `zoom_out` levels under the fit) |
 
 ## Pages
 
@@ -201,8 +203,7 @@ change the defaults below.
 
 | function | page | changed defaults | own keywords |
 |---|---|---|---|
-| `render_dashboard` | map + sidebar: base map and colour-by menus, class filter with legend, query box, results table, read-out | `template="dashboard"`, `name="Roads dashboard"`, `basemap_switcher=False`, `filter_control=False`, `road_popup=False` | `template="classic"`: the old form, with the sidebar docked at the right and no toolbar. The default `"dashboard"` is the overlay form ([Dashboard layout](../guides/dashboard-layout.md)) |
-| `render_report` | map + sidebar: KPI cards, colour-by legend, filter, search, read-out | `template="report"`, `name="Roads report"`, `filter_control=False`, `road_popup=False` | |
+| `render_dashboard` | map + sidebar: base map and colour-by menus, class filter with legend, query box, results table, read-out | `template="dashboard"`, `name="Roads dashboard"`, `basemap_switcher=False`, `filter_control=False`, `road_popup=False` | `layout="dock"`: the old form, with the sidebar docked at the right and no toolbar. The default `"overlay"` floats the sidebar over a full map ([Dashboard layout](../guides/dashboard-layout.md)) |
 | `render_street_view` | map + Google Street View of the clicked road | `name="Roads and Street View"`, `road_popup=False`, `street_view=True` | see below |
 
 | `render_street_view` keyword | default | what |

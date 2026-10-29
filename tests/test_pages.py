@@ -1,4 +1,4 @@
-"""Packaged one-call pages: render_dashboard / render_report inject the bundled sidebars."""
+"""Packaged one-call pages: render_dashboard injects the bundled sidebar."""
 import geopandas as gpd
 from shapely.geometry import LineString
 
@@ -25,7 +25,6 @@ def _edges():
 def test_sidebar_html_bundled():
     # the templates ship inside the package (importlib.resources), not the repo ui/ dir
     assert "Roads dashboard" in rs.sidebar_html("dashboard")
-    assert 'id="rp"' in rs.sidebar_html("report")
 
 
 def test_render_dashboard_injects_sidebar_once():
@@ -35,18 +34,12 @@ def test_render_dashboard_injects_sidebar_once():
     assert h.count("</body>") == 1      # injected exactly once, before the single close tag
 
 
-def test_render_report_injects_sidebar():
-    h = rs.render_report(_edges()).html
-    assert '<div id="rp"' in h
-    assert h.count("</body>") == 1
-
-
 def test_name_shows_as_sidebar_heading():
     # name= is the visible page title, not just the <title> tag (escaped, so markup can't inject)
     h = rs.render_dashboard(_edges(), name="Södermalm <traffic>").html
     assert "<h2>Södermalm &lt;traffic&gt;</h2>" in h
     assert "<h2>Roads dashboard</h2>" not in h
-    assert "<h2>Roads report</h2>" in rs.render_report(_edges()).html   # default still shows
+    assert "<h2>Roads dashboard</h2>" in rs.render_dashboard(_edges()).html   # default still shows
 
 
 def test_pages_are_web_only():
@@ -134,9 +127,30 @@ def test_each_page_has_its_template():
     d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
     assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "right", "width_px": 340, "look": "card"},
                                                                        {"position": "right", "settings": True})
-    c = _dashboard(rs.render_dashboard(_edges(), template="classic").html)
-    assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("classic", "dock", "card", None)
-    assert _dashboard(rs.render_report(_edges()).html)["phone"]["panel"] == "below"
+    c = _dashboard(rs.render_dashboard(_edges(), layout="dock").html)
+    assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("dashboard", "dock", "card", None)
+
+
+def test_one_template_with_a_layout():
+    """The old names are errors with the way out; the map has no layout; there is no report page."""
+    import pytest
+    for old in ("classic", "report"):
+        with pytest.raises(ValueError, match=f'template="{old}" is gone'):
+            rs.render_dashboard(_edges(), template=old)
+    with pytest.raises(ValueError, match="layout must be"):
+        rs.render_dashboard(_edges(), layout="grid")
+    with pytest.raises(ValueError, match="layout= is for"):
+        rs.render_edges(_edges(), backend="web", layout="dock")
+    assert not hasattr(rs, "render_report")
+
+
+def test_the_boundary_shade_and_limit_are_the_pages_choice():
+    from shapely.geometry import box
+    area = box(17.99, 59.29, 18.02, 59.32)
+    d = _dashboard(rs.render_dashboard(_edges(), boundary=area).html)["boundary"]
+    assert (d["dim"], d["limit"]) == (False, False)
+    d = _dashboard(rs.render_dashboard(_edges(), boundary=area, boundary_dim=True, boundary_limit=True).html)["boundary"]
+    assert (d["dim"], d["limit"], d["limit_pad"]) == (True, True, 2.0)
 
 
 def test_the_dashboard_template_is_the_overlay_form():

@@ -5,16 +5,14 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// The named form of a page. `Map`: the map and its control column. `Classic`: the map and a docked query sidebar, with no toolbar. `Dashboard`: the
-/// same sidebar floats over a full map, with the toolbar, the settings and the window rules (the default of `render_dashboard`, decided
-/// 2026-10-29). `Report`: the map and a docked stats sidebar.
+/// The named form of a page. `Map`: the map and its control column. `Dashboard`: the map and the query sidebar (decided 2026-10-29: this is the one
+/// template with a panel; a later template follows its style). The sidebar floats over a full map with the toolbar (`Layout::Overlay`, the
+/// default of `render_dashboard`), or it is docked at the right with no toolbar (`Layout::Dock`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Template {
     Map,
-    Classic,
     Dashboard,
-    Report,
 }
 
 /// `Dock`: the panel takes its own space and the map is the rest. `Overlay`: the map fills the window and the panel floats over it.
@@ -76,23 +74,12 @@ pub struct WindowRules {
     pub remember: bool,
 }
 
-/// What a panel is on a phone.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PhonePanel {
-    /// a bottom sheet with three heights: closed, 40 % and full
-    Sheet,
-    /// under the map: the map takes 55 % of the height and the panel scrolls
-    Below,
-}
-
-/// The phone form: the same page at a width of `max_width_px` or less.
+/// The phone form: the same page at a width of `max_width_px` or less. The panel is a bottom sheet with three heights: closed, 40 % and full.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Phone {
     pub max_width_px: u32,
     pub toolbar: Edge,
-    pub panel: PhonePanel,
 }
 
 /// The style of the selection in the Google 3D window: a line, its outline and its arrows, one style for every layer that draws the selection.
@@ -242,8 +229,9 @@ impl Google3d {
 }
 
 /// The area boundary (docs/design/dashboard_templates.md, 3.3; decided 2026-10-29, level 3). The outline is the map option `boundary` (a dashed
-/// line, whose look is in the config files; a duckOSM file's `main.boundary` is its geometry). This adds what the dashboard does with it: the
-/// outside is shaded, and the camera is limited. A page that has no `boundary` has neither.
+/// line, whose look is in the config files). It is an input of the page: the caller says where it comes from. This adds what the dashboard can
+/// do with it: the outside is shaded (`dim`), and the camera is limited (`limit`). Both are off until the page asks (`boundary_dim`,
+/// `boundary_limit`): a fixed area is a choice of the page. A page that has no `boundary` has neither.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BoundaryRules {
@@ -259,8 +247,8 @@ pub struct BoundaryRules {
 }
 
 impl BoundaryRules {
-    fn new(on: bool) -> BoundaryRules {
-        BoundaryRules { dim: on, limit: on, dim_light: 0.16, dim_dark: 0.4, limit_pad: 2.0, zoom_out: 3.0 }
+    fn new() -> BoundaryRules {
+        BoundaryRules { dim: false, limit: false, dim_light: 0.16, dim_dark: 0.4, limit_pad: 2.0, zoom_out: 3.0 }
     }
 }
 
@@ -281,41 +269,36 @@ pub struct Dashboard {
 }
 
 impl Template {
-    /// The template of a keyword (`template=`).
-    pub fn parse(name: &str) -> Result<Template, crate::Error> {
-        serde_json::from_value(Value::from(name))
-            .map_err(|_| crate::error::options(format!("template must be \"map\", \"dashboard\", \"classic\" or \"report\", got '{name}'")))
-    }
-
     /// The sidebar's HTML, and the keywords that it changes when the call gives none (pages.py's defaults; tests/test_pages.py checks them).
     /// `map` has no sidebar.
     pub(crate) fn sidebar(self) -> Option<(&'static str, &'static str)> {
         match self {
             Template::Map => None,
-            Template::Classic => Some((roadstyle_assets::text!("templates/dashboard.html"),
-                r#"{"name": "Roads dashboard", "basemap_switcher": false, "filter_control": false, "road_popup": false}"#)),
             Template::Dashboard => Some((roadstyle_assets::text!("templates/dashboard.html"),
                 r#"{"name": "Roads dashboard", "basemap_switcher": false, "filter_control": false, "road_popup": false}"#)),
-            Template::Report => Some((roadstyle_assets::text!("templates/report.html"),
-                r#"{"name": "Roads report", "basemap_switcher": true, "filter_control": false, "road_popup": false}"#)),
         }
     }
 
-    /// The defaults of the template.
-    pub fn dashboard(self) -> Dashboard {
-        let right = |width_px| Some(Panel { side: Edge::Right, width_px, look: PanelLook::Card });
+    /// The defaults of the template with a layout (`Map` has no panel, so the layout does not change it).
+    pub fn dashboard(self, layout: Layout) -> Dashboard {
+        let right = Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Card });
         let free = WindowRules { clamp: false, recenter_map: true, restore_open: true, remember: true };
-        let phone = |panel| Phone { max_width_px: 700, toolbar: Edge::Top, panel };
-        let (layout, panel, toolbar, windows, phone) = match self {
-            Template::Map => (Layout::Dock, None, None, free, phone(PhonePanel::Sheet)),
-            Template::Classic => (Layout::Dock, right(340), None, free, phone(PhonePanel::Sheet)),
-            Template::Dashboard => (Layout::Overlay, right(340), Some(Toolbar { position: Edge::Right, settings: true }),
-                                 WindowRules { clamp: true, recenter_map: false, ..free }, phone(PhonePanel::Sheet)),
-            Template::Report => (Layout::Dock, right(340), None, free, phone(PhonePanel::Below)),
+        let phone = Phone { max_width_px: 700, toolbar: Edge::Top };
+        let (layout, panel, toolbar, windows) = match (self, layout) {
+            (Template::Map, _) => (Layout::Dock, None, None, free),
+            (Template::Dashboard, Layout::Dock) => (Layout::Dock, right, None, free),
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, right, Some(Toolbar { position: Edge::Right, settings: true }),
+                                                       WindowRules { clamp: true, recenter_map: false, ..free }),
         };
-        // the area's boundary is for the two forms that work on one area
-        let boundary = BoundaryRules::new(matches!(self, Template::Classic | Template::Dashboard));
-        Dashboard { template: self, layout, panel, toolbar, windows, boundary, google_3d: Google3d::new(), phone }
+        Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), phone }
+    }
+}
+
+impl Layout {
+    /// The layout of a keyword (`layout=`).
+    pub fn parse(name: &str) -> Result<Layout, crate::Error> {
+        serde_json::from_value(Value::from(name))
+            .map_err(|_| crate::error::options(format!("layout must be \"overlay\" or \"dock\", got '{name}'")))
     }
 }
 
@@ -337,9 +320,9 @@ impl Dashboard {
     }
 }
 
-/// The keywords that each template with a sidebar changes, and their values (`page_options`' `template_keys`).
+/// The keywords that the template with a sidebar changes, and their values (`page_options`' `template_keys`).
 pub fn template_keys() -> Map<String, Value> {
-    [Template::Classic, Template::Dashboard, Template::Report].into_iter()
+    [Template::Dashboard].into_iter()
         .map(|t| (serde_json::to_value(t).expect("a name").as_str().expect("a name").to_string(),
                   serde_json::from_str(t.sidebar().expect("a sidebar").1).expect("a template's defaults are JSON")))
         .collect()
@@ -349,79 +332,80 @@ pub fn template_keys() -> Map<String, Value> {
 mod tests {
     use super::*;
 
+    use Layout::{Dock, Overlay};
+
     #[test]
-    fn each_template_has_its_defaults() {
-        let d = Template::Classic.dashboard();
-        assert_eq!((d.layout, d.panel, d.toolbar), (Layout::Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Card }), None));
-        let r = Template::Dashboard.dashboard();
-        assert_eq!((r.layout, r.toolbar), (Layout::Overlay, Some(Toolbar { position: Edge::Right, settings: true })));
+    fn each_form_has_its_defaults() {
+        let d = Template::Dashboard.dashboard(Dock);
+        assert_eq!((d.layout, d.panel, d.toolbar), (Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Card }), None));
+        let r = Template::Dashboard.dashboard(Overlay);
+        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
-        let free = Template::Map.dashboard();
-        assert!((free.layout, free.panel, free.toolbar) == (Layout::Dock, None, None) && !free.windows.clamp && free.windows.recenter_map);
-        assert_eq!(Template::Report.dashboard().phone.panel, PhonePanel::Below);
+        for layout in [Dock, Overlay] {         // the map has no panel, whatever the layout is
+            let free = Template::Map.dashboard(layout);
+            assert!((free.layout, free.panel, free.toolbar) == (Dock, None, None) && !free.windows.clamp && free.windows.recenter_map);
+        }
     }
 
     #[test]
-    fn only_the_dashboard_clamps_the_windows() {
-        let clamp: Vec<Template> = [Template::Map, Template::Classic, Template::Dashboard, Template::Report].into_iter()
-            .filter(|t| t.dashboard().windows.clamp).collect();
-        assert_eq!(clamp, [Template::Dashboard]);
+    fn only_the_overlay_dashboard_clamps_the_windows() {
+        let clamp: Vec<(Template, Layout)> = [(Template::Map, Dock), (Template::Dashboard, Dock), (Template::Dashboard, Overlay)].into_iter()
+            .filter(|(t, l)| t.dashboard(*l).windows.clamp).collect();
+        assert_eq!(clamp, [(Template::Dashboard, Overlay)]);
     }
 
     #[test]
-    fn every_template_has_one_phone_width_and_the_bar_at_the_top() {
-        for t in [Template::Map, Template::Classic, Template::Dashboard, Template::Report] {
-            let p = t.dashboard().phone;
-            assert_eq!((p.max_width_px, p.toolbar), (700, Edge::Top), "{t:?}");
+    fn every_form_has_one_phone_width_and_the_bar_at_the_top() {
+        for (t, l) in [(Template::Map, Dock), (Template::Dashboard, Dock), (Template::Dashboard, Overlay)] {
+            let p = t.dashboard(l).phone;
+            assert_eq!((p.max_width_px, p.toolbar), (700, Edge::Top), "{t:?} {l:?}");
         }
     }
 
     #[test]
     fn the_first_paint_script_names_the_classes_of_the_form() {
-        let r = Template::Dashboard.dashboard().first_paint();
+        let r = Template::Dashboard.dashboard(Overlay).first_paint();
         assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right")"#) && r.contains("(max-width:700px)"), "{r}");
-        assert!(Template::Report.dashboard().first_paint().contains(r#"c.add("rs-tpl-report","rs-dock")"#));
+        assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock")"#));
     }
 
     #[test]
-    fn only_the_forms_of_one_area_have_the_boundary() {
-        let on: Vec<Template> = [Template::Map, Template::Classic, Template::Dashboard, Template::Report].into_iter()
-            .filter(|t| t.dashboard().boundary.dim).collect();
-        assert_eq!(on, [Template::Classic, Template::Dashboard]);
-        let b = Template::Dashboard.dashboard().boundary;
-        assert!(b.dim && b.limit && b.limit_pad > 0.0 && b.zoom_out > 0.0);
+    fn the_shade_and_the_limit_of_a_boundary_are_off_until_the_page_asks() {
+        for (t, l) in [(Template::Map, Dock), (Template::Dashboard, Dock), (Template::Dashboard, Overlay)] {
+            let b = t.dashboard(l).boundary;
+            assert!(!b.dim && !b.limit && b.limit_pad > 0.0 && b.zoom_out > 0.0, "{t:?} {l:?}");
+        }
     }
 
     #[test]
     fn the_google_3d_window_starts_with_follow_on_and_the_selection_in_cyan() {
-        let g = Template::Dashboard.dashboard().google_3d;
+        let g = Template::Dashboard.dashboard(Overlay).google_3d;
         assert!(g.follow && g.fov_deg.is_none());
         assert_eq!((g.min_alt_m, g.min_zoom_drawn, g.selection_style.color.as_str(), g.selection_style.width), (80.0, 17.0, "#22d3ee", 8.0));
     }
 
     #[test]
-    fn a_template_name_is_parsed_or_refused() {
-        assert_eq!(Template::parse("dashboard").unwrap(), Template::Dashboard);
-        assert!(Template::parse("sidebar").unwrap_err().to_string().contains("template must be"));
+    fn a_layout_name_is_parsed_or_refused() {
+        assert_eq!((Layout::parse("overlay").unwrap(), Layout::parse("dock").unwrap()), (Overlay, Dock));
+        assert!(Layout::parse("grid").unwrap_err().to_string().contains("layout must be"));
     }
 
     #[test]
     fn the_defaults_are_the_json_that_the_page_reads() {
-        let v = serde_json::to_value(Template::Dashboard.dashboard()).unwrap();
+        let v = serde_json::to_value(Template::Dashboard.dashboard(Overlay)).unwrap();
         assert_eq!(v["template"], "dashboard");
         assert_eq!(v["toolbar"], serde_json::json!({"position": "right", "settings": true}));
-        assert_eq!(v["phone"], serde_json::json!({"max_width_px": 700, "toolbar": "top", "panel": "sheet"}));
+        assert_eq!(v["phone"], serde_json::json!({"max_width_px": 700, "toolbar": "top"}));
         assert!(serde_json::from_value::<Dashboard>(serde_json::json!({"template": "map", "layout": "dock", "panel": null, "toolbar": null,
             "windows": {"clamp": false, "recenter_map": true, "restore_open": true, "remember": true}, "boundary": v["boundary"],
             "google_3d": v["google_3d"], "phone": v["phone"], "extra": 1})).is_err());
     }
 
     #[test]
-    fn the_sidebar_templates_change_the_keywords_of_their_page() {
+    fn the_sidebar_template_changes_the_keywords_of_its_page() {
         let k = template_keys();
-        assert_eq!(k.len(), 3);
-        assert_eq!(k["report"]["basemap_switcher"], true);
-        assert_eq!((&k["classic"]["name"], &k["dashboard"]["name"]), (&serde_json::json!("Roads dashboard"), &serde_json::json!("Roads dashboard")));
+        assert_eq!(k.len(), 1);
+        assert_eq!(k["dashboard"]["name"], "Roads dashboard");
     }
 
     fn layer(v: serde_json::Value) -> Result<Layer3d, serde_json::Error> { serde_json::from_value(v) }
