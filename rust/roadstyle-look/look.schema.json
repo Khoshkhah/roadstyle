@@ -2101,6 +2101,13 @@
         "color_table": {
           "$ref": "#/$defs/Color"
         },
+        "live_ramp": {
+          "description": "the ramp of live data (rs.setData) when the call has no cmap: colours of a medium brightness, so they show on a light and on a dark map",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Color"
+          }
+        },
         "opacity": {
           "$ref": "#/$defs/Num"
         },
@@ -2114,6 +2121,7 @@
         "casing_width",
         "nodata",
         "color_table",
+        "live_ramp",
         "opacity",
         "casing_opacity"
       ]

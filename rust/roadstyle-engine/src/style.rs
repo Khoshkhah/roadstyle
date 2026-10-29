@@ -173,9 +173,9 @@ fn interaction_meta(look: &Look) -> Value {
 }
 
 /// R22, live data: the feature states that the road layer reads, so a page's dashboard (rs.setData) colours and sizes the roads from a
-/// table with no new build; the ramp is the call's cmap (else viridis), as 9 colours, and the no-data colour the theme's.
+/// table with no new build; the ramp is the call's cmap (else the palette's data.live_ramp), as 9 colours, and the no-data colour the theme's.
 fn live_meta(look: &Look) -> Result<Value, Error> {
-    let cmap = look.map.color.cmap.as_ref().map_or_else(|| json!("viridis"), |c| serde_json::to_value(c).unwrap_or(Value::Null));
+    let cmap = look.map.color.cmap.as_ref().map_or_else(|| json!(look.sections.data.live_ramp), |c| serde_json::to_value(c).unwrap_or(Value::Null));
     let ramp = colors::Ramp::new(&cmap)?;
     Ok(json!({"color": layers::LIVE_COLOR, "width": layers::LIVE_WIDTH, "types": {layers::LIVE_COLOR: "color", layers::LIVE_WIDTH: "factor"},
               "ramp": ramp.stops(9), "nodata": look.sections.data.nodata}))

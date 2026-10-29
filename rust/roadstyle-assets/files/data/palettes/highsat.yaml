@@ -24,7 +24,7 @@ arrows: {color: "#5b5b5b", opacity: 0.7}
 bridges: {casing_color: "#64748b", shadow: {"color": "rgba(0,0,0,0.25)"}, decks: {"underlay": "#f2f2f2", "opacity": 0.7}}
 tunnels: {fill_dash_color: "rgba(255,255,255,0.55)", toward: "Sand", towards: {"Slate": "#64748b", "Dark": "#14181d", "Light": "#efede8", "Graphite": "#374151", "Navy": "#1e293b", "Stone": "#78716c", "Sand": "#d6cfc4", "Teal": "#134e4a"}, palette: "Graphite + silver", palettes: {"One colour": null, "Slate + ice": ["#64748b", "#cbd5e1"], "Blue + cyan": ["#315b7d", "#a9d7e8"], "Warm + sand": ["#806d64", "#e7c9a7"], "Graphite + silver": ["#4b5563", "#b8bec7"], "Indigo + lavender": ["#4c5c96", "#b9c2ea"], "Teal + mint": ["#2f6f73", "#9fd3cf"]}, to: {"fill": "#64748b", "dash": "#94a3b8"}}
 selection: {hover: "#b388ff", select: "#7c4dff", casing: "#000000", opacity: 0.85, glow_opacity: 0.35, folium_hover: "#ffffff"}
-data: {nodata: "#cccccc", color_table: "#bbbbbb", opacity: 0.9, casing_opacity: 0.75}
+data: {nodata: "#cccccc", color_table: "#bbbbbb", live_ramp: ["#3b82f6", "#06b6d4", "#22c55e", "#eab308", "#f97316", "#ef4444", "#be123c"], opacity: 0.9, casing_opacity: 0.75}
 overlays: {color: "#6aa9ff", circle_stroke: "#ffffff", fill_opacity: 0.15, circle_opacity: 0.85, line_opacity: 0.9, outline_opacity: 0.9}
 boundary: {color: "#6a0dad", opacity: 0.9}
 background: {light: "#e8e6e1", dark: "#0e1113"}

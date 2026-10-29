@@ -6,6 +6,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Live data colours a number in sets by natural breaks** (`rs.setData`). `classes` (default 7) is the number of sets; the cut points are the Fisher-Jenks
+  natural breaks of the call's numbers, so one very busy street does not use up the colour bar. `breaks` gives your own cut points (the same colours on every day).
+  The legend lists each set with its lowest and highest number and its number of roads. `classes: 0`, or a `vmin` / `vmax`, keeps the smooth ramp.
+- **The default ramp of live data is the palette's `data.live_ramp`** (blue, cyan, green, yellow, orange, red, dark red): colours of a medium brightness
+  that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
+
 ### Changed
 - **`line-dasharray` is only on the dashed pieces** (docs/design/tile_speed.md). The pieces that have a dash (a tunnel's gap and dashes,
   `__rs_k` 3 and 4, and a piece with its own pattern, `__rs_dash`) are drawn by a layer of their own for each band (`roads-simple-dash`,

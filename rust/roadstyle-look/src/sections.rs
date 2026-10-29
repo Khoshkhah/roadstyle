@@ -340,6 +340,8 @@ pub struct DataLook {
     pub casing_width: Num,
     pub nodata: Color,
     pub color_table: Color,
+    /// the ramp of live data (rs.setData) when the call has no cmap: colours of a medium brightness, so they show on a light and on a dark map
+    pub live_ramp: Vec<Color>,
     pub opacity: Num,
     pub casing_opacity: Num,
 }

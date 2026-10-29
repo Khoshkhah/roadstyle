@@ -84,6 +84,10 @@ fn the_64_looks_of_mapstyle() {
         if let Some(c) = got.pointer_mut("/theme/casing").and_then(Value::as_object_mut) {
             c.shift_remove("drop_below_px");
         }
+        // added on 2026-10-29: the palette's data.live_ramp, the default colours of live data (rs.setData)
+        if let Some(d) = got.pointer_mut("/theme/data").and_then(Value::as_object_mut) {
+            d.shift_remove("live_ramp");
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }
