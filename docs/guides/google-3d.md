@@ -97,11 +97,22 @@ more layers). The page remembers your choice. A wrong key, a wrong `kind`, a rep
 `selection` layer without `match` stops with an error. The selected road has its own style, the same
 for all layers that draw the selection: `Google3d.selection_style` of the template.
 
+## The selection
+
+The selected road is one solid line (also in a tunnel), `mesh_altitude_m` (1.5 m) above Google's mesh: at 0.5 m the bumps of the mesh cut the
+line into pieces. Its style is the template's `google_3d.selection_style` (cyan, 8 px, a dark outline, white arrows). A selection can have
+points (`sel.points`): the window draws a pin for each. To change an option, use `dashboard=`:
+
+```python
+rs.render_dashboard(edges, google_3d=True, dashboard={"google_3d": {"selection_style": {"color": "#ff0066", "width": 10}}})
+```
+
 ## From JavaScript
 
 | Call or event | What it does |
 |---|---|
 | `rsSetGoogle3D(true)` / `rsSetGoogle3D(false)` | opens / closes the window |
 | `rs:google3dchange` | fires when the window opens or closes; `e.detail.open` |
+| `rsG3dDraw(cs, name, lvl, sel)` | draws a selection of your own: `cs` the road's `[lng, lat]` points (or `[]`), `sel.points` points drawn as pins |
 | `rsG3dLayers.register({id, kind, features, style})` | adds a layer at run time; `features(selection, {bounds})` gives a GeoJSON FeatureCollection. The same `id` replaces a layer |
 | `rsG3dLayers.list()` / `isOn(id)` / `setOn(id, on)` / `refresh()` | read the layers, show or hide one, draw again |

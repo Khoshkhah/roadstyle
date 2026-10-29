@@ -35,6 +35,10 @@ To add a tool of your own, use `rs.tools`:
 rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => save()});
 ```
 
+To hide the bar until your tools are in, build the page with `dashboard={"toolbar": {"hold": True}}` and call
+`rs.tools.ready()` when they are added (the bar shows after 6 s at the latest). The keyword `dashboard=` changes any option of the template, for
+example the bar's `position`.
+
 ## The settings
 
 The gear button opens the settings. They are kept in the browser. They are not in the page file.

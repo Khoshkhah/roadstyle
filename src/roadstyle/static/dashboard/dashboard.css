@@ -174,6 +174,7 @@ html.rs-overlay,html.rs-overlay body{overflow:hidden}
 #rs-show-right .maplibregl-ctrl{margin:0;float:none}
 #rs-show-right button{width:32px;height:32px}
 .bm-menu{background:var(--rs-pop-bg)!important;color:var(--rs-pop-ink)!important}
+#rs-toolbar[data-held]{visibility:hidden}
 #rs-toolbar{position:fixed;z-index:8;box-sizing:border-box;display:flex;align-items:center;gap:4px;padding:8px;
   border:1px solid var(--rs-tb-border);border-radius:10px;font:11px/1.2 system-ui,sans-serif}
 #rs-toolbar .maplibregl-ctrl{margin:0!important;float:none!important}

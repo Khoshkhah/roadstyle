@@ -90,6 +90,11 @@ export function initToolbar(){
   if(!d || !d.toolbar) return false;
   themeTool(); attributionTool();
   const bar = el("div"); bar.id = "rs-toolbar"; document.body.appendChild(bar);
+  if(d.toolbar.hold){                       // a page that adds tools of its own: no bar without them at the load; rs.tools.ready() shows it, 6 s at the latest
+    bar.dataset.held = "1";                  // an attribute, not a class: the bar's class is set again at each change of its edge
+    const show = () => { delete bar.dataset.held; };
+    document.addEventListener("rs:toolsready", show, {once: true}); setTimeout(show, 6000);
+  }
   const phone = matchMedia("(max-width:" + d.phone.max_width_px + "px)");
   const place = () => { bar.className = "rs-tb-" + (phone.matches ? d.phone.toolbar : (_tbEdge || layoutNow().toolbar)); bar.dataset.edge = bar.className.slice(6); };
   _tbPlace = place; place(); phone.addEventListener("change", place);

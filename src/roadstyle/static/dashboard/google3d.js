@@ -165,7 +165,7 @@ export function initGoogle3D(){
     // A MODE CHANGE (Google's own toggle or the page's): every polyline is removed from the 3D map and the selected entity's line is drawn again from the
     // build's geometry, 300 ms after the switch and again after Google's first camera event in the new mode. One line, the build's, in both views.
     let redrawT=0, redrawNext=false;
-    const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d").forEach(x=>x.remove()); line=null; };
+    const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d, gmp-marker-3d").forEach(x=>x.remove()); line=null; };
     const redrawRoad=()=>{ try{ drawLayers(); }catch(e){ LOG.push("redraw: "+String(e&&e.message||e).slice(0, 120)); } };
     const modeChanged=()=>{ quietUntil=performance.now()+1000; keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
     document.addEventListener("rs:labelschange", ()=>{ if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); });
@@ -196,7 +196,7 @@ export function initGoogle3D(){
     // WHAT THE 3D WINDOW DRAWS: a registry of layers. A layer is {id, label, kind, features(selection, {bounds}) -> GeoJSON, style, arrows, available(), scope, max, on}.
     // kind: "line" (a polyline: style.color, style.width px, style.dash [on, off] metres, arrows: direction arrows along it), "ribbon" (a band around a line:
     // style.widthM metres, or the feature's property style.widthProp, style.fill, style.color for its edge), "polygon" (style.fill, style.color outline),
-    // "points" (an octagon of style.radius metres). Every kind lies on Google's mesh (RELATIVE_TO_MESH, 0.5 m), keeps every original vertex of a line,
+    // "points" (an octagon of style.radius metres). Every kind lies on Google's mesh (RELATIVE_TO_MESH, `google_3d.mesh_altitude_m`, 1.5 m), keeps every original vertex of a line,
     // gets points only on segments longer than 5 m, is drawn once per selection, and is drawn again on a mode change. By default a layer draws the features
     // tied to the selection; scope:"view" draws those in the visible area instead, at most `max` (500). The built-in layer "selected" is the selected road's
     // line; a page can register a layer of the same id to replace it. A "Show" menu in the window's bar has one checkbox per available layer (shown when
@@ -223,7 +223,7 @@ export function initGoogle3D(){
     const selStyle=()=>({color:SS.color, width:SS.width, outline:SS.outline, outlineWidth:SS.outline_width, arrowColor:SS.arrow_color, arrowWidth:SS.arrow_width,
                          arrowEvery:SS.arrow_every, fill:SS.fill});
     let want=null;
-    const selParts=()=>want ? (Array.isArray(want.cs[0]) && Array.isArray(want.cs[0][0]) ? want.cs : [want.cs]).filter(c=>c.length>1) : [];
+    const selParts=()=>want && want.cs.length ? (Array.isArray(want.cs[0]) && Array.isArray(want.cs[0][0]) ? want.cs : [want.cs]).filter(c=>c.length>1) : [];
     REG.set("selected", {id:"selected", label:"Selected road", kind:"line", selection:true,
       features:()=>({type:"FeatureCollection", features:selParts().map(c=>({type:"Feature", geometry:{type:"LineString", coordinates:c}, properties:{lvl:want.lvl}}))})});
     const register=d=>{ if(!d || !d.id || typeof d.features!=="function") throw new Error("rsG3dLayers.register: a layer needs an id and a features(selection) function"); REG.set(d.id, {kind:"line", ...d}); paintMenu(); drawLayers(); };
@@ -241,13 +241,15 @@ export function initGoogle3D(){
       const want_=sel && sel.props && c.match in sel.props ? sel.props[c.match] : sel && sel.key;
       return {type:"FeatureCollection", features:fs.filter(f=>f.properties && String(f.properties[c.match])===String(want_))}; }});
     // the geometry helpers
-    // The altitude mode follows the view. Over the imagery (SATELLITE, HYBRID) a line lies on Google's mesh (RELATIVE_TO_MESH, 0.5 m). Google's drawn map
+    // The altitude mode follows the view. Over the imagery (SATELLITE, HYBRID) a line lies on Google's mesh (RELATIVE_TO_MESH, `google_3d.mesh_altitude_m`, 1.5 m). Google's drawn map
     // (ROADMAP) does not show that mesh: its streets lie flat on the terrain, so there a line is 1 m above the ground (RELATIVE_TO_GROUND). Every kind uses this rule.
     // Google draws a CLAMP_TO_GROUND line as a thin draped line and does not honour its width (seen in the drawn map: 2 px for 8 px set). So in the drawn map a line is
     // RELATIVE_TO_GROUND at 1 m: Google's drawn streets lie on its terrain, and the line keeps its width.
     const drawnAlt=()=>"RELATIVE_TO_GROUND";
     const MESH=()=>drawnMode() ? ((lib.AltitudeMode||{})[drawnAlt()]||drawnAlt()) : ((lib.AltitudeMode||{}).RELATIVE_TO_MESH||"RELATIVE_TO_MESH");
-    const pts=r=>r.map(c=>({lat:c[1], lng:c[0], altitude:drawnMode() && drawnAlt()==='RELATIVE_TO_GROUND' ? 1 : 0.5}));
+    // over the imagery `mesh_altitude_m` above the mesh: at 0.5 m the mesh's bumps (cars, trees, kerbs) cut the line into pieces
+    const MESH_ALT=G ? G.mesh_altitude_m : 1.5;
+    const pts=r=>r.map(c=>({lat:c[1], lng:c[0], altitude:drawnMode() && drawnAlt()==='RELATIVE_TO_GROUND' ? 1 : MESH_ALT}));
     // every original vertex is kept (a smooth arc stays an arc), and a segment longer than 5 m gets points in between
     const densify=cs=>{ const out=[cs[0]], k=Math.cos(cs[0][1]*Math.PI/180);
       for(let i=1; i<cs.length; i++){ const [x0, y0]=cs[i-1], [x1, y1]=cs[i], m=Math.hypot((x1-x0)*111320*k, (y1-y0)*111320), n=Math.ceil(m/5);
@@ -279,25 +281,30 @@ export function initGoogle3D(){
       if(def.kind==="points"){ for(const c of pointsOf(g)) polygon(circle(c, st.radius||2), st); return; }
       for(const raw of linesOf(g)){ if(raw.length<2) continue; const cs=densify(raw);
         if(def.kind==="ribbon"){ const w=(st.widthProp && +pr[st.widthProp]) || st.widthM || 3; polygon(offsetRing(cs, w/2), st); continue; }
-        const tunnel=pr.lvl<0, dash=tunnel ? [7, 5] : st.dash;
-        if(dash){ const {total, run}=along(cs); if(tunnel) tun.hidden=false;
+        const tunnel=pr.lvl<0, dash=tunnel && !def.selection ? [7, 5] : st.dash;      // the selected road is one solid line in both views: short dashes break up on the mesh (the bar's note says "tunnel")
+        if(tunnel) tun.hidden=false;
+        if(dash){ const {total, run}=along(cs);
           for(let a=0; a<total; a+=dash[0]+dash[1]) polyline(run(a, Math.min(a+dash[0], total)), tunnel && !def.selection ? {...st, color:"#7e57c2"} : st); }
         else polyline(cs, st);
         if(def.arrows) arrowsOn(cs, st); } };
     const inView=(f, b)=>{ const g=f.geometry; return [...linesOf(g).flat(), ...ringsOf(g).flat(), ...pointsOf(g)].some(c=>c[0]>=b.getWest() && c[0]<=b.getEast() && c[1]>=b.getSouth() && c[1]<=b.getNorth()); };
     const drawLayers=()=>{
       if(!m3 || !lib) return;
-      m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d").forEach(x=>x.remove());       // one selection, one set of lines: whatever an earlier draw left goes
+      m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d, gmp-marker-3d").forEach(x=>x.remove());       // one selection, one set of lines: whatever an earlier draw left goes
       made=[]; line=made; tun.hidden=true;
       for(const def of REG.values()){ if(!avail(def) || !layerOn(def)) continue;
         try{ const view=def.scope==="view", b=map.getBounds(); if(!view && !want) continue;
           let fs=(def.features(want && want.sel || {key:want && want.name, props:{}}, {bounds:b, parts:selParts(), level:want ? want.lvl : 0}) || {}).features || [];
           if(view){ fs=fs.filter(f=>inView(f, b)).slice(0, def.max||500); }
           const st=def.style||{}; for(const f of fs) drawFeature(def, f, st);
-        }catch(e){ LOG.push("layer "+def.id+": "+String(e&&e.message||e).slice(0, 120)); console.warn("rs google 3d: the layer", def.id, "was not drawn:", e); } } };
+        }catch(e){ LOG.push("layer "+def.id+": "+String(e&&e.message||e).slice(0, 120)); console.warn("rs google 3d: the layer", def.id, "was not drawn:", e); } }
+      // the selected points (sel.points of rsG3dDraw, for example an event on the selected road): a Google pin on a stick, 6 m above the ground or the mesh
+      for(const c of (want && want.points) || []){ try{ add(new lib.Marker3DElement({position:{lat:c[1], lng:c[0], altitude:6}, altitudeMode:MESH(), extruded:true})); }
+        catch(e){ LOG.push("point: "+String(e&&e.message||e).slice(0, 120)); } } };
     let viewT=0;
     map.on("moveend", ()=>{ if(m3 && [...REG.values()].some(d=>d.scope==="view" && avail(d) && layerOn(d))){ clearTimeout(viewT); viewT=setTimeout(drawLayers, 400); } });
-    // DRAW THE SELECTION in the 3D view. cs: the road's [lng, lat] points (or an array of lines); lvl: its level; sel: {key, props} for the layers tied to the selection.
+    // DRAW THE SELECTION in the 3D view. cs: the road's [lng, lat] points (or an array of lines, or [] for points only); lvl: its level; sel: {key, props} for the
+    // layers tied to the selection, and sel.points: [lng, lat] points of the selection drawn as pins (an event and its road are one selection).
     // rs:select calls it for a click on a road; a page with its own selection (a stepper, a list) calls window.rsG3dDraw(cs, name, lvl, sel).
     // A selection asked for before the view exists is drawn when it opens.
     // the title of a road with no name: its class and length, "Service road, 42 m" or "Primary link, 120 m"
@@ -308,8 +315,8 @@ export function initGoogle3D(){
       return cls+(isFinite(len) ? ", "+Math.round(len)+" m" : ""); };
     const draw=(any, name, lvl, keep, sel)=>{
       const parts=(Array.isArray(any[0]) && Array.isArray(any[0][0]) ? any : [any]).filter(c=>c.length>1);     // one line, or several
-      want={cs:any, name, lvl, sel:sel||(keep && want ? want.sel : null)};
-      if(!m3 || !lib || !parts.length) return;
+      want={cs:any, name, lvl, sel:sel||(keep && want ? want.sel : null)}; want.points=(want.sel && want.sel.points) || [];
+      if(!m3 || !lib || (!parts.length && !want.points.length)) return;
       if(!keep) setFollow(true);               // a road selection turns Follow on: the map leads (a redraw after a mode change does not)
       ttl.textContent=name || roadTitle(want.sel && want.sel.props);
       drawLayers();

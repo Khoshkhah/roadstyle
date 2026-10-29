@@ -16,9 +16,10 @@ _URL = "http://rs.test/p.html"
 # what the window needs of Google's "maps3d" library: three elements that keep what they are given
 _STUB = """
 class E extends HTMLElement { constructor(o){ super(); Object.assign(this, o||{}); } }
-for (const [n, c] of [["gmp-map-3d", "Map3DElement"], ["gmp-polyline-3d", "Polyline3DElement"], ["gmp-polygon-3d", "Polygon3DElement"]]) {
+for (const [n, c] of [["gmp-map-3d", "Map3DElement"], ["gmp-polyline-3d", "Polyline3DElement"], ["gmp-polygon-3d", "Polygon3DElement"],
+                      ["gmp-marker-3d", "Marker3DElement"]]) {
   window[c] = class extends E {}; customElements.define(n, window[c]); }
-window.google = {maps: {importLibrary: async () => ({Map3DElement, Polyline3DElement, Polygon3DElement})}};
+window.google = {maps: {importLibrary: async () => ({Map3DElement, Polyline3DElement, Polygon3DElement, Marker3DElement})}};
 window.__rsGmReady();
 """
 _ZONES = {"type": "FeatureCollection", "features": [
@@ -93,3 +94,31 @@ def test_the_window_draws_the_layers_and_the_show_menu_hides_one(tmp_path):
 
     assert errors == []
     assert labels == [["Selected road", True], ["Zones", True], ["Points", False]]
+
+
+def _open_window(p, html, errors):
+    page = p.chromium.launch(args=_ARGS).new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.route("https://maps.googleapis.com/**", lambda r: r.fulfill(content_type="text/javascript", body=_STUB))
+    page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
+    page.goto(_URL)
+    page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+    page.click("button[title='Google 3D']")
+    page.wait_for_selector("gmp-map-3d", state="attached")
+    return page
+
+
+def test_the_selected_road_is_one_solid_line_above_the_mesh_and_its_points_are_pins():
+    """The selection is one polyline 1.5 m above the mesh (the option `mesh_altitude_m`), also in a tunnel (level -1); its `points` are pins."""
+    html, o = _options(dashboard={"google_3d": {"mesh_altitude_m": 2.5}})
+    assert o["dashboard"]["google_3d"]["mesh_altitude_m"] == 2.5 and _options()[1]["dashboard"]["google_3d"]["mesh_altitude_m"] == 1.5
+    errors = []
+    with pw.sync_playwright() as p:
+        page = _open_window(p, html, errors)
+        got = page.evaluate("""() => { rsG3dDraw([[18.0, 59.30], [18.0, 59.31]], "R", -1, {key: "k", props: {}, points: [[18.0, 59.305], [18.0, 59.307]]});
+            const L = [...document.querySelectorAll('gmp-polyline-3d')];
+            return {lines: L.length, alt: L[0].path[0].altitude, pins: document.querySelectorAll('gmp-marker-3d').length}; }""")
+        page.evaluate("rsG3dDraw([], 'only points', 0, {key: 'k', props: {}, points: [[18.0, 59.305]]})")      # points without a road
+        pins = page.evaluate("document.querySelectorAll('gmp-marker-3d').length")
+        page.context.browser.close()
+    assert errors == [] and got == {"lines": 1, "alt": 2.5, "pins": 2} and pins == 1

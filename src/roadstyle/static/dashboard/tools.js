@@ -87,6 +87,8 @@ export const rsTools = {
     b.onclick = e => { _emit("rs:toolchange", {id: t.id, state: "press"}); if(t.onClick) t.onClick(e); };
     return info(t);
   },
+  // the page has added its tools: the bar shows (`toolbar.hold`)
+  ready(){ document.dispatchEvent(new Event("rs:toolsready")); },
   // a tool of the page gets its behavior: {onClick}
   bind(id, spec){ const t = need(id); if(spec && spec.onClick) t.onClick = spec.onClick; return info(t); },
   remove(id){ const t = need(id), c = !t.group && t.el.closest(".maplibregl-ctrl"); (c || t.el).remove(); tools.delete(id); },

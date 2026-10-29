@@ -165,7 +165,14 @@ What happens to the old `main` (the tag `python-engine-final`, which no branch f
 3. The SimReady page moves to the Rust dashboard (`template="dashboard"`, its tools and 3D layers as options) in the SimReady repository.
    Its `tools/test_map.py` must pass on the new page before the move.
 
-Port list (commits of the tag after 1c835679, and their step): none yet.
+Port list (commits of the tag after 1c835679, and their step):
+
+| Commit | What it gave | Where it is now |
+|---|---|---|
+| `0bc41ab8` | one selection style for the 3D window | typed `google_3d.selection_style` (D7); the page changes it with `dashboard={"google_3d": {"selection_style": {...}}}` (D9). The run-time `window.rsG3dSelectionStyle` is not ported |
+| `a234f30d` | pins for the points of a selection (`sel.points`) | `google3d.js` (D9) |
+| `435d108d` | the selected road is one solid line, 1.5 m above the mesh | typed `google_3d.mesh_altitude_m` (D9); the run-time `window.rsG3dMeshAltitude` is not ported |
+| `1e300999` | the bar stays hidden until a page has added its buttons | typed `toolbar.hold` and `rs.tools.ready()` (D9). The run-time `window.rsToolbarHold` and `rsToolbarShow` are not ported |
 
 ## 5. Tests
 

@@ -80,3 +80,22 @@ def test_a_desktop_keeps_the_docked_sidebar(tmp_path):
         sb, mp = _box(page, "#sb"), _box(page, "#map")
         browser.close()
     assert not phone and sb["w"] == 340 and mp["w"] == 1280 - 340
+
+
+def test_a_held_toolbar_shows_when_the_page_has_added_its_tools(tmp_path):
+    """toolbar.hold: no bar at the load; rs.tools.ready() shows it."""
+    import roadstyle as rs
+    path = tmp_path / "hold.html"
+    rs.render_dashboard(_edges(), basemap="blank", dashboard={"toolbar": {"hold": True}}).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page()
+        page.add_init_script("const st = window.setTimeout; window.setTimeout = (f, t, ...a) => t === 6000 ? 0 : st(f, t, ...a)")    # the 6 s limit does not run
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        vis = lambda: page.evaluate("getComputedStyle(document.getElementById('rs-toolbar')).visibility")   # noqa: E731
+        before = vis()
+        page.evaluate("rs.tools.add({id: 'mine', title: 'Mine'}); rs.tools.ready()")
+        after = vis()
+        browser.close()
+    assert (before, after) == ("hidden", "visible")

@@ -58,6 +58,10 @@ pub struct Toolbar {
     pub position: Edge,
     /// the tool `settings`: the person's choices (the place of the bar and the panel, the transparency, the keys), kept in the browser
     pub settings: bool,
+    /// the bar stays hidden until the page calls `rs.tools.ready()` (6 s at the latest): a page that adds tools of its own sets this, so that no bar
+    /// without them flashes at the load
+    #[serde(default)]
+    pub hold: bool,
 }
 
 /// The rules of the floating windows (Street View, Google 3D).
@@ -214,6 +218,9 @@ pub struct Google3d {
     pub min_alt_m: f64,
     /// the map's zoom over which the drawn map shows the note
     pub min_zoom_drawn: f64,
+    /// metres above Google's mesh at which a line or a pin of the window lies over the imagery: at 0.5 m the mesh's bumps (cars, trees, kerbs) cut
+    /// a line into pieces
+    pub mesh_altitude_m: f64,
     pub selection_style: SelectionStyle,
     /// the page's layers (the page keyword `google_3d_layers`); none in a template
     pub layers: Vec<Layer3d>,
@@ -221,7 +228,7 @@ pub struct Google3d {
 
 impl Google3d {
     fn new() -> Google3d {
-        Google3d { fov_deg: None, follow: true, min_alt_m: 80.0, min_zoom_drawn: 17.0,
+        Google3d { fov_deg: None, follow: true, min_alt_m: 80.0, min_zoom_drawn: 17.0, mesh_altitude_m: 1.5,
                    selection_style: SelectionStyle { color: "#22d3ee".into(), width: 8.0, outline: "#0b1020".into(), outline_width: 2.0,
                                                      arrow_color: "#ffffff".into(), arrow_width: 5.0, arrow_every: 25.0, fill: "rgba(34,211,238,0.35)".into() },
                    layers: Vec::new() }
@@ -287,7 +294,7 @@ impl Template {
         let (layout, panel, toolbar, windows) = match (self, layout) {
             (Template::Map, _) => (Layout::Dock, None, None, free),
             (Template::Dashboard, Layout::Dock) => (Layout::Dock, right, None, free),
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, right, Some(Toolbar { position: Edge::Right, settings: true }),
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, right, Some(Toolbar { position: Edge::Right, settings: true, hold: false }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
         Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), phone }
@@ -320,6 +327,26 @@ impl Dashboard {
     }
 }
 
+/// A partial `Dashboard` (the page keyword `dashboard=`) over the dashboard of the template: mappings are merged field by field, any other
+/// value replaces the field's. A wrong key or value is an error (the type refuses it), and the template cannot change.
+pub fn merge(base: &Dashboard, over: &Value) -> Result<Dashboard, crate::Error> {
+    fn deep(a: &mut Value, b: &Value) {
+        match (a, b) {
+            (Value::Object(a), Value::Object(b)) => b.iter().for_each(|(k, v)| deep(a.entry(k.clone()).or_insert(Value::Null), v)),
+            (a, b) => *a = b.clone(),
+        }
+    }
+    let Value::Object(o) = over else {
+        return Err(crate::error::options("dashboard= must be a mapping of the dashboard's options"));
+    };
+    if o.contains_key("template") {
+        return Err(crate::error::options("dashboard= cannot change the template: use template="));
+    }
+    let mut v = serde_json::to_value(base).expect("a Dashboard is JSON");
+    deep(&mut v, over);
+    serde_json::from_value(v).map_err(|e| crate::error::options(format!("dashboard=: {e}")))
+}
+
 /// The keywords that the template with a sidebar changes, and their values (`page_options`' `template_keys`).
 pub fn template_keys() -> Map<String, Value> {
     [Template::Dashboard].into_iter()
@@ -339,7 +366,7 @@ mod tests {
         let d = Template::Dashboard.dashboard(Dock);
         assert_eq!((d.layout, d.panel, d.toolbar), (Dock, Some(Panel { side: Edge::Right, width_px: 340, look: PanelLook::Card }), None));
         let r = Template::Dashboard.dashboard(Overlay);
-        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true })));
+        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
         for layout in [Dock, Overlay] {         // the map has no panel, whatever the layout is
             let free = Template::Map.dashboard(layout);
@@ -381,7 +408,7 @@ mod tests {
     fn the_google_3d_window_starts_with_follow_on_and_the_selection_in_cyan() {
         let g = Template::Dashboard.dashboard(Overlay).google_3d;
         assert!(g.follow && g.fov_deg.is_none());
-        assert_eq!((g.min_alt_m, g.min_zoom_drawn, g.selection_style.color.as_str(), g.selection_style.width), (80.0, 17.0, "#22d3ee", 8.0));
+        assert_eq!((g.min_alt_m, g.min_zoom_drawn, g.mesh_altitude_m, g.selection_style.color.as_str(), g.selection_style.width), (80.0, 17.0, 1.5, "#22d3ee", 8.0));
     }
 
     #[test]
@@ -394,7 +421,7 @@ mod tests {
     fn the_defaults_are_the_json_that_the_page_reads() {
         let v = serde_json::to_value(Template::Dashboard.dashboard(Overlay)).unwrap();
         assert_eq!(v["template"], "dashboard");
-        assert_eq!(v["toolbar"], serde_json::json!({"position": "right", "settings": true}));
+        assert_eq!(v["toolbar"], serde_json::json!({"position": "right", "settings": true, "hold": false}));
         assert_eq!(v["phone"], serde_json::json!({"max_width_px": 700, "toolbar": "top"}));
         assert!(serde_json::from_value::<Dashboard>(serde_json::json!({"template": "map", "layout": "dock", "panel": null, "toolbar": null,
             "windows": {"clamp": false, "recenter_map": true, "restore_open": true, "remember": true}, "boundary": v["boundary"],
@@ -406,6 +433,19 @@ mod tests {
         let k = template_keys();
         assert_eq!(k.len(), 1);
         assert_eq!(k["dashboard"]["name"], "Roads dashboard");
+    }
+
+    #[test]
+    fn a_partial_dashboard_is_merged_over_the_defaults() {
+        let base = Template::Dashboard.dashboard(Overlay);
+        let d = merge(&base, &serde_json::json!({"toolbar": {"position": "left", "hold": true}, "google_3d": {"selection_style": {"width": 12.0}, "mesh_altitude_m": 2.0}})).unwrap();
+        assert_eq!(d.toolbar, Some(Toolbar { position: Edge::Left, settings: true, hold: true }));
+        assert_eq!((d.google_3d.selection_style.width, d.google_3d.selection_style.color.as_str(), d.google_3d.mesh_altitude_m), (12.0, "#22d3ee", 2.0));
+        assert_eq!(merge(&base, &serde_json::json!({"toolbar": null})).unwrap().toolbar, None);
+        for (bad, said) in [(serde_json::json!({"toolbar": {"colour": 1}}), "colour"), (serde_json::json!({"template": "map"}), "cannot change the template"),
+                            (serde_json::json!({"windows": {"clamp": "yes"}}), "invalid type"), (serde_json::json!([1]), "must be a mapping")] {
+            assert!(merge(&base, &bad).unwrap_err().to_string().contains(said), "{bad}");
+        }
     }
 
     fn layer(v: serde_json::Value) -> Result<Layer3d, serde_json::Error> { serde_json::from_value(v) }

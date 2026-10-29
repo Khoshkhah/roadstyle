@@ -126,7 +126,7 @@ def test_each_page_has_its_template():
     assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
     d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
     assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "right", "width_px": 340, "look": "card"},
-                                                                       {"position": "right", "settings": True})
+                                                                       {"position": "right", "settings": True, "hold": False})
     c = _dashboard(rs.render_dashboard(_edges(), layout="dock").html)
     assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("dashboard", "dock", "card", None)
 
@@ -144,6 +144,17 @@ def test_one_template_with_a_layout():
     assert not hasattr(rs, "render_report")
 
 
+def test_the_dashboard_keyword_merges_typed_options():
+    import pytest
+    d = _dashboard(rs.render_dashboard(_edges(), dashboard={"toolbar": {"position": "left", "hold": True},
+                                                            "google_3d": {"selection_style": {"width": 12}}}).html)
+    assert d["toolbar"] == {"position": "left", "settings": True, "hold": True}
+    assert (d["google_3d"]["selection_style"]["width"], d["google_3d"]["selection_style"]["color"]) == (12.0, "#22d3ee")
+    for bad, said in [({"toolbar": {"colour": 1}}, "colour"), ({"template": "map"}, "cannot change the template"), ({"windows": {"clamp": "x"}}, "invalid type")]:
+        with pytest.raises(ValueError, match=said):
+            rs.render_dashboard(_edges(), dashboard=bad)
+
+
 def test_the_boundary_shade_and_limit_are_the_pages_choice():
     from shapely.geometry import box
     area = box(17.99, 59.29, 18.02, 59.32)
@@ -156,7 +167,7 @@ def test_the_boundary_shade_and_limit_are_the_pages_choice():
 def test_the_dashboard_template_is_the_overlay_form():
     h = rs.render_dashboard(_edges()).html
     d = _dashboard(h)
-    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True})
+    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True, "hold": False})
     assert d["windows"]["clamp"] is True and d["windows"]["recenter_map"] is False
     assert '<div id="sb"' in h and "<h2>Roads dashboard</h2>" in h
     assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right")' in h   # the first paint has the form

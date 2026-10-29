@@ -19,6 +19,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   off until `boundary_dim=True` and `boundary_limit=True`.
 
 ### Added
+- **`dashboard={...}`: change any option of the template.** The partial option is merged over the template's (a wrong key or value is a `ValueError`;
+  the template cannot change). New options: `toolbar.hold` (the bar stays hidden until the page calls `rs.tools.ready()`), `google_3d.mesh_altitude_m`
+  (the selected road is one solid line 1.5 m above the mesh, also in a tunnel), and pins for the points of a 3D selection (`sel.points` of `rsG3dDraw`).
+  These come from four commits of the `n8-engine` work (`0bc41ab8`, `a234f30d`, `435d108d`, `1e300999`); the port list is in the design doc.
 - **Typed layers for the Google 3D window.** The new keyword `google_3d_layers=[{id, kind, source, match, scope, max, on, arrows, style}]`
   draws the features of a GeoJSON source of the page in the window (kinds `line`, `ribbon`, `polygon`, `points`); the window's Show menu turns
   each on or off. The list is a Rust type (`dashboard::Layer3d`, in `Google3d.layers`): a wrong key or `kind`, a repeated `id` or a
