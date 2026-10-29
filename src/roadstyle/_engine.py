@@ -332,9 +332,9 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds, pro
     style, base = json.loads(t.style), base_url.rstrip("/")
     roads = style["sources"]["roads"]
     generation = style.get("metadata", {}).get("roadstyle:generation")           # a row is valid in one generation only: the URL carries it
-    tiles_url = f"{base}/tiles/{{z}}/{{x}}/{{y}}.pbf" + (f"?g={generation}" if generation else "")
+    tiles_url = f"{base}/tiles/{{z}}/{{x}}/{{y}}{t.extension}" + (f"?g={generation}" if generation else "")
     at = {"tiles": [tiles_url]} if format == "xyz" else {"url": f"pmtiles://{base}/roads.pmtiles"}
-    roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom", "promoteId") if k in roads}, **at, "bounds": list(bounds)}
+    roads = style["sources"]["roads"] = {**{k: roads[k] for k in ("type", "minzoom", "maxzoom", "promoteId", "encoding") if k in roads}, **at, "bounds": list(bounds)}
     meta = style.pop("metadata", {})
     style = {k: style[k] for k in ("version", "sources", "layers", "glyphs") if k in style}     # Python's key order: the same bytes
     style["sprite"], style["name"] = f"{base}/sprite", name
@@ -354,7 +354,7 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds, pro
         (d / "roads.pmtiles").write_bytes(_pmtiles(t, int(roads["minzoom"]), int(roads["maxzoom"]), bounds, names))
     if format == "xyz":                     # every tile with data, and an empty file for each other tile of the roads' bounds
         fallback = float(meta.get("roadstyle:tiles", {}).get("buffer_px", 80))
-        t.write_xyz(str(d / "tiles"), list(bounds), ".pbf", (json.dumps(style["layers"]), fallback))
+        t.write_xyz(str(d / "tiles"), list(bounds), t.extension, (json.dumps(style["layers"]), fallback))
     (d / "props.json").write_text(props)             # a click on a piece: its id is the row of the road in this file
     base_props = {}
     for layer, text in t.props_files():          # a layer's popup fields are not in its tiles: by row, the feature id

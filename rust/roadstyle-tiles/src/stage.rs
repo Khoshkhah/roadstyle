@@ -35,6 +35,8 @@ pub struct TileOptions {
     pub slots_from: u32,
     /// the pieces of a `simple` source wait for their properties until a tile shows them (`Tiles::add_waiting`; the level editor's map)
     pub wait: bool,
+    /// the format of the tiles that `archive` writes and of the style's vector source (the default: MVT)
+    pub format: crate::TileFormat,
 }
 
 /// The tile settings and the column names that stage 1 writes into a saved style: `{"minzoom", "maxzoom", "buffer_px", "extent"}` and
@@ -64,7 +66,7 @@ impl TileOptions {
         let generation = metadata[roadstyle_model::props::GENERATION].as_str().map(String::from);
         let popups = roadstyle_model::props::overlay_popups(metadata);
         Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, base, generation,
-                         pieces, exact: None, only: None, slots_from, wait: false })
+                         pieces, exact: None, only: None, slots_from, wait: false, format: Default::default() })
     }
 
     /// The rules of a saved style (stage 1's style.json).
@@ -84,6 +86,7 @@ impl TileOptions {
     pub fn tiles(&self) -> Result<crate::Tiles, Error> {
         let mut tiles = crate::Tiles::with_buffers(self.min_zoom, self.max_zoom, self.buffers.iter().map(|b| b * crate::EXTENT / TILE_PX).collect())?;
         tiles.generation = self.generation.clone();
+        tiles.format = self.format;
         Ok(tiles)
     }
 

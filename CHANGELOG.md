@@ -6,6 +6,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **MapLibre Tile (MLT) as a second tile format**, with MVT the default. `export_style(..., tile_format="mlt")`, `roadstyle tiles
+  --tile-format mlt`, `Tiler.tile(source, z, x, y, "mlt")` and `Tiler.style("mlt")` write or give the same tiles in MLT (the crate
+  `mlt-core` encodes them: same ids, order, properties and geometry; no shared dictionary, FSST or FastPFOR). The style's vector source
+  has `"encoding": "mlt"`, the XYZ files end in `.mlt`, and a PMTiles file has tile type 6. MapLibre GL JS 5.12 or later reads them. On
+  Monaco the tiles are 41 % of the MVT bytes (63 % after gzip), with the same pixels. The tile budget has MLT limits
+  (`mlt_view_bytes`, `mlt_max_tile_bytes`). A key with two value types in one layer (`__rs_cap`) is text in MLT. The wasm package
+  grows by 0.49 MB (12.22 to 12.72 MB, 4 %; 3.04 to 3.19 MB gzipped).
+
 ### Removed
 - **Python's own road-style and tile engine** (decision D0, 2026-10-27). The Rust engine is the only engine of the web page, the style,
   the tiles and the exports. `render_edges(backend="web")`, `export_style`, `export_inline`, `export_look` and `export_geojson` call it.

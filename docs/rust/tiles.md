@@ -56,6 +56,34 @@ protocol. The same map gives the same archive each time: the archive has no time
 On Monaco (849 edges), the XYZ form has 31 tile files (3.1 MB), and the PMTiles form is one file of 1.1 MB, because its tiles
 are gzipped.
 
+### The tile format: MVT or MLT
+
+A tile can be in one of two formats. `mvt` (Mapbox Vector Tile) is the default. `mlt` (MapLibre Tile) gives smaller tiles. Both
+formats have the same features: the same layers, ids, order, properties and geometry. The tile contract is the same too.
+
+```python
+rs.export_style(edges, "monaco_mlt", base_url="https://example.org/monaco", tile_format="mlt")
+```
+
+With `tile_format="mlt"`:
+
+- the tile files end in `.mlt`, not `.pbf`;
+- the vector source in `style.json` has `"encoding": "mlt"`;
+- a PMTiles file has tile type 6 (MapLibre Vector Tile) in its header.
+
+The map app must use MapLibre GL JS 5.12 or later. An app that does not know MLT shows no road.
+
+On the Monaco test data, the 468 tiles are 5.9 MB in MVT and 2.4 MB in MLT. After gzip they are 2.3 MB and 1.4 MB. MapLibre
+draws the two formats with the same pixels (`tests/test_mlt.py` compares four views). MapLibre needs the same time, or up to
+11 % more, to read MLT.
+
+Two things are different in MLT:
+
+- A property has one type in a tile layer. When a key has two types in one layer, MLT writes its values as text. For example,
+  `__rs_cap` is `true` on some pieces and `"square"` on others, so MLT gives `"true"` and `"square"`. A style expression that
+  reads such a key must work with text. The expressions of the roadstyle style do.
+- The encoder does not use a shared dictionary (MapLibre GL JS 5.24 refuses it), FSST or FastPFOR (they give larger tiles after gzip).
+
 ### The input of `export_style`
 
 `export_style` takes the keywords of `render_edges` that change the style. In place of a GeoDataFrame, it also takes the path of
@@ -74,6 +102,8 @@ file and no folder:
 3. The engine does not keep the tile. MapLibre keeps the tiles that it has in its own cache.
 
 A new look gives a new `Tiler` and a new generation in the address, so MapLibre does not mix old tiles with the new style.
+`tiler.tile("roads", z, x, y, "mlt")` gives the tile in MLT, and `tiler.style("mlt")` gives the style of the same format (the
+vector source has `"encoding": "mlt"`). Without the format, they use the format of the `Tiler` (MVT, or the look's `tile_format`).
 `tiler.archive(bounds, layers)` is the exception: it makes all tiles in the bounds at once, as one PMTiles archive in memory, for
 a page that saves its map as a file. See [Use roadstyle in the browser](browser.md#add-roads-that-come-later-as-vector-tiles).
 

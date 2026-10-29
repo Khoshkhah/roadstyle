@@ -42,7 +42,10 @@ Stage 2 makes the vector tiles from stage 1's files: one PMTiles file, or a fold
 ```bash
 roadstyle tiles out/stage1 out/roads.pmtiles
 roadstyle tiles out/stage1 out/xyz --format xyz --base-url https://example.org/tiles
+roadstyle tiles out/stage1 out/roads.pmtiles --tile-format mlt
 ```
+
+`--tile-format mlt` writes MapLibre Tiles in place of Mapbox Vector Tiles (see [Make tiles and PMTiles](tiles.md)).
 
 ## Make and solve a level area
 

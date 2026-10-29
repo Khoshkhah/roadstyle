@@ -20,7 +20,7 @@ usage:
       the page in one file (render_edges(backend=\"web\")): the map, its dashboard and MapLibre, offline. The base map's key:
       --api-key, else $ROADSTYLE_API_KEY; the Google Maps key: --street-view-key, else $GOOGLE_MAPS_KEY. Any other option is a
       keyword of render (--tiles, --views '{\"plain\": {\"road_fill\": false}}').
-  roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--keep COL,COL] [--base-url URL]
+  roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--tile-format mvt|mlt] [--keep COL,COL] [--base-url URL]
       stage 2: the vector tiles of stage 1's files (tile_geojson): one PMTiles file, or <out>/roads/{z}/{x}/{y} and style.json.
   roadstyle levels make <edges> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
                     [--band-dist 10] [--head-m 5] [--near-rules] [--highway-col highway] [--layer-col layer] [--bridge-col bridge]
@@ -172,8 +172,11 @@ fn tiles_cmd(src: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> 
     let format = take(opts, "format").unwrap_or_else(|| "pmtiles".into());
     let keep = list(take(opts, "keep"));
     let base = take(opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
+    let tile_format = roadstyle::tiles::TileFormat::parse(&take(opts, "tile_format").unwrap_or_else(|| "mvt".into())).map_err(|e| Error::Usage(e.to_string()))?;
     no_more(opts)?;
-    let (style, tiles) = roadstyle::tiles_of_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
+    let (mut style, mut tiles) = roadstyle::tiles_of_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
+    tiles.format = tile_format;
+    tile_format.set_encoding(&mut style["sources"][roadstyle::tiles::SOURCE]);
     let bounds = tiles.bounds().ok_or(Error::Engine(format!("tiles: no feature in the files of {src}")))?;
     let out = PathBuf::from(out);
     match format.as_str() {
@@ -192,7 +195,7 @@ fn tiles_cmd(src: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> 
                 let ([x0, y0], [x1, y1]) = (tile_of(bounds[0], bounds[3], z), tile_of(bounds[2], bounds[1], z));
                 for x in x0..=x1 {
                     for y in y0..=y1 {
-                        let b = tiles.build(z, x, y);        // each tile once: no cache (review 4, D9)
+                        let b = tiles.build_in(tile_format, z, x, y).map_err(|e| Error::Engine(format!("tiles: {e}")))?;        // each tile once: no cache (review 4, D9)
                         if !b.is_empty() {
                             let p = out.join("roads").join(z.to_string()).join(x.to_string());
                             std::fs::create_dir_all(&p).map_err(|e| Error::File(format!("{}: {e}", p.display())))?;

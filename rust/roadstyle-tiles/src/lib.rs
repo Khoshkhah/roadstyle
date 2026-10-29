@@ -14,16 +14,19 @@
 
 pub mod buffer;
 pub mod error;
+pub mod format;
 pub mod pmtiles;
 pub mod rules;
 pub mod stage;
 mod geom;
 mod layer;
+mod mlt;
 mod mvt;
 mod small;
 mod val;
 
 pub use error::Error;
+pub use format::TileFormat;
 pub use val::{TileValue, Val};
 use geom::*;
 use val::*;
@@ -85,6 +88,8 @@ pub struct Tiles {
     cache: std::sync::Mutex<TileCache>,
     /// the generation of the road set (the archive's metadata carries it; `stage::TileOptions::tiles` sets it)
     generation: Option<String>,
+    /// the format that `archive` writes (`stage::TileOptions::format`); `tile` and `build` are MVT, `tile_in` and `build_in` any
+    pub format: TileFormat,
     /// the props files of the layers with popup fields: (layer, JSON array of the fields by row, the row being the feature id)
     pub props_files: Vec<(String, String)>,
 }
@@ -110,7 +115,7 @@ impl Tiles {
         if buffers.len() != max_zoom as usize + 1 {
             return Err(Error::Options(format!("{} tile buffers for the zooms 0 to {max_zoom}", buffers.len())));
         }
-        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default(), generation: None, props_files: Vec::new() })
+        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default(), generation: None, format: TileFormat::default(), props_files: Vec::new() })
     }
 
     /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom
@@ -296,7 +301,7 @@ impl Tiles {
             let (x0, x1, y0, y1) = (cell(lo[0] - b), cell(hi[0] + b), cell(hi[1] - b), cell(lo[1] + b));
             for x in x0..=x1 {
                 for y in y0..=y1 {
-                    let t = self.build(z, x, y);       // each tile once: the cache is for a map that asks again (review 4, D9)
+                    let t = self.build_in(self.format, z, x, y)?;       // each tile once: the cache is for a map that asks again (review 4, D9)
                     if !t.is_empty() {
                         w.write_tile(pmtiles::tile_id(z, x, y), &pmtiles::gzip(&t));
                     }
@@ -309,7 +314,7 @@ impl Tiles {
                                      center_lon_e7: (e7[0] + e7[2]) / 2, center_lat_e7: (e7[1] + e7[3]) / 2 };
         let meta = serde_json::json!({"vector_layers": layers.iter().map(|n| serde_json::json!({"id": n, "fields": {}})).collect::<Vec<_>>(),
                                       "contract": roadstyle_model::props::CONTRACT, "generation": self.generation});
-        w.finish(&place, &meta.to_string()).ok_or(Error::Empty)
+        w.finish(self.format.pmtiles_type(), &place, &meta.to_string()).ok_or(Error::Empty)
     }
 
     /// The box of every feature `[min lon, min lat, max lon, max lat]` (None: no feature), as an archive's bounds.
@@ -327,6 +332,23 @@ impl Tiles {
     /// The tile layers, in their order.
     pub fn layer_names(&self) -> Vec<String> {
         self.layers.iter().filter(|(_, l)| !l.trees.is_empty()).map(|(k, _)| k.clone()).collect()      // a layer with no feature is none
+    }
+
+    /// `build` in the format `format`: the tile of `build`, made again as MLT (mlt.rs).
+    pub fn build_in(&self, format: TileFormat, z: u32, x: u32, y: u32) -> Result<Vec<u8>, Error> {
+        let mvt = self.build(z, x, y);
+        match format {
+            TileFormat::Mvt => Ok(mvt),
+            TileFormat::Mlt => mlt::from_mvt(&mvt),
+        }
+    }
+
+    /// `tile` in the format `format` (the MVT tile is the cached one).
+    pub fn tile_in(&self, format: TileFormat, z: u32, x: u32, y: u32) -> Result<Vec<u8>, Error> {
+        match format {
+            TileFormat::Mvt => Ok(self.tile(z, x, y)),
+            TileFormat::Mlt => mlt::from_mvt(&self.tile(z, x, y)),
+        }
     }
 
     /// The tile z/x/y, made again (`tile` with no cache): for a walk that asks for each tile once (the archive, a folder of tiles).
@@ -710,6 +732,34 @@ mod tests {
         assert!(!t.tile(18, 41536, 89738).is_empty(), "the road 40 px out of the tile is in it");
         assert!(t.tile(18, 41536, 89739).is_empty(), "and not in the tile after it");
         assert!(t.tile(18, 41540, 89738).is_empty(), "the road 60 px out of the tile is not in it");
+    }
+
+    #[test]
+    fn a_tile_format_names_its_style_encoding_file_and_archive_type() {
+        assert_eq!(TileFormat::parse("mlt"), Ok(TileFormat::Mlt));
+        assert!(matches!(TileFormat::parse("pbf"), Err(Error::Options(_))));
+        let mut source = json!({"type": "vector"});
+        TileFormat::Mlt.set_encoding(&mut source);
+        assert_eq!(source["encoding"], "mlt");
+        TileFormat::Mvt.set_encoding(&mut source);
+        assert_eq!(source, json!({"type": "vector"}), "MVT is the source's default: no key");
+        assert_eq!([TileFormat::Mvt.extension(), TileFormat::Mlt.extension()], [".pbf", ".mlt"]);
+        // an archive's header: the tile type is its byte 99 (1 MVT, 6 MapLibre Vector Tile in the PMTiles v3 spec)
+        for (format, want) in [(TileFormat::Mvt, 1), (TileFormat::Mlt, 6)] {
+            let mut t = Tiles::new(0, 3, 80.0).unwrap();
+            t.format = format;
+            t.add("roads", &json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": [
+                {"type": "Feature", "properties": {"n": 1}, "geometry": {"type": "LineString", "coordinates": [[1.0, 1.0], [10.0, 10.0]]}}]}}),
+                  &keys(&["n"]), false, 0);
+            let a = t.archive([1.0, 1.0, 10.0, 10.0], &["roads".to_string()]).unwrap();
+            assert_eq!(a[99], want, "{}", format.name());
+        }
+    }
+
+    #[test]
+    fn an_empty_tile_is_empty_in_mlt_too() {
+        let t = Tiles::new(0, 3, 80.0).unwrap();
+        assert!(t.tile_in(TileFormat::Mlt, 3, 4, 3).unwrap().is_empty());
     }
 
     #[test]

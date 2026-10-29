@@ -14,3 +14,4 @@ indexmap.workspace = true
 rstar.workspace = true
 foldhash = "0.2"                    # the layers' keys and values: a lookup for each property of each feature that a tile makes
 flate2 = "1"                        # the PMTiles archive: its tiles, directories and metadata are gzipped
+mlt-core = "0.22"                    # MapLibre Tile (MLT): the encoder of a tile in the second format (mlt.rs)

@@ -11,6 +11,8 @@
     "view_features": 113,
     "max_tile_bytes": 4393,
     "max_tile_features": 113,
+    "mlt_view_bytes": 1871,
+    "mlt_max_tile_bytes": 1871,
     "layers": {
      "simple": {
       "features": 113,
@@ -31,6 +33,8 @@
     "view_features": 327,
     "max_tile_bytes": 11849,
     "max_tile_features": 327,
+    "mlt_view_bytes": 4752,
+    "mlt_max_tile_bytes": 4752,
     "layers": {
      "simple": {
       "features": 327,
@@ -51,6 +55,8 @@
     "view_features": 1014,
     "max_tile_bytes": 35698,
     "max_tile_features": 1014,
+    "mlt_view_bytes": 13389,
+    "mlt_max_tile_bytes": 13389,
     "layers": {
      "simple": {
       "features": 1014,
@@ -71,6 +77,8 @@
     "view_features": 1723,
     "max_tile_bytes": 60647,
     "max_tile_features": 1723,
+    "mlt_view_bytes": 22648,
+    "mlt_max_tile_bytes": 22648,
     "layers": {
      "simple": {
       "features": 1723,
@@ -91,6 +99,8 @@
     "view_features": 5796,
     "max_tile_bytes": 116724,
     "max_tile_features": 3322,
+    "mlt_view_bytes": 72547,
+    "mlt_max_tile_bytes": 41389,
     "layers": {
      "simple": {
       "features": 3322,
@@ -111,6 +121,8 @@
     "view_features": 7990,
     "max_tile_bytes": 189630,
     "max_tile_features": 4972,
+    "mlt_view_bytes": 127892,
+    "mlt_max_tile_bytes": 79447,
     "layers": {
      "simple": {
       "features": 4106,
@@ -143,6 +155,8 @@
     "view_features": 22702,
     "max_tile_bytes": 268535,
     "max_tile_features": 7351,
+    "mlt_view_bytes": 324136,
+    "mlt_max_tile_bytes": 105506,
     "layers": {
      "simple": {
       "features": 6556,
@@ -203,6 +217,8 @@
     "view_features": 2692,
     "max_tile_bytes": 49605,
     "max_tile_features": 1516,
+    "mlt_view_bytes": 24436,
+    "mlt_max_tile_bytes": 13418,
     "layers": {
      "simple": {
       "features": 1516,
@@ -223,6 +239,8 @@
     "view_features": 3074,
     "max_tile_bytes": 55312,
     "max_tile_features": 1695,
+    "mlt_view_bytes": 28264,
+    "mlt_max_tile_bytes": 15093,
     "layers": {
      "simple": {
       "features": 1695,
@@ -243,6 +261,8 @@
     "view_features": 7288,
     "max_tile_bytes": 101752,
     "max_tile_features": 3070,
+    "mlt_view_bytes": 70317,
+    "mlt_max_tile_bytes": 29553,
     "layers": {
      "simple": {
       "features": 3070,
@@ -263,6 +283,8 @@
     "view_features": 8704,
     "max_tile_bytes": 151753,
     "max_tile_features": 4517,
+    "mlt_view_bytes": 88589,
+    "mlt_max_tile_bytes": 45499,
     "layers": {
      "simple": {
       "features": 4517,
@@ -283,6 +305,8 @@
     "view_features": 23783,
     "max_tile_bytes": 193063,
     "max_tile_features": 5512,
+    "mlt_view_bytes": 234261,
+    "mlt_max_tile_bytes": 54273,
     "layers": {
      "simple": {
       "features": 5512,
@@ -303,6 +327,8 @@
     "view_features": 22027,
     "max_tile_bytes": 132590,
     "max_tile_features": 3709,
+    "mlt_view_bytes": 285616,
+    "mlt_max_tile_bytes": 44846,
     "layers": {
      "simple": {
       "features": 3143,
@@ -335,6 +361,8 @@
     "view_features": 15615,
     "max_tile_bytes": 127625,
     "max_tile_features": 3398,
+    "mlt_view_bytes": 207168,
+    "mlt_max_tile_bytes": 43571,
     "layers": {
      "simple": {
       "features": 3062,
@@ -395,6 +423,8 @@
     "view_features": 113,
     "max_tile_bytes": 4393,
     "max_tile_features": 113,
+    "mlt_view_bytes": 1871,
+    "mlt_max_tile_bytes": 1871,
     "layers": {
      "simple": {
       "features": 113,
@@ -415,6 +445,8 @@
     "view_features": 327,
     "max_tile_bytes": 11849,
     "max_tile_features": 327,
+    "mlt_view_bytes": 4752,
+    "mlt_max_tile_bytes": 4752,
     "layers": {
      "simple": {
       "features": 327,
@@ -435,6 +467,8 @@
     "view_features": 1014,
     "max_tile_bytes": 35698,
     "max_tile_features": 1014,
+    "mlt_view_bytes": 13389,
+    "mlt_max_tile_bytes": 13389,
     "layers": {
      "simple": {
       "features": 1014,
@@ -455,6 +489,8 @@
     "view_features": 1723,
     "max_tile_bytes": 60647,
     "max_tile_features": 1723,
+    "mlt_view_bytes": 22648,
+    "mlt_max_tile_bytes": 22648,
     "layers": {
      "simple": {
       "features": 1723,
@@ -475,6 +511,8 @@
     "view_features": 5796,
     "max_tile_bytes": 116724,
     "max_tile_features": 3322,
+    "mlt_view_bytes": 72547,
+    "mlt_max_tile_bytes": 41389,
     "layers": {
      "simple": {
       "features": 3322,
@@ -495,6 +533,8 @@
     "view_features": 7990,
     "max_tile_bytes": 189099,
     "max_tile_features": 4972,
+    "mlt_view_bytes": 127366,
+    "mlt_max_tile_bytes": 79085,
     "layers": {
      "simple": {
       "features": 4106,
@@ -527,6 +567,8 @@
     "view_features": 22702,
     "max_tile_bytes": 268172,
     "max_tile_features": 7351,
+    "mlt_view_bytes": 323480,
+    "mlt_max_tile_bytes": 105256,
     "layers": {
      "simple": {
       "features": 6556,
@@ -587,6 +629,8 @@
     "view_features": 2692,
     "max_tile_bytes": 49605,
     "max_tile_features": 1516,
+    "mlt_view_bytes": 24436,
+    "mlt_max_tile_bytes": 13418,
     "layers": {
      "simple": {
       "features": 1516,
@@ -607,6 +651,8 @@
     "view_features": 3074,
     "max_tile_bytes": 55312,
     "max_tile_features": 1695,
+    "mlt_view_bytes": 28264,
+    "mlt_max_tile_bytes": 15093,
     "layers": {
      "simple": {
       "features": 1695,
@@ -627,6 +673,8 @@
     "view_features": 7288,
     "max_tile_bytes": 101752,
     "max_tile_features": 3070,
+    "mlt_view_bytes": 70317,
+    "mlt_max_tile_bytes": 29553,
     "layers": {
      "simple": {
       "features": 3070,
@@ -647,6 +695,8 @@
     "view_features": 8704,
     "max_tile_bytes": 151753,
     "max_tile_features": 4517,
+    "mlt_view_bytes": 88589,
+    "mlt_max_tile_bytes": 45499,
     "layers": {
      "simple": {
       "features": 4517,
@@ -667,6 +717,8 @@
     "view_features": 23783,
     "max_tile_bytes": 193063,
     "max_tile_features": 5512,
+    "mlt_view_bytes": 234261,
+    "mlt_max_tile_bytes": 54273,
     "layers": {
      "simple": {
       "features": 5512,
@@ -687,6 +739,8 @@
     "view_features": 22027,
     "max_tile_bytes": 132409,
     "max_tile_features": 3709,
+    "mlt_view_bytes": 284761,
+    "mlt_max_tile_bytes": 44688,
     "layers": {
      "simple": {
       "features": 3143,
@@ -719,6 +773,8 @@
     "view_features": 15615,
     "max_tile_bytes": 127516,
     "max_tile_features": 3398,
+    "mlt_view_bytes": 206875,
+    "mlt_max_tile_bytes": 43493,
     "layers": {
      "simple": {
       "features": 3062,
@@ -779,6 +835,8 @@
     "view_features": 293,
     "max_tile_bytes": 10110,
     "max_tile_features": 293,
+    "mlt_view_bytes": 5379,
+    "mlt_max_tile_bytes": 5379,
     "layers": {
      "ov0": {
       "features": 110,
@@ -907,6 +965,8 @@
     "view_features": 616,
     "max_tile_bytes": 21297,
     "max_tile_features": 616,
+    "mlt_view_bytes": 10644,
+    "mlt_max_tile_bytes": 10644,
     "layers": {
      "ov0": {
       "features": 168,
@@ -1035,6 +1095,8 @@
     "view_features": 1426,
     "max_tile_bytes": 49721,
     "max_tile_features": 1426,
+    "mlt_view_bytes": 22255,
+    "mlt_max_tile_bytes": 22255,
     "layers": {
      "ov0": {
       "features": 216,
@@ -1163,6 +1225,8 @@
     "view_features": 2202,
     "max_tile_bytes": 78477,
     "max_tile_features": 2202,
+    "mlt_view_bytes": 34501,
+    "mlt_max_tile_bytes": 34501,
     "layers": {
      "ov0": {
       "features": 243,
@@ -1303,6 +1367,8 @@
     "view_features": 6375,
     "max_tile_bytes": 129860,
     "max_tile_features": 3632,
+    "mlt_view_bytes": 89956,
+    "mlt_max_tile_bytes": 50957,
     "layers": {
      "ov0": {
       "features": 164,
@@ -1443,6 +1509,8 @@
     "view_features": 7272,
     "max_tile_bytes": 161372,
     "max_tile_features": 4413,
+    "mlt_view_bytes": 107984,
+    "mlt_max_tile_bytes": 64574,
     "layers": {
      "ov0": {
       "features": 164,
@@ -1583,6 +1651,8 @@
     "view_features": 23824,
     "max_tile_bytes": 279084,
     "max_tile_features": 7761,
+    "mlt_view_bytes": 371065,
+    "mlt_max_tile_bytes": 115128,
     "layers": {
      "ov0": {
       "features": 86,
@@ -1846,6 +1916,8 @@
     "view_features": 6004,
     "max_tile_bytes": 96382,
     "max_tile_features": 3173,
+    "mlt_view_bytes": 76082,
+    "mlt_max_tile_bytes": 38179,
     "layers": {
      "ov0": {
       "features": 1402,
@@ -1950,6 +2022,8 @@
     "view_features": 7135,
     "max_tile_bytes": 116584,
     "max_tile_features": 3615,
+    "mlt_view_bytes": 101225,
+    "mlt_max_tile_bytes": 51784,
     "layers": {
      "ov0": {
       "features": 1829,
@@ -2066,6 +2140,8 @@
     "view_features": 12101,
     "max_tile_bytes": 166844,
     "max_tile_features": 4982,
+    "mlt_view_bytes": 171085,
+    "mlt_max_tile_bytes": 70133,
     "layers": {
      "ov0": {
       "features": 1953,
@@ -2182,6 +2258,8 @@
     "view_features": 13931,
     "max_tile_bytes": 226787,
     "max_tile_features": 6544,
+    "mlt_view_bytes": 214805,
+    "mlt_max_tile_bytes": 94573,
     "layers": {
      "ov0": {
       "features": 2151,
@@ -2310,6 +2388,8 @@
     "view_features": 28644,
     "max_tile_bytes": 240467,
     "max_tile_features": 6776,
+    "mlt_view_bytes": 369492,
+    "mlt_max_tile_bytes": 85391,
     "layers": {
      "ov0": {
       "features": 1147,
@@ -2438,6 +2518,8 @@
     "view_features": 20509,
     "max_tile_bytes": 126759,
     "max_tile_features": 3504,
+    "mlt_view_bytes": 262541,
+    "mlt_max_tile_bytes": 51236,
     "layers": {
      "ov0": {
       "features": 724,
@@ -2566,6 +2648,8 @@
     "view_features": 19624,
     "max_tile_bytes": 154533,
     "max_tile_features": 4009,
+    "mlt_view_bytes": 343670,
+    "mlt_max_tile_bytes": 63902,
     "layers": {
      "ov0": {
       "features": 190,
@@ -4911,6 +4995,102 @@
     "tartu-base.style.expressions.ov12-circle-lv0-o0.paint.circle-color: new, 473",
     "tartu-base.style.expressions.ov13-circle-lv0-o0.paint.circle-color: new, 473",
     "tartu-base.style.expressions.ov13-circle-lv1-o0.paint.circle-color: new, 473"
+   ]
+  },
+  {
+   "date": "2026-10-28",
+   "why": "MLT entries (mlt_view_bytes, mlt_max_tile_bytes) added: new numbers, no old limit changes",
+   "changes": [
+    "monaco.z9.mlt_view_bytes: new, 1871",
+    "monaco.z9.mlt_max_tile_bytes: new, 1871",
+    "monaco.z10.mlt_view_bytes: new, 4752",
+    "monaco.z10.mlt_max_tile_bytes: new, 4752",
+    "monaco.z11.mlt_view_bytes: new, 13389",
+    "monaco.z11.mlt_max_tile_bytes: new, 13389",
+    "monaco.z12.mlt_view_bytes: new, 22648",
+    "monaco.z12.mlt_max_tile_bytes: new, 22648",
+    "monaco.z13.mlt_view_bytes: new, 72547",
+    "monaco.z13.mlt_max_tile_bytes: new, 41389",
+    "monaco.z14.mlt_view_bytes: new, 127366",
+    "monaco.z14.mlt_max_tile_bytes: new, 79085",
+    "monaco.z15.mlt_view_bytes: new, 323480",
+    "monaco.z15.mlt_max_tile_bytes: new, 105256",
+    "monaco-full.z9.mlt_view_bytes: new, 1871",
+    "monaco-full.z9.mlt_max_tile_bytes: new, 1871",
+    "monaco-full.z10.mlt_view_bytes: new, 4752",
+    "monaco-full.z10.mlt_max_tile_bytes: new, 4752",
+    "monaco-full.z11.mlt_view_bytes: new, 13389",
+    "monaco-full.z11.mlt_max_tile_bytes: new, 13389",
+    "monaco-full.z12.mlt_view_bytes: new, 22648",
+    "monaco-full.z12.mlt_max_tile_bytes: new, 22648",
+    "monaco-full.z13.mlt_view_bytes: new, 72547",
+    "monaco-full.z13.mlt_max_tile_bytes: new, 41389",
+    "monaco-full.z14.mlt_view_bytes: new, 127892",
+    "monaco-full.z14.mlt_max_tile_bytes: new, 79447",
+    "monaco-full.z15.mlt_view_bytes: new, 324136",
+    "monaco-full.z15.mlt_max_tile_bytes: new, 105506",
+    "monaco-base.z9.mlt_view_bytes: new, 5379",
+    "monaco-base.z9.mlt_max_tile_bytes: new, 5379",
+    "monaco-base.z10.mlt_view_bytes: new, 10644",
+    "monaco-base.z10.mlt_max_tile_bytes: new, 10644",
+    "monaco-base.z11.mlt_view_bytes: new, 22255",
+    "monaco-base.z11.mlt_max_tile_bytes: new, 22255",
+    "monaco-base.z12.mlt_view_bytes: new, 34501",
+    "monaco-base.z12.mlt_max_tile_bytes: new, 34501",
+    "monaco-base.z13.mlt_view_bytes: new, 89956",
+    "monaco-base.z13.mlt_max_tile_bytes: new, 50957",
+    "monaco-base.z14.mlt_view_bytes: new, 107984",
+    "monaco-base.z14.mlt_max_tile_bytes: new, 64574",
+    "monaco-base.z15.mlt_view_bytes: new, 371065",
+    "monaco-base.z15.mlt_max_tile_bytes: new, 115128"
+   ]
+  },
+  {
+   "date": "2026-10-28",
+   "why": "MLT entries (mlt_view_bytes, mlt_max_tile_bytes) added: new numbers, no old limit changes",
+   "changes": [
+    "tartu.z9.mlt_view_bytes: new, 24436",
+    "tartu.z9.mlt_max_tile_bytes: new, 13418",
+    "tartu.z10.mlt_view_bytes: new, 28264",
+    "tartu.z10.mlt_max_tile_bytes: new, 15093",
+    "tartu.z11.mlt_view_bytes: new, 70317",
+    "tartu.z11.mlt_max_tile_bytes: new, 29553",
+    "tartu.z12.mlt_view_bytes: new, 88589",
+    "tartu.z12.mlt_max_tile_bytes: new, 45499",
+    "tartu.z13.mlt_view_bytes: new, 234261",
+    "tartu.z13.mlt_max_tile_bytes: new, 54273",
+    "tartu.z14.mlt_view_bytes: new, 284761",
+    "tartu.z14.mlt_max_tile_bytes: new, 44688",
+    "tartu.z15.mlt_view_bytes: new, 206875",
+    "tartu.z15.mlt_max_tile_bytes: new, 43493",
+    "tartu-full.z9.mlt_view_bytes: new, 24436",
+    "tartu-full.z9.mlt_max_tile_bytes: new, 13418",
+    "tartu-full.z10.mlt_view_bytes: new, 28264",
+    "tartu-full.z10.mlt_max_tile_bytes: new, 15093",
+    "tartu-full.z11.mlt_view_bytes: new, 70317",
+    "tartu-full.z11.mlt_max_tile_bytes: new, 29553",
+    "tartu-full.z12.mlt_view_bytes: new, 88589",
+    "tartu-full.z12.mlt_max_tile_bytes: new, 45499",
+    "tartu-full.z13.mlt_view_bytes: new, 234261",
+    "tartu-full.z13.mlt_max_tile_bytes: new, 54273",
+    "tartu-full.z14.mlt_view_bytes: new, 285616",
+    "tartu-full.z14.mlt_max_tile_bytes: new, 44846",
+    "tartu-full.z15.mlt_view_bytes: new, 207168",
+    "tartu-full.z15.mlt_max_tile_bytes: new, 43571",
+    "tartu-base.z9.mlt_view_bytes: new, 76082",
+    "tartu-base.z9.mlt_max_tile_bytes: new, 38179",
+    "tartu-base.z10.mlt_view_bytes: new, 101225",
+    "tartu-base.z10.mlt_max_tile_bytes: new, 51784",
+    "tartu-base.z11.mlt_view_bytes: new, 171085",
+    "tartu-base.z11.mlt_max_tile_bytes: new, 70133",
+    "tartu-base.z12.mlt_view_bytes: new, 214805",
+    "tartu-base.z12.mlt_max_tile_bytes: new, 94573",
+    "tartu-base.z13.mlt_view_bytes: new, 369492",
+    "tartu-base.z13.mlt_max_tile_bytes: new, 85391",
+    "tartu-base.z14.mlt_view_bytes: new, 262541",
+    "tartu-base.z14.mlt_max_tile_bytes: new, 51236",
+    "tartu-base.z15.mlt_view_bytes: new, 343670",
+    "tartu-base.z15.mlt_max_tile_bytes: new, 63902"
    ]
   }
  ]

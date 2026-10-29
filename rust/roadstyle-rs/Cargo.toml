@@ -18,3 +18,4 @@ sha2.workspace = true
 indexmap.workspace = true
 base64.workspace = true
 flate2 = "1"                        # the golden styles of tests/colors.rs are gzipped
+mlt-core = "0.22"                   # tests/tile_mlt.rs decodes the MLT tiles

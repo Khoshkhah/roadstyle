@@ -26,3 +26,20 @@ if(!same){
   console.error(`wasm differs from the Rust golden: want ${JSON.stringify({text: want.text, road_table: want.road_table.text})}`);
   process.exit(1);
 }
+
+// MLT, the second tile format: the same call gives a tile in MLT, the style names the encoding, and a format that is not known is an error
+{
+  const tiler = new pkg.Tiler(readFileSync(new URL("roads.parquet", data)), look, undefined, undefined, "rs://", []);
+  const n = 2 ** 15, lon = 7.4243, lat = 43.7384;
+  const [x, y] = [Math.floor((lon + 180) / 360 * n), Math.floor((1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n)];
+  const mvt = tiler.tile("roads", 15, x, y), mlt = tiler.tile("roads", 15, x, y, "mlt");
+  const encoding = f => JSON.parse(tiler.style(f)).sources.roads.encoding;
+  const ok = mvt.length > 0 && mlt.length > 0 && mlt.length < mvt.length && encoding() === undefined && encoding("mvt") === undefined && encoding("mlt") === "mlt";
+  let refused = false;
+  try { tiler.tile("roads", 15, x, y, "pbf"); } catch { refused = true; }
+  console.log(JSON.stringify({mvt: mvt.length, mlt: mlt.length, refused}));
+  if(!ok || !refused){
+    console.error("the wasm Tiler does not give the MLT tile and style");
+    process.exit(1);
+  }
+}

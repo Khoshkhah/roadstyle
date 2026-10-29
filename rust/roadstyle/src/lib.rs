@@ -172,7 +172,7 @@ pub fn tile_stage(s: &sources::Styled, o: &tiles::stage::TileOptions, at: &Value
     let mut style = s.style_with(inline, true);
     without_roads(&mut style);
     let tiled: Vec<String> = s.shown().filter(|(k, _)| o.wants(k)).map(|(k, _)| k.to_string()).collect();
-    Ok((tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom)), tiles))
+    Ok((tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom), o.format), tiles))
 }
 
 /// An export's style without the whole roads (the source `roads` and the layers on it: the pick and the highlight): the pieces pick and
@@ -194,8 +194,8 @@ pub fn style_text(s: &sources::Styled, style: &Value) -> String {
 }
 
 /// The style that draws stage 2's tiles: the sources `tiled` become the tile layers of one vector source `roads` (first, at `at`, with the
-/// tiles' zooms), and each layer on one of them draws its tile layer (`source-layer`); the other sources stay.
-pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, u32)) -> Value {
+/// tiles' zooms and the `encoding` of `format`), and each layer on one of them draws its tile layer (`source-layer`); the other sources stay.
+pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, u32), format: tiles::TileFormat) -> Value {
     let is_tiled = |v: &Value| v.as_str().is_some_and(|s| tiled.iter().any(|t| t == s));
     for l in style["layers"].as_array_mut().into_iter().flatten() {
         if let Some(src) = l.get("source").cloned().filter(is_tiled) {
@@ -208,6 +208,9 @@ pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, 
     vector.extend(at.as_object().into_iter().flatten().map(|(k, v)| (k.clone(), v.clone())));
     vector.insert("minzoom".into(), zooms.0.into());
     vector.insert("maxzoom".into(), zooms.1.into());
+    if let Some(e) = format.encoding() {
+        vector.insert("encoding".into(), e.into());
+    }
     // the generation of the road set is in the tile URL: a row is valid in one generation only (and the browser's cache keeps no old tile)
     if let Some(g) = style["metadata"][roadstyle_model::props::GENERATION].as_str() {
         for t in vector.get_mut("tiles").and_then(Value::as_array_mut).into_iter().flatten() {
@@ -285,7 +288,7 @@ pub fn tiles_of_files_with<E: std::fmt::Display>(read: impl Fn(&str) -> Result<V
         let (keep, whole, from) = whole_unless_lines(json_lines(&src), rule, o.min_zoom);
         tiled.add(k, &src, &keep, whole, first_drawn(layers, k, from, o.max_zoom));
     }
-    Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom)), tiled))
+    Ok((tiled_style(style, &names, at, (o.min_zoom, o.max_zoom), o.format), tiled))
 }
 
 /// A value of a stage-1 file for the tiles: an Arrow cell, or the JSON value of a `roadstyle:json` column's text.
@@ -501,6 +504,10 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
     let list = |k: &str| look.other.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(String::from));
     o.exact = list("tile_keep").map(Iterator::collect);
     o.only = list("tile_layers").map(Iterator::collect);
+    // the tile format ("mvt" or "mlt"), also from the look until T4 moves it
+    if let Some(f) = look.other.get("tile_format").and_then(Value::as_str) {
+        o.format = tiles::TileFormat::parse(f)?;
+    }
     // the call's data_maxzoom and data_tolerance for the sources that stay in the style (the look's `other` until the bindings give it)
     let (style, tiled) = tile_stage(&s, &o, &xyz_at(prefix), sources::SourceMode::inline_of(&look.other))?;
     Ok((style_text(&s, &style), tiled, s.warnings))

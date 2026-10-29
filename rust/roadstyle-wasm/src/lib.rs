@@ -339,6 +339,19 @@ mod wasm {
         roadstyle::export_look::export_look(&look.0, &lc, &ps).map(|v| v.to_string()).map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// The tile format that a call names (`"mvt"` or `"mlt"`), else `own`.
+    fn tile_format(format: Option<String>, own: roadstyle::tiles::TileFormat) -> Result<roadstyle::tiles::TileFormat, JsError> {
+        format.map(|f| roadstyle::tiles::TileFormat::parse(&f)).transpose().map_err(|e| JsError::new(&e.to_string())).map(|f| f.unwrap_or(own))
+    }
+
+    /// The style text with the `encoding` of the vector source set for `format` (None: the text as it is).
+    fn style_in(style: &str, format: Option<String>) -> Result<String, JsError> {
+        let Some(f) = format else { return Ok(style.to_string()) };
+        let mut v: serde_json::Value = serde_json::from_str(style).map_err(|e| JsError::new(&e.to_string()))?;
+        tile_format(Some(f), Default::default())?.set_encoding(&mut v["sources"][roadstyle::tiles::SOURCE]);
+        Ok(v.to_string())
+    }
+
     /// A map with vector tiles: `new Tiler(roads, look, features?, name?, prefix, keep)`, then `style()` (the style's JSON text) and
     /// `tile(source, z, x, y)` (a vector tile, empty when nothing is in it) for each request of the map, and `props(layer, id)` (the
     /// tile layer, for example `roads`).
@@ -357,13 +370,17 @@ mod wasm {
             Ok(Tiler { style, tiles })
         }
 
-        pub fn style(&self) -> String {
-            self.style.clone()
+        /// style(format?): the style's JSON text; `format` ("mvt" or "mlt", else the Tiler's own, the look's `tile_format`) sets the
+        /// `encoding` of the vector source, so a page that asks `tile` for a format sets the style of the same format.
+        pub fn style(&self, format: Option<String>) -> Result<String, JsError> {
+            style_in(&self.style, format)
         }
 
-        /// `source` is the style's one source, `roads`: the tile has a layer for each of the old sources.
-        pub fn tile(&self, source: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
-            if source == roadstyle::tiles::SOURCE { self.tiles.tile(z, x, y) } else { Vec::new() }
+        /// `source` is the style's one source, `roads`: the tile has a layer for each of the old sources. `format`: "mvt" or "mlt"
+        /// (else the Tiler's own).
+        pub fn tile(&self, source: &str, z: u32, x: u32, y: u32, format: Option<String>) -> Result<Vec<u8>, JsError> {
+            let f = tile_format(format, self.tiles.format)?;
+            if source == roadstyle::tiles::SOURCE { self.tiles.tile_in(f, z, x, y).map_err(|e| JsError::new(&e.to_string())) } else { Ok(Vec::new()) }
         }
 
         /// archive(bounds, layers): a PMTiles archive of every tile in bounds [min lon, min lat, max lon, max lat] (one file of the map).
@@ -590,12 +607,14 @@ mod wasm {
             roadstyle::relevel::LiveTiles::new(sources.inner, look.0.clone(), prefix, &keep).map(LiveMap).map_err(|e| JsError::new(&e.to_string()))
         }
 
-        pub fn style(&self) -> String {
-            self.0.style().to_string()
+        /// style(format?) and tile(source, z, x, y, format?): as a Tiler's.
+        pub fn style(&self, format: Option<String>) -> Result<String, JsError> {
+            style_in(self.0.style(), format)
         }
 
-        pub fn tile(&mut self, source: &str, z: u32, x: u32, y: u32) -> Vec<u8> {
-            if source == roadstyle::tiles::SOURCE { self.0.tile(z, x, y) } else { Vec::new() }
+        pub fn tile(&mut self, source: &str, z: u32, x: u32, y: u32, format: Option<String>) -> Result<Vec<u8>, JsError> {
+            let f = tile_format(format, self.0.format())?;
+            if source == roadstyle::tiles::SOURCE { self.0.tile_in(f, z, x, y).map_err(|e| JsError::new(&e.to_string())) } else { Ok(Vec::new()) }
         }
 
         /// roadLines(rows): as Sources.roadLines, from the stage 1 that the map holds.

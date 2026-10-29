@@ -142,9 +142,16 @@ impl Tiler {
         Ok(Tiler { style, tiles })
     }
 
-    fn tile<'py>(&self, py: Python<'py>, z: u32, x: u32, y: u32) -> Bound<'py, PyBytes> {
-        let t = py.detach(|| self.tiles.tile(z, x, y));
-        PyBytes::new(py, &t)
+    /// tile(z, x, y) -> bytes: the tile in the Tiler's format (the look's `tile_format`, "mvt" or "mlt").
+    fn tile<'py>(&self, py: Python<'py>, z: u32, x: u32, y: u32) -> PyResult<Bound<'py, PyBytes>> {
+        let t = py.detach(|| self.tiles.tile_in(self.tiles.format, z, x, y)).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(PyBytes::new(py, &t))
+    }
+
+    /// The file extension of a tile in the Tiler's format (".pbf" or ".mlt").
+    #[getter]
+    fn extension(&self) -> &'static str {
+        self.tiles.format.extension()
     }
 
     /// props_files() -> [(layer, JSON text)]: the popup fields of each layer that has some, by row (the tile's feature id)
@@ -191,7 +198,7 @@ impl Tiler {
             };
             for x in x0.min(ex0)..=x1.max(ex1) {
                 for y in y0.min(ey0)..=y1.max(ey1) {
-                    let t = py.detach(|| self.tiles.tile(z, x, y));
+                    let t = py.detach(|| self.tiles.tile_in(self.tiles.format, z, x, y)).map_err(|e| PyValueError::new_err(e.to_string()))?;
                     let inside = (x0..=x1).contains(&x) && (y0..=y1).contains(&y);
                     if !t.is_empty() || (buffers.is_some() && inside) {
                         let path = std::path::Path::new(&dir).join(z.to_string()).join(x.to_string()).join(format!("{y}{ext}"));

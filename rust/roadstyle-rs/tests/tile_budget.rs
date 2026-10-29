@@ -11,6 +11,9 @@
 //! box is under 1 px). For the view: the bytes of all its tiles and the bytes and features of its largest tile. For the style: the size
 //! of each filter, paint and layout (JSON characters) that is over `SMALL`, and the total.
 //!
+//! Each view also has the bytes of the same tiles in MLT (`mlt_view_bytes`, `mlt_max_tile_bytes`, raw bytes as the MVT numbers are):
+//! they only go down too.
+//!
 //! The view of an area is the 3 x 3 tiles around a fixed centre (the budget file keeps it, `center`), at zoom 9 to 15. The keep list of the
 //! tiles is empty: the numbers are the engine's own tiles, without a page's popup fields. Each area has two looks: `monaco` is the page's
 //! (the lean look: the `simple` pieces and the slots) and `monaco-full` is `export_style`'s (it has the whole-road layer `roads` too).
@@ -274,11 +277,15 @@ fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look,
     out.insert("center".into(), json!(center));
     for (name, view) in views {
         let (mut bytes, mut features, mut biggest, mut most) = (0usize, 0usize, 0usize, 0usize);
+        let (mut mlt_bytes, mut mlt_biggest) = (0usize, 0usize);
         let mut layers: BTreeMap<String, [usize; 10]> = BTreeMap::new();
         for (z, x, y) in view {
             let t = tiles.tile(z, x, y);
             bytes += t.len();
             biggest = biggest.max(t.len());
+            let mlt = tiles.tile_in(roadstyle_rs::tiles::TileFormat::Mlt, z, x, y).unwrap();      // the same tile in MLT (raw bytes, as MVT's)
+            mlt_bytes += mlt.len();
+            mlt_biggest = mlt_biggest.max(mlt.len());
             let decoded = common::decode_tile(&t);
             let tables = layers_of(&t);
             most = most.max(tables.iter().map(|l| l.1.features).sum());
@@ -298,7 +305,8 @@ fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look,
         }
         let layers: Map<String, Value> = layers.into_iter().map(|(k, n)| (k, json!({"features": n[0], "bytes": n[1], "values": n[2], "keys": n[3],
             "keys_unread": n[4], "no_id": n[5], "strings": n[6], "string_bytes": n[7], "short_segments": n[8], "tiny": n[9]}))).collect();
-        out.insert(name, json!({"view_bytes": bytes, "view_features": features, "max_tile_bytes": biggest, "max_tile_features": most, "layers": layers}));
+        out.insert(name, json!({"view_bytes": bytes, "view_features": features, "max_tile_bytes": biggest, "max_tile_features": most,
+                                "mlt_view_bytes": mlt_bytes, "mlt_max_tile_bytes": mlt_biggest, "layers": layers}));
     }
     out.insert("style".into(), style_sizes(&style));
     Value::Object(out)

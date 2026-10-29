@@ -117,8 +117,9 @@ impl Writer {
         self.addressed += 1;
     }
 
-    /// The archive: the header (127 bytes), the root directory, the metadata (JSON text), the leaves and the tiles. None: no tile.
-    pub fn finish(mut self, place: &Place, metadata: &str) -> Option<Vec<u8>> {
+    /// The archive: the header (127 bytes), the root directory, the metadata (JSON text), the leaves and the tiles. `tile_type`: the
+    /// header's tile type (`TileFormat::pmtiles_type`). None: no tile.
+    pub fn finish(mut self, tile_type: u8, place: &Place, metadata: &str) -> Option<Vec<u8>> {
         let (contents, entries_n) = (self.seen.len() as u64, self.entries.len() as u64);
         self.entries.sort_by_key(|e| e.id);
         let zoom = |id: u64| ((64 - (3 * id + 1).leading_zeros()) - 1) / 2;
@@ -155,8 +156,8 @@ impl Writer {
                   self.addressed, entries_n, contents] {
             h.extend_from_slice(&v.to_le_bytes());
         }
-        // clustered, internal compression (gzip), tile compression (gzip), tile type (MVT), the zooms
-        h.extend_from_slice(&[(!self.unordered) as u8, 2, 2, 1, min_zoom as u8, max_zoom as u8]);
+        // clustered, internal compression (gzip), tile compression (gzip), tile type, the zooms
+        h.extend_from_slice(&[(!self.unordered) as u8, 2, 2, tile_type, min_zoom as u8, max_zoom as u8]);
         for v in [place.min_lon_e7, place.min_lat_e7, place.max_lon_e7, place.max_lat_e7] {
             h.extend_from_slice(&v.to_le_bytes());
         }

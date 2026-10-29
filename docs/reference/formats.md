@@ -286,8 +286,8 @@ const tiler = new Tiler(roads, look, undefined, "Monaco", "rs://1/", ["name", "h
 
 | Output | Content |
 |---|---|
-| `tiler.style()` | the style, as JSON text |
-| `tiler.tile("roads", z, x, y)` | one vector tile (MVT bytes), made when MapLibre asks for it |
+| `tiler.style(format?)` | the style, as JSON text; `format` `"mlt"` sets `"encoding": "mlt"` on the vector source |
+| `tiler.tile("roads", z, x, y, format?)` | one vector tile (MVT bytes, or MLT with `"mlt"`), made when MapLibre asks for it |
 | `tiler.props("roads", row)` | the properties of one road, for a click |
 | `tiler.archive(bounds, layers)` | only on request: one PMTiles archive of all tiles, as bytes |
 

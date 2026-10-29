@@ -63,7 +63,8 @@ def export_style(edges, out_dir, *, base_url: str, format: str = "xyz", **kwargs
     ``roads.pmtiles`` for MapLibre pages that register the ``pmtiles://`` protocol. The style holds the roads only: the base
     map comes from the app. The road tiles keep every column of the edges, so a click shows the data. ``kwargs``: the
     keywords of ``render_edges`` (profile, palette, overlays, ...); ``view_3d`` defaults to ``True`` here, so the style has
-    the bridge decks for an app's own tilt.
+    the bridge decks for an app's own tilt. ``tile_format``: ``"mvt"`` (default; files ``.pbf``) or ``"mlt"`` (MapLibre Tile; files
+    ``.mlt``, the style's source has ``"encoding": "mlt"``, and a PMTiles archive has the MLT tile type): MapLibre GL JS 5.12 or later.
     """
     if format not in ("xyz", "pmtiles"):
         raise ValueError(f"format must be 'xyz' or 'pmtiles', got {format!r}")

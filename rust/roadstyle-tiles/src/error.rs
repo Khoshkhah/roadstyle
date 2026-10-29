@@ -12,6 +12,8 @@ pub enum Error {
     Options(String),
     /// An archive with no tile: no feature in its bounds.
     Empty,
+    /// A tile that the MLT encoder did not take (mlt-core's message).
+    Mlt(String),
 }
 
 impl fmt::Display for Error {
@@ -19,6 +21,7 @@ impl fmt::Display for Error {
         match self {
             Error::Options(m) => f.write_str(m),
             Error::Empty => f.write_str("the archive has no tile"),
+            Error::Mlt(m) => write!(f, "MLT tile: {m}"),
         }
     }
 }

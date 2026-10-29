@@ -69,6 +69,23 @@ impl LiveTiles {
 
     /// The tile z/x/y of the tile source (`Tiles::tile`), after its waiting pieces got their properties.
     pub fn tile(&mut self, z: u32, x: u32, y: u32) -> Vec<u8> {
+        self.fill(z, x, y);
+        self.tiles.tile(z, x, y)
+    }
+
+    /// `tile` in the format `format` (`Tiles::tile_in`).
+    pub fn tile_in(&mut self, format: tiles::TileFormat, z: u32, x: u32, y: u32) -> Result<Vec<u8>, tiles::Error> {
+        self.fill(z, x, y);
+        self.tiles.tile_in(format, z, x, y)
+    }
+
+    /// The format of the tiles (`TileOptions::format`).
+    pub fn format(&self) -> tiles::TileFormat {
+        self.tiles.format
+    }
+
+    /// Give the waiting pieces of the tile z/x/y their properties.
+    fn fill(&mut self, z: u32, x: u32, y: u32) {
         let roads = &self.styled.roads.roads;
         for (k, src) in &self.styled.sources {
             let Src::Simple(p) = src else { continue };
@@ -82,7 +99,6 @@ impl LiveTiles {
                 .map(|(&(i, _), (_, props, c))| (i, c.expect("a waiting piece has a line"), props.into_iter()));
             self.tiles.make(k, feats, &keep);
         }
-        self.tiles.tile(z, x, y)
     }
 
     /// The tiled style (JSON text).

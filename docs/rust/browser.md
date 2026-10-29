@@ -47,8 +47,8 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `look.toJson()`, `Look.fromJson(text)` | JSON text, a `Look` | save a look and load it again (version 2; `fromJson` also reads 1 and 0) |
 | `inlineStyle(roads, look, features?, planner?, name?)` | JSON text | the style with the roads in it (as `export_inline`) |
 | `new Tiler(roads, look, features?, name?, prefix, keep)` | a `Tiler` | the style with vector-tile sources, and the tiles on request |
-| `tiler.style()` | JSON text | the style of the `Tiler` |
-| `tiler.tile("roads", z, x, y)` | `Uint8Array` | one vector tile; empty when no road is in it |
+| `tiler.style(format?)` | JSON text | the style of the `Tiler`; `format` (`"mvt"` or `"mlt"`) sets the `encoding` of the vector source |
+| `tiler.tile("roads", z, x, y, format?)` | `Uint8Array` | one vector tile in `format` (default: the format of the `Tiler`); empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
 | `pageFrom(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it. The page's keys (`sidebar`, `popup_mode`, ...) come from `options`' args; `given` adds your values (`street_view_key`, `api_key`) |
