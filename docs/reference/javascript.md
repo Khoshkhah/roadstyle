@@ -76,6 +76,8 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | **Street View** | | |
 | `rsSetStreetView(on)` | open / close the Street View window (`street_view="window"` only; otherwise does nothing) | `rs:streetviewchange` |
 | `rsSetGoogle3D(on)` | open / close the Google 3D window (`google_3d=True` only; otherwise does nothing) | `rs:google3dchange` |
+| `rsG3dLayers.register(layer)` | add a layer to the Google 3D window: `{id, label, kind, features(selection, {bounds}) -> GeoJSON, style, arrows, scope, max, on, available()}`. The same `id` replaces a layer. `google_3d_layers` (Python) makes the same layers from a GeoJSON source | |
+| `rsG3dLayers.list()` / `isOn(id)` / `setOn(id, on)` / `refresh()` | read the layers; show or hide one (kept per page); draw again | |
 | `rsStreetViewStep(m)` | move the Street View spot `m` metres along the edge (negative = back), stopping at its ends; returns the new URL | `rs:streetviewmove` |
 | `rsSetStreetViewMarker(on)` | show / hide the map marker at the Street View spot | |
 | `rsSetStreetViewMarkerAt(lng, lat, heading)` | put the marker where a panorama stands, looking `heading` degrees (for a Street View that reports its own moves). The spot is snapped onto the road as drawn, in its lane: the clicked edge while the viewer is on it, else the nearest road on screen in the direction they walked; free only with no road within 20 m. `null` goes back to the edge spot; the next selection or step clears it | |

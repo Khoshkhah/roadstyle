@@ -149,7 +149,7 @@ not a git merge of the old branch. Each step lands alone, with its desktop form,
 | D5 | The window rules in `float.js` | The window checks |
 | D6 | The base-map box, the `basemaps.json` fields, the OpenFreeMap merge, "On top" | The base-map checks |
 | D7 | Google 3D from the last form of the old `main`: one-way link, Follow, the note, modes and labels | The Google 3D checks, with the `gmp-map-3d` stub |
-| D8 | The 3D layers and the "Show" selector | The 3D layer checks |
+| D8 (done) | The 3D layers and the "Show" selector: `Layer3d` in Rust (`Google3d.layers`, the page keyword `google_3d_layers`), read by `google3d.js` | The 3D layer checks (`tests/test_google3d_layers_browser.py`, with a stub of Google's `maps3d` library) |
 | D9 | The area boundary: `Boundary` in Rust, `main.boundary` read from the duckOSM file, the outline, the dim and the limit in JS | The boundary checks: the line is under the roads; a pan cannot leave the bounds; each field can be turned off |
 
 What happens to the old `main` (the tag `python-engine-final`, which no branch follows):

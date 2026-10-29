@@ -200,7 +200,7 @@ export function initGoogle3D(){
     // gets points only on segments longer than 5 m, is drawn once per selection, and is drawn again on a mode change. By default a layer draws the features
     // tied to the selection; scope:"view" draws those in the visible area instead, at most `max` (500). The built-in layer "selected" is the selected road's
     // line; a page can register a layer of the same id to replace it. A "Show" menu in the window's bar has one checkbox per available layer (shown when
-    // there are two or more), and the choice is kept per page. From Python: render_dashboard(google_3d_layers=[{id, label, kind, source, match, style, ...}]).
+    // there are two or more), and the choice is kept per page. From Python: render_dashboard(google_3d_layers=[{id, label, kind, source, match, scope, max, on, arrows, style}]), a typed list (roadstyle::dashboard::Layer3d).
     const REG=new Map(), LKEY="rs-g3d-layers:"+location.pathname;
     const stored=()=>{ try{ return JSON.parse(localStorage.getItem(LKEY))||{}; }catch(e){ return {}; } };
     const layerOn=d=>{ const v=stored(); return d.id in v ? !!v[d.id] : d.on!==false; };
@@ -230,8 +230,11 @@ export function initGoogle3D(){
     window.rsG3dLayers={register, list:()=>[...REG.values()].map(d=>({id:d.id, label:d.label, kind:d.kind, on:layerOn(d), available:avail(d)})),
       isOn:id=>REG.has(id) && layerOn(REG.get(id)), setOn:(id, on)=>{ const v=stored(); v[id]=!!on; try{ localStorage.setItem(LKEY, JSON.stringify(v)); }catch(e){} paintMenu(); drawLayers(); },
       refresh:()=>{ paintMenu(); drawLayers(); }};
-    // a layer from Python: its features are those of a GeoJSON source of the page whose property `match` equals the same property of the selected feature (or the selection's key)
-    for(const c of (O.google_3d_layers||[])) REG.set(c.id, {kind:"line", ...c, features:(sel, ctx)=>{
+    // a layer of the page (the typed list `google_3d.layers`, from the keyword google_3d_layers): its features are those of a GeoJSON source of the page whose
+    // property `match` equals the same property of the selected feature (or the selection's key). The style keys are snake_case in the list and camelCase here.
+    const CAMEL={outline_width:"outlineWidth", width_m:"widthM", width_prop:"widthProp"};
+    const styleOf=st=>Object.fromEntries(Object.entries(st||{}).map(([k, v])=>[CAMEL[k]||k, v]));
+    for(const c of (G ? G.layers : [])) REG.set(c.id, {...c, style:styleOf(c.style), features:(sel, ctx)=>{
       const src=map.getSource(c.source), data=src && src.serialize ? src.serialize().data : null; if(!data || typeof data==="string") return {type:"FeatureCollection", features:[]};
       const fs=data.features||[];
       if(c.scope==="view") return {type:"FeatureCollection", features:fs};

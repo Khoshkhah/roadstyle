@@ -160,6 +160,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `street_view` | `street_view`: `"window"`, `true` or `false` | `"window"` | `streetview.js`, `svspot.js` |
 | `street_view_key` | `street_view_key` | `""` | `streetview.js`, `google3d.js` |
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
+| `dashboard.google_3d.layers` | `google_3d_layers`: `[{id, label, kind, source, match, scope, max, on, arrows, style}]` (`roadstyle::dashboard::Layer3d`) | `[]` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
 | `filter` | `filter_control`, `access_col`, `minzoom`: `{on, col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
 | `filter_control` | `filter_control`: the Roads box (a page key; `filter.on` is this and a class to show) | `true`; a style made before N32 step 2 has its own `filter.on`, which stays without this option | `index.js` |

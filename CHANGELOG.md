@@ -11,6 +11,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
 ### Added
+- **Typed layers for the Google 3D window.** The new keyword `google_3d_layers=[{id, kind, source, match, scope, max, on, arrows, style}]`
+  draws the features of a GeoJSON source of the page in the window (kinds `line`, `ribbon`, `polygon`, `points`); the window's Show menu turns
+  each on or off. The list is a Rust type (`dashboard::Layer3d`, in `Google3d.layers`): a wrong key or `kind`, a repeated `id` or a
+  `selection` layer without `match` is a `ValueError`. The run-time calls are `rsG3dLayers` (`register`, `list`, `isOn`, `setOn`, `refresh`).
+  The guide `guides/google-3d.md` has the layers, the view switch, Follow and the low-camera note.
 - **MapLibre Tile (MLT) as a second tile format**, with MVT the default. `export_style(..., tile_format="mlt")`, `roadstyle tiles
   --tile-format mlt`, `Tiler.tile(source, z, x, y, "mlt")` and `Tiler.style("mlt")` write or give the same tiles in MLT (the crate
   `mlt-core` encodes them: same ids, order, properties and geometry; no shared dictionary, FSST or FastPFOR). The style's vector source

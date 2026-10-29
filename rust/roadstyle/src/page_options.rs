@@ -20,7 +20,7 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": false,
-    "template": null, "filter_control": true, "legend": true}"#;
+    "template": null, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
 
 /// The two map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
 const SIDEBAR_YIELDS: [&str; 2] = ["name", "road_popup"];
@@ -70,6 +70,7 @@ struct PageKeys {
     street_view: Value,
     street_view_key: Option<String>,
     google_3d: bool,
+    google_3d_layers: Vec<crate::dashboard::Layer3d>,
     compress: bool,
     views: Value,
     tiles: bool,
@@ -156,6 +157,7 @@ fn check_keys<'a>(k: &'a PageKeys, look: &Look, template: Template) -> Result<(&
     if !k.street_view.is_boolean() && k.street_view != "window" {
         return Err(crate::error::options(format!("street_view must be True, False or \"window\", got {}", repr(&k.street_view))));
     }
+    crate::dashboard::check_layers(&k.google_3d_layers).map_err(crate::error::options)?;
     let key = k.street_view_key.clone().filter(|v| !v.is_empty());
     // a page with a toolbar has the settings tool, where the person can type the key; a page without one has no place for it
     if k.google_3d && key.is_none() && template.dashboard().toolbar.is_none() {
@@ -242,8 +244,10 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let mut tunnel = ctl["tunnel"].clone();
     tunnel["bg"] = bg.into();
     let ontop = if bms.len() > 1 { ontop_layers() } else { Value::Null };
+    let mut dashboard = template.dashboard();
+    dashboard.google_3d.layers = k.google_3d_layers.clone();
     let opts = PageOptions {
-        dashboard: template.dashboard(), basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
+        dashboard, basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
         popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
         street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d: k.google_3d,

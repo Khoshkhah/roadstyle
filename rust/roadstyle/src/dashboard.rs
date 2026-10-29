@@ -110,6 +110,110 @@ pub struct SelectionStyle {
     pub fill: String,
 }
 
+/// What a 3D layer draws.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayerKind {
+    /// a polyline (`LayerStyle`: color, width, dash)
+    Line,
+    /// a band around a line (`width_m`, or the feature's property `width_prop`)
+    Ribbon,
+    /// a filled area with an outline
+    Polygon,
+    /// an octagon of `radius` metres at each point
+    Points,
+}
+
+/// Which features of the source a 3D layer draws.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LayerScope {
+    /// the features tied to the selected road (see `Layer3d::match_prop`)
+    #[default]
+    Selection,
+    /// the features in the visible area, at most `Layer3d::max`
+    View,
+}
+
+/// The look of a 3D layer. A key that does not fit the layer's kind is ignored by the drawing; the colors are CSS colors.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LayerStyle {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    /// line width in pixels
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outline: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outline_width: Option<f64>,
+    /// [metres on, metres off]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dash: Option<[f64; 2]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<String>,
+    /// ribbon width in metres
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width_m: Option<f64>,
+    /// the feature property that holds the ribbon width in metres
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width_prop: Option<String>,
+    /// points: radius in metres
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f64>,
+}
+
+/// A layer of the Google 3D window: the features of a GeoJSON source of the page, drawn on Google's mesh. The "Show" menu of the window has
+/// one checkbox for each layer (it shows when there are two or more).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Layer3d {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub kind: LayerKind,
+    /// the id of a GeoJSON source of the page
+    pub source: String,
+    /// scope `selection`: the feature property that is equal to the same property of the selected road
+    #[serde(rename = "match", default, skip_serializing_if = "Option::is_none")]
+    pub match_prop: Option<String>,
+    #[serde(default)]
+    pub scope: LayerScope,
+    /// scope `view`: the most features drawn
+    #[serde(default = "Layer3d::max_default")]
+    pub max: u32,
+    /// the layer starts shown
+    #[serde(default = "Layer3d::on_default")]
+    pub on: bool,
+    /// kind `line`: direction arrows along the line
+    #[serde(default)]
+    pub arrows: bool,
+    #[serde(default)]
+    pub style: LayerStyle,
+}
+
+impl Layer3d {
+    fn max_default() -> u32 { 500 }
+    fn on_default() -> bool { true }
+}
+
+/// The checks of a list of layers: an id is used once, and a layer of scope `selection` says which property ties it to the road.
+pub fn check_layers(layers: &[Layer3d]) -> Result<(), String> {
+    for (i, l) in layers.iter().enumerate() {
+        if l.id.is_empty() || l.source.is_empty() {
+            return Err(format!("google_3d_layers[{i}]: a layer needs an id and a source"));
+        }
+        if layers[..i].iter().any(|o| o.id == l.id) {
+            return Err(format!("google_3d_layers: the id '{}' is used twice", l.id));
+        }
+        if l.scope == LayerScope::Selection && l.match_prop.is_none() {
+            return Err(format!("google_3d_layers: the layer '{}' has scope selection and needs `match` (or scope \"view\")", l.id));
+        }
+    }
+    Ok(())
+}
+
 /// The Google 3D window (docs/design/dashboard_templates.md, 3.3). The map leads the camera, in one direction only.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -124,13 +228,16 @@ pub struct Google3d {
     /// the map's zoom over which the drawn map shows the note
     pub min_zoom_drawn: f64,
     pub selection_style: SelectionStyle,
+    /// the page's layers (the page keyword `google_3d_layers`); none in a template
+    pub layers: Vec<Layer3d>,
 }
 
 impl Google3d {
     fn new() -> Google3d {
         Google3d { fov_deg: None, follow: true, min_alt_m: 80.0, min_zoom_drawn: 17.0,
                    selection_style: SelectionStyle { color: "#22d3ee".into(), width: 8.0, outline: "#0b1020".into(), outline_width: 2.0,
-                                                     arrow_color: "#ffffff".into(), arrow_width: 5.0, arrow_every: 25.0, fill: "rgba(34,211,238,0.35)".into() } }
+                                                     arrow_color: "#ffffff".into(), arrow_width: 5.0, arrow_every: 25.0, fill: "rgba(34,211,238,0.35)".into() },
+                   layers: Vec::new() }
     }
 }
 
@@ -315,5 +422,30 @@ mod tests {
         assert_eq!(k.len(), 3);
         assert_eq!(k["report"]["basemap_switcher"], true);
         assert_eq!((&k["classic"]["name"], &k["dashboard"]["name"]), (&serde_json::json!("Roads dashboard"), &serde_json::json!("Roads dashboard")));
+    }
+
+    fn layer(v: serde_json::Value) -> Result<Layer3d, serde_json::Error> { serde_json::from_value(v) }
+
+    #[test]
+    fn a_layer_has_its_defaults_and_names_its_keys() {
+        let l = layer(serde_json::json!({"id": "route", "kind": "line", "source": "bus", "match": "route_id",
+                                         "style": {"color": "#f00", "width": 6, "dash": [8, 4]}})).unwrap();
+        assert_eq!((l.scope, l.max, l.on, l.arrows), (LayerScope::Selection, 500, true, false));
+        assert_eq!(l.style.dash, Some([8.0, 4.0]));
+        // the page gets the keys back in snake_case, without the ones that are not set
+        let v = serde_json::to_value(&l).unwrap();
+        assert_eq!((v["match"].clone(), v["style"].as_object().unwrap().len()), ("route_id".into(), 3));
+        for bad in [serde_json::json!({"id": "a", "kind": "tube", "source": "s"}), serde_json::json!({"id": "a", "kind": "line", "source": "s", "colour": 1}),
+                    serde_json::json!({"id": "a", "kind": "line", "source": "s", "style": {"outlineWidth": 2}})] {
+            assert!(layer(bad).is_err());
+        }
+    }
+
+    #[test]
+    fn the_layers_of_a_page_are_checked_together() {
+        let mk = |id: &str, scope: &str, m: Option<&str>| layer(serde_json::json!({"id": id, "kind": "points", "source": "s", "scope": scope, "match": m})).unwrap();
+        assert!(check_layers(&[mk("a", "view", None), mk("b", "selection", Some("k"))]).is_ok());
+        assert!(check_layers(&[mk("a", "view", None), mk("a", "view", None)]).unwrap_err().contains("used twice"));
+        assert!(check_layers(&[mk("a", "selection", None)]).unwrap_err().contains("needs `match`"));
     }
 }
