@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The road layer is one layer for each band of zooms** (`roads-simple` below z14, `roads-simple-z14` from z14, `roads-simple-z15` from z15;
+  docs/design/tile_speed.md, "The road layer in MapLibre"). MapLibre evaluates each data-driven paint property for each feature. In a band, a
+  property whose zoom curve is one value is that value: `line-offset` is 0 below z15, `line-blur` is 0 and `line-opacity` is a short `case`
+  below z14. A band also keeps only the zoom stops that its zooms read. The picture does not change (0 pixels). A style with line items keeps
+  one road layer. `roadstyle:controls.pick` lists every band.
 - **The dashboard reads the road layer as a list of layers** (`RS_LEANS`, with `leanAt()` for the one that the map draws at its zoom). Pick,
   hover, select and Street View use the list, so the road layer can be more than one style layer (zoom bands, the dash layers).
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or

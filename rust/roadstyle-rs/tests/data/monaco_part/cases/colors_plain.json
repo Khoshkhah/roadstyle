@@ -16,7 +16,23 @@
         "line",
         "simple",
         "f400c3887e0b8239",
-        "befc9f51ea157a90",
+        "dd2904e08f863061",
+        "f61343b045b32d9b"
+      ],
+      [
+        "roads-simple-z14",
+        "line",
+        "simple",
+        "f400c3887e0b8239",
+        "6de7c5333afa7ef3",
+        "f61343b045b32d9b"
+      ],
+      [
+        "roads-simple-z15",
+        "line",
+        "simple",
+        "f400c3887e0b8239",
+        "fe48a55424d98389",
         "f61343b045b32d9b"
       ],
       [
@@ -73,10 +89,10 @@
       "roadstyle:interaction": "a911c29a8eeae5d8",
       "roadstyle:images": "e9049aa3d5b18840",
       "roadstyle:sources": "de9ed92a2cabe7fc",
-      "roadstyle:controls": "7ad47e2cab264f27",
+      "roadstyle:controls": "1684d10875ec0989",
       "roadstyle:generation": "18db75a661ad967c"
     },
-    "hash": "f36345f81a8697ec"
+    "hash": "4b633397bdebd0ce"
   },
   "color_options": {
     "names": [],

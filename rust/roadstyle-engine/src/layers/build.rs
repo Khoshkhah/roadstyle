@@ -18,7 +18,7 @@ pub struct PageInfo {
 
 
 /// The values that the layer builders share.
-struct Ctx<'a> {
+pub(super) struct Ctx<'a> {
     look: &'a crate::Look,
     roads: &'a crate::road::Roads,
     /// the road layers read the class role's column by its own name in the table (the slots have their own "highway")
@@ -26,8 +26,8 @@ struct Ctx<'a> {
     /// render's width_m_col: metre widths from width_m_zoom on (docs/design/metre_widths.md)
     metres: bool,
     /// the roads have two-way pairs
-    pairs: bool,
-    any_tunnel: bool,
+    pub(super) pairs: bool,
+    pub(super) any_tunnel: bool,
     any_dup: bool,
     /// audit N2: the pieces draw and pick, and the road table has the fields and the lines; only an export (an app with no road table)
     /// keeps the roads, with their pick and highlight layers, for its clicks
@@ -48,7 +48,7 @@ struct Ctx<'a> {
 }
 
 impl<'a> Ctx<'a> {
-    fn new(look: &'a crate::Look, roads: &'a crate::road::Roads, decks: bool) -> Result<Self, crate::Error> {
+    pub(super) fn new(look: &'a crate::Look, roads: &'a crate::road::Roads, decks: bool) -> Result<Self, crate::Error> {
         let s = &look.sections;
         let any_tunnel = roads.iter().any(|p| p.get(Mark::Tunnel.name()).is_some_and(crate::roads::yes));
         let tu = &s.tunnels;
@@ -96,7 +96,7 @@ fn piece_kind(n: i64) -> Value {
 }
 
 /// The width and offset expressions of the road layers.
-struct Widths {
+pub(super) struct Widths {
     casing: Value,
     fill: Value,
     /// a bridge's casing: the width and two casings
@@ -113,7 +113,7 @@ struct Widths {
 
 /// With `items` (the line items on the edges, `__rs_k` 5), every curve of the road layer is base-2 exponential, so theirs in metres is exact
 /// at every zoom.
-fn widths(cx: &Ctx, items: bool) -> Widths {
+pub(super) fn widths(cx: &Ctx, items: bool) -> Widths {
     let (m, s, mo) = (&cx.look.model, &cx.look.sections, &cx.look.map);
     let hw = cx.hw;
     let wmz = mo.width.m_zoom.map_or_else(|| json!(s.roads.width_m_zoom), crate::given);
@@ -256,7 +256,7 @@ fn class_table(cx: &Ctx, i: usize, fallback: &Value) -> Value {
 }
 
 /// The paint of the road layer, and the dash patterns of its features.
-fn line_paint(cx: &Ctx, w: &Widths, items: &[&Props], fills: &[String]) -> (Value, Vec<String>) {
+pub(super) fn line_paint(cx: &Ctx, w: &Widths, items: &[&Props], fills: &[String]) -> (Value, Vec<String>) {
     let (m, s) = (&cx.look.model, &cx.look.sections);
     let dashes = dash_patterns(cx, items);
     let (is_sh, factor) = (piece_kind(2), json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]));
@@ -639,6 +639,10 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     overlay_colours(&mut layers, &ov.ids);
     if cx.any_tunnel {
         tunnel_look(&cx, &mut layers, &edge_ids, &mut info);
+    }
+    // with items the layer stays one: the items' popup finds it by its id, and their offset is a value of every zoom
+    if items.is_empty() {
+        layers = layers.into_iter().flat_map(|l| if l["id"] == "roads-simple" { super::bands::split(l) } else { vec![l] }).collect();
     }
     let state = crate::contract::page_state(look, active, ovs.len());       // the page's start values, baked in `finish`
     let out = finish(&cx, layers, &state, ovs);

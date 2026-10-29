@@ -17,7 +17,7 @@ DATA = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "monaco_part" / "road
 
 # the middle of a road's fill piece in the window, in pixels, from the road layer of simple mode
 ROAD_PIXEL = """() => {
-  const f = map.queryRenderedFeatures({layers: ["roads-simple"]}).find(f => f.properties.__rs_k === 1 && f.geometry.type === "LineString"
+  const f = map.queryRenderedFeatures({layers: map.getStyle().layers.filter(l => l.id.startsWith("roads-simple")).map(l => l.id)}).find(f => f.properties.__rs_k === 1 && f.geometry.type === "LineString"
                                                                           && f.geometry.coordinates.length > 1);
   const c = f.geometry.coordinates, p = map.project(c[Math.floor(c.length / 2)]);
   return [p.x, p.y];
@@ -47,7 +47,7 @@ def _roads():
 # window.map is the element <div id="map"> (the browser's named access), on which map.loaded() throws and stops the wait.
 def _mouse(pg):
     """Hover a road and click it with the real mouse: the cursor, the tooltip and the rs:select's id."""
-    pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded() && map.queryRenderedFeatures({layers: ['roads-simple']}).length", timeout=60000)
+    pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded() && map.queryRenderedFeatures({layers: map.getStyle().layers.filter(l => l.id.startsWith('roads-simple')).map(l => l.id)}).length", timeout=60000)
     pg.evaluate("window.__sel = null; document.addEventListener('rs:select', e => { window.__sel = e.detail.id; })")
     x, y = pg.evaluate(ROAD_PIXEL)
     pg.mouse.move(x - 30, y - 30)
@@ -83,7 +83,7 @@ def test_a_road_is_picked_on_a_host_page_with_no_contract(tmp_path, old):
     g = _roads()
     style = json.loads(_engine.rust().inline_style(_engine._arrow(g), _engine._look_of({}), None, None, "roads"))
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] != "symbol"]    # the arrows and names need a sprite and glyphs
-    assert style["metadata"]["roadstyle:controls"]["pick"] == ["roads-simple"]
+    assert style["metadata"]["roadstyle:controls"]["pick"] == ["roads-simple", "roads-simple-z14", "roads-simple-z15"]
     if old:
         del style["metadata"]["roadstyle:controls"]["pick"]
     with _host(tmp_path, style, g) as (pg, errors):

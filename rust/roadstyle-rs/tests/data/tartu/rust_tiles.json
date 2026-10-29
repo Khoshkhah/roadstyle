@@ -16,7 +16,23 @@
         "line",
         "roads",
         "f400c3887e0b8239",
-        "12f513be3d92cd66",
+        "3a2a3a5909a6415c",
+        "f61343b045b32d9b"
+      ],
+      [
+        "roads-simple-z14",
+        "line",
+        "roads",
+        "f400c3887e0b8239",
+        "086f5b0bb1822c4f",
+        "f61343b045b32d9b"
+      ],
+      [
+        "roads-simple-z15",
+        "line",
+        "roads",
+        "f400c3887e0b8239",
+        "93a2e6119094e24f",
         "f61343b045b32d9b"
       ],
       [
@@ -47,12 +63,12 @@
       "roadstyle:interaction": "a911c29a8eeae5d8",
       "roadstyle:images": "e9049aa3d5b18840",
       "roadstyle:sources": "8bf9b5c1a82fc4e1",
-      "roadstyle:controls": "7ad47e2cab264f27",
+      "roadstyle:controls": "1684d10875ec0989",
       "roadstyle:generation": "f65f2fa935673aa4",
       "roadstyle:contract": "d4735e3a265e16ee",
       "roadstyle:arrows": "42d2b70866ba77b8"
     },
-    "hash": "2c80462df9f103ae"
+    "hash": "1f7ec890abd97e2c"
   },
   "tiles": {
     "z12": {

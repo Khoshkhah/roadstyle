@@ -185,14 +185,24 @@
     }
    },
    "style": {
-    "layers": 4,
-    "expressions_total": 29049,
+    "layers": 6,
+    "expressions_total": 39822,
     "expressions": {
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
      },
      "roads-arrows": {
       "filter": 875,
@@ -391,14 +401,24 @@
     }
    },
    "style": {
-    "layers": 4,
-    "expressions_total": 29049,
+    "layers": 6,
+    "expressions_total": 39822,
     "expressions": {
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
      },
      "roads-arrows": {
       "filter": 875,
@@ -597,14 +617,24 @@
     }
    },
    "style": {
-    "layers": 4,
-    "expressions_total": 28803,
+    "layers": 6,
+    "expressions_total": 39576,
     "expressions": {
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
      },
      "roads-arrows": {
       "filter": 579,
@@ -803,14 +833,24 @@
     }
    },
    "style": {
-    "layers": 4,
-    "expressions_total": 28803,
+    "layers": 6,
+    "expressions_total": 39576,
     "expressions": {
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
      },
      "roads-arrows": {
       "filter": 579,
@@ -1873,8 +1913,8 @@
     }
    },
    "style": {
-    "layers": 38,
-    "expressions_total": 32237,
+    "layers": 40,
+    "expressions_total": 43010,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -1888,8 +1928,18 @@
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -2834,8 +2884,8 @@
     }
    },
    "style": {
-    "layers": 38,
-    "expressions_total": 32231,
+    "layers": 40,
+    "expressions_total": 43005,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -2849,8 +2899,18 @@
      "roads-simple": {
       "filter": 803,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 4513
+     },
+     "roads-simple-z14": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 3468
+     },
+     "roads-simple-z15": {
+      "filter": 803,
+      "paint.line-color": 2279,
+      "paint.line-width": 10861,
+      "paint.line-offset": 2112
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -5091,6 +5151,66 @@
     "tartu-base.z14.mlt_max_tile_bytes: new, 51236",
     "tartu-base.z15.mlt_view_bytes: new, 343670",
     "tartu-base.z15.mlt_max_tile_bytes: new, 63902"
+   ]
+  },
+  {
+   "date": "2026-10-29",
+   "why": "Zoom bands (2j): the road layer is three style layers (below z14, z14 to z15, from z15), each with the limits of the one layer. The style has two more layers, and its expressions grow because the paint is there three times (a band keeps only the zoom stops that it reads). The tiles do not change.",
+   "changes": [
+    "monaco.style.layers: 4 -> 6",
+    "monaco.style.expressions_total: 28803 -> 39576",
+    "monaco.style.expressions.roads-simple-z14.filter: new, 803",
+    "monaco.style.expressions.roads-simple-z14.paint.line-color: new, 2279",
+    "monaco.style.expressions.roads-simple-z14.paint.line-width: new, 3468",
+    "monaco.style.expressions.roads-simple-z15.filter: new, 803",
+    "monaco.style.expressions.roads-simple-z15.paint.line-color: new, 2279",
+    "monaco.style.expressions.roads-simple-z15.paint.line-width: new, 10861",
+    "monaco.style.expressions.roads-simple-z15.paint.line-offset: new, 2112",
+    "monaco-full.style.layers: 4 -> 6",
+    "monaco-full.style.expressions_total: 29049 -> 39822",
+    "monaco-full.style.expressions.roads-simple-z14.filter: new, 803",
+    "monaco-full.style.expressions.roads-simple-z14.paint.line-color: new, 2279",
+    "monaco-full.style.expressions.roads-simple-z14.paint.line-width: new, 3468",
+    "monaco-full.style.expressions.roads-simple-z15.filter: new, 803",
+    "monaco-full.style.expressions.roads-simple-z15.paint.line-color: new, 2279",
+    "monaco-full.style.expressions.roads-simple-z15.paint.line-width: new, 10861",
+    "monaco-full.style.expressions.roads-simple-z15.paint.line-offset: new, 2112",
+    "monaco-base.style.layers: 38 -> 40",
+    "monaco-base.style.expressions_total: 32237 -> 43010",
+    "monaco-base.style.expressions.roads-simple-z14.filter: new, 803",
+    "monaco-base.style.expressions.roads-simple-z14.paint.line-color: new, 2279",
+    "monaco-base.style.expressions.roads-simple-z14.paint.line-width: new, 3468",
+    "monaco-base.style.expressions.roads-simple-z15.filter: new, 803",
+    "monaco-base.style.expressions.roads-simple-z15.paint.line-color: new, 2279",
+    "monaco-base.style.expressions.roads-simple-z15.paint.line-width: new, 10861",
+    "monaco-base.style.expressions.roads-simple-z15.paint.line-offset: new, 2112",
+    "tartu.style.layers: 4 -> 6",
+    "tartu.style.expressions_total: 28803 -> 39576",
+    "tartu.style.expressions.roads-simple-z14.filter: new, 803",
+    "tartu.style.expressions.roads-simple-z14.paint.line-color: new, 2279",
+    "tartu.style.expressions.roads-simple-z14.paint.line-width: new, 3468",
+    "tartu.style.expressions.roads-simple-z15.filter: new, 803",
+    "tartu.style.expressions.roads-simple-z15.paint.line-color: new, 2279",
+    "tartu.style.expressions.roads-simple-z15.paint.line-width: new, 10861",
+    "tartu.style.expressions.roads-simple-z15.paint.line-offset: new, 2112",
+    "tartu-full.style.layers: 4 -> 6",
+    "tartu-full.style.expressions_total: 29049 -> 39822",
+    "tartu-full.style.expressions.roads-simple-z14.filter: new, 803",
+    "tartu-full.style.expressions.roads-simple-z14.paint.line-color: new, 2279",
+    "tartu-full.style.expressions.roads-simple-z14.paint.line-width: new, 3468",
+    "tartu-full.style.expressions.roads-simple-z15.filter: new, 803",
+    "tartu-full.style.expressions.roads-simple-z15.paint.line-color: new, 2279",
+    "tartu-full.style.expressions.roads-simple-z15.paint.line-width: new, 10861",
+    "tartu-full.style.expressions.roads-simple-z15.paint.line-offset: new, 2112",
+    "tartu-base.style.layers: 38 -> 40",
+    "tartu-base.style.expressions_total: 32231 -> 43005",
+    "tartu-base.style.expressions.roads-simple-z14.filter: new, 803",
+    "tartu-base.style.expressions.roads-simple-z14.paint.line-color: new, 2279",
+    "tartu-base.style.expressions.roads-simple-z14.paint.line-width: new, 3468",
+    "tartu-base.style.expressions.roads-simple-z15.filter: new, 803",
+    "tartu-base.style.expressions.roads-simple-z15.paint.line-color: new, 2279",
+    "tartu-base.style.expressions.roads-simple-z15.paint.line-width: new, 10861",
+    "tartu-base.style.expressions.roads-simple-z15.paint.line-offset: new, 2112"
    ]
   }
  ]

@@ -15,7 +15,23 @@
       "line",
       "simple",
       "f400c3887e0b8239",
-      "32e918431e4d245d",
+      "05e5e03f0959d913",
+      "f61343b045b32d9b"
+    ],
+    [
+      "roads-simple-z14",
+      "line",
+      "simple",
+      "f400c3887e0b8239",
+      "b9e64ade9ef34800",
+      "f61343b045b32d9b"
+    ],
+    [
+      "roads-simple-z15",
+      "line",
+      "simple",
+      "f400c3887e0b8239",
+      "1eb000ca4b888d9c",
       "f61343b045b32d9b"
     ],
     [
@@ -72,10 +88,10 @@
     "roadstyle:interaction": "a911c29a8eeae5d8",
     "roadstyle:images": "e9049aa3d5b18840",
     "roadstyle:sources": "de9ed92a2cabe7fc",
-    "roadstyle:controls": "7ad47e2cab264f27",
+    "roadstyle:controls": "1684d10875ec0989",
     "roadstyle:generation": "960db97f1bd34c71"
   },
-  "hash": "ac45ced5f9b15f31",
+  "hash": "27d4f5cd22ab65d9",
   "road_table": {
     "rows": 13298,
     "columns": [
@@ -117,7 +133,7 @@
     }
   },
   "text": {
-    "bytes": 17985530,
-    "sha16": "ac45ced5f9b15f31"
+    "bytes": 17996710,
+    "sha16": "27d4f5cd22ab65d9"
   }
 }

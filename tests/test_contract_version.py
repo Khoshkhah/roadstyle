@@ -23,7 +23,7 @@ window.map = new maplibregl.Map({container: "map", style, bounds: BOUNDS});
 window.rs = rsDashboard(map, {style});
 map.once("idle", () => { window.done = true; });
 </script></body></html>"""
-ROAD = """() => { const f = map.queryRenderedFeatures({layers: ["roads-simple"]}).find(f => f.properties.__rs_k === 1 && f.geometry.type ===
+ROAD = """() => { const f = map.queryRenderedFeatures({layers: map.getStyle().layers.filter(l => l.id.startsWith("roads-simple")).map(l => l.id)}).find(f => f.properties.__rs_k === 1 && f.geometry.type ===
   "LineString"); const c = f.geometry.coordinates, p = map.project(c[Math.floor(c.length / 2)]); return [p.x, p.y]; }"""
 
 
