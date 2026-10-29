@@ -306,6 +306,22 @@ mod wasm {
         page_of(roadstyle::read::read_roads(roads, "geometry").map_err(|e| JsError::new(&e.to_string()))?, features, look, options, given)
     }
 
+    /// hostOptions(look: Look, given?: string) -> string: the options of a JavaScript host page that calls `rsDashboard` itself (JSON text):
+    /// `dashboard` (the typed options of the template, with the `layout` and `dashboard` keys of `given`), `first_paint` (the classes of
+    /// <html>, the panel's width and the phone width: `rsFirstPaint` of the dashboard's template.js sets them), `basemaps` and `ontop` (the
+    /// `basemaps` and `ontop` options, with the base map `basemap` first) and `basemap` (the active key). `given`: JSON text with the keys
+    /// `layout`, `dashboard`, `basemap`, `basemaps`, `api_key`, `basemap_switcher`, `street_view_key`. The same rules as `pageFrom`.
+    #[wasm_bindgen(js_name = hostOptions)]
+    pub fn host_options(look: &JsLook, given: Option<String>) -> Result<String, JsError> {
+        let given: serde_json::Map<String, serde_json::Value> = match given {
+            Some(g) => serde_json::from_str(&g).map_err(|e| JsError::new(&format!("given: {e}")))?,
+            None => serde_json::Map::new(),
+        };
+        let (options, warnings) = roadstyle::page_options::host_options(&look.0, &given).map_err(|e| JsError::new(&e.to_string()))?;
+        warnings.iter().for_each(|w| console_warn(w));
+        Ok(options.to_string())
+    }
+
     /// pageFrom and Roads.page: the page of read roads.
     fn page_of(roads: roadstyle::RoadTable, features: Option<Vec<u8>>, look: &JsLook, options: &str, given: Option<String>) -> Result<String, JsError> {
         let o: roadstyle::look::Options = serde_json::from_str(options).map_err(|e| JsError::new(&format!("options: {e}")))?;

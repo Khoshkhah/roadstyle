@@ -459,6 +459,34 @@ fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Va
     Ok((active_bm, bms, style))
 }
 
+/// The options of a host page that writes its own HTML and calls `rsDashboard` itself (a JavaScript page, such as the duckOSM page): the typed
+/// `dashboard` of the template `dashboard` (with the layout and the `dashboard` keys of `given`, as `page_from` merges them), its first paint, and the
+/// base maps (`basemaps`, `ontop` and the active key, as `page_from` gives them to the page). `given` has the keys of a call: `layout`, `dashboard`,
+/// `basemap`, `basemaps`, `api_key`, `basemap_switcher`. The same rules as a page that roadstyle writes, so the host has no copy of them.
+pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, Vec<String>), crate::Error> {
+    let mut given = given.clone();
+    given.entry("template").or_insert_with(|| "dashboard".into());
+    let (template, layout) = form_of(&given)?;
+    if template != Template::Dashboard {
+        return Err(crate::error::options("host_options is for template=\"dashboard\": a host page has a panel and a bar"));
+    }
+    let mut dashboard = template.dashboard(layout);
+    let (a, owned) = page_args(look, &given, template)?;
+    let look = owned.as_ref().unwrap_or(look);
+    let k: PageKeys = serde_json::from_value(Value::Object(a)).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
+    let mut warnings = Vec::new();
+    let (active, bms, _) = basemaps(&k, look, &mut warnings)?;
+    dashboard.google_3d.layers = k.google_3d_layers.clone();
+    dashboard.boundary.dim = k.boundary_dim;
+    dashboard.boundary.limit = k.boundary_limit;
+    if let Some(over) = k.dashboard.as_ref().filter(|v| !v.is_null()) {
+        dashboard = crate::dashboard::merge(&dashboard, over)?;
+    }
+    let first = dashboard.first_paint_parts();
+    let ontop = if bms.len() > 1 { ontop_layers() } else { Value::Null };
+    Ok((json!({"dashboard": dashboard, "first_paint": first, "basemaps": bms, "ontop": ontop, "basemap": active["key"]}), warnings))
+}
+
 const VIEW_BOOLS: [&str; 4] = ["road_fill", "bridges", "tunnels", "view3d"];
 
 /// `views` as the page reads it, [{name, set}]; a setting that is not known, or that names a colour option, an
@@ -595,6 +623,29 @@ mod tests {
         assert_eq!(inject_token("https://t.example/{z}/{x}/{y}?s=1", "T"), "https://t.example/{z}/{x}/{y}?s=1&api_key=T");
         assert_eq!(inject_token("https://t.example/{z}/{x}/{y}?token={token}", "T"), "https://t.example/{z}/{x}/{y}?token=T");
         assert_eq!(inject_token("", "T"), "");
+    }
+
+    #[test]
+    fn a_host_page_gets_the_dashboard_its_first_paint_and_the_base_maps_of_a_page_that_roadstyle_writes() {
+        let look = Look::resolve(&Options::from_value(&json!({"args": {"state": "live"}})).unwrap()).unwrap();
+        let given = json!({"basemap": "blank", "basemaps": ["blank", "osm"], "dashboard": {"panel": {"width_px": 370}}});
+        let (o, warnings) = host_options(&look, given.as_object().unwrap()).unwrap();
+        assert!(warnings.is_empty(), "{warnings:?}");
+        // the dashboard of the template with the call's change, and its first paint from the same value
+        assert_eq!(o["dashboard"]["template"], "dashboard");
+        assert_eq!(o["dashboard"]["panel"]["width_px"], 370);
+        assert_eq!(o["first_paint"]["panel_width_px"], 370);
+        assert_eq!(o["first_paint"]["phone_max_width_px"], 700);
+        assert_eq!(o["first_paint"]["classes"], json!(["rs-tpl-dashboard", "rs-overlay", "rs-has-toolbar", "rs-tb-left", "rs-panel-left", "rs-hide-scale"]));
+        // the base maps: the active one first, its dark twin with it, the tiles as MapLibre's `tiles`
+        let keys: Vec<&Value> = o["basemaps"].as_array().unwrap().iter().map(|b| &b["key"]).collect();
+        assert_eq!(keys, ["blank", "osm", "blank_dark"]);
+        assert_eq!(o["basemap"], "blank");
+        assert_eq!(o["basemaps"][1]["tiles"], json!(["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png", "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png", "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"]));
+        assert_eq!(o["basemaps"][0]["bg"], "#efede8");
+        assert!(o["ontop"]["hillshade"].is_object());
+        // a form that is not the dashboard is an error here, as for a page
+        assert!(host_options(&look, json!({"template": "map"}).as_object().unwrap()).is_err());
     }
 
     #[test]

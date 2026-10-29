@@ -40,7 +40,7 @@ export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(ty
 export let OVERLAYS = [];
 export function initCore(m, opts){
   map = m; O = opts; RS_PREFIX = opts.prefix;
-  RS_TILED = opts.tiles; OVERLAYS = opts.overlays;
+  RS_TILED = opts.tiles;
   useStyle(opts.style);
   map.on("sourcedata", e=>{ const s=map.getSource(e.sourceId); if(s && s._data) delete s._data._rs; if(_SRC.decks && e.sourceId===RS_PREFIX+_SRC.decks.source) _decks=null; });
   window.rsQuery = rsQuery; window.rsGetProps = rsGetProps; window.rsHighlight = rsHighlight; window.rsFocus = rsFocus;
@@ -49,6 +49,7 @@ export function initCore(m, opts){
 // no road layers, nothing to pick
 export function useStyle(st){
   style = st || {layers:[], sources:{}, metadata:{}};
+  OVERLAYS = O.overlays;                // the style's own base-map layers (ov<i>): a later style has other ones
   // the layers decide (they are what the map draws); the given map only for a role with no layer: a style made again for tiles can keep the
   // role map of its GeoJSON stage in its metadata
   _SRC = {...(O.sources || (style.metadata || {})["roadstyle:sources"] || {}), ..._sourcesOf(style)};

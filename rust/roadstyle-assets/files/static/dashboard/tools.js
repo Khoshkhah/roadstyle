@@ -42,6 +42,7 @@ let sink = null;                            // the renderer that is mounted: a f
 export function defineTool(id, kind, el, more = {}){
   const t = {id, kind, el, title: "", ...more};
   tools.set(id, t);
+  el.dataset.rsTool = id;
   if(sink) sink([t]);
   return t;
 }
@@ -53,6 +54,7 @@ export function replaceTool(id, kind, el, more = {}){
   if(!slot) return defineTool(id, kind, el, more);
   const t = {id, kind, el, title: "", ...more};
   tools.set(id, t);
+  el.dataset.rsTool = id;
   slot.replaceWith(wrap(el));
   if(onReplace) onReplace(t);
   return t;
@@ -84,7 +86,7 @@ function adoptNav(){
         map.on("rotate", turn); map.on("pitch", turn); turn();
       }
     }
-    if(b) tools.set(id, {id, kind: "button", el: b, title, group: "nav"});
+    if(b){ b.dataset.rsTool = id; tools.set(id, {id, kind: "button", el: b, title, group: "nav"}); }
   }
   ctrl.remove();
 }

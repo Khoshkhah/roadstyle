@@ -5,6 +5,19 @@ import {map, O} from "./core.js";
 const SHEETS = 3;
 let _sheet = null;                                  // the function that sets the sheet's height (0: closed, 1: 40 %, 2: full)
 export function setSheet(n){ if(_sheet) _sheet(n); }
+// the sheet's height now (0: closed, 1: 40 %, 2: full), or null where the page has no sheet (not a phone, or no panel)
+export function getSheet(){
+  const c = document.documentElement.classList, i = [...Array(SHEETS).keys()].find(i => c.contains("rs-sheet-" + i));
+  return c.contains("rs-phone") && i !== undefined ? i : null;
+}
+// The first paint of a host page that writes its own HTML: the `first_paint` of roadstyle-wasm's `hostOptions` (the classes of <html>, the panel's width, the
+// phone width). Call it before the first paint, as the script that a page of roadstyle writes does; initTemplate keeps `rs-phone` current after it.
+export function rsFirstPaint(first){
+  const root = document.documentElement;
+  root.classList.add(...first.classes);
+  if(first.panel_width_px != null) root.style.setProperty("--rs-panel-w", first.panel_width_px + "px");
+  if(matchMedia("(max-width:" + first.phone_max_width_px + "px)").matches) root.classList.add("rs-phone");
+}
 export function initTemplate(){
   const d = O.dashboard;
   if(!d) return;

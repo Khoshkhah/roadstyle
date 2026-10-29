@@ -3,7 +3,8 @@
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
 import {initCore, useStyle, _contractError, _emit} from "./core.js";
 import {initGeneration, useGeneration} from "./generation.js";
-import {initTemplate} from "./template.js";
+import {initTemplate, setSheet, getSheet} from "./template.js";
+import {initWindows, freeArea} from "./windows.js";
 import {initBoundary} from "./boundary.js";
 import {initTheme} from "./theme.js";
 import {mountColumn, rsTools} from "./tools.js";
@@ -14,7 +15,6 @@ import {initToolbar} from "./toolbar.js";
 import {initSettings} from "./settings.js";
 import {initPlacement} from "./placement.js";
 import {initSections} from "./sections.js";
-import {initWindows} from "./windows.js";
 import {initTip} from "./tip.js";
 import {initPanelScroll} from "./panelscroll.js";
 import {initOverlay} from "./overlay.js";
@@ -28,8 +28,8 @@ import {initFilter, initFilterBox, useFilter} from "./filter.js";
 import {initFind} from "./find.js";
 import {initColor, useColor} from "./color.js";
 import {useLegend} from "./legend.js";
-import {initOverlays} from "./overlays.js";
-import {initFeatures} from "./features.js";
+import {initOverlays, useOverlays} from "./overlays.js";
+import {initFeatures, useFeatures} from "./features.js";
 import {initTunnel} from "./tunnel.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
@@ -67,6 +67,7 @@ const RS_DEFAULTS = {
 function fromStyle(o, given){
   const meta = (o.style && o.style.metadata) || {}, it = meta["roadstyle:interaction"] || {};
   const ctl = meta["roadstyle:controls"] || {}, P = o.prefix || "";
+  if(!given.has("overlays")) o.overlays = [];          // the layers of the style of the moment: a later style without them takes the old ones away
   for(const k in ctl) if(!given.has(k)) o[k] = ctl[k];
   if(!given.has("overlays") && ctl.overlays && P)
     o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit, extrude: ov.extrude && P+ov.extrude,
@@ -132,8 +133,12 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useSelect(); useFilter(); useColor(); useLegend(); useColorBox();
+      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); useColor(); useLegend(); useColorBox();
     },
+    // the phone's bottom sheet: rs.sheet() is its height (0 closed, 1 40 %, 2 full; null: no sheet), rs.sheet(n) sets it; rs.freeArea() is the part of
+    // the map that the bar, the panel and the sheet leave free, in window coordinates ({lo, hi, top, bottom}): a host pads its map with it
+    sheet: n => n === undefined ? getSheet() : setSheet(n),
+    freeArea,
     // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
     setData, clearData,
     // the cut points of rs.setData, for a page that colours many calls the same way (an hour slider: the breaks of the whole day)

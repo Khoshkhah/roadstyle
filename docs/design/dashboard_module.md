@@ -59,6 +59,19 @@ rs.setStyle(style, {road_table});
   Colour by menu and the legend are made again in their place. The selection, the hover and the fetched properties go, because
   they are the old roads'. A switch that is off (a class, Bridges, Tunnels) applies to the new roads too.
 - **`style: null`.** The dashboard starts with no roads: nothing to pick until `setStyle`.
+- **The style's base-map layers (`ov<i>`).** They come with each style, so `setStyle` reads them again (`useOverlays`, `useFeatures`): the hover
+  handlers are made once for each layer id of the map (they find the overlay of the layer at each move), the Layers box and its rows are made
+  again (and taken away when the new style has no overlay), the 3D switch and the tool `buildings` follow the layers with an `extrude`
+  (the base map's own tool comes back when the new style has none), and an overlay that the person switched off stays off.
+- **The base map layers `bg` and `basemap` are the map's.** `basemap.js` reads the map, not the roads style: the raster layer is rebuilt
+  before the layer that follows it in the map, and a vector style's layers go before the same layer, so they stay under the roads that a
+  host added with a prefix. A vector style's `sprite` replaces the map's sprite for as long as it is the base map (its places' icons); the map's
+  own comes back with a raster base map. `rsSetBasemap(key)` of a map with a dark twin is the twin in the dark theme, for any caller.
+- **A host page's panel and options.** The shell of the panel (`#sb`, `.sb-top`, `#sb-hide`, `#sb-show`) is at the end of `dashboard.css`, so a
+  host page that has its own panel needs no copy of it. roadstyle-wasm's `hostOptions(look, given)` gives it the typed `dashboard`, the
+  `first_paint` (`rsFirstPaint`), and the `basemaps`, `ontop` and active key, by the same rules as `pageFrom`.
+- **The phone's sheet.** `rs.sheet()` and `rs.sheet(n)` read and set its height; `freeArea()` (also `rs.freeArea()`) ends at its upper edge on a phone and starts under the bar.
+  The boxes of the bar keep 12 px from every edge of the window, sideways too.
 - **`prefix`.** The page adds the roads style's sources and layers with this prefix (`"rs-"`). The dashboard adds it to each
   source and layer id that it uses. The names in the style itself stay as they are: a layer's `source-layer`, the metadata.
 - **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
@@ -144,7 +157,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 
 | Option | From `render` | Default in `index.js` | Read by |
 |---|---|---|---|
-| `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (the roles), `basemap.js` (the base map layer) |
+| `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (the roles) |
 | `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
 | `road_table` | (none: the tiled page sets `window.RS_SIDE`) | `null` | `core.js` (`RoadTable`) |
 | `live` | `live_data=True` (the Rust engine): `{color, width, types, ramp, nodata}` | the metadata `roadstyle:live`, else `null` | `live.js` |

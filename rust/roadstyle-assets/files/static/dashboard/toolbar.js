@@ -69,14 +69,15 @@ function boxRules(bar){
   document.addEventListener("keydown", e => { if(e.key === "Escape") boxes().forEach(t => t.close()); }, true);
   bar.addEventListener("click", e => { const own = e.target.closest(".maplibregl-ctrl"); setTimeout(() => boxes().filter(t => t.el !== own).forEach(t => t.close()), 0); });
 }
-// a box keeps 12 px from the edge of the window: it moves up or down by what it overhangs, at each opening and each change of its size
+// a box keeps 12 px from the edge of the window: it moves up, down, left or right by what it overhangs, at each opening and each change of its size
 const _tbGap = 12;
+const _tbShift = (lo, hi, size) => { const over = hi - (size - _tbGap), under = _tbGap - lo; return over > 0 ? -over : under > 0 ? under : 0; };
 function keepInside(box){
   const fit = () => {
     if(box.hidden || (box.classList.contains("bm-menu") && !box.classList.contains("open"))) return;
     box.style.translate = "0 0";                // a box is anchored at its top or at its bottom edge: it moves with `translate`, which works for both
-    const r = box.getBoundingClientRect(), over = r.bottom - (innerHeight - _tbGap), under = _tbGap - r.top;
-    box.style.translate = "0 " + (over > 0 ? -over : under > 0 ? under : 0) + "px";
+    const r = box.getBoundingClientRect();
+    box.style.translate = _tbShift(r.left, r.right, innerWidth) + "px " + _tbShift(r.top, r.bottom, innerHeight) + "px";
   };
   new MutationObserver(fit).observe(box, {attributes: true, attributeFilter: ["hidden", "class"]});
   new ResizeObserver(fit).observe(box);

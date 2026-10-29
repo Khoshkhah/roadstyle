@@ -1,7 +1,7 @@
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
-import {map, style, O, _emit} from "./core.js";
+import {map, O, _emit} from "./core.js";
 import {defineTool, BUILDINGS_ICON, LAYERS_ICON} from "./tools.js";
 import {buildBox} from "./basemapbox.js";
 import {savedKey} from "./settings.js";
@@ -10,12 +10,16 @@ let BASEMAPS = [];
 // "vbm-", under the roads, and the raster base map is hidden. Its building extrusion (a fill-extrusion layer) moves to the end, so a road
 // behind a building is hidden as in reality; it shows in 3D (pitch above 0) and the flat building layer shows in 2D. window.rsBuildings(on)
 // hides or shows the buildings in both modes.
-let vec = null, buildingsOn = true, glyphs0 = null;
+let vec = null, buildingsOn = true, glyphs0 = null, sprite0 = null;
+// The layer that follows the base map layer in the map: the vector style's layers and a rebuilt raster layer go before it, so they stay under the roads. The map is
+// asked, not the roads style: a host page adds the roads' layers with its prefix, and its own layers `bg` and `basemap` have none.
+const afterBase = ()=>{ const ls = map.getStyle().layers, i = ls.findIndex(l=>l.id === "basemap"); return (ls.slice(i + 1).find(l=>!l.id.startsWith("vbm-")) || {}).id; };
 const clearVector = ()=>{
   if(!vec) return;
   for(const l of map.getStyle().layers.filter(x=>x.id.startsWith("vbm-"))) map.removeLayer(l.id);
   for(const k of Object.keys(map.getStyle().sources).filter(x=>x.startsWith("vbm-"))) map.removeSource(k);
   if(glyphs0) map.setGlyphs(glyphs0);
+  if(sprite0 !== null){ sprite0 ? map.setSprite(sprite0) : map.removeSprite("default"); sprite0 = null; }
   vec = null;
   if(map.getLayer("basemap")) map.setLayoutProperty("basemap", "visibility", "visible");
 };
@@ -52,9 +56,11 @@ const mergeVector = async b=>{
   glyphs0 = glyphs0 || map.getStyle().glyphs;
   if(map.getLayer("basemap")) map.setLayoutProperty("basemap", "visibility", "none");
   if(s.glyphs) map.setGlyphs(s.glyphs);
+  // the style's icons (the places' `circle-11`, ...): its sprite takes the place of the map's, and the map's comes back with the raster base map
+  if(s.sprite){ if(sprite0 === null) sprite0 = map.getStyle().sprite || ""; map.setSprite(s.sprite); }
   for(const [k, v] of Object.entries(s.sources)) map.addSource("vbm-"+k, v);
-  const before = map.getStyle().layers.find(l=>l.id !== "bg" && l.id !== "basemap" && !l.id.startsWith("vbm-"));       // under the roads
-  for(const l of s.layers){ const m = {...l, id:"vbm-"+l.id}; if(l.source) m.source = "vbm-"+l.source; map.addLayer(m, before && before.id); }
+  const before = afterBase();       // under the roads
+  for(const l of s.layers){ const m = {...l, id:"vbm-"+l.id}; if(l.source) m.source = "vbm-"+l.source; map.addLayer(m, before); }
   vec = s;
   paintBuildings();
   for(const l of s.layers) if(l.type === "fill-extrusion") map.moveLayer("vbm-"+l.id);        // after the roads and the page's layers
@@ -67,17 +73,19 @@ export function rsBuildings(on){
   return buildingsOn;
 }
 export function rsSetBasemap(keyOrIdx){
-  const idx = typeof keyOrIdx==="number" ? keyOrIdx
+  let idx = typeof keyOrIdx==="number" ? keyOrIdx
     : BASEMAPS.findIndex(b=>b.key===keyOrIdx || b.label===keyOrIdx);
+  // a map with a dark twin (`dark`) is the twin in the dark theme, whoever asks (the box, the page, the theme)
+  const twin = BASEMAPS[idx] && BASEMAPS[idx].dark && document.documentElement.dataset.rsTheme === "dark" ? BASEMAPS.findIndex(b=>b.key === BASEMAPS[idx].dark) : -1;
+  if(twin >= 0) idx = twin;
   const b = BASEMAPS[idx]; if(!b) return;
   if(!b.style_url) clearVector();
   if(b.style_url){ mergeVector(b); }
   else if(b.tiles.length && map.getLayer("basemap")){
     // rebuild the source, not setTiles: a raster source's maxzoom (past it the last level is
     // scaled up) and its attribution are fixed when it is created. Same ids, same place in the
-    // layer order: back under the layer that followed it in the page's style.
-    const def = style.layers.find(l=>l.id==="basemap");
-    const after = style.layers.slice(style.layers.indexOf(def)+1).map(l=>l.id).find(id=>map.getLayer(id));
+    // layer order: back under the layer that follows it in the map.
+    const def = map.getStyle().layers.find(l=>l.id==="basemap"), after = afterBase();
     map.removeLayer("basemap"); map.removeSource("bm");
     map.addSource("bm", {type:"raster", tiles:b.tiles.map(keyed), tileSize:256, maxzoom:b.maxzoom||19, attribution:b.attr||""});
     map.addLayer({...def, layout:{...(def.layout||{}), visibility:"visible"}}, after);

@@ -7,6 +7,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **A JavaScript host page needs no adapters** (`rsDashboard(map, {style: null, prefix, ...})` and `rs.setStyle` after each build):
+  - The style's own base-map layers (`ov<i>`) get their switch, their hover and the 3D switch with each `rs.setStyle`; the rows of the old style go, a switch that was
+    off stays off.
+  - A raster base map goes under the roads that carry the page's prefix (the module reads the map's layer order, not the roads style).
+  - `rsSetBasemap("blank")` is the dark twin in the dark theme, for the page as for the box.
+  - A vector base map's `sprite` is merged (OpenFreeMap's place icons); the map's own sprite comes back with a raster base map.
+  - `hostOptions(look, given)` of roadstyle-wasm gives the typed `dashboard`, its `first_paint`, the `basemaps`, `ontop` and the active key, by the rules of `pageFrom`;
+    `rsFirstPaint(first)` (`dashboard/template.js`) sets the first paint. The panel's shell rules moved from the template `dashboard` to the end of `dashboard.css`.
+  - `rs.sheet()` / `rs.sheet(n)` (the phone sheet's height) and `rs.freeArea()` (the free part of the map; on a phone it counts the bar and the sheet).
+  - The element of a tool has `data-rs-tool="<id>"`, which stays after the `title` went to the tooltip.
 - **`rs.naturalBreaks(values, k)`** gives the cut points that `rs.setData` uses, so a page can give the same `breaks` to many calls (an hour slider: the breaks of the whole day).
 - **A legend row has a shape** (`square`, the default, `circle` or `line`): `dashboard={"legend": {"rows": [{"color": ..., "label": ..., "shape": "circle"}]}}` and `rs.legend.add`. The legend then
   explains the colour of a circle on the map (a sensor) as well as the colour of a road. A wrong shape is an error.
@@ -22,6 +32,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- **A box of the bar stays inside a phone's screen sideways.** The boxes moved up or down only; the base-map box was 143 px out of a 390 px screen. They move left or right too.
 - **A box of the bar stays inside the window.** The settings box could reach above the top of the window when the window was not high: the bar moved a box
   with `margin-top`, which does nothing for a box that is fixed to the bar by its bottom edge. It uses `translate` now, for every box.
 - **The "Colour by and legend" button is in the bar for a style that comes later.** A page that starts with `rsDashboard(map, {style: null, ...})` and gets its roads

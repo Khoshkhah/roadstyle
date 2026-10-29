@@ -35,7 +35,7 @@ export function buildBox(menu){
     const lab = _bxEl("label", "rs-bm-row"), r = _bxEl("input"), sw = _bxEl("span", "rs-bm-sw");
     r.type = "radio"; r.name = "rs-bm"; r.value = b.key; sw.style.background = _bxSwatch(b);
     lab.append(r, sw, _bxEl("span", "rs-bm-n", b.title || b.label));
-    r.onchange = () => window.rsSetBasemap(b.dark && isDark() ? b.dark : b.key);
+    r.onchange = () => window.rsSetBasemap(b.key);
     menu.appendChild(lab); rows.push([b, r, sw]);
   });
   menu.appendChild(_bxEl("hr"));

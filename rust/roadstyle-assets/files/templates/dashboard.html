@@ -7,22 +7,6 @@
 #map{right:var(--rs-panel-w,340px)}
 body{--rs-side:var(--rs-panel-w,340px)}   /* shift the map's right-anchored controls left of the panel */
 .co-ctrl,.co-lg{display:none}  /* the sidebar owns the colour-by select + legend; hide the built-in ones */
-#sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,340px);box-sizing:border-box;overflow:auto;
-  padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
-  --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
-  background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
-#sb[data-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026;--accent:#5aa9f8}
-.sb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.sb-top h2{margin:0;font-size:15px}
-#sb-th,#sb-hide{background:none;border:1px solid var(--line);border-radius:8px;color:var(--mut);
-  cursor:pointer;font-size:13px;width:28px;height:28px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
-#sb-hide{margin-left:6px}
-#sb #sb-th,#sb #sb-hide{padding:0}      /* over "#sb button": the icon needs the room */
-#sb-th:hover,#sb-hide:hover{color:var(--accent);border-color:var(--accent)}
-#sb.hidden{display:none}
-#sb-show{position:fixed;top:10px;right:10px;z-index:3;display:none;background:#fff;color:#333;
-  border:1px solid #ccc;border-radius:8px;width:32px;height:32px;cursor:pointer;padding:0;
-  align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 #sb label{display:block;margin:11px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
   text-transform:uppercase;letter-spacing:.04em}
 #sb select,#q{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
