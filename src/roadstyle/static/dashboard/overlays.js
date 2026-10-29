@@ -4,7 +4,7 @@
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields, _esc} from "../popup.js";
-import {map, O, OVERLAYS, _emit} from "./core.js";
+import {map, O, OVERLAYS, RS_PREFIX, _role, _emit} from "./core.js";
 import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
@@ -65,11 +65,16 @@ export function handleOverlayClick(e, tier){                      // info popup 
 let _ovTip = null;   // one shared hover tooltip for every overlay that asked for one (Overlay(tooltip=[...]))
 // window.rsSetOverlay(label, on) shows/hides one overlay; the Layers control is UI over it.
 export const _ovCbs={};   // label -> its checkbox in the Layers box
+// every layer of the map that draws an overlay's source: its `layers` and also the ones that the style does not list there (the fill pattern `ov0-pattern`, the
+// icons `ov13-icon`, the 3D layer), found by their source (a GeoJSON source) or source layer (tiles), so that a switch hides or shows the whole overlay
+const _ovAllLayers = ov => {
+  const role = ov.source.slice(RS_PREFIX.length);
+  return [...new Set([...ov.layers, ...map.getStyle().layers.filter(l=>_role(l)===role).map(l=>l.id)])].filter(id=>map.getLayer(id));
+};
 export function rsSetOverlay(labelOrIdx, on){
   const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
   const ov = OVERLAYS[i]; if(!ov) return;
-  ov.layers.forEach(id=>{ if(map.getLayer(id))
-    map.setLayoutProperty(id,"visibility", on?"visible":"none"); });
+  _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
   on ? _ovOff.delete(ov.label) : _ovOff.add(ov.label);
   if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;

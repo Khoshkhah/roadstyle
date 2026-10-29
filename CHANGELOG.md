@@ -50,6 +50,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
+  the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
+  in tiles).
 - **A box of the bar stays inside a phone's screen sideways.** The boxes moved up or down only; the base-map box was 143 px out of a 390 px screen. They move left or right too.
 - **A box of the bar stays inside the window.** The settings box could reach above the top of the window when the window was not high: the bar moved a box
   with `margin-top`, which does nothing for a box that is fixed to the bar by its bottom edge. It uses `translate` now, for every box.

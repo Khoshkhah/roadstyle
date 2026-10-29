@@ -317,3 +317,41 @@ def test_the_boxes_with_the_layers_stay_inside_a_phone(host):
     assert not errors, errors
     for tool, r in seen.items():
         assert r["left"] >= 11 and r["right"] <= 390 - 11 and r["top"] >= 0 and r["bottom"] <= 844 - 11, (tool, r)
+
+
+_VISIBLE_OV = """() => map.getStyle().layers.filter(l => /^ov\\d/.test(l['source-layer'] || '') || /(^|-)ov\\d/.test(l.id))
+  .filter(l => map.getLayoutProperty(l.id, 'visibility') !== 'none').map(l => l.id)"""
+
+
+def test_the_one_switch_hides_every_layer_of_the_area_data_and_shows_them_again(host):
+    """The layers that the style does not list in the overlay's `layers` (the fill pattern, the icons, the 3D layer) were left visible when the switch went off."""
+    base, vec = host
+    style, tiler = _engine_style()
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="application/x-protobuf", body=bytes(tiler.tile(*(int(v) for v in r.request.url.rsplit("/t/", 1)[1].split("?")[0].split("/")))))
+                   if "/t/" in r.request.url else r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        page.evaluate("(s) => addStyle(s)", style)
+        page.wait_for_function("!!map.getLayer('rs-ov5-3d') && window.RS_OVERLAYS.length > 0")
+        page.evaluate("() => rsSetBuildings3D(true)")
+        on = page.evaluate(_VISIBLE_OV)
+        assert "rs-ov0-pattern" in on and "rs-ov5-3d" in on, on
+        page.evaluate("() => rsSetOverlays(false)")
+        for zoom in (12, 15, 18):
+            page.evaluate("(z) => map.jumpTo({zoom: z})", zoom)
+            assert page.evaluate(_VISIBLE_OV) == [], (zoom, page.evaluate(_VISIBLE_OV))
+        page.evaluate("() => rsSetTheme('dark')")
+        page.evaluate("() => rsSetBasemap('osm')")
+        page.evaluate("() => rsSetBasemap('blank')")
+        page.evaluate("(s) => addStyle(s)", style)          # the next style comes with the switch off
+        assert page.evaluate(_VISIBLE_OV) == []
+        page.evaluate("() => rsSetOverlays(true)")
+        again = page.evaluate(_VISIBLE_OV)
+        assert "rs-ov0-pattern" in again and "rs-ov5-3d" in again, again
+        browser.close()
+    assert not errors, errors
