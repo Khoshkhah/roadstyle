@@ -1,5 +1,5 @@
 //! A flat layer's shapes at the pixel grid of the zoom (docs/design/tile_speed.md, "The tiles of the low zooms"). A flat layer is one that
-//! only `fill` and `line` style layers draw (`Tiles::flat`): the base map's land, water and buildings. Below the last zoom its polygons
+//! only `fill` and `line` style layers draw (`Tiles::flat`): the base map's land, water and paved areas. Below the last zoom its polygons
 //! are cut to the tile and its buffer and simplified to `TOLERANCE`, and a line under half a pixel is left out.
 
 use super::*;

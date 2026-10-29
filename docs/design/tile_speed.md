@@ -172,7 +172,7 @@ At z9 to z11 the base map is the cost. At z12 and z13 the road pieces are the co
 - A base-map polygon goes into each tile whole and is not simplified. The z10 tile has 92,611 vertices of land, and 80 % of its segments are shorter than 1 px.
 - The layer of other ways (`ov5`: the streets that are not in the network) has 17,000 to 23,000 lines with no property in a low-zoom tile, and 74 % of them at z9
   are shorter than 1 px. They are drawn with a stroke of 1.4 px.
-- No feature of a visible layer is outside its zoom span. Rule 1 has no gain here. The layers that the page hides at the start have 0.3 to 1 % of the bytes.
+- No feature of a visible layer is outside its zoom span. Rule 1 has no gain here. The layers that the page hides at the start have 0.1 to 1.1 % of the bytes (3.1 % at z15).
 
 **The rules.** A layer is flat when only `fill` and `line` style layers draw it (`Tiles::flat`): a point, symbol or extrusion layer needs its shape as it is.
 Below the last zoom, for a flat layer (`roadstyle-tiles/src/small.rs`):
@@ -182,7 +182,7 @@ Below the last zoom, for a flat layer (`roadstyle-tiles/src/small.rs`):
 | 1 | Only the features that a style layer draws at the zoom | None. Not changed. | `undrawn` = 0 (the budget) |
 | 6 | A polygon is cut to the tile and its buffer and simplified to 1 tile unit (1/8 px) | `ov0` 262 KB to 147 KB at z10, MapLibre z9 155 to 100 ms, z10 187 to 138 ms | `a_flat_layers_polygon_is_cut_to_the_tile_and_simplified` |
 | 7 | A line that is together under half a pixel long and stays in the tile is left out | `ov5` 384 KB to 208 KB at z10, MapLibre z9 100 to 73 ms, z10 138 to 114 ms | `a_flat_layers_line_under_half_a_pixel_is_left_out` |
-| 7 | A polygon whose box is under 1 px on both sides is left out | 3 to 4 % of the bytes, no change in MapLibre time. **Not done.** | |
+| 7 | A polygon whose box is under 1 px on both sides is left out | 2 to 4 % of the bytes, no change in MapLibre time. **Not done.** | |
 
 Why these numbers (each was measured on Burnaby, MapLibre time and the pixels that differ by more than 64 of 765 in 17 views, z9 to z16 and pitch 60):
 
@@ -190,7 +190,7 @@ Why these numbers (each was measured on Burnaby, MapLibre time and the pixels th
   by 1/8 px at most, which is the step of the tile grid. A tile of zoom z is drawn at the map zooms z to z + 1, so at the end of that span the edge moves by 1/4 px.
 - A limit of 1 px for the lines gave the same MapLibre time as half a pixel, 0.005 to 0.41 % of pixels that differ (half a pixel: 0.003 to 0.17 %), and 20 to 55 KB less for each tile at z9 to z10.
   A fragment of a footway is one feature, so a limit of 1 px makes more breaks in a path that has many short fragments.
-- The polygons under 1 px (rule 7, the third row) were built, measured and removed from the code: a gain of 3 to 4 % of the bytes and no gain in time is not worth a rule.
+- The polygons under 1 px (rule 7, the third row) were built, measured and removed from the code: a gain of 2 to 4 % of the bytes and no gain in time is not worth a rule.
 
 The last zoom is as before. A layer that a circle, symbol or extrusion layer draws is as before (the walls of an extrusion at a cut edge would show).
 
