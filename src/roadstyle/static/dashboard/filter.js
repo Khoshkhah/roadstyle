@@ -127,6 +127,7 @@ export function rsSetAccess(kind, on){      // show / hide the roads of one acce
 }
 // a new roads style (rs.setStyle): its layers' own filters are read again, and the switches that are off hide its roads too
 export function useFilter(){
+  if(O.filter){ FILTER = O.filter; ACCESS = FILTER.access || []; }          // a new style has its own road classes
   for(const k in _fltBase) delete _fltBase[k];
   for(const k in _ovBase) delete _ovBase[k];
   if(_modes) rsSetModes(_modes);                              // the new road table's rows

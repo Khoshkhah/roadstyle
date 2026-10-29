@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The tool `roads`** (after the base map button): the road filter in the bar. A box with a row for each road class (check box, colour, name, number of roads), All and None, and a click on a name shows only
+  that class; Bridges, Tunnels and the access kinds when the data has them. It uses the filter calls of the page, so the map template's Roads box and this tool are one filter. A page with no road classes
+  has the button greyed out. A style that comes later (`rs.setStyle`) gets its own classes.
 - **`dashboard={"toolbar": {"navigation": "box"}}`**: one button with the compass needle (it turns with the map and flattens with the tilt) in place of the + and - buttons, the
   compass and the 2D/3D button. A click opens a box with a zoom slider (with - and +), a turn slider, a tilt slider and a button that sets north and the tilt back. Ctrl + drag on the
   map turns and tilts it. **This is the default** (`"buttons"` brings the earlier buttons back; the compass button then has the tooltip "Drag to turn and tilt").

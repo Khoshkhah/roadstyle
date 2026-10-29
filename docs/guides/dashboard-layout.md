@@ -21,10 +21,10 @@ There is one template with a panel: `dashboard`. A future template follows its s
 
 ## The toolbox
 
-The bar has one button for each tool: theme, navigate, Street View, Google 3D, base map, 3D buildings,
+The bar has one button for each tool: theme, navigate, Street View, Google 3D, base map, roads, 3D buildings,
 colour and legend, settings, attribution. The toolbox is fixed: a tool that the page cannot use is greyed out, and its tooltip says why.
 The map is navigated with **one button** (the compass needle): a click opens a box with a zoom, a turn and a tilt slider, and Ctrl + drag on the map turns and tilts it.
-`dashboard={"toolbar": {"navigation": "buttons"}}` brings the buttons back (+, -, compass, 2D/3D). The credits button is in the bottom corner, with the scale and the zoom number.
+`dashboard={"toolbar": {"navigation": "buttons"}}` brings the buttons back (+, -, compass, 2D/3D). **Roads** filters the road types (a check box and a count for each class; All, None; a click on a name shows only that class). The credits button is in the bottom corner, with the scale and the zoom number.
 
 A box opens toward the map; one box is open at a time. A click outside it, or Escape, closes it.
 

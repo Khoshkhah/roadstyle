@@ -9,6 +9,7 @@ import {initTheme} from "./theme.js";
 import {mountColumn, rsTools} from "./tools.js";
 import {initColorBox, useColorBox} from "./colorbox.js";
 import {initNavBox} from "./navbox.js";
+import {initRoadsBox, useRoadsBox} from "./roadsbox.js";
 import {naturalBreaks} from "./breaks.js";
 import {initSelectBox} from "./selectbox.js";
 import {initToolbar} from "./toolbar.js";
@@ -117,6 +118,7 @@ export function rsDashboard(map, options){
   initSelect();
   initColorBox();
   initNavBox();
+  initRoadsBox();
   initSelectBox();
   initPanelScroll();
   initPlacement();
@@ -134,7 +136,7 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useSelect(); useFilter(); useColor(); useLegend(); useColorBox();
+      useStyle(style); useSelect(); useFilter(); useColor(); useLegend(); useColorBox(); useRoadsBox();
     },
     // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
     setData, clearData,

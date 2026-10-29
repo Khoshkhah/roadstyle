@@ -188,7 +188,7 @@ def test_the_base_map_follows_the_theme_from_the_start(tmp_path):
 
 def test_the_toolbox_is_fixed_and_a_tool_that_the_page_cannot_use_is_greyed_out(tmp_path):
     """The same tools are in the bar of every dashboard, in the same order; the ones that this page cannot use are disabled, with a title that says why."""
-    fixed = ["theme", "navigate", "street_view", "google_3d", "basemap", "buildings", "legend", "settings", "attribution"]
+    fixed = ["theme", "navigate", "street_view", "google_3d", "basemap", "roads", "buildings", "legend", "settings", "attribution"]
     path = tmp_path / "bare.html"
     rs.render_dashboard(_edges(), basemap="blank", basemap_switcher=False, street_view=False).save(path)         # no colour option, no Google 3D, one base map
     full = tmp_path / "full.html"

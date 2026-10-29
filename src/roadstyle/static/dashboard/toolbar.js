@@ -122,7 +122,7 @@ export function initToolbar(){
     }
   });
   boxRules(bar);
-  const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-nav-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
+  const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-nav-box, #rs-roads-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
   toolList().forEach(fitBox); setOnReplace(fitBox);
   _tbRerun = followPanels(bar, () => bar.dataset.edge);
   return true;
