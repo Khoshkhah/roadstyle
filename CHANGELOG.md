@@ -6,6 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
+  MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
+
 ### Added
 - **MapLibre Tile (MLT) as a second tile format**, with MVT the default. `export_style(..., tile_format="mlt")`, `roadstyle tiles
   --tile-format mlt`, `Tiler.tile(source, z, x, y, "mlt")` and `Tiler.style("mlt")` write or give the same tiles in MLT (the crate

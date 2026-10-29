@@ -73,11 +73,47 @@ With `tile_format="mlt"`:
 
 The map app must use MapLibre GL JS 5.12 or later. An app that does not know MLT shows no road.
 
-On the Monaco test data, the 468 tiles are 5.9 MB in MVT and 2.4 MB in MLT. After gzip they are 2.3 MB and 1.4 MB. MapLibre
-draws the two formats with the same pixels (`tests/test_mlt.py` compares four views). MapLibre needs the same time, or up to
-11 % more, to read MLT.
+#### Which format to choose
 
-Two things are different in MLT:
+- **MLT** is the better choice for tiles that go over a network: a tile server, a folder of XYZ tiles or a PMTiles file. An MLT
+  tile has about 40 % of the bytes of an MVT tile, and about 60 % after gzip.
+- **MVT** is the better choice for tiles that the browser makes itself (`Tiler`, see [section C](#c-make-the-tiles-in-the-browser)).
+  No network sends these tiles, so the smaller size gives no gain, and the worker needs more time to make an MLT tile.
+- **MVT stays the default.** MapLibre needs about the same time to read both formats, but the speed can depend on the browser and
+  on the device. All measurements below use one browser (Chromium with software rendering). A comparison in several browsers and
+  on a phone is still to do.
+
+#### Measured results
+
+All numbers come from MapLibre GL JS 5.24.
+
+| Test | MVT | MLT |
+|---|---|---|
+| Monaco test data, 468 tiles, bytes | 5.9 MB | 2.4 MB |
+| The same tiles, after gzip | 2.3 MB | 1.4 MB |
+| Burnaby, the largest tile of each zoom 9 to 15, after gzip | 70 to 495 KB | 43 to 288 KB (57 to 61 % of MVT) |
+| Burnaby, MapLibre time to read and lay out the largest tile | base | +1 to +10 % (z9 to z13), -1 % (z14), +6 % (z15) |
+| Pixels that differ from the MVT picture | - | 0 (Monaco, four views; Burnaby, 17 views) |
+
+The page of duckosm-rust measured the tile of a Burnaby view (driving) in the browser, with the blank base map. Each row is the mean
+over the tiles of the view, in 2 runs for each format. "Cut" is the time that the map worker needs to make the tile. "Read" is the
+time that MapLibre needs to parse the tile and make its layout.
+
+| Zoom | Tiles | KB for each tile, MVT / MLT | Cut (ms), MVT / MLT | Read (ms), MVT / MLT |
+|---|---|---|---|---|
+| 11 | 14 | 113 / 45 | 0.4 / 5.3 | 128 / 122 |
+| 13 | 10 | 248 / 90 | 1.1 / 12.8 | 173 / 211 |
+| 15 | 9 | 113 / 49 | 0.6 / 7.2 | 133 / 103 |
+
+- The read time is about the same. The difference is within the noise of the runs.
+- The worker needs 5 to 13 ms to cut an MLT tile, and about 1 ms for an MVT tile. The MVT time is low because the engine keeps the
+  MVT tiles that it cut before; MLT is made from the MVT tile each time it is asked for.
+- The tests are `tests/test_mlt.py` (the pixels), `rust/roadstyle-rs/tests/tile_mlt.rs` (the features) and
+  `rust/roadstyle-rs/tests/tile_budget.rs` (the size limits of the MLT tiles). The Burnaby numbers of the first table are from a
+  speed study of 2026-10-28 (headless Chromium, software rendering, 1 worker, the best of 7 to 15 runs). The second table is from the
+  duckosm-rust page (2026-10-29).
+
+#### What is different in MLT
 
 - A property has one type in a tile layer. When a key has two types in one layer, MLT writes its values as text. For example,
   `__rs_cap` is `true` on some pieces and `"square"` on others, so MLT gives `"true"` and `"square"`. A style expression that

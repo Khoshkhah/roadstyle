@@ -291,6 +291,9 @@ const tiler = new Tiler(roads, look, undefined, "Monaco", "rs://1/", ["name", "h
 | `tiler.props("roads", row)` | the properties of one road, for a click |
 | `tiler.archive(bounds, layers)` | only on request: one PMTiles archive of all tiles, as bytes |
 
+MVT is the default. MLT is for tiles that go over a network; for tiles made in the browser, MVT is faster to make. See
+[the measurements](../rust/tiles.md#measured-results).
+
 - The style: **tiled**, and **live** when the look has `args.state = "live"` (else baked). Its source `roads` points to
   `rs://1/roads/{z}/{x}/{y}`, and the page answers this address with `tiler.tile`.
 - Nothing is written to a file. The page can write a whole HTML file with `pageFrom`, as `render_edges` does.

@@ -57,6 +57,11 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 
+The tile format: use `"mvt"` (the default) for tiles that the page makes in the browser. An MLT tile has about 40 % of the bytes, but the
+worker needs 5 to 13 ms to make it, and about 1 ms for an MVT tile. MapLibre needs about the same time to read both. The results can
+depend on the browser and on the device, so MVT stays the default until a comparison in several browsers is done
+([the measurements](tiles.md#measured-results)).
+
 A look's JSON (`toJson`) is a format to save and load a look, not an API: its inner fields change between versions. Do not read or
 change its fields. Give your keywords to `resolveLook`, or change a saved look with `withArg`.
 
