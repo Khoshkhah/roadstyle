@@ -1,6 +1,7 @@
 """Top-level ``render_edges`` — normalise input, filter, then render with the chosen backend."""
 from __future__ import annotations
 
+import json
 import warnings
 from collections.abc import Mapping
 
@@ -141,9 +142,9 @@ def render_edges(
         if k in kwargs:
             raise ValueError(f"render_edges takes no {k}: compute the levels first (rs.compute_levels(edges, {k}=...), or rs.level_input + "
                              "rs.solve_levels) and pass casing_level_col / fill_level_col / casing_start_col / casing_end_col")
-    if kwargs.get("sidebar") is not None:      # render_dashboard, render_report: the sidebar's keywords where the call gives none
-        from .pages import SIDEBAR_DEFAULTS
-        for k, v in SIDEBAR_DEFAULTS.get(kwargs["sidebar"], {}).items():
+    if kwargs.get("template") is not None:      # render_dashboard, render_report: the template's keywords where the call gives none
+        from . import _engine
+        for k, v in json.loads(_engine.rust().template_keys()).get(kwargs["template"], {}).items():
             kwargs.setdefault(k, v)
     for k, why in (("engine", "roadstyle has one engine, the Rust engine"), ("simple", "the simple look is the only look")):
         if k in kwargs:

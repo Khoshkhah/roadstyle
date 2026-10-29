@@ -439,10 +439,10 @@ fn page_key_defaults() -> String {
     serde_json::Value::Object(roadstyle::page_options::page_key_defaults()).to_string()
 }
 
-/// sidebar_keys() -> str: the keywords that each sidebar (sidebar=) changes when the caller gives none (JSON text).
+/// template_keys() -> str: the keywords that each template (template=) changes when the caller gives none (JSON text).
 #[pyfunction]
-fn sidebar_keys() -> String {
-    serde_json::Value::Object(roadstyle::page_options::sidebar_keys()).to_string()
+fn template_keys() -> String {
+    serde_json::Value::Object(roadstyle::dashboard::template_keys()).to_string()
 }
 
 /// export_look(look, cols, positions) -> str: the simple look for another app's data layer (roadstyle_engine::export_look); `cols`: the
@@ -649,7 +649,7 @@ fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(page_of_json, m)?)?;
     m.add_function(wrap_pyfunction!(page_from, m)?)?;
     m.add_function(wrap_pyfunction!(page_key_defaults, m)?)?;
-    m.add_function(wrap_pyfunction!(sidebar_keys, m)?)?;
+    m.add_function(wrap_pyfunction!(template_keys, m)?)?;
     m.add_function(wrap_pyfunction!(export_look, m)?)?;
     m.add_function(wrap_pyfunction!(inline_style, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_look, m)?)?;

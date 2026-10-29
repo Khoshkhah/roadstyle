@@ -10,7 +10,7 @@ const OVERLAY_SAMPLES = {sensors: "sensors.geojson", zones: "zones.geojson"};
 const CMAPS = ["viridis", "plasma", "magma", "cividis", "coolwarm", "RdYlGn_r"];
 const OV_COLORS = ["#7c4dff", "#00bcd4", "#ff9800", "#e91e63"];
 const ID_COLS = new Set(["id", "fid", "gid", "uid", "objectid"]);
-// the pages (pages.render_dashboard, render_report: sidebar=), their Python call, title and base maps offered (studio/dashboard.py, report.py)
+// the pages (pages.render_dashboard, render_report: template=), their Python call, title and base maps offered (studio/dashboard.py, report.py)
 const PAGES = {map: {fn: "render_edges", file: "map.html"},
                dashboard: {fn: "render_dashboard", file: "dashboard.html", title: "Roads dashboard"},
                report: {fn: "render_report", file: "report.html", title: "Roads report"}};
@@ -49,7 +49,7 @@ function keywords(co){
 // are the dashboard's filter (include= is Python's filter before the engine), the overlays their GeoJSON
 function lookOptions(co){
   const {palette, include, ...kw} = keywords(co), args = {...kw, name: kw.name || "roadstyle", state: "live"};
-  if (st.page !== "map") args.sidebar = st.page;
+  if (st.page !== "map") args.template = st.page;
   // a JSON object's keys are text, as in Python's json.dumps of the dict
   if (args.color_options) args.color_options = co.map((o) => o.colors ? {...o, colors: Object.fromEntries([...o.colors].map(([k, c]) => [String(k), c]))} : o);
   if (args.overlays) args.overlays = st.overlays.map((o) => ({label: o.label, color: o.color, placement: o.under ? "under" : "over", popup: o.popup,

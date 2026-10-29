@@ -3,6 +3,7 @@
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
 import {initCore, useStyle, _contractError} from "./core.js";
 import {initGeneration, useGeneration} from "./generation.js";
+import {initTemplate} from "./template.js";
 import {initPanel, initPanelTab} from "./panel.js";
 import {initZoom} from "./zoom.js";
 import {initView3D} from "./view3d.js";
@@ -30,6 +31,7 @@ const RS_DEFAULTS = {
   sources: null,               // role -> {source, layer} (roadstyle:sources); null: the style's metadata, else its layers
   arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
   live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)
+  dashboard: null,             // the template's typed options (roadstyle::dashboard::Dashboard): layout, panel, toolbar, windows, phone; null: none
   basemaps: [], basemap_switcher: true,
   tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
   tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
@@ -77,6 +79,7 @@ export function rsDashboard(map, options){
   if(error){ console.error(error); o.style = null; }
   fromStyle(o, given);
   initCore(map, o);
+  initTemplate();
   initPanel();
   initZoom();
   initView3D();

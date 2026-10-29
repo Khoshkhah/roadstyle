@@ -297,7 +297,7 @@ mod wasm {
 
     /// pageFrom(roads: Uint8Array, look: Look, options: string, given?: string) -> string: the page of the roads (GeoParquet) in one
     /// call, as render_edges(backend="web") (roadstyle::page_options::page_from; MapLibre stays a placeholder). `look`: resolveLook's of
-    /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args. The page's keys (sidebar,
+    /// `options` (its JSON text, which a view's palette resolves again), with "state": "live" in its args. The page's keys (template,
     /// popup_mode, ...) come from the call's args (page_options::given_of: the keywords that are not map options, name, road_popup);
     /// `given`: the caller's values over them (JSON text: api_key, street_view_key, resolved_basemaps); `features`: a duckOSM map's base
     /// map (Parquet bytes).

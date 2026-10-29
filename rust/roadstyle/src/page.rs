@@ -6,6 +6,7 @@
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use crate::dashboard::Dashboard;
 use crate::sources::Styled;
 use roadstyle_engine::table::JsSafe;
 use serde_json::{Map, Number, Value};
@@ -32,6 +33,8 @@ const PMTILES_JS: &str = asset!("vendor/pmtiles.js");
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PageOptions {
+    /// the template's typed options (docs/design/dashboard_templates.md)
+    pub dashboard: Dashboard,
     pub basemaps: Vec<Value>,
     pub basemap_switcher: bool,
     /// a tiled page (the roads in the embedded PMTiles archive)
@@ -221,7 +224,8 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
     opts.insert("camera".into(), serde_json::json!({"center": [(x0 + x1) / 2.0, (y0 + y1) / 2.0], "pitch": c.pitch, "bearing": c.bearing,
                                                     "max_pitch": c.max_pitch, "bounds": [[x0, y0], [x1, y1]]}));
     // the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
-    let mut html = fill(&frame(), &[("__TITLE__", escape(p.name)), ("__STYLE__", style_json),
+    let first = page.dashboard.first_paint();
+    let mut html = fill(&frame().replacen("</head><body>", &format!("</head><body>{first}"), 1), &[("__TITLE__", escape(p.name)), ("__STYLE__", style_json),
                                     ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();

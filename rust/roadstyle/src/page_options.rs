@@ -4,6 +4,7 @@
 //! writes the page. The Python binding, the CLI and the studio call it; the caller resolves only what it alone knows: a base map that is not in
 //! data/basemaps.json, the base map's API key and the Google Maps key.
 
+use crate::dashboard::Template;
 use crate::look::Options;
 use crate::page::{escape, gzip_b64, page_html, Camera, PageOptions, PageParts};
 use crate::sources::Styled;
@@ -19,18 +20,9 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": false,
-    "sidebar": null, "filter_control": true, "legend": true}"#;
+    "template": null, "filter_control": true, "legend": true}"#;
 
-/// The bundled sidebars (`sidebar=`, pages.render_dashboard and render_report): the template that goes on the page, and the keywords
-/// that it changes when the caller does not give them (pages.py's defaults; tests/test_pages.py checks them).
-const SIDEBARS: [(&str, &str, &str); 2] = [
-    ("dashboard", roadstyle_assets::text!("templates/dashboard.html"),
-     r#"{"name": "Roads dashboard", "basemap_switcher": false, "filter_control": false, "road_popup": false}"#),
-    ("report", roadstyle_assets::text!("templates/report.html"),
-     r#"{"name": "Roads report", "basemap_switcher": true, "filter_control": false, "road_popup": false}"#),
-];
-
-/// The two map options that a sidebar's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
+/// The two map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
 const SIDEBAR_YIELDS: [&str; 2] = ["name", "road_popup"];
 
 /// The page's keys of a call (render_edges' keywords), the `given` of page_from: the look's `other` (the call's keywords that are not map
@@ -46,12 +38,7 @@ pub fn given_of(look: &Look, args: &Value) -> Map<String, Value> {
     g
 }
 
-/// The keywords that each sidebar changes, and their values.
-pub fn sidebar_keys() -> Map<String, Value> {
-    SIDEBARS.iter().map(|(k, _, d)| (k.to_string(), serde_json::from_str(d).expect("a sidebar's defaults are JSON"))).collect()
-}
-
-/// pages._page: the sidebar's template with the page's name as its heading (its first <h2>), before the end of the body.
+/// A template's sidebar with the page's name as its heading (its first <h2>), before the end of the body.
 fn add_sidebar(html: String, template: &str, name: &str) -> String {
     let frag = match (template.find("<h2>"), template.find("</h2>")) {
         (Some(i), Some(j)) if i < j => format!("{}<h2>{}</h2>{}", &template[..i], escape(name), &template[j + 5..]),
@@ -119,35 +106,35 @@ pub struct Page {
 }
 
 /// The page of `roads` with `look` (resolved from `options`, which a view's palette resolves again with its palette). `given`: the
-/// page's keys (render's keywords: name, basemap_switcher, sidebar, views, hover_delay_ms, ...; a look has none), over the base map's page
+/// page's keys (render's keywords: name, basemap_switcher, template, views, hover_delay_ms, ...; a look has none), over the base map's page
 /// defaults (`look.base_map_page`), and the caller's values: `street_view_key`, `api_key` (put into a base map's URL), and
 /// `resolved_basemaps`, the entries (as data/basemaps.json's) of the base map keys that the caller resolved itself (the caller's key of
 /// each provider). `features`: the base map's rows (`read_features`, a duckOSM map's features.parquet), or None.
-type Sidebar = (&'static str, &'static str, &'static str);
-
-/// The sidebar the call names (`sidebar=`), if any.
-fn sidebar_of(given: &Map<String, Value>) -> Result<Option<&'static Sidebar>, crate::Error> {
-    match given.get("sidebar").filter(|v| !v.is_null()) {
-        None => Ok(None),
-        Some(v) => SIDEBARS.iter().find(|s| v == s.0).map(Some)
-            .ok_or_else(|| crate::error::options(format!("sidebar must be \"dashboard\" or \"report\", got {}", repr(v)))),
+/// The template the call names (`template=`); none: `map`. The keyword `sidebar` of the old form is an error.
+fn template_of(given: &Map<String, Value>) -> Result<Template, crate::Error> {
+    if given.contains_key("sidebar") {
+        return Err(crate::error::options("sidebar= is now template=: use \"dashboard\", \"report\", \"review\" or \"map\""));
+    }
+    match given.get("template").filter(|v| !v.is_null()) {
+        None => Ok(Template::Map),
+        Some(v) => Template::parse(v.as_str().ok_or_else(|| crate::error::options(format!("template must be a name, got {}", repr(v))))?),
     }
 }
 
-/// The page's keywords: the defaults of the page keys, the base map's, the name, a sidebar's where the caller gave none, then the caller's.
+/// The page's keywords: the defaults of the page keys, the base map's, the name, a template's where the caller gave none, then the caller's.
 /// With a sidebar, the look too (it sets the popup, which stage 1 reads).
-fn page_args(look: &Look, given: &Map<String, Value>, sidebar: Option<&Sidebar>) -> Result<(Map<String, Value>, Option<Look>), crate::Error> {
+fn page_args(look: &Look, given: &Map<String, Value>, template: Template) -> Result<(Map<String, Value>, Option<Look>), crate::Error> {
     let mut owned = None;
     let mut a = page_key_defaults();
     a.extend(look.base_map_page.iter().map(|(k, v)| (k.clone(), v.clone())));
-    let named = look.map.output.name.as_ref();         // the map's name: the call's or the base map's, over a sidebar's
+    let named = look.map.output.name.as_ref();         // the map's name: the call's or the base map's, over a template's
     if let Some(n) = named {
         a.insert("name".into(), n.as_str().into());
     }
-    if let Some((_, _, d)) = sidebar {
+    if let Some((_, d)) = template.sidebar() {
         let mut l = look.clone();
         let mine = |k: &str| given.contains_key(k) || (k == "name" && named.is_some());
-        for (k, v) in serde_json::from_str::<Map<String, Value>>(d).expect("a sidebar's defaults are JSON").into_iter().filter(|(k, _)| !mine(k)) {
+        for (k, v) in serde_json::from_str::<Map<String, Value>>(d).expect("a template's defaults are JSON").into_iter().filter(|(k, _)| !mine(k)) {
             if k == "road_popup" {
                 l = l.with_arg(&k, v)?;
             } else {
@@ -221,8 +208,8 @@ fn page_camera(look: &Look, k: &PageKeys) -> Result<Camera, crate::Error> {
 
 pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
                  -> Result<Page, crate::Error> {
-    let sidebar = sidebar_of(given)?;
-    let (a, owned) = page_args(look, given, sidebar)?;
+    let template = template_of(given)?;
+    let (a, owned) = page_args(look, given, template)?;
     let look = owned.as_ref().unwrap_or(look);
     let k: PageKeys = serde_json::from_value(Value::Object(a.clone())).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
     // the map options that the page reads too: the popup panel, the 3D view, the hover colour, the colour options, the columns
@@ -253,7 +240,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let mut tunnel = ctl["tunnel"].clone();
     tunnel["bg"] = bg.into();
     let opts = PageOptions {
-        basemaps: bms, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
+        dashboard: template.dashboard(), basemaps: bms, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
         popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
         street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d: k.google_3d,
@@ -280,8 +267,8 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         side: Some((&Value::Null, Some(&side))), simple_js: Some(&simple_js), sources: Some(&src),
     };
     let mut html = page_html(page_style, &opts, &parts);
-    if let Some((_, template, _)) = sidebar {
-        html = add_sidebar(html, template, parts.name);
+    if let Some((sidebar, _)) = template.sidebar() {
+        html = add_sidebar(html, sidebar, parts.name);
     }
     Ok(Page { html, warnings: std::mem::take(&mut src.warnings) })
 }
@@ -563,12 +550,12 @@ mod tests {
 
     #[test]
     fn given_of_has_the_page_keys_of_a_call() {
-        let o = Options::from_value(&json!({"args": {"state": "live", "sidebar": "dashboard", "popup_mode": "panel", "name": "N",
+        let o = Options::from_value(&json!({"args": {"state": "live", "template": "dashboard", "popup_mode": "panel", "name": "N",
                                                      "road_popup": ["highway"], "color_by": "lanes"}})).unwrap();
         let g = given_of(&Look::resolve(&o).unwrap(), &o.args);
-        assert_eq!(g["sidebar"], "dashboard");
+        assert_eq!(g["template"], "dashboard");
         assert_eq!(g["popup_mode"], "panel");
-        assert_eq!((&g["name"], &g["road_popup"]), (&json!("N"), &json!(["highway"])));   // a sidebar's defaults give way to them
+        assert_eq!((&g["name"], &g["road_popup"]), (&json!("N"), &json!(["highway"])));   // a template's defaults give way to them
         assert!(!g.contains_key("color_by") && !g.contains_key("state"), "map options are the look's: {g:?}");
     }
 }

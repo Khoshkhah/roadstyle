@@ -127,8 +127,8 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
     """mapstyle's ``render_map`` on the Rust engine: the page of the duckOSM file ``db`` (``read``, its roads in the style of ``mode``, the
     base map of ``features.*`` with ``layers``, the shared dashboard with the base map's controls: modes, kinds, each layer's clicks,
     tooltip and popup). ``interaction``: a layer's start ``{clickable, tooltip, popup}`` (e.g. ``{"landcover": {"clickable": True}}``).
-    ``dashboard=True``: roadstyle's report page (``sidebar="report"``). ``kwargs``: render_edges' keywords (``basemap``, ``tiles``,
-    ``sidebar``, ...). Gives a ``WebMap`` (``.save(path)``)."""
+    ``dashboard=True``: roadstyle's report page (``template="report"``). ``kwargs``: render_edges' keywords (``basemap``, ``tiles``,
+    ``template``, ...). Gives a ``WebMap`` (``.save(path)``)."""
     from . import render_web as rw
     from ._engine import _warn, page_given, rust
 
@@ -143,7 +143,7 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
         roads = _with_modes(roads)
         colors = yaml.safe_load(_assets.text("data/basemap/modes.yaml"))["mode_colors"]
         # the panel shows the clicked road: no road hover tooltip
-        kw = {"name": f"{Path(db).stem}: dashboard", "tooltip": None, "sidebar": "report",
+        kw = {"name": f"{Path(db).stem}: dashboard", "tooltip": None, "template": "report",
               "color_options": {"Road class": {}, "Modes": {"color_by": "modes", "colors": colors}}, **kw}
     o = _options(db, mode, theme, paths, level_kw, kw)
     lk = rust().resolve_look(json.dumps(o))

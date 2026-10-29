@@ -111,7 +111,7 @@ ignore it.
 | `color_col` | `"color"` | all | the colour column when `color_table` is a DataFrame |
 | `color_options` | `None` | web | `{name: {styler kwargs}}`: a *Colour by* menu that recolours in the browser; the first entry shows on open |
 | `color_active` | `0` | web | the option shown on open (index or name) |
-| `sidebar` | `None` | web | `"dashboard"` or `"report"`: the bundled sidebar of `render_dashboard` or `render_report` on the page; it also sets `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none |
+| `template` | `None` | web | `"map"`, `"dashboard"`, `"review"` or `"report"`: the form of the page (`None` is `"map"`). A template sets the panel, the layout, the toolbar and the window rules; the three with a sidebar also set `name`, `basemap_switcher`, `filter_control` and `road_popup` where the call gives none. `render_dashboard` and `render_report` set it. The old `sidebar=` is an error |
 | `views` | `None` | web | `{name: {setting: value}}`: a *View* menu next to *Colour by*; each view sets several things at once, the first shows on open |
 
 Each `color_options` value takes `color_by`, `colors`, `cmap`, `vmin`, `vmax`, `width_by`,
@@ -200,8 +200,8 @@ change the defaults below.
 
 | function | page | changed defaults | own keywords |
 |---|---|---|---|
-| `render_dashboard` | map + sidebar: base map and colour-by menus, class filter with legend, query box, results table, read-out | `name="Roads dashboard"`, `basemap_switcher=False`, `filter_control=False`, `road_popup=False` | |
-| `render_report` | map + sidebar: KPI cards, colour-by legend, filter, search, read-out | `name="Roads report"`, `filter_control=False`, `road_popup=False` | |
+| `render_dashboard` | map + sidebar: base map and colour-by menus, class filter with legend, query box, results table, read-out | `template="dashboard"`, `name="Roads dashboard"`, `basemap_switcher=False`, `filter_control=False`, `road_popup=False` | `template="review"`: the overlay form ([Dashboard layout](../guides/dashboard-layout.md)) |
+| `render_report` | map + sidebar: KPI cards, colour-by legend, filter, search, read-out | `template="report"`, `name="Roads report"`, `filter_control=False`, `road_popup=False` | |
 | `render_street_view` | map + Google Street View of the clicked road | `name="Roads and Street View"`, `road_popup=False`, `street_view=True` | see below |
 
 | `render_street_view` keyword | default | what |

@@ -52,23 +52,19 @@ def _page(gdf, template: str, *, defaults: dict, edit=None, **kw):
     return m
 
 
-#: the keywords that each sidebar (``sidebar=``) changes when the call gives none (roadstyle::page_options::SIDEBARS, the same)
-SIDEBAR_DEFAULTS = {
-    "dashboard": {"name": "Roads dashboard", "basemap_switcher": False, "filter_control": False, "road_popup": False},
-    "report": {"name": "Roads report", "basemap_switcher": True, "filter_control": False, "road_popup": False},
-}
-
-
-def render_dashboard(gdf, **kw):
+def render_dashboard(gdf, *, template="dashboard", **kw):
     """A self-contained **dashboard** page: the styled map with every built-in control off and the
     bundled dashboard sidebar injected — base-map + colour-by selects, a class filter with a legend,
     a WHERE-clause query box with a result table, and a selected-road read-out.
 
     Populate the *Colour by* picker with ``color_options={...}`` (see :func:`render_edges`); any
     other ``render_edges`` keyword passes through. Returns a :class:`WebMap`;
-    ``.save("dashboard.html")`` writes the page."""
+    ``.save("dashboard.html")`` writes the page.
+
+    ``template="review"``: the overlay form (the map fills the window, the sidebar floats, a toolbar at the right; see
+    docs/guides/dashboard-layout.md). The default ``"dashboard"`` docks the sidebar."""
     kw.pop("backend", None)                       # web only: the sidebar drives a MapLibre map
-    return render_edges(gdf, backend="web", sidebar="dashboard", **kw)
+    return render_edges(gdf, backend="web", template=template, **kw)
 
 
 def render_report(gdf, **kw):
@@ -79,7 +75,7 @@ def render_report(gdf, **kw):
     Same ``color_options=`` / ``render_edges`` keywords as :func:`render_dashboard`. Returns a
     :class:`WebMap`; ``.save("report.html")`` writes the page."""
     kw.pop("backend", None)
-    return render_edges(gdf, backend="web", sidebar="report", **kw)
+    return render_edges(gdf, backend="web", template="report", **kw)
 
 
 def render_street_view(gdf, *, panel_width: float = 42, resizable: bool = True,

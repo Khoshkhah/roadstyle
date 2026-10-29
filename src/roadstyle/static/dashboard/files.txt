@@ -2,6 +2,7 @@
 # Rust page writer). A new module: add its name here. tests/test_release_files.py checks that each .js file of this folder is here.
 core
 generation
+template
 panel
 find
 zoom

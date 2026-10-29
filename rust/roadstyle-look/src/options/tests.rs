@@ -31,7 +31,7 @@ fn the_flat_keywords() {
     let (m, rest) = MapOptions::from_args(&json!({
         "highway_col": "klass", "casing_level_col": "cl", "fill_level_col": "fl", "color_by": "speed", "cmap": ["#000", "red"],
         "width_by": [1, 4], "road_popup": "panel", "road_tooltip": false, "tooltip": ["name"], "minzoom": {"service": 16},
-        "color_table": {"1": "#ff0000"}, "color_key": "id", "view_3d": true, "state": "live", "basemap": "blank", "sidebar": null,
+        "color_table": {"1": "#ff0000"}, "color_key": "id", "view_3d": true, "state": "live", "basemap": "blank", "template": null,
         "levels": {"edge_hash": "ab", "n_edges": 2}, "modes": ["driving"], "interaction": {"landcover": {"clickable": true}},
         "color_options": {"Speed": {"color_by": "speed", "missing": "self"}, "Class": {}},
         "overlays": [{"fc": {"type": "FeatureCollection", "features": []}, "kind": "line", "edge_col": "eid", "text_col": null,

@@ -121,3 +121,33 @@ def test_street_view_spot_is_readable():
     """The spot - edge, metres along it, point, heading - is exposed as a getter and an event."""
     h = rs.render_edges(_edges(), backend="web").html
     assert "window.rsGetStreetViewSpot = rsGetStreetViewSpot" in h and '"rs:streetviewspot"' in h
+
+
+def _dashboard(html):
+    """The typed `dashboard` option of a page (RS_OPTIONS.dashboard)."""
+    import json
+    return json.JSONDecoder().raw_decode(html, html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]["dashboard"]
+
+
+def test_each_page_has_its_template():
+    assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
+    d = _dashboard(rs.render_dashboard(_edges()).html)
+    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "dock", {"side": "right", "width_px": 340}, None)
+    assert _dashboard(rs.render_report(_edges()).html)["phone"]["panel"] == "below"
+
+
+def test_the_review_template_is_the_overlay_form():
+    h = rs.render_dashboard(_edges(), template="review").html
+    d = _dashboard(h)
+    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right"})
+    assert d["windows"]["clamp"] is True and d["windows"]["recenter_map"] is False
+    assert '<div id="sb"' in h and "<h2>Roads review</h2>" in h
+    assert 'c.add("rs-tpl-review","rs-overlay","rs-has-toolbar","rs-tb-right")' in h   # the first paint has the form
+
+
+def test_a_template_name_is_checked_and_sidebar_is_gone():
+    import pytest
+    with pytest.raises(ValueError, match="template must be"):
+        rs.render_dashboard(_edges(), template="wide")
+    with pytest.raises(ValueError, match="unknown keyword .sidebar."):
+        rs.render_edges(_edges(), backend="web", sidebar="dashboard")

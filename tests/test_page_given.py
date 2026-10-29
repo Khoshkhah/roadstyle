@@ -1,4 +1,4 @@
-"""The page's keys of a call (sidebar, popup_mode, ...) go into page_from's `given` by one rule, roadstyle::page_options::given_of: the
+"""The page's keys of a call (template, popup_mode, ...) go into page_from's `given` by one rule, roadstyle::page_options::given_of: the
 look's other keywords, and name and road_popup of the call. Python's page (_engine.page_given) and the wasm page (pageFrom, Roads.page:
 the studio) use it, so the same keywords give the same page. Before, the wasm page lost them (the studio's Dashboard and Report pages had
 no sidebar)."""
@@ -14,9 +14,9 @@ from roadstyle import _engine
 ROOT = pathlib.Path(__file__).parents[1]
 DATA = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "monaco_part" / "roads.parquet"
 PKG = ROOT / "rust" / "roadstyle-wasm" / "pkg" / "roadstyle_wasm.js"
-ARGS = {"state": "live", "basemap": "blank", "sidebar": "dashboard", "popup_mode": "panel", "find_control": True, "name": "Monaco",
+ARGS = {"state": "live", "basemap": "blank", "template": "dashboard", "popup_mode": "panel", "find_control": True, "name": "Monaco",
         "road_popup": ["highway", "name"]}
-KEYS = ("sidebar", "popup_mode", "find_control", "name", "road_popup", "basemap_switcher", "filter_control")
+KEYS = ("template", "popup_mode", "find_control", "name", "road_popup", "basemap_switcher", "filter_control")
 
 
 def _opts(html):
@@ -28,8 +28,8 @@ def test_given_of_has_the_calls_page_keys():
     o = {"args": ARGS}
     lk = _engine.rust().resolve_look(json.dumps(o))
     g = json.loads(_engine.rust().given_of(lk, json.dumps(o)))
-    assert {k: g.get(k) for k in ("sidebar", "popup_mode", "find_control", "name", "road_popup")} == {k: ARGS[k] for k in (
-        "sidebar", "popup_mode", "find_control", "name", "road_popup")}
+    assert {k: g.get(k) for k in ("template", "popup_mode", "find_control", "name", "road_popup")} == {k: ARGS[k] for k in (
+        "template", "popup_mode", "find_control", "name", "road_popup")}
     assert "state" not in g, "a map option is the look's"
 
 

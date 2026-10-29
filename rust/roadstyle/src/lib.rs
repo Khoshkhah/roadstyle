@@ -12,6 +12,7 @@ pub use roadstyle_io::gpkg;
 pub mod error;
 pub use error::Error;
 pub use roadstyle_engine::Error as EngineError;
+pub mod dashboard;
 pub mod level_area;
 pub mod level_editor;
 pub mod options;
