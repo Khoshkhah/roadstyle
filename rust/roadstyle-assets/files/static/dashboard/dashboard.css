@@ -148,9 +148,9 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 /* the phone form of a template (template.js; `rs-phone` and `rs-tpl-*` are on <html> from the first paint). A sidebar template shows its
    panel as a bottom sheet (dashboard, review) or under the map (report); the map is the full width. */
 .rs-grip{display:none}
-html.rs-phone #map{right:0!important}
-html.rs-phone body{--rs-side:0px!important}
-html.rs-phone #sb-hide,html.rs-phone #sb-show,html.rs-phone #rp-hide,html.rs-phone #rp-show{display:none!important}
+html.rs-phone:not(.rs-tpl-map) #map{right:0!important}
+html.rs-phone:not(.rs-tpl-map) body{--rs-side:0px!important}
+html.rs-phone:not(.rs-tpl-map) :is(#sb-hide,#sb-show,#rp-hide,#rp-show){display:none!important}
 html.rs-phone{--rs-sheet-h:40vh;--rs-grip-h:28px}
 html.rs-phone.rs-sheet-0{--rs-sheet-h:0px}
 html.rs-phone.rs-sheet-2{--rs-sheet-h:calc(100vh - 52px - var(--rs-grip-h))}

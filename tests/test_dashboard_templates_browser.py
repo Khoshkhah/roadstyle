@@ -55,7 +55,8 @@ def test_the_sidebar_is_a_sheet_of_three_heights(tmp_path, template):
         for state in (2, 0, 1):                            # from 40 %, a tap of the grip goes to full, then closed, then 40 % again
             page.touchscreen.tap(195, _box(page, ".rs-grip")["t"] + 14)
             page.wait_for_timeout(300)
-            heights[state] = page.evaluate("getComputedStyle(document.getElementById('sb')).display") == "none" and 0 or _box(page, "#sb")
+            hidden = page.evaluate("getComputedStyle(document.getElementById('sb')).display") == "none"
+            heights[state] = 0 if hidden else _box(page, "#sb")
         browser.close()
     assert not errors
     assert heights[2]["t"] >= 52 and heights[2]["b"] == 844                  # full: the bar's 52 px stay free

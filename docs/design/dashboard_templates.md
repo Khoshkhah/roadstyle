@@ -1,16 +1,16 @@
 # Dashboard templates and the toolbox
 
-Status: design, 2026-10-29. Not built. A later session builds it in the steps of section 4.
+Status: approved 2026-10-29. Being built in the steps D1 to D8 of section 4.
 
 ## 1. Why
 
-A SimReady session built a layout and a toolbox on the old `main` branch (67 commits, `git log origin/rust-engine..origin/main`).
+A SimReady session built a layout and a toolbox on the old Python `main` branch (67 commits, `git log 87917037..python-engine-final`). Since 2026-10-29 the old branch is the tag `python-engine-final`, and `main` is the Rust engine.
 It is in Python (`render_dashboard(layout=, toolbar=)`) and in `window.rs*` switches. Kaveh wants named dashboard forms and one toolbox
 for every project, with the options in Rust and a phone form for each form. The design changes only the page: tile contract 2 and the tile budget stay as they are.
 
-## 2. Inventory of `main`
+## 2. Inventory of the old `main` (tag `python-engine-final`)
 
-| Feature | Where on `main` | On `rust-engine` |
+| Feature | Where on the old `main` | In the Rust engine |
 |---|---|---|
 | Overlay layout: full map, floating panel, chevrons, corner scale box that slides with the panel | `dashboard_layout/layout.js`, `layout.css`, `pages._with_layout` | a module; `Layout` in Rust; binding pass-through; Playwright |
 | Toolbar: 4 positions, slides beside the panel, theme first, attribution last, dark theme, pop-ups in its look | `layout.js` (moves MapLibre controls into the bar) | the tool registry (3.2); `Toolbar` in Rust; the bar written by `page.rs` |
@@ -66,9 +66,9 @@ pub struct Google3d { pub fov_deg: Option<f64>, pub follow: bool, pub min_alt_m:
 
 Only `review` sets `windows.clamp: true` and `recenter_map: false`. The other templates keep today's window rules.
 
-The `window.rs*` switches of `main` become fields:
+The `window.rs*` switches of the old `main` become fields:
 
-| `main` | `rust-engine` |
+| Old `main` | Rust engine |
 |---|---|
 | `rsWindowRecentre = false` | `windows.recenter_map: false` |
 | `rsRestoreWindows = false` | `windows.restore_open: false` |
@@ -103,24 +103,26 @@ The JS side, on the `rs` object (`window.rsTools` is the alias):
 | `rs.on("tool", fn)` | Tells the page of each open, close and press |
 
 Each control module registers its tool and adds no MapLibre control. Two renderers read the registry: the column (template `map`) and
-the bar. Thus the DOM moves and the 150 ms poll of `main`'s `layout.js` go.
+the bar. Thus the DOM moves and the 150 ms poll of the old `layout.js` go.
 
 ### 3.3 The pop-up boxes and the windows
 
 | Part | Rule |
 |---|---|
-| Base-map box | One radio row with a swatch for each map, then "On top": Hillshade, Labels, 3D buildings. A themed pair is one row. Labels is greyed on a map with its own labels |
+| Base-map box | One radio row with a swatch for each map, then "On top": Hillshade, Labels, 3D buildings. A themed pair is one row. Labels is one state for the 2D map and the Google 3D window (decided 2026-10-29): the switch is always on, the Google 3D window always follows it (HYBRID with labels, SATELLITE without), and the 2D map gets labels only from the base maps that can show them (the OpenFreeMap styles; Esri Gray and Esri Satellite add Esri's label tiles). Blank, OpenStreetMap, Esri Streets and CARTO get no label layer from the page |
 | Base-map data | `data/basemaps.json` gets `style_url`, `group`, `title`, `dark`, `swatch`, and a `menu` list in place of `switcher`. The Esri label and hillshade URLs move there from the JS |
 | Legend box | The legend of the active color option, the classes in two columns |
 | Attribution box | The base map's text, and Google's when a Google window is open |
+| Area boundary | The outline of the area (decided 2026-10-29, level 3): a thin line over the base map and under the roads, the outside of it shaded, and the camera limited to the boundary's bounds (`maxBounds`, with a margin). It comes from the table `main.boundary` of the duckOSM file; a page of a plain GeoDataFrame gives it with `boundary=`. Fields: `boundary.outline`, `boundary.dim`, `boundary.limit`, each on by default in `dashboard` and `review` and off in `map` and `report` |
+| Theme | One value on `<html>` (`light` or `dark`) that the sidebar, the bar, the boxes, the popup and the tooltip all read (decided 2026-10-29: the popup and the tooltip have a dark theme too). The theme button of the bar sets it; a dark base map can set it |
 | Windows | Opened and clamped in the free area (between the panel and the bar) at each change. A window keeps the user's size and grows back. With `recenter_map: false`, it never moves the map |
 | Google 3D | The map leads, in one direction only (brief section 9). Input in the window, or a Google camera change that the page did not set, turns Follow off |
 | 3D "Show" selector | `Layer3d {id, label, kind (Line, Ribbon, Polygon, Points), source, match_prop, scope (Selection, View), max: 500, style, arrows, on}`. JS: `rs.g3d.layers.register`, `list`, `setOn`, `refresh` (alias `window.rsG3dLayers`). The menu shows with two layers or more. A page can replace the built-in layer `selected` |
 
-## 4. The port from `main`
+## 4. The port from the old `main`
 
-The port copies the JS from `main` into `rust/roadstyle-assets/files/static/dashboard/` and changes it to read the typed options. It is
-not a git merge of `main`. Each step lands alone, with its desktop form, its phone form and its tests.
+The port copies the JS from the tag `python-engine-final` into `rust/roadstyle-assets/files/static/dashboard/` and changes it to read the typed options. It is
+not a git merge of the old branch. Each step lands alone, with its desktop form, its phone form and its tests.
 
 | Step | Content | Tests |
 |---|---|---|
@@ -130,21 +132,22 @@ not a git merge of `main`. Each step lands alone, with its desktop form, its pho
 | D4 | The overlay layout, the floating panel, the chevrons, the corner box; template `review` | The panel checks |
 | D5 | The window rules in `float.js` | The window checks |
 | D6 | The base-map box, the `basemaps.json` fields, the OpenFreeMap merge, "On top" | The base-map checks |
-| D7 | Google 3D from `main`'s last form: one-way link, Follow, the note, modes and labels | The Google 3D checks, with the `gmp-map-3d` stub |
+| D7 | Google 3D from the last form of the old `main`: one-way link, Follow, the note, modes and labels | The Google 3D checks, with the `gmp-map-3d` stub |
 | D8 | The 3D layers and the "Show" selector | The 3D layer checks |
+| D9 | The area boundary: `Boundary` in Rust, `main.boundary` read from the duckOSM file, the outline, the dim and the limit in JS | The boundary checks: the line is under the roads; a pan cannot leave the bounds; each field can be turned off |
 
-What happens to `main`:
+What happens to the old `main` (the tag `python-engine-final`, which no branch follows):
 
-1. From now on, `main` gets no new features. A SimReady fix can still go on `main`, with a line in the port list below.
-2. After D8, `main` is frozen. Its README says so and points to `rust-engine`.
+1. It gets no new work. A SimReady fix that it needs is made in the Rust engine, with a line in the port list below.
+2. The Rust engine is `main` (`rust-engine` is the same commit).
 3. The SimReady page moves to the Rust dashboard (`template="review"`, its tools and 3D layers as options) in the SimReady repository.
    Its `tools/test_map.py` must pass on the new page before the move.
 
-Port list (commits on `main` after 1c835679, and their step): none yet.
+Port list (commits of the tag after 1c835679, and their step): none yet.
 
 ## 5. Tests
 
-The Playwright checks from `main`'s `tests/test_dashboard_layout_browser.py`, `test_google3d_layers_browser.py`, `test_g3d_fov_option.py`
+The Playwright checks from the tag's `tests/test_dashboard_layout_browser.py`, `test_google3d_layers_browser.py`, `test_g3d_fov_option.py`
 and the SimReady brief (sections 7j to 7m, 8 to 10):
 
 | Group | Checks |
@@ -169,4 +172,4 @@ not cover the bar; a window is a bottom sheet; 40 % of the height or more shows 
 | 3. Where is the bar on a phone? | At the top, horizontal, for every desktop position; the panel and the windows are bottom sheets |
 | 4. Keep the 401/403 tile check of each base map when the page is built? | No. The engine makes no network requests. A provider that stops answering is removed from `basemaps.json` |
 | 5. Keep the debug switches of Google 3D (`?g3dalt=`, `?g3d=leave`, the logs and counters)? | Keep only one read-out behind `?debug=1`; remove the URL switches |
-| 6. When does `main` stop? | No new features from today; SimReady fixes only, each in the port list, until D8 lands |
+| 6. When does the old `main` stop? | At once: the tag `python-engine-final` gets no new work |
