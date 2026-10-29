@@ -85,7 +85,7 @@ def test_the_binding_tiles_of_monaco_are_within_the_budget():
     budget = BUDGET["areas"]["monaco"]
     lon, lat = budget["center"]
     over = []
-    for z in range(12, 16):
+    for z in range(9, 16):
         limit, biggest, view_bytes, view_features, layers = budget[f"z{z}"], 0, 0, 0, {}
         most = 0
         for tile in (tiler.tile(*t) for t in _square(z, lon, lat)):

@@ -11,9 +11,11 @@
 //! box is under 1 px). For the view: the bytes of all its tiles and the bytes and features of its largest tile. For the style: the size
 //! of each filter, paint and layout (JSON characters) that is over `SMALL`, and the total.
 //!
-//! The view of an area is the 3 x 3 tiles around a fixed centre (the budget file keeps it, `center`). The keep list of the tiles is
-//! empty: the numbers are the engine's own tiles, without a page's popup fields. Each area has two looks: `monaco` is the page's
+//! The view of an area is the 3 x 3 tiles around a fixed centre (the budget file keeps it, `center`), at zoom 9 to 15. The keep list of the
+//! tiles is empty: the numbers are the engine's own tiles, without a page's popup fields. Each area has two looks: `monaco` is the page's
 //! (the lean look: the `simple` pieces and the slots) and `monaco-full` is `export_style`'s (it has the whole-road layer `roads` too).
+//! `monaco-base` and `tartu-base` are the page's look with the area's base map (land, water, paved areas, buildings): at the low zooms it is
+//! most of a tile.
 //!
 //!     cargo test --release -p roadstyle-rs --test tile_budget -- --nocapture       (the table)
 //!     ROADSTYLE_BURNABY_ROADS=<roads.parquet> cargo test --release -p roadstyle-rs --test tile_budget burnaby -- --ignored --nocapture
@@ -28,25 +30,38 @@ use std::path::PathBuf;
 type View = (String, Vec<(u32, u32, u32)>);
 
 /// The first and the last zoom of the fixed views.
-const ZOOMS: std::ops::RangeInclusive<u32> = 12..=15;
+const ZOOMS: std::ops::RangeInclusive<u32> = 9..=15;
 /// A filter, paint or layout of a style layer over this many JSON characters has its own limit; a smaller one has none.
 const SMALL: usize = 256;
 /// One pixel in tile units (512 px tiles, extent 4096).
 const PIXEL: i64 = 8;
 
-/// The areas of the budget: its name, the inputs' folder in tests/data, and whether it is the full look (`export_style`'s: the
-/// whole-road layer `roads` too) or the lean look of the page.
-const AREAS: [(&str, &str, bool); 4] = [("monaco", "monaco", false), ("monaco-full", "monaco", true), ("tartu", "tartu", false), ("tartu-full", "tartu", true)];
+/// What an area's tiles are made from: the page's lean look (`Lean`), the look of `export_style` (`Full`: the whole-road layer `roads` too),
+/// or the lean look with the area's base map (`Base`: tests/data/look.json and the area's `features.parquet`).
+#[derive(Clone, Copy, PartialEq)]
+enum Kind {
+    Lean,
+    Full,
+    Base,
+}
+
+/// The areas of the budget: its name, the inputs' folder in tests/data, and its look.
+const AREAS: [(&str, &str, Kind); 6] = [("monaco", "monaco", Kind::Lean), ("monaco-full", "monaco", Kind::Full), ("monaco-base", "monaco", Kind::Base),
+                                        ("tartu", "tartu", Kind::Lean), ("tartu-full", "tartu", Kind::Full), ("tartu-base", "tartu", Kind::Base)];
 
 fn data(p: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(p)
 }
 
-/// An area's look: its options (golden_options.json.gz); `full`: as an export (areas.rs), with the whole-road layer `roads`.
-fn look(area: &str, full: bool) -> roadstyle_rs::Look {
+/// An area's look: its options (golden_options.json.gz), as an export (areas.rs) with the whole-road layer `roads` for `Full`; the page's
+/// look (look.json) for `Base`.
+fn look(area: &str, kind: Kind) -> roadstyle_rs::Look {
+    if kind == Kind::Base {
+        return roadstyle_rs::Look::from_value(serde_json::from_slice(&std::fs::read(data("look.json")).unwrap()).unwrap()).unwrap();
+    }
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
     let mut look = roadstyle_rs::Look::resolution_value(&roadstyle_rs::look::Options::from_value(&o).unwrap()).unwrap();
-    look["args"]["export"] = full.into();
+    look["args"]["export"] = (kind == Kind::Full).into();
     roadstyle_rs::Look::from_value(look).unwrap()
 }
 
@@ -181,7 +196,8 @@ struct Rules {
     undrawn: usize,
 }
 
-fn rules_of(z: u32, feats: &[common::Feature], reads: Option<&HashSet<String>>,
+/// `last`: the tiles' last zoom: its tiles have every feature that a layer draws at or after it (MapLibre scales them up).
+fn rules_of(z: u32, last: u32, feats: &[common::Feature], reads: Option<&HashSet<String>>,
             zoom: &roadstyle_rs::tiles::rules::ZoomRules) -> Rules {
     let mut r = Rules::default();
     let mut used: HashSet<&str> = HashSet::new();
@@ -190,7 +206,7 @@ fn rules_of(z: u32, feats: &[common::Feature], reads: Option<&HashSet<String>>,
         r.no_id += usize::from(id.is_none());
         if !zoom.is_empty() {
             let (from, until) = zoom.span(props);
-            r.undrawn += usize::from(!(z as f64 + 1.0 > from && (z as f64) < until));
+            r.undrawn += usize::from(!((z == last || z as f64 + 1.0 > from) && (z as f64) < until));
         }
         if *kind != 1 {
             let pts: Vec<[i64; 2]> = parts.iter().flatten().copied().collect();
@@ -252,6 +268,7 @@ fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look,
     let style: Value = serde_json::from_str(&style).unwrap();
     let reads = style_reads(&style);
     let layers_json = style["layers"].as_array().cloned().unwrap_or_default();
+    let last = serde_json::to_value(&look.sections.tiles).unwrap()["maxzoom"].as_f64().unwrap_or(f64::MAX) as u32;
     let mut zoom: HashMap<String, roadstyle_rs::tiles::rules::ZoomRules> = HashMap::new();
     let mut out = Map::new();
     out.insert("center".into(), json!(center));
@@ -268,7 +285,7 @@ fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look,
             for (l, tb) in tables {
                 features += tb.features;
                 let zr = zoom.entry(l.clone()).or_insert_with(|| roadstyle_rs::tiles::rules::ZoomRules::of(&layers_json, &l));
-                let r = rules_of(z, &decoded[&l], reads.get(&l), zr);
+                let r = rules_of(z, last, &decoded[&l], reads.get(&l), zr);
                 for (what, n) in [("undrawn", r.undrawn), ("duplicates", tb.dup)] {
                     if n > 0 {
                         broken.push(format!("{name} {l} {z}/{x}/{y}: {n} {what} (rule {})", if what == "undrawn" { 1 } else { 5 }));
@@ -288,12 +305,13 @@ fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look,
 }
 
 /// The areas of the budget: the fixed views of the area's roads (the budget's centre, else the roads' middle).
-fn measure_area(dir: &str, full: bool, saved: &Value, broken: &mut Vec<String>) -> Value {
+fn measure_area(dir: &str, kind: Kind, saved: &Value, broken: &mut Vec<String>) -> Value {
     let roads = std::fs::read(data(&format!("{dir}/roads.parquet"))).unwrap();
     let center = saved["center"].as_array().map(|c| [c[0].as_f64().unwrap(), c[1].as_f64().unwrap()]).unwrap_or_else(|| center_of(&roads));
     let views = ZOOMS.map(|z| (format!("z{z}"), square(z, center[0], center[1]))).collect();
-    // no base-map features: the areas' golden looks have no layers_yaml (the overlays are measured by the local Burnaby gate)
-    measure(roads, None, &look(dir, full), center, views, broken)
+    // the golden looks have no layers_yaml: only `Base` has the base map (Burnaby's is measured by the local gate)
+    let features = (kind == Kind::Base).then(|| std::fs::read(data(&format!("{dir}/features.parquet"))).unwrap());
+    measure(roads, features, &look(dir, kind), center, views, broken)
 }
 
 /// Every number of `got` that is larger than its limit in `limit`, or has none: as lines.
@@ -356,8 +374,8 @@ fn has(area: &str) -> bool {
 fn the_tiles_stay_within_their_budget() {
     let budget = budget();
     let (mut got, mut errors) = (Map::new(), Vec::new());
-    for (name, dir, full) in AREAS.into_iter().filter(|(_, dir, _)| has(dir)) {
-        let m = measure_area(dir, full, &budget["areas"][name], &mut errors);
+    for (name, dir, kind) in AREAS.into_iter().filter(|(_, dir, _)| has(dir)) {
+        let m = measure_area(dir, kind, &budget["areas"][name], &mut errors);
         println!("{}", table(name, &m, &budget["areas"][name]));
         over(&m, &budget["areas"][name], name, &mut errors);
         got.insert(name.into(), m);
