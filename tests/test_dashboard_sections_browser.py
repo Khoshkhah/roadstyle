@@ -27,8 +27,8 @@ def _page(tmp_path, **dash):
     return path
 
 
-def _open(p, path):
-    browser = p.chromium.launch(args=_ARGS)
+def _open(p, path, scrollbars=False):
+    browser = p.chromium.launch(args=_ARGS, ignore_default_args=["--hide-scrollbars"] if scrollbars else None)       # headless hides the scrollbars by default
     page = browser.new_page(viewport={"width": 1280, "height": 800})
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -100,3 +100,52 @@ def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
     assert not errors
     assert light["text"] != dark["text"] and light["card"] != dark["card"] and light["link"] != dark["link"]
     assert min(light["ratios"]) >= 4.5 and min(dark["ratios"]) >= 4.5, (light, dark)
+
+
+@pytest.mark.parametrize("side", ["left", "right"])
+def test_the_scrollbar_of_the_panel_is_at_its_outer_edge(tmp_path, side):
+    """A tall panel scrolls: the scrollbar is at the left of a left panel and at the right of a right panel, and the content keeps its left-to-right text."""
+    path = tmp_path / "scroll.html"
+    tall = {"id": "tall", "label": "Tall", "html": "".join(f"<p>Line {i}</p>" for i in range(60))}
+    rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"side": side, "sections": [tall]}}).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path, scrollbars=True)
+        got = page.evaluate("""() => { const b = document.querySelector('#sb .sb-body'), l = b.querySelector('label').getBoundingClientRect(), r = b.getBoundingClientRect();
+            return {bar: b.offsetWidth - b.clientWidth, scrolls: b.scrollHeight > b.clientHeight, gapLeft: l.left - r.left, gapRight: r.right - l.right,
+                    dir: getComputedStyle(b.querySelector('label')).direction}; }""")
+        browser.close()
+    assert not errors and got["scrolls"] and got["bar"] > 0 and got["dir"] == "ltr"
+    assert (got["gapLeft"] > got["gapRight"]) == (side == "left")        # the scrollbar's width is on the outer side
+
+
+def test_the_panel_scrollbar_is_hidden_at_rest_has_enough_contrast_and_the_fade_follows_the_scroll(tmp_path):
+    """At rest the thumb is transparent; over the panel it shows with a contrast of 3:1 or more against the panel, in both themes; `data-more` (the fade) is
+    on while there is more below and off at the end."""
+    path = tmp_path / "thumb.html"
+    tall = {"id": "tall", "label": "Tall", "html": "".join(f"<p>Line {i}</p>" for i in range(60))}
+    rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"sections": [tall]}}).save(path)
+    probe = """() => { const b = document.querySelector('#sb .sb-body'), ctx = document.createElement('canvas').getContext('2d'); ctx.canvas.width = ctx.canvas.height = 1;
+        const rgba = c => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
+        const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+        const bg = rgba(getComputedStyle(document.getElementById('sb')).getPropertyValue('--bg').trim()).slice(0, 3);
+        const sc = getComputedStyle(b).scrollbarColor, thumb = sc.slice(0, sc.indexOf(') ') + 1);
+        const [r, g, bl, a] = rgba(thumb), over = [r, g, bl].map((v, i) => v * a / 255 + bg[i] * (1 - a / 255));
+        const [x, y] = [lum(over), lum(bg)].sort((m, n) => n - m);
+        return {alpha: a, ratio: (x + .05) / (y + .05)}; }"""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        rest = page.evaluate("getComputedStyle(document.querySelector('#sb .sb-body')).scrollbarColor")
+        more_top = page.evaluate("document.querySelector('#sb .sb-body').hasAttribute('data-more')")
+        page.evaluate("document.querySelector('#sb .sb-body').classList.add('rs-scrolling')")
+        light = page.evaluate(probe)
+        page.evaluate("rsSetTheme('dark')")
+        page.wait_for_timeout(300)
+        dark = page.evaluate(probe)
+        page.evaluate("const b = document.querySelector('#sb .sb-body'); b.scrollTop = b.scrollHeight")
+        page.wait_for_timeout(300)
+        more_end = page.evaluate("document.querySelector('#sb .sb-body').hasAttribute('data-more')")
+        browser.close()
+    assert not errors
+    assert rest.startswith("rgba(0, 0, 0, 0)"), rest                       # at rest the thumb is transparent
+    assert more_top is True and more_end is False
+    assert light["ratio"] >= 3.0 and dark["ratio"] >= 3.0, (light, dark)

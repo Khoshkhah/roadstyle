@@ -22,6 +22,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
+### Changed
+- **The panel's scrollbar** is at its outer edge (at the left for a left panel, at the right for a right panel), shows only while the pointer is over the panel or
+  the body scrolls, and has a soft fade at the bottom edge while more is below. The thumb is the text color at 47 % (light) or 40 % (dark): 3:1 against the panel.
+
 ### Added
 - **Sections for the dashboard panel and rows for its legend.** `dashboard={"panel": {"sections": [{id, html, label, after, before}], "hide": [...]},
   "legend": {"rows": [{color, label}]}}` and the run-time `rs.sections` and `rs.legend` replace the string edits of the template's HTML (the old `edit=`). A section

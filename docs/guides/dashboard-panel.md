@@ -47,3 +47,9 @@ already do. For your own colours, use the panel's variables, and not fixed colou
 
 `.sb-note` is small, muted text and `.rs-sec-box` is a box. Both have a contrast of 4.5 or more in the two themes. The rows of
 `legend` follow the theme too.
+
+## Scrolling
+
+The panel's title stays, and only the body scrolls. The scrollbar is at the outer edge of the panel: at the left of a left panel,
+at the right of a right panel. It shows only when you point at the panel or scroll. A soft fade at the bottom edge shows that more
+content is below. The scrollbar has a contrast of 3:1 or more in both themes. Your sections scroll with the rest, and you do not need CSS for it.

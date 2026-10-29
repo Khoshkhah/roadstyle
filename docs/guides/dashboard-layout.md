@@ -26,7 +26,7 @@ colour and legend, settings, attribution. A tool that the page does not use is n
 
 A button that opens a box opens it toward the map. One box is open at a time. A click outside the box, or the Escape key, closes it.
 
-Your own blocks in the panel and rows in the legend: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard to the new version](migrating-dashboard.md).
+The panel scrolls under its title, with the scrollbar at its outer edge. Your own blocks and legend rows: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard to the new version](migrating-dashboard.md).
 
 To add a tool of your own, use `rs.tools`:
 
@@ -45,7 +45,7 @@ The gear button opens the settings. They are kept in the browser, not in the pag
   as a frame (default) or as a card. The scale and zoom box can be hidden.
 - **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
 - **Keys.** A Google Maps key (Street View and Google 3D) and a CARTO key. A key that you save is used instead of the key of the page.
-  A page with a toolbox can be built with no Google key. The person who opens it adds the key in the settings.
+  A page with a toolbox needs no Google key at build time: the person adds it.
 
 ## The windows
 
@@ -59,11 +59,9 @@ A window is a bottom sheet too. Only one sheet is open at a time.
 
 ## The area boundary
 
-If the page has a `boundary` (a polygon), the map shows a line along it and shades the outside.
-The camera stays near it, and you can still zoom out and move the whole area off the screen.
-Give the polygon with `boundary=` (GeoJSON, or a shapely geometry).
+`boundary=` (GeoJSON, or a shapely geometry) is an input of the page: the map shows a dashed line along it. `boundary_dim=True` shades the
+outside. `boundary_limit=True` keeps the camera near it. Both are off by default, because a page can show a general map.
 
 ## Style
 
-Every part uses the same tokens and works in the light and the dark theme. The rules are in
-`docs/design/dashboard_templates.md`, section 3.4.
+Every part uses the same tokens and works in both themes. The rules are in `docs/design/dashboard_templates.md`, section 3.4.

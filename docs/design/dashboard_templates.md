@@ -139,6 +139,7 @@ finished. (Decided 2026-10-29: "every item must follow the style, and have a dar
 | No system parts | No native `title` tooltip (tip.js takes it), no native `<select>` list (selectbox.js), no native scrollbar style. Native controls get `color-scheme` from the theme |
 | Boxes | A box of the bar has the same width (264 px), padding (8 px) and font (12 px) as the others, keeps 12 px from the window edge, opens toward the map, and closes on an outside click and on Escape. It is never clipped by its parent: a bar must not have an `overflow` rule |
 | Panels | The header stays and only the body scrolls (`.sb-top` and `.sb-body`). The body does not hand its scroll to the map |
+| Scrollbar | At the outer edge of the panel (a left panel: at the left; decided 2026-10-29). Hidden at rest; it shows while the pointer is over the panel or the body scrolls. The thumb is the text color at 47 % (light) or 40 % (dark): 3:1 against the panel. A soft fade at the bottom edge (`data-more`) shows that more is below |
 | Places | The part works with the bar at each of the four edges, with the panel on the left and on the right, and on a phone (700 px) |
 | Test | The part is on the sample page (a panel with cards, text and controls), and it is looked at in both themes, with the bar at two edges and on a phone, before it is committed |
 
