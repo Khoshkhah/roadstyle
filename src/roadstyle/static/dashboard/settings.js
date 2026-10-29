@@ -74,12 +74,8 @@ export function initSettings(){
         const a = JSON.parse(_stGet("rs-settings:appearance") || "{}"); a[k] = +r.value; _stPut("rs-settings:appearance", JSON.stringify(a)); };
       row.append(_stEl("span", "", text), r, val); box.append(row);
     }
-    const reset = _stEl("button", "rs-set-reset", "Reset transparency"); reset.type = "button";
-    reset.onclick = () => { for(const [k] of _stLayers) _stRoot.style.removeProperty("--rs-a-" + k); _stPut("rs-settings:appearance", null); fill(); };
-    box.append(reset);
     const keys = _stKeys.filter(k => k.show());
-    if(keys.length){ box.append(_stEl("hr"), _stEl("div", "rs-set-h", "Keys")); keys.forEach(k => box.append(_stKeyRow(k)));
-      box.append(_stEl("div", "rs-set-note", "A key is saved in this browser only. It is never written into the page file.")); }
+    if(keys.length){ box.append(_stEl("hr"), _stEl("div", "rs-set-h", "Keys")); keys.forEach(k => box.append(_stKeyRow(k))); }
   };
   const open = () => { fill(); box.hidden = false; };
   b.onclick = e => { e.stopPropagation(); box.hidden ? open() : (box.hidden = true); };

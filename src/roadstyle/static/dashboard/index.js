@@ -7,7 +7,7 @@ import {initTemplate} from "./template.js";
 import {initBoundary} from "./boundary.js";
 import {initTheme} from "./theme.js";
 import {mountColumn, rsTools} from "./tools.js";
-import {initColorBox} from "./colorbox.js";
+import {initColorBox, useColorBox} from "./colorbox.js";
 import {initSelectBox} from "./selectbox.js";
 import {initToolbar} from "./toolbar.js";
 import {initSettings} from "./settings.js";
@@ -131,7 +131,7 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useSelect(); useFilter(); useColor(); useLegend();
+      useStyle(style); useSelect(); useFilter(); useColor(); useLegend(); useColorBox();
     },
     // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
     setData, clearData,

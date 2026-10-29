@@ -6,6 +6,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **A box of the bar stays inside the window.** The settings box could reach above the top of the window when the window was not high: the bar moved a box
+  with `margin-top`, which does nothing for a box that is fixed to the bar by its bottom edge. It uses `translate` now, for every box.
+- **The "Colour by and legend" button is in the bar for a style that comes later.** A page that starts with `rsDashboard(map, {style: null, ...})` and gets its roads
+  with `rs.setStyle` had a greyed button, because the tool was made once, at the start. Now `rs.setStyle` makes the tool when the new style has colour options
+  (or the page has live data), in the place of the greyed button, and puts the greyed button back when a later style has none. A box that a tool brings later keeps
+  inside the window, as the others do.
+
+### Removed
+- The value of a transparency slider is in the row of its label (two rows for a slider, not three).
+- The settings have no "Reset transparency" button and no note about the key ("A key is saved in this browser only...").
+
 ### Changed
 - **`line-dasharray` is only on the dashed pieces** (docs/design/tile_speed.md). The pieces that have a dash (a tunnel's gap and dashes,
   `__rs_k` 3 and 4, and a piece with its own pattern, `__rs_dash`) are drawn by a layer of their own for each band (`roads-simple-dash`,

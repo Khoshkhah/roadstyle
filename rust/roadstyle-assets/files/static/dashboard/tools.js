@@ -3,20 +3,22 @@
 // is the element with its buttons, `kind` is button, toggle, box or window. The page's calls are `rs.tools` (api.js).
 import {map, O, _emit} from "./core.js";
 // the toolbox of a dashboard is fixed (docs/design/dashboard_templates.md, 3.2): a tool that the page cannot use stays in its place, greyed out, and its title says why
+const FIXED = {
+  street_view: [() => STREETVIEW_ICON, "Street View is off on this page (street_view=False)"],
+  google_3d: [() => GOOGLE3D_ICON, "Google 3D is off on this page (google_3d=True turns it on)"],
+  basemap: [() => LAYERS_ICON, "This page has one base map"],
+  buildings: [() => BUILDINGS_ICON, "3D buildings need a vector base map (OpenFreeMap)"],
+  legend: [() => LEGEND_ICON, "This page has no colour options and no live data"],
+};
+// the greyed place of a tool, in the place of the tool (a later style can take the tool away: rs.setStyle)
+export function greyTool(id){
+  const [icon, why] = FIXED[id], b = document.createElement("button");
+  b.type = "button"; b.disabled = true; b.title = why; b.innerHTML = icon();
+  return replaceTool(id, "button", b, {title: why, disabled: true});
+}
 export function fillToolbox(){
   if(!(O.dashboard && O.dashboard.toolbar)) return;
-  const fixed = [
-    ["street_view", STREETVIEW_ICON, "Street View is off on this page (street_view=False)"],
-    ["google_3d", GOOGLE3D_ICON, "Google 3D is off on this page (google_3d=True turns it on)"],
-    ["basemap", LAYERS_ICON, "This page has one base map"],
-    ["buildings", BUILDINGS_ICON, "3D buildings need a vector base map (OpenFreeMap)"],
-    ["legend", LEGEND_ICON, "This page has no colour options and no live data"],
-  ];
-  for(const [id, icon, why] of fixed){
-    if(tools.has(id)) continue;
-    const b = document.createElement("button"); b.type = "button"; b.disabled = true; b.title = why; b.innerHTML = icon;
-    defineTool(id, "button", b, {title: why, disabled: true});
-  }
+  for(const id of Object.keys(FIXED)) if(!tools.has(id)) greyTool(id);
 }
 // the default order of the bar and of the column; a page tool goes after these, and `attribution` is the last one of a bar
 export const ORDER = ["theme", "zoom_in", "zoom_out", "compass", "view3d", "panel_show", "street_view", "google_3d", "basemap", "buildings", "legend"];
@@ -41,6 +43,18 @@ export function defineTool(id, kind, el, more = {}){
   const t = {id, kind, el, title: "", ...more};
   tools.set(id, t);
   if(sink) sink([t]);
+  return t;
+}
+let onReplace = null;                       // the bar's: a box that a tool brings later keeps inside the window too (toolbar.js)
+export const setOnReplace = fn => { onReplace = fn; };
+// a tool that takes the place of the tool with the same id, in the bar or in the column (the legend: a later style has colour options or has none)
+export function replaceTool(id, kind, el, more = {}){
+  const old = tools.get(id), slot = old && sink && old.el.closest(".maplibregl-ctrl");
+  if(!slot) return defineTool(id, kind, el, more);
+  const t = {id, kind, el, title: "", ...more};
+  tools.set(id, t);
+  slot.replaceWith(wrap(el));
+  if(onReplace) onReplace(t);
   return t;
 }
 // the tools in the default order, then the page's tools in the order they were added, then `attribution`

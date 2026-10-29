@@ -6,15 +6,21 @@ import {_esc} from "../popup.js";
 import {O} from "./core.js";
 import {COLOR_OPTIONS, _coActive, rsSetColorField} from "./color.js";
 import {coLegendNow, coLegendExtra} from "./legend.js";
-import {defineTool, wrap, LEGEND_ICON} from "./tools.js";
+import {replaceTool, greyTool, getTool, wrap, LEGEND_ICON} from "./tools.js";
 
 // the colour option of the road class bakes no legend: its classes come from the Roads box (the style's filter facts), each with its fill color
 function _cbClasses(){
   const f = O.filter || {}, sw = f.swatches || {};
   return (f.classes || []).map(c => '<div class="lg-row"><span class="lg-sw" style="background:' + _esc(sw[c] || "#888") + '"></span>' + _esc(c) + "</div>").join("");
 }
-export function initColorBox(){
-  if(!(O.dashboard && O.dashboard.toolbar) || !(COLOR_OPTIONS.length || O.live)) return;       // a live-data page has the legend of its data, with no colour option
+let _cb = null;                // the box of the tool now: {box, fill}
+// the tool for the style of now: made when the page has colour options or live data, greyed out when it has none. At the start, and again for a
+// new style (rs.setStyle); the tool keeps its place in the bar
+export function useColorBox(){
+  if(!(O.dashboard && O.dashboard.toolbar)) return;
+  const want = COLOR_OPTIONS.length || O.live, has = getTool("legend") && !getTool("legend").disabled;       // a live-data page has the legend of its data, with no colour option
+  if(!want){ _cb = null; if(has) greyTool("legend"); return; }
+  if(has){ const t = getTool("legend"); t.title = t.el.querySelector("button").title = COLOR_OPTIONS.length ? "Colour by and legend" : "Legend"; return; }
   const b = document.createElement("button"), d = wrap(b), box = document.createElement("div");
   b.type = "button"; b.title = COLOR_OPTIONS.length ? "Colour by and legend" : "Legend"; b.innerHTML = LEGEND_ICON;
   d.classList.add("rs-color-ctrl"); box.id = "rs-color-box"; box.hidden = true; d.appendChild(box);
@@ -29,7 +35,11 @@ export function initColorBox(){
   const open = () => { fill(); box.hidden = false; };
   b.onclick = e => { e.stopPropagation(); box.hidden ? open() : (box.hidden = true); };
   box.addEventListener("click", e => e.stopPropagation());                 // a click inside the box does not close it
-  document.addEventListener("rs:colorchange", () => { if(!box.hidden) fill(); });
-  document.addEventListener("rs:datachange", () => { if(!box.hidden) fill(); });                // live data: a new day, a new legend
-  defineTool("legend", "box", d, {title: b.title, open, close: () => { box.hidden = true; }, isOpen: () => !box.hidden});
+  _cb = {box, fill};
+  replaceTool("legend", "box", d, {title: b.title, open, close: () => { box.hidden = true; }, isOpen: () => !box.hidden});
+}
+export function initColorBox(){
+  document.addEventListener("rs:colorchange", () => { if(_cb && !_cb.box.hidden) _cb.fill(); });
+  document.addEventListener("rs:datachange", () => { if(_cb && !_cb.box.hidden) _cb.fill(); });                // live data: a new day, a new legend
+  useColorBox();
 }

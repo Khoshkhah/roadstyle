@@ -2,7 +2,7 @@
 // theme. The template gives the edge (`dashboard.toolbar.position`, and `phone.toolbar` on a phone). Two tools are the bar's own: `theme`, the
 // first, and `attribution`, the last. A box (the base map, the attribution) opens toward the map's center, and one box is open at a time.
 import {map, O} from "./core.js";
-import {closeBoxes, defineTool, fillToolbox, mountTools, toolList, wrap} from "./tools.js";
+import {closeBoxes, defineTool, fillToolbox, mountTools, setOnReplace, toolList, wrap} from "./tools.js";
 import {rsSetTheme} from "./theme.js";
 import {followPanels} from "./overlay.js";
 import {layoutNow} from "./placement.js";
@@ -74,9 +74,9 @@ const _tbGap = 12;
 function keepInside(box){
   const fit = () => {
     if(box.hidden || (box.classList.contains("bm-menu") && !box.classList.contains("open"))) return;
-    box.style.marginTop = "0px";
+    box.style.translate = "0 0";                // a box is anchored at its top or at its bottom edge: it moves with `translate`, which works for both
     const r = box.getBoundingClientRect(), over = r.bottom - (innerHeight - _tbGap), under = _tbGap - r.top;
-    box.style.marginTop = (over > 0 ? -over : under > 0 ? under : 0) + "px";
+    box.style.translate = "0 " + (over > 0 ? -over : under > 0 ? under : 0) + "px";
   };
   new MutationObserver(fit).observe(box, {attributes: true, attributeFilter: ["hidden", "class"]});
   new ResizeObserver(fit).observe(box);
@@ -120,7 +120,8 @@ export function initToolbar(){
     }
   });
   boxRules(bar);
-  for(const t of toolList()) if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); }
+  const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
+  toolList().forEach(fitBox); setOnReplace(fitBox);
   _tbRerun = followPanels(bar, () => bar.dataset.edge);
   return true;
 }

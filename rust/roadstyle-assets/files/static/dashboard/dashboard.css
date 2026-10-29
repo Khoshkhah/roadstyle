@@ -387,9 +387,9 @@ html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!i
 #rs-settings-box button:hover:not(:disabled){background:var(--rs-tb-hover)}
 #rs-settings-box button:disabled{opacity:.4;cursor:not-allowed}
 .rs-set-slide{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;padding:3px 8px}
-.rs-set-slide input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--accent,#1a6bd6)}
-.rs-set-slide b{font-weight:600;font-size:11px}
-#rs-settings-box .rs-set-reset{margin:4px 8px 0}
+.rs-set-slide span{grid-column:1;grid-row:1}
+.rs-set-slide input{grid-column:1/-1;grid-row:2;width:100%;margin:0;accent-color:var(--accent,#1a6bd6)}
+.rs-set-slide b{grid-column:2;grid-row:1;font-weight:600;font-size:11px}      /* the value is in the row of the label: two rows for a slider, not three */
 .rs-set-key{padding:2px 8px 6px}
 .rs-set-key input{width:100%;box-sizing:border-box;margin:4px 0;padding:6px 10px;border:0;border-radius:10px;background:var(--rs-tb-hover);color:inherit;font:12px system-ui,sans-serif}
 .rs-set-key input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6)}
