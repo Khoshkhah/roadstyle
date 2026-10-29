@@ -149,6 +149,116 @@ The time did not change (the difference is inside the batch noise of 0.15 s; on 
 `roads` tile layer is gone. In the budget (`tile_budget.json`), the largest `simple` tile of Monaco z15 has 68 distinct values (was 8,713),
 15 keys (was 19) and an MVT id on every piece.
 
+## The tiles of the low zooms (2026-10-28)
+
+On the duckosm-rust page, Burnaby (64,221 roads, with the base map) had low-zoom tiles of 0.5 to 1.2 MB, and MapLibre needed 0.4 to 0.7 s for one
+tile. The tile cut in Rust is 2 to 80 ms. The page's zoom lag is therefore MapLibre's parse and layout, so the tiles must carry only what is drawn.
+`.claude/tile-lag/speed/` of the workspace has the measurements and the drivers (`COMPOSITION.md`, `composition.mjs`, `ml.py`, `cmp.py`).
+
+**The composition came first.** `composition.mjs` decodes the tiles of Burnaby at z9 to z15 and checks each feature against the style layers (zoom span,
+filter, visibility). `ml.py tile` gives MapLibre's time for the largest tile of each zoom, with and without the style layers of a source layer
+(headless Chromium, software GL, 1 worker, median of 3 to 5 runs, the noise is about 10 %):
+
+| Tile | KB | all layers | roads only | base map only | `ov0` (land) only | `ov5` (other ways) only |
+|---|---|---|---|---|---|---|
+| z9 | 638 | 154 ms | 34 | 191 | 113 | 78 |
+| z10 | 841 | 202 | 42 | 205 | 115 | 50 |
+| z11 | 1,157 | 246 | 110 | 197 | 116 | 36 |
+| z12 | 790 | 178 | 104 | 86 | 57 | 30 |
+| z13 | 590 | 148 | 109 | 40 | 37 | 17 |
+
+At z9 to z11 the base map is the cost. At z12 and z13 the road pieces are the cost. Three facts from the composition decide the rules:
+
+- A base-map polygon goes into each tile whole and is not simplified. The z10 tile has 92,611 vertices of land, and 80 % of its segments are shorter than 1 px.
+- The layer of other ways (`ov5`: the streets that are not in the network) has 17,000 to 23,000 lines with no property in a low-zoom tile, and 74 % of them at z9
+  are shorter than 1 px. They are drawn with a stroke of 1.4 px.
+- No feature of a visible layer is outside its zoom span. Rule 1 has no gain here. The layers that the page hides at the start have 0.3 to 1 % of the bytes.
+
+**The rules.** A layer is flat when only `fill` and `line` style layers draw it (`Tiles::flat`): a point, symbol or extrusion layer needs its shape as it is.
+Below the last zoom, for a flat layer (`roadstyle-tiles/src/small.rs`):
+
+| # | Rule | Gain on Burnaby | Test |
+|---|---|---|---|
+| 1 | Only the features that a style layer draws at the zoom | None. Not changed. | `undrawn` = 0 (the budget) |
+| 6 | A polygon is cut to the tile and its buffer and simplified to 1 tile unit (1/8 px) | `ov0` 262 KB to 147 KB at z10, MapLibre z9 155 to 100 ms, z10 187 to 138 ms | `a_flat_layers_polygon_is_cut_to_the_tile_and_simplified` |
+| 7 | A line that is together under half a pixel long and stays in the tile is left out | `ov5` 384 KB to 208 KB at z10, MapLibre z9 100 to 73 ms, z10 138 to 114 ms | `a_flat_layers_line_under_half_a_pixel_is_left_out` |
+| 7 | A polygon whose box is under 1 px on both sides is left out | 3 to 4 % of the bytes, no change in MapLibre time. **Not done.** | |
+
+Why these numbers (each was measured on Burnaby, MapLibre time and the pixels that differ by more than 64 of 765 in 17 views, z9 to z16 and pitch 60):
+
+- The tolerance of 2 units gave 15 % less MapLibre time than 1 unit, and 0.009 to 0.2 % of pixels that differ (against 0.002 to 0.06 %). The edge of a polygon moves
+  by 1/8 px at most, which is the step of the tile grid. A tile of zoom z is drawn at the map zooms z to z + 1, so at the end of that span the edge moves by 1/4 px.
+- A limit of 1 px for the lines gave the same MapLibre time as half a pixel, 0.005 to 0.41 % of pixels that differ (half a pixel: 0.003 to 0.17 %), and 20 to 55 KB less for each tile at z9 to z10.
+  A fragment of a footway is one feature, so a limit of 1 px makes more breaks in a path that has many short fragments.
+- The polygons under 1 px (rule 7, the third row) were built, measured and removed from the code: a gain of 3 to 4 % of the bytes and no gain in time is not worth a rule.
+
+The last zoom is as before. A layer that a circle, symbol or extrusion layer draws is as before (the walls of an extrusion at a cut edge would show).
+
+| View (1400 x 850) | KB before | KB after | Features before | After | Vertices before | After |
+|---|---|---|---|---|---|---|
+| z9 | 638 | 322 | 24,778 | 13,300 | 130,115 | 56,815 |
+| z10 | 841 | 518 | 30,463 | 19,602 | 170,199 | 88,206 |
+| z11 | 1,508 | 1,260 | 48,992 | 42,874 | 246,363 | 167,235 |
+| z12 | 1,838 | 1,630 | 56,541 | 53,620 | 307,917 | 225,353 |
+| z13 | 2,270 | 2,158 | 66,407 | 65,618 | 270,140 | 220,558 |
+| z14 | 1,018 | 969 | 28,484 | 28,351 | 116,317 | 94,684 |
+| z15 | 840 | 840 | 22,595 | 22,595 | 98,744 | 98,744 |
+| Pitch 60, z13 (22 tiles) | 4,549 | 4,189 | 136,744 | 131,933 | 638,343 | 494,069 |
+
+MapLibre time for the largest tile of each zoom (`ml.py tile`, median of 5), before and after: z9 154 to 73 ms, z10 202 to 114 ms, z11 246 to 193 ms, z12 178 to 152 ms,
+z13 148 to 146 ms, z14 and z15 are the same tiles. The roads are the rest of the time at z11 to z13. Pixels that differ by more than 64 of 765: 0.003 to 0.17 % (0 at z15 and z16.5).
+The tile cut time (`LiveMap.tile`) does not change by more than 5 ms for each tile.
+
+**Burnaby on the page, before and after.** A scratch copy of the contract-2 page (duckosm-rust `claude/tile-contract-2`: roadstyle `2fc8477`, 4 MapLibre workers, no tile
+queue or overview of the other page PRs) with only `map/pkg` replaced: the build of `origin/rust-engine` (`71af6fe4`) and the build of this branch. `black.py` of
+`.claude/tile-lag/zoom/` builds Burnaby in the page (driving, blank dark, pitch 60) and then zooms with the mouse wheel. Path A: start at zoom 9, 10 wheel events of 400 px, the
+view goes to zoom 13.6, three pans, and the same wheel events out. Headless Chromium with software GL. Before and after ran at the same time on one machine, 5 runs each: the
+run-to-run noise is 30 %, so read the median and the runs.
+
+| | before | after |
+|---|---|---|
+| Largest tile of z6, z7, z8, z9 (KB) | 220, 317, 454, 638 | 37, 111, 205, 322 |
+| Largest tile of z10, z12, z13 (KB) | 841, 791, 591 | 518, 705, 557 |
+| MapLibre parse and layout, median of the tiles over 20 KB: z12, z13 (ms) | 637, 694 | 402, 469 |
+| Zoom in (path A), ms to idle: median (runs) | 5,785 (4,854; 5,785; 5,076; 5,844; 6,603) | 3,552 (3,902; 2,618; 3,050; 4,479; 3,552) |
+| Zoom out, ms with more than 5 % of the area empty: median (runs) | 1,117 (588; 1,763; 1,117; 1,820; 792) | 785 (345; 1,108; 785; 0; 1,728) |
+| Zoom out, empty share of the area times the time (area-ms): median | 483 | 280 |
+| Tile calls, MB of path A: median | 155 calls, 8.2 MB | 149 calls, 8.4 MB |
+
+Path A mostly asks for tiles of z12 to z13, where the road pieces are the cost, so the total bytes of the path do not change. Path B (the fit view, zoom 11.45, 14 wheel events
+of 250 px, 2 runs each): zoom in 7,984 ms (6,972; 8,996) before and 6,366 ms (5,450; 7,282) after; zoom out empty for more than 5 % of the area 1,588 ms before and 1,211 ms after.
+The static test (`ml.py view`: the saved tiles of Burnaby, a flat view jumps in by 2 zooms, 4 MapLibre workers, median of 5 runs, with the first frame of a new map): z10 451 ms before
+and 476 after (the same tiles within the noise), z11 806 to 357, z12 813 to 451, z13 697 to 557, pitch 60 at z14 527 to 420. The tile cut in Node (`LiveMap.tile`, 12 tiles of one view)
+costs more: z10 38 to 65 ms before and 71 to 105 ms after, z12 87 to 118 ms before and 128 to 192 ms after, that is 3 to 6 ms for each tile for the polygon clip and the simplification.
+That time is in the map worker, in parallel with MapLibre's, and it is below the gain of 30 to 100 ms that MapLibre has for each tile.
+
+**What the page can do (not changed here).**
+
+- **Keep the overview at z9** (`rs-low`, land and water). Its tile is now 322 KB and MapLibre needs 73 ms (before 638 KB and 154 ms). An overview at z8 would be 205 KB, and the
+  start below z9 (the black zoom out from z6 to z8 of the report) would load tiles of 37 to 205 KB, not 220 to 454 KB.
+- **Make the tiles of the zooms below the view before the map asks for them.** The zoom out is empty because the map has no tile 3 or more levels up. Each such tile costs 50 to 190 ms in
+  MapLibre now, so the worker can make and the map can parse 2 levels up while the user zooms in.
+- **The source `maxzoom` of `rs-roads`** (15 in the page's look) is correct: the tiles of z13 to z15 are 550 to 170 KB and take 135 to 50 ms. A lower `maxzoom` saves little (z15 at pitch 60: 3,068 KB
+  of 20 tiles against 3,018 KB of 19 tiles at z14) and makes the casing pieces less exact (`tile_precision.rs`).
+- **The roads are the cost from z11.** The smaller road width expression above (about 25 ms for each tile at z11 to z13) is a roadstyle change, not a page change.
+
+**The road width expression.** The expression is 29,032 characters (24,720 in the style of the page: `line-width` of `roads-simple`). We measured the MapLibre time of the largest tile,
+with the road layer only (the base-map layers removed, tiles of this change, median of 5):
+
+| Tile | the expression now | a smaller form with the same widths | one lookup by class (the widths are wrong) | constant width |
+|---|---|---|---|---|
+| z11 | 125 ms | 97 | 90 | 84 |
+| z12 | 99 | 81 | 74 | 62 |
+| z13 | 113 | 89 | 74 | 65 |
+
+The smaller form has the same widths: one `let` that computes the row of the piece (kind, pair, bridge, two-way) once and one lookup in a table of 20 rows for each of the 9 stops.
+A check of 187,920 combinations of features, zooms and live widths found no difference (`width_let.mjs`). Its gain is 18 to 22 % of the road time, 20 to 25 ms for a tile of the
+low zooms. It is not in the code: the engine has no step that builds the table (one more key in each piece gives the same lookup), the JSON is longer (39 KB), and decision D2 of
+`tile_v2_plan.md` ("simple code and a good view are important; if it does not have much effect, leave it") stands. It is the next lever for the road pieces if the lag at z11 to z13 stays.
+
+**The budget.** `tile_budget.json` has views of zoom 9 to 15 (it had 12 to 15) and the areas `monaco-base` and `tartu-base`: the page's look with the base map. The rules above have a
+limit in it now (`short_segments`, `tiny`, `bytes` and `features` of each base-map layer). The check of rule 1 knows the last zoom of the look.
+
 ## The next levers
 
 The Node profile of the tilted view after this change: interning about 90 ms, tile encoding (`Tiles::build`) about 60 ms of its

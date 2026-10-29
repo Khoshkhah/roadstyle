@@ -1,6 +1,7 @@
 # The tile contract: tiles draw, the data layer knows
 
-Status: design, 2026-10-27. The tile size standard (below) is in force with its test and budget. The rest has no library code yet.
+Status: design, 2026-10-27; the tile size standard (below) is in force with its test and budget; rules 6, 7 and 9 for the base map: 2026-10-28.
+The rest has no library code yet.
 Branch `design-tile-contract`, from `rust-engine` at `cfa80c2`.
 
 This note separates the data of a road from its tiles. A tile then has only what MapLibre needs to draw it. All other data stays
@@ -27,10 +28,10 @@ the number 0, and the test asserts it. For the other rules, the number can only 
 | 3 | The id is the MVT feature id, a dense row, and no id key (section 2) | Not done. `simple` has no MVT id (`__rs_edge` and `__rs_edge2` are keys). | `no_id` (ratchet) |
 | 4 | A number, not a text | Not done. `simple` has 19 to 33 text values (class, colours). `roads` has 30,302 in one Monaco tile (509,422 bytes). | `strings`, `string_bytes` (ratchet) |
 | 5 | Each key and each value once in a layer | Done. | `duplicates` = 0 (asserted) |
-| 6 | Simplify a line to the pixel tolerance of the zoom | Partly. Below the last zoom the tolerance is 0.5 of 4096 units (1/16 px). A tolerance of 1 px gave 1 to 2 % on Burnaby ([tile_speed.md](tile_speed.md)). | `short_segments`, segments under 1 px (ratchet); a pixel test comes with the change |
-| 7 | Drop or merge a feature smaller than a pixel at the zoom | Partly. Done below the last zoom (rule B, 2026-10-27): a road whose pieces are together under 1 px goes unless it leaves the tile, and a casing end piece (`__rs_seam`) under 1 px goes. Every fill and every casing body piece stays: a rule that dropped all pieces under 1 px broke streets. `tiny` in Monaco z12: 1,564 → 169. Not done: a merge of equal pieces, and the tiles of the last zoom. | `tiny` (ratchet); the unit tests of `drop_tiny` |
+| 6 | Simplify a line to the pixel tolerance of the zoom | Partly. Below the last zoom the tolerance of a line is 0.5 of 4096 units (1/16 px). A tolerance of 1 px gave 1 to 2 % on Burnaby ([tile_speed.md](tile_speed.md)). **The polygons of a flat layer (the base map's land, water and paved areas) are done (2026-10-28):** cut to the tile and its buffer and simplified to 1 unit (1/8 px) below the last zoom: Burnaby z10 land 262 KB to 147 KB. | `short_segments`, segments under 1 px (ratchet; `monaco-base`, `tartu-base`); the unit test `a_flat_layers_polygon_is_cut_to_the_tile_and_simplified` |
+| 7 | Drop or merge a feature smaller than a pixel at the zoom | Partly. Done below the last zoom (rule B, 2026-10-27): a road whose pieces are together under 1 px goes unless it leaves the tile, and a casing end piece (`__rs_seam`) under 1 px goes. Every fill and every casing body piece stays: a rule that dropped all pieces under 1 px broke streets. `tiny` in Monaco z12: 1,564 → 169. **A base-map line of a flat layer that is together under half a pixel long and stays in the tile is done (2026-10-28):** Burnaby z10 other ways 384 KB to 208 KB. A polygon under 1 px was tried and left out: 2 to 4 % of the bytes, no change in MapLibre time. Not done: a merge of equal pieces, and the tiles of the last zoom. | `tiny` (ratchet); the unit tests of `drop_tiny` and `a_flat_layers_line_under_half_a_pixel_is_left_out` |
 | 8 | Coordinates on the grid of the zoom | Not done. All zooms use 4096 units (8 for each pixel); z12 needs 2. The gain is small: geometry is 11 % of `roads` and 18 % of `simple`. | `bytes` (ratchet); a test of the grid comes with the rule |
-| 9 | A base-map layer follows rules 1 to 8 | Partly. It follows rule 1 by its `minzoom`. All its keys stay (`ov4`: 0.3 MB of `osm_id`, `kind`, `name`). | The Burnaby gate prints the same numbers for `ov*`. CI cannot: the golden looks have no base-map layers. |
+| 9 | A base-map layer follows rules 1 to 8 | Partly. It follows rule 1 by its `minzoom` (no gain on Burnaby: `undrawn` is 0 for every layer that the page shows). Rules 6 and 7 are done for a flat layer. All its keys stay (`ov4`: 0.3 MB of `osm_id`, `kind`, `name`). | The areas `monaco-base` and `tartu-base` of the budget (the page's look with the base map). |
 | 10 | One copy of a road in the tile source | Done in the page's look. Not in the full look: `roads` repeats each road that `simple` has. | The `roads` layer of `monaco-full` and `tartu-full` (ratchet) |
 
 **What the big tiles are.** The full look (`export_style`, for a server) has a second road layer, `roads`: one feature for each whole
@@ -60,9 +61,10 @@ The missing rules, in the order of their effect on these tiles:
 In the page's look, the missing rules are 3 and 2, and the rest of 7 (a merge).
 
 **The ratchet.** The budget file `rust/roadstyle-rs/tests/data/tile_budget.json` has a limit for each number. The views are the 3 x 3
-tiles around a fixed centre of Monaco and of Tartu, at zoom 12, 13, 14 and 15, with an empty keep list (the engine's own tiles,
-without a page's popup fields). Each area has two looks: `monaco` and `tartu` are the page's look (the lean look: the `simple`
-pieces and the slots), and `monaco-full` and `tartu-full` are the look of `export_style`.
+tiles around a fixed centre of Monaco and of Tartu, at zoom 9 to 15 (12 to 15 before 2026-10-28), with an empty keep list (the engine's own tiles,
+without a page's popup fields). Each area has three looks: `monaco` and `tartu` are the page's look (the lean look: the `simple`
+pieces and the slots), `monaco-full` and `tartu-full` are the look of `export_style`, and `monaco-base` and `tartu-base` are the page's look
+with the area's base map (land, water, paved areas, buildings).
 
 | Number | For |
 |---|---|

@@ -35,6 +35,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **The tiles of the low zooms are smaller** (2026-10-28, `docs/design/tile_speed.md`, "The tiles of the low zooms"). Below the last zoom, a layer that only
+  `fill` and `line` style layers draw (the base map's land, water and paved areas; the layers of a circle, symbol or extrusion style layer are not changed) has its
+  polygons cut to the tile and its buffer and simplified to 1/8 px, and a line that is together under half a pixel long and stays in the tile is left out. Burnaby,
+  the largest tile: z9 638 KB to 323 KB, z10 841 KB to 518 KB, z11 1,158 KB to 958 KB; MapLibre's parse and layout of that tile: z9 154 to 73 ms, z10 202 to 114 ms,
+  z11 246 to 193 ms; the pixels that differ by more than 64 of 765: 0.003 to 0.17 %. The tile budget has views of zoom 9 to 15 and the areas `monaco-base` and
+  `tartu-base` (the page's look with the base map). The tile goldens of Monaco and Tartu change.
 - **Tiles, contract 2** (steps 3 to 7 of `docs/design/tile_v2_plan.md`, 2026-10-27; the tile bytes of the page's look are 26 to 30 % smaller,
   the picture is the same). The style metadata `roadstyle:contract` is 2: a dashboard of contract 1 refuses it; the new dashboard reads
   contract 1 and 2.
