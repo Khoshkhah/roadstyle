@@ -22,7 +22,7 @@ There is one template with a panel: `dashboard`. A future template follows its s
 ## The toolbox
 
 The bar has one button for each tool: theme, zoom in, zoom out, compass, 2D/3D, Street View, Google 3D, base map, 3D buildings,
-colour and legend, settings, attribution. A tool that the page does not use is not on the bar.
+colour and legend, settings, attribution. The toolbox is fixed: a tool that the page cannot use stays in its place, greyed out, and its tooltip says why.
 
 A button that opens a box opens it toward the map. One box is open at a time. A click outside the box, or the Escape key, closes it.
 

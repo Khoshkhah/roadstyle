@@ -182,3 +182,27 @@ def test_the_base_map_follows_the_theme_from_the_start(tmp_path):
     assert not errors
     assert (light["key"], dark["key"], back["key"]) == ("blank", "blank_dark", "blank")
     assert dark["bg"] != light["bg"] and back["bg"] == light["bg"]
+
+
+def test_the_toolbox_is_fixed_and_a_tool_that_the_page_cannot_use_is_greyed_out(tmp_path):
+    """The same tools are in the bar of every dashboard, in the same order; the ones that this page cannot use are disabled, with a title that says why."""
+    fixed = ["theme", "zoom_in", "zoom_out", "compass", "view3d", "street_view", "google_3d", "basemap", "buildings", "legend", "settings", "attribution"]
+    path = tmp_path / "bare.html"
+    rs.render_dashboard(_edges(), basemap="blank", basemap_switcher=False, street_view=False).save(path)         # no colour option, no Google 3D, one base map
+    full = tmp_path / "full.html"
+    rs.render_dashboard(_edges(), color_options={"Road class": {}}, google_3d=True, street_view_key="AIzaTEST").save(full)
+    probe = """() => rs.tools.list().map(t => [t.id, t.disabled, (document.querySelector(`#rs-toolbar [title="${t.title}"]`) || {}).disabled === true])"""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        bare = page.evaluate(probe)
+        titles = page.evaluate("Object.fromEntries(rs.tools.list().filter(t => t.disabled).map(t => [t.id, t.title]))")
+        browser.close()
+        browser, page, errors2 = _open(p, full)
+        rich = page.evaluate(probe)
+        browser.close()
+    assert not errors and not errors2
+    assert [t[0] for t in bare] == fixed and [t[0] for t in rich] == fixed
+    assert {t[0] for t in bare if t[1]} == {"street_view", "google_3d", "basemap", "buildings", "legend"}
+    assert all(t[2] for t in bare if t[1])                                   # the button is disabled in the page
+    assert "street_view=False" in titles["street_view"] and "google_3d=True" in titles["google_3d"] and "one base map" in titles["basemap"]
+    assert not any(t[1] for t in rich if t[0] in ("street_view", "google_3d", "legend"))

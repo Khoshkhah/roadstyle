@@ -5,7 +5,7 @@
 import {_esc} from "../popup.js";
 import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
-import {defineTool} from "./tools.js";
+import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
 import {_wPhone} from "./windows.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep} from "./svspot.js";
@@ -106,9 +106,7 @@ export function initStreetView(){
     bar.lastChild.onclick=()=>rsSetStreetView(false);
     const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
     btn=document.createElement("button"); btn.type="button"; btn.title="Street View";
-    btn.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto">'+
-      '<circle cx="12" cy="4.5" r="3" fill="currentColor"/>'+
-      '<path d="M8.5 9h7l-1.2 7h-1.8l-.6 6.5h-1.8L9.5 16H7.7z" fill="currentColor"/></svg>';
+    btn.innerHTML=STREETVIEW_ICON;
     btn.onclick=()=>rsSetStreetView(w.hidden);
     d.appendChild(btn);
     defineTool("street_view", "window", d, {title: btn.title, open: ()=>rsSetStreetView(true), close: ()=>rsSetStreetView(false), isOpen: ()=>!w.hidden});

@@ -29,6 +29,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The panel's scrollbar** is at its outer edge (at the left for a left panel, at the right for a right panel), shows only while the pointer is over the panel or
   the body scrolls, and has a soft fade at the bottom edge while more is below. The thumb is the text color at 47 % (light) or 40 % (dark): 3:1 against the panel.
 
+### Changed
+- **The toolbox is fixed.** Street View, Google 3D, the base map, 3D buildings and Colour by and legend are always in the bar, in the same places. A tool that the page cannot
+  use is greyed out, and its tooltip says why (`rs.tools.list()` gives `disabled`).
+
 ### Added
 - **Live data for a new day, with a guide.** `guides/live-data.md` shows the day picker: `live_data=True`, a picker in the panel (`dashboard={"panel": {"sections": ...}}`) and the new keywords
   `page_script=` and `page_style=` (the page's own JavaScript and CSS, the last of the body: no string edit of the HTML), which wait for the new event `rs:ready` (`window.rsReady`).

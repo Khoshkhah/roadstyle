@@ -95,7 +95,7 @@ The `window.rs*` switches of the old `main` become fields:
 | `window` | `street_view`, `google_3d` | Section 3.3 |
 
 The default order on the bar: `theme`, `zoom_in`, `zoom_out`, `compass`, `view3d`, `street_view`, `google_3d`, `basemap`, `buildings`,
-`legend`, the page's tools, `attribution`. A tool whose option is off (`google_3d: false`) is not on the bar.
+`legend`, the page's tools, `attribution`. The toolbox is fixed (decided 2026-10-29): a tool that the page cannot use (`google_3d` off, `street_view` off, one base map, no vector base map for 3D buildings, no colour option and no live data) stays in its place, greyed out, with a title that says why.
 
 In Rust, a `Tool` is a built-in name or a page tool `{id, icon, title}`. A page adds or removes a tool in `toolbar.tools`. `page.rs`
 writes the bar with its buttons in the first HTML, so no frame shows an empty bar or the old column.

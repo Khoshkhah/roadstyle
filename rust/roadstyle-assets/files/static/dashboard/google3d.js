@@ -6,7 +6,7 @@
 import {_esc} from "../popup.js";
 import {map, O, _road, _rprops, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
-import {defineTool} from "./tools.js";
+import {defineTool, GOOGLE3D_ICON} from "./tools.js";
 import {_wPhone} from "./windows.js";
 import {_svKey} from "./streetview.js";
 import {_svLine, _svDist, _svAt} from "./svspot.js";
@@ -339,8 +339,7 @@ export function initGoogle3D(){
     bar.lastChild.onclick=()=>rsSetGoogle3D(false);
     const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
     btn=document.createElement("button"); btn.type="button"; btn.title="Google 3D";
-    btn.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">'+
-      '<path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>';
+    btn.innerHTML=GOOGLE3D_ICON;
     btn.onclick=()=>rsSetGoogle3D(w.hidden);
     d.appendChild(btn);
     defineTool("google_3d", "window", d, {title: btn.title, open: ()=>rsSetGoogle3D(true), close: ()=>rsSetGoogle3D(false), isOpen: ()=>!w.hidden});

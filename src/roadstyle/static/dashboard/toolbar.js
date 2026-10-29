@@ -2,7 +2,7 @@
 // theme. The template gives the edge (`dashboard.toolbar.position`, and `phone.toolbar` on a phone). Two tools are the bar's own: `theme`, the
 // first, and `attribution`, the last. A box (the base map, the attribution) opens toward the map's center, and one box is open at a time.
 import {map, O} from "./core.js";
-import {closeBoxes, defineTool, mountTools, toolList, wrap} from "./tools.js";
+import {closeBoxes, defineTool, fillToolbox, mountTools, toolList, wrap} from "./tools.js";
 import {rsSetTheme} from "./theme.js";
 import {followPanels} from "./overlay.js";
 import {layoutNow} from "./placement.js";
@@ -93,6 +93,7 @@ export function initToolbar(){
   const d = O.dashboard;
   if(!d || !d.toolbar) return false;
   themeTool(); attributionTool();
+  fillToolbox();                          // the places of the tools that this page cannot use: greyed out
   const bar = el("div"); bar.id = "rs-toolbar"; document.body.appendChild(bar);
   if(d.toolbar.hold){                       // a page that adds tools of its own: no bar without them at the load; rs.tools.ready() shows it, 6 s at the latest
     bar.dataset.held = "1";                  // an attribute, not a class: the bar's class is set again at each change of its edge

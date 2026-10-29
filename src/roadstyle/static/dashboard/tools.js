@@ -1,7 +1,23 @@
 // The tool registry (docs/design/dashboard_templates.md, 3.2). A control module defines its tool (`defineTool`); a renderer reads the
 // registry: the column here (the MapLibre corner, template `map` and `dashboard`), the bar in bar.js. A tool is {id, kind, el, ...}: `el`
 // is the element with its buttons, `kind` is button, toggle, box or window. The page's calls are `rs.tools` (api.js).
-import {map, _emit} from "./core.js";
+import {map, O, _emit} from "./core.js";
+// the toolbox of a dashboard is fixed (docs/design/dashboard_templates.md, 3.2): a tool that the page cannot use stays in its place, greyed out, and its title says why
+export function fillToolbox(){
+  if(!(O.dashboard && O.dashboard.toolbar)) return;
+  const fixed = [
+    ["street_view", STREETVIEW_ICON, "Street View is off on this page (street_view=False)"],
+    ["google_3d", GOOGLE3D_ICON, "Google 3D is off on this page (google_3d=True turns it on)"],
+    ["basemap", LAYERS_ICON, "This page has one base map"],
+    ["buildings", BUILDINGS_ICON, "3D buildings need a vector base map (OpenFreeMap)"],
+    ["legend", LEGEND_ICON, "This page has no colour options and no live data"],
+  ];
+  for(const [id, icon, why] of fixed){
+    if(tools.has(id)) continue;
+    const b = document.createElement("button"); b.type = "button"; b.disabled = true; b.title = why; b.innerHTML = icon;
+    defineTool(id, "button", b, {title: why, disabled: true});
+  }
+}
 // the default order of the bar and of the column; a page tool goes after these, and `attribution` is the last one of a bar
 export const ORDER = ["theme", "zoom_in", "zoom_out", "compass", "view3d", "panel_show", "street_view", "google_3d", "basemap", "buildings", "legend"];
 // the compass: a fixed ring, and a needle that turns with the map (the north half is solid and the south half is light, all in the text color; chosen
@@ -12,6 +28,12 @@ export const LAYERS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" styl
 // the icon of the tool `buildings`
 export const BUILDINGS_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="2" ' +
   'stroke-linejoin="round"><path d="M3 21h18M5 21V8l6-3v16M11 21V10l8 2v9"/><path d="M8 10v1M8 14v1M14 14v1M17 14v1"/></svg>';
+// the icons of the tools that two modules need (the tool, and the greyed place of a tool that the page cannot use)
+export const STREETVIEW_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto">' +
+  '<circle cx="12" cy="4.5" r="3" fill="currentColor"/><path d="M8.5 9h7l-1.2 7h-1.8l-.6 6.5h-1.8L9.5 16H7.7z" fill="currentColor"/></svg>';
+export const GOOGLE3D_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">' +
+  '<path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>';
+export const LEGEND_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><path d="M14 7h6M14 17h6"/></svg>';
 const tools = new Map();                    // id -> {id, kind, el, title, group, open, close, isOpen, onClick}
 const LAST = ["settings", "attribution"];               // the last tool of a bar
 let sink = null;                            // the renderer that is mounted: a function that takes a list of tools
@@ -75,7 +97,7 @@ function mount(render){
 }
 export const mountColumn = () => mount(addToColumn);
 export const mountTools = render => mount(render);
-const info = t => ({id: t.id, kind: t.kind, title: t.title, open: t.isOpen ? !!t.isOpen() : null});
+const info = t => ({id: t.id, kind: t.kind, title: t.title, open: t.isOpen ? !!t.isOpen() : null, disabled: !!t.disabled});
 const need = id => { const t = tools.get(id); if(!t) throw new Error("rs.tools: no tool '" + id + "'"); return t; };
 // rs.tools (window.rsTools is the alias): the page's calls
 export const rsTools = {
