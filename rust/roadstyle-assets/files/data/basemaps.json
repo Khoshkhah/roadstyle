@@ -111,7 +111,7 @@
    "key": "esri_gray",
    "label": "Light Gray",
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-   "attr": "Tiles © Esri",
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
    "is_dark": false,
    "satellite": false,
    "lonboard": null,
@@ -136,7 +136,7 @@
    "key": "esri_street",
    "label": "Streets",
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-   "attr": "Tiles © Esri",
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, © OpenStreetMap contributors, and the GIS User Community",
    "is_dark": false,
    "satellite": false,
    "lonboard": null,
@@ -160,7 +160,7 @@
    "key": "esri_dark_gray",
    "label": "Dark Gray",
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-   "attr": "Tiles © Esri",
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
    "is_dark": true,
    "satellite": false,
    "lonboard": null,
@@ -184,7 +184,7 @@
    "key": "satellite",
    "label": "Satellite",
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-   "attr": "Tiles © Esri",
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community",
    "is_dark": true,
    "satellite": true,
    "lonboard": null,
@@ -387,22 +387,22 @@
   "hillshade": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}",
    "opacity": 0.4,
-   "attr": "Tiles © Esri"
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen, Rijkswaterstaat, GSA, Geoland, FEMA, Intermap, and the GIS user community"
   },
   "labels": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
    "opacity": 1,
-   "attr": "Tiles © Esri"
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
   },
   "labels_gray_light": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
    "opacity": 1,
-   "attr": "Tiles © Esri"
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
   },
   "labels_gray_dark": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
    "opacity": 1,
-   "attr": "Tiles © Esri"
+   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
   }
  }
 }

@@ -6,6 +6,8 @@ import {_esc} from "../popup.js";
 import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool} from "./tools.js";
+import {savedKey} from "./settings.js";
+import {_wPhone} from "./windows.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep} from "./svspot.js";
 export let _svWindow = false;
 // with a Maps JavaScript API key (street_view_key=) the window offers Linked - a real panorama that

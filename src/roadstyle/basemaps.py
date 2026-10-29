@@ -124,7 +124,7 @@ class Basemap:
     group: str = ""
     title: str = ""
     dark: str | None = None
-    swatch: "str | tuple[str, str, str] | list[str]" = ""
+    swatch: str | tuple[str, str, str] | list[str] = ""
 
 
 def _bundled() -> tuple[dict[str, Basemap], list[str]]:

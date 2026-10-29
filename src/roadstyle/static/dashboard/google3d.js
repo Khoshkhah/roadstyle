@@ -7,6 +7,7 @@ import {_esc} from "../popup.js";
 import {map, O, _road, _rprops, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool} from "./tools.js";
+import {_wPhone} from "./windows.js";
 import {_svKey} from "./streetview.js";
 import {_svLine, _svDist, _svAt} from "./svspot.js";
 export function rsSetGoogle3D(){}

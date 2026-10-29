@@ -30,8 +30,12 @@ const _tbOut = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stro
 const _tbCredits = () => {
   const inner = map.getContainer().querySelector(".maplibregl-ctrl-attrib-inner"), rows = [];
   let pre = "";
+  // MapLibre puts the credits of the sources in one line, with " | " between them: a text before a "|" is a row of its own
   for(const n of inner ? inner.childNodes : []){
-    if(n.nodeType === 3) pre += n.textContent;
+    if(n.nodeType === 3) n.textContent.split("|").forEach((t, i) => {
+      if(i > 0){ if(pre.trim()) rows.push({text: pre.replace(/\s+/g, " ").trim()}); pre = ""; }
+      pre += t;
+    });
     else if(n.tagName === "A"){ rows.push({text: (pre + " " + n.textContent).replace(/\s+/g, " ").trim(), href: n.href}); pre = ""; }
   }
   if(pre.trim()) rows.push({text: pre.replace(/\s+/g, " ").trim()});

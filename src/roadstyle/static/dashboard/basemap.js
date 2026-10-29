@@ -83,6 +83,7 @@ export function rsSetBasemap(keyOrIdx){
     map.addLayer({...def, layout:{...(def.layout||{}), visibility:"visible"}}, after);
   } else if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility","none");
   map.setPaintProperty("bg","background-color", b.bg);
+  map.getContainer().style.backgroundColor = b.bg;         // the sky of a tilted view (above the horizon) has the base map's color, not the white of the page
   const m = document.querySelector(".bm-menu");
   if(m) m.querySelectorAll("[data-i]").forEach(el=>el.classList.toggle("on", +el.dataset.i===idx));
   _emit("rs:basemapchange", {basemap:b.key, index:idx, dark:!!b.is_dark});
@@ -93,6 +94,7 @@ export function initBasemap(){
   window.rsBuildings = rsBuildings;
   map.on("pitchend", paintBuildings);
   window.RS_BASEMAPS = BASEMAPS;
+  if(BASEMAPS[0]) map.getContainer().style.backgroundColor = BASEMAPS[0].bg;
   // a page that starts on a CARTO map with no key, and a key saved in the settings: the map starts again with it
   if(BASEMAPS[0] && (BASEMAPS[0].tiles || []).some(t=>keyed(t) !== t)) map.once("load", ()=>rsSetBasemap(0));
   // a page that starts on a vector style (basemap="ofm_liberty") merges it as soon as the style is in, as a click on its row would

@@ -4,8 +4,9 @@
 import {map, _emit} from "./core.js";
 // the default order of the bar and of the column; a page tool goes after these, and `attribution` is the last one of a bar
 export const ORDER = ["theme", "zoom_in", "zoom_out", "compass", "view3d", "panel_show", "street_view", "google_3d", "basemap", "buildings", "legend"];
-// the compass: the north half is red, the south half has the text color
-const COMPASS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto"><path d="M12 2.5 17 12H7z" fill="#e5484d"/><path d="M12 21.5 7 12h10z" fill="currentColor" opacity=".7"/></svg>';
+// the compass: a fixed ring, and a needle that turns with the map (the north half is solid and the south half is light, all in the text color; chosen
+// 2026-10-29: a dial with ticks was too small to read at 20 px). MapLibre turns the whole icon element, so the page cancels that (dashboard.css) and turns the needle.
+const COMPASS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><g class="rs-needle"><path d="M12 4.6 15.7 12H8.3z" fill="currentColor"/><path d="M12 19.4 8.3 12h7.4z" fill="currentColor" opacity=".3"/></g></svg>';
 // the icon of the tool `basemap`: three tilted sheets, the top one filled
 export const LAYERS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3 3 8l9 5 9-5-9-5z" fill="currentColor"/><path d="M3 12.5l9 5 9-5" fill="none"/><path d="M3 17l9 5 9-5" fill="none"/></svg>';
 // the icon of the tool `buildings`
@@ -34,9 +35,16 @@ function adoptNav(){
   for(const [id, sel, title] of [["zoom_in", ".maplibregl-ctrl-zoom-in", "Zoom in"], ["zoom_out", ".maplibregl-ctrl-zoom-out", "Zoom out"],
                                  ["compass", ".maplibregl-ctrl-compass", "Reset bearing"]]){
     const b = ctrl.querySelector(sel);
-    if(id === "compass" && b){                      // our needle in place of MapLibre's pale picture; MapLibre still turns the icon element with the map
+    if(id === "compass" && b){                      // our ring and needle in place of MapLibre's pale picture; the needle turns with the map and leans with its tilt, the ring does not
       const icon = b.querySelector(".maplibregl-ctrl-icon");
-      if(icon) icon.innerHTML = COMPASS_ICON;
+      if(icon){
+        icon.innerHTML = COMPASS_ICON;
+        // the needle turns with the bearing and is foreshortened by the tilt (it lies flat, seen from a low angle); the ring stays as it is. At a very low
+        // angle the needle keeps a third of its height, so it can still be seen
+        const needle = icon.querySelector(".rs-needle");
+        const turn = () => needle.setAttribute("transform", "translate(12 12) scale(1 " + Math.max(0.35, Math.cos(map.getPitch() * Math.PI / 180)).toFixed(3) + ") rotate(" + (-map.getBearing()) + ") translate(-12 -12)");
+        map.on("rotate", turn); map.on("pitch", turn); turn();
+      }
     }
     if(b) tools.set(id, {id, kind: "button", el: b, title, group: "nav"});
   }

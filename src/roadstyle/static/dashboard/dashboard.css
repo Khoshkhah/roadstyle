@@ -328,8 +328,8 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card,html.rs
 :is(#sb,#rp,.rs-side) :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--accent,#1a6bd6)}
 :is(#sb,#rp,.rs-side) :is(input[type=checkbox],input[type=radio]){width:16px;height:16px;margin:0}
 :is(#sb,#rp,.rs-side) button{border-radius:10px}
-/* ---- the Street View and Google 3D windows: the style of the panel and the boxes ---- */
-.rs-svw{border-radius:14px;border:0;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 8px 28px rgba(0,0,0,.35);color:var(--rs-tb-ink)}
+/* ---- the Street View and Google 3D windows: the style of the boxes (the second level of transparency: --rs-box-bg, like the popup and the tooltip) ---- */
+.rs-svw{border-radius:14px;border:0;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 8px 28px rgba(0,0,0,.35);color:var(--rs-tb-ink)}
 .rs-svw-bar{background:var(--rs-card-bg);color:var(--rs-tb-ink);padding:6px 8px 6px 14px;gap:6px}
 .rs-svw-t{font-weight:600}
 .rs-svw-bar button{border:0;background:none;color:var(--rs-tb-ink);min-width:28px;height:28px;padding:0 8px;border-radius:10px;font:13px/1 system-ui;cursor:pointer}
@@ -363,7 +363,10 @@ html.rs-panel-left :is(#sb-hide,#sb-show,#rp-hide,#rp-show,.rs-side-min) svg,htm
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:340px!important;right:0!important}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden,#rp.hidden) #map{left:0!important}
 /* the compass: our needle (tools.js) instead of MapLibre's picture, which is pale on a translucent bar */
-.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:none!important;display:flex;align-items:center;justify-content:center}
+/* the icon fills its button and is centered in it (MapLibre's own box is 29 px high and sat at the top of a 32 px button) */
+.maplibregl-ctrl-compass{position:relative}
+.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:none!important;position:absolute;inset:0;width:auto;height:auto;display:flex!important;align-items:center;justify-content:center}
+.maplibregl-ctrl-compass .maplibregl-ctrl-icon svg{margin:0!important}
 #rs-toolbar .maplibregl-ctrl-compass .maplibregl-ctrl-icon{filter:none!important}
 /* ---- the settings box (settings.js) ---- */
 #rs-toolbar .rs-set-ctrl{position:relative!important;overflow:visible}
@@ -412,3 +415,5 @@ html:not(.rs-phone).rs-overlay.rs-panel-left #sb,html:not(.rs-phone).rs-overlay.
 html:not(.rs-phone).rs-overlay.rs-panel-card #sb,html:not(.rs-phone).rs-overlay.rs-panel-card #rp{top:8px;bottom:8px;right:8px;left:auto;height:auto;border-radius:0;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;border:0;box-shadow:none;overflow:visible}
 html:not(.rs-phone).rs-overlay.rs-panel-card.rs-panel-left #sb,html:not(.rs-phone).rs-overlay.rs-panel-card.rs-panel-left #rp{left:8px;right:auto}
 html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card,html:not(.rs-phone).rs-overlay.rs-panel-card #rp .rp-card{border-radius:14px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 6px 24px rgba(0,0,0,.28)}
+/* MapLibre turns the whole compass icon with the map: the ring must not turn, so the page cancels it and turns the needle only (tools.js) */
+.maplibregl-ctrl-compass .maplibregl-ctrl-icon{transform:none!important}

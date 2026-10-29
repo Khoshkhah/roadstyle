@@ -127,7 +127,7 @@ finished. (Decided 2026-10-29: "every item must follow the style, and have a dar
 | Rule | What it means |
 |---|---|
 | Two themes | The part works in the light and the dark theme, and follows the one theme value on `<html>` (`data-rs-theme`). It has no color of its own: it reads the tokens |
-| Tokens | Colors come from the tokens of `popup.css`: `--rs-tb-bg` (the bar, the panel, the scale box), `--rs-box-bg` (boxes, popup, tooltip), `--rs-card-bg` (the layer before the text), `--rs-tb-ink`, `--rs-tb-border`, `--rs-tb-hover`, `--rs-tb-on`. The opacities are `--rs-a-tb`, `--rs-a-box`, `--rs-a-card`, which the person sets in the settings box |
+| Tokens | Colors come from the tokens of `popup.css`: `--rs-tb-bg` (the bar, the panel, the scale box), `--rs-box-bg` (boxes, windows, popup, tooltip), `--rs-card-bg` (the layer before the text), `--rs-tb-ink`, `--rs-tb-border`, `--rs-tb-hover`, `--rs-tb-on`. The opacities are `--rs-a-tb`, `--rs-a-box`, `--rs-a-card`, which the person sets in the settings box |
 | One look | Rounded corners (10 px for boxes, 14 px for windows and lists, 8 to 12 px for controls), the 6 px blur, no light border line on a dark surface, one shadow. Text sits on the card layer, not straight on a translucent layer |
 | No system parts | No native `title` tooltip (tip.js takes it), no native `<select>` list (selectbox.js), no native scrollbar style. Native controls get `color-scheme` from the theme |
 | Boxes | A box of the bar has the same width (264 px), padding (8 px) and font (12 px) as the others, keeps 12 px from the window edge, opens toward the map, and closes on an outside click and on Escape. It is never clipped by its parent: a bar must not have an `overflow` rule |
