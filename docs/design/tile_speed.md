@@ -294,3 +294,36 @@ own time, allocations (`malloc`, `free`, `realloc`) about 47 ms, piece cells abo
 - **The page's tilted view.** The page asked for 36 tiles at pitch 60, zoom 14 (1.5 s before). The model of MapLibre's tilted view
   in `bench_live_views.mjs` gives 21 tiles. With the gain above, the page's case is about 1.0 s. The target of 0.6 s needs one of
   the levers that change the tile bytes, or tiles that the worker makes before the map asks for them.
+
+## The road layer in MapLibre (2026-10-29)
+
+**Problem.** MapLibre evaluates each data-driven paint property for each feature of a tile. For the road layer, this is 75 to 86 % of the
+feature loop (z12 and z13, Burnaby). A property that is one value, or a layer without a property, costs less.
+
+**Zoom bands.** `layers/bands.rs` splits the road layer when a zoom curve is one value at its start. `line-offset` is 0 up to z15, and
+`line-blur` and `line-opacity` are one value up to z14. The layers are `roads-simple` (below z14), `roads-simple-z14` and `roads-simple-z15`.
+In a band, the constant takes the place of the curve, and the band keeps only the zoom stops that it reads. A test compares the values of
+the bands with the one layer at every zoom. With line items the layer stays one.
+
+**Dash layers.** Only the dashed pieces have `line-dasharray`: a tunnel's gap and dashes (`__rs_k` 3 and 4) and a piece with `__rs_dash`.
+They are in the layer `<band>-dash`, under the layer of the other pieces. A tunnel is then under the roads that cross it and under its own
+fill, as in rank. A dashed piece with `__rs_dash` is under all other pieces, not between them. The picture changes by 1 % of the pixels
+(the dotted fringe of the casing goes).
+
+**Layers.** Before: 1 road layer. After: 3, and 6 when the area has dashed pieces. A tile of one zoom builds 1 or 2 of them. The style text
+of the road grows from 29 KB to 70 KB (Monaco); the tile budget has the new limits.
+
+**JS.** The dashboard reads the road layers as a list (`RS_LEANS`; `leanAt()` gives the one that the map draws). Pick, hover, select and
+Street View use the list.
+
+**Cost in code.** 111 lines in `bands.rs`, 20 in the style builder and 20 in the JS (without tests).
+
+**Result** (Burnaby, live style, minimum of 15 runs, change against the style before; noise 5 to 8 points):
+
+| Change | z11 | z12 | z13 | z14 | Pixels that differ |
+|---|---|---|---|---|---|
+| Zoom bands alone | -18 % | -13 % | -15 % | -19 % | 0 |
+| Dash layers alone | -14 % | -9 % | -8 % | -9 % | 0.97 % |
+| Both | -18 % | -11 % | -26 % | -26 % | 0.97 % |
+
+The MLT and MVT tiles give the same pixels. The tiles do not change (the same bytes).
