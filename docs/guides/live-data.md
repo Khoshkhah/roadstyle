@@ -21,12 +21,25 @@ The ids of duckOSM are 64-bit numbers, and a JSON number above 2^53 is not exact
 
 | Option | Meaning |
 |---|---|
-| `colorBy` | the column that gives the colour: a number goes on the ramp from `vmin` to `vmax` (the range of the data when you leave them out), a text gets one colour for each value |
+| `colorBy` | the column that gives the colour: a number goes in one of `classes` sets (see [The colour sets](#the-colour-sets)), a text gets one colour for each value |
+| `classes` | the number of sets for a number, default 7. `classes: 0`, or a `vmin` or `vmax`, gives a smooth ramp from `vmin` to `vmax` (the range of the data when you leave them out) |
+| `breaks` | your own cut points, for example `[200, 800]` gives 3 sets. The same colours then mean the same numbers on every day |
 | `widthBy`, `widthRange` | a column that gives a **factor** of the drawn width (from `widthRange[0]` to `widthRange[1]`, default `[1, 3]`). Do not use it for numbers like the flow: the two carriageways of a street have the same width, and the factor makes one cover the other. Show the flow in the colour |
-| `ramp`, `stepped` | your own list of colours; `stepped: true` takes the nearest colour, with hard edges |
+| `ramp`, `stepped` | your own list of colours (the default is `data.live_ramp` of the palette); `stepped: true` takes the nearest colour of a smooth ramp, with hard edges |
 | `nodata` | the colour of a road with no row (default: the page's no-data colour) |
 | `key` | the column that names the road (default `edge_id`; `"row"` for the number of the road's row) |
 | `legend` | `false`: no legend; `{title: "..."}`: change the legend |
+
+## The colour sets
+
+A number goes in one of `classes` sets (default 7). The cut points are the **natural breaks** of the numbers you give (the Fisher–Jenks method):
+the numbers inside a set are as close as possible, and the sets are as different as possible. The sets have different numbers of members. One very busy street does not
+use up the colour bar: it gets a set of its own. Set 1 gets the first colour of the ramp, the last set gets the last colour.
+
+The legend shows the lowest and the highest number of each set, and how many roads are in it: `100 – 400 (9)`.
+
+The cut points come from the data of the call, so each day has its own. To compare two days by colour, give the same `breaks` to both. The default ramp goes
+from blue through green and yellow to red. Its colours have a medium brightness, so they show on the light map and on the dark map.
 
 ## A day picker
 

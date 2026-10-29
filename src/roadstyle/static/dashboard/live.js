@@ -6,6 +6,7 @@
 import {map, O, RoadTable, _src, _setJoined, _emit} from "./core.js";
 import {setLiveLegend} from "./legend.js";
 import {setLiveColors} from "./color.js";
+import {naturalBreaks, setOf} from "./breaks.js";
 let _liveRows = [];                  // the rows that have a live width now
 const _hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
 const _toHex = v => "#" + v.map(x => Math.round(x).toString(16).padStart(2, "0")).join("");
@@ -34,14 +35,24 @@ export async function setData(table, opts){
   else {
     const at = new Map(); for(let i = 0, n = RoadTable.rows(); i < n; i++){ const v = RoadTable.props(i)[O.edge_id_col]; if(v != null) at.set(String(v), i); }
     rows.forEach(r => { const i = at.get(String(r[key])); if(i != null) joined.set(i, r); }); }
-  // the colour: a number on the ramp from vmin to vmax (else the data's range), a text a ramp colour for each value; no value: nodata
+  // the colour: a number goes in one of `classes` sets (natural breaks of this data, default 7; or the `breaks` that the page gives), each set one
+  // colour of the ramp; a smooth ramp from vmin to vmax instead (`classes: 0`, or vmin / vmax given). A text: a ramp colour for each value. No value: nodata
   const ramp = o.ramp || L.ramp, nodata = o.nodata !== undefined ? o.nodata : L.nodata, cols = new Map(), ws = new Map();
   let legend = null;
   if(o.colorBy){
     const vals = [...joined.values()].map(r => r[o.colorBy]), num = vals.some(v => typeof v === "number");
-    if(num){ const [lo, hi] = _range(vals, o.vmin, o.vmax);
+    if(num && (o.classes === 0 || o.vmin != null || o.vmax != null)){        // a smooth ramp from vmin to vmax (the range of the data when left out)
+      const [lo, hi] = _range(vals, o.vmin, o.vmax);
       joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)) cols.set(i, _at(ramp, hi > lo ? (v - lo) / (hi - lo) : 0.5, o.stepped)); });
       legend = {kind: "continuous", title: o.colorBy, ramp: ramp, vmin: lo, vmax: hi, stepped: !!o.stepped}; }
+    else if(num){        // sets: natural breaks of this data (classes, default 7), or the cut points that the page gives (breaks)
+      const nums = vals.filter(v => typeof v === "number" && isFinite(v)), cuts = o.breaks ? [...o.breaks].sort((a, b) => a - b) : naturalBreaks(nums, o.classes || 7), k = cuts.length + 1;
+      const col = n => _at(ramp, k > 1 ? n / (k - 1) : 0.5), min = Array(k).fill(Infinity), max = Array(k).fill(-Infinity), count = Array(k).fill(0);
+      joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)){ const n = setOf(cuts, v);
+        cols.set(i, col(n)); count[n]++; min[n] = Math.min(min[n], v); max[n] = Math.max(max[n], v); } });
+      const fmt = v => String(+v.toPrecision(3)), entries = [];
+      for(let n = 0; n < k; n++) if(count[n]) entries.push([(min[n] === max[n] ? fmt(min[n]) : fmt(min[n]) + " – " + fmt(max[n])) + " (" + count[n] + ")", col(n)]);
+      legend = {kind: "categorical", title: o.colorBy, entries}; }
     else { const cats = [...new Set(vals.filter(v => v != null).map(String))].sort(), col = {};
       cats.forEach((c, k) => { col[c] = _at(ramp, cats.length > 1 ? k / (cats.length - 1) : 0.5, o.stepped); });
       joined.forEach((r, i) => { const v = r[o.colorBy]; if(v != null) cols.set(i, col[String(v)]); });

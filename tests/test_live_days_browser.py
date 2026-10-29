@@ -94,3 +94,23 @@ def test_the_picker_select_is_the_themed_list_and_ids_must_be_text(tmp_path):
         number = page.evaluate("rows => rs.setData(JSON.parse(rows), {colorBy: 'flow'}).then(r => r.matched)", rows_number)
         browser.close()
     assert themed and text == 6 and number < 6
+
+
+def test_a_number_goes_in_one_of_n_sets_by_natural_breaks_and_the_legend_counts_the_members(tmp_path):
+    rows = [{"edge_id": str(i + 1), "flow": v} for i, v in enumerate([100, 120, 130, 400, 420, 5000])]
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", live_data=True).html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded() && !!(window.rs && rs.setData)", timeout=60_000)
+        legend = """async (o) => { await rs.setData(ROWS, Object.assign({colorBy: "flow"}, o)); rs.tools.open('legend');
+          const t = document.querySelector('.rs-cb-lg').textContent.replace(/\\s+/g, ' ').trim(); rs.tools.close('legend'); return t; }""".replace("ROWS", json.dumps(rows))
+        three = page.evaluate(legend, {"classes": 3})
+        assert "100 – 130 (3)" in three and "400 – 420 (2)" in three and "5000 (1)" in three
+        fixed = page.evaluate(legend, {"breaks": [200]})
+        assert "100 – 130 (3)" in fixed and "400 – 5000 (3)" in fixed and "5000 (1)" not in fixed
+        assert "(" not in page.evaluate(legend, {"classes": 0}) and errors == []
+        browser.close()

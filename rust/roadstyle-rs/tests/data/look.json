@@ -867,6 +867,15 @@
    "casing_width": 0.0,
    "nodata": "#cccccc",
    "color_table": "#bbbbbb",
+   "live_ramp": [
+    "#3b82f6",
+    "#06b6d4",
+    "#22c55e",
+    "#eab308",
+    "#f97316",
+    "#ef4444",
+    "#be123c"
+   ],
    "opacity": 0.9,
    "casing_opacity": 0.75
   },
