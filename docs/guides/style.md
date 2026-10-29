@@ -59,7 +59,7 @@ rs.render_edges(edges, palette="mono", basemap="blank")      # no tiles: works o
 
 ## Map controls
 
-Labels, one-way arrows, the road-class filter panel and the base-map switcher are all on by
+Labels, one-way arrows and the base-map switcher are all on by
 default. Turn any of them off:
 
 ```python

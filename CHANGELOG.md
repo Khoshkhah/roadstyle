@@ -62,6 +62,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   inside the window, as the others do.
 
 ### Removed
+- **The Roads box is gone** (the floating box with a row for each road class, Bridges, Tunnels and the access kinds, `.flt-ctrl`). A page with a bar has no place for it, and it covered the bar. The filter calls stay
+  (`rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsFilter`, `rsSetModes`, `rs.setFilter`; `rs.setStyle` keeps what a call switched off): the colour box, `rs.setFilter`, the views and the host pages use them.
+  The keyword `filter_control` (and `--no-filter`) has no effect now. The class minzoom dimming of the rows went with the box. The map's other old floating boxes (Tunnels, View) are hidden on a page with a bar, as Colour by was.
 - The settings have no "Reset transparency" button and no note about the key ("A key is saved in this browser only...").
 
 ### Changed

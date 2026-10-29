@@ -25,7 +25,7 @@ import {initView3D} from "./view3d.js";
 import {initStreetView} from "./streetview.js";
 import {initGoogle3D} from "./google3d.js";
 import {initBasemap} from "./basemap.js";
-import {initFilter, initFilterBox, useFilter} from "./filter.js";
+import {initFilter, useFilter} from "./filter.js";
 import {initFind} from "./find.js";
 import {initColor, useColor} from "./color.js";
 import {useLegend} from "./legend.js";
@@ -52,8 +52,7 @@ const RS_DEFAULTS = {
   tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
   street_view: "window", street_view_key: "", google_3d: false,
-  filter: {on: false, classes: []}, color_active: 0,
-  filter_control: true,         // the Roads box (render's keyword; a page key, not the style's)
+  filter: {classes: []}, color_active: 0,
   legend: true,                 // the legend box of the colour options (render's keyword; the style always has the legend data)
   overlays: [], overlay_control: true, overlay_popup: true,
   overlays_label: "Map layers",  // the label of the one switch for the style's base-map layers (the base-map box) and of their list (the legend box)
@@ -80,11 +79,6 @@ function fromStyle(o, given){
   if(!given.has("road_popup")) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
   if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
-  // the Roads box: the page option filter_control and a class to show. The facts of the filter (classes, col, access, swatches, minzoom)
-  // are the style's (roadstyle:controls.filter); a style made before N32 step 2 has its own `on` there, which stays when the page gives
-  // no filter_control
-  const f = o.filter || {};
-  if(given.has("filter_control") || !("on" in f)) o.filter = {...f, on: o.filter_control !== false && (f.classes || []).length > 0};
   if(!given.has("color_options")) o.color_options = meta["roadstyle:color_options"] || [];
   if(!given.has("live")) o.live = meta["roadstyle:live"] || null;
 }
@@ -110,7 +104,6 @@ export function rsDashboard(map, options){
   initBoundary();
   initFilter();
   initFind();
-  initFilterBox();
   initColor();
   useLegend();
   initOverlays();
@@ -138,7 +131,7 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); initFilterBox(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); refreshState();
+      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); refreshState();
     },
     // the phone's bottom sheet: rs.sheet() is its height (0 closed, 1 40 %, 2 full; null: no sheet), rs.sheet(n) sets it; rs.freeArea() is the part of
     // the map that the bar, the panel and the sheet leave free, in window coordinates ({lo, hi, top, bottom}): a host pads its map with it

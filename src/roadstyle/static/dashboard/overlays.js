@@ -127,17 +127,11 @@ function _ovBoxRows(){
   if(_ovBox){ _ovBox.remove(); _ovBox = null; }
   for(const k of Object.keys(_ovCbs)){ _ovCbs[k].closest("label")?.remove(); delete _ovCbs[k]; }
   if(!OVERLAYS.length || !O.overlay_control || _ovInToolbox()) return;       // overlay_control=False: no Layers box (rsSetOverlay still works)
-  // panel mode: overlay toggles join the panel's Roads card, right after its Bridges row — a
-  // second floating "Layers" box on the map competes with the panel that hosts everything else.
-  // Non-panel keeps the standalone Layers control.
-  const host=_popupMode==="panel" ? document.querySelector(".flt-ctrl .flt-body") : null;
-  if(host) OVERLAYS.forEach((ov,i)=> host.appendChild(_ovRow(ov, i===0)));
-  else{   // its own Layers box; a base map's page (box_layout "stack"): under the Roads box, folded like it
-    const stack=O.box_layout==="stack", {box, body}=_box("ov-ctrl", "ov", "Layers", stack ? true : null);
-    OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
-    (stack ? _tlHost() : document.body).appendChild(box);
-    _ovBox = box;
-  }
+  // a Layers box of its own (a page with no bar, or with no base-map box); a base map's page (box_layout "stack"): in the stack, folded
+  const stack=O.box_layout==="stack", {box, body}=_box("ov-ctrl", "ov", "Layers", stack ? true : null);
+  OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
+  (stack ? _tlHost() : document.body).appendChild(box);
+  _ovBox = box;
 }
 // the overlays of the style of the moment (at the start, and again for a new style: rs.setStyle): their handlers, their rows, and their start state
 export function useOverlays(){

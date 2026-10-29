@@ -685,7 +685,7 @@ def test_tunnels_toggle_like_bridges():
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
                                    LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
     html = render_edges(g, backend="web").html
-    assert _in('"tunnels": true', html) and "function rsSetTunnels(" in html and '"rs-flt-tn"' in html
+    assert _in('"tunnels": true', html) and "function rsSetTunnels(" in html
     assert '[">=",["coalesce",["get",lvl],0],0]' in html                     # lvl: the piece's level, or an attached item's baked __rs_lvl
     plain = render_edges(_edges(), backend="web").html
     assert _in('"tunnels": false', plain)

@@ -54,7 +54,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 | `--pitch DEG`, `--bearing DEG` | `pitch`, `bearing` | starting camera |
 | `--no-arrows` | `arrows=False` | no one-way arrows |
 | `--no-labels` | `labels=False` | no street names |
-| `--no-filter` | `filter_control=False` | no road-class filter panel |
+| `--no-filter` | `filter_control=False` | no effect: the road-class filter panel was removed |
 | `--no-basemap-switcher` | `basemap_switcher=False` | no base-map button |
 | `--tiles` | `tiles=True` | embedded PMTiles, for big networks |
 | `--no-compress` | `compress=False` | plain JSON data instead of gzip |

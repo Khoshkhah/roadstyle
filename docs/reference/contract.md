@@ -50,7 +50,7 @@ host gives them to `rsDashboard` itself.
 | `simple` | the id of the one road layer of simple mode (`roads-simple`) |
 | `pitch_3d` | the camera's tilt in 3D |
 | `select_color` | the colour of a selected road (also the Google 3D line) |
-| `filter` | the filter panel: `{on, col, classes, access, swatches, bridges, tunnels, minzoom}`, and `palettes` with a view's palette. `minzoom`: `{class: zoom}`, the first zoom of each class of `classes` that the class minzoom hides below a zoom; null when the minzoom is off (`minzoom=False`) |
+| `filter` | the road filter (the facts that `rsSetClasses` and the colour box's class legend read): `{col, classes, access, swatches, bridges, tunnels, minzoom}`, and `palettes` with a view's palette. `minzoom`: `{class: zoom}`, the first zoom of each class of `classes` that the class minzoom hides below a zoom; null when the minzoom is off (`minzoom=False`) |
 | `color_active` | the colour option at the start |
 | `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]`; a base-map layer also has `kinds` (`[[kind, count], ...]`, most first) and, with a 3D layer, `extrude` (that layer's id) |
 | `tunnel` | the tunnel look: `{layers, dash, casing, strength, palette, palettes, ratio, bg, steps, ratios, toward, towards, to, control}` |
@@ -92,7 +92,7 @@ contract makes changeable (or a value that is not used).
 | `hover_color` | color, `selection.hover` (`#b388ff`) | `render`; the palette | engine: a literal in each highlight expression | gap: fixed in the style | planned (see below) |
 | `select_color` | color, `selection.select` (`#7c4dff`) | `render`; the palette; option (Google 3D line) | engine (literal), `google3d.js` | gap: fixed in the style | planned (see below) |
 | the glow | `selection.opacity` 0.85, `glow_opacity` 0.35 (palette); the width of the fill (simple mode) | the palette | engine (`_simple_color(glow=...)`) | gap: fixed | planned (see below) |
-| `filter` | `{col, classes, swatches, palettes, bridges, tunnels, access, minzoom}`; the dashboard sets `on` from the page option `filter_control` (default true) and a class to show | `render` (`filter_col`, `access_col`); the page (`filter_control`); option | `filter.js`, `views.js` | yes | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`; `rs:filterchange`; `window.RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
+| `filter` | `{col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `render` (`filter_col`, `access_col`); option | `filter.js`, `views.js` | yes | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`; `rs:filterchange`; `window.RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
 | access colors | `access.private`, `bus`, `pedestrian`, `delivery` (palette) | the palette | engine (`__rs_access` colors) | no | |
 | `color_options` | `[{name, prop, legend}]` | `render`; `roadstyle:color_options`; option | `color.js`, `legend.js`, `views.js` | the choice: yes; a new option: `restyle` | `rsSetColorField`; `rs:colorchange`; `window.RS_COLOR_OPTIONS` |
 | the legend | `{title, kind, entries}` or `{title, kind, ramp, vmin, vmax}` | the data styler (`bake_color_options`); the page shows it when its option `legend` is true (the default) | `legend.js` | follows the option | gap: the metadata does not give the active option |

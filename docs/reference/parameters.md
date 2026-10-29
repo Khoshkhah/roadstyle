@@ -89,8 +89,8 @@ ignore it.
 |---|---|---|---|
 | `include` / `exclude` | `None` | all | keep only / drop these classes (str or list) |
 | `match_links` | `True` | all | `primary` also matches `primary_link` |
-| `filter_control` | `True` | web | the road-class filter panel (folium: only when there is no legend) |
-| `filter_col` | `None` | web | the column the filter panel lists, when it differs from `highway_col` |
+| `filter_control` | `True` | web | no effect: the road-class filter panel was removed (`rsSetClasses` filters from a script) |
+| `filter_col` | `None` | web | the column that `rsSetClasses` filters by, when it differs from `highway_col` |
 | `find_control` | `False` | web | a "Search roads…" box in the top-left stack (the docked panel has its own); the JS `rsFind(text)` is always defined ([design](../design/sensor_matching_requests.md)) |
 | `overlay_control` | `True` | web | `False` hides the *Layers* box of the overlays; `rsSetOverlay` still works |
 | `overlay_popup` | `True` | web | `False`: no overlay shows a click popup (it stays clickable and fires `rs:select`); one overlay: `Overlay(popup_window=False)` |
