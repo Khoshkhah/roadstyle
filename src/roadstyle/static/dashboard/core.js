@@ -14,6 +14,10 @@ export let RS_TILED = false;
 // RS_LEAN: the simple look's road layer (the id), or false for the full look (simple=False). The full look's paths (RS_LEAN false: core.js
 // _fs and _roadOfPiece, select.js's pick layers, svspot.js's road layer) go with simple=False in N16 (branch n16-full-look-js).
 export let RS_LEAN = false;
+// RS_LEANS: the ids of all the layers of the simple look's road (a layer for each band of zooms, docs/design/tile_speed.md); RS_LEAN is the first.
+// leanAt(): the one that the map draws at its zoom
+export let RS_LEANS = [];
+export function leanAt(){ const z=map.getZoom(); return RS_LEANS.find(id=>{ const l=map.getLayer(id); return l && z>=(l.minzoom||0) && z<(l.maxzoom||25); }) || RS_LEAN; }
 // the newest version of the interaction contract (the metadata roadstyle:contract) that this dashboard reads: the engine's
 // contract::CONTRACT (tests/test_contract_names.py checks the two)
 export const CONTRACT = 2;
@@ -48,8 +52,9 @@ export function useStyle(st){
   // the layers decide (they are what the map draws); the given map only for a role with no layer: a style made again for tiles can keep the
   // role map of its GeoJSON stage in its metadata
   _SRC = {...(O.sources || (style.metadata || {})["roadstyle:sources"] || {}), ..._sourcesOf(style)};
-  const lean = style.layers.find(l=>(l["source-layer"] || l.source)==="simple" && l.type==="line");
-  RS_LEAN = lean ? RS_PREFIX+lean.id : false;
+  const leans = style.layers.filter(l=>(l["source-layer"] || l.source)==="simple" && l.type==="line");
+  RS_LEANS = leans.map(l=>RS_PREFIX+l.id);
+  RS_LEAN = leans.length ? RS_LEANS[0] : false;
   RS_ROLES = new Set(Object.keys(O.sources || (style.metadata || {})["roadstyle:sources"] || {}));
   _decks = null;
   _useState();

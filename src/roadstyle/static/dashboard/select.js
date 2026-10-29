@@ -1,6 +1,6 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, OVERLAYS, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
+import {map, style, O, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot} from "./svspot.js";
@@ -29,7 +29,7 @@ export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); i
   const q = RS_LEAN ? {layers:ids, filter:_FILL_PIECE} : {layers:ids};
   let l = map.queryRenderedFeatures([p.x, p.y], q);
   if(!l.length) l = map.queryRenderedFeatures(box(p), q);
-  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && l[0].layer.id===RS_LEAN ? _roadOfPiece(l[0]) : l[0]; }
+  return !l.length ? null : ITEM_LAYERS.has(l[0].layer.id) ? _roadOf(l[0]) : RS_LEAN && RS_LEANS.includes(l[0].layer.id) ? _roadOfPiece(l[0]) : l[0]; }
 export function srcOf(f){ return f && f.layer && _role(f.layer)==="decks" ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // road table's row behind the feature id; decks keep the feature's own properties
@@ -126,7 +126,7 @@ export function useSelect(){
   _sel=null; _hov=null; _cur=null;
   // the style's pick layers (roadstyle:controls.pick, in every style since b3a8e64); for a style made before b3a8e64 that has no
   // contract, none: then the road layer of simple mode (the role simple), which every such style draws its roads with
-  PICK_LAYERS = (O.pick.length ? O.pick.map(id=>RS_PREFIX+id) : RS_LEAN ? [RS_LEAN] : []).concat([...ITEM_LAYERS]);
+  PICK_LAYERS = (O.pick.length ? O.pick.map(id=>RS_PREFIX+id) : RS_LEAN ? RS_LEANS : []).concat([...ITEM_LAYERS]);
   _roadPopup = O.road_popup !== false; _popupFields = Array.isArray(O.road_popup) ? O.road_popup : null;
   _ttip = O.road_tooltip; _ttipOnly = Array.isArray(_ttip) ? _ttip : null; _TIP_DELAY = O.hover_delay_ms;
   _tip = _ttip ? new maplibregl.Popup(

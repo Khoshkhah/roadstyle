@@ -1,7 +1,7 @@
 // GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
 // looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
 import {_esc} from "../popup.js";
-import {map, O, RS_PREFIX, RS_LEAN, _road, _roadOfPiece, _emit} from "./core.js";
+import {map, O, RS_PREFIX, RS_LEAN, RS_LEANS, leanAt, _road, _roadOfPiece, _emit} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf} from "./select.js";
 let _streetView = false;
@@ -64,7 +64,7 @@ export function _svPick(ll, f, id){
 // the drawn lane offset (px) of an edge at this zoom: the road layer's own line-offset expression,
 // ["interpolate",["linear"],["zoom"], z, ["case", two-way?, ["match",["get",class], ..., dflt], 0], ...]
 export function _svLanePx(props){
-  const lay=RS_LEAN || RS_PREFIX+"roads-fill"; if(!map.getLayer(lay)) return 0;     // the road layer: simple mode's one layer, or the full look's fill
+  const lay=RS_LEAN ? leanAt() : RS_PREFIX+"roads-fill"; if(!map.getLayer(lay)) return 0;     // the road layer: simple mode's one layer, or the full look's fill
   const e=map.getPaintProperty(lay, "line-offset");
   if(!Array.isArray(e) || e[0]!=="interpolate") return typeof e==="number" ? e : 0;
   const val=x=>{ if(typeof x==="number") return x;
@@ -125,7 +125,7 @@ export function rsSetStreetViewMarkerAt(lng, lat, heading){
   const off=(a, b)=>{ const x=Math.abs(a-b)%360; return x>180 ? 360-x : x; };
   let best=_svPos ? _svOnEdge(_svPos.f, ll) : null;
   if(!best || best.d>_SV_LANE_M+6 || best.m<=0.01 || best.m>=_svAt(best.f, 1e9).len-0.01){
-    const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_LEAN ? [RS_LEAN] : RS_FILL_LAYERS.filter(id=>map.getLayer(id)), cand=[];
+    const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_LEAN ? RS_LEANS : RS_FILL_LAYERS.filter(id=>map.getLayer(id)), cand=[];
     map.queryRenderedFeatures([[q.x-r, q.y-r], [q.x+r, q.y+r]], RS_LEAN ? {layers:lays, filter:["==", ["get", "__rs_k"], 1]} : {layers:lays}).forEach(f=>{
       if(RS_LEAN) f=_roadOfPiece(f);
       if(f.id==null || cand.some(c=>c.f.id===f.id)) return;

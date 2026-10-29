@@ -7,6 +7,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The dashboard reads the road layer as a list of layers** (`RS_LEANS`, with `leanAt()` for the one that the map draws at its zoom). Pick,
+  hover, select and Street View use the list, so the road layer can be more than one style layer (zoom bands, the dash layers).
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
