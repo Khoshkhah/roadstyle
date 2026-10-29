@@ -28,6 +28,7 @@ The ids of duckOSM are 64-bit numbers, and a JSON number above 2^53 is not exact
 | `ramp`, `stepped` | your own list of colours (the default is `data.live_ramp` of the palette); `stepped: true` takes the nearest colour of a smooth ramp, with hard edges |
 | `nodata` | the colour of a road with no row (default: the page's no-data colour) |
 | `key` | the column that names the road (default `edge_id`; `"row"` for the number of the road's row) |
+| `fields` | the columns of the rows that the popup, the tooltip and the panel show, for example `["flow"]`. Default: every column except the key column |
 | `legend` | `false`: no legend; `{title: "..."}`: change the legend |
 
 ## The colour sets
@@ -40,6 +41,15 @@ The legend shows the lowest and the highest number of each set, and how many roa
 
 The cut points come from the data of the call, so each day has its own. To compare two days by colour, give the same `breaks` to both. The default ramp goes
 from blue through green and yellow to red. Its colours have a medium brightness, so they show on the light map and on the dark map.
+
+## Several ways to colour
+
+A page that can show the same data in more than one way (for example the flow, then who was counted) gives the names to the legend box. The box shows
+them as its "Colour by" list, above the legend:
+
+```javascript
+rs.colorModes.set(["Traffic", "Counted"], {onChange: name => show(name)});    // show() calls rs.setData with that mode's column
+```
 
 ## A day picker
 

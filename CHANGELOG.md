@@ -17,6 +17,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
     `rsFirstPaint(first)` (`dashboard/template.js`) sets the first paint. The panel's shell rules moved from the template `dashboard` to the end of `dashboard.css`.
   - `rs.sheet()` / `rs.sheet(n)` (the phone sheet's height) and `rs.freeArea()` (the free part of the map; on a phone it counts the bar and the sheet).
   - The element of a tool has `data-rs-tool="<id>"`, which stays after the `title` went to the tooltip.
+- **`rs.setData` takes `fields`**: the columns of the rows that the popup, the tooltip and the panel show. The key column (`edge_id`) never shows: the road has it.
+- **`rs.colorModes`**: a page gives the legend box its own "Colour by" list (`set(names, {active, onChange})`, `select`, `clear`, `active`; event `rs:colormode`). A live-data page has no colour
+  options of the style, so its modes (Traffic, Counted, How sure) go in the toolbox, next to the legend, and not in a bar of its own.
 - **`rs.naturalBreaks(values, k)`** gives the cut points that `rs.setData` uses, so a page can give the same `breaks` to many calls (an hour slider: the breaks of the whole day).
 - **A legend row has a shape** (`square`, the default, `circle` or `line`): `dashboard={"legend": {"rows": [{"color": ..., "label": ..., "shape": "circle"}]}}` and `rs.legend.add`. The legend then
   explains the colour of a circle on the map (a sensor) as well as the colour of a road. A wrong shape is an error.

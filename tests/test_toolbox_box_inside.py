@@ -29,7 +29,7 @@ def test_the_boxes_of_the_bar_stay_inside_the_window_and_the_settings_have_no_re
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
             page.goto(_URL)
-            page.wait_for_function("window.map && window.map.loaded() && !!window.rs", timeout=60_000)
+            page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
             for box in ("settings", "attribution"):
                 r = page.evaluate(_BOX, box)
                 assert r["top"] >= 11 and r["bottom"] <= height - 11, (height, box, r)
@@ -49,7 +49,7 @@ def test_a_tooltip_of_the_bar_does_not_cover_the_bar_after_an_earlier_one():
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.route(_URL, lambda r: r.fulfill(content_type="text/html", body=html))
         page.goto(_URL)
-        page.wait_for_function("window.map && window.map.loaded() && !!window.rs", timeout=60_000)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
         seen = []
         for title in ("Zoom in", "Google 3D is off", "Zoom in", "Drag to rotate"):
             button = page.locator(f"#rs-toolbar button[title^='{title}'], #rs-toolbar button[data-rs-tip^='{title}']").first
