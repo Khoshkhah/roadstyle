@@ -113,7 +113,7 @@ pub struct Page {
 /// The template the call names (`template=`); none: `map`. The keyword `sidebar` of the old form is an error.
 fn template_of(given: &Map<String, Value>) -> Result<Template, crate::Error> {
     if given.contains_key("sidebar") {
-        return Err(crate::error::options("sidebar= is now template=: use \"dashboard\", \"report\", \"review\" or \"map\""));
+        return Err(crate::error::options("sidebar= is now template=: use \"dashboard\", \"classic\", \"report\" or \"map\""));
     }
     match given.get("template").filter(|v| !v.is_null()) {
         None => Ok(Template::Map),
@@ -148,7 +148,7 @@ fn page_args(look: &Look, given: &Map<String, Value>, template: Template) -> Res
 }
 
 /// The checks of the page keys that need two of them or the look: the popup mode ("panel" from the look or the key) and the Google key.
-fn check_keys<'a>(k: &'a PageKeys, look: &Look) -> Result<(&'a str, Option<String>), crate::Error> {
+fn check_keys<'a>(k: &'a PageKeys, look: &Look, template: Template) -> Result<(&'a str, Option<String>), crate::Error> {
     let mode = if look.map.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { k.popup_mode.as_deref().filter(|m| !m.is_empty()).unwrap_or("popup") };
     if k.side_panel_html.is_some() && mode == "panel" {
         return Err(crate::error::options("side_panel_html and popup_mode='panel' are two panels on the right: use one"));
@@ -157,8 +157,10 @@ fn check_keys<'a>(k: &'a PageKeys, look: &Look) -> Result<(&'a str, Option<Strin
         return Err(crate::error::options(format!("street_view must be True, False or \"window\", got {}", repr(&k.street_view))));
     }
     let key = k.street_view_key.clone().filter(|v| !v.is_empty());
-    if k.google_3d && key.is_none() {
-        return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY"));
+    // a page with a toolbar has the settings tool, where the person can type the key; a page without one has no place for it
+    if k.google_3d && key.is_none() && template.dashboard().toolbar.is_none() {
+        return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY \
+                                          (the template \"dashboard\" lets the person add it in the settings)"));
     }
     Ok((mode, key))
 }
@@ -214,7 +216,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let k: PageKeys = serde_json::from_value(Value::Object(a.clone())).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
     // the map options that the page reads too: the popup panel, the 3D view, the hover colour, the colour options, the columns
     let mo = &look.map;
-    let (mode, key) = check_keys(&k, look)?;
+    let (mode, key) = check_keys(&k, look, template)?;
     let bounds = bounds_of(&roads);
     let tiled = k.tiles;
     let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
@@ -239,8 +241,9 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let (ctl, inter) = (&meta["roadstyle:controls"], &meta["roadstyle:interaction"]);
     let mut tunnel = ctl["tunnel"].clone();
     tunnel["bg"] = bg.into();
+    let ontop = if bms.len() > 1 { ontop_layers() } else { Value::Null };
     let opts = PageOptions {
-        dashboard: template.dashboard(), basemaps: bms, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
+        dashboard: template.dashboard(), basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
         popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
         street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d: k.google_3d,
@@ -368,6 +371,12 @@ fn bg_color(bm: &Value, look: &Look) -> String {
     (if dark { &b.dark } else { &b.light }).css().into()
 }
 
+/// The layers on top of a base map (data/basemaps.json `ontop`): only a page with the base-map box has them (the box turns them on).
+fn ontop_layers() -> Value {
+    let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
+    all["ontop"].clone()
+}
+
 /// the active base map, the switcher's list (the active one first) and the style that draws it.
 fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Value, Vec<Value>, Value), crate::Error> {
     let api = k.api_key.as_deref();
@@ -381,8 +390,22 @@ fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Va
     for b in keys.iter().filter(|b| key_of(b) != active_bm["key"] && key_of(b) != key_of(&active)) {
         list.push(basemap(b, api, &resolved, warnings)?);
     }
+    // a map with a dark twin (`dark`) brings its twin: the box lists the pair as one row, and the theme switches between them
+    let mut i = 0;
+    while i < list.len() {
+        if let Some(t) = list[i]["dark"].as_str().filter(|t| !list.iter().any(|b| b["key"] == *t)) {
+            let twin = basemap(&json!(t), api, &resolved, warnings)?;
+            list.push(twin);
+        }
+        i += 1;
+    }
+    let order = |b: &Value| keys.iter().position(|k| key_of(k) == b["key"]).map_or(99, |p| p as i64);
     let mut bms: Vec<Value> = list.iter().map(|b| json!({"key": b["key"], "label": b["label"], "tiles": tiles_of(b), "bg": bg_color(b, look),
-                                                         "maxzoom": b.get("maxzoom").cloned().unwrap_or(json!(19)), "attr": b["attr"]})).collect();
+                                                         "title": b.get("title").cloned().unwrap_or_else(|| b["label"].clone()), "group": b.get("group").cloned().unwrap_or(json!("")),
+                                                         "swatch": b.get("swatch").cloned().unwrap_or(Value::Null), "order": order(b),
+                                                         "maxzoom": b.get("maxzoom").cloned().unwrap_or(json!(19)), "attr": b["attr"],
+                                                         "is_dark": b["is_dark"], "style_url": b.get("style_url").cloned().unwrap_or(Value::Null),
+                                                         "dark": b.get("dark").cloned().unwrap_or(Value::Null)})).collect();
     if !k.basemap_switcher && k.basemaps.as_ref().is_none_or(|l| l.is_empty()) {
         bms.truncate(1);        // no switcher and no list given: only the fixed backdrop (window.rsSetBasemap reaches a given list)
     }

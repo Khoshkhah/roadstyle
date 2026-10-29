@@ -35,8 +35,8 @@ gives the defaults. A page can change each field, except the panel's template HT
 | Template | Called by | Desktop form | Phone form (width 700 px or less) |
 |---|---|---|---|
 | `map` | `render_edges` (default) | The map and the MapLibre control column, as today. A host panel (`side_panel_html`) is possible | The column as today; the boxes fold (`panel._narrow`) |
-| `dashboard` | `render_dashboard` (default) | Dock layout: the map, and the sidebar `templates/dashboard.html` at the right, 340 px. No toolbar | The sidebar is a bottom sheet (3 heights: closed, 40 %, full). The map stays full width |
-| `review` | `render_dashboard(template="review")` | Overlay layout, the same sidebar floats at the right, toolbar at the right, window rules on | Toolbar horizontal at the top; the sidebar is a bottom sheet; a window is a bottom sheet, and one sheet is open at a time |
+| `classic` | `render_dashboard(template="classic")` | Dock layout: the map, and the sidebar `templates/dashboard.html` at the right, 340 px. No toolbar | The sidebar is a bottom sheet (3 heights: closed, 40 %, full). The map stays full width |
+| `dashboard` | `render_dashboard` (default) | Overlay layout, the same sidebar floats at the right, toolbar at the right, window rules on | Toolbar horizontal at the top; the sidebar is a bottom sheet; a window is a bottom sheet, and one sheet is open at a time |
 | `report` | `render_report` | Dock layout, the sidebar `templates/report.html`. No toolbar | The report under the map: the map 55 % of the height, the report scrolls |
 
 Each template has one panel at most (Kaveh, 2026-10-28: "the design was wrong from the beginning by adding two side panels").
@@ -44,7 +44,7 @@ Each template has one panel at most (Kaveh, 2026-10-28: "the design was wrong fr
 The Rust types (serde, `deny_unknown_fields`; the defaults come from the template):
 
 ```rust
-pub enum Template { Map, Dashboard, Review, Report }
+pub enum Template { Map, Dashboard, Dashboard, Report }
 pub enum Layout { Dock, Overlay }
 pub enum Edge { Right, Left, Top, Bottom }
 
@@ -64,7 +64,7 @@ pub struct Google3d { pub fov_deg: Option<f64>, pub follow: bool, pub min_alt_m:
                       pub layers: Vec<Layer3d>, pub selection_style: LineStyle }
 ```
 
-Only `review` sets `windows.clamp: true` and `recenter_map: false`. The other templates keep today's window rules.
+Only `dashboard` sets `windows.clamp: true` and `recenter_map: false`. The other templates keep today's window rules.
 
 The `window.rs*` switches of the old `main` become fields:
 
@@ -113,11 +113,27 @@ the bar. Thus the DOM moves and the 150 ms poll of the old `layout.js` go.
 | Base-map data | `data/basemaps.json` gets `style_url`, `group`, `title`, `dark`, `swatch`, and a `menu` list in place of `switcher`. The Esri label and hillshade URLs move there from the JS |
 | Legend box | The legend of the active color option, the classes in two columns |
 | Attribution box | The base map's text, and Google's when a Google window is open |
-| Area boundary | The outline of the area (decided 2026-10-29, level 3): a thin line over the base map and under the roads, the outside of it shaded, and the camera limited to the boundary's bounds (`maxBounds`, with a margin). It comes from the table `main.boundary` of the duckOSM file; a page of a plain GeoDataFrame gives it with `boundary=`. Fields: `boundary.outline`, `boundary.dim`, `boundary.limit`, each on by default in `dashboard` and `review` and off in `map` and `report` |
+| Area boundary | The outline of the area (decided 2026-10-29, level 3): a thin line over the base map and under the roads, the outside of it shaded, and the camera limited to the boundary's bounds (`maxBounds`, with a margin). It comes from the table `main.boundary` of the duckOSM file; a page of a plain GeoDataFrame gives it with `boundary=`. Fields: `boundary.outline`, `boundary.dim`, `boundary.limit`, each on by default in `dashboard` and `dashboard` and off in `map` and `report` |
 | Theme | One value on `<html>` (`light` or `dark`) that the sidebar, the bar, the boxes, the popup and the tooltip all read (decided 2026-10-29: the popup and the tooltip have a dark theme too). The theme button of the bar sets it; a dark base map can set it |
 | Windows | Opened and clamped in the free area (between the panel and the bar) at each change. A window keeps the user's size and grows back. With `recenter_map: false`, it never moves the map |
 | Google 3D | The map leads, in one direction only (brief section 9). Input in the window, or a Google camera change that the page did not set, turns Follow off |
 | 3D "Show" selector | `Layer3d {id, label, kind (Line, Ribbon, Polygon, Points), source, match_prop, scope (Selection, View), max: 500, style, arrows, on}`. JS: `rs.g3d.layers.register`, `list`, `setOn`, `refresh` (alias `window.rsG3dLayers`). The menu shows with two layers or more. A page can replace the built-in layer `selected` |
+
+### 3.4 The style rules for every part
+
+Every part that is added to a dashboard (a tool, a box, a window, a control of a panel) follows these rules. A part that breaks one is not
+finished. (Decided 2026-10-29: "every item must follow the style, and have a dark and a light theme".)
+
+| Rule | What it means |
+|---|---|
+| Two themes | The part works in the light and the dark theme, and follows the one theme value on `<html>` (`data-rs-theme`). It has no color of its own: it reads the tokens |
+| Tokens | Colors come from the tokens of `popup.css`: `--rs-tb-bg` (the bar, the panel, the scale box), `--rs-box-bg` (boxes, popup, tooltip), `--rs-card-bg` (the layer before the text), `--rs-tb-ink`, `--rs-tb-border`, `--rs-tb-hover`, `--rs-tb-on`. The opacities are `--rs-a-tb`, `--rs-a-box`, `--rs-a-card`, which the person sets in the settings box |
+| One look | Rounded corners (10 px for boxes, 14 px for windows and lists, 8 to 12 px for controls), the 6 px blur, no light border line on a dark surface, one shadow. Text sits on the card layer, not straight on a translucent layer |
+| No system parts | No native `title` tooltip (tip.js takes it), no native `<select>` list (selectbox.js), no native scrollbar style. Native controls get `color-scheme` from the theme |
+| Boxes | A box of the bar has the same width (264 px), padding (8 px) and font (12 px) as the others, keeps 12 px from the window edge, opens toward the map, and closes on an outside click and on Escape. It is never clipped by its parent: a bar must not have an `overflow` rule |
+| Panels | The header stays and only the body scrolls (`.sb-top` and `.sb-body`). The body does not hand its scroll to the map |
+| Places | The part works with the bar at each of the four edges, with the panel on the left and on the right, and on a phone (700 px) |
+| Test | The part is on the sample page (a panel with cards, text and controls), and it is looked at in both themes, with the bar at two edges and on a phone, before it is committed |
 
 ## 4. The port from the old `main`
 
@@ -129,7 +145,7 @@ not a git merge of the old branch. Each step lands alone, with its desktop form,
 | D1 | `Dashboard`, `Template` and their defaults in Rust; the binding passes `template`; `sidebar=` becomes the template | The `map`, `dashboard` and `report` pages are the same as before; a Rust test for each template's defaults; the guard `scripts/check_no_python_shape.py` |
 | D2 | The tool registry and the column renderer | The column has the same buttons in the same order as before |
 | D3 | The bar renderer: 4 positions, theme and attribution tools, the box rules, the dark theme | The bar checks of section 5 |
-| D4 | The overlay layout, the floating panel, the chevrons, the corner box; template `review` | The panel checks |
+| D4 | The overlay layout, the floating panel, the chevrons, the corner box; template `dashboard` | The panel checks |
 | D5 | The window rules in `float.js` | The window checks |
 | D6 | The base-map box, the `basemaps.json` fields, the OpenFreeMap merge, "On top" | The base-map checks |
 | D7 | Google 3D from the last form of the old `main`: one-way link, Follow, the note, modes and labels | The Google 3D checks, with the `gmp-map-3d` stub |
@@ -140,7 +156,7 @@ What happens to the old `main` (the tag `python-engine-final`, which no branch f
 
 1. It gets no new work. A SimReady fix that it needs is made in the Rust engine, with a line in the port list below.
 2. The Rust engine is `main` (`rust-engine` is the same commit).
-3. The SimReady page moves to the Rust dashboard (`template="review"`, its tools and 3D layers as options) in the SimReady repository.
+3. The SimReady page moves to the Rust dashboard (`template="dashboard"`, its tools and 3D layers as options) in the SimReady repository.
    Its `tools/test_map.py` must pass on the new page before the move.
 
 Port list (commits of the tag after 1c835679, and their step): none yet.
@@ -167,7 +183,7 @@ not cover the bar; a window is a bottom sheet; 40 % of the height or more shows 
 
 | Question | Recommendation |
 |---|---|
-| 1. Must `render_dashboard` use `review` by default? | No. Keep `dashboard` as the default, so other projects' pages do not change. Remove `dashboard` later if no project uses it |
+| 1. Must `render_dashboard` use the new form by default? | **Yes (decided 2026-10-29).** The new form is `dashboard`, the old docked form is `classic`; a project that wants the old look writes `template="classic"`. The name `review` is gone: it came from the SimReady page and did not describe the form |
 | 2. One phone width for every rule? Today windows change at 520 px and boxes at 700 px | Yes, 700 px for all, in `phone.max_width_px` |
 | 3. Where is the bar on a phone? | At the top, horizontal, for every desktop position; the panel and the windows are bottom sheets |
 | 4. Keep the 401/403 tile check of each base map when the page is built? | No. The engine makes no network requests. A provider that stops answering is removed from `basemaps.json` |

@@ -36,6 +36,8 @@ pub struct PageOptions {
     /// the template's typed options (docs/design/dashboard_templates.md)
     pub dashboard: Dashboard,
     pub basemaps: Vec<Value>,
+    /// the layers on top of a base map (data/basemaps.json `ontop`: hillshade, the Esri labels): url, opacity, attribution
+    pub ontop: Value,
     pub basemap_switcher: bool,
     /// a tiled page (the roads in the embedded PMTiles archive)
     pub tiles: bool,

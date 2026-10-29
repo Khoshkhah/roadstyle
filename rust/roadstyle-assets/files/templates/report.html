@@ -16,15 +16,15 @@ body{--rs-side:340px}   /* shift the map's right-anchored controls (base-map ico
 #rp[data-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026;--accent:#5aa9f8}
 .rp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .rp-top h2{margin:0;font-size:15px}
-#rp-th{background:none;border:1px solid var(--line);border-radius:99px;color:var(--mut);
-  cursor:pointer;font-size:13px;width:26px;height:26px;line-height:1}
+#rp-th,#rp-hide{background:none;border:1px solid var(--line);border-radius:8px;color:var(--mut);
+  cursor:pointer;font-size:13px;width:28px;height:28px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
 #rp-th:hover,#rp-hide:hover{color:var(--accent);border-color:var(--accent)}
-#rp-hide{background:none;border:1px solid var(--line);border-radius:99px;color:var(--mut);cursor:pointer;
-  font-size:14px;width:26px;height:26px;line-height:1;margin-left:6px}
+#rp-hide{margin-left:6px}
+#rp #rp-th,#rp #rp-hide{padding:0}      /* over "#rp button": the icon needs the room */
 #rp.hidden{display:none}
 #rp-show{position:fixed;top:10px;right:10px;z-index:3;display:none;background:#fff;color:#333;
-  border:1px solid #ccc;border-radius:5px;width:30px;height:30px;cursor:pointer;font-size:16px;
-  line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+  border:1px solid #ccc;border-radius:8px;width:32px;height:32px;cursor:pointer;padding:0;
+  align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.2)}
 .rp-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .rp-kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
 .rp-kv{font-size:19px;font-weight:660;letter-spacing:-.3px}
@@ -61,9 +61,10 @@ body{--rs-side:340px}   /* shift the map's right-anchored controls (base-map ico
 #rp-detail b{color:var(--ink)}
 </style>
 <div id="rp" data-theme="light">
+<div class="rp-card">
   <div class="rp-top"><h2>Report</h2>
-    <span><button id="rp-th" title="Light / dark">◐</button><button id="rp-hide" title="Hide panel">»</button></span></div>
-
+    <span><button id="rp-th" title="Light / dark">◐</button><button id="rp-hide" title="Hide panel"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m8.5 9.5 2.5 2.5-2.5 2.5"/></svg></button></span></div>
+<div class="rp-body">
   <details open><summary>Summary</summary>
     <div class="rp-kpis" id="rp-kpis"></div></details>
 
@@ -81,7 +82,9 @@ body{--rs-side:340px}   /* shift the map's right-anchored controls (base-map ico
   <div class="rp-sec">Selected road</div>
   <div id="rp-detail">Click a road, or a search result.</div>
 </div>
-<button id="rp-show" title="Show panel">&laquo;</button>
+</div>
+</div>
+<button id="rp-show" title="Show panel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m10.5 9.5-2.5 2.5 2.5 2.5"/></svg></button>
 <script>
 (function(){
   const $ = id => document.getElementById(id);
@@ -94,7 +97,7 @@ body{--rs-side:340px}   /* shift the map's right-anchored controls (base-map ico
   // hide / unhide the panel — the map takes the space back, a reopen button appears (like map.resize)
   function panel(show){
     rp.classList.toggle("hidden", !show);
-    $("rp-show").style.display = show ? "none" : "block";
+    $("rp-show").style.display = show ? "none" : "flex";
     const mp = $("map"); if (mp) mp.style.right = show ? "340px" : "0";
     document.body.style.setProperty("--rs-side", show ? "340px" : "0px");   // move the base-map icon with the panel
     try { map.resize(); } catch (e) {}

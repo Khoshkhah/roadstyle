@@ -49,6 +49,7 @@ body.rs-panel #map{right:320px}
   justify-content:space-between;align-items:center;color:#666;font-weight:700;
   font-size:11px;letter-spacing:.6px;text-transform:uppercase}
 .rs-side-x,.rs-side-min{cursor:pointer;color:#999;font:700 16px/1 sans-serif;padding:0 3px}
+.rs-side-min{display:inline-flex;align-items:center}
 .rs-side-x:hover,.rs-side-min:hover{color:#333}
 .rs-side-q{padding:9px 14px;border-bottom:1px solid #ececec}
 .rs-side-q input{width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #ddd;
@@ -143,23 +144,271 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-g3d-warn{color:#fbbf24;font-size:11px;white-space:nowrap}
 .maplibregl-ctrl-group button.rs-on{background:#dfe9ff}
 .rs-svm{pointer-events:none}
-@media (max-width:520px){.rs-svw{   /* phones only: a docs column is ~690 px */left:0!important;right:0!important;top:auto!important;bottom:0!important;
-  width:auto!important;height:45%!important;border-radius:10px 10px 0 0;resize:none}}
+html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a bottom sheet */left:0!important;right:0!important;top:auto!important;bottom:0!important;
+  width:auto!important;height:45%!important;border-radius:14px 14px 0 0;resize:none}
 /* the phone form of a template (template.js; `rs-phone` and `rs-tpl-*` are on <html> from the first paint). A sidebar template shows its
-   panel as a bottom sheet (dashboard, review) or under the map (report); the map is the full width. */
+   panel as a bottom sheet (dashboard, classic) or under the map (report); the map is the full width. */
 .rs-grip{display:none}
 html.rs-phone:not(.rs-tpl-map) #map{right:0!important}
 html.rs-phone:not(.rs-tpl-map) body{--rs-side:0px!important}
 html.rs-phone:not(.rs-tpl-map) :is(#sb-hide,#sb-show,#rp-hide,#rp-show){display:none!important}
 html.rs-phone{--rs-sheet-h:40vh;--rs-grip-h:28px}
 html.rs-phone.rs-sheet-0{--rs-sheet-h:0px}
-html.rs-phone.rs-sheet-2{--rs-sheet-h:calc(100vh - 52px - var(--rs-grip-h))}
-html.rs-phone.rs-tpl-dashboard #sb,html.rs-phone.rs-tpl-review #sb{top:auto;left:0;right:0;bottom:0;width:auto;height:var(--rs-sheet-h);
+html.rs-phone.rs-sheet-2{--rs-sheet-h:calc(100vh - var(--rs-top,52px) - var(--rs-grip-h))}
+html.rs-phone.rs-tpl-dashboard #sb,html.rs-phone.rs-tpl-classic #sb{top:auto;left:0;right:0;bottom:0;width:auto;height:var(--rs-sheet-h);
   border-left:0;border-top:1px solid var(--line);z-index:5;transition:height .15s}
 html.rs-phone.rs-sheet-0 #sb{display:none}
-html.rs-phone.rs-tpl-dashboard .rs-grip,html.rs-phone.rs-tpl-review .rs-grip{display:flex;align-items:center;justify-content:center;
+html.rs-phone.rs-tpl-dashboard .rs-grip,html.rs-phone.rs-tpl-classic .rs-grip{display:flex;align-items:center;justify-content:center;
   position:fixed;left:0;right:0;bottom:var(--rs-sheet-h);height:var(--rs-grip-h);z-index:6;box-sizing:border-box;touch-action:none;
   background:#fff;border-radius:12px 12px 0 0;box-shadow:0 -2px 8px rgba(0,0,0,.15);transition:bottom .15s}
 .rs-grip i{width:44px;height:5px;border-radius:3px;background:#b9bec7}
 html.rs-phone.rs-tpl-report #map{bottom:45%}
 html.rs-phone.rs-tpl-report #rp{top:55%;left:0;right:0;width:auto;border-left:0;border-top:1px solid var(--line)}
+/* a greyed tool */
+.maplibregl-ctrl button:disabled{opacity:.4;cursor:not-allowed}
+/* ---- the overlay layout and the bar (overlay.js, toolbar.js; docs/design/dashboard_templates.md, 3.1 to 3.3) ---- */
+html.rs-overlay #map{position:absolute!important;inset:0!important;left:0!important;right:0!important;width:auto!important}
+html.rs-overlay #sb,html.rs-overlay .rs-side{z-index:5;box-shadow:0 0 12px rgba(0,0,0,.2)}
+html.rs-overlay #sb{background:var(--bg,#fff);bottom:0}
+html.rs-overlay,html.rs-overlay body{overflow:hidden}
+/* the chevron that brings a hidden right panel back: a small square at the top right, not a tool of the bar */
+#rs-show-right{position:fixed;top:10px;right:10px;z-index:6;width:32px;height:32px;display:none}
+#rs-show-right .maplibregl-ctrl{margin:0;float:none}
+#rs-show-right button{width:32px;height:32px}
+.bm-menu{background:var(--rs-pop-bg)!important;color:var(--rs-pop-ink)!important}
+#rs-toolbar{position:fixed;z-index:8;box-sizing:border-box;display:flex;align-items:center;gap:4px;padding:8px;
+  border:1px solid var(--rs-tb-border);border-radius:10px;font:11px/1.2 system-ui,sans-serif}
+#rs-toolbar .maplibregl-ctrl{margin:0!important;float:none!important}
+#rs-toolbar .maplibregl-ctrl-group{display:flex;background:none;box-shadow:none;border-radius:0;gap:4px}
+#rs-toolbar button{width:32px;height:32px;background:none;border:0;border-radius:6px;font:700 13px/32px system-ui,sans-serif;color:var(--rs-tb-ink);padding:0;cursor:pointer}
+#rs-toolbar button svg,#rs-toolbar button .maplibregl-ctrl-icon{filter:none}
+html[data-rs-theme=dark] #rs-toolbar .maplibregl-ctrl-icon{filter:invert(.85)}
+#rs-toolbar button.on,#rs-toolbar button.rs-on{background:var(--rs-tb-on)}
+#rs-toolbar button:disabled{opacity:.4;cursor:not-allowed}
+#rs-toolbar .maplibregl-ctrl-group button+button{border:0}
+#rs-toolbar button:hover:not(:disabled){background:var(--rs-tb-hover)}
+#rs-toolbar.rs-tb-right,#rs-toolbar.rs-tb-left{flex-direction:column;width:44px;top:50%;transform:translateY(-50%);max-height:calc(100% - 128px)}
+#rs-toolbar.rs-tb-right .maplibregl-ctrl-group,#rs-toolbar.rs-tb-left .maplibregl-ctrl-group{flex-direction:column}
+#rs-toolbar.rs-tb-right{right:8px}
+#rs-toolbar.rs-tb-left{left:8px}
+#rs-toolbar.rs-tb-top,#rs-toolbar.rs-tb-bottom{flex-direction:row;flex-wrap:wrap;justify-content:center;min-height:44px;left:50%;transform:translateX(-50%);max-width:calc(100% - 16px)}   /* no overflow rule: a box opens outside the bar, and a scroll would clip it */
+#rs-toolbar.rs-tb-top{top:8px}
+#rs-toolbar.rs-tb-bottom{bottom:8px}
+/* the boxes of a button open toward the center of the map */
+#rs-toolbar .bm-ctrl,#rs-toolbar .rs-attr-ctrl{position:relative!important;overflow:visible}
+#rs-toolbar .bm-menu{position:absolute!important;z-index:9}
+#rs-toolbar.rs-tb-right .bm-menu{top:0!important;bottom:auto!important;left:auto!important;right:calc(100% + 12px)!important}
+#rs-toolbar.rs-tb-left .bm-menu{top:0!important;bottom:auto!important;right:auto!important;left:calc(100% + 12px)!important}
+#rs-toolbar.rs-tb-top .bm-menu{top:calc(100% + 12px)!important;bottom:auto!important;left:0!important;right:auto!important}
+#rs-toolbar.rs-tb-bottom .bm-menu{bottom:calc(100% + 12px)!important;top:auto!important;left:0!important;right:auto!important}
+html.rs-has-toolbar .maplibregl-ctrl-top-right,html.rs-has-toolbar .maplibregl-ctrl-bottom-right{display:none!important}
+#rs-attr-box{position:absolute;z-index:9}
+#rs-attr-box[hidden]{display:none}
+#rs-attr-box a{color:inherit}
+#rs-toolbar.rs-tb-right #rs-attr-box{right:calc(100% + 12px);bottom:0}
+#rs-toolbar.rs-tb-left #rs-attr-box{left:calc(100% + 12px);bottom:0}
+#rs-toolbar.rs-tb-top #rs-attr-box{top:calc(100% + 12px);right:0}
+#rs-toolbar.rs-tb-bottom #rs-attr-box{bottom:calc(100% + 12px);right:0}
+#rs-toolbar .bm-menu.open{display:block}
+/* every pop-up of the bar takes the bar's own look: one rule set (the bar, the boxes, the scale box) */
+#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,.rs-pop{background:var(--rs-box-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+/* the chevrons of the panels (show and hide) take the bar's look too */
+#rs-show-right button,#sb-show,#sb-hide,html.rs-overlay .rs-side-min{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important;box-shadow:none!important}
+html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;box-sizing:border-box;padding:0!important;font-size:16px;cursor:pointer}
+/* the scale box */
+#rs-scalebox{position:fixed;left:8px;bottom:8px;height:28px;width:160px;box-sizing:border-box;z-index:7;display:flex;align-items:center;padding:0 8px;gap:6px;
+  user-select:none;-webkit-user-select:none;pointer-events:none;font:11px/1 system-ui,sans-serif}
+#rs-scalebox .maplibregl-ctrl-scale{flex:none;width:auto;max-width:80px;margin:0!important;background:none!important;color:var(--rs-tb-ink)!important;border-color:var(--rs-tb-ink)!important;padding:0 2px;text-align:left}
+#rs-scalebox .rs-scale-slot{flex:none;width:90px;overflow:hidden}
+#rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:46px!important;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 monospace;text-align:right!important;border-radius:0}
+html.rs-theme-in-bar #sb-th{display:none!important}
+html.rs-phone #rs-scalebox{display:none}
+/* thin overlay scrollbars for every scrollable box: 6 px, a rounded thumb in the theme's text color at 30 %, no track, no arrows */
+html.rs-overlay *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--rs-tb-ink) 30%,transparent) transparent}
+html.rs-overlay ::-webkit-scrollbar{width:6px;height:6px;background:transparent}
+html.rs-overlay ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--rs-tb-ink) 30%,transparent);border-radius:3px}
+html.rs-overlay ::-webkit-scrollbar-track,html.rs-overlay ::-webkit-scrollbar-corner{background:transparent}
+html.rs-overlay ::-webkit-scrollbar-button{display:none}
+/* ---- the base-map box (basemapbox.js): radio rows with a swatch, then "On top" ---- */
+.bm-menu.rs-bm-box{display:none;width:200px!important;padding:8px;gap:2px;border-radius:8px;max-height:calc(100vh - 24px);overflow-y:auto}
+.bm-menu.rs-bm-box.open{display:grid}
+.rs-bm-h{font:700 10px/1.2 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;opacity:.65;margin:2px 4px 4px}
+.bm-menu.rs-bm-box div{padding:0!important}
+.bm-menu.rs-bm-box .rs-bm-h{padding:2px 4px!important}
+.rs-bm-row{display:flex;align-items:center;gap:8px;padding:4px;border-radius:6px;cursor:pointer;font:12px/1.3 system-ui,sans-serif}
+.rs-bm-row:hover{background:var(--rs-tb-hover,rgba(0,0,0,.08))}
+.rs-bm-sw{box-sizing:border-box;width:32px;height:20px;border-radius:3px;border:1px solid rgba(0,0,0,.2);flex:none}
+.rs-bm-box hr{border:0;border-top:1px solid var(--rs-tb-border,rgba(0,0,0,.12));margin:4px 0;width:100%}
+.rs-bm-row input:disabled+.rs-bm-n{opacity:.45}
+.rs-bm-row.rs-bm-off{opacity:.45;cursor:not-allowed}
+.bm-menu .rs-bm-i{margin-left:auto;flex:none;width:14px;height:14px;line-height:12px;border:1px solid currentColor;border-radius:50%;font:italic 700 10px Georgia,serif;text-align:center;opacity:.65;cursor:help;box-sizing:border-box}
+.rs-g3d-note{color:#fbbf24;font-size:10.5px;line-height:1.2;flex:1;min-width:0}
+.rs-g3d-note[hidden]{display:none}
+.rs-svw-bar button.rs-g3d-follow{font:11px/1 system-ui;padding:3px 7px;border-radius:4px;color:#cbd5e1;background:none;border:1px solid rgba(255,255,255,.45);white-space:nowrap}
+.rs-svw-bar button.rs-g3d-follow.on{background:#0E7F91;color:#fff;border-color:#0E7F91}
+.rs-g3d-showwrap{position:relative}
+.rs-g3d-showwrap[hidden]{display:none}
+.rs-svw-bar button.rs-g3d-show{font:11px/1 system-ui;padding:3px 7px;border-radius:4px;color:#cbd5e1;background:none;border:1px solid rgba(255,255,255,.45);white-space:nowrap}
+.rs-g3d-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:5;min-width:140px;background:#23262d;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:6px 8px;font:12px/1.8 system-ui;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.rs-g3d-menu[hidden]{display:none}
+.rs-g3d-menu label{display:block;white-space:nowrap;cursor:pointer}
+/* ---- the tool `legend` (colorbox.js): "Colour by" as radio rows, then the legend in two columns; the look of the base-map box ---- */
+#rs-toolbar .rs-color-ctrl{position:relative!important;overflow:visible}
+#rs-color-box{position:absolute;z-index:9}
+#rs-color-box[hidden]{display:none}
+#rs-toolbar.rs-tb-right #rs-color-box{right:calc(100% + 12px);top:0}
+#rs-toolbar.rs-tb-left #rs-color-box{left:calc(100% + 12px);top:0}
+#rs-toolbar.rs-tb-top #rs-color-box{top:calc(100% + 12px);right:0}
+#rs-toolbar.rs-tb-bottom #rs-color-box{bottom:calc(100% + 12px);right:0}
+#rs-color-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:8px 0 6px}
+.rs-cb-opts{display:grid;gap:2px}
+.rs-cb-opt{display:block;width:100%;padding:6px 8px;border:0;border-radius:6px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+#rs-toolbar .rs-cb-opt{width:100%;height:auto;padding:7px 10px;border-radius:6px;font:12px/1.3 system-ui,sans-serif;color:var(--rs-tb-ink);text-align:left}
+.rs-cb-opt:hover{background:var(--rs-tb-hover)}
+.rs-cb-opt.on{background:var(--rs-tb-on);font-weight:600}
+.rs-cb-lg{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;padding:0 4px}
+.rs-cb-lg .lg-title{grid-column:1/-1;font-weight:600;margin-bottom:2px}
+.rs-cb-lg .lg-row{display:flex;align-items:center;gap:7px;white-space:nowrap;min-width:0}
+.rs-cb-lg .lg-sw{width:16px;height:10px;border-radius:3px;display:inline-block;flex:none;box-shadow:inset 0 0 0 1px rgba(128,128,128,.35)}
+.rs-cb-lg .lg-bar{grid-column:1/-1;height:10px;border-radius:5px;margin:4px 0 2px}
+.rs-cb-lg .lg-ends{grid-column:1/-1;display:flex;justify-content:space-between;opacity:.7;font-size:11px}
+html.rs-has-toolbar .co-ctrl,html.rs-has-toolbar .co-lg{display:none!important}
+/* every box of the bar (the base-map box, the colour box, the attribution): the same padding, shadow, font and text side; the base-map and colour boxes the same width */
+#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto}
+#rs-toolbar .bm-menu.rs-bm-box,#rs-color-box,#rs-attr-box{width:264px!important}
+/* ---- one background for everything that floats over the map: the bar's (--rs-tb-bg in popup.css, 90 % opaque), with the same blur, border and text color ---- */
+.rs-zoom,.flt-ctrl,.rs-find,.co-ctrl,.tn-ctrl,.vw-ctrl,.co-lg,.ov-ctrl,.maplibregl-ctrl .bm-menu,html.rs-overlay #sb,html.rs-overlay .rs-side,
+html.rs-phone.rs-tpl-dashboard .rs-grip,html.rs-phone.rs-tpl-classic .rs-grip,html.rs-phone.rs-tpl-dashboard #sb,html.rs-phone.rs-tpl-classic #sb{
+  background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-color:var(--rs-tb-border);color:var(--rs-tb-ink)}
+/* a phone: the bar at the top or the bottom takes a second row when its tools do not fit in one (each tool stays 32 px) */
+html.rs-phone #rs-toolbar.rs-tb-top,html.rs-phone #rs-toolbar.rs-tb-bottom{height:auto;flex-wrap:wrap;justify-content:center;overflow:visible;left:8px;right:8px;width:auto;max-width:none;transform:none}
+html.rs-phone #rs-toolbar.rs-tb-top .maplibregl-ctrl-group,html.rs-phone #rs-toolbar.rs-tb-bottom .maplibregl-ctrl-group{flex-direction:row}
+/* ---- the attribution box (toolbar.js): one row for each credit, the link icon at the right ---- */
+#rs-attr-box[hidden]{display:none}
+.rs-attr-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:6px;color:inherit;text-decoration:none;font:12px/1.3 system-ui,sans-serif}
+a.rs-attr-row{cursor:pointer}
+a.rs-attr-row:hover{background:var(--rs-tb-hover)}
+.rs-attr-out{display:inline-flex;opacity:.55;flex:none}
+a.rs-attr-row:hover .rs-attr-out{opacity:1}
+/* The bar's background and blur are on a layer behind it, not on the bar: a box inside a bar that has a blur cannot blur the map behind the box
+   (the bar would be its backdrop root), and it looked more transparent than the bar. */
+#rs-toolbar{border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-toolbar::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* the scale box is of the first level, with the bar */
+#rs-scalebox{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+/* ---- the card of a sidebar (templates/*.html): the layer between the translucent panel and its text ---- */
+.sb-card,.rp-card{display:contents}
+html.rs-overlay #sb,html.rs-phone.rs-tpl-dashboard #sb,html.rs-phone.rs-tpl-classic #sb{padding:8px;overflow:hidden}
+html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card,html.rs-phone.rs-tpl-classic #sb .sb-card{display:block;box-sizing:border-box;height:100%;overflow:auto;padding:14px 15px;border-radius:8px;background:var(--rs-card-bg)}
+/* the zoom read-out inside the scale box has no layer of its own (the box has the background and the blur) */
+#rs-scalebox .rs-zoom{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border:0!important;box-shadow:none!important}
+/* ---- the select list of the panels (selectbox.js): a button, and a list in the look of the boxes ---- */
+.rs-sel{position:relative}
+.rs-sel-native{display:none!important}
+#sb .rs-sel-btn,#rp .rs-sel-btn,.rs-side .rs-sel-btn,.rs-sel-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:6px 9px;
+  border:0;border-radius:12px;background:var(--card,transparent);color:inherit;font:13px system-ui,sans-serif;text-align:left;cursor:pointer}
+.rs-sel-btn:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6)}
+.rs-sel-btn:focus-visible,.rs-sel-btn[aria-expanded=true]{outline:0;box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6),0 0 0 3px color-mix(in srgb,var(--accent,#1a6bd6) 22%,transparent)}
+.rs-sel-btn:disabled{opacity:.5;cursor:not-allowed}
+.rs-sel-btn svg{flex:none;opacity:.6}
+.rs-sel-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-sel-list{position:fixed;z-index:60;box-sizing:border-box;overflow-y:auto;padding:5px;border-radius:14px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  border:0;box-shadow:0 6px 22px rgba(0,0,0,.3);color:var(--rs-tb-ink);font:13px system-ui,sans-serif}
+.rs-sel-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 11px;border-radius:10px;cursor:pointer}
+.rs-sel-opt.on{background:var(--rs-tb-hover)}
+.rs-sel-opt.sel{font-weight:600}
+.rs-sel-opt svg{flex:none;color:var(--accent,#1a6bd6)}
+/* ---- the controls of the panels, in the theme (a dark panel has dark controls) ---- */
+#sb,#rp,.rs-side{color-scheme:light}
+#sb[data-theme=dark],#rp[data-theme=dark],html[data-rs-theme=dark] .rs-side{color-scheme:dark}
+:is(#sb,#rp,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea){
+  box-sizing:border-box;padding:7px 11px;border:0;border-radius:12px;background:var(--card,var(--rs-card-bg));color:var(--ink,var(--rs-tb-ink));font:13px system-ui,sans-serif}
+:is(#sb,#rp,.rs-side) :is(input,textarea)::placeholder{color:var(--mut,var(--rs-tb-ink));opacity:.6}
+:is(#sb,#rp,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea):focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6),0 0 0 3px color-mix(in srgb,var(--accent,#1a6bd6) 22%,transparent)}
+:is(#sb,#rp,.rs-side) :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--accent,#1a6bd6)}
+:is(#sb,#rp,.rs-side) :is(input[type=checkbox],input[type=radio]){width:16px;height:16px;margin:0}
+:is(#sb,#rp,.rs-side) button{border-radius:10px}
+/* ---- the Street View and Google 3D windows: the style of the panel and the boxes ---- */
+.rs-svw{border-radius:14px;border:0;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 8px 28px rgba(0,0,0,.35);color:var(--rs-tb-ink)}
+.rs-svw-bar{background:var(--rs-card-bg);color:var(--rs-tb-ink);padding:6px 8px 6px 14px;gap:6px}
+.rs-svw-t{font-weight:600}
+.rs-svw-bar button{border:0;background:none;color:var(--rs-tb-ink);min-width:28px;height:28px;padding:0 8px;border-radius:10px;font:13px/1 system-ui;cursor:pointer}
+.rs-svw-bar button:hover:not(:disabled){background:var(--rs-tb-hover)}
+.rs-svw-mode{display:inline-flex;border:0;border-radius:10px;overflow:hidden;background:var(--rs-tb-hover)}
+.rs-svw-bar .rs-svw-mode button{height:24px;font:11px/1 system-ui;padding:0 9px;color:var(--rs-tb-ink);border-radius:0}
+.rs-svw-bar .rs-svw-mode button.on{background:var(--accent,#1a6bd6);color:#fff}
+.rs-svw-bar button.rs-g3d-follow,.rs-svw-bar button.rs-g3d-show{border:0;background:var(--rs-tb-hover);color:var(--rs-tb-ink);border-radius:10px;height:24px;padding:0 10px;font:11px/1 system-ui}
+.rs-svw-bar button.rs-g3d-follow.on{background:var(--accent,#1a6bd6);color:#fff}
+.rs-svw-bar a.rs-g3d-src{color:var(--rs-tb-ink);opacity:.6}
+.rs-g3d-warn{color:#d97706}
+.rs-svw-msg{background:var(--rs-card-bg);color:var(--rs-tb-ink)}
+.rs-svw-msg code{background:var(--rs-tb-hover);color:inherit;border-radius:6px;padding:1px 6px}
+.rs-svw-msg a{color:var(--accent,#1a6bd6)}
+.rs-g3d-menu{background:var(--rs-card-bg);color:var(--rs-tb-ink);border:0;border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.3);padding:6px 10px}
+.rs-svw iframe,.rs-svw-pano{background:var(--rs-card-bg)}
+/* ---- the scroll protocol of a panel (docs/design/dashboard_templates.md): the header (title, theme and hide buttons) stays; only the body scrolls; the
+   body does not hand its scroll to the map; a line under the header shows when the body is scrolled (panelscroll.js); the scrollbar is thin ---- */
+html #sb,html #rp{padding:0;overflow:hidden}
+html .sb-card,html .rp-card{display:flex;flex-direction:column;height:100%;min-height:0;box-sizing:border-box}
+html .sb-top,html .rp-top{flex:none;margin:0;padding:14px 15px 10px;position:relative;z-index:1;transition:box-shadow .15s}
+html .sb-top.scrolled,html .rp-top.scrolled{box-shadow:0 1px 0 var(--line,var(--rs-tb-border)),0 8px 10px -8px rgba(0,0,0,.35)}
+html .sb-body,html .rp-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px 14px}
+html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card,html.rs-phone.rs-tpl-classic #sb .sb-card{display:flex;flex-direction:column;overflow:hidden;padding:0;border-radius:14px}
+/* ---- the side of the panel (placement.js: <html class="rs-panel-left">) ---- */
+html.rs-panel-left #sb,html.rs-panel-left #rp,html.rs-panel-left .rs-side{left:0;right:auto}
+html.rs-panel-left #sb{border-left:0;border-right:1px solid var(--line,var(--rs-tb-border))}
+html.rs-panel-left #rp{border-left:0;border-right:1px solid var(--line,var(--rs-tb-border))}
+html.rs-panel-left #sb-show,html.rs-panel-left #rp-show,html.rs-panel-left #rs-show-right{left:10px;right:auto}
+html.rs-panel-left :is(#sb-hide,#sb-show,#rp-hide,#rp-show,.rs-side-min) svg,html.rs-panel-left #rs-show-right svg{transform:scaleX(-1)}
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:340px!important;right:0!important}
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden,#rp.hidden) #map{left:0!important}
+/* the compass: our needle (tools.js) instead of MapLibre's picture, which is pale on a translucent bar */
+.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:none!important;display:flex;align-items:center;justify-content:center}
+#rs-toolbar .maplibregl-ctrl-compass .maplibregl-ctrl-icon{filter:none!important}
+/* ---- the settings box (settings.js) ---- */
+#rs-toolbar .rs-set-ctrl{position:relative!important;overflow:visible}
+#rs-settings-box{position:absolute;z-index:9}
+#rs-settings-box[hidden]{display:none}
+#rs-toolbar.rs-tb-right #rs-settings-box{right:calc(100% + 12px);bottom:0}
+#rs-toolbar.rs-tb-left #rs-settings-box{left:calc(100% + 12px);bottom:0}
+#rs-toolbar.rs-tb-top #rs-settings-box{top:calc(100% + 12px);right:0}
+#rs-toolbar.rs-tb-bottom #rs-settings-box{bottom:calc(100% + 12px);right:0}
+#rs-toolbar .bm-menu,#rs-settings-box{--rs-set-x:0}
+#rs-settings-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto;width:264px!important;
+  background:var(--rs-box-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-settings-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:8px 0 6px}
+.rs-set-h{font:700 10px/1.2 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;opacity:.65;margin:6px 8px 6px}
+.rs-set-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 8px}
+.rs-set-l{opacity:.85}
+.rs-set-seg{display:inline-flex;border-radius:10px;background:var(--rs-tb-hover);padding:2px;gap:2px}
+#rs-toolbar .rs-set-seg button,#rs-settings-box button{width:auto;height:auto;min-width:0;padding:4px 9px;border:0;border-radius:8px;background:none;color:inherit;font:11px/1.2 system-ui,sans-serif;cursor:pointer}
+#rs-settings-box .rs-set-seg button.on{background:var(--rs-tb-on)}
+#rs-settings-box button:hover:not(:disabled){background:var(--rs-tb-hover)}
+#rs-settings-box button:disabled{opacity:.4;cursor:not-allowed}
+.rs-set-slide{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;padding:3px 8px}
+.rs-set-slide input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--accent,#1a6bd6)}
+.rs-set-slide b{font-weight:600;font-size:11px}
+#rs-settings-box .rs-set-reset{margin:4px 8px 0}
+.rs-set-key{padding:2px 8px 6px}
+.rs-set-key input{width:100%;box-sizing:border-box;margin:4px 0;padding:6px 10px;border:0;border-radius:10px;background:var(--rs-tb-hover);color:inherit;font:12px system-ui,sans-serif}
+.rs-set-key input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6)}
+.rs-set-btns{display:flex;gap:4px}
+.rs-set-note{font-size:11px;opacity:.75;padding:2px 8px 4px}
+.rs-set-key .rs-set-note{padding:4px 0 0}
+html.rs-phone .rs-set-layout,html.rs-phone .rs-set-layout+hr{display:none}
+/* ---- the explanation of a button (tip.js): a box of the page's look, instead of the browser's own ---- */
+#rs-tip{position:fixed;z-index:80;box-sizing:border-box;max-width:240px;padding:6px 11px;border-radius:10px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  color:var(--rs-tb-ink);box-shadow:0 4px 16px rgba(0,0,0,.25);font:12px/1.35 system-ui,sans-serif;pointer-events:none}
+#rs-tip[hidden]{display:none}
+/* the person can hide the scale and the zoom number (settings.js: "Scale and zoom") */
+html.rs-hide-scale #rs-scalebox,html.rs-hide-scale .maplibregl-ctrl-scale,html.rs-hide-scale .rs-zoom{display:none!important}
+/* the view switch of the Google 3D window: the same look as the Street View mode switch (Imagery or Map) */
+.rs-g3d-view button:disabled{opacity:.45;cursor:default}
+/* ---- the shape of the panel in the overlay layout: the same panel (full height, its translucent frame, its card), with the corners on the map side
+   curved. The frame's curve is concentric with the card's: card 14 px + the frame's 8 px = 22 px ---- */
+html:not(.rs-phone).rs-overlay #sb,html:not(.rs-phone).rs-overlay #rp{border-radius:22px 0 0 22px}
+html:not(.rs-phone).rs-overlay.rs-panel-left #sb,html:not(.rs-phone).rs-overlay.rs-panel-left #rp{border-radius:0 22px 22px 0}
+/* "card": the panel is its card only: a floating card with an 8 px margin and rounded corners, no full-height frame (settings: Panel look) */
+html:not(.rs-phone).rs-overlay.rs-panel-card #sb,html:not(.rs-phone).rs-overlay.rs-panel-card #rp{top:8px;bottom:8px;right:8px;left:auto;height:auto;border-radius:0;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;border:0;box-shadow:none;overflow:visible}
+html:not(.rs-phone).rs-overlay.rs-panel-card.rs-panel-left #sb,html:not(.rs-phone).rs-overlay.rs-panel-card.rs-panel-left #rp{left:8px;right:auto}
+html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card,html:not(.rs-phone).rs-overlay.rs-panel-card #rp .rp-card{border-radius:14px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 6px 24px rgba(0,0,0,.28)}

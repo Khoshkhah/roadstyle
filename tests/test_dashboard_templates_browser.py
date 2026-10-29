@@ -36,7 +36,7 @@ def _box(page, sel):
     return page.evaluate("s=>{const r=document.querySelector(s).getBoundingClientRect();return {t:r.top,b:r.bottom,l:r.left,r:r.right,w:r.width,h:r.height}}", sel)
 
 
-@pytest.mark.parametrize("template", ["dashboard", "review", "report"])
+@pytest.mark.parametrize("template", ["dashboard", "classic", "report"])
 def test_a_phone_has_no_horizontal_scroll(tmp_path, template):
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, tmp_path, template, **PHONE)
@@ -47,7 +47,7 @@ def test_a_phone_has_no_horizontal_scroll(tmp_path, template):
     assert phone and not wide and not errors and map_box["w"] == 390
 
 
-@pytest.mark.parametrize("template", ["dashboard", "review"])
+@pytest.mark.parametrize("template", ["dashboard", "classic"])
 def test_the_sidebar_is_a_sheet_of_three_heights(tmp_path, template):
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, tmp_path, template, **PHONE)
@@ -83,7 +83,7 @@ def test_the_report_goes_under_the_map(tmp_path):
 
 def test_a_desktop_keeps_the_docked_sidebar(tmp_path):
     with pw.sync_playwright() as p:
-        browser, page, _ = _open(p, tmp_path, "dashboard", viewport={"width": 1280, "height": 800})
+        browser, page, _ = _open(p, tmp_path, "classic", viewport={"width": 1280, "height": 800})
         phone = page.evaluate("document.documentElement.classList.contains('rs-phone')")
         sb, mp = _box(page, "#sb"), _box(page, "#map")
         browser.close()

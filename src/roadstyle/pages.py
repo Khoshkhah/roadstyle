@@ -61,8 +61,8 @@ def render_dashboard(gdf, *, template="dashboard", **kw):
     other ``render_edges`` keyword passes through. Returns a :class:`WebMap`;
     ``.save("dashboard.html")`` writes the page.
 
-    ``template="review"``: the overlay form (the map fills the window, the sidebar floats, a toolbar at the right; see
-    docs/guides/dashboard-layout.md). The default ``"dashboard"`` docks the sidebar."""
+    ``template="dashboard"`` (the default) is the overlay form: the map fills the window, the sidebar floats, a toolbar at the right with
+    the settings and the windows (docs/guides/dashboard-layout.md). ``template="classic"`` docks the sidebar at the right and has no toolbar."""
     kw.pop("backend", None)                       # web only: the sidebar drives a MapLibre map
     return render_edges(gdf, backend="web", template=template, **kw)
 

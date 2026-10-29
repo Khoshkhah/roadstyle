@@ -3,7 +3,7 @@
 // its 3D layer (extrude: the layer id), its start switches (interactive, tooltip, popup_window).
 import {map, OVERLAYS, _emit} from "./core.js";
 import {_ovCbs} from "./overlays.js";
-import {VIEW_CTRL} from "./view3d.js";
+import {defineTool, BUILDINGS_ICON} from "./tools.js";
 import {_check} from "./panel.js";
 let _b3d = [], _b3dOn = false;     // the overlays with a 3D layer (ov.extrude), the switch
 // a 3D layer shows while the switch is on and its overlay (the buildings) is shown
@@ -42,18 +42,14 @@ export function initFeatures(){
   window.rsGetBuildings3D = () => _b3dOn;
   if(!_b3d.length) return;
   document.addEventListener("rs:overlaychange", e => { if(_b3d.some(ov => ov.label === e.detail.overlay)) _show3d(); });
-  // its button, right under the 2D/3D button
-  map.addControl({onAdd(){
-    const d = document.createElement("div"), bt = document.createElement("button");
-    d.className = "maplibregl-ctrl maplibregl-ctrl-group";
-    bt.type = "button"; bt.id = "rs-b3d-btn"; bt.title = "Buildings in 3D";
-    bt.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="2" ' +
-      'stroke-linejoin="round"><path d="M3 21h18M5 21V8l6-3v16M11 21V10l8 2v9"/><path d="M8 10v1M8 14v1M14 14v1M17 14v1"/></svg>';
-    bt.onclick = () => rsSetBuildings3D(!_b3dOn);
-    d.appendChild(bt);
-    if(VIEW_CTRL) setTimeout(() => VIEW_CTRL.after(d));      // after MapLibre has put it at the end of its corner
-    return d;
-  }, onRemove(){}});
+  // its button: the tool `buildings`
+  const d = document.createElement("div"), bt = document.createElement("button");
+  d.className = "maplibregl-ctrl maplibregl-ctrl-group";
+  bt.type = "button"; bt.id = "rs-b3d-btn"; bt.title = "Buildings in 3D";
+  bt.innerHTML = BUILDINGS_ICON;
+  bt.onclick = () => rsSetBuildings3D(!_b3dOn);
+  d.appendChild(bt);
+  defineTool("buildings", "toggle", d, {title: bt.title, isOpen: () => _b3dOn});
   // its row in the Layers box, under the buildings' row
   const row = _ovCbs[_b3d[0].label] && _ovCbs[_b3d[0].label].parentNode;
   if(row){

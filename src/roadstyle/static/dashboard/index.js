@@ -4,6 +4,17 @@
 import {initCore, useStyle, _contractError} from "./core.js";
 import {initGeneration, useGeneration} from "./generation.js";
 import {initTemplate} from "./template.js";
+import {initBoundary} from "./boundary.js";
+import {initTheme} from "./theme.js";
+import {mountColumn, rsTools} from "./tools.js";
+import {initColorBox} from "./colorbox.js";
+import {initSelectBox} from "./selectbox.js";
+import {initToolbar} from "./toolbar.js";
+import {initSettings} from "./settings.js";
+import {initWindows} from "./windows.js";
+import {initTip} from "./tip.js";
+import {initPanelScroll} from "./panelscroll.js";
+import {initOverlay} from "./overlay.js";
 import {initPanel, initPanelTab} from "./panel.js";
 import {initZoom} from "./zoom.js";
 import {initView3D} from "./view3d.js";
@@ -32,7 +43,7 @@ const RS_DEFAULTS = {
   arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
   live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)
   dashboard: null,             // the template's typed options (roadstyle::dashboard::Dashboard): layout, panel, toolbar, windows, phone; null: none
-  basemaps: [], basemap_switcher: true,
+  basemaps: [], ontop: {}, basemap_switcher: true,
   tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
   tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
@@ -80,6 +91,7 @@ export function rsDashboard(map, options){
   fromStyle(o, given);
   initCore(map, o);
   initTemplate();
+  initTheme();
   initPanel();
   initZoom();
   initView3D();
@@ -87,6 +99,7 @@ export function rsDashboard(map, options){
   initStreetView();
   initGoogle3D();
   initBasemap();
+  initBoundary();
   initFilter();
   initFind();
   initFilterBox();
@@ -98,6 +111,14 @@ export function rsDashboard(map, options){
   initViews();
   initArrows();
   initSelect();
+  initColorBox();
+  initSelectBox();
+  initPanelScroll();
+  initSettings();
+  initWindows();
+  initTip();
+  initToolbar() || mountColumn();  // every control module has defined its tool: the bar or the column shows them (tools.js)
+  initOverlay();
   const rs = makeApi({
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection and the hover go: they were the old roads'.
@@ -112,6 +133,7 @@ export function rsDashboard(map, options){
     setData, clearData,
   });
   rs.error = error;               // null, or the text of the contract error of the style (setStyle sets it again)
+  window.rsTools = rsTools;       // the alias of rs.tools
   window.rs = rs;                 // the page's one object (the window.rs* functions stay as they are)
   fromUrl(rs);
   return rs;

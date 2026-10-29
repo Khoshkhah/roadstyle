@@ -18,6 +18,8 @@ export function coLegendHtml(lg){
       +'<div class="lg-ends"><span>'+_esc(lg.vmin)+'</span><span>'+_esc(lg.vmax)+'</span></div>'; }
   return h;
 }
+// the legend html of now: the live data's, else the active colour option's ("" when there is none)
+export function coLegendNow(){ return coLegendHtml(_liveLegend || (COLOR_OPTIONS[_coActive]||{}).legend); }
 export function coUpdateLegend(){
   if(!_coLegendEl) return;
   const h = coLegendHtml(_liveLegend || (COLOR_OPTIONS[_coActive]||{}).legend);

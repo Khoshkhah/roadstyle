@@ -272,7 +272,7 @@ def test_web_view_3d_flag():
 def test_web_camera_toggle_control():
     """Every map carries the 2D/3D toggle button; its target pitch comes from terrain settings."""
     html = render_edges(_edges(), backend="web").html
-    assert _opt(html, "pitch_3d") == 55 and 'b.textContent = m.getPitch()<5 ? "3D" : "2D"' in html
+    assert _opt(html, "pitch_3d") == 55 and 'b.textContent = map.getPitch()<5 ? "3D" : "2D"' in html
 
 
 
@@ -427,7 +427,7 @@ def test_blank_basemap_is_tile_free_and_offline():
     assert style["layers"][0] == {"id": "bg", "type": "background",
                                   "paint": {"background-color": "#efede8"}}
     assert "bm" not in style["sources"]
-    assert "cartocdn" not in wm.html and "arcgisonline" not in wm.html
+    assert "basemaps.cartocdn.com" not in wm.html and "arcgisonline" not in wm.html        # no tile URL (the dashboard's own code names the provider)
 
 
 def test_blank_basemap_with_switcher_precreates_hidden_raster():
@@ -451,7 +451,8 @@ def test_basemap_maxzoom_reaches_the_page():
                       basemaps=["esri_gray", "osm", "blank"])
     assert _style(wm.html)["sources"]["bm"]["maxzoom"] == 16
     entries = _opt(wm.html, "basemaps")
-    assert {e["key"]: e["maxzoom"] for e in entries} == {"esri_gray": 16, "osm": 19, "blank": 19}
+    assert {e["key"]: e["maxzoom"] for e in entries if e["key"] in ("esri_gray", "osm", "blank")} == {"esri_gray": 16, "osm": 19, "blank": 19}
+    assert {"esri_dark_gray", "blank_dark"} <= {e["key"] for e in entries}                   # a map with a dark twin brings the twin (the theme switches to it)
     assert "Esri" in entries[0]["attr"] and "OpenStreetMap" in entries[1]["attr"]
 
 
@@ -478,7 +479,7 @@ def test_switcher_off_with_explicit_basemaps_keeps_them_addressable():
     baked, so window.rsSetBasemap('key') can drive a custom UI."""
     wm = render_edges(_edges(), backend="web", basemaps=["voyager", "blank"],
                       basemap_switcher=False)
-    assert [e["key"] for e in _opt(wm.html, "basemaps")] == ["voyager", "blank"]
+    assert [e["key"] for e in _opt(wm.html, "basemaps")] == ["voyager", "blank", "blank_dark"]       # blank brings its dark twin
     assert _opt(wm.html, "basemap_switcher") is False
     # without an explicit list, only the fixed backdrop is baked (nothing to switch to)
     wm2 = render_edges(_edges(), backend="web", basemap_switcher=False)

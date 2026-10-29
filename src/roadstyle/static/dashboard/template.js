@@ -3,6 +3,8 @@
 // The rules are in dashboard.css, under `html.rs-phone`.
 import {map, O} from "./core.js";
 const SHEETS = 3;
+let _sheet = null;                                  // the function that sets the sheet's height (0: closed, 1: 40 %, 2: full)
+export function setSheet(n){ if(_sheet) _sheet(n); }
 export function initTemplate(){
   const d = O.dashboard;
   if(!d) return;
@@ -21,7 +23,8 @@ function makeGrip(){
   const root = document.documentElement, g = document.createElement("div");
   g.className = "rs-grip"; g.title = "Panel"; g.innerHTML = "<i></i>";
   let h = 1, y0 = null;
-  const show = n=>{ h = n; for(let i = 0; i < SHEETS; i++) root.classList.toggle("rs-sheet-" + i, i === h); };
+  const show = n=>{ h = n; for(let i = 0; i < SHEETS; i++) root.classList.toggle("rs-sheet-" + i, i === h); document.dispatchEvent(new CustomEvent("rs:sheetchange", {detail: {height: h}})); };
+  _sheet = show;
   g.addEventListener("pointerdown", e=>{ y0 = e.clientY; g.setPointerCapture(e.pointerId); });
   g.addEventListener("pointerup", e=>{
     if(y0 == null) return;

@@ -119,6 +119,12 @@ class Basemap:
     #: answers beyond its levels with HTTP 200 and a "Map data not yet available" image, so the
     #: browser can't tell a tile is missing: without this the map goes grey (measured 2026-09-29)
     maxzoom: int = 19
+    #: the fields of the dashboard's base-map box (data/basemaps.json): a vector style, the group and the title of its row, its dark twin, its swatch
+    style_url: str | None = None
+    group: str = ""
+    title: str = ""
+    dark: str | None = None
+    swatch: "str | tuple[str, str, str] | list[str]" = ""
 
 
 def _bundled() -> tuple[dict[str, Basemap], list[str]]:

@@ -114,10 +114,28 @@ export interface DashboardState {
 }
 
 export type DashboardEvent = "state" | "select" | "deselect" | "filter" | "color" | "overlay" | "tunnel" | "view" | "view3d"
-  | "basemap" | "highlight" | "roadfill" | "streetview" | "google3d" | "data";
+  | "basemap" | "highlight" | "roadfill" | "streetview" | "google3d" | "data" | "tool";
+
+/** One tool of the toolbox (docs/design/dashboard_templates.md, 3.2). */
+export interface ToolInfo { id: string; kind: "button" | "toggle" | "box" | "window"; title: string; open: boolean | null; }
+
+/** rs.tools: the toolbox. */
+export interface Tools {
+  /** The tools in the order of the column or the bar. */
+  list(): ToolInfo[];
+  /** A tool of the page: `icon` is the HTML of its button. It goes after the built-in tools. */
+  add(tool: { id: string; title?: string; icon?: string; kind?: ToolInfo["kind"]; onClick?: (e: Event) => void }): ToolInfo;
+  /** Gives a tool of the page its behavior. */
+  bind(id: string, spec: { onClick?: (e: Event) => void }): ToolInfo;
+  remove(id: string): void;
+  /** Opens or closes a box or a window. */
+  open(id: string): void;
+  close(id: string): void;
+}
 
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
+  tools: Tools;
   /** null, or the error of a style whose interaction contract (roadstyle:contract) is newer than this dashboard reads: then the
    *  dashboard adds no road interaction for it. setStyle sets it again. */
   error: string | null;

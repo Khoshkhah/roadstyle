@@ -5,6 +5,7 @@
 import {_esc} from "../popup.js";
 import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
+import {defineTool} from "./tools.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep} from "./svspot.js";
 export let _svWindow = false;
 // with a Maps JavaScript API key (street_view_key=) the window offers Linked - a real panorama that
@@ -12,7 +13,7 @@ export let _svWindow = false;
 export let _svKey = "";
 export function rsSetStreetView(){}
 export function initStreetView(){
-  _svWindow = O.street_view==="window"; _svKey = O.street_view_key || "";
+  _svWindow = O.street_view==="window"; _svKey = savedKey("google") || O.street_view_key || "";           // the key that the person saved (settings) is over the page's
   if(_svWindow){
     const fromDisk=location.protocol==="file:";
     const w=document.createElement("div"); w.className="rs-svw"; w.hidden=true;
@@ -96,23 +97,22 @@ export function initStreetView(){
       if(!on){ hideP();                          // closed: drop the panorama (see hideP)
         // and forget the road: opened again it waits for a road, not the last one (Kaveh, 2026-10-14)
         last=null; fr.hidden=true; msg.hidden=false; msg.textContent="Click a road to see it in Street View."; ttl.textContent="Street View"; }
-      w.hidden=!on; if(on && innerWidth>520) place(); rsSetStreetViewMarker(!!on);
+      w.hidden=!on; if(on && !_wPhone()) place(); rsSetStreetViewMarker(!!on);
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
       _emit("rs:streetviewchange", {open:!!on});
     };
     bar.lastChild.onclick=()=>rsSetStreetView(false);
-    map.addControl({onAdd(){
-      const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
-      btn=document.createElement("button"); btn.type="button"; btn.title="Street View";
-      btn.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto">'+
-        '<circle cx="12" cy="4.5" r="3" fill="currentColor"/>'+
-        '<path d="M8.5 9h7l-1.2 7h-1.8l-.6 6.5h-1.8L9.5 16H7.7z" fill="currentColor"/></svg>';
-      btn.onclick=()=>rsSetStreetView(w.hidden);
-      d.appendChild(btn); return d;
-    }, onRemove(){}});
+    const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
+    btn=document.createElement("button"); btn.type="button"; btn.title="Street View";
+    btn.innerHTML='<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto">'+
+      '<circle cx="12" cy="4.5" r="3" fill="currentColor"/>'+
+      '<path d="M8.5 9h7l-1.2 7h-1.8l-.6 6.5h-1.8L9.5 16H7.7z" fill="currentColor"/></svg>';
+    btn.onclick=()=>rsSetStreetView(w.hidden);
+    d.appendChild(btn);
+    defineTool("street_view", "window", d, {title: btn.title, open: ()=>rsSetStreetView(true), close: ()=>rsSetStreetView(false), isOpen: ()=>!w.hidden});
     // reopen a window left open last time only once the map is up: this code runs before the Street View
     // spot (svspot.js) is set up, and throwing here stopped the page before any road was drawn
-    if(st.open) map.once("load", ()=>rsSetStreetView(true));
+    if(st.open) map.once("load", ()=>{ if(!O.dashboard || O.dashboard.windows.restore_open) rsSetStreetView(true); });      // a template can start with its windows closed
   }
   window.rsSetStreetView = rsSetStreetView;
 }

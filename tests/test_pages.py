@@ -131,18 +131,21 @@ def _dashboard(html):
 
 def test_each_page_has_its_template():
     assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
-    d = _dashboard(rs.render_dashboard(_edges()).html)
-    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "dock", {"side": "right", "width_px": 340}, None)
+    d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
+    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "right", "width_px": 340, "look": "card"},
+                                                                       {"position": "right", "settings": True})
+    c = _dashboard(rs.render_dashboard(_edges(), template="classic").html)
+    assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("classic", "dock", "card", None)
     assert _dashboard(rs.render_report(_edges()).html)["phone"]["panel"] == "below"
 
 
-def test_the_review_template_is_the_overlay_form():
-    h = rs.render_dashboard(_edges(), template="review").html
+def test_the_dashboard_template_is_the_overlay_form():
+    h = rs.render_dashboard(_edges()).html
     d = _dashboard(h)
-    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right"})
+    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True})
     assert d["windows"]["clamp"] is True and d["windows"]["recenter_map"] is False
-    assert '<div id="sb"' in h and "<h2>Roads review</h2>" in h
-    assert 'c.add("rs-tpl-review","rs-overlay","rs-has-toolbar","rs-tb-right")' in h   # the first paint has the form
+    assert '<div id="sb"' in h and "<h2>Roads dashboard</h2>" in h
+    assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right")' in h   # the first paint has the form
 
 
 def test_a_template_name_is_checked_and_sidebar_is_gone():

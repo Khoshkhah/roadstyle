@@ -2,8 +2,12 @@
 // host tools) and the selected road's record. Built BEFORE the controls, so they mount into it.
 import {_esc} from "../popup.js";
 import {map, O} from "./core.js";
+import {defineTool} from "./tools.js";
 import {_findWire} from "./find.js";
 import {rsDeselect} from "./select.js";
+// the icons of the panel: a panel with an arrow toward the edge that it hides to (close) or comes from (open)
+const _PANEL_CLOSE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m8.5 9.5 2.5 2.5-2.5 2.5"/></svg>';
+const _PANEL_OPEN = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m10.5 9.5-2.5 2.5 2.5 2.5"/></svg>';
 export let _popupMode = "popup";       // "popup" (floating) or "panel" (full-height side panel)
 export let _sideBd=null, _sideCtl=null;
 let _sideTab=null, _hostEl=null, _hostKey="", _sideEl=null;
@@ -19,7 +23,7 @@ function _sideInit(){
   document.body.classList.add("rs-panel");
   const sd=document.createElement("div"); sd.className="rs-side"; _sideEl=sd;
   sd.innerHTML='<div class="rs-side-hd"><span>'+_esc(document.title||"Map")+'</span>'+
-    '<span class="rs-side-min" title="Hide panel">&raquo;</span></div>'+
+    '<span class="rs-side-min" title="Hide panel">'+_PANEL_CLOSE+'</span></div>'+
     '<div class="rs-side-q"><input type="search" placeholder="Search roads\u2026" spellcheck="false">'+
     '<div class="rs-side-q-res"></div></div>'+
     '<div class="rs-side-ctl"></div><div class="rs-side-tools"></div>'+
@@ -46,15 +50,13 @@ export function initPanel(){
 export function initPanelTab(){
   if(_hostEl){ _hostEl.querySelector(".rs-side-min").onclick=()=>{ rsPanelShow(false); }; }
   if(_popupMode==="panel" || _hostEl){    // panel-reopen button: same chrome as 2D, right below it in the stack
-    map.addControl({onAdd(){
-      const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
-      const b=document.createElement("button"); b.type="button";
-      b.style.cssText="font:700 14px/1 system-ui";
-      b.textContent="\u00ab"; b.title="Show panel";
-      b.onclick=()=>{ rsPanelShow(true); };
-      _sideTab=d; d.style.display="none";
-      d.appendChild(b); return d;
-    }, onRemove(){}});
+    const d=document.createElement("div"); d.className="maplibregl-ctrl maplibregl-ctrl-group";
+    const b=document.createElement("button"); b.type="button";
+    b.innerHTML=_PANEL_OPEN; b.title="Show panel";
+    b.onclick=()=>{ rsPanelShow(true); };
+    _sideTab=d; d.style.display="none";
+    d.appendChild(b);
+    defineTool("panel_show", "button", d, {title: b.title});
   }
   if(_hostEl){ let on=!_narrow(); try{ const v=localStorage.getItem(_hostKey); if(v!=null) on=v==="1"; }catch(e){} if(!on) rsPanelShow(false); }   // remembered per page; a narrow screen starts closed
 }

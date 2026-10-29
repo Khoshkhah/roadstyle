@@ -49,7 +49,15 @@
     "#888"
    ],
    "subdomains": "abc",
-   "maxzoom": 20
+   "maxzoom": 20,
+   "group": "CARTO",
+   "title": "CARTO",
+   "dark": "dark_matter",
+   "swatch": [
+    "#fbf8f3",
+    "#ffffff",
+    "#d4dadc"
+   ]
   },
   {
    "key": "dark_matter",
@@ -66,7 +74,14 @@
     "#5b6573"
    ],
    "subdomains": "abc",
-   "maxzoom": 20
+   "maxzoom": 20,
+   "group": "CARTO",
+   "title": "Dark Matter",
+   "swatch": [
+    "#0b0b0b",
+    "#2c2c2c",
+    "#1f2a33"
+   ]
   },
   {
    "key": "osm",
@@ -83,7 +98,14 @@
     "#888"
    ],
    "subdomains": "abc",
-   "maxzoom": 19
+   "maxzoom": 19,
+   "group": "OpenStreetMap",
+   "title": "OpenStreetMap",
+   "swatch": [
+    "#f2efe9",
+    "#f4c542",
+    "#aad3df"
+   ]
   },
   {
    "key": "esri_gray",
@@ -100,7 +122,15 @@
     "#9aa"
    ],
    "subdomains": "abc",
-   "maxzoom": 16
+   "maxzoom": 16,
+   "group": "Esri",
+   "title": "Esri Gray",
+   "dark": "esri_dark_gray",
+   "swatch": [
+    "#e4e4e4",
+    "#ffffff",
+    "#c8d3dc"
+   ]
   },
   {
    "key": "esri_street",
@@ -117,7 +147,14 @@
     "#a8c8e8"
    ],
    "subdomains": "abc",
-   "maxzoom": 19
+   "maxzoom": 19,
+   "group": "Esri",
+   "title": "Esri Streets",
+   "swatch": [
+    "#e9e5dc",
+    "#ffffff",
+    "#bfd9e8"
+   ]
   },
   {
    "key": "esri_dark_gray",
@@ -134,7 +171,14 @@
     "#5b6573"
    ],
    "subdomains": "abc",
-   "maxzoom": 16
+   "maxzoom": 16,
+   "group": "Esri",
+   "title": "Dark Gray",
+   "swatch": [
+    "#3a3f45",
+    "#6b7078",
+    "#2a3138"
+   ]
   },
   {
    "key": "satellite",
@@ -151,7 +195,14 @@
     "#fffdf2"
    ],
    "subdomains": "abc",
-   "maxzoom": 19
+   "maxzoom": 19,
+   "group": "Esri",
+   "title": "Esri Satellite",
+   "swatch": [
+    "#3b4a32",
+    "#8a8f84",
+    "#1d3b4f"
+   ]
   },
   {
    "key": "blank",
@@ -168,7 +219,11 @@
     "#888"
    ],
    "subdomains": "abc",
-   "maxzoom": 19
+   "maxzoom": 19,
+   "group": "Blank",
+   "title": "Blank",
+   "dark": "blank_dark",
+   "swatch": "#ffffff"
   },
   {
    "key": "blank_dark",
@@ -185,16 +240,169 @@
     "#5b6573"
    ],
    "subdomains": "abc",
-   "maxzoom": 19
+   "maxzoom": 19,
+   "group": "Blank",
+   "title": "Blank dark",
+   "swatch": "#14181d"
+  },
+  {
+   "key": "ofm_liberty",
+   "label": "OpenFreeMap Liberty",
+   "url": "",
+   "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#f8f4f0,#e9e4dc)",
+   "preview": [
+    "#f9a23a",
+    "#fff",
+    "#9ec5fe"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19,
+   "style_url": "https://tiles.openfreemap.org/styles/liberty",
+   "group": "OpenFreeMap",
+   "title": "OpenFreeMap Liberty",
+   "dark": "ofm_fiord",
+   "swatch": [
+    "#f2efe9",
+    "#ffe16b",
+    "#a0c8f0"
+   ]
+  },
+  {
+   "key": "ofm_bright",
+   "label": "OpenFreeMap Bright",
+   "url": "",
+   "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#f5f1ea,#e6e0d4)",
+   "preview": [
+    "#ffd166",
+    "#fff",
+    "#9ec5fe"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19,
+   "style_url": "https://tiles.openfreemap.org/styles/bright",
+   "group": "OpenFreeMap",
+   "title": "OpenFreeMap Bright",
+   "swatch": [
+    "#f8f4f0",
+    "#fff6b3",
+    "#a0c8f0"
+   ]
+  },
+  {
+   "key": "ofm_positron",
+   "label": "OpenFreeMap Positron",
+   "url": "",
+   "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+   "is_dark": false,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#f3f5f7,#e3e8ed)",
+   "preview": [
+    "#888",
+    "#bbb",
+    "#888"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19,
+   "style_url": "https://tiles.openfreemap.org/styles/positron",
+   "group": "OpenFreeMap",
+   "title": "OpenFreeMap Positron",
+   "dark": "ofm_dark",
+   "swatch": [
+    "#e8e8e8",
+    "#ffffff",
+    "#cdd2d4"
+   ]
+  },
+  {
+   "key": "ofm_dark",
+   "label": "OpenFreeMap Dark",
+   "url": "",
+   "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+   "is_dark": true,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#2b2f36,#1a1d22)",
+   "preview": [
+    "#6b7078",
+    "#9aa0a8",
+    "#3a4048"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19,
+   "style_url": "https://tiles.openfreemap.org/styles/dark",
+   "group": "OpenFreeMap",
+   "title": "OpenFreeMap Dark",
+   "swatch": [
+    "#2b2f36",
+    "#9aa0a8",
+    "#3a4048"
+   ]
+  },
+  {
+   "key": "ofm_fiord",
+   "label": "OpenFreeMap Fiord",
+   "url": "",
+   "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+   "is_dark": true,
+   "satellite": false,
+   "lonboard": null,
+   "bg": "linear-gradient(180deg,#45516e,#2f394f)",
+   "preview": [
+    "#7f8fb3",
+    "#a9b7d6",
+    "#2c3750"
+   ],
+   "subdomains": "abc",
+   "maxzoom": 19,
+   "style_url": "https://tiles.openfreemap.org/styles/fiord",
+   "group": "OpenFreeMap",
+   "title": "OpenFreeMap Fiord",
+   "swatch": [
+    "#45516e",
+    "#a9b7d6",
+    "#2c3750"
+   ]
   }
  ],
  "switcher": [
-  "esri_gray",
-  "positron",
+  "ofm_liberty",
+  "ofm_bright",
+  "ofm_positron",
   "osm",
+  "esri_gray",
+  "esri_street",
   "satellite",
-  "voyager",
-  "dark_matter",
   "blank"
- ]
+ ],
+ "ontop": {
+  "hillshade": {
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}",
+   "opacity": 0.4,
+   "attr": "Tiles © Esri"
+  },
+  "labels": {
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+   "opacity": 1,
+   "attr": "Tiles © Esri"
+  },
+  "labels_gray_light": {
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+   "opacity": 1,
+   "attr": "Tiles © Esri"
+  },
+  "labels_gray_dark": {
+   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+   "opacity": 1,
+   "attr": "Tiles © Esri"
+  }
+ }
 }
