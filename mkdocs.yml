@@ -58,6 +58,7 @@ nav:
       - Big networks: guides/big-networks.md
       - Dashboards & JavaScript: guides/dashboards.md
       - Dashboard layout: guides/dashboard-layout.md
+      - Add to the panel: guides/dashboard-panel.md
       - Move a dashboard to the new version: guides/migrating-dashboard.md
       - Put it on a website: guides/website.md
       - AI agents: guides/agents.md

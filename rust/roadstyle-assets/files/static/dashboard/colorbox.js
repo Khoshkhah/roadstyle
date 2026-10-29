@@ -5,7 +5,7 @@
 import {_esc} from "../popup.js";
 import {O} from "./core.js";
 import {COLOR_OPTIONS, _coActive, rsSetColorField} from "./color.js";
-import {coLegendNow} from "./legend.js";
+import {coLegendNow, coLegendExtra} from "./legend.js";
 import {defineTool, wrap} from "./tools.js";
 
 const _cbIcon = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><path d="M14 7h6M14 17h6"/></svg>';
@@ -22,7 +22,7 @@ export function initColorBox(){
   const fill = () => {
     const opts = COLOR_OPTIONS.map((o, i) => '<button type="button" class="rs-cb-opt' + (i === _coActive ? " on" : "") + '" role="radio" aria-checked="' + (i === _coActive) + '" data-i="' + i +
                                            '">' + _esc(o.name) + "</button>").join("");
-    const lg = coLegendNow() || _cbClasses();
+    const lg = (coLegendNow() || _cbClasses()) + coLegendExtra();
     box.innerHTML = '<div class="rs-bm-h">Colour by</div><div class="rs-cb-opts" role="radiogroup">' + opts + "</div>" +
       (lg ? '<hr><div class="rs-bm-h">Legend</div><div class="rs-cb-lg">' + lg + "</div>" : "");
     box.querySelectorAll(".rs-cb-opt").forEach(o => { o.onclick = () => { rsSetColorField(parseInt(o.dataset.i, 10)); fill(); }; });

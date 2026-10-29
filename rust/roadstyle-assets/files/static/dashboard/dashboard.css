@@ -415,3 +415,20 @@ html:not(.rs-phone).rs-overlay.rs-panel-card.rs-panel-left #sb{left:8px;right:au
 html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 6px 24px rgba(0,0,0,.28)}
 /* MapLibre turns the whole compass icon with the map: the ring must not turn, so the page cancels it and turns the needle only (tools.js) */
 .maplibregl-ctrl-compass .maplibregl-ctrl-icon{transform:none!important}
+
+/* ---- the panel's sections (sections.js): a box with no layout of its own, and the page's rows in the panel's legend ---- */
+.sb-sec{display:contents}
+.sb-sec[hidden]{display:none}
+#sb-legend-extra{margin-top:2px}
+/* the kit for the HTML that a page adds to the panel: the panel's tokens (--ink, --mut, --line, --card, --accent) change with the theme, so a section that
+   uses them follows the light and the dark theme. Plain text, links, tables and rules already do. */
+.sb-sec{color:var(--ink)}
+.sb-sec :is(p,li,small,.sb-note){color:var(--ink);font-size:13px;line-height:1.5;margin:6px 0}
+.sb-sec .sb-note{color:color-mix(in srgb,var(--ink) 72%,var(--card));font-size:12px}      /* readable small print in both themes (--mut on --card is 3.9:1 in the light theme) */
+.sb-sec a{color:var(--accent)}
+.sb-sec :is(hr){border:0;border-top:1px solid var(--line);margin:10px 0}
+.sb-sec table{width:100%;border-collapse:collapse;font-size:12px}
+.sb-sec :is(td,th){padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;color:var(--ink)}
+.sb-sec th{color:var(--mut);font-weight:600}
+.sb-sec :is(.rs-sec-box,details){background:var(--card);color:var(--ink);border-radius:12px;padding:8px 10px;margin:6px 0}
+.sb-sec summary{cursor:pointer;font-weight:600}

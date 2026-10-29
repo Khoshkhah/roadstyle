@@ -22,6 +22,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 
+### Added
+- **Sections for the dashboard panel and rows for its legend.** `dashboard={"panel": {"sections": [{id, html, label, after, before}], "hide": [...]},
+  "legend": {"rows": [{color, label}]}}` and the run-time `rs.sections` and `rs.legend` replace the string edits of the template's HTML (the old `edit=`). A section
+  has a stable id (`base_map`, `colour_by`, `legend`, `query`, `selected_road`). The page's HTML follows the light and the dark theme: a kit for text, links, tables and
+  boxes (`.sb-note`, `.rs-sec-box`) and the panel's variables. New guide `guides/dashboard-panel.md`.
+
 ### Fixed
 - **`panel.width_px` had no effect** (the template wrote 340 px in five places): the panel, the map and the controls now use `--rs-panel-w`, which the first-paint script
   sets from the typed option.

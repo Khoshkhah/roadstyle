@@ -4,6 +4,8 @@
 // functions as the controls, so the page and the host never disagree. The page sets window.rs to it.
 import {map, O, CONTRACT} from "./core.js";
 import {rsTools} from "./tools.js";
+import {rsSections} from "./sections.js";
+import {rsLegend} from "./legend.js";
 
 const EVENTS = {select: "rs:select", deselect: "rs:deselect", filter: "rs:filterchange", color: "rs:colorchange", overlay: "rs:overlaychange",
                 tunnel: "rs:tunnelchange", view: "rs:viewselect", view3d: "rs:viewchange", basemap: "rs:basemapchange", highlight: "rs:highlightchange",
@@ -66,6 +68,8 @@ export function makeApi(extra){
                 "streetView", "google3d", "panel"];
   const api = {
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
+    sections: rsSections,        // the panel's sections: list, get, add, remove, hide, show (sections.js)
+    legend: rsLegend,            // the legend's own rows for the page: add, remove, list (legend.js)
     contract: CONTRACT,          // the newest roadstyle:contract that this dashboard reads (core.js)
     select(id){ if(id == null) call("rsDeselect"); else call("rsSelect", row(id)); },
     highlight(ids){ call("rsHighlight", rows(ids) || []); },

@@ -10,6 +10,7 @@ colorbox
 selectbox
 placement
 panelscroll
+sections
 settings
 tip
 toolbar

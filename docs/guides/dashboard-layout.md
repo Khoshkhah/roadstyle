@@ -21,13 +21,12 @@ There is one template with a panel: `dashboard`. A future template follows its s
 
 ## The toolbox
 
-The bar has one button for each tool, in this order: theme, zoom in, zoom out, compass, 2D/3D, Street View,
-Google 3D, base map, 3D buildings, colour and legend, settings, attribution. A tool that the page does not use is not on the bar.
+The bar has one button for each tool: theme, zoom in, zoom out, compass, 2D/3D, Street View, Google 3D, base map, 3D buildings,
+colour and legend, settings, attribution. A tool that the page does not use is not on the bar.
 
-A button that opens a box (base map, colour and legend, settings, attribution) opens it toward the map. One box is open at a time.
-A click outside the box, or the Escape key, closes it.
+A button that opens a box opens it toward the map. One box is open at a time. A click outside the box, or the Escape key, closes it.
 
-An older script? See [Move a dashboard to the new version](migrating-dashboard.md).
+Your own blocks in the panel and rows in the legend: [Add to the panel](dashboard-panel.md). An older script? [Move a dashboard to the new version](migrating-dashboard.md).
 
 To add a tool of your own, use `rs.tools`:
 
@@ -40,7 +39,7 @@ shows after 6 s at the latest). The keyword `dashboard=` changes any option of t
 
 ## The settings
 
-The gear button opens the settings. They are kept in the browser. They are not in the page file.
+The gear button opens the settings. They are kept in the browser, not in the page file.
 
 - **Layout.** The bar can be at the left, the top, the right or the bottom. The panel can be at the left or the right,
   as a frame (default) or as a card. The scale and zoom box can be hidden.
