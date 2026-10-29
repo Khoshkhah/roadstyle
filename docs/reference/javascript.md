@@ -28,6 +28,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()`, and `ready()` (with `toolbar.hold`) |
 | `rs.sections` | the dashboard panel's sections: `add({id, html, el, label, after, before})`, `get`, `list`, `hide`, `show`, `remove`; event `rs:sectionchange` ([guide](../guides/dashboard-panel.md)) |
+| `rs.naturalBreaks(values, k)` | the `k - 1` cut points (ascending) that split the numbers into `k` sets by Fisher-Jenks natural breaks: the `breaks` of `rs.setData` for a page that colours many calls the same way (an hour slider: the breaks of the whole day) |
 | `rs.legend` | rows that the page adds to the legend: `add({id, color, label, shape})` (`shape`: `square`, `circle` or `line`) or `add({id, html})`, `remove(id)`, `list()` |
 | `rs.setData(rows, options)` | live data (`live_data=True`): colour and size the roads from rows, an Arrow table or the URL of a JSON file; a second call replaces the values. `rs.clearData()` takes them away. `edge_id` must be text. Event `rs:datachange`; Promise `{rows, matched, ms}`; a number goes in `classes` sets by natural breaks, or in your `breaks` ([guide](../guides/live-data.md)) |
 | event `rs:ready` | `window.rs` and the panel's sections are there; `window.rsReady` is true from then on. A `page_script` waits for it |

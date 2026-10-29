@@ -113,4 +113,5 @@ def test_a_number_goes_in_one_of_n_sets_by_natural_breaks_and_the_legend_counts_
         fixed = page.evaluate(legend, {"breaks": [200]})
         assert "100 – 130 (3)" in fixed and "400 – 5000 (3)" in fixed and "5000 (1)" not in fixed
         assert "(" not in page.evaluate(legend, {"classes": 0}) and errors == []
+        assert page.evaluate("rs.naturalBreaks([1, 2, 3, 100, 110, 120], 2)") == [100] and page.evaluate("rs.naturalBreaks([5, 5, 5], 4)") == []
         browser.close()

@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`rs.naturalBreaks(values, k)`** gives the cut points that `rs.setData` uses, so a page can give the same `breaks` to many calls (an hour slider: the breaks of the whole day).
 - **A legend row has a shape** (`square`, the default, `circle` or `line`): `dashboard={"legend": {"rows": [{"color": ..., "label": ..., "shape": "circle"}]}}` and `rs.legend.add`. The legend then
   explains the colour of a circle on the map (a sensor) as well as the colour of a road. A wrong shape is an error.
 - **Live data colours a number in sets by natural breaks** (`rs.setData`). `classes` (default 7) is the number of sets; the cut points are the Fisher-Jenks

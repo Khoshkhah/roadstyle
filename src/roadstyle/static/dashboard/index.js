@@ -8,6 +8,7 @@ import {initBoundary} from "./boundary.js";
 import {initTheme} from "./theme.js";
 import {mountColumn, rsTools} from "./tools.js";
 import {initColorBox, useColorBox} from "./colorbox.js";
+import {naturalBreaks} from "./breaks.js";
 import {initSelectBox} from "./selectbox.js";
 import {initToolbar} from "./toolbar.js";
 import {initSettings} from "./settings.js";
@@ -135,6 +136,8 @@ export function rsDashboard(map, options){
     },
     // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
     setData, clearData,
+    // the cut points of rs.setData, for a page that colours many calls the same way (an hour slider: the breaks of the whole day)
+    naturalBreaks: (values, k) => naturalBreaks(values, k),
   });
   rs.error = error;               // null, or the text of the contract error of the style (setStyle sets it again)
   window.rsTools = rsTools;       // the alias of rs.tools
