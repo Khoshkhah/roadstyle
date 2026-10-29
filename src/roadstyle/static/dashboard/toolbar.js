@@ -37,6 +37,7 @@ const _tbCredits = () => {
   if(pre.trim()) rows.push({text: pre.replace(/\s+/g, " ").trim()});
   if([".rs-g3d", ".rs-svw:not(.rs-g3d)"].some(s => { const w = document.querySelector(s); return w && !w.hidden; }))
     rows.push({text: "Map data \u00a9 Google", href: "https://www.google.com/help/terms_maps/"});
+  rows.push({text: "MapLibre", href: "https://maplibre.org"});         // the library that draws the map (BSD license)
   return rows.filter((r, i) => rows.findIndex(x => x.text === r.text) === i);
 };
 function attributionTool(){
