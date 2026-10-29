@@ -173,8 +173,8 @@ fn bridge_ramp(cx: &Ctx) -> (Value, Value, impl Fn(&Value) -> f64) {
     (json!(r[0]), json!(r[1]), move |z: &Value| ((z.as_f64().unwrap() - r0) / (r1 - r0)).clamp(0.0, 1.0))
 }
 
-/// The width of the road layer, by piece: the bridge's shadow and casing, the tunnel dashes, the casing, an item, else the fill.
-fn line_width(cx: &Ctx, w: &Widths, items: bool) -> Value {
+/// The width curve of the road layer, by piece: the bridge's shadow and casing, the tunnel dashes, the casing, an item, else the fill.
+fn width_curve(cx: &Ctx, w: &Widths, items: bool) -> Value {
     let (m, s) = (&cx.look.model, &cx.look.sections);
     let (is_c, is_sh, is_b) = (piece_kind(0), piece_kind(2), json!(["to-boolean", ["get", Mark::Bridge.name()]]));
     let (blur, extra) = (s.bridges.shadow.blur.f(), s.bridges.casing_extra.f());
@@ -191,8 +191,14 @@ fn line_width(cx: &Ctx, w: &Widths, items: bool) -> Value {
         wide.push((piece_kind(5), plus_px(&metre_curve(&w.fill, Mark::ItemWidthM.name()), |_| px.clone(), None)));
     }
     let width = by_feature(&wide, &w.fill);
-    let width = if cx.pairs { m.pair_width(cx.hw, &width, w.metre_zoom) } else { width };
-    times_each_stop(&width, &json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]))
+    if cx.pairs { m.pair_width(cx.hw, &width, w.metre_zoom) } else { width }
+}
+
+/// The width of the road layer: `width_curve` as one lookup of a row table (width_table.rs), else (a width that a feature's own value sets:
+/// metres, items) the curve with the live factor at each stop.
+fn line_width(cx: &Ctx, w: &Widths, items: bool) -> Value {
+    let (curve, live) = (width_curve(cx, w, items), json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]));
+    width_table::table_form(&curve, cx.hw, &cx.look.model.classes, &live).unwrap_or_else(|| times_each_stop(&curve, &live))
 }
 
 /// _simple_color, with the glow of lean mode. R22 and audit N8 (2026-10-24), in every style: a road's colour (rsColor, rsColorBase,
@@ -638,3 +644,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let out = finish(&cx, layers, &state, ovs);
     Ok((if ovs.is_empty() { out } else { restyle(out, ovs) }, info))
 }
+
+#[cfg(test)]
+#[path = "width_tests.rs"]
+mod width_tests;

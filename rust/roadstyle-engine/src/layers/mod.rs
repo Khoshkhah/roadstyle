@@ -1,13 +1,14 @@
 //! The road layers (full port step 2, docs/design/rust-spike.md): the expression builders, over the road tables of
 //! `_load_road_model` (look.json "roads_model" and "theme"). `exprs`: the width and offset expressions and the filters; `eval`: the
 //! evaluator that finds the layers no feature can draw; `build`: the road layers of a style; `restyle`: the overlays' second pass;
-//! `labels`: the names' size and filter.
+//! `labels`: the names' size and filter; `width_table`: the road width as one row lookup.
 
 mod build;
 mod eval;
 mod exprs;
 mod labels;
 mod restyle;
+mod width_table;
 
 use roadstyle_model::mark::Mark;
 use crate::overlays::{edge_overlay, overlay_layers, Overlay};

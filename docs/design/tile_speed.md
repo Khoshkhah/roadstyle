@@ -240,7 +240,7 @@ That time is in the map worker, in parallel with MapLibre's, and it is below the
   MapLibre now, so the worker can make and the map can parse 2 levels up while the user zooms in.
 - **The source `maxzoom` of `rs-roads`** (15 in the page's look) is correct: the tiles of z13 to z15 are 550 to 170 KB and take 135 to 50 ms. A lower `maxzoom` saves little (z15 at pitch 60: 3,068 KB
   of 20 tiles against 3,018 KB of 19 tiles at z14) and makes the casing pieces less exact (`tile_precision.rs`).
-- **The roads are the cost from z11.** The smaller road width expression above (about 25 ms for each tile at z11 to z13) is a roadstyle change, not a page change.
+- **The roads are the cost from z11.** The smaller road width expression (below: built, 8 to 12 ms for each tile at z11 to z13) is a roadstyle change, not a page change.
 
 **The road width expression.** The expression is 29,032 characters (24,720 in the style of the page: `line-width` of `roads-simple`). We measured the MapLibre time of the largest tile,
 with the road layer only (the base-map layers removed, tiles of this change, median of 5):
@@ -252,9 +252,27 @@ with the road layer only (the base-map layers removed, tiles of this change, med
 | z13 | 113 | 89 | 74 | 65 |
 
 The smaller form has the same widths: one `let` that computes the row of the piece (kind, pair, bridge, two-way) once and one lookup in a table of 20 rows for each of the 9 stops.
-A check of 187,920 combinations of features, zooms and live widths found no difference (`width_let.mjs`). Its gain is 18 to 22 % of the road time, 20 to 25 ms for a tile of the
-low zooms. It is not in the code: the engine has no step that builds the table (one more key in each piece gives the same lookup), the JSON is longer (39 KB), and decision D2 of
-`tile_v2_plan.md` ("simple code and a good view are important; if it does not have much effect, leave it") stands. It is the next lever for the road pieces if the lag at z11 to z13 stays.
+A check of 187,920 combinations of features, zooms and live widths found no difference (`width_let.mjs`).
+
+**Built (2026-10-29, branch `design-width-table`).** The engine now writes this form (`layers/width_table.rs`). `width_curve` still builds the `case` form; `table_form` evaluates it
+for each row (kind, pair, bridge, two-way), class and stop, and writes the `let`. Two more steps make it smaller than the prototype: the classes that have the same width in all rows
+and stops are one group (13 groups for 29 classes: a second `at` gives the group), and the numbers are rounded to 6 decimals. A width that a feature sets (metres, items) is not in a
+table: `table_form` gives None and the `case` form stays. The new form is 14,580 characters in the budget's styles (before 26,312) and 14,270 in the Burnaby style (before 24,720).
+`tests` in `layers/width_tests.rs` compare the two forms for all 48 rows, all classes, zooms 11 to 21 in halves and two live widths, in three modes (no pairs; pairs; pairs and tunnels).
+The same check in MapLibre's own style-spec evaluator (`width_table_check.mjs`) found 0 differences in 187,920 combinations; the largest difference is 8e-7 px.
+
+MapLibre parse and layout of the largest tile (Burnaby, `ml.py tile`, tiles of this branch, ms, median of 28 runs, the runs in brackets). The road layer alone (base-map layers removed),
+the three forms in turn, 4 rounds of 7 runs, on a machine that other sessions also used:
+
+| Tile | `case` form | prototype | table form (built) |
+|---|---|---|---|
+| z11 (903 KB) | 129 (116-161) | 120 (102-169) | 117 (97-143) |
+| z12 (687 KB) | 100 (90-152) | 95 (80-119) | 92 (81-122) |
+| z13 (564 KB) | 112 (102-215) | 100 (89-141) | 104 (90-154) |
+
+The gain is 7 to 9 % of the road time, 8 to 12 ms for each tile, not the 18 to 22 % of the first measurement (125 to 97 ms at z11). The machine had more load now, and the run-to-run noise
+is 20 to 30 %: read the direction (the table form is faster at all three zooms, as the prototype is), not the last digit. The full style (all layers), 2 rounds of 7 runs:
+z11 203 to 185 ms, z12 185 to 150 ms, z13 142 to 134 ms. The pixels of 17 views are the same (see the CHANGELOG).
 
 **The budget.** `tile_budget.json` has views of zoom 9 to 15 (it had 12 to 15) and the areas `monaco-base` and `tartu-base`: the page's look with the base map. The rules above have a
 limit in it now (`short_segments`, `tiny`, `bytes` and `features` of each base-map layer). The check of rule 1 knows the last zoom of the look.

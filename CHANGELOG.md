@@ -35,6 +35,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   up to z12, 16 to 30 px at z13 to z15, 106 px at z18.
 
 ### Changed
+- **The road width is one table lookup** (2026-10-29, `docs/design/tile_speed.md`, "The road width expression"). `line-width` of `roads-simple` is a `let` that finds the row of the
+  piece (kind, pair, bridge, two-way) and the group of its class one time, and one `at` in a table for each zoom stop (`layers/width_table.rs`). The widths are the same: 0 differences
+  in 187,920 combinations in MapLibre's evaluator, and 0 pixels differ in 17 views of Burnaby. The expression is 14,580 characters in the budget's styles (before 26,312), the Monaco
+  style 11 KB smaller, and MapLibre's parse and layout of the largest road tile is 7 to 9 % faster (z11 129 to 117 ms, z12 100 to 92 ms, z13 112 to 104 ms, the road layer alone).
+  A width that a feature sets (metre widths, items) keeps the `case` form. The tile budget goes down (`line-width` 26,312 to 14,872); the style goldens of Monaco and Tartu change
+  in the hash of `roads-simple`'s paint only, the tiles do not change.
 - **The tiles of the low zooms are smaller** (2026-10-28, `docs/design/tile_speed.md`, "The tiles of the low zooms"). Below the last zoom, a layer that only
   `fill` and `line` style layers draw (the base map's land, water and paved areas; the layers of a circle, symbol or extrusion style layer are not changed) has its
   polygons cut to the tile and its buffer and simplified to 1/8 px, and a line that is together under half a pixel long and stays in the tile is left out. Burnaby,

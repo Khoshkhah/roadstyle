@@ -46,7 +46,7 @@ def test_live_data_reads_the_feature_state_of_the_road(part, keywords):
     assert len(live["ramp"]) == 9 and live["nodata"].startswith("#")
     text = json.dumps(road(on))
     assert '["feature-state", "rs_c"]' in text and '["coalesce", ["feature-state", "rs_w"], 1]' in text
-    # the width is still a zoom curve at the top (MapLibre), the factor in each stop
+    # the width is still one `let` (the piece's row) over a zoom curve (MapLibre finds the curve in a `let`), the factor in each stop
     assert road(on)["line-width"][:3] == road(off)["line-width"][:3]
     off.pop("metadata"), on.pop("metadata")
     for st in (off, on):

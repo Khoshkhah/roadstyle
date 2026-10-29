@@ -12,7 +12,7 @@ pub(super) fn to_boolean(v: &Value) -> bool {
 }
 
 /// _ev's three values: a value, or one only the page can tell (the zoom, an operator it does not read).
-enum Ev {
+pub(super) enum Ev {
     V(Value),
     Maybe,
 }
@@ -36,14 +36,14 @@ pub(super) fn as_num(v: &Value) -> Option<f64> {
 }
 
 /// _ev: a MapLibre expression on a feature's properties, or Maybe where only the page can tell.
-fn ev(e: &Value, p: &dyn Get) -> Ev {
+pub(super) fn ev(e: &Value, p: &dyn Get) -> Ev {
     let Some(arr) = e.as_array().filter(|a| !a.is_empty()) else { return Ev::V(e.clone()) };
     let (op, a) = (arr[0].as_str().unwrap_or(""), &arr[1..]);
     match op {
         "literal" => Ev::V(a[0].clone()),
         // R8's class index: an item of a literal list
         "at" if a.len() == 2 => match (ev(&a[0], p), ev(&a[1], p)) {
-            (Ev::V(Value::Number(i)), Ev::V(Value::Array(arr))) => i.as_u64().and_then(|i| arr.get(i as usize)).map_or(Ev::Maybe, |v| Ev::V(v.clone())),
+            (Ev::V(Value::Number(i)), Ev::V(Value::Array(arr))) => i.as_f64().filter(|i| i.fract() == 0.0 && *i >= 0.0).and_then(|i| arr.get(i as usize)).map_or(Ev::Maybe, |v| Ev::V(v.clone())),
             _ => Ev::Maybe,
         },
         "get" if a.len() == 1 => Ev::V(a[0].as_str().and_then(|k| p.value(k)).unwrap_or(Value::Null)),
@@ -80,6 +80,10 @@ fn ev(e: &Value, p: &dyn Get) -> Ev {
                             "+" => Ev::V(format!("{x}{y}").into()),
                             _ => Ev::Maybe,
                         };
+                    }
+                    if vals.len() > 2 && (op == "+" || op == "*") {      // MapLibre's + and * take any number of numbers
+                        let nums: Option<Vec<f64>> = vals.iter().map(as_num).collect();
+                        return nums.map_or(Ev::Maybe, |n| Ev::V(json!(if op == "+" { n.iter().sum::<f64>() } else { n.iter().product::<f64>() })));
                     }
                     let (Some(x), Some(y)) = (as_num(&vals[0]), as_num(&vals[1])) else { return Ev::Maybe };
                     match op {
@@ -213,7 +217,9 @@ mod tests {
         assert_eq!(ev_of(json!(["+", "a", "b"]), p.clone()), Some(json!("ab")));
         assert_eq!(ev_of(json!(["%", -1, 3]), p.clone()), Some(json!(2.0)), "the remainder has the sign of the divisor");
         assert_eq!(ev_of(json!(["%", 1, 0]), p.clone()), None);
-        assert_eq!(ev_of(json!(["*", ["get", "lanes"], 1.5]), p), Some(json!(3.0)));
+        assert_eq!(ev_of(json!(["*", ["get", "lanes"], 1.5]), p.clone()), Some(json!(3.0)));
+        assert_eq!(ev_of(json!(["+", 1, 2, 3, ["get", "lanes"]]), p.clone()), Some(json!(8.0)), "more than two numbers");
+        assert_eq!(ev_of(json!(["*", 2, 3, ["get", "lanes"]]), p), Some(json!(12.0)));
     }
 
     #[test]

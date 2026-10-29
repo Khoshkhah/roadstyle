@@ -71,6 +71,7 @@ fn bound(e: &Value, z: f64, live: f64) -> Option<f64> {
         "zoom" => Some(z),
         "feature-state" => Some(live),
         "at" => b(a.get(2)?),
+        "let" => b(a.last()?),      // a variable is only read as the index of an `at`, which the bound does not use
         "abs" => b(a.get(1)?),
         "*" => a[1..].iter().try_fold(1.0, |m, x| b(x).map(|x| m * x)),
         "+" | "-" => a[1..].iter().try_fold(0.0, |m, x| b(x).map(|x| m + x)),
@@ -125,6 +126,13 @@ fn bound(e: &Value, z: f64, live: f64) -> Option<f64> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_bound_of_a_width_table_is_its_largest_value() {
+        let w = json!(["let", "row", ["get", "i"], ["interpolate", ["linear"], ["zoom"], 12, ["*", ["at", ["var", "row"], ["literal", [1, 4]]], 2], 18, ["at", ["var", "row"], ["literal", [3, 5]]]]]);
+        assert_eq!(bound(&w, 12.0, 3.0), Some(8.0));
+        assert_eq!(bound(&w, 18.0, 3.0), Some(5.0));
+    }
 
     #[test]
     fn the_bound_of_a_road_width() {
