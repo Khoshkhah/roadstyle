@@ -144,7 +144,7 @@ def test_a_view_switches_the_palette_in_the_browser(tmp_path):
     pw = pytest.importorskip("playwright.sync_api")
     import roadstyle as rs
     path = tmp_path / "views.html"
-    rs.render_edges(_edges(), basemap="blank", views={"Day": {"palette": "amber"}, "Night": {"palette": "mono"}}).save(path)
+    rs.render_edges(_edges(), basemap="blank", views={"Day": {"palette": "amber"}, "Night": {"palette": "mono"}}, tiles=False).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -153,9 +153,8 @@ def test_a_view_switches_the_palette_in_the_browser(tmp_path):
         page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
         page.goto(path.resolve().as_uri())
         page.wait_for_function("window.map && map.loaded() && document.getElementById('vw-select')", timeout=30_000)
-        swatch = "getComputedStyle(document.querySelector('.flt-sw')).backgroundColor"
-        day = page.evaluate(f"[map.getGlobalState().rs_palette, {swatch}]")
+        day = page.evaluate("map.getGlobalState().rs_palette")
         page.evaluate("rsSetView('Night')")
-        night = page.evaluate(f"[map.getGlobalState().rs_palette, {swatch}]")
+        night = page.evaluate("map.getGlobalState().rs_palette")
         browser.close()
-    assert errors == [] and day[0] == "amber" and night[0] == "mono" and day[1] != night[1]
+    assert errors == [] and day == "amber" and night == "mono"

@@ -209,6 +209,20 @@ mod tests {
     }
 
     #[test]
+    fn a_private_access_road_starts_at_the_later_of_its_class_and_the_private_zoom() {
+        let access = Mark::Access.name();
+        let layers = [json!({"source": "simple", "filter": ["all", [">=", ["zoom"], ["match", ["coalesce", ["get", "highway"], ""], "service", 14.0, 0.0]],
+            ["any", ["!=", ["coalesce", ["get", access], ""], "private"], [">=", ["zoom"], 15.0]]]})];
+        let r = ZoomRules::of(&layers, "simple");
+        let z = |p: Value| r.span(p.as_object().unwrap()).0;
+        assert_eq!(z(json!({"highway": "service"})), 14.0);
+        assert_eq!(z(json!({"highway": "service", access: "private"})), 15.0);
+        assert_eq!(z(json!({"highway": "residential", access: "private"})), 15.0);
+        assert_eq!(z(json!({"highway": "residential"})), 0.0);
+        assert_eq!(z(json!({"highway": "service", access: "bus"})), 14.0);
+    }
+
+    #[test]
     fn the_zooms_of_a_seam() {
         // the casing's seam (_simple_pieces): an end without lap from zoom 17, an end with lap below 17
         let layers = [json!({"source-layer": "simple", "filter": ["all", [">=", ["zoom"], ["match", ["get", "highway"], "residential", 13, 0]],

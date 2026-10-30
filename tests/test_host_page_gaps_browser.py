@@ -217,8 +217,8 @@ def _engine_style():
 
 # what the page finds with a style of the engine: each box, tool and global that follows the style (rs.setStyle), and goes with a style that has none
 _TOOLS = """() => ({
-  roads: [...document.querySelectorAll('.flt-ctrl label')].map(l => l.textContent.trim()),
-  roadsOff: [...document.querySelectorAll('.flt-ctrl input')].filter(i => !i.checked).length,
+  floatingBoxes: [...document.querySelectorAll('.flt-ctrl, .co-ctrl, .tn-ctrl, .vw-ctrl, .ov-ctrl, .co-lg')].filter(e => e.getBoundingClientRect().width > 0).length,
+  primaryHidden: !!map.getLayer('rs-roads-simple') && JSON.stringify(map.getFilter('rs-roads-simple')).includes('["literal",["primary"]]'),
   floating: document.querySelectorAll('.ov-ctrl').length, switchShown: !document.querySelector('.rs-bm-layers').hidden,
   layers: (() => { rs.tools.open('legend'); const l = [...document.querySelectorAll('.rs-cb-layers .lg-row')].map(r => r.textContent.trim()); rs.tools.close('legend'); return l; })(),
   tunnel: !!document.querySelector('.tn-ctrl #tn-pre'),
@@ -249,23 +249,24 @@ def test_every_control_that_a_style_gives_follows_a_later_style_of_the_engine(ho
         page.goto(base + "/page.html")
         page.wait_for_function("window.ready === true", timeout=60_000)
         start = page.evaluate(_TOOLS)
-        assert not start["roads"] and not start["layers"] and not start["switchShown"] and not start["tunnel"] and not start["legend"] and not start["arrowImage"], start
+        assert not start["layers"] and not start["switchShown"] and not start["tunnel"] and not start["legend"] and not start["arrowImage"], start
         page.evaluate("(s) => addStyle(s)", style)
-        page.wait_for_selector(".flt-ctrl")
-        page.wait_for_function("map.hasImage('oneway')", timeout=20_000)
+        page.wait_for_function("map.hasImage('oneway') && window.RS_CLASSES.length > 3", timeout=20_000)
         first = page.evaluate(_TOOLS)
-        assert "primary" in first["roads"] and first["classes"] > 3, first
+        assert first["classes"] > 3 and not first["primaryHidden"], first
+        # no floating map box on a page with a bar: the base-map box and the legend box have what they showed
+        assert first["floatingBoxes"] == 0, first
         assert "buildings" in first["layers"] and len(first["layers"]) == 17 and first["floating"] == 0 and first["switchShown"] and first["tunnel"] and first["legend"] and first["colourOptions"] == 1, first
-        # a class that the person switched off stays off with the next style, and the box has it unchecked
+        # a class that the person switched off stays off with the next style
         page.evaluate("() => rsSetClasses(RS_CLASSES.filter(c => c !== 'primary'))")
+        assert page.evaluate(_TOOLS)["primaryHidden"]
         page.evaluate("(s) => addStyle(s)", style)
-        page.wait_for_selector(".flt-ctrl")
         again = page.evaluate(_TOOLS)
-        assert again["roadsOff"] == 1 and again["roads"] == first["roads"] and again["layers"] == first["layers"], (first, again)
+        assert again["primaryHidden"] and again["floatingBoxes"] == 0 and again["layers"] == first["layers"], (first, again)
         # a style with none of the controls takes every one of them away
         page.evaluate("(s) => addStyle(s)", _style(overlays=False))
         gone = page.evaluate(_TOOLS)
-        assert not gone["roads"] and not gone["layers"] and not gone["switchShown"] and not gone["tunnel"] and not gone["legend"] and gone["classes"] == 0, gone
+        assert not gone["layers"] and not gone["switchShown"] and not gone["tunnel"] and not gone["legend"] and gone["classes"] == 0, gone
         browser.close()
     assert not errors, errors
 
@@ -306,7 +307,7 @@ def test_the_boxes_with_the_layers_stay_inside_a_phone(host):
         page.goto(base + "/page.html")
         page.wait_for_function("window.ready === true", timeout=60_000)
         page.evaluate("(s) => addStyle(s)", style)
-        page.wait_for_selector(".flt-ctrl")
+        page.wait_for_function("window.RS_CLASSES.length > 3")
         seen = {}
         for tool, box in (("basemap", ".bm-menu"), ("legend", "#rs-color-box")):
             page.evaluate("(t) => rs.tools.open(t)", tool)
@@ -317,3 +318,41 @@ def test_the_boxes_with_the_layers_stay_inside_a_phone(host):
     assert not errors, errors
     for tool, r in seen.items():
         assert r["left"] >= 11 and r["right"] <= 390 - 11 and r["top"] >= 0 and r["bottom"] <= 844 - 11, (tool, r)
+
+
+_VISIBLE_OV = """() => map.getStyle().layers.filter(l => /^ov\\d/.test(l['source-layer'] || '') || /(^|-)ov\\d/.test(l.id))
+  .filter(l => map.getLayoutProperty(l.id, 'visibility') !== 'none').map(l => l.id)"""
+
+
+def test_the_one_switch_hides_every_layer_of_the_area_data_and_shows_them_again(host):
+    """The layers that the style does not list in the overlay's `layers` (the fill pattern, the icons, the 3D layer) were left visible when the switch went off."""
+    base, vec = host
+    style, tiler = _engine_style()
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="application/x-protobuf", body=bytes(tiler.tile(*(int(v) for v in r.request.url.rsplit("/t/", 1)[1].split("?")[0].split("/")))))
+                   if "/t/" in r.request.url else r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        page.evaluate("(s) => addStyle(s)", style)
+        page.wait_for_function("!!map.getLayer('rs-ov5-3d') && window.RS_OVERLAYS.length > 0")
+        page.evaluate("() => rsSetBuildings3D(true)")
+        on = page.evaluate(_VISIBLE_OV)
+        assert "rs-ov0-pattern" in on and "rs-ov5-3d" in on, on
+        page.evaluate("() => rsSetOverlays(false)")
+        for zoom in (12, 15, 18):
+            page.evaluate("(z) => map.jumpTo({zoom: z})", zoom)
+            assert page.evaluate(_VISIBLE_OV) == [], (zoom, page.evaluate(_VISIBLE_OV))
+        page.evaluate("() => rsSetTheme('dark')")
+        page.evaluate("() => rsSetBasemap('osm')")
+        page.evaluate("() => rsSetBasemap('blank')")
+        page.evaluate("(s) => addStyle(s)", style)          # the next style comes with the switch off
+        assert page.evaluate(_VISIBLE_OV) == []
+        page.evaluate("() => rsSetOverlays(true)")
+        again = page.evaluate(_VISIBLE_OV)
+        assert "rs-ov0-pattern" in again and "rs-ov5-3d" in again, again
+        browser.close()
+    assert not errors, errors

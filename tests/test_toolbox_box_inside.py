@@ -196,3 +196,49 @@ def test_the_credits_button_has_no_tooltip_but_a_label_for_a_screen_reader():
         browser.close()
     assert not errors, errors
     assert got["title"] is None and got["label"] == "Attribution" and got["tip"] is False and got["tool"] == "Attribution", got
+
+
+def test_the_explanation_marks_of_the_base_map_box_are_a_question_mark():
+    html, errors = rs.render_dashboard(_edges(), basemap="ofm_liberty").html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, _serve(html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=90_000)
+        page.evaluate("rs.tools.open('basemap')")
+        page.wait_for_timeout(500)
+        marks = page.evaluate("[...document.querySelectorAll('.rs-bm-i')].map(e => e.textContent)")
+        browser.close()
+    assert not errors, errors
+    assert marks and set(marks) == {"?"}, marks
+
+
+def test_the_roads_tool_filters_the_road_types_with_all_none_and_show_only():
+    import geopandas as gpd
+    from shapely.geometry import LineString
+    edges = gpd.GeoDataFrame({"highway": ["primary", "primary", "residential", "service"], "edge_id": [1, 2, 3, 4]}, crs=4326,
+                             geometry=[LineString([(18.0 + i * 1e-3, 59.30), (18.0 + i * 1e-3, 59.31)]) for i in range(4)])
+    html, errors = rs.render_dashboard(edges, basemap="blank").html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1200, "height": 760})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, _serve(html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
+        got = page.evaluate("""async () => { const order = rs.tools.list().map(t => t.id), events = [];
+            document.addEventListener('rs:filterchange', e => events.push(e.detail.visible ? e.detail.visible.join(',') : null));
+            rs.tools.open('roads'); const box = document.querySelector('#rs-roads-box');
+            const rows = [...box.querySelectorAll('.rs-rd-row')].map(r => [r.querySelector('button').textContent, r.querySelector('b').textContent, r.querySelector('input').checked]);
+            const click = s => { box.querySelector(s).click(); return new Promise(r => setTimeout(r, 150)); };
+            await click('button[data-only="primary"]'); const only = [...box.querySelectorAll('input[data-c]')].map(i => i.checked);
+            await click('button[data-a="none"]'); const none = events[events.length - 1];
+            await click('button[data-a="all"]'); const all = events[events.length - 1];
+            return {order, rows, only, none, all}; }""")
+        browser.close()
+    assert not errors, errors
+    assert got["order"].index("roads") == got["order"].index("basemap") + 1, got["order"]
+    assert got["rows"] == [["primary", "2", True], ["residential", "1", True], ["service", "1", True]], got["rows"]
+    assert got["only"] == [True, False, False] and got["none"] == "" and got["all"] == "primary,residential,service", got

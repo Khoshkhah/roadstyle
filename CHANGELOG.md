@@ -14,6 +14,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   asks apply, discard or stay, then sends the event `"back"`. The picked roads have the dashboard's selection glow; `destroy()` clears their colour (`rsColor(null)`) and
   glow. The History tab has the edits.csv download. The colours are the panel's tokens. `roadstyle serve` serves `host_options.json`, and its page is a host of the
   standard dashboard (template, panel, hide and show buttons).
+- **The tool `roads`** (after the base map button): the road filter in the bar. A box with a row for each road class (check box, colour, name, number of roads), All and None, and a click on a name shows only
+  that class; Bridges, Tunnels and the access kinds when the data has them. It uses the filter calls of the page, so the map template's Roads box and this tool are one filter. A page with no road classes
+  has the button greyed out. A style that comes later (`rs.setStyle`) gets its own classes.
 - **Every control that a style gives follows a later `rs.setStyle`.** The Roads box (classes, Bridges, Tunnels, access kinds), the Tunnels box, the arrows' icon and rules,
   the boundary's shade and limits, the arrow and the fill-layer facts of Street View, the pick layers, the id fields and the parts of `rs.getState()` were made once, at
   the start, so a page that starts with `style: null` had none of them. They are made again for each style now, and go with a style that has none; a switch that was off
@@ -47,16 +50,31 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
+  roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:
+  `{"*": 0, "service": 14}`) and the key `"@private"` (the first zoom of the private-access roads). `minzoom=False` is still every class at every zoom. The profile's own table (`default.yaml`) is unchanged for the map template.
+- **The explanation marks in the base map box are a "?"** (they were an italic "i"): the "i" is only the credits button.
 - **A page with a bar has no floating Layers box.** The style's own base-map layers (the duckOSM layers: landcover, water, buildings, ...) have one switch for all of them in the
   base-map box (`overlays_label`, default "Map layers"; `rsSetOverlays(on)`), and the legend box lists them with their colours, each swatch with a thin border so that a white
   or near-white colour shows. A page with no bar, or with no base-map box, keeps the Layers box.
 - **The compass button also changes the tilt**: dragging it turns the map (left and right) and tilts it (up and down); a click sets north and the tilt back (`visualizePitch`).
   The attribution button has an italic serif "i" in a ring, so it does not look like a page's help button ("?").
+- **`tiles` is `True` by default: every page embeds its roads as tiles.** MapLibre cuts GeoJSON roads into tiles in the browser and keeps every vertex, so on 22,000 roads (Nacka) the
+  GeoJSON page draws 2.4 to 2.6 times the triangles of the tiled page at zoom 11 to 13, and pan and zoom stall for twice as long. `tiles=False` keeps the GeoJSON roads (and a page with a
+  palette in a view needs it: an error says so). To keep the tiled page about as small as the GeoJSON page: the last tile zoom is **16** (`tiles.maxzoom`, was 18: 0.1 to 0.3 % of the
+  pixels differ at zoom 17 to 20.5) and the embedded archive is **one gzip stream** (the tiles are not gzipped one by one; the page inflates it with `DecompressionStream`).
+  The tiles are **MLT in every path** (a page, the map worker, `export_style`, `roadstyle tiles`; the same pixels, 60 % of the bytes: Nacka 20.0 MB); `tile_format="mvt"` gives MVT.
+  The map worker keeps each tile in each format (an MLT tile was made again at each request). One rule for the tile paths: docs/design/tiling.md.
+- **`rs.setData` is about 3 times faster on 22,000 roads** (17 ms to 6 ms; 71 ms to 23 ms with the CPU 4 times slower): the key-to-row index is made once and not for each call, a
+  road's own fields are read with no copy, and the colour of a set is made once and not for each road.
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
 - **The dashboard shows every road class at every zoom.** The template `dashboard` gives `minzoom=False` where the call gives none (a data page shows every road; the
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
+  the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
+  in tiles).
 - **A box of the bar stays inside a phone's screen sideways.** The boxes moved up or down only; the base-map box was 143 px out of a 390 px screen. They move left or right too.
 - **A box of the bar stays inside the window.** The settings box could reach above the top of the window when the window was not high: the bar moved a box
   with `margin-top`, which does nothing for a box that is fixed to the bar by its bottom edge. It uses `translate` now, for every box.
@@ -66,21 +84,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
   inside the window, as the others do.
 
 ### Removed
+- **The Roads box is gone** (the floating box with a row for each road class, Bridges, Tunnels and the access kinds, `.flt-ctrl`). A page with a bar has no place for it, and it covered the bar. The filter calls stay
+  (`rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsFilter`, `rsSetModes`, `rs.setFilter`; `rs.setStyle` keeps what a call switched off): the colour box, `rs.setFilter`, the views and the host pages use them.
+  The keyword `filter_control` (and `--no-filter`) has no effect now. The class minzoom dimming of the rows went with the box. The map's other old floating boxes (Tunnels, View) are hidden on a page with a bar, as Colour by was.
 - The settings have no "Reset transparency" button and no note about the key ("A key is saved in this browser only...").
 
 ### Changed
 - **`line-dasharray` is only on the dashed pieces** (docs/design/tile_speed.md). The pieces that have a dash (a tunnel's gap and dashes,
-  `__rs_k` 3 and 4, and a piece with its own pattern, `__rs_dash`) are drawn by a layer of their own for each band (`roads-simple-dash`,
-  `roads-simple-z14-dash`, ...), under the layer of the other pieces: a tunnel is under the roads that cross it and under its own fill. The
+  `__rs_k` 3 and 4, and a piece with its own pattern, `__rs_dash`) are drawn by a layer of their own (`roads-simple-dash`), under the layer of the other pieces: a tunnel is under the roads that cross it and under its own fill. The
   other pieces have no `line-dasharray`, so MapLibre looks up no dash pattern for them. The base look had a faint dotted fringe on the
   casing that this removes (about 1 % of the pixels).
-- **The road layer is one layer for each band of zooms** (`roads-simple` below z14, `roads-simple-z14` from z14, `roads-simple-z15` from z15;
-  docs/design/tile_speed.md, "The road layer in MapLibre"). MapLibre evaluates each data-driven paint property for each feature. In a band, a
-  property whose zoom curve is one value is that value: `line-offset` is 0 below z15, `line-blur` is 0 and `line-opacity` is a short `case`
-  below z14. A band also keeps only the zoom stops that its zooms read. The picture does not change (0 pixels). A style with line items keeps
-  one road layer. `roadstyle:controls.pick` lists every band.
 - **The dashboard reads the road layer as a list of layers** (`RS_LEANS`, with `leanAt()` for the one that the map draws at its zoom). Pick,
-  hover, select and Street View use the list, so the road layer can be more than one style layer (zoom bands, the dash layers).
+  hover, select and Street View use the list, so the road layer can be more than one style layer (the dash layer).
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 

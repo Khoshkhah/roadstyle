@@ -77,7 +77,7 @@ ignore it.
 | `legend` | `True` | web | a legend for data colouring (class styling has none). Web: a page key; the style always has the legend data (`roadstyle:color_options`) |
 | `name` | web `"roadstyle"`, folium `"roads"` | web | page title (web) / layer name (folium) |
 | `hover_color` / `select_color` | `"#b388ff"` / `"#7c4dff"` | web | highlight of the hovered / selected road |
-| `minzoom` | `None` (`False` for `render_dashboard`) | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default of `render_edges`), a dict overrides parts, `False` = all classes at all zooms (the default of `render_dashboard`: a data page shows every road) |
+| `minzoom` | `None` (one table for `render_dashboard`: service roads and living streets from zoom 14, steps, platforms, corridors and roads from zoom 15, private-access roads from zoom 15, every other class from zoom 0) | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default of `render_edges`), a dict overrides parts of it (the key `"*"` sets every class first: `{"*": 0, "service": 14}` is every class at every zoom but the service roads; the key `"@private"` is the first zoom of the roads with private access (`access_col`), whatever their class), `False` = all classes at all zooms |
 | `offset_frac` | `0.28` | web | two-way lane offset, fraction of the road's pixel width; `0` = no lane split |
 | `width_frac` | `0.6` | web | each lane's width, fraction of the full road width |
 | `offset_zoom` | `15` | web | zoom where the two directions start to fan apart |
@@ -89,8 +89,8 @@ ignore it.
 |---|---|---|---|
 | `include` / `exclude` | `None` | all | keep only / drop these classes (str or list) |
 | `match_links` | `True` | all | `primary` also matches `primary_link` |
-| `filter_control` | `True` | web | the road-class filter panel (folium: only when there is no legend) |
-| `filter_col` | `None` | web | the column the filter panel lists, when it differs from `highway_col` |
+| `filter_control` | `True` | web | no effect: the road-class filter panel was removed (`rsSetClasses` filters from a script) |
+| `filter_col` | `None` | web | the column that `rsSetClasses` filters by, when it differs from `highway_col` |
 | `find_control` | `False` | web | a "Search roads…" box in the top-left stack (the docked panel has its own); the JS `rsFind(text)` is always defined ([design](../design/sensor_matching_requests.md)) |
 | `overlay_control` | `True` | web | `False` hides the *Layers* box of the overlays; `rsSetOverlay` still works |
 | `overlay_popup` | `True` | web | `False`: no overlay shows a click popup (it stays clickable and fires `rs:select`); one overlay: `Overlay(popup_window=False)` |
@@ -157,7 +157,7 @@ have, is an error. Each palette that a view names is built once more into the pa
 
 | keyword | default | backends | what |
 |---|---|---|---|
-| `tiles` | `False` | web | pack the roads, the casing pieces and the end caps as embedded PMTiles (for ~10⁵ edges); needs `roadstyle[tiles]` |
+| `tiles` | `True` | web | the roads, the casing pieces and the end caps are embedded PMTiles (MLT, or MVT with `tile_format="mvt"`; the whole archive is one gzip stream). `tiles=False`: the roads are GeoJSON, which MapLibre cuts into tiles in the browser, keeping every vertex: on 22,000 roads (Nacka, 173,000 pieces) that draws 2.4 to 2.6 times the triangles at zoom 11 to 13 (556,000 against 234,000 at zoom 11) and stalls twice as long while panning. A page with a palette in a view needs `tiles=False` (an error says so) |
 | `live_data` | `False` | web, Rust engine | the metadata `roadstyle:live` (the feature states `rs_c` and `rs_w`, the default ramp, the no-data colour; [contract](contract.md)) and the page's option `live`, which `rs.setData` reads. Every style's road layer reads its colour and its width factor from the feature state on the road's row (since 2026-10-24, audit N8). With the Python engine: a `ValueError` |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
 | `tunnel_control` | `False` | web | on a map with tunnels, a *Tunnels* box (a tool for choosing the look): the colour list (`tunnel_toward`), the tunnel slider (`tunnel_strength`: 0, 25, 50, 55, 60, 65, 70, 75, 100), the casing palette and the dash ratio ([design](../design/tunnel_look.md)) |
@@ -293,7 +293,7 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `bridge_decks` | `base_m 5`, `thickness_m 1`, `ramp_m 40`, `step_m 2.5`, `match_zoom 18`, `opacity 0.7`, `width_scale 0.6`, `flat_below 16`, `casing_px 2` | 3D bridge decks |
 | `overlays` | `color #6aa9ff`, `radius 6`, `width 2`, per-kind opacities, `circle_stroke #ffffff` | `Overlay` defaults |
 | `annotations` | `slot_m 100` | label / arrow spacing along a road, metres |
-| `tiles` | `minzoom 6`, `maxzoom 18`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up: at maxzoom 15 a casing piece stood 4–5 px off its fill at zoom 22, at 18 about 1 px. The Rust engine gives each zoom the buffer of its widest stroke (half the line width, the gap and the offset, 3 times a live width; `roadstyle_tiles::buffer`); `buffer_px` is the buffer of a zoom where a width cannot be bounded |
+| `tiles` | `minzoom 6`, `maxzoom 16`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up: at maxzoom 15 a casing piece stood 4–5 px off its fill at zoom 22. On Nacka, 16 against 18 changes 0.1 to 0.3 % of the pixels at zoom 17 to 20.5 and saves 3.8 MB of the page. The Rust engine gives each zoom the buffer of its widest stroke (half the line width, the gap and the offset, 3 times a live width; `roadstyle_tiles::buffer`); `buffer_px` is the buffer of a zoom where a width cannot be bounded |
 | `api_key` / `api_keys` | `None` / `{}` | default key / per-provider keys |
 
 **See also:** [JavaScript API](javascript.md) · [Settings & palettes](settings.md) · [Command line](cli.md)

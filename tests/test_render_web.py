@@ -310,7 +310,7 @@ def test_web_pick_survives_missing_layers():
     list to existing layers or every hover/click errors out and nothing is selectable."""
     html = render_edges(_edges(), backend="web", view_3d=True).html
     assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
-    assert "O.pick.map(id=>RS_PREFIX+id)" in html and _opt(html, "pick") == ["roads-simple", "roads-simple-z14", "roads-simple-z15"]   # the page gives the pick layers (R7)
+    assert "O.pick.map(id=>RS_PREFIX+id)" in html and _opt(html, "pick") == ["roads-simple"]   # the page gives the pick layers (R7)
 
 
 def test_web_camera_max_pitch():
@@ -603,7 +603,7 @@ def test_web_street_view_link():
     assert "rsSetStreetViewMarker(!!on);" in on and 'data-step="15"' in on
     # the marker sits on the DRAWN lane (roads-fill's own line-offset at this zoom), not 2.5 m out,
     # which is off the road when zoomed in; and it follows zoom / rotate / pitch
-    assert 'const lay=RS_LEAN ? leanAt() : RS_PREFIX+"roads-fill"' in on and 'map.getPaintProperty(lay, "line-offset")' in on
+    assert 'const lay=RS_LEAN || RS_PREFIX+"roads-fill"' in on and 'map.getPaintProperty(lay, "line-offset")' in on
     assert 'map.on("move", _svMarkPlace);' in on
 
 
@@ -685,7 +685,7 @@ def test_tunnels_toggle_like_bridges():
                          geometry=[LineString([(18.0, 59.30), (18.01, 59.30)]),
                                    LineString([(18.01, 59.30), (18.02, 59.30)])], crs=4326)
     html = render_edges(g, backend="web").html
-    assert _in('"tunnels": true', html) and "function rsSetTunnels(" in html and '"rs-flt-tn"' in html
+    assert _in('"tunnels": true', html) and "function rsSetTunnels(" in html
     assert '[">=",["coalesce",["get",lvl],0],0]' in html                     # lvl: the piece's level, or an attached item's baked __rs_lvl
     plain = render_edges(_edges(), backend="web").html
     assert _in('"tunnels": false', plain)
@@ -1392,7 +1392,7 @@ def test_overlay_styles_work_for_overlays_attached_to_edges():
     g = _edge_world()
     data = _line_overlay_data().assign(order=[1, 3])
     st = _style(render_edges(g, backend="web", road_fill=False, settings=_STYLES, overlays=[
-        Overlay(data, edge_col="edge_id", order_col="order", style="dashed", label="a"), Overlay(data, edge_col="edge_id", order_col="order", style="street_name", label="b")]).html)
+        Overlay(data, edge_col="edge_id", order_col="order", style="dashed", label="a"), Overlay(data, edge_col="edge_id", order_col="order", style="street_name", label="b")], tiles=False).html)
     ids = [lyr["id"] for lyr in st["layers"]]
     assert any(i.startswith("ov0-line-lv") and "-o1" in i for i in ids) and any(i.startswith("ov1-text-lv") and "-o3" in i for i in ids)
     one = next(lyr for lyr in st["layers"] if lyr["id"].startswith("ov0-line-lv"))
@@ -1587,18 +1587,18 @@ def test_the_road_tooltip_waits_for_the_mouse_to_rest():
 
 def test_data_maxzoom_sets_the_last_cut_zoom_of_every_geojson_source():
     """data_maxzoom: every GeoJSON source of the page is cut into tiles up to that zoom only (above it MapLibre reuses them); default: MapLibre's own."""
-    style = _style(render_edges(_edges(), backend="web", basemap="blank", data_maxzoom=17).html)
+    style = _style(render_edges(_edges(), backend="web", basemap="blank", data_maxzoom=17, tiles=False).html)
     geo = [s for s in style["sources"].values() if s["type"] == "geojson"]
     assert geo and all(s["maxzoom"] == 17 for s in geo)
-    assert all("maxzoom" not in s for s in _style(render_edges(_edges(), backend="web", basemap="blank").html)["sources"].values() if s["type"] == "geojson")
+    assert all("maxzoom" not in s for s in _style(render_edges(_edges(), backend="web", basemap="blank", tiles=False).html)["sources"].values() if s["type"] == "geojson")
 
 
 def test_data_tolerance_sets_the_simplification_of_the_road_tile_sources():
     """data_tolerance: the GeoJSON sources that carry a tolerance (the roads) take it; default None keeps roadstyle's 0.05."""
-    style = _style(render_edges(_edges(), backend="web", basemap="blank", data_tolerance=1).html)
+    style = _style(render_edges(_edges(), backend="web", basemap="blank", data_tolerance=1, tiles=False).html)
     tol = [s["tolerance"] for s in style["sources"].values() if s["type"] == "geojson" and "tolerance" in s]
     assert tol and all(t == 1.0 for t in tol)
-    base = _style(render_edges(_edges(), backend="web", basemap="blank").html)
+    base = _style(render_edges(_edges(), backend="web", basemap="blank", tiles=False).html)
     assert all(s["tolerance"] == 0.05 for s in base["sources"].values() if s["type"] == "geojson" and "tolerance" in s)
 
 
@@ -1889,7 +1889,7 @@ def test_one_arrow_per_one_way_road_in_the_window(tmp_path):
     path = tmp_path / "arrows.html"
     pts = [(18.0 + i * 0.001, 59.3) for i in range(41)]                       # one straight one-way street, about 2.3 km, many slots
     g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]}, geometry=[LineString(pts)], crs=4326)
-    render_edges(g, backend="web", basemap="blank").save(path)
+    render_edges(g, backend="web", basemap="blank", tiles=False).save(path)
     arrows = "map.getSource('arrows')._data.geojson.features.map(f => f.geometry.coordinates)"
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -1924,7 +1924,7 @@ def test_arrows_are_thinned(tmp_path):
     row = lambda y: [(18.0 + i * 0.001, y) for i in range(41)]                 # noqa: E731
     g = gpd.GeoDataFrame({"highway": ["residential", "primary", "primary"], "name": ["Side", "Main N", "Main S"], "oneway": [True] * 3},
                          geometry=[LineString(row(59.31)), LineString(row(59.3)), LineString(row(59.30005))], crs=4326)
-    render_edges(g, backend="web", basemap="blank").save(path)
+    render_edges(g, backend="web", basemap="blank", tiles=False).save(path)
     names = "map.getSource('arrows')._data.geojson.features.map(f => f.properties.name).sort()"
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -1947,7 +1947,7 @@ def test_an_arrow_that_would_touch_a_name_is_left_out():
     dropped where they would touch one; they never push a name away."""
     g = gpd.GeoDataFrame({"highway": ["primary"], "name": ["Long St"], "oneway": [True]},
                          geometry=[LineString([(18.0, 59.3), (18.01, 59.3)])], crs=4326)
-    style = _style(render_edges(g, backend="web", basemap="blank").html)
+    style = _style(render_edges(g, backend="web", basemap="blank", tiles=False).html)
     arrows = [l for l in style["layers"] if l["id"].startswith("roads-arrows")]
     assert arrows and all(l["layout"]["icon-allow-overlap"] is False and l["layout"]["icon-ignore-placement"] is True for l in arrows)
     ids = [l["id"] for l in style["layers"]]
@@ -1999,7 +1999,7 @@ def test_simple_has_the_tunnels_box_with_the_palette_and_dash_selects():
 def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
     """The footway's fill (``__rs_dash`` "4,4" from the palette) is dashed per feature, butt ended, in the dash layer; a solid road has no
     dash (2f: only the dashed pieces are in a layer with line-dasharray)."""
-    style = _style(render_edges(_simple_world(), backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce").html)
+    style = _style(render_edges(_simple_world(), backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", tiles=False).html)
     layer = next(l for l in style["layers"] if l["id"] == "roads-simple-dash")
     assert "line-dasharray" not in next(l for l in style["layers"] if l["id"] == "roads-simple")["paint"]
     foot = next(f["properties"] for f in style["sources"]["simple"]["data"]["features"] if f["id"] == 2)
@@ -2007,7 +2007,7 @@ def test_simple_dashed_class_fill_has_the_full_looks_dasharray():
     by = da[3]
     assert by[0] == "match" and foot["__rs_dash"] in by and by[by.index(foot["__rs_dash"]) + 1] == ["literal", [float(v) for v in foot["__rs_dash"].split(",")]]
     assert by[-1] == ["literal", [1, 0]]
-    plain = render_edges(_edges(), backend="web").html
+    plain = render_edges(_edges(), backend="web", tiles=False).html
     assert "line-dasharray" not in json.dumps(next(l for l in _style(plain)["layers"] if l["id"] == "roads-simple")["paint"])      # no dash, no tunnel: nothing set
 
 
@@ -2135,7 +2135,7 @@ def test_a_seam_is_long_enough_to_keep_its_direction():
     """A seam reaches 0.5 m each way from its cut (a quarter of the shorter piece at most): a 2 cm seam fell on one or two steps of the
     map's tile grid above zoom 18 and was drawn as a square block out of the outline (2026-10-08)."""
     kw = dict(backend="web", casing_level_col="cm", fill_level_col="fl", casing_start_col="cs", casing_end_col="ce", head_m=5.0)
-    feats = _style(render_edges(_simple_world(), **kw).html)["sources"]["simple"]["data"]["features"]
+    feats = _style(render_edges(_simple_world(), **kw, tiles=False).html)["sources"]["simple"]["data"]["features"]
     seams = [f["geometry"]["coordinates"] for f in feats if f["properties"].get("__rs_seam") and not f["properties"].get("__rs_lap")]
     assert seams
     for c in seams:
@@ -2161,7 +2161,7 @@ def test_an_unclassed_two_way_pair_pairs_and_the_warning_names_it():
     g = gpd.GeoDataFrame({"highway": [None, float("nan")], "edge_ref": ["w#2f", "w#2r"], "cs": 0, "cm": 0, "ce": 0, "fl": 0,
                           "cap_s": None, "cap_e": None}, geometry=[LineString([a, b]), LineString([b, a])], crs=4326)   # _TWIN_KW's columns
     with pytest.warns(UserWarning, match=r"2 edges have no 'highway' value.*w#2f, w#2r"):
-        html = render_edges(g, **_TWIN_KW).html
+        html = render_edges(g, **_TWIN_KW, tiles=False).html
     feats = _style(html)["sources"]["simple"]["data"]["features"]
     assert {f["id"] for f in feats if f["properties"]["__rs_k"] != 1} == {0}                  # one casing, the first edge's
     assert all(f["properties"].get("__rs_twoway", True) for f in feats) and sorted(f["id"] for f in feats if f["properties"]["__rs_k"] == 1) == [0, 1]
@@ -2241,13 +2241,13 @@ def _crossing_with_lanes(n=3, dash=False, **kw):
     roads = gpd.GeoDataFrame({"edge_id": [1, 2], "highway": ["residential"] * 2, "bridge": ["no", "yes"], "layer": [0, 1],
                               "oneway": ["yes", "yes"]}, geometry=[a, b], crs=4326)
     if not n:
-        return render_edges(roads, backend="web", **kw)
+        return render_edges(roads, backend="web", **{"tiles": False, **kw})
     lanes = gpd.GeoDataFrame([{"edge_id": e, "order": k, "w": 3.25, "off": k * 3.0, "c": "#00ff00", "geometry": g}
                               for e, g in ((1, a), (2, b)) for k in range(n)], crs=4326)
     if dash:
         lanes["d"] = [[2, 4] if k == 0 else None for k in lanes["order"]]
     ov = Overlay(lanes, edge_col="edge_id", order_col="order", color_col="c", width_m_col="w", offset_m_col="off", dash_col="d" if dash else None)
-    return render_edges(roads, backend="web", overlays=[ov], **kw)
+    return render_edges(roads, backend="web", overlays=[ov], **{"tiles": False, **kw})
 
 
 def test_line_items_are_pieces_of_the_one_road_layer_at_their_edge_fill():
@@ -2290,7 +2290,7 @@ def test_road_items_are_pieces_of_the_road_layer_with_no_source_of_their_own():
     """2026-10-10: render(items=...) puts the road's own items (lanes, lines, marks) in the one road layer only: no overlay source or layer;
     a picked item keeps its own fields (the popup), the others only what the layer reads; items need simple mode."""
     roads, items = _road_with_items()
-    html = render_edges(roads, backend="web", items=items, items_popup=["lane_id"]).html
+    html = render_edges(roads, backend="web", items=items, items_popup=["lane_id"], tiles=False).html
     st = _style(html)
     assert not [k for k in st["sources"] if k.startswith("ov")] and not [l for l in st["layers"] if l["id"].startswith("ov")]
     k5 = [f["properties"] for f in sorted((f for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5),
@@ -2300,14 +2300,14 @@ def test_road_items_are_pieces_of_the_road_layer_with_no_source_of_their_own():
     assert _opt(html, "items") == {"label": "items", "popup": ["lane_id"], "layer": "roads-simple"}
     assert "feature-state" in json.dumps(next(l for l in st["layers"] if l["id"] == "roads-simple")["paint"]["line-color"])
     with pytest.raises(ValueError, match="simple"):
-        render_edges(roads, backend="web", items=items, simple=False)
+        render_edges(roads, backend="web", items=items, simple=False, tiles=False)
 
 
 def test_a_click_on_a_road_item_selects_the_item_in_the_browser(tmp_path):
     pw = pytest.importorskip("playwright.sync_api")
     roads, items = _road_with_items()
     path = tmp_path / "items.html"
-    render_edges(roads, backend="web", basemap="blank", items=items, items_popup=["lane_id"]).save(path)
+    render_edges(roads, backend="web", basemap="blank", items=items, items_popup=["lane_id"], tiles=False).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -2389,9 +2389,9 @@ def test_a_road_item_with_a_minzoom_shows_from_that_zoom():
     """items= ``minzoom`` (2026-10-10, zebra stripes): baked as ``__rs_imz`` and kept out of the one road layer below that zoom; no item with one:
     no such filter."""
     roads, items = _road_with_items()
-    plain = next(l for l in _style(render_edges(roads, backend="web", items=items).html)["layers"] if l["id"] == "roads-simple")
+    plain = next(l for l in _style(render_edges(roads, backend="web", items=items, tiles=False).html)["layers"] if l["id"] == "roads-simple")
     assert "__rs_imz" not in json.dumps(plain.get("filter"))
-    st = _style(render_edges(roads, backend="web", items=items.assign(minzoom=[None, 17.0])).html)
+    st = _style(render_edges(roads, backend="web", items=items.assign(minzoom=[None, 17.0]), tiles=False).html)
     lyr = next(l for l in st["layers"] if l["id"] == "roads-simple")
     assert ["any", ["!", ["has", "__rs_imz"]], [">=", ["zoom"], ["get", "__rs_imz"]]] in lyr["filter"]
     assert [f["properties"].get("__rs_imz") for f in st["sources"]["simple"]["data"]["features"] if f["properties"]["__rs_k"] == 5] == [None, 17.0]

@@ -20,21 +20,10 @@
    the native zoom controls (top-right) and the scale bar (bottom-left). Panel mode docks them. */
 .rs-tl{position:absolute;top:10px;left:10px;z-index:2;display:flex;flex-direction:column;
   gap:8px;align-items:flex-start;max-height:calc(100% - 20px)}
-.rs-tl .co-ctrl,.rs-tl .tn-ctrl,.rs-tl .vw-ctrl,.rs-tl .flt-ctrl{position:static;max-height:none}
-.rs-tl .flt-ctrl{overflow:auto;min-height:0}   /* long class lists scroll inside the stack */
-.flt-ctrl{position:absolute;top:10px;left:10px;z-index:2;background:#fff;border-radius:8px;
-box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
-font:13px system-ui,sans-serif;color:#334155;max-height:70%;overflow:auto}
-.flt-ctrl .flt-hd{padding:8px 11px 6px;cursor:pointer;user-select:none;
-  font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
-.flt-ctrl .flt-body{padding:0 11px 8px;display:flex;flex-direction:column;gap:3px}
+.rs-tl .co-ctrl,.rs-tl .tn-ctrl,.rs-tl .vw-ctrl{position:static;max-height:none}
 .flt-sw{display:inline-block;width:16px;height:5px;border-radius:2px;margin:0 2px 0 5px;
   vertical-align:middle;border:1px solid rgba(0,0,0,.15)}
-.flt-ctrl.collapsed .flt-body{display:none}
 .rs-rule{margin-top:4px;padding-top:4px;border-top:1px solid #ddd}   /* the first row of a group in a box (_check's rule) */
-.flt-ctrl label{cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px}
-.flt-ctrl label:hover{color:#1a6bd6}
-.flt-ctrl label.flt-below{opacity:.45}   /* a class that the map does not draw at this zoom (its title: from zoom N) */
 .rs-find{background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);
   font:13px system-ui,sans-serif;color:#334155;width:230px;box-sizing:border-box}
 .rs-find .rs-side-q-res:empty{display:none}
@@ -70,10 +59,8 @@ body.rs-panel #map{right:320px}
 .rs-side-hd2{border-top:1px solid #ececec}
 /* the map's own controls, docked: static block cards instead of floating boxes */
 .rs-side-ctl{flex:0 1 auto;min-height:0;max-height:55%;overflow:auto}
-.rs-side .co-ctrl,.rs-side .tn-ctrl,.rs-side .vw-ctrl,.rs-side .flt-ctrl,.rs-side .co-lg{position:static;box-shadow:none;border-radius:0;
+.rs-side .co-ctrl,.rs-side .tn-ctrl,.rs-side .vw-ctrl,.rs-side .co-lg{position:static;box-shadow:none;border-radius:0;
   max-height:none;background:#fff;border-bottom:1px solid #f0f0f0;padding:8px 14px}
-.rs-side .flt-ctrl .flt-hd{padding:0 0 4px}
-.rs-side .flt-ctrl .flt-body{padding:0}
 /* hidden panel: the map takes the page back; the reopen button lives in the map's own
    top-right control stack (below 2D/3D), so no extra positioning is needed */
 body.rs-side-hidden .rs-side{display:none}
@@ -212,7 +199,7 @@ html.rs-has-toolbar .maplibregl-ctrl-top-right,html.rs-has-toolbar .maplibregl-c
 #rs-toolbar.rs-tb-bottom #rs-attr-box{bottom:calc(100% + 12px);right:0}
 #rs-toolbar .bm-menu.open{display:block}
 /* every pop-up of the bar takes the bar's own look: one rule set (the bar, the boxes, the scale box) */
-#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,.rs-pop{background:var(--rs-box-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,.rs-pop{background:var(--rs-box-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 /* the chevrons of the panels (show and hide) take the bar's look too */
 #rs-show-right button,#sb-show,#sb-hide,html.rs-overlay .rs-side-min{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important;box-shadow:none!important}
 html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;box-sizing:border-box;padding:0!important;font-size:16px;cursor:pointer}
@@ -250,7 +237,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-bm-box hr{border:0;border-top:1px solid var(--rs-tb-border,rgba(0,0,0,.12));margin:4px 0;width:100%}
 .rs-bm-row input:disabled+.rs-bm-n{opacity:.45}
 .rs-bm-row.rs-bm-off{opacity:.45;cursor:not-allowed}
-.bm-menu .rs-bm-i{margin-left:auto;flex:none;width:14px;height:14px;line-height:12px;border:1px solid currentColor;border-radius:50%;font:italic 700 10px Georgia,serif;text-align:center;opacity:.65;cursor:help;box-sizing:border-box}
+.bm-menu .rs-bm-i{margin-left:auto;flex:none;width:16px;height:16px;line-height:14px;border:1px solid currentColor;border-radius:50%;font:700 10px/14px system-ui,sans-serif;text-align:center;opacity:.65;cursor:help;box-sizing:border-box}
 .rs-g3d-note{color:#fbbf24;font-size:10.5px;line-height:1.2;flex:1;min-width:0}
 .rs-g3d-note[hidden]{display:none}
 .rs-svw-bar button.rs-g3d-follow{font:11px/1 system-ui;padding:3px 7px;border-radius:4px;color:#cbd5e1;background:none;border:1px solid rgba(255,255,255,.45);white-space:nowrap}
@@ -262,7 +249,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-g3d-menu[hidden]{display:none}
 .rs-g3d-menu label{display:block;white-space:nowrap;cursor:pointer}
 /* ---- the tool `legend` (colorbox.js): "Colour by" as radio rows, then the legend in two columns; the look of the base-map box ---- */
-#rs-toolbar .rs-color-ctrl,#rs-toolbar .rs-nav-ctrl{position:relative!important;overflow:visible}
+#rs-toolbar .rs-color-ctrl,#rs-toolbar .rs-nav-ctrl,#rs-toolbar .rs-roads-ctrl{position:relative!important;overflow:visible}
 #rs-color-box{position:absolute;z-index:9}
 #rs-color-box[hidden]{display:none}
 #rs-toolbar.rs-tb-right #rs-color-box{right:calc(100% + 12px);top:0}
@@ -270,6 +257,25 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 #rs-toolbar.rs-tb-top #rs-color-box{top:calc(100% + 12px);right:0}
 #rs-toolbar.rs-tb-bottom #rs-color-box{bottom:calc(100% + 12px);right:0}
 #rs-color-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:8px 0 6px}
+/* ---- the box of the tool `roads` (roadsbox.js): a row for each road class ---- */
+#rs-roads-box{position:absolute;z-index:9}
+#rs-roads-box[hidden]{display:none}
+#rs-toolbar.rs-tb-right #rs-roads-box{right:calc(100% + 12px);top:0}
+#rs-toolbar.rs-tb-left #rs-roads-box{left:calc(100% + 12px);top:0}
+#rs-toolbar.rs-tb-top #rs-roads-box{top:calc(100% + 12px);right:0}
+#rs-toolbar.rs-tb-bottom #rs-roads-box{bottom:calc(100% + 12px);right:0}
+#rs-roads-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:8px 0 6px}
+.rs-rd-bar{display:flex;gap:6px;margin:2px 0 6px}
+.rs-rd-row{display:grid;grid-template-columns:18px 14px 1fr auto;gap:8px;align-items:center;margin:0;padding:2px 2px;cursor:pointer;font:12px/1.3 system-ui,sans-serif}
+.rs-rd-row i{width:14px;height:8px;border-radius:2px;display:block}
+.rs-rd-row span,.rs-rd-row button{text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-rd-row b{font-weight:400;opacity:.65;font-variant-numeric:tabular-nums;font-size:11px}
+.rs-rd-row input{margin:0;accent-color:var(--accent,#1a6bd6)}
+#rs-toolbar #rs-roads-box button{width:auto;height:auto;min-width:0;border:0;background:none;color:inherit;font:12px/1.3 system-ui,sans-serif;cursor:pointer;padding:0;border-radius:6px}
+#rs-roads-box .rs-rd-row button:hover{text-decoration:underline}
+.rs-rd-row.rs-rd-plain{grid-template-columns:18px 1fr}
+#rs-toolbar #rs-roads-box .rs-rd-bar button{padding:4px 12px;border:1px solid var(--rs-tb-border)}
+#rs-roads-box .rs-rd-bar button:hover{background:var(--rs-tb-hover)}
 /* ---- the box of the tool `navigate` (navbox.js): zoom, turn and tilt ---- */
 #rs-nav-box{position:absolute;z-index:9}
 #rs-nav-box[hidden]{display:none}
@@ -301,12 +307,12 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-cb-lg .lg-sw.line{height:4px;border-radius:2px;box-shadow:none}
 .rs-cb-lg .lg-bar{grid-column:1/-1;height:10px;border-radius:5px;margin:4px 0 2px}
 .rs-cb-lg .lg-ends{grid-column:1/-1;display:flex;justify-content:space-between;opacity:.7;font-size:11px}
-html.rs-has-toolbar .co-ctrl,html.rs-has-toolbar .co-lg{display:none!important}
+html.rs-has-toolbar :is(.co-ctrl,.co-lg,.tn-ctrl,.vw-ctrl){display:none!important}
 /* every box of the bar (the base-map box, the colour box, the attribution): the same padding, shadow, font and text side; the base-map and colour boxes the same width */
-#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto}
-#rs-toolbar .bm-menu.rs-bm-box,#rs-color-box,#rs-attr-box,#rs-nav-box{width:264px!important}
+#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto}
+#rs-toolbar .bm-menu.rs-bm-box,#rs-color-box,#rs-attr-box,#rs-nav-box,#rs-roads-box{width:264px!important}
 /* ---- one background for everything that floats over the map: the bar's (--rs-tb-bg in popup.css, 90 % opaque), with the same blur, border and text color ---- */
-.rs-zoom,.flt-ctrl,.rs-find,.co-ctrl,.tn-ctrl,.vw-ctrl,.co-lg,.ov-ctrl,.maplibregl-ctrl .bm-menu,html.rs-overlay #sb,html.rs-overlay .rs-side,
+.rs-zoom,.rs-find,.co-ctrl,.tn-ctrl,.vw-ctrl,.co-lg,.ov-ctrl,.maplibregl-ctrl .bm-menu,html.rs-overlay #sb,html.rs-overlay .rs-side,
 html.rs-phone.rs-tpl-dashboard .rs-grip,html.rs-phone.rs-tpl-dashboard #sb{
   background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-color:var(--rs-tb-border);color:var(--rs-tb-ink)}
 /* a phone: the bar at the top or the bottom takes a second row when its tools do not fit in one (each tool stays 32 px) */

@@ -15,7 +15,7 @@
       "line",
       "simple",
       "4bcefc13a022f286",
-      "dd2904e08f863061",
+      "befc9f51ea157a90",
       "f61343b045b32d9b"
     ],
     [
@@ -23,39 +23,7 @@
       "line",
       "simple",
       "3cbfaa04a98a82eb",
-      "fab39757700ffdef",
-      "f61343b045b32d9b"
-    ],
-    [
-      "roads-simple-z14-dash",
-      "line",
-      "simple",
-      "4bcefc13a022f286",
-      "6de7c5333afa7ef3",
-      "f61343b045b32d9b"
-    ],
-    [
-      "roads-simple-z14",
-      "line",
-      "simple",
-      "3cbfaa04a98a82eb",
-      "06aa8c531acd220e",
-      "f61343b045b32d9b"
-    ],
-    [
-      "roads-simple-z15-dash",
-      "line",
-      "simple",
-      "4bcefc13a022f286",
-      "fe48a55424d98389",
-      "f61343b045b32d9b"
-    ],
-    [
-      "roads-simple-z15",
-      "line",
-      "simple",
-      "3cbfaa04a98a82eb",
-      "23282013fc6deda4",
+      "9d64c6432591223f",
       "f61343b045b32d9b"
     ],
     [
@@ -112,10 +80,10 @@
     "roadstyle:interaction": "a911c29a8eeae5d8",
     "roadstyle:images": "e9049aa3d5b18840",
     "roadstyle:sources": "267ea3a9f253b1b2",
-    "roadstyle:controls": "1a06acaaa6c7dbda",
+    "roadstyle:controls": "be7a2872ac7e5a7b",
     "roadstyle:generation": "18db75a661ad967c"
   },
-  "hash": "ada9d5b992da2dc7",
+  "hash": "8d12825a771dacd8",
   "road_table": {
     "rows": 1373,
     "columns": [

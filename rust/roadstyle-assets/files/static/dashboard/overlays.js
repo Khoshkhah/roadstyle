@@ -4,7 +4,7 @@
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields, _esc} from "../popup.js";
-import {map, O, OVERLAYS, _emit} from "./core.js";
+import {map, O, OVERLAYS, RS_PREFIX, _role, _emit} from "./core.js";
 import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
@@ -65,11 +65,16 @@ export function handleOverlayClick(e, tier){                      // info popup 
 let _ovTip = null;   // one shared hover tooltip for every overlay that asked for one (Overlay(tooltip=[...]))
 // window.rsSetOverlay(label, on) shows/hides one overlay; the Layers control is UI over it.
 export const _ovCbs={};   // label -> its checkbox in the Layers box
+// every layer of the map that draws an overlay's source: its `layers` and also the ones that the style does not list there (the fill pattern `ov0-pattern`, the
+// icons `ov13-icon`, the 3D layer), found by their source (a GeoJSON source) or source layer (tiles), so that a switch hides or shows the whole overlay
+const _ovAllLayers = ov => {
+  const role = ov.source.slice(RS_PREFIX.length);
+  return [...new Set([...ov.layers, ...map.getStyle().layers.filter(l=>_role(l)===role).map(l=>l.id)])].filter(id=>map.getLayer(id));
+};
 export function rsSetOverlay(labelOrIdx, on){
   const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
   const ov = OVERLAYS[i]; if(!ov) return;
-  ov.layers.forEach(id=>{ if(map.getLayer(id))
-    map.setLayoutProperty(id,"visibility", on?"visible":"none"); });
+  _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
   on ? _ovOff.delete(ov.label) : _ovOff.add(ov.label);
   if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
@@ -122,17 +127,11 @@ function _ovBoxRows(){
   if(_ovBox){ _ovBox.remove(); _ovBox = null; }
   for(const k of Object.keys(_ovCbs)){ _ovCbs[k].closest("label")?.remove(); delete _ovCbs[k]; }
   if(!OVERLAYS.length || !O.overlay_control || _ovInToolbox()) return;       // overlay_control=False: no Layers box (rsSetOverlay still works)
-  // panel mode: overlay toggles join the panel's Roads card, right after its Bridges row — a
-  // second floating "Layers" box on the map competes with the panel that hosts everything else.
-  // Non-panel keeps the standalone Layers control.
-  const host=_popupMode==="panel" ? document.querySelector(".flt-ctrl .flt-body") : null;
-  if(host) OVERLAYS.forEach((ov,i)=> host.appendChild(_ovRow(ov, i===0)));
-  else{   // its own Layers box; a base map's page (box_layout "stack"): under the Roads box, folded like it
-    const stack=O.box_layout==="stack", {box, body}=_box("ov-ctrl", "ov", "Layers", stack ? true : null);
-    OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
-    (stack ? _tlHost() : document.body).appendChild(box);
-    _ovBox = box;
-  }
+  // a Layers box of its own (a page with no bar, or with no base-map box); a base map's page (box_layout "stack"): in the stack, folded
+  const stack=O.box_layout==="stack", {box, body}=_box("ov-ctrl", "ov", "Layers", stack ? true : null);
+  OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
+  (stack ? _tlHost() : document.body).appendChild(box);
+  _ovBox = box;
 }
 // the overlays of the style of the moment (at the start, and again for a new style: rs.setStyle): their handlers, their rows, and their start state
 export function useOverlays(){

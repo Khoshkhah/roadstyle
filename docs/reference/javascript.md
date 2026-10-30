@@ -75,8 +75,8 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | **Built-in controls** | | |
 | `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
 | `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
-| `rsSetBridges(on)` | show / hide every bridge and its 3D deck (the filter panel's *Bridges* row) | `rs:filterchange` |
-| `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows (the filter panel's *Tunnels* row) | `rs:filterchange` |
+| `rsSetBridges(on)` | show / hide every bridge and its 3D deck | `rs:filterchange` |
+| `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetTunnelStyle({strength, palette, ratio, toward})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]`, `toward` a name of `RS_TUNNEL_TOWARDS` or a `#rrggbb` (any may be left out; another `toward` throws) | `rs:tunnelchange` |
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |

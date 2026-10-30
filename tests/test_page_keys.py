@@ -1,6 +1,5 @@
-"""filter_control and legend are page keys (N32 step 2): the dashboard reads them from the page's options (RS_OPTIONS, a host's), with
-render's defaults (true). The style has the facts: the filter (roadstyle:controls.filter, with no `on`) and the legend data
-(roadstyle:color_options). A style made before has its own controls.filter.on, which stays when the page gives no filter_control."""
+"""legend is a page key (N32 step 2): the dashboard reads it from the page's options (RS_OPTIONS, a host's), with render's default (true). The style
+has the legend data (roadstyle:color_options). The Roads box is gone, so `filter_control` has no effect."""
 import functools
 import http.server
 import json
@@ -66,7 +65,7 @@ def _boxes(tmp_path, style, bounds, options):
             pg.on("pageerror", lambda e: errors.append(str(e)))
             pg.goto(f"http://127.0.0.1:{server.server_address[1]}/host.html")
             pg.wait_for_function("window.done === true", timeout=60000)
-            out = pg.evaluate("[!!document.querySelector('.flt-ctrl'), !!document.querySelector('.co-lg')]")
+            out = pg.evaluate("[!!document.querySelector('.co-lg')]")
             browser.close()
     finally:
         server.shutdown()
@@ -74,16 +73,10 @@ def _boxes(tmp_path, style, bounds, options):
     return out
 
 
-@pytest.mark.parametrize("on, options, want", [
-    (None, {}, [True, True]),                                       # a new style, render's defaults
-    (None, {"filter_control": False, "legend": False}, [False, False]),
-    (False, {}, [False, True]),                                     # a style made before: its own controls.filter.on
-    (False, {"filter_control": True}, [True, True]),                # the page's option first
-], ids=["defaults", "page off", "old style off", "page over old style"])
-def test_filter_control_and_legend_are_page_keys(tmp_path, live_style, on, options, want):
+@pytest.mark.parametrize("options, want", [
+    ({}, [True]),                                       # render's default
+    ({"legend": False}, [False]),
+], ids=["default", "page off"])
+def test_legend_is_a_page_key(tmp_path, live_style, options, want):
     style, bounds = live_style
-    style = json.loads(json.dumps(style))
-    style["metadata"]["roadstyle:controls"]["filter"].pop("on", None)          # a new style: the engine writes no `on`
-    if on is not None:
-        style["metadata"]["roadstyle:controls"]["filter"]["on"] = on
-    assert _boxes(tmp_path, style, bounds, options) == want
+    assert _boxes(tmp_path, json.loads(json.dumps(style)), bounds, options) == want

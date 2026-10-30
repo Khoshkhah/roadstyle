@@ -3,7 +3,7 @@
 //! evaluator that finds the layers no feature can draw; `build`: the road layers of a style; `restyle`: the overlays' second pass;
 //! `labels`: the names' size and filter; `width_table`: the road width as one row lookup.
 
-mod bands;
+mod dash;
 mod build;
 mod eval;
 mod exprs;

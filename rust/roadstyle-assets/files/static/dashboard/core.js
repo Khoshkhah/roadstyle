@@ -14,10 +14,8 @@ export let RS_TILED = false;
 // RS_LEAN: the simple look's road layer (the id), or false for the full look (simple=False). The full look's paths (RS_LEAN false: core.js
 // _fs and _roadOfPiece, select.js's pick layers, svspot.js's road layer) go with simple=False in N16 (branch n16-full-look-js).
 export let RS_LEAN = false;
-// RS_LEANS: the ids of all the layers of the simple look's road (a layer for each band of zooms, docs/design/tile_speed.md); RS_LEAN is the first.
-// leanAt(): the one that the map draws at its zoom
+// RS_LEANS: the ids of all the layers of the simple look's road (the layer and its dash layer, docs/design/tile_speed.md); RS_LEAN is the first.
 export let RS_LEANS = [];
-export function leanAt(){ const z=map.getZoom(); return RS_LEANS.find(id=>{ const l=map.getLayer(id); return l && z>=(l.minzoom||0) && z<(l.maxzoom||25); }) || RS_LEAN; }
 // the newest version of the interaction contract (the metadata roadstyle:contract) that this dashboard reads: the engine's
 // contract::CONTRACT (tests/test_contract_names.py checks the two)
 export const CONTRACT = 2;
@@ -122,6 +120,8 @@ export function _setJoined(m, fields, key){ _joined = m;
 export const RoadTable = {
   has(i){ const t=_table(); return !!t && t.props[i]!=null; },
   props(i){ const t=_table(), p=(t && t.props[i]) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
+  // the road's own fields, with no joined row (rs.setData reads every road's key: no object for each road)
+  own(i){ const t=_table(); return (t && t.props[i]) || null; },
   line(i){ const t=_table(); return (t && ((t.lines && t.lines[i]) || (t._lines && t._lines.get(i)))) || null; },
   // a Promise that the line of row i is loaded (linesOf); null when there is nothing to load
   load(i){ const t=_table(); if(!t || t.lines || !t.linesOf || i==null || (t._lines && t._lines.has(i))) return null;

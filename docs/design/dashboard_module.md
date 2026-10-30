@@ -61,8 +61,8 @@ rs.setStyle(style, {road_table});
 - **`style: null`.** The dashboard starts with no roads: nothing to pick until `setStyle`.
 - **Every control that a style gives follows `rs.setStyle`.** The options that the old style's `roadstyle:controls` gave go (they take the default
   again), and the new style's come. `setStyle` then runs, for the new style: the base-map layers (`useOverlays`, `useFeatures`), the pick layers and the
-  id fields (`useSelect`, `useSpot`), the Roads box with its class, Bridges, Tunnels and access rows, and the globals `RS_CLASSES`, `RS_MODES`, `RS_KINDS`,
-  `RS_ACCESS` (`useFilter`, `initFilterBox`), the Tunnels box (`initTunnel`; the look that the person chose stays), the arrows' icon and rules
+  id fields (`useSelect`, `useSpot`), the filter's classes and globals `RS_CLASSES`, `RS_MODES`, `RS_KINDS`,
+  `RS_ACCESS` (`useFilter`; the dashboard has no Roads box: a page filters with `rsSetClasses` and the other calls), the Tunnels box (`initTunnel`; the look that the person chose stays), the arrows' icon and rules
   (`initArrows`), the boundary's shade and limits (`initBoundary`; a GeoJSON boundary source, not a tile layer), the colour menu, the legend and the tool
   (`useColor`, `useLegend`, `useColorBox`), and the parts of `rs.getState()` (`refreshState`). A switch that the person turned off (a class, Bridges,
   Tunnels, an overlay) stays off, and a box that has no rows for the new style goes. A new control module that reads the style at the start must do the same,
@@ -188,13 +188,13 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `dashboard.google_3d.layers` | `google_3d_layers`: `[{id, label, kind, source, match, scope, max, on, arrows, style}]` (`roadstyle::dashboard::Layer3d`) | `[]` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
 | `filter` | `filter_control`, `access_col`, `minzoom`: `{on, col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
-| `filter_control` | `filter_control`: the Roads box (a page key; `filter.on` is this and a class to show) | `true`; a style made before N32 step 2 has its own `filter.on`, which stays without this option | `index.js` |
+| `filter_control` | `filter_control` | no effect: the Roads box was removed (the option stays so that a call that gives it still works) | none |
 | `legend` | `legend`: the legend box (a page key; the style always has the legend data) | `true` | `legend.js` |
 | `color_options` | `color_options` or a data styler's legend: `[{name, prop, legend}]` | the style's metadata, else `[]` | `color.js`, `legend.js`, `views.js` |
 | `color_active` | `color_active`, as an index | `0` | `color.js` |
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window, kinds}]` (`kinds`: a base-map layer's `[[kind, count], ...]`, most first) | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js`, `features.js` |
 | `modes` | a duckOSM map's modes: `[[mode, count], ...]` (`roadstyle:controls.modes`) | `[]` | `filter.js` |
-| `box_layout` | `"stack"`: a base map's page (the Roads and Layers boxes folded, Layers under Roads); `"corner"`: the Layers box alone in its corner. On a screen 700 px wide or less (`panel._narrow`), every box (Roads, Layers, Legend) starts folded in both layouts, as the side panel starts closed | `"corner"` | `filter.js`, `overlays.js`, `panel.js` |
+| `box_layout` | `"stack"`: a base map's page (the Layers box folded); `"corner"`: the Layers box alone in its corner. On a screen 700 px wide or less (`panel._narrow`), every box (Roads, Layers, Legend) starts folded in both layouts, as the side panel starts closed | `"corner"` | `filter.js`, `overlays.js`, `panel.js` |
 | `overlay_control` | `overlay_control` | `true`: on a page with a bar, the base-map box has the one switch for all the layers and the legend box lists them; on a page with no bar (or no base-map box) the Layers box has a row for each. `false`: none of them | `overlays.js`, `basemapbox.js`, `colorbox.js` |
 | `overlays_label` | `roadstyle:controls.overlays_label`, else the page's option | `"Map layers"`: the label of the one switch (a duckOSM page: `"duckOSM layers"`) and of the list in the legend box | `basemapbox.js`, `colorbox.js` |
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
@@ -228,7 +228,7 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `google3d.js` | the Google 3D window and its camera link | `google_3d`, `street_view_key`, `select_color` | `rsSetGoogle3D` |
 | `svspot.js` | the Street View spot on a road, its marker, the step buttons, the Street View link | `street_view`, `fill_layers` | `rsSetStreetViewMarkerAt`, `rsSetStreetViewMarker`, `rsStreetViewStep`, `rsGetStreetViewSpot` |
 | `basemap.js` | the base map button and menu | `basemaps`, `basemap_switcher`; the layers `basemap`, `bg` | `rsSetBasemap`, `RS_BASEMAPS` |
-| `filter.js` | the Roads box: classes (a class that the map does not draw at this zoom, `filter.minzoom`: its row dimmed, title "from zoom N"), Bridges, Tunnels, access kinds; the id filter | `filter`, `overlays` | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`, `RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
+| `filter.js` | the road filter (no box): classes, Bridges, Tunnels, access kinds; the id filter | `filter`, `overlays` | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`, `RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
 | `color.js` | the Colour by menu, the recolouring, the road fill switch | `color_options`, `color_active`, `road_fill`; the states `rs_co`, `rs_top` (the full look: `rs_colors`, `rs_base`), `rs_ov_<n>`, `rs_fill_on`; the feature state `rs_c` | `rsSetColorField`, `rsColor`, `rsColorBase`, `rsSetRoadFill`, `RS_COLOR_OPTIONS` |
 | `legend.js` | the legend of the active colour option | `color_options[i].legend` | |
 | `overlays.js` | the overlay popups, the overlay tooltip, the Layers box | `overlays`, `overlay_control`, `overlay_popup` | `rsSetOverlay`, `RS_OVERLAYS` |

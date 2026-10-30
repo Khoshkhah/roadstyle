@@ -9,6 +9,7 @@ const FIXED = {
   basemap: [() => LAYERS_ICON, "This page has one base map"],
   buildings: [() => BUILDINGS_ICON, "3D buildings need a vector base map (OpenFreeMap)"],
   legend: [() => LEGEND_ICON, "This page has no colour options and no live data"],
+  roads: [() => ROADS_ICON, "This page has no road types to filter"],
 };
 // the greyed place of a tool, in the place of the tool (a later style can take the tool away: rs.setStyle)
 export function greyTool(id){
@@ -21,7 +22,7 @@ export function fillToolbox(){
   for(const id of Object.keys(FIXED)) if(!tools.has(id)) greyTool(id);
 }
 // the default order of the bar and of the column; a page tool goes after these, and `attribution` is the last one of a bar
-export const ORDER = ["theme", "zoom_in", "zoom_out", "compass", "navigate", "view3d", "panel_show", "street_view", "google_3d", "basemap", "buildings", "legend"];
+export const ORDER = ["theme", "zoom_in", "zoom_out", "compass", "navigate", "view3d", "panel_show", "street_view", "google_3d", "basemap", "roads", "buildings", "legend"];
 // the compass: a fixed ring, and a needle that turns with the map (the north half is solid and the south half is light, all in the text color; chosen
 // 2026-10-29: a dial with ticks was too small to read at 20 px). MapLibre turns the whole icon element, so the page cancels that (dashboard.css) and turns the needle.
 export const COMPASS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><g class="rs-needle"><path d="M12 4.6 15.7 12H8.3z" fill="currentColor"/><path d="M12 19.4 8.3 12h7.4z" fill="currentColor" opacity=".3"/></g></svg>';
@@ -35,6 +36,8 @@ export const STREETVIEW_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" 
   '<circle cx="12" cy="4.5" r="3" fill="currentColor"/><path d="M8.5 9h7l-1.2 7h-1.8l-.6 6.5h-1.8L9.5 16H7.7z" fill="currentColor"/></svg>';
 export const GOOGLE3D_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round">' +
   '<path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>';
+// the icon of the tool `roads`: a road in perspective, the dashed line down its middle
+export const ROADS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8.5 3 4 21M15.5 3 20 21"/><path d="M12 4.5v3M12 10.5v3M12 16.5v3" stroke-dasharray="0"/></svg>';
 export const LEGEND_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><path d="M14 7h6M14 17h6"/></svg>';
 const tools = new Map();                    // id -> {id, kind, el, title, group, open, close, isOpen, onClick}
 const LAST = ["settings", "attribution"];               // the last tool of a bar

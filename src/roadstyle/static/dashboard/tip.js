@@ -13,7 +13,7 @@ function _tpTake(el){                                  // the text of the explan
 }
 function _tpHide(){ clearTimeout(_tpTimer); _tpFor = null; if(_tpBox) _tpBox.hidden = true; }
 // a button whose box is open shows no explanation: the box is what the person looks at, and the explanation would lie over it
-const _tpOpenBox = el => { const w = el.closest(".maplibregl-ctrl"); return !!(w && w.querySelector("#rs-attr-box:not([hidden]), #rs-color-box:not([hidden]), #rs-nav-box:not([hidden]), #rs-settings-box:not([hidden]), .bm-menu.open")); };
+const _tpOpenBox = el => { const w = el.closest(".maplibregl-ctrl"); return !!(w && w.querySelector("#rs-attr-box:not([hidden]), #rs-color-box:not([hidden]), #rs-nav-box:not([hidden]), #rs-roads-box:not([hidden]), #rs-settings-box:not([hidden]), .bm-menu.open")); };
 function _tpShow(el){
   const text = _tpTake(el); if(!text || !document.body.contains(el) || _tpOpenBox(el)) return;
   if(!_tpBox){ _tpBox = document.createElement("div"); _tpBox.id = "rs-tip"; _tpBox.setAttribute("role", "tooltip"); document.body.append(_tpBox); }
