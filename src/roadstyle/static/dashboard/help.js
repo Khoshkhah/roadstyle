@@ -5,7 +5,6 @@
 // puts its own words in for a while sets them again), `clear()` takes the window and the button away.
 import {_emit} from "./core.js";
 const _hpIcon = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4.5"/><circle cx="12" cy="17.6" r=".6" fill="currentColor"/></svg>';
-<<<<<<< HEAD
 let _hpBox = null, _hpBtn = null, _hpMain = null;
 const _hpKey = e => { if(e.key === "Escape") _hpClose(); };       // heard only while the window is open: a page that took the help away has no listener left
 function _hpClose(){ if(_hpBox && !_hpBox.hidden){ _hpBox.hidden = true; document.removeEventListener("keydown", _hpKey, true); _emit("rs:helpchange", {open: false}); } }

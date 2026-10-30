@@ -46,6 +46,13 @@
 - **Scriptable.** A `window.rs*` JavaScript API and events for your own dashboard, and shared parts for its panel.
 - **Ready for AI agents.** An MCP server and an agent skill.
 
+## What is new in 0.26.1
+
+- **One accent colour.** The dashboard uses the Sonocount teal in the light and the dark theme, defined once. The corner box has the shape of the bar, a button with a text shows no tooltip box, and every tool of a phone's one-row bar can be reached.
+- **Street View docked, and a dashboard with no panel.** `street_view="dock"` puts Street View beside the map with a divider that you drag. `dashboard={"panel": None}` gives a map with the toolbox only.
+- **Help and folding in the panel.** `rs.help.button` adds a "?" button with its own words to a card or a label, all of them open one window. A **Collapse all / Expand all** control folds the panel's sections. The level editor has a "?" help window with two links to the levels guide.
+- **Fix:** a page that starts in the dark theme no longer shows the error "Style is not done loading".
+
 ## What is new in 0.26.0
 
 - **A standard dashboard and toolbox.** `rs.render_dashboard(edges)` makes a map with one panel and one bar of tools: navigate (zoom, turn and
@@ -63,7 +70,7 @@
   <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard_dark.jpg" alt="The dashboard in the dark theme with the OpenFreeMap Fiord base map: Monaco, one road selected" width="80%">
 </p>
 
-More: [What is new in 0.26.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0260) ·
+More: [What is new in 0.26.1](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0261) ·
 [Dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) ·
 [Dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) ·
 [Big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) ·

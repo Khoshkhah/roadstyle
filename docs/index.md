@@ -91,6 +91,8 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
 - **One accent colour.** The dashboard uses the Sonocount teal everywhere, in the light and the dark theme, defined once. The corner box has the shape of the bar, a button with a text shows no tooltip box, and every tool of a phone's one-row bar can be reached. [Dashboard layout](guides/dashboard-layout.md)
 - **Help in the level editor.** A **?** button opens a help window with two links to the levels guide. [Edit the levels](guides/levels.md#edit-the-levels-in-a-dashboard)
+- **Street View docked, a dashboard with no panel.** `street_view="dock"` and `dashboard={"panel": None}`. [Dashboard layout](guides/dashboard-layout.md)
+- **Help buttons and folding.** `rs.help.button` adds a "?" button with its own words; a **Collapse all / Expand all** control folds the panel's sections; a page that starts in the dark theme no longer fails with "Style is not done loading". [Add to the panel](guides/dashboard-panel.md)
 
 ## What is new in 0.26.0
 
