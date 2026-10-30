@@ -209,13 +209,10 @@ impl Mark {
 pub const TILE_ROAD_KEYS: [&str; 8] = ["r", "lvl", "highway", "name", "chain", "slot", "rank", "oneway"];
 
 /// The (layer, key) pairs of a tile that still have a TEXT value. The aim is none on `simple` (a number or a flag is what a style expression needs;
-/// the text is in the road table): `highway` becomes the class code `__rs_ci`, `__rs_dash` an index of the dash patterns, `__rs_cap` a
-/// code (`__rs_cls` is the number `__rs_cc` since 2026-10-29). The test `tile_keys` fails for a text value outside this list and for an entry that has no text value any more (the list only shrinks).
+/// the text is in the road table): `highway` becomes the class code `__rs_ci`. (Since 2026-10-29 `__rs_cls` is the number `__rs_cc`, `__rs_dash` the
+/// index of its pattern and `__rs_cap` 1 or 2: tiles/src/codes.rs.) The test `tile_keys` fails for a text value outside this list and for an entry that has no text value any more (the list only shrinks).
 /// `name` of `slots` stays: MapLibre's `text-field` reads the street name from the tile.
-pub const TILE_TEXT_KEYS: [(&str, &str); 5] = [
-    ("simple", "highway"), ("simple", "__rs_dash"), ("simple", "__rs_cap"),
-    ("slots", "highway"), ("slots", "name"),
-];
+pub const TILE_TEXT_KEYS: [(&str, &str); 3] = [("simple", "highway"), ("slots", "highway"), ("slots", "name")];
 
 /// A key that a road feature of a tile may have: a mark, or one of `TILE_ROAD_KEYS`.
 pub fn tile_key_allowed(key: &str) -> bool {

@@ -217,6 +217,11 @@ pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, 
             *t = format!("{}?g={g}", t.as_str().unwrap_or_default()).into();
         }
     }
+    if let Some(layers) = style["layers"].as_array_mut() {
+        // the road layers of the tiles read the numbers of the text keys (tiles::codes), as the tile cut writes them
+        let dashes = tiles::codes::dash_patterns(layers);
+        tiles::codes::encode_style(layers, &dashes);
+    }
     style["metadata"][roadstyle_model::props::CONTRACT_KEY] = roadstyle_model::props::CONTRACT.into();
     let mut sources = serde_json::Map::new();
     sources.insert(tiles::SOURCE.into(), Value::Object(vector));

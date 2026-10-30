@@ -82,7 +82,7 @@ pub(crate) struct Builder {
     /// the layer is the pieces': a property `__rs_edge` is a feature's id, not a key
     pub(crate) road_id: bool,
     /// the classes of the filter panel: the text `__rs_cls` of a road feature goes into the tile as its index in this list, `__rs_cc` (None: not a road layer; an empty list: the page has no filter panel, so the class is not in the tile)
-    pub(crate) class_codes: Option<Vec<String>>,
+    pub(crate) codes: Option<crate::codes::Codes>,
     /// the numbers of the last feature's properties, by place: the pieces of one road come one after another and have most of their
     /// properties the same, which then take their numbers with no lookup
     pub(crate) last: Vec<(u32, u32)>,
@@ -116,7 +116,7 @@ impl Builder {
     /// the rules give them.
     pub(crate) fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32, f32, Option<u64>) {
         let (keys, key_at, vals, encoded, val_at, scratch) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at, &mut self.scratch);
-        let (rules, last, road_id, class_codes) = (&self.rules, &self.last, self.road_id, &self.class_codes);
+        let (rules, last, road_id, codes) = (&self.rules, &self.last, self.road_id, &self.codes);
         let mut read = Map::new();        // the values that the first-zoom rules read
         let mut j = 0;
         let (mut road, edge) = (None, roadstyle_model::mark::Mark::Edge.name());
@@ -124,16 +124,25 @@ impl Builder {
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
                 // a text class is a small number in a tile: the index in the filter panel's list (a class that the list lacks has no key: no filter hides it)
-                let (key, v): (&str, Val) = if let Some(codes) = class_codes.as_ref().filter(|_| k.as_ref() == roadstyle_model::mark::Mark::Class.name()) {
-                    match &v {
-                        Val::Str(s) => match codes.iter().position(|c| c == s.as_ref()) {
+                let (key, v): (&str, Val) = match codes.as_ref() {
+                    // a text class, a dash pattern and a square end are numbers in a tile (codes.rs); a class that the filter panel lacks has no key: no filter hides it
+                    Some(c) if k.as_ref() == roadstyle_model::mark::Mark::Class.name() => match &v {
+                        Val::Str(s) => match c.class.iter().position(|x| x == s.as_ref()) {
                             Some(i) => (roadstyle_model::mark::Mark::ClassCode.name(), Val::Int(i as i64)),
                             None => return None,
                         },
                         _ => return None,
-                    }
-                } else {
-                    (k.as_ref(), v)
+                    },
+                    Some(c) if k.as_ref() == roadstyle_model::mark::Mark::Dash.name() => match &v {
+                        Val::Str(s) => (k.as_ref(), Val::Int(c.dashes.iter().position(|x| x == s.as_ref())? as i64 + 1)),
+                        _ => return None,
+                    },
+                    Some(_) if k.as_ref() == roadstyle_model::mark::Mark::Cap.name() => match &v {
+                        Val::Str(s) if s == "square" => (k.as_ref(), Val::Int(2)),
+                        Val::Bool(true) => (k.as_ref(), Val::Int(1)),
+                        _ => return None,
+                    },
+                    _ => (k.as_ref(), v),
                 };
                 if road_id && key == edge {
                     road = match v { Val::Int(i) => u64::try_from(i).ok(), Val::UInt(u) => Some(u), _ => None };
