@@ -53,14 +53,16 @@ how they get to the browser. Each choice comes after the one before it.
 
 ### Choice 1: GeoJSON or vector tiles
 
-| | GeoJSON (the default) | Vector tiles (MVT) |
+| | Vector tiles (the default) | GeoJSON |
 |---|---|---|
-| Who cuts the roads into tiles | MapLibre, in the browser, for all roads when the page opens | roadstyle, before the browser |
-| Calls | `render_edges(edges)`, `export_inline`, `inlineStyle` | `tiles=True`, `export_style`, `Tiler` |
-| Good for | up to about 10⁴ edges | about 10⁵ edges |
+| Who cuts the roads into tiles | roadstyle, before the browser, with one rule for every way ([Tiling](../design/tiling.md)) | MapLibre, in the browser, for all roads when the page opens |
+| Format | MLT (MVT when you ask for it) | GeoJSON |
+| Calls | `render_edges(edges)`, `export_style`, `Tiler` | `render_edges(edges, tiles=False)`, `export_inline`, `inlineStyle` |
+| Good for | every network | a small network, or a page with a palette in a view |
 
-With GeoJSON, roadstyle makes no tiles. The page gives MapLibre all the roads, and MapLibre cuts them; `data_maxzoom` and
-`data_tolerance` control that cut. Choices 2 and 3 do not apply.
+With GeoJSON, roadstyle makes no tiles. The page gives MapLibre all the roads, and MapLibre cuts them, and it keeps every vertex. On 22,000
+roads that draws 2.4 to 2.6 times the triangles of the tiles at zoom 11 to 13. `data_maxzoom` and `data_tolerance` control that cut.
+Choices 2 and 3 do not apply.
 
 After the cut, MapLibre does the same work with both forms: it turns each tile into shapes for the GPU and draws them. The map
 looks the same, and the dashboard works on both.
@@ -69,7 +71,7 @@ looks the same, and the dashboard works on both.
 
 | Way | Call | Where the tiles are | Server | What the browser loads |
 |---|---|---|---|---|
-| A. In one HTML file | `render_edges(edges, tiles=True)` | one PMTiles archive inside the page | not necessary: the file opens from disk | the whole file at the start, with all tiles; MapLibre decodes only the tiles in view |
+| A. In one HTML file | `render_edges(edges)` | one PMTiles archive inside the page | not necessary: the file opens from disk | the whole file at the start, with all tiles; MapLibre decodes only the tiles in view |
 | B. On a server | `export_style(...)` | files on a web server | necessary | `style.json`, then only the tiles in view, one request for each |
 | C. Made in the browser | `new Tiler(...)` (WebAssembly) | nowhere: the engine makes each tile when MapLibre asks for it | only for the page and the roads file | the roads file one time; the tiles exist only in memory |
 
@@ -81,7 +83,7 @@ looks the same, and the dashboard works on both.
 
 | | XYZ folder (`format="xyz"`) | One PMTiles file (`format="pmtiles"`) |
 |---|---|---|
-| The files | one file for each tile: `tiles/<z>/<x>/<y>.pbf` | one file, `roads.pmtiles`; an index at its start tells where each tile is |
+| The files | one file for each tile: `tiles/<z>/<x>/<y>.mlt` | one file, `roads.pmtiles`; an index at its start tells where each tile is |
 | How the map gets one tile | one request for that tile's file | one request for a part of the file (an HTTP range request) |
 
 In both forms the map downloads only the tiles of its view. The difference is the number of files on the server.

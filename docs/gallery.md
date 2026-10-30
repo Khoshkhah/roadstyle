@@ -57,7 +57,7 @@ More in [Colour by your data](guides/colour.md).
 
 ## 3D bridges
 
-Bridges as raised decks over the roads that pass under them. Every map has a 2D/3D button.
+Bridges as raised decks over the roads that pass under them. A map page has a 2D/3D button. A dashboard has the `navigate` button, whose box has a tilt slider.
 
 ```python
 rs.render_edges(edges, view_3d=True)
@@ -92,13 +92,13 @@ More in [Google 3D](guides/google-3d.md).
 
 ## Ready-made pages
 
-A dashboard with base map, colour and query controls, in one call.
+A dashboard with a query panel and a toolbox (navigate, base map, roads, colour and legend, settings), in one call.
 
 ```python
 rs.render_dashboard(edges, color_options={"Class": {}, "Speed": {"color_by": "maxspeed_kmh"}})
 ```
 
-![The dashboard page: the map coloured by speed, the side panel with base map, colour, legend, a query and its results](img/gallery/dashboard.jpg)
+![The dashboard page: Monaco's roads, the panel at the left with the selected road, and the toolbox next to it](img/gallery/dashboard.jpg)
 
 More in [Dashboards & JavaScript](guides/dashboards.md).
 

@@ -8,7 +8,7 @@
 
     ---
 
-    On every map by default: a Street View button opens a small window over the map.
+    On every map by default: a Street View button opens a small window over the map. In a dashboard, the button is in the toolbox.
 
     [:octicons-arrow-right-24: The floating window](#the-floating-window)
 
@@ -30,7 +30,7 @@
 
 ## The floating window
 
-Press the **Street View** button (the person, under the 3D button) and click a road. The window
+Press the **Street View** button (the person; in the toolbox of a dashboard, it is after the navigate button) and click a road. The window
 follows each new click. Drag its title bar to move it and its corner to resize it. It stays inside
 the map, and comes back inside when the map shrinks (a side panel opening, a smaller browser
 window). The page remembers whether it was open, and where.

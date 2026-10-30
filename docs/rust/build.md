@@ -87,11 +87,10 @@ roadstyle-rs/tests/get_goldens.sh
 cargo test --release
 ```
 
-The Python tests compare the two engines, then run the whole suite with the Rust engine as the default:
+The Python tests run the whole suite with the Rust engine:
 
 ```bash
-pytest tests/test_engine_parity.py
-ROADSTYLE_ENGINE=rust pytest
+pytest
 ```
 
 ## One shared build folder

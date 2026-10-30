@@ -8,13 +8,11 @@ Python 3.10 or newer.
 
 ```bash
 pip install roadstyle
-pip install "roadstyle[numeric,tiles]"   # extras combine; "roadstyle[all]" takes every one
+pip install "roadstyle[duckdb,arrow]"   # extras combine; "roadstyle[all]" takes every one
 ```
 
 | Extra | Enables |
 |---|---|
-| `numeric` | numeric colour ramps (`color_by` on numbers, `cmap`) |
-| `tiles` | `tiles=True`, vector tiles inside the file for big networks |
 | `duckdb` | `rs.from_duckdb`, edges from a DuckDB query |
 | `arrow` | edges from a pyarrow Table |
 | `basemaps` | any xyzservices tile provider as a base map |
@@ -59,7 +57,7 @@ pip install "roadstyle[numeric,tiles]"   # extras combine; "roadstyle[all]" take
     ```
 
 The file is self-contained: it opens from disk with no server. Hover a road to highlight it, click
-it for its attributes, and switch the base map with the button at the bottom right. In a notebook
+it for its attributes, and switch the base map with the base-map button of the map's controls. In a notebook
 the map shows inline (it loads MapLibre from a CDN, so the preview needs the network).
 
 !!! note "Street View needs a server"
@@ -115,5 +113,5 @@ More on osmnx, from choosing the area to failed downloads: [Roads from OpenStree
 - [Style the roads](guides/style.md): palettes, base maps, labels, 3D bridges.
 - [Colour by your data](guides/colour.md): a column becomes colour and a legend.
 - [Google Street View](guides/street-view.md): the window, or a page with Street View beside the map.
-- [Dashboards & JavaScript](guides/dashboards.md): ready-made pages and the `rs*` API.
+- [Dashboards & JavaScript](guides/dashboards.md): the standard dashboard with its toolbox, and the `rs*` API.
 - [Every parameter](reference/parameters.md) and the [command line](reference/cli.md).

@@ -2,7 +2,7 @@
 
 > Python library: turn a GeoDataFrame of road edges (LineString geometry + an OSM `highway` column) into one styled, interactive, offline HTML map (MapLibre, data inlined) with road cartography (casing and fill, per-zoom widths, labels, one-way arrows, bridges and tunnels, 3D), Google Street View for the clicked road (a Street View button and floating window by default; `street_view=True` for a plain popup link, `False` for none; `rs.render_street_view` for a side-by-side page), and a `window.rs*` JavaScript API. `pip install roadstyle`; main call `rs.render_edges(gdf, ...).save("map.html")`. osmnx edges work as they are; `pip install "roadstyle[mcp]"` adds `roadstyle-mcp`, an MCP server for AI agents.
 
-Edges are directed: a two-way road is two edges with reversed geometry. JS calls (rsSelect, rsColor, rsFocus) take roadstyle feature ids from `rsQuery`, never your own `edge_id`. Unknown keywords to `render_edges` are silently ignored.
+Edges are directed: a two-way road is two edges with reversed geometry. JS calls (rsSelect, rsColor, rsFocus) take roadstyle feature ids from `rsQuery`, never your own `edge_id`. An unknown keyword to `render_edges` is a `ValueError` that names the nearest known keyword.
 
 ## Start here
 
@@ -11,17 +11,17 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 
 ## Reference
 
-- [Every parameter](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/parameters.md): every public function and class, every keyword of render_edges per backend, the pages, stylers, Overlay, StyleConfig
+- [Every parameter](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/parameters.md): every public function and class, every keyword of render_edges, the pages, Overlay, StyleConfig
 - [JavaScript API](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/javascript.md): every window.rs* function, every rs:* event, the registries
 - [Settings & palettes](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/settings.md): the settings files, the palettes, base maps and API keys
 - [Command line](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/reference/cli.md): every flag of `roadstyle`, --page, roadstyle studio
 
 ## Rust engine
 
-- [Overview](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/index.md): engine="rust" or ROADSTYLE_ENGINE=rust; the same output as the Python engine, 3 to 30 times faster on a large area
-- [Switch the engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/switch-engine.md): the keyword, the environment variable, the error and the warning when a part is Python only
-- [Keywords by engine](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/keywords.md): every render_edges keyword and public function, with its state in each engine
-- [Use roadstyle in the browser](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/browser.md): the WebAssembly package (makeLook, makeStyle, Tiler, makePage), the worker SQL, rsDashboard with style: null, prefix, tiles, engine.props
+- [Overview](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/index.md): the one engine, written in Rust; Python is a thin binding
+- [Make tiles and PMTiles](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/tiles.md): MLT tiles to zoom 16, the three ways to get tiles to the browser, the tile keys and the tile budget
+- [Tiling: one algorithm and one protocol](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/design/tiling.md): the one rule for every tile path
+- [Use roadstyle in the browser](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/browser.md): the WebAssembly package (resolveLook, inlineStyle, Tiler, pageFrom), the worker SQL, rsDashboard with style: null, prefix, tiles, engine.props, the level editor in a page
 
 ## Guides
 
@@ -31,10 +31,15 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 - [Roads from OpenStreetMap](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/osmnx.md): osmnx download → render_edges, area and network_type, bridge/tunnel-safe simplification, Overpass failures
 - [Add your own layers](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/overlays.md): Overlay zones, points, lines
 - [Google Street View](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/street-view.md): the floating window (default) and the side-by-side page (beside / below)
-- [Big networks](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/big-networks.md): tiles=True, lonboard, choosing a backend
-- [Dashboards & JavaScript](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboards.md): ready-made pages, driving the map from your own page
+- [Big networks](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/big-networks.md): tiles on by default, MLT, opting out with tiles=False
+- [Dashboards & JavaScript](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboards.md): the standard dashboard and its toolbox, driving the map from your own page
+- [Dashboard layout](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboard-layout.md): the panel, the toolbox (navigate, roads, base map, legend, settings, credits), the zoom table, the phone form
+- [Add to the panel](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboard-panel.md): sections and legend rows
+- [Live data: a new day](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/live-data.md): rs.setData, natural breaks, the day picker
+- [Move a dashboard to the new version](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/migrating-dashboard.md): each old keyword and the changes from 0.25 to 0.26
+- [Which road is on top](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/levels.md): the level solver, the level editor, the editor in a dashboard
 - [AI agents](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/agents.md): the MCP server (render_place, render_file, snapshot) and the agent skill
-- [Put it on a website](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/website.md): iframe, the JSON spec, roadstyle.js
+- [Put it on a website](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/website.md): the saved page in an iframe, a style for other map apps
 - [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and the code for each look
 
 ## Optional

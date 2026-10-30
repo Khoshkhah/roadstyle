@@ -72,7 +72,7 @@
 
     ---
 
-    Vector tiles for ~10⁵ edges.
+    Vector tiles are on by default, and one tiling rule serves every path.
 
     [:octicons-arrow-right-24: Big networks](big-networks.md)
 
@@ -80,15 +80,47 @@
 
     ---
 
-    The ready-made dashboard page, and driving the map from your own panel.
+    The ready-made dashboard page, its toolbox, and driving the map from your own panel.
 
     [:octicons-arrow-right-24: Dashboards & JavaScript](dashboards.md)
+
+-   :material-view-quilt-outline:{ .lg .middle } **Dashboard layout**
+
+    ---
+
+    The panel, the toolbox, the settings and the phone form.
+
+    [:octicons-arrow-right-24: Dashboard layout](dashboard-layout.md)
+
+-   :material-page-layout-sidebar-left:{ .lg .middle } **Add to the panel**
+
+    ---
+
+    Your own blocks in the panel, and your own rows in the legend.
+
+    [:octicons-arrow-right-24: Add to the panel](dashboard-panel.md)
+
+-   :material-chart-timeline-variant:{ .lg .middle } **Live data: a new day**
+
+    ---
+
+    Colour the roads from rows of a new day, with a day picker.
+
+    [:octicons-arrow-right-24: Live data](live-data.md)
+
+-   :material-arrow-up-bold-box-outline:{ .lg .middle } **Move a dashboard**
+
+    ---
+
+    Each old keyword and each change of 0.26.0, with its new place.
+
+    [:octicons-arrow-right-24: Move a dashboard to the new version](migrating-dashboard.md)
 
 -   :material-web:{ .lg .middle } **Put it on a website**
 
     ---
 
-    An iframe, a JSON spec for your own Leaflet or MapLibre map, or roadstyle.js.
+    The saved page in an iframe, or a style that other map apps open by URL.
 
     [:octicons-arrow-right-24: Put it on a website](website.md)
 

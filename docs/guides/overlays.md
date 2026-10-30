@@ -94,8 +94,8 @@ draws **the casing of the road and not its fill**: `render_edges(edges, road_fil
 
 ## The Layers control
 
-Each overlay gets a checkbox in the **Layers** control, at the bottom-right above the base-map
-button. From your own page, `rsSetOverlay("Zones", false)` hides a layer (by label or index): see
+On a map page (`render_edges`), each overlay gets a checkbox in the **Layers** control, at the bottom-right above the base-map
+button. A dashboard has no Layers box: the overlays are in the base-map and legend boxes of the toolbox ([Dashboard layout](dashboard-layout.md)). From your own page, `rsSetOverlay("Zones", false)` hides a layer (by label or index): see
 the [JavaScript API](../reference/javascript.md).
 
 ## What wins a click

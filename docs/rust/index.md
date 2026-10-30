@@ -43,13 +43,14 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     [Architecture of the Rust version](architecture.md) ·
     [How a map is drawn](drawing.md) ·
+    [Tiling: one algorithm and one protocol](../design/tiling.md) ·
     [How the levels are solved](levels-solver.md)
 
 </div>
 
 ## What it is good for
 
-- **Large networks.** On Tartu (64,828 roads) the page takes 6.1 s. With `tiles=True` it takes 13.4 s.
+- **Large networks.** The page keeps the roads as vector tiles by default (MLT, one rule for every path). On Nacka (22,191 roads) the tiled page is 20 MB, and the page with GeoJSON roads draws 2.4 to 2.6 times the triangles at zoom 11 to 13.
 - **Nightly pages.** The output is the same for the same input: the same style, options and data.
 - **The browser.** A page can make the style and the tiles itself, from a duckOSM file or a GeoParquet file, with no Python.
 

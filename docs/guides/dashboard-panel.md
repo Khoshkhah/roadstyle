@@ -1,6 +1,6 @@
 # Add to the panel
 
-<p class="lead">A page adds its own blocks to the dashboard's side panel, hides some of the panel's blocks, and adds rows to the legend. No edit of the template's HTML is necessary.</p>
+<p class="lead">A page adds its own blocks to the dashboard's side panel, hides some of the panel's blocks, and adds rows to the legend. No edit of the template's HTML is necessary. The toolbox, the navigate button and the phone form are in [Dashboard layout](dashboard-layout.md).</p>
 
 ## The panel's sections
 
@@ -21,6 +21,8 @@ rs.render_dashboard(edges, google_3d=True, dashboard={
 ```
 
 A wrong `id`, an `after` or `before` that is not a section, or a name in `hide` that is not a section is an error.
+
+The rows of `legend` show in the legend box of the toolbox, after the rows of the colour option. They show in the panel's legend section too, when you show that section. A row has a colour, a label and a shape (`square`, `circle` or `line`). A wrong shape is an error.
 
 ## The same from JavaScript
 

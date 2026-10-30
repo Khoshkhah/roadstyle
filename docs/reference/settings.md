@@ -48,8 +48,8 @@ rs.render_edges(edges, profile="highsat", palette="highsat")
 rs.use_settings({"palette": "night"})                   # the rest of the process
 ```
 
-An unknown name is an error that lists the names there are. A palette made in code (`rs.register_palette`) gives only its
-class looks; the other colors come from the palette in force.
+An unknown name is an error that lists the names there are. A palette is a file: Python has no palette registry and no palette
+object.
 
 ## The settings file
 
@@ -71,7 +71,7 @@ Every settings level uses one layout. `profile` and `palette` name the look; `co
 **The older layout** (2026-10-19): a settings file that still gives style values as `palettes`, `selection`, `roads` or as
 style keys of `config` (`labels`, `arrows`, `bridge_*`, `tunnel_*`, `minzoom`, ...) keeps working for one release. roadstyle
 reads each one as its theme key and gives a `DeprecationWarning` that names the new key (`config.bridge_casing_color ->
-theme bridges.casing_color`). A palette entry may also be wrapped as `{"roads": {...}}`, the form `save_palette` writes.
+theme bridges.casing_color`). A palette entry may also be wrapped as `{"roads": {...}}`.
 
 ## Palettes
 
@@ -157,21 +157,23 @@ four palettes: `opacity` 1.0.
 
 In every palette:
 
-- `*_link` roads take the parent's colour, 0.7 × the width (`link_scale`).
+- `*_link` roads take the parent's colour, 0.6 × the width (`link_scale`).
 - Tunnels: on the web map, v2's tunnel slider (`tunnel_strength`) moves everything on a tunnel toward a chosen colour (`tunnel_toward`, default Sand), opaque; the casing is
   dashes, one colour or a two-colour palette (`tunnel_palette`) ([design](../design/tunnel_look.md)). Bridges get a black casing 1.5 px wider.
 - An unknown class draws as `unclassified`.
 
 ## Custom palettes
 
-| call | does |
-|---|---|
-| `rs.PALETTES["highsat"]["busway"] = rs.RoadStyle("#FF00AA", 2.0, 4.0)` | add one class to a palette |
-| `rs.palette_to_dict(p)` / `rs.palette_from_dict(d)` | the same as plain dicts |
+A palette is a YAML file. To add a class to a palette, add it under `classes:` in `./palettes/<name>.yaml`, and pick the file with
+`palette="<name>"` ([Profiles and palettes](#profiles-and-palettes)). The file states only what it changes. A class needs a `fill`,
+and it can have `casing`, `dash` (`[on, off]` px) and `opacity` (1.0). The widths are in the profile (`roads.classes`). For a
+non-OSM class column, give a palette and a profile keyed by your classes, and pass `highway_col=`.
 
-A `RoadStyle` needs `fill`, `width`, `casing_width`; `casing` (default: the palette's `roads.fallback.palette_casing`, `None` = none),
-`dash` (`[on, off]` px) and `opacity` (1.0) are optional. For a non-OSM class column, register a
-palette keyed by your classes and pass `highway_col=`.
+```yaml
+# ./palettes/busway.yaml
+classes:
+  busway: {fill: "#FF00AA"}
+```
 
 ## Base maps & API keys
 

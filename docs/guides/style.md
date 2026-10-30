@@ -63,15 +63,15 @@ Labels, one-way arrows and the base-map switcher are all on by
 default. Turn any of them off:
 
 ```python
-rs.render_edges(edges, labels=False, arrows=False, filter_control=False, basemap_switcher=False)
+rs.render_edges(edges, labels=False, arrows=False, basemap_switcher=False)
 ```
 
-On the command line: `--no-labels`, `--no-arrows`, `--no-filter`, `--no-basemap-switcher`.
+On the command line: `--no-labels`, `--no-arrows`, `--no-basemap-switcher`. The road filter is the `roads` tool of the dashboard ([Dashboard layout](dashboard-layout.md#roads)); `filter_control` and `--no-filter` have no effect.
 
 ## 3D bridges
 
 `view_3d=True` tilts the camera and draws bridges as raised decks, so you can see the roads that
-pass under them. Every map also has a 2D/3D button. Below zoom 16 bridges draw flat.
+pass under them. A map page has a 2D/3D button, and a dashboard has the tilt slider in its `navigate` box. Below zoom 16 bridges draw flat.
 
 ```python
 rs.render_edges(edges, view_3d=True)                         # CLI: --view-3d
@@ -97,11 +97,11 @@ Which road is drawn over which comes from the drawing levels: [Which road is on 
 rs.highway_types(edges)                                      # the classes in your data
 rs.render_edges(edges, include=["motorway", "trunk", "primary", "secondary"])
 rs.render_edges(edges, exclude=["service", "footway", "path", "cycleway"])
-rs.render_edges(edges, minzoom=True)                         # hide minor classes when zoomed out
+rs.render_edges(edges, minzoom=False)                        # every class at every zoom (the default hides minor classes when zoomed out)
 ```
 
 `include` and `exclude` also keep or drop the `*_link` ramps of each class (`match_links=True`).
-`minzoom` can also be a dict such as `{"residential": 14}` to change the zoom for some classes.
+`minzoom` can also be a dict such as `{"residential": 14}` to change the zoom for some classes. `render_dashboard` has its own zoom table ([Dashboard layout](dashboard-layout.md#roads-at-small-zooms)).
 
 ## Your own road classes
 

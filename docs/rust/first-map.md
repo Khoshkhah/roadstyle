@@ -1,6 +1,6 @@
 # Your first map with the Rust engine
 
-<p class="lead">In this tutorial, we draw the roads of Monaco with the Rust engine and put them in vector tiles.</p>
+<p class="lead">In this tutorial, we draw the roads of Monaco with the Rust engine, and we see that the page keeps them in vector tiles.</p>
 
 You need Python 3.10 or newer and a connection to the internet (osmnx gets the roads from OpenStreetMap).
 
@@ -46,21 +46,24 @@ bridges over tunnels. Move the mouse over a road: the road glows. Click a road: 
     "API KEY REQUIRED". The roads are not affected. To use a base map with no key, add `basemap="osm"`, or read
     [Base maps and API keys](../reference/settings.md#base-maps-api-keys).
 
-## Put the roads in vector tiles
+## The roads are in vector tiles
 
-For a large network, the page can keep the roads as vector tiles (an embedded PMTiles archive). Add these lines:
+The page that you made already keeps the roads as vector tiles (an embedded PMTiles archive). Tiles are the default. The file has all
+the tiles in it, but MapLibre decodes only the tiles that it shows, so a large network opens fast.
+
+To compare, add these lines. They write the roads as GeoJSON in place of tiles:
 
 ```python
-t = rs.render_edges(edges, name="Monaco", tiles=True)
-t.save("monaco_tiles.html")
+g = rs.render_edges(edges, name="Monaco", tiles=False)
+g.save("monaco_geojson.html")
 ```
 
-Run the file and open `monaco_tiles.html`. The map looks the same as `monaco_rust.html`. The file has all the tiles in it, but
-MapLibre decodes only the tiles that it shows, so a large network opens fast. The other ways to get tiles to the browser are in
-[Make tiles and PMTiles](tiles.md).
+Run the file and open `monaco_geojson.html`. The map looks the same as `monaco_rust.html`. The two files have nearly the same
+size, but MapLibre draws the tiled page with fewer triangles, so its pan and zoom are faster on a large network. The other ways to
+get tiles to the browser are in [Make tiles and PMTiles](tiles.md).
 
 ## What we did
 
-We drew a map with the Rust engine and put its roads in vector tiles. Next:
+We drew a map with the Rust engine. Its roads are vector tiles by default, and `tiles=False` gives GeoJSON roads. Next:
 
 - [Use roadstyle in the browser](browser.md): the same engine with no Python.

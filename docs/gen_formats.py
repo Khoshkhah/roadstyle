@@ -78,7 +78,7 @@ def rows(path: Path) -> list[list[str]]:
 
 
 def table(path: Path) -> str:
-    head = ["Key", f"Value in `{path.relative_to(ROOT / 'src' / 'roadstyle')}`", "Comment in the file"]
+    head = ["Key", f"Value in `{path.relative_to(DATA.parent)}`", "Comment in the file"]
     lines = ["| " + " | ".join(head) + " |", "|---|---|---|"] + ["| " + " | ".join(r) + " |" for r in rows(path)]
     names = ", ".join(f"`{p.stem}`" for p in sorted(path.parent.glob("*.yaml")))
     return f"Bundled: {names}. The table shows `{path.stem}`; the others state only what they change.\n\n" + "\n".join(lines)

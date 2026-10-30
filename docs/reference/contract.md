@@ -89,7 +89,7 @@ contract makes changeable (or a value that is not used).
 | `popup_mode` | `"popup"` or `"panel"` | `render`; option | `panel.js` and every docked control | no | |
 | `road_tooltip`, `tooltip` | false, true or fields | `render`; look `args.tooltip`; `roadstyle:interaction.tooltip` | `select.js` | gap | |
 | `hover_delay_ms` | ms, 300 | `render` (a page key); `roadstyle:interaction` (the look's default); option; `_TIP_DELAY` | `select.js`, `overlays.js` | gap | |
-| `copy_field` | text, `"edge_id"` | look `args.copy_field` (mapstyle passes it) | folium only | gap: not used by the web page | |
+| `copy_field` | text, `"edge_id"` | look `args.copy_field` (mapstyle passes it) | no reader | gap: not used by the web page | |
 | `hover_color` | color, `selection.hover` (`#b388ff`) | `render`; the palette | engine: a literal in each highlight expression | gap: fixed in the style | planned (see below) |
 | `select_color` | color, `selection.select` (`#7c4dff`) | `render`; the palette; option (Google 3D line) | engine (literal), `google3d.js` | gap: fixed in the style | planned (see below) |
 | the glow | `selection.opacity` 0.85, `glow_opacity` 0.35 (palette); the width of the fill (simple mode) | the palette | engine (`_simple_color(glow=...)`) | gap: fixed | planned (see below) |
@@ -151,13 +151,13 @@ With `state: baked` (the export, RustGIS), the engine writes the start values in
 ## The feature properties `__rs_*`
 
 67 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
-reads (the internal contract between the engine and the dashboard of the same version). "Leaflet" marks the names of the Leaflet spec
+reads (the internal contract between the engine and the dashboard of the same version).
 Each one goes into a typed field of the render model, and the engine writes the property only
 when a layer reads it.
 
 | Names | Meaning | Written by | Read by | Kind | Replaced by |
 |---|---|---|---|---|---|
-| `__rs_fill`, `__rs_w`, `__rs_op`, `__rs_dash`, `__rs_casing`, `__rs_cw`, `__rs_cop`, `__rs_class` | the class style of the edge: fill color, width, opacity, dash, casing color, casing width, casing opacity, class | `stylers.bake_props`, `roads.rs` | engine layers, `color.js` (`__rs_fill`), Leaflet | dashboard (`__rs_fill`), Leaflet | `RoadDraw.class` + the look; the layer expressions read the class |
+| `__rs_fill`, `__rs_w`, `__rs_op`, `__rs_dash`, `__rs_casing`, `__rs_cw`, `__rs_cop`, `__rs_class` | the class style of the edge: fill color, width, opacity, dash, casing color, casing width, casing opacity, class | `stylers.bake_props`, `roads.rs` | engine layers, `color.js` (`__rs_fill`) | dashboard (`__rs_fill`) | `RoadDraw.class` + the look; the layer expressions read the class |
 | `__rs_fill__<i>` (`__rs_fill__1`, ...), `__rs_fill@<palette>`, `__rs_color` | the fill of color option `i`, of a palette of a view, the `color_table` column | `simple.rs`, `render.py` | engine, `color.js` | dashboard (`__rs_fill__<i>`) | `RoadDraw.look` paint columns (task 1) |
 | `__rs_cl`, `__rs_fl`, `__rs_cs`, `__rs_ce` | the casing (main), fill, casing start and casing end numbers | `_mark_levels`, `roads.rs` | engine | internal | `RoadDraw.levels` |
 | `__rs_hs`, `__rs_he`, `__rs_cap`, `__rs_cap0`, `__rs_cap1`, `__rs_split` | the head lengths, the cap of both ends, of each end, two different ends | `render` (the head columns), `_mark_caps` | engine | internal | `RoadDraw.ends` |
@@ -166,7 +166,7 @@ when a layer reads it.
 | `__rs_bridge`, `__rs_tunnel`, `__rs_access`, `__rs_lvl` | the bridge look, the tunnel look, the access kind, the tag level of an attached item | `_mark_lvl`, `access_col`, `_edge_overlay` | engine, `filter.js` (`__rs_access`, `__rs_lvl`) | dashboard (`__rs_access`, `__rs_lvl`) | `RoadDraw.structure`, `RoadDraw.look.access` |
 | `__rs_ci` | the class index of every feature of `simple` (R8): its class's place in the profile's class list, else the list's length; the road layer reads its width and offset tables with `["at", ["get", "__rs_ci"], ["literal", [...]]]` | `layers::class_index`, `simple.rs`, `_class_index` | the layers | engine | |
 | `__rs_cls` | the class column of the edge on every piece, name and arrow of a GeoJSON source (for the class filter); the road table has it too | `_mark_cls`, `roads.rs`, `slots.rs` | `filter.js` | dashboard | the edge label: the dashboard reads the class through the edge |
-| `__rs_cc` | the Roads filter's class as a number in a tile, **only when the filter is on another column than the class column** (`filter_col`): the place of `__rs_cls` in `roadstyle:controls.filter.classes`. Otherwise the Roads filter reads `__rs_ci`, and a tile has no `__rs_cc` | `tiles/src/layer.rs` (`Builder`) | `filter.js` | dashboard | the tile cut makes it; one rule for every path (docs/design/tiling.md) |
+| `__rs_cc` | the road filter's class as a number in a tile, **only when the filter is on another column than the class column** (`filter_col`): the place of `__rs_cls` in `roadstyle:controls.filter.classes`. Otherwise the Roads filter reads `__rs_ci`, and a tile has no `__rs_cc` | `tiles/src/layer.rs` (`Builder`) | `filter.js` | dashboard | the tile cut makes it; one rule for every path (docs/design/tiling.md) |
 | `__rs_kept_` (the prefix of `__rs_kept_<column>`) | the output name of an input column with one of the four level names (casing_start, casing_level, casing_end, fill_level) when the engine computes the levels: the computed ones take the four names | `road.rs` (`Roads::new`, `kept`) | the outputs | internal | |
 | `__rs_edge`, `__rs_edge2`, `__rs_edges` | `__rs_edge`: the carrier of a road's key in the engine and on an overlay's item (not a property of a piece or a slot in a style or a tile). `__rs_edge2`: the key of the twin of a road drawn as one line, a field of the road table only (a piece and a slot do not have it since contract 2: `rsFilter` takes the twin from the road table). `__rs_edges`: the keys of a shadow or a deck. A road's key (`RoadKey`, `table << 32 \| row`; the row for one table) is the feature id of its pieces and slots | every generator | `core.js`, `filter.js`, `select.js`, `arrows.js`, the level editor | dashboard | the edge label of each piece (render model) |
 | `__rs_k`, `r` | the kind of piece (0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item) and its rank (an integer; the line-sort-key adds the road's key as `r * 2^32 + id`) | `_simple_pieces`, `simple.rs` | engine, `core.js`, `svspot.js` (`__rs_k`) | dashboard (`__rs_k`) | `DrawKey` |

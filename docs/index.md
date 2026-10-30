@@ -60,7 +60,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
     ---
 
-    Vector tiles in the file, or the GPU backend for millions of edges.
+    Vector tiles in the file, on by default, and one tiling rule for every path.
 
     [:octicons-arrow-right-24: Big networks](guides/big-networks.md)
 
@@ -68,7 +68,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
     ---
 
-    Ready-made pages, and `window.rs*` calls to drive the map.
+    The standard dashboard with its toolbox, and `window.rs*` calls to drive the map.
 
     [:octicons-arrow-right-24: Dashboards & JavaScript](guides/dashboards.md)
 
@@ -76,11 +76,29 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
     ---
 
-    An iframe, a JSON spec, or `roadstyle.js` on your own map.
+    The saved page in an iframe, or a style for other map apps.
 
     [:octicons-arrow-right-24: Put it on a website](guides/website.md)
 
 </div>
+
+## What is new in 0.26.0
+
+- **A standard dashboard and toolbox.** `render_dashboard` has one panel and one bar of tools. The bar has one `navigate` button
+  (zoom, turn and tilt, with Ctrl + drag), the `roads` filter, one base-map tool, the legend, the settings and the credits.
+  A tool that the page cannot use is greyed out, with a reason. On a phone the bar folds and the panel is a bottom sheet.
+  [Dashboard layout](guides/dashboard-layout.md) · [Add to the panel](guides/dashboard-panel.md)
+- **One zoom table.** The dashboard shows service roads and living streets from zoom 14, and steps, platforms, corridors, roads and
+  private roads from zoom 15. `minzoom=False` shows all. [Dashboard layout](guides/dashboard-layout.md#roads-at-small-zooms)
+- **Tiles are the default.** Every page embeds its roads as MLT tiles to zoom 16, with one road layer for every zoom. `tiles=False`
+  gives GeoJSON roads, and `tile_format="mvt"` gives MVT. One tiling rule serves the page, the browser worker, `export_style` and
+  `roadstyle tiles`. [Big networks](guides/big-networks.md) · [Make tiles and PMTiles](rust/tiles.md) ·
+  [Tiling](design/tiling.md)
+- **The level editor is in the dashboard.** It draws into the page's one standard panel, and the History tab has `edits.csv`.
+  [Which road is on top](guides/levels.md#edit-the-levels-in-a-dashboard)
+- **Live data.** Colours by natural breaks, a legend with the number of roads, and a guide for a new day.
+  [Live data](guides/live-data.md)
+- **Move a script.** [Move a dashboard to the new version](guides/migrating-dashboard.md) lists each change from 0.25.
 
 ## When to use roadstyle
 

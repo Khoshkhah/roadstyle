@@ -1,14 +1,13 @@
 # Put it on a website
 
-<p class="lead">Four ways to show a roadstyle map on a web page or in another map app, from no front-end code to your own map component.</p>
+<p class="lead">Two ways to show a roadstyle map on a web page or in another map app: the saved page in an iframe, or a style that other map apps open by URL.</p>
 
 | way | Python at runtime? | use when |
 |---|---|---|
 | [The saved HTML in an iframe](#the-saved-html-in-an-iframe) | no | a static site, a report, a quick embed |
-| [A roadstyle.js page](#a-roadstylejs-page) | no | a light Leaflet page with its own small JS API |
 | [A style for other map apps](#a-style-for-other-map-apps) | once, to write the files | GeoLibre, RustGIS, QGIS or your MapLibre page opens the roads by URL |
 
-In all four the browser needs no styling logic: each road carries its resolved style.
+In both the browser needs no styling logic: the style holds the rules, and each road piece carries its values.
 
 ## The saved HTML in an iframe
 
@@ -25,17 +24,6 @@ rs.render_edges(edges).save("roads.html")
 
 The map is a snapshot: re-run Python to show new data.
 
-## A roadstyle.js page
-
-`rs.save` writes a Leaflet page with a small bundled renderer, `roadstyle.js`, and its
-`RoadStyleMap` API (`on("select")`, `setColorField`, `addPanel`). `rs.to_iframe` returns the
-same page as an `<iframe srcdoc>` string to paste anywhere.
-
-```python
-rs.save(edges, "roads.html", color_by="maxspeed_kmh", cmap="viridis")
-html = rs.to_iframe(edges, height="600px")
-```
-
 Most custom pages are easier as the default map plus your own panel:
 see [Dashboards & JavaScript](dashboards.md).
 
@@ -43,8 +31,8 @@ see [Dashboards & JavaScript](dashboards.md).
 
 ## A style for other map apps
 
-`rs.export_style` writes the roads as a MapLibre style, vector tiles and a sprite: the roads only, with every column of the
-edges in the tiles. Put the folder on a web server, then open it in GeoLibre (with the roadstyle plugin), RustGIS or any
+`rs.export_style` writes the roads as a MapLibre style, vector tiles, a sprite and the road table: the roads only. The tiles have the
+keys that the style reads, and no data column. The table `props.json` has the columns. Put the folder on a web server, then open it in GeoLibre (with the roadstyle plugin), RustGIS or any
 MapLibre page. The base map is the app's own.
 
 ```python
@@ -57,7 +45,8 @@ positions. A file without the positions is an error that says how to save them. 
 | file | content |
 |---|---|
 | `style.json` | the roads' layers; every URL starts with `base_url` |
-| `tiles/{z}/{x}/{y}.pbf` | the road tiles, every column (an id past 2^53 as text); `format="pmtiles"` writes one `roads.pmtiles` |
+| `tiles/{z}/{x}/{y}.mlt` | the road tiles in MLT (`tile_format="mvt"` gives `.pbf`; the app needs MapLibre GL JS 5.12 or later for MLT); `format="pmtiles"` writes one `roads.pmtiles` |
+| `props.json` | the road table: every column of every road, by the road's row (an id past 2^53 as text). A click reads it |
 | `sprite.json`, `sprite.png` (and `@2x`) | the one-way arrow |
 
 - `base_url` is the URL where the folder is served. The server must send `Access-Control-Allow-Origin: *`.

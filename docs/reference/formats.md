@@ -8,8 +8,8 @@
 | Input | the roads | a table of lines: GeoDataFrame, a geo file, GeoJSON, Arrow, DuckDB; the Rust engine reads GeoParquet | [The roads](#the-roads) |
 | Input | the level data | 8 columns in the roads, or a duckOSM file | [The level data](#the-level-data) |
 | Input | the look | a palette and a profile (YAML), settings (JSON or YAML), the keywords of `render_edges` | [The look](#the-look) |
-| Internal | the merged look | JSON, between the look and the engine | [The merged look](#the-merged-look) |
-| Output | the MapLibre style, the road data, the page: other files for each way (default, A, B, C) | JSON, GeoJSON or vector tiles, HTML | [The output of each way](#the-output-of-each-way) |
+| Internal | the merged look | JSON, between the look and the engine | [The merged look](#the-look-file) |
+| Output | the MapLibre style, the road data, the page: other files for each way (GeoJSON, A, B, C) | JSON, GeoJSON or vector tiles, HTML | [The output of each way](#the-output-of-each-way) |
 
 How the parts work together: [How a map is drawn](../rust/drawing.md).
 
@@ -33,7 +33,7 @@ value.
 | a width in metres | a number | no | `width_m_col` | the road drawn at its real width, from `width_m_zoom` |
 | a directed flag | true or empty: a direction of its own; false: undirected | no | `directed_col` | a two-way pair of undirected edges is one line |
 | a driving flag | true or empty: cars can drive it; false: they cannot | no | `driving_col` | the one-way arrow only on an edge for cars |
-| a filter class | text | no | `filter_col` | the classes in the Roads box, when they differ from `highway` |
+| a filter class | text | no | `filter_col` | the classes of the `roads` tool (the road filter), when they differ from `highway` |
 | the level data | see the next section | no | | the drawing order |
 | any other column | any | no | | in the popup, and in `rs.query` |
 
@@ -231,10 +231,10 @@ simple mode, `view_3d=True`), made with `rs.export_inline(edges)` on 2026-10-23.
 Each way to the browser ([Three choices for the road data](../rust/drawing.md#three-choices-for-the-road-data)) gives other
 outputs. The style of each way is one of the forms in [The forms of the output style](#the-forms-of-the-output-style).
 
-#### The default: GeoJSON in one HTML file
+#### GeoJSON in one HTML file (`tiles=False`)
 
 ```python
-rs.render_edges(edges).save("map.html")
+rs.render_edges(edges, tiles=False).save("map.html")
 ```
 
 | Output | Content |
@@ -243,20 +243,21 @@ rs.render_edges(edges).save("map.html")
 
 The style: **inline** and **live**. The browser loads the whole file; MapLibre cuts the GeoJSON into tiles itself.
 
-#### Way A: vector tiles in one HTML file
+#### Way A, the default: vector tiles in one HTML file
 
 ```python
-rs.render_edges(edges, tiles=True).save("map.html")
+rs.render_edges(edges).save("map.html")                      # tiles=True is the default
+rs.render_edges(edges, tile_format="mvt").save("map.html")   # MVT tiles in place of MLT
 ```
 
 | Output | Content |
 |---|---|
-| `map.html` | one file: the live style, a PMTiles archive of all the tiles (base64 in the page), a side table, MapLibre and the dashboard |
+| `map.html` | one file: the live style, a PMTiles archive of all the tiles (base64 in the page, one gzip stream), a side table, MapLibre and the dashboard |
 
 - The style: **tiled** and **live**. Its source `roads` is `{"type": "vector", "url": "pmtiles://roads"}`, and the page reads it
-  from the archive inside the file.
+  from the archive inside the file. The tiles are MLT, to zoom 16.
 - The side table (`window.RS_SIDE`) holds every column of every road, for the popups and for `rs.query`, because a tile holds
-  only the columns that the style needs.
+  only the keys that the style needs.
 - The browser loads the whole file; MapLibre decodes only the tiles in view.
 
 #### Way B: vector tiles on a server
@@ -269,11 +270,12 @@ rs.export_style(edges, "out", base_url="https://example.org/map", format="pmtile
 | Output | XYZ folder | One PMTiles file |
 |---|---|---|
 | `style.json` | yes | yes |
-| the tiles | `tiles/<z>/<x>/<y>.pbf`, one file for each tile | `roads.pmtiles`, one file |
+| the tiles | `tiles/<z>/<x>/<y>.mlt`, one file for each tile (`.pbf` with `tile_format="mvt"`) | `roads.pmtiles`, one file |
 | the sprite (the one-way arrow) | `sprite.png`, `sprite.json`, `sprite@2x.png`, `sprite@2x.json` | the same |
+| the road table (a click reads a road's row) | `props.json` | the same |
 | the road popup for an app's plugin | `popup.js`, `popup.css` | the same |
 
-- The style: **tiled** and **baked**. Its source `roads` points to `<base_url>/tiles/{z}/{x}/{y}.pbf`, or to
+- The style: **tiled** and **baked**. Its source `roads` points to `<base_url>/tiles/{z}/{x}/{y}.mlt`, or to
   `pmtiles://<base_url>/roads.pmtiles`. Every address in it starts with `base_url`.
 - It has the roads only, with no base map and no page: the map app (GeoLibre, QGIS, a MapLibre page) gives them.
 - `export_style` returns the path of `style.json`.
@@ -286,12 +288,12 @@ const tiler = new Tiler(roads, look, undefined, "Monaco", "rs://1/", ["name", "h
 
 | Output | Content |
 |---|---|
-| `tiler.style(format?)` | the style, as JSON text; `format` `"mlt"` sets `"encoding": "mlt"` on the vector source |
-| `tiler.tile("roads", z, x, y, format?)` | one vector tile (MVT bytes, or MLT with `"mlt"`), made when MapLibre asks for it |
+| `tiler.style(format?)` | the style, as JSON text; `format` `"mvt"` or `"mlt"` sets the `encoding` of the vector source |
+| `tiler.tile("roads", z, x, y, format?)` | one vector tile (MLT bytes, or MVT with `"mvt"`), made when MapLibre asks for it |
 | `tiler.props("roads", row)` | the properties of one road, for a click |
 | `tiler.archive(bounds, layers)` | only on request: one PMTiles archive of all tiles, as bytes |
 
-MVT is the default. MLT is for tiles that go over a network; for tiles made in the browser, MVT is faster to make. See
+MLT is the default for every way. `format` `"mvt"` gives MVT, for an app that cannot read MLT. The `Tiler` keeps each tile in each format that was asked for. See
 [the measurements](../rust/tiles.md#measured-results).
 
 - The style: **tiled**, and **live** when the look has `args.state = "live"` (else baked). Its source `roads` points to
@@ -330,7 +332,7 @@ these is a layer in its tiles (a layer's `source-layer`).
 | Source (or tile layer) | One feature for each | Monaco | Main properties |
 |---|---|---|---|
 | `roads` | edge (the whole road) | 849 | the class style (`__rs_fill`, `__rs_w`, `__rs_casing`, `__rs_cw`, `__rs_dash`, `__rs_op`), the levels (`__rs_cl`, `__rs_fl`, `__rs_cs`, `__rs_ce`), `__rs_bridge`, `__rs_tunnel`, `__rs_oneway`, `__rs_edge` (its row), and every column of your data |
-| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `r` (the rank: an integer, 100 for each step of the key), `__rs_cap`; the feature id is its road's row, `highway` |
+| `simple` | piece of a road: a casing part, a fill, a bridge shadow, a tunnel dash, an item | 4,607 | `__rs_k` (the kind: 0 casing, 1 fill, 2 shadow, 3 tunnel gap, 4 tunnel dash, 5 item), `r` (the rank: an integer, 100 for each step of the key), `__rs_cap` (1 flat end, 2 square end), `__rs_dash` (the index of the dash pattern), `__rs_ci` (the class: a place in the tile's class list); the feature id is its road's row |
 | `slots` | place of a street name or a one-way arrow along a road | 646 | `name`, `oneway`, `slot`, `rank`, `lvl`; the feature id is its road's row |
 | `decks` | part of a 3D bridge deck (only with `view_3d=True`) | 588 | `__rs_height`, `__rs_base`, `__rs_edges` |
 
@@ -384,8 +386,8 @@ Two separate choices give the form of a style.
 
 | Form | Made by | Sources |
 |---|---|---|
-| **Inline** | `export_inline`, `inlineStyle`, `render_edges` | GeoJSON sources with all the data inside the style |
-| **Tiled** | `export_style` (`style.json`), `tiler.style()`, `render_edges(tiles=True)` | one vector source `roads` with the address of the tiles: `<base_url>/tiles/{z}/{x}/{y}.pbf`, `pmtiles://...` or `rs://...`; zooms 6 to 18 |
+| **Inline** | `export_inline`, `inlineStyle`, `render_edges(tiles=False)` | GeoJSON sources with all the data inside the style |
+| **Tiled** (the default of `render_edges`) | `export_style` (`style.json`), `tiler.style()`, `render_edges` | one vector source `roads` with the address of the tiles: `<base_url>/tiles/{z}/{x}/{y}.mlt`, `pmtiles://...` or `rs://...`; zooms 6 to 16 |
 
 **Whether the controls can change it:**
 
@@ -400,10 +402,9 @@ The road data is the features of the four sources above, with their properties. 
 ([Three choices for the road data](../rust/drawing.md#three-choices-for-the-road-data)):
 
 - **GeoJSON** inside the style (`sources.<name>.data`).
-- **Vector tiles** (Mapbox Vector Tile 2.1): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer since 2026-10-27: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page; the popup fields of an overlay are in `props/<source>.json` of `export_style`, by row, not in its tiles), zooms
-  6 to 18 and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` and a slot have their road's row as their id (all
-  pieces of a road share it). A tile keeps the keys of the layer's one set (the keys that the style reads, the page's keys, the 3 filter keys
-  and the columns named in `keep`), but not a `__rs_*` flag that is false: every reader takes a missing flag as false. Below the last zoom, a line is
+- **Vector tiles** (MLT by default, MVT 2.1 with `tile_format="mvt"`): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer since 2026-10-27: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page; the popup fields of an overlay are in `props/<source>.json` of `export_style`, by row, not in its tiles), zooms
+  6 to 16 (MapLibre scales the last zoom up) and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` and a slot have their road's row as their id (all
+  pieces of a road share it). A road feature in a tile has only the marks and the keys of `TILE_ROAD_KEYS` (the allow-list of [Tiling](../design/tiling.md#the-keys-of-a-tile-2026-10-29)), and no text value: the one exception is the street name of a name slot. It has no `__rs_*` flag that is false (every reader takes a missing flag as false), and no `lvl` when the level is 0. Below the last zoom, a line is
   simplified to half a tile unit.
 
 Each piece carries its values as `__rs_*` properties, and the style's rules read them
@@ -415,7 +416,7 @@ The road fields are in the source `roads` (GeoJSON) or in the side table (tiles)
 
 `render_edges` and `pageFrom` write one HTML file. It holds:
 
-- the live style, with the data inline (gzipped, `compress=True`) or with the PMTiles archive (`tiles=True`);
+- the live style, with the PMTiles archive (the default, `tiles=True`) or with the data inline (gzipped, `compress=True`, `tiles=False`);
 - MapLibre GL JS 5.24 (inside the file, or from a CDN);
 - the dashboard: the modules of `static/dashboard/` as one script, the popup (`popup.js`, `popup.css`) and `dashboard.css`;
 - the options of the dashboard: the object `RS_OPTIONS`, with the values of the page keywords and the camera (`camera`).

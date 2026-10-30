@@ -127,7 +127,7 @@ different styles. The test `the_paths_differ_only_in_the_documented_keys` fails 
 | 3b | The paths differ only in the documented keys | `the_paths_differ_only_in_the_documented_keys` | done |
 | 4 | No whole-road layer `roads` in the tiles of `export_style` (a click reads the road table by row) | `tests/test_export_style.py::test_style_points_at_its_own_files` | done |
 | 5 | A base-map layer keeps only what its layers read (`height`, `base`, `kind`; no `osm_id`, no `name`) | `stage.rs`: `a_base_map_layer_keeps_what_its_layers_read` | done |
-| 6 | The tile bytes only go down | `tile_budget.rs`, `tests/test_tile_budget.py` | done (bytes); a number for the property bytes is not in the budget yet |
+| 6 | The tile bytes only go down | `tile_budget.rs`, `tests/test_tile_budget.py` | done (bytes, and `property_bytes`: the bytes of the `tags` field of the largest tile, since 0.26.0) |
 
 **What cannot leave the tile**
 - `name` on the `slots` features: `text-field` reads the street name from the tile; MapLibre has no side table for a layout property. It stays on the label anchors, never on a road piece.

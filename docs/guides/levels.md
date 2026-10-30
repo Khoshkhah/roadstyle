@@ -44,12 +44,13 @@ rs.render_edges(levels, casing_start_col="casing_start", casing_level_col="casin
                 casing_end_col="casing_end", fill_level_col="fill_level").save("map.html")
 ```
 
-**1. The input** (`rs.level_input(edges)`). The two directions of a segment are one road. Between roads the input finds three kinds of pair:
+**1. The input** (`rs.level_input(edges)`). The two directions of a segment are one road. Between roads the input finds four kinds of pair:
 
 | pair | when | what it asks |
 |---|---|---|
 | *meet* | two road ends are one node | each head is under the other road's fill (a hard rule) |
 | *stack* | roads of different bands cross, or run within `band_dist` (10 m) away from a node they share | each crossing part of the upper road's casing is over the lower road's fill |
+| *crossing* | a path (footway, path, cycleway, steps, pedestrian, bridleway, corridor) meets a node where a car road goes on, in the same band, and the path has the lower priority | the road's head there is over the path's fill: the map draws the path under the road, and the road keeps its outline. There is no *meet* between them |
 | *order* | roads meet: of one band, or of different bands that only meet (a tunnel mouth) | the road with the higher priority has the higher fill |
 
 The band is the level from the tags: a non-zero `layer`, else 1 for a bridge, -1 for a tunnel, else 0 (or your own `band_col`). The
@@ -63,22 +64,25 @@ over the next, is an example.
 **3. The stages.** The solver works in this order. Each stage keeps the result of the stage before it:
 
 1. Keep as many real crossings (stacks) as possible.
-2. Then keep as many order wishes as possible.
-3. Then keep as many near rules as possible. A near rule lifts a part that only comes close to the road under it. They are off by
+2. Then keep as many path crossings (*crossing* pairs) as possible. A bridge over a road comes first, so it outranks a path crossing.
+3. Then keep as many order wishes as possible.
+4. Then keep as many near rules as possible. A near rule lifts a part that only comes close to the road under it. They are off by
    default: turn them on with `near_rules=True`.
-4. Then use as few positions as possible, and put each casing as near to its fill as possible.
+5. Then use as few positions as possible, and put each casing as near to its fill as possible.
 
 **4. The answer.** Every edge gets its four numbers. The solver moves them so that the most common casing position is 0 (the ground),
 and makes them consecutive. A stack that it could not keep is in `result.attrs["levels_given_up"]`, with a warning: it is a flaw on
-the map. The order wishes that it did not keep are in `levels_orders_not_kept`.
+the map. The order wishes that it did not keep are in `levels_orders_not_kept`. `levels_info.json` of an area has `crossings` and `crossings_not_kept` too.
 
 **The two engines.** Both solve the same input in the same stages:
 
-- **Python** (the default) solves each stage as an integer program with HiGHS. A stage that needs more than `time_limit` (60 s)
-  keeps the best answer that it found, with a warning.
 - **Rust** (the default; `engine="rust"`, or `ROADSTYLE_ENGINE=rust`) solves each stage as a minimum-cost flow: each rule "number A ≤ number B + w"
   is one arc of a graph. It checks every hard rule of its answer before it gives it, and it has no time limit. Monaco (13,298 edges)
   takes 0.2 s, Tartu (64,828 edges) 3.1 s.
+
+- **Python** (`engine="python"`) solves each stage as an integer program with HiGHS. A stage that needs more than `time_limit` (60 s)
+  keeps the best answer that it found, with a warning. It has no crossing stage: a solve of pairs that have `crossing` rows stops with
+  an error that says so, and does not drop the rows.
 
 Two answers can be equally good: the two engines can give different numbers for a few roads, with the same broken rules and the same
 number of positions.
@@ -88,16 +92,16 @@ heads of that time.
 
 ## Fix it by hand: the level editor
 
-![The level editor: two roads picked, their cards with ends and heads, the Issues tab](../img/level-editor.png)
+![The level editor in the dashboard's panel: Boulevard du Larvotto and Rond-Point du Portier picked, their cards, and the apply bar with one change waiting](../img/level-editor.png)
 
 `roadstyle-levels edit out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
 second road to see every pair between the two.
 
 The editor is in Rust: the solver runs in the page (WebAssembly), and a small Rust server (`roadstyle serve out/area`) gives the page
-the area's files and saves your changes. Monaco solves in 0.1 s in the page. `--engine python` opens the earlier editor with its Python
-server. The server answers only on 127.0.0.1, only to its own address (`Host`), and saves only the page's own changes (`Origin`) of at
+the area's files and saves your changes. Monaco solves in 0.1 s in the page. The server answers only on 127.0.0.1, only to its own address (`Host`), and saves only the page's own changes (`Origin`) of at
 most 16 MB. Its page files are in the program; build them in with `rust/roadstyle-wasm/build_editor.sh` before you build roadstyle.
-On any other web server the page shows the area and saves nothing.
+On any other web server the page shows the area and saves nothing. The page is a host of the standard dashboard: it has the
+dashboard's panel, toolbox and phone form, and `roadstyle serve` gives it the file `host_options.json`.
 
 - **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
   *meet* (join two ends).
@@ -114,7 +118,7 @@ Your changes are in three small tables in the area folder. The input step never 
 
 | file | what |
 |---|---|
-| `edits.csv` | your rules: `relation` (`order`, `stack`, `meet`), `a`, `b`, `a_end` (a stack's part: `start`, `main`, `end`), `b_end`, `enabled` (`false` switches that found row off) |
+| `edits.csv` | your rules: `relation` (`order`, `stack`, `meet`, and `crossing` to switch off a found crossing), `a`, `b`, `a_end` (a stack's part: `start`, `main`, `end`), `b_end`, `enabled` (`false` switches that found row off) |
 | `heads.csv` | head lengths per road end in metres (`road`, `start_m`, `end_m`; empty: 5 m) |
 | `caps.csv` | cap per road end (`road`, `start`, `end`: `round`, `square`, `flat`; empty: round) |
 
@@ -124,6 +128,39 @@ Your changes are in three small tables in the area folder. The input step never 
 result into it (`visualization.edge_levels`), and `rs.load_area_levels(con, edges)` reads it back for the same edges only. duckOSM's
 `duckosm levels monaco.duckdb` makes such an area for all travel modes, and mapstyle draws from it. Keep the three tables: with them a
 rebuilt file gets the same drawing order back.
+
+**Old level files.** A file made by roadstyle 0.17.1 has `visualization.edge_levels` with the five columns `edge` and the four numbers only, and its
+`edge_levels_meta` has `method` and no `source`. Both readers (Rust and `load_area_levels`) read it: the method is the source, and the missing head
+lengths and caps are empty, so the ends have the default 5 m and a round cap. Roadstyle does not write the file again, so you do not need to migrate it.
+
+## Edit the levels in a dashboard
+
+The level editor does not have a frame of its own. It draws into the one standard panel of the dashboard (`#sb`), so the editor and the
+page have the same panel, the same side, the same look, the same theme and the same phone sheet. A page that already has a dashboard adds
+the editor with one call:
+
+```js
+const editor = await levelEditor({map, panel: document.getElementById("sb"), backLabel: "Steps", pkgUrl, store});
+editor.addEventListener("solved", async (e) => apply(e.detail.levelsCsv, await e.detail.draw()));
+editor.addEventListener("back", () => { editor.destroy(); showSteps(); });
+```
+
+The calls and the options are in [Use roadstyle in the browser](../rust/browser.md#the-level-editor-in-a-page). This is what the editor does with the panel:
+
+- **The host's panel.** `panel` is the host's `.sb-card`, with `.sb-top` and `.sb-body`. The editor hides the host's body and shows its own tabs:
+  Edit, History and Issues. The top line has the button "← Steps" (`backLabel`) and "Edit levels", before the host's hide button.
+- **The apply bar.** A bar at the bottom of the panel (on a phone: of the sheet) shows "N waiting", *Discard* and *Apply and solve*. It shows only when
+  changes wait. "N waiting" opens the list, and you can take out each change. A cap or a head length needs no solve: the editor saves it at once.
+- **Back, with changes waiting.** "← Steps" with no change waiting sends the event `"back"` at once. With changes waiting, the bar asks: *Apply*
+  (solves, then sends `"back"`), *Discard* (drops the changes, then sends `"back"`) or *Stay*. The host answers `"back"` with `editor.destroy()`,
+  which puts the host's panel back.
+- **The History tab** has the list of your edits, and a button that downloads `edits.csv`.
+- **The picked roads** have the dashboard's own selection glow. The editor's colours tell road 1 from road 2. When the editor closes, it clears the
+  colour and the glow.
+- **The toolbox** is the dashboard's. It does not change.
+
+`roadstyle-levels edit` opens the same editor in a page that is a host of the standard dashboard: it has the template, the panel, and the hide and show buttons
+of the dashboard. Your edits are in `edits.csv` in the area folder.
 
 ## Your own numbers
 

@@ -84,6 +84,7 @@ nav:
           - Architecture of the Rust version: rust/architecture.md
           - How a map is drawn: rust/drawing.md
           - How the levels are solved: rust/levels-solver.md
+          - "Tiling: one algorithm and one protocol": design/tiling.md
   - Studio: studio.md
 
 # Old pages; keep their URLs working.

@@ -57,10 +57,9 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 
-The tile format: use `"mvt"` (the default) for tiles that the page makes in the browser. An MLT tile has about 40 % of the bytes, but the
-worker needs 5 to 13 ms to make it, and about 1 ms for an MVT tile. MapLibre needs about the same time to read both. The results can
-depend on the browser and on the device, so MVT stays the default until a comparison in several browsers is done
-([the measurements](tiles.md#measured-results)).
+The tile format: the default is MLT, the same as for every other way to make tiles. Use `"mvt"` for an app that cannot read MLT. The
+worker keeps each tile in each format that was asked for, so an MLT tile costs 1 to 6 ms (Nacka, native), one time for each tile.
+MapLibre needs about the same time to read both formats ([the measurements](tiles.md#measured-results)).
 
 A look's JSON (`toJson`) is a format to save and load a look, not an API: its inner fields change between versions. Do not read or
 change its fields. Give your keywords to `resolveLook`, or change a saved look with `withArg`.
@@ -96,7 +95,7 @@ const rs = rsDashboard(map, {style, find_control: true});
 </script>
 ```
 
-The page shows the roads colored by `lanes`, the legend, the Roads box, the search box, the popup and the hover glow.
+The page shows the roads colored by `lanes`, the legend, the search box, the popup and the hover glow.
 
 - `args` takes the keywords of `render_edges` that change the style, with their Python names: `color_by`, `cmap`, `arrows`,
   `labels`, `view_3d`, `highway_col`, ... ([every parameter](../reference/parameters.md)).
@@ -217,11 +216,13 @@ The parts of this page:
   in `roadstyle:state`. Without this step, MapLibre writes errors and draws the roads in black.
 - **`calculateTileZoom`.** One tile zoom on the whole screen, so a road keeps one width in a view tilted more than 60°
   ([One tile zoom or several](drawing.md#one-tile-zoom-or-several)).
-- **The feature id.** All the pieces of a road have the road's row as their MVT id (contract 2), so the hover glow and the selection
+- **The feature id.** All the pieces of a road have the road's row as their feature id (contract 2), so the hover glow and the selection
   light the whole road. There is no `promoteId`.
 - **`style: null`, `prefix: "rs-"`.** The dashboard starts with no roads, and adds `rs-` to each source and layer id that it uses.
 - **`engine.props`.** The dashboard asks the engine for one road's properties at a click, at `rsSelect` and for the tooltip.
-- **`rs.setStyle(style)`.** The controls stay. The Colour by menu and the legend are made again, and the selection is cleared.
+- **`rs.setStyle(style)`.** The controls stay. Every control that a style gives (the colour options and the legend, the `roads` tool and
+  its classes, the base-map layers, the arrows, the boundary) is made again for the new style, and goes when the new style has none.
+  A switch that was off stays off. The selection is cleared.
   The dashboard sets the style's global state: a live style's layers read MapLibre's global state (`rs_co`, `rs_fill_on`, ...),
   whose start values are in the style's own `state` block, which your map does not have. The dashboard sets each value of
   `roadstyle:state` that your map does not have yet, and keeps the values that your map has.

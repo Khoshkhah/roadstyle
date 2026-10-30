@@ -1,6 +1,6 @@
 # Command line
 
-<p class="lead">The <code>roadstyle</code> command turns a road file into a map, a page or a JSON spec, without writing Python.</p>
+<p class="lead">The <code>roadstyle</code> command turns a road file into a map or a page, without writing Python.</p>
 
 ```bash
 roadstyle INPUT [options]          # INPUT: GPKG, GeoJSON, Shapefile, … with a road-class column
@@ -49,22 +49,21 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 | `--vmin N`, `--vmax N` | `vmin`, `vmax` | ramp range |
 | `--width-by MIN MAX` | `width_by` | width in px follows the numeric `--color-by` |
 | **Web map (`-f web`)** | | |
-| `--page {dashboard,report,street-view}` | `render_dashboard` / `render_report` / `render_street_view` | a ready-made page instead of the plain map |
+| `--page {dashboard,street-view}` | `render_dashboard` / `render_street_view` | a ready-made page instead of the plain map |
 | `--view-3d` | `view_3d=True` | tilted camera and 3D bridge decks |
 | `--pitch DEG`, `--bearing DEG` | `pitch`, `bearing` | starting camera |
 | `--no-arrows` | `arrows=False` | no one-way arrows |
 | `--no-labels` | `labels=False` | no street names |
-| `--no-filter` | `filter_control=False` | no effect: the road-class filter panel was removed |
+| `--no-filter` | `filter_control=False` | no effect: the floating Roads box is gone (the dashboard's `roads` tool is the road filter) |
 | `--no-basemap-switcher` | `basemap_switcher=False` | no base-map button |
-| `--tiles` | `tiles=True` | embedded PMTiles, for big networks |
+| `--tiles` | `tiles=True` | embedded MLT vector tiles. Python embeds tiles by default. The command line writes GeoJSON roads unless you give `--tiles` |
 | `--no-compress` | `compress=False` | plain JSON data instead of gzip |
 
 ## `--page`
 
 | page | builds |
 |---|---|
-| `dashboard` | the map + a query sidebar |
-| `report` | the map + a stats sidebar |
+| `dashboard` | the map, a panel with a query box, and the standard toolbox ([Dashboard layout](../guides/dashboard-layout.md)) |
 | `street-view` | the map + Google Street View of the clicked road |
 
 `--page` needs `-f web`. For `street-view` only:
@@ -101,7 +100,6 @@ roadstyle edges.gpkg --include motorway trunk primary -o major.html
 roadstyle edges.gpkg --color-by maxspeed_kmh --cmap viridis --width-by 1 6
 roadstyle edges.gpkg --page street-view --layout below --panel-width 50
 roadstyle edges.gpkg --page dashboard -o dashboard.html
-roadstyle edges.gpkg -f spec -o map_data.json
 ```
 
 **See also:** [Every parameter](parameters.md) · [Get started](../get-started.md)

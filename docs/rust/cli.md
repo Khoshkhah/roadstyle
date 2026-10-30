@@ -19,8 +19,9 @@ offline. Any other option is a keyword of `render`:
 
 ```bash
 roadstyle page roads.parquet out/map.html --basemap osm --views '{"plain": {"road_fill": false}}'
-roadstyle page roads.parquet out/tiled.html --tiles
-roadstyle page roads.parquet out/dashboard.html --sidebar dashboard
+roadstyle page roads.parquet out/geojson.html --no-tiles        # GeoJSON roads: the page has tiles by default
+roadstyle page roads.parquet out/mvt.html --tile-format mvt
+roadstyle page roads.parquet out/dashboard.html --template dashboard
 ```
 
 A CARTO base map needs a key: `--api-key KEY`, else the environment variable `ROADSTYLE_API_KEY`. Google 3D and the Street View
@@ -42,10 +43,10 @@ Stage 2 makes the vector tiles from stage 1's files: one PMTiles file, or a fold
 ```bash
 roadstyle tiles out/stage1 out/roads.pmtiles
 roadstyle tiles out/stage1 out/xyz --format xyz --base-url https://example.org/tiles
-roadstyle tiles out/stage1 out/roads.pmtiles --tile-format mlt
+roadstyle tiles out/stage1 out/roads_mvt.pmtiles --tile-format mvt
 ```
 
-`--tile-format mlt` writes MapLibre Tiles in place of Mapbox Vector Tiles (see [Make tiles and PMTiles](tiles.md)).
+The tiles are MapLibre Tiles (MLT) by default, as in every other path. `--tile-format mvt` writes Mapbox Vector Tiles. One rule cuts the tiles for `page`, `tiles` and the other paths ([Make tiles and PMTiles](tiles.md)).
 
 ## Make and solve a level area
 

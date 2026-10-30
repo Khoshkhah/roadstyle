@@ -17,7 +17,7 @@ download on first run; in a git checkout it uses `ui/studio/samples/` directly.
 | Page | Makes | Same as |
 |---|---|---|
 | **Map** | a map with its built-in controls | `rs.render_edges(edges, ...)` |
-| **Dashboard** | the map with a query sidebar: query box, filter and colour buttons, results table, detail panel | `rs.render_dashboard(edges, ...)` |
+| **Dashboard** | the map with a query panel and the standard toolbox: query box, filter and colour buttons, results table, detail panel | `rs.render_dashboard(edges, ...)` |
 
 Each page has a download button for the self-contained HTML, and shows the Python call so you can
 copy it out when you outgrow the knobs.
