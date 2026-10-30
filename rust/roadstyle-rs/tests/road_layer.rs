@@ -23,31 +23,28 @@ fn road_layers(style: &Value) -> Vec<&Value> {
     style["layers"].as_array().unwrap().iter().filter(|l| l["id"].as_str().unwrap().starts_with("roads-simple")).collect()
 }
 
-/// 2j: the road layer is one layer for each band of zooms (below z14, z14 to z15, from z15). The first has the id `roads-simple`, and a
-/// road is picked on every band.
+/// 2j: the road layer is one layer for every zoom (zoom bands, `roads-simple-z14` and `-z15`, were removed: MapLibre keeps the tiles of the old
+/// zoom while the new ones come, and a layer of a band had no buckets in them, so the roads were missing at a pitched view). A road is picked on it.
 #[test]
-fn the_road_layer_has_a_layer_for_each_band_of_zooms() {
+fn the_road_layer_is_one_layer_for_every_zoom() {
     let s = style(&[("state", "live".into())]);
-    let bands: Vec<&Value> = road_layers(&s).into_iter().filter(|l| !l["id"].as_str().unwrap().ends_with("-dash")).collect();
-    let zooms: Vec<(&str, Option<f64>, Option<f64>)> = bands.iter().map(|l| (l["id"].as_str().unwrap(), l["minzoom"].as_f64(), l["maxzoom"].as_f64())).collect();
-    assert_eq!(zooms, [("roads-simple", None, Some(14.0)), ("roads-simple-z14", Some(14.0), Some(15.0)), ("roads-simple-z15", Some(15.0), None)]);
+    let layers: Vec<&Value> = road_layers(&s).into_iter().filter(|l| !l["id"].as_str().unwrap().ends_with("-dash")).collect();
+    assert_eq!(layers.len(), 1);
+    assert_eq!(layers[0]["id"], "roads-simple");
+    assert!(layers[0].get("minzoom").is_none() && layers[0].get("maxzoom").is_none(), "no zoom range: every tile has its buckets");
     let pick: Vec<&str> = s["metadata"]["roadstyle:controls"]["pick"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
-    assert_eq!(pick.iter().filter(|p| !p.ends_with("-dash")).count(), 3);
+    assert_eq!(pick.iter().filter(|p| !p.ends_with("-dash")).count(), 1);
     assert!(pick.iter().all(|p| p.starts_with("roads-simple")), "a road is picked on every layer of the road: {pick:?}");
-    // below z14 the offset and the blur are constants; from z15 they are zoom curves
-    assert_eq!((&bands[0]["paint"]["line-offset"], &bands[0]["paint"]["line-blur"]), (&Value::from(0), &Value::from(0)));
-    assert!(bands[2]["paint"]["line-offset"].is_array() && bands[2]["paint"]["line-blur"].is_array());
-    // every band keeps the sort key
-    assert!(bands.iter().all(|l| l["layout"].get("line-sort-key").is_some()));
+    assert!(layers[0]["layout"].get("line-sort-key").is_some());
 }
 
-/// 2f: only the dashed pieces (the tunnels' gaps and dashes, a piece with its own pattern) have `line-dasharray`, in a layer of their own for each band.
+/// 2f: only the dashed pieces (the tunnels' gaps and dashes, a piece with its own pattern) have `line-dasharray`, in a layer of their own.
 #[test]
 fn only_the_dashed_pieces_have_a_dash() {
     let s = style(&[]);
     let layers = road_layers(&s);
     let ids: Vec<&str> = layers.iter().map(|l| l["id"].as_str().unwrap()).collect();
-    assert_eq!(ids, ["roads-simple-dash", "roads-simple", "roads-simple-z14-dash", "roads-simple-z14", "roads-simple-z15-dash", "roads-simple-z15"]);
+    assert_eq!(ids, ["roads-simple-dash", "roads-simple"]);
     for l in &layers {
         assert_eq!(l["paint"].get("line-dasharray").is_some(), l["id"].as_str().unwrap().ends_with("-dash"), "{}", l["id"]);
     }

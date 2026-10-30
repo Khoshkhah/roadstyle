@@ -86,10 +86,11 @@ class StyleConfig:
     #: ramps and collision culling handle density automatically; unnamed name-slots stay empty.
     annotations: dict = field(default_factory=lambda: {"slot_m": 100})
     #: vector tiling (web backend, `tiles=True`): tileset zoom range, MVT grid extent, and the
-    #: clip buffer in extent units (bleed for strokes crossing tile edges). maxzoom 18 (2026-10-25, was 15): the map scales the
-    #: last zoom's tiles up, and the casing pieces' cut points round to that zoom's grid; at 15 a casing piece stood 4-5 px off its
-    #: fill at zoom 22, at 18 about 1 px. A planet build chooses its own maxzoom with this known error.
-    tiles: dict = field(default_factory=lambda: {"minzoom": 6, "maxzoom": 18,
+    #: clip buffer in extent units (bleed for strokes crossing tile edges). maxzoom 16 (2026-10-29; 18 from 2026-10-25, 15 before): the map
+    #: scales the last zoom's tiles up, and the casing pieces' cut points round to that zoom's grid. At 15 a casing piece stood 4-5 px off its
+    #: fill at zoom 22. On Nacka, 16 against 18 differs by 0.1 to 0.3 % of the pixels at zoom 17 to 20 (none by more than 64 levels but 81 at
+    #: zoom 20.5) and the page is 3.8 MB smaller. A planet build chooses its own maxzoom with this known error.
+    tiles: dict = field(default_factory=lambda: {"minzoom": 6, "maxzoom": 16,
                                                  "extent": 4096, "buffer_px": 80})
     #: default API key / access token for basemaps (e.g. Mapbox, Stadia, MapTiler)
     api_key: str | None = None

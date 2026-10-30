@@ -56,11 +56,12 @@ def test_style_points_at_its_own_files(tmp_path):
     assert all(lyr["layout"]["symbol-placement"] == "line-center" and "__rs_arw" in json.dumps(lyr["filter"]) for lyr in arrows)   # fewer arrows
 
 
-def test_tile_folder_is_plain_mvt(tmp_path):
+def test_tile_folder_is_plain_mlt(tmp_path):
+    """MLT is the one default tile format (docs/design/tiling.md); the files are not gzipped (a static server sends no Content-Encoding)."""
     _, s = _export(tmp_path)
-    assert s["sources"]["roads"]["tiles"] == [f"{BASE}/tiles/{{z}}/{{x}}/{{y}}.pbf"] and "url" not in s["sources"]["roads"]
-    tiles = list((tmp_path / "tiles").rglob("*.pbf"))
-    assert tiles and all(t.read_bytes()[:2] != b"\x1f\x8b" for t in tiles)   # a static server sends no Content-Encoding
+    assert s["sources"]["roads"]["tiles"] == [f"{BASE}/tiles/{{z}}/{{x}}/{{y}}.mlt"] and "url" not in s["sources"]["roads"] and s["sources"]["roads"]["encoding"] == "mlt"
+    tiles = list((tmp_path / "tiles").rglob("*.mlt"))
+    assert tiles and all(t.read_bytes()[:2] != b"\x1f\x8b" for t in tiles)
 
 
 def test_the_style_holds_the_roads_only(tmp_path):
@@ -83,7 +84,7 @@ def test_from_a_duckosm_geoparquet_file(tmp_path):
     with_levels, without = tmp_path / "e.parquet", tmp_path / "n.parquet"
     lv.to_parquet(with_levels)
     g.to_parquet(without)
-    rs.export_style(str(with_levels), tmp_path / "out", base_url=BASE)
+    rs.export_style(str(with_levels), tmp_path / "out", base_url=BASE, tile_format="mvt")
     props = json.loads((tmp_path / "out" / "props.json").read_text())             # the fields of each road, by its row (the pieces' id)
     assert len(props) == 12 and all("lanes" in p and "name" in p for p in props)
     assert [p["edge_id"] for p in props] == [str(2 ** 60 + i) for i in range(12)]

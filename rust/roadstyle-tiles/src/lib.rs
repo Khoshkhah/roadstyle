@@ -66,8 +66,8 @@ fn road_layer(name: &str) -> bool {
 /// The last tiles asked for, up to `TILE_CACHE_BYTES` (audit R14: a map asks for the same tiles again).
 #[derive(Default)]
 struct TileCache {
-    tiles: HashMap<(u32, u32, u32), std::sync::Arc<Vec<u8>>>,
-    order: std::collections::VecDeque<(u32, u32, u32)>,
+    tiles: HashMap<(u32, u32, u32, TileFormat), std::sync::Arc<Vec<u8>>>,
+    order: std::collections::VecDeque<(u32, u32, u32, TileFormat)>,
     bytes: usize,
 }
 
@@ -289,7 +289,13 @@ impl Tiles {
     /// The archive of every tile of the bounds `[min lon, min lat, max lon, max lat]` (an empty tile is left out), in zoom and then x, y
     /// order, as render's tiled page and export_style write it; `layers`: the tile layers of the metadata's vector_layers.
     pub fn archive(&self, bounds: [f64; 4], layers: &[String]) -> Result<Vec<u8>, Error> {
-        let mut w = pmtiles::Writer::default();
+        self.archive_in(bounds, layers, false)
+    }
+
+    /// `archive` with the tiles not compressed one by one (`plain`): the whole archive gzips better as one stream (the tiles are small, about
+    /// 1 KB at the last zoom, and a stream of 32 KB sees what the tiles have in common: Nacka, MLT, 7.7 MB in 6.2 MB).
+    pub fn archive_in(&self, bounds: [f64; 4], layers: &[String], plain: bool) -> Result<Vec<u8>, Error> {
+        let mut w = if plain { pmtiles::Writer::plain() } else { pmtiles::Writer::default() };
         let ll = |lon, lat| merc_ll(lon, lat).ok_or_else(|| Error::Options(format!("the archive's bounds {bounds:?} are not longitude and latitude")));
         let (lo, hi) = (ll(bounds[0], bounds[1])?, ll(bounds[2], bounds[3])?);
         for z in self.min_zoom..=self.max_zoom {
@@ -303,7 +309,7 @@ impl Tiles {
                 for y in y0..=y1 {
                     let t = self.build_in(self.format, z, x, y)?;       // each tile once: the cache is for a map that asks again (review 4, D9)
                     if !t.is_empty() {
-                        w.write_tile(pmtiles::tile_id(z, x, y), &pmtiles::gzip(&t));
+                        w.write_tile(pmtiles::tile_id(z, x, y), &if plain { t } else { pmtiles::gzip(&t) });
                     }
                 }
             }
@@ -343,12 +349,17 @@ impl Tiles {
         }
     }
 
-    /// `tile` in the format `format` (the MVT tile is the cached one).
+    /// `tile` in the format `format`. Each format is cached: a map asks for a tile again, and an MLT tile costs 1 to 6 ms to make from the MVT one.
     pub fn tile_in(&self, format: TileFormat, z: u32, x: u32, y: u32) -> Result<Vec<u8>, Error> {
-        match format {
-            TileFormat::Mvt => Ok(self.tile(z, x, y)),
-            TileFormat::Mlt => mlt::from_mvt(&self.tile(z, x, y)),
+        if format == TileFormat::Mvt {
+            return Ok(self.tile(z, x, y));
         }
+        if let Some(t) = self.cache.lock().unwrap().tiles.get(&(z, x, y, format)) {
+            return Ok(t.to_vec());
+        }
+        let out = mlt::from_mvt(&self.tile(z, x, y))?;
+        self.keep_tile((z, x, y, format), &out);
+        Ok(out)
     }
 
     /// The tile z/x/y, made again (`tile` with no cache): for a walk that asks for each tile once (the archive, a folder of tiles).
@@ -376,21 +387,26 @@ impl Tiles {
         if z < self.min_zoom || z > self.max_zoom {
             return Vec::new();
         }
-        if let Some(t) = self.cache.lock().unwrap().tiles.get(&(z, x, y)) {
+        if let Some(t) = self.cache.lock().unwrap().tiles.get(&(z, x, y, TileFormat::Mvt)) {
             return t.to_vec();
         }
         let out = self.build(z, x, y);
+        self.keep_tile((z, x, y, TileFormat::Mvt), &out);
+        out
+    }
+
+    /// A tile into the cache (the oldest go out above `TILE_CACHE_BYTES`).
+    fn keep_tile(&self, key: (u32, u32, u32, TileFormat), tile: &[u8]) {
         let mut c = self.cache.lock().unwrap();
-        c.bytes += out.len();
-        c.tiles.insert((z, x, y), std::sync::Arc::new(out.clone()));
-        c.order.push_back((z, x, y));
+        c.bytes += tile.len();
+        c.tiles.insert(key, std::sync::Arc::new(tile.to_vec()));
+        c.order.push_back(key);
         while c.bytes > TILE_CACHE_BYTES {
             let Some(old) = c.order.pop_front() else { break };
             if let Some(t) = c.tiles.remove(&old) {
                 c.bytes -= t.len();
             }
         }
-        out
     }
 
     /// The buffer round a tile of zoom `z` of `layer`, in tile units: none for a whole layer (its features go whole into the tiles

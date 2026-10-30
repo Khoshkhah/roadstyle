@@ -82,7 +82,7 @@ rs.render_edges(edges, color_by="aadt", cmap="viridis")                # colour 
 rs.render_edges(edges, palette="mono", color_options={                 # several colourings,
     "Traffic": {"color_by": "aadt", "cmap": "viridis"},                #   switched in the browser
     "Speed":   {"color_by": "maxspeed_kmh", "cmap": "magma"}})
-rs.render_edges(edges, tiles=True)                                     # 100k+ edges
+rs.render_edges(edges, tiles=False)                                    # GeoJSON roads (tiles are the default)
 rs.render_dashboard(edges).save("dashboard.html")                      # map + query sidebar
 rs.render_street_view(edges).save("street_view.html")                  # map and Street View side by side
 ```

@@ -79,7 +79,7 @@ impl fmt::Display for Error {
                 Unsupported::ItemPalette { palette, key } => write!(f, "palette {palette:?} changes {key} of an item and not of its road: not in this engine"),
                 Unsupported::MultiLineItem { overlay, item } => write!(f, "overlay {overlay}: item {item} is a MultiLineString; this engine draws LineString items only"),
                 Unsupported::TableItems { overlay } => write!(f, "overlay {overlay}: line items from a typed table are not made (only a caller's overlay has items)"),
-                Unsupported::TiledPalettes => f.write_str("tiles=True with a view's palette: the tiles have one palette"),
+                Unsupported::TiledPalettes => f.write_str("tiles=True with a view's palette: the tiles have one palette (a page with a palette in a view needs tiles=False)"),
             },
             Error::Look(e) => e.fmt(f),
             Error::Levels(e) => e.fmt(f),

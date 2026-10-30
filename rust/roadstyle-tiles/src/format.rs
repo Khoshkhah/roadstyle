@@ -3,10 +3,11 @@
 use crate::Error;
 use serde_json::Value;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// The one format of the tiles of every path (a page's archive, the map worker, a server's files): MLT. MVT is the cut itself, and a caller asks for it with `"mvt"`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum TileFormat {
-    #[default]
     Mvt,
+    #[default]
     Mlt,
 }
 

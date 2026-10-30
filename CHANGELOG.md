@@ -52,9 +52,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   or near-white colour shows. A page with no bar, or with no base-map box, keeps the Layers box.
 - **The compass button also changes the tilt**: dragging it turns the map (left and right) and tilts it (up and down); a click sets north and the tilt back (`visualizePitch`).
   The attribution button has an italic serif "i" in a ring, so it does not look like a page's help button ("?").
-- **A page of 10,000 roads or more without `tiles=True` gives a warning.** MapLibre cuts GeoJSON roads into tiles in the browser and keeps every vertex, so on 22,000 roads
-  (Nacka) the map draws 2.4 to 2.6 times the triangles of the tiled page at zoom 11 to 13, pan and zoom stall for twice as long, and the map can be empty while new
-  tiles are made. The picture is the same. The default of `tiles` is not changed (the tiled page is about 3 times larger).
+- **`tiles` is `True` by default: every page embeds its roads as tiles.** MapLibre cuts GeoJSON roads into tiles in the browser and keeps every vertex, so on 22,000 roads (Nacka) the
+  GeoJSON page draws 2.4 to 2.6 times the triangles of the tiled page at zoom 11 to 13, and pan and zoom stall for twice as long. `tiles=False` keeps the GeoJSON roads (and a page with a
+  palette in a view needs it: an error says so). To keep the tiled page about as small as the GeoJSON page: the last tile zoom is **16** (`tiles.maxzoom`, was 18: 0.1 to 0.3 % of the
+  pixels differ at zoom 17 to 20.5) and the embedded archive is **one gzip stream** (the tiles are not gzipped one by one; the page inflates it with `DecompressionStream`).
+  The tiles are **MLT in every path** (a page, the map worker, `export_style`, `roadstyle tiles`; the same pixels, 60 % of the bytes: Nacka 20.0 MB); `tile_format="mvt"` gives MVT.
+  The map worker keeps each tile in each format (an MLT tile was made again at each request). One rule for the tile paths: docs/design/tiling.md.
 - **`rs.setData` is about 3 times faster on 22,000 roads** (17 ms to 6 ms; 71 ms to 23 ms with the CPU 4 times slower): the key-to-row index is made once and not for each call, a
   road's own fields are read with no copy, and the colour of a set is made once and not for each road.
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
@@ -81,17 +84,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - **`line-dasharray` is only on the dashed pieces** (docs/design/tile_speed.md). The pieces that have a dash (a tunnel's gap and dashes,
-  `__rs_k` 3 and 4, and a piece with its own pattern, `__rs_dash`) are drawn by a layer of their own for each band (`roads-simple-dash`,
-  `roads-simple-z14-dash`, ...), under the layer of the other pieces: a tunnel is under the roads that cross it and under its own fill. The
+  `__rs_k` 3 and 4, and a piece with its own pattern, `__rs_dash`) are drawn by a layer of their own (`roads-simple-dash`), under the layer of the other pieces: a tunnel is under the roads that cross it and under its own fill. The
   other pieces have no `line-dasharray`, so MapLibre looks up no dash pattern for them. The base look had a faint dotted fringe on the
   casing that this removes (about 1 % of the pixels).
-- **The road layer is one layer for each band of zooms** (`roads-simple` below z14, `roads-simple-z14` from z14, `roads-simple-z15` from z15;
-  docs/design/tile_speed.md, "The road layer in MapLibre"). MapLibre evaluates each data-driven paint property for each feature. In a band, a
-  property whose zoom curve is one value is that value: `line-offset` is 0 below z15, `line-blur` is 0 and `line-opacity` is a short `case`
-  below z14. A band also keeps only the zoom stops that its zooms read. The picture does not change (0 pixels). A style with line items keeps
-  one road layer. `roadstyle:controls.pick` lists every band.
 - **The dashboard reads the road layer as a list of layers** (`RS_LEANS`, with `leanAt()` for the one that the map draws at its zoom). Pick,
-  hover, select and Street View use the list, so the road layer can be more than one style layer (zoom bands, the dash layers).
+  hover, select and Street View use the list, so the road layer can be more than one style layer (the dash layer).
 - **MLT documentation:** the measured results (Monaco sizes, the Burnaby speed study and the page of duckosm-rust), when to choose MLT or
   MVT, and a note that the speed can depend on the browser and on the device. MVT stays the default until a comparison in several browsers.
 

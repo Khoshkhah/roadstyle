@@ -16,7 +16,7 @@
         "line",
         "simple",
         "b7cf11813e537461",
-        "eac26d978918a536",
+        "0f8982d10befef0a",
         "f61343b045b32d9b"
       ],
       [
@@ -24,39 +24,7 @@
         "line",
         "simple",
         "278bdfc8da6323c3",
-        "c4ec609c1d2eaf93",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z14-dash",
-        "line",
-        "simple",
-        "b7cf11813e537461",
-        "129dc2226fa95034",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z14",
-        "line",
-        "simple",
-        "278bdfc8da6323c3",
-        "979c9ce2592794a3",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z15-dash",
-        "line",
-        "simple",
-        "b7cf11813e537461",
-        "4449b3bce5fd7e89",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z15",
-        "line",
-        "simple",
-        "278bdfc8da6323c3",
-        "dfb09fdb8fc60637",
+        "0a22082885dd7ce4",
         "f61343b045b32d9b"
       ],
       [
@@ -114,10 +82,10 @@
       "roadstyle:images": "e9049aa3d5b18840",
       "roadstyle:color_options": "253e2dfd41ca8ff2",
       "roadstyle:sources": "de9ed92a2cabe7fc",
-      "roadstyle:controls": "70a93bd14e09d762",
+      "roadstyle:controls": "13b74d5d7142a722",
       "roadstyle:generation": "18db75a661ad967c"
     },
-    "hash": "4c3af62b600854a4"
+    "hash": "5431624d2a7e328f"
   },
   "color_options": {
     "names": [

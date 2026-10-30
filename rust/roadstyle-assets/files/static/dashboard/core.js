@@ -14,7 +14,7 @@ export let RS_TILED = false;
 // RS_LEAN: the simple look's road layer (the id), or false for the full look (simple=False). The full look's paths (RS_LEAN false: core.js
 // _fs and _roadOfPiece, select.js's pick layers, svspot.js's road layer) go with simple=False in N16 (branch n16-full-look-js).
 export let RS_LEAN = false;
-// RS_LEANS: the ids of all the layers of the simple look's road (a layer for each band of zooms, docs/design/tile_speed.md); RS_LEAN is the first.
+// RS_LEANS: the ids of all the layers of the simple look's road (the layer and its dash layer, docs/design/tile_speed.md); RS_LEAN is the first.
 // leanAt(): the one that the map draws at its zoom
 export let RS_LEANS = [];
 export function leanAt(){ const z=map.getZoom(); return RS_LEANS.find(id=>{ const l=map.getLayer(id); return l && z>=(l.minzoom||0) && z<(l.maxzoom||25); }) || RS_LEAN; }

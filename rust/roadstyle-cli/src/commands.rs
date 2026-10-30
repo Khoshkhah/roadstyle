@@ -20,7 +20,7 @@ usage:
       the page in one file (render_edges(backend=\"web\")): the map, its dashboard and MapLibre, offline. The base map's key:
       --api-key, else $ROADSTYLE_API_KEY; the Google Maps key: --street-view-key, else $GOOGLE_MAPS_KEY. Any other option is a
       keyword of render (--tiles, --views '{\"plain\": {\"road_fill\": false}}').
-  roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--tile-format mvt|mlt] [--keep COL,COL] [--base-url URL]
+  roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--tile-format mlt|mvt] [--keep COL,COL] [--base-url URL]
       stage 2: the vector tiles of stage 1's files (tile_geojson): one PMTiles file, or <out>/roads/{z}/{x}/{y} and style.json.
   roadstyle levels make <edges> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
                     [--band-dist 10] [--head-m 5] [--near-rules] [--highway-col highway] [--layer-col layer] [--bridge-col bridge]
@@ -172,7 +172,7 @@ fn tiles_cmd(src: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> 
     let format = take(opts, "format").unwrap_or_else(|| "pmtiles".into());
     let keep = list(take(opts, "keep"));
     let base = take(opts, "base_url").map(|b| format!("{}/", b.trim_end_matches('/'))).unwrap_or_default();
-    let tile_format = roadstyle::tiles::TileFormat::parse(&take(opts, "tile_format").unwrap_or_else(|| "mvt".into())).map_err(|e| Error::Usage(e.to_string()))?;
+    let tile_format = roadstyle::tiles::TileFormat::parse(&take(opts, "tile_format").unwrap_or_else(|| "mlt".into())).map_err(|e| Error::Usage(e.to_string()))?;
     no_more(opts)?;
     let (mut style, mut tiles) = roadstyle::tiles_of_files(Path::new(src), &keep, None, &roadstyle::xyz_at(&base))?;
     tiles.format = tile_format;

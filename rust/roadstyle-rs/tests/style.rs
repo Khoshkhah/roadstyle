@@ -35,10 +35,8 @@
 //! - the tiles of the low zooms (2026-10-28, docs/design/tile_speed.md): below the last zoom, the polygons of a layer that only fill and
 //!   line layers draw (the base map's land, water and paved areas) are cut to the tile and its buffer and simplified to 1/8 px (a tile unit),
 //!   and a line of such a layer that is together under half a pixel long and stays in the tile is left out.
-//! - zoom bands (2026-10-29, docs/design/tile_speed.md): the road layer is a layer for each band of zooms (`roads-simple`, `roads-simple-z14`,
-//!   `roads-simple-z15`), where a paint property that is one value in the band is that value.
 //! - the dash (2026-10-29, docs/design/tile_speed.md): only the dashed pieces (the tunnels' dashes and the pieces with a pattern) have
-//!   `line-dasharray`, in a layer of their own for each band (`roads-simple-dash`, ...).
+//!   `line-dasharray`, in a layer of their own (`roads-simple-dash`).
 //!
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
@@ -67,7 +65,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "f2f45d192af44f8f52efa2b49f8664edef1392e0615efa63a7484810487e19d8");
+    assert_eq!(style_hash(&area), "25d407cb463d307cc34928b4610875ae2854dbf9ebe0059b251cfbbe268b2c57");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -116,7 +114,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "b311dd7828a458ccc63dd7b18b7db485d7e9849d6c67af311acddcd26e79deec");
+    assert_eq!(tiles_hash(&area), "a75c5e564947cdd82ab94d3732c8c614fe3dfd2ff48d186cee94b13553db49dd");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at

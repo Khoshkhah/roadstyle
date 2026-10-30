@@ -83,7 +83,7 @@ def test_a_road_is_picked_on_a_host_page_with_no_contract(tmp_path, old):
     g = _roads()
     style = json.loads(_engine.rust().inline_style(_engine._arrow(g), _engine._look_of({}), None, None, "roads"))
     style["layers"] = [lyr for lyr in style["layers"] if lyr["type"] != "symbol"]    # the arrows and names need a sprite and glyphs
-    assert style["metadata"]["roadstyle:controls"]["pick"] == ["roads-simple-dash", "roads-simple", "roads-simple-z14-dash", "roads-simple-z14", "roads-simple-z15-dash", "roads-simple-z15"]
+    assert style["metadata"]["roadstyle:controls"]["pick"] == ["roads-simple-dash", "roads-simple"]
     if old:
         del style["metadata"]["roadstyle:controls"]["pick"]
     with _host(tmp_path, style, g) as (pg, errors):

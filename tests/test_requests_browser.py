@@ -35,7 +35,7 @@ def _page(tmp_path, name, edges=None, **kw):
     from roadstyle import render_edges as render
 
     path = tmp_path / f"{name}.html"
-    render(edges if edges is not None else _edges(), basemap="blank", **kw).save(path)
+    render(edges if edges is not None else _edges(), basemap="blank", **{"tiles": False, **kw}).save(path)      # these tests read the GeoJSON sources
     return path
 
 

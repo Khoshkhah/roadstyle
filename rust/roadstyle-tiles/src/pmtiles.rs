@@ -35,7 +35,12 @@ struct Entry {
 }
 
 pub(crate) fn gzip(data: &[u8]) -> Vec<u8> {
-    let mut e = flate2::GzBuilder::new().mtime(0).write(Vec::new(), flate2::Compression::new(6));
+    gzip_at(data, 6)
+}
+
+/// `gzip` at a level (9: the best, for a page that embeds the whole archive once).
+pub fn gzip_at(data: &[u8], level: u32) -> Vec<u8> {
+    let mut e = flate2::GzBuilder::new().mtime(0).write(Vec::new(), flate2::Compression::new(level));
     e.write_all(data).unwrap();
     e.finish().unwrap()
 }
@@ -91,10 +96,17 @@ pub struct Writer {
     data: Vec<u8>,
     addressed: u64,
     unordered: bool,
+    /// the tiles are not gzipped one by one (the tile compression of the header is none): a host that gzips the whole archive
+    plain: bool,
 }
 
 impl Writer {
-    /// A tile's bytes as they go into the archive (gzipped vector tiles: tile compression gzip).
+    /// A Writer for tiles that are not compressed (the tile compression of the header is none).
+    pub fn plain() -> Writer {
+        Writer { plain: true, ..Writer::default() }
+    }
+
+    /// A tile's bytes as they go into the archive (gzipped vector tiles: tile compression gzip; `plain`: as they are).
     pub fn write_tile(&mut self, id: u64, data: &[u8]) {
         if self.entries.last().is_some_and(|l| id < l.id) {
             self.unordered = true;
@@ -156,8 +168,8 @@ impl Writer {
                   self.addressed, entries_n, contents] {
             h.extend_from_slice(&v.to_le_bytes());
         }
-        // clustered, internal compression (gzip), tile compression (gzip), tile type, the zooms
-        h.extend_from_slice(&[(!self.unordered) as u8, 2, 2, tile_type, min_zoom as u8, max_zoom as u8]);
+        // clustered, internal compression (gzip), tile compression (gzip, or none for a plain archive), tile type, the zooms
+        h.extend_from_slice(&[(!self.unordered) as u8, 2, if self.plain { 1 } else { 2 }, tile_type, min_zoom as u8, max_zoom as u8]);
         for v in [place.min_lon_e7, place.min_lat_e7, place.max_lon_e7, place.max_lat_e7] {
             h.extend_from_slice(&v.to_le_bytes());
         }

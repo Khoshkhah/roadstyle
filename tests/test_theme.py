@@ -144,7 +144,7 @@ def test_a_view_switches_the_palette_in_the_browser(tmp_path):
     pw = pytest.importorskip("playwright.sync_api")
     import roadstyle as rs
     path = tmp_path / "views.html"
-    rs.render_edges(_edges(), basemap="blank", views={"Day": {"palette": "amber"}, "Night": {"palette": "mono"}}).save(path)
+    rs.render_edges(_edges(), basemap="blank", views={"Day": {"palette": "amber"}, "Night": {"palette": "mono"}}, tiles=False).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
