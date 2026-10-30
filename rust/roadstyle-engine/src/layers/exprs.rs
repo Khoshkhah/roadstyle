@@ -446,7 +446,8 @@ mod class_minzoom_tests {
         let table = json!({"service": 14, "@private": 15}).as_object().cloned().unwrap();
         let f = super::minzoom_filter("highway", &table);
         assert_eq!(f[0], "all");
-        assert_eq!(f[2], json!(["any", ["!=", ["coalesce", ["get", "__rs_access"], ""], "private"], [">=", ["zoom"], 15.0]]));
+        let access = roadstyle_model::mark::Mark::Access.name();
+        assert_eq!(f[2], json!(["any", ["!=", ["coalesce", ["get", access], ""], "private"], [">=", ["zoom"], 15.0]]));
         let plain = super::minzoom_filter("highway", json!({"service": 14}).as_object().unwrap());
         assert_eq!(plain[0], ">=");
     }
