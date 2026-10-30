@@ -51,10 +51,11 @@
     "roadstyle:interaction": "a911c29a8eeae5d8",
     "roadstyle:images": "e9049aa3d5b18840",
     "roadstyle:sources": "3eb959a8e2207438",
+    "roadstyle:classes": "e0a3fe0ab6ac40de",
     "roadstyle:controls": "7ad47e2cab264f27",
     "roadstyle:generation": "18db75a661ad967c"
   },
-  "hash": "0e64cf015473b353",
+  "hash": "938c3b51912f6510",
   "road_table": {
     "rows": 1373,
     "columns": [

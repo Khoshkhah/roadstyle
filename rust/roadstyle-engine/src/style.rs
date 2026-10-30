@@ -201,6 +201,7 @@ fn metadata(look: &Look, images: Map<String, Value>, planned: Option<(&str, Valu
     // the roads with no contract too (contract::describe; tiled_style writes them again for the tiles)
     let pick = contract::pick_layers(layers);
     metadata.insert("roadstyle:sources".into(), contract::roles(layers));
+    metadata.insert(roadstyle_model::props::CLASSES.into(), json!(look.model.classes));
     match contract {
         None => {
             metadata.insert("roadstyle:controls".into(), json!({"pick": pick}));

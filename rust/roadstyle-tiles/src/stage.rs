@@ -71,6 +71,8 @@ impl TileOptions {
                          pieces, exact: None, only: None, slots_from, wait: false, format: Default::default(),
                          codes: crate::codes::Codes {
                              class: metadata["roadstyle:controls"]["filter"]["classes"].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect(),
+                             classes: metadata[roadstyle_model::props::CLASSES].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect(),
+                             class_col: col("class").unwrap_or_else(|| "highway".into()),
                              dashes: crate::codes::dash_patterns(layers) } })
     }
 

@@ -80,10 +80,11 @@
     "roadstyle:interaction": "a911c29a8eeae5d8",
     "roadstyle:images": "e9049aa3d5b18840",
     "roadstyle:sources": "de9ed92a2cabe7fc",
+    "roadstyle:classes": "e0a3fe0ab6ac40de",
     "roadstyle:controls": "13b74d5d7142a722",
     "roadstyle:generation": "960db97f1bd34c71"
   },
-  "hash": "cecfe6c5b5163a4f",
+  "hash": "c44683ff891879c9",
   "road_table": {
     "rows": 13298,
     "columns": [
@@ -125,7 +126,7 @@
     }
   },
   "text": {
-    "bytes": 18007241,
-    "sha16": "cecfe6c5b5163a4f"
+    "bytes": 18007587,
+    "sha16": "c44683ff891879c9"
   }
 }

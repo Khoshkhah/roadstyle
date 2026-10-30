@@ -29,6 +29,7 @@ fn look(export: bool) -> Look {
 
 /// Every tile of the roads' box at zooms 12, 14 and 15: (layer, key, is a text) with the number of features that have it.
 fn keys_of(tiles: &Tiles, roads: &[u8]) -> BTreeMap<(String, String, bool), usize> {
+    // the entry (layer, "#features", false) is the number of features of the layer
     let t = roadstyle_rs::read::read_roads(roads.to_vec(), "geometry").unwrap();
     let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
     for c in (0..t.len()).filter_map(|i| t.line(i)).flatten() {
@@ -43,6 +44,7 @@ fn keys_of(tiles: &Tiles, roads: &[u8]) -> BTreeMap<(String, String, bool), usiz
             for y in ty(y1)..=ty(y0) {
                 for (layer, feats) in common::decode_tile(&tiles.tile(z, x, y)) {
                     for (id, props, _, _) in feats {
+                        *out.entry((layer.clone(), "#features".to_string(), false)).or_insert(0) += 1;
                         if layer == "simple" || layer == "slots" {
                             assert!(id.is_some(), "{layer}: a feature has no id (the id is the road's row)");
                         }
@@ -64,7 +66,7 @@ fn table(path: &str, style: &str, found: &BTreeMap<(String, String, bool), usize
     let style: Value = serde_json::from_str(style).unwrap();
     let layers = style["layers"].as_array().cloned().unwrap_or_default();
     let mut out = format!("\n### Tile keys: {path}\n\n| layer | key | value | features | read by the style | read by the page |\n|---|---|---|---|---|---|\n");
-    for ((layer, key, is_text), n) in found.iter().filter(|((l, ..), _)| l == "simple" || l == "slots") {
+    for ((layer, key, is_text), n) in found.iter().filter(|((l, k, _), _)| (l == "simple" || l == "slots") && k != "#features") {
         let get = format!("[\"get\",\"{key}\"]");
         let style_layers: Vec<String> = layers.iter().filter(|l| l["source-layer"] == layer.as_str())
             .filter(|l| ["paint", "layout", "filter"].iter().any(|k| l[k].to_string().contains(&get))).map(|l| l["id"].as_str().unwrap_or("").to_string()).collect();
@@ -86,7 +88,13 @@ fn check(path: &str, style: &str, found: &BTreeMap<(String, String, bool), usize
     let road = |l: &str| l == "simple" || l == "slots";
     let text: BTreeSet<(String, String)> = roadstyle_rs::mark::TILE_TEXT_KEYS.iter().map(|(l, k)| (l.to_string(), k.to_string())).collect();
     let mut errors = Vec::new();
-    for (layer, key, is_text) in found.keys().filter(|(l, ..)| road(l)) {
+    for layer in ["simple", "slots"] {
+        let n = |k: &str| found.get(&(layer.to_string(), k.to_string(), false)).copied().unwrap_or(0);
+        if n("#features") > 0 && n(roadstyle_rs::mark::Mark::ClassIndex.name()) != n("#features") {
+            errors.push(format!("{layer}: {} features and {} with the class number __rs_ci (the style's class tests read it)", n("#features"), n(roadstyle_rs::mark::Mark::ClassIndex.name())));
+        }
+    }
+    for (layer, key, is_text) in found.keys().filter(|(l, k, _)| road(l) && k != "#features") {
         if !roadstyle_rs::mark::tile_key_allowed(key) {
             errors.push(format!("{layer}.{key}: not on the list of tile keys (a data column goes to the road table, not to a tile)"));
         }
@@ -95,11 +103,8 @@ fn check(path: &str, style: &str, found: &BTreeMap<(String, String, bool), usize
         }
     }
     for (layer, key) in &text {
-        if !found.keys().any(|(l, k, t)| l == layer && k == key && *t) && !found.is_empty() {
-            // a list entry that no tile of this path has as text: the list shrinks (the path may not have the key at all: `slots` of a page with no names)
-            if found.keys().any(|(l, ..)| l == layer) && path != "stage 1 files" && path != "export look" {
-                errors.push(format!("{layer}.{key}: no text value any more on the {path}: take it out of TILE_TEXT_KEYS"));
-            }
+        if !found.keys().any(|(l, k, t)| l == layer && k == key && *t) {
+            errors.push(format!("{layer}.{key}: no text value any more on the {path}: take it out of TILE_TEXT_KEYS"));
         }
     }
     assert!(errors.is_empty(), "{path}:\n{}", errors.join("\n"));
@@ -129,4 +134,22 @@ fn the_tiles_of_the_stage_1_files_have_only_the_listed_keys() {
     let (style, tiles) = roadstyle_rs::tiles_of_files(&dir, &[], None, &roadstyle_rs::xyz_at("")).unwrap();
     std::fs::remove_dir_all(&dir).ok();
     check("stage 1 files (the program roadstyle tiles)", &style.to_string(), &keys_of(&tiles, &roads));
+}
+
+/// One rule means one key set. The paths differ only where the style differs, and this list says where: `__rs_cc` is the class for the Roads filter, which
+/// the page look has (its style has the filter panel) and the export look has not; `__rs_arw` marks the slots that carry an arrow, which the export look's
+/// arrow layer reads and the page look has not (the page's `arrows.js` places its own arrows).
+#[test]
+fn the_paths_differ_only_in_the_documented_keys() {
+    let roads = data("monaco/roads.parquet");
+    let features = Some(data("monaco/features.parquet"));
+    let keys = |look: &Look| -> BTreeSet<(String, String)> {
+        let (_, tiles, _) = roadstyle_rs::tiled_from_parquet(roads.clone(), look, features.clone(), None, "rs://", &[]).unwrap();
+        keys_of(&tiles, &roads).into_keys().filter(|(l, k, _)| (l == "simple" || l == "slots") && k != "#features").map(|(l, k, _)| (l, k)).collect()
+    };
+    let (page, export) = (keys(&look(false)), keys(&look(true)));
+    let only_page: Vec<String> = page.difference(&export).map(|(l, k)| format!("{l}.{k}")).collect();
+    let only_export: Vec<String> = export.difference(&page).map(|(l, k)| format!("{l}.{k}")).collect();
+    assert_eq!(only_page, ["simple.__rs_cc", "slots.__rs_cc"], "keys of the page look only");
+    assert_eq!(only_export, ["slots.__rs_arw"], "keys of the export look only");
 }

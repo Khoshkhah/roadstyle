@@ -68,21 +68,26 @@ are in the road table, and the popup, the panel, the filters by row and the live
 worker, `export_style`, `roadstyle tiles`): there is one rule, not one for each path.
 
 **What the tiles of Monaco have** (the table that the test prints for every path; the CI job summary has it too). `simple` is the road pieces and
-`slots` the name and arrow anchors:
+`slots` the name and arrow anchors. No road feature has a text value except the street name of a name slot.
 
 | layer | key | value | read by the style | read by the page |
 |---|---|---|---|---|
 | simple | `__rs_k`, `__rs_ci`, `r`, `__rs_twoway`, `__rs_pair`, `__rs_bridge`, `__rs_tunnel`, `__rs_seam`, `__rs_lap` | number or flag | road layer and its dash layer | `__rs_k` |
+| simple | `__rs_ci` | the class: the place in `roadstyle:classes` (the model's classes) | road layer (widths, offsets, the class minzoom) | |
+| simple | `__rs_cc` | the class for the Roads filter: the place in `roadstyle:controls.filter.classes` | nobody | the Roads filter (`filter.js`) |
+| simple | `__rs_dash`, `__rs_cap` | the index (from 1) of the dash pattern; 1 flat end, 2 square end | road layer | |
 | simple | `lvl` | number | (the Roads filter: Bridges and Tunnels) | yes |
-| simple | `__rs_cap` | 1 flat end, 2 square end | road layer | |
-| simple | `__rs_dash` | the index (from 1) of the dash pattern | road layer | |
-| simple | `highway` | **text** | road layer (the class minzoom `match`) | |
-| simple | `__rs_cc` | the class as a number: the index in the filter panel's `classes` | nobody in the static style | the Roads filter (`filter.js`) |
-| slots | `chain`, `slot`, `rank`, `oneway` | number | `slot`, `oneway`: names and arrows | arrows.js, labels |
-| slots | `lvl`, `__rs_tunnel` | number or flag | names and arrows | |
-| slots | `highway` | **text** | names and arrows (the size by class, the minor-road rule) | `arrows.js` |
-| slots | `__rs_cc` | the class as a number | nobody | the Roads filter |
-| slots | `name` | **text** | names (`text-field`) | labels |
+| slots | `__rs_ci` | the class of the chain, as in `simple` | names and arrows (the size by class, the minor-road rule, the class minzoom) | `arrows.js` |
+| slots | `__rs_cc`, `lvl`, `__rs_tunnel` | number or flag | names and arrows; the Roads filter | |
+| slots | `chain`, `slot`, `rank`, `oneway` | number | names, arrows | arrows.js, labels |
+| slots | `name` | **text**: the only one | names (`text-field`) | labels |
+
+**Why the paths do not have the same key set.** A key is in a tile when the style's expressions or the page's contract read it, and the three paths have
+different styles. The test `the_paths_differ_only_in_the_documented_keys` fails for any other difference:
+- `__rs_cc` (`simple` and `slots`) is in the **page look** only: its style has the filter panel (`roadstyle:controls.filter`), and the Roads filter hides a class by this number. The export
+  look and the files of stage 1 have no filter panel, so no class key for the filter.
+- `__rs_arw` (`slots`) is in the **export look and the stage 1 files** only: the export style's arrow layer draws only the slots that have it, and the page's `arrows.js`
+  places its own arrows, so its style does not read it.
 
 **Checklist and tests**
 
@@ -90,25 +95,25 @@ worker, `export_style`, `roadstyle tiles`): there is one rule, not one for each 
 |---|---|---|---|
 | 1 | The feature id of a piece and of a slot is the road's row | `tile_keys.rs`, each path | done |
 | 2 | A key of a road feature is a mark or one of `TILE_ROAD_KEYS`: no data column | `the_page_look_tiles_have_only_the_listed_keys`, `the_export_look_tiles_have_only_the_listed_keys`, `the_tiles_of_the_stage_1_files_have_only_the_listed_keys` | done |
-| 3 | No text value on a road feature, outside `TILE_TEXT_KEYS`; the list only shrinks (an entry with no text value fails the test) | the same three | list pinned at 3 pairs (`highway` on `simple` and `slots`, `name` on `slots`); `__rs_cls`, `__rs_dash` and `__rs_cap` are numbers (2026-10-29) |
+| 3 | No text value on a road feature, outside `TILE_TEXT_KEYS` (only `slots.name`); an entry with no text value fails the test; every feature has `__rs_ci` | the same three | done (2026-10-29: `__rs_cls`, `highway`, `__rs_dash`, `__rs_cap` are numbers) |
+| 3b | The paths differ only in the documented keys | `the_paths_differ_only_in_the_documented_keys` | done |
 | 4 | No whole-road layer `roads` in the tiles of `export_style` (a click reads the road table by row) | `tests/test_export_style.py::test_style_points_at_its_own_files` | done |
 | 5 | A base-map layer keeps only what its layers read (`height`, `base`, `kind`; no `osm_id`, no `name`) | `stage.rs`: `a_base_map_layer_keeps_what_its_layers_read` | done |
 | 6 | The tile bytes only go down | `tile_budget.rs`, `tests/test_tile_budget.py` | done (bytes); a number for the property bytes is not in the budget yet |
 
 **What cannot leave the tile**
 - `name` on the `slots` features: `text-field` reads the street name from the tile; MapLibre has no side table for a layout property. It stays on the label anchors, never on a road piece.
-- The numbers and flags in the first row: the style's expressions and the dashboard's layer filters read them while MapLibre draws.
+- The numbers and flags in the first rows: the style's expressions and the dashboard's layer filters read them while MapLibre draws.
 
-**What is still text on a road feature, and how it leaves** (not done): `highway` on `simple` (the class minzoom `match`) and on `slots` (the size of an arrow, the
-minor-road rule, `arrows.js`). The class is then three keys in a piece (`__rs_ci`, `__rs_cc`, `highway`): one numeric key is enough, and it is the one change that saves bytes (below).
-The numbers of the other text keys are written by the tile cut (`rust/roadstyle-tiles/src/codes.rs` and `layer.rs`), and the style's expressions of the tile layers are
-rewritten to read them (`encode_style`, in `tiled_style`): `__rs_cls` is the index in `roadstyle:controls.filter.classes` (the Roads filter hides a class by its number in a
-vector source; a GeoJSON source keeps the text), `__rs_dash` is the index from 1 in the road layer's dash patterns, and `__rs_cap` is 1 or 2. A page with no filter panel has no class key.
+**How the text leaves** (`rust/roadstyle-tiles/src/codes.rs` and `layer.rs`; one rule for every path). The tile cut writes the numbers, and `encode_style` rewrites the expressions of the tile layers to read them (a
+GeoJSON layer keeps its text): `__rs_cls` becomes `__rs_cc`, the index in `roadstyle:controls.filter.classes` (the Roads filter hides a class by its number in a vector source); the class text of a slot
+(`highway`) becomes `__rs_ci` and the class text of a piece is dropped (the engine has put `__rs_ci` on it; a `match` on the class text reads `__rs_ci` and the numbers of the classes in `roadstyle:classes`); `__rs_dash` is the
+index from 1 in the road layer's dash patterns; `__rs_cap` is 1 or 2. A page with no filter panel has no `__rs_cc`.
 
 **What it gave, measured on Nacka** (the same base, with and without the numbers; z6-z16; MVT and MLT): **almost nothing in bytes**. MVT: 0.0 % (21.33 and 21.34 MB of tiles); MLT: 1.8 % of the tile
 bytes and 0.6 % more in the archive (6.96 and 6.83 MB; the archive 5.30 and 5.33 MB). A text value is in a tile once (the value table), and a feature has only its index, as it has for a number; the gzip
 makes the text keys small. The gain of the work is the rule (no text on a road feature, one list, a test on every path), not the size. **The size is in the number of keys of a piece**
-(8 to 14 tags, 34 to 40 % of the raw bytes): a key that leaves every piece takes about 2 bytes of 37 (5 %), so one class key in place of three (`__rs_ci`, `__rs_cc`, `highway`) saves about 10 % of the tag bytes, and
+(8 to 14 tags, 34 to 40 % of the raw bytes): a key that leaves every piece takes about 2 bytes of 37 (5 %), so one class key in place of two (`__rs_ci` for the style, `__rs_cc` for the Roads filter: they differ when the filter column is not the class column) saves about 5 % of the tag bytes, and
 `lvl` (a number that the Bridges and Tunnels switches filter on) and the flags `__rs_twoway`, `__rs_pair` could be one `__rs_k`-like code.
 
 **Where the bytes are** (Nacka, MVT, 13,687 tiles; a count of the raw bytes of a tile: geometry, the tags of each feature (a key and a value index), the key and value tables)

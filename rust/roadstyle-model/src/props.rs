@@ -230,6 +230,8 @@ pub const CONTRACT_KEY: &str = "roadstyle:contract";
 
 /// The metadata key of the generation of the road set: the first 16 hex characters of `roadstyle_levels::edge_hash` of its edge ids. A
 /// road's row (the tiles' feature id) is valid in one generation only; the tile URL and the archive carry it.
+/// The style's metadata key of the model's classes, in their order: `__rs_ci` is a place in this list (a tile's class text is that number).
+pub const CLASSES: &str = "roadstyle:classes";
 pub const GENERATION: &str = "roadstyle:generation";
 
 /// The metadata key of the popup fields of each overlay that has some, by its source: `{source: [field]}`. They are not in the

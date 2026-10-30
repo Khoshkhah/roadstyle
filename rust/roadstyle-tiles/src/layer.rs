@@ -83,6 +83,8 @@ pub(crate) struct Builder {
     pub(crate) road_id: bool,
     /// the classes of the filter panel: the text `__rs_cls` of a road feature goes into the tile as its index in this list, `__rs_cc` (None: not a road layer; an empty list: the page has no filter panel, so the class is not in the tile)
     pub(crate) codes: Option<crate::codes::Codes>,
+    /// the layer is the slots': the class text `highway` of a slot is its `__rs_ci` in a tile (a piece has `__rs_ci` from the engine)
+    pub(crate) slots: bool,
     /// the numbers of the last feature's properties, by place: the pieces of one road come one after another and have most of their
     /// properties the same, which then take their numbers with no lookup
     pub(crate) last: Vec<(u32, u32)>,
@@ -116,13 +118,21 @@ impl Builder {
     /// the rules give them.
     pub(crate) fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32, f32, Option<u64>) {
         let (keys, key_at, vals, encoded, val_at, scratch) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at, &mut self.scratch);
-        let (rules, last, road_id, codes) = (&self.rules, &self.last, self.road_id, &self.codes);
+        let (rules, last, road_id, codes, slots) = (&self.rules, &self.last, self.road_id, &self.codes, self.slots);
         let mut read = Map::new();        // the values that the first-zoom rules read
         let mut j = 0;
         let (mut road, edge) = (None, roadstyle_model::mark::Mark::Edge.name());
         let props: Vec<(u32, u32)> = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
+                if road_id && k.as_ref() == edge {
+                    road = match v { Val::Int(i) => u64::try_from(i).ok(), Val::UInt(u) => Some(u), _ => None };
+                    return None;
+                }
+                if rules.reads(k.as_ref()) {
+                    read.insert(k.as_ref().to_string(), json_of(&v));
+                }
+                // the first-zoom rules read the text above; the tile has the number
                 // a text class is a small number in a tile: the index in the filter panel's list (a class that the list lacks has no key: no filter hides it)
                 let (key, v): (&str, Val) = match codes.as_ref() {
                     // a text class, a dash pattern and a square end are numbers in a tile (codes.rs); a class that the filter panel lacks has no key: no filter hides it
@@ -131,6 +141,11 @@ impl Builder {
                             Some(i) => (roadstyle_model::mark::Mark::ClassCode.name(), Val::Int(i as i64)),
                             None => return None,
                         },
+                        _ => return None,
+                    },
+                    // the class text: a piece has its number from the engine (`__rs_ci`), a slot gets it here; no class text in a tile
+                    Some(c) if !c.classes.is_empty() && (k.as_ref() == c.class_col || k.as_ref() == "highway") => match &v {
+                        Val::Str(s) if slots => (roadstyle_model::mark::Mark::ClassIndex.name(), Val::Int(c.classes.iter().position(|x| x == s.as_ref()).unwrap_or(c.classes.len()) as i64)),
                         _ => return None,
                     },
                     Some(c) if k.as_ref() == roadstyle_model::mark::Mark::Dash.name() => match &v {
@@ -144,13 +159,6 @@ impl Builder {
                     },
                     _ => (k.as_ref(), v),
                 };
-                if road_id && key == edge {
-                    road = match v { Val::Int(i) => u64::try_from(i).ok(), Val::UInt(u) => Some(u), _ => None };
-                    return None;
-                }
-                if rules.reads(key) {
-                    read.insert(key.to_string(), json_of(&v));
-                }
                 if v == Val::Bool(false) && key.starts_with(roadstyle_model::mark::PREFIX) {
                     return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
                 }
