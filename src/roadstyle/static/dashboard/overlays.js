@@ -4,7 +4,7 @@
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields, _esc} from "../popup.js";
-import {map, O, OVERLAYS, RS_PREFIX, _role, _emit} from "./core.js";
+import {map, O, OVERLAYS, RS_PREFIX, _NO_HOVER, _role, _emit} from "./core.js";
 import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
@@ -94,7 +94,7 @@ const _ovTips = ov=>ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   //
 function _ovBind(id){
   if(_ovBound.has(id)) return;
   _ovBound.add(id);
-  map.on("mousemove", id, e=>{ const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
+  map.on("mousemove", id, e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
     map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)
     const f = e.features && e.features[0]; if(!f) return;
     const k={source:ov.source, id:f.id}, same=o=>!!o && o.source===k.source && o.id===k.id;

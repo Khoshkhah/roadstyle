@@ -8,6 +8,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Fixed
 - **The full sheet on a phone**: the sheet and the boxes of the bar used `vh`, which on a phone with its address bar visible is taller than the screen. The grip of the full sheet went under the bar and the sheet could not be lowered. They use `dvh` now (the visible screen).
+- **No hover on a touch-only device**: a tap on a phone makes the browser send an emulated mouse move, so a road showed its tooltip and its popup together. A device whose main input cannot hover (`(hover: none)`) has no hover tooltip and no hover light, on the roads and on the overlays; a tap is a click. A mouse is unchanged.
+- **The Google 3D window's header is one row on a phone**: its "heights: Mapzen" credit is a row of the bar's attribution box there ("Ground heights: Mapzen, SRTM", with the Google credit while a Google window is open), not in the header.
 - **The bar on a phone is one row**: when the tools do not fit, the row moves sideways under a finger (no scrollbar), with a soft fade at an edge that has more tools. A box of the bar opens under it as a fixed box of the window's width (the scrolling row would clip it). The fold button hides the bar: one small button stays, and the page keeps the choice. The tools are in `.rs-tb-scroll` inside `.rs-tb-row`, which are `display:contents` on a desktop.
 - **The bars of the windows on a phone**: the bar of the Google 3D window (and of Street View) is one row; its tunnel note got a column of one word per line. The bar wraps, and the note has a row of its own.
 

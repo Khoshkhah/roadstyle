@@ -175,3 +175,40 @@ def test_the_fold_button_hides_the_bar_and_the_page_keeps_it_with_the_sheet_open
             assert _bar(page)["bar"]["h"] < 60 and _bar(page)["bar"]["w"] > w * 0.8
         browser.close()
     assert not errors, errors
+
+
+@pytest.mark.parametrize("w,h", _PHONES)
+def test_the_google_3d_header_is_one_row_on_a_phone(w, h):
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", google_3d=True).html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = _open(browser, html, errors, viewport={"width": w, "height": h}, **_TOUCH)
+        r = page.evaluate("""() => { const win = document.querySelector('.rs-g3d'); win.hidden = false;
+          const bar = win.querySelector('.rs-svw-bar'), kids = [...bar.children].filter(e => e.offsetParent), top = e => { const b = e.getBoundingClientRect(); return Math.round((b.top + b.bottom) / 2 / 6); };   // the centres: items of other heights share a row
+          return {h: bar.getBoundingClientRect().height, tops: [...new Set(kids.map(top))], n: kids.length, credit: getComputedStyle(win.querySelector('.rs-g3d-src')).display}; }""")
+        assert len(r["tops"]) == 1 and r["h"] < 46 and r["credit"] == "none", r      # one row; the credit is in the attribution box
+        browser.close()
+    assert not errors, errors
+
+
+def test_a_tap_on_a_phone_shows_no_hover_tooltip_but_a_mouse_on_a_desktop_does():
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", road_tooltip=True, hover_delay_ms=100).html, []
+    on_road = "(() => { const p = map.project([18.0005, 59.3005]); return [p.x, p.y]; })()"
+    tip = "[...document.querySelectorAll('.rs-tip')].filter(e => e.offsetParent).length"
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = _open(browser, html, errors, viewport={"width": 390, "height": 844}, **_TOUCH)
+        page.evaluate("rs.sheet(0)")
+        page.wait_for_timeout(400)
+        x, y = page.evaluate(on_road)
+        page.touchscreen.tap(x, y)
+        page.wait_for_timeout(900)
+        assert page.evaluate(tip) == 0, "a tap on a phone is a click, not a hover"
+        desk = _open(browser, html, errors, viewport={"width": 1280, "height": 800})
+        x, y = desk.evaluate(on_road)
+        desk.mouse.move(x - 3, y - 3)
+        desk.mouse.move(x, y)
+        desk.wait_for_timeout(900)
+        assert desk.evaluate(tip) == 1, "a mouse on a desktop still shows the tooltip"
+        browser.close()
+    assert not errors, errors

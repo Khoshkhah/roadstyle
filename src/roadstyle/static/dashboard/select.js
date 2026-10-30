@@ -1,6 +1,6 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
+import {map, style, O, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _NO_HOVER, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot, useSpot} from "./svspot.js";
@@ -143,7 +143,7 @@ export function initSelect(){
   initSpot();
   window.rsDeselect = rsDeselect;
   window.rsSelect = rsSelect;
-  map.on("mousemove", e=>{ _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
+  map.on("mousemove", e=>{ if(_NO_HOVER.matches) return; _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
   map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; _cur=null; clearTimeout(_tipT); if(_tip) _tip.remove(); });
   map.on("click", async e=>{
     // visual stacking decides the click: an "over" overlay (POIs, in front of the roads) wins;
