@@ -97,7 +97,7 @@ marks! {
     /// the class as a number in a tile: the index of `__rs_cls` in the filter panel's list (`roadstyle:controls.filter.classes`); a tile has this, the road table has the text
     ClassCode = "__rs_cc" [Pieces, Slots];
     /// the class index of the road layer's lookups
-    ClassIndex = "__rs_ci";
+    ClassIndex = "__rs_ci" [Slots];
     /// the road's grade (the position of its fill, as a number)
     Lvl = "lvl" [Pieces, Table];
     /// an item's road's grade
