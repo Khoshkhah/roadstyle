@@ -7,9 +7,9 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 import pytest
+from light import light
 from shapely.geometry import LineString
 
-from light import light
 from roadstyle import Overlay, compute_levels, render_edges
 
 _KEY_UNIT = 100_000_000      # the pieces' sort keys: one drawing position
