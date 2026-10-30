@@ -8,7 +8,7 @@
 // solved levels.csv to `store`, and after each solve it sends the event "solved" ({levelsCsv, levelsInfo, draw()}: draw gives the map's
 // table, GeoParquet, one row for each edge) so that the host can apply it. The event "back" comes when the person leaves with "← <backLabel>"
 // (with changes waiting, after "Apply, discard or stay" has an answer that leaves): the host then calls destroy() and shows its own steps.
-// `backLabel: null` has no "← ..." button (a page with no steps). `template` is the dashboard template of the editor's own map's dashboard.
+// `backLabel: null` has no "← ..." button (a page with no steps). `template` is the dashboard template of the editor's own map's dashboard, and `basemaps` its base maps ({style, basemaps, ontop}: host_options.json): the same base-map box as every dashboard.
 // A store is {load(name, bytes) -> {body, mtime} | null,
 // save(name, text | bytes)} with an optional `name` (the area's, shown in the panel) and `key`: httpStore for roadstyle serve,
 // browserStore for a page with no server.
@@ -20,6 +20,7 @@
 import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
+import {initPanelScroll} from "../panelscroll.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
 const EMPTY = COLS.join(",") + "\n";
@@ -101,11 +102,11 @@ const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
-export async function levelEditor({map = null, container = document.body, panel, backLabel = "Steps", template = null, pkgUrl, store,
+export async function levelEditor({map = null, container = document.body, panel, backLabel = "Steps", template = null, basemaps = null, pkgUrl, store,
                                    maplibregl: ml = globalThis.maplibregl, dashboard = null, prefix = dashboard ? null : "lv-rs-",
                                    levels: given = null, host = null, colors = {}}){
-// the picked roads and the hover (`colors`: {select, hover, second}): road 1 in the selection's colour, road 2 darker, the hover lighter
-const COLORS = {select: "#7c4dff", hover: "#b388ff", second: "#4527a0", ...colors};
+// the picked roads and the hover (`colors`: {select, hover, second}): road 1 red, road 2 blue, the hover a lighter red
+const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", ...colors};
 // the host's panel: the card, its title line (the title first, then the hide button) and its body
 const hostCard = panel?.querySelector?.(".sb-card"), hostBar = hostCard?.querySelector(".sb-top"), hostBody = hostCard?.querySelector(".sb-body");
 if(!hostBar?.firstElementChild || !hostBody)
@@ -241,6 +242,7 @@ function ownSources(st){
   return st;
 }
 const own = !map;                                                // no host map: the editor's own, on the area's box
+if(own && !basemaps?.style) throw new Error("level editor: the editor's own map needs `basemaps`, the base maps of a host page (host_options.json: style, basemaps, ontop)");
 const added = ["road", "s_lon", "s_lat", "e_lon", "e_lat"];      // host: the fields that the panel reads, put on the host's road table
 const mine = {layers: [], sources: [], images: []};              // what the editor put on the map
 const taken = {layers: [], sources: {}, order: [], style: null};  // the host's roads that the editor took off, for destroy
@@ -276,15 +278,15 @@ if(host){                                                        // the host's m
     const div = document.createElement("div");
     div.style.cssText = "position:absolute;inset:0";
     container.appendChild(div);
-    map = new ml.Map({container: div, style: "https://tiles.openfreemap.org/styles/positron", bounds: [[bb[0], bb[1]], [bb[2], bb[3]]],
+    map = new ml.Map({container: div, style: basemaps.style, bounds: [[bb[0], bb[1]], [bb[2], bb[3]]],
       attributionControl: {compact: true}});
     map.addControl(new ml.NavigationControl({visualizePitch: true}));
     map.addControl(new ml.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
   } else map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {padding: 40, duration: 0});
   window.map = map;                                                // the panel (level_editor.html) draws on the global map
   // the page's one dashboard: the host's, else one for the editor (the road fields: the road table RS_SIDE)
-  rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
-    dashboard: template});
+  rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge",
+    basemaps: basemaps.basemaps, ontop: basemaps.ontop, dashboard: template});
   if(own){                                                         // the area in the part of the map that the panel and the bar leave free
     const f = rs.freeArea(), r = map.getContainer().getBoundingClientRect();
     map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {duration: 0, padding: {left: f.lo - r.left + 40, right: r.right - f.hi + 40, top: f.top - r.top + 40,
@@ -506,6 +508,7 @@ try {
     else hostCard.appendChild(node);                              // a script runs here, at once
   }
 } finally { [document.addEventListener, map.on] = [docOn, mapOn]; }
+initPanelScroll();                                               // the editor's tabs scroll by the panel's protocol (the class rs-pbody)
 if(backLabel == null) document.getElementById("lv-back").remove();      // a page with no steps to go back to
 else document.getElementById("lv-back").textContent = "← " + backLabel;
 document.getElementById("lv").addEventListener("lv:back", () => events.dispatchEvent(new CustomEvent("back")));

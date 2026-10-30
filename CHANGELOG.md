@@ -7,6 +7,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The level editor has the dashboard's base-map box.** The editor's own map starts on the page's base style (Blank, as every dashboard) with the standard box: the base
+  maps, "On top" (Hillshade, Labels, 3D buildings), and the dark twin that follows the theme. `host_options()` (and `data/host_options.json`) gives `style`, the base style that a
+  page of roadstyle gets, so a host page makes its map from it and has no copy of the rule. `levelEditor({basemaps})` takes it (`host_options.json`) and is required for the
+  editor's own map; the fixed OpenFreeMap Positron style is gone.
+- **The level editor's two picked roads are red (road 1) and blue (road 2)**, on the map and in the panel (they were two purples). The "on top" and part rows keep inside the panel: a long road name ends with "…".
+- **The editor's tabs scroll as the panel does.** A scroll box with the class `rs-pbody` (and `data-head`, the selector of its header, which has the class `rs-phead`) has the
+  panel's scroll protocol: a thin scrollbar at the outer edge, a line under the header and a fade at the bottom.
 - **`roadstyle levels edit AREA_DIR`**: the level editor from the Rust program, with no Python. It checks that the folder has `roads.parquet`, then serves the editor page
   (the standard dashboard: one panel, the bar, both themes, the phone sheet) and saves `edits.csv`, `heads.csv`, `caps.csv` and `levels.csv`. `roadstyle serve` is the same
   without the check. A new test (`tests/test_levels_edit_browser.py`) makes an area with the program and drives the page in Chromium.
@@ -53,6 +60,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- OpenFreeMap Bright is not in the default list of base maps (`switcher` in `data/basemaps.json`). `basemap="ofm_bright"` still works.
 - **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
   roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:
   `{"*": 0, "service": 14}`) and the key `"@private"` (the first zoom of the private-access roads). `minzoom=False` is still every class at every zoom. The profile's own table (`default.yaml`) is unchanged for the map template.

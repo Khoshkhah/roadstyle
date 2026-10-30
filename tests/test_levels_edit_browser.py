@@ -2,8 +2,8 @@
 
 The test makes an area with the program, starts the editor, and drives it in Chromium: the one panel, the bar, the dark theme, the phone
 sheet, and an edit that reaches edits.csv. The browser job gives the program's path in ROADSTYLE_BIN. A build with no WebAssembly package
-of the editor (CI builds none) cannot serve the page: the test is skipped then. The page's CDN MapLibre and base-map style are answered
-from files, so the test needs no network.
+of the editor (CI builds none) cannot serve the page: the test is skipped then. The page's CDN MapLibre is answered from a file, and the
+standard base map is Blank, so the test needs no network.
 """
 import csv
 import os
@@ -23,7 +23,6 @@ pytestmark = pytest.mark.skipif(not BIN, reason="ROADSTYLE_BIN: the path of the 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "rust" / "roadstyle-assets" / "files" / "vendor"
 EDGES = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "level_area" / "edges.parquet"
-BLANK_STYLE = '{"version": 8, "sources": {}, "layers": []}'
 
 
 @pytest.fixture(scope="module")
@@ -49,7 +48,6 @@ def _open(browser, url, **kw):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.route("**/maplibre-gl@*/dist/maplibre-gl.js", lambda r: r.fulfill(path=str(VENDOR / "maplibre-gl.js"), content_type="text/javascript"))
     page.route("**/maplibre-gl@*/dist/maplibre-gl.css", lambda r: r.fulfill(path=str(VENDOR / "maplibre-gl.css"), content_type="text/css"))
-    page.route("https://tiles.openfreemap.org/**", lambda r: r.fulfill(body=BLANK_STYLE, content_type="application/json"))
     page.goto(url)
     page.wait_for_selector("#lv-boot", state="detached", timeout=60000)
     page.wait_for_selector("#sb .sb-card #lv", timeout=60000)
@@ -64,6 +62,11 @@ def test_the_page_is_the_dashboards_panel_and_bar_in_both_themes(editor):
         assert page.evaluate("document.documentElement.classList.contains('rs-has-toolbar')"), "the dashboard's bar"
         assert page.locator("#sb .sb-top .t").inner_text() == "Edit levels" and page.locator("#sb-hide").is_visible()
         assert page.locator("button[title='Light / dark']").is_visible()
+        # the standard base-map box of every dashboard: Blank is the default, and the list has the other maps
+        page.click("button[title='Base map and layers']")
+        assert page.locator(".rs-bm-box input[name='rs-bm']:checked").get_attribute("value") == "blank"
+        assert page.locator(".rs-bm-box .rs-bm-row").count() >= 7
+        page.keyboard.press("Escape")
         assert page.get_attribute("#sb", "data-theme") == "light"
         page.click("button[title='Light / dark']")
         assert page.get_attribute("#sb", "data-theme") == "dark" and page.evaluate("document.documentElement.dataset.rsTheme") == "dark"

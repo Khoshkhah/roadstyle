@@ -386,7 +386,7 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 html #sb{padding:0;overflow:hidden}
 html .sb-card{display:flex;flex-direction:column;height:100%;min-height:0;box-sizing:border-box}
 html .sb-top{flex:none;margin:0;padding:14px 15px 10px;position:relative;z-index:1;transition:box-shadow .15s}
-html .sb-top.scrolled{box-shadow:0 1px 0 var(--line,var(--rs-tb-border)),0 8px 10px -8px rgba(0,0,0,.35)}
+html :is(.sb-top,.rs-phead).scrolled{box-shadow:0 1px 0 var(--line,var(--rs-tb-border)),0 8px 10px -8px rgba(0,0,0,.35)}
 html .sb-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px 14px}
 html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display:flex;flex-direction:column;overflow:hidden;padding:0;border-radius:14px}
 /* ---- the side of the panel (placement.js: <html class="rs-panel-left">) ---- */
@@ -471,17 +471,17 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 
 /* ---- the scrollbar of the panel is at its outer edge (decided 2026-10-29): a left panel has it at the left, a right panel at the right. A scroll box with
    `direction: rtl` puts its scrollbar at the left; the content keeps its own direction. Not on a phone: the sheet has no side. ---- */
-html.rs-panel-left:not(.rs-phone) .sb-body{direction:rtl}
-html.rs-panel-left:not(.rs-phone) .sb-body > *{direction:ltr}
+html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody){direction:rtl}
+html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody) > *{direction:ltr}
 
 /* ---- the panel's scrollbar (decided 2026-10-29): the thumb shows only while the pointer is over the panel or the body scrolls (panelscroll.js sets
-   .rs-scrolling); the space stays reserved, so nothing jumps. The thumb is the text color at 47 % in the light theme and 40 % in the dark theme: 3:1 against the
+   .rs-scrolling). A host panel with its own scroll boxes (the level editor's tabs) gives them the class `rs-pbody` and `data-head`, the selector of their header (class `rs-phead`); the space stays reserved, so nothing jumps. The thumb is the text color at 47 % in the light theme and 40 % in the dark theme: 3:1 against the
    panel, the least that a part of an interface needs. A soft fade at the bottom edge shows that more is below (panelscroll.js sets data-more). ---- */
-#sb .sb-body{scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:transparent transparent}
+#sb :is(.sb-body,.rs-pbody){scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:transparent transparent}
 html #sb{--rs-thumb:47%}
 html #sb[data-theme=dark]{--rs-thumb:40%}
-#sb .sb-body:hover,#sb .sb-body.rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb),transparent) transparent}
-#sb .sb-body[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent)}
+#sb :is(.sb-body,.rs-pbody):hover,#sb :is(.sb-body,.rs-pbody).rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb),transparent) transparent}
+#sb :is(.sb-body,.rs-pbody)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent)}
 /* ---- The panel's shell (position, tokens, the title row, the hide and show buttons): the rules that the sidebar of a template needs, and that a host
    page with its own panel (#sb with .sb-top, #sb-hide and #sb-show) needs too. They are at the end, as they were in the template's own style. ---- */
 #sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,340px);box-sizing:border-box;overflow:auto;
