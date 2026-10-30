@@ -38,8 +38,31 @@
 - **Any road data.** A GeoDataFrame, a file, DuckDB, Arrow, [osmnx](https://osmnx.readthedocs.io/)
   or [duckOSM](https://github.com/Khoshkhah/duckOSM).
 - **Colour by your data.** Speed, traffic or any column, with a legend and a menu of colourings.
-- **Scriptable.** A `window.rs*` JavaScript API and events for your own dashboard.
+- **Scriptable.** A `window.rs*` JavaScript API and events for your own dashboard, and shared parts for its panel.
 - **Ready for AI agents.** An MCP server and an agent skill.
+
+## What is new in 0.26.0
+
+- **A standard dashboard and toolbox.** `rs.render_dashboard(edges)` makes a map with one panel and one bar of tools: navigate (zoom, turn and
+  tilt in one box), road filter, base maps, colour and legend, settings and credits. A tool that the page cannot use is grey, and its tooltip says
+  why. On a phone the bar is one row that you move sideways, and the panel is a bottom sheet.
+- **Tiles by default, one rule.** Every page keeps its roads as MLT vector tiles to zoom 16, with one road layer for every zoom. The page, the
+  browser worker, `export_style` and `roadstyle tiles` all use the same tiling rule. `tiles=False` gives GeoJSON roads, and `tile_format="mvt"` gives MVT.
+- **The level editor is in the panel.** It uses the page's standard panel, with an apply bar and `edits.csv` in the History tab.
+- **Shared dashboard parts.** Help window, hover box, tabs, number tiles, tables, charts and chips are in the panel's own look, in both themes.
+  `rs.classify` makes colour classes for roads.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/dashboard-desktop.png" alt="The dashboard on a desktop: Monaco, the panel at the left and the toolbox next to it" width="62%">
+  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/dashboard-phone.png" alt="The dashboard on a phone: the bar at the top and the panel as a bottom sheet" width="22%">
+</p>
+
+More: [What is new in 0.26.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0260) ·
+[Dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) ·
+[Dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) ·
+[Big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) ·
+[Move a script from 0.25](https://khoshkhah.github.io/roadstyle/guides/migrating-dashboard/) ·
+[Documentation](https://khoshkhah.github.io/roadstyle/).
 
 ## Install
 
@@ -82,8 +105,8 @@ rs.render_edges(edges, color_by="aadt", cmap="viridis")                # colour 
 rs.render_edges(edges, palette="mono", color_options={                 # several colourings,
     "Traffic": {"color_by": "aadt", "cmap": "viridis"},                #   switched in the browser
     "Speed":   {"color_by": "maxspeed_kmh", "cmap": "magma"}})
-rs.render_edges(edges, tiles=False)                                    # GeoJSON roads (tiles are the default)
-rs.render_dashboard(edges).save("dashboard.html")                      # map + query panel + toolbox
+rs.render_edges(edges, tiles=False)                                    # GeoJSON roads (MLT tiles are the default)
+rs.render_dashboard(edges).save("dashboard.html")                      # map + panel + the standard toolbox
 rs.render_street_view(edges).save("street_view.html")                  # map and Street View side by side
 ```
 
@@ -245,9 +268,9 @@ More: [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/set
 | Where | What you find |
 |---|---|
 | **[Get started](https://khoshkhah.github.io/roadstyle/get-started/)** | install, a first map, what your data needs |
-| **Guides** | [style the roads](https://khoshkhah.github.io/roadstyle/guides/style/) · [colour by your data](https://khoshkhah.github.io/roadstyle/guides/colour/) · [your own layers](https://khoshkhah.github.io/roadstyle/guides/overlays/) · [Google Street View](https://khoshkhah.github.io/roadstyle/guides/street-view/) · [big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) · [dashboards & JavaScript](https://khoshkhah.github.io/roadstyle/guides/dashboards/) · [on a website](https://khoshkhah.github.io/roadstyle/guides/website/) |
+| **Guides** | [style the roads](https://khoshkhah.github.io/roadstyle/guides/style/) · [colour by your data](https://khoshkhah.github.io/roadstyle/guides/colour/) · [your own layers](https://khoshkhah.github.io/roadstyle/guides/overlays/) · [Google Street View](https://khoshkhah.github.io/roadstyle/guides/street-view/) · [big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) · [dashboards & JavaScript](https://khoshkhah.github.io/roadstyle/guides/dashboards/) · [dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) · [dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) · [which road is on top](https://khoshkhah.github.io/roadstyle/guides/levels/) · [on a website](https://khoshkhah.github.io/roadstyle/guides/website/) |
 | **[Gallery](https://khoshkhah.github.io/roadstyle/gallery/)** | a picture and one line of code per look |
-| **[Rust engine](https://khoshkhah.github.io/roadstyle/rust/)** | the one engine: the same maps, 3 to 30 times faster on a large area; the browser package and the crates |
+| **[Rust engine](https://khoshkhah.github.io/roadstyle/rust/)** | the one engine: the style, the tiles, the levels and the page; the browser package and the crates |
 | **Reference** | [every parameter](https://khoshkhah.github.io/roadstyle/reference/parameters/) · [JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/) · [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/settings/) · [command line](https://khoshkhah.github.io/roadstyle/reference/cli/) |
 | **[Changelog](https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md)** | what changed in each release |
 
@@ -258,7 +281,7 @@ More: [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/set
 - **[OpenStreetMap](https://www.openstreetmap.org/copyright)** data (© OpenStreetMap contributors, ODbL) and the
   **[openstreetmap-carto](https://github.com/gravitystorm/openstreetmap-carto)** style, whose road classes,
   colours and widths roadstyle follows.
-- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), solves which road is drawn on top.
+- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), is the optional Python solver of which road is drawn on top. The default solver is in Rust.
 - **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry.
 
 ## License

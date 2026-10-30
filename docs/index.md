@@ -120,7 +120,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 - **[OpenStreetMap](https://www.openstreetmap.org/copyright)** data (© OpenStreetMap contributors, ODbL) and the
   **[openstreetmap-carto](https://github.com/gravitystorm/openstreetmap-carto)** style, whose road classes,
   colours and widths roadstyle follows.
-- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), solves which road is drawn on top.
+- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), is the optional Python solver of which road is drawn on top. The default solver is in Rust.
 - **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry.
 
 [:material-image-multiple: Gallery](gallery.md) ·
