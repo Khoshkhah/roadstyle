@@ -97,7 +97,7 @@ The gear button opens the settings. The browser keeps them. They do not go into 
 
 - **Layout.** The bar: left, top, right or bottom. The panel: left or right, as a frame (default) or a card. The scale and zoom number can show.
 - **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
-  Every floating part follows one of the three sliders. All three start at 40 %.
+  Every floating part follows one of the three sliders. The bar and the boxes start at 40 %, the card behind the text at 70 %.
 - **Keys.** A Google Maps key (Street View, Google 3D). No base map needs a key. A saved key replaces the key of the page. A page needs no Google key at build time.
 
 ### Credits

@@ -19,6 +19,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   this browser. The panel's title row has "Collapse all" / "Expand all" (`#rs-fold-all`), which acts on the sections that fold and are shown (`rs.sections.foldAll`, `fold`, `folded`).
 
 ### Changed
+- **The card behind the text starts at 70 %** (`--rs-a-card` 0.7); the bar and the boxes stay at 40 %. The settings box still moves each one.
 - **One accent colour for the whole dashboard: the Sonocount teal.** `--accent` is `#0e7c8e` in the light theme (the logo's teal, a little darker so that a link is 4.6:1 on the panel's cards: the logo's own is 4.43:1) and a lighter teal of the same hue (`#42c2d7`, 8.5:1 on the dark panel) in the dark theme; `--accent-fill` is the logo teal `#0E7F91` of a
   filled control (a selected tab, a primary button, the mode and follow buttons of the Street View and Google 3D windows), with white text (4.71:1) in both themes. They are defined once, in `dashboard.css` (the panel's own
   `#1a6bd6` and `#5aa9f8` and the teal that two rules wrote in hex are gone, with every `var(--accent, #1a6bd6)` fallback), so the floating windows read it too (the token was only on the panel). The Google 3D selection
