@@ -316,9 +316,14 @@ pub(crate) fn by_feature(cases: &[(Value, Value)], default: &Value) -> Value {
     Value::Array(out)
 }
 
-/// _minzoom_filter: a feature only from its class's first zoom (a class that the table does not name: 0, always drawn).
+/// The key of the minzoom mapping for the roads with private access (the access kind `private`, access_col): they show only from this zoom or
+/// from their class's first zoom, whichever is later. `{"@private": 15}`.
+pub(crate) const PRIVATE_KEY: &str = "@private";
+
+/// _minzoom_filter: a feature only from its class's first zoom (a class that the table does not name: 0, always drawn); a road with private access
+/// also not before the zoom of the table's key `@private`. The clauses are `>=` of the zoom and an `all` / `any` of them, which the tiles read too.
 pub(crate) fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
-    let mut keys: Vec<&String> = table.keys().collect();
+    let mut keys: Vec<&String> = table.keys().filter(|k| k.as_str() != PRIVATE_KEY).collect();
     keys.sort();
     let mut m = vec![json!("match"), json!(["coalesce", ["get", col], ""])];
     for k in keys {
@@ -326,11 +331,17 @@ pub(crate) fn minzoom_filter(col: &str, table: &Map<String, Value>) -> Value {
         m.push(json!(table[k].as_f64().unwrap_or(0.0)));
     }
     m.push(json!(0.0));
-    json!([">=", ["zoom"], m])
+    let by_class = json!([">=", ["zoom"], m]);
+    match table.get(PRIVATE_KEY).and_then(Value::as_f64).filter(|z| *z > 0.0) {
+        Some(z) => json!(["all", by_class, ["any", ["!=", ["coalesce", ["get", roadstyle_model::mark::Mark::Access.name()], ""], "private"], [">=", ["zoom"], z]]]),
+        None => by_class,
+    }
 }
 
 /// render's minzoom (_minzoom_filter): null or true the config's table of the classes' first zooms (the default since 2026-10-25, as
-/// OpenMapTiles and OSM-Carto do), a mapping that table with changes, false every class at every zoom (None).
+/// OpenMapTiles and OSM-Carto do), a mapping that table with changes, false every class at every zoom (None). In a mapping the key `"*"`
+/// sets every class of the table first (`{"*": 0, "steps": 15}` is every class at every zoom but the steps), and the key `"@private"` is the
+/// first zoom of the roads with private access, whatever their class (`PRIVATE_KEY`).
 pub(crate) fn class_minzoom(look: &crate::Look) -> Option<Map<String, Value>> {
     use roadstyle_look::options::ClassMinzoom;
     let table = || look.sections.roads.class_values("minzoom");
@@ -338,11 +349,17 @@ pub(crate) fn class_minzoom(look: &crate::Look) -> Option<Map<String, Value>> {
         ClassMinzoom::Profile => Some(table()),
         ClassMinzoom::Table(o) => {
             let mut t = table();
-            t.extend(o.iter().map(|(k, v)| (k.clone(), v.clone())));
+            if let Some(all) = o.get("*") {
+                t.values_mut().for_each(|v| *v = all.clone());
+            }
+            t.extend(o.iter().filter(|(k, _)| k.as_str() != "*").map(|(k, v)| (k.clone(), v.clone())));
             Some(t)
         }
         ClassMinzoom::Off => None,
-    }.filter(|t| !t.is_empty())
+    }.map(|mut t| {
+        t.retain(|_, z| z.as_f64().is_some_and(|z| z > 0.0));          // a class from zoom 0 needs no entry
+        t
+    }).filter(|t| !t.is_empty())
 }
 
 /// casing.drop_below_px (2026-10-25): a casing piece (`__rs_k` 0, not a bridge's) only from its class's first zoom whose tiles show the
@@ -397,3 +414,40 @@ pub(super) fn simple_dasharray(dashes: &[String]) -> Value {
     json!(["case", ["==", ["get", Mark::PieceKind.name()], 4], gs("rs_tun_ratio"), by])
 }
 
+
+#[cfg(test)]
+mod class_minzoom_tests {
+    use super::class_minzoom;
+    use roadstyle_look::{Look, Options};
+    use serde_json::{json, Map, Value};
+
+    fn first(args: Value) -> Option<Map<String, Value>> {
+        class_minzoom(&Look::resolve(&Options { args, ..Default::default() }).expect("a look"))
+    }
+
+    /// `{"*": 0, "service": 14}` is every class at every zoom but the service roads; the profile's table is the default; `false` has no first zoom; the
+    /// dashboard's default (every class at every zoom but the steps, the platforms and the corridors, from zoom 15) has three entries and no zero.
+    #[test]
+    fn a_star_in_the_minzoom_mapping_sets_every_class_first() {
+        let profile = first(json!({})).expect("the profile's table");
+        assert_eq!(profile["residential"].as_f64(), Some(13.0));
+        assert_eq!(first(json!({"minzoom": {"*": 0, "service": 14}})), json!({"service": 14}).as_object().cloned());
+        assert_eq!(first(json!({"minzoom": false})), None);
+        let dashboard = first(json!({"minzoom": {"*": 0, "service": 14, "living_street": 14, "steps": 15, "platform": 15, "corridor": 15, "road": 15, "@private": 15}})).expect("a table");
+        assert_eq!(dashboard, json!({"service": 14, "living_street": 14, "steps": 15, "platform": 15, "corridor": 15, "road": 15, "@private": 15}).as_object().cloned().unwrap());
+        // a change of a class without the star keeps the rest of the profile's table
+        let some = first(json!({"minzoom": {"service": 16}})).expect("a table");
+        assert_eq!((some["service"].as_f64(), some["residential"].as_f64()), (Some(16.0), Some(13.0)));
+    }
+
+    /// A road with private access is drawn from the table's `@private` zoom or from its class's zoom, whichever is later; without the key the filter is the class's only.
+    #[test]
+    fn a_private_access_road_shows_from_the_private_zoom_at_the_earliest() {
+        let table = json!({"service": 14, "@private": 15}).as_object().cloned().unwrap();
+        let f = super::minzoom_filter("highway", &table);
+        assert_eq!(f[0], "all");
+        assert_eq!(f[2], json!(["any", ["!=", ["coalesce", ["get", "__rs_access"], ""], "private"], [">=", ["zoom"], 15.0]]));
+        let plain = super::minzoom_filter("highway", json!({"service": 14}).as_object().unwrap());
+        assert_eq!(plain[0], ">=");
+    }
+}

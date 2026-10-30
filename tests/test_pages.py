@@ -214,9 +214,22 @@ def _page_option(html, key):
     return json.JSONDecoder().raw_decode(html, at)[0][key]
 
 
-def test_the_dashboard_shows_every_road_class_at_every_zoom_and_a_call_can_still_hide_minor_classes():
-    edges = _edges()
-    assert _page_option(rs.render_dashboard(edges).html, "filter")["minzoom"] is None
-    assert _page_option(rs.render_dashboard(edges, minzoom=True).html, "filter")["minzoom"]["residential"] == 13
-    assert _page_option(rs.render_dashboard(edges, minzoom={"residential": 9}).html, "filter")["minzoom"]["residential"] == 9
-    assert _page_option(rs.render_edges(edges, backend="web").html, "filter")["minzoom"]["residential"] == 13      # the map template: as before
+def test_the_dashboard_has_one_zoom_table_service_roads_from_14_steps_and_more_from_15_and_private_roads_not_before_15():
+    classes = ["primary", "residential", "service", "living_street", "steps", "platform", "corridor", "road", "footway"]
+    edges = gpd.GeoDataFrame({"highway": classes, "access": [None, None, None, None, None, None, None, None, "private"]}, crs=4326,
+                             geometry=[LineString([(17.9 + i * 1e-3, 59.37), (17.91 + i * 1e-3, 59.38)]) for i in range(len(classes))])
+
+    def first(html):
+        return _page_option(html, "filter")["minzoom"]
+    table = {"service": 14, "living_street": 14, "steps": 15, "platform": 15, "corridor": 15, "road": 15}
+    assert first(rs.render_dashboard(edges).html) == table                                                     # every other class from zoom 0
+    assert first(rs.render_dashboard(edges, minzoom=False).html) is None                                       # a call can ask for every class at every zoom
+    assert first(rs.render_dashboard(edges, minzoom=True).html)["residential"] == 13                           # or for the profile's table
+    assert first(rs.render_dashboard(edges, minzoom={"*": 0, "service": 16}).html) == {"service": 16}          # a star sets every class first
+    assert first(rs.render_dashboard(edges, minzoom={"residential": 9}).html)["residential"] == 9             # a mapping without the star changes the profile's table
+    assert first(rs.render_edges(edges, backend="web").html)["residential"] == 13                              # the map template: as before
+    # the roads with private access (access_col): in the road layer's filter, not before zoom 15 whatever the class
+    html = rs.render_dashboard(edges, access_col="access").html
+    assert '"private"' in html and "__rs_access" in html
+    private = rs.render_dashboard(edges, access_col="access", minzoom={"*": 0, "@private": 16}).html
+    assert first(private) == {}                                                                                # no class has a first zoom

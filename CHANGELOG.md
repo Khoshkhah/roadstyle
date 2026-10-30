@@ -43,6 +43,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
+  roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:
+  `{"*": 0, "service": 14}`) and the key `"@private"` (the first zoom of the private-access roads). `minzoom=False` is still every class at every zoom. The profile's own table (`default.yaml`) is unchanged for the map template.
 - **The explanation marks in the base map box are a "?"** (they were an italic "i"): the "i" is only the credits button.
 - **A page with a bar has no floating Layers box.** The style's own base-map layers (the duckOSM layers: landcover, water, buildings, ...) have one switch for all of them in the
   base-map box (`overlays_label`, default "Map layers"; `rsSetOverlays(on)`), and the legend box lists them with their colours, each swatch with a thin border so that a white
