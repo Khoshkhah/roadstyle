@@ -57,6 +57,72 @@ rules with MLT (z16, one gzip stream), and 18.8 MB with GeoJSON roads. The size 
 - **The GeoJSON path** draws 2.4 to 2.6 times the triangles of the tiles at zoom 11 to 13, and its pan and zoom stall for twice as long. It is only for a page that
   needs it (a palette in a view is not possible with tiles).
 
+## The keys of a tile (2026-10-29)
+
+A road feature in a tile has the geometry, the feature id (the road's row, a number) and the keys that MapLibre must read: the style's
+expressions (paint, layout, filter) and the dashboard's layer filters. A road's other fields (name, edge, level, width, access, the popup fields)
+are in the road table, and the popup, the panel, the filters by row and the live colours read the table by the row id.
+
+**The list:** `TILE_ROAD_KEYS` and `TILE_TEXT_KEYS` in `rust/roadstyle-model/src/mark.rs`. A key of a road feature is a mark (`Mark::ALL`) or one of
+`TILE_ROAD_KEYS`; a text value only in a pair of `TILE_TEXT_KEYS`. **Every path** makes its tiles with `TileOptions::rule` (the page's archive, the map
+worker, `export_style`, `roadstyle tiles`): there is one rule, not one for each path.
+
+**What the tiles of Monaco have** (the table that the test prints for every path; the CI job summary has it too). `simple` is the road pieces and
+`slots` the name and arrow anchors:
+
+| layer | key | value | read by the style | read by the page |
+|---|---|---|---|---|
+| simple | `__rs_k`, `__rs_ci`, `r`, `__rs_twoway`, `__rs_pair`, `__rs_bridge`, `__rs_tunnel`, `__rs_seam`, `__rs_lap` | number or flag | road layer and its dash layer | `__rs_k` |
+| simple | `lvl` | number | (the Roads filter: Bridges and Tunnels) | yes |
+| simple | `__rs_cap` | flag, or text `"square"` on 551 of 2,132 features | road layer | |
+| simple | `__rs_dash` | **text** (the dash pattern, 1,377 features) | road layer | |
+| simple | `highway` | **text** | road layer (the class minzoom `match`) | |
+| simple | `__rs_cls` | **text** | nobody in the static style | the Roads filter (`filter.js`) |
+| slots | `chain`, `slot`, `rank`, `oneway` | number | `slot`, `oneway`: names and arrows | arrows.js, labels |
+| slots | `lvl`, `__rs_tunnel` | number or flag | names and arrows | |
+| slots | `highway` | **text** | names and arrows (the size by class, the minor-road rule) | `arrows.js` |
+| slots | `__rs_cls` | **text** | nobody | the Roads filter |
+| slots | `name` | **text** | names (`text-field`) | labels |
+
+**Checklist and tests**
+
+| # | Rule | Test | State |
+|---|---|---|---|
+| 1 | The feature id of a piece and of a slot is the road's row | `tile_keys.rs`, each path | done |
+| 2 | A key of a road feature is a mark or one of `TILE_ROAD_KEYS`: no data column | `the_page_look_tiles_have_only_the_listed_keys`, `the_export_look_tiles_have_only_the_listed_keys`, `the_tiles_of_the_stage_1_files_have_only_the_listed_keys` | done |
+| 3 | No text value on a road feature, outside `TILE_TEXT_KEYS`; the list only shrinks (an entry with no text value fails the test) | the same three | list pinned at 7 pairs; 6 to convert |
+| 4 | No whole-road layer `roads` in the tiles of `export_style` (a click reads the road table by row) | `tests/test_export_style.py::test_style_points_at_its_own_files` | done |
+| 5 | A base-map layer keeps only what its layers read (`height`, `base`, `kind`; no `osm_id`, no `name`) | `stage.rs`: `a_base_map_layer_keeps_what_its_layers_read` | done |
+| 6 | The tile bytes only go down | `tile_budget.rs`, `tests/test_tile_budget.py` | done (bytes); a number for the property bytes is not in the budget yet |
+
+**What cannot leave the tile**
+- `name` on the `slots` features: `text-field` reads the street name from the tile; MapLibre has no side table for a layout property. It stays on the label anchors, never on a road piece.
+- The numbers and flags in the first row: the style's expressions and the dashboard's layer filters read them while MapLibre draws.
+
+**What is still text on a road feature, and how it leaves** (not done). Each is a text that a number can replace; none is read as text by anything but one expression or one filter:
+1. `__rs_cls` (pieces and slots) and `highway` (pieces and slots): a class code, a small integer, is already in the piece as `__rs_ci` (the index of the model's class
+   list). The Roads filter (`filter.js`) hides a class by a layer filter on the text; it uses the code of the class in `roadstyle:controls.filter.classes` instead
+   (the list that the filter panel has). The style's `match` on `highway` (the class minzoom, the arrows' size) becomes a `match` or `at` on the code. The slots get
+   the code too (`__rs_ci` or the filter's code).
+2. `__rs_dash`: the index of the dash pattern in the sorted list of the patterns that the road layer already has (`dash_patterns`); the expression is an `at` on it.
+3. `__rs_cap`: 0 round, 1 butt, 2 square.
+4. `__rs_access` (when the page has an access column; not in Monaco): the index of the value.
+The change is in the engine's piece builder (`simple/piece.rs`), the style expressions (`layers/exprs.rs`, `layers/build.rs`), `filter.js` and the goldens of the style and the
+tiles; it does not change a picture.
+
+**Where the bytes are** (Nacka, MVT, 13,687 tiles; a count of the raw bytes of a tile: geometry, the tags of each feature (a key and a value index), the key and value tables)
+
+| Zoom | Features | Geometry | Tags | Key table | Value table | The rest (feature header, id) |
+|---|---|---|---|---|---|---|
+| z12 | 60,502 | 28 % | 40 % | 0 % | 0 % | 32 % |
+| z14 | 104,896 | 29 % | 40 % | 0 % | 2 % | 29 % |
+| z16 | 160,650 | 30 % | 37 % | 2 % | 4 % | 27 % |
+| z17 | 217,616 | 29 % | 34 % | 4 % | 6 % | 27 % |
+
+The tags are the largest part (34 to 40 %): a piece has 8 to 14 of them. A key that leaves a piece takes about 2 bytes of each piece before the gzip.
+The `__rs_cls`, `highway` text and the dash text are the same string for most pieces, so the gzip makes them small (the key and value tables are under 10 %);
+the gain of moving them is mostly the tags of two keys (about 2 of 10 on a piece), and the simpler style.
+
 ## What is not one yet
 
 1. The embedded archive has 3 tile layers (`roads`, `simple`, `slots`). The other sources of the page (the base map, the boundary, the overlays) stay GeoJSON in the page.
