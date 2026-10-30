@@ -93,9 +93,36 @@ number of positions.
 The solver reads only the pairs, never the lines or the head lengths. Which parts of a stack cross is decided in the input, with the
 heads of that time.
 
-## Fix it by hand: the level editor
+## Edit the levels
 
-![The level editor in the dashboard's panel: Boulevard du Larvotto and Rond-Point du Portier picked, their cards, and the apply bar with one change waiting](../img/level-editor.png)
+Make an area, solve it, and open the editor. The Rust program `roadstyle` does all three with no Python:
+
+```bash
+roadstyle levels make edges.gpkg out/area --boundary area.geojson    # roads.parquet, pairs.csv, edits.csv, boundary.geojson
+roadstyle levels solve out/area                                      # levels.csv, levels_info.json
+roadstyle levels edit out/area                                       # the editor, http://127.0.0.1:8780/level_editor/
+```
+
+`--boundary` is optional. It takes a GeoJSON polygon, feature or feature collection, and keeps it as `boundary.geojson` in the area folder. The editor draws it as the dashed line
+of the area's edge, as a dashboard does. `levels edit AREA_DIR` checks that the folder has `roads.parquet`, serves the editor page and saves your changes. The Python commands
+`roadstyle-levels make`, `solve` and `edit` make the same files.
+
+<div class="grid" markdown>
+
+![The level editor on a desktop: Boulevard du Larvotto (red) and Rond-Point du Portier (blue) picked, their cards, and the apply bar with one change waiting](../img/level-editor.png)
+
+![The level editor on a phone: the bar at the top, the map, and the panel as a bottom sheet](../img/level-editor-phone.png){ width="260" }
+
+</div>
+
+The editor is the standard dashboard. It has the panel, the toolbox and the phone form of [Dashboard layout](dashboard-layout.md), in the light and the dark theme. These parts are the dashboard's own:
+
+- **The base-map box.** The map starts on the blank base map, as every dashboard does. The box has the base maps, the switches under *On top* (Hillshade, Labels, 3D buildings) and the dark twin that follows the theme.
+- **Red and blue picks.** Road 1 is red, and road 2 is blue. The hover has a light color of the road that the next click picks. A long road name ends with "…", so the rows stay inside the panel.
+- **Segmented tabs.** *Edit*, *History* and *Issues* are the dashboard's segmented control. The tabs scroll as the panel does: a thin scrollbar at the outer edge, a line under the header and a fade at the bottom.
+- **The area boundary.** The dashed line of `boundary.geojson`.
+- **The mode box.** When the roads have a `modes` column (driving, walking, cycling, bus, private), the box shows only the roads of the ticked modes.
+
 
 `roadstyle levels edit out/area` (or `roadstyle-levels edit out/area`) opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
 second road to see every pair between the two.

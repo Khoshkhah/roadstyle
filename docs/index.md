@@ -94,8 +94,9 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
   gives GeoJSON roads, and `tile_format="mvt"` gives MVT. One tiling rule serves the page, the browser worker, `export_style` and
   `roadstyle tiles`. [Big networks](guides/big-networks.md) · [Make tiles and PMTiles](rust/tiles.md) ·
   [Tiling](design/tiling.md)
-- **The level editor is in the dashboard.** It draws into the page's one standard panel, and the History tab has `edits.csv`.
-  [Which road is on top](guides/levels.md#edit-the-levels-in-a-dashboard)
+- **The level editor is in the dashboard.** `roadstyle levels edit AREA_DIR` opens it from the Rust program, with no Python. It draws into the page's one
+  standard panel, with the base-map box, red and blue picks, segmented tabs and the area boundary (`levels make --boundary`). The History tab has `edits.csv`.
+  [Edit the levels](guides/levels.md#edit-the-levels) · [in a dashboard](guides/levels.md#edit-the-levels-in-a-dashboard)
 - **Parts for a dashboard page.** The panel has shared parts: a help window (`rs.help`), a hover box (`rs.hover`), tabs (`rs.tabs`), number tiles (`rs.kpi`),
   scroll areas and tables, chart colours (`rs.svg`), chips and text boxes. `rs.classify` makes discrete colour classes for roads. The panel is 400 px wide.
   [Dashboard parts](guides/dashboard-parts.md)

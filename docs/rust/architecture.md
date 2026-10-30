@@ -76,13 +76,13 @@ flowchart TB
     roadstyle_levels["roadstyle-levels<br/>2,851 lines"]
     roadstyle_engine["roadstyle-engine<br/>7,771 lines"]
     roadstyle_tiles["roadstyle-tiles<br/>2,603 lines"]
-    roadstyle["roadstyle<br/>3,505 lines"]
+    roadstyle["roadstyle<br/>3,506 lines"]
     roadstyle_rs["roadstyle-rs<br/>232 lines"]
     roadstyle_wasm["roadstyle-wasm<br/>709 lines"]
     roadstyle_py["roadstyle-py<br/>683 lines"]
-    roadstyle_cli["roadstyle-cli<br/>417 lines"]
+    roadstyle_cli["roadstyle-cli<br/>439 lines"]
     roadstyle_mcp["roadstyle-mcp<br/>289 lines"]
-    roadstyle_serve["roadstyle-serve<br/>283 lines"]
+    roadstyle_serve["roadstyle-serve<br/>291 lines"]
     roadstyle_snapshot["roadstyle-snapshot<br/>180 lines"]
     roadstyle_levels --> roadstyle_model
     roadstyle_assets --> roadstyle_look
@@ -126,16 +126,16 @@ step) takes this crate alone.
 | [`roadstyle-levels`](#roadstyle-levels) | roadstyle's drawing levels: the tags rule and the solver (a leaf crate: the road flags are its own module) | 2,851 | rstar, sha2 |
 | [`roadstyle-engine`](#roadstyle-engine) | roadstyle's rendering engine: the style of a map, the data-driven paint, the legend data, the base-map layers | 7,771 | `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, foldhash, indexmap, rstar, serde_json |
 | [`roadstyle-tiles`](#roadstyle-tiles) | roadstyle's vector tiles on request (the rules of tiles.py) | 2,603 | `roadstyle-model`, flate2, foldhash, indexmap, mlt-core, rstar, serde_json |
-| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 3,505 | `roadstyle-assets`, `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, `roadstyle-tiles`, base64, flate2, serde, serde_json |
+| [`roadstyle`](#roadstyle) | roadstyle as a Rust library: the facade over the model, the readers, the levels, the engine and the tiles | 3,506 | `roadstyle-assets`, `roadstyle-engine`, `roadstyle-io`, `roadstyle-levels`, `roadstyle-look`, `roadstyle-model`, `roadstyle-tiles`, base64, flate2, serde, serde_json |
 | [`roadstyle-rs`](#roadstyle-rs) | The old name of the facade crate roadstyle, kept for one version | 232 | `roadstyle`, serde_json |
 | [`roadstyle-wasm`](#roadstyle-wasm) | The browser's front-end of roadstyle-rs: inlineStyle, Tiler, memoryBytes | 709 | `roadstyle`, serde_json, wasm-bindgen |
 | [`roadstyle-py`](#roadstyle-py) | The Python binding of roadstyle's Rust engine: the module roadstyle._rust (PyO3, abi3) | 683 | `roadstyle`, `roadstyle-serve`, arrow-array, pyo3, serde_json |
-| [`roadstyle-cli`](#roadstyle-cli) | The roadstyle program: one command for each job (serve: the level editor's files; snapshot: a PNG of a saved page) | 417 | `roadstyle`, `roadstyle-serve`, `roadstyle-snapshot`, serde_json |
+| [`roadstyle-cli`](#roadstyle-cli) | The roadstyle program: one command for each job (serve: the level editor's files; snapshot: a PNG of a saved page) | 439 | `roadstyle`, `roadstyle-serve`, `roadstyle-snapshot`, serde_json |
 | [`roadstyle-mcp`](#roadstyle-mcp) | MCP server for roadstyle: AI agents draw styled, interactive road maps of road files | 289 | `roadstyle`, `roadstyle-snapshot`, base64, rmcp, schemars, serde, serde_json, tokio |
-| [`roadstyle-serve`](#roadstyle-serve) | roadstyle serve: the level editor's page files and an area folder on 127.0.0.1 (the program and the Python binding call it) | 283 | `roadstyle-assets`, httparse |
+| [`roadstyle-serve`](#roadstyle-serve) | roadstyle serve: the level editor's page files and an area folder on 127.0.0.1 (the program and the Python binding call it) | 291 | `roadstyle-assets`, httparse |
 | [`roadstyle-snapshot`](#roadstyle-snapshot) | PNG pictures of saved roadstyle pages: Chromium over CDP draws the page, as roadstyle's Python snapshot does | 180 | anyhow, headless_chrome, serde_json |
 
-All crates: 26,658 lines of Rust in `rust/*/src/`.
+All crates: 26,689 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
 The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
@@ -316,7 +316,7 @@ Library, in `rust/roadstyle/`. Public API: `error`, `dashboard`, `level_area`, `
 | `level_editor` | 680 | The level editor in a page: an area folder's roads (roads.parquet, one row for each road with its edges both ways) and pairs, the solver of roadstyle-levels' `area`, and what the page draws and shows |  |
 | `options` | 52 | The keywords of a call (render_edges' flat keywords) that no part of roadstyle reads: not a map option (roadstyle_look::options), not a page key (page_options) and not a key of the style writer or of stage 2 |  |
 | `page` | 267 | The page writer: the HTML page of a live style (state "live") and the options of its dashboard |  |
-| `page_options` | 692 | Stage 3 of a page in one call (audit R3): `page_from` makes the page of a look's roads, as render_edges(backend="web") with the Rust engine (`_engine.render_page`) | `_engine.py`, `basemaps.py` |
+| `page_options` | 693 | Stage 3 of a page in one call (audit R3): `page_from` makes the page of a look's roads, as render_edges(backend="web") with the Rust engine (`_engine.render_page`) | `_engine.py`, `basemaps.py` |
 | `relevel` | 222 | The level editor's redraw: a tiled map whose roads get new levels, heads and caps |  |
 
 #### `roadstyle-rs` { #roadstyle-rs }
@@ -351,7 +351,7 @@ Library and program, in `rust/roadstyle-cli/`. Public API: `commands`, `Error`.
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
 | `lib` | 7 | The roadstyle program: one command for each job (commands.rs) |  |
-| `commands` | 348 | The commands of the roadstyle program (main.rs runs `run`): stage 1 (`sources`), stage 2 (`tiles`), a level area (`levels make`, `levels solve`) and the level editor (`serve`) |  |
+| `commands` | 370 | The commands of the roadstyle program (main.rs runs `run`): stage 1 (`sources`), stage 2 (`tiles`), a level area (`levels make`, `levels solve`) and the level editor (`levels edit`, `serve`) |  |
 | `error` | 53 | The errors of the program: one kind for each cause, each with the text that the program writes (the same text as before the type) |  |
 | `main` | 9 | `roadstyle <command>`: the roadstyle program (`roadstyle help` lists the commands: lib.rs, commands.rs) |  |
 
@@ -369,7 +369,7 @@ Library, in `rust/roadstyle-serve/`. Public API: `has_package`, `WRITABLE`, `MAX
 
 | Module | Lines | What it does | Python counterpart |
 |---|---|---|---|
-| `lib` | 283 | `roadstyle serve` (the program, roadstyle-cli, and the Python binding call it): the level editor's page files (in the program, `embedded`, or a folder) and an area folder under `/area/`, on 127.0.0.1 only |  |
+| `lib` | 291 | `roadstyle serve` (the program, roadstyle-cli, and the Python binding call it): the level editor's page files (in the program, `embedded`, or a folder) and an area folder under `/area/`, on 127.0.0.1 only |  |
 
 #### `roadstyle-snapshot` { #roadstyle-snapshot }
 
@@ -543,7 +543,7 @@ saved page still works offline.*
 
 | File | Lines | What it does | Window API |
 |---|---|---|---|
-| `api.js` | 159 | the runtime API of the interaction contract: one object for a host page, over the window.rs* functions of the controls |  |
+| `api.js` | 170 | the runtime API of the interaction contract: one object for a host page, over the window.rs* functions of the controls |  |
 | `arrows.js` | 164 | oneway direction-arrow icon (openstreetmap-carto) |  |
 | `basemap.js` | 153 | base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's tiles; the road layers stay put); the dropdown is just UI over it and stays in sync | `RS_BASEMAPS`, `rsBuildings`, `rsSetBasemap` |
 | `basemapbox.js` | 93 | The base-map box: the heading "Base map", one radio row with a swatch for each map, a divider, and "On top": Hillshade, Labels and 3D buildings | `rsLabelsOn` |
@@ -558,14 +558,17 @@ saved page still works offline.*
 | `float.js` | 57 | shared by the Street View and Google 3D windows |  |
 | `generation.js` | 42 | the tiles' generation against the style's |  |
 | `google3d.js` | 351 | GOOGLE 3D window (google_3d=True, with a key): Google's photorealistic 3D view in a floating window, opened by its map button (or rsSetGoogle3D(true)) | `rsG3dDraw`, `rsG3dFollow`, `rsG3dLayers`, `rsG3dOwnDraw`, `rsLabelsTipExtra`, `rsRestoreWindows`, `rsSetGoogle3D`, `rsWindowRecentre` |
-| `index.js` | 156 | roadstyle's map dashboard, the entry: rsDashboard(map, options) adds the map controls and the road interaction of roadstyle's page to a MapLibre map | `rsReady`, `rsTools` |
+| `help.js` | 31 | The help window of a page: `rs.help.set({title, intro, terms: [[term, text], ...], note})` puts an "i" button in the panel's title and keeps the window that it opens |  |
+| `hover.js` | 23 | The hover box of a page: the words that a page shows near the pointer over its own chart or its own map layer |  |
+| `index.js` | 157 | roadstyle's map dashboard, the entry: rsDashboard(map, options) adds the map controls and the road interaction of roadstyle's page to a MapLibre map | `rsReady`, `rsTools` |
+| `kpi.js` | 6 | A number tile of a page: `rs.kpi(title, value, sub, color?)` is the HTML of one tile - a small title, a big number and a line under it - for a `<div class="rs-kpis">` (a grid of three) |  |
 | `legend.js` | 75 | the legend of the active "colour by" option: COLOR_OPTIONS[i].legend, {title, kind: "categorical", entries: [[label, colour, count?], ...]} or {title, kind: "continuous", ramp: [colour, ...], vmin, vmax, stepped} (stylers.bake_color_options; stepped: rs.setData's nearest stops, with a hard edge half-way between two stops) |  |
 | `live.js` | 91 | LIVE DATA (R22): rs.setData(table, options) joins a table to the roads, by edge_id or by the row, and gives each road its colour and its width factor as feature state on its row (the names of the style's metadata roadstyle:live: rs_c and rs_w), which the road layer reads |  |
 | `navbox.js` | 34 | The tool `navigate`: the one button for the map's view |  |
 | `overlay.js` | 64 | The overlay layout: the map fills the window and the panel floats over it |  |
 | `overlays.js` | 151 | extra overlay layers (zones / POIs / lines): click an interactive overlay -> popup of its fields; a Layers control toggles each overlay's visibility | `RS_OVERLAYS`, `rsGetOverlays`, `rsSetOverlay`, `rsSetOverlays` |
 | `panel.js` | 96 | panel mode: a full-height side panel hosts the map controls (colour-by, road filter, legend, host tools) and the selected road's record | `rsPanelShow` |
-| `panelscroll.js` | 22 | The scroll protocol of a panel: the header stays, only the body scrolls |  |
+| `panelscroll.js` | 42 | The scroll protocol of a panel: the header stays, only the body scrolls |  |
 | `placement.js` | 47 | The place of the bar and of the panel | `rsFreePad` |
 | `roadsbox.js` | 58 | The tool `roads`: the road filter in the bar |  |
 | `sections.js` | 67 | The panel's sections: the page adds a block to the panel, hides one of the panel's own, or moves one, with `rs.sections` or with the typed option `dashboard.panel.sections` / `hide`, and no longer edits the template's HTML as text |  |
@@ -573,11 +576,13 @@ saved page still works offline.*
 | `selectbox.js` | 73 | A select list in the look of the boxes |  |
 | `settings.js` | 88 | The tool `settings`: the person's own choices, kept in this browser only (localStorage, never in the page file): where the bar and the panel are, how transparent the layers are, and the keys of Google and CARTO | `rsOpenSettings` |
 | `streetview.js` | 118 | Street View window (street_view="window"): hidden until the map button (or rsSetStreetView(true)) opens it; then a draggable, resizable window over the map that follows every road selection | `rsSetStreetView` |
+| `svg.js` | 14 | The SVG helper of a page's charts: `rs.svg(parent, tag, attrs, text?)` makes one SVG element, sets its attributes and appends it |  |
 | `svspot.js` | 189 | GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link), looking the way the edge runs | `rsGetStreetViewSpot`, `rsSetStreetViewMarker`, `rsSetStreetViewMarkerAt`, `rsStreetViewStep` |
+| `tabs.js` | 32 | Tabs and the two-way switch of a page |  |
 | `template.js` | 53 | The dashboard template's phone form: the class `rs-phone` on <html> at the phone width or less (the first paint sets it; this keeps it current), and the bottom sheet of a sidebar (three heights: closed, 40 %, full) |  |
 | `theme.js` | 36 | The page's theme: <html data-rs-theme="light|dark">, which the popup, the tooltip and (later) the bar read (popup.css, dashboard.css) | `rsSetTheme` |
 | `tip.js` | 49 | The explanation of a button: the browser draws a `title` itself, in the system's style, so the page takes the `title` of a button of the bar, the boxes, the panels and the windows when the pointer comes (or the key focus), keeps its text in `data-rs-tip` and shows it in a box of the page's look |  |
-| `toolbar.js` | 151 | The bar: the tools of the registry on one bar at an edge of the window, in the look of the theme |  |
+| `toolbar.js` | 177 | The bar: the tools of the registry on one bar at an edge of the window, in the look of the theme |  |
 | `tools.js` | 143 | The tool registry |  |
 | `tunnel.js` | 69 | the tunnel look, v2's slider: TUNNEL.strength 0-100 moves a tunnel's colours toward TUNNEL.to.fill | `RS_TUNNEL_PALETTES`, `RS_TUNNEL_TOWARDS`, `rsSetTunnelStyle` |
 | `view3d.js` | 22 | 2D/3D camera: window.rsSetView3D(on) tilts to the configured camera.pitch_3d (2D also squares the bearing back to north); the toggle button is UI over it and follows any pitch change — its label shows the view it will switch TO | `rsSetView3D` |

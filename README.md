@@ -48,7 +48,7 @@
   why. On a phone the bar is one row that you move sideways, and the panel is a bottom sheet.
 - **Tiles by default, one rule.** Every page keeps its roads as MLT vector tiles to zoom 16, with one road layer for every zoom. The page, the
   browser worker, `export_style` and `roadstyle tiles` all use the same tiling rule. `tiles=False` gives GeoJSON roads, and `tile_format="mvt"` gives MVT.
-- **The level editor is in the panel.** It uses the page's standard panel, with an apply bar and `edits.csv` in the History tab.
+- **The level editor is in the panel.** `roadstyle levels edit AREA_DIR` opens it from the Rust program. It uses the page's standard panel, with an apply bar, red and blue picks, the area boundary (`levels make --boundary`) and `edits.csv` in the History tab.
 - **Shared dashboard parts.** Help window, hover box, tabs, number tiles, tables, charts and chips are in the panel's own look, in both themes.
   `rs.classify` makes colour classes for roads.
 

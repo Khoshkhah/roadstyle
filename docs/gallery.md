@@ -35,7 +35,7 @@ More in [Which road is on top](guides/levels.md).
 ## Stacked roads
 
 Roads, ramps and tunnels crossing each other at several levels, each drawn in the right order. Any place can be fixed by hand in the
-[level editor](guides/levels.md#fix-it-by-hand-the-level-editor).
+[level editor](guides/levels.md#edit-the-levels).
 
 ```python
 rs.render_edges(edges)
