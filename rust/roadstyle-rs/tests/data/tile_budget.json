@@ -185,40 +185,20 @@
     }
    },
    "style": {
-    "layers": 9,
-    "expressions_total": 72350,
+    "layers": 5,
+    "expressions_total": 50926,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-simple": {
       "filter": 914,
       "paint.line-color": 2239,
-      "paint.line-width": 4513
-     },
-     "roads-simple-z14-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z14": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z15-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
-     },
-     "roads-simple-z15": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-arrows": {
       "filter": 875,
@@ -417,40 +397,20 @@
     }
    },
    "style": {
-    "layers": 9,
-    "expressions_total": 72350,
+    "layers": 5,
+    "expressions_total": 50926,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-simple": {
       "filter": 914,
       "paint.line-color": 2239,
-      "paint.line-width": 4513
-     },
-     "roads-simple-z14-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z14": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z15-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
-     },
-     "roads-simple-z15": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-arrows": {
       "filter": 875,
@@ -649,40 +609,20 @@
     }
    },
    "style": {
-    "layers": 9,
-    "expressions_total": 72104,
+    "layers": 5,
+    "expressions_total": 50680,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-simple": {
       "filter": 914,
       "paint.line-color": 2239,
-      "paint.line-width": 4513
-     },
-     "roads-simple-z14-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z14": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z15-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
-     },
-     "roads-simple-z15": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-arrows": {
       "filter": 579,
@@ -881,40 +821,20 @@
     }
    },
    "style": {
-    "layers": 9,
-    "expressions_total": 72104,
+    "layers": 5,
+    "expressions_total": 50680,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-simple": {
       "filter": 914,
       "paint.line-color": 2239,
-      "paint.line-width": 4513
-     },
-     "roads-simple-z14-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z14": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z15-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
-     },
-     "roads-simple-z15": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-arrows": {
       "filter": 579,
@@ -1977,8 +1897,8 @@
     }
    },
    "style": {
-    "layers": 43,
-    "expressions_total": 75538,
+    "layers": 39,
+    "expressions_total": 54114,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -1992,34 +1912,14 @@
      "roads-simple-dash": {
       "filter": 908,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-simple": {
       "filter": 914,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
-     },
-     "roads-simple-z14-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z14": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z15-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
-     },
-     "roads-simple-z15": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -2964,8 +2864,8 @@
     }
    },
    "style": {
-    "layers": 43,
-    "expressions_total": 75533,
+    "layers": 39,
+    "expressions_total": 54108,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -2979,34 +2879,14 @@
      "roads-simple-dash": {
       "filter": 908,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "roads-simple": {
       "filter": 914,
       "paint.line-color": 2279,
-      "paint.line-width": 4513
-     },
-     "roads-simple-z14-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z14": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 3468
-     },
-     "roads-simple-z15-dash": {
-      "filter": 908,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
-     },
-     "roads-simple-z15": {
-      "filter": 914,
-      "paint.line-color": 2279,
-      "paint.line-width": 10861,
-      "paint.line-offset": 2112
+      "paint.line-width": 14872,
+      "paint.line-offset": 3033
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -5445,6 +5325,36 @@
     "tartu-base.style.expressions.roads-simple-z14.filter: 888 -> 914",
     "tartu-base.style.expressions.roads-simple-z15-dash.filter: 882 -> 908",
     "tartu-base.style.expressions.roads-simple-z15.filter: 888 -> 914"
+   ]
+  },
+  {
+   "date": "2026-10-29",
+   "why": "one road layer for every zoom: the zoom bands left the roads empty at z14/z15 (Kaveh agreed 2026-10-29)",
+   "changes": [
+    "monaco.style.expressions.roads-simple-dash.paint.line-width: 4513 -> 14872",
+    "monaco.style.expressions.roads-simple-dash.paint.line-offset: new, 3033",
+    "monaco.style.expressions.roads-simple.paint.line-width: 4513 -> 14872",
+    "monaco.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "monaco-full.style.expressions.roads-simple-dash.paint.line-width: 4513 -> 14872",
+    "monaco-full.style.expressions.roads-simple-dash.paint.line-offset: new, 3033",
+    "monaco-full.style.expressions.roads-simple.paint.line-width: 4513 -> 14872",
+    "monaco-full.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "monaco-base.style.expressions.roads-simple-dash.paint.line-width: 4513 -> 14872",
+    "monaco-base.style.expressions.roads-simple-dash.paint.line-offset: new, 3033",
+    "monaco-base.style.expressions.roads-simple.paint.line-width: 4513 -> 14872",
+    "monaco-base.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "tartu.style.expressions.roads-simple-dash.paint.line-width: 4513 -> 14872",
+    "tartu.style.expressions.roads-simple-dash.paint.line-offset: new, 3033",
+    "tartu.style.expressions.roads-simple.paint.line-width: 4513 -> 14872",
+    "tartu.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "tartu-full.style.expressions.roads-simple-dash.paint.line-width: 4513 -> 14872",
+    "tartu-full.style.expressions.roads-simple-dash.paint.line-offset: new, 3033",
+    "tartu-full.style.expressions.roads-simple.paint.line-width: 4513 -> 14872",
+    "tartu-full.style.expressions.roads-simple.paint.line-offset: new, 3033",
+    "tartu-base.style.expressions.roads-simple-dash.paint.line-width: 4513 -> 14872",
+    "tartu-base.style.expressions.roads-simple-dash.paint.line-offset: new, 3033",
+    "tartu-base.style.expressions.roads-simple.paint.line-width: 4513 -> 14872",
+    "tartu-base.style.expressions.roads-simple.paint.line-offset: new, 3033"
    ]
   }
  ]
