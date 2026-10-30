@@ -82,6 +82,18 @@ function foldTool(bar){
   b.onclick = e => { e.stopPropagation(); closeBoxes(); on = !on; set(on); try{ localStorage.setItem(_tbFoldKey, on ? "1" : "0"); }catch(e){} };
   bar.insertBefore(w, bar.firstChild);
 }
+// a soft fade at the edge of the scrolling row shows that more buttons are there (`rs-more-l`, `rs-more-r` on the row)
+function scrollHints(row, scroll){
+  const set = () => {
+    row.classList.toggle("rs-more-l", scroll.scrollLeft > 2);
+    row.classList.toggle("rs-more-r", scroll.scrollLeft < scroll.scrollWidth - scroll.clientWidth - 2);
+  };
+  scroll.addEventListener("scroll", set, {passive: true});
+  new ResizeObserver(set).observe(scroll);
+  new MutationObserver(set).observe(scroll, {childList: true});
+  addEventListener("resize", set);
+  set();
+}
 // one box is open at a time: a click outside the open box and the Escape key close it, and so does the click on another box's button
 function boxRules(bar){
   const boxes = () => toolList().filter(t => t.kind === "box" && t.isOpen && t.isOpen());
@@ -118,6 +130,10 @@ export function initToolbar(){
   themeTool(); attributionTool();
   fillToolbox();                          // the places of the tools that this page cannot use: greyed out
   const bar = el("div"); bar.id = "rs-toolbar"; document.body.appendChild(bar);
+  // the tools are in `scroll`, inside `row`: on a phone the bar is one row and `scroll` moves sideways under a finger; `row` holds the two fades.
+  // Both are `display:contents` elsewhere. The fold button is the bar's own, outside the row.
+  const row = el("div", "rs-tb-row"), scroll = el("div", "rs-tb-scroll");
+  row.append(scroll, el("i", "rs-tb-fade rs-tb-fade-l"), el("i", "rs-tb-fade rs-tb-fade-r")); bar.appendChild(row);
   if(d.toolbar.hold){                       // a page that adds tools of its own: no bar without them at the load; rs.tools.ready() shows it, 6 s at the latest
     bar.dataset.held = "1";                  // an attribute, not a class: the bar's class is set again at each change of its edge
     const show = () => { delete bar.dataset.held; };
@@ -139,10 +155,11 @@ export function initToolbar(){
       }
       const w = wrap(t.el);
       if(t.id === "attribution") attr = w;
-      attr && attr.parentNode === bar && t.id !== "attribution" ? bar.insertBefore(w, attr) : bar.appendChild(w);       // the credits can be in the corner box (overlay.js)
+      attr && attr.parentNode === scroll && t.id !== "attribution" ? scroll.insertBefore(w, attr) : scroll.appendChild(w);       // the credits can be in the corner box (overlay.js)
     }
   });
   foldTool(bar);
+  scrollHints(row, scroll);
   boxRules(bar);
   const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-nav-box, #rs-roads-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
   toolList().forEach(fitBox); setOnReplace(fitBox);

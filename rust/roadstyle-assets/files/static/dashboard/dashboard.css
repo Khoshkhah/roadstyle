@@ -180,11 +180,12 @@ html[data-rs-theme=dark] #rs-toolbar .maplibregl-ctrl-icon{filter:invert(.85)}
 #rs-toolbar button.on,#rs-toolbar button.rs-on{background:var(--rs-tb-on)}
 #rs-toolbar button:disabled{opacity:.4;cursor:not-allowed}
 /* the fold button (toolbar.js): a folded bar shows only this button; on a bar along the top or the bottom its arrow points to the side */
-html.rs-tb-folded #rs-toolbar>.maplibregl-ctrl:not(.rs-tb-fold){display:none}
+html.rs-tb-folded #rs-toolbar>.rs-tb-row{display:none}
 #rs-toolbar.rs-tb-top .rs-tb-fold svg,#rs-toolbar.rs-tb-bottom .rs-tb-fold svg{transform:rotate(-90deg)}
 html.rs-tb-folded #rs-toolbar .rs-tb-fold svg{transform:none}
 #rs-toolbar .maplibregl-ctrl-group button+button{border:0}
 #rs-toolbar button:hover:not(:disabled){background:var(--rs-tb-hover)}
+.rs-tb-row,.rs-tb-scroll{display:contents}
 #rs-toolbar.rs-tb-right,#rs-toolbar.rs-tb-left{flex-direction:column;width:44px;top:50%;transform:translateY(-50%);max-height:calc(100% - 128px)}
 #rs-toolbar.rs-tb-right .maplibregl-ctrl-group,#rs-toolbar.rs-tb-left .maplibregl-ctrl-group{flex-direction:column}
 #rs-toolbar.rs-tb-right{right:8px}
@@ -330,6 +331,22 @@ html.rs-phone.rs-tpl-dashboard .rs-grip,html.rs-phone.rs-tpl-dashboard #sb{
 /* a phone: the bar at the top or the bottom takes a second row when its tools do not fit in one (each tool stays 32 px) */
 html.rs-phone #rs-toolbar.rs-tb-top,html.rs-phone #rs-toolbar.rs-tb-bottom{height:auto;flex-wrap:wrap;justify-content:center;overflow:visible;left:8px;right:8px;width:auto;max-width:none;transform:none}
 html.rs-phone #rs-toolbar.rs-tb-top .maplibregl-ctrl-group,html.rs-phone #rs-toolbar.rs-tb-bottom .maplibregl-ctrl-group{flex-direction:row}
+/* a phone, the bar along the top: ONE row. The tools move sideways under a finger (no scrollbar), a soft fade at an edge shows that there are more, and the
+   bar folds to one small button. A box opens under the bar as a fixed box: a scrolling row would clip a box that is its child. */
+html.rs-phone #rs-toolbar.rs-tb-top{flex-wrap:nowrap;justify-content:flex-start}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-row{display:block;position:relative;flex:1;min-width:0}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;touch-action:pan-x}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll::-webkit-scrollbar{display:none}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>*{flex:none}
+html.rs-phone #rs-toolbar.rs-tb-top .maplibregl-ctrl{transform:none}   /* MapLibre gives each control a transform; it would make the control the frame of its fixed box */
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:first-child{margin-left:auto}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:last-child{margin-right:auto}
+.rs-tb-fade{display:none;position:absolute;top:0;bottom:0;width:26px;pointer-events:none}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-more-l .rs-tb-fade-l{display:block;left:0;background:linear-gradient(to right,var(--rs-tb-bg),transparent)}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-more-r .rs-tb-fade-r{display:block;right:0;background:linear-gradient(to left,var(--rs-tb-bg),transparent)}
+html.rs-phone.rs-tb-folded #rs-toolbar.rs-tb-top{right:auto}
+html.rs-phone.rs-tb-folded #rs-toolbar.rs-tb-top .rs-tb-row{display:none}
+html.rs-phone #rs-toolbar.rs-tb-top :is(.bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box){position:fixed!important;top:var(--rs-top,60px)!important;left:12px!important;right:12px!important;bottom:auto!important;width:auto!important;max-height:calc(100dvh - var(--rs-top,60px) - 12px)}
 /* ---- the attribution box (toolbar.js): one row for each credit, the link icon at the right ---- */
 #rs-attr-box[hidden]{display:none}
 .rs-attr-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:6px;color:inherit;text-decoration:none;font:12px/1.3 system-ui,sans-serif}

@@ -151,9 +151,11 @@ At 700 px or less, the bar is at the top and the panel is a bottom sheet.
 
 ![The dashboard on a phone: the bar at the top and the panel as a bottom sheet](../img/dashboard-phone.png){ width="260" }
 
-- **The bar** has the same tools as on a desktop. It wraps to a second row when the tools do not fit in one row. The **fold button** is first in the
-  bar. It folds the bar to one button (three lines), and a tap opens it again. The page keeps your choice in this browser
-  (`rs-settings:toolbar-folded`).
+- **The bar** has the same tools as on a desktop, in **one row**. When the tools do not fit, the row moves sideways under a finger (it has
+  no scrollbar). A soft fade at an edge shows that more tools are there. A box of the bar opens under the row, as a fixed box with
+  the width of the window, so the scrolling row does not clip it.
+- **The fold button** is first in the bar. It hides the bar, and one small button stays. A tap on that button opens the bar again. The page keeps
+  your choice in this browser (`rs-settings:toolbar-folded`).
 - **The sheet** has three heights: closed, 40 % and full. Its grip is a strip of 44 px with an arrow. The arrow goes one height down, and up when the sheet is
   closed. The grip and its line follow the theme. The sheet uses the height of the visible screen (`dvh`), so the grip of the full sheet stays below the bar and you can lower the sheet.
 - **The first view** fits into the free part of the window: below the bar and above the sheet. On a desktop it fits beside the panel and the

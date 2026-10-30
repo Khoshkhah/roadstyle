@@ -59,8 +59,8 @@ Every dashboard has the same parts, in the same places. You do not build them. Y
   adds (`rs.legend`), and the colours of the base-map layers.
 - **The settings** keep the place of the bar and the panel, three transparency sliders and your keys, in your browser.
 - **The credits** are in a box in the corner of the map. On a phone they are in the bar.
-- **A phone** (700 px or less) has the bar at the top, which you can fold to one button, and the panel as a bottom sheet with a
-  button on its grip.
+- **A phone** (700 px or less) has the bar at the top in one row that moves sideways under a finger, and a fold button that hides the bar
+  to one small button. The panel is a bottom sheet with a button on its grip.
 
 The pages [Dashboard layout](dashboard-layout.md) and [Add to the panel](dashboard-panel.md) have the details. To build your own
 panel and tools from JavaScript, use `rs.sections`, `rs.legend` and `rs.tools`

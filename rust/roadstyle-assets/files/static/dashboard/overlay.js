@@ -57,7 +57,7 @@ export function initOverlay(){
   // is not drawn, so the credits go back to the bar
   if(credits){
     const w = credits.el.closest(".maplibregl-ctrl") || credits.el, bar = document.getElementById("rs-toolbar"), phone = matchMedia("(max-width:" + d.phone.max_width_px + "px)");
-    const put = () => (phone.matches && bar ? bar : box).appendChild(w);
+    const put = () => (phone.matches && bar ? bar.querySelector(".rs-tb-scroll") : box).appendChild(w);
     put(); phone.addEventListener("change", put);
   }
   followPanels(box, () => root.classList.contains("rs-panel-left") ? "right" : "left");       // always on the side opposite to the panel
