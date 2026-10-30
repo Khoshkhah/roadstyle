@@ -5,6 +5,7 @@
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
 pub mod colors;
+pub mod dark;
 pub mod contract;
 pub mod decks;
 pub mod draw;

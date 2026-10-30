@@ -102,7 +102,7 @@ fn frac(x: f64) -> f64 {
 }
 
 /// colorsys.rgb_to_hls
-fn rgb_to_hls(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+pub fn rgb_to_hls(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
     let (maxc, minc) = (r.max(g).max(b), r.min(g).min(b));
     let (sumc, rangec) = (maxc + minc, maxc - minc);
     let l = sumc / 2.0;
@@ -116,7 +116,7 @@ fn rgb_to_hls(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
 }
 
 /// colorsys.hls_to_rgb
-fn hls_to_rgb(h: f64, l: f64, s: f64) -> [f64; 3] {
+pub fn hls_to_rgb(h: f64, l: f64, s: f64) -> [f64; 3] {
     if s == 0.0 {
         return [l, l, l];
     }

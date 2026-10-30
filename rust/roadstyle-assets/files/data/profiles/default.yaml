@@ -119,3 +119,13 @@ overlays:
   item_overlap_px: 1
 
 boundary: {width: 2.5, dash: [3, 2]}
+
+# The dark theme (docs/design/dark_theme.md): the style holds the light colour of each layer and its dark one, and the dashboard's theme switch
+# picks one (the global state rs_theme). A colour's lightness (0 black to 1 white) is placed between the two numbers of `lightness`, and its saturation is
+# multiplied by `saturation`; the hue stays. A first number above the second turns the lightness over (the labels). The fill of a road keeps its colour.
+dark:
+  area: {lightness: [0.10, 0.30], saturation: 0.85}      # the fills and the 3D buildings of the base map's layers
+  line: {lightness: [0.30, 0.65], saturation: 0.90}      # their lines and outlines
+  point: {lightness: [0.30, 0.80], saturation: 1.0}      # their points and icons
+  casing: {lightness: [0.12, 0.42], saturation: 0.85}    # the casing of the roads
+  label: {lightness: [0.92, 0.30], saturation: 1.0}      # the names, the arrows and their halos (white becomes dark, grey becomes light)

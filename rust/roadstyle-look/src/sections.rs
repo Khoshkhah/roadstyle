@@ -63,6 +63,9 @@ pub struct Sections {
     pub overlays: OverlayLook,
     pub boundary: BoundaryLook,
     pub background: BackgroundLook,
+    /// the dark theme of the style's layers (`rs_theme` "dark"): how each light colour is turned dark
+    #[serde(default)]
+    pub dark: DarkLook,
     /// the colour of each kind of restricted road
     pub access: IndexMap<String, Color>,
     pub camera: CameraLook,
@@ -377,6 +380,38 @@ pub struct BoundaryLook {
     pub dash: Vec<Num>,
     pub color: Color,
     pub opacity: Num,
+}
+
+/// One kind of colour in the dark theme: the lightness of the light colour (0 to 1) is placed between `lightness[0]` (for black) and `lightness[1]` (for
+/// white), and the saturation is multiplied by `saturation`. The hue stays. A first number above the second turns the lightness over (the labels).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DarkBand {
+    pub lightness: [f64; 2],
+    pub saturation: f64,
+}
+
+/// The dark theme (profile `dark`): a band for each kind of colour of the style. `area`: the fills and the 3D buildings of the base map's layers; `line`: their
+/// lines and outlines; `point`: their points and icons; `casing`: the casing of the roads (the fill of a road keeps its colour); `label`: the names, the
+/// arrows and their halos. The textures of the land are made again in the `area` band.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DarkLook {
+    pub area: DarkBand,
+    pub line: DarkBand,
+    pub point: DarkBand,
+    pub casing: DarkBand,
+    pub label: DarkBand,
+}
+
+impl Default for DarkLook {
+    /// the values of the default profile, so that a look file made before the dark theme has them
+    fn default() -> DarkLook {
+        let band = |l0: f64, l1: f64, s: f64| DarkBand { lightness: [l0, l1], saturation: s };
+        DarkLook { area: band(0.10, 0.30, 0.85), line: band(0.30, 0.65, 0.9), point: band(0.30, 0.80, 1.0), casing: band(0.12, 0.42, 0.85), label: band(0.92, 0.30, 1.0) }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
