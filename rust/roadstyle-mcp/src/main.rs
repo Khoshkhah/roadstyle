@@ -26,7 +26,7 @@ roadstyle draws road networks as styled, interactive, offline HTML maps (MapLibr
 Docs: https://khoshkhah.github.io/roadstyle/ (every keyword: /reference/parameters/).";
 
 /// The tool that this server does not have yet (render_place).
-const PYTHON: &str = "the Python server (pip install roadstyle-mcp==0.26.0)";
+const PYTHON: &str = "the Python server (pip install roadstyle-mcp==0.26.1)";
 
 /// The vendored MapLibre (WebMap.save and the CLI's `roadstyle page` put the same in), so a saved map works offline.
 const MAPLIBRE_JS: &str = roadstyle::assets::text!("vendor/maplibre-gl.js");

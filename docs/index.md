@@ -87,6 +87,11 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
 </div>
 
+## What is new in 0.26.1
+
+- **One accent colour.** The dashboard uses the Sonocount teal everywhere, in the light and the dark theme, defined once. The corner box has the shape of the bar, a button with a text shows no tooltip box, and every tool of a phone's one-row bar can be reached. [Dashboard layout](guides/dashboard-layout.md)
+- **Help in the level editor.** A **?** button opens a help window with two links to the levels guide. [Edit the levels](guides/levels.md#edit-the-levels-in-a-dashboard)
+
 ## What is new in 0.26.0
 
 - **A standard dashboard and toolbox.** `render_dashboard` has one panel and one bar of tools. The bar has one `navigate` button

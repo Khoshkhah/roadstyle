@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-30
+
+### Added
+- **The level editor has a help window.** A **?** button next to the editor's title opens the dashboard's own help window (`rs.help`) with short words (Simplified Technical English): what a level is, how to pick the red and the blue road, Order, Stack, Meet and "on top", the casing parts, Add to the list, Discard, Apply and solve, History and `edits.csv`, Issues, and "← Steps" with changes waiting. A dot of each colour shows road 1 and road 2. It works in both themes and on a phone, where the window is a sheet at the bottom. `rs.help.set` takes `anchor` (the element for the button), and `rs.help` has `get()` and `clear()`; the editor sets the host's own words again when it closes. The Esc listener of the window is on the page only while the window is open. The window ends with two links to this guide ("Edit the levels" and "Edit the levels in a dashboard"), which open in a new tab.
+- The goldens of the Monaco page and of the page with views have the new size and hash (`rust_page.json`, `page_views.json`): the help window adds 1,095 bytes to every page.
+
 ### Changed
 - **One accent colour for the whole dashboard: the Sonocount teal.** `--accent` is `#0e7c8e` in the light theme (the logo's teal, a little darker so that a link is 4.6:1 on the panel's cards: the logo's own is 4.43:1) and a lighter teal of the same hue (`#42c2d7`, 8.5:1 on the dark panel) in the dark theme; `--accent-fill` is the logo teal `#0E7F91` of a
   filled control (a selected tab, a primary button, the mode and follow buttons of the Street View and Google 3D windows), with white text (4.71:1) in both themes. They are defined once, in `dashboard.css` (the panel's own
@@ -25,8 +31,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [0.26.0] - 2026-10-30
 
 ### Added
-- **The level editor has a help window.** A **?** button next to the editor's title opens the dashboard's own help window (`rs.help`) with short words (Simplified Technical English): what a level is, how to pick the red and the blue road, Order, Stack, Meet and "on top", the casing parts, Add to the list, Discard, Apply and solve, History and `edits.csv`, Issues, and "← Steps" with changes waiting. A dot of each colour shows road 1 and road 2. It works in both themes and on a phone, where the window is a sheet at the bottom. `rs.help.set` takes `anchor` (the element for the button), and `rs.help` has `get()` and `clear()`; the editor sets the host's own words again when it closes. The Esc listener of the window is on the page only while the window is open. The window ends with two links to this guide ("Edit the levels" and "Edit the levels in a dashboard"), which open in a new tab.
-- The goldens of the Monaco page and of the page with views have the new size and hash (`rust_page.json`, `page_views.json`): the help window adds 1,095 bytes to every page.
 - **The dark theme of a live style's layers.** The style holds a dark colour for each light colour of the base map's layers (land, parks, water, buildings, paved, parking, lines, points), for
   the casing of the roads and for the names and arrows, picked by the global state `rs_theme`: the dashboard's theme switch sets it, so a host with a dark base map (Fiord) is dark
   all over with no new style and no new tile. The dark colour is the light one turned by the profile's `dark` block (a lightness band and a saturation for each of `area`, `line`, `point`,

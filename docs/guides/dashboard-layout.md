@@ -181,4 +181,8 @@ At 700 px or less, the bar is at the top and the panel is a bottom sheet.
 
 ## Style
 
+The dashboard has one accent colour, the Sonocount teal: `--accent` is `#0e7c8e` in the light theme and a lighter teal in the dark theme. It is defined once in `dashboard.css`. A selected tab, a primary button, the mode and follow buttons of the Street View and Google 3D windows, and a link use it, in the panel and in the floating windows. A page cannot set its own accent.
+
+The box in the bottom corner (scale, zoom number, credits) has the rounded shape of the bar. A button with a text shows no tooltip box, and a tooltip box never covers its control. On a phone every tool of the one-row bar can be reached: the row scrolls, and the first and the last tool are whole at the ends.
+
 Every part uses the same tokens in both themes (rules: `docs/design/dashboard_templates.md`, 3.4).

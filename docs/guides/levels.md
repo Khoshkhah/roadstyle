@@ -191,6 +191,7 @@ The calls and the options are in [Use roadstyle in the browser](../rust/browser.
 - **The picked roads** have the dashboard's own selection glow. The editor's colours tell road 1 from road 2. When the editor closes, it clears the
   colour and the glow.
 - **The toolbox** is the dashboard's. It does not change.
+- **Help.** The **?** button next to the title opens the dashboard's help window. It ends with two links to this guide, "Edit the levels" and "Edit the levels in a dashboard". They open in a new tab.
 
 `roadstyle-levels edit` opens the same editor in a page that is a host of the standard dashboard: it has the template, the panel, and the hide and show buttons
 of the dashboard. Your edits are in `edits.csv` in the area folder.

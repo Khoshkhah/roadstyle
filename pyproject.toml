@@ -5,7 +5,7 @@ build-backend = "maturin"
 
 [project]
 name = "roadstyle"
-version = "0.26.0"
+version = "0.26.1"
 description = "Road cartography for Python: turn road edges into styled, interactive, offline HTML maps (MapLibre) with a JavaScript API"
 readme = "README.md"
 requires-python = ">=3.10"
