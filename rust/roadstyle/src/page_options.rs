@@ -461,7 +461,7 @@ fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Va
 
 /// The options of a host page that writes its own HTML and calls `rsDashboard` itself (a JavaScript page, such as the duckOSM page): the typed
 /// `dashboard` of the template `dashboard` (with the layout and the `dashboard` keys of `given`, as `page_from` merges them), its first paint, and the
-/// base maps (`basemaps`, `ontop` and the active key, as `page_from` gives them to the page). `given` has the keys of a call: `layout`, `dashboard`,
+/// base maps (`basemaps`, `ontop`, the active key and `style`, the page's base style: its background and the hidden raster layer, as `page_from` gives them to the page). `given` has the keys of a call: `layout`, `dashboard`,
 /// `basemap`, `basemaps`, `api_key`, `basemap_switcher`. The same rules as a page that roadstyle writes, so the host has no copy of them.
 /// `data/host_options.json` is its answer for the default look and no keys (a test keeps it current): a host page fetches the file, changes what it needs
 /// (the panel's width, `hide`, the order of the base maps) and loads no WebAssembly module on its main thread for it.
@@ -477,7 +477,7 @@ pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, V
     let look = owned.as_ref().unwrap_or(look);
     let k: PageKeys = serde_json::from_value(Value::Object(a)).map_err(|e| crate::error::options(format!("a page key: {e}")))?;
     let mut warnings = Vec::new();
-    let (active, bms, _) = basemaps(&k, look, &mut warnings)?;
+    let (active, bms, style) = basemaps(&k, look, &mut warnings)?;
     dashboard.google_3d.layers = k.google_3d_layers.clone();
     dashboard.boundary.dim = k.boundary_dim;
     dashboard.boundary.limit = k.boundary_limit;
@@ -486,7 +486,7 @@ pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, V
     }
     let first = dashboard.first_paint_parts();
     let ontop = if bms.len() > 1 { ontop_layers() } else { Value::Null };
-    Ok((json!({"dashboard": dashboard, "first_paint": first, "basemaps": bms, "ontop": ontop, "basemap": active["key"]}), warnings))
+    Ok((json!({"dashboard": dashboard, "first_paint": first, "basemaps": bms, "ontop": ontop, "basemap": active["key"], "style": style}), warnings))
 }
 
 const VIEW_BOOLS: [&str; 4] = ["road_fill", "bridges", "tunnels", "view3d"];
@@ -649,6 +649,7 @@ mod tests {
         assert_eq!(o["basemap"], "blank");
         assert_eq!(o["basemaps"][1]["tiles"], json!(["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png", "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png", "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"]));
         assert_eq!(o["basemaps"][0]["bg"], "#efede8");
+        assert_eq!(o["style"]["layers"][0]["id"], "bg");
         assert!(o["ontop"]["hillshade"].is_object());
         // a form that is not the dashboard is an error here, as for a page
         assert!(host_options(&look, json!({"template": "map"}).as_object().unwrap()).is_err());

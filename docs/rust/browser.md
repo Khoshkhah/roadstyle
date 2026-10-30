@@ -339,7 +339,7 @@ and the panel only (Burnaby, 76,189 roads: 1.7 s, against 7.9 s more for its own
 ```js
 const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
   host: {edgeIdCol: "edge_id", replaceRoads: async (rows) => redraw(rows)},
-  colors: {select: "#7c4dff", hover: "#b388ff", second: "#4527a0"}});
+  colors: {select: "#e53935", hover: "#ff8a80", second: "#1e63d6"}});
 ```
 
 - Your map, your roads and your pick stay as they are. Your road table (`window.RS_SIDE`) must keep the edge id field (`edgeIdCol`,

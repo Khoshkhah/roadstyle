@@ -2,8 +2,8 @@
 // the body is scrolled, so the person sees that there is more above; the body has `data-more` while there is more below (a fade at its bottom edge), and
 // `rs-scrolling` while it scrolls (the scrollbar shows). (The rest of the protocol is CSS: the body does not hand its scroll to the map.)
 export function initPanelScroll(){
-  const run = () => document.querySelectorAll(".sb-body, .rp-body").forEach(body => {
-    const head = body.previousElementSibling;
+  const run = () => document.querySelectorAll(".sb-body, .rp-body, .rs-pbody").forEach(body => {
+    const head = body.dataset.head ? document.querySelector(body.dataset.head) : body.previousElementSibling;   // data-head: the header of a body that is not just after it
     if(!head || body.dataset.rsScroll) return;
     body.dataset.rsScroll = "1";
     const mark = () => head.classList.toggle("scrolled", body.scrollTop > 0);

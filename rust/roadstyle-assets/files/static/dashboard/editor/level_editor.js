@@ -8,7 +8,7 @@
 // solved levels.csv to `store`, and after each solve it sends the event "solved" ({levelsCsv, levelsInfo, draw()}: draw gives the map's
 // table, GeoParquet, one row for each edge) so that the host can apply it. The event "back" comes when the person leaves with "← <backLabel>"
 // (with changes waiting, after "Apply, discard or stay" has an answer that leaves): the host then calls destroy() and shows its own steps.
-// `backLabel: null` has no "← ..." button (a page with no steps). `template` is the dashboard template of the editor's own map's dashboard.
+// `backLabel: null` has no "← ..." button (a page with no steps). `template` is the dashboard template of the editor's own map's dashboard, and `basemaps` its base maps ({style, basemaps, ontop}: host_options.json): the same base-map box as every dashboard.
 // A store is {load(name, bytes) -> {body, mtime} | null,
 // save(name, text | bytes)} with an optional `name` (the area's, shown in the panel) and `key`: httpStore for roadstyle serve,
 // browserStore for a page with no server.
@@ -20,6 +20,7 @@
 import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
+import {initPanelScroll} from "../panelscroll.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
 const EMPTY = COLS.join(",") + "\n";
@@ -101,11 +102,14 @@ const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
  * are now), `files` (those names) and `answer()` (the last answer of the solver). */
-export async function levelEditor({map = null, container = document.body, panel, backLabel = "Steps", template = null, pkgUrl, store,
+export async function levelEditor({map = null, container = document.body, panel, backLabel = "Steps", template = null, basemaps = null, pkgUrl, store,
                                    maplibregl: ml = globalThis.maplibregl, dashboard = null, prefix = dashboard ? null : "lv-rs-",
                                    levels: given = null, host = null, colors = {}}){
-// the picked roads and the hover (`colors`: {select, hover, second}): road 1 in the selection's colour, road 2 darker, the hover lighter
-const COLORS = {select: "#7c4dff", hover: "#b388ff", second: "#4527a0", ...colors};
+// the picked roads and the hover (`colors`: {select, hover, second}): road 1 red, road 2 blue, the hover a lighter red
+const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", hover2: "#82b1ff", ...colors};
+// The dashboard has one select colour and one hover colour for every road; the editor wants road 1 red and road 2 blue, and the hover of the road
+// that would be the next pick lighter in its colour. The look gets two sentinel colours, which `highlight` replaces in the road layers' paint.
+const SENT = {select: "#fe0a01", hover: "#fe0a02"};
 // the host's panel: the card, its title line (the title first, then the hide button) and its body
 const hostCard = panel?.querySelector?.(".sb-card"), hostBar = hostCard?.querySelector(".sb-top"), hostBody = hostCard?.querySelector(".sb-body");
 if(!hostBar?.firstElementChild || !hostBody)
@@ -119,15 +123,36 @@ if(dashboard && !prefix && !host)
 if(map && window.map instanceof ml.Map && window.map !== map)     // (an element with the id "map" is window.map too: not a map)
   throw new Error("level editor: window.map is another map; the panel draws on window.map");
 const P = map ? prefix : "rs-";                                  // a host map: the editor's layers and sources with the prefix given
+// the highlight colours (see SENT): `captureHL` keeps the paint of the road layers that hold a sentinel, `highlight(groups)` ([[ids, colour], ...], one for each
+// picked road, as rsColor takes them) sets that paint again: a picked road in its colour (an expression on the road's id), the hover in the colour of the road
+// that the next click would pick (light red for the first, light blue for the second)
+const hl = {orig: new Map(), groups: null};
+const swapColors = (v, to) => Array.isArray(v) ? v.map(x => swapColors(x, to)) : v && typeof v === "object"
+  ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swapColors(x, to)])) : v === SENT.select ? to.select : v === SENT.hover ? to.hover : v;
+const hasSent = v => { const t = JSON.stringify(v); return t.includes(SENT.select) || t.includes(SENT.hover); };
+function captureHL(){
+  hl.orig.clear();
+  for(const l of map.getStyle().layers) if(l.paint && hasSent(l.paint)) hl.orig.set(l.id, l.paint);
+}
+function highlight(groups){
+  hl.groups = groups;
+  const picked = (groups || []).filter(g => g[0].length);
+  const select = picked.length ? ["match", ["id"], ...picked.flatMap(([ids, c]) => [ids, c]), COLORS.select] : COLORS.select;
+  const to = {select, hover: picked.length === 1 && picked[0][1] === COLORS.select ? COLORS.hover2 : COLORS.hover};
+  for(const [id, paint] of hl.orig) if(map.getLayer(id)) for(const [k, v] of Object.entries(paint)) if(hasSent(v)) map.setPaintProperty(id, k, swapColors(v, to));
+}
 // the road table's fields: what the page reads of a row (the dashboard's reads.json, "table"), live data's id and the road that a click
 // picks (the other fields of a road are a large part of the table's text, which the page parses after each answer)
 const reads = await fetch(new URL("../reads.json", import.meta.url));
 if(!reads.ok) throw new Error(`level editor: the dashboard's reads.json (${reads.status})`);
-const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road"];
+const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road", "modes"];   // "modes": the panel's mode box
 // the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
 const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
 const call = caller(worker);
-await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), look: JSON.stringify({args: {...LOOK, hover_color: COLORS.hover}})});
+// the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
+const boundaryF = map ? null : await store.load("boundary.geojson");
+await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)),
+  look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundaryF ? {boundary: JSON.parse(boundaryF.body)} : {})}})});
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
@@ -241,6 +266,7 @@ function ownSources(st){
   return st;
 }
 const own = !map;                                                // no host map: the editor's own, on the area's box
+if(own && !basemaps?.style) throw new Error("level editor: the editor's own map needs `basemaps`, the base maps of a host page (host_options.json: style, basemaps, ontop)");
 const added = ["road", "s_lon", "s_lat", "e_lon", "e_lat"];      // host: the fields that the panel reads, put on the host's road table
 const mine = {layers: [], sources: [], images: []};              // what the editor put on the map
 const taken = {layers: [], sources: {}, order: [], style: null};  // the host's roads that the editor took off, for destroy
@@ -276,15 +302,15 @@ if(host){                                                        // the host's m
     const div = document.createElement("div");
     div.style.cssText = "position:absolute;inset:0";
     container.appendChild(div);
-    map = new ml.Map({container: div, style: "https://tiles.openfreemap.org/styles/positron", bounds: [[bb[0], bb[1]], [bb[2], bb[3]]],
+    map = new ml.Map({container: div, style: basemaps.style, bounds: [[bb[0], bb[1]], [bb[2], bb[3]]],
       attributionControl: {compact: true}});
     map.addControl(new ml.NavigationControl({visualizePitch: true}));
     map.addControl(new ml.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
   } else map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {padding: 40, duration: 0});
   window.map = map;                                                // the panel (level_editor.html) draws on the global map
   // the page's one dashboard: the host's, else one for the editor (the road fields: the road table RS_SIDE)
-  rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge", basemap_switcher: false,
-    dashboard: template});
+  rs = dashboard || rsDashboard(map, {style: null, prefix: P, tiles: true, simple: "roads-simple", edge_id_col: "edge",
+    basemaps: basemaps.basemaps, ontop: basemaps.ontop, dashboard: template});
   if(own){                                                         // the area in the part of the map that the panel and the bar leave free
     const f = rs.freeArea(), r = map.getContainer().getBoundingClientRect();
     map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {duration: 0, padding: {left: f.lo - r.left + 40, right: r.right - f.hi + 40, top: f.top - r.top + 40,
@@ -321,6 +347,8 @@ if(host){                                                        // the host's m
       map.getLayer("lv-ends") ? "lv-ends" : undefined);
     mine.layers.push(P + "lv-tap");
     rs.setStyle(st);
+    captureHL();
+    highlight(hl.groups);
   }
   // the style loaded: a host map's load event can be over, and isStyleLoaded false a moment while it loads an image, with no event after
   while(!map.isStyleLoaded()) await new Promise(ok => setTimeout(ok, 50));
@@ -488,6 +516,7 @@ window.lvApi = async (path, body) => {
 // --- the panel (static/level_editor.html), with its scripts run, in the host's panel: the host's body and title are kept and hidden
 const html = (await (await fetch(new URL("../../level_editor.html", import.meta.url))).text()).replace("__STATS__", JSON.stringify(stats()));
 window.lvColors = [COLORS.select, COLORS.second];
+window.lvHighlight = highlight;                                 // the panel gives the picked roads (static/level_editor.html)
 window.lvDownload = download;                                    // the History tab's button
 const holder = document.createElement("div");
 holder.innerHTML = html;
@@ -506,6 +535,7 @@ try {
     else hostCard.appendChild(node);                              // a script runs here, at once
   }
 } finally { [document.addEventListener, map.on] = [docOn, mapOn]; }
+initPanelScroll();                                               // the editor's tabs scroll by the panel's protocol (the class rs-pbody)
 if(backLabel == null) document.getElementById("lv-back").remove();      // a page with no steps to go back to
 else document.getElementById("lv-back").textContent = "← " + backLabel;
 document.getElementById("lv").addEventListener("lv:back", () => events.dispatchEvent(new CustomEvent("back")));
@@ -556,7 +586,7 @@ function destroy(){
     const t = window.RS_SIDE;
     if(t && t.lvFields){ t.props.forEach(p => { if(p) for(const k of added) delete p[k]; }); delete t.lvFields; }
     if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
-    delete window.lvColors; delete window.lvDownload;
+    delete window.lvColors; delete window.lvDownload; delete window.lvHighlight;
     return;
   }
   ml.removeProtocol("lv");
@@ -573,7 +603,7 @@ function destroy(){
   }
   // window.map stays the host's map (the panel's last timers read it)
   if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
-  delete window.lvColors; delete window.lvDownload;
+  delete window.lvColors; delete window.lvDownload; delete window.lvHighlight;
 }
 return Object.assign(events, {map, roads: order, facts: roadsOf, download, destroy, files: Object.keys(files), answer: () => res});
 }

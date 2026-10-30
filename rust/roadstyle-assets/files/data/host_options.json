@@ -315,5 +315,38 @@
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
     }
   },
-  "basemap": "blank"
+  "basemap": "blank",
+  "style": {
+    "version": 8,
+    "sources": {
+      "bm": {
+        "type": "raster",
+        "tiles": [
+          "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        ],
+        "tileSize": 256,
+        "maxzoom": 19,
+        "attribution": "© OpenStreetMap contributors"
+      }
+    },
+    "layers": [
+      {
+        "id": "bg",
+        "type": "background",
+        "paint": {
+          "background-color": "#efede8"
+        }
+      },
+      {
+        "id": "basemap",
+        "type": "raster",
+        "source": "bm",
+        "layout": {
+          "visibility": "none"
+        }
+      }
+    ]
+  }
 }

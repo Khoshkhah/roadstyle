@@ -1,5 +1,5 @@
 //! The commands of the roadstyle program (main.rs runs `run`): stage 1 (`sources`), stage 2 (`tiles`), a level area (`levels make`,
-//! `levels solve`) and the level editor (`serve`). The options have the names of the keywords of `render_edges` (`--color-by lanes` is
+//! `levels solve`) and the level editor (`levels edit`, `serve`). The options have the names of the keywords of `render_edges` (`--color-by lanes` is
 //! `color_by="lanes"`, `--no-arrows` is `arrows=False`); a value that is JSON (a number, true, a list) is read as JSON.
 
 use crate::Error;
@@ -25,11 +25,14 @@ usage:
   roadstyle levels make <edges> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
                     [--band-dist 10] [--head-m 5] [--near-rules] [--highway-col highway] [--layer-col layer] [--bridge-col bridge]
                     [--tunnel-col tunnel] [--junction-col junction]
-      a level area's input: roads.parquet, pairs.csv and edits.csv (roadstyle-levels make).
+                    [--boundary AREA.geojson]
+      a level area's input: roads.parquet, pairs.csv and edits.csv (roadstyle-levels make). --boundary copies a GeoJSON file to
+      boundary.geojson: the editor draws it as a dashed line, the edge of the area.
   roadstyle levels solve <area folder>
       levels.csv and levels_info.json from the area's input and your edits.csv, heads.csv and caps.csv (roadstyle-levels solve).
-  roadstyle serve <area folder> [--port 8780] [--page DIR]
-      the level editor at http://127.0.0.1:<port>/level_editor/ (roadstyle-levels edit).
+  roadstyle levels edit <area folder> [--port 8780] [--page DIR]
+      the level editor at http://127.0.0.1:<port>/level_editor/: the page, your area's files, and the saves of your changes
+      (edits.csv, heads.csv, caps.csv, levels.csv). `roadstyle serve <area folder>` is the same without the check of the area.
   roadstyle snapshot <page.html> <out.png> [--center LON,LAT] [--zoom Z] [--pitch P] [--bearing B] [--width 1200] [--height 800]
                     [--scale 1] [--settle 2.5] [--timeout 40]
       a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot).
@@ -221,13 +224,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
         ("page", [roads, out]) => page_cmd(roads, out, &mut opts),
         ("tiles", [src, out]) => tiles_cmd(src, out, &mut opts),
         ("levels", [sub, rest @ ..]) => levels(sub, rest, opts),
-        ("serve", [area]) => {
-            let port: u16 = take(&mut opts, "port").map_or(Ok(8780), |p| p.parse().map_err(|_| Error::Usage("--port needs a number".into())))?;
-            let page = take(&mut opts, "page").map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
-            no_more(&opts)?;
-            println!("level editor: http://127.0.0.1:{port}/level_editor/  ({area}; Ctrl+C to stop)");
-            Ok(roadstyle_serve::serve(Path::new(area), page, port)?)
-        }
+        ("serve", [area]) => serve(area, &mut opts),
         ("snapshot", [page, out]) => snapshot(page, out, opts),
         ("help" | "-h", _) => {
             println!("{USAGE}");
@@ -246,6 +243,7 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
                                       bridge_col: s("bridge_col", d.bridge_col), tunnel_col: s("tunnel_col", d.tunnel_col),
                                       junction_col: s("junction_col", d.junction_col), ..d };
             o.band_col = take(&mut opts, "band_col");
+            let boundary = take(&mut opts, "boundary");
             if let Some(order) = take(&mut opts, "order") {
                 o.order = (order != "none").then_some(order);
             }
@@ -259,6 +257,15 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
             no_more(&opts)?;
             let table = roads(edges)?;
             let made = make_area(&table, Path::new(folder), &o)?.made;
+            if let Some(file) = boundary {
+                // the area's edge for the editor (the dashed line): GeoJSON, as `boundary=` of render
+                let text = String::from_utf8(read(&file)?).map_err(|e| Error::File(format!("{file}: {e}")))?;
+                let json: Value = serde_json::from_str(&text).map_err(|e| Error::File(format!("{file}: not JSON: {e}")))?;
+                if !matches!(json["type"].as_str(), Some("Polygon" | "MultiPolygon" | "Feature" | "FeatureCollection")) {
+                    return Err(Error::Usage(format!("--boundary {file}: not a GeoJSON polygon, feature or feature collection")));
+                }
+                std::fs::write(Path::new(folder).join("boundary.geojson"), text).map_err(|e| Error::File(e.to_string()))?;
+            }
             for w in &made.warnings {
                 eprintln!("warning: {w}");
             }
@@ -287,8 +294,23 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
                      dir.join("levels.csv").display(), answer.given_up.len(), answer.orders_not_kept.len());
             Ok(())
         }
+        ("edit", [folder]) => {
+            if !Path::new(folder).join("roads.parquet").exists() {
+                return Err(Error::File(format!("{folder}: no roads.parquet: make the area first (roadstyle levels make)")));
+            }
+            serve(folder, &mut opts)
+        }
         _ => Err(Error::Usage(USAGE.into())),
     }
+}
+
+/// `serve` and `levels edit`: the level editor of an area folder, until Ctrl+C.
+fn serve(area: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Error> {
+    let port: u16 = take(opts, "port").map_or(Ok(8780), |p| p.parse().map_err(|_| Error::Usage("--port needs a number".into())))?;
+    let page = take(opts, "page").map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
+    no_more(opts)?;
+    println!("level editor: http://127.0.0.1:{port}/level_editor/  ({area}; Ctrl+C to stop)");
+    Ok(roadstyle_serve::serve(Path::new(area), page, port)?)
 }
 
 /// An error for an option the command does not take.

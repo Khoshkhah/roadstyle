@@ -120,6 +120,7 @@ fn answer(stream: TcpStream, site: &Site) -> Result<(), String> {
         }
         let body = match &site.page {
             Page::Embedded => embedded(rel).map(<[u8]>::to_vec),
+            Page::Dir(_) if rel == "host_options.json" => embedded(rel).map(<[u8]>::to_vec),   // data of the program, not a file of the page folder
             Page::Dir(dir) => inside(dir, rel).and_then(|f| std::fs::read(f).ok()),
         };
         return match body {
@@ -243,6 +244,13 @@ mod tests {
         assert!(ask(&format!("PUT /area/roads.parquet HTTP/1.1\r\n{host}Content-Length: 1\r\n\r\nx")).starts_with("HTTP/1.1 405"));
         assert!(ask(&format!("PUT /index.html HTTP/1.1\r\n{host}Content-Length: 1\r\n\r\nx")).starts_with("HTTP/1.1 405"));
         assert!(ask(&format!("GET /area/../page/index.html HTTP/1.1\r\n{host}\r\n")).starts_with("HTTP/1.1 404"));
+    }
+
+    #[test]
+    fn a_page_folder_still_gets_the_programs_host_options() {
+        let (_, ask, port) = server("opts");
+        let answer = ask(&format!("GET /host_options.json HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n"));
+        assert!(answer.starts_with("HTTP/1.1 200") && answer.contains("\"dashboard\""), "{answer}");
     }
 
     #[test]

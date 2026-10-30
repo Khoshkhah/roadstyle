@@ -108,3 +108,29 @@ fn an_unknown_option_or_command_is_an_error() {
     assert!(!run(&["draw"]).status.success());
     assert!(String::from_utf8_lossy(&run(&["help"]).stdout).contains("roadstyle sources"));
 }
+
+#[test]
+fn levels_edit_needs_a_made_area() {
+    let dir = tmp("edit-empty");
+    let out = Command::new(env!("CARGO_BIN_EXE_roadstyle")).args(["levels", "edit", &dir.to_string_lossy()]).output().unwrap();
+    assert!(!out.status.success() && String::from_utf8_lossy(&out.stderr).contains("no roads.parquet: make the area first"));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn levels_make_keeps_the_boundary_of_the_area() {
+    let dir = tmp("boundary");
+    std::fs::create_dir_all(&dir).unwrap();
+    let square = dir.join("square.geojson");
+    std::fs::write(&square, r#"{"type":"Polygon","coordinates":[[[7.4,43.7],[7.5,43.7],[7.5,43.8],[7.4,43.7]]]}"#).unwrap();
+    let area = dir.join("area");
+    roadstyle(&["levels", "make", &data("level_area/edges.parquet"), &area.to_string_lossy(), "--boundary", &square.to_string_lossy()]);
+    assert_eq!(std::fs::read_to_string(area.join("boundary.geojson")).unwrap(), std::fs::read_to_string(&square).unwrap());
+    // a file that is not GeoJSON is an error, and the area has no boundary.geojson from it
+    let text = dir.join("roads.txt");
+    std::fs::write(&text, r#"{"type":"Point"}"#).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_roadstyle"))
+        .args(["levels", "make", &data("level_area/edges.parquet"), &dir.join("other").to_string_lossy(), "--boundary", &text.to_string_lossy()]).output().unwrap();
+    assert!(!out.status.success() && String::from_utf8_lossy(&out.stderr).contains("not a GeoJSON polygon"));
+    std::fs::remove_dir_all(&dir).ok();
+}

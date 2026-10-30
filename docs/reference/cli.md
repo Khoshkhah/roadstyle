@@ -79,7 +79,7 @@ Street View needs the page served over http(s): `python -m http.server`, then op
 
 ## `roadstyle-levels`
 
-The level step with files you can read and edit ([Which road is on top](../guides/levels.md)):
+The level step with files you can read and edit ([Which road is on top](../guides/levels.md)). The Rust program `roadstyle` has the same commands, with no Python: `roadstyle levels make`, `levels solve` and `levels edit` ([The roadstyle program](../rust/cli.md#make-and-solve-a-level-area)). `levels make --boundary AREA.geojson` also keeps the edge of the area, which the editor draws as a dashed line:
 
 ```text
 roadstyle-levels make SOURCE FOLDER [--query SQL] [--band-col COL] [--order priority|class|COL] [--near-rules]   # roads.parquet, pairs.csv (edits.csv once)

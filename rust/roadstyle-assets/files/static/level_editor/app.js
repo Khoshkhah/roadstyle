@@ -12,6 +12,6 @@ document.getElementById("sb-hide").onclick = () => { sb.classList.add("hidden");
 show.onclick = () => { sb.classList.remove("hidden"); show.style.display = ""; };
 
 // backLabel null: this page has no steps to go back to, so no "back" button
-await levelEditor({container: document.body, panel: sb, backLabel: null, template: opts.dashboard,
+await levelEditor({container: document.body, panel: sb, backLabel: null, template: opts.dashboard, basemaps: opts,
   pkgUrl: new URL("./pkg/roadstyle_wasm.js", import.meta.url), store: httpStore("/area/")});
 document.getElementById("lv-boot").remove();

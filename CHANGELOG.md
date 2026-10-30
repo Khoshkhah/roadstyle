@@ -29,6 +29,17 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The tool `roads`** (after the base map button): the road filter in the bar. A box with a row for each road class (check box, colour, name, number of roads), All and None, and a click on a name shows only
   that class; Bridges, Tunnels and the access kinds when the data has them. It uses the filter calls of the page, so the map template's Roads box and this tool are one filter. A page with no road classes
   has the button greyed out. A style that comes later (`rs.setStyle`) gets its own classes.
+- **`roadstyle levels make --boundary AREA.geojson`** keeps the edge of the area as `boundary.geojson` in the area folder. The level editor draws it as the dashboard's dashed boundary line.
+- **The level editor has the dashboard's base-map box.** The editor's own map starts on the page's base style (Blank, as every dashboard) with the standard box: the base
+  maps, "On top" (Hillshade, Labels, 3D buildings), and the dark twin that follows the theme. `host_options()` (and `data/host_options.json`) gives `style`, the base style that a
+  page of roadstyle gets, so a host page makes its map from it and has no copy of the rule. `levelEditor({basemaps})` takes it (`host_options.json`) and is required for the
+  editor's own map; the fixed OpenFreeMap Positron style is gone.
+- **The level editor's picked roads and hover have their own colours**, not the palette's purple: road 1 is red and its hover a light red; road 2 is blue and its hover a light blue (the hover is in the colour of the road that the next click picks). The look gets two sentinel colours that the editor replaces in the road layers' paint (`highlight`). The "on top" and part rows keep inside the panel: a long road name ends with "…". The editor's tabs and choice rows are the dashboard's segmented control.
+- **The editor's tabs scroll as the panel does.** A scroll box with the class `rs-pbody` (and `data-head`, the selector of its header, which has the class `rs-phead`) has the
+  panel's scroll protocol: a thin scrollbar at the outer edge, a line under the header and a fade at the bottom.
+- **`roadstyle levels edit AREA_DIR`**: the level editor from the Rust program, with no Python. It checks that the folder has `roads.parquet`, then serves the editor page
+  (the standard dashboard: one panel, the bar, both themes, the phone sheet) and saves `edits.csv`, `heads.csv`, `caps.csv` and `levels.csv`. `roadstyle serve` is the same
+  without the check. A new test (`tests/test_levels_edit_browser.py`) makes an area with the program and drives the page in Chromium.
 - **The level editor draws into the host's standard panel.** `levelEditor({map, panel, backLabel, ...})` takes the host's `#sb` (`.sb-card` with `.sb-top` and
   `.sb-body`): the host's body is hidden, the top line is "← Steps" and "Edit levels" before the host's hide button, and `destroy()` puts the host's panel back. The
   editor's own frame, fold buttons (`lv-toggle`, `lv-handle`), phone sheet and `layout` option are gone; the panel's side, width, look and phone sheet are the host's. A bar
@@ -111,6 +122,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   gave `Referenced column 'source' not found` (the Rust reader) or "not from a level area" (`load_area_levels`), so the pages drew the automatic order. Both readers now take the method
   as the source, and the missing heads and caps are NULL (the default ends). The file is not written: no migration is needed. A meta row with neither column is still "not from
   a level area".
+- The level editor's mode box (driving, walking, cycling, bus, private) was never shown: the editor's lean road table dropped the `modes` column. It keeps it now.
+- `roadstyle serve --page DIR` gives the page `host_options.json` (the program's own file) in place of a 404.
 - **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
   the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
   in tiles).
