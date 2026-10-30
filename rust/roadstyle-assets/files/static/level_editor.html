@@ -24,11 +24,9 @@
 #lv-hits div{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--lv-line)} #lv-hits div:last-child{border-bottom:none}
 #lv-hits div:hover,#lv-hits div.on{background:var(--lv-hover)} #lv-hits b{font-weight:600} #lv-hits small{color:var(--lv-mute)}
 #lv .t{font-size:15px;font-weight:650;letter-spacing:-.01em} #lv .area{color:var(--lv-mute);font-size:12px;margin-top:1px}
-#lv .tabs{flex:none;display:flex;gap:2px;padding:0 15px;border-bottom:1px solid var(--lv-line)}
-#lv .tabs button{border:none;background:none;padding:9px 10px 8px;font:600 12.5px system-ui;color:var(--lv-mute);cursor:pointer;border-bottom:2px solid transparent;
-  margin-bottom:-1px}
-#lv .tabs button.on{color:var(--lv-ink);border-bottom-color:var(--lv-ink)} #lv .tabs button:hover{color:var(--lv-ink)}
-#lv .tabs .cnt{display:inline-block;min-width:16px;margin-left:4px;padding:0 5px;border-radius:999px;background:var(--lv-soft);font-size:11px;color:var(--lv-ink2)}
+#lv .tabs{flex:none;padding:2px 15px 10px}                       /* the tabs are the dashboard's segmented control (#lv .seg), as the settings box has */
+#lv .tabs .seg button{display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px}
+#lv .tabs .cnt{display:inline-block;min-width:16px;padding:0 5px;border-radius:999px;background:var(--lv-soft);font-size:11px;color:var(--lv-ink2)}
 #lv [data-tab][hidden]{display:none}
 #lv .scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px 24px}
 #lv section{padding:12px 0 4px}
@@ -44,8 +42,8 @@
 #lv .card .nm{font-weight:620;font-size:13.5px;padding-right:22px} #lv .card .sub{color:var(--lv-mute);font-size:12px}
 #lv .card .x{position:absolute;right:8px;top:7px;border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:15px;line-height:1}
 #lv .card .x:hover{color:var(--lv-bad)}
-#lv .grid{display:grid;grid-template-columns:auto 1fr auto 1fr;gap:2px 10px;margin-top:8px;font-size:12px}
-#lv .grid span:nth-child(odd){color:var(--lv-mute)} #lv .grid span:nth-child(even){font-variant-numeric:tabular-nums}
+#lv .grid{display:grid;grid-template-columns:54px minmax(0,1fr) 50px minmax(0,1fr);gap:2px 10px;margin-top:8px;font-size:12px}
+#lv .grid span:nth-child(odd){color:var(--lv-mute)} #lv .grid span:nth-child(even){font-variant-numeric:tabular-nums} #lv .grid .wide{overflow-wrap:anywhere}
 #lv .wd{margin-top:8px;padding:7px 8px 8px;border:1px solid var(--lv-line);border-radius:8px}
 #lv .wd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
 #lv .wd-row{display:grid;grid-template-columns:1fr 1fr 64px;gap:6px;align-items:stretch}
@@ -81,9 +79,10 @@
 #lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}
 #lv .act{flex:none;font:12px system-ui;border:1px solid var(--lv-line);background:var(--lv-card);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--lv-ink2)}
 #lv .act:hover{border-color:var(--lv-bad);color:var(--lv-bad)}
-#lv .seg{display:flex;background:var(--lv-soft);border-radius:8px;padding:3px;gap:3px}
-#lv .seg button{flex:1;border:none;background:none;border-radius:6px;padding:5px 0;font:600 12.5px system-ui;color:var(--lv-ink2);cursor:pointer}
-#lv .seg button.on{background:var(--lv-card);box-shadow:0 1px 3px rgba(16,24,40,.12);color:var(--lv-ink)}
+#lv .seg{display:flex;background:var(--rs-tb-hover);border-radius:10px;padding:2px;gap:2px}
+#lv .seg button{flex:1;border:none;background:none;border-radius:8px;padding:5px 0;font:600 12px/1.2 system-ui;color:var(--lv-mute);cursor:pointer}
+#lv .seg button:hover{color:var(--lv-ink)}
+#lv .seg button.on{background:var(--rs-tb-on);color:var(--lv-ink)}
 #lv .desc{margin:8px 2px;color:var(--lv-ink2);font-size:12.5px}
 #lv .warn{margin:8px 0;padding:8px 10px;border-radius:8px;background:var(--lv-warn-bg);border:1px solid var(--lv-warn-line);color:var(--lv-warn-ink);font-size:12.5px}
 #lv .ends{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:8px 0}
@@ -122,7 +121,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
 </style>
 <div class="lv-title"><button class="lv-back" id="lv-back" title="Back to the steps"></button><span class="t">Edit levels</span></div>
 <div id="lv">
-  <nav class="tabs rs-phead" id="lv-tabs"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given" title="Given up (a real crossing broke) · near warnings">Issues<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span><span class="cnt" id="lv-nr-n" style="background:var(--lv-warn-bg);color:var(--lv-warn-ink)">0</span></button></nav>
+  <nav class="tabs rs-phead" id="lv-tabs"><div class="seg"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given" title="Given up (a real crossing broke) · near warnings">Issues<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span><span class="cnt" id="lv-nr-n" style="background:var(--lv-warn-bg);color:var(--lv-warn-ink)">0</span></button></div></nav>
   <div class="scroll rs-pbody" data-head="#lv-tabs" data-tab="edit">
     <section><div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div>
       <div class="modes" id="lv-modes" hidden title="Show only the roads of these modes (display only: every road is still solved)"></div></section>
@@ -214,6 +213,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   function paint(){
     const g = sel.map((r, k) => r != null && idsOf(r).length ? [idsOf(r), C[k]] : null).filter(Boolean);
     rsColor(g.length ? g : null);
+    window.lvHighlight?.(g);
     const f = [];
     sel.forEach((r, k) => { if(r == null) return; const id = idsOf(r)[0]; if(id == null) return; const p = rsGetProps([id])[0];   // the road's ends, on each edge
       f.push({type: "Feature", properties: {c: C[k], open: 0}, geometry: {type: "Point", coordinates: [p.s_lon, p.s_lat]}});
@@ -314,12 +314,12 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
       <div class="nm"><span class="num" style="--c:${C[k]}">${k + 1}</span>${esc(f.name || f.highway || "road")}</div>
       <div class="sub">${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</div>
       <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
-        <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two-way)" : ""}</span>
+        <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two‑way)" : ""}</span>
         <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
-        ${f.modes ? `<span>modes</span><span style="grid-column:span 3">${esc(f.modes)}</span>` : ""}
-        ${f.bus_lines ? `<span>bus lines</span><span style="grid-column:span 3">${esc(f.bus_lines)}</span>` : ""}
-        <span>road id</span><span style="grid-column:span 3;font-size:11px">${esc(r)}</span>
-        ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→○" : "direction ○→●"}</span><span style="grid-column:span 3;font-size:11px"
+        ${f.modes ? `<span>modes</span><span class="wide" style="grid-column:span 3">${esc(f.modes)}</span>` : ""}
+        ${f.bus_lines ? `<span>bus lines</span><span class="wide" style="grid-column:span 3">${esc(f.bus_lines)}</span>` : ""}
+        <span>road id</span><span class="wide" style="grid-column:span 3;font-size:11px">${esc(r)}</span>
+        ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→○" : "direction ○→●"}</span><span class="wide" style="grid-column:span 3;font-size:11px"
           title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}${d.lanes != null ? " · lanes " + esc(d.lanes) : sidewalk(d, f) ? " · sidewalk" : ""}${d.modes ? " · " + esc(d.modes) : ""}</span>`).join("")}</div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
       ${["start", "end"].map((e, i) => `<div class="caps" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">

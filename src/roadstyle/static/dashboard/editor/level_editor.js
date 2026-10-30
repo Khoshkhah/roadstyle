@@ -106,7 +106,10 @@ export async function levelEditor({map = null, container = document.body, panel,
                                    maplibregl: ml = globalThis.maplibregl, dashboard = null, prefix = dashboard ? null : "lv-rs-",
                                    levels: given = null, host = null, colors = {}}){
 // the picked roads and the hover (`colors`: {select, hover, second}): road 1 red, road 2 blue, the hover a lighter red
-const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", ...colors};
+const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", hover2: "#82b1ff", ...colors};
+// The dashboard has one select colour and one hover colour for every road; the editor wants road 1 red and road 2 blue, and the hover of the road
+// that would be the next pick lighter in its colour. The look gets two sentinel colours, which `highlight` replaces in the road layers' paint.
+const SENT = {select: "#fe0a01", hover: "#fe0a02"};
 // the host's panel: the card, its title line (the title first, then the hide button) and its body
 const hostCard = panel?.querySelector?.(".sb-card"), hostBar = hostCard?.querySelector(".sb-top"), hostBody = hostCard?.querySelector(".sb-body");
 if(!hostBar?.firstElementChild || !hostBody)
@@ -120,6 +123,24 @@ if(dashboard && !prefix && !host)
 if(map && window.map instanceof ml.Map && window.map !== map)     // (an element with the id "map" is window.map too: not a map)
   throw new Error("level editor: window.map is another map; the panel draws on window.map");
 const P = map ? prefix : "rs-";                                  // a host map: the editor's layers and sources with the prefix given
+// the highlight colours (see SENT): `captureHL` keeps the paint of the road layers that hold a sentinel, `highlight(groups)` ([[ids, colour], ...], one for each
+// picked road, as rsColor takes them) sets that paint again: a picked road in its colour (an expression on the road's id), the hover in the colour of the road
+// that the next click would pick (light red for the first, light blue for the second)
+const hl = {orig: new Map(), groups: null};
+const swapColors = (v, to) => Array.isArray(v) ? v.map(x => swapColors(x, to)) : v && typeof v === "object"
+  ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swapColors(x, to)])) : v === SENT.select ? to.select : v === SENT.hover ? to.hover : v;
+const hasSent = v => { const t = JSON.stringify(v); return t.includes(SENT.select) || t.includes(SENT.hover); };
+function captureHL(){
+  hl.orig.clear();
+  for(const l of map.getStyle().layers) if(l.paint && hasSent(l.paint)) hl.orig.set(l.id, l.paint);
+}
+function highlight(groups){
+  hl.groups = groups;
+  const picked = (groups || []).filter(g => g[0].length);
+  const select = picked.length ? ["match", ["id"], ...picked.flatMap(([ids, c]) => [ids, c]), COLORS.select] : COLORS.select;
+  const to = {select, hover: picked.length === 1 && picked[0][1] === COLORS.select ? COLORS.hover2 : COLORS.hover};
+  for(const [id, paint] of hl.orig) if(map.getLayer(id)) for(const [k, v] of Object.entries(paint)) if(hasSent(v)) map.setPaintProperty(id, k, swapColors(v, to));
+}
 // the road table's fields: what the page reads of a row (the dashboard's reads.json, "table"), live data's id and the road that a click
 // picks (the other fields of a road are a large part of the table's text, which the page parses after each answer)
 const reads = await fetch(new URL("../reads.json", import.meta.url));
@@ -131,7 +152,7 @@ const call = caller(worker);
 // the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
 const boundaryF = map ? null : await store.load("boundary.geojson");
 await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)),
-  look: JSON.stringify({args: {...LOOK, hover_color: COLORS.hover, ...(boundaryF ? {boundary: JSON.parse(boundaryF.body)} : {})}})});
+  look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundaryF ? {boundary: JSON.parse(boundaryF.body)} : {})}})});
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
@@ -326,6 +347,8 @@ if(host){                                                        // the host's m
       map.getLayer("lv-ends") ? "lv-ends" : undefined);
     mine.layers.push(P + "lv-tap");
     rs.setStyle(st);
+    captureHL();
+    highlight(hl.groups);
   }
   // the style loaded: a host map's load event can be over, and isStyleLoaded false a moment while it loads an image, with no event after
   while(!map.isStyleLoaded()) await new Promise(ok => setTimeout(ok, 50));
@@ -493,6 +516,7 @@ window.lvApi = async (path, body) => {
 // --- the panel (static/level_editor.html), with its scripts run, in the host's panel: the host's body and title are kept and hidden
 const html = (await (await fetch(new URL("../../level_editor.html", import.meta.url))).text()).replace("__STATS__", JSON.stringify(stats()));
 window.lvColors = [COLORS.select, COLORS.second];
+window.lvHighlight = highlight;                                 // the panel gives the picked roads (static/level_editor.html)
 window.lvDownload = download;                                    // the History tab's button
 const holder = document.createElement("div");
 holder.innerHTML = html;
@@ -562,7 +586,7 @@ function destroy(){
     const t = window.RS_SIDE;
     if(t && t.lvFields){ t.props.forEach(p => { if(p) for(const k of added) delete p[k]; }); delete t.lvFields; }
     if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
-    delete window.lvColors; delete window.lvDownload;
+    delete window.lvColors; delete window.lvDownload; delete window.lvHighlight;
     return;
   }
   ml.removeProtocol("lv");
@@ -579,7 +603,7 @@ function destroy(){
   }
   // window.map stays the host's map (the panel's last timers read it)
   if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
-  delete window.lvColors; delete window.lvDownload;
+  delete window.lvColors; delete window.lvDownload; delete window.lvHighlight;
 }
 return Object.assign(events, {map, roads: order, facts: roadsOf, download, destroy, files: Object.keys(files), answer: () => res});
 }

@@ -12,7 +12,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   maps, "On top" (Hillshade, Labels, 3D buildings), and the dark twin that follows the theme. `host_options()` (and `data/host_options.json`) gives `style`, the base style that a
   page of roadstyle gets, so a host page makes its map from it and has no copy of the rule. `levelEditor({basemaps})` takes it (`host_options.json`) and is required for the
   editor's own map; the fixed OpenFreeMap Positron style is gone.
-- **The level editor's two picked roads are red (road 1) and blue (road 2)**, on the map and in the panel (they were two purples). The "on top" and part rows keep inside the panel: a long road name ends with "…".
+- **The level editor's picked roads and hover have their own colours**, not the palette's purple: road 1 is red and its hover a light red; road 2 is blue and its hover a light blue (the hover is in the colour of the road that the next click picks). The look gets two sentinel colours that the editor replaces in the road layers' paint (`highlight`). The "on top" and part rows keep inside the panel: a long road name ends with "…". The editor's tabs and choice rows are the dashboard's segmented control.
 - **The editor's tabs scroll as the panel does.** A scroll box with the class `rs-pbody` (and `data-head`, the selector of its header, which has the class `rs-phead`) has the
   panel's scroll protocol: a thin scrollbar at the outer edge, a line under the header and a fade at the bottom.
 - **`roadstyle levels edit AREA_DIR`**: the level editor from the Rust program, with no Python. It checks that the folder has `roads.parquet`, then serves the editor page
