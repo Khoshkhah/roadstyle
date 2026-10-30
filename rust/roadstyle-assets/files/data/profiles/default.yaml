@@ -122,9 +122,9 @@ boundary: {width: 2.5, dash: [3, 2]}
 
 # The dark theme (docs/design/dark_theme.md): the style holds the light colour of each layer and its dark one, and the dashboard's theme switch
 # picks one (the global state rs_theme). A colour's lightness (0 black to 1 white) is placed between the two numbers of `lightness`, and its saturation is
-# multiplied by `saturation`; the hue stays. A first number above the second turns the lightness over (the labels). The fill of a road keeps its colour.
+# multiplied by `saturation`; the hue stays, but a warm colour (hue 330 to 70 degrees) takes the `warm` hue and saturation when a band has them. A first number above the second turns the lightness over (the labels). The fill of a road keeps its colour.
 dark:
-  area: {lightness: [0.08, 0.24], saturation: 0.30}      # the fills and the 3D buildings of the base map's layers
+  area: {lightness: [0.08, 0.24], saturation: 0.45, warm: {hue: 218, saturation: 0.35}}   # the fills and the 3D buildings of the base map's layers; a warm colour (land, buildings) turns a cool neutral
   line: {lightness: [0.28, 0.60], saturation: 0.50}      # their lines and outlines
   point: {lightness: [0.30, 0.80], saturation: 1.0}      # their points and icons
   casing: {lightness: [0.12, 0.42], saturation: 0.85}    # the casing of the roads

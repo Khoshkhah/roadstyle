@@ -63,7 +63,11 @@
             0.08,
             0.24
           ],
-          "saturation": 0.3
+          "saturation": 0.45,
+          "warm": {
+            "hue": 218.0,
+            "saturation": 0.35
+          }
         },
         "line": {
           "lightness": [
@@ -2327,11 +2331,41 @@
         "saturation": {
           "type": "number",
           "format": "double"
+        },
+        "warm": {
+          "description": "A warm colour (red, orange, yellow: the hue from 330 to 70 degrees: land, buildings, paved) takes this hue and this saturation in place of its own,\nso that a warm light map turns a cool neutral (close to a dark base map's tone).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DarkWarm"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,
       "required": [
         "lightness",
+        "saturation"
+      ]
+    },
+    "DarkWarm": {
+      "description": "The hue (degrees) and the saturation (a multiplier) that a warm colour takes in the dark theme.",
+      "type": "object",
+      "properties": {
+        "hue": {
+          "type": "number",
+          "format": "double"
+        },
+        "saturation": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "hue",
         "saturation"
       ]
     },

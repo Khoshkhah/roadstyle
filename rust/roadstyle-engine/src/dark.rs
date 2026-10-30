@@ -38,7 +38,12 @@ pub fn darken(c: &str, band: &DarkBand) -> Option<String> {
     let (rgb, alpha) = read(c)?;
     let (h, l, s) = roadstyle_look::basemap::rgb_to_hls(rgb[0], rgb[1], rgb[2]);
     let l = band.lightness[0] + (band.lightness[1] - band.lightness[0]) * l;
-    let out = roadstyle_look::basemap::hls_to_rgb(h, l.clamp(0.0, 1.0), (s * band.saturation).clamp(0.0, 1.0)).map(|x| (x * 255.0).round() as u8);
+    // a warm colour (red to yellow) of a band with `warm` takes its cool hue and its saturation; a grey (no saturation) has no hue to change
+    let (h, s) = match &band.warm {
+        Some(w) if s > 0.0 && !(70.0 / 360.0..330.0 / 360.0).contains(&h) => (w.hue / 360.0, s * w.saturation),
+        _ => (h, s * band.saturation),
+    };
+    let out = roadstyle_look::basemap::hls_to_rgb(h, l.clamp(0.0, 1.0), s.clamp(0.0, 1.0)).map(|x| (x * 255.0).round() as u8);
     Some(match alpha {
         None => roadstyle_look::color::hex(out),
         Some(a) => format!("rgba({},{},{},{a})", out[0], out[1], out[2]),
@@ -204,7 +209,7 @@ mod tests {
     use super::*;
 
     fn band(l0: f64, l1: f64, s: f64) -> DarkBand {
-        DarkBand { lightness: [l0, l1], saturation: s }
+        DarkBand { lightness: [l0, l1], saturation: s, warm: None }
     }
 
     #[test]
@@ -214,6 +219,17 @@ mod tests {
         assert!(l < 0.31 && l > 0.2, "{d} {l}");
         assert_eq!(darken("rgba(0,0,0,0.25)", &band(0.9, 0.3, 1.0)).unwrap(), "rgba(230,230,230,0.25)");
         assert_eq!(darken("grass", &band(0.1, 0.3, 1.0)), None, "a name is not a colour");
+    }
+
+    #[test]
+    fn a_warm_colour_turns_a_cool_neutral_and_a_green_keeps_its_hue() {
+        let b = DarkBand { warm: Some(roadstyle_look::sections::DarkWarm { hue: 218.0, saturation: 0.35 }), ..band(0.08, 0.24, 0.45) };
+        let hue_of = |c: &str| { let (c, _) = read(&darken(c, &b).unwrap()).unwrap(); roadstyle_look::basemap::rgb_to_hls(c[0], c[1], c[2]).0 * 360.0 };
+        assert!((hue_of("#f2efe9") - 218.0).abs() < 6.0, "beige land");
+        assert!((hue_of("#d9d0c9") - 218.0).abs() < 6.0, "grey-brown building");
+        assert!((hue_of("#cdebb0") - 95.0).abs() < 8.0, "grass keeps its green");
+        assert!((hue_of("#aad3df") - 195.0).abs() < 6.0, "water keeps its blue");
+        assert_eq!(darken("#808080", &b).unwrap().len(), 7, "a grey stays a grey");
     }
 
     #[test]

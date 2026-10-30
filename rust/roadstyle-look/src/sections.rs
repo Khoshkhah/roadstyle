@@ -390,6 +390,19 @@ pub struct BoundaryLook {
 pub struct DarkBand {
     pub lightness: [f64; 2],
     pub saturation: f64,
+    /// A warm colour (red, orange, yellow: the hue from 330 to 70 degrees: land, buildings, paved) takes this hue and this saturation in place of its own,
+    /// so that a warm light map turns a cool neutral (close to a dark base map's tone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warm: Option<DarkWarm>,
+}
+
+/// The hue (degrees) and the saturation (a multiplier) that a warm colour takes in the dark theme.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DarkWarm {
+    pub hue: f64,
+    pub saturation: f64,
 }
 
 /// The dark theme (profile `dark`): a band for each kind of colour of the style. `area`: the fills and the 3D buildings of the base map's layers; `line`: their
@@ -409,8 +422,9 @@ pub struct DarkLook {
 impl Default for DarkLook {
     /// the values of the default profile, so that a look file made before the dark theme has them
     fn default() -> DarkLook {
-        let band = |l0: f64, l1: f64, s: f64| DarkBand { lightness: [l0, l1], saturation: s };
-        DarkLook { area: band(0.08, 0.24, 0.30), line: band(0.28, 0.60, 0.50), point: band(0.30, 0.80, 1.0), casing: band(0.12, 0.42, 0.85), label: band(0.92, 0.30, 1.0) }
+        let band = |l0: f64, l1: f64, s: f64| DarkBand { lightness: [l0, l1], saturation: s, warm: None };
+        let area = DarkBand { warm: Some(DarkWarm { hue: 218.0, saturation: 0.35 }), ..band(0.08, 0.24, 0.45) };
+        DarkLook { area, line: band(0.28, 0.60, 0.50), point: band(0.30, 0.80, 1.0), casing: band(0.12, 0.42, 0.85), label: band(0.92, 0.30, 1.0) }
     }
 }
 
