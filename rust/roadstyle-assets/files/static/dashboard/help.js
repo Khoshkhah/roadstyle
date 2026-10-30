@@ -28,6 +28,8 @@ export const rsHelp = {
       if(h){ _hpBtn = document.createElement("button"); _hpBtn.id = "rs-help-btn"; _hpBtn.type = "button"; _hpBtn.innerHTML = _hpIcon; h.append(_hpBtn); _hpBtn.onclick = _hpOpen; }
     } else if(h && _hpBtn.parentNode !== h) h.append(_hpBtn);
     if(_hpBtn){ _hpBtn.title = spec.button || "How to read this page"; _hpBtn.setAttribute("aria-label", _hpBtn.title); }
+    // a page with no panel (dashboard={"panel": None}, street_view="dock") has no title to put the button in: the help is a tool of the bar
+    else if(window.rs && window.rs.tools && !window.rs.tools.list().some(t => t.id === "help")) window.rs.tools.add({id: "help", title: spec.button || "How to read this page", icon: _hpIcon, onClick: _hpOpen});
   },
   get: () => _hpSpec,
   clear(){ _hpClose(); if(_hpBox) _hpBox.remove(); if(_hpBtn) _hpBtn.remove(); _hpBox = _hpBtn = _hpSpec = null; },

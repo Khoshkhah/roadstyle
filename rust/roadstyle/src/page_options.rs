@@ -174,8 +174,8 @@ fn check_keys<'a>(k: &'a PageKeys, look: &Look, dashboard: &crate::dashboard::Da
     if k.side_panel_html.is_some() && mode == "panel" {
         return Err(crate::error::options("side_panel_html and popup_mode='panel' are two panels on the right: use one"));
     }
-    if !k.street_view.is_boolean() && k.street_view != "window" {
-        return Err(crate::error::options(format!("street_view must be True, False or \"window\", got {}", repr(&k.street_view))));
+    if !k.street_view.is_boolean() && k.street_view != "window" && k.street_view != "dock" {
+        return Err(crate::error::options(format!("street_view must be True, False, \"window\" or \"dock\", got {}", repr(&k.street_view))));
     }
     crate::dashboard::check_layers(&k.google_3d_layers).map_err(crate::error::options)?;
     let key = k.street_view_key.clone().filter(|v| !v.is_empty());
@@ -269,9 +269,18 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     dashboard.google_3d.layers = k.google_3d_layers.clone();
     dashboard.boundary.dim = k.boundary_dim;
     dashboard.boundary.limit = k.boundary_limit;
+    // street_view="dock": Street View beside the map with a divider (the map and the window share the screen). The page has no panel and the bar is at the
+    // left, the map's own edge; `dashboard=` can still give a panel and move the bar
+    if k.street_view == "dock" {
+        dashboard.panel = None;
+        if let Some(t) = dashboard.toolbar.as_mut() {
+            t.position = crate::dashboard::Edge::Left;
+        }
+    }
     if let Some(over) = k.dashboard.as_ref().filter(|v| !v.is_null()) {
         dashboard = crate::dashboard::merge(&dashboard, over)?;
     }
+    let has_panel = dashboard.panel.is_some();
     let opts = PageOptions {
         dashboard, basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
@@ -300,7 +309,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         side: Some((&Value::Null, Some(&side))), simple_js: Some(&simple_js), sources: Some(&src),
     };
     let mut html = page_html(page_style, &opts, &parts);
-    if let Some((sidebar, _)) = template.sidebar() {
+    if let Some((sidebar, _)) = template.sidebar().filter(|_| has_panel) {
         html = add_sidebar(html, sidebar, parts.name);
     }
     // the page's own CSS and JavaScript, the last things of the body: they see the panel and `rs` (the event `rs:ready` says when `window.rs` is there)

@@ -14,11 +14,30 @@ export let _svWindow = false;
 // reports every step and turn, so the map marker walks with the viewer - beside Classic, the embed
 export let _svKey = "";
 export function rsSetStreetView(){}
+// street_view="dock": the window is a side of the page, not a floating window. It takes the right part of the screen (on a phone, the lower part) with a divider
+// that the person drags, and the map takes the rest. The share is remembered per page in this browser.
+function _svDock(w){
+  const KEY="rs-street-view-dock:"+location.pathname, root=document.documentElement;
+  const st=(()=>{ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } })();
+  const save=()=>{ try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){} };
+  const drag=document.createElement("div"); drag.className="rs-svw-drag"; drag.title="Drag to resize"; drag.hidden=true; document.body.appendChild(drag);
+  const share=p=>{ st.pct=Math.max(20, Math.min(80, p)); root.style.setProperty("--rs-sv-w", st.pct+"%"); };
+  const place=()=>{ root.classList.add("rs-sv-docked"); share(st.pct||42); drag.hidden=_wPhone(); map.resize(); };
+  w.__rsUnplace=()=>{ root.classList.remove("rs-sv-docked"); drag.hidden=true; map.resize(); };
+  drag.addEventListener("pointerdown", e=>{
+    drag.setPointerCapture(e.pointerId); w.classList.add("rs-dragging");      // the frame must not swallow the pointer (not `rs-drag`: windows.js moves a window with that class)
+    const mv=ev=>{ share(100*(innerWidth-ev.clientX)/innerWidth); map.resize(); };
+    drag.addEventListener("pointermove", mv);
+    drag.addEventListener("pointerup", ()=>{ drag.removeEventListener("pointermove", mv); w.classList.remove("rs-dragging"); save(); }, {once:true});
+  });
+  return {st, save, place};
+}
 export function initStreetView(){
-  _svWindow = O.street_view==="window"; _svKey = savedKey("google") || O.street_view_key || "";           // the key that the person saved (settings) is over the page's
+  const dock=O.street_view==="dock";
+  _svWindow = O.street_view==="window" || dock; _svKey = savedKey("google") || O.street_view_key || "";           // the key that the person saved (settings) is over the page's
   if(_svWindow){
     const fromDisk=location.protocol==="file:";
-    const w=document.createElement("div"); w.className="rs-svw"; w.hidden=true;
+    const w=document.createElement("div"); w.className="rs-svw"+(dock?" rs-svw-dock":""); w.hidden=true;
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Street View</span>'+
       '<span class="rs-svw-mode" hidden><button type="button" data-m="linked" title="The map marker walks and turns with you; Google\'s street photos only">Linked</button>'+
       '<button type="button" data-m="classic" title="Google\'s plain Street View: the marker stays where you clicked">Classic</button></span>'+
@@ -30,7 +49,7 @@ export function initStreetView(){
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
           fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), flip=w.querySelector(".rs-svw-mode");
-    const {st, save, place}=_rsFloat(w, bar, "rs-street-view-window", false);
+    const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked or Classic, remembered in this browser (the same choice as the Street View page's)
     const MODE_KEY="rs-street-view-mode";
     let mode="classic", pano=null, svc=null;
@@ -63,7 +82,9 @@ export function initStreetView(){
         pano=new g.StreetViewPanorama(pdiv, {pano:id, pov:pov, visible:true,
                                              motionTracking:false, addressControl:false, fullscreenControl:true});
         const report=()=>{ const p=pano && pano.getPosition(); if(p) rsSetStreetViewMarkerAt(p.lng(), p.lat(), pano.getPov().heading); };
-        pano.addListener("position_changed", report); pano.addListener("pov_changed", report); },
+        pano.addListener("position_changed", report); pano.addListener("pov_changed", report);
+        // a panorama does not see its box change size (the docked window, dragged by its divider): it is told
+        if(dock){ const p0=pano; new ResizeObserver(()=>{ if(pano===p0) g.event.trigger(p0, "resize"); }).observe(pdiv); } },
         ()=>{ hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
     let last=null, btn=null;                   // the latest road selection: {name, url}
     const show=()=>{
@@ -99,7 +120,7 @@ export function initStreetView(){
       if(!on){ hideP();                          // closed: drop the panorama (see hideP)
         // and forget the road: opened again it waits for a road, not the last one (Kaveh, 2026-10-14)
         last=null; fr.hidden=true; msg.hidden=false; msg.textContent="Click a road to see it in Street View."; ttl.textContent="Street View"; }
-      w.hidden=!on; if(on && !_wPhone()) place(); rsSetStreetViewMarker(!!on);
+      w.hidden=!on; if(on && (dock || !_wPhone())) place(); if(!on && dock) w.__rsUnplace(); rsSetStreetViewMarker(!!on);
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
       _emit("rs:streetviewchange", {open:!!on});
     };
@@ -112,7 +133,7 @@ export function initStreetView(){
     defineTool("street_view", "window", d, {title: btn.title, open: ()=>rsSetStreetView(true), close: ()=>rsSetStreetView(false), isOpen: ()=>!w.hidden});
     // reopen a window left open last time only once the map is up: this code runs before the Street View
     // spot (svspot.js) is set up, and throwing here stopped the page before any road was drawn
-    if(st.open) map.once("load", ()=>{ if(!O.dashboard || O.dashboard.windows.restore_open) rsSetStreetView(true); });      // a template can start with its windows closed
+    if(dock ? st.open!==false : st.open) map.once("load", ()=>{ if(!O.dashboard || O.dashboard.windows.restore_open) rsSetStreetView(true); });      // a template can start with its windows closed
   }
   window.rsSetStreetView = rsSetStreetView;
 }
