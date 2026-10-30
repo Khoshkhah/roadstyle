@@ -141,9 +141,9 @@ html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a 
 html.rs-phone:not(.rs-tpl-map) #map{right:0!important}
 html.rs-phone:not(.rs-tpl-map) body{--rs-side:0px!important}
 html.rs-phone:not(.rs-tpl-map) :is(#sb-hide,#sb-show){display:none!important}
-html.rs-phone{--rs-sheet-h:40vh;--rs-grip-h:44px}
+html.rs-phone{--rs-sheet-h:40dvh;--rs-grip-h:44px}
 html.rs-phone.rs-sheet-0{--rs-sheet-h:0px}
-html.rs-phone.rs-sheet-2{--rs-sheet-h:calc(100vh - var(--rs-top,52px) - var(--rs-grip-h))}
+html.rs-phone.rs-sheet-2{--rs-sheet-h:calc(100dvh - var(--rs-top,52px) - var(--rs-grip-h))}
 html.rs-phone.rs-tpl-dashboard #sb{top:auto;left:0;right:0;bottom:0;width:auto;height:var(--rs-sheet-h);
   border-left:0;border-top:1px solid var(--line);z-index:5;transition:height .15s}
 html.rs-phone.rs-sheet-0 #sb{display:none}
@@ -233,7 +233,7 @@ html.rs-overlay ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--rs-
 html.rs-overlay ::-webkit-scrollbar-track,html.rs-overlay ::-webkit-scrollbar-corner{background:transparent}
 html.rs-overlay ::-webkit-scrollbar-button{display:none}
 /* ---- the base-map box (basemapbox.js): radio rows with a swatch, then "On top" ---- */
-.bm-menu.rs-bm-box{display:none;width:200px!important;padding:8px;gap:2px;border-radius:8px;max-height:calc(100vh - 24px);overflow-y:auto}
+.bm-menu.rs-bm-box{display:none;width:200px!important;padding:8px;gap:2px;border-radius:8px;max-height:calc(100dvh - 24px);overflow-y:auto}
 .bm-menu.rs-bm-box.open{display:grid}
 .rs-bm-h{font:700 10px/1.2 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;opacity:.65;margin:2px 4px 4px}
 .bm-menu.rs-bm-box div{padding:0!important}
@@ -318,7 +318,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-cb-lg .lg-ends{grid-column:1/-1;display:flex;justify-content:space-between;opacity:.7;font-size:11px}
 html.rs-has-toolbar :is(.co-ctrl,.co-lg,.tn-ctrl,.vw-ctrl){display:none!important}
 /* every box of the bar (the base-map box, the colour box, the attribution): the same padding, shadow, font and text side; the base-map and colour boxes the same width */
-#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto}
+#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100dvh - 24px);overflow-y:auto}
 #rs-toolbar .bm-menu.rs-bm-box,#rs-color-box,#rs-attr-box,#rs-nav-box,#rs-roads-box{width:264px!important}
 /* ---- one background for everything that floats over the map: the bar's (--rs-tb-bg in popup.css, 90 % opaque), with the same blur, border and text color ---- */
 .rs-zoom,.rs-find,.co-ctrl,.tn-ctrl,.vw-ctrl,.co-lg,.ov-ctrl,.maplibregl-ctrl .bm-menu,html.rs-overlay #sb,html.rs-overlay .rs-side,
@@ -422,7 +422,7 @@ html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!i
 #rs-toolbar.rs-tb-top #rs-settings-box{top:calc(100% + 12px);right:0}
 #rs-toolbar.rs-tb-bottom #rs-settings-box{bottom:calc(100% + 12px);right:0}
 #rs-toolbar .bm-menu,#rs-settings-box{--rs-set-x:0}
-#rs-settings-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100vh - 24px);overflow-y:auto;width:264px!important;
+#rs-settings-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100dvh - 24px);overflow-y:auto;width:264px!important;
   background:var(--rs-box-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 #rs-settings-box hr{border:0;border-top:1px solid var(--rs-tb-border);margin:8px 0 6px}
 .rs-set-h{font:700 10px/1.2 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;opacity:.65;margin:6px 8px 6px}

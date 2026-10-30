@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The full sheet on a phone**: the sheet and the boxes of the bar used `vh`, which on a phone with its address bar visible is taller than the screen. The grip of the full sheet went under the bar and the sheet could not be lowered. They use `dvh` now (the visible screen).
+
 ### Added
 - **The bar folds** (`dashboard`): a fold button, first in the bar, folds it to one button (three lines); a tap opens it again, and the page keeps the choice in this browser (`rs-settings:toolbar-folded`).
 - **The phone sheet has a button**: the grip is a 44 px strip with a down arrow (an up arrow when the sheet is closed) that goes one height down, and up from closed. The grip and its line follow the theme (they were white in the dark theme).
