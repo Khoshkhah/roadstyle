@@ -47,6 +47,7 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   cameras (zoom <-> range from MapLibre's camera distance), `there` stops echo loops, the map is the judge (it clamps,
   Google goes back), `ground` reads the ground height from Terrain Tiles (Google's center is above sea level), `pad`
   moves the map's center beside the window. Check a change on a hill (Monaco), not only on flat Södermalm.
+- Tiles: one set of rules for every path (the page's archive, the map worker, `export_style`, `roadstyle tiles`): `docs/design/tiling.md`. A road layer has no `minzoom` or `maxzoom` (a zoom band leaves the map empty while the tiles of the new zoom load). A road feature in a tile has only marks and the keys of `TILE_ROAD_KEYS` (`roadstyle-model` `mark.rs`); the test `rust/roadstyle-rs/tests/tile_keys.rs` fails for another key or a new text value.
 - Every style value is in a config file (docs/design/style_config.md): colors in `rust/roadstyle-assets/files/data/palettes/*.yaml`, all else in
   `rust/roadstyle-assets/files/data/profiles/default.yaml`. Read them merged with `THEME[...]` in `render_web.py` or `_settings.theme_value(path)`
   elsewhere, never as a literal. `tests/test_theme.py` fails on a color literal and on a color in a profile. A new style value = a

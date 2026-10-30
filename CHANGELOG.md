@@ -43,6 +43,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **Documents and types follow the dashboard of this release.** `docs/design/dashboard_module.md` lists every module of `files.txt` (the tool registry, the bar, the navigation box, the Roads tool, the settings tool, the sections, the select box, the panel scroll, the tips, the window rules, the generation check and the natural breaks) and the default of `tiles`; `index.d.ts` types `rs.sections`, `rs.legend`, `rs.colorModes`, `rs.naturalBreaks` and the options `classes`, `breaks` and `fields` of `rs.setData`; `parameters.md` names `toolbar.navigation`; the agent guide (`skills/roadstyle/SKILL.md`) and `AGENTS.md` name the tile defaults and the one road layer.
 - **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
   roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:
   `{"*": 0, "service": 14}`) and the key `"@private"` (the first zoom of the private-access roads). `minzoom=False` is still every class at every zoom. The profile's own table (`default.yaml`) is unchanged for the map template.

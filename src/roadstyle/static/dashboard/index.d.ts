@@ -132,9 +132,43 @@ export interface Tools {
   close(id: string): void;
 }
 
+/** rs.sections: the sections of the panel (sections.js). */
+export interface Sections {
+  /** The ids of the sections that are in the panel now, in order. */
+  list(): string[];
+  /** The box of a section (the page can move it), or null. */
+  get(id: string): HTMLElement | null;
+  /** A section of the page: html or el, at the end of the panel when it has neither after nor before. */
+  add(spec: { id: string; html?: string; el?: HTMLElement; label?: string | null; after?: string; before?: string }): void;
+  remove(id: string): void;
+  hide(id: string): void;
+  show(id: string): void;
+}
+
+/** rs.legend: the page's own rows in the legend (legend.js). */
+export interface LegendRows {
+  /** A row: {id, color, label, shape} (shape: "square", "circle" or "line") or {id, html}. */
+  add(row: { id: string; color?: string; label?: string; shape?: "square" | "circle" | "line"; html?: string }): void;
+  remove(id: string): void;
+  list(): string[];
+}
+
+/** rs.colorModes: the page's own "Colour by" list in the legend box (colorbox.js); an option of the style has none. */
+export interface ColorModes {
+  set(names: string[], opts?: { active?: string; onChange?: (name: string) => void }): void;
+  select(name: string): void;
+  clear(): void;
+  readonly active: string | null;
+}
+
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
   tools: Tools;
+  sections: Sections;
+  legend: LegendRows;
+  colorModes: ColorModes;
+  /** The cut points of Fisher-Jenks natural breaks that split the numbers in k sets (what rs.setData uses for a number). */
+  naturalBreaks(values: number[], k: number): number[];
   /** null, or the error of a style whose interaction contract (roadstyle:contract) is newer than this dashboard reads: then the
    *  dashboard adds no road interaction for it. setStyle sets it again. */
   error: string | null;
@@ -173,6 +207,10 @@ export interface Dashboard {
    *  column row), and colour (colorBy) or size (widthBy) the roads from it, with no new style. A second call replaces the values. */
   setData(table: Array<Record<string, unknown>> | { toArray(): unknown[] } | string, options?: {
     key?: string; colorBy?: string; vmin?: number; vmax?: number; ramp?: string[]; widthBy?: string; widthRange?: [number, number];
+    /** a number goes in this many sets by natural breaks (default 7; 0: a smooth ramp), or in the sets of these cut points */
+    classes?: number; breaks?: number[];
+    /** the columns that the popup, the tooltip and the panel show (default: every column but the key) */
+    fields?: string[];
     nodata?: string | null; legend?: false | { title?: string }; stepped?: boolean;
   }): Promise<{ rows: number; matched: number; ms: number }>;
   clearData(): void;

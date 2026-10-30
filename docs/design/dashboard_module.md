@@ -175,7 +175,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `live` | `live_data=True` (the Rust engine): `{color, width, types, ramp, nodata}` | the metadata `roadstyle:live`, else `null` | `live.js` |
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
 | `basemap_switcher` | `basemap_switcher` | `true` | `basemap.js` |
-| `tiles` | `tiles` | `false` | `core.js` (the sidecar table `window.RS_SIDE`) |
+| `tiles` | `tiles` | `true` (the page's roads are embedded tiles; `false`: GeoJSON roads) | `core.js` (the sidecar table `window.RS_SIDE`) |
 | `sources` | the page's roles (`roadstyle:sources`) | `null`: the metadata, else the style's layers | `core.js` (`_src`, `RS_ROLES`), `filter.js` |
 | `arrows` | the page's arrows (`roadstyle:arrows`) | the metadata, else `"points"` with an `arrows` source | `arrows.js` |
 | `popup_mode` | `popup_mode` (or `road_popup="panel"`) | `"popup"` | `panel.js`, and each control that docks in the panel |
@@ -236,6 +236,18 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `views.js` | the View menu | `views`, `filter.palettes`; the state `rs_palette` | `rsSetView`, `RS_VIEWS` |
 | `arrows.js` | the one-way arrow image, one arrow for each one-way road in the window | `arrow_icon`, `arrow_color`, `arrow_rules`; the sources `slots`, `arrows` | |
 | `select.js` | hover, click, select, the road popup, the hover tooltip | `road_popup`, `road_tooltip`, `hover_delay_ms`, `items`, `overlays` | `rsSelect`, `rsDeselect` |
+| `tools.js` | the tool registry: a control defines its tool (`defineTool`: a button, a toggle, a box or a window); a renderer (the column of the template `map`, the bar `toolbar.js`) reads it. The toolbox is fixed: a tool that the page cannot use stays in its place, greyed out | `dashboard.toolbar` | `rs.tools` |
+| `toolbar.js` | the bar: the tools of the registry on one bar at an edge of the window, in the look of the theme; the tools `theme` (first) and `attribution` (last) are its own; one box open at a time | `dashboard.toolbar.position`, `phone.toolbar` | |
+| `navbox.js` | the tool `navigate` (`toolbar.navigation = "box"`, the default): one button with the compass needle; its box has a zoom slider, a turn slider, a tilt slider and a reset button; the compass drags to turn and tilt | `dashboard.toolbar.navigation` | |
+| `roadsbox.js` | the tool `roads`: the road filter in the bar, one row for each class (check box, colour, name, number of roads), All, None, Bridges, Tunnels and the restricted kinds; it calls the filter calls of `filter.js` | `filter` | |
+| `settings.js` | the tool `settings`: the person's own choices kept in this browser (where the bar and the panel are, the transparency of the layers, the keys of Google and CARTO) | | |
+| `sections.js` | the panel's sections: a page adds a block, hides one of the panel's own or moves one (`rs.sections`, `dashboard.panel.sections` / `hide`) | `dashboard.panel` | `rs.sections` |
+| `selectbox.js` | a select list in the look of the boxes (the native `<select>` stays in the page, hidden; the page still reads and sets its value) | | |
+| `panelscroll.js` | the scroll protocol of a panel: the header stays, only the body scrolls, with a line under the header and a fade at the bottom | | |
+| `tip.js` | the explanation of a button in a box of the page's look (the `title` is moved to `data-rs-tip`; 350 ms after the pointer comes) | | |
+| `windows.js` | the window rules: a floating window opens in the free part of the map and, with `windows.clamp`, stays in it; on a phone a window is a bottom sheet | `dashboard.windows` | `rs.freeArea`, `rs.sheet` |
+| `generation.js` | the tiles' generation against the style's: tiles of another road set would be coloured as other roads, so the dashboard says so and hides the layers of the vector sources | `tiles_generation`, the event `rs:tiles-generation` | |
+| `breaks.js` | the natural breaks (Fisher-Jenks) of the numbers that `rs.setData` colours in sets | | `rs.naturalBreaks` |
 | `index.js` | the entry: the defaults, then each control in the order of the old template | all options | `rsDashboard` (a global of the Python page) |
 | `dashboard.css` | the look of all of the above | | |
 
