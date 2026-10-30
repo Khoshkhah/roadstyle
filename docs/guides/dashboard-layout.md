@@ -24,7 +24,7 @@ There is one template with a panel: `dashboard`. `layout` changes the frame:
 The bar has one button for each tool: theme, navigate, Street View, Google 3D, base map, roads, 3D buildings,
 colour and legend, settings, attribution. The toolbox is fixed: a tool that the page cannot use is greyed out, and its tooltip says why.
 **One button** (the compass needle) navigates the map: a click opens a zoom, turn and tilt box; Ctrl + drag on the map turns and tilts it.
-`"navigation": "buttons"` brings the old buttons back (+, -, compass, 2D/3D). The **fold button**, first in the bar, folds it to one button; the page keeps your choice. **Roads** filters the road types (check box and count for each class; All, None; a click on a name shows only it). The credits button is in the bottom corner, with the scale and zoom number.
+`"navigation": "buttons"` brings the old buttons back (+, -, compass, 2D/3D). The **fold button**, first in the bar, folds it to one button (on a phone, one small button); the page keeps your choice. On a phone the bar is one row: swipe it sideways when the tools do not fit, and a soft fade at an edge shows that more are there. **Roads** filters the road types (check box and count for each class; All, None; a click on a name shows only it). The credits button is in the bottom corner, with the scale and zoom number.
 
 A box opens toward the map; one box is open at a time. A click outside it, or Escape, closes it.
 
