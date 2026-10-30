@@ -64,3 +64,6 @@ jobs:
         run: pytest -q
         env:
           ROADSTYLE_BIN: rust/target/debug/roadstyle
+
+      - name: MLT tiles in Chromium, Firefox and WebKit (the skipped browsers are listed with their reason)
+        run: pytest -q -rs tests/test_mlt_browsers.py
