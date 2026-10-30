@@ -1,10 +1,9 @@
 //! The dash layer of the road layer (docs/design/tile_speed.md, "Dash layers"). MapLibre looks up a dash pattern for each feature of a layer
 //! that has `line-dasharray`, so only the dashed pieces have it, in a layer of their own.
 //!
-//! The road layer is NOT split by zoom (zoom bands, 2026-10-29, removed the same day). A band is a layer with `minzoom` and `maxzoom`, and the
-//! worker builds a tile's buckets only for the layers of the tile's zoom. MapLibre keeps the tiles of the old zoom on the screen until the
-//! tiles of the new zoom have come, and those tiles have no buckets for the layer that the map draws at the new zoom: the roads were
-//! missing at a pitched view, zooming out below z14 or in above it (Nacka, pitch 60, z13.5 to z14.2), with the tiles or without them.
+//! A road layer has no `minzoom` and no `maxzoom` (docs/design/tiling.md): the worker builds the buckets of a tile only for the layers of the
+//! tile's zoom, and MapLibre keeps the tiles of the old zoom on the screen until the new ones come, so a layer with a zoom range leaves the
+//! map empty while the new tiles load.
 
 use super::*;
 
