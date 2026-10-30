@@ -99,6 +99,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Fixed
 - **The full sheet on a phone**: the sheet and the boxes of the bar used `vh`, which on a phone with its address bar visible is taller than the screen. The grip of the full sheet went under the bar and the sheet could not be lowered. They use `dvh` now (the visible screen).
+- **The help window and the scroll area use `dvh`, not `vh`** (the merge of `rs.help` and `rs-scroll` with the phone fixes): `100vh` and `60vh` are taller than the visible screen on a phone. The test `tests/test_dashboard_css_units.py` keeps `vh` out of the dashboard's CSS.
 - **The bar on a phone is one row**: when the tools do not fit, the row moves sideways under a finger (no scrollbar), with a soft fade at an edge that has more tools. A box of the bar opens under it as a fixed box of the window's width (the scrolling row would clip it). The fold button hides the bar: one small button stays, and the page keeps the choice. The tools are in `.rs-tb-scroll` inside `.rs-tb-row`, which are `display:contents` on a desktop.
 - **The bars of the windows on a phone**: the bar of the Google 3D window (and of Street View) is one row; its tunnel note got a column of one word per line. The bar wraps, and the note has a row of its own.
 - **`duckosm levels` (`solve_area`) takes the `crossing` rows of a level area.** The Rust `make_area` writes `crossing` pair rows (a path at a node where a car road

@@ -535,7 +535,7 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 /* THE HELP WINDOW (help.js): the page's words in roadstyle's look - the card token, the blur and the border of the other floating windows */
 #rs-help{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center}
 #rs-help[hidden]{display:none}
-#rs-help .rs-help-box{position:relative;max-width:480px;max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;margin:16px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+#rs-help .rs-help-box{position:relative;max-width:480px;max-height:calc(100dvh - 32px);overflow-y:auto;box-sizing:border-box;margin:16px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   color:var(--rs-tb-ink);border:1px solid var(--rs-tb-border);border-radius:12px;padding:18px 20px;font:13px/1.5 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 #rs-help .rs-help-ttl{font-size:16px;font-weight:700;margin-bottom:4px}
 #rs-help .rs-help-intro{margin:4px 0 12px}
@@ -559,7 +559,7 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 
 /* ---- A SCROLL AREA IN THE PANEL (panelscroll.js, class rs-scroll): the body's rules for each area - a thin scrollbar that shows over the area or while it scrolls, a
    fade at the bottom edge while there is more, and no scroll handed on to the map or to the body. Its height is `--rs-scroll-h` (the page can set it). ---- */
-#sb .rs-scroll,#rp .rs-scroll{overflow:auto;overscroll-behavior:contain;max-height:var(--rs-scroll-h,min(520px,60vh));scrollbar-width:thin;scrollbar-color:transparent transparent}
+#sb .rs-scroll,#rp .rs-scroll{overflow:auto;overscroll-behavior:contain;max-height:var(--rs-scroll-h,min(520px,60dvh));scrollbar-width:thin;scrollbar-color:transparent transparent}
 #sb .rs-scroll:hover,#sb .rs-scroll.rs-scrolling,#rp .rs-scroll:hover,#rp .rs-scroll.rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
 #sb .rs-scroll[data-more],#rp .rs-scroll[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
 /* a table in it: the header row stays, the numbers line up, the first column is text. A column that sorts has `data-sort="asc"` or `"desc"` on its th. */
