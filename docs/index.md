@@ -2,6 +2,11 @@
 
 <p class="lead">Turn a road network into a styled, interactive HTML map that works offline, with Google Street View and a JavaScript API.</p>
 
+<div style="display:flex;gap:12px;align-items:flex-start;justify-content:center;margin:1rem 0">
+<img src="img/gallery/dashboard.jpg" alt="The standard dashboard on a desktop: Monaco on the OpenFreeMap Positron base map, a road selected in the panel at the left, and the toolbox at the right edge" style="width:70%;min-width:0">
+<img src="img/gallery/dashboard_phone.jpg" alt="The dashboard on a phone: the one-row bar at the top, the map, and the panel as a bottom sheet" style="width:23%;min-width:0">
+</div>
+
 <div class="rs-hero" markdown>
 ![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](img/hero.jpg)
 </div>
@@ -88,6 +93,13 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
   (zoom, turn and tilt, with Ctrl + drag), the `roads` filter, one base-map tool, the legend, the settings and the credits.
   A tool that the page cannot use is greyed out, with a reason. On a phone the bar folds and the panel is a bottom sheet.
   [Dashboard layout](guides/dashboard-layout.md) · [Add to the panel](guides/dashboard-panel.md)
+- **Seven base maps, no key.** OpenFreeMap Liberty and Positron, OpenStreetMap, Esri Gray, Esri Streets, Esri Satellite and Blank, each with its dark twin when it has
+  one. The CARTO maps and OpenFreeMap Bright are gone, and a page that asks for one gets `ofm_positron` and a warning. The default base map of `render_edges` is `ofm_positron`.
+  [Style the roads](guides/style.md#base-maps)
+- **A dark theme for the style's own layers.** The theme switch turns the land, water, buildings and the casing of the roads dark with no new style and no new tile.
+  [Dashboard layout](guides/dashboard-layout.md#the-dark-theme)
+- **The toolbox is at the right edge** on a desktop, and the panel at the left. On a phone the bar is one row at the top that you move sideways, a fold button hides it,
+  there is no hover tooltip on a touch screen, and the Google 3D window has a one-row header.
 - **One zoom table.** The dashboard shows service roads and living streets from zoom 14, and steps, platforms, corridors, roads and
   private roads from zoom 15. `minzoom=False` shows all. [Dashboard layout](guides/dashboard-layout.md#roads-at-small-zooms)
 - **Tiles are the default.** Every page embeds its roads as MLT tiles to zoom 16, with one road layer for every zoom. `tiles=False`

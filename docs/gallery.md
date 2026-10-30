@@ -92,13 +92,22 @@ More in [Google 3D](guides/google-3d.md).
 
 ## Ready-made pages
 
-A dashboard with a query panel and a toolbox (navigate, base map, roads, colour and legend, settings), in one call.
+The standard dashboard: a query panel at the left and a toolbox at the right edge (navigate, base map, roads, colour and legend, settings), in one call.
+The map starts on the base map that you ask for. The pictures below use OpenFreeMap Positron and OpenFreeMap Fiord (the dark theme).
 
 ```python
-rs.render_dashboard(edges, color_options={"Class": {}, "Speed": {"color_by": "maxspeed_kmh"}})
+rs.render_dashboard(edges, basemap="ofm_positron", color_options={"Class": {}, "Speed": {"color_by": "maxspeed_kmh"}})
 ```
 
-![The dashboard page: Monaco's roads, the panel at the left with the selected road, and the toolbox next to it](img/gallery/dashboard.jpg)
+![The dashboard on a desktop: Monaco, a road selected in the panel at the left, and the toolbox at the right edge](img/gallery/dashboard.jpg)
+
+![The dashboard in the dark theme on the OpenFreeMap Fiord base map](img/gallery/dashboard_dark.jpg)
+
+<div style="max-width:300px" markdown>
+
+![The dashboard on a phone: the one-row bar at the top, the map, and the panel as a bottom sheet](img/gallery/dashboard_phone.jpg)
+
+</div>
 
 More in [Dashboards & JavaScript](guides/dashboards.md).
 

@@ -26,6 +26,11 @@
   <a href="https://khoshkhah.github.io/roadstyle/">Documentation</a>
 </p>
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard.jpg" alt="The standard dashboard on a desktop: Monaco on the OpenFreeMap Positron base map, a road selected in the panel at the left, and the toolbox at the right edge" width="68%">
+  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard_phone.jpg" alt="The dashboard on a phone: the one-row bar at the top, the map, and the panel as a bottom sheet" width="22%">
+</p>
+
 ![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/hero.jpg)
 
 ## Why roadstyle
@@ -45,7 +50,9 @@
 
 - **A standard dashboard and toolbox.** `rs.render_dashboard(edges)` makes a map with one panel and one bar of tools: navigate (zoom, turn and
   tilt in one box), road filter, base maps, colour and legend, settings and credits. A tool that the page cannot use is grey, and its tooltip says
-  why. On a phone the bar is one row that you move sideways, and the panel is a bottom sheet.
+  why. The toolbox is at the right edge and the panel at the left. On a phone the bar is one row that you move sideways, and the panel is a bottom sheet.
+- **Seven base maps, no key.** OpenFreeMap Liberty and Positron (the default), OpenStreetMap, Esri Gray, Esri Streets, Esri Satellite and Blank, each with its dark twin
+  when it has one. The CARTO maps are gone, so no base map needs a key. The theme switch also turns the style's own layers dark.
 - **Tiles by default, one rule.** Every page keeps its roads as MLT vector tiles to zoom 16, with one road layer for every zoom. The page, the
   browser worker, `export_style` and `roadstyle tiles` all use the same tiling rule. `tiles=False` gives GeoJSON roads, and `tile_format="mvt"` gives MVT.
 - **The level editor is in the panel.** `roadstyle levels edit AREA_DIR` opens it from the Rust program. It uses the page's standard panel, with an apply bar, red and blue picks, the area boundary (`levels make --boundary`) and `edits.csv` in the History tab.
@@ -53,8 +60,7 @@
   `rs.classify` makes colour classes for roads.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/dashboard-desktop.png" alt="The dashboard on a desktop: Monaco, the panel at the left and the toolbox next to it" width="62%">
-  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/dashboard-phone.png" alt="The dashboard on a phone: the bar at the top and the panel as a bottom sheet" width="22%">
+  <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard_dark.jpg" alt="The dashboard in the dark theme with the OpenFreeMap Fiord base map: Monaco, one road selected" width="80%">
 </p>
 
 More: [What is new in 0.26.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0260) ·

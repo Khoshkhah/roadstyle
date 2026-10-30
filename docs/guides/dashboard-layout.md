@@ -8,7 +8,7 @@ import roadstyle as rs
 rs.render_dashboard(edges, color_options={"Road class": {}}).save("dashboard.html")
 ```
 
-![The dashboard on a desktop: the panel at the left, the toolbox next to it, and the roads of Monaco](../img/dashboard-desktop.png)
+![The dashboard on a desktop: the panel at the left, the toolbox at the right edge, and the roads of Monaco](../img/dashboard-desktop.png)
 
 ## The form
 
@@ -81,6 +81,8 @@ swatch has a thin border, so that a white colour shows.
 The 3D buildings switch tilts a flat map to 55° and zooms in to 15 when the zoom is under 14.5, because the buildings start at that
 zoom. When you switch it off, the map goes flat again if this switch tilted it. A call of `rsBuildings(on)` from a script moves nothing.
 
+![The base-map box: seven base maps, and Hillshade, Labels and 3D buildings under On top](../img/dashboard-basemap-box.png)
+
 ### Colour and legend
 
 The box has the *Colour by* list and the legend of the active colour option. Your own rows follow the legend
@@ -115,6 +117,15 @@ OpenStreetMap") in place of your page's credit. The base map's credits follow. T
 ![The colour and legend box: the colour options and the legend of the road classes](../img/dashboard-legend-box.png)
 
 </div>
+
+## The dark theme
+
+The theme button sets the light or the dark theme for the whole page: the bar, the panel, the boxes, the popup and the roads. A dark base map (OpenFreeMap Fiord or Dark, Esri
+Dark Gray, Blank dark) sets the dark theme too. The style's own layers (land, parks, water, buildings, paved areas, lines and points of a duckOSM map, the casing of the roads, the names and the arrows) have a dark
+colour in the style, and the global state `rs_theme` picks it. A change of theme needs no new style and no new tile. The dark colour is the light one turned by the `dark` block of the profile.
+The fill of a road keeps its colour. Design: `docs/design/dark_theme.md`.
+
+![The dashboard in the dark theme on the OpenFreeMap Fiord base map](../img/gallery/dashboard_dark.jpg)
 
 ## Add a tool
 
