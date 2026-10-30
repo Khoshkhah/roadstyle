@@ -28,7 +28,9 @@ EDGES = ROOT / "rust" / "roadstyle-rs" / "tests" / "data" / "level_area" / "edge
 @pytest.fixture(scope="module")
 def editor(tmp_path_factory):
     area = tmp_path_factory.mktemp("area")
-    subprocess.run([BIN, "levels", "make", str(EDGES), str(area)], check=True, capture_output=True)
+    square = area.parent / "square.geojson"
+    square.write_text('{"type": "Polygon", "coordinates": [[[7.4, 43.7], [7.5, 43.7], [7.5, 43.8], [7.4, 43.7]]]}')
+    subprocess.run([BIN, "levels", "make", str(EDGES), str(area), "--boundary", str(square)], check=True, capture_output=True)
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
@@ -60,6 +62,7 @@ def test_the_page_is_the_dashboards_panel_and_bar_in_both_themes(editor):
         b = p.chromium.launch()
         page, errors = _open(b, url, viewport={"width": 1300, "height": 800})
         assert page.evaluate("document.documentElement.classList.contains('rs-has-toolbar')"), "the dashboard's bar"
+        assert page.evaluate("map.getStyle().layers.some(l => l.id.endsWith('boundary'))"), "the area's boundary.geojson: the dashed line"
         assert page.locator("#sb .sb-top .t").inner_text() == "Edit levels" and page.locator("#sb-hide").is_visible()
         assert page.locator("button[title='Light / dark']").is_visible()
         # the standard base-map box of every dashboard: Blank is the default, and the list has the other maps

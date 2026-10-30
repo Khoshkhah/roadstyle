@@ -102,6 +102,8 @@ server. The server answers only on 127.0.0.1, only to its own address (`Host`), 
 most 16 MB. Its page files are in the program; build them in with `rust/roadstyle-wasm/build_editor.sh` before you build roadstyle.
 On any other web server the page shows the area and saves nothing.
 
+- **The edge of the area**: `roadstyle levels make edges.parquet out/area --boundary area.geojson` keeps the GeoJSON polygon as
+  `out/area/boundary.geojson`, and the editor draws it as a dashed line. An area with no such file has no line.
 - **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
   *meet* (join two ends).
 - **Switch off** a pair that the input found. To replace a found stack, switch off its rows, then add your own parts.

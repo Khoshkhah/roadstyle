@@ -25,7 +25,9 @@ usage:
   roadstyle levels make <edges> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
                     [--band-dist 10] [--head-m 5] [--near-rules] [--highway-col highway] [--layer-col layer] [--bridge-col bridge]
                     [--tunnel-col tunnel] [--junction-col junction]
-      a level area's input: roads.parquet, pairs.csv and edits.csv (roadstyle-levels make).
+                    [--boundary AREA.geojson]
+      a level area's input: roads.parquet, pairs.csv and edits.csv (roadstyle-levels make). --boundary copies a GeoJSON file to
+      boundary.geojson: the editor draws it as a dashed line, the edge of the area.
   roadstyle levels solve <area folder>
       levels.csv and levels_info.json from the area's input and your edits.csv, heads.csv and caps.csv (roadstyle-levels solve).
   roadstyle levels edit <area folder> [--port 8780] [--page DIR]
@@ -241,6 +243,7 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
                                       bridge_col: s("bridge_col", d.bridge_col), tunnel_col: s("tunnel_col", d.tunnel_col),
                                       junction_col: s("junction_col", d.junction_col), ..d };
             o.band_col = take(&mut opts, "band_col");
+            let boundary = take(&mut opts, "boundary");
             if let Some(order) = take(&mut opts, "order") {
                 o.order = (order != "none").then_some(order);
             }
@@ -254,6 +257,15 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
             no_more(&opts)?;
             let table = roads(edges)?;
             let made = make_area(&table, Path::new(folder), &o)?.made;
+            if let Some(file) = boundary {
+                // the area's edge for the editor (the dashed line): GeoJSON, as `boundary=` of render
+                let text = String::from_utf8(read(&file)?).map_err(|e| Error::File(format!("{file}: {e}")))?;
+                let json: Value = serde_json::from_str(&text).map_err(|e| Error::File(format!("{file}: not JSON: {e}")))?;
+                if !matches!(json["type"].as_str(), Some("Polygon" | "MultiPolygon" | "Feature" | "FeatureCollection")) {
+                    return Err(Error::Usage(format!("--boundary {file}: not a GeoJSON polygon, feature or feature collection")));
+                }
+                std::fs::write(Path::new(folder).join("boundary.geojson"), text).map_err(|e| Error::File(e.to_string()))?;
+            }
             for w in &made.warnings {
                 eprintln!("warning: {w}");
             }

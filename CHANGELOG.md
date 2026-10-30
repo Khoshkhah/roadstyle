@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`roadstyle levels make --boundary AREA.geojson`** keeps the edge of the area as `boundary.geojson` in the area folder. The level editor draws it as the dashboard's dashed boundary line.
 - **The level editor has the dashboard's base-map box.** The editor's own map starts on the page's base style (Blank, as every dashboard) with the standard box: the base
   maps, "On top" (Hillshade, Labels, 3D buildings), and the dark twin that follows the theme. `host_options()` (and `data/host_options.json`) gives `style`, the base style that a
   page of roadstyle gets, so a host page makes its map from it and has no copy of the rule. `levelEditor({basemaps})` takes it (`host_options.json`) and is required for the

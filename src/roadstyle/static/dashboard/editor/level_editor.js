@@ -128,7 +128,10 @@ const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road"];
 // the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
 const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
 const call = caller(worker);
-await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), look: JSON.stringify({args: {...LOOK, hover_color: COLORS.hover}})});
+// the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
+const boundaryF = map ? null : await store.load("boundary.geojson");
+await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)),
+  look: JSON.stringify({args: {...LOOK, hover_color: COLORS.hover, ...(boundaryF ? {boundary: JSON.parse(boundaryF.body)} : {})}})});
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
