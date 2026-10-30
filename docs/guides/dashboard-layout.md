@@ -157,6 +157,8 @@ The key `"@private"` sets the first zoom of the private-access roads. The profil
 
 Street View and Google 3D open in the free part of the map and keep their size. Google 3D has a view switch, **Imagery** or **Map**, and **Follow** is on at the start.
 
+`street_view="dock"` docks Street View beside the map, as a side of the page with a divider that you drag. The window takes the right part of the screen (the lower part on a phone). The Street View button of the bar closes and opens it. A dashboard with `dashboard={"panel": None}` has no panel: the page is the map and the toolbox. See [Street View](street-view.md#docked-beside-the-map).
+
 ## A phone
 
 At 700 px or less, the bar is at the top and the panel is a bottom sheet.

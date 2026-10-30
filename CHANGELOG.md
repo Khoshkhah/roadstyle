@@ -6,12 +6,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 ## [0.26.1] - 2026-10-30
 
 ### Added
 - **The level editor has a help window.** A **?** button next to the editor's title opens the dashboard's own help window (`rs.help`) with short words (Simplified Technical English): what a level is, how to pick the red and the blue road, Order, Stack, Meet and "on top", the casing parts, Add to the list, Discard, Apply and solve, History and `edits.csv`, Issues, and "← Steps" with changes waiting. A dot of each colour shows road 1 and road 2. It works in both themes and on a phone, where the window is a sheet at the bottom. `rs.help.set` takes `anchor` (the element for the button), and `rs.help` has `get()` and `clear()`; the editor sets the host's own words again when it closes. The Esc listener of the window is on the page only while the window is open. The window ends with two links to this guide ("Edit the levels" and "Edit the levels in a dashboard"), which open in a new tab.
 - The goldens of the Monaco page and of the page with views have the new size and hash (`rust_page.json`, `page_views.json`): the help window adds 1,095 bytes to every page.
+- **A dashboard with no panel: `dashboard={"panel": None}`.** The page is a map with the toolbox and nothing else (it had the panel's HTML even then). `rs.help.set` puts its "i" button in the bar when there is no panel title for it.
+- **Street View docked beside the map: `street_view="dock"`.** The window is a side of the page, not a floating window: it takes the right part of the screen (the lower 45 % on a phone), the map takes the rest, and a divider that the person drags sets the share (20 to 80 %, kept in the browser). The page has no panel and the bar is at the left, the map's own edge; `dashboard=` can give a panel and move the bar. The Street View button of the bar closes and opens the dock; the map gets the whole page when it is closed. `street_view="window"` is unchanged.
 
 ### Changed
 - **One accent colour for the whole dashboard: the Sonocount teal.** `--accent` is `#0e7c8e` in the light theme (the logo's teal, a little darker so that a link is 4.6:1 on the panel's cards: the logo's own is 4.43:1) and a lighter teal of the same hue (`#42c2d7`, 8.5:1 on the dark panel) in the dark theme; `--accent-fill` is the logo teal `#0E7F91` of a
@@ -28,11 +29,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
   does not cover the control (the side that faces the map's center, then below, above, right, left). An icon button keeps its `aria-label`.
 - **Every tool of the one-row bar of a phone is whole.** At 390 px the last tool (the credits) of ten was at 376-408 px, partly off the screen. A tool of one button now shrinks from 32 px to 26 px before the row scrolls, and the row has 4 px
   at each end, so the first and the last tool are whole when the row is at its end.
-=======
-### Added
-- **A dashboard with no panel: `dashboard={"panel": None}`.** The page is a map with the toolbox and nothing else (it had the panel's HTML even then). `rs.help.set` puts its "i" button in the bar when there is no panel title for it.
-- **Street View docked beside the map: `street_view="dock"`.** The window is a side of the page, not a floating window: it takes the right part of the screen (the lower 45 % on a phone), the map takes the rest, and a divider that the person drags sets the share (20 to 80 %, kept in the browser). The page has no panel and the bar is at the left, the map's own edge; `dashboard=` can give a panel and move the bar. The Street View button of the bar closes and opens the dock; the map gets the whole page when it is closed. `street_view="window"` is unchanged.
->>>>>>> origin/dashboard-dock
 
 ## [0.26.0] - 2026-10-30
 
