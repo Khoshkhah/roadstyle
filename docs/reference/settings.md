@@ -71,7 +71,7 @@ Every settings level uses one layout. `profile` and `palette` name the look; `co
 **The older layout** (2026-10-19): a settings file that still gives style values as `palettes`, `selection`, `roads` or as
 style keys of `config` (`labels`, `arrows`, `bridge_*`, `tunnel_*`, `minzoom`, ...) keeps working for one release. roadstyle
 reads each one as its theme key and gives a `DeprecationWarning` that names the new key (`config.bridge_casing_color ->
-theme bridges.casing_color`). A palette entry may also be wrapped as `{"roads": {...}}`.
+theme bridges.casing_color`). A palette entry can also be wrapped as `{"roads": {...}}`.
 
 ## Palettes
 
