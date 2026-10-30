@@ -7,6 +7,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The dark theme of a live style's layers.** The style holds a dark colour for each light colour of the base map's layers (land, parks, water, buildings, paved, parking, lines, points), for
+  the casing of the roads and for the names and arrows, picked by the global state `rs_theme`: the dashboard's theme switch sets it, so a host with a dark base map (Fiord) is dark
+  all over with no new style and no new tile. The dark colour is the light one turned by the profile's `dark` block (a lightness band and a saturation for each of `area`, `line`, `point`,
+  `casing` and `label`); the fill of a road keeps its colour. The textures and the icons have dark twin images. The Monaco style grows by 16.5 KB (+18.8 %); a style that is not live is as before.
+  Design: `docs/design/dark_theme.md`.
 - **`rs.classify`: discrete colour classes for roads, from data.** `classify(values, method="natural"|"quantile"|"equal"|"fixed", k, breaks=, pivot=, palette=, fmt=)` gives the cuts, the class labels and the colours (`.labels`, `.breaks`, `.colors`, `.option(column)` for `color_options`). Natural breaks are Fisher-Jenks, as in the JavaScript `rs.naturalBreaks`; a `pivot` is always one of the cuts; a missing value has its own grey class. Also `natural_breaks` and `ramp`.
 - **A docs page, "Dashboard parts"**, lists the shared parts of a dashboard page and the rules (width, colours, themes, scroll, transparency).
 - **`rs.ready(fn)`: start-up code of a page.** It runs `fn` now when the page is ready (`window.rsReady`), or when `rs:ready` comes. A page no longer writes `window.rsReady ? main() : addEventListener("rs:ready", main, {once: true})`.

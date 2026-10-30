@@ -166,3 +166,13 @@ fn the_tunnel_look_is_checked() {
     assert_eq!(e(json!({"tunnel_towards": {"A": "red"}, "tunnel_toward": "A"})), "tunnel_towards 'A': 'red' is not a '#rrggbb' colour");
     assert!(Look::resolve(&Options::from_value(&json!({"settings": {"config": {"tunnel_toward": "#123456"}}})).unwrap()).is_ok());
 }
+
+/// A look file made before the dark theme has no `dark` section: it gets the bands of the default profile (the one place of the values is data/profiles/default.yaml).
+#[test]
+fn the_dark_bands_of_a_look_with_none_are_the_default_profiles() {
+    let resolved = Look::resolve(&Options::default()).unwrap();
+    assert_eq!(resolved.sections.dark, roadstyle_look::sections::DarkLook::default());
+    let mut file = serde_json::from_str::<Value>(&resolved.to_json()).unwrap();
+    file.as_object_mut().unwrap().remove("dark");
+    assert_eq!(Look::from_json(&file.to_string()).unwrap().sections.dark, resolved.sections.dark);
+}

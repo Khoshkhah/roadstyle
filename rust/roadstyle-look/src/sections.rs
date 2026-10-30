@@ -410,7 +410,7 @@ impl Default for DarkLook {
     /// the values of the default profile, so that a look file made before the dark theme has them
     fn default() -> DarkLook {
         let band = |l0: f64, l1: f64, s: f64| DarkBand { lightness: [l0, l1], saturation: s };
-        DarkLook { area: band(0.10, 0.30, 0.85), line: band(0.30, 0.65, 0.9), point: band(0.30, 0.80, 1.0), casing: band(0.12, 0.42, 0.85), label: band(0.92, 0.30, 1.0) }
+        DarkLook { area: band(0.08, 0.24, 0.30), line: band(0.28, 0.60, 0.50), point: band(0.30, 0.80, 1.0), casing: band(0.12, 0.42, 0.85), label: band(0.92, 0.30, 1.0) }
     }
 }
 

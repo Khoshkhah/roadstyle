@@ -8,6 +8,7 @@
 
 use crate::Error;
 use roadstyle_look::sections::{DarkBand, DarkLook};
+use roadstyle_model::mark::Mark;
 use serde_json::{json, Map, Value};
 
 /// The global state that the theme switch sets.
@@ -94,7 +95,7 @@ fn road_colour(e: &Value, band: &DarkBand, keep: &[String]) -> Value {
         Some(a) if a.first().is_some_and(|f| f == "let") && a.len() >= 3 => (&a[1..a.len() - 1], &a[a.len() - 1]),
         _ => (&[][..], e),
     };
-    let casing = json!(["==", ["get", "__rs_k"], 0]);
+    let casing = json!(["==", ["get", Mark::PieceKind.name()], 0]);
     let body = match body.as_array() {
         Some(a) if a.first().is_some_and(|f| f == "case") => {
             let mut out = a.clone();
@@ -230,7 +231,7 @@ mod tests {
     #[test]
     fn a_road_keeps_its_fill_and_its_casing_table_and_branch_go_dark() {
         let e = json!(["let", "fill_colours", ["literal", ["#ffffff"]], "casing_colours", ["literal", ["#bbbbbb"]],
-                       ["case", ["==", ["get", "__rs_k"], 2], "rgba(0,0,0,0.25)", ["==", ["get", "__rs_k"], 0], "#64748b", "#ffffff"]]);
+                       ["case", ["==", ["get", Mark::PieceKind.name()], 2], "rgba(0,0,0,0.25)", ["==", ["get", Mark::PieceKind.name()], 0], "#64748b", "#ffffff"]]);
         let t = road_colour(&e, &band(0.12, 0.42, 0.85), &[]);
         assert_eq!(t[2], json!(["literal", ["#ffffff"]]), "the fills stay");
         assert_eq!(t[4][0], "case", "the casing table has a dark twin");

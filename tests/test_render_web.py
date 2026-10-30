@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 from shapely.geometry import LineString
 
+from light import light
 from roadstyle import Overlay, compute_levels, render_edges
 
 _KEY_UNIT = 100_000_000      # the pieces' sort keys: one drawing position
@@ -402,9 +403,9 @@ def test_render_edges_scoped_settings():
     no files, no lingering global state."""
     styled = render_edges(_edges(), backend="web",
                           settings={"config": {"labels": {"color": "#123123"}}}).html
-    assert _in('"text-color": "#123123"', styled)
+    assert _in('"#123123"]', styled)              # the light colour, the else of the theme's case (a live page has a dark colour beside it)
     plain = render_edges(_edges(), backend="web").html
-    assert _in('"text-color": "#5b5b5b"', plain)      # fully restored afterwards
+    assert _in('"#5b5b5b"]', plain)      # fully restored afterwards
 
 
 def test_overlay_defaults_come_from_settings():
@@ -816,7 +817,7 @@ def test_label_size_stops_from_the_settings():
     st = _style(render_edges(_pairs().assign(name="Main Street"), backend="web", settings={"config": {"labels": {"size": [[20, 16], [16, 11]], "halo_color": "#fff", "halo_width": 1.5}}}).html)
     lab = next(l for l in st["layers"] if l.get("layout", {}).get("text-size") and l["layout"].get("symbol-placement") == "line-center")
     assert lab["layout"]["text-size"] == ["interpolate", ["linear"], ["zoom"], 16.0, 11.0, 20.0, 16.0]
-    assert lab["paint"]["text-halo-color"] == "#fff" and lab["paint"]["text-halo-width"] == 1.5
+    assert light(lab["paint"]["text-halo-color"]) == "#fff" and lab["paint"]["text-halo-width"] == 1.5
 
 
 
@@ -1354,7 +1355,7 @@ def test_overlay_styles_come_from_the_settings_and_an_argument_wins():
     g = _edge_world()
     st = _style(render_edges(g, backend="web", settings=_STYLES, overlays=[Overlay(_line_overlay_data(), style="divider", label="d"), Overlay(_line_overlay_data(), style="divider", color="#ff0000", label="e")]).html)
     lay = {lyr["id"]: lyr for lyr in st["layers"]}
-    own = lambda c: c[-1][-1] if c[0] == "coalesce" else c[-1]           # noqa: E731 - inside the rsColor state: the hover / select case
+    own = lambda c: light(c[-1][-1] if c[0] == "coalesce" else c[-1])    # noqa: E731 - inside the rsColor state: the hover / select case
     assert own(lay["ov0-line"]["paint"]["line-color"]) == "#ffffff" and own(lay["ov1-line"]["paint"]["line-color"]) == "#ff0000"   # the argument wins
     assert lay["ov0-line"]["minzoom"] == 16.0
     with pytest.raises(ValueError, match=r"not in the settings.*divider"):
@@ -1382,7 +1383,7 @@ def test_overlay_metre_width_dash_zoom_range_and_text():
     assert dashed["paint"]["line-dasharray"] == [3.0, 3.0] and dashed["layout"]["line-cap"] == "butt" and dashed["minzoom"] == 16.0 and dashed["maxzoom"] == 21.0
     text = lay["ov2-text"]
     assert text["type"] == "symbol" and text["layout"]["text-field"] == ["get", "label"] and text["layout"]["symbol-placement"] == "line-center"
-    assert text["paint"]["text-halo-color"] == "#ffffff" and text["layout"]["text-size"] == 13 and st["glyphs"]
+    assert light(text["paint"]["text-halo-color"]) == "#ffffff" and text["layout"]["text-size"] == 13 and st["glyphs"]
     with pytest.raises(ValueError, match="text_col"):
         render_edges(_edge_world(), backend="web", overlays=[Overlay(_line_overlay_data(), kind="text")])
 
