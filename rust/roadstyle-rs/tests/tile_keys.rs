@@ -21,6 +21,9 @@ fn look(export: bool) -> Look {
     look["args"]["arrows"] = true.into();
     look["args"]["labels"] = true.into();
     look["args"]["export"] = export.into();
+    if !export {
+        look["args"]["state"] = "live".into();          // a page's style: the interaction contract, with the filter panel's classes (`roadstyle:controls.filter`)
+    }
     Look::from_value(look).unwrap()
 }
 

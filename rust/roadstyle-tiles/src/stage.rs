@@ -27,6 +27,8 @@ pub struct TileOptions {
     pub base: HashSet<String>,
     /// the pieces' own columns: the class, lvl, the metre width and the class filter
     pub pieces: HashSet<String>,
+    /// the classes of the filter panel (`roadstyle:controls.filter.classes`): a road feature's text class `__rs_cls` is its index in this list in the tiles (`__rs_cc`)
+    pub class_codes: Vec<String>,
     /// render(tiles=True)'s page: the columns of the roads and the pieces (tile_keep)
     pub exact: Option<HashSet<String>>,
     /// render(tiles=True)'s page: the sources in the tiles (tile_layers; the page keeps the others inline)
@@ -66,7 +68,8 @@ impl TileOptions {
         let generation = metadata[roadstyle_model::props::GENERATION].as_str().map(String::from);
         let popups = roadstyle_model::props::overlay_popups(metadata);
         Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, base, generation,
-                         pieces, exact: None, only: None, slots_from, wait: false, format: Default::default() })
+                         pieces, exact: None, only: None, slots_from, wait: false, format: Default::default(),
+                         class_codes: metadata["roadstyle:controls"]["filter"]["classes"].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect() })
     }
 
     /// The rules of a saved style (stage 1's style.json).
@@ -87,6 +90,7 @@ impl TileOptions {
         let mut tiles = crate::Tiles::with_buffers(self.min_zoom, self.max_zoom, self.buffers.iter().map(|b| b * crate::EXTENT / TILE_PX).collect())?;
         tiles.generation = self.generation.clone();
         tiles.format = self.format;
+        tiles.class_codes.clone_from(&self.class_codes);
         Ok(tiles)
     }
 

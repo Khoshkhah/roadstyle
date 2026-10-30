@@ -7,7 +7,8 @@
     "lvl",
     "__rs_lvl",
     "__rs_access",
-    "__rs_pick"
+    "__rs_pick",
+    "__rs_cc"
   ],
   "decks": [
     "__rs_edges",
@@ -19,7 +20,8 @@
     "rank",
     "oneway",
     "highway",
-    "name"
+    "name",
+    "__rs_cc"
   ],
   "table": [
     "__rs_edge2",

@@ -81,6 +81,8 @@ pub(crate) struct Builder {
     pub(crate) rules: rules::ZoomRules,
     /// the layer is the pieces': a property `__rs_edge` is a feature's id, not a key
     pub(crate) road_id: bool,
+    /// the classes of the filter panel: the text `__rs_cls` of a road feature goes into the tile as its index in this list, `__rs_cc` (None: not a road layer; an empty list: the page has no filter panel, so the class is not in the tile)
+    pub(crate) class_codes: Option<Vec<String>>,
     /// the numbers of the last feature's properties, by place: the pieces of one road come one after another and have most of their
     /// properties the same, which then take their numbers with no lookup
     pub(crate) last: Vec<(u32, u32)>,
@@ -114,25 +116,37 @@ impl Builder {
     /// the rules give them.
     pub(crate) fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32, f32, Option<u64>) {
         let (keys, key_at, vals, encoded, val_at, scratch) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at, &mut self.scratch);
-        let (rules, last, road_id) = (&self.rules, &self.last, self.road_id);
+        let (rules, last, road_id, class_codes) = (&self.rules, &self.last, self.road_id, &self.class_codes);
         let mut read = Map::new();        // the values that the first-zoom rules read
         let mut j = 0;
         let (mut road, edge) = (None, roadstyle_model::mark::Mark::Edge.name());
         let props: Vec<(u32, u32)> = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
-                if road_id && k.as_ref() == edge {
+                // a text class is a small number in a tile: the index in the filter panel's list (a class that the list lacks has no key: no filter hides it)
+                let (key, v): (&str, Val) = if let Some(codes) = class_codes.as_ref().filter(|_| k.as_ref() == roadstyle_model::mark::Mark::Class.name()) {
+                    match &v {
+                        Val::Str(s) => match codes.iter().position(|c| c == s.as_ref()) {
+                            Some(i) => (roadstyle_model::mark::Mark::ClassCode.name(), Val::Int(i as i64)),
+                            None => return None,
+                        },
+                        _ => return None,
+                    }
+                } else {
+                    (k.as_ref(), v)
+                };
+                if road_id && key == edge {
                     road = match v { Val::Int(i) => u64::try_from(i).ok(), Val::UInt(u) => Some(u), _ => None };
                     return None;
                 }
-                if rules.reads(k.as_ref()) {
-                    read.insert(k.as_ref().to_string(), json_of(&v));
+                if rules.reads(key) {
+                    read.insert(key.to_string(), json_of(&v));
                 }
-                if v == Val::Bool(false) && k.as_ref().starts_with(roadstyle_model::mark::PREFIX) {
+                if v == Val::Bool(false) && key.starts_with(roadstyle_model::mark::PREFIX) {
                     return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
                 }
                 j += 1;
-                if let Some(&(at, n)) = last.get(j - 1).filter(|(at, n)| keys[*at as usize] == k.as_ref() && vals[*n as usize] == v) {
+                if let Some(&(at, n)) = last.get(j - 1).filter(|(at, n)| keys[*at as usize] == key && vals[*n as usize] == v) {
                     return Some((at, n));        // the key and the value of the last feature's property in this place
                 }
                 scratch.clear();
@@ -146,11 +160,11 @@ impl Builder {
                         vals.len() as u32 - 1
                     }
                 };
-                let at = match key_at.get(k.as_ref()) {
+                let at = match key_at.get(key) {
                     Some(&at) => at,
                     None => {
-                        keys.push(k.as_ref().to_string());
-                        key_at.insert(k.as_ref().to_string(), keys.len() as u32 - 1);
+                        keys.push(key.to_string());
+                        key_at.insert(key.to_string(), keys.len() as u32 - 1);
                         keys.len() as u32 - 1
                     }
                 };

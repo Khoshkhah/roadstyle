@@ -44,7 +44,10 @@ export function _applyRoadFilters(){
       if(multi[kind]) f=and(f, multi[kind].length ? _has(["id"], multi[kind]) : false);
     }else{
       const lvl=ov?"__rs_lvl":"lvl";
-      if(hidden.length) f=and(f, ["!",["in",["get","__rs_cls"],["literal",hidden]]]);
+      // a tile has the class as a number (__rs_cc: its index in FILTER.classes, docs/design/tiling.md), a GeoJSON source its text (__rs_cls)
+      if(hidden.length) f=and(f, l["source-layer"]
+        ? ["!",["in",["coalesce",["get","__rs_cc"],-1],["literal",hidden.map(c=>FILTER.classes.indexOf(c))]]]
+        : ["!",["in",["get","__rs_cls"],["literal",hidden]]]);
       if(_accHid.size) f=and(f, ["!",["in",["coalesce",["get","__rs_access"],""],["literal",[..._accHid]]]]);
       if(!_bridgesOn) f=and(f, ["<",["coalesce",["get",lvl],0],1]);
       if(!_tunnelsOn) f=and(f, [">=",["coalesce",["get",lvl],0],0]);
