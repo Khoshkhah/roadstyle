@@ -68,7 +68,7 @@ with the area's base map (land, water, paved areas, buildings).
 
 | Number | For |
 |---|---|
-| features, bytes, values (the distinct values), keys, and the numbers of rules 2, 3, 4, 6 and 7 | the largest tile of each tile layer, in each view |
+| features, bytes, values (the distinct values), keys, `property_bytes` (the bytes of the features' `tags` fields), and the numbers of rules 2, 3, 4, 6 and 7 | the largest tile of each tile layer, in each view |
 | bytes of all the tiles, bytes and features of the largest tile | each view |
 | layers, characters of all expressions | the style |
 | characters of each filter, paint and layout over 256 | each style layer |

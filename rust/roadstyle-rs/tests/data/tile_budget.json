@@ -7,16 +7,16 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 3863,
+    "view_bytes": 3773,
     "view_features": 113,
-    "max_tile_bytes": 3863,
+    "max_tile_bytes": 3773,
     "max_tile_features": 113,
-    "mlt_view_bytes": 1573,
-    "mlt_max_tile_bytes": 1573,
+    "mlt_view_bytes": 1548,
+    "mlt_max_tile_bytes": 1548,
     "layers": {
      "simple": {
       "features": 113,
-      "bytes": 3863,
+      "bytes": 3773,
       "values": 28,
       "keys": 11,
       "keys_unread": 1,
@@ -24,21 +24,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 169,
-      "tiny": 18
+      "tiny": 18,
+      "property_bytes": 1345
      }
     }
    },
    "z10": {
-    "view_bytes": 10450,
+    "view_bytes": 10018,
     "view_features": 327,
-    "max_tile_bytes": 10450,
+    "max_tile_bytes": 10018,
     "max_tile_features": 327,
-    "mlt_view_bytes": 4018,
-    "mlt_max_tile_bytes": 4018,
+    "mlt_view_bytes": 3906,
+    "mlt_max_tile_bytes": 3906,
     "layers": {
      "simple": {
       "features": 327,
-      "bytes": 10450,
+      "bytes": 10018,
       "values": 32,
       "keys": 11,
       "keys_unread": 1,
@@ -46,21 +47,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 351,
-      "tiny": 49
+      "tiny": 49,
+      "property_bytes": 3550
      }
     }
    },
    "z11": {
-    "view_bytes": 31522,
+    "view_bytes": 29924,
     "view_features": 1014,
-    "max_tile_bytes": 31522,
+    "max_tile_bytes": 29924,
     "max_tile_features": 1014,
-    "mlt_view_bytes": 11166,
-    "mlt_max_tile_bytes": 11166,
+    "mlt_view_bytes": 10946,
+    "mlt_max_tile_bytes": 10946,
     "layers": {
      "simple": {
       "features": 1014,
-      "bytes": 31522,
+      "bytes": 29924,
       "values": 36,
       "keys": 11,
       "keys_unread": 1,
@@ -68,21 +70,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 941,
-      "tiny": 81
+      "tiny": 81,
+      "property_bytes": 10294
      }
     }
    },
    "z12": {
-    "view_bytes": 53586,
+    "view_bytes": 50704,
     "view_features": 1723,
-    "max_tile_bytes": 53586,
+    "max_tile_bytes": 50704,
     "max_tile_features": 1723,
-    "mlt_view_bytes": 18930,
-    "mlt_max_tile_bytes": 18930,
+    "mlt_view_bytes": 18672,
+    "mlt_max_tile_bytes": 18672,
     "layers": {
      "simple": {
       "features": 1723,
-      "bytes": 53586,
+      "bytes": 50704,
       "values": 42,
       "keys": 11,
       "keys_unread": 1,
@@ -90,21 +93,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1730,
-      "tiny": 169
+      "tiny": 169,
+      "property_bytes": 16841
      }
     }
    },
    "z13": {
-    "view_bytes": 180050,
+    "view_bytes": 169497,
     "view_features": 5796,
-    "max_tile_bytes": 103246,
+    "max_tile_bytes": 97254,
     "max_tile_features": 3322,
-    "mlt_view_bytes": 59861,
-    "mlt_max_tile_bytes": 34430,
+    "mlt_view_bytes": 59472,
+    "mlt_max_tile_bytes": 34202,
     "layers": {
      "simple": {
       "features": 3322,
-      "bytes": 103246,
+      "bytes": 97254,
       "values": 38,
       "keys": 11,
       "keys_unread": 1,
@@ -112,21 +116,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 3100,
-      "tiny": 253
+      "tiny": 253,
+      "property_bytes": 31251
      }
     }
    },
    "z14": {
-    "view_bytes": 273022,
+    "view_bytes": 258694,
     "view_features": 7990,
-    "max_tile_bytes": 170821,
+    "max_tile_bytes": 162039,
     "max_tile_features": 4972,
-    "mlt_view_bytes": 111751,
-    "mlt_max_tile_bytes": 70223,
+    "mlt_view_bytes": 111196,
+    "mlt_max_tile_bytes": 69868,
     "layers": {
      "simple": {
       "features": 4106,
-      "bytes": 130156,
+      "bytes": 122820,
       "values": 41,
       "keys": 13,
       "keys_unread": 1,
@@ -134,11 +139,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2338,
-      "tiny": 140
+      "tiny": 140,
+      "property_bytes": 38355
      },
      "slots": {
       "features": 866,
-      "bytes": 40666,
+      "bytes": 39219,
       "values": 555,
       "keys": 10,
       "keys_unread": 3,
@@ -146,21 +152,22 @@
       "strings": 139,
       "string_bytes": 2898,
       "short_segments": 757,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 14240
      }
     }
    },
    "z15": {
-    "view_bytes": 737776,
+    "view_bytes": 697574,
     "view_features": 22702,
-    "max_tile_bytes": 239903,
+    "max_tile_bytes": 227011,
     "max_tile_features": 7351,
-    "mlt_view_bytes": 278261,
-    "mlt_max_tile_bytes": 91322,
+    "mlt_view_bytes": 276388,
+    "mlt_max_tile_bytes": 90735,
     "layers": {
      "simple": {
       "features": 6556,
-      "bytes": 201873,
+      "bytes": 190353,
       "values": 48,
       "keys": 13,
       "keys_unread": 1,
@@ -168,11 +175,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 914,
-      "tiny": 253
+      "tiny": 253,
+      "property_bytes": 60446
      },
      "slots": {
       "features": 795,
-      "bytes": 38031,
+      "bytes": 36658,
       "values": 590,
       "keys": 10,
       "keys_unread": 3,
@@ -180,7 +188,8 @@
       "strings": 122,
       "string_bytes": 2572,
       "short_segments": 257,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 12563
      }
     }
    },
@@ -217,16 +226,16 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 76663,
+    "view_bytes": 71426,
     "view_features": 2692,
-    "max_tile_bytes": 43480,
+    "max_tile_bytes": 40516,
     "max_tile_features": 1516,
     "mlt_view_bytes": 18884,
-    "mlt_max_tile_bytes": 10275,
+    "mlt_max_tile_bytes": 10270,
     "layers": {
      "simple": {
       "features": 1516,
-      "bytes": 43480,
+      "bytes": 40516,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -234,21 +243,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1196,
-      "tiny": 1155
+      "tiny": 1155,
+      "property_bytes": 13679
      }
     }
    },
    "z10": {
-    "view_bytes": 88454,
+    "view_bytes": 82499,
     "view_features": 3074,
-    "max_tile_bytes": 48449,
+    "max_tile_bytes": 45159,
     "max_tile_features": 1695,
-    "mlt_view_bytes": 22815,
-    "mlt_max_tile_bytes": 12533,
+    "mlt_view_bytes": 22794,
+    "mlt_max_tile_bytes": 12525,
     "layers": {
      "simple": {
       "features": 1695,
-      "bytes": 48449,
+      "bytes": 45159,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -256,21 +266,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 716,
-      "tiny": 578
+      "tiny": 578,
+      "property_bytes": 15135
      }
     }
    },
    "z11": {
-    "view_bytes": 212808,
+    "view_bytes": 198461,
     "view_features": 7288,
-    "max_tile_bytes": 89363,
+    "max_tile_bytes": 83290,
     "max_tile_features": 3070,
-    "mlt_view_bytes": 55306,
-    "mlt_max_tile_bytes": 23233,
+    "mlt_view_bytes": 55272,
+    "mlt_max_tile_bytes": 23216,
     "layers": {
      "simple": {
       "features": 3070,
-      "bytes": 89363,
+      "bytes": 83290,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -278,21 +289,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1249,
-      "tiny": 662
+      "tiny": 662,
+      "property_bytes": 27516
      }
     }
    },
    "z12": {
-    "view_bytes": 258861,
+    "view_bytes": 241684,
     "view_features": 8704,
-    "max_tile_bytes": 133539,
+    "max_tile_bytes": 124616,
     "max_tile_features": 4517,
-    "mlt_view_bytes": 70486,
-    "mlt_max_tile_bytes": 36225,
+    "mlt_view_bytes": 70425,
+    "mlt_max_tile_bytes": 36199,
     "layers": {
      "simple": {
       "features": 4517,
-      "bytes": 133539,
+      "bytes": 124616,
       "values": 19,
       "keys": 11,
       "keys_unread": 1,
@@ -300,21 +312,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1972,
-      "tiny": 188
+      "tiny": 188,
+      "property_bytes": 39944
      }
     }
    },
    "z13": {
-    "view_bytes": 733463,
+    "view_bytes": 686097,
     "view_features": 23783,
-    "max_tile_bytes": 170872,
+    "max_tile_bytes": 159889,
     "max_tile_features": 5512,
-    "mlt_view_bytes": 185211,
+    "mlt_view_bytes": 185166,
     "mlt_max_tile_bytes": 42999,
     "layers": {
      "simple": {
       "features": 5512,
-      "bytes": 170872,
+      "bytes": 159889,
       "values": 22,
       "keys": 11,
       "keys_unread": 1,
@@ -322,21 +335,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1294,
-      "tiny": 252
+      "tiny": 252,
+      "property_bytes": 54379
      }
     }
    },
    "z14": {
-    "view_bytes": 727045,
+    "view_bytes": 683275,
     "view_features": 22027,
-    "max_tile_bytes": 118523,
+    "max_tile_bytes": 111159,
     "max_tile_features": 3709,
-    "mlt_view_bytes": 244017,
+    "mlt_view_bytes": 243922,
     "mlt_max_tile_bytes": 37900,
     "layers": {
      "simple": {
       "features": 3143,
-      "bytes": 95486,
+      "bytes": 89247,
       "values": 24,
       "keys": 13,
       "keys_unread": 1,
@@ -344,11 +358,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 182,
-      "tiny": 46
+      "tiny": 46,
+      "property_bytes": 29244
      },
      "slots": {
       "features": 567,
-      "bytes": 23038,
+      "bytes": 21912,
       "values": 301,
       "keys": 10,
       "keys_unread": 3,
@@ -356,21 +371,22 @@
       "strings": 56,
       "string_bytes": 493,
       "short_segments": 139,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 8436
      }
     }
    },
    "z15": {
-    "view_bytes": 530162,
+    "view_bytes": 498923,
     "view_features": 15615,
-    "max_tile_bytes": 114310,
+    "max_tile_bytes": 107586,
     "max_tile_features": 3398,
-    "mlt_view_bytes": 176276,
+    "mlt_view_bytes": 176035,
     "mlt_max_tile_bytes": 36984,
     "layers": {
      "simple": {
       "features": 3062,
-      "bytes": 99395,
+      "bytes": 93337,
       "values": 21,
       "keys": 13,
       "keys_unread": 1,
@@ -378,11 +394,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 415,
-      "tiny": 269
+      "tiny": 269,
+      "property_bytes": 32630
      },
      "slots": {
       "features": 337,
-      "bytes": 14915,
+      "bytes": 14250,
       "values": 272,
       "keys": 10,
       "keys_unread": 3,
@@ -390,7 +407,8 @@
       "strings": 27,
       "string_bytes": 234,
       "short_segments": 50,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 4742
      }
     }
    },
@@ -427,16 +445,16 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 3863,
+    "view_bytes": 3773,
     "view_features": 113,
-    "max_tile_bytes": 3863,
+    "max_tile_bytes": 3773,
     "max_tile_features": 113,
-    "mlt_view_bytes": 1573,
-    "mlt_max_tile_bytes": 1573,
+    "mlt_view_bytes": 1548,
+    "mlt_max_tile_bytes": 1548,
     "layers": {
      "simple": {
       "features": 113,
-      "bytes": 3863,
+      "bytes": 3773,
       "values": 28,
       "keys": 11,
       "keys_unread": 1,
@@ -444,21 +462,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 169,
-      "tiny": 18
+      "tiny": 18,
+      "property_bytes": 1345
      }
     }
    },
    "z10": {
-    "view_bytes": 10450,
+    "view_bytes": 10018,
     "view_features": 327,
-    "max_tile_bytes": 10450,
+    "max_tile_bytes": 10018,
     "max_tile_features": 327,
-    "mlt_view_bytes": 4018,
-    "mlt_max_tile_bytes": 4018,
+    "mlt_view_bytes": 3906,
+    "mlt_max_tile_bytes": 3906,
     "layers": {
      "simple": {
       "features": 327,
-      "bytes": 10450,
+      "bytes": 10018,
       "values": 32,
       "keys": 11,
       "keys_unread": 1,
@@ -466,21 +485,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 351,
-      "tiny": 49
+      "tiny": 49,
+      "property_bytes": 3550
      }
     }
    },
    "z11": {
-    "view_bytes": 31522,
+    "view_bytes": 29924,
     "view_features": 1014,
-    "max_tile_bytes": 31522,
+    "max_tile_bytes": 29924,
     "max_tile_features": 1014,
-    "mlt_view_bytes": 11166,
-    "mlt_max_tile_bytes": 11166,
+    "mlt_view_bytes": 10946,
+    "mlt_max_tile_bytes": 10946,
     "layers": {
      "simple": {
       "features": 1014,
-      "bytes": 31522,
+      "bytes": 29924,
       "values": 36,
       "keys": 11,
       "keys_unread": 1,
@@ -488,21 +508,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 941,
-      "tiny": 81
+      "tiny": 81,
+      "property_bytes": 10294
      }
     }
    },
    "z12": {
-    "view_bytes": 53586,
+    "view_bytes": 50704,
     "view_features": 1723,
-    "max_tile_bytes": 53586,
+    "max_tile_bytes": 50704,
     "max_tile_features": 1723,
-    "mlt_view_bytes": 18930,
-    "mlt_max_tile_bytes": 18930,
+    "mlt_view_bytes": 18672,
+    "mlt_max_tile_bytes": 18672,
     "layers": {
      "simple": {
       "features": 1723,
-      "bytes": 53586,
+      "bytes": 50704,
       "values": 42,
       "keys": 11,
       "keys_unread": 1,
@@ -510,21 +531,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1730,
-      "tiny": 169
+      "tiny": 169,
+      "property_bytes": 16841
      }
     }
    },
    "z13": {
-    "view_bytes": 180050,
+    "view_bytes": 169497,
     "view_features": 5796,
-    "max_tile_bytes": 103246,
+    "max_tile_bytes": 97254,
     "max_tile_features": 3322,
-    "mlt_view_bytes": 59861,
-    "mlt_max_tile_bytes": 34430,
+    "mlt_view_bytes": 59472,
+    "mlt_max_tile_bytes": 34202,
     "layers": {
      "simple": {
       "features": 3322,
-      "bytes": 103246,
+      "bytes": 97254,
       "values": 38,
       "keys": 11,
       "keys_unread": 1,
@@ -532,21 +554,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 3100,
-      "tiny": 253
+      "tiny": 253,
+      "property_bytes": 31251
      }
     }
    },
    "z14": {
-    "view_bytes": 272287,
+    "view_bytes": 257960,
     "view_features": 7990,
-    "max_tile_bytes": 170291,
+    "max_tile_bytes": 161508,
     "max_tile_features": 4972,
-    "mlt_view_bytes": 111224,
-    "mlt_max_tile_bytes": 69861,
+    "mlt_view_bytes": 110669,
+    "mlt_max_tile_bytes": 69506,
     "layers": {
      "simple": {
       "features": 4106,
-      "bytes": 130156,
+      "bytes": 122820,
       "values": 41,
       "keys": 13,
       "keys_unread": 1,
@@ -554,11 +577,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2338,
-      "tiny": 140
+      "tiny": 140,
+      "property_bytes": 38355
      },
      "slots": {
       "features": 866,
-      "bytes": 40135,
+      "bytes": 38689,
       "values": 555,
       "keys": 9,
       "keys_unread": 3,
@@ -566,21 +590,22 @@
       "strings": 139,
       "string_bytes": 2898,
       "short_segments": 757,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 13719
      }
     }
    },
    "z15": {
-    "view_bytes": 736891,
+    "view_bytes": 696690,
     "view_features": 22702,
-    "max_tile_bytes": 239540,
+    "max_tile_bytes": 226648,
     "max_tile_features": 7351,
-    "mlt_view_bytes": 277605,
-    "mlt_max_tile_bytes": 91072,
+    "mlt_view_bytes": 275732,
+    "mlt_max_tile_bytes": 90485,
     "layers": {
      "simple": {
       "features": 6556,
-      "bytes": 201873,
+      "bytes": 190353,
       "values": 48,
       "keys": 13,
       "keys_unread": 1,
@@ -588,11 +613,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 914,
-      "tiny": 253
+      "tiny": 253,
+      "property_bytes": 60446
      },
      "slots": {
       "features": 795,
-      "bytes": 37668,
+      "bytes": 36295,
       "values": 590,
       "keys": 9,
       "keys_unread": 3,
@@ -600,7 +626,8 @@
       "strings": 122,
       "string_bytes": 2572,
       "short_segments": 257,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 12210
      }
     }
    },
@@ -637,16 +664,16 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 76663,
+    "view_bytes": 71426,
     "view_features": 2692,
-    "max_tile_bytes": 43480,
+    "max_tile_bytes": 40516,
     "max_tile_features": 1516,
     "mlt_view_bytes": 18884,
-    "mlt_max_tile_bytes": 10275,
+    "mlt_max_tile_bytes": 10270,
     "layers": {
      "simple": {
       "features": 1516,
-      "bytes": 43480,
+      "bytes": 40516,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -654,21 +681,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1196,
-      "tiny": 1155
+      "tiny": 1155,
+      "property_bytes": 13679
      }
     }
    },
    "z10": {
-    "view_bytes": 88454,
+    "view_bytes": 82499,
     "view_features": 3074,
-    "max_tile_bytes": 48449,
+    "max_tile_bytes": 45159,
     "max_tile_features": 1695,
-    "mlt_view_bytes": 22815,
-    "mlt_max_tile_bytes": 12533,
+    "mlt_view_bytes": 22794,
+    "mlt_max_tile_bytes": 12525,
     "layers": {
      "simple": {
       "features": 1695,
-      "bytes": 48449,
+      "bytes": 45159,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -676,21 +704,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 716,
-      "tiny": 578
+      "tiny": 578,
+      "property_bytes": 15135
      }
     }
    },
    "z11": {
-    "view_bytes": 212808,
+    "view_bytes": 198461,
     "view_features": 7288,
-    "max_tile_bytes": 89363,
+    "max_tile_bytes": 83290,
     "max_tile_features": 3070,
-    "mlt_view_bytes": 55306,
-    "mlt_max_tile_bytes": 23233,
+    "mlt_view_bytes": 55272,
+    "mlt_max_tile_bytes": 23216,
     "layers": {
      "simple": {
       "features": 3070,
-      "bytes": 89363,
+      "bytes": 83290,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -698,21 +727,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1249,
-      "tiny": 662
+      "tiny": 662,
+      "property_bytes": 27516
      }
     }
    },
    "z12": {
-    "view_bytes": 258861,
+    "view_bytes": 241684,
     "view_features": 8704,
-    "max_tile_bytes": 133539,
+    "max_tile_bytes": 124616,
     "max_tile_features": 4517,
-    "mlt_view_bytes": 70486,
-    "mlt_max_tile_bytes": 36225,
+    "mlt_view_bytes": 70425,
+    "mlt_max_tile_bytes": 36199,
     "layers": {
      "simple": {
       "features": 4517,
-      "bytes": 133539,
+      "bytes": 124616,
       "values": 19,
       "keys": 11,
       "keys_unread": 1,
@@ -720,21 +750,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1972,
-      "tiny": 188
+      "tiny": 188,
+      "property_bytes": 39944
      }
     }
    },
    "z13": {
-    "view_bytes": 733463,
+    "view_bytes": 686097,
     "view_features": 23783,
-    "max_tile_bytes": 170872,
+    "max_tile_bytes": 159889,
     "max_tile_features": 5512,
-    "mlt_view_bytes": 185211,
+    "mlt_view_bytes": 185166,
     "mlt_max_tile_bytes": 42999,
     "layers": {
      "simple": {
       "features": 5512,
-      "bytes": 170872,
+      "bytes": 159889,
       "values": 22,
       "keys": 11,
       "keys_unread": 1,
@@ -742,21 +773,22 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1294,
-      "tiny": 252
+      "tiny": 252,
+      "property_bytes": 54379
      }
     }
    },
    "z14": {
-    "view_bytes": 726110,
+    "view_bytes": 682340,
     "view_features": 22027,
-    "max_tile_bytes": 118342,
+    "max_tile_bytes": 110978,
     "max_tile_features": 3709,
-    "mlt_view_bytes": 243162,
+    "mlt_view_bytes": 243068,
     "mlt_max_tile_bytes": 37742,
     "layers": {
      "simple": {
       "features": 3143,
-      "bytes": 95486,
+      "bytes": 89247,
       "values": 24,
       "keys": 13,
       "keys_unread": 1,
@@ -764,11 +796,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 182,
-      "tiny": 46
+      "tiny": 46,
+      "property_bytes": 29244
      },
      "slots": {
       "features": 567,
-      "bytes": 22857,
+      "bytes": 21731,
       "values": 301,
       "keys": 9,
       "keys_unread": 3,
@@ -776,21 +809,22 @@
       "strings": 56,
       "string_bytes": 493,
       "short_segments": 139,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 8265
      }
     }
    },
    "z15": {
-    "view_bytes": 529919,
+    "view_bytes": 498681,
     "view_features": 15615,
-    "max_tile_bytes": 114206,
+    "max_tile_bytes": 107482,
     "max_tile_features": 3398,
-    "mlt_view_bytes": 175983,
+    "mlt_view_bytes": 175742,
     "mlt_max_tile_bytes": 36906,
     "layers": {
      "simple": {
       "features": 3062,
-      "bytes": 99395,
+      "bytes": 93337,
       "values": 21,
       "keys": 13,
       "keys_unread": 1,
@@ -798,11 +832,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 415,
-      "tiny": 269
+      "tiny": 269,
+      "property_bytes": 32630
      },
      "slots": {
       "features": 337,
-      "bytes": 14811,
+      "bytes": 14146,
       "values": 271,
       "keys": 9,
       "keys_unread": 3,
@@ -810,7 +845,8 @@
       "strings": 27,
       "string_bytes": 234,
       "short_segments": 50,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 4653
      }
     }
    },
@@ -847,12 +883,12 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 9580,
+    "view_bytes": 9491,
     "view_features": 293,
-    "max_tile_bytes": 9580,
+    "max_tile_bytes": 9491,
     "max_tile_features": 293,
-    "mlt_view_bytes": 5081,
-    "mlt_max_tile_bytes": 5081,
+    "mlt_view_bytes": 5056,
+    "mlt_max_tile_bytes": 5056,
     "layers": {
      "ov0": {
       "features": 110,
@@ -864,7 +900,8 @@
       "strings": 29,
       "string_bytes": 280,
       "short_segments": 588,
-      "tiny": 57
+      "tiny": 57,
+      "property_bytes": 437
      },
      "ov1": {
       "features": 2,
@@ -876,7 +913,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 37,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov11": {
       "features": 3,
@@ -888,7 +926,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 4,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov2": {
       "features": 8,
@@ -900,7 +939,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 16,
-      "tiny": 8
+      "tiny": 8,
+      "property_bytes": 15
      },
      "ov3": {
       "features": 2,
@@ -912,7 +952,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 3,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov4": {
       "features": 31,
@@ -924,7 +965,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 97,
-      "tiny": 20
+      "tiny": 20,
+      "property_bytes": 62
      },
      "ov6": {
       "features": 7,
@@ -936,7 +978,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 15,
-      "tiny": 5
+      "tiny": 5,
+      "property_bytes": 13
      },
      "ov7": {
       "features": 13,
@@ -948,7 +991,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 31,
-      "tiny": 10
+      "tiny": 10,
+      "property_bytes": 25
      },
      "ov8": {
       "features": 12,
@@ -960,11 +1004,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 12,
-      "tiny": 5
+      "tiny": 5,
+      "property_bytes": 23
      },
      "simple": {
       "features": 113,
-      "bytes": 3863,
+      "bytes": 3773,
       "values": 28,
       "keys": 11,
       "keys_unread": 1,
@@ -972,17 +1017,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 169,
-      "tiny": 18
+      "tiny": 18,
+      "property_bytes": 1345
      }
     }
    },
    "z10": {
-    "view_bytes": 19899,
+    "view_bytes": 19466,
     "view_features": 616,
-    "max_tile_bytes": 19899,
+    "max_tile_bytes": 19466,
     "max_tile_features": 616,
-    "mlt_view_bytes": 9911,
-    "mlt_max_tile_bytes": 9911,
+    "mlt_view_bytes": 9799,
+    "mlt_max_tile_bytes": 9799,
     "layers": {
      "ov0": {
       "features": 168,
@@ -994,7 +1040,8 @@
       "strings": 31,
       "string_bytes": 295,
       "short_segments": 958,
-      "tiny": 84
+      "tiny": 84,
+      "property_bytes": 670
      },
      "ov1": {
       "features": 2,
@@ -1006,7 +1053,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 48,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov11": {
       "features": 3,
@@ -1018,7 +1066,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 5,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov2": {
       "features": 27,
@@ -1030,7 +1079,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 76,
-      "tiny": 23
+      "tiny": 23,
+      "property_bytes": 54
      },
      "ov3": {
       "features": 3,
@@ -1042,7 +1092,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 6,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov4": {
       "features": 50,
@@ -1054,7 +1105,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 203,
-      "tiny": 27
+      "tiny": 27,
+      "property_bytes": 100
      },
      "ov6": {
       "features": 8,
@@ -1066,7 +1118,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 22,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 15
      },
      "ov7": {
       "features": 22,
@@ -1078,7 +1131,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 60,
-      "tiny": 13
+      "tiny": 13,
+      "property_bytes": 43
      },
      "ov8": {
       "features": 12,
@@ -1090,11 +1144,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 4,
-      "tiny": 3
+      "tiny": 3,
+      "property_bytes": 23
      },
      "simple": {
       "features": 327,
-      "bytes": 10450,
+      "bytes": 10018,
       "values": 32,
       "keys": 11,
       "keys_unread": 1,
@@ -1102,17 +1157,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 351,
-      "tiny": 49
+      "tiny": 49,
+      "property_bytes": 3550
      }
     }
    },
    "z11": {
-    "view_bytes": 45545,
+    "view_bytes": 43947,
     "view_features": 1426,
-    "max_tile_bytes": 45545,
+    "max_tile_bytes": 43947,
     "max_tile_features": 1426,
-    "mlt_view_bytes": 20032,
-    "mlt_max_tile_bytes": 20032,
+    "mlt_view_bytes": 19812,
+    "mlt_max_tile_bytes": 19812,
     "layers": {
      "ov0": {
       "features": 216,
@@ -1124,7 +1180,8 @@
       "strings": 32,
       "string_bytes": 305,
       "short_segments": 1222,
-      "tiny": 67
+      "tiny": 67,
+      "property_bytes": 861
      },
      "ov1": {
       "features": 2,
@@ -1136,7 +1193,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 57,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov11": {
       "features": 3,
@@ -1148,7 +1206,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 9,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov2": {
       "features": 72,
@@ -1160,7 +1219,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 237,
-      "tiny": 59
+      "tiny": 59,
+      "property_bytes": 143
      },
      "ov3": {
       "features": 4,
@@ -1172,7 +1232,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 6,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 7
      },
      "ov4": {
       "features": 70,
@@ -1184,7 +1245,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 300,
-      "tiny": 27
+      "tiny": 27,
+      "property_bytes": 139
      },
      "ov6": {
       "features": 11,
@@ -1196,7 +1258,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 24,
-      "tiny": 4
+      "tiny": 4,
+      "property_bytes": 21
      },
      "ov7": {
       "features": 29,
@@ -1208,7 +1271,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 85,
-      "tiny": 13
+      "tiny": 13,
+      "property_bytes": 58
      },
      "ov8": {
       "features": 12,
@@ -1220,11 +1284,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 4,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 23
      },
      "simple": {
       "features": 1014,
-      "bytes": 31522,
+      "bytes": 29924,
       "values": 36,
       "keys": 11,
       "keys_unread": 1,
@@ -1232,17 +1297,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 941,
-      "tiny": 81
+      "tiny": 81,
+      "property_bytes": 10294
      }
     }
    },
    "z12": {
-    "view_bytes": 71417,
+    "view_bytes": 68534,
     "view_features": 2202,
-    "max_tile_bytes": 71417,
+    "max_tile_bytes": 68534,
     "max_tile_features": 2202,
-    "mlt_view_bytes": 30783,
-    "mlt_max_tile_bytes": 30783,
+    "mlt_view_bytes": 30525,
+    "mlt_max_tile_bytes": 30525,
     "layers": {
      "ov0": {
       "features": 243,
@@ -1254,7 +1320,8 @@
       "strings": 32,
       "string_bytes": 305,
       "short_segments": 1362,
-      "tiny": 40
+      "tiny": 40,
+      "property_bytes": 972
      },
      "ov1": {
       "features": 2,
@@ -1266,7 +1333,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 64,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov11": {
       "features": 6,
@@ -1278,7 +1346,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 15,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 11
      },
      "ov15": {
       "features": 2,
@@ -1290,7 +1359,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov2": {
       "features": 86,
@@ -1302,7 +1372,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 338,
-      "tiny": 44
+      "tiny": 44,
+      "property_bytes": 172
      },
      "ov3": {
       "features": 5,
@@ -1314,7 +1385,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 3,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 9
      },
      "ov4": {
       "features": 83,
@@ -1326,7 +1398,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 371,
-      "tiny": 13
+      "tiny": 13,
+      "property_bytes": 166
      },
      "ov6": {
       "features": 11,
@@ -1338,7 +1411,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 25,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 21
      },
      "ov7": {
       "features": 35,
@@ -1350,7 +1424,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 109,
-      "tiny": 12
+      "tiny": 12,
+      "property_bytes": 70
      },
      "ov8": {
       "features": 12,
@@ -1362,11 +1437,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 3,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 23
      },
      "simple": {
       "features": 1723,
-      "bytes": 53586,
+      "bytes": 50704,
       "values": 42,
       "keys": 11,
       "keys_unread": 1,
@@ -1374,17 +1450,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1730,
-      "tiny": 169
+      "tiny": 169,
+      "property_bytes": 16841
      }
     }
    },
    "z13": {
-    "view_bytes": 203858,
+    "view_bytes": 193305,
     "view_features": 6375,
-    "max_tile_bytes": 116381,
+    "max_tile_bytes": 110390,
     "max_tile_features": 3632,
-    "mlt_view_bytes": 77271,
-    "mlt_max_tile_bytes": 43997,
+    "mlt_view_bytes": 76881,
+    "mlt_max_tile_bytes": 43770,
     "layers": {
      "ov0": {
       "features": 164,
@@ -1396,7 +1473,8 @@
       "strings": 27,
       "string_bytes": 257,
       "short_segments": 742,
-      "tiny": 17
+      "tiny": 17,
+      "property_bytes": 653
      },
      "ov1": {
       "features": 2,
@@ -1408,7 +1486,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 35,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov11": {
       "features": 15,
@@ -1420,7 +1499,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 28,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 29
      },
      "ov15": {
       "features": 2,
@@ -1432,7 +1512,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov2": {
       "features": 46,
@@ -1444,7 +1525,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 187,
-      "tiny": 11
+      "tiny": 11,
+      "property_bytes": 92
      },
      "ov3": {
       "features": 5,
@@ -1456,7 +1538,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 9
      },
      "ov4": {
       "features": 66,
@@ -1468,7 +1551,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 269,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 131
      },
      "ov6": {
       "features": 8,
@@ -1480,7 +1564,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 31,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 15
      },
      "ov7": {
       "features": 24,
@@ -1492,7 +1577,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 43,
-      "tiny": 6
+      "tiny": 6,
+      "property_bytes": 47
      },
      "ov8": {
       "features": 11,
@@ -1504,11 +1590,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 21
      },
      "simple": {
       "features": 3322,
-      "bytes": 103246,
+      "bytes": 97254,
       "values": 38,
       "keys": 11,
       "keys_unread": 1,
@@ -1516,17 +1603,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 3100,
-      "tiny": 253
+      "tiny": 253,
+      "property_bytes": 31251
      }
     }
    },
    "z14": {
-    "view_bytes": 238546,
+    "view_bytes": 226434,
     "view_features": 7272,
-    "max_tile_bytes": 144724,
+    "max_tile_bytes": 137388,
     "max_tile_features": 4413,
-    "mlt_view_bytes": 93282,
-    "mlt_max_tile_bytes": 55994,
+    "mlt_view_bytes": 92764,
+    "mlt_max_tile_bytes": 55654,
     "layers": {
      "ov0": {
       "features": 164,
@@ -1538,7 +1626,8 @@
       "strings": 27,
       "string_bytes": 257,
       "short_segments": 432,
-      "tiny": 5
+      "tiny": 5,
+      "property_bytes": 653
      },
      "ov1": {
       "features": 2,
@@ -1550,7 +1639,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 11,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov11": {
       "features": 15,
@@ -1562,7 +1652,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 23,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 29
      },
      "ov15": {
       "features": 2,
@@ -1574,7 +1665,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov2": {
       "features": 46,
@@ -1586,7 +1678,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 137,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 92
      },
      "ov3": {
       "features": 5,
@@ -1598,7 +1691,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 9
      },
      "ov4": {
       "features": 66,
@@ -1610,7 +1704,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 160,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 131
      },
      "ov6": {
       "features": 8,
@@ -1622,7 +1717,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 21,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 15
      },
      "ov7": {
       "features": 24,
@@ -1634,7 +1730,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 46,
-      "tiny": 3
+      "tiny": 3,
+      "property_bytes": 47
      },
      "ov8": {
       "features": 10,
@@ -1646,11 +1743,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 19
      },
      "simple": {
       "features": 4106,
-      "bytes": 130156,
+      "bytes": 122820,
       "values": 41,
       "keys": 13,
       "keys_unread": 1,
@@ -1658,17 +1756,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2338,
-      "tiny": 140
+      "tiny": 140,
+      "property_bytes": 38355
      }
     }
    },
    "z15": {
-    "view_bytes": 790607,
+    "view_bytes": 752908,
     "view_features": 23824,
-    "max_tile_bytes": 251622,
+    "max_tile_bytes": 239731,
     "max_tile_features": 7761,
-    "mlt_view_bytes": 326135,
-    "mlt_max_tile_bytes": 101112,
+    "mlt_view_bytes": 324229,
+    "mlt_max_tile_bytes": 100489,
     "layers": {
      "ov0": {
       "features": 86,
@@ -1680,7 +1779,8 @@
       "strings": 18,
       "string_bytes": 162,
       "short_segments": 250,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 343
      },
      "ov1": {
       "features": 2,
@@ -1692,7 +1792,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 17,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov10": {
       "features": 20,
@@ -1704,7 +1805,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 39
      },
      "ov11": {
       "features": 10,
@@ -1716,7 +1818,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 18,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 19
      },
      "ov12": {
       "features": 10,
@@ -1728,7 +1831,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 56
      },
      "ov13": {
       "features": 191,
@@ -1740,7 +1844,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 1581
      },
      "ov14": {
       "features": 38,
@@ -1752,7 +1857,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 76
      },
      "ov15": {
       "features": 2,
@@ -1764,7 +1870,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov16": {
       "features": 13,
@@ -1776,7 +1883,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 25
      },
      "ov2": {
       "features": 34,
@@ -1788,7 +1896,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 100,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 68
      },
      "ov3": {
       "features": 5,
@@ -1800,7 +1909,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 9
      },
      "ov4": {
       "features": 32,
@@ -1812,7 +1922,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 79,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 64
      },
      "ov5": {
       "features": 542,
@@ -1824,7 +1935,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 392,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3250
      },
      "ov6": {
       "features": 8,
@@ -1836,7 +1948,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 6,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 15
      },
      "ov7": {
       "features": 9,
@@ -1848,7 +1961,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 30,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 17
      },
      "ov8": {
       "features": 9,
@@ -1860,7 +1974,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 17
      },
      "ov9": {
       "features": 20,
@@ -1872,11 +1987,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 39
      },
      "simple": {
       "features": 6802,
-      "bytes": 211703,
+      "bytes": 199811,
       "values": 48,
       "keys": 13,
       "keys_unread": 1,
@@ -1884,7 +2000,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1514,
-      "tiny": 499
+      "tiny": 499,
+      "property_bytes": 63098
      }
     }
    },
@@ -1934,9 +2051,9 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 171892,
+    "view_bytes": 166655,
     "view_features": 6004,
-    "max_tile_bytes": 90257,
+    "max_tile_bytes": 87293,
     "max_tile_features": 3173,
     "mlt_view_bytes": 70530,
     "mlt_max_tile_bytes": 35770,
@@ -1951,7 +2068,8 @@
       "strings": 42,
       "string_bytes": 439,
       "short_segments": 5049,
-      "tiny": 877
+      "tiny": 877,
+      "property_bytes": 5606
      },
      "ov1": {
       "features": 58,
@@ -1963,7 +2081,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 219,
-      "tiny": 41
+      "tiny": 41,
+      "property_bytes": 115
      },
      "ov2": {
       "features": 148,
@@ -1975,7 +2094,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 244,
-      "tiny": 56
+      "tiny": 56,
+      "property_bytes": 296
      },
      "ov3": {
       "features": 37,
@@ -1987,7 +2107,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 174,
-      "tiny": 19
+      "tiny": 19,
+      "property_bytes": 74
      },
      "ov5": {
       "features": 2,
@@ -1999,7 +2120,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 14,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov6": {
       "features": 101,
@@ -2011,7 +2133,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 201,
-      "tiny": 54
+      "tiny": 54,
+      "property_bytes": 202
      },
      "ov7": {
       "features": 110,
@@ -2023,11 +2146,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 60,
-      "tiny": 41
+      "tiny": 41,
+      "property_bytes": 219
      },
      "simple": {
       "features": 1516,
-      "bytes": 43480,
+      "bytes": 40516,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -2035,17 +2159,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1196,
-      "tiny": 1155
+      "tiny": 1155,
+      "property_bytes": 13679
      }
     }
    },
    "z10": {
-    "view_bytes": 214177,
+    "view_bytes": 208222,
     "view_features": 7135,
-    "max_tile_bytes": 109722,
+    "max_tile_bytes": 106431,
     "max_tile_features": 3615,
-    "mlt_view_bytes": 95776,
-    "mlt_max_tile_bytes": 49224,
+    "mlt_view_bytes": 95756,
+    "mlt_max_tile_bytes": 49215,
     "layers": {
      "ov0": {
       "features": 1829,
@@ -2057,7 +2182,8 @@
       "strings": 44,
       "string_bytes": 456,
       "short_segments": 7070,
-      "tiny": 704
+      "tiny": 704,
+      "property_bytes": 7316
      },
      "ov1": {
       "features": 84,
@@ -2069,7 +2195,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 373,
-      "tiny": 47
+      "tiny": 47,
+      "property_bytes": 168
      },
      "ov11": {
       "features": 3,
@@ -2081,7 +2208,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 4,
-      "tiny": 2
+      "tiny": 2,
+      "property_bytes": 5
      },
      "ov2": {
       "features": 138,
@@ -2093,7 +2221,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 254,
-      "tiny": 35
+      "tiny": 35,
+      "property_bytes": 276
      },
      "ov3": {
       "features": 60,
@@ -2105,7 +2234,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 281,
-      "tiny": 23
+      "tiny": 23,
+      "property_bytes": 119
      },
      "ov5": {
       "features": 2,
@@ -2117,7 +2247,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 16,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov6": {
       "features": 112,
@@ -2129,7 +2260,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 186,
-      "tiny": 42
+      "tiny": 42,
+      "property_bytes": 223
      },
      "ov7": {
       "features": 124,
@@ -2141,11 +2273,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 32,
-      "tiny": 23
+      "tiny": 23,
+      "property_bytes": 247
      },
      "simple": {
       "features": 1695,
-      "bytes": 48449,
+      "bytes": 45159,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -2153,16 +2286,17 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 716,
-      "tiny": 578
+      "tiny": 578,
+      "property_bytes": 15135
      }
     }
    },
    "z11": {
-    "view_bytes": 375480,
+    "view_bytes": 361133,
     "view_features": 12101,
-    "max_tile_bytes": 154455,
+    "max_tile_bytes": 148382,
     "max_tile_features": 4982,
-    "mlt_view_bytes": 156074,
+    "mlt_view_bytes": 156040,
     "mlt_max_tile_bytes": 64041,
     "layers": {
      "ov0": {
@@ -2175,7 +2309,8 @@
       "strings": 43,
       "string_bytes": 444,
       "short_segments": 8276,
-      "tiny": 415
+      "tiny": 415,
+      "property_bytes": 7810
      },
      "ov1": {
       "features": 48,
@@ -2187,7 +2322,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 274,
-      "tiny": 13
+      "tiny": 13,
+      "property_bytes": 96
      },
      "ov11": {
       "features": 4,
@@ -2199,7 +2335,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 14,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 7
      },
      "ov2": {
       "features": 148,
@@ -2211,7 +2348,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 229,
-      "tiny": 41
+      "tiny": 41,
+      "property_bytes": 296
      },
      "ov3": {
       "features": 88,
@@ -2223,7 +2361,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 393,
-      "tiny": 23
+      "tiny": 23,
+      "property_bytes": 176
      },
      "ov5": {
       "features": 2,
@@ -2235,7 +2374,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 17,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov6": {
       "features": 97,
@@ -2247,7 +2387,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 199,
-      "tiny": 17
+      "tiny": 17,
+      "property_bytes": 194
      },
      "ov7": {
       "features": 127,
@@ -2259,11 +2400,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 14,
-      "tiny": 7
+      "tiny": 7,
+      "property_bytes": 253
      },
      "simple": {
       "features": 3070,
-      "bytes": 89363,
+      "bytes": 83290,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
@@ -2271,17 +2413,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1249,
-      "tiny": 662
+      "tiny": 662,
+      "property_bytes": 27516
      }
     }
    },
    "z12": {
-    "view_bytes": 451980,
+    "view_bytes": 434803,
     "view_features": 13931,
-    "max_tile_bytes": 208573,
+    "max_tile_bytes": 199650,
     "max_tile_features": 6544,
-    "mlt_view_bytes": 196702,
-    "mlt_max_tile_bytes": 85299,
+    "mlt_view_bytes": 196642,
+    "mlt_max_tile_bytes": 85274,
     "layers": {
      "ov0": {
       "features": 2151,
@@ -2293,7 +2436,8 @@
       "strings": 43,
       "string_bytes": 444,
       "short_segments": 9132,
-      "tiny": 211
+      "tiny": 211,
+      "property_bytes": 8601
      },
      "ov1": {
       "features": 48,
@@ -2305,7 +2449,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 298,
-      "tiny": 5
+      "tiny": 5,
+      "property_bytes": 96
      },
      "ov11": {
       "features": 4,
@@ -2317,7 +2462,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 20,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 7
      },
      "ov15": {
       "features": 4,
@@ -2329,7 +2475,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 7
      },
      "ov2": {
       "features": 149,
@@ -2341,7 +2488,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 183,
-      "tiny": 22
+      "tiny": 22,
+      "property_bytes": 298
      },
      "ov3": {
       "features": 102,
@@ -2353,7 +2501,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 500,
-      "tiny": 22
+      "tiny": 22,
+      "property_bytes": 204
      },
      "ov5": {
       "features": 2,
@@ -2365,7 +2514,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 4,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov6": {
       "features": 100,
@@ -2377,7 +2527,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 202,
-      "tiny": 9
+      "tiny": 9,
+      "property_bytes": 200
      },
      "ov7": {
       "features": 130,
@@ -2389,11 +2540,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 7,
-      "tiny": 5
+      "tiny": 5,
+      "property_bytes": 260
      },
      "simple": {
       "features": 4517,
-      "bytes": 133539,
+      "bytes": 124616,
       "values": 19,
       "keys": 11,
       "keys_unread": 1,
@@ -2401,16 +2553,17 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1972,
-      "tiny": 188
+      "tiny": 188,
+      "property_bytes": 39944
      }
     }
    },
    "z13": {
-    "view_bytes": 930987,
+    "view_bytes": 883621,
     "view_features": 28644,
-    "max_tile_bytes": 218275,
+    "max_tile_bytes": 207292,
     "max_tile_features": 6776,
-    "mlt_view_bytes": 320443,
+    "mlt_view_bytes": 320398,
     "mlt_max_tile_bytes": 74117,
     "layers": {
      "ov0": {
@@ -2423,7 +2576,8 @@
       "strings": 38,
       "string_bytes": 400,
       "short_segments": 4987,
-      "tiny": 53
+      "tiny": 53,
+      "property_bytes": 4586
      },
      "ov1": {
       "features": 23,
@@ -2435,7 +2589,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 115,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 45
      },
      "ov11": {
       "features": 4,
@@ -2447,7 +2602,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 14,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 7
      },
      "ov15": {
       "features": 4,
@@ -2459,7 +2615,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 7
      },
      "ov2": {
       "features": 95,
@@ -2471,7 +2628,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 42,
-      "tiny": 3
+      "tiny": 3,
+      "property_bytes": 190
      },
      "ov3": {
       "features": 56,
@@ -2483,7 +2641,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 399,
-      "tiny": 3
+      "tiny": 3,
+      "property_bytes": 111
      },
      "ov5": {
       "features": 2,
@@ -2495,7 +2654,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov6": {
       "features": 53,
@@ -2507,7 +2667,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 171,
-      "tiny": 5
+      "tiny": 5,
+      "property_bytes": 105
      },
      "ov7": {
       "features": 120,
@@ -2519,11 +2680,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 6,
-      "tiny": 3
+      "tiny": 3,
+      "property_bytes": 239
      },
      "simple": {
       "features": 5512,
-      "bytes": 170872,
+      "bytes": 159889,
       "values": 22,
       "keys": 11,
       "keys_unread": 1,
@@ -2531,16 +2693,17 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1294,
-      "tiny": 252
+      "tiny": 252,
+      "property_bytes": 54379
      }
     }
    },
    "z14": {
-    "view_bytes": 670318,
+    "view_bytes": 633894,
     "view_features": 20509,
-    "max_tile_bytes": 116222,
+    "max_tile_bytes": 111096,
     "max_tile_features": 3504,
-    "mlt_view_bytes": 223345,
+    "mlt_view_bytes": 223292,
     "mlt_max_tile_bytes": 45750,
     "layers": {
      "ov0": {
@@ -2553,7 +2716,8 @@
       "strings": 26,
       "string_bytes": 257,
       "short_segments": 1501,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 2893
      },
      "ov1": {
       "features": 6,
@@ -2565,7 +2729,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 15,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 11
      },
      "ov11": {
       "features": 3,
@@ -2577,7 +2742,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov15": {
       "features": 3,
@@ -2589,7 +2755,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov2": {
       "features": 9,
@@ -2601,7 +2768,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 5,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 17
      },
      "ov3": {
       "features": 23,
@@ -2613,7 +2781,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 146,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 45
      },
      "ov5": {
       "features": 2,
@@ -2625,7 +2794,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov6": {
       "features": 21,
@@ -2637,7 +2807,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 158,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 41
      },
      "ov7": {
       "features": 115,
@@ -2649,11 +2820,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 229
      },
      "simple": {
       "features": 3143,
-      "bytes": 95486,
+      "bytes": 89247,
       "values": 24,
       "keys": 13,
       "keys_unread": 1,
@@ -2661,17 +2833,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 182,
-      "tiny": 46
+      "tiny": 46,
+      "property_bytes": 29244
      }
     }
    },
    "z15": {
-    "view_bytes": 699239,
+    "view_bytes": 670728,
     "view_features": 19624,
-    "max_tile_bytes": 141415,
+    "max_tile_bytes": 134993,
     "max_tile_features": 4009,
-    "mlt_view_bytes": 313367,
-    "mlt_max_tile_bytes": 57171,
+    "mlt_view_bytes": 313244,
+    "mlt_max_tile_bytes": 57170,
     "layers": {
      "ov0": {
       "features": 190,
@@ -2683,7 +2856,8 @@
       "strings": 15,
       "string_bytes": 138,
       "short_segments": 606,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 759
      },
      "ov1": {
       "features": 3,
@@ -2695,7 +2869,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 26,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov12": {
       "features": 14,
@@ -2707,7 +2882,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 80
      },
      "ov13": {
       "features": 40,
@@ -2719,7 +2895,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 319
      },
      "ov14": {
       "features": 10,
@@ -2731,7 +2908,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 19
      },
      "ov15": {
       "features": 3,
@@ -2743,7 +2921,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 5
      },
      "ov16": {
       "features": 4,
@@ -2755,7 +2934,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 7
      },
      "ov3": {
       "features": 2,
@@ -2767,7 +2947,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov4": {
       "features": 713,
@@ -2779,7 +2960,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 297,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 4278
      },
      "ov5": {
       "features": 2,
@@ -2791,7 +2973,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 3
      },
      "ov6": {
       "features": 4,
@@ -2803,7 +2986,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 7
      },
      "ov7": {
       "features": 55,
@@ -2815,7 +2999,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 109
      },
      "ov8": {
       "features": 48,
@@ -2827,7 +3012,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 58,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 96
      },
      "ov9": {
       "features": 40,
@@ -2839,11 +3025,12 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1,
-      "tiny": 1
+      "tiny": 1,
+      "property_bytes": 80
      },
      "simple": {
       "features": 3243,
-      "bytes": 106306,
+      "bytes": 99884,
       "values": 21,
       "keys": 13,
       "keys_unread": 1,
@@ -2851,7 +3038,8 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 701,
-      "tiny": 450
+      "tiny": 450,
+      "property_bytes": 35158
      }
     }
    },
@@ -5347,6 +5535,200 @@
     "tartu-base.style.expressions.roads-simple-dash.paint.line-offset: new, 3033",
     "tartu-base.style.expressions.roads-simple.paint.line-width: 4513 -> 14872",
     "tartu-base.style.expressions.roads-simple.paint.line-offset: new, 3033"
+   ]
+  },
+  {
+   "date": "2026-10-30",
+   "why": "New limit property_bytes (the bytes of the feature properties of the largest tile of a layer); it had no limit before. Not a raise of an existing limit.",
+   "changes": [
+    "monaco.z9.layers.simple.property_bytes: new, 1345",
+    "monaco.z10.layers.simple.property_bytes: new, 3550",
+    "monaco.z11.layers.simple.property_bytes: new, 10294",
+    "monaco.z12.layers.simple.property_bytes: new, 16841",
+    "monaco.z13.layers.simple.property_bytes: new, 31251",
+    "monaco.z14.layers.simple.property_bytes: new, 38355",
+    "monaco.z14.layers.slots.property_bytes: new, 13719",
+    "monaco.z15.layers.simple.property_bytes: new, 60446",
+    "monaco.z15.layers.slots.property_bytes: new, 12210",
+    "monaco-full.z9.layers.simple.property_bytes: new, 1345",
+    "monaco-full.z10.layers.simple.property_bytes: new, 3550",
+    "monaco-full.z11.layers.simple.property_bytes: new, 10294",
+    "monaco-full.z12.layers.simple.property_bytes: new, 16841",
+    "monaco-full.z13.layers.simple.property_bytes: new, 31251",
+    "monaco-full.z14.layers.simple.property_bytes: new, 38355",
+    "monaco-full.z14.layers.slots.property_bytes: new, 14240",
+    "monaco-full.z15.layers.simple.property_bytes: new, 60446",
+    "monaco-full.z15.layers.slots.property_bytes: new, 12563",
+    "monaco-base.z9.layers.ov0.property_bytes: new, 437",
+    "monaco-base.z9.layers.ov1.property_bytes: new, 3",
+    "monaco-base.z9.layers.ov11.property_bytes: new, 5",
+    "monaco-base.z9.layers.ov2.property_bytes: new, 15",
+    "monaco-base.z9.layers.ov3.property_bytes: new, 3",
+    "monaco-base.z9.layers.ov4.property_bytes: new, 62",
+    "monaco-base.z9.layers.ov6.property_bytes: new, 13",
+    "monaco-base.z9.layers.ov7.property_bytes: new, 25",
+    "monaco-base.z9.layers.ov8.property_bytes: new, 23",
+    "monaco-base.z9.layers.simple.property_bytes: new, 1345",
+    "monaco-base.z10.layers.ov0.property_bytes: new, 670",
+    "monaco-base.z10.layers.ov1.property_bytes: new, 3",
+    "monaco-base.z10.layers.ov11.property_bytes: new, 5",
+    "monaco-base.z10.layers.ov2.property_bytes: new, 54",
+    "monaco-base.z10.layers.ov3.property_bytes: new, 5",
+    "monaco-base.z10.layers.ov4.property_bytes: new, 100",
+    "monaco-base.z10.layers.ov6.property_bytes: new, 15",
+    "monaco-base.z10.layers.ov7.property_bytes: new, 43",
+    "monaco-base.z10.layers.ov8.property_bytes: new, 23",
+    "monaco-base.z10.layers.simple.property_bytes: new, 3550",
+    "monaco-base.z11.layers.ov0.property_bytes: new, 861",
+    "monaco-base.z11.layers.ov1.property_bytes: new, 3",
+    "monaco-base.z11.layers.ov11.property_bytes: new, 5",
+    "monaco-base.z11.layers.ov2.property_bytes: new, 143",
+    "monaco-base.z11.layers.ov3.property_bytes: new, 7",
+    "monaco-base.z11.layers.ov4.property_bytes: new, 139",
+    "monaco-base.z11.layers.ov6.property_bytes: new, 21",
+    "monaco-base.z11.layers.ov7.property_bytes: new, 58",
+    "monaco-base.z11.layers.ov8.property_bytes: new, 23",
+    "monaco-base.z11.layers.simple.property_bytes: new, 10294",
+    "monaco-base.z12.layers.ov0.property_bytes: new, 972",
+    "monaco-base.z12.layers.ov1.property_bytes: new, 3",
+    "monaco-base.z12.layers.ov11.property_bytes: new, 11",
+    "monaco-base.z12.layers.ov15.property_bytes: new, 3",
+    "monaco-base.z12.layers.ov2.property_bytes: new, 172",
+    "monaco-base.z12.layers.ov3.property_bytes: new, 9",
+    "monaco-base.z12.layers.ov4.property_bytes: new, 166",
+    "monaco-base.z12.layers.ov6.property_bytes: new, 21",
+    "monaco-base.z12.layers.ov7.property_bytes: new, 70",
+    "monaco-base.z12.layers.ov8.property_bytes: new, 23",
+    "monaco-base.z12.layers.simple.property_bytes: new, 16841",
+    "monaco-base.z13.layers.ov0.property_bytes: new, 653",
+    "monaco-base.z13.layers.ov1.property_bytes: new, 3",
+    "monaco-base.z13.layers.ov11.property_bytes: new, 29",
+    "monaco-base.z13.layers.ov15.property_bytes: new, 3",
+    "monaco-base.z13.layers.ov2.property_bytes: new, 92",
+    "monaco-base.z13.layers.ov3.property_bytes: new, 9",
+    "monaco-base.z13.layers.ov4.property_bytes: new, 131",
+    "monaco-base.z13.layers.ov6.property_bytes: new, 15",
+    "monaco-base.z13.layers.ov7.property_bytes: new, 47",
+    "monaco-base.z13.layers.ov8.property_bytes: new, 21",
+    "monaco-base.z13.layers.simple.property_bytes: new, 31251",
+    "monaco-base.z14.layers.ov0.property_bytes: new, 653",
+    "monaco-base.z14.layers.ov1.property_bytes: new, 3",
+    "monaco-base.z14.layers.ov11.property_bytes: new, 29",
+    "monaco-base.z14.layers.ov15.property_bytes: new, 3",
+    "monaco-base.z14.layers.ov2.property_bytes: new, 92",
+    "monaco-base.z14.layers.ov3.property_bytes: new, 9",
+    "monaco-base.z14.layers.ov4.property_bytes: new, 131",
+    "monaco-base.z14.layers.ov6.property_bytes: new, 15",
+    "monaco-base.z14.layers.ov7.property_bytes: new, 47",
+    "monaco-base.z14.layers.ov8.property_bytes: new, 19",
+    "monaco-base.z14.layers.simple.property_bytes: new, 38355",
+    "monaco-base.z15.layers.ov0.property_bytes: new, 343",
+    "monaco-base.z15.layers.ov1.property_bytes: new, 3",
+    "monaco-base.z15.layers.ov10.property_bytes: new, 39",
+    "monaco-base.z15.layers.ov11.property_bytes: new, 19",
+    "monaco-base.z15.layers.ov12.property_bytes: new, 56",
+    "monaco-base.z15.layers.ov13.property_bytes: new, 1581",
+    "monaco-base.z15.layers.ov14.property_bytes: new, 76",
+    "monaco-base.z15.layers.ov15.property_bytes: new, 3",
+    "monaco-base.z15.layers.ov16.property_bytes: new, 25",
+    "monaco-base.z15.layers.ov2.property_bytes: new, 68",
+    "monaco-base.z15.layers.ov3.property_bytes: new, 9",
+    "monaco-base.z15.layers.ov4.property_bytes: new, 64",
+    "monaco-base.z15.layers.ov5.property_bytes: new, 3250",
+    "monaco-base.z15.layers.ov6.property_bytes: new, 15",
+    "monaco-base.z15.layers.ov7.property_bytes: new, 17",
+    "monaco-base.z15.layers.ov8.property_bytes: new, 17",
+    "monaco-base.z15.layers.ov9.property_bytes: new, 39",
+    "monaco-base.z15.layers.simple.property_bytes: new, 63098",
+    "tartu.z9.layers.simple.property_bytes: new, 13679",
+    "tartu.z10.layers.simple.property_bytes: new, 15135",
+    "tartu.z11.layers.simple.property_bytes: new, 27516",
+    "tartu.z12.layers.simple.property_bytes: new, 39944",
+    "tartu.z13.layers.simple.property_bytes: new, 54379",
+    "tartu.z14.layers.simple.property_bytes: new, 29244",
+    "tartu.z14.layers.slots.property_bytes: new, 8265",
+    "tartu.z15.layers.simple.property_bytes: new, 32630",
+    "tartu.z15.layers.slots.property_bytes: new, 4653",
+    "tartu-full.z9.layers.simple.property_bytes: new, 13679",
+    "tartu-full.z10.layers.simple.property_bytes: new, 15135",
+    "tartu-full.z11.layers.simple.property_bytes: new, 27516",
+    "tartu-full.z12.layers.simple.property_bytes: new, 39944",
+    "tartu-full.z13.layers.simple.property_bytes: new, 54379",
+    "tartu-full.z14.layers.simple.property_bytes: new, 29244",
+    "tartu-full.z14.layers.slots.property_bytes: new, 8436",
+    "tartu-full.z15.layers.simple.property_bytes: new, 32630",
+    "tartu-full.z15.layers.slots.property_bytes: new, 4742",
+    "tartu-base.z9.layers.ov0.property_bytes: new, 5606",
+    "tartu-base.z9.layers.ov1.property_bytes: new, 115",
+    "tartu-base.z9.layers.ov2.property_bytes: new, 296",
+    "tartu-base.z9.layers.ov3.property_bytes: new, 74",
+    "tartu-base.z9.layers.ov5.property_bytes: new, 3",
+    "tartu-base.z9.layers.ov6.property_bytes: new, 202",
+    "tartu-base.z9.layers.ov7.property_bytes: new, 219",
+    "tartu-base.z9.layers.simple.property_bytes: new, 13679",
+    "tartu-base.z10.layers.ov0.property_bytes: new, 7316",
+    "tartu-base.z10.layers.ov1.property_bytes: new, 168",
+    "tartu-base.z10.layers.ov11.property_bytes: new, 5",
+    "tartu-base.z10.layers.ov2.property_bytes: new, 276",
+    "tartu-base.z10.layers.ov3.property_bytes: new, 119",
+    "tartu-base.z10.layers.ov5.property_bytes: new, 3",
+    "tartu-base.z10.layers.ov6.property_bytes: new, 223",
+    "tartu-base.z10.layers.ov7.property_bytes: new, 247",
+    "tartu-base.z10.layers.simple.property_bytes: new, 15135",
+    "tartu-base.z11.layers.ov0.property_bytes: new, 7810",
+    "tartu-base.z11.layers.ov1.property_bytes: new, 96",
+    "tartu-base.z11.layers.ov11.property_bytes: new, 7",
+    "tartu-base.z11.layers.ov2.property_bytes: new, 296",
+    "tartu-base.z11.layers.ov3.property_bytes: new, 176",
+    "tartu-base.z11.layers.ov5.property_bytes: new, 3",
+    "tartu-base.z11.layers.ov6.property_bytes: new, 194",
+    "tartu-base.z11.layers.ov7.property_bytes: new, 253",
+    "tartu-base.z11.layers.simple.property_bytes: new, 27516",
+    "tartu-base.z12.layers.ov0.property_bytes: new, 8601",
+    "tartu-base.z12.layers.ov1.property_bytes: new, 96",
+    "tartu-base.z12.layers.ov11.property_bytes: new, 7",
+    "tartu-base.z12.layers.ov15.property_bytes: new, 7",
+    "tartu-base.z12.layers.ov2.property_bytes: new, 298",
+    "tartu-base.z12.layers.ov3.property_bytes: new, 204",
+    "tartu-base.z12.layers.ov5.property_bytes: new, 3",
+    "tartu-base.z12.layers.ov6.property_bytes: new, 200",
+    "tartu-base.z12.layers.ov7.property_bytes: new, 260",
+    "tartu-base.z12.layers.simple.property_bytes: new, 39944",
+    "tartu-base.z13.layers.ov0.property_bytes: new, 4586",
+    "tartu-base.z13.layers.ov1.property_bytes: new, 45",
+    "tartu-base.z13.layers.ov11.property_bytes: new, 7",
+    "tartu-base.z13.layers.ov15.property_bytes: new, 7",
+    "tartu-base.z13.layers.ov2.property_bytes: new, 190",
+    "tartu-base.z13.layers.ov3.property_bytes: new, 111",
+    "tartu-base.z13.layers.ov5.property_bytes: new, 3",
+    "tartu-base.z13.layers.ov6.property_bytes: new, 105",
+    "tartu-base.z13.layers.ov7.property_bytes: new, 239",
+    "tartu-base.z13.layers.simple.property_bytes: new, 54379",
+    "tartu-base.z14.layers.ov0.property_bytes: new, 2893",
+    "tartu-base.z14.layers.ov1.property_bytes: new, 11",
+    "tartu-base.z14.layers.ov11.property_bytes: new, 5",
+    "tartu-base.z14.layers.ov15.property_bytes: new, 5",
+    "tartu-base.z14.layers.ov2.property_bytes: new, 17",
+    "tartu-base.z14.layers.ov3.property_bytes: new, 45",
+    "tartu-base.z14.layers.ov5.property_bytes: new, 3",
+    "tartu-base.z14.layers.ov6.property_bytes: new, 41",
+    "tartu-base.z14.layers.ov7.property_bytes: new, 229",
+    "tartu-base.z14.layers.simple.property_bytes: new, 29244",
+    "tartu-base.z15.layers.ov0.property_bytes: new, 759",
+    "tartu-base.z15.layers.ov1.property_bytes: new, 5",
+    "tartu-base.z15.layers.ov12.property_bytes: new, 80",
+    "tartu-base.z15.layers.ov13.property_bytes: new, 319",
+    "tartu-base.z15.layers.ov14.property_bytes: new, 19",
+    "tartu-base.z15.layers.ov15.property_bytes: new, 5",
+    "tartu-base.z15.layers.ov16.property_bytes: new, 7",
+    "tartu-base.z15.layers.ov3.property_bytes: new, 3",
+    "tartu-base.z15.layers.ov4.property_bytes: new, 4278",
+    "tartu-base.z15.layers.ov5.property_bytes: new, 3",
+    "tartu-base.z15.layers.ov6.property_bytes: new, 7",
+    "tartu-base.z15.layers.ov7.property_bytes: new, 109",
+    "tartu-base.z15.layers.ov8.property_bytes: new, 96",
+    "tartu-base.z15.layers.ov9.property_bytes: new, 80",
+    "tartu-base.z15.layers.simple.property_bytes: new, 35158"
    ]
   }
  ]

@@ -6,7 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-30
+
 ### Added
+- **The tile budget limits the bytes of the feature properties** (`property_bytes`, a new limit: it is not a raise of an old limit). For each view and tile layer, `rust/roadstyle-rs/tests/tile_budget.rs` adds up the bytes of the `tags` field of every feature in the largest tile. `tests/data/tile_budget.json` has the limit of each area (the measured number plus 2 %), and `scripts/tile_budget.py` can only lower it. A key added to the features fails the test (`a_key_added_to_the_tiles_is_over_the_property_budget`).
 - **A person's switch of the 3D buildings shows them**: on, the map is tilted to 55° if it is flat and zoomed in to 15 if it is below 14.5 (where the buildings start); off, it is flattened again if this switch tilted it. There is no 2D / 3D button by default, so the switch did nothing visible on a flat map. A script's `rsBuildings(on)` moves nothing.
 - **`dashboard={"credits": [{"text": ..., "href": ...}]}`**: the credits of the page's own data, first in the credits list. The dashboard's default is "\u00a9 OpenStreetMap contributors" (the source of its roads, ODbL); `[]` leaves it out. It is not added again when the base map's list already names OpenStreetMap.
 - **The legend of live data** writes each range and its number of roads apart: one column, the range at the left, the count at the right in a lighter colour, with aligned digits (an entry is `[range, colour, count]`).

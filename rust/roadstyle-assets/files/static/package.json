@@ -1,6 +1,6 @@
 {
   "name": "roadstyle-dashboard",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "description": "roadstyle's map dashboard: the controls, the legend, the popups, Street View and the road interaction for a MapLibre map of roads",
   "license": "MIT",
   "homepage": "https://github.com/Khoshkhah/roadstyle",

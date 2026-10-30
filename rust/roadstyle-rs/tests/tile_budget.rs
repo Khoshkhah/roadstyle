@@ -7,7 +7,7 @@
 //!
 //! For each view, for each tile layer, the largest tile: its features, bytes, keys and values (the distinct values), and
 //! `keys_unread` (rule 2: keys that no style layer on the layer reads), `no_id` (rule 3: features without an MVT id), `strings` and
-//! `string_bytes` (rule 4: values that are text), `short_segments` (rule 6: line segments under 1 px) and `tiny` (rule 7: features whose
+//! `string_bytes` (rule 4: values that are text), `property_bytes` (the bytes of the features' tags fields: the size of the properties), `short_segments` (rule 6: line segments under 1 px) and `tiny` (rule 7: features whose
 //! box is under 1 px). For the view: the bytes of all its tiles and the bytes and features of its largest tile. For the style: the size
 //! of each filter, paint and layout (JSON characters) that is over `SMALL`, and the total.
 //!
@@ -59,12 +59,20 @@ fn data(p: &str) -> PathBuf {
 /// An area's look: its options (golden_options.json.gz), as an export (areas.rs) with the whole-road layer `roads` for `Full`; the page's
 /// look (look.json) for `Base`.
 fn look(area: &str, kind: Kind) -> roadstyle_rs::Look {
+    look_with(area, kind, &[])
+}
+
+/// `look` with more options (`args`), for example a width column, which puts one more key on every road piece.
+fn look_with(area: &str, kind: Kind, args: &[(&str, &str)]) -> roadstyle_rs::Look {
     if kind == Kind::Base {
         return roadstyle_rs::Look::from_value(serde_json::from_slice(&std::fs::read(data("look.json")).unwrap()).unwrap()).unwrap();
     }
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
     let mut look = roadstyle_rs::Look::resolution_value(&roadstyle_rs::look::Options::from_value(&o).unwrap()).unwrap();
     look["args"]["export"] = (kind == Kind::Full).into();
+    for (k, v) in args {
+        look["args"][*k] = json!(v);
+    }
     roadstyle_rs::Look::from_value(look).unwrap()
 }
 
@@ -117,6 +125,7 @@ struct Tables {
     values: usize,
     strings: usize,
     string_bytes: usize,
+    property_bytes: usize,
     dup: usize,
 }
 
@@ -127,7 +136,11 @@ fn layers_of(tile: &[u8]) -> Vec<(String, Tables)> {
         for (f, _, _, d) in fields(layer) {
             match f {
                 1 => name = String::from_utf8(d.to_vec()).unwrap(),
-                2 => t.features += 1,
+                2 => {
+                    t.features += 1;
+                    // the feature's properties: its tags field (tag byte, length, packed key and value indexes)
+                    t.property_bytes += fields(d).iter().filter(|f| f.0 == 2).map(|f| 1 + (64 - (f.3.len() as u64 | 1).leading_zeros() as usize).div_ceil(7) + f.3.len()).sum::<usize>();
+                }
                 3 => {
                     t.keys += 1;
                     t.dup += usize::from(!keys.insert(d));
@@ -278,7 +291,7 @@ fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look,
     for (name, view) in views {
         let (mut bytes, mut features, mut biggest, mut most) = (0usize, 0usize, 0usize, 0usize);
         let (mut mlt_bytes, mut mlt_biggest) = (0usize, 0usize);
-        let mut layers: BTreeMap<String, [usize; 10]> = BTreeMap::new();
+        let mut layers: BTreeMap<String, [usize; 11]> = BTreeMap::new();
         for (z, x, y) in view {
             let t = tiles.tile(z, x, y);
             bytes += t.len();
@@ -299,12 +312,12 @@ fn measure(roads: Vec<u8>, features: Option<Vec<u8>>, look: &roadstyle_rs::Look,
                     }
                 }
                 let e = layers.entry(l).or_default();
-                let now = [tb.features, tb.bytes, tb.values, tb.keys, r.keys_unread, r.no_id, tb.strings, tb.string_bytes, r.short_segments, r.tiny];
+                let now = [tb.features, tb.bytes, tb.values, tb.keys, r.keys_unread, r.no_id, tb.strings, tb.string_bytes, r.short_segments, r.tiny, tb.property_bytes];
                 e.iter_mut().zip(now).for_each(|(m, n)| *m = (*m).max(n));
             }
         }
         let layers: Map<String, Value> = layers.into_iter().map(|(k, n)| (k, json!({"features": n[0], "bytes": n[1], "values": n[2], "keys": n[3],
-            "keys_unread": n[4], "no_id": n[5], "strings": n[6], "string_bytes": n[7], "short_segments": n[8], "tiny": n[9]}))).collect();
+            "keys_unread": n[4], "no_id": n[5], "strings": n[6], "string_bytes": n[7], "short_segments": n[8], "tiny": n[9], "property_bytes": n[10]}))).collect();
         out.insert(name, json!({"view_bytes": bytes, "view_features": features, "max_tile_bytes": biggest, "max_tile_features": most,
                                 "mlt_view_bytes": mlt_bytes, "mlt_max_tile_bytes": mlt_biggest, "layers": layers}));
     }
@@ -343,13 +356,13 @@ fn table(area: &str, got: &Value, limit: &Value) -> String {
         Some(l) => format!("{}/{}", g, l),
         None => g.to_string(),
     };
-    let mut s = format!("{area}: the largest tile of each layer (measured/limit)\n{:<6}{:<8}{:>20}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}\n",
-                        "view", "layer", "bytes", "feat.", "values", "unread", "no_id", "strings", "short", "tiny");
+    let mut s = format!("{area}: the largest tile of each layer (measured/limit)\n{:<6}{:<8}{:>20}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>16}\n",
+                        "view", "layer", "bytes", "feat.", "values", "unread", "no_id", "strings", "short", "tiny", "prop. bytes");
     for (view, v) in got.as_object().into_iter().flatten().filter(|(k, _)| *k != "center" && *k != "style") {
         for (layer, m) in v["layers"].as_object().into_iter().flatten() {
             let l = &limit[view]["layers"][layer];
-            s += &format!("{view:<6}{layer:<8}{:>20}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}\n", cell(&m["bytes"], &l["bytes"]), m["features"].to_string(), m["values"].to_string(),
-                          m["keys_unread"].to_string(), m["no_id"].to_string(), m["strings"].to_string(), m["short_segments"].to_string(), m["tiny"].to_string());
+            s += &format!("{view:<6}{layer:<8}{:>20}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>9}{:>16}\n", cell(&m["bytes"], &l["bytes"]), m["features"].to_string(), m["values"].to_string(),
+                          m["keys_unread"].to_string(), m["no_id"].to_string(), m["strings"].to_string(), m["short_segments"].to_string(), m["tiny"].to_string(), cell(&m["property_bytes"], &l["property_bytes"]));
         }
         let l = &limit[view];
         s += &format!("{view:<6}{:<8}{:>20}   all tiles {} features; largest tile {} bytes, {} features\n", "(all)", cell(&v["view_bytes"], &l["view_bytes"]),
@@ -394,6 +407,26 @@ fn the_tiles_stay_within_their_budget() {
     assert!(errors.is_empty(), "the tiles break a reduction rule or are over their budget (docs/design/tile_contract.md, 'The tile size \
             standard'). A change that makes the tiles smaller is the aim. To raise a limit, the PR text must say why and Kaveh must agree: \
             scripts/tile_budget.py --raise --why '...'\n{}", errors.join("\n"));
+}
+
+/// The limit of `property_bytes` works: Monaco's tiles are within it, and the same tiles with a width column (one more key on every road piece) are over it.
+#[test]
+fn a_key_added_to_the_tiles_is_over_the_property_budget() {
+    let budget = budget();
+    let saved = &budget["areas"]["monaco"];
+    let roads = std::fs::read(data("monaco/roads.parquet")).unwrap();
+    let center = [saved["center"][0].as_f64().unwrap(), saved["center"][1].as_f64().unwrap()];
+    let views = || ZOOMS.map(|z| (format!("z{z}"), square(z, center[0], center[1]))).collect::<Vec<View>>();
+    let property_lines = |args: &[(&str, &str)]| {
+        let (mut broken, mut lines) = (Vec::new(), Vec::new());
+        let m = measure(roads.clone(), None, &look_with("monaco", Kind::Lean, args), center, views(), &mut broken);
+        over(&m, saved, "monaco", &mut lines);
+        lines.retain(|l| l.contains("property_bytes"));
+        lines
+    };
+    assert!(property_lines(&[]).is_empty(), "the plain tiles are over the property budget");
+    let more = property_lines(&[("width_m_col", "lanes")]);
+    assert!(!more.is_empty(), "more keys on every feature must be over the property_bytes limit");
 }
 
 /// The local gate for Burnaby (its roads are not in the repository): the same table, and the limits of `areas.burnaby` if the budget has
