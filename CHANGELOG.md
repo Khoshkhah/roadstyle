@@ -86,6 +86,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- **The full sheet on a phone**: the sheet and the boxes of the bar used `vh`, which on a phone with its address bar visible is taller than the screen. The grip of the full sheet went under the bar and the sheet could not be lowered. They use `dvh` now (the visible screen).
+- **The bars of the windows on a phone**: the bar of the Google 3D window (and of Street View) is one row; its tunnel note got a column of one word per line. The bar wraps, and the note has a row of its own.
 - **`duckosm levels` (`solve_area`) takes the `crossing` rows of a level area.** The Rust `make_area` writes `crossing` pair rows (a path at a node where a car road
   goes on, 2026-10-25), but the Python solve path (`levels._indexed`, `solve_rules`) knew only meet, stack, near and order, so a solve stopped with
   `pairs: the relation 'crossing' is not meet, stack, near or order`. The Rust solver has the crossing stage: `solve_rules` takes the crossings and gives the ones that it did not
