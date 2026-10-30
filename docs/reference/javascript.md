@@ -28,6 +28,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box. Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()`, and `ready()` (with `toolbar.hold`). The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
+| `rs.svg` | `svg(parent, tag, attrs, text?)`: one SVG element of a chart; a value that starts with `var(` goes to the style ([guide](../guides/dashboard-panel.md)) |
 | `rs.kpi` | the HTML of one number tile: `kpi(title, value, sub, color?)`, for a `<div class="rs-kpis">` ([guide](../guides/dashboard-panel.md)) |
 | `rs.tabs` | tabs and the two-way switch of a page: `use(nav, onChange)` returns `{select(id), current()}` ([guide](../guides/dashboard-panel.md)) |
 | `rs.hover` | the page's hover box: `show(html, event)`, `hide()`, `on(node, html \| fn)` ([guide](../guides/dashboard-panel.md)) |
@@ -71,7 +72,8 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsSetKinds(label, list)` / `rsGetKinds(label)` / `RS_KINDS` | a base-map layer: show only these `kind` values (`null`: all), with the layer's own filter and `rsFilter`; `RS_KINDS`: `{label: {kind: count}}` from each overlay entry's `kinds` | `rs:filterchange` (`overlay`, `kinds`) |
 | `rsSetInteraction(label, {clickable, tooltip, popup})` / `rsGetInteraction(label)` | a base-map layer: its clicks (and its hover colour), its hover tooltip (its field list, else its popup's, else every field) and its click popup. The start values are the overlay entry's `interactive`, `tooltip` and `popup_window` | `rs:interactionchange` (`overlay`, `clickable`, `tooltip`, `popup`) |
 | `rsSetBuildings3D(on)` / `rsGetBuildings3D()` | the 3D buildings (the layer that a base-map overlay names in `extrude`): they show while this is on and their buildings layer is shown. A button under the 2D/3D button and a row under the buildings in the Layers box | `rs:buildings3dchange` (`on`) |
-| `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:highlightchange` |
+| `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:themechange` | `rsSetTheme`, the theme button | `theme` (`light` or `dark`) |
+| `rs:highlightchange` |
 | `rsFocus(ids, opt?, layer?)` | fit the camera to one id or a set; `opt` goes to MapLibre `fitBounds` (default `padding` 80, `maxZoom` 17) | |
 | **Selection** | | |
 | `rsSelect(id)` | select one road exactly like a click: glow, popup or panel | `rs:select` |

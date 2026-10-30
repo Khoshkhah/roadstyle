@@ -9,6 +9,7 @@ import {rsHelp} from "./help.js";
 import {rsHover} from "./hover.js";
 import {rsTabs} from "./tabs.js";
 import {rsKpi} from "./kpi.js";
+import {rsSvg} from "./svg.js";
 import {rsLegend} from "./legend.js";
 import {rsColorModes} from "./colorbox.js";
 
@@ -80,6 +81,7 @@ export function makeApi(extra){
                 "streetView", "google3d", "panel"];
   const api = {
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
+    svg: rsSvg,                  // one SVG element for a chart, with var(--x) colours (svg.js)
     kpi: rsKpi,                  // the HTML of a number tile (kpi.js)
     tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)
     hover: rsHover,              // the hover box of a page: show, hide, on (hover.js)

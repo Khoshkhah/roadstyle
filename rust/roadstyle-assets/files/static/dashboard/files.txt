@@ -18,6 +18,7 @@ help
 hover
 tabs
 kpi
+svg
 toolbar
 panel
 find

@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Chart colours and `rs.svg`.** `--rs-chart-band`, `--rs-chart-band-line`, `--rs-chart-grid` and `--rs-chart-miss` have a light and a dark value, for the charts of a page. `rs.svg(parent, tag, attrs, text?)` makes one SVG element; a value that starts with `var(` goes to the style, because an SVG attribute does not read a variable. A chart with these two follows the theme with no code of its own (the event `rs:themechange` is for what is drawn on a canvas).
 - **Cards, number tiles, a caption and a callout in the panel.** `rs.kpi(title, value, sub, color?)` is the HTML of one number tile for a `<div class="rs-kpis">` (a grid of three; `--rs-kpi-cols` changes it). `.rs-cap` is a small capital caption, and `.rs-callout` is the answer in one box with a coloured edge (`--rs-callout`). A card is the existing `.rs-sec-box`; it now styles an `h3` title and the muted description (`h3 + p`) after it, and fits an `svg` to its width.
 - **`rs.tabs.use` and the classes `rs-tabs`, `rs-tab`, `rs-seg`: tabs and the two-way switch of a page.** The page writes the buttons (`data-tab` or `data-v`) and the panes beside them (`data-pane`); a click or an arrow key selects, the chosen button has `on` and `aria-selected`, and the panes show or hide. The selected one is in `--accent`, which a page can set. A page no longer writes its own tab code.
 - **`rs-scroll` and `rs-table`: a scroll area and a table in the panel.** A list or table in a `<div class="rs-scroll">` gets the panel body's scroll protocol: a thin scrollbar that shows over the area or while it scrolls, a fade at the bottom edge while there is more, and no scroll handed on to the map or the body. Its height is `--rs-scroll-h` (default the smaller of 520 px and 60 % of the window). `<table class="rs-table">` in it keeps its header row, lines up the numbers and tints the row under the pointer; a sorted column has `data-sort="asc"` or `"desc"` on its `th`.
@@ -48,6 +49,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **The card behind the text starts at 40 %**, as the bar and the boxes do (`--rs-a-card` was 0.75). All three layers of the settings box start at 0.4; the person can still change each one.
 - **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
   roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:
   `{"*": 0, "service": 14}`) and the key `"@private"` (the first zoom of the private-access roads). `minzoom=False` is still every class at every zoom. The profile's own table (`default.yaml`) is unchanged for the map template.

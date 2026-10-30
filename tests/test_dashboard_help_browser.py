@@ -140,3 +140,19 @@ def test_cards_and_number_tiles(tmp_path):
         assert muted != ink
         assert page.evaluate("getComputedStyle(document.querySelector('.rs-callout')).borderLeftWidth") == "4px"
     _run(tmp_path, body)
+
+
+def test_a_chart_follows_the_theme_with_rs_svg(tmp_path):
+    def body(page):
+        page.evaluate("""() => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.id = 'ch'; document.querySelector('#sb .sb-body').appendChild(s);
+            rs.svg(s, 'polygon', {points: '0,0 9,0 9,9', fill: 'var(--rs-chart-band)', stroke: 'var(--rs-chart-band-line)', 'stroke-width': 1});
+            rs.svg(s, 'text', {x: 1, y: 1}, 'T'); }""")
+        assert page.evaluate("document.querySelector('#ch polygon').getAttribute('stroke-width')") == "1"
+        assert page.evaluate("document.querySelector('#ch polygon').getAttribute('fill')") is None        # the variable went to the style
+        assert page.evaluate("document.querySelector('#ch text').textContent") == "T"
+        fill = lambda: page.evaluate("getComputedStyle(document.querySelector('#ch polygon')).fill")
+        light = fill()
+        assert light != "none" and light != ""
+        page.evaluate("rsSetTheme('dark')")
+        assert fill() != light
+    _run(tmp_path, body)

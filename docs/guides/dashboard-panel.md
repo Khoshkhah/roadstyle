@@ -57,6 +57,17 @@ document.getElementById("k").innerHTML = rs.kpi("Inside the range", "80.4%", "pr
 
 A card is `.rs-sec-box`: an `h3` is its title and the paragraph right after it is its short muted description. An `svg` in it fills the width. `rs-kpis` is a grid of three tiles (`--rs-kpi-cols` changes the number). All of them use the panel's tokens, so they follow the light and the dark theme.
 
+## Charts
+
+```js
+const s = document.querySelector("#chart");
+rs.svg(s, "line", {x1: 0, x2: 300, y1: 40, y2: 40, stroke: "var(--rs-chart-grid)"});
+rs.svg(s, "polygon", {points: "...", fill: "var(--rs-chart-band)", stroke: "var(--rs-chart-band-line)"});
+rs.svg(s, "text", {x: 4, y: 12, fill: "var(--mut)", "font-size": 9}, "0");
+```
+
+`rs.svg` makes one SVG element. An SVG attribute does not read `var(--x)`, so a value that starts with `var(` goes to the style. The chart then follows the theme with no code of its own. The colours that charts share are `--rs-chart-band`, `--rs-chart-band-line`, `--rs-chart-grid` and `--rs-chart-miss`; for text and lines use the panel's `--ink`, `--mut`, `--line` and `--card`. What is drawn on a canvas cannot read a variable: redraw it on the event `rs:themechange`.
+
 ## Tabs and a two-way switch
 
 ```html

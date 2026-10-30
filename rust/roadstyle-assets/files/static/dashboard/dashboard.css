@@ -566,3 +566,8 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb .rs-cap{margin:2px 0 6px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
 /* a callout: the answer in one box, with an edge in a colour of the page (`--rs-callout`, or set `border-left-color` from the code) */
 #sb .rs-callout{margin:0 0 12px;padding:8px 11px;border:1px solid var(--line);border-left:4px solid var(--rs-callout,var(--accent));border-radius:0 8px 8px 0;background:var(--card);font-size:12.5px;line-height:1.5}
+
+/* ---- CHART COLOURS: the colours that a page's charts share, with a light and a dark value (use them with `rs.svg`, which takes `var(--x)` in `fill` and `stroke`).
+   For text and lines the panel's own tokens do the same: --ink, --mut, --line, --card. ---- */
+html{--rs-chart-band:#e0f2fe;--rs-chart-band-line:#bae6fd;--rs-chart-grid:#eef2f6;--rs-chart-miss:#e2e8f0}
+html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-line:rgba(90,169,248,.45);--rs-chart-grid:#272b33;--rs-chart-miss:#3a404a}
