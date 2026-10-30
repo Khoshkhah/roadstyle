@@ -14,7 +14,7 @@
       ]
     },
     "toolbar": {
-      "position": "left",
+      "position": "right",
       "settings": true,
       "hold": false,
       "navigation": "box"
@@ -71,7 +71,7 @@
       "rs-tpl-dashboard",
       "rs-overlay",
       "rs-has-toolbar",
-      "rs-tb-left",
+      "rs-tb-right",
       "rs-panel-left",
       "rs-hide-scale"
     ],

@@ -126,7 +126,7 @@ def test_each_page_has_its_template():
     assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
     d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
     assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "left", "width_px": 400, "look": "frame", "sections": [], "hide": ["base_map", "colour_by", "legend"]},
-                                                                       {"position": "left", "settings": True, "hold": False, "navigation": "box"})
+                                                                       {"position": "right", "settings": True, "hold": False, "navigation": "box"})
     c = _dashboard(rs.render_dashboard(_edges(), layout="dock").html)
     assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("dashboard", "dock", "frame", None)
 
@@ -180,10 +180,10 @@ def test_the_boundary_shade_and_limit_are_the_pages_choice():
 def test_the_dashboard_template_is_the_overlay_form():
     h = rs.render_dashboard(_edges()).html
     d = _dashboard(h)
-    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "left", "settings": True, "hold": False, "navigation": "box"})
+    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True, "hold": False, "navigation": "box"})
     assert d["windows"]["clamp"] is True and d["windows"]["recenter_map"] is False
     assert '<div id="sb"' in h and "<h2>Roads dashboard</h2>" in h
-    assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-left","rs-panel-left","rs-hide-scale")' in h   # the first paint has the form
+    assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-hide-scale")' in h   # the first paint has the form
 
 
 def test_a_template_name_is_checked_and_sidebar_is_gone():
@@ -202,7 +202,7 @@ def test_the_dashboard_starts_with_a_blank_map_that_needs_no_key_and_with_no_sca
         h = rs.render_dashboard(_edges()).html
     opts = json.JSONDecoder().raw_decode(h, h.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]
     d = opts["dashboard"]
-    assert d["scale_box"] is False and d["panel"]["side"] == "left" and d["toolbar"]["position"] == "left"
+    assert d["scale_box"] is False and d["panel"]["side"] == "left" and d["toolbar"]["position"] == "right"
     got = [b["key"] for b in opts["basemaps"]]
     assert got[0] == "blank" and len(got) > 1 and not set(_removed_basemaps()) & set(got), got
     assert "carto.com" not in "".join(t for b in opts["basemaps"] for t in b.get("tiles", []))

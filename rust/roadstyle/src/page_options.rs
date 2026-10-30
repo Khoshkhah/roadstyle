@@ -654,7 +654,7 @@ mod tests {
         assert_eq!(o["dashboard"]["panel"]["width_px"], 370);
         assert_eq!(o["first_paint"]["panel_width_px"], 370);
         assert_eq!(o["first_paint"]["phone_max_width_px"], 700);
-        assert_eq!(o["first_paint"]["classes"], json!(["rs-tpl-dashboard", "rs-overlay", "rs-has-toolbar", "rs-tb-left", "rs-panel-left", "rs-hide-scale"]));
+        assert_eq!(o["first_paint"]["classes"], json!(["rs-tpl-dashboard", "rs-overlay", "rs-has-toolbar", "rs-tb-right", "rs-panel-left", "rs-hide-scale"]));
         // the base maps: the active one first, its dark twin with it, the tiles as MapLibre's `tiles`
         let keys: Vec<&Value> = o["basemaps"].as_array().unwrap().iter().map(|b| &b["key"]).collect();
         assert_eq!(keys, ["blank", "osm", "blank_dark"]);

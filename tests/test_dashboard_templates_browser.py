@@ -172,6 +172,6 @@ def test_a_wider_panel_in_the_overlay_layout(tmp_path):
         page.goto(path.resolve().as_uri())
         page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
         page.wait_for_timeout(300)
-        sb, card, bar = _box(page, "#sb"), _box(page, "#sb .sb-card"), _box(page, "#rs-toolbar")
+        sb, bar = _box(page, "#sb"), _box(page, "#rs-toolbar")
         browser.close()
-    assert sb["w"] == 420 and abs(bar["l"] - card["r"]) <= 1.01              # the panel and the bar are at the left by default
+    assert sb["w"] == 420 and bar["r"] > 1280 - 20               # the panel is at the left, the bar at the right edge, by default

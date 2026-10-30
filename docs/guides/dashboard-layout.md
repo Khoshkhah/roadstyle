@@ -1,6 +1,6 @@
 # Dashboard layout
 
-A dashboard is a map with a side panel and a toolbox. `render_dashboard` makes it from your road data. It starts with a blank map (no key), the panel and the toolbox at the left, and no scale box.
+A dashboard is a map with a side panel and a toolbox. `render_dashboard` makes it from your road data. It starts with a blank map (no key), the panel at the left, the toolbox at the right edge, and no scale box.
 
 ```python
 import roadstyle as rs
@@ -16,7 +16,7 @@ There is one template with a panel: `dashboard`. `layout` changes the frame:
 
 | Keyword | What you get |
 |---|---|
-| `layout="overlay"` (default) | The map fills the window. The panel floats over it, at the left, with the toolbox next to it |
+| `layout="overlay"` (default) | The map fills the window. The panel floats over it, at the left. The toolbox is a column at the right edge (`dashboard={"toolbar": {"position": "left"}}` moves it); its boxes open to its left |
 | `layout="dock"` | The panel is docked at the left and takes its own space. No toolbox: the tools are the MapLibre buttons |
 
 `template="map"` is the map only (the default of `render_edges`). The `classic` template and the report page are gone.
