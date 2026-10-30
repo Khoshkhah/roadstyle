@@ -298,35 +298,22 @@ own time, allocations (`malloc`, `free`, `realloc`) about 47 ms, piece cells abo
 ## The road layer in MapLibre (2026-10-29)
 
 **Problem.** MapLibre evaluates each data-driven paint property for each feature of a tile. For the road layer, this is 75 to 86 % of the
-feature loop (z12 and z13, Burnaby). A property that is one value, or a layer without a property, costs less.
-
-**Zoom bands (removed 2026-10-29).** `layers/bands.rs` split the road layer for each band of zooms (`roads-simple`, `-z14`, `-z15`), and each band
-had its paint values as constants. They saved 13 to 19 % of the MapLibre time (Burnaby, z11 to z14). They were removed the same day: the worker
-builds the buckets of a tile only for the layers whose `minzoom` and `maxzoom` hold the tile's zoom, and MapLibre keeps the tiles of the old zoom
-on the screen until the tiles of the new zoom have come. A layer that the map draws at the new zoom has no buckets in those tiles, so the roads were
-missing: at pitch 60 on Nacka, zooming out from z14 to z13.5 left roads only in the far field, and zooming in past z14 the same (a screenshot at z13.72;
-0 empty frames in 60 without bands, 4 with). It happens with GeoJSON roads and with tiles. A layer with a zoom range is safe only when no tile of
-another zoom can be on the screen, and that is never true. The road layer is now one layer for every zoom (and its dash layer).
+feature loop (z12 and z13, Burnaby). A layer without a property costs less.
 
 **Dash layers.** Only the dashed pieces have `line-dasharray`: a tunnel's gap and dashes (`__rs_k` 3 and 4) and a piece with `__rs_dash`.
-They are in the layer `<band>-dash`, under the layer of the other pieces. A tunnel is then under the roads that cross it and under its own
+They are in the layer `roads-simple-dash`, under the layer of the other pieces. A tunnel is then under the roads that cross it and under its own
 fill, as in rank. A dashed piece with `__rs_dash` is under all other pieces, not between them. The picture changes by 1 % of the pixels
 (the dotted fringe of the casing goes).
 
-**Layers.** Before: 1 road layer. After: 1, and 2 when the area has dashed pieces. The style text
-of the road grows from 29 KB to 70 KB (Monaco); the tile budget has the new limits.
+**Layers.** 1 road layer, and 2 when the area has dashed pieces (the dash layer). No layer of the road has a `minzoom` or a `maxzoom`: see [tiling.md](tiling.md).
 
-**JS.** The dashboard reads the road layers as a list (`RS_LEANS`; `leanAt()` gives the one that the map draws). Pick, hover, select and
+**JS.** The dashboard reads the road layers as a list (`RS_LEANS`). Pick, hover, select and
 Street View use the list.
-
-**Cost in code.** 111 lines in `bands.rs`, 20 in the style builder and 20 in the JS (without tests).
 
 **Result** (Burnaby, live style, minimum of 15 runs, change against the style before; noise 5 to 8 points):
 
 | Change | z11 | z12 | z13 | z14 | Pixels that differ |
 |---|---|---|---|---|---|
-| Zoom bands alone (removed, see above) | -18 % | -13 % | -15 % | -19 % | 0 |
 | Dash layers alone | -14 % | -9 % | -8 % | -9 % | 0.97 % |
-| Both | -18 % | -11 % | -26 % | -26 % | 0.97 % |
 
 The MLT and MVT tiles give the same pixels. The tiles do not change (the same bytes).

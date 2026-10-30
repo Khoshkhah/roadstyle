@@ -642,7 +642,7 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     }
     // with items the layer stays one: the items' popup finds it by its id
     if items.is_empty() {
-        layers = layers.into_iter().flat_map(|l| if l["id"] == "roads-simple" { super::bands::split_dash(l) } else { vec![l] }).collect();
+        layers = layers.into_iter().flat_map(|l| if l["id"] == "roads-simple" { super::dash::split_dash(l) } else { vec![l] }).collect();
     }
     let state = crate::contract::page_state(look, active, ovs.len());       // the page's start values, baked in `finish`
     let out = finish(&cx, layers, &state, ovs);

@@ -115,7 +115,7 @@ pub fn describe(style: &mut Value) {
     }
 }
 
-/// The layers that a road is picked on (clicked, hovered): the road layer and its bands (`roads-simple`, `roads-simple-z14`, ...; a style with no `roads-simple`: its
+/// The layers that a road is picked on (clicked, hovered): the road layer and its dash layer (`roads-simple`, `roads-simple-dash`; a style with no `roads-simple`: its
 /// fill layers, not the halves'), and the 3D decks' tops (not their casing, roads-deck-casing). A caller's items are in `overlays`.
 pub fn pick_layers(layers: &[Value]) -> Value {
     let fill = |id: &str| ["roads-fill", "roads-low-fill", "roads-high-fill", "roads-bridge-fill"].iter().any(|p| id.starts_with(p));

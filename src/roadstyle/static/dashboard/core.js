@@ -15,9 +15,7 @@ export let RS_TILED = false;
 // _fs and _roadOfPiece, select.js's pick layers, svspot.js's road layer) go with simple=False in N16 (branch n16-full-look-js).
 export let RS_LEAN = false;
 // RS_LEANS: the ids of all the layers of the simple look's road (the layer and its dash layer, docs/design/tile_speed.md); RS_LEAN is the first.
-// leanAt(): the one that the map draws at its zoom
 export let RS_LEANS = [];
-export function leanAt(){ const z=map.getZoom(); return RS_LEANS.find(id=>{ const l=map.getLayer(id); return l && z>=(l.minzoom||0) && z<(l.maxzoom||25); }) || RS_LEAN; }
 // the newest version of the interaction contract (the metadata roadstyle:contract) that this dashboard reads: the engine's
 // contract::CONTRACT (tests/test_contract_names.py checks the two)
 export const CONTRACT = 2;

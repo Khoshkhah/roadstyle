@@ -33,10 +33,6 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
-- **The roads were missing while zooming at a pitched view.** The road layer was split into zoom bands (`roads-simple`, `-z14`, `-z15`, a change of 2026-10-29, not released). MapLibre keeps
-  the tiles of the old zoom on the screen until the tiles of the new zoom have come, and those tiles have no buckets for the layer that the map draws at the new zoom.
-  On Nacka at pitch 60, zooming out below z14 (z13.5 to z14.0) or in above it left roads only in the far field. The road layer is one layer for every zoom again (with its
-  dash layer). It costs back the 13 to 19 % that the bands saved.
 - **A box of the bar stays inside the window.** The settings box could reach above the top of the window when the window was not high: the bar moved a box
   with `margin-top`, which does nothing for a box that is fixed to the bar by its bottom edge. It uses `translate` now, for every box.
 - **The "Colour by and legend" button is in the bar for a style that comes later.** A page that starts with `rsDashboard(map, {style: null, ...})` and gets its roads

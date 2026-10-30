@@ -1,7 +1,7 @@
 // GOOGLE STREET VIEW of the clicked edge (the window, the side-by-side page, or a plain link),
 // looking the way the edge runs. A plain maps URL, no API key; where it stands is below.
 import {_esc} from "../popup.js";
-import {map, O, RS_PREFIX, RS_LEAN, RS_LEANS, leanAt, _road, _roadOfPiece, _emit} from "./core.js";
+import {map, O, RS_PREFIX, RS_LEAN, RS_LEANS, _road, _roadOfPiece, _emit} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf} from "./select.js";
 let _streetView = false;
@@ -64,7 +64,7 @@ export function _svPick(ll, f, id){
 // the drawn lane offset (px) of an edge at this zoom: the road layer's own line-offset expression,
 // ["interpolate",["linear"],["zoom"], z, ["case", two-way?, ["match",["get",class], ..., dflt], 0], ...]
 export function _svLanePx(props){
-  const lay=RS_LEAN ? leanAt() : RS_PREFIX+"roads-fill"; if(!map.getLayer(lay)) return 0;     // the road layer: simple mode's one layer, or the full look's fill
+  const lay=RS_LEAN || RS_PREFIX+"roads-fill"; if(!map.getLayer(lay)) return 0;     // the road layer: simple mode's one layer, or the full look's fill
   const e=map.getPaintProperty(lay, "line-offset");
   if(!Array.isArray(e) || e[0]!=="interpolate") return typeof e==="number" ? e : 0;
   const val=x=>{ if(typeof x==="number") return x;

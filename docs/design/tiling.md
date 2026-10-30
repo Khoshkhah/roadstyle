@@ -20,6 +20,7 @@ file server. A transport never changes a tile.
 | Keys | The keys that the style reads, and the road id. A page that needs more keys names them (`tile_keep`); this is the only difference between the callers | `TileOptions` |
 | Compression | The library makes tiles with **no compression**. The transport compresses (next table) | the transports |
 | Tile address | `<source>/<z>/<x>/<y>` with the generation of the road set. A transport only changes the prefix | the style's vector source |
+| Road layers | One road layer and its dash layer, with **no `minzoom` and no `maxzoom`**. The worker builds the buckets of a tile only for the layers of the tile's zoom, and MapLibre keeps the tiles of the old zoom on the screen until the new ones come: a layer with a zoom range leaves the map empty for 0.1 to 0.3 s at each zoom it starts or ends (Nacka, z14 and z15; road ink 0.000 in 10 frames of 734). A value that changes with the zoom is a zoom curve inside the one layer | `layers/build.rs`, `layers/dash.rs` |
 | Default | Tiles on for every page. The GeoJSON path is an opt-out: `tiles=False` | `page_options.rs` |
 
 | Transport | Prefix | Compression | Used by |

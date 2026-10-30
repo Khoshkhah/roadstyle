@@ -80,7 +80,7 @@ def test_the_binding_tiles_of_monaco_are_within_the_budget():
     from roadstyle import _engine
 
     o = json.loads(gzip.decompress((DATA / "monaco/golden_options.json.gz").read_bytes()))
-    look = _engine.rust().resolve_look(json.dumps(o)).with_arg("export", "false")
+    look = _engine.rust().resolve_look(json.dumps(o)).with_arg("export", "false").with_arg("tile_format", "\"mvt\"")      # the budget counts the MVT cut
     tiler = _engine.rust().Tiler(pq.read_table(DATA / "monaco/roads.parquet"), look, None, None, "rs://", [])
     budget = BUDGET["areas"]["monaco"]
     lon, lat = budget["center"]
