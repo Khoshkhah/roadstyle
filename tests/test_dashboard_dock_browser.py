@@ -4,8 +4,9 @@ import pytest
 
 pw = pytest.importorskip("playwright.sync_api")
 
-import roadstyle as rs  # noqa: E402
 from test_dashboard_sections_browser import _edges, _open  # noqa: E402
+
+import roadstyle as rs  # noqa: E402
 
 
 def _run(tmp_path, body, **kw):
@@ -41,22 +42,32 @@ def test_street_view_dock_shares_the_screen_with_a_divider(tmp_path):
         assert win.is_visible()
         r = win.bounding_box()
         assert r["x"] + r["width"] == pytest.approx(1280, abs=1) and r["height"] == pytest.approx(800, abs=1)
-        mapw = lambda: page.evaluate("document.getElementById('map').getBoundingClientRect().width")
+        def mapw():
+            return page.evaluate("document.getElementById('map').getBoundingClientRect().width")
         assert mapw() == pytest.approx(1280 - r["width"], abs=1)
         # the divider: dragging it to the left gives Street View more
         d = page.locator(".rs-svw-drag").bounding_box()
-        page.mouse.move(d["x"] + 5, 400); page.mouse.down(); page.mouse.move(500, 400, steps=6); page.mouse.up()
+        page.mouse.move(d["x"] + 5, 400)
+        page.mouse.down()
+        page.mouse.move(500, 400, steps=6)
+        page.mouse.up()
         r2 = win.bounding_box()
         assert r2["width"] > r["width"] + 100 and mapw() == pytest.approx(1280 - r2["width"], abs=1)
         # the window is still a side of the page while and after the drag: windows.js moves a window that is being dragged, and must not touch this one
         box = win.bounding_box()
         assert box["x"] + box["width"] == pytest.approx(1280, abs=1) and box["y"] == 0 and box["height"] == pytest.approx(800, abs=1)
         assert "left" not in (win.get_attribute("style") or "") and "top" not in (win.get_attribute("style") or "")
-        page.mouse.move(d["x"] + 5, 400); page.mouse.down(); page.mouse.move(520, 400, steps=3)
-        mid = win.bounding_box(); page.mouse.up()
+        page.mouse.move(d["x"] + 5, 400)
+        page.mouse.down()
+        page.mouse.move(520, 400, steps=3)
+        mid = win.bounding_box()
+        page.mouse.up()
         assert mid["y"] == 0 and mid["height"] == pytest.approx(800, abs=1) and "rs-drag " not in (win.get_attribute("class") or "") + " "
         # the share is kept, and bounded: at most 80 %
-        page.mouse.move(500 + 5, 400); page.mouse.down(); page.mouse.move(5, 400, steps=6); page.mouse.up()
+        page.mouse.move(500 + 5, 400)
+        page.mouse.down()
+        page.mouse.move(5, 400, steps=6)
+        page.mouse.up()
         assert win.bounding_box()["width"] <= 0.8 * 1280 + 1
         # closed: the map has the whole page again, and the divider goes
         page.evaluate("rs.tools.close('street_view')")
