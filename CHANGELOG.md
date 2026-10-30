@@ -13,6 +13,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - The goldens of the Monaco page and of the page with views have the new size and hash (`rust_page.json`, `page_views.json`): the help window adds 1,095 bytes to every page.
 - **A dashboard with no panel: `dashboard={"panel": None}`.** The page is a map with the toolbox and nothing else (it had the panel's HTML even then). `rs.help.set` puts its "i" button in the bar when there is no panel title for it.
 - **Street View docked beside the map: `street_view="dock"`.** The window is a side of the page, not a floating window: it takes the right part of the screen (the lower 45 % on a phone), the map takes the rest, and a divider that the person drags sets the share (20 to 80 %, kept in the browser). The page has no panel and the bar is at the left, the map's own edge; `dashboard=` can give a panel and move the bar. The Street View button of the bar closes and opens the dock; the map gets the whole page when it is closed. `street_view="window"` is unchanged.
+- **Several help buttons, one window.** `rs.help.button(el, {title, intro, terms, note, html, button})` puts a "?" button with its own words in `el`, and `rs.help.open({title, ...})` opens the window with words of its own (from a link or a key);
+  `rs.help.set` stays the page's main words. One window, the look of the other windows, inside the screen on a phone.
+- **Sections that fold, and one button for all.** `rs.sections.add({..., label, fold: true})` (typed: `fold` of a section of `dashboard.panel.sections`) makes the label a button with a chevron that hides the body, with the state kept in
+  this browser. The panel's title row has "Collapse all" / "Expand all" (`#rs-fold-all`), which acts on the sections that fold and are shown (`rs.sections.foldAll`, `fold`, `folded`).
 
 ### Changed
 - **One accent colour for the whole dashboard: the Sonocount teal.** `--accent` is `#0e7c8e` in the light theme (the logo's teal, a little darker so that a link is 4.6:1 on the panel's cards: the logo's own is 4.43:1) and a lighter teal of the same hue (`#42c2d7`, 8.5:1 on the dark panel) in the dark theme; `--accent-fill` is the logo teal `#0E7F91` of a
@@ -21,6 +25,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   takes the accent for its default colour. A page does not set its own accent any more.
 
 ### Fixed
+- **A page that starts in the dark theme had the error "Style is not done loading".** The theme's base-map swap (the dark twin) ran before the style was loaded. It waits for the style now, with the theme's state `rs_theme`.
 - **The corner box has the shape of the bar.** The box with the scale, the zoom number and the credits had square corners and its own look: its layer was made by two rules, and the later one (`border-radius: inherit`) put 0
   over the first, because the box itself had no radius. It has one rule now, as the bar: the border and the radius (10 px) on the box, the colour and the blur on a layer behind it, in the light and the dark theme and with
   the transparency setting. Its text is the type of the bar (`system-ui`), with tabular numbers for the zoom number, not a monospace font.

@@ -54,6 +54,7 @@ window.map = new maplibregl.Map({container: "map", center: [18.005, 59.305], zoo
 map.on("error", e => window.errors.push(String(e.error && e.error.message || e)));
 map.addControl(new maplibregl.NavigationControl(), "top-right");
 window.rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, basemaps: OPTS.basemaps, ontop: OPTS.ontop, basemap_switcher: true, dashboard: OPTS.dashboard});
+if (location.search.includes("dark")) rsSetTheme("dark");     // a page that starts in the dark theme: before the style is loaded
 // a roads style, as the page makes it: the sources and layers are in the map with the prefix first, then rs.setStyle
 window.addStyle = (style) => {
   for (const l of map.getStyle().layers.filter(l => l.id.startsWith("rs-"))) map.removeLayer(l.id);
@@ -566,4 +567,105 @@ def test_the_accent_reads_the_same_in_the_panel_and_in_the_windows_and_follows_t
         assert page.evaluate(read) == ["#0e7c8e", "#0e7c8e", "#0E7F91"]
         page.evaluate("() => rsSetTheme('dark')")
         assert page.evaluate(read) == ["#42c2d7", "#42c2d7", "#0E7F91"]          # a window or the bar reads what the panel reads; the fill keeps its teal for the white text
+        browser.close()
+
+
+def _open_page(browser, base, width, height, query="", touch=False):
+    errors = []
+    context = browser.new_context(viewport={"width": width, "height": height}, has_touch=touch)
+    page = context.new_page()
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+    page.goto(base + "/page.html" + query)
+    page.wait_for_function("window.ready === true", timeout=60_000)
+    return page, errors
+
+
+def test_a_page_that_starts_dark_has_no_error_and_gets_the_dark_base_map(host):
+    """rsSetTheme("dark") before the style is loaded: the base map's swap and the theme's state wait for the style ("Style is not done loading")."""
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        for width, height, touch in ((1100, 760, False), (390, 844, True)):
+            page, errors = _open_page(browser, base, width, height, "?dark=1", touch)
+            page.wait_for_function("map.getGlobalState().rs_theme === 'dark'")
+            page.wait_for_function("map.getPaintProperty('bg', 'background-color') === '#14181d'", timeout=20_000)       # the dark twin of the blank base map
+            assert document_theme(page) == "dark" and not errors, (width, errors)
+        browser.close()
+
+
+def document_theme(page):
+    return page.evaluate("() => document.documentElement.dataset.rsTheme")
+
+
+def test_several_help_buttons_each_with_their_own_words_open_one_window(host):
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        for width, height, touch in ((1100, 760, False), (390, 844, True)):
+            page, errors = _open_page(browser, base, width, height, "", touch)
+            page.evaluate("""() => { rs.sections.add({id: 'one', label: 'One', html: '<p id=p1>First</p>'}); rs.sections.add({id: 'two', label: 'Two', html: '<p id=p2>Second</p>'});
+                rs.help.button(document.querySelector("[data-rs-section=one] label"), {title: 'About one', intro: 'Words of one.', terms: [['a', 'b']], button: 'About section one'});
+                rs.help.button(document.querySelector("[data-rs-section=two] label"), {title: 'About two', html: '<p id=own>Words of two.</p>'}); }""")
+            if touch:
+                page.evaluate("() => rs.sheet(2)")
+                page.wait_for_timeout(300)
+            buttons = page.locator(".rs-help-btn")
+            assert buttons.count() == 2 and page.locator("[data-rs-section=one] .rs-help-btn").get_attribute("aria-label") == "About section one"
+            (page.locator("[data-rs-section=one] .rs-help-btn").tap() if touch else page.locator("[data-rs-section=one] .rs-help-btn").click())
+            assert page.locator("#rs-help:not([hidden]) .rs-help-ttl").inner_text() == "About one" and "Words of one." in page.locator("#rs-help").inner_text()
+            page.keyboard.press("Escape")
+            assert page.evaluate("() => document.getElementById('rs-help').hidden")
+            (page.locator("[data-rs-section=two] .rs-help-btn").tap() if touch else page.locator("[data-rs-section=two] .rs-help-btn").click())
+            assert page.locator("#rs-help .rs-help-ttl").inner_text() == "About two" and page.locator("#own").count() == 1
+            assert page.evaluate("() => document.querySelectorAll('#rs-help').length") == 1                      # one window for all the buttons
+            box = page.evaluate("() => { const r = document.querySelector('#rs-help .rs-help-box').getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom, innerWidth, innerHeight]; }")
+            assert box[0] >= 0 and box[1] >= 0 and box[2] <= box[4] and box[3] <= box[5], box                    # inside the screen
+            page.keyboard.press("Escape")
+            page.evaluate("() => rs.help.open({title: 'Opened by a link', intro: 'No button.'})")
+            assert page.locator("#rs-help .rs-help-ttl").inner_text() == "Opened by a link"
+            assert not errors, errors
+            page.close()
+        browser.close()
+
+
+def _tap(page, selector, touch):
+    page.locator(selector).tap() if touch else page.locator(selector).click()
+
+
+def _folded(page):
+    return page.evaluate("() => ['a', 'b', 'c'].map(i => rs.sections.folded(i))")
+
+
+def _visible(page, name):
+    return page.evaluate("(i) => document.getElementById('body-' + i).getBoundingClientRect().height > 0", name)
+
+
+def test_the_panel_title_row_folds_and_unfolds_all_the_sections_that_fold_and_keeps_the_state(host):
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        for width, height, touch in ((1100, 760, False), (390, 844, True)):
+            page, errors = _open_page(browser, base, width, height, "", touch)
+            page.evaluate("""() => { for (const id of ['a', 'b', 'c']) rs.sections.add({id, label: 'Section ' + id, html: '<p id=body-' + id + '>Body ' + id + '</p>', fold: true});
+                rs.sections.add({id: 'plain', label: 'Plain', html: '<p id=body-plain>No fold</p>'}); }""")
+            if touch:
+                page.evaluate("() => rs.sheet(2)")
+                page.wait_for_timeout(300)
+            assert page.evaluate("() => document.querySelector('#sb .sb-top #rs-fold-all').getAttribute('aria-label')") == "Collapse all" and _folded(page) == [False] * 3
+            _tap(page, "#rs-fold-all", touch)
+            assert _folded(page) == [True] * 3 and not _visible(page, "a") and _visible(page, "plain") and page.evaluate("() => document.getElementById('rs-fold-all').getAttribute('aria-label')") == "Expand all"
+            _tap(page, "[data-rs-section=b] .rs-sec-hd", touch)                                                                # one section opens: the title row offers to fold all again
+            assert _folded(page) == [True, False, True] and _visible(page, "b") and page.evaluate("() => document.getElementById('rs-fold-all').getAttribute('aria-label')") == "Collapse all"
+            page.evaluate("() => rs.sections.hide('c')")                                                         # a hidden section is not acted on
+            page.evaluate("() => rs.sections.foldAll(false)")
+            assert _folded(page) == [False, False, True]
+            page.evaluate("() => rs.sections.fold('a', true)")
+            page.reload()                                                                                         # the state is kept in this browser
+            page.wait_for_function("window.ready === true", timeout=60_000)
+            page.evaluate("""() => { for (const id of ['a', 'b', 'c']) rs.sections.add({id, label: 'Section ' + id, html: '<p id=body-' + id + '>Body ' + id + '</p>', fold: true}); }""")
+            assert _folded(page) == [True, False, True], _folded(page)
+            assert page.evaluate("() => { let n = 0; try { rs.sections.add({id: 'x', html: 'x', fold: true}); } catch (e) { n = e.message.includes('needs a label') ? 1 : 0; } return n; }") == 1
+            assert not errors, errors
+            page.context.close()
         browser.close()

@@ -496,6 +496,18 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 /* ---- the panel's sections (sections.js): a box with no layout of its own, and the page's rows in the panel's legend ---- */
 .sb-sec{display:contents}
 .sb-sec[hidden]{display:none}
+/* a section that folds (sections.js, `fold: true`): its label is a button with a chevron; what follows the label is its body */
+.sb-sec[data-rs-fold]{display:block;margin:0 0 6px}
+.sb-sec .rs-sec-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:6px 0;border:0;background:none;color:var(--mut);font:600 11px/1.2 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;text-align:left;cursor:pointer}
+.sb-sec .rs-sec-hd:hover{color:var(--ink)}
+.sb-sec .rs-sec-hd:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
+.sb-sec .rs-sec-hd svg{flex:none;transition:transform .15s}
+.sb-sec.folded .rs-sec-hd svg{transform:rotate(-90deg)}
+.sb-sec.folded .rs-sec-body{display:none}
+/* the button of the panel's title row that folds or unfolds every section that folds */
+#rs-fold-all[hidden]{display:none}
+#sb #rs-fold-all{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;margin-left:6px;background:none;border:1px solid var(--line);border-radius:8px;color:var(--mut);cursor:pointer;flex:none}
+#sb #rs-fold-all:hover{color:var(--accent);border-color:var(--accent)}
 #sb-legend-extra{margin-top:2px}
 /* the kit for the HTML that a page adds to the panel: the panel's tokens (--ink, --mut, --line, --card, --accent) change with the theme, so a section that
    uses them follows the light and the dark theme. Plain text, links, tables and rules already do. */
@@ -555,8 +567,8 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #rs-help .rs-help-note{margin-top:12px;padding:8px 10px;background:color-mix(in srgb,#38a3dc 14%,transparent);border-radius:8px;font-size:12px}
 #rs-help a{color:inherit;font-weight:600;text-decoration:underline}
 #rs-help .rs-help-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:20px;color:inherit;cursor:pointer}
-#sb #rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
-#sb #rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}
+:is(#sb,body) .rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
+:is(#sb,body) .rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}      /* (the panel's own `#sb button` rules are as specific: the id of the panel is in both) */
 /* a phone: the help window is a sheet at the bottom of the screen, as the panel and the other windows are */
 html.rs-phone #rs-help{align-items:flex-end}
 html.rs-phone #rs-help .rs-help-box{margin:0;width:100%;max-width:none;max-height:85dvh;border-radius:14px 14px 0 0;border-bottom:0}

@@ -28,9 +28,10 @@ The rows of `legend` show in the legend box of the toolbox, after the rows of th
 
 | Call | What it does |
 |---|---|
-| `rs.sections.add({id, html, el, label, after, before})` | adds a section; it returns its box |
+| `rs.sections.add({id, html, el, label, after, before, fold})` | adds a section; it returns its box. With `fold: true` (and a `label`) its label is a button with a chevron and a click hides its body; the state is kept in this browser |
 | `rs.sections.list()` / `get(id)` | the ids in order; the box of a section (move it into your own tab) |
 | `rs.sections.hide(id)` / `show(id)` / `remove(id)` | hide or show any section; remove only your own |
+| `rs.sections.fold(id, on)` / `foldAll(on)` / `folded(id)` | fold or unfold one section that folds, or all of them that are shown (a hidden one keeps its state); whether one is folded. The panel's title row has one button, "Collapse all" / "Expand all", that does `foldAll`; it shows when a section folds |
 | `rs.legend.add({id, color, label, shape})` or `{id, html}` | a row of the legend; `shape` is the mark of what the page draws in this colour: `square` (default), `circle` or `line`. `remove(id)`, `list()` |
 
 The event `rs:sectionchange` has `detail.id` and `detail.state`.
@@ -42,7 +43,16 @@ rs.help.set({title: "How to read this page", intro: "What the page shows.",
              terms: [["Inside the range", "How often the promise held."]], note: "A short note."});
 ```
 
-A "?" button appears in the panel's title (`anchor: element` puts it in another element, for example in the title of a panel that a module draws). `rs.help.get()` gives the words that are set now, and `rs.help.clear()` takes the window and the button away. On a phone the window is a sheet at the bottom of the screen. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
+A "?" button appears in the panel's title (`anchor: element` puts it in another element, for example in the title of a panel that a module draws). A page with more to explain puts a "?" button with its own words beside a card's title or a label, and all the buttons open the one window:
+
+```js
+rs.help.button(document.querySelector("#card-3 h2"), {title: "About step 3", intro: "What it does.", html: "<p>Words of the page's own.</p>", button: "About step 3"});
+rs.help.open({title: "Opened by a link", intro: "No button."});     // the same window, from a link or a key
+```
+
+The words are `{title, intro, terms, note, html}` (`html` is a block of the page's own after the intro); `button` is the name of the button for a screen reader and its tooltip. `rs.help.button` gives the button back.
+
+The window opens inside the screen. On a phone it is a sheet at the bottom of the screen. `rs.help.get()` gives the words that are set now, and `rs.help.clear()` takes the window and the button away. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
 
 ## Cards, number tiles and a callout
 

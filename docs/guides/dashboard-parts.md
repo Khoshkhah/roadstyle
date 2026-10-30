@@ -10,6 +10,8 @@ uses `--accent-fill`, the logo teal `#0E7F91`, which takes white text (4.71:1) i
 | Part | What it is | Use it for |
 |---|---|---|
 | `rs.help.set({title, intro, terms, note})` | the "i" button in the panel title and its window | "How to read this page" |
+| `rs.help.button(el, {title, ...})`, `rs.help.open({title, ...})` | one more "?" button with its own words, and the same window opened from a link | a card, a label |
+| `rs.sections.add({..., label, fold: true})` | a section that folds; one button in the title row folds all of them, and the state is kept | the page's cards |
 | `rs.hover.show(html, event)`, `rs.hover.on(node, html)` | the hover box, in the look of the popup | words over a chart or a map layer |
 | `class="rs-tabs"` + `rs.tabs.use(nav, onChange)` | tabs, and `rs-seg` for a two-way switch | the parts of a page, a mode |
 | `class="rs-sec-box"` | a card; an `h3` and the paragraph after it are its title and description | one block of a page |
