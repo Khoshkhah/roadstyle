@@ -94,8 +94,13 @@ marks! {
     Rank = "r";
     /// the class filter's value
     Class = "__rs_cls" [Pieces, Table];
-    /// the class index of the road layer's lookups
-    ClassIndex = "__rs_ci";
+    /// the Roads filter's class as a number in a tile, only when the filter is on another column than the class column (`filter_col`): the place of `__rs_cls` in
+    /// the filter's classes (`roadstyle:controls.filter.classes`). Otherwise the filter reads `__rs_ci`
+    ClassCode = "__rs_cc" [Pieces, Slots];
+    /// the class index of the road layer's lookups, and the class of a feature in a tile: its place in the model's classes (`roadstyle:classes`), else the
+    /// length of the list; a tile also has the Roads filter's classes that the model lacks after it (the style of a tile has the list). The style's class tests and the
+    /// Roads filter read it; a tile has no class text and no `__rs_cls`, the road table has the text
+    ClassIndex = "__rs_ci" [Slots];
     /// the road's grade (the position of its fill, as a number)
     Lvl = "lvl" [Pieces, Table];
     /// an item's road's grade
@@ -198,6 +203,26 @@ impl Mark {
         static BY_NAME: std::sync::OnceLock<std::collections::HashMap<&'static str, Mark>> = std::sync::OnceLock::new();
         BY_NAME.get_or_init(|| Mark::ALL.iter().rev().map(|&m| (m.name(), m)).collect()).get(name).copied()
     }
+}
+
+/// The keys, besides the marks, that a road feature of a tile (the layers `simple` and `slots`) may have (docs/design/tiling.md, "The keys of a
+/// tile"): `r` the rank of the sort key, `lvl` the level (the dashboard's bridge and tunnel switches filter on it), and the name slots' `name`, `chain`,
+/// `slot`, `rank` and `oneway`. A data column is not on the list: a road's fields come from the road table by the feature id (the road's row).
+pub const TILE_ROAD_KEYS: [&str; 7] = ["r", "lvl", "name", "chain", "slot", "rank", "oneway"];
+
+/// The most keys that the features of a layer have in a tile on the test data (the test `tile_keys` counts them, without the export look's `__rs_arw`).
+/// It only goes down. The flags, the end shape, the piece kind, the dash index and the level in one number were
+/// measured on 2026-10-30 and are not used: they make the MLT tiles (the default) and the style bigger (docs/design/tiling.md, "Why not one number").
+pub const TILE_KEY_COUNT: [(&str, usize); 2] = [("simple", 12), ("slots", 8)];
+
+/// The (layer, key) pairs of a tile that have a TEXT value: only the street name of a name slot. MapLibre's `text-field` reads it from the tile. A road
+/// piece has no text, and every other key is a number or a flag; the class is `__rs_ci` (the place in `roadstyle:classes`, for the style and the
+/// Roads filter), the dash pattern and the end shape are numbers (tiles/src/codes.rs). The test `tile_keys` fails for any other text value.
+pub const TILE_TEXT_KEYS: [(&str, &str); 1] = [("slots", "name")];
+
+/// A key that a road feature of a tile may have: a mark (but not the class text `__rs_cls`: the class is `__rs_ci`), or one of `TILE_ROAD_KEYS`.
+pub fn tile_key_allowed(key: &str) -> bool {
+    Mark::of(key).is_some_and(|m| m != Mark::Class) || TILE_ROAD_KEYS.contains(&key)
 }
 
 /// The keys of the dashboard's filters (class, level, access): a road-derived tile layer (the pieces, the slots) keeps them.

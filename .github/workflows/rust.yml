@@ -61,6 +61,11 @@ jobs:
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
         run: cargo test --offline --release
 
+      - name: The keys of the tiles of every path (the table is in the job summary; docs/design/tiling.md)
+        env:
+          ROADSTYLE_TILE_KEYS_OUT: ${{ github.step_summary }}
+        run: cargo test --offline --release -p roadstyle-rs --test tile_keys -- --nocapture
+
       - name: The programs (roadstyle-cli, roadstyle-mcp and roadstyle-snapshot are not default members)
         env:
           CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"

@@ -4,6 +4,7 @@
     "__rs_edge",
     "__rs_k",
     "__rs_cls",
+    "__rs_cc",
     "lvl",
     "__rs_lvl",
     "__rs_access",
@@ -14,6 +15,8 @@
     "__rs_casing_slab"
   ],
   "slots": [
+    "__rs_cc",
+    "__rs_ci",
     "chain",
     "slot",
     "rank",

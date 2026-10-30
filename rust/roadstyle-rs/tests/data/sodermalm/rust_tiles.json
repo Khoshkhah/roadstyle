@@ -15,33 +15,33 @@
         "roads-simple-dash",
         "line",
         "roads",
-        "c6dd38bb7bc4b1e3",
+        "7dba3dd03c4319bc",
         "2d5bf8efa2ddf2cb",
-        "f61343b045b32d9b"
+        "80a0a620e1edb4a9"
       ],
       [
         "roads-simple",
         "line",
         "roads",
-        "be36798777dcd860",
+        "723b0425b6040679",
         "4ed1ff35371e8f02",
-        "f61343b045b32d9b"
+        "80a0a620e1edb4a9"
       ],
       [
         "roads-arrows",
         "symbol",
         "roads",
-        "052373ab617afa51",
+        "a241851eeac8f610",
         "b9e63a214b296e3e",
-        "6defc6068961f92c"
+        "85d3837d775e0132"
       ],
       [
         "roads-labels",
         "symbol",
         "roads",
-        "e193daf9d3d4aeaf",
+        "a75220679d4f92dc",
         "e66f1480f0ee2761",
-        "042c1e60af4c52d7"
+        "ee1b27fc7b639905"
       ]
     ],
     "sources": {
@@ -55,43 +55,44 @@
       "roadstyle:interaction": "8bd55e519f81a314",
       "roadstyle:images": "e9049aa3d5b18840",
       "roadstyle:sources": "8bf9b5c1a82fc4e1",
+      "roadstyle:classes": "24c3e0f943aad349",
       "roadstyle:controls": "13b74d5d7142a722",
       "roadstyle:generation": "9e412555b660f02c",
       "roadstyle:contract": "d4735e3a265e16ee",
       "roadstyle:arrows": "42d2b70866ba77b8"
     },
-    "hash": "7c234526d4621aee"
+    "hash": "beb3a6759766f7d1"
   },
   "tiles": {
     "z12": {
       "simple": {
         "tiles": 3,
         "features": 2021,
-        "hash": "a315cc4deaeedd51"
+        "hash": "5e73dee0737daf61"
       }
     },
     "z14": {
       "simple": {
         "tiles": 7,
         "features": 10394,
-        "hash": "86bf47b4362a35cc"
+        "hash": "80b9ab017e8830ca"
       },
       "slots": {
         "tiles": 7,
         "features": 1334,
-        "hash": "dcb55d44cfa7330d"
+        "hash": "c18e61aa98a1655c"
       }
     },
     "z15": {
       "simple": {
         "tiles": 9,
         "features": 9376,
-        "hash": "3171c25d7cfc349b"
+        "hash": "e9f4de26e34d3351"
       },
       "slots": {
         "tiles": 9,
         "features": 1139,
-        "hash": "4ea5bfc884b864f4"
+        "hash": "67e8e797a62242fa"
       }
     }
   }

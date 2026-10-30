@@ -81,6 +81,8 @@ pub(crate) struct Builder {
     pub(crate) rules: rules::ZoomRules,
     /// the layer is the pieces': a property `__rs_edge` is a feature's id, not a key
     pub(crate) road_id: bool,
+    /// the numbers of the text keys of a road feature (None: not a road layer)
+    pub(crate) codes: Option<crate::codes::Codes>,
     /// the numbers of the last feature's properties, by place: the pieces of one road come one after another and have most of their
     /// properties the same, which then take their numbers with no lookup
     pub(crate) last: Vec<(u32, u32)>,
@@ -111,14 +113,18 @@ impl Builder {
     }
 
     /// The numbers of the properties' keys and values (a key or a value seen first gets the next number), and the first zoom that
-    /// the rules give them.
+    /// the rules give them. A road layer's text and its zero level become numbers or leave the feature (codes.rs): the class text is the one class number
+    /// `__rs_ci`, a dash pattern is its place in the road layer's `match`, a square end is 2, and a level of 0 has no key (every reader takes a missing level as 0).
     pub(crate) fn intern<K: AsRef<str>, V: TileValue>(&mut self, props: impl Iterator<Item = (K, V)>) -> (Vec<(u32, u32)>, f32, f32, Option<u64>) {
+        use roadstyle_model::mark::Mark;
         let (keys, key_at, vals, encoded, val_at, scratch) = (&mut self.keys, &mut self.key_at, &mut self.vals, &mut self.encoded, &mut self.val_at, &mut self.scratch);
-        let (rules, last, road_id) = (&self.rules, &self.last, self.road_id);
+        let (rules, last, road_id, codes) = (&self.rules, &self.last, self.road_id, &self.codes);
         let mut read = Map::new();        // the values that the first-zoom rules read
         let mut j = 0;
-        let (mut road, edge) = (None, roadstyle_model::mark::Mark::Edge.name());
-        let props: Vec<(u32, u32)> = props
+        let (mut road, edge) = (None, Mark::Edge.name());
+        // the class of a road feature of a tile: its text (the class column of a piece, `highway` of a slot) and the number that the engine gave a piece
+        let (mut class_text, mut class_no): (Option<String>, Option<i64>) = (None, None);
+        let mut props: Vec<(u32, u32)> = props
             .filter_map(|(k, v)| {
                 let v = v.tile_val()?;
                 if road_id && k.as_ref() == edge {
@@ -128,35 +134,53 @@ impl Builder {
                 if rules.reads(k.as_ref()) {
                     read.insert(k.as_ref().to_string(), json_of(&v));
                 }
-                if v == Val::Bool(false) && k.as_ref().starts_with(roadstyle_model::mark::PREFIX) {
+                // the first-zoom rules read the values above; the tile has the numbers
+                let key: &str = k.as_ref();
+                let (key, v): (&str, Val) = match codes.as_ref() {
+                    Some(c) => {
+                        if key == Mark::Class.name() {
+                            // the Roads filter reads `__rs_ci`; a filter on another column has its own number, the place of the filter's class text in its classes
+                            return match &v {
+                                Val::Str(s) if !c.filter_codes.is_empty() => c.filter_codes.iter().position(|x| x == s.as_ref())
+                                    .map(|i| number(keys, key_at, vals, encoded, val_at, scratch, last, { j += 1; j - 1 }, Mark::ClassCode.name(), Val::Int(i as i64))),
+                                _ => None,
+                            };
+                        }
+                        if key == Mark::ClassIndex.name() {
+                            class_no = if let Val::Int(i) = v { Some(i) } else { None };
+                            return None;
+                        }
+                        if !c.classes.is_empty() && (key == c.class_col || key == "highway") {
+                            if let Val::Str(s) = &v {
+                                class_text.get_or_insert_with(|| s.to_string());
+                            }
+                            return None;
+                        }
+                        match &v {
+                            Val::Str(s) if key == Mark::Dash.name() => (key, Val::Int(c.dashes.iter().position(|x| x == s.as_ref())? as i64 + 1)),
+                            _ if key == Mark::Dash.name() => return None,
+                            Val::Str(s) if key == Mark::Cap.name() && s == "square" => (key, Val::Int(2)),
+                            Val::Bool(true) if key == Mark::Cap.name() => (key, Val::Int(1)),
+                            _ if key == Mark::Cap.name() => return None,
+                            Val::Int(0) if key == "lvl" => return None,
+                            _ => (key, v),
+                        }
+                    }
+                    None => (key, v),
+                };
+                if v == Val::Bool(false) && key.starts_with(roadstyle_model::mark::PREFIX) {
                     return None; // a false flag: every reader of a __rs_* flag takes a missing key as false (to-boolean, a truthy check)
                 }
                 j += 1;
-                if let Some(&(at, n)) = last.get(j - 1).filter(|(at, n)| keys[*at as usize] == k.as_ref() && vals[*n as usize] == v) {
-                    return Some((at, n));        // the key and the value of the last feature's property in this place
-                }
-                scratch.clear();
-                encode_into(&v, scratch);
-                let v = match val_at.get(scratch.as_slice()) {
-                    Some(&at) => at,
-                    None => {
-                        vals.push(v.owned());
-                        encoded.push(scratch.clone());
-                        val_at.insert(scratch.clone(), vals.len() as u32 - 1);
-                        vals.len() as u32 - 1
-                    }
-                };
-                let at = match key_at.get(k.as_ref()) {
-                    Some(&at) => at,
-                    None => {
-                        keys.push(k.as_ref().to_string());
-                        key_at.insert(k.as_ref().to_string(), keys.len() as u32 - 1);
-                        keys.len() as u32 - 1
-                    }
-                };
-                Some((at, v))
+                Some(number(keys, key_at, vals, encoded, val_at, scratch, last, j - 1, key, v))
             })
             .collect();
+        if let Some(c) = codes.as_ref().filter(|c| !c.classes.is_empty()) {
+            let no = class_text.as_deref().map(|t| c.class_no(t)).or(class_no);
+            if let Some(no) = no {
+                props.push(number(keys, key_at, vals, encoded, val_at, scratch, last, j, Mark::ClassIndex.name(), Val::Int(no)));
+            }
+        }
         self.last.clone_from(&props);
         let (from, until) = if rules.is_empty() { (0.0, f32::INFINITY) } else { let (a, b) = rules.span(&read); (a as f32, b as f32) };
         (props, from, until, road)
@@ -176,6 +200,36 @@ impl Builder {
     }
 }
 
+
+/// The numbers of a property's key and value (new ones when the layer has not seen them); `j` is the place of the property in the feature: the
+/// same place of the last feature takes its numbers with no lookup.
+#[allow(clippy::too_many_arguments)]
+fn number(keys: &mut Vec<String>, key_at: &mut Numbers<String>, vals: &mut Vec<Val<'static>>, encoded: &mut Vec<Vec<u8>>, val_at: &mut Numbers<Vec<u8>>,
+          scratch: &mut Vec<u8>, last: &[(u32, u32)], j: usize, key: &str, v: Val) -> (u32, u32) {
+    if let Some(&(at, n)) = last.get(j).filter(|(at, n)| keys[*at as usize] == key && vals[*n as usize] == v) {
+        return (at, n);
+    }
+    scratch.clear();
+    encode_into(&v, scratch);
+    let n = match val_at.get(scratch.as_slice()) {
+        Some(&at) => at,
+        None => {
+            vals.push(v.owned());
+            encoded.push(scratch.clone());
+            val_at.insert(scratch.clone(), vals.len() as u32 - 1);
+            vals.len() as u32 - 1
+        }
+    };
+    let at = match key_at.get(key) {
+        Some(&at) => at,
+        None => {
+            keys.push(key.to_string());
+            key_at.insert(key.to_string(), keys.len() as u32 - 1);
+            keys.len() as u32 - 1
+        }
+    };
+    (at, n)
+}
 
 /// 1 px of a 512 px tile, in tile units.
 pub(crate) const PX: f64 = EXTENT / 512.0;

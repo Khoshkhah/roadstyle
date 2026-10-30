@@ -39,6 +39,8 @@ let _RS_ARROW = null;     // the profile's arrows.place, main_below and main, an
 // the one-way slots, indexed once for each slots data (N12): each piece's line and box, and each chain's pieces; made again when the data
 // changes (a new array of features: setData, or the level editor's update)
 let _slotIdx = {fs: null, pieces: [], chains: new Map()};
+// the class text of a name or arrow slot: a GeoJSON source has `highway`, a tile has `__rs_ci` (the place of the class in the style's `roadstyle:classes`)
+function _slotClass(p){ return p.highway != null ? p.highway : (((style && style.metadata) || {})["roadstyle:classes"] || [])[p.__rs_ci]; }
 function _slotIndex(){
   const fs = _sfeats((_src("slots")||{}).source);
   if(_slotIdx.fs === fs) return _slotIdx;
@@ -48,7 +50,7 @@ function _slotIndex(){
     const c = f.geometry && f.geometry.coordinates; if(!c) continue;
     const box = [Infinity, Infinity, -Infinity, -Infinity];
     for(const [x, y] of c){ if(x < box[0]) box[0] = x; if(y < box[1]) box[1] = y; if(x > box[2]) box[2] = x; if(y > box[3]) box[3] = y; }
-    const q = {c: c, p: p, box: box, main: _RS_ARROW.main.has(String(p.highway || "").replace(/_link$/, ""))};
+    const q = {c: c, p: p, box: box, main: _RS_ARROW.main.has(String(_slotClass(p) || "").replace(/_link$/, ""))};
     pieces.push(q);
     if(!chains.has(p.chain)) chains.set(p.chain, []);
     chains.get(p.chain).push(q);

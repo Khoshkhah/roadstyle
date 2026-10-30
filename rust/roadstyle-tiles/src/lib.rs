@@ -15,6 +15,7 @@
 pub mod buffer;
 pub mod error;
 pub mod format;
+pub mod codes;
 pub mod pmtiles;
 pub mod rules;
 pub mod stage;
@@ -92,6 +93,8 @@ pub struct Tiles {
     pub format: TileFormat,
     /// the props files of the layers with popup fields: (layer, JSON array of the fields by row, the row being the feature id)
     pub props_files: Vec<(String, String)>,
+    /// the numbers of the text keys of a road feature (codes.rs; docs/design/tiling.md)
+    pub codes: codes::Codes,
 }
 
 /// The properties that a layer's tiles keep: those in `keep`, the one key set of the layer (stage::TileOptions::rule).
@@ -115,7 +118,7 @@ impl Tiles {
         if buffers.len() != max_zoom as usize + 1 {
             return Err(Error::Options(format!("{} tile buffers for the zooms 0 to {max_zoom}", buffers.len())));
         }
-        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default(), generation: None, format: TileFormat::default(), props_files: Vec::new() })
+        Ok(Tiles { layers: IndexMap::new(), style: Vec::new(), min_zoom, max_zoom, buffers, cache: Default::default(), generation: None, format: TileFormat::default(), props_files: Vec::new(), codes: codes::Codes::default() })
     }
 
     /// The style's layers: a source added after this leaves out of a tile each feature that every layer drawing it hides at every zoom
@@ -131,7 +134,7 @@ impl Tiles {
     }
 
     fn builder(&self, name: &str) -> Builder {
-        Builder { rules: rules::ZoomRules::of(&self.style, name), road_id: road_layer(name), ..Default::default() }
+        Builder { rules: rules::ZoomRules::of(&self.style, name), road_id: road_layer(name), codes: road_layer(name).then(|| self.codes.clone()), ..Default::default() }
     }
 
     /// A new layer: the caches of the old tiles go.
@@ -231,7 +234,8 @@ impl Tiles {
         let Some(layer) = self.layers.get_mut(name) else { return };
         let Some((key_at, val_at)) = layer.at.take() else { return };
         let mut b = Builder { keys: std::mem::take(&mut layer.keys), key_at, vals: std::mem::take(&mut layer.vals),
-                              encoded: std::mem::take(&mut layer.encoded), val_at, road_id: road_layer(name), ..Default::default() };
+                              encoded: std::mem::take(&mut layer.encoded), val_at, road_id: road_layer(name),
+                              codes: road_layer(name).then(|| self.codes.clone()), ..Default::default() };
         for (i, c, props) in feats {
             let (props, ..) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep)));
             let f = &mut layer.feats[i as usize];
@@ -266,7 +270,7 @@ impl Tiles {
         let (key_at, val_at) = layer.at.take().unwrap_or_else(|| (keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
                                                                   encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect()));
         let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules,
-                              road_id: road_layer(name), last: Vec::new(), scratch: Vec::new() };
+                              road_id: road_layer(name), codes: road_layer(name).then(|| self.codes.clone()), last: Vec::new(), scratch: Vec::new() };
         for (j, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep)));

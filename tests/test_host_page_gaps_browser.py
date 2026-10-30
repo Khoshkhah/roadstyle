@@ -218,7 +218,7 @@ def _engine_style():
 # what the page finds with a style of the engine: each box, tool and global that follows the style (rs.setStyle), and goes with a style that has none
 _TOOLS = """() => ({
   floatingBoxes: [...document.querySelectorAll('.flt-ctrl, .co-ctrl, .tn-ctrl, .vw-ctrl, .ov-ctrl, .co-lg')].filter(e => e.getBoundingClientRect().width > 0).length,
-  primaryHidden: !!map.getLayer('rs-roads-simple') && JSON.stringify(map.getFilter('rs-roads-simple')).includes('["literal",["primary"]]'),
+  primaryHidden: !!map.getLayer('rs-roads-simple') && JSON.stringify(map.getFilter('rs-roads-simple')).includes('["in",["coalesce",["get","__rs_ci"],-1]'),    // a tile layer hides a class by its number (docs/design/tiling.md)
   floating: document.querySelectorAll('.ov-ctrl').length, switchShown: !document.querySelector('.rs-bm-layers').hidden,
   layers: (() => { rs.tools.open('legend'); const l = [...document.querySelectorAll('.rs-cb-layers .lg-row')].map(r => r.textContent.trim()); rs.tools.close('legend'); return l; })(),
   tunnel: !!document.querySelector('.tn-ctrl #tn-pre'),
