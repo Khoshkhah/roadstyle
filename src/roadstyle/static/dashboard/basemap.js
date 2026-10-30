@@ -1,7 +1,7 @@
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
-import {map, O, _emit} from "./core.js";
+import {map, O, _emit, _ownBuildings} from "./core.js";
 import {defineTool, BUILDINGS_ICON, LAYERS_ICON} from "./tools.js";
 import {buildBox} from "./basemapbox.js";
 let BASEMAPS = [];
@@ -24,7 +24,7 @@ const clearVector = ()=>{
 };
 const paintBuildings = ()=>{
   if(!vec) return;
-  const solid = map.getPitch() > 0.5, vis = on=>on && buildingsOn ? "visible" : "none";
+  const solid = map.getPitch() > 0.5, vis = on=>on && buildingsOn && !_ownBuildings() ? "visible" : "none";
   for(const l of vec.layers){
     if(l.type === "fill-extrusion") map.setLayoutProperty("vbm-"+l.id, "visibility", vis(solid));
     else if(/building/.test(l.id) && l.type === "fill") map.setLayoutProperty("vbm-"+l.id, "visibility", vis(!solid));
@@ -105,6 +105,7 @@ export function initBasemap(){
   window.rsSetBasemap = rsSetBasemap;
   window.rsBuildings = rsBuildings;
   map.on("pitchend", paintBuildings);
+  for(const ev of ["rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, paintBuildings);        // the page's own buildings on or off
   window.RS_BASEMAPS = BASEMAPS;
   if(BASEMAPS[0]) map.getContainer().style.backgroundColor = BASEMAPS[0].bg;
   // a page that starts on a vector style (basemap="ofm_liberty") merges it as soon as the style is in, as a click on its row would

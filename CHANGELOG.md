@@ -6,12 +6,21 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-30
+
 ### Added
 - **The dark theme of a live style's layers.** The style holds a dark colour for each light colour of the base map's layers (land, parks, water, buildings, paved, parking, lines, points), for
   the casing of the roads and for the names and arrows, picked by the global state `rs_theme`: the dashboard's theme switch sets it, so a host with a dark base map (Fiord) is dark
   all over with no new style and no new tile. The dark colour is the light one turned by the profile's `dark` block (a lightness band and a saturation for each of `area`, `line`, `point`,
   `casing` and `label`); the fill of a road keeps its colour. The textures and the icons have dark twin images. The Monaco style grows by 16.5 KB (+18.8 %); a style that is not live is as before.
   Design: `docs/design/dark_theme.md`.
+- **The tile budget limits the bytes of the feature properties** (`property_bytes`, a new limit: it is not a raise of an old limit). For each view and tile layer, `rust/roadstyle-rs/tests/tile_budget.rs` adds up the bytes of the `tags` field of every feature in the largest tile. `tests/data/tile_budget.json` has the limit of each area (the measured number plus 2 %), and `scripts/tile_budget.py` can only lower it. A key added to the features fails the test (`a_key_added_to_the_tiles_is_over_the_property_budget`).
+- **The bar folds** (`dashboard`): a fold button, first in the bar, folds it to one button (three lines); a tap opens it again, and the page keeps the choice in this browser (`rs-settings:toolbar-folded`).
+- **The phone sheet has a button**: the grip is a 44 px strip with a down arrow (an up arrow when the sheet is closed) that goes one height down, and up from closed. The grip and its line follow the theme (they were white in the dark theme).
+- **The first view fits into the free part of the window**: below the bar and above the sheet on a phone, beside the panel and the bar on a desktop (`window.rsFreePad`, called by the page's first `fitBounds`). It was a fixed 30 px, so the roads were half under the sheet or the panel.
+- **A person's switch of the 3D buildings shows them**: on, the map is tilted to 55° if it is flat and zoomed in to 15 if it is below 14.5 (where the buildings start); off, it is flattened again if this switch tilted it. There is no 2D / 3D button by default, so the switch did nothing visible on a flat map. A script's `rsBuildings(on)` moves nothing.
+- **`dashboard={"credits": [{"text": ..., "href": ...}]}`**: the credits of the page's own data, first in the credits list. The dashboard's default is "\u00a9 OpenStreetMap contributors" (the source of its roads, ODbL); `[]` leaves it out. It is not added again when the base map's list already names OpenStreetMap.
+- **The legend of live data** writes each range and its number of roads apart: one column, the range at the left, the count at the right in a lighter colour, with aligned digits (an entry is `[range, colour, count]`).
 - **`rs.classify`: discrete colour classes for roads, from data.** `classify(values, method="natural"|"quantile"|"equal"|"fixed", k, breaks=, pivot=, palette=, fmt=)` gives the cuts, the class labels and the colours (`.labels`, `.breaks`, `.colors`, `.option(column)` for `color_options`). Natural breaks are Fisher-Jenks, as in the JavaScript `rs.naturalBreaks`; a `pivot` is always one of the cuts; a missing value has its own grey class. Also `natural_breaks` and `ramp`.
 - **A docs page, "Dashboard parts"**, lists the shared parts of a dashboard page and the rules (width, colours, themes, scroll, transparency).
 - **`rs.ready(fn)`: start-up code of a page.** It runs `fn` now when the page is ready (`window.rsReady`), or when `rs:ready` comes. A page no longer writes `window.rsReady ? main() : addEventListener("rs:ready", main, {once: true})`.
@@ -25,6 +34,24 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The tool `roads`** (after the base map button): the road filter in the bar. A box with a row for each road class (check box, colour, name, number of roads), All and None, and a click on a name shows only
   that class; Bridges, Tunnels and the access kinds when the data has them. It uses the filter calls of the page, so the map template's Roads box and this tool are one filter. A page with no road classes
   has the button greyed out. A style that comes later (`rs.setStyle`) gets its own classes.
+- **`roadstyle levels make --boundary AREA.geojson`** keeps the edge of the area as `boundary.geojson` in the area folder. The level editor draws it as the dashboard's dashed boundary line.
+- **The level editor has the dashboard's base-map box.** The editor's own map starts on the page's base style (Blank, as every dashboard) with the standard box: the base
+  maps, "On top" (Hillshade, Labels, 3D buildings), and the dark twin that follows the theme. `host_options()` (and `data/host_options.json`) gives `style`, the base style that a
+  page of roadstyle gets, so a host page makes its map from it and has no copy of the rule. `levelEditor({basemaps})` takes it (`host_options.json`) and is required for the
+  editor's own map; the fixed OpenFreeMap Positron style is gone.
+- **The level editor's picked roads and hover have their own colours**, not the palette's purple: road 1 is red and its hover a light red; road 2 is blue and its hover a light blue (the hover is in the colour of the road that the next click picks). The look gets two sentinel colours that the editor replaces in the road layers' paint (`highlight`). The "on top" and part rows keep inside the panel: a long road name ends with "…". The editor's tabs and choice rows are the dashboard's segmented control.
+- **The editor's tabs scroll as the panel does.** A scroll box with the class `rs-pbody` (and `data-head`, the selector of its header, which has the class `rs-phead`) has the
+  panel's scroll protocol: a thin scrollbar at the outer edge, a line under the header and a fade at the bottom.
+- **`roadstyle levels edit AREA_DIR`**: the level editor from the Rust program, with no Python. It checks that the folder has `roads.parquet`, then serves the editor page
+  (the standard dashboard: one panel, the bar, both themes, the phone sheet) and saves `edits.csv`, `heads.csv`, `caps.csv` and `levels.csv`. `roadstyle serve` is the same
+  without the check. A new test (`tests/test_levels_edit_browser.py`) makes an area with the program and drives the page in Chromium.
+- **The level editor draws into the host's standard panel.** `levelEditor({map, panel, backLabel, ...})` takes the host's `#sb` (`.sb-card` with `.sb-top` and
+  `.sb-body`): the host's body is hidden, the top line is "← Steps" and "Edit levels" before the host's hide button, and `destroy()` puts the host's panel back. The
+  editor's own frame, fold buttons (`lv-toggle`, `lv-handle`), phone sheet and `layout` option are gone; the panel's side, width, look and phone sheet are the host's. A bar
+  at the bottom of the panel ("N waiting", Discard, Apply and solve) replaces the "Waiting to apply" box and shows only when changes wait; "← Steps" with changes waiting
+  asks apply, discard or stay, then sends the event `"back"`. The picked roads have the dashboard's selection glow; `destroy()` clears their colour (`rsColor(null)`) and
+  glow. The History tab has the edits.csv download. The colours are the panel's tokens. `roadstyle serve` serves `host_options.json`, and its page is a host of the
+  standard dashboard (template, panel, hide and show buttons).
 - **Every control that a style gives follows a later `rs.setStyle`.** The Roads box (classes, Bridges, Tunnels, access kinds), the Tunnels box, the arrows' icon and rules,
   the boundary's shade and limits, the arrow and the fill-layer facts of Street View, the pick layers, the id fields and the parts of `rs.getState()` were made once, at
   the start, so a page that starts with `style: null` had none of them. They are made again for each style now, and go with a style that has none; a switch that was off
@@ -58,12 +85,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **Every floating surface follows one of the three transparency sliders** (bar and panel, boxes with the popup and the tooltip, card behind the text): the zoom number and the legend of the map template had translucent backgrounds of their own and use the tokens now; the corner strip's colour and blur are on a pseudo element (as the bar's), so the credits box inside it blurs like the other boxes. A test fails for a translucent `background` of its own.
+- **The default base map list has no OpenFreeMap Bright** (it is a colour variant of Liberty): Liberty, Positron, OpenStreetMap, Esri Gray, Streets and Satellite, Blank. A page can still ask for `ofm_bright` by key.
+- **Documents and types follow the dashboard of this release.** `docs/design/dashboard_module.md` lists every module of `files.txt` (the tool registry, the bar, the navigation box, the Roads tool, the settings tool, the sections, the select box, the panel scroll, the tips, the window rules, the generation check and the natural breaks) and the default of `tiles`; `index.d.ts` types `rs.sections`, `rs.legend`, `rs.colorModes`, `rs.naturalBreaks` and the options `classes`, `breaks` and `fields` of `rs.setData`; `parameters.md` names `toolbar.navigation`; the agent guide (`skills/roadstyle/SKILL.md`) and `AGENTS.md` name the tile defaults and the one road layer.
 - **The panel of a dashboard is 400 px wide by default** (it was 340 px), so the pages of one project share one panel width. A page that needs another width still sets `dashboard={"panel": {"width_px": ...}}`; fit the content to the panel and do not widen the panel for it.
 - **The card behind the text starts at 40 %**, as the bar and the boxes do (`--rs-a-card` was 0.75). All three layers of the settings box start at 0.4; the person can still change each one.
 - **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
   roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:
   `{"*": 0, "service": 14}`) and the key `"@private"` (the first zoom of the private-access roads). `minzoom=False` is still every class at every zoom. The profile's own table (`default.yaml`) is unchanged for the map template.
-- **The explanation marks in the base map box are a "?"** (they were an italic "i"): the "i" is only the credits button.
+- **The base map box has no explanation marks** (the italic "i", then a "?"): the rows of Hillshade, Labels and 3D buildings are self-explaining. The credits list is short: the long lists of image sources ("Sources: Esri, Vantor, ...") are left out and a long text is cut.
 - **A page with a bar has no floating Layers box.** The style's own base-map layers (the duckOSM layers: landcover, water, buildings, ...) have one switch for all of them in the
   base-map box (`overlays_label`, default "Map layers"; `rsSetOverlays(on)`), and the legend box lists them with their colours, each swatch with a thin border so that a white
   or near-white colour shows. A page with no bar, or with no base-map box, keeps the Layers box.
@@ -75,6 +105,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   pixels differ at zoom 17 to 20.5) and the embedded archive is **one gzip stream** (the tiles are not gzipped one by one; the page inflates it with `DecompressionStream`).
   The tiles are **MLT in every path** (a page, the map worker, `export_style`, `roadstyle tiles`; the same pixels, 60 % of the bytes: Nacka 20.0 MB); `tile_format="mvt"` gives MVT.
   The map worker keeps each tile in each format (an MLT tile was made again at each request). One rule for the tile paths: docs/design/tiling.md.
+- **A road feature in a tile has no text at all but the street name of a name slot.** The tile cut (one rule for every path) writes the index of the dash pattern in `__rs_dash` and 1 or 2 in `__rs_cap`, and the expressions of the tile layers read them (`tiles/src/codes.rs`). The class text of a slot is `__rs_ci`, and a piece has no class text: `highway` is gone from the tiles, and the style's class tests (the class minzoom, the arrows' size and the names' size) read `__rs_ci`. The Roads filter hides a class by its place in `roadstyle:classes`, which has the filter's classes that the model lacks (Monaco: `ferry`) after the model's. One list of the keys of a road feature (`TILE_ROAD_KEYS`, `TILE_TEXT_KEYS`) and the test `tile_keys` check every path (a data column or a new text value in a tile fails it; so does a difference between the paths that the test does not name). On Nacka the tiles are not smaller (0 to 2 %): a text value was in a tile once.
+- **One class key in a tile, and a level only when it is not 0.** `__rs_cc` is gone from the default: the class is `__rs_ci`, a place in the tile style's `roadstyle:classes` (the model's classes, the fallback number, then the Roads filter's classes that the model lacks, such as Monaco's `ferry`), the style's class lookups have the fallback for each added class, and the Roads filter reads `__rs_ci` (the style tells it which key: `roadstyle:controls.filter.class_key`; a filter on another column than the class column, `filter_col`, still has `__rs_cc`). A road feature with `lvl` 0 has no `lvl` key (3,506 of 31,058 Monaco pieces have it). The test `tile_keys` fails when a layer has more keys than `TILE_KEY_COUNT` (`simple` 12, `slots` 8). Packing the flags, the end shape, the piece kind and the dash into one number was measured and not used: it makes the default MLT tiles (up to 9 %) and the style (up to 8 %) bigger (docs/design/tiling.md, "Why not one number for the flags").
 - **`rs.setData` is about 3 times faster on 22,000 roads** (17 ms to 6 ms; 71 ms to 23 ms with the CPU 4 times slower): the key-to-row index is made once and not for each call, a
   road's own fields are read with no copy, and the colour of a set is made once and not for each road.
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
@@ -82,6 +114,24 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- **The full sheet on a phone**: the sheet and the boxes of the bar used `vh`, which on a phone with its address bar visible is taller than the screen. The grip of the full sheet went under the bar and the sheet could not be lowered. They use `dvh` now (the visible screen).
+- **The help window and the scroll area use `dvh`, not `vh`** (the merge of `rs.help` and `rs-scroll` with the phone fixes): `100vh` and `60vh` are taller than the visible screen on a phone. The test `tests/test_dashboard_css_units.py` keeps `vh` out of the dashboard's CSS.
+- **The bar on a phone is one row**: when the tools do not fit, the row moves sideways under a finger (no scrollbar), with a soft fade at an edge that has more tools. A box of the bar opens under it as a fixed box of the window's width (the scrolling row would clip it). The fold button hides the bar: one small button stays, and the page keeps the choice. The tools are in `.rs-tb-scroll` inside `.rs-tb-row`, which are `display:contents` on a desktop.
+- **The page's own buildings win over a vector base map's**: a page with its own buildings layer (a 3D layer named in `extrude`, as the duckOSM page's area) drew both its buildings and the vector style's (OpenFreeMap) at the same place. While the page's are on, the style's buildings, flat and 3D, are not drawn and the base-map box's "3D buildings" row is off; switch the page's off and the style's come back (`_ownBuildings` in `core.js`).
+- **No hover on a touch-only device**: a tap on a phone makes the browser send an emulated mouse move, so a road showed its tooltip and its popup together. A device whose main input cannot hover (`(hover: none)`) has no hover tooltip and no hover light, on the roads and on the overlays; a tap is a click. A mouse is unchanged.
+- **The Google 3D window's header is one row on a phone**: its "heights: Mapzen" credit is a row of the bar's attribution box there ("Ground heights: Mapzen, SRTM", with the Google credit while a Google window is open), not in the header.
+- **The bars of the windows on a phone**: the bar of the Google 3D window (and of Street View) is one row; its tunnel note got a column of one word per line. The bar wraps, and the note has a row of its own.
+- **`duckosm levels` (`solve_area`) takes the `crossing` rows of a level area.** The Rust `make_area` writes `crossing` pair rows (a path at a node where a car road
+  goes on, 2026-10-25), but the Python solve path (`levels._indexed`, `solve_rules`) knew only meet, stack, near and order, so a solve stopped with
+  `pairs: the relation 'crossing' is not meet, stack, near or order`. The Rust solver has the crossing stage: `solve_rules` takes the crossings and gives the ones that it did not
+  keep, `solve_levels` passes them, `levels_info.json` has `crossings` and `crossings_not_kept`, and an edit can switch a crossing off. The Python engine
+  (`engine="python"`) has no such stage: it stops with an error that says so (no silent drop of the rows). Södermalm (8,929 roads): 1,201 crossings, none broken.
+- **Stored levels of roadstyle 0.17.1 are read.** A file whose `visualization.edge_levels` has the four numbers only and whose `edge_levels_meta` has `method` and no `source`
+  gave `Referenced column 'source' not found` (the Rust reader) or "not from a level area" (`load_area_levels`), so the pages drew the automatic order. Both readers now take the method
+  as the source, and the missing heads and caps are NULL (the default ends). The file is not written: no migration is needed. A meta row with neither column is still "not from
+  a level area".
+- The level editor's mode box (driving, walking, cycling, bus, private) was never shown: the editor's lean road table dropped the `modes` column. It keeps it now.
+- `roadstyle serve --page DIR` gives the page `host_options.json` (the program's own file) in place of a 404.
 - **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
   the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
   in tiles).
@@ -94,6 +144,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   inside the window, as the others do.
 
 ### Removed
+- **The CARTO base maps and OpenFreeMap Bright are removed.** The keys `voyager`, `voyager_nolabels`, `positron`, `dark_matter` and `ofm_bright` are gone from
+  `data/basemaps.json`. The base maps of roadstyle are now seven (each with its dark twin, when it has one): `ofm_liberty` (`ofm_fiord`), `ofm_positron` (`ofm_dark`), `osm`,
+  `esri_gray` (`esri_dark_gray`), `esri_street`, `satellite` and `blank` (`blank_dark`). None needs a key.
+  - **Fallback.** A page that asks for a removed key (`basemap=`, `basemaps=`, a view's `basemap`, the `basemap` of a saved look) gets `ofm_positron` and one warning for each such key.
+    The rule is in one place, `current_key` of `page_options.rs`, with the list `removed` and the key `fallback` in `data/basemaps.json`. `rs.get_basemap` gives an error for a removed key.
+  - **The default base map is `ofm_positron`** (it was `voyager`), in `defaults.json`, `StyleConfig.basemap` and the MCP programs. The MCP programs no longer pick `esri_street` when there is no key.
+  - **No CARTO key.** The settings box has no "CARTO key" row, and the page code has no saved CARTO key. The warning "CARTO base map requested with no API key" is gone. A base map of roadstyle never takes a key:
+    `api_key` goes only into a tile URL that you give, an xyzservices provider and a base map that you register. A key in a tile URL is now always `api_key=` (CARTO's `key=` is gone).
+  - `Basemap.lonboard` (the name of a CARTO style) is gone.
+  - OSM Carto, the colour scheme of OpenStreetMap (the palette `carto`, `basemap/osm_carto.yaml`), stays.
 - **The Roads box is gone** (the floating box with a row for each road class, Bridges, Tunnels and the access kinds, `.flt-ctrl`). A page with a bar has no place for it, and it covered the bar. The filter calls stay
   (`rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsFilter`, `rsSetModes`, `rs.setFilter`; `rs.setStyle` keeps what a call switched off): the colour box, `rs.setFilter`, the views and the host pages use them.
   The keyword `filter_control` (and `--no-filter`) has no effect now. The class minzoom dimming of the rows went with the box. The map's other old floating boxes (Tunnels, View) are hidden on a page with a bar, as Colour by was.

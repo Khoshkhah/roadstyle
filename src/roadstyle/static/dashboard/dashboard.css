@@ -137,6 +137,7 @@ html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a 
   width:auto!important;height:45%!important;border-radius:14px 14px 0 0;resize:none}
 html.rs-phone .rs-svw-bar{flex-wrap:wrap}   /* the buttons and the credit of a window do not fit in one row: the second row, and the note of the 3D window has a row of its own */
 html.rs-phone .rs-svw-t{flex:1 0 auto}
+html.rs-phone .rs-svw-bar a.rs-g3d-src{display:none}   /* its credit is in the bar's attribution box on a phone: the header is one row */
 html.rs-phone .rs-g3d-note{order:9;flex:1 0 100%}
 /* the phone form of a template (template.js; `rs-phone` and `rs-tpl-*` are on <html> from the first paint). A sidebar template shows its
    panel as a bottom sheet; the map is the full width. */

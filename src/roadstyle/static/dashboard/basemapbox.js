@@ -6,7 +6,7 @@
 // THE LABELS SWITCH is one state for the 2D map and the Google 3D window (window.rsLabelsOn): the window always follows it. The 2D map gets
 // labels only from a base map that can show them: the style's own labels (a vector style), or Esri's label tiles (Esri Gray, Esri Satellite).
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
-import {map, O, OVERLAYS, _emit} from "./core.js";
+import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
@@ -59,8 +59,10 @@ export function buildBox(menu){
   const apply = () => {
     const vec = vector(), kind = labelKind(), on = wantOf();
     tops.labels.c.checked = on;                       // the switches show the state of the map that is on
-    tops.buildings.c.disabled = !vec; tops.buildings.c.checked = vec && rsBuildings();
-    tops.buildings.lab.classList.toggle("rs-bm-off", !vec);
+    const own = _ownBuildings();                       // the area's own buildings are shown: they have their own switch, and the vector style's are not drawn
+    tops.buildings.c.disabled = !vec || own; tops.buildings.c.checked = vec && !own && rsBuildings();
+    tops.buildings.lab.classList.toggle("rs-bm-off", !vec || own);
+    tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
     raster("hillshade", tops.hillshade.c.checked, ontop.hillshade);
@@ -86,7 +88,7 @@ export function buildBox(menu){
   const swatches = () => rows.forEach(([b, , sw]) => { const tw = b.dark && byKey(b.dark); sw.style.background = _bxSwatch(isDark() && tw ? tw : b); });
   document.addEventListener("rs:basemapchange", e => { current = e.detail.basemap; mark(); setTimeout(apply, 0); });
   document.addEventListener("rs:basemapready", apply);
-  document.addEventListener("rs:buildingschange", apply);
+  for(const ev of ["rs:buildingschange", "rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, apply);
   document.addEventListener("rs:themechange", swatches);
   map.on("load", apply);
   mark(); swatches(); apply();

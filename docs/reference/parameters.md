@@ -122,7 +122,7 @@ have, is an error. Each palette that a view names is built once more into the pa
 | `popup_mode` | `None` (= `"popup"`) | web | `"panel"` docks the read-out in a side panel with a search box |
 | `side_panel_html` | `None` | web | the HTML of your own full-height panel on the right, with the docked panel's » handle, « map button and `rsPanelShow(on)`; the open or closed state is kept per page; `--rs-side` follows it. An error with `popup_mode="panel"` |
 | `host_panel_width` | `320` | web | the width of that panel, px |
-| `road_tooltip` | `False` | web | on hover: `True` = every column, a list = those columns |
+| `road_tooltip` | `False` | web | on hover: `True` = every column, a list = those columns. Not on a touch-only device (a phone): a tap is a click |
 | `hover_delay_ms` | `300` | web | a road or an overlay item lights up and shows its tooltip once the mouse rests this long on it (a passing mouse lights nothing); `0`: at once |
 | `data_maxzoom` | `None` | web | the last zoom MapLibre cuts the GeoJSON sources into tiles at; above it, MapLibre enlarges those tiles and does not cut them again. Positions are as exact as the tile grid of that zoom. `None`: MapLibre's own |
 | `data_tolerance` | `None` | web | how far MapLibre simplifies the road geometry in the tiles it cuts. `None`: `0.05`, which keeps every vertex. A road is cut into tiles in the browser, and zoomed out one tile holds a whole district: `1` makes a sweep at zoom 12 about three times faster (687 to 226 ms on a 22,000-road page), and the page looks the same at zoom 14 and above (no pixel differs in a 760 x 560 view) and the same at zoom 12 to within a fraction of a pixel along road edges |

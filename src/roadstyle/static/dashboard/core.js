@@ -33,9 +33,13 @@ export function _contractError(st){
     " or older: use a newer roadstyle dashboard. The dashboard adds no road interaction for this style." : null;
 }
 // a dashboard event: document's CustomEvent `type` with `detail` (the rs:* events of docs/reference/javascript.md)
+// a touch-only device (a phone): a tap makes the browser send an emulated mouse move, which is not a hover; no hover tooltip or light there
+export const _NO_HOVER = matchMedia("(hover: none)");
 export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...
 export let OVERLAYS = [];
+// the page's own buildings (a layer of its area with a 3D layer, features.js) are on: they win over the buildings of a vector base map
+export const _ownBuildings = () => OVERLAYS.some(o => o.extrude && o.visible !== false);
 // true from the map's first `load` event: a style that comes later (rs.setStyle) is added to a loaded map, and no `load` comes again for it
 // (isStyleLoaded is false while the new sources load)
 export let RS_LOADED = false;
