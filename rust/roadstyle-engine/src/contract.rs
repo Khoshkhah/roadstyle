@@ -24,7 +24,7 @@ pub fn page_state(look: &crate::Look, active: usize, n_overlays: usize) -> Map<S
     let ratio: Vec<f64> = Some(&tu.casing_dash).filter(|a| !a.is_empty()).map(|a| a.iter().map(Num::f).collect()).unwrap_or_else(|| vec![1.0, 1.0]);
     // render's road_fill: the start value of rs_fill_on (off: each fill's opacity is 0)
     let road_fill = look.map.roads.fill;
-    let mut state = json!({"rs_co": active, "rs_top": [], "rs_fill_on": road_fill,
+    let mut state = json!({"rs_co": active, "rs_top": [], "rs_fill_on": road_fill, "rs_theme": "light",
         "rs_tun_strength": tu.strength.f(), "rs_tun_toward": tu.toward_color(), "rs_tun_two": pair.is_some(),
         "rs_tun_c0": pair.map_or(dash, |p| &p[0]), "rs_tun_c1": pair.map_or(dash, |p| &p[1]), "rs_tun_ratio": ratio})
         .as_object().unwrap().clone();

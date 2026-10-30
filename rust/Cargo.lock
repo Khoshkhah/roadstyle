@@ -1894,6 +1894,7 @@ dependencies = [
 name = "roadstyle-engine"
 version = "0.26.0"
 dependencies = [
+ "base64 0.22.1",
  "foldhash 0.2.0",
  "indexmap",
  "roadstyle-levels",

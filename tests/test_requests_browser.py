@@ -6,6 +6,7 @@ playwright is not installed.
 import json
 
 import pytest
+from light import light
 
 pw = pytest.importorskip("playwright.sync_api")
 
@@ -111,7 +112,7 @@ def test_circle_overlay_outline_and_width(tmp_path):
         browser, page, _ = _open(p, path)
         got = page.evaluate("[map.getPaintProperty('ov0-circle','circle-stroke-color'), map.getPaintProperty('ov0-circle','circle-stroke-width')]")
         browser.close()
-    assert got == ["#112233", 3]
+    assert [light(got[0]), got[1]] == ["#112233", 3]
 
 
 def _access_edges():

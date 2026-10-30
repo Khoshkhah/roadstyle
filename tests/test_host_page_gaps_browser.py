@@ -19,7 +19,17 @@ import pytest
 pw = pytest.importorskip("playwright.sync_api")
 ROOT = pathlib.Path(__file__).parents[1]
 FILES = "/rust/roadstyle-assets/files"
-PNG = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d605a60000000049454e44ae426082")
+def _png():
+    """A 1 x 1 PNG that MapLibre decodes (the sprite of the host page, the raster tiles)."""
+    import struct
+    import zlib
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(b"\x00\x80\x80\x80\xff")) + chunk(b"IEND", b"")
+
+
+PNG = _png()
 SQUARE = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "a"}, "geometry": {
     "type": "Polygon", "coordinates": [[[18.0, 59.3], [18.01, 59.3], [18.01, 59.31], [18.0, 59.31], [18.0, 59.3]]]}}]}
 HOST = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -356,3 +366,48 @@ def test_the_one_switch_hides_every_layer_of_the_area_data_and_shows_them_again(
         assert "rs-ov0-pattern" in again and "rs-ov5-3d" in again, again
         browser.close()
     assert not errors, errors
+
+
+_LUMA = """async () => {
+  await new Promise(r => map.once('idle', r));
+  const c = map.getCanvas(), w = c.width, h = c.height, g = document.createElement('canvas'); g.width = w; g.height = h;
+  const x = g.getContext('2d'); map.triggerRepaint(); await new Promise(r => map.once('render', r)); x.drawImage(c, 0, 0);
+  const d = x.getImageData(0, 0, w, h).data; let s = 0, n = 0;
+  for (let i = 0; i < d.length; i += 16) { s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; n++; }
+  return s / n;
+}"""
+
+
+def test_the_dark_theme_turns_the_layers_of_the_style_dark_with_no_new_style(host):
+    """The live style of the engine has a dark colour for each light one, and the dashboard's theme switch sets the global state rs_theme. The map is dark with the dark
+    base map, the roads keep their fill, no expression is refused, and the light theme comes back."""
+    base, vec = host
+    style, tiler = _engine_style()
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--enable-webgl-draw-buffers"])
+        page = browser.new_page(viewport={"width": 900, "height": 700})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="application/x-protobuf", body=bytes(tiler.tile(*(int(v) for v in r.request.url.rsplit("/t/", 1)[1].split("?")[0].split("/")))))
+                   if "/t/" in r.request.url else r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        page.evaluate("(s) => addStyle(s)", style)
+        page.evaluate("(c) => map.jumpTo({center: c, zoom: 15.5})", style["center"])
+        page.evaluate("() => rsSetBasemap('blank')")
+        light = page.evaluate(_LUMA)
+        assert page.evaluate("() => map.getGlobalState().rs_theme") == "light"
+        page.evaluate("() => rsSetTheme('dark')")
+        assert page.evaluate("() => map.getGlobalState().rs_theme") == "dark"
+        dark = page.evaluate(_LUMA)
+        # the layers alone: the same light backdrop, the style's colours of the dark theme over it
+        page.evaluate("() => { map.setPaintProperty('bg', 'background-color', '#efede8'); map.getContainer().style.backgroundColor = '#efede8'; }")
+        layers_only = page.evaluate(_LUMA)
+        page.evaluate("() => rsSetTheme('light')")
+        again = page.evaluate(_LUMA)
+        engine_errors = page.evaluate("() => window.errors")
+        browser.close()
+    assert not errors and not engine_errors, (errors, engine_errors)
+    assert dark < 0.45 * light, (light, dark)         # the land, the water and the buildings are dark; the roads keep their fill
+    assert layers_only < 0.9 * light, (light, layers_only)      # the base map is the same: the style's own layers are darker
+    assert abs(again - light) < 1.0, (light, again)

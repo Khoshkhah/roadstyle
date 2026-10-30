@@ -8,6 +8,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import pytest
+from light import light
 from shapely.geometry import LineString
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "roadstyle"
@@ -86,11 +87,11 @@ def test_profile_and_palette_by_name_for_one_render(tmp_path, monkeypatch):
     (tmp_path / "profiles").mkdir()
     (tmp_path / "profiles" / "late.yaml").write_text("labels: {minzoom: 15.5}\n")
     s = _style(rs.render_edges(_edges(), basemap="blank", palette="blue", profile="late"))
-    assert _layer(s, "roads-labels")["paint"]["text-color"] == "#0000ff"          # the palette's colors
+    assert light(_layer(s, "roads-labels")["paint"]["text-color"]) == "#0000ff"          # the palette's colors
     assert "#abcdef" in json.dumps(_layer(s, "roads-simple")["paint"]["line-color"])
     assert _layer(s, "roads-labels")["minzoom"] == 15.5                            # the profile's rules
     s2 = _style(rs.render_edges(_edges(), basemap="blank"))                         # the next render: default and amber again
-    assert _layer(s2, "roads-labels")["paint"]["text-color"] == "#5b5b5b" and _layer(s2, "roads-labels")["minzoom"] == 14
+    assert light(_layer(s2, "roads-labels")["paint"]["text-color"]) == "#5b5b5b" and _layer(s2, "roads-labels")["minzoom"] == 14
 
 
 def test_unknown_name_is_an_error_that_lists_the_names():

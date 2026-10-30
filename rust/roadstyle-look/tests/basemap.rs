@@ -92,6 +92,10 @@ fn the_64_looks_of_mapstyle() {
         if let Some(d) = got.pointer_mut("/theme/data").and_then(Value::as_object_mut) {
             d.shift_remove("live_ramp");
         }
+        // added on 2026-10-30: the profile's dark theme bands (the style's dark colours, roadstyle-engine dark.rs)
+        if let Some(t) = got.get_mut("theme").and_then(Value::as_object_mut) {
+            t.shift_remove("dark");
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }

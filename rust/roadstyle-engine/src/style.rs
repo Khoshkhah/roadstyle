@@ -70,6 +70,14 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
         sources.push(("slots".into(), Src::Json(slots_for(slots, export))));
     }
     add_boundary(look, &mut sources, &mut layers);
+    // a live style (the dashboard's) has the dark colours too, picked by the global state rs_theme (dark.rs)
+    if live {
+        let sel = &look.sections.selection;
+        let keep: Vec<String> = [Some(sel.select.css()), Some(sel.hover.css()), look.map.interaction.select_color.as_ref().map(|c| c.css()),
+                                 look.map.interaction.hover_color.as_ref().map(|c| c.css())].into_iter().flatten().map(String::from).collect();
+        crate::dark::layers(&mut layers, &look.sections.dark, &keep);
+        crate::dark::images(&mut images, &look.sections.dark)?;
+    }
     images.insert("oneway".into(), look.sections.arrows.image.clone());
     let mut metadata = metadata(look, images, planned, colors.meta, &layers, contract)?;
     if !popups.is_empty() {

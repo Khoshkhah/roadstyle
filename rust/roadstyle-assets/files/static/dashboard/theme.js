@@ -1,15 +1,24 @@
 // The page's theme: <html data-rs-theme="light|dark">, which the popup, the tooltip and (later) the bar read (popup.css, dashboard.css).
 // A sidebar of a template keeps its own switch (`data-theme` on #sb); this follows it. rsSetTheme(name) sets both.
+import {map} from "./core.js";
+// the dark theme of the style's layers (dark.rs): the global state rs_theme, which the layers' colours read ("dark" picks the dark colour of each). It is set when
+// the style is loaded (before that MapLibre refuses a global state), and again at each change of the theme
+const syncStyleTheme = () => {
+  const set = () => map.setGlobalStateProperty("rs_theme", document.documentElement.dataset.rsTheme === "dark" ? "dark" : "light");
+  try { set(); } catch(e){ if(!/not done loading/.test(e.message)) throw e; map.once("style.load", set); }
+};
 export function rsSetTheme(name){
   const dark = name === "dark", root = document.documentElement;
   if(root.dataset.rsTheme === (dark ? "dark" : "light")) return;
   root.dataset.rsTheme = dark ? "dark" : "light";
   for(const el of document.querySelectorAll("#sb")) if(el.dataset.theme !== root.dataset.rsTheme) el.dataset.theme = root.dataset.rsTheme;
+  syncStyleTheme();
   document.dispatchEvent(new CustomEvent("rs:themechange", {detail: {theme: root.dataset.rsTheme}}));
 }
 export function initTheme(){
   window.rsSetTheme = rsSetTheme;
   document.documentElement.dataset.rsTheme = "light";
+  syncStyleTheme();
   // a base map with a dark twin (`dark` in data/basemaps.json) follows the theme: the twin in the dark theme, the light map again in the
   // light theme; and a dark base map that the person picks turns the page dark
   let current = null;         // the base map now: the first of the list (the page's own) until a change; the list is not there yet when this runs

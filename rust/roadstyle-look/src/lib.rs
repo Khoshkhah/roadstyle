@@ -26,6 +26,8 @@ pub use widths::{round_to, RoadModel};
 
 /// The pixels of an 8-bit PNG: (width, height, channels, the rows), for the tests of the textures.
 pub use png::decode as png_pixels;
+/// An 8-bit RGBA PNG of `w` x `h` pixels (the rows one after the other): the engine's dark twins of the textures.
+pub use png::encode_rgba as png_rgba;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
