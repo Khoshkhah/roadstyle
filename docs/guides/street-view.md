@@ -51,6 +51,16 @@ With a Google Maps JavaScript API key the window's bar has the same **Linked / C
 the side-by-side page: Linked is a real panorama and the map marker walks with you, Classic is the
 keyless embed.
 
+## Docked beside the map
+
+A dashboard can have Street View as a side of the page, with a divider you drag, and no panel:
+
+```python
+rs.render_dashboard(edges, street_view="dock", street_view_key=KEY).save("street_view.html")
+```
+
+The window takes the right part of the screen (the lower part on a phone) and the map the rest. The bar is at the left, the map's own edge, and its Street View button closes and opens the dock. Drag the divider: the share is 20 to 80 % and the browser remembers it. The page has no panel; `dashboard={"panel": {...}}` gives it one, and `dashboard={"toolbar": {"position": "top"}}` moves the bar. A map with the toolbox and no panel and no Street View dock is `dashboard={"panel": None}`.
+
 ## Side by side
 
 A page of its own: the map and Street View share the screen. Click a road and Street View shows it.

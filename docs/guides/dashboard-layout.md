@@ -26,7 +26,7 @@ defaults, and a wrong key or value is an error. These are the parts:
 
 | Part | Keys |
 |---|---|
-| `panel` | `side` (`"left"` or `"right"`), `width_px` (400 by default; fit your content to the panel and do not widen the panel for it), `look` (`"frame"` or `"card"`), `sections`, `hide` ([Add to the panel](dashboard-panel.md)) |
+| `panel` | `None` (no panel: a map with the toolbox), or `side` (`"left"` or `"right"`), `width_px` (400 by default; fit your content to the panel and do not widen the panel for it), `look` (`"frame"` or `"card"`), `sections`, `hide` ([Add to the panel](dashboard-panel.md)) |
 | `toolbar` | `position` (`"left"`, `"top"`, `"right"` or `"bottom"`), `navigation` (`"box"` or `"buttons"`), `settings`, `hold` |
 | `legend` | `rows`: the rows that your page adds to the legend |
 | `credits` | the credits of your own data: `[{"text": ..., "href": ...}]` |

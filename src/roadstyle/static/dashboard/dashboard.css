@@ -612,3 +612,15 @@ html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-li
 #sb .rs-chip{display:inline-block;padding:2px 8px;border-radius:10px;background:color-mix(in srgb,var(--mut) 18%,transparent);color:var(--mut);font-size:11px;font-weight:600;line-height:1.35}
 #sb .rs-chip.accent{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
 #sb .rs-dot{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:var(--mut)}
+
+/* ---- STREET VIEW DOCKED (street_view="dock", streetview.js): a side of the page. The window takes the right part of the screen with a divider, the map takes the rest;
+   on a phone the window is the lower part. The overlay's `#map{inset:0}` gives way to the window's share (`--rs-sv-w`). ---- */
+html.rs-sv-docked.rs-overlay #map{right:var(--rs-sv-w,42%)!important;width:auto!important}
+.rs-svw.rs-svw-dock{position:fixed;top:0;right:0;bottom:0;left:auto!important;width:var(--rs-sv-w,42%)!important;height:auto!important;max-width:none;border-radius:0;resize:none;
+  box-shadow:none;border-left:1px solid var(--rs-tb-border);-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--rs-card-bg)}
+.rs-svw-drag{position:fixed;top:0;bottom:0;right:calc(var(--rs-sv-w,42%) - 5px);width:10px;cursor:col-resize;z-index:61;touch-action:none}
+.rs-svw.rs-dragging iframe,.rs-svw.rs-dragging .rs-svw-pano{pointer-events:none}
+.rs-svw-drag:hover{background:color-mix(in srgb,var(--rs-tb-ink) 18%,transparent)}
+.rs-svw-drag[hidden]{display:none}
+html.rs-phone.rs-sv-docked.rs-overlay #map{right:0!important;bottom:45%!important;height:auto!important}
+html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:45%!important}

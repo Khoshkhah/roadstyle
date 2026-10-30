@@ -6,6 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **A dashboard with no panel: `dashboard={"panel": None}`.** The page is a map with the toolbox and nothing else (it had the panel's HTML even then). `rs.help.set` puts its "i" button in the bar when there is no panel title for it.
+- **Street View docked beside the map: `street_view="dock"`.** The window is a side of the page, not a floating window: it takes the right part of the screen (the lower 45 % on a phone), the map takes the rest, and a divider that the person drags sets the share (20 to 80 %, kept in the browser). The page has no panel and the bar is at the left, the map's own edge; `dashboard=` can give a panel and move the bar. The Street View button of the bar closes and opens the dock; the map gets the whole page when it is closed. `street_view="window"` is unchanged.
+
 ## [0.26.0] - 2026-10-30
 
 ### Added

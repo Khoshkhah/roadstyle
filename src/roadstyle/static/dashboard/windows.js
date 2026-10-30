@@ -48,7 +48,7 @@ function _wFit(w){
 export function initWindows(){
   const D = O.dashboard;
   if(!D) return;
-  const wins = () => [...document.querySelectorAll(".rs-svw")];
+  const wins = () => [...document.querySelectorAll(".rs-svw:not(.rs-svw-dock)")];
   // a phone: one sheet is open at a time (the panel's, the Street View window, the Google 3D window)
   const close = id => { const t = getTool(id); if(t && t.isOpen && t.isOpen()) t.close(); };
   document.addEventListener("rs:streetviewchange", e => { if(e.detail.open && _wPhone()){ close("google_3d"); setSheet(0); } });
