@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **The toolbar is at the right edge by default** (`dashboard`, desktop): the panel stays at the left. The bar's boxes open to its left, and the corner box (the credits) is below the bar's end. The Rust default (`Toolbar.position`), `data/host_options.json` (the duckOSM page reads it) and the first-paint class (`rs-tb-right`) follow. A page that sets `dashboard={"toolbar": {"position": ...}}` keeps its place, and a person's saved choice wins. The phone keeps the bar at the top.
+
 ### Added
 - **`rs.classify`: discrete colour classes for roads, from data.** `classify(values, method="natural"|"quantile"|"equal"|"fixed", k, breaks=, pivot=, palette=, fmt=)` gives the cuts, the class labels and the colours (`.labels`, `.breaks`, `.colors`, `.option(column)` for `color_options`). Natural breaks are Fisher-Jenks, as in the JavaScript `rs.naturalBreaks`; a `pivot` is always one of the cuts; a missing value has its own grey class. Also `natural_breaks` and `ramp`.
 - **A docs page, "Dashboard parts"**, lists the shared parts of a dashboard page and the rules (width, colours, themes, scroll, transparency).

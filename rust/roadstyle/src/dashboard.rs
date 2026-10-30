@@ -368,7 +368,7 @@ impl Template {
         let (layout, panel, toolbar, windows) = match (self, layout) {
             (Template::Map, _) => (Layout::Dock, None, None, free),
             (Template::Dashboard, Layout::Dock) => (Layout::Dock, panel0.clone(), None, free),
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone(), Some(Toolbar { position: Edge::Left, settings: true, hold: false, navigation: Navigation::Box }),
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone(), Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
         Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(),
@@ -500,7 +500,7 @@ mod tests {
         assert_eq!((d.layout, d.panel.as_ref().map(|p| (p.side, p.width_px, p.look)), d.toolbar), (Dock, Some((Edge::Left, 400, PanelLook::Frame)), None));
         assert_eq!(d.panel.as_ref().unwrap().hide, ["base_map", "colour_by", "legend"]);
         let r = Template::Dashboard.dashboard(Overlay);
-        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Left, settings: true, hold: false, navigation: Navigation::Box })));
+        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
         for layout in [Dock, Overlay] {         // the map has no panel, whatever the layout is
             let free = Template::Map.dashboard(layout);
@@ -526,7 +526,7 @@ mod tests {
     #[test]
     fn the_first_paint_script_names_the_classes_of_the_form() {
         let r = Template::Dashboard.dashboard(Overlay).first_paint();
-        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-left","rs-panel-left","rs-hide-scale")"#) && r.contains("(max-width:700px)"), "{r}");
+        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-hide-scale")"#) && r.contains("(max-width:700px)"), "{r}");
         assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock","rs-panel-left","rs-hide-scale")"#));
         // the width of the panel, and a side and a look that are not the default
         let mut wide = Template::Dashboard.dashboard(Overlay);
@@ -560,7 +560,7 @@ mod tests {
     fn the_defaults_are_the_json_that_the_page_reads() {
         let v = serde_json::to_value(Template::Dashboard.dashboard(Overlay)).unwrap();
         assert_eq!(v["template"], "dashboard");
-        assert_eq!(v["toolbar"], serde_json::json!({"position": "left", "settings": true, "hold": false, "navigation": "box"}));
+        assert_eq!(v["toolbar"], serde_json::json!({"position": "right", "settings": true, "hold": false, "navigation": "box"}));
         assert_eq!(v["scale_box"], false);
         assert_eq!(v["phone"], serde_json::json!({"max_width_px": 700, "toolbar": "top"}));
         assert!(serde_json::from_value::<Dashboard>(serde_json::json!({"template": "map", "layout": "dock", "panel": null, "toolbar": null,
