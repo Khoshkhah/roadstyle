@@ -179,8 +179,9 @@ export function _sv(ll, f){
     return '<div class="rs-sv" style="margin-top:4px"><a href="#" onclick="rsSetStreetView(true);return false">Street View</a></div>';
   return !u ? "" : '<div class="rs-sv" style="margin-top:4px"><a target="_blank" rel="noopener" href="'+
     _esc(u)+'">Street View &#8599;</a></div>'; }
+export function useSpot(){ _streetView = !!O.street_view; RS_FILL_LAYERS = O.fill_layers.map(id=>RS_PREFIX+id); }      // the style's fill layers: a later style has its own
 export function initSpot(){
-  _streetView = !!O.street_view; RS_FILL_LAYERS = O.fill_layers.map(id=>RS_PREFIX+id);
+  useSpot();
   window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
   map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
   window.rsGetStreetViewSpot = rsGetStreetViewSpot;

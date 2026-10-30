@@ -3,7 +3,7 @@
 import {map, O, _emit} from "./core.js";
 import {_tlHost} from "./panel.js";
 import {rsSetColorField, rsSetRoadFill} from "./color.js";
-import {FILTER, _fltSw, rsSetClasses, rsSetBridges, rsSetTunnels} from "./filter.js";
+import {rsSetClasses, rsSetBridges, rsSetTunnels} from "./filter.js";
 import {rsSetOverlay} from "./overlays.js";
 import {rsSetBasemap} from "./basemap.js";
 import {rsSetView3D} from "./view3d.js";
@@ -21,9 +21,7 @@ export function rsSetView(nameOrIdx){
   if("tunnels" in s) rsSetTunnels(s.tunnels);
   if("basemap" in s) rsSetBasemap(s.basemap);
   if("view3d" in s) rsSetView3D(s.view3d);
-  if("palette" in s){ map.setGlobalStateProperty("rs_palette", s.palette);     // the page holds every view's palette (render_web._merge_palettes)
-    const sw = (FILTER.palettes||{})[s.palette] || {};
-    for(const c in _fltSw) if(sw[c]) _fltSw[c].style.background = sw[c]; }
+  if("palette" in s) map.setGlobalStateProperty("rs_palette", s.palette);     // the page holds every view's palette (render_web._merge_palettes)
   _vwActive = i;
   const sel=document.getElementById("vw-select"); if(sel) sel.value=String(i);
   _emit("rs:viewselect", {view:v.name, index:i});

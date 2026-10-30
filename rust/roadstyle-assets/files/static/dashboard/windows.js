@@ -9,17 +9,23 @@ import {setSheet} from "./template.js";
 const _wGap = 12;
 export const _wPhone = () => document.documentElement.classList.contains("rs-phone");
 const _wVis = e => !!e && getComputedStyle(e).display !== "none" && e.getBoundingClientRect().width > 0;
-// the part of the map that no panel and no bar covers, in window coordinates: {lo, hi} across, {top, bottom} down
+// the part of the map that no panel and no bar covers, in window coordinates: {lo, hi} across, {top, bottom} down. On a phone the bar is at the top and
+// the sheet is at the bottom: its upper edge is the grip (a closed sheet has the grip alone).
 export function freeArea(){
   const m = map.getContainer().getBoundingClientRect();
   let lo = m.left, hi = m.right, top = m.top, bottom = m.bottom;
-  if(_wPhone()) return {lo, hi, top, bottom};
+  const bar = document.getElementById("rs-toolbar");
+  if(_wPhone()){
+    const grip = document.querySelector(".rs-grip"), sb = document.getElementById("sb"), edge = _wVis(grip) ? grip : _wVis(sb) ? sb : null;
+    if(edge) bottom = Math.min(bottom, edge.getBoundingClientRect().top);
+    if(_wVis(bar)) top = Math.max(top, bar.getBoundingClientRect().bottom + 8);
+    return {lo, hi, top, bottom};
+  }
   for(const p of document.querySelectorAll("#sb, .rs-side")){
     if(!_wVis(p)) continue;
     const r = p.getBoundingClientRect();
     (r.left + r.right) / 2 < innerWidth / 2 ? lo = Math.max(lo, r.right) : hi = Math.min(hi, r.left);
   }
-  const bar = document.getElementById("rs-toolbar");
   if(_wVis(bar)){
     const r = bar.getBoundingClientRect(), e = bar.dataset.edge;
     if(e === "right") hi = Math.min(hi, r.left - 8); else if(e === "left") lo = Math.max(lo, r.right + 8);

@@ -13,6 +13,8 @@ const EVENTS = {select: "rs:select", deselect: "rs:deselect", filter: "rs:filter
                 roadfill: "rs:roadfillchange", streetview: "rs:streetviewchange", google3d: "rs:google3dchange", data: "rs:datachange",
                 tool: "rs:toolchange"};
 
+let _refresh = null;
+export function refreshState(){ if(_refresh) _refresh(); }     // a new roads style (rs.setStyle): the overlays, the tunnel look and the colour option of the state are the style's
 export function makeApi(extra){
   let rowOf = null, edgeOf = null;                    // edge id <-> row, made on the first use (every road's properties, once)
   const index = () => {
@@ -25,14 +27,19 @@ export function makeApi(extra){
   const row = id => { index(); return rowOf.has(String(id)) ? rowOf.get(String(id)) : id; };
   const edge = r => { index(); return edgeOf.has(r) ? edgeOf.get(r) : (r == null ? null : String(r)); };
   const rows = ids => ids == null ? null : Array.from(ids, row);
-  const filt = O.filter || {};
   const state = {v: 1, selection: null, highlight: [], colorBy: ((O.color_options || [])[O.color_active] || {}).name || null, colors: [],
                  filter: {classes: null, bridges: true, tunnels: true, access: [], ids: null}, overlays: {},
                  roadFill: !O.road_fill || O.road_fill.on !== false, tunnel: null, palette: null, view: null,
                  basemap: ((O.basemaps || [])[0] || {}).key || null, view3d: false, streetView: {mode: "off"}, google3d: false, panel: null};
-  (O.overlays || []).forEach(o => { state.overlays[o.label] = {visible: o.visible !== false}; });
-  if(O.tunnel && O.tunnel.layers && Object.keys(O.tunnel.layers).length)
-    state.tunnel = {strength: O.tunnel.strength, toward: O.tunnel.toward, palette: O.tunnel.palette, ratio: O.tunnel.ratio};
+  // the parts of the state that a style gives: at the start, and again for a new style (refreshState)
+  const fromStyle = () => {
+    state.overlays = {};
+    (O.overlays || []).forEach(o => { state.overlays[o.label] = {visible: o.visible !== false}; });
+    state.tunnel = O.tunnel && O.tunnel.layers && Object.keys(O.tunnel.layers).length
+      ? {strength: O.tunnel.strength, toward: O.tunnel.toward, palette: O.tunnel.palette, ratio: O.tunnel.ratio} : null;
+    state.colorBy = ((O.color_options || [])[O.color_active] || {}).name || null;
+  };
+  fromStyle(); _refresh = fromStyle;
   const listeners = new Map();                        // our own document listeners, for destroy()
   const fns = {};                                     // on(): the host's functions by event name
   const emit = (name, detail) => (fns[name] || []).forEach(f => { try{ f(detail); }catch(e){ console.error(e); } });
@@ -83,7 +90,7 @@ export function makeApi(extra){
     color(groups){ if(!groups || !groups.length) call("rsColor", null); else call("rsColor", groups.map(g => [rows(g.ids), g.color])); },
     setFilter(f){
       const x = f || {};
-      if("classes" in x) call("rsSetClasses", x.classes == null ? (filt.classes || []) : x.classes);
+      if("classes" in x) call("rsSetClasses", x.classes == null ? ((O.filter || {}).classes || []) : x.classes);
       if("bridges" in x) call("rsSetBridges", !!x.bridges);
       if("tunnels" in x) call("rsSetTunnels", !!x.tunnels);
       if("access" in x && window.rsGetAccess){ const off = new Set(x.access || []); Object.keys(window.rsGetAccess()).forEach(k => call("rsSetAccess", k, !off.has(k))); }

@@ -3,7 +3,7 @@
 // its 3D layer (extrude: the layer id), its start switches (interactive, tooltip, popup_window).
 import {map, OVERLAYS, _emit} from "./core.js";
 import {_ovCbs} from "./overlays.js";
-import {defineTool, BUILDINGS_ICON} from "./tools.js";
+import {getTool, greyTool, replaceTool, BUILDINGS_ICON} from "./tools.js";
 import {_check} from "./panel.js";
 let _b3d = [], _b3dOn = false;     // the overlays with a 3D layer (ov.extrude), the switch
 // a 3D layer shows while the switch is on and its overlay (the buildings) is shown
@@ -33,28 +33,45 @@ export function rsGetInteraction(label){
   const ov = OVERLAYS.find(o => o.label === label);
   return ov ? {clickable: !!ov.interactive, tooltip: ov.tooltip !== null && ov.tooltip !== undefined, popup: ov.popup_window !== false} : null;
 }
-export function initFeatures(){
-  OVERLAYS.forEach(ov => { if(ov.tooltip) _tips[ov.label] = ov.tooltip; });
-  window.rsSetInteraction = rsSetInteraction;
-  window.rsGetInteraction = rsGetInteraction;
-  _b3d = OVERLAYS.filter(ov => ov.extrude);
-  window.rsSetBuildings3D = rsSetBuildings3D;
-  window.rsGetBuildings3D = () => _b3dOn;
-  if(!_b3d.length) return;
-  document.addEventListener("rs:overlaychange", e => { if(_b3d.some(ov => ov.label === e.detail.overlay)) _show3d(); });
-  // its button: the tool `buildings`
+// the tool `buildings` and its row, for the overlays of the style of the moment. The tool that was there before (the base map's, for a vector style) comes
+// back when a later style has no 3D layer; the greyed place if there was none.
+let _own = false, _prev = null;
+function _b3dTool(){
+  if(!_own) _prev = getTool("buildings") || null;
+  _own = true;
   const d = document.createElement("div"), bt = document.createElement("button");
   d.className = "maplibregl-ctrl maplibregl-ctrl-group";
-  bt.type = "button"; bt.id = "rs-b3d-btn"; bt.title = "Buildings in 3D";
+  bt.type = "button"; bt.id = "rs-b3d-btn"; bt.title = _b3dOn ? "Flat buildings" : "Buildings in 3D";
+  bt.classList.toggle("rs-on", _b3dOn);
   bt.innerHTML = BUILDINGS_ICON;
   bt.onclick = () => rsSetBuildings3D(!_b3dOn);
   d.appendChild(bt);
-  defineTool("buildings", "toggle", d, {title: bt.title, isOpen: () => _b3dOn});
+  replaceTool("buildings", "toggle", d, {title: bt.title, isOpen: () => _b3dOn});
+}
+export function useFeatures(){
+  _b3d = OVERLAYS.filter(ov => ov.extrude);
+  for(const k in _tips) delete _tips[k];
+  OVERLAYS.forEach(ov => { if(ov.tooltip) _tips[ov.label] = ov.tooltip; });
+  document.getElementById("rs-b3d")?.closest("label")?.remove();      // the row of an earlier style
+  if(!_b3d.length){
+    if(_own){ _own = false; _prev ? replaceTool("buildings", _prev.kind, _prev.el, _prev) : greyTool("buildings"); }
+    return;
+  }
+  _b3dTool();
+  _show3d();
   // its row in the Layers box, under the buildings' row
   const row = _ovCbs[_b3d[0].label] && _ovCbs[_b3d[0].label].parentNode;
   if(row){
-    const {lab} = _check("Buildings 3D", false, rsSetBuildings3D, {id: "rs-b3d"});
+    const {lab} = _check("Buildings 3D", _b3dOn, rsSetBuildings3D, {id: "rs-b3d"});
     lab.style.paddingLeft = "18px";
     row.after(lab);
   }
+}
+export function initFeatures(){
+  window.rsSetInteraction = rsSetInteraction;
+  window.rsGetInteraction = rsGetInteraction;
+  window.rsSetBuildings3D = rsSetBuildings3D;
+  window.rsGetBuildings3D = () => _b3dOn;
+  document.addEventListener("rs:overlaychange", e => { if(_b3d.some(ov => ov.label === e.detail.overlay)) _show3d(); });
+  useFeatures();
 }

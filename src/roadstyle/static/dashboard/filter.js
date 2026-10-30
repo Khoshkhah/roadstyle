@@ -2,10 +2,10 @@
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
 // filter composes (AND) with the id filter from rsFilter below.
 import {map, O, OVERLAYS, RS_ROLES, RoadTable, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr, _emit} from "./core.js";
-import {_popupMode, _tlHost, _box, _check} from "./panel.js";
-export let FILTER = {on:false, classes:[]};
-const _fltCbs={}, _fltBase={};
+export let FILTER = {classes:[]};
+const _fltBase={};
 let _fltVis=null;   // Set of visible classes; null = all
+let _fltSeen=new Set();   // the classes of the style of the moment
 let _qIds=null;     // id-set filter from rsFilter; null = off
 let ACCESS = [];   // access_col: [[kind, colour, label, count], ...] for the kinds the data has (docs/design/sensor_matching_requests.md)
 const _accHid = new Set();            // the access kinds switched off (rsSetAccess)
@@ -59,26 +59,14 @@ export function _applyRoadFilters(){
 export function rsSetClasses(visible){
   _fltVis=new Set(visible);
   const hidden=_applyRoadFilters();
-  FILTER.classes.forEach(c=>{ if(_fltCbs[c]) _fltCbs[c].checked=_fltVis.has(c); });
   _emit("rs:filterchange", {visible:FILTER.classes.filter(c=>_fltVis.has(c)), hidden:hidden});
-}
-export const _fltSw = {};   // class -> its swatch element in the Roads panel
-const _fltLab = {};          // class -> its row in the Roads panel
-// a class that the map does not draw at this zoom (FILTER.minzoom: {class: its first zoom}, roadstyle:controls.filter): its row dimmed,
-// with its first zoom as the title. The layer's filter reads the zoom of the tile, a whole number.
-function _fltBelow(){
-  const mz = FILTER.minzoom, z = Math.floor(map.getZoom());
-  for(const c in _fltLab){ const m = mz && mz[c], below = m != null && z < m;
-    _fltLab[c].classList.toggle("flt-below", below); _fltLab[c].title = below ? "from zoom " + m : ""; }
 }
 export function rsSetBridges(on){
   _bridgesOn=!!on; _applyRoadFilters();
-  const cb=document.getElementById("rs-flt-br"); if(cb) cb.checked=_bridgesOn;
   _emit("rs:filterchange", {bridges:_bridgesOn});
 }
 export function rsSetTunnels(on){
   _tunnelsOn=!!on; _applyRoadFilters();
-  const cb=document.getElementById("rs-flt-tn"); if(cb) cb.checked=_tunnelsOn;
   _emit("rs:filterchange", {tunnels:_tunnelsOn});
 }
 export function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
@@ -122,12 +110,21 @@ export function rsSetModes(list){
 }
 export function rsSetAccess(kind, on){      // show / hide the roads of one access kind
   on ? _accHid.delete(kind) : _accHid.add(kind); _applyRoadFilters();
-  const cb=document.getElementById("rs-flt-acc-"+kind); if(cb) cb.checked=!!on;
   _emit("rs:filterchange", {access:kind, visible:!!on});
 }
 // a new roads style (rs.setStyle): its layers' own filters are read again, and the switches that are off hide its roads too
 export function useFilter(){
-  if(O.filter){ FILTER = O.filter; ACCESS = FILTER.access || []; }          // a new style has its own road classes
+  FILTER = O.filter; ACCESS = FILTER.access || [];
+  // a class that the person has not seen yet shows; the ones that were switched off stay off
+  if(_fltVis) FILTER.classes.forEach(c=>{ if(!_fltSeen.has(c)) _fltVis.add(c); });
+  _fltSeen = new Set(FILTER.classes);
+  window.RS_CLASSES = FILTER.classes;
+  window.RS_CLASS_COL = FILTER.col;          // the column RS_CLASSES came from (for custom UIs / stats)
+  window.RS_CLASS_COLORS = FILTER.swatches || {};   // class -> its baked fill colour
+  window.rsGetAccess = ()=>Object.fromEntries(ACCESS.map(a=>[a[0], !_accHid.has(a[0])]));
+  window.RS_ACCESS = Object.fromEntries(ACCESS.map(a=>[a[0], a[3]]));
+  window.RS_MODES = Object.fromEntries(O.modes || []);       // roadstyle:controls.modes: [[mode, count], ...]
+  window.RS_KINDS = Object.fromEntries(OVERLAYS.filter(ov=>ov.kinds).map(ov=>[ov.label, Object.fromEntries(ov.kinds)]));
   for(const k in _fltBase) delete _fltBase[k];
   for(const k in _ovBase) delete _ovBase[k];
   if(_modes) rsSetModes(_modes);                              // the new road table's rows
@@ -135,40 +132,15 @@ export function useFilter(){
   OVERLAYS.filter(ov=>!ov.base && (_ovIds[ov.label] || _ovKinds[ov.label])).forEach(_ovApply);
 }
 export function initFilter(){
-  FILTER = O.filter; ACCESS = FILTER.access || [];
   map.on("load",()=>{ _fltLayers().forEach(l=>{ if(!(l.id in _fltBase)) _fltBase[l.id]=map.getFilter(l.id)||null; }); });
   window.rsSetClasses = rsSetClasses;
-  window.RS_CLASSES = FILTER.classes;
-  window.RS_CLASS_COL = FILTER.col;          // the column RS_CLASSES came from (for custom UIs / stats)
-  window.RS_CLASS_COLORS = FILTER.swatches || {};   // class -> its baked fill colour
+  window.rsSetAccess = rsSetAccess;
   window.rsSetBridges = rsSetBridges;
   window.rsSetTunnels = rsSetTunnels;
   window.rsFilter = rsFilter;
   window.rsSetModes = rsSetModes;
   window.rsGetModes = ()=>_modes && _modes.slice();
-  window.RS_MODES = Object.fromEntries(O.modes || []);       // roadstyle:controls.modes: [[mode, count], ...]
   window.rsSetKinds = rsSetKinds;
   window.rsGetKinds = label=>{ const L=_lyr(label), k=L && L.ov && _ovKinds[L.ov.label]; return k ? k.slice() : null; };
-  window.RS_KINDS = Object.fromEntries(OVERLAYS.filter(ov=>ov.kinds).map(ov=>[ov.label, Object.fromEntries(ov.kinds)]));
-}
-// the Roads box: a checkbox for each class, then Bridges / Tunnels and the access kinds
-export function initFilterBox(){
-  if(FILTER.on){
-    // panel: folded to save space; a base map's page (box_layout "stack", mapstyle's layout): folded at the start too
-    const {box, body}=_box("flt-ctrl", "flt", "Roads", _popupMode==="panel" || O.box_layout==="stack");
-    FILTER.classes.forEach(c=>{      // _fltSw: the swatch of each class (a view's palette sets their colours, FILTER.palettes)
-      const r=_check(c, true, ()=>rsSetClasses(FILTER.classes.filter(k=>_fltCbs[k].checked)), {sw:(FILTER.swatches||{})[c]||"#888"});
-      _fltCbs[c]=r.cb; _fltSw[c]=r.sw; _fltLab[c]=r.lab; body.append(r.lab);
-    });
-    if(FILTER.minzoom){ _fltBelow(); map.on("zoomend", _fltBelow); }
-    // grade-separated data: Bridges / Tunnels rows under the classes, then the restricted roads (access_col) with the kind's colour;
-    // the first row of each group ruled off
-    [["bridges","rs-flt-br","Bridges",rsSetBridges],["tunnels","rs-flt-tn","Tunnels",rsSetTunnels]].filter(r=>FILTER[r[0]])
-      .forEach((r,i)=>body.append(_check(r[2], true, r[3], {id:r[1], cls:"flt-grade", rule:i===0}).lab));
-    ACCESS.forEach((a,i)=>body.append(_check(a[2], true, on=>rsSetAccess(a[0], on), {id:"rs-flt-acc-"+a[0], cls:"flt-grade", rule:i===0, sw:a[1]}).lab));
-    _tlHost().appendChild(box);
-  }
-  window.rsSetAccess = rsSetAccess;
-  window.rsGetAccess = ()=>Object.fromEntries(ACCESS.map(a=>[a[0], !_accHid.has(a[0])]));
-  window.RS_ACCESS = Object.fromEntries(ACCESS.map(a=>[a[0], a[3]]));
+  useFilter();
 }

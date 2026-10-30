@@ -3,7 +3,7 @@ import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
 import {map, style, O, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
-import {_svLine, _svDist, _svPick, _sv, initSpot} from "./svspot.js";
+import {_svLine, _svDist, _svPick, _sv, initSpot, useSpot} from "./svspot.js";
 const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
@@ -124,6 +124,12 @@ let _sel=null;
 export function useSelect(){
   if(_tip) _tip.remove();
   _sel=null; _hov=null; _cur=null;
+  // only clickable items take part (2026-10-10): a non-interactive item (lanestyle's lane lines, arrows) let the click through to the lane under it
+  ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base && (o.interactive || o.select==="item")).flatMap(o=>o.layers));
+  ROAD_ITEMS = O.items;
+  ITEM_PICK = ROAD_ITEMS && {label:ROAD_ITEMS.label, popup:ROAD_ITEMS.popup, select:"item", interactive:true};
+  _ID_KEYS = [...new Set([O.edge_id_col, "edge_ref"])];
+  useSpot();
   // the style's pick layers (roadstyle:controls.pick, in every style since b3a8e64); for a style made before b3a8e64 that has no
   // contract, none: then the road layer of simple mode (the role simple), which every such style draws its roads with
   PICK_LAYERS = (O.pick.length ? O.pick.map(id=>RS_PREFIX+id) : RS_LEAN ? RS_LEANS : []).concat([...ITEM_LAYERS]);
@@ -133,11 +139,6 @@ export function useSelect(){
     {closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"}) : null;
 }
 export function initSelect(){
-  // only clickable items take part (2026-10-10): a non-interactive item (lanestyle's lane lines, arrows) let the click through to the lane under it
-  ITEM_LAYERS = new Set(OVERLAYS.filter(o=>o.base && (o.interactive || o.select==="item")).flatMap(o=>o.layers));
-  ROAD_ITEMS = O.items;
-  ITEM_PICK = ROAD_ITEMS && {label:ROAD_ITEMS.label, popup:ROAD_ITEMS.popup, select:"item", interactive:true};
-  _ID_KEYS = [...new Set([O.edge_id_col, "edge_ref"])];
   useSelect();
   initSpot();
   window.rsDeselect = rsDeselect;

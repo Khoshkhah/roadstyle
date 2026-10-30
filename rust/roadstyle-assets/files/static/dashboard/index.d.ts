@@ -41,14 +41,13 @@ export interface DashboardOptions {
   /** The selection colour (the theme's selection.select). */
   select_color?: string;
   /** The Roads box: {on, col, classes, swatches, palettes, bridges, tunnels, access}. */
-  /** The Roads box (roadstyle:controls.filter). minzoom: {class: its first zoom}; a class's row is dimmed below it; null: no class minzoom. */
-  filter?: { on: boolean; classes: string[]; col?: string; minzoom?: Record<string, number> | null; [k: string]: unknown };
+  /** The road filter's facts (roadstyle:controls.filter): the classes that rsSetClasses filters by, their colours, the access kinds. minzoom: {class: its first zoom}. */
+  filter?: { classes: string[]; col?: string; minzoom?: Record<string, number> | null; [k: string]: unknown };
   /** The colour options: [{name, prop, legend}]; the legend is categorical {title, entries} or continuous {title, ramp, vmin, vmax}. */
   color_options?: ColorOption[];
   /** The index of the colour option that shows first. */
   color_active?: number;
-  /** The Roads box (render's filter_control, a page key). Default true; a style made before N32 step 2 has its own filter.on, which
-   *  stays when this is not given. */
+  /** No effect: the Roads box was removed. */
   filter_control?: boolean;
   /** The legend box of the colour options (render's legend, a page key; the style always has the legend data). Default true. */
   legend?: boolean;
@@ -142,6 +141,11 @@ export interface Dashboard {
   readonly contract: number;
   /** A new roads style: add its sources and layers to the map first (with the prefix). The controls stay. more.road_table: its road table. */
   setStyle(style: StyleSpecification, more?: { road_table?: RoadTableData | null }): void;
+  /** The phone's bottom sheet: its height (0 closed, 1 40 %, 2 full; null where the page has no sheet), or set it. */
+  sheet(): 0 | 1 | 2 | null;
+  sheet(height: 0 | 1 | 2): void;
+  /** The part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates. */
+  freeArea(): { lo: number; hi: number; top: number; bottom: number };
   select(id: EdgeId | null): void;
   highlight(ids: EdgeId[]): void;
   focus(ids: EdgeId | EdgeId[]): void;

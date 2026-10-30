@@ -4,7 +4,8 @@
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields, _esc} from "../popup.js";
-import {map, O, OVERLAYS, _emit} from "./core.js";
+import {map, O, OVERLAYS, RS_PREFIX, _role, _emit} from "./core.js";
+import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
@@ -64,12 +65,18 @@ export function handleOverlayClick(e, tier){                      // info popup 
 let _ovTip = null;   // one shared hover tooltip for every overlay that asked for one (Overlay(tooltip=[...]))
 // window.rsSetOverlay(label, on) shows/hides one overlay; the Layers control is UI over it.
 export const _ovCbs={};   // label -> its checkbox in the Layers box
+// every layer of the map that draws an overlay's source: its `layers` and also the ones that the style does not list there (the fill pattern `ov0-pattern`, the
+// icons `ov13-icon`, the 3D layer), found by their source (a GeoJSON source) or source layer (tiles), so that a switch hides or shows the whole overlay
+const _ovAllLayers = ov => {
+  const role = ov.source.slice(RS_PREFIX.length);
+  return [...new Set([...ov.layers, ...map.getStyle().layers.filter(l=>_role(l)===role).map(l=>l.id)])].filter(id=>map.getLayer(id));
+};
 export function rsSetOverlay(labelOrIdx, on){
   const i = typeof labelOrIdx==="number" ? labelOrIdx : OVERLAYS.findIndex(o=>o.label===labelOrIdx);
   const ov = OVERLAYS[i]; if(!ov) return;
-  ov.layers.forEach(id=>{ if(map.getLayer(id))
-    map.setLayoutProperty(id,"visibility", on?"visible":"none"); });
+  _ovAllLayers(ov).forEach(id=>map.setLayoutProperty(id,"visibility", on?"visible":"none"));
   ov.visible = !!on;
+  on ? _ovOff.delete(ov.label) : _ovOff.add(ov.label);
   if(_ovCbs[ov.label]) _ovCbs[ov.label].checked = !!on;
   _emit("rs:overlaychange", {overlay:ov.label, visible:!!on});
 }
@@ -78,45 +85,67 @@ function _ovRow(ov, rule){
   _ovCbs[ov.label]=r.cb;
   return r.lab;
 }
-export function initOverlays(){
+// the hover tooltip and the hover glow of an overlay's layer, made once for each layer id of the map: the handlers find the overlay of the layer
+// at each move, so a layer that a later style brings (the same ids) has the overlay of the new style
+const _ovBound = new Set();
+const _ovOfLayer = id => OVERLAYS.find(o=>o.layers.includes(id));
+// rsSetInteraction can make a layer clickable, or give it its tooltip, later; the handlers read ov.interactive and ov.tooltip on each move
+const _ovTips = ov=>ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
+function _ovBind(id){
+  if(_ovBound.has(id)) return;
+  _ovBound.add(id);
+  map.on("mousemove", id, e=>{ const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
+    map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)
+    const f = e.features && e.features[0]; if(!f) return;
+    const k={source:ov.source, id:f.id}, same=o=>!!o && o.source===k.source && o.id===k.id;
+    _ovUnder=k;
+    if(same(_ovHov)){ if(_ovTip && _ovTip.isOpen()) _ovTip.setLngLat(e.lngLat); return; }   // lit: its tooltip follows the mouse
+    if(_ovHov){ _ovState(_ovHov,{hover:false}); _ovHov=null; if(_ovTip) _ovTip.remove(); }  // another one: the last off at once
+    clearTimeout(_ovT); const ll=e.lngLat, props=f.properties||{};
+    _ovT=setTimeout(()=>{ if(!same(_ovUnder)) return; _ovHov=k; if(ov.interactive) _ovState(_ovHov,{hover:true});
+      if(_ovTip && _ovTips(ov)){
+        _ovTip.setLngLat(ll).setHTML(_rfields(props, ov.tooltip===true ? null : ov.tooltip)); if(!_ovTip.isOpen()) _ovTip.addTo(map); } }, _TIP_DELAY); });
+  map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor=""; clearTimeout(_ovT); _ovUnder=null;
+    _ovState(_ovHov,{hover:false}); _ovHov=null;
+    if(_ovTip) _ovTip.remove(); });
+}
+// The Layers box: one row for each overlay, in the panel's Roads card (panel mode) or in a box of its own; a new style takes the rows of the old one away
+// and brings its own (a box with no row is taken away). The labels that the person turned off stay off.
+const _ovOff = new Set();
+let _ovBox = null, _ovGroupOff = false;
+// A page with a toolbar has no Layers box: one switch for all the layers is in the base-map box (basemapbox.js), and the legend box lists them
+// (colorbox.js). A page with no base-map box keeps the Layers box.
+const _ovInToolbox = () => !!(O.dashboard && O.dashboard.toolbar && getTool("basemap"));
+// rsSetOverlays(on): every layer of the style together. On: each layer as the style starts it (the points of a base map start off); off: all of them hidden
+export function rsSetOverlays(on){
+  _ovGroupOff = !on;
+  OVERLAYS.forEach(ov=>rsSetOverlay(ov.label, on ? ov.visible0 : false));
+  _emit("rs:overlayschange", {visible: !!on});
+}
+export const rsGetOverlays = () => OVERLAYS.length > 0 && !_ovGroupOff;
+function _ovBoxRows(){
+  if(_ovBox){ _ovBox.remove(); _ovBox = null; }
+  for(const k of Object.keys(_ovCbs)){ _ovCbs[k].closest("label")?.remove(); delete _ovCbs[k]; }
+  if(!OVERLAYS.length || !O.overlay_control || _ovInToolbox()) return;       // overlay_control=False: no Layers box (rsSetOverlay still works)
+  // a Layers box of its own (a page with no bar, or with no base-map box); a base map's page (box_layout "stack"): in the stack, folded
+  const stack=O.box_layout==="stack", {box, body}=_box("ov-ctrl", "ov", "Layers", stack ? true : null);
+  OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
+  (stack ? _tlHost() : document.body).appendChild(box);
+  _ovBox = box;
+}
+// the overlays of the style of the moment (at the start, and again for a new style: rs.setStyle): their handlers, their rows, and their start state
+export function useOverlays(){
   _OV_POPUP = O.overlay_popup;
-  // the shared hover tooltip
-  _ovTip = OVERLAYS.length                     // rsSetInteraction can give a layer its tooltip later
-    ? new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth,
-                            offset:POPUP.tipOffset, className:"rs-tip"}) : null;
-  // every overlay: rsSetInteraction can make a layer clickable, or give it its tooltip, later; the handlers read ov.interactive and
-  // ov.tooltip on each move
-  const tips = ov=>ov.tooltip===true || (ov.tooltip && ov.tooltip.length);   // true: every field (rsSetInteraction, a layer with no list)
-  OVERLAYS.forEach(ov=>{
-   _ovFetch(ov);
-   ov.layers.forEach(id=>{
-    map.on("mousemove", id, e=>{ if(!(ov.interactive || tips(ov))) return;
-      map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)
-      const f = e.features && e.features[0]; if(!f) return;
-      const k={source:ov.source, id:f.id}, same=o=>!!o && o.source===k.source && o.id===k.id;
-      _ovUnder=k;
-      if(same(_ovHov)){ if(_ovTip && _ovTip.isOpen()) _ovTip.setLngLat(e.lngLat); return; }   // lit: its tooltip follows the mouse
-      if(_ovHov){ _ovState(_ovHov,{hover:false}); _ovHov=null; if(_ovTip) _ovTip.remove(); }  // another one: the last off at once
-      clearTimeout(_ovT); const ll=e.lngLat, props=f.properties||{};
-      _ovT=setTimeout(()=>{ if(!same(_ovUnder)) return; _ovHov=k; if(ov.interactive) _ovState(_ovHov,{hover:true});
-        if(_ovTip && tips(ov)){
-          _ovTip.setLngLat(ll).setHTML(_rfields(props, ov.tooltip===true ? null : ov.tooltip)); if(!_ovTip.isOpen()) _ovTip.addTo(map); } }, _TIP_DELAY); });
-    map.on("mouseleave", id, ()=>{ map.getCanvas().style.cursor=""; clearTimeout(_ovT); _ovUnder=null;
-      _ovState(_ovHov,{hover:false}); _ovHov=null;
-      if(_ovTip) _ovTip.remove(); });
-  }); });
-  window.rsSetOverlay = rsSetOverlay;
+  clearOvSel(); _ovHov = null; _ovUnder = null;
+  if(!_ovTip) _ovTip = new maplibregl.Popup({closeButton:false, closeOnClick:false, maxWidth:POPUP.maxWidth, offset:POPUP.tipOffset, className:"rs-tip"});
+  OVERLAYS.forEach(ov=>{ ov.visible0 = ov.visible !== false; _ovFetch(ov); ov.layers.forEach(_ovBind); if(_ovGroupOff || _ovOff.has(ov.label)) rsSetOverlay(ov.label, false); });
   window.RS_OVERLAYS = OVERLAYS;
-  if(OVERLAYS.length && O.overlay_control){     // overlay_control=False: no Layers box (rsSetOverlay still works)
-    // panel mode: overlay toggles join the panel's Roads card, right after its Bridges row — a
-    // second floating "Layers" box on the map competes with the panel that hosts everything else.
-    // Non-panel keeps the standalone Layers control.
-    const host=_popupMode==="panel" ? document.querySelector(".flt-ctrl .flt-body") : null;
-    if(host) OVERLAYS.forEach((ov,i)=> host.appendChild(_ovRow(ov, i===0)));
-    else{   // its own Layers box; a base map's page (box_layout "stack"): under the Roads box, folded like it
-      const stack=O.box_layout==="stack", {box, body}=_box("ov-ctrl", "ov", "Layers", stack ? true : null);
-      OVERLAYS.forEach(ov=> body.appendChild(_ovRow(ov)));
-      (stack ? _tlHost() : document.body).appendChild(box);
-    }
-  }
+  _ovBoxRows();
+  _emit("rs:overlayschange", {visible: rsGetOverlays()});       // the base-map box and the legend box read the layers again
+}
+export function initOverlays(){
+  window.rsSetOverlay = rsSetOverlay;
+  window.rsSetOverlays = rsSetOverlays;
+  window.rsGetOverlays = rsGetOverlays;
+  useOverlays();
 }

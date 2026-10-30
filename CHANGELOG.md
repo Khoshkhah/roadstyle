@@ -10,6 +10,21 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **The tool `roads`** (after the base map button): the road filter in the bar. A box with a row for each road class (check box, colour, name, number of roads), All and None, and a click on a name shows only
   that class; Bridges, Tunnels and the access kinds when the data has them. It uses the filter calls of the page, so the map template's Roads box and this tool are one filter. A page with no road classes
   has the button greyed out. A style that comes later (`rs.setStyle`) gets its own classes.
+- **Every control that a style gives follows a later `rs.setStyle`.** The Roads box (classes, Bridges, Tunnels, access kinds), the Tunnels box, the arrows' icon and rules,
+  the boundary's shade and limits, the arrow and the fill-layer facts of Street View, the pick layers, the id fields and the parts of `rs.getState()` were made once, at
+  the start, so a page that starts with `style: null` had none of them. They are made again for each style now, and go with a style that has none; a switch that was off
+  stays off. The options that the old style's controls gave go back to their defaults. A host's look must be live (`state="live"`) for the style to have the controls.
+- **A JavaScript host page needs no adapters** (`rsDashboard(map, {style: null, prefix, ...})` and `rs.setStyle` after each build):
+  - The style's own base-map layers (`ov<i>`) get their switch, their hover and the 3D switch with each `rs.setStyle`; the rows of the old style go, a switch that was
+    off stays off.
+  - A raster base map goes under the roads that carry the page's prefix (the module reads the map's layer order, not the roads style).
+  - `rsSetBasemap("blank")` is the dark twin in the dark theme, for the page as for the box.
+  - A vector base map's `sprite` is merged (OpenFreeMap's place icons); the map's own sprite comes back with a raster base map.
+  - The file `data/host_options.json` (Rust writes it; a test keeps it current) has the typed `dashboard`, its `first_paint`, the `basemaps`, `ontop` and the active key,
+    by the rules of `pageFrom`: a host fetches it and loads no WebAssembly module on its main thread;
+    `rsFirstPaint(first)` (`dashboard/template.js`) sets the first paint. The panel's shell rules moved from the template `dashboard` to the end of `dashboard.css`.
+  - `rs.sheet()` / `rs.sheet(n)` (the phone sheet's height) and `rs.freeArea()` (the free part of the map; on a phone it counts the bar and the sheet).
+  - The element of a tool has `data-rs-tool="<id>"`, which stays after the `title` went to the tooltip.
 - **`dashboard={"toolbar": {"navigation": "box"}}`**: one button with the compass needle (it turns with the map and flattens with the tilt) in place of the + and - buttons, the
   compass and the 2D/3D button. A click opens a box with a zoom slider (with - and +), a turn slider, a tilt slider and a button that sets north and the tilt back. Ctrl + drag on the
   map turns and tilts it. **This is the default** (`"buttons"` brings the earlier buttons back; the compass button then has the tooltip "Drag to turn and tilt").
@@ -29,6 +44,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 - **The explanation marks in the base map box are a "?"** (they were an italic "i"): the "i" is only the credits button.
+- **A page with a bar has no floating Layers box.** The style's own base-map layers (the duckOSM layers: landcover, water, buildings, ...) have one switch for all of them in the
+  base-map box (`overlays_label`, default "Map layers"; `rsSetOverlays(on)`), and the legend box lists them with their colours, each swatch with a thin border so that a white
+  or near-white colour shows. A page with no bar, or with no base-map box, keeps the Layers box.
 - **The compass button also changes the tilt**: dragging it turns the map (left and right) and tilts it (up and down); a click sets north and the tilt back (`visualizePitch`).
   The attribution button has an italic serif "i" in a ring, so it does not look like a page's help button ("?").
 - The value of a transparency slider is in the row of its label (two rows for a slider, not three).
@@ -36,6 +54,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
+  the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
+  in tiles).
+- **A box of the bar stays inside a phone's screen sideways.** The boxes moved up or down only; the base-map box was 143 px out of a 390 px screen. They move left or right too.
 - **A box of the bar stays inside the window.** The settings box could reach above the top of the window when the window was not high: the bar moved a box
   with `margin-top`, which does nothing for a box that is fixed to the bar by its bottom edge. It uses `translate` now, for every box.
 - **The "Colour by and legend" button is in the bar for a style that comes later.** A page that starts with `rsDashboard(map, {style: null, ...})` and gets its roads
@@ -44,6 +66,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
   inside the window, as the others do.
 
 ### Removed
+- **The Roads box is gone** (the floating box with a row for each road class, Bridges, Tunnels and the access kinds, `.flt-ctrl`). A page with a bar has no place for it, and it covered the bar. The filter calls stay
+  (`rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsFilter`, `rsSetModes`, `rs.setFilter`; `rs.setStyle` keeps what a call switched off): the colour box, `rs.setFilter`, the views and the host pages use them.
+  The keyword `filter_control` (and `--no-filter`) has no effect now. The class minzoom dimming of the rows went with the box. The map's other old floating boxes (Tunnels, View) are hidden on a page with a bar, as Colour by was.
 - The settings have no "Reset transparency" button and no note about the key ("A key is saved in this browser only...").
 
 ### Changed

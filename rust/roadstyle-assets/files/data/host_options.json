@@ -1,0 +1,332 @@
+{
+  "dashboard": {
+    "template": "dashboard",
+    "layout": "overlay",
+    "panel": {
+      "side": "left",
+      "width_px": 340,
+      "look": "frame",
+      "sections": [],
+      "hide": [
+        "base_map",
+        "colour_by",
+        "legend"
+      ]
+    },
+    "toolbar": {
+      "position": "left",
+      "settings": true,
+      "hold": false,
+      "navigation": "box"
+    },
+    "windows": {
+      "clamp": true,
+      "recenter_map": false,
+      "restore_open": true,
+      "remember": true
+    },
+    "boundary": {
+      "dim": false,
+      "limit": false,
+      "dim_light": 0.16,
+      "dim_dark": 0.4,
+      "limit_pad": 2.0,
+      "zoom_out": 3.0
+    },
+    "google_3d": {
+      "fov_deg": null,
+      "follow": true,
+      "min_alt_m": 80.0,
+      "min_zoom_drawn": 17.0,
+      "mesh_altitude_m": 1.5,
+      "selection_style": {
+        "color": "#22d3ee",
+        "width": 8.0,
+        "outline": "#0b1020",
+        "outline_width": 2.0,
+        "arrow_color": "#ffffff",
+        "arrow_width": 5.0,
+        "arrow_every": 25.0,
+        "fill": "rgba(34,211,238,0.35)"
+      },
+      "layers": []
+    },
+    "legend": {
+      "rows": []
+    },
+    "scale_box": false,
+    "phone": {
+      "max_width_px": 700,
+      "toolbar": "top"
+    }
+  },
+  "first_paint": {
+    "classes": [
+      "rs-tpl-dashboard",
+      "rs-overlay",
+      "rs-has-toolbar",
+      "rs-tb-left",
+      "rs-panel-left",
+      "rs-hide-scale"
+    ],
+    "panel_width_px": 340,
+    "phone_max_width_px": 700
+  },
+  "basemaps": [
+    {
+      "key": "blank",
+      "label": "Blank",
+      "tiles": [],
+      "bg": "#efede8",
+      "title": "Blank",
+      "group": "Blank",
+      "swatch": "#ffffff",
+      "order": 7,
+      "maxzoom": 19,
+      "attr": "",
+      "is_dark": false,
+      "style_url": null,
+      "dark": "blank_dark"
+    },
+    {
+      "key": "ofm_liberty",
+      "label": "OpenFreeMap Liberty",
+      "tiles": [],
+      "bg": "#e8e6e1",
+      "title": "OpenFreeMap Liberty",
+      "group": "OpenFreeMap",
+      "swatch": [
+        "#f2efe9",
+        "#ffe16b",
+        "#a0c8f0"
+      ],
+      "order": 0,
+      "maxzoom": 19,
+      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+      "is_dark": false,
+      "style_url": "https://tiles.openfreemap.org/styles/liberty",
+      "dark": "ofm_fiord"
+    },
+    {
+      "key": "ofm_bright",
+      "label": "OpenFreeMap Bright",
+      "tiles": [],
+      "bg": "#e8e6e1",
+      "title": "OpenFreeMap Bright",
+      "group": "OpenFreeMap",
+      "swatch": [
+        "#f8f4f0",
+        "#fff6b3",
+        "#a0c8f0"
+      ],
+      "order": 1,
+      "maxzoom": 19,
+      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+      "is_dark": false,
+      "style_url": "https://tiles.openfreemap.org/styles/bright",
+      "dark": null
+    },
+    {
+      "key": "ofm_positron",
+      "label": "OpenFreeMap Positron",
+      "tiles": [],
+      "bg": "#e8e6e1",
+      "title": "OpenFreeMap Positron",
+      "group": "OpenFreeMap",
+      "swatch": [
+        "#e8e8e8",
+        "#ffffff",
+        "#cdd2d4"
+      ],
+      "order": 2,
+      "maxzoom": 19,
+      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+      "is_dark": false,
+      "style_url": "https://tiles.openfreemap.org/styles/positron",
+      "dark": "ofm_dark"
+    },
+    {
+      "key": "osm",
+      "label": "OpenStreetMap",
+      "tiles": [
+        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      ],
+      "bg": "#e8e6e1",
+      "title": "OpenStreetMap",
+      "group": "OpenStreetMap",
+      "swatch": [
+        "#f2efe9",
+        "#f4c542",
+        "#aad3df"
+      ],
+      "order": 3,
+      "maxzoom": 19,
+      "attr": "© OpenStreetMap contributors",
+      "is_dark": false,
+      "style_url": null,
+      "dark": null
+    },
+    {
+      "key": "esri_gray",
+      "label": "Light Gray",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "bg": "#e8e6e1",
+      "title": "Esri Gray",
+      "group": "Esri",
+      "swatch": [
+        "#e4e4e4",
+        "#ffffff",
+        "#c8d3dc"
+      ],
+      "order": 4,
+      "maxzoom": 16,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
+      "is_dark": false,
+      "style_url": null,
+      "dark": "esri_dark_gray"
+    },
+    {
+      "key": "esri_street",
+      "label": "Streets",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "bg": "#e8e6e1",
+      "title": "Esri Streets",
+      "group": "Esri",
+      "swatch": [
+        "#e9e5dc",
+        "#ffffff",
+        "#bfd9e8"
+      ],
+      "order": 5,
+      "maxzoom": 19,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, © OpenStreetMap contributors, and the GIS User Community",
+      "is_dark": false,
+      "style_url": null,
+      "dark": null
+    },
+    {
+      "key": "satellite",
+      "label": "Satellite",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "bg": "#0e1113",
+      "title": "Esri Satellite",
+      "group": "Esri",
+      "swatch": [
+        "#3b4a32",
+        "#8a8f84",
+        "#1d3b4f"
+      ],
+      "order": 6,
+      "maxzoom": 19,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community",
+      "is_dark": true,
+      "style_url": null,
+      "dark": null
+    },
+    {
+      "key": "blank_dark",
+      "label": "Blank dark",
+      "tiles": [],
+      "bg": "#14181d",
+      "title": "Blank dark",
+      "group": "Blank",
+      "swatch": "#14181d",
+      "order": 99,
+      "maxzoom": 19,
+      "attr": "",
+      "is_dark": true,
+      "style_url": null,
+      "dark": null
+    },
+    {
+      "key": "ofm_fiord",
+      "label": "OpenFreeMap Fiord",
+      "tiles": [],
+      "bg": "#0e1113",
+      "title": "OpenFreeMap Fiord",
+      "group": "OpenFreeMap",
+      "swatch": [
+        "#45516e",
+        "#a9b7d6",
+        "#2c3750"
+      ],
+      "order": 99,
+      "maxzoom": 19,
+      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+      "is_dark": true,
+      "style_url": "https://tiles.openfreemap.org/styles/fiord",
+      "dark": null
+    },
+    {
+      "key": "ofm_dark",
+      "label": "OpenFreeMap Dark",
+      "tiles": [],
+      "bg": "#0e1113",
+      "title": "OpenFreeMap Dark",
+      "group": "OpenFreeMap",
+      "swatch": [
+        "#2b2f36",
+        "#9aa0a8",
+        "#3a4048"
+      ],
+      "order": 99,
+      "maxzoom": 19,
+      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+      "is_dark": true,
+      "style_url": "https://tiles.openfreemap.org/styles/dark",
+      "dark": null
+    },
+    {
+      "key": "esri_dark_gray",
+      "label": "Dark Gray",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "bg": "#0e1113",
+      "title": "Dark Gray",
+      "group": "Esri",
+      "swatch": [
+        "#3a3f45",
+        "#6b7078",
+        "#2a3138"
+      ],
+      "order": 99,
+      "maxzoom": 16,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
+      "is_dark": true,
+      "style_url": null,
+      "dark": null
+    }
+  ],
+  "ontop": {
+    "hillshade": {
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}",
+      "opacity": 0.4,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen, Rijkswaterstaat, GSA, Geoland, FEMA, Intermap, and the GIS user community"
+    },
+    "labels": {
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      "opacity": 1,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
+    },
+    "labels_gray_light": {
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+      "opacity": 1,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
+    },
+    "labels_gray_dark": {
+      "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+      "opacity": 1,
+      "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
+    }
+  },
+  "basemap": "blank"
+}

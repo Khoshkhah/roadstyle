@@ -384,10 +384,19 @@ impl Layout {
     }
 }
 
+/// What the first paint needs: the classes of <html>, the panel's width and the phone width. `Dashboard::first_paint` writes them as the script of a
+/// page that roadstyle writes; a host page that writes its own HTML takes them as data (`page_options::host_options`, `rsFirstPaint` in template.js).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct FirstPaint {
+    pub classes: Vec<String>,
+    pub panel_width_px: Option<u32>,
+    pub phone_max_width_px: u32,
+}
+
 impl Dashboard {
-    /// The script that is the first thing of the body: the classes of <html> that the first paint needs (the template, the layout, the
-    /// toolbar, the phone form), so that no frame shows the page in another form. The dashboard's script keeps them current.
-    pub fn first_paint(&self) -> String {
+    /// The classes of <html> that the first paint needs (the template, the layout, the toolbar, the phone form), so that no frame shows the page
+    /// in another form. The dashboard's script keeps them current.
+    pub fn first_paint_parts(&self) -> FirstPaint {
         fn word<T: Serialize>(v: &T) -> String {
             serde_json::to_value(v).ok().and_then(|v| v.as_str().map(String::from)).expect("a name")
         }
@@ -397,7 +406,6 @@ impl Dashboard {
             classes.push(format!("rs-tb-{}", word(&t.position)));
         }
         // the panel's side and look, and its width: the person's saved choice (placement.js) can change the side and the look after the load
-        let mut width = String::new();
         if let Some(p) = &self.panel {
             if p.side == Edge::Left {
                 classes.push("rs-panel-left".into());
@@ -405,14 +413,20 @@ impl Dashboard {
             if p.look == PanelLook::Card {
                 classes.push("rs-panel-card".into());
             }
-            width = format!("document.documentElement.style.setProperty(\"--rs-panel-w\",\"{}px\");", p.width_px);
         }
         if !self.scale_box {
             classes.push("rs-hide-scale".into());
         }
-        let list = classes.iter().map(|c| format!("\"{c}\"")).collect::<Vec<_>>().join(",");
+        FirstPaint { classes, panel_width_px: self.panel.as_ref().map(|p| p.width_px), phone_max_width_px: self.phone.max_width_px }
+    }
+
+    /// The script that is the first thing of the body (`first_paint_parts` as code).
+    pub fn first_paint(&self) -> String {
+        let f = self.first_paint_parts();
+        let width = f.panel_width_px.map_or_else(String::new, |w| format!("document.documentElement.style.setProperty(\"--rs-panel-w\",\"{w}px\");"));
+        let list = f.classes.iter().map(|c| format!("\"{c}\"")).collect::<Vec<_>>().join(",");
         format!("<script>(function(){{var c=document.documentElement.classList;c.add({list});{width}\
-                 if(matchMedia(\"(max-width:{}px)\").matches)c.add(\"rs-phone\")}})()</script>", self.phone.max_width_px)
+                 if(matchMedia(\"(max-width:{}px)\").matches)c.add(\"rs-phone\")}})()</script>", f.phone_max_width_px)
     }
 }
 

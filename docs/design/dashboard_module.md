@@ -59,6 +59,31 @@ rs.setStyle(style, {road_table});
   Colour by menu and the legend are made again in their place. The selection, the hover and the fetched properties go, because
   they are the old roads'. A switch that is off (a class, Bridges, Tunnels) applies to the new roads too.
 - **`style: null`.** The dashboard starts with no roads: nothing to pick until `setStyle`.
+- **Every control that a style gives follows `rs.setStyle`.** The options that the old style's `roadstyle:controls` gave go (they take the default
+  again), and the new style's come. `setStyle` then runs, for the new style: the base-map layers (`useOverlays`, `useFeatures`), the pick layers and the
+  id fields (`useSelect`, `useSpot`), the filter's classes and globals `RS_CLASSES`, `RS_MODES`, `RS_KINDS`,
+  `RS_ACCESS` (`useFilter`; the dashboard has no Roads box: a page filters with `rsSetClasses` and the other calls), the Tunnels box (`initTunnel`; the look that the person chose stays), the arrows' icon and rules
+  (`initArrows`), the boundary's shade and limits (`initBoundary`; a GeoJSON boundary source, not a tile layer), the colour menu, the legend and the tool
+  (`useColor`, `useLegend`, `useColorBox`), and the parts of `rs.getState()` (`refreshState`). A switch that the person turned off (a class, Bridges,
+  Tunnels, an overlay) stays off, and a box that has no rows for the new style goes. A new control module that reads the style at the start must do the same,
+  and `tests/test_host_page_gaps_browser.py` (the style of the engine, through the Python binding) must show it.
+- **The style's base-map layers (`ov<i>`).** They come with each style, so `setStyle` reads them again (`useOverlays`, `useFeatures`): the hover
+  handlers are made once for each layer id of the map (they find the overlay of the layer at each move), the Layers box and its rows are made
+  again (and taken away when the new style has no overlay), the 3D switch and the tool `buildings` follow the layers with an `extrude`
+  (the base map's own tool comes back when the new style has none), and an overlay that the person switched off stays off.
+- **The base map layers `bg` and `basemap` are the map's.** `basemap.js` reads the map, not the roads style: the raster layer is rebuilt
+  before the layer that follows it in the map, and a vector style's layers go before the same layer, so they stay under the roads that a
+  host added with a prefix. A vector style's `sprite` replaces the map's sprite for as long as it is the base map (its places' icons); the map's
+  own comes back with a raster base map. `rsSetBasemap(key)` of a map with a dark twin is the twin in the dark theme, for any caller.
+- **A host page's panel and options.** The shell of the panel (`#sb`, `.sb-top`, `#sb-hide`, `#sb-show`) is at the end of `dashboard.css`, so a
+  host page that has its own panel needs no copy of it. The file `data/host_options.json` (written by Rust, `page_options::host_options`; a
+  test keeps it current) has the typed `dashboard`, the `first_paint` (`rsFirstPaint`), and the `basemaps`, `ontop` and active key, by the same
+  rules as `pageFrom`. A host fetches it, changes what it needs (the panel's width, `hide`, the order of the base maps) and loads no WebAssembly
+  module on its main thread for it. The host's look must have state `live` (`withArg("state", "\"live\"")`) for the dashboard to find the style's
+  controls (the base-map layers `overlays`, the filter, the tunnels) and `color_options` for its colour tool: a style of a static look has the
+  pick layers only (`roadstyle-rs/tests/host_style.rs`).
+- **The phone's sheet.** `rs.sheet()` and `rs.sheet(n)` read and set its height; `freeArea()` (also `rs.freeArea()`) ends at its upper edge on a phone and starts under the bar.
+  The boxes of the bar keep 12 px from every edge of the window, sideways too.
 - **`prefix`.** The page adds the roads style's sources and layers with this prefix (`"rs-"`). The dashboard adds it to each
   source and layer id that it uses. The names in the style itself stay as they are: a layer's `source-layer`, the metadata.
 - **The base map.** With no `basemaps` option the dashboard has no base map button and does not touch the map's own base map.
@@ -144,7 +169,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 
 | Option | From `render` | Default in `index.js` | Read by |
 |---|---|---|---|
-| `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (the roles), `basemap.js` (the base map layer) |
+| `style` | the style object | `null`: the roads come later (`setStyle`) | `core.js` (the roles) |
 | `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
 | `road_table` | (none: the tiled page sets `window.RS_SIDE`) | `null` | `core.js` (`RoadTable`) |
 | `live` | `live_data=True` (the Rust engine): `{color, width, types, ramp, nodata}` | the metadata `roadstyle:live`, else `null` | `live.js` |
@@ -163,14 +188,15 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `dashboard.google_3d.layers` | `google_3d_layers`: `[{id, label, kind, source, match, scope, max, on, arrows, style}]` (`roadstyle::dashboard::Layer3d`) | `[]` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
 | `filter` | `filter_control`, `access_col`, `minzoom`: `{on, col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
-| `filter_control` | `filter_control`: the Roads box (a page key; `filter.on` is this and a class to show) | `true`; a style made before N32 step 2 has its own `filter.on`, which stays without this option | `index.js` |
+| `filter_control` | `filter_control` | no effect: the Roads box was removed (the option stays so that a call that gives it still works) | none |
 | `legend` | `legend`: the legend box (a page key; the style always has the legend data) | `true` | `legend.js` |
 | `color_options` | `color_options` or a data styler's legend: `[{name, prop, legend}]` | the style's metadata, else `[]` | `color.js`, `legend.js`, `views.js` |
 | `color_active` | `color_active`, as an index | `0` | `color.js` |
 | `overlays` | `overlays`: `[{label, source, layers, popup, tooltip, interactive, under, base, select, color, visible, popup_window, kinds}]` (`kinds`: a base-map layer's `[[kind, count], ...]`, most first) | `[]` | `core.js`, `overlays.js`, `filter.js`, `select.js`, `features.js` |
 | `modes` | a duckOSM map's modes: `[[mode, count], ...]` (`roadstyle:controls.modes`) | `[]` | `filter.js` |
-| `box_layout` | `"stack"`: a base map's page (the Roads and Layers boxes folded, Layers under Roads); `"corner"`: the Layers box alone in its corner. On a screen 700 px wide or less (`panel._narrow`), every box (Roads, Layers, Legend) starts folded in both layouts, as the side panel starts closed | `"corner"` | `filter.js`, `overlays.js`, `panel.js` |
-| `overlay_control` | `overlay_control` | `true` | `overlays.js` |
+| `box_layout` | `"stack"`: a base map's page (the Layers box folded); `"corner"`: the Layers box alone in its corner. On a screen 700 px wide or less (`panel._narrow`), every box (Roads, Layers, Legend) starts folded in both layouts, as the side panel starts closed | `"corner"` | `filter.js`, `overlays.js`, `panel.js` |
+| `overlay_control` | `overlay_control` | `true`: on a page with a bar, the base-map box has the one switch for all the layers and the legend box lists them; on a page with no bar (or no base-map box) the Layers box has a row for each. `false`: none of them | `overlays.js`, `basemapbox.js`, `colorbox.js` |
+| `overlays_label` | `roadstyle:controls.overlays_label`, else the page's option | `"Map layers"`: the label of the one switch (a duckOSM page: `"duckOSM layers"`) and of the list in the legend box | `basemapbox.js`, `colorbox.js` |
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
 | `tunnel` | `tunnel_control` and the theme's tunnels: `{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}` | `{layers: {}, steps: [], control: false}` | `tunnel.js`, `arrows.js` |
 | `fill_layers` | the road fill layer ids | `[]` | `svspot.js` |
@@ -202,7 +228,7 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `google3d.js` | the Google 3D window and its camera link | `google_3d`, `street_view_key`, `select_color` | `rsSetGoogle3D` |
 | `svspot.js` | the Street View spot on a road, its marker, the step buttons, the Street View link | `street_view`, `fill_layers` | `rsSetStreetViewMarkerAt`, `rsSetStreetViewMarker`, `rsStreetViewStep`, `rsGetStreetViewSpot` |
 | `basemap.js` | the base map button and menu | `basemaps`, `basemap_switcher`; the layers `basemap`, `bg` | `rsSetBasemap`, `RS_BASEMAPS` |
-| `filter.js` | the Roads box: classes (a class that the map does not draw at this zoom, `filter.minzoom`: its row dimmed, title "from zoom N"), Bridges, Tunnels, access kinds; the id filter | `filter`, `overlays` | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`, `RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
+| `filter.js` | the road filter (no box): classes, Bridges, Tunnels, access kinds; the id filter | `filter`, `overlays` | `rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsGetAccess`, `rsFilter`, `RS_CLASSES`, `RS_CLASS_COL`, `RS_CLASS_COLORS`, `RS_ACCESS` |
 | `color.js` | the Colour by menu, the recolouring, the road fill switch | `color_options`, `color_active`, `road_fill`; the states `rs_co`, `rs_top` (the full look: `rs_colors`, `rs_base`), `rs_ov_<n>`, `rs_fill_on`; the feature state `rs_c` | `rsSetColorField`, `rsColor`, `rsColorBase`, `rsSetRoadFill`, `RS_COLOR_OPTIONS` |
 | `legend.js` | the legend of the active colour option | `color_options[i].legend` | |
 | `overlays.js` | the overlay popups, the overlay tooltip, the Layers box | `overlays`, `overlay_control`, `overlay_popup` | `rsSetOverlay`, `RS_OVERLAYS` |

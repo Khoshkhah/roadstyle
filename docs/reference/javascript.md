@@ -25,15 +25,19 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rs.select(id)`, `rs.highlight(ids)`, `rs.focus(ids)` | as `rsSelect`, `rsHighlight`, `rsFocus`, with edge ids (`null`: deselect) |
 | `rs.query({column: value})`, `rs.find(text)`, `rs.props(id)` | edge ids of the roads that match; one road's properties |
 | `rs.setColorBy(name)`, `rs.color([{color, ids}])`, `rs.setFilter({classes, bridges, tunnels, access, ids})` | as the controls |
+| `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box. Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
-| `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()`, and `ready()` (with `toolbar.hold`) |
+| `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()`, and `ready()` (with `toolbar.hold`). The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
 | `rs.sections` | the dashboard panel's sections: `add({id, html, el, label, after, before})`, `get`, `list`, `hide`, `show`, `remove`; event `rs:sectionchange` ([guide](../guides/dashboard-panel.md)) |
 | `rs.colorModes` | the page's own "Colour by" list in the legend box (a live-data page has no colour options of the style): `set(["Traffic", "Counted?"], {active, onChange(name, index)})`, `select(name)`, `clear()`, `active`. Event `rs:colormode` (`detail.name`, `detail.index`) |
 | `rs.naturalBreaks(values, k)` | the `k - 1` cut points (ascending) that split the numbers into `k` sets by Fisher-Jenks natural breaks: the `breaks` of `rs.setData` for a page that colours many calls the same way (an hour slider: the breaks of the whole day) |
 | `rs.legend` | rows that the page adds to the legend: `add({id, color, label, shape})` (`shape`: `square`, `circle` or `line`) or `add({id, html})`, `remove(id)`, `list()` |
 | `rs.setData(rows, options)` | live data (`live_data=True`): colour and size the roads from rows, an Arrow table or the URL of a JSON file; a second call replaces the values. `rs.clearData()` takes them away. `edge_id` must be text. Event `rs:datachange`; Promise `{rows, matched, ms}`; a number goes in `classes` sets by natural breaks, or in your `breaks` ([guide](../guides/live-data.md)) |
 | event `rs:ready` | `window.rs` and the panel's sections are there; `window.rsReady` is true from then on. A `page_script` waits for it |
-| `rs.setStyle(style)` | a new roads style (a page whose roads come later) |
+| `rs.setStyle(style)` | a new roads style (a page whose roads come later). The controls read the new style: its base-map layers (`ov<i>`) get their Layers box rows, hover and 3D switch, and the rows of the old style go. A switch that the person turned off stays off |
+| `rs.sheet(n)` | the phone's bottom sheet: `rs.sheet()` is its height (0 closed, 1 40 %, 2 full; `null` when the page has no sheet), `rs.sheet(n)` sets it. Event `rs:sheetchange` |
+| `rs.freeArea()` | the part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates: `{lo, hi, top, bottom}`. A host page pads its map with it |
+| `rsFirstPaint(first)` | for a host page that writes its own HTML: sets the classes of `<html>`, the panel's width and the phone class from `first_paint` of `data/host_options.json`, before the first paint. It is exported by `dashboard/template.js` |
 | `rs.error` | `null`, or the error of a style whose interaction contract (`roadstyle:contract`) is newer than the dashboard reads, or whose generation (`roadstyle:generation`) is not the generation of its tiles: then the dashboard adds no road interaction for it (and, for the generation, shows a message and hides the vector layers). `setStyle` sets it again |
 | `rs.contract` | the newest `roadstyle:contract` that the dashboard reads |
 | `rs.destroy()` | removes the object's listeners |
@@ -71,8 +75,8 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | **Built-in controls** | | |
 | `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
 | `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
-| `rsSetBridges(on)` | show / hide every bridge and its 3D deck (the filter panel's *Bridges* row) | `rs:filterchange` |
-| `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows (the filter panel's *Tunnels* row) | `rs:filterchange` |
+| `rsSetBridges(on)` | show / hide every bridge and its 3D deck | `rs:filterchange` |
+| `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetTunnelStyle({strength, palette, ratio, toward})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]`, `toward` a name of `RS_TUNNEL_TOWARDS` or a `#rrggbb` (any may be left out; another `toward` throws) | `rs:tunnelchange` |
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |

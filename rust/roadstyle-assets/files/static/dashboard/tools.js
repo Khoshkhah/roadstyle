@@ -45,6 +45,7 @@ let sink = null;                            // the renderer that is mounted: a f
 export function defineTool(id, kind, el, more = {}){
   const t = {id, kind, el, title: "", ...more};
   tools.set(id, t);
+  el.dataset.rsTool = id;
   if(sink) sink([t]);
   return t;
 }
@@ -56,6 +57,7 @@ export function replaceTool(id, kind, el, more = {}){
   if(!slot) return defineTool(id, kind, el, more);
   const t = {id, kind, el, title: "", ...more};
   tools.set(id, t);
+  el.dataset.rsTool = id;
   slot.replaceWith(wrap(el));
   if(onReplace) onReplace(t);
   return t;
@@ -90,7 +92,7 @@ function adoptNav(){
     }
     const label = id === "compass" ? "Drag to turn and tilt the map, click to set north and the tilt back" : title;
     if(id === "compass" && b) b.setAttribute("title", label);
-    if(b) tools.set(id, {id, kind: "button", el: b, title: label, group: "nav"});
+    if(b){ b.dataset.rsTool = id; tools.set(id, {id, kind: "button", el: b, title: label, group: "nav"}); }
   }
   ctrl.remove();
 }

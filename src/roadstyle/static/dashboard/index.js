@@ -3,7 +3,8 @@
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
 import {initCore, useStyle, _contractError, _emit} from "./core.js";
 import {initGeneration, useGeneration} from "./generation.js";
-import {initTemplate} from "./template.js";
+import {initTemplate, setSheet, getSheet} from "./template.js";
+import {initWindows, freeArea} from "./windows.js";
 import {initBoundary} from "./boundary.js";
 import {initTheme} from "./theme.js";
 import {mountColumn, rsTools} from "./tools.js";
@@ -16,7 +17,6 @@ import {initToolbar} from "./toolbar.js";
 import {initSettings} from "./settings.js";
 import {initPlacement} from "./placement.js";
 import {initSections} from "./sections.js";
-import {initWindows} from "./windows.js";
 import {initTip} from "./tip.js";
 import {initPanelScroll} from "./panelscroll.js";
 import {initOverlay} from "./overlay.js";
@@ -26,17 +26,17 @@ import {initView3D} from "./view3d.js";
 import {initStreetView} from "./streetview.js";
 import {initGoogle3D} from "./google3d.js";
 import {initBasemap} from "./basemap.js";
-import {initFilter, initFilterBox, useFilter} from "./filter.js";
+import {initFilter, useFilter} from "./filter.js";
 import {initFind} from "./find.js";
 import {initColor, useColor} from "./color.js";
 import {useLegend} from "./legend.js";
-import {initOverlays} from "./overlays.js";
-import {initFeatures} from "./features.js";
+import {initOverlays, useOverlays} from "./overlays.js";
+import {initFeatures, useFeatures} from "./features.js";
 import {initTunnel} from "./tunnel.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
 import {initSelect, useSelect} from "./select.js";
-import {makeApi, fromUrl} from "./api.js";
+import {makeApi, fromUrl, refreshState} from "./api.js";
 import {setData, clearData} from "./live.js";
 // an option left out: render's default. The theme's values (select_color, arrow_icon, arrow_color, arrow_rules) have none:
 // they come from the look (roadstyle's profile and palette).
@@ -53,10 +53,10 @@ const RS_DEFAULTS = {
   tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
   street_view: "window", street_view_key: "", google_3d: false,
-  filter: {on: false, classes: []}, color_active: 0,
-  filter_control: true,         // the Roads box (render's keyword; a page key, not the style's)
+  filter: {classes: []}, color_active: 0,
   legend: true,                 // the legend box of the colour options (render's keyword; the style always has the legend data)
   overlays: [], overlay_control: true, overlay_popup: true,
+  overlays_label: "Map layers",  // the label of the one switch for the style's base-map layers (the base-map box) and of their list (the legend box)
   modes: [], box_layout: "corner",   // roadstyle:controls.modes [[mode, count], ...]; "stack": a base map's page (Layers under Roads, folded)
   tunnel: {layers: {}, steps: [], control: false}, fill_layers: [], pick: [], road_fill: {on: true, paint: {}},
   views: [], items: null, edge_id_col: "edge_id", arrow_icon: null,
@@ -66,9 +66,12 @@ const RS_DEFAULTS = {
 // engine, when the map has data colours), and the other controls of a style made with state "live" (roadstyle:controls, the interaction
 // contract of docs/design/rust_library.md: the filter panel, the overlays, the tunnel look, the road fill, the arrows' rules, ...).
 // The overlays' sources and layers there have no prefix: the page's prefix goes on them.
+let _fromCtl = [];            // the options that the last style's controls gave
 function fromStyle(o, given){
   const meta = (o.style && o.style.metadata) || {}, it = meta["roadstyle:interaction"] || {};
   const ctl = meta["roadstyle:controls"] || {}, P = o.prefix || "";
+  for(const k of _fromCtl) if(!given.has(k)) o[k] = RS_DEFAULTS[k];      // a later style without a control takes the old style's value away (the filter, the overlays, the tunnels, ...)
+  _fromCtl = Object.keys(ctl);
   for(const k in ctl) if(!given.has(k)) o[k] = ctl[k];
   if(!given.has("overlays") && ctl.overlays && P)
     o.overlays = ctl.overlays.map(ov=>({...ov, source: P+ov.source, layers: ov.layers.map(id=>P+id), hit: ov.hit && P+ov.hit, extrude: ov.extrude && P+ov.extrude,
@@ -77,11 +80,6 @@ function fromStyle(o, given){
   if(!given.has("road_popup")) o.road_popup = "popup" in it ? it.popup : null;           // false: none; null: every field; [fields]
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
   if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
-  // the Roads box: the page option filter_control and a class to show. The facts of the filter (classes, col, access, swatches, minzoom)
-  // are the style's (roadstyle:controls.filter); a style made before N32 step 2 has its own `on` there, which stays when the page gives
-  // no filter_control
-  const f = o.filter || {};
-  if(given.has("filter_control") || !("on" in f)) o.filter = {...f, on: o.filter_control !== false && (f.classes || []).length > 0};
   if(!given.has("color_options")) o.color_options = meta["roadstyle:color_options"] || [];
   if(!given.has("live")) o.live = meta["roadstyle:live"] || null;
 }
@@ -107,7 +105,6 @@ export function rsDashboard(map, options){
   initBoundary();
   initFilter();
   initFind();
-  initFilterBox();
   initColor();
   useLegend();
   initOverlays();
@@ -136,8 +133,12 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useSelect(); useFilter(); useColor(); useLegend(); useColorBox(); useRoadsBox();
+      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); useRoadsBox(); refreshState();
     },
+    // the phone's bottom sheet: rs.sheet() is its height (0 closed, 1 40 %, 2 full; null: no sheet), rs.sheet(n) sets it; rs.freeArea() is the part of
+    // the map that the bar, the panel and the sheet leave free, in window coordinates ({lo, hi, top, bottom}): a host pads its map with it
+    sheet: n => n === undefined ? getSheet() : setSheet(n),
+    freeArea,
     // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
     setData, clearData,
     // the cut points of rs.setData, for a page that colours many calls the same way (an hour slider: the breaks of the whole day)
