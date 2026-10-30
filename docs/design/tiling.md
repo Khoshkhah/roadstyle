@@ -82,6 +82,28 @@ worker, `export_style`, `roadstyle tiles`): there is one rule, not one for each 
 | slots | `chain`, `slot`, `rank`, `oneway` | number | names, arrows | arrows.js, labels |
 | slots | `name` | **text**: the only one | names (`text-field`) | labels |
 
+A feature has at most `TILE_KEY_COUNT` keys (`simple` 13, `slots` 9, without `__rs_arw`; the export look has one less because it has no `__rs_cc`): the test `tile_keys` fails when a path has more. The number only goes down.
+
+**Why two class keys.** `__rs_ci` is the place of the class in the model's classes (`roadstyle:classes`); every class that the model does not have gets the same number, the length of the list (the style's lookups have one fallback for them). `__rs_cc` is the place
+in the filter panel's classes, which are the classes of the data. They differ when the data has a class that the model does not have: Monaco has `ferry`. With one key, the Roads filter could not hide `ferry` alone (it would hide every class
+that is not in the model), and a lookup array cannot grow without a change in every `at` of the style. Tested on 2026-10-30: a tile cut with one key returns an error for Monaco ("the Roads filter has the class 'ferry', which is not one of the model's classes").
+One key would need the class list of the page to be the model's classes and the data's classes, and the arrays of the style to have a fallback for each added class; the gain is about 5 % of the tag bytes (MVT), less in MLT.
+
+**Why not one number for the flags (measured 2026-10-30; branch `claude/nacka-tile-keys-packed`, not for merge).** One number `__rs_f` for the six flags, the end shape, the piece kind, the dash index and the level
+gives 3 keys on a piece, and it is **worse for the default format**. The tile budget (Monaco and Tartu, the view bytes of the same tiles):
+
+| Packed into one number | MVT view bytes | MLT view bytes | Style expressions (Monaco) |
+|---|---|---|---|
+| nothing (the keys as they are) | 0 % | 0 % | 46,423 (limit 47,352) |
+| the six flags and the slots' one-way flag | −1 % | −1 % to +0.1 % | 48,255 (over) |
+| the same and the end shape | −1 % | −1 % to +0.4 % | 48,419 (over) |
+| the same and the piece kind | −3 % to −5 % | +0.5 % to +6 % | 49,924 (over) |
+| all of them, the dash index and the level too | −11 % to −14 % | +2 % to +9 % | 50,213 (over) |
+
+Two reasons. MLT keeps a sparse flag as a presence bit, so a flag key costs less than one number for each feature; a combined number has many distinct values (46 values in a Monaco z9 tile against 28), and the
+value table and the integers grow. And MapLibre has no bit operation: each read of a flag is `["%", ["floor", ["/", F, 2^i]], 2]`, longer than `["get", key]`. The budget fails on both, and a limit
+does not go up without Kaveh. Do not pack the flags for MLT. If a page uses MVT only, a layout with one number is 11 % to 14 % smaller: that is a decision for a format-specific rule, not for the one rule.
+
 **Why the paths do not have the same key set.** A key is in a tile when the style's expressions or the page's contract read it, and the three paths have
 different styles. The test `the_paths_differ_only_in_the_documented_keys` fails for any other difference:
 - `__rs_cc` (`simple` and `slots`) is in the **page look** only: its style has the filter panel (`roadstyle:controls.filter`), and the Roads filter hides a class by this number. The export
@@ -96,6 +118,7 @@ different styles. The test `the_paths_differ_only_in_the_documented_keys` fails 
 | 1 | The feature id of a piece and of a slot is the road's row | `tile_keys.rs`, each path | done |
 | 2 | A key of a road feature is a mark or one of `TILE_ROAD_KEYS`: no data column | `the_page_look_tiles_have_only_the_listed_keys`, `the_export_look_tiles_have_only_the_listed_keys`, `the_tiles_of_the_stage_1_files_have_only_the_listed_keys` | done |
 | 3 | No text value on a road feature, outside `TILE_TEXT_KEYS` (only `slots.name`); an entry with no text value fails the test; every feature has `__rs_ci` | the same three | done (2026-10-29: `__rs_cls`, `highway`, `__rs_dash`, `__rs_cap` are numbers) |
+| 3c | A feature has at most `TILE_KEY_COUNT` keys | the same three | done (2026-10-30) |
 | 3b | The paths differ only in the documented keys | `the_paths_differ_only_in_the_documented_keys` | done |
 | 4 | No whole-road layer `roads` in the tiles of `export_style` (a click reads the road table by row) | `tests/test_export_style.py::test_style_points_at_its_own_files` | done |
 | 5 | A base-map layer keeps only what its layers read (`height`, `base`, `kind`; no `osm_id`, no `name`) | `stage.rs`: `a_base_map_layer_keeps_what_its_layers_read` | done |

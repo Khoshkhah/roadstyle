@@ -102,6 +102,13 @@ fn check(path: &str, style: &str, found: &BTreeMap<(String, String, bool), usize
             errors.push(format!("{layer}.{key}: a text value on a road feature (a number or a flag in the tile, the text in the road table)"));
         }
     }
+    // the keys of a feature only go down (mark.rs TILE_KEY_COUNT); `__rs_arw` is the export look's own
+    for (layer, max) in roadstyle_rs::mark::TILE_KEY_COUNT {
+        let keys = found.keys().filter(|(l, k, _)| l == layer && k != "#features" && k != roadstyle_rs::mark::Mark::SlotArrow.name()).count();
+        if keys > max {
+            errors.push(format!("{layer}: {keys} keys, at most {max} (TILE_KEY_COUNT only goes down)"));
+        }
+    }
     for (layer, key) in &text {
         if !found.keys().any(|(l, k, t)| l == layer && k == key && *t) {
             errors.push(format!("{layer}.{key}: no text value any more on the {path}: take it out of TILE_TEXT_KEYS"));

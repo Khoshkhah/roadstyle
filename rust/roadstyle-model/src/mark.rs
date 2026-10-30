@@ -207,6 +207,11 @@ impl Mark {
 /// `slot`, `rank` and `oneway`. A data column is not on the list: a road's fields come from the road table by the feature id (the road's row).
 pub const TILE_ROAD_KEYS: [&str; 7] = ["r", "lvl", "name", "chain", "slot", "rank", "oneway"];
 
+/// The most keys that a road feature of a layer has in a tile on the test data (the test `tile_keys` counts them, without the export look's `__rs_arw`;
+/// the page look has `__rs_cc` in addition). It only goes down. The flags, the end shape, the piece kind, the dash index and the level in one number were
+/// measured on 2026-10-30 and are not used: they make the MLT tiles (the default) and the style bigger (docs/design/tiling.md, "Why not one number").
+pub const TILE_KEY_COUNT: [(&str, usize); 2] = [("simple", 13), ("slots", 9)];
+
 /// The (layer, key) pairs of a tile that have a TEXT value: only the street name of a name slot. MapLibre's `text-field` reads it from the tile. A road
 /// piece has no text, and every other key is a number or a flag; the class is `__rs_ci` (the place in `roadstyle:classes`) and `__rs_cc` (the place in
 /// the filter panel's classes), the dash pattern and the end shape are numbers (tiles/src/codes.rs). The test `tile_keys` fails for any other text value.
