@@ -383,8 +383,10 @@ def test_the_editor_works_in_the_hosts_panel(view):
             page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html")
             page.wait_for_function("window.ready && !!document.getElementById('lv')", timeout=60000)
             page.wait_for_timeout(1500)                                           # the tiles of the editor's roads
-            box = lambda sel: page.evaluate(f"(() => {{ const r = document.querySelector({sel!r}).getBoundingClientRect(); return {{top: r.top, bottom: r.bottom, left: r.left, right: r.right, h: r.height}}; }})()")
-            tap = (lambda sel: page.locator(sel).tap()) if phone else (lambda sel: page.locator(sel).click())
+            def box(sel):
+                return page.evaluate(f"(() => {{ const r = document.querySelector({sel!r}).getBoundingClientRect(); return {{top: r.top, bottom: r.bottom, left: r.left, right: r.right, h: r.height}}; }})()")
+            def tap(sel):
+                page.locator(sel).tap() if phone else page.locator(sel).click()
             # open: the top line, three tabs, no apply bar; on a phone the panel is the sheet at the bottom
             assert page.locator("#sb .lv-back").inner_text() == "← Steps" and page.locator("#sb .lv-title .t").inner_text() == "Edit levels"
             assert page.evaluate("[...document.querySelectorAll('#lv-tabs button')].map(b => b.dataset.t).join()") == "edit,history,given"
@@ -421,7 +423,8 @@ def test_the_editor_works_in_the_hosts_panel(view):
             assert sb["bottom"] - 16 <= bar["bottom"] <= sb["bottom"], (bar, sb)       # at the bottom edge of the panel (of the sheet)
             for sel in ("#lv-apply", "#lv-discard"):
                 assert page.locator(sel).is_visible()
-                if phone: assert box(sel)["h"] >= 44, sel
+                if phone:
+                    assert box(sel)["h"] >= 44, sel
             page.evaluate("document.querySelector('#lv .scroll[data-tab=edit]').scrollTop = 400")      # the panel scrolls, the bar stays
             assert box("#lv-bar") == bar
             assert page.evaluate("document.getElementById('lv-queue').hidden"), "the list of the waiting changes opens on a tap"
