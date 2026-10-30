@@ -102,6 +102,12 @@ m.save("map.html")                        # m.html is the page as a string
 - Unsure of a keyword? `help(rs.render_edges)` or the parameters page. Don't guess: an unknown
   or misspelt keyword does nothing and gives a warning with the nearest known name (an error from roadstyle 0.27.0).
 
+## A dashboard page: use the shared parts
+
+`render_dashboard` pages share one set of parts (help window, hover box, tabs, cards, number tiles, scroll area and table, chart colours, inputs, chips,
+`rs.ready`, `rs.classify`): see `docs/guides/dashboard-parts.md`. **Use a part when one exists; never write CSS or JavaScript for the same thing in a page.**
+The panel is 400 px: fit the content to it.
+
 ## Check the result
 
 Look at the map before reporting it done. With `pip install playwright && playwright install chromium`:

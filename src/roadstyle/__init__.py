@@ -16,6 +16,7 @@ from .basemaps import (
     register_basemap,
     set_api_key,
 )
+from .classify import Classes, classify, natural_breaks, ramp
 from .config import StyleConfig
 from .edges import (
     RoadEdges,
@@ -95,6 +96,10 @@ except Exception:                                    # running from a bare sourc
     __version__ = "0+unknown"
 
 __all__ = [
+    "classify",
+    "Classes",
+    "natural_breaks",
+    "ramp",
     "export_inline",
     "export_look",
     "export_style",

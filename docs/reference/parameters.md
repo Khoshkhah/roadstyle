@@ -26,6 +26,8 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `from_duckdb(con_or_rel, query=None, *, geometry, class_col, crs=4326, rename)` | `RoadEdges` | from DuckDB; select the geometry as `ST_AsWKB(geom)` |
 | `filter_edges(gdf, include, exclude, highway_col, match_links)` | GeoDataFrame | keep / drop road classes |
 | `highway_types(gdf, highway_col="highway", normalize=True)` | `list` | the classes present |
+| `classify(values, method="natural", k=5, *, breaks=None, pivot=None, palette="viridis", reverse=False, fmt="{:g}")` | `Classes` | discrete colour classes for roads: the cuts, the labels and the colours (`.labels`, `.breaks`, `.colors`, `.option(column)` for `color_options`). `method`: `natural` (Fisher-Jenks), `quantile`, `equal` or `fixed`. A `pivot` is always one of the cuts. [Dashboard parts](../guides/dashboard-parts.md#colour-classes) |
+| `natural_breaks(values, k)`, `ramp(palette, k)` | cuts, colours | the cuts of `classify`, and `k` colours along a palette |
 | **Base maps, settings** ([Settings & palettes](settings.md)) | | |
 | `BASEMAPS`, `Basemap`, `get_basemap`, `register_basemap` | | base maps ([below](#basemap)) |
 | `set_api_key(key, provider=None)` / `get_api_key(provider=None)` | / `str` | base-map API keys |

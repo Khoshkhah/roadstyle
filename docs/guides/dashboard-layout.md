@@ -26,7 +26,7 @@ defaults, and a wrong key or value is an error. These are the parts:
 
 | Part | Keys |
 |---|---|
-| `panel` | `side` (`"left"` or `"right"`), `width_px`, `look` (`"frame"` or `"card"`), `sections`, `hide` ([Add to the panel](dashboard-panel.md)) |
+| `panel` | `side` (`"left"` or `"right"`), `width_px` (400 by default; fit your content to the panel and do not widen the panel for it), `look` (`"frame"` or `"card"`), `sections`, `hide` ([Add to the panel](dashboard-panel.md)) |
 | `toolbar` | `position` (`"left"`, `"top"`, `"right"` or `"bottom"`), `navigation` (`"box"` or `"buttons"`), `settings`, `hold` |
 | `legend` | `rows`: the rows that your page adds to the legend |
 | `credits` | the credits of your own data: `[{"text": ..., "href": ...}]` |
@@ -95,7 +95,7 @@ The gear button opens the settings. The browser keeps them. They do not go into 
 
 - **Layout.** The bar: left, top, right or bottom. The panel: left or right, as a frame (default) or a card. The scale and zoom number can show.
 - **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
-  Every floating part follows one of the three sliders.
+  Every floating part follows one of the three sliders. All three start at 40 %.
 - **Keys.** A Google Maps key (Street View, Google 3D) and a CARTO key. The CARTO key shows only when the page has a CARTO base map. A saved
   key replaces the key of the page. A page needs no Google key at build time.
 

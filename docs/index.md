@@ -96,6 +96,9 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
   [Tiling](design/tiling.md)
 - **The level editor is in the dashboard.** It draws into the page's one standard panel, and the History tab has `edits.csv`.
   [Which road is on top](guides/levels.md#edit-the-levels-in-a-dashboard)
+- **Parts for a dashboard page.** The panel has shared parts: a help window (`rs.help`), a hover box (`rs.hover`), tabs (`rs.tabs`), number tiles (`rs.kpi`),
+  scroll areas and tables, chart colours (`rs.svg`), chips and text boxes. `rs.classify` makes discrete colour classes for roads. The panel is 400 px wide.
+  [Dashboard parts](guides/dashboard-parts.md)
 - **Live data.** Colours by natural breaks, a legend with the number of roads, and a guide for a new day.
   [Live data](guides/live-data.md)
 - **Move a script.** [Move a dashboard to the new version](guides/migrating-dashboard.md) lists each change from 0.25.

@@ -45,8 +45,9 @@ The pictures show Monaco, made with `rs.render_dashboard(edges, name="Monaco")` 
 
 Every dashboard has the same parts, in the same places. You do not build them. You change them with one option, `dashboard={...}`.
 
-- **The panel** is at the left, with the query box and the selected road. You can add blocks of your own to it
-  ([Add to the panel](dashboard-panel.md)).
+- **The panel** is at the left, 400 px wide, with the query box and the selected road. You can add blocks of your own to it
+  ([Add to the panel](dashboard-panel.md)). Build them from the shared parts of a dashboard: help window, hover box, tabs, number tiles,
+  tables, charts and chips ([Dashboard parts](dashboard-parts.md)).
 - **The toolbox** is one bar next to the panel. Its tools are always in the same places: theme, navigate, Street View, Google 3D,
   base map, roads, 3D buildings, colour and legend, settings, and the credits. A tool that the page cannot use is greyed out, and its
   tooltip says why. You can add tools of your own with `rs.tools` ([Dashboard layout](dashboard-layout.md)).
@@ -62,14 +63,14 @@ Every dashboard has the same parts, in the same places. You do not build them. Y
 - **A phone** (700 px or less) has the bar at the top in one row that moves sideways under a finger, and a fold button that hides the bar
   to one small button. The panel is a bottom sheet with a button on its grip.
 
-The pages [Dashboard layout](dashboard-layout.md) and [Add to the panel](dashboard-panel.md) have the details. To build your own
+The pages [Dashboard layout](dashboard-layout.md), [Add to the panel](dashboard-panel.md) and [Dashboard parts](dashboard-parts.md) have the details. To build your own
 panel and tools from JavaScript, use `rs.sections`, `rs.legend` and `rs.tools`
 ([JavaScript API](../reference/javascript.md#the-rs-object)).
 
 ```python
 rs.render_dashboard(edges, dashboard={
     "toolbar": {"position": "right", "navigation": "buttons"},   # the bar at the right, with the zoom buttons
-    "panel": {"side": "right", "width_px": 400},
+    "panel": {"side": "right", "width_px": 480},
 })
 ```
 

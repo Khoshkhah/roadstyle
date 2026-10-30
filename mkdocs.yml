@@ -59,6 +59,7 @@ nav:
       - Dashboards & JavaScript: guides/dashboards.md
       - Dashboard layout: guides/dashboard-layout.md
       - Add to the panel: guides/dashboard-panel.md
+      - Dashboard parts: guides/dashboard-parts.md
       - "Live data: a new day": guides/live-data.md
       - Move a dashboard to the new version: guides/migrating-dashboard.md
       - Put it on a website: guides/website.md

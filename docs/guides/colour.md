@@ -50,6 +50,18 @@ rs.render_edges(edges, color_by="color", colors="self")     # `color` holds "#rr
 
 Neither draws a legend.
 
+## Classes from your data
+
+For numbers that you want in a few classes, `rs.classify` gives the cuts, a label for each road and the colours:
+
+```python
+cls = rs.classify(edges["coverage"], method="natural", k=5, pivot=0.8, palette="rdylgn", fmt="{:.0%}")
+edges["cov_class"] = cls.labels
+rs.render_dashboard(edges, color_options={"Coverage": cls.option("cov_class")})
+```
+
+`method` is `natural` (Fisher-Jenks: the cuts fall in the gaps of the data), `quantile`, `equal` or `fixed`. More: [Dashboard parts](dashboard-parts.md#colour-classes).
+
 ## Several colourings with a menu
 
 `color_options` puts several colourings in one map, with a **Colour by** menu to switch between

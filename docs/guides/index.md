@@ -100,6 +100,14 @@
 
     [:octicons-arrow-right-24: Add to the panel](dashboard-panel.md)
 
+-   :material-puzzle-outline:{ .lg .middle } **Dashboard parts**
+
+    ---
+
+    The shared parts of a dashboard page: help, hover box, tabs, number tiles, tables, charts and chips.
+
+    [:octicons-arrow-right-24: Dashboard parts](dashboard-parts.md)
+
 -   :material-chart-timeline-variant:{ .lg .middle } **Live data: a new day**
 
     ---

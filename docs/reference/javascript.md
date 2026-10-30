@@ -28,6 +28,12 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box (its label is `overlays_label`, default "Map layers"). Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()` (each tool with its `kind`, `open` and `disabled` state; a tool that the page cannot use is greyed out, and its title says why), and `ready()` (with `toolbar.hold`). `rs.on("tool", fn)` tells of each open, close and press. The built-in tools are `theme`, `navigate`, `street_view`, `google_3d`, `basemap`, `roads`, `buildings`, `legend`, `settings` and `attribution`. The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
+| `rs.ready` | `ready(fn)`: runs `fn` now if the page is ready, else on `rs:ready` |
+| `rs.svg` | `svg(parent, tag, attrs, text?)`: one SVG element of a chart; a value that starts with `var(` goes to the style ([guide](../guides/dashboard-panel.md)) |
+| `rs.kpi` | the HTML of one number tile: `kpi(title, value, sub, color?)`, for a `<div class="rs-kpis">` ([guide](../guides/dashboard-panel.md)) |
+| `rs.tabs` | tabs and the two-way switch of a page: `use(nav, onChange)` returns `{select(id), current()}` ([guide](../guides/dashboard-panel.md)) |
+| `rs.hover` | the page's hover box: `show(html, event)`, `hide()`, `on(node, html \| fn)` ([guide](../guides/dashboard-panel.md)) |
+| `rs.help` | the page's help window: `set({title, intro, terms: [[term, text], ...], note})` adds the "i" button to the panel's title and keeps the window, `open`, `close`; event `rs:helpchange` ([guide](../guides/dashboard-panel.md)) |
 | `rs.sections` | the dashboard panel's sections: `add({id, html, el, label, after, before})`, `get`, `list`, `hide`, `show`, `remove`; event `rs:sectionchange` ([guide](../guides/dashboard-panel.md)) |
 | `rs.colorModes` | the page's own "Colour by" list in the legend box (a live-data page has no colour options of the style): `set(["Traffic", "Counted?"], {active, onChange(name, index)})`, `select(name)`, `clear()`, `active`. Event `rs:colormode` (`detail.name`, `detail.index`) |
 | `rs.naturalBreaks(values, k)` | the `k - 1` cut points (ascending) that split the numbers into `k` sets by Fisher-Jenks natural breaks: the `breaks` of `rs.setData` for a page that colours many calls the same way (an hour slider: the breaks of the whole day) |
@@ -114,6 +120,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | | `rsColor` with one set / several | `ids`, `color` / `groups: [{ids, color}]` |
 | | `rsColor` on an overlay | `overlay`, `ids`, `color` |
 | `rs:highlightchange` | `rsHighlight` | `ids` (plus `overlay` on an overlay) |
+| `rs:themechange` | `rsSetTheme`, the theme button | `theme` (`light` or `dark`) |
 | `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
 | `rs:interactionchange` | `rsSetInteraction` | `overlay` (label), `clickable`, `tooltip`, `popup` |

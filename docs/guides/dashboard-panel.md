@@ -35,6 +35,78 @@ The rows of `legend` show in the legend box of the toolbox, after the rows of th
 
 The event `rs:sectionchange` has `detail.id` and `detail.state`.
 
+## A help window
+
+```js
+rs.help.set({title: "How to read this page", intro: "What the page shows.",
+             terms: [["Inside the range", "How often the promise held."]], note: "A short note."});
+```
+
+An "i" button appears in the panel's title. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
+
+## Cards, number tiles and a callout
+
+```html
+<div class="rs-callout" style="--rs-callout:#16a34a"><b>Yes, the promise holds.</b> On 80 % of hours the traffic was inside the range.</div>
+<div class="rs-cap">All counted hours</div>
+<div class="rs-kpis" id="k"></div>
+<div class="rs-sec-box"><h3>By hour of the day</h3><p>How often the range held, hour by hour.</p><svg>...</svg></div>
+```
+
+```js
+document.getElementById("k").innerHTML = rs.kpi("Inside the range", "80.4%", "promised 80 %", "#15803d") + rs.kpi("Typical miss", "10 %", "on one hour");
+```
+
+A card is `.rs-sec-box`: an `h3` is its title and the paragraph right after it is its short muted description. An `svg` in it fills the width. `rs-kpis` is a grid of three tiles (`--rs-kpi-cols` changes the number). All of them use the panel's tokens, so they follow the light and the dark theme.
+
+## Buttons, text boxes, chips and a dot
+
+A plain `<button>` and `<button class="sb-primary">` in the panel are styled already, and so are a `<select>` and a text `<input>` or `<textarea>`: write no class for them. `<span class="rs-chip">road type</span>` is a small label, `rs-chip accent` tints it with the page's `--accent`, and `<span class="rs-dot" style="background:#15803d"></span>` is a colour mark before a word.
+
+## Charts
+
+```js
+const s = document.querySelector("#chart");
+rs.svg(s, "line", {x1: 0, x2: 300, y1: 40, y2: 40, stroke: "var(--rs-chart-grid)"});
+rs.svg(s, "polygon", {points: "...", fill: "var(--rs-chart-band)", stroke: "var(--rs-chart-band-line)"});
+rs.svg(s, "text", {x: 4, y: 12, fill: "var(--mut)", "font-size": 9}, "0");
+```
+
+`rs.svg` makes one SVG element. An SVG attribute does not read `var(--x)`, so a value that starts with `var(` goes to the style. The chart then follows the theme with no code of its own. The colours that charts share are `--rs-chart-band`, `--rs-chart-band-line`, `--rs-chart-grid` and `--rs-chart-miss`; for text and lines use the panel's `--ink`, `--mut`, `--line` and `--card`. What is drawn on a canvas cannot read a variable: redraw it on the event `rs:themechange`.
+
+## Tabs and a two-way switch
+
+```html
+<nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets</button></nav>
+<div data-pane="a">...</div><div data-pane="b" hidden>...</div>
+<div class="rs-seg" id="mode"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div>
+```
+
+```js
+const tabs = rs.tabs.use(document.querySelector(".rs-tabs"), id => console.log(id));    // tabs.select("b") opens a tab from the code
+rs.tabs.use(document.getElementById("mode"), v => redraw(v));
+```
+
+A click or an arrow key selects. The chosen button has `on` and `aria-selected`; the panes beside the tabs (the siblings with `data-pane`) show the one with the same id. The selected one is in `--accent`: set it for the page with `#sb{--accent:#0E7F91}` in `page_style`.
+
+## A hover box
+
+```js
+rs.hover.on(chartNode, ev => "<b>Saturday</b><br>24 hours");     // the text, or a function of the event; null hides
+rs.hover.show("<b>A street</b>", mapEvent.originalEvent);         // by hand, over a map layer
+rs.hover.hide();
+```
+
+The box has the popup's look and follows the pointer. It flips to the other side at the edge of the page and never takes the pointer. The words can have HTML.
+
+## A list or a table that scrolls
+
+```html
+<div class="rs-scroll"><table class="rs-table"><thead><tr><th data-sort="desc">Street</th><th>Hours</th></tr></thead><tbody>...</tbody></table></div>
+```
+
+`rs-scroll` gives the area the panel body's scroll rules: a thin scrollbar that shows only over the area or while it scrolls, a fade at the bottom edge while there is more below, and a scroll that never goes on to the map. The height is `--rs-scroll-h` (default: the smaller of 520 px and 60 % of the window). `rs-table` keeps the header row in view, lines up the numbers (the first column is text) and tints the row under the pointer. Put `data-sort="asc"` or `"desc"` on the `th` of the sorted column.
+
 ## Both themes
 
 The panel has a light and a dark theme. Your HTML must follow them. Plain text, links, tables, `hr`, inputs and buttons

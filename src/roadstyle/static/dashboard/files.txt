@@ -14,6 +14,11 @@ panelscroll
 sections
 settings
 tip
+help
+hover
+tabs
+kpi
+svg
 toolbar
 panel
 find

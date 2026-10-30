@@ -425,7 +425,7 @@ html.rs-panel-left #sb,html.rs-panel-left .rs-side{left:0;right:auto}
 html.rs-panel-left #sb{border-left:0;border-right:1px solid var(--line,var(--rs-tb-border))}
 html.rs-panel-left #sb-show,html.rs-panel-left #rs-show-right{left:10px;right:auto}
 html.rs-panel-left :is(#sb-hide,#sb-show,.rs-side-min) svg,html.rs-panel-left #rs-show-right svg{transform:scaleX(-1)}
-html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:var(--rs-panel-w,340px)!important;right:0!important}
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:var(--rs-panel-w,400px)!important;right:0!important}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!important}
 /* the compass: our needle (tools.js) instead of MapLibre's picture, which is pale on a translucent bar */
 /* the icon fills its button and is centered in it (MapLibre's own box is 29 px high and sat at the top of a 32 px button) */
@@ -515,7 +515,7 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb .sb-body[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent)}
 /* ---- The panel's shell (position, tokens, the title row, the hide and show buttons): the rules that the sidebar of a template needs, and that a host
    page with its own panel (#sb with .sb-top, #sb-hide and #sb-show) needs too. They are at the end, as they were in the template's own style. ---- */
-#sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,340px);box-sizing:border-box;overflow:auto;
+#sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,400px);box-sizing:border-box;overflow:auto;
   padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
   --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
   background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
@@ -531,3 +531,83 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb-show{position:fixed;top:10px;right:10px;z-index:3;display:none;background:#fff;color:#333;
   border:1px solid #ccc;border-radius:8px;width:32px;height:32px;cursor:pointer;padding:0;
   align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+
+/* THE HELP WINDOW (help.js): the page's words in roadstyle's look - the card token, the blur and the border of the other floating windows */
+#rs-help{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center}
+#rs-help[hidden]{display:none}
+#rs-help .rs-help-box{position:relative;max-width:480px;max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;margin:16px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  color:var(--rs-tb-ink);border:1px solid var(--rs-tb-border);border-radius:12px;padding:18px 20px;font:13px/1.5 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#rs-help .rs-help-ttl{font-size:16px;font-weight:700;margin-bottom:4px}
+#rs-help .rs-help-intro{margin:4px 0 12px}
+#rs-help .rs-help-terms{display:grid;grid-template-columns:120px 1fr;margin:0;border-top:1px solid var(--rs-tb-border)}
+#rs-help .rs-help-terms dt,#rs-help .rs-help-terms dd{margin:0;padding:8px 0;border-bottom:1px solid var(--rs-tb-border);font-size:12.5px}
+#rs-help .rs-help-terms dt{font-weight:700;padding-right:10px}
+#rs-help .rs-help-note{margin-top:12px;padding:8px 10px;background:color-mix(in srgb,#38a3dc 14%,transparent);border-radius:8px;font-size:12px}
+#rs-help .rs-help-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:20px;color:inherit;cursor:pointer}
+#sb #rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
+#sb #rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}
+
+
+/* The strip's blur is a layer behind it, not a property of the strip: a box that opens inside a blurred parent (the attribution) blurs only what the parent
+   holds, and the map behind it stays sharp. The box in the toolbar has no blurred parent, and that is why it looks like glass. */
+#rs-scalebox::before{content:"";position:absolute;inset:-1px;z-index:-1;border-radius:inherit;pointer-events:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+
+/* THE HOVER BOX (hover.js): the popup's look - the box token, the blur and the border - and it never takes the pointer */
+#rs-hover{position:fixed;z-index:3000;max-width:280px;pointer-events:none;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border);
+  color:var(--rs-tb-ink);padding:6px 9px;border-radius:8px;font:11.5px/1.45 system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+#rs-hover[hidden]{display:none}
+
+/* ---- A SCROLL AREA IN THE PANEL (panelscroll.js, class rs-scroll): the body's rules for each area - a thin scrollbar that shows over the area or while it scrolls, a
+   fade at the bottom edge while there is more, and no scroll handed on to the map or to the body. Its height is `--rs-scroll-h` (the page can set it). ---- */
+#sb .rs-scroll,#rp .rs-scroll{overflow:auto;overscroll-behavior:contain;max-height:var(--rs-scroll-h,min(520px,60vh));scrollbar-width:thin;scrollbar-color:transparent transparent}
+#sb .rs-scroll:hover,#sb .rs-scroll.rs-scrolling,#rp .rs-scroll:hover,#rp .rs-scroll.rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
+#sb .rs-scroll[data-more],#rp .rs-scroll[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+/* a table in it: the header row stays, the numbers line up, the first column is text. A column that sorts has `data-sort="asc"` or `"desc"` on its th. */
+#sb .rs-table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
+#sb .rs-table th{position:sticky;top:0;z-index:2;text-align:right;padding:4px;border-bottom:1px solid var(--line);color:var(--mut);background:var(--card);cursor:pointer;white-space:nowrap;font-size:10.5px;font-weight:700}
+#sb .rs-table td{text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+#sb .rs-table th:first-child,#sb .rs-table td:first-child{text-align:left}
+#sb .rs-table tbody tr{cursor:pointer}
+#sb .rs-table tbody tr:hover{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+#sb .rs-table th[data-sort]{color:var(--accent)}
+#sb .rs-table th[data-sort=asc]::after{content:" \25B2";font-size:8px}
+#sb .rs-table th[data-sort=desc]::after{content:" \25BC";font-size:8px}
+
+/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js): the selected one is in --accent (a page sets it: `#sb{--accent:#0E7F91}`); the rest are the panel's muted ink ---- */
+#sb .rs-tabs{display:flex;flex-wrap:wrap;gap:2px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+#sb .rs-tab{padding:7px 9px;border:1px solid transparent;border-radius:6px;background:none;color:var(--mut);font:600 12px system-ui,sans-serif;cursor:pointer;user-select:none}
+#sb .rs-tab:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
+#sb .rs-tab.on,#sb .rs-tab.on:hover{color:#fff;background:var(--accent);border-color:var(--accent)}
+#sb .rs-seg{display:flex;padding:2px;margin-bottom:12px;border-radius:8px;background:color-mix(in srgb,var(--mut) 25%,transparent)}
+#sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:6px;background:none;color:var(--mut);font:600 11.5px system-ui,sans-serif;cursor:pointer}
+#sb .rs-seg button:hover{color:var(--ink);border:0}
+#sb .rs-seg button.on,#sb .rs-seg button.on:hover{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+#sb .rs-tab:focus-visible,#sb .rs-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#sb [data-pane][hidden]{display:none}
+
+/* ---- CARDS, NUMBER TILES, A CAPTION AND A CALLOUT in the panel (the box itself is `.rs-sec-box`, above): a card has a title and, right after it, its short muted description ---- */
+.sb-sec .rs-sec-box h3{font-size:12px;font-weight:700;margin:0 0 3px;color:var(--ink)}
+.sb-sec .rs-sec-box h3 + p{color:var(--mut);font-size:11.5px;line-height:1.45;margin:0 0 7px}
+.sb-sec .rs-sec-box svg{width:100%;height:auto;display:block;overflow:hidden}
+#sb .rs-kpis{display:grid;grid-template-columns:repeat(var(--rs-kpi-cols,3),1fr);gap:8px;margin:0 0 12px}
+#sb .rs-kpi{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+#sb .rs-kpi-title{font-size:9.5px;font-weight:700;color:var(--mut);text-transform:uppercase}
+#sb .rs-kpi-val{font-size:17px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;color:var(--ink)}
+#sb .rs-kpi-sub{font-size:10px;color:var(--mut)}
+#sb .rs-cap{margin:2px 0 6px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+/* a callout: the answer in one box, with an edge in a colour of the page (`--rs-callout`, or set `border-left-color` from the code) */
+#sb .rs-callout{margin:0 0 12px;padding:8px 11px;border:1px solid var(--line);border-left:4px solid var(--rs-callout,var(--accent));border-radius:0 8px 8px 0;background:var(--card);font-size:12.5px;line-height:1.5}
+
+/* ---- CHART COLOURS: the colours that a page's charts share, with a light and a dark value (use them with `rs.svg`, which takes `var(--x)` in `fill` and `stroke`).
+   For text and lines the panel's own tokens do the same: --ink, --mut, --line, --card. ---- */
+html{--rs-chart-band:#e0f2fe;--rs-chart-band-line:#bae6fd;--rs-chart-grid:#eef2f6;--rs-chart-miss:#e2e8f0}
+html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-line:rgba(90,169,248,.45);--rs-chart-grid:#272b33;--rs-chart-miss:#3a404a}
+
+/* ---- INPUTS, CHIPS AND A DOT in the panel: a text box looks like the panel's select and query box; a chip is a small rounded label (`.accent` tints it with --accent);
+   a dot is a colour mark before a word. A plain <button> and `button.sb-primary` are styled by the template; a page needs no class for them. ---- */
+#sb :is(input[type=text],input[type=search],input[type=number],input:not([type]),textarea){width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;outline:none}
+#sb :is(input,textarea):focus{border-color:var(--accent)}
+#sb :is(input,textarea)::placeholder{color:var(--mut)}
+#sb .rs-chip{display:inline-block;padding:2px 8px;border-radius:10px;background:color-mix(in srgb,var(--mut) 18%,transparent);color:var(--mut);font-size:11px;font-weight:600;line-height:1.35}
+#sb .rs-chip.accent{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+#sb .rs-dot{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:var(--mut)}

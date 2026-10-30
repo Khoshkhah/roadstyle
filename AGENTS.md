@@ -19,6 +19,9 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 
 ## Changing the library
 
+- A new part for dashboard pages (a button, a box, a chart colour) goes in `rust/roadstyle-assets/files/static/dashboard/` and in `docs/guides/dashboard-parts.md`, with a
+  browser test (`tests/test_dashboard_help_browser.py` shows how) and a look at it in both themes. A page of a project must not carry its own copy.
+
 - roadstyle's files (the profiles and palettes, the base map's files, `cmaps.json`, `basemaps.json`, the dashboard, the popup, the
   page templates, MapLibre) have one copy: `rust/roadstyle-assets/files/`, the crate roadstyle-assets. A crate takes a file with
   `roadstyle_assets::text!("data/cmaps.json")` (a wrong name does not compile); Python asks `roadstyle._assets.text(name)`, which

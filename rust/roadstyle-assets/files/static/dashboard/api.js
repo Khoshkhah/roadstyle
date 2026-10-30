@@ -5,6 +5,11 @@
 import {map, O, CONTRACT} from "./core.js";
 import {rsTools} from "./tools.js";
 import {rsSections} from "./sections.js";
+import {rsHelp} from "./help.js";
+import {rsHover} from "./hover.js";
+import {rsTabs} from "./tabs.js";
+import {rsKpi} from "./kpi.js";
+import {rsSvg} from "./svg.js";
 import {rsLegend} from "./legend.js";
 import {rsColorModes} from "./colorbox.js";
 
@@ -76,6 +81,12 @@ export function makeApi(extra){
                 "streetView", "google3d", "panel"];
   const api = {
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
+    ready: fn => window.rsReady ? fn() : document.addEventListener("rs:ready", fn, {once: true}),   // run fn now if the page is ready, else when it is
+    svg: rsSvg,                  // one SVG element for a chart, with var(--x) colours (svg.js)
+    kpi: rsKpi,                  // the HTML of a number tile (kpi.js)
+    tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)
+    hover: rsHover,              // the hover box of a page: show, hide, on (hover.js)
+    help: rsHelp,                // the page's help window: set, open, close (help.js)
     sections: rsSections,        // the panel's sections: list, get, add, remove, hide, show (sections.js)
     legend: rsLegend,            // the legend's own rows for the page: add, remove, list (legend.js)
     colorModes: rsColorModes,    // the page's own "Colour by" list in the legend box: set, select, clear, active (colorbox.js)

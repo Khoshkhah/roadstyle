@@ -34,6 +34,7 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 - [Big networks](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/big-networks.md): tiles on by default, MLT, opting out with tiles=False
 - [Dashboards & JavaScript](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboards.md): the standard dashboard and its toolbox, driving the map from your own page
 - [Dashboard layout](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboard-layout.md): the panel, the toolbox (navigate, roads, base map, legend, settings, credits), the zoom table, the phone form
+- [Dashboard parts](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboard-parts.md): the shared parts of a dashboard page (rs.help, rs.hover, rs.tabs, rs.kpi, rs-scroll, rs-table, rs.svg, chips), rs.classify
 - [Add to the panel](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboard-panel.md): sections and legend rows
 - [Live data: a new day](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/live-data.md): rs.setData, natural breaks, the day picker
 - [Move a dashboard to the new version](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/migrating-dashboard.md): each old keyword and the changes from 0.25 to 0.26
