@@ -3,9 +3,10 @@
 import {map} from "./core.js";
 // the dark theme of the style's layers (dark.rs): the global state rs_theme, which the layers' colours read ("dark" picks the dark colour of each). It is set when
 // the style is loaded (before that MapLibre refuses a global state), and again at each change of the theme
+// It answers whether the style is loaded: a change of the map's style (the base map) must wait for it as well ("Style is not done loading").
 const syncStyleTheme = () => {
   const set = () => map.setGlobalStateProperty("rs_theme", document.documentElement.dataset.rsTheme === "dark" ? "dark" : "light");
-  try { set(); } catch(e){ if(!/not done loading/.test(e.message)) throw e; map.once("style.load", set); }
+  try { set(); return true; } catch(e){ if(!/not done loading/.test(e.message)) throw e; map.once("style.load", set); return false; }
 };
 export function rsSetTheme(name){
   const dark = name === "dark", root = document.documentElement;
@@ -30,8 +31,12 @@ export function initTheme(){
     const all = window.RS_BASEMAPS || [];
     current = current || all[0] || null;
     if(!current || !window.rsSetBasemap) return;
-    if(e.detail.theme === "dark" && current.dark) window.rsSetBasemap(current.dark);
-    else if(e.detail.theme === "light"){ const light = all.find(b => b.dark === current.key); if(light) window.rsSetBasemap(light.key); }
+    // a page that starts in the dark theme changes it before the style is loaded: the base map's swap waits for the style, with the theme state
+    const swap = () => {
+      if(e.detail.theme === "dark" && current.dark) window.rsSetBasemap(current.dark);
+      else if(e.detail.theme === "light"){ const light = all.find(b => b.dark === current.key); if(light) window.rsSetBasemap(light.key); }
+    };
+    syncStyleTheme() ? swap() : map.once("style.load", swap);
   });
   // the sidebar is injected after this script runs: look for it when the page is parsed
   const follow = () => {

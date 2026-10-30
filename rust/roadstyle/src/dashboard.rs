@@ -61,6 +61,9 @@ pub struct Section {
     /// the same, before it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub before: Option<String>,
+    /// the section folds: its label is a button, its body hides, and the panel's title row has one button for all the sections that fold (needs a `label`)
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fold: bool,
 }
 
 /// The side panel: its edge, its width, its look, the sections that the page adds, and the panel's own sections that it hides. The panel's HTML is
@@ -476,6 +479,9 @@ impl Dashboard {
             if s.id.is_empty() || PANEL_SECTIONS.contains(&s.id.as_str()) || known.contains(&s.id.as_str()) {
                 return bad(format!("sections: the id '{}' is empty or used twice (the panel's own ids: {})", s.id, PANEL_SECTIONS.join(", ")));
             }
+            if s.fold && s.label.is_none() {
+                return bad(format!("sections: '{}' folds (`fold`) and has no `label`, which is its button", s.id));
+            }
             if s.after.is_some() && s.before.is_some() {
                 return bad(format!("sections: '{}' has `after` and `before`: use one", s.id));
             }
@@ -519,6 +525,18 @@ mod tests {
             let free = Template::Map.dashboard(layout);
             assert!((free.layout, free.panel, free.toolbar) == (Dock, None, None) && !free.windows.clamp && free.windows.recenter_map);
         }
+    }
+
+    #[test]
+    fn a_section_that_folds_needs_a_label() {
+        let d = Template::Dashboard.dashboard(Overlay);
+        let with = |v: Value| merge(&d, &serde_json::json!({"panel": {"sections": [v]}}));
+        assert!(with(serde_json::json!({"id": "a", "html": "<p>x</p>", "label": "A", "fold": true})).is_ok());
+        let e = with(serde_json::json!({"id": "a", "html": "<p>x</p>", "fold": true})).unwrap_err().to_string();
+        assert!(e.contains("folds") && e.contains("label"), "{e}");
+        // a section that does not fold writes no `fold` key
+        let s = serde_json::to_value(with(serde_json::json!({"id": "a", "html": "x"})).unwrap().panel.unwrap().sections).unwrap();
+        assert!(s[0].get("fold").is_none(), "{s}");
     }
 
     #[test]
