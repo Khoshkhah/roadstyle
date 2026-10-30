@@ -219,7 +219,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.locator("#sb .sb-top .lv-back").inner_text() == "← Steps" and page.locator("#sb .sb-top .t").inner_text() == "Edit levels"
             assert page.locator("#sb-hide").is_visible(), "the host's hide button stays"
             # the lean road table: only the fields that the page reads (reads.json's table), live data's id and the road that a click picks
-            want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road"}
+            want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road", "modes"}
             got = page.evaluate("[...new Set(window.RS_SIDE.props.flatMap(Object.keys))]")
             assert "road" in got and set(got) <= want, set(got) - want
             # the first open solved the whole area; levels_info.json keeps the key of its inputs (roadstyle-levels' inputs_key: the SHA-256

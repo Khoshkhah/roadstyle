@@ -145,7 +145,7 @@ function highlight(groups){
 // picks (the other fields of a road are a large part of the table's text, which the page parses after each answer)
 const reads = await fetch(new URL("../reads.json", import.meta.url));
 if(!reads.ok) throw new Error(`level editor: the dashboard's reads.json (${reads.status})`);
-const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road"];
+const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road", "modes"];   // "modes": the panel's mode box
 // the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
 const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
 const call = caller(worker);

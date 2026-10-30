@@ -84,6 +84,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- The level editor's mode box (driving, walking, cycling, bus, private) was never shown: the editor's lean road table dropped the `modes` column. It keeps it now.
 - `roadstyle serve --page DIR` gives the page `host_options.json` (the program's own file) in place of a 404.
 - **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
   the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
