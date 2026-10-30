@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`rs-scroll` and `rs-table`: a scroll area and a table in the panel.** A list or table in a `<div class="rs-scroll">` gets the panel body's scroll protocol: a thin scrollbar that shows over the area or while it scrolls, a fade at the bottom edge while there is more, and no scroll handed on to the map or the body. Its height is `--rs-scroll-h` (default the smaller of 520 px and 60 % of the window). `<table class="rs-table">` in it keeps its header row, lines up the numbers and tints the row under the pointer; a sorted column has `data-sort="asc"` or `"desc"` on its `th`.
+- **`rs.hover`: the hover box of a page.** `rs.hover.show(html, event)`, `hide()` and `on(node, html | fn)` show the words that a page puts near the pointer over its own chart or map layer. The box has the popup's look (the box token, the blur, the border) in both themes, flips at an edge and never takes the pointer. A page no longer writes its own hover box.
+- **`rs.help`: the help window of a page.** `rs.help.set({title, intro, terms: [[term, text], ...], note})` puts an "i" button in the panel's title and keeps the window that it opens (`open`, `close`; Esc and the cross close it). The page gives the words and roadstyle gives the look: the card token, the blur and the border of the other floating windows, in both themes. A page no longer writes its own help window.
 - **The tool `roads`** (after the base map button): the road filter in the bar. A box with a row for each road class (check box, colour, name, number of roads), All and None, and a click on a name shows only
   that class; Bridges, Tunnels and the access kinds when the data has them. It uses the filter calls of the page, so the map template's Roads box and this tool are one filter. A page with no road classes
   has the button greyed out. A style that comes later (`rs.setStyle`) gets its own classes.

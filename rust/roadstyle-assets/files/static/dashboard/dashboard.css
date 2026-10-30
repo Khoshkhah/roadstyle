@@ -330,7 +330,7 @@ a.rs-attr-row:hover .rs-attr-out{opacity:1}
 #rs-toolbar{border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 #rs-toolbar::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 /* the scale box is of the first level, with the bar */
-#rs-scalebox{background:var(--rs-tb-bg)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-scalebox{background:var(--rs-tb-bg)!important;border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 /* ---- the card of a sidebar (templates/*.html): the layer between the translucent panel and its text ---- */
 .sb-card{display:contents}
 html.rs-overlay #sb,html.rs-phone.rs-tpl-dashboard #sb{padding:8px;overflow:hidden}
@@ -500,3 +500,44 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb-show{position:fixed;top:10px;right:10px;z-index:3;display:none;background:#fff;color:#333;
   border:1px solid #ccc;border-radius:8px;width:32px;height:32px;cursor:pointer;padding:0;
   align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+
+/* THE HELP WINDOW (help.js): the page's words in roadstyle's look - the card token, the blur and the border of the other floating windows */
+#rs-help{position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center}
+#rs-help[hidden]{display:none}
+#rs-help .rs-help-box{position:relative;max-width:480px;max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;margin:16px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  color:var(--rs-tb-ink);border:1px solid var(--rs-tb-border);border-radius:12px;padding:18px 20px;font:13px/1.5 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+#rs-help .rs-help-ttl{font-size:16px;font-weight:700;margin-bottom:4px}
+#rs-help .rs-help-intro{margin:4px 0 12px}
+#rs-help .rs-help-terms{display:grid;grid-template-columns:120px 1fr;margin:0;border-top:1px solid var(--rs-tb-border)}
+#rs-help .rs-help-terms dt,#rs-help .rs-help-terms dd{margin:0;padding:8px 0;border-bottom:1px solid var(--rs-tb-border);font-size:12.5px}
+#rs-help .rs-help-terms dt{font-weight:700;padding-right:10px}
+#rs-help .rs-help-note{margin-top:12px;padding:8px 10px;background:color-mix(in srgb,#38a3dc 14%,transparent);border-radius:8px;font-size:12px}
+#rs-help .rs-help-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:20px;color:inherit;cursor:pointer}
+#sb #rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
+#sb #rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}
+
+
+/* The strip's blur is a layer behind it, not a property of the strip: a box that opens inside a blurred parent (the attribution) blurs only what the parent
+   holds, and the map behind it stays sharp. The box in the toolbar has no blurred parent, and that is why it looks like glass. */
+#rs-scalebox::before{content:"";position:absolute;inset:-1px;z-index:-1;border-radius:inherit;pointer-events:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+
+/* THE HOVER BOX (hover.js): the popup's look - the box token, the blur and the border - and it never takes the pointer */
+#rs-hover{position:fixed;z-index:3000;max-width:280px;pointer-events:none;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border);
+  color:var(--rs-tb-ink);padding:6px 9px;border-radius:8px;font:11.5px/1.45 system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+#rs-hover[hidden]{display:none}
+
+/* ---- A SCROLL AREA IN THE PANEL (panelscroll.js, class rs-scroll): the body's rules for each area - a thin scrollbar that shows over the area or while it scrolls, a
+   fade at the bottom edge while there is more, and no scroll handed on to the map or to the body. Its height is `--rs-scroll-h` (the page can set it). ---- */
+#sb .rs-scroll,#rp .rs-scroll{overflow:auto;overscroll-behavior:contain;max-height:var(--rs-scroll-h,min(520px,60vh));scrollbar-width:thin;scrollbar-color:transparent transparent}
+#sb .rs-scroll:hover,#sb .rs-scroll.rs-scrolling,#rp .rs-scroll:hover,#rp .rs-scroll.rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
+#sb .rs-scroll[data-more],#rp .rs-scroll[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+/* a table in it: the header row stays, the numbers line up, the first column is text. A column that sorts has `data-sort="asc"` or `"desc"` on its th. */
+#sb .rs-table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
+#sb .rs-table th{position:sticky;top:0;z-index:2;text-align:right;padding:4px;border-bottom:1px solid var(--line);color:var(--mut);background:var(--card);cursor:pointer;white-space:nowrap;font-size:10.5px;font-weight:700}
+#sb .rs-table td{text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+#sb .rs-table th:first-child,#sb .rs-table td:first-child{text-align:left}
+#sb .rs-table tbody tr{cursor:pointer}
+#sb .rs-table tbody tr:hover{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+#sb .rs-table th[data-sort]{color:var(--accent)}
+#sb .rs-table th[data-sort=asc]::after{content:" \25B2";font-size:8px}
+#sb .rs-table th[data-sort=desc]::after{content:" \25BC";font-size:8px}

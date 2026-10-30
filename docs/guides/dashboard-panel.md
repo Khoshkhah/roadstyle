@@ -33,6 +33,33 @@ A wrong `id`, an `after` or `before` that is not a section, or a name in `hide` 
 
 The event `rs:sectionchange` has `detail.id` and `detail.state`.
 
+## A help window
+
+```js
+rs.help.set({title: "How to read this page", intro: "What the page shows.",
+             terms: [["Inside the range", "How often the promise held."]], note: "A short note."});
+```
+
+An "i" button appears in the panel's title. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
+
+## A hover box
+
+```js
+rs.hover.on(chartNode, ev => "<b>Saturday</b><br>24 hours");     // the text, or a function of the event; null hides
+rs.hover.show("<b>A street</b>", mapEvent.originalEvent);         // by hand, over a map layer
+rs.hover.hide();
+```
+
+The box has the popup's look and follows the pointer. It flips to the other side at the edge of the page and never takes the pointer. The words can have HTML.
+
+## A list or a table that scrolls
+
+```html
+<div class="rs-scroll"><table class="rs-table"><thead><tr><th data-sort="desc">Street</th><th>Hours</th></tr></thead><tbody>...</tbody></table></div>
+```
+
+`rs-scroll` gives the area the panel body's scroll rules: a thin scrollbar that shows only over the area or while it scrolls, a fade at the bottom edge while there is more below, and a scroll that never goes on to the map. The height is `--rs-scroll-h` (default: the smaller of 520 px and 60 % of the window). `rs-table` keeps the header row in view, lines up the numbers (the first column is text) and tints the row under the pointer. Put `data-sort="asc"` or `"desc"` on the `th` of the sorted column.
+
 ## Both themes
 
 The panel has a light and a dark theme. Your HTML must follow them. Plain text, links, tables, `hr`, inputs and buttons

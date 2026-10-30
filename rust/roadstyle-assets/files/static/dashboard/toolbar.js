@@ -40,6 +40,15 @@ const _tbCredits = () => {
     else if(n.tagName === "A"){ rows.push({text: (pre + " " + n.textContent).replace(/\s+/g, " ").trim(), href: n.href}); pre = ""; }
   }
   if(pre.trim()) rows.push({text: pre.replace(/\s+/g, " ").trim()});
+  // MapLibre lists the credit of a source only while its tiles are on screen: a page with the blank base map shows nothing, though its data is OpenStreetMap's.
+  // With no row from MapLibre, the credits that the style's sources carry are the rows (read as text with DOMParser: nothing of them runs).
+  if(!rows.length) for(const s of Object.values(map.getStyle().sources || {})){
+    if(!s.attribution) continue;
+    const doc = new DOMParser().parseFromString(s.attribution, "text/html"), a = doc.querySelector("a");
+    const text = doc.body.textContent.replace(/\s+/g, " ").trim();
+    // the credit of OpenStreetMap's data is the same row as the vector styles give: "Data from" and the link to the copyright page
+    /OpenStreetMap/.test(text) && !a ? rows.push({text: "Data from OpenStreetMap", href: "https://www.openstreetmap.org/copyright"}) : rows.push({text, href: a && a.href});
+  }
   if([".rs-g3d", ".rs-svw:not(.rs-g3d)"].some(s => { const w = document.querySelector(s); return w && !w.hidden; }))
     rows.push({text: "Map data \u00a9 Google", href: "https://www.google.com/help/terms_maps/"});
   rows.push({text: "MapLibre", href: "https://maplibre.org"});         // the library that draws the map (BSD license)

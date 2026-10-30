@@ -18,7 +18,7 @@ import {initSettings} from "./settings.js";
 import {initPlacement} from "./placement.js";
 import {initSections} from "./sections.js";
 import {initTip} from "./tip.js";
-import {initPanelScroll} from "./panelscroll.js";
+import {initPanelScroll, initInnerScroll} from "./panelscroll.js";
 import {initOverlay} from "./overlay.js";
 import {initPanel, initPanelTab} from "./panel.js";
 import {initZoom} from "./zoom.js";
@@ -118,6 +118,7 @@ export function rsDashboard(map, options){
   initRoadsBox();
   initSelectBox();
   initPanelScroll();
+  initInnerScroll();
   initPlacement();
   initSettings();
   initSections();

@@ -14,6 +14,8 @@ panelscroll
 sections
 settings
 tip
+help
+hover
 toolbar
 panel
 find
