@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The bar folds** (`dashboard`): a fold button, first in the bar, folds it to one button (three lines); a tap opens it again, and the page keeps the choice in this browser (`rs-settings:toolbar-folded`).
+- **The phone sheet has a button**: the grip is a 44 px strip with a down arrow (an up arrow when the sheet is closed) that goes one height down, and up from closed. The grip and its line follow the theme (they were white in the dark theme).
+- **The first view fits into the free part of the window**: below the bar and above the sheet on a phone, beside the panel and the bar on a desktop (`window.rsFreePad`, called by the page's first `fitBounds`). It was a fixed 30 px, so the roads were half under the sheet or the panel.
 - **A person's switch of the 3D buildings shows them**: on, the map is tilted to 55° if it is flat and zoomed in to 15 if it is below 14.5 (where the buildings start); off, it is flattened again if this switch tilted it. There is no 2D / 3D button by default, so the switch did nothing visible on a flat map. A script's `rsBuildings(on)` moves nothing.
 - **`dashboard={"credits": [{"text": ..., "href": ...}]}`**: the credits of the page's own data, first in the credits list. The dashboard's default is "\u00a9 OpenStreetMap contributors" (the source of its roads, ODbL); `[]` leaves it out. It is not added again when the base map's list already names OpenStreetMap.
 - **The legend of live data** writes each range and its number of roads apart: one column, the range at the left, the count at the right in a lighter colour, with aligned digits (an entry is `[range, colour, count]`).

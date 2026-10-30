@@ -51,7 +51,7 @@ map.on("load", function(){ var tries=0; (function check(){ setTimeout(function()
   }catch(e){}
 }, 2500); })(); });
 map.on("load", ()=>{ try{ map.fitBounds(cam.bounds,
-  {padding:30, duration:0, pitch:cam.pitch, bearing:cam.bearing}); }catch(e){} });
+  {padding:(window.rsFreePad ? window.rsFreePad() : 30), duration:0, pitch:cam.pitch, bearing:cam.bearing}); }catch(e){} });
 window.map = map;
 }
 </script></body></html>

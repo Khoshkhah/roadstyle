@@ -141,7 +141,7 @@ html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a 
 html.rs-phone:not(.rs-tpl-map) #map{right:0!important}
 html.rs-phone:not(.rs-tpl-map) body{--rs-side:0px!important}
 html.rs-phone:not(.rs-tpl-map) :is(#sb-hide,#sb-show){display:none!important}
-html.rs-phone{--rs-sheet-h:40vh;--rs-grip-h:28px}
+html.rs-phone{--rs-sheet-h:40vh;--rs-grip-h:44px}
 html.rs-phone.rs-sheet-0{--rs-sheet-h:0px}
 html.rs-phone.rs-sheet-2{--rs-sheet-h:calc(100vh - var(--rs-top,52px) - var(--rs-grip-h))}
 html.rs-phone.rs-tpl-dashboard #sb{top:auto;left:0;right:0;bottom:0;width:auto;height:var(--rs-sheet-h);
@@ -149,8 +149,11 @@ html.rs-phone.rs-tpl-dashboard #sb{top:auto;left:0;right:0;bottom:0;width:auto;h
 html.rs-phone.rs-sheet-0 #sb{display:none}
 html.rs-phone.rs-tpl-dashboard .rs-grip{display:flex;align-items:center;justify-content:center;
   position:fixed;left:0;right:0;bottom:var(--rs-sheet-h);height:var(--rs-grip-h);z-index:6;box-sizing:border-box;touch-action:none;
-  background:#fff;border-radius:12px 12px 0 0;box-shadow:0 -2px 8px rgba(0,0,0,.15);transition:bottom .15s}
-.rs-grip i{width:44px;height:5px;border-radius:3px;background:#b9bec7}
+  background:var(--rs-box-bg);color:var(--rs-tb-ink);border-radius:12px 12px 0 0;box-shadow:0 -2px 8px rgba(0,0,0,.15);transition:bottom .15s}
+.rs-grip i{width:44px;height:5px;border-radius:3px;background:currentColor;opacity:.35}
+/* the button of the grip: a down arrow (the sheet goes one height down), an up arrow when the sheet is closed */
+.rs-grip-btn{position:absolute;right:8px;top:6px;width:32px;height:32px;padding:0;border:0;border-radius:6px;background:none;color:inherit;display:flex;align-items:center;justify-content:center;cursor:pointer}
+html.rs-sheet-0 .rs-grip-btn svg{transform:rotate(180deg)}
 /* a greyed tool */
 .maplibregl-ctrl button:disabled{opacity:.4;cursor:not-allowed}
 /* ---- the overlay layout and the bar (overlay.js, toolbar.js; docs/design/dashboard_templates.md, 3.1 to 3.3) ---- */
@@ -173,6 +176,10 @@ html.rs-overlay,html.rs-overlay body{overflow:hidden}
 html[data-rs-theme=dark] #rs-toolbar .maplibregl-ctrl-icon{filter:invert(.85)}
 #rs-toolbar button.on,#rs-toolbar button.rs-on{background:var(--rs-tb-on)}
 #rs-toolbar button:disabled{opacity:.4;cursor:not-allowed}
+/* the fold button (toolbar.js): a folded bar shows only this button; on a bar along the top or the bottom its arrow points to the side */
+html.rs-tb-folded #rs-toolbar>.maplibregl-ctrl:not(.rs-tb-fold){display:none}
+#rs-toolbar.rs-tb-top .rs-tb-fold svg,#rs-toolbar.rs-tb-bottom .rs-tb-fold svg{transform:rotate(-90deg)}
+html.rs-tb-folded #rs-toolbar .rs-tb-fold svg{transform:none}
 #rs-toolbar .maplibregl-ctrl-group button+button{border:0}
 #rs-toolbar button:hover:not(:disabled){background:var(--rs-tb-hover)}
 #rs-toolbar.rs-tb-right,#rs-toolbar.rs-tb-left{flex-direction:column;width:44px;top:50%;transform:translateY(-50%);max-height:calc(100% - 128px)}

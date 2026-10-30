@@ -34,13 +34,16 @@ export function initTemplate(){
 // the grip above the sheet: a tap goes to the next height, a drag of 30 px or more goes one height up or down
 function makeGrip(){
   const root = document.documentElement, g = document.createElement("div");
-  g.className = "rs-grip"; g.title = "Panel"; g.innerHTML = "<i></i>";
+  g.className = "rs-grip"; g.title = "Panel";
+  g.innerHTML = '<i></i><button type="button" class="rs-grip-btn" aria-label="Lower or raise the panel"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>';
   let h = 1, y0 = null;
   const show = n=>{ h = n; for(let i = 0; i < SHEETS; i++) root.classList.toggle("rs-sheet-" + i, i === h); document.dispatchEvent(new CustomEvent("rs:sheetchange", {detail: {height: h}})); };
   _sheet = show;
-  g.addEventListener("pointerdown", e=>{ y0 = e.clientY; g.setPointerCapture(e.pointerId); });
+  // the button goes one height down, and up from closed (a tap on the strip steps round the three heights, a drag of 30 px moves one)
+  g.querySelector(".rs-grip-btn").addEventListener("click", ()=>show(h > 0 ? h - 1 : 1));
+  g.addEventListener("pointerdown", e=>{ if(e.target.closest(".rs-grip-btn")) return; y0 = e.clientY; g.setPointerCapture(e.pointerId); });
   g.addEventListener("pointerup", e=>{
-    if(y0 == null) return;
+    if(y0 == null || e.target.closest(".rs-grip-btn")) return;
     const dy = e.clientY - y0; y0 = null;
     show(Math.abs(dy) < 30 ? (h + 1) % SHEETS : Math.max(0, Math.min(SHEETS - 1, h + (dy < 0 ? 1 : -1))));
   });
