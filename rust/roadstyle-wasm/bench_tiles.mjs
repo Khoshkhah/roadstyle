@@ -2,13 +2,13 @@
 // styleSources and tilesOfSources (the page's map worker), tile() for each tile that a 1280 x 800 view at the roads' centre shows, at
 // zooms 10 to 15 (the tiles' last zoom; MapLibre scales z15 up), cold (the first time) and warm (again: the tile cache).
 //
-//   node roadstyle-wasm/bench_tiles.mjs <pkg> roadstyle-rs/tests/data/tartu
+//   node roadstyle-wasm/bench_tiles.mjs <pkg> roadstyle-rs/tests/data/tartu [mlt|mvt]
 
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 
-const [pkg, area] = process.argv.slice(2);
+const [pkg, area, format] = process.argv.slice(2);      // format: "mlt" (the default) or "mvt"
 const rs = createRequire(import.meta.url)(resolve(pkg, "roadstyle_wasm.js"));
 const look = rs.Look.fromJson(readFileSync(join(area, "..", "look.json"), "utf8"));
 const roads = new Uint8Array(readFileSync(join(area, "roads.parquet")));
@@ -25,7 +25,7 @@ for (const z of [10, 11, 12, 13, 14, 15]) {
     let total = 0, max = 0, bytes = 0, big = 0;
     for (const [x, y] of ids) {
       const t = performance.now();
-      const b = tiler.tile("roads", z, x, y);
+      const b = tiler.tile("roads", z, x, y, format);
       const ms = performance.now() - t;
       total += ms; max = Math.max(max, ms); bytes += b.length; big = Math.max(big, b.length);
     }

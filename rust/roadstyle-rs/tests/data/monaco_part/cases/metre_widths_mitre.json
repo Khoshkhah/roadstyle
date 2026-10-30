@@ -15,7 +15,7 @@
       "line",
       "simple",
       "b7cf11813e537461",
-      "2f485408c1ddbc5e",
+      "736472830d80ce6e",
       "f61343b045b32d9b"
     ],
     [
@@ -23,23 +23,7 @@
       "line",
       "simple",
       "278bdfc8da6323c3",
-      "3e46c8f6289a8438",
-      "f61343b045b32d9b"
-    ],
-    [
-      "roads-simple-z14-dash",
-      "line",
-      "simple",
-      "b7cf11813e537461",
-      "e63ffebd72d59b18",
-      "f61343b045b32d9b"
-    ],
-    [
-      "roads-simple-z14",
-      "line",
-      "simple",
-      "278bdfc8da6323c3",
-      "7d4403e18b0242e2",
+      "7860af1d7e02a598",
       "f61343b045b32d9b"
     ],
     [
@@ -75,10 +59,10 @@
     "roadstyle:interaction": "a911c29a8eeae5d8",
     "roadstyle:images": "e9049aa3d5b18840",
     "roadstyle:sources": "3eb959a8e2207438",
-    "roadstyle:controls": "b1189017b0fc1d5f",
+    "roadstyle:controls": "13b74d5d7142a722",
     "roadstyle:generation": "18db75a661ad967c"
   },
-  "hash": "6abec6f52fadc1d6",
+  "hash": "2ddc95a0f83fd5ae",
   "road_table": {
     "rows": 1373,
     "columns": [

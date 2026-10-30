@@ -233,7 +233,7 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
     let mut parts = String::new();
     if let Some(pmt) = p.tiles {
         parts = format!("<script>{}</script>{}", PMTILES_JS.replace("</script>", "<\\/script>"),
-                        TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(pmt)));
+                        TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(pmt, 9))));
     }
     if let Some((side, side_b64)) = p.side {
         let side_b64 = side_b64.map_or_else(|| gzip_b64(&serde_json::to_vec(&JsSafe(side)).expect("a JSON value")), String::from);

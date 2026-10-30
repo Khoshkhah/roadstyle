@@ -16,7 +16,7 @@
         "line",
         "roads",
         "c6dd38bb7bc4b1e3",
-        "2a4f7fd2f4df3344",
+        "2d5bf8efa2ddf2cb",
         "f61343b045b32d9b"
       ],
       [
@@ -24,39 +24,7 @@
         "line",
         "roads",
         "be36798777dcd860",
-        "dedbcddb0bed3d3b",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z14-dash",
-        "line",
-        "roads",
-        "c6dd38bb7bc4b1e3",
-        "095a641316ae4be8",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z14",
-        "line",
-        "roads",
-        "be36798777dcd860",
-        "467a5cd704bd7ee0",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z15-dash",
-        "line",
-        "roads",
-        "c6dd38bb7bc4b1e3",
-        "05ece72c93cdaee0",
-        "f61343b045b32d9b"
-      ],
-      [
-        "roads-simple-z15",
-        "line",
-        "roads",
-        "be36798777dcd860",
-        "f9bf960c93db0b13",
+        "4ed1ff35371e8f02",
         "f61343b045b32d9b"
       ],
       [
@@ -80,19 +48,19 @@
       "roads": [
         "vector",
         null,
-        "cab46118a0b35f6e"
+        "d6572a56c780dbc9"
       ]
     },
     "metadata": {
       "roadstyle:interaction": "8bd55e519f81a314",
       "roadstyle:images": "e9049aa3d5b18840",
       "roadstyle:sources": "8bf9b5c1a82fc4e1",
-      "roadstyle:controls": "70a93bd14e09d762",
+      "roadstyle:controls": "13b74d5d7142a722",
       "roadstyle:generation": "9e412555b660f02c",
       "roadstyle:contract": "d4735e3a265e16ee",
       "roadstyle:arrows": "42d2b70866ba77b8"
     },
-    "hash": "e701ce0e7eb08b9c"
+    "hash": "7c234526d4621aee"
   },
   "tiles": {
     "z12": {

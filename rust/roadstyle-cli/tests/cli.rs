@@ -58,7 +58,7 @@ fn page_of_monaco() {
         let opts = serde_json::Deserializer::from_str(&html[at..]).into_iter::<serde_json::Value>().next().unwrap().unwrap();
         (html, opts)
     };
-    let (html, o) = page(&["--basemap", "osm", "--palette", "amber", "--views", r#"{"mono": {"palette": "mono"}}"#, "--name", "Monaco"]);
+    let (html, o) = page(&["--basemap", "osm", "--palette", "amber", "--views", r#"{"mono": {"palette": "mono"}}"#, "--tiles", "false", "--name", "Monaco"]);
     assert!(!html.contains("__MAPLIBRE_JS__") && html.contains("maplibregl") && html.contains("<title>Monaco</title>"));
     assert_eq!((o["basemaps"][0]["key"].as_str(), o["tiles"].as_bool(), o["views"][0]["name"].as_str()), (Some("osm"), Some(false), Some("mono")));
     assert!(o["filter"]["palettes"]["mono"].is_object() && o["camera"]["bounds"][0][0].as_f64().unwrap() > 7.0);

@@ -23,17 +23,16 @@
 
 ## Up to ~10⁴ edges: the default
 
-The saved page inlines every edge (gzipped) and opens from disk with no server. Nothing to set.
-Below ~10⁴ edges this is the simplest and just as fast as the options below.
+The saved page embeds the roads as a PMTiles vector tileset (`tiles=True`, the default) and opens from disk with no server. Nothing to set.
 
-## Towards ~10⁵ edges: `tiles=True`
+## Why tiles are the default: `tiles=True`
 
-`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file. The road pieces are in the tileset as one tile layer.
+`tiles=True` embeds the roads as a PMTiles vector tileset in the same HTML file. The road pieces are in the tileset as one tile layer. The tiles are MLT (about 60 % of the bytes of MVT, the same picture), up to zoom 16 (the map scales them up), and the whole archive is one gzip stream. On Nacka (22,000 roads) the page is 20 MB, against 18.8 MB with GeoJSON roads (`tiles=False`), which draws 2.5 times the triangles at zoom 11 to 13.
 
 - The browser parses only the tiles in view, so a ~100k-edge map opens in seconds, not ~10 s.
 - Low zooms carry simplified geometry.
 - The JavaScript API, popups and selection work exactly as with inline data.
-- The file is somewhat larger.
+- A page with a palette in a view needs `tiles=False`.
 
 ## The drawing order of a big network
 

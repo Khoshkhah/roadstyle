@@ -1,10 +1,9 @@
 {
   "page": {
-    "bytes": 4262930,
-    "sha16": "373731d8923a9a8c"
+    "bytes": 2754725,
+    "sha16": "c47bb23f6e818cf6"
   },
   "warnings": [
-    "this page draws 13298 roads from GeoJSON: MapLibre cuts them into tiles in the browser, keeps every vertex, and draws about 2.5 times the triangles of tiles=True at zoom 11 to 13 (22,000 roads, measured 2026-10-29). Pan and zoom lag and the map can blank while new tiles are made. tiles=True makes the page about 3 times larger and draws the same picture",
     "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, or use a keyless base map (esri_street, esri_dark_gray, osm)."
   ]
 }

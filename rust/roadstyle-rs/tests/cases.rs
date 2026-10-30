@@ -161,7 +161,7 @@ fn export_look_for_another_apps_layer() {
 #[test]
 fn a_page_with_views() {
     // a look of roadstyle's own palettes (the fixture's look.json has mapstyle's base map, whose palette a view cannot change)
-    let o = roadstyle_rs::look::Options::from_value(&json!({"palette": "amber", "args": {"state": "live", "arrows": true, "labels": true,
+    let o = roadstyle_rs::look::Options::from_value(&json!({"palette": "amber", "args": {"state": "live", "arrows": true, "labels": true, "tiles": false,
         "views": {"plain": {"road_fill": false}, "carto": {"palette": "carto"}, "bridges": {"bridges": true, "classes": ["primary"]}}}})).unwrap();
     let l = Look::resolve(&o).unwrap();
     // the page's keys (views) come from the call, not from the look

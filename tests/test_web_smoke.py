@@ -27,7 +27,7 @@ def test_saved_map_boots_and_draws_roads(tmp_path):
     from roadstyle import render_edges as render
 
     path = tmp_path / "smoke.html"
-    render(_edges(), basemap="blank").save(path)   # blank basemap: zero network requests
+    render(_edges(), basemap="blank", tiles=False).save(path)   # blank basemap: zero network requests
 
     errors = []
     with pw.sync_playwright() as p:
@@ -53,7 +53,7 @@ def test_compressed_map_inflates_and_attaches(tmp_path):
 
     path = tmp_path / "smoke_gz.html"
     g = _edges(4000)             # clears the 256 KB compression threshold
-    render(g, basemap="blank").save(path)
+    render(g, basemap="blank", tiles=False).save(path)
     assert 'id="rs-gz"' in path.read_text()
 
     errors = []
@@ -176,7 +176,7 @@ def test_map_that_starts_late_still_gets_its_roads(tmp_path):
     from roadstyle import render_edges as render
 
     path = tmp_path / "late.html"
-    render(_edges(4000), basemap="blank").save(path)   # big enough for the compressed path
+    render(_edges(4000), basemap="blank", tiles=False).save(path)   # big enough for the compressed path
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
@@ -218,7 +218,7 @@ def test_edge_overlay_page_boots_and_rsfilter_keeps_position_and_order(tmp_path)
     g = _edges().assign(edge_id=range(100, 140))
     pts = gpd.GeoDataFrame({"edge_id": [100, 101, 102]}, geometry=[Point(18.0 + i * 1e-3, 59.3005) for i in range(3)], crs=4326)
     path = tmp_path / "edge_overlay.html"
-    render(g, basemap="blank", overlays=[Overlay(pts, edge_col="edge_id", kind="circle", label="signs", radius=8)]).save(path)
+    render(g, basemap="blank", overlays=[Overlay(pts, edge_col="edge_id", kind="circle", label="signs", radius=8)], tiles=False).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -246,7 +246,7 @@ def test_rsfilter_reaches_the_arrows_and_street_names(tmp_path):
     from roadstyle import render_edges as render
 
     path = tmp_path / "slots.html"
-    render(_edges(), basemap="blank", arrows=True, labels=True).save(path)
+    render(_edges(), basemap="blank", arrows=True, labels=True, tiles=False).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -272,7 +272,7 @@ def test_a_road_without_its_fill_is_still_found_by_a_click(tmp_path):
     from roadstyle import render_edges as render
 
     path = tmp_path / "nofill.html"
-    render(_edges(), basemap="blank", road_fill=False).save(path)
+    render(_edges(), basemap="blank", road_fill=False, tiles=False).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -300,7 +300,7 @@ def test_a_page_with_overlay_styles_boots(tmp_path):
         "name": {"kind": "text", "text_col": "label", "text_size": 12}}}}}
     path = tmp_path / "styles.html"
     render_edges(g, backend="web", basemap="blank", settings=theme, road_fill=False,
-           overlays=[Overlay(over, edge_col="edge_id", style=s, label=s, popup=[]) for s in ("divider", "dashed", "name")]).save(path)
+           overlays=[Overlay(over, edge_col="edge_id", style=s, label=s, popup=[]) for s in ("divider", "dashed", "name")], tiles=False).save(path)
     errors = []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
@@ -331,7 +331,7 @@ def test_an_item_attached_to_a_road_follows_its_road(tmp_path):
     free = gpd.GeoDataFrame({"n": [1, 2]}, geometry=[Point(18.001, 59.301), Point(18.003, 59.303)], crs=4326)
     path = tmp_path / "items.html"
     render(g, basemap="blank", tunnel_col="tunnel", overlays=[Overlay(items, edge_col="edge_id", kind="circle", radius=8, label="signs", popup=["kind"]),
-                                                             Overlay(free, kind="circle", radius=8, label="free")]).save(path)
+                                                             Overlay(free, kind="circle", radius=8, label="free")], tiles=False).save(path)
     shown = """async ([call, label]) => { eval(call); await new Promise(r => { map.once('idle', r); map.triggerRepaint(); setTimeout(r, 3000); });
       const ov = RS_OVERLAYS.find(o => o.label === label);
       return [...new Set(map.queryRenderedFeatures({layers: ov.layers}).map(f => label === 'signs' ? f.properties.edge_id : f.properties.n))].sort(); }"""
@@ -400,7 +400,7 @@ def test_each_direction_and_each_item_selects_its_own_edge_or_itself(tmp_path):
     lanes = gpd.GeoDataFrame({"edge_id": [12], "lane": ["L1"]}, geometry=[LineString([(18.0005, y1), (18.0035, y1)])], crs=4326)
     path = tmp_path / "select.html"
     render(g, basemap="blank", overlays=[Overlay(signs, edge_col="edge_id", kind="circle", radius=8, label="signs", popup=["kind"]),
-                                         Overlay(lanes, edge_col="edge_id", kind="line", width=6, label="lanes", popup=["lane"], select="item")]).save(path)
+                                         Overlay(lanes, edge_col="edge_id", kind="line", width=6, label="lanes", popup=["lane"], select="item")], tiles=False).save(path)
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 800, "height": 600})
@@ -469,7 +469,7 @@ def test_a_tilted_map_keeps_its_arrows(tmp_path):
     from roadstyle import render_edges as render
 
     path = tmp_path / "arrows.html"
-    render(_edges(12), basemap="blank").save(path)
+    render(_edges(12), basemap="blank", tiles=False).save(path)
     with pw.sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 1200, "height": 800})

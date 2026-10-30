@@ -19,7 +19,7 @@ const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "basemap_switcher": true, "name": "roadstyle", "pitch": null,
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
-    "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": false,
+    "street_view_key": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": true,
     "template": null, "layout": null, "dashboard": null, "page_script": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
 
 /// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
@@ -99,9 +99,6 @@ fn present(v: &Value) -> bool {
         _ => true,
     }
 }
-
-/// The number of roads from which an inline (GeoJSON) page gets a warning to use `tiles=True`.
-const GEOJSON_ROADS_WARN: usize = 10_000;
 
 /// The page's own keywords and their defaults.
 pub fn page_key_defaults() -> Map<String, Value> {
@@ -245,13 +242,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let (mode, key) = check_keys(&k, look, &dashboard)?;
     let bounds = bounds_of(&roads);
     let tiled = k.tiles;
-    let n_roads = roads.len();
     let mut src = crate::sources_of(roads, look, features, None, look.map.output.name.clone())?;
-    if !tiled && n_roads >= GEOJSON_ROADS_WARN {
-        src.warnings.push(format!("this page draws {n_roads} roads from GeoJSON: MapLibre cuts them into tiles in the browser, keeps every vertex, and draws about 2.5 times \
-            the triangles of tiles=True at zoom 11 to 13 (22,000 roads, measured 2026-10-29). Pan and zoom lag and the map can blank while new tiles are made. \
-            tiles=True makes the page about 3 times larger and draws the same picture"));
-    }
     let (active, bms, base) = basemaps(&k, look, &mut src.warnings)?;
     let bg = bg_color(&active, look);
     let keys: Vec<Value> = bms.iter().map(|b| b["key"].clone()).collect();
@@ -579,8 +570,12 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &[])?;
     o.exact = Some(keep.into_iter().flatten().map(String::from).collect());
     o.only = Some(["roads", "simple", "slots"].map(String::from).to_vec());
+    if let Some(f) = a.get("tile_format").and_then(Value::as_str) {        // the one default is MLT (docs/design/tiling.md)
+        o.format = crate::tiles::TileFormat::parse(f)?;
+    }
     let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a))?;
-    let archive = t.archive(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names())?;
+    // the page gzips the whole archive (page.rs), so its tiles are not gzipped one by one
+    let archive = t.archive_in(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names(), true)?;
     Ok((style, Some(archive)))
 }
 

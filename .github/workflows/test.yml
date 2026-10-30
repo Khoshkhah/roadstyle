@@ -53,7 +53,7 @@ jobs:
       - name: Install (+ headless Chromium, + mcp for the Python MCP server's tests until it retires)
         run: |
           pip install -e ".[dev]" playwright "mcp>=2.2,<3"
-          playwright install --with-deps chromium
+          playwright install --with-deps chromium firefox webkit     # Firefox and WebKit for tests/test_mlt_browsers.py
 
       - name: The Rust program roadstyle, for the Rust snapshot's test (tests/test_snapshot_rust.py)
         run: |
