@@ -7,140 +7,140 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 4393,
+    "view_bytes": 4140,
     "view_features": 113,
-    "max_tile_bytes": 4393,
+    "max_tile_bytes": 4140,
     "max_tile_features": 113,
-    "mlt_view_bytes": 1871,
-    "mlt_max_tile_bytes": 1871,
+    "mlt_view_bytes": 1712,
+    "mlt_max_tile_bytes": 1712,
     "layers": {
      "simple": {
       "features": 113,
-      "bytes": 4393,
-      "values": 34,
-      "keys": 13,
+      "bytes": 4140,
+      "values": 32,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 49,
+      "strings": 5,
+      "string_bytes": 35,
       "short_segments": 169,
       "tiny": 18
      }
     }
    },
    "z10": {
-    "view_bytes": 11849,
+    "view_bytes": 11167,
     "view_features": 327,
-    "max_tile_bytes": 11849,
+    "max_tile_bytes": 11167,
     "max_tile_features": 327,
-    "mlt_view_bytes": 4752,
-    "mlt_max_tile_bytes": 4752,
+    "mlt_view_bytes": 4374,
+    "mlt_max_tile_bytes": 4374,
     "layers": {
      "simple": {
       "features": 327,
-      "bytes": 11849,
-      "values": 39,
-      "keys": 13,
+      "bytes": 11167,
+      "values": 37,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 8,
-      "string_bytes": 60,
+      "strings": 6,
+      "string_bytes": 45,
       "short_segments": 351,
       "tiny": 49
      }
     }
    },
    "z11": {
-    "view_bytes": 35698,
+    "view_bytes": 33642,
     "view_features": 1014,
-    "max_tile_bytes": 35698,
+    "max_tile_bytes": 33642,
     "max_tile_features": 1014,
-    "mlt_view_bytes": 13389,
-    "mlt_max_tile_bytes": 13389,
+    "mlt_view_bytes": 12267,
+    "mlt_max_tile_bytes": 12267,
     "layers": {
      "simple": {
       "features": 1014,
-      "bytes": 35698,
-      "values": 45,
-      "keys": 13,
+      "bytes": 33642,
+      "values": 43,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 10,
-      "string_bytes": 84,
+      "strings": 8,
+      "string_bytes": 70,
       "short_segments": 941,
       "tiny": 81
      }
     }
    },
    "z12": {
-    "view_bytes": 60647,
+    "view_bytes": 57173,
     "view_features": 1723,
-    "max_tile_bytes": 60647,
+    "max_tile_bytes": 57173,
     "max_tile_features": 1723,
-    "mlt_view_bytes": 22648,
-    "mlt_max_tile_bytes": 22648,
+    "mlt_view_bytes": 20778,
+    "mlt_max_tile_bytes": 20778,
     "layers": {
      "simple": {
       "features": 1723,
-      "bytes": 60647,
-      "values": 55,
-      "keys": 13,
+      "bytes": 57173,
+      "values": 53,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 13,
-      "string_bytes": 126,
+      "strings": 11,
+      "string_bytes": 112,
       "short_segments": 1730,
       "tiny": 169
      }
     }
    },
    "z13": {
-    "view_bytes": 203893,
+    "view_bytes": 192182,
     "view_features": 5796,
-    "max_tile_bytes": 116724,
+    "max_tile_bytes": 110043,
     "max_tile_features": 3322,
-    "mlt_view_bytes": 72547,
-    "mlt_max_tile_bytes": 41389,
+    "mlt_view_bytes": 66142,
+    "mlt_max_tile_bytes": 37887,
     "layers": {
      "simple": {
       "features": 3322,
-      "bytes": 116724,
-      "values": 53,
-      "keys": 13,
+      "bytes": 110043,
+      "values": 49,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 15,
-      "string_bytes": 146,
+      "strings": 12,
+      "string_bytes": 124,
       "short_segments": 3100,
       "tiny": 253
      }
     }
    },
    "z14": {
-    "view_bytes": 303953,
+    "view_bytes": 287655,
     "view_features": 7990,
-    "max_tile_bytes": 189630,
+    "max_tile_bytes": 179500,
     "max_tile_features": 4972,
-    "mlt_view_bytes": 127892,
-    "mlt_max_tile_bytes": 79447,
+    "mlt_view_bytes": 119420,
+    "mlt_max_tile_bytes": 74615,
     "layers": {
      "simple": {
       "features": 4106,
-      "bytes": 146803,
-      "values": 58,
-      "keys": 15,
+      "bytes": 138553,
+      "values": 55,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 17,
-      "string_bytes": 174,
+      "strings": 14,
+      "string_bytes": 151,
       "short_segments": 2338,
       "tiny": 140
      },
      "slots": {
       "features": 866,
-      "bytes": 42827,
+      "bytes": 40947,
       "values": 566,
-      "keys": 11,
+      "keys": 10,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 150,
@@ -151,30 +151,30 @@
     }
    },
    "z15": {
-    "view_bytes": 826955,
+    "view_bytes": 780826,
     "view_features": 22702,
-    "max_tile_bytes": 268535,
+    "max_tile_bytes": 253504,
     "max_tile_features": 7351,
-    "mlt_view_bytes": 324136,
-    "mlt_max_tile_bytes": 105506,
+    "mlt_view_bytes": 300487,
+    "mlt_max_tile_bytes": 98202,
     "layers": {
      "simple": {
       "features": 6556,
-      "bytes": 228351,
-      "values": 68,
-      "keys": 15,
+      "bytes": 215201,
+      "values": 65,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 20,
-      "string_bytes": 198,
+      "strings": 17,
+      "string_bytes": 176,
       "short_segments": 914,
       "tiny": 253
      },
      "slots": {
       "features": 795,
-      "bytes": 40184,
+      "bytes": 38304,
       "values": 601,
-      "keys": 11,
+      "keys": 10,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 135,
@@ -186,7 +186,7 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 50926,
+    "expressions_total": 50884,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
@@ -219,140 +219,140 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 87578,
+    "view_bytes": 82144,
     "view_features": 2692,
-    "max_tile_bytes": 49605,
+    "max_tile_bytes": 46552,
     "max_tile_features": 1516,
-    "mlt_view_bytes": 24436,
-    "mlt_max_tile_bytes": 13418,
+    "mlt_view_bytes": 21641,
+    "mlt_max_tile_bytes": 11838,
     "layers": {
      "simple": {
       "features": 1516,
-      "bytes": 49605,
-      "values": 24,
-      "keys": 13,
+      "bytes": 46552,
+      "values": 22,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 55,
+      "strings": 5,
+      "string_bytes": 40,
       "short_segments": 1196,
       "tiny": 1155
      }
     }
    },
    "z10": {
-    "view_bytes": 100907,
+    "view_bytes": 94711,
     "view_features": 3074,
-    "max_tile_bytes": 55312,
+    "max_tile_bytes": 51895,
     "max_tile_features": 1695,
-    "mlt_view_bytes": 28264,
-    "mlt_max_tile_bytes": 15093,
+    "mlt_view_bytes": 25520,
+    "mlt_max_tile_bytes": 13803,
     "layers": {
      "simple": {
       "features": 1695,
-      "bytes": 55312,
-      "values": 24,
-      "keys": 13,
+      "bytes": 51895,
+      "values": 22,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 55,
+      "strings": 5,
+      "string_bytes": 40,
       "short_segments": 716,
       "tiny": 578
      }
     }
    },
    "z11": {
-    "view_bytes": 242341,
+    "view_bytes": 227673,
     "view_features": 7288,
-    "max_tile_bytes": 101752,
+    "max_tile_bytes": 95585,
     "max_tile_features": 3070,
-    "mlt_view_bytes": 70317,
-    "mlt_max_tile_bytes": 29553,
+    "mlt_view_bytes": 62774,
+    "mlt_max_tile_bytes": 26383,
     "layers": {
      "simple": {
       "features": 3070,
-      "bytes": 101752,
-      "values": 25,
-      "keys": 13,
+      "bytes": 95585,
+      "values": 24,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 9,
-      "string_bytes": 77,
+      "strings": 7,
+      "string_bytes": 63,
       "short_segments": 1249,
       "tiny": 662
      }
     }
    },
    "z12": {
-    "view_bytes": 294245,
+    "view_bytes": 276713,
     "view_features": 8704,
-    "max_tile_bytes": 151753,
+    "max_tile_bytes": 142691,
     "max_tile_features": 4517,
-    "mlt_view_bytes": 88589,
-    "mlt_max_tile_bytes": 45499,
+    "mlt_view_bytes": 79495,
+    "mlt_max_tile_bytes": 40851,
     "layers": {
      "simple": {
       "features": 4517,
-      "bytes": 151753,
-      "values": 27,
-      "keys": 13,
+      "bytes": 142691,
+      "values": 26,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 11,
-      "string_bytes": 109,
+      "strings": 9,
+      "string_bytes": 94,
       "short_segments": 1972,
       "tiny": 188
      }
     }
    },
    "z13": {
-    "view_bytes": 829643,
+    "view_bytes": 781843,
     "view_features": 23783,
-    "max_tile_bytes": 193063,
+    "max_tile_bytes": 182009,
     "max_tile_features": 5512,
-    "mlt_view_bytes": 234261,
-    "mlt_max_tile_bytes": 54273,
+    "mlt_view_bytes": 209591,
+    "mlt_max_tile_bytes": 48616,
     "layers": {
      "simple": {
       "features": 5512,
-      "bytes": 193063,
-      "values": 32,
-      "keys": 13,
+      "bytes": 182009,
+      "values": 30,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 13,
-      "string_bytes": 132,
+      "strings": 10,
+      "string_bytes": 110,
       "short_segments": 1294,
       "tiny": 252
      }
     }
    },
    "z14": {
-    "view_bytes": 810621,
+    "view_bytes": 766181,
     "view_features": 22027,
-    "max_tile_bytes": 132590,
+    "max_tile_bytes": 125119,
     "max_tile_features": 3709,
-    "mlt_view_bytes": 285616,
-    "mlt_max_tile_bytes": 44846,
+    "mlt_view_bytes": 264304,
+    "mlt_max_tile_bytes": 41292,
     "layers": {
      "simple": {
       "features": 3143,
-      "bytes": 108236,
-      "values": 37,
-      "keys": 15,
+      "bytes": 101919,
+      "values": 35,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 14,
-      "string_bytes": 140,
+      "strings": 12,
+      "string_bytes": 123,
       "short_segments": 182,
       "tiny": 46
      },
      "slots": {
       "features": 567,
-      "bytes": 24355,
+      "bytes": 23200,
       "values": 310,
-      "keys": 11,
+      "keys": 10,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 62,
@@ -363,30 +363,30 @@
     }
    },
    "z15": {
-    "view_bytes": 591096,
+    "view_bytes": 559341,
     "view_features": 15615,
-    "max_tile_bytes": 127625,
+    "max_tile_bytes": 120671,
     "max_tile_features": 3398,
-    "mlt_view_bytes": 207168,
-    "mlt_max_tile_bytes": 43571,
+    "mlt_view_bytes": 191384,
+    "mlt_max_tile_bytes": 40229,
     "layers": {
      "simple": {
       "features": 3062,
-      "bytes": 111786,
-      "values": 32,
-      "keys": 15,
+      "bytes": 105633,
+      "values": 30,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 12,
-      "string_bytes": 109,
+      "strings": 11,
+      "string_bytes": 100,
       "short_segments": 415,
       "tiny": 269
      },
      "slots": {
       "features": 337,
-      "bytes": 15839,
+      "bytes": 15038,
       "values": 279,
-      "keys": 11,
+      "keys": 10,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 34,
@@ -398,7 +398,7 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 50926,
+    "expressions_total": 50884,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
@@ -431,140 +431,140 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 4393,
+    "view_bytes": 4140,
     "view_features": 113,
-    "max_tile_bytes": 4393,
+    "max_tile_bytes": 4140,
     "max_tile_features": 113,
-    "mlt_view_bytes": 1871,
-    "mlt_max_tile_bytes": 1871,
+    "mlt_view_bytes": 1712,
+    "mlt_max_tile_bytes": 1712,
     "layers": {
      "simple": {
       "features": 113,
-      "bytes": 4393,
-      "values": 34,
-      "keys": 13,
+      "bytes": 4140,
+      "values": 32,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 49,
+      "strings": 5,
+      "string_bytes": 35,
       "short_segments": 169,
       "tiny": 18
      }
     }
    },
    "z10": {
-    "view_bytes": 11849,
+    "view_bytes": 11167,
     "view_features": 327,
-    "max_tile_bytes": 11849,
+    "max_tile_bytes": 11167,
     "max_tile_features": 327,
-    "mlt_view_bytes": 4752,
-    "mlt_max_tile_bytes": 4752,
+    "mlt_view_bytes": 4374,
+    "mlt_max_tile_bytes": 4374,
     "layers": {
      "simple": {
       "features": 327,
-      "bytes": 11849,
-      "values": 39,
-      "keys": 13,
+      "bytes": 11167,
+      "values": 37,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 8,
-      "string_bytes": 60,
+      "strings": 6,
+      "string_bytes": 45,
       "short_segments": 351,
       "tiny": 49
      }
     }
    },
    "z11": {
-    "view_bytes": 35698,
+    "view_bytes": 33642,
     "view_features": 1014,
-    "max_tile_bytes": 35698,
+    "max_tile_bytes": 33642,
     "max_tile_features": 1014,
-    "mlt_view_bytes": 13389,
-    "mlt_max_tile_bytes": 13389,
+    "mlt_view_bytes": 12267,
+    "mlt_max_tile_bytes": 12267,
     "layers": {
      "simple": {
       "features": 1014,
-      "bytes": 35698,
-      "values": 45,
-      "keys": 13,
+      "bytes": 33642,
+      "values": 43,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 10,
-      "string_bytes": 84,
+      "strings": 8,
+      "string_bytes": 70,
       "short_segments": 941,
       "tiny": 81
      }
     }
    },
    "z12": {
-    "view_bytes": 60647,
+    "view_bytes": 57173,
     "view_features": 1723,
-    "max_tile_bytes": 60647,
+    "max_tile_bytes": 57173,
     "max_tile_features": 1723,
-    "mlt_view_bytes": 22648,
-    "mlt_max_tile_bytes": 22648,
+    "mlt_view_bytes": 20778,
+    "mlt_max_tile_bytes": 20778,
     "layers": {
      "simple": {
       "features": 1723,
-      "bytes": 60647,
-      "values": 55,
-      "keys": 13,
+      "bytes": 57173,
+      "values": 53,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 13,
-      "string_bytes": 126,
+      "strings": 11,
+      "string_bytes": 112,
       "short_segments": 1730,
       "tiny": 169
      }
     }
    },
    "z13": {
-    "view_bytes": 203893,
+    "view_bytes": 192182,
     "view_features": 5796,
-    "max_tile_bytes": 116724,
+    "max_tile_bytes": 110043,
     "max_tile_features": 3322,
-    "mlt_view_bytes": 72547,
-    "mlt_max_tile_bytes": 41389,
+    "mlt_view_bytes": 66142,
+    "mlt_max_tile_bytes": 37887,
     "layers": {
      "simple": {
       "features": 3322,
-      "bytes": 116724,
-      "values": 53,
-      "keys": 13,
+      "bytes": 110043,
+      "values": 49,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 15,
-      "string_bytes": 146,
+      "strings": 12,
+      "string_bytes": 124,
       "short_segments": 3100,
       "tiny": 253
      }
     }
    },
    "z14": {
-    "view_bytes": 303219,
+    "view_bytes": 286920,
     "view_features": 7990,
-    "max_tile_bytes": 189099,
+    "max_tile_bytes": 178970,
     "max_tile_features": 4972,
-    "mlt_view_bytes": 127366,
-    "mlt_max_tile_bytes": 79085,
+    "mlt_view_bytes": 118894,
+    "mlt_max_tile_bytes": 74252,
     "layers": {
      "simple": {
       "features": 4106,
-      "bytes": 146803,
-      "values": 58,
-      "keys": 15,
+      "bytes": 138553,
+      "values": 55,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 17,
-      "string_bytes": 174,
+      "strings": 14,
+      "string_bytes": 151,
       "short_segments": 2338,
       "tiny": 140
      },
      "slots": {
       "features": 866,
-      "bytes": 42297,
+      "bytes": 40417,
       "values": 566,
-      "keys": 10,
+      "keys": 9,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 150,
@@ -575,30 +575,30 @@
     }
    },
    "z15": {
-    "view_bytes": 826071,
+    "view_bytes": 779941,
     "view_features": 22702,
-    "max_tile_bytes": 268172,
+    "max_tile_bytes": 253141,
     "max_tile_features": 7351,
-    "mlt_view_bytes": 323480,
-    "mlt_max_tile_bytes": 105256,
+    "mlt_view_bytes": 299832,
+    "mlt_max_tile_bytes": 97952,
     "layers": {
      "simple": {
       "features": 6556,
-      "bytes": 228351,
-      "values": 68,
-      "keys": 15,
+      "bytes": 215201,
+      "values": 65,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 20,
-      "string_bytes": 198,
+      "strings": 17,
+      "string_bytes": 176,
       "short_segments": 914,
       "tiny": 253
      },
      "slots": {
       "features": 795,
-      "bytes": 39821,
+      "bytes": 37940,
       "values": 601,
-      "keys": 10,
+      "keys": 9,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 135,
@@ -610,7 +610,7 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 50680,
+    "expressions_total": 50638,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
@@ -643,140 +643,140 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 87578,
+    "view_bytes": 82144,
     "view_features": 2692,
-    "max_tile_bytes": 49605,
+    "max_tile_bytes": 46552,
     "max_tile_features": 1516,
-    "mlt_view_bytes": 24436,
-    "mlt_max_tile_bytes": 13418,
+    "mlt_view_bytes": 21641,
+    "mlt_max_tile_bytes": 11838,
     "layers": {
      "simple": {
       "features": 1516,
-      "bytes": 49605,
-      "values": 24,
-      "keys": 13,
+      "bytes": 46552,
+      "values": 22,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 55,
+      "strings": 5,
+      "string_bytes": 40,
       "short_segments": 1196,
       "tiny": 1155
      }
     }
    },
    "z10": {
-    "view_bytes": 100907,
+    "view_bytes": 94711,
     "view_features": 3074,
-    "max_tile_bytes": 55312,
+    "max_tile_bytes": 51895,
     "max_tile_features": 1695,
-    "mlt_view_bytes": 28264,
-    "mlt_max_tile_bytes": 15093,
+    "mlt_view_bytes": 25520,
+    "mlt_max_tile_bytes": 13803,
     "layers": {
      "simple": {
       "features": 1695,
-      "bytes": 55312,
-      "values": 24,
-      "keys": 13,
+      "bytes": 51895,
+      "values": 22,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 55,
+      "strings": 5,
+      "string_bytes": 40,
       "short_segments": 716,
       "tiny": 578
      }
     }
    },
    "z11": {
-    "view_bytes": 242341,
+    "view_bytes": 227673,
     "view_features": 7288,
-    "max_tile_bytes": 101752,
+    "max_tile_bytes": 95585,
     "max_tile_features": 3070,
-    "mlt_view_bytes": 70317,
-    "mlt_max_tile_bytes": 29553,
+    "mlt_view_bytes": 62774,
+    "mlt_max_tile_bytes": 26383,
     "layers": {
      "simple": {
       "features": 3070,
-      "bytes": 101752,
-      "values": 25,
-      "keys": 13,
+      "bytes": 95585,
+      "values": 24,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 9,
-      "string_bytes": 77,
+      "strings": 7,
+      "string_bytes": 63,
       "short_segments": 1249,
       "tiny": 662
      }
     }
    },
    "z12": {
-    "view_bytes": 294245,
+    "view_bytes": 276713,
     "view_features": 8704,
-    "max_tile_bytes": 151753,
+    "max_tile_bytes": 142691,
     "max_tile_features": 4517,
-    "mlt_view_bytes": 88589,
-    "mlt_max_tile_bytes": 45499,
+    "mlt_view_bytes": 79495,
+    "mlt_max_tile_bytes": 40851,
     "layers": {
      "simple": {
       "features": 4517,
-      "bytes": 151753,
-      "values": 27,
-      "keys": 13,
+      "bytes": 142691,
+      "values": 26,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 11,
-      "string_bytes": 109,
+      "strings": 9,
+      "string_bytes": 94,
       "short_segments": 1972,
       "tiny": 188
      }
     }
    },
    "z13": {
-    "view_bytes": 829643,
+    "view_bytes": 781843,
     "view_features": 23783,
-    "max_tile_bytes": 193063,
+    "max_tile_bytes": 182009,
     "max_tile_features": 5512,
-    "mlt_view_bytes": 234261,
-    "mlt_max_tile_bytes": 54273,
+    "mlt_view_bytes": 209591,
+    "mlt_max_tile_bytes": 48616,
     "layers": {
      "simple": {
       "features": 5512,
-      "bytes": 193063,
-      "values": 32,
-      "keys": 13,
+      "bytes": 182009,
+      "values": 30,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 13,
-      "string_bytes": 132,
+      "strings": 10,
+      "string_bytes": 110,
       "short_segments": 1294,
       "tiny": 252
      }
     }
    },
    "z14": {
-    "view_bytes": 809685,
+    "view_bytes": 765244,
     "view_features": 22027,
-    "max_tile_bytes": 132409,
+    "max_tile_bytes": 124937,
     "max_tile_features": 3709,
-    "mlt_view_bytes": 284761,
-    "mlt_max_tile_bytes": 44688,
+    "mlt_view_bytes": 263449,
+    "mlt_max_tile_bytes": 41134,
     "layers": {
      "simple": {
       "features": 3143,
-      "bytes": 108236,
-      "values": 37,
-      "keys": 15,
+      "bytes": 101919,
+      "values": 35,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 14,
-      "string_bytes": 140,
+      "strings": 12,
+      "string_bytes": 123,
       "short_segments": 182,
       "tiny": 46
      },
      "slots": {
       "features": 567,
-      "bytes": 24173,
+      "bytes": 23019,
       "values": 310,
-      "keys": 10,
+      "keys": 9,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 62,
@@ -787,30 +787,30 @@
     }
    },
    "z15": {
-    "view_bytes": 590848,
+    "view_bytes": 559093,
     "view_features": 15615,
-    "max_tile_bytes": 127516,
+    "max_tile_bytes": 120561,
     "max_tile_features": 3398,
-    "mlt_view_bytes": 206875,
-    "mlt_max_tile_bytes": 43493,
+    "mlt_view_bytes": 191091,
+    "mlt_max_tile_bytes": 40152,
     "layers": {
      "simple": {
       "features": 3062,
-      "bytes": 111786,
-      "values": 32,
-      "keys": 15,
+      "bytes": 105633,
+      "values": 30,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 12,
-      "string_bytes": 109,
+      "strings": 11,
+      "string_bytes": 100,
       "short_segments": 415,
       "tiny": 269
      },
      "slots": {
       "features": 337,
-      "bytes": 15730,
+      "bytes": 14929,
       "values": 277,
-      "keys": 10,
+      "keys": 9,
       "keys_unread": 3,
       "no_id": 1,
       "strings": 34,
@@ -822,7 +822,7 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 50680,
+    "expressions_total": 50638,
     "expressions": {
      "roads-simple-dash": {
       "filter": 908,
@@ -855,12 +855,12 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 10110,
+    "view_bytes": 9857,
     "view_features": 293,
-    "max_tile_bytes": 10110,
+    "max_tile_bytes": 9857,
     "max_tile_features": 293,
-    "mlt_view_bytes": 5379,
-    "mlt_max_tile_bytes": 5379,
+    "mlt_view_bytes": 5220,
+    "mlt_max_tile_bytes": 5220,
     "layers": {
      "ov0": {
       "features": 110,
@@ -972,25 +972,25 @@
      },
      "simple": {
       "features": 113,
-      "bytes": 4393,
-      "values": 34,
-      "keys": 13,
+      "bytes": 4140,
+      "values": 32,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 49,
+      "strings": 5,
+      "string_bytes": 35,
       "short_segments": 169,
       "tiny": 18
      }
     }
    },
    "z10": {
-    "view_bytes": 21297,
+    "view_bytes": 20616,
     "view_features": 616,
-    "max_tile_bytes": 21297,
+    "max_tile_bytes": 20616,
     "max_tile_features": 616,
-    "mlt_view_bytes": 10644,
-    "mlt_max_tile_bytes": 10644,
+    "mlt_view_bytes": 10267,
+    "mlt_max_tile_bytes": 10267,
     "layers": {
      "ov0": {
       "features": 168,
@@ -1102,25 +1102,25 @@
      },
      "simple": {
       "features": 327,
-      "bytes": 11849,
-      "values": 39,
-      "keys": 13,
+      "bytes": 11167,
+      "values": 37,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 8,
-      "string_bytes": 60,
+      "strings": 6,
+      "string_bytes": 45,
       "short_segments": 351,
       "tiny": 49
      }
     }
    },
    "z11": {
-    "view_bytes": 49721,
+    "view_bytes": 47665,
     "view_features": 1426,
-    "max_tile_bytes": 49721,
+    "max_tile_bytes": 47665,
     "max_tile_features": 1426,
-    "mlt_view_bytes": 22255,
-    "mlt_max_tile_bytes": 22255,
+    "mlt_view_bytes": 21133,
+    "mlt_max_tile_bytes": 21133,
     "layers": {
      "ov0": {
       "features": 216,
@@ -1232,25 +1232,25 @@
      },
      "simple": {
       "features": 1014,
-      "bytes": 35698,
-      "values": 45,
-      "keys": 13,
+      "bytes": 33642,
+      "values": 43,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 10,
-      "string_bytes": 84,
+      "strings": 8,
+      "string_bytes": 70,
       "short_segments": 941,
       "tiny": 81
      }
     }
    },
    "z12": {
-    "view_bytes": 78477,
+    "view_bytes": 75003,
     "view_features": 2202,
-    "max_tile_bytes": 78477,
+    "max_tile_bytes": 75003,
     "max_tile_features": 2202,
-    "mlt_view_bytes": 34501,
-    "mlt_max_tile_bytes": 34501,
+    "mlt_view_bytes": 32631,
+    "mlt_max_tile_bytes": 32631,
     "layers": {
      "ov0": {
       "features": 243,
@@ -1374,25 +1374,25 @@
      },
      "simple": {
       "features": 1723,
-      "bytes": 60647,
-      "values": 55,
-      "keys": 13,
+      "bytes": 57173,
+      "values": 53,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 13,
-      "string_bytes": 126,
+      "strings": 11,
+      "string_bytes": 112,
       "short_segments": 1730,
       "tiny": 169
      }
     }
    },
    "z13": {
-    "view_bytes": 227701,
+    "view_bytes": 215990,
     "view_features": 6375,
-    "max_tile_bytes": 129860,
+    "max_tile_bytes": 123179,
     "max_tile_features": 3632,
-    "mlt_view_bytes": 89956,
-    "mlt_max_tile_bytes": 50957,
+    "mlt_view_bytes": 83552,
+    "mlt_max_tile_bytes": 47455,
     "layers": {
      "ov0": {
       "features": 164,
@@ -1516,25 +1516,25 @@
      },
      "simple": {
       "features": 3322,
-      "bytes": 116724,
-      "values": 53,
-      "keys": 13,
+      "bytes": 110043,
+      "values": 49,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 15,
-      "string_bytes": 146,
+      "strings": 12,
+      "string_bytes": 124,
       "short_segments": 3100,
       "tiny": 253
      }
     }
    },
    "z14": {
-    "view_bytes": 266118,
+    "view_bytes": 252581,
     "view_features": 7272,
-    "max_tile_bytes": 161372,
+    "max_tile_bytes": 153122,
     "max_tile_features": 4413,
-    "mlt_view_bytes": 107984,
-    "mlt_max_tile_bytes": 64574,
+    "mlt_view_bytes": 100559,
+    "mlt_max_tile_bytes": 60262,
     "layers": {
      "ov0": {
       "features": 164,
@@ -1658,25 +1658,25 @@
      },
      "simple": {
       "features": 4106,
-      "bytes": 146803,
-      "values": 58,
-      "keys": 15,
+      "bytes": 138553,
+      "values": 55,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 17,
-      "string_bytes": 174,
+      "strings": 14,
+      "string_bytes": 151,
       "short_segments": 2338,
       "tiny": 140
      }
     }
    },
    "z15": {
-    "view_bytes": 877086,
+    "view_bytes": 834293,
     "view_features": 23824,
-    "max_tile_bytes": 279084,
+    "max_tile_bytes": 265442,
     "max_tile_features": 7761,
-    "mlt_view_bytes": 371065,
-    "mlt_max_tile_bytes": 115128,
+    "mlt_view_bytes": 348437,
+    "mlt_max_tile_bytes": 108098,
     "layers": {
      "ov0": {
       "features": 86,
@@ -1884,13 +1884,13 @@
      },
      "simple": {
       "features": 6802,
-      "bytes": 239164,
-      "values": 68,
-      "keys": 15,
+      "bytes": 225522,
+      "values": 65,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 20,
-      "string_bytes": 198,
+      "strings": 17,
+      "string_bytes": 176,
       "short_segments": 1514,
       "tiny": 499
      }
@@ -1898,7 +1898,7 @@
    },
    "style": {
     "layers": 39,
-    "expressions_total": 54114,
+    "expressions_total": 54072,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -1942,12 +1942,12 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 182807,
+    "view_bytes": 177373,
     "view_features": 6004,
-    "max_tile_bytes": 96382,
+    "max_tile_bytes": 93329,
     "max_tile_features": 3173,
-    "mlt_view_bytes": 76082,
-    "mlt_max_tile_bytes": 38179,
+    "mlt_view_bytes": 73287,
+    "mlt_max_tile_bytes": 36964,
     "layers": {
      "ov0": {
       "features": 1402,
@@ -2035,25 +2035,25 @@
      },
      "simple": {
       "features": 1516,
-      "bytes": 49605,
-      "values": 24,
-      "keys": 13,
+      "bytes": 46552,
+      "values": 22,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 55,
+      "strings": 5,
+      "string_bytes": 40,
       "short_segments": 1196,
       "tiny": 1155
      }
     }
    },
    "z10": {
-    "view_bytes": 226630,
+    "view_bytes": 220434,
     "view_features": 7135,
-    "max_tile_bytes": 116584,
+    "max_tile_bytes": 113167,
     "max_tile_features": 3615,
-    "mlt_view_bytes": 101225,
-    "mlt_max_tile_bytes": 51784,
+    "mlt_view_bytes": 98481,
+    "mlt_max_tile_bytes": 50494,
     "layers": {
      "ov0": {
       "features": 1829,
@@ -2153,25 +2153,25 @@
      },
      "simple": {
       "features": 1695,
-      "bytes": 55312,
-      "values": 24,
-      "keys": 13,
+      "bytes": 51895,
+      "values": 22,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 7,
-      "string_bytes": 55,
+      "strings": 5,
+      "string_bytes": 40,
       "short_segments": 716,
       "tiny": 578
      }
     }
    },
    "z11": {
-    "view_bytes": 405013,
+    "view_bytes": 390344,
     "view_features": 12101,
-    "max_tile_bytes": 166844,
+    "max_tile_bytes": 160677,
     "max_tile_features": 4982,
-    "mlt_view_bytes": 171085,
-    "mlt_max_tile_bytes": 70133,
+    "mlt_view_bytes": 163542,
+    "mlt_max_tile_bytes": 66962,
     "layers": {
      "ov0": {
       "features": 1953,
@@ -2271,25 +2271,25 @@
      },
      "simple": {
       "features": 3070,
-      "bytes": 101752,
-      "values": 25,
-      "keys": 13,
+      "bytes": 95585,
+      "values": 24,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 9,
-      "string_bytes": 77,
+      "strings": 7,
+      "string_bytes": 63,
       "short_segments": 1249,
       "tiny": 662
      }
     }
    },
    "z12": {
-    "view_bytes": 487364,
+    "view_bytes": 469832,
     "view_features": 13931,
-    "max_tile_bytes": 226787,
+    "max_tile_bytes": 217726,
     "max_tile_features": 6544,
-    "mlt_view_bytes": 214805,
-    "mlt_max_tile_bytes": 94573,
+    "mlt_view_bytes": 205712,
+    "mlt_max_tile_bytes": 89926,
     "layers": {
      "ov0": {
       "features": 2151,
@@ -2401,25 +2401,25 @@
      },
      "simple": {
       "features": 4517,
-      "bytes": 151753,
-      "values": 27,
-      "keys": 13,
+      "bytes": 142691,
+      "values": 26,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 11,
-      "string_bytes": 109,
+      "strings": 9,
+      "string_bytes": 94,
       "short_segments": 1972,
       "tiny": 188
      }
     }
    },
    "z13": {
-    "view_bytes": 1027167,
+    "view_bytes": 979367,
     "view_features": 28644,
-    "max_tile_bytes": 240467,
+    "max_tile_bytes": 229413,
     "max_tile_features": 6776,
-    "mlt_view_bytes": 369492,
-    "mlt_max_tile_bytes": 85391,
+    "mlt_view_bytes": 344823,
+    "mlt_max_tile_bytes": 79734,
     "layers": {
      "ov0": {
       "features": 1147,
@@ -2531,25 +2531,25 @@
      },
      "simple": {
       "features": 5512,
-      "bytes": 193063,
-      "values": 32,
-      "keys": 13,
+      "bytes": 182009,
+      "values": 30,
+      "keys": 12,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 13,
-      "string_bytes": 132,
+      "strings": 10,
+      "string_bytes": 110,
       "short_segments": 1294,
       "tiny": 252
      }
     }
    },
    "z14": {
-    "view_bytes": 745149,
+    "view_bytes": 708207,
     "view_features": 20509,
-    "max_tile_bytes": 126759,
+    "max_tile_bytes": 121552,
     "max_tile_features": 3504,
-    "mlt_view_bytes": 262541,
-    "mlt_max_tile_bytes": 51236,
+    "mlt_view_bytes": 242772,
+    "mlt_max_tile_bytes": 48473,
     "layers": {
      "ov0": {
       "features": 724,
@@ -2661,25 +2661,25 @@
      },
      "simple": {
       "features": 3143,
-      "bytes": 108236,
-      "values": 37,
-      "keys": 15,
+      "bytes": 101919,
+      "values": 35,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 14,
-      "string_bytes": 140,
+      "strings": 12,
+      "string_bytes": 123,
       "short_segments": 182,
       "tiny": 46
      }
     }
    },
    "z15": {
-    "view_bytes": 757432,
+    "view_bytes": 728692,
     "view_features": 19624,
-    "max_tile_bytes": 154533,
+    "max_tile_bytes": 148016,
     "max_tile_features": 4009,
-    "mlt_view_bytes": 343670,
-    "mlt_max_tile_bytes": 63902,
+    "mlt_view_bytes": 328377,
+    "mlt_max_tile_bytes": 60517,
     "layers": {
      "ov0": {
       "features": 190,
@@ -2851,13 +2851,13 @@
      },
      "simple": {
       "features": 3243,
-      "bytes": 119423,
-      "values": 32,
-      "keys": 15,
+      "bytes": 112906,
+      "values": 30,
+      "keys": 14,
       "keys_unread": 1,
       "no_id": 1,
-      "strings": 12,
-      "string_bytes": 109,
+      "strings": 11,
+      "string_bytes": 100,
       "short_segments": 701,
       "tiny": 450
      }
@@ -2865,7 +2865,7 @@
    },
    "style": {
     "layers": 39,
-    "expressions_total": 54108,
+    "expressions_total": 54067,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
