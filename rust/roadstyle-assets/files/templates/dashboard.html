@@ -32,6 +32,7 @@ body{--rs-side:var(--rs-panel-w,340px)}   /* shift the map's right-anchored cont
 #sb-legend{margin-top:5px}
 .sb-lgrow{display:flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;padding:1px 0}
 .sb-lgrow i{width:14px;height:8px;border-radius:2px;flex:none}
+.sb-lgrow .sb-lgn{margin-left:auto;font-weight:400;font-size:11px;opacity:.6;font-variant-numeric:tabular-nums}
 .sb-lgrow i.circle{width:10px;height:10px;margin:0 2px;border-radius:50%}
 .sb-lgrow i.line{height:3px}
 .sb-lgbar{height:10px;border-radius:3px;margin:3px 0}
@@ -107,7 +108,7 @@ function legendHtml(o){
     return '<div class="sb-lgbar" style="background:linear-gradient(90deg,' + (lg.ramp || []).join(",") + ')"></div>'
       + '<div class="sb-lgends"><span>' + esc(lg.vmin) + '</span><span>' + esc(lg.vmax) + '</span></div>';
   if (lg && lg.kind === "categorical" && (lg.entries || []).length)
-    return lg.entries.map(e => '<div class="sb-lgrow"><i style="background:' + e[1] + '"></i>' + esc(e[0]) + '</div>').join("");
+    return lg.entries.map(e => '<div class="sb-lgrow"><i style="background:' + e[1] + '"></i>' + esc(e[0]) + (e[2] != null ? '<b class="sb-lgn">' + Number(e[2]).toLocaleString("en") + "</b>" : "") + "</div>").join("");
   const cls = window.RS_CLASSES || [], cols = window.RS_CLASS_COLORS || {};
   return cls.length ? cls.map(c => '<div class="sb-lgrow"><i style="background:' + (cols[c] || "#888") + '"></i>' + esc(c) + '</div>').join("")
     : '<span class="sb-none">no legend</span>';

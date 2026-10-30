@@ -107,12 +107,13 @@ def test_a_number_goes_in_one_of_n_sets_by_natural_breaks_and_the_legend_counts_
         page.goto(_URL)
         page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!(window.rs && rs.setData)", timeout=60_000)
         legend = """async (o) => { await rs.setData(ROWS, Object.assign({colorBy: "flow"}, o)); rs.tools.open('legend');
-          const t = document.querySelector('.rs-cb-lg').textContent.replace(/\\s+/g, ' ').trim(); rs.tools.close('legend'); return t; }""".replace("ROWS", json.dumps(rows))
+          const t = [...document.querySelectorAll('.rs-cb-lg .lg-row')].map(r => (r.querySelector('.lg-t') || r).textContent + (r.querySelector('.lg-n') ? ' (' + r.querySelector('.lg-n').textContent + ')' : '')).join(' | ') + ' | ' + document.querySelector('.rs-cb-lg').textContent;
+          rs.tools.close('legend'); return t; }""".replace("ROWS", json.dumps(rows))
         three = page.evaluate(legend, {"classes": 3})
-        assert "100 – 130 (3)" in three and "400 – 420 (2)" in three and "5000 (1)" in three
+        assert "100 – 130 (3)" in three and "400 – 420 (2)" in three and "5,000 (1)" in three
         fixed = page.evaluate(legend, {"breaks": [200]})
-        assert "100 – 130 (3)" in fixed and "400 – 5000 (3)" in fixed and "5000 (1)" not in fixed
-        assert "(" not in page.evaluate(legend, {"classes": 0}) and errors == []
+        assert "100 – 130 (3)" in fixed and "400 – 5,000 (3)" in fixed and "5,000 (1)" not in fixed
+        assert " (" not in page.evaluate(legend, {"classes": 0}).split(" | ")[0] and errors == []
         assert page.evaluate("rs.naturalBreaks([1, 2, 3, 100, 110, 120], 2)") == [100] and page.evaluate("rs.naturalBreaks([5, 5, 5], 4)") == []
         browser.close()
 
