@@ -264,8 +264,8 @@ already returns early in the same way. Thus the page and the export use one set 
 7. **The camera.** The style gets `center` and `zoom` from the bounds of the edges, as the page's `fitBounds`.
 8. **Page-only keywords are refused.** `views=` (the page applies the first view at load) and `color_active=`
    (the page picks that option at load) raise `ValueError`, because the style cannot do what the page does.
-9. **A keyed base map keeps its key.** CARTO's tile URL has the API key in it, so `style.json` has the key too.
-   The guide says this. For files that other people can see, use a keyless base map or `basemap=None`.
+9. **A tile URL with a key keeps its key.** A base map that you give as a tile URL with `api_key` has the key in the URL, so `style.json` has the key too.
+   The guide says this. The base maps of roadstyle need no key.
 
 `basemap` not given means the base map of `render_edges`. Because `render_edges` reads `basemap=None` as "the
 default", the export uses its own marker for "not given" and gives `render_edges` only a named base map.

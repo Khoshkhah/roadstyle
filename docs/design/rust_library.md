@@ -1420,8 +1420,6 @@ Decisions (2026-10-24):
 - **The option check:** a misspelt option is an error with the close names, as in Python. The server checks the options against the
   keys that stage 1 reads (`STAGE1` in `main.rs`) and the page's keywords (`page_options::page_defaults`). `tests/test_mcp_rs_options.py`
   checks that each key of `STAGE1` is a `render_edges` keyword.
-- **The base map:** with no `CARTO_API_KEY` (or `ROADSTYLE_API_KEY`) and no `basemap` option, the page takes `esri_street` and the
-  answer says so, as in Python.
 - **The package:** `roadstyle-mcp` on PyPI becomes a maturin `bindings = "bin"` wheel that holds the Rust program. `uvx roadstyle-mcp`,
   `server.json` and `.claude-plugin/plugin.json` do not change. `mcp_server.py` and the `roadstyle[mcp]` extra retire when the three
   tools are in Rust.

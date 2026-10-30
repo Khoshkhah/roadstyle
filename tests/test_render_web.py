@@ -427,20 +427,34 @@ def test_blank_basemap_is_tile_free_and_offline():
     assert style["layers"][0] == {"id": "bg", "type": "background",
                                   "paint": {"background-color": "#efede8"}}
     assert "bm" not in style["sources"]
-    assert "basemaps.cartocdn.com" not in wm.html and "arcgisonline" not in wm.html        # no tile URL (the dashboard's own code names the provider)
+    assert "arcgisonline" not in wm.html        # no tile URL (the dashboard's own code names the provider)
 
 
 def test_blank_basemap_with_switcher_precreates_hidden_raster():
     """blank active + tiled maps offered: the raster layer exists but starts hidden, so the
     dropdown can flip visibility without adding sources at runtime."""
     wm = render_edges(_edges(), backend="web", basemap="blank",
-                      basemaps=["blank", "voyager"])
+                      basemaps=["blank", "osm"])
     style = _style(wm.html)
     raster = next(l for l in style["layers"] if l["id"] == "basemap")
     assert raster["layout"] == {"visibility": "none"}
-    assert style["sources"]["bm"]["tiles"]           # voyager tiles, ready to show
+    assert style["sources"]["bm"]["tiles"]           # osm tiles, ready to show
     entries = _opt(wm.html, "basemaps")
     assert entries[0]["tiles"] == [] and entries[0]["bg"] == "#efede8"
+
+
+def test_a_removed_basemap_falls_back_to_ofm_positron_with_a_warning():
+    """The CARTO maps and OpenFreeMap Bright are gone: an old page that names one still draws, on ofm_positron, once, with a warning."""
+    import json
+
+    from roadstyle import _assets
+    a, b, c, *_ = json.loads(_assets.text("data/basemaps.json"))["removed"]
+    with pytest.warns(UserWarning, match=f"'{a}' was removed.*'ofm_positron'") as w:
+        wm = render_edges(_edges(), backend="web", basemap=a, basemaps=[a, b, c, "osm"], views={"Night": {"basemap": c}})
+    assert {str(x.message) for x in w} >= {f"base map '{k}' was removed; 'ofm_positron' is used instead" for k in (a, b, c)}
+    keys = [e["key"] for e in _opt(wm.html, "basemaps")]
+    assert keys[0] == "ofm_positron" and keys.count("ofm_positron") == 1 and "osm" in keys and "ofm_dark" in keys
+    assert "carto.com" not in wm.html
 
 
 def test_basemap_maxzoom_reaches_the_page():
@@ -458,11 +472,13 @@ def test_basemap_maxzoom_reaches_the_page():
 
 def test_keyed_basemap_keeps_every_field():
     """Injecting an API key copies the base map; the copy used to re-list fields by hand."""
+    import dataclasses
+
     from roadstyle.basemaps import BASEMAPS, get_basemap
-    keyed = get_basemap("voyager", api_key="k")
-    assert "key=k" in keyed.url and keyed.maxzoom == 20
-    assert (keyed.bg, keyed.preview, keyed.lonboard) == (
-        BASEMAPS["voyager"].bg, BASEMAPS["voyager"].preview, BASEMAPS["voyager"].lonboard)
+    mine = dataclasses.replace(BASEMAPS["osm"], key="mine", maxzoom=20)
+    keyed = get_basemap(mine, api_key="k")
+    assert "api_key=k" in keyed.url and keyed.maxzoom == 20
+    assert (keyed.bg, keyed.preview) == (mine.bg, mine.preview)
 
 
 def test_js_api_hooks_are_baked():
@@ -477,9 +493,9 @@ def test_js_api_hooks_are_baked():
 def test_switcher_off_with_explicit_basemaps_keeps_them_addressable():
     """basemap_switcher=False hides the dropdown but an explicit basemaps= list stays fully
     baked, so window.rsSetBasemap('key') can drive a custom UI."""
-    wm = render_edges(_edges(), backend="web", basemaps=["voyager", "blank"],
+    wm = render_edges(_edges(), backend="web", basemap="osm", basemaps=["osm", "blank"],
                       basemap_switcher=False)
-    assert [e["key"] for e in _opt(wm.html, "basemaps")] == ["voyager", "blank", "blank_dark"]       # blank brings its dark twin
+    assert [e["key"] for e in _opt(wm.html, "basemaps")] == ["osm", "blank", "blank_dark"]       # blank brings its dark twin
     assert _opt(wm.html, "basemap_switcher") is False
     # without an explicit list, only the fixed backdrop is baked (nothing to switch to)
     wm2 = render_edges(_edges(), backend="web", basemap_switcher=False)
@@ -608,7 +624,7 @@ def test_web_street_view_link():
 
 
 def test_basemap_button_is_a_map_control_in_the_top_right_column():
-    html = render_edges(_edges(), backend="web", basemaps=["positron", "osm"]).html
+    html = render_edges(_edges(), backend="web", basemaps=["ofm_positron", "osm"]).html
     # added with map.addControl like 2D/3D and Street View, not appended to <body>
     assert "bm-ctrl" in html and "maplibregl-ctrl maplibregl-ctrl-group bm-ctrl" in html
     assert "document.body.appendChild(menu)" not in html
@@ -827,7 +843,6 @@ def test_a_two_way_pair_that_disagrees_is_named_in_a_warning():
     ok = _twin([(1, "a", "b", -1, 0, 1, 1, "yes", None), (2, "b", "a", 1, 0, -1, 1, None, "yes")])
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        warnings.filterwarnings("ignore", message="CARTO base map requested with no API key")    # CI has no key: not the twins' warning
         render_edges(ok, **_TWIN_KW, edge_id_col="edge_id")
     for bad in (ok.assign(ce=[1, 0]), ok.assign(cap_e=[None, None])):
         with pytest.warns(UserWarning, match=r"twin_casing: 1 two-way pair.*: 1 / 2"):

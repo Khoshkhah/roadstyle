@@ -58,7 +58,7 @@ class StyleConfig:
     #: class -> zoom below which it is hidden. Consulted only when the caller opts in.
     minzoom: dict = field(default_factory=lambda: _settings.style()["config"]["minzoom"])
     #: the primary base map layer (a key in basemaps.BASEMAPS); per-call `basemap=` overrides
-    basemap: str = "voyager"
+    basemap: str = "ofm_positron"
     #: street-name label paint (web backend): color, halo_color, halo_width (0/None = no halo); size: [[zoom, px], ...] for every class
     #: (absent: each class's size from its fill width)
     labels: dict = field(default_factory=lambda: _settings.theme_value("labels"))

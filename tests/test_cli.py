@@ -30,7 +30,7 @@ def test_missing_input_returns_2(tmp_path):
 @pytest.mark.parametrize("fmt", ["web"])
 def test_each_format_writes_a_file(tmp_path, fmt):
     out = tmp_path / f"map_{fmt}"
-    assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--basemap", "dark_matter"]) == 0
+    assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--basemap", "ofm_dark"]) == 0
 
 
 @pytest.mark.parametrize("page,marker", [("dashboard", '<div id="sb"'), ("street-view", '<div id="sv"')])

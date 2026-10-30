@@ -244,7 +244,7 @@ const html = pageFrom(roads, resolveLook(options), options)
   .replace("<script>__MAPLIBRE_JS__</script>", '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>');
 ```
 
-`given` (JSON text) holds what only the host knows: `api_key` (the key of a CARTO base map), `street_view_key`, and
+`given` (JSON text) holds what only the host knows: `api_key` (the key of a tile URL that the host gives), `street_view_key`, and
 `resolved_basemaps` (base map entries in the form of `data/basemaps.json`). The warnings of the stages go to `console.warn`.
 
 ## The level editor in a page

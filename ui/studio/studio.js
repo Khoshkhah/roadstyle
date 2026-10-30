@@ -13,7 +13,7 @@ const ID_COLS = new Set(["id", "fid", "gid", "uid", "objectid"]);
 // the pages (pages.render_dashboard: template=), their Python call, title and base maps offered (studio/dashboard.py)
 const PAGES = {map: {fn: "render_edges", file: "map.html"},
                dashboard: {fn: "render_dashboard", file: "dashboard.html", title: "Roads dashboard"}};
-const OFFERED = ["voyager", "positron", "dark_matter", "osm", "satellite", "blank"];
+const OFFERED = ["ofm_positron", "ofm_dark", "osm", "satellite", "blank"];
 const MAPLIBRE = "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist";   // render_web._MAPLIBRE_CDN: the preview's MapLibre (a page's _repr_html_)
 
 // the state of the knobs

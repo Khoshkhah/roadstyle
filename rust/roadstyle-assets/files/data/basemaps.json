@@ -1,96 +1,12 @@
 {
  "basemaps": [
   {
-   "key": "voyager",
-   "label": "Voyager",
-   "url": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-   "attr": "© OpenStreetMap contributors © CARTO",
-   "is_dark": false,
-   "satellite": false,
-   "lonboard": "Voyager",
-   "bg": "linear-gradient(180deg,#e8eef0,#d8e0e5)",
-   "preview": [
-    "#ff9933",
-    "#e8ecef",
-    "#9ec5fe"
-   ],
-   "subdomains": "abc",
-   "maxzoom": 20
-  },
-  {
-   "key": "voyager_nolabels",
-   "label": "Voyager (no labels)",
-   "url": "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png",
-   "attr": "© OpenStreetMap contributors © CARTO",
-   "is_dark": false,
-   "satellite": false,
-   "lonboard": "Voyager",
-   "bg": "linear-gradient(180deg,#e8eef0,#d8e0e5)",
-   "preview": [
-    "#ff9933",
-    "#e8ecef",
-    "#9ec5fe"
-   ],
-   "subdomains": "abc",
-   "maxzoom": 20
-  },
-  {
-   "key": "positron",
-   "label": "Positron",
-   "url": "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-   "attr": "© OpenStreetMap contributors © CARTO",
-   "is_dark": false,
-   "satellite": false,
-   "lonboard": "Positron",
-   "bg": "linear-gradient(180deg,#f3f5f7,#e3e8ed)",
-   "preview": [
-    "#888",
-    "#bbb",
-    "#888"
-   ],
-   "subdomains": "abc",
-   "maxzoom": 20,
-   "group": "CARTO",
-   "title": "CARTO",
-   "dark": "dark_matter",
-   "swatch": [
-    "#fbf8f3",
-    "#ffffff",
-    "#d4dadc"
-   ]
-  },
-  {
-   "key": "dark_matter",
-   "label": "Dark Matter",
-   "url": "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-   "attr": "© OpenStreetMap contributors © CARTO",
-   "is_dark": true,
-   "satellite": false,
-   "lonboard": "DarkMatter",
-   "bg": "radial-gradient(circle,#18222e,#0b1014)",
-   "preview": [
-    "#22d3a3",
-    "#9ec5fe",
-    "#5b6573"
-   ],
-   "subdomains": "abc",
-   "maxzoom": 20,
-   "group": "CARTO",
-   "title": "Dark Matter",
-   "swatch": [
-    "#0b0b0b",
-    "#2c2c2c",
-    "#1f2a33"
-   ]
-  },
-  {
    "key": "osm",
    "label": "OpenStreetMap",
    "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
    "attr": "© OpenStreetMap contributors",
    "is_dark": false,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#f2efe9,#e8e4db)",
    "preview": [
     "#e07020",
@@ -114,7 +30,6 @@
    "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
    "is_dark": false,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#eceff1,#d8dde1)",
    "preview": [
     "#9aa",
@@ -139,7 +54,6 @@
    "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, © OpenStreetMap contributors, and the GIS User Community",
    "is_dark": false,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#f2efe9,#e8e4db)",
    "preview": [
     "#e8a33d",
@@ -163,7 +77,6 @@
    "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
    "is_dark": true,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#3a3f45,#25292e)",
    "preview": [
     "#22d3a3",
@@ -187,7 +100,6 @@
    "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community",
    "is_dark": true,
    "satellite": true,
-   "lonboard": null,
    "bg": "linear-gradient(140deg,#2d3823,#4a3a2a,#2a2820)",
    "preview": [
     "#ffe8a0",
@@ -211,7 +123,6 @@
    "attr": "",
    "is_dark": false,
    "satellite": false,
-   "lonboard": null,
    "bg": "#efede8",
    "preview": [
     "#888",
@@ -232,7 +143,6 @@
    "attr": "",
    "is_dark": true,
    "satellite": false,
-   "lonboard": null,
    "bg": "#14181d",
    "preview": [
     "#22d3a3",
@@ -252,7 +162,6 @@
    "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
    "is_dark": false,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#f8f4f0,#e9e4dc)",
    "preview": [
     "#f9a23a",
@@ -272,38 +181,12 @@
    ]
   },
   {
-   "key": "ofm_bright",
-   "label": "OpenFreeMap Bright",
-   "url": "",
-   "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
-   "is_dark": false,
-   "satellite": false,
-   "lonboard": null,
-   "bg": "linear-gradient(180deg,#f5f1ea,#e6e0d4)",
-   "preview": [
-    "#ffd166",
-    "#fff",
-    "#9ec5fe"
-   ],
-   "subdomains": "abc",
-   "maxzoom": 19,
-   "style_url": "https://tiles.openfreemap.org/styles/bright",
-   "group": "OpenFreeMap",
-   "title": "OpenFreeMap Bright",
-   "swatch": [
-    "#f8f4f0",
-    "#fff6b3",
-    "#a0c8f0"
-   ]
-  },
-  {
    "key": "ofm_positron",
    "label": "OpenFreeMap Positron",
    "url": "",
    "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
    "is_dark": false,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#f3f5f7,#e3e8ed)",
    "preview": [
     "#888",
@@ -329,7 +212,6 @@
    "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
    "is_dark": true,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#2b2f36,#1a1d22)",
    "preview": [
     "#6b7078",
@@ -354,7 +236,6 @@
    "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
    "is_dark": true,
    "satellite": false,
-   "lonboard": null,
    "bg": "linear-gradient(180deg,#45516e,#2f394f)",
    "preview": [
     "#7f8fb3",
@@ -382,6 +263,14 @@
   "satellite",
   "blank"
  ],
+ "removed": [
+  "voyager",
+  "voyager_nolabels",
+  "positron",
+  "dark_matter",
+  "ofm_bright"
+ ],
+ "fallback": "ofm_positron",
  "ontop": {
   "hillshade": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}",

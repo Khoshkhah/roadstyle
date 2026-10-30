@@ -56,19 +56,22 @@ def test_get_api_key_from_env(monkeypatch):
     assert get_api_key("stadia") == "env_roadstyle_token"
 
 
-def test_carto_basemap_api_key_injection(monkeypatch):
-    # Without key: returns standard url
-    bm = get_basemap("voyager")
-    assert "key=" not in bm.url
+def test_a_base_map_of_roadstyle_takes_no_key(monkeypatch):
+    from roadstyle.basemaps import BASEMAPS
+    monkeypatch.setenv("ROADSTYLE_API_KEY", "env_token")
+    for key in BASEMAPS:
+        assert get_basemap(key, api_key="my_key") is BASEMAPS[key]
 
-    # With explicit key: appends ?key=... for CARTO
-    bm_keyed = get_basemap("voyager", api_key="my_carto_key")
-    assert "key=my_carto_key" in bm_keyed.url
 
-    # With env var: CARTO_API_KEY
-    monkeypatch.setenv("CARTO_API_KEY", "env_carto_key")
-    bm_env = get_basemap("voyager")
-    assert "key=env_carto_key" in bm_env.url
+def test_the_removed_base_maps_are_an_error_here():
+    import json
+
+    from roadstyle import _assets
+    removed = json.loads(_assets.text("data/basemaps.json"))["removed"]
+    assert len(removed) == 5
+    for key in removed:
+        with pytest.raises(ValueError, match="unknown basemap"):
+            get_basemap(key)
 
 
 def test_get_basemap_custom_url_with_placeholder():

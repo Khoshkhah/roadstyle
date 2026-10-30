@@ -1,5 +1,5 @@
 // The tool `settings` (docs/design/dashboard_templates.md, 3.2): the person's own choices, kept in this browser only (localStorage, never in the
-// page file): where the bar and the panel are, how transparent the layers are, and the keys of Google and CARTO. A key that the person saves is used
+// page file): where the bar and the panel are, how transparent the layers are, and the key of Google. A key that the person saves is used
 // instead of the page's own key (so a person can test another key); "Clear" goes back to the page's key. A saved place is over the template's. A key
 // needs a reload: Street View and the Google script read it when the page starts.
 import {O} from "./core.js";
@@ -14,10 +14,8 @@ const _stPut = (k, v) => { try{ v == null ? localStorage.removeItem(k) : localSt
 
 // ---- the keys: the page's own key, else the one that the person saved ----
 export const savedKey = name => _stGet("rs-key:" + name) || "";
-const _stCarto = () => (O.basemaps || []).some(b => (b.tiles || []).some(t => /cartocdn\.com/.test(t)));
 const _stKeys = [
   {name: "google", title: "Google Maps key", note: "Street View (Linked) and Google 3D", page: () => !!O.street_view_key, show: () => O.street_view === "window" || O.google_3d},
-  {name: "carto", title: "CARTO key", note: "CARTO base maps", page: () => (O.basemaps || []).some(b => (b.tiles || []).some(t => /cartocdn\.com/.test(t) && /[?&]key=/.test(t))), show: _stCarto},
 ];
 
 // ---- how transparent: three numbers, the tokens of popup.css (--rs-a-tb: the bar and the panel, --rs-a-box: the boxes, the popup and the tooltip,

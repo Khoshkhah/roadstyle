@@ -36,8 +36,8 @@ def main() -> None:
     # tilted. color_options are BAKED (Python precomputes each option's per-edge colours); the
     # sidebar's "Colour by" select switches between them. Adjust to your columns.
     m = rs.render_dashboard(
-        edges, basemap="voyager", view_3d=True,
-        basemaps=["voyager", "positron", "dark_matter", "osm", "satellite", "blank"],
+        edges, basemap="ofm_positron", view_3d=True,
+        basemaps=["ofm_positron", "ofm_dark", "osm", "satellite", "blank"],
         color_options={"Class": {},
                        "Speed": {"color_by": "maxspeed_kmh", "cmap": "plasma"},
                        "Lanes": {"color_by": "lanes", "cmap": "viridis"}},

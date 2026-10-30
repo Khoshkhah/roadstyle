@@ -98,9 +98,8 @@ def _inject_token(url: str, token: str) -> str:
         return url
     if any(p in url for p in ("{api_key}", "{accessToken}", "{apikey}", "{apiKey}", "{token}", "{key}", "{access_token}")):
         return _replace_token_placeholders(url, token)
-    param_name = "key" if "cartocdn.com" in url else "api_key"
     sep = "&" if "?" in url else "?"
-    return f"{url}{sep}{param_name}={token}"
+    return f"{url}{sep}api_key={token}"
 
 
 @dataclass(frozen=True)
@@ -111,7 +110,6 @@ class Basemap:
     attr: str
     is_dark: bool = False          # dark canvas?
     satellite: bool = False        # apply the saturate/brightness tile filter
-    lonboard: str | None = None    # CartoBasemap name (lonboard backend)
     bg: str = "#444"               # thumbnail background (CSS)
     preview: tuple[str, str, str] = ("#888", "#bbb", "#888")  # 3 preview road colours
     subdomains: str = "abc"
@@ -130,11 +128,8 @@ class Basemap:
 def _bundled() -> tuple[dict[str, Basemap], list[str]]:
     """The base maps of data/basemaps.json (one list for Python and the studio in the browser) and the switcher's default set.
 
-    Every basemaps.cartocdn.com entry (voyager, voyager_nolabels, positron, dark_matter) is served WATERMARKED: a keyless tile comes
-    back stamped "API KEY REQUIRED", with or without a browser Referer, so they need a CARTO API key. The esri_* and osm entries are
-    keyless and unstamped; esri_street and esri_dark_gray are the keyless stand-ins for voyager and dark_matter. voyager_nolabels has
-    no street names, so the map's own labels are the only ones. A url of "" (blank, blank_dark) is no tile layer: only the canvas
-    colour (bg), with no network request."""
+    Every entry is keyless. A url of "" (blank, blank_dark) is no tile layer: only the canvas colour (bg), with no network request;
+    a style_url (the OpenFreeMap maps) is a vector style."""
     import json
 
     from . import _assets
@@ -157,7 +152,7 @@ def _basemap_from_provider(tp, api_key: str | None = None) -> Basemap:
     """Convert an ``xyzservices.TileProvider`` (duck-typed) into a :class:`Basemap`.
 
     Lets any of the hundreds of xyzservices tile sources be used directly, e.g.
-    ``render_edges(edges, basemap=xyzservices.providers.CartoDB.Positron)``.
+    ``render_edges(edges, basemap=xyzservices.providers.OpenTopoMap)``.
     """
     name = getattr(tp, "name", None) or (
         tp.get("name", "custom") if hasattr(tp, "get") else "custom"
@@ -209,35 +204,15 @@ def _basemap_from_provider(tp, api_key: str | None = None) -> Basemap:
                    is_dark=is_dark, maxzoom=maxzoom)
 
 
-def _warn_unkeyed(url: str, resolved_key: str | None) -> None:
-    """Say so when a CARTO base map is about to render watermarked.
-
-    CARTO stamps a keyless tile "API KEY REQUIRED" and still answers 200, so nothing downstream
-    can tell: the request succeeds, the image arrives, the map looks built. A page published that
-    way is wrong in the one way nobody checks, and it stayed wrong for a day on a site whose
-    nightly job reported success throughout.
-
-    A warning and not an exception, deliberately. The map still draws, and a deployment that fails
-    its whole night over a watermark is worse than one that says the watermark is there. It goes
-    to stderr, which is where a nightly job's health is read from.
-    """
-    if resolved_key or "cartocdn.com" not in (url or ""):
-        return
-    import warnings
-    warnings.warn(
-        "CARTO base map requested with no API key: the tiles will come back stamped "
-        "'API KEY REQUIRED'. Set one in roadstyle.json, or use a keyless base map "
-        "(esri_street, esri_dark_gray, osm).",
-        stacklevel=3,
-    )
-
-
 def get_basemap(key: str | Basemap, api_key: str | None = None) -> Basemap:
     """Resolve a base map from a registered key, a :class:`Basemap`, or an
-    ``xyzservices.TileProvider`` (duck-typed via its ``build_url`` method)."""
+    ``xyzservices.TileProvider`` (duck-typed via its ``build_url`` method).
+
+    The base maps of roadstyle need no key. A key goes only into a base map that you register yourself, a tile URL
+    and an xyzservices provider. A removed key (data/basemaps.json ``removed``) is an error here; a page
+    falls back to ``ofm_positron`` with a warning (roadstyle::page_options)."""
     if isinstance(key, Basemap):
-        resolved_key = api_key or get_api_key(key.key) or get_api_key("carto" if "cartocdn.com" in key.url else None)
-        _warn_unkeyed(key.url, resolved_key)
+        resolved_key = api_key or get_api_key(key.key)
         if resolved_key and key.url:
             new_url = _inject_token(key.url, resolved_key)
             if new_url != key.url:
@@ -245,15 +220,7 @@ def get_basemap(key: str | Basemap, api_key: str | None = None) -> Basemap:
         return key
     if isinstance(key, str):
         if key in BASEMAPS:
-            bm = BASEMAPS[key]
-            provider = "carto" if "cartocdn.com" in bm.url else key
-            resolved_key = api_key or get_api_key(provider) or get_api_key(key) or get_api_key()
-            _warn_unkeyed(bm.url, resolved_key)
-            if resolved_key and bm.url:
-                new_url = _inject_token(bm.url, resolved_key)
-                if new_url != bm.url:
-                    return dataclasses.replace(bm, url=new_url)
-            return bm
+            return BASEMAPS[key]
         if "{z}" in key and "{x}" in key and "{y}" in key:
             resolved_key = api_key or get_api_key()
             url = _inject_token(key, resolved_key) if resolved_key else key

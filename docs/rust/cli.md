@@ -24,7 +24,7 @@ roadstyle page roads.parquet out/mvt.html --tile-format mvt
 roadstyle page roads.parquet out/dashboard.html --template dashboard
 ```
 
-A CARTO base map needs a key: `--api-key KEY`, else the environment variable `ROADSTYLE_API_KEY`. Google 3D and the Street View
+A base map that is a tile URL can take a key: `--api-key KEY`, else the environment variable `ROADSTYLE_API_KEY`. Google 3D and the Street View
 window take `--street-view-key KEY`, else `GOOGLE_MAPS_KEY`. The program writes a key into the page only when you give one.
 
 ## Draw a map in two stages

@@ -233,9 +233,7 @@
   "basemap": "blank",
   "basemaps": [
    "blank",
-   "voyager_nolabels",
-   "voyager",
-   "positron",
+   "ofm_positron",
    "osm",
    "satellite"
   ],
@@ -1682,7 +1680,7 @@
    "secondary_link": 12,
    "tertiary_link": 12
   },
-  "basemap": "voyager",
+  "basemap": "ofm_positron",
   "labels": {
    "halo_width": 0,
    "font": [

@@ -18,7 +18,7 @@ from pathlib import Path
 from mcp.server.mcpserver import Image, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from . import as_edges, get_api_key, load_edges, render_edges
+from . import as_edges, load_edges, render_edges
 from . import snapshot as _snapshot
 
 OUT_DIR = Path.home() / "roadstyle-maps"
@@ -94,11 +94,6 @@ def _preview(html_path: Path, **camera) -> list:
 
 def _render(gdf, options: dict | None, output_path: str | None, stem: str) -> list:
     opts = _check_options(options)
-    notes = []
-    if "basemap" not in opts and not get_api_key("carto"):
-        # the default CARTO tiles come back stamped "API KEY REQUIRED" without a key
-        opts["basemap"] = "esri_street"
-        notes.append("basemap: esri_street (the default CARTO map needs CARTO_API_KEY)")
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         e = as_edges(gdf, class_col=opts.get("highway_col", "highway"))
@@ -110,9 +105,7 @@ def _render(gdf, options: dict | None, output_path: str | None, stem: str) -> li
              f"{len(g):,} edges; classes: " + ", ".join(f"{k} {v}" for k, v in classes.head(8).items()),
              "bounds (w, s, e, n): " + ", ".join(f"{b:.5f}" for b in g.total_bounds)]
     msgs = dict.fromkeys(str(w.message) for w in caught)       # once each, in order
-    if notes:     # we picked a keyless map; CARTO's warning is about the switcher's other entries
-        msgs = [m for m in msgs if not m.startswith("CARTO base map requested")]
-    lines += notes + [f"warning: {m}" for m in msgs]
+    lines += [f"warning: {m}" for m in msgs]
     return ["\n".join(lines), *_preview(out)]
 
 

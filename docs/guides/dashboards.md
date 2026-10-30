@@ -97,8 +97,8 @@ the same settings in every view when they must switch back.
 `palette` switches every color of the map: the road classes, and also the names, arrows, bridges, tunnels and the swatches of the roads filter of the `roads` tool. A color option with a palette (`{"palette": "carto"}`, above) recolors only the road fills.
 
 ```python
-rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "positron"},
-                              "Night": {"palette": "mono", "basemap": "dark_matter"}})
+rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positron"},
+                              "Night": {"palette": "mono", "basemap": "ofm_dark"}})
 ```
 
 A name the page does not have is an error. From your page: `rsSetView(name)`, and `rsSetRoadFill(on)`

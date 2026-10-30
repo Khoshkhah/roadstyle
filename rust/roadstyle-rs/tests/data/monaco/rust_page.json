@@ -1,9 +1,11 @@
 {
   "page": {
-    "bytes": 2757493,
-    "sha16": "19bb19ca137a9842"
+    "bytes": 2794743,
+    "sha16": "11ba21e00ba318b7"
   },
   "warnings": [
-    "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, or use a keyless base map (esri_street, esri_dark_gray, osm)."
+    "base map 'voyager_nolabels' was removed; 'ofm_positron' is used instead",
+    "base map 'voyager' was removed; 'ofm_positron' is used instead",
+    "base map 'positron' was removed; 'ofm_positron' is used instead"
   ]
 }

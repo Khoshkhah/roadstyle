@@ -1,6 +1,6 @@
 """``roadstyle`` command-line interface — turn a road file into a styled map without writing Python.
 
-    roadstyle edges.gpkg -o map.html --basemap dark_matter
+    roadstyle edges.gpkg -o map.html --basemap ofm_dark
     roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web
     roadstyle edges.gpkg --include motorway trunk primary -o major.html
 
@@ -28,8 +28,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Render a road-edge file (GPKG, GeoJSON, Shapefile, …) into a styled "
                     "interactive map.",
         epilog="examples:\n"
-               "  roadstyle edges.gpkg -o map.html --basemap dark_matter\n"
-               "  roadstyle edges.gpkg --palette carto --basemap positron\n"
+               "  roadstyle edges.gpkg -o map.html --basemap ofm_dark\n"
+               "  roadstyle edges.gpkg --palette carto --basemap ofm_positron\n"
                "  roadstyle edges.gpkg --include motorway trunk primary -o major.html\n"
                "  roadstyle edges.gpkg --color-by aadt --cmap viridis --width-by 1 6 -f web\n"
                "  roadstyle edges.gpkg --page street-view         # map + Google Street View\n"
@@ -48,7 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
     style.add_argument("--palette", default="amber", choices=["amber", "carto", "highsat", "mono"],
                        help="class palette (default: amber).")
     style.add_argument("--basemap", help="the primary base map layer (a key in BASEMAPS; "
-                       "default from settings: voyager).")
+                       "default from settings: ofm_positron).")
     style.add_argument("--tooltip", nargs="+", metavar="COL",
                        help="columns to show in the hover tooltip.")
 

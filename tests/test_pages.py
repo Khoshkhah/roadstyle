@@ -198,14 +198,21 @@ def test_the_dashboard_starts_with_a_blank_map_that_needs_no_key_and_with_no_sca
     import json
     import warnings
     with warnings.catch_warnings():
-        warnings.simplefilter("error")             # no "CARTO base map requested with no API key"
+        warnings.simplefilter("error")             # no warning at all: the base maps need no key
         h = rs.render_dashboard(_edges()).html
     opts = json.JSONDecoder().raw_decode(h, h.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = "))[0]
     d = opts["dashboard"]
     assert d["scale_box"] is False and d["panel"]["side"] == "left" and d["toolbar"]["position"] == "left"
     got = [b["key"] for b in opts["basemaps"]]
-    assert got[0] == "blank" and len(got) > 1 and not {"voyager", "positron", "dark_matter"} & set(got), got
-    assert "cartocdn" not in "".join(t for b in opts["basemaps"] for t in b.get("tiles", []))
+    assert got[0] == "blank" and len(got) > 1 and not set(_removed_basemaps()) & set(got), got
+    assert "carto.com" not in "".join(t for b in opts["basemaps"] for t in b.get("tiles", []))
+
+
+def _removed_basemaps():
+    import json
+
+    from roadstyle import _assets
+    return json.loads(_assets.text("data/basemaps.json"))["removed"]
 
 
 def _page_option(html, key):

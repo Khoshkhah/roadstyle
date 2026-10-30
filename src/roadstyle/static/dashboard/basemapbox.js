@@ -5,7 +5,7 @@
 //
 // THE LABELS SWITCH is one state for the 2D map and the Google 3D window (window.rsLabelsOn): the window always follows it. The 2D map gets
 // labels only from a base map that can show them: the style's own labels (a vector style), or Esri's label tiles (Esri Gray, Esri Satellite).
-// Blank, OpenStreetMap, Esri Streets and CARTO get no label layer from the page. The choice is kept for each base map.
+// Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
 

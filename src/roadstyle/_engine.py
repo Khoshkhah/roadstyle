@@ -416,8 +416,9 @@ def render_page(gdf, *, palette=None, profile=None, settings=None, highway_col="
 def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=None) -> dict:
     """The page's keys and what only Python knows of a page (roadstyle::page_options makes the rest): the page's keys of the call
     (roadstyle::page_options::given_of of the look ``lk`` and the call's ``args``, as the wasm page), the Google Maps key of the
-    environment, and each base map key with its API key of roadstyle.json, of set_api_key or of the environment (basemaps.get_api_key,
-    by provider), in force with the settings of the call as render_edges applies them."""
+    environment, and each base map key that Python knows (a base map that the caller registered, a tile URL) with its API key of roadstyle.json, of
+    set_api_key or of the environment (basemaps.get_api_key, by provider), in force with the settings of the call as render_edges
+    applies them. A key that Python does not know goes on as it is: roadstyle::page_options gives an error, or the fallback of a removed key."""
     import dataclasses
 
     from . import _settings as _s
@@ -431,9 +432,9 @@ def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=
     prev = list(_s._EXTRA)
     try:
         _use(*prev, *srcs)
-        from .basemaps import DEFAULT_SWITCHER, get_basemap
+        from .basemaps import BASEMAPS, DEFAULT_SWITCHER, get_basemap
         keys = list(dict.fromkeys(k for k in [a["basemap"] or rw.CONFIG.basemap, *(a["basemaps"] or DEFAULT_SWITCHER)] if isinstance(k, str)))
-        resolved = [dataclasses.asdict(get_basemap(k, api_key=a["api_key"])) for k in keys]
+        resolved = [dataclasses.asdict(get_basemap(k, api_key=a["api_key"])) for k in keys if k in BASEMAPS or "{z}" in k]
     finally:
         _use(*prev)
     page = json.loads(rust().given_of(lk, json.dumps({"args": args or {}})))     # the page's keys: page_options::given_of, the one rule

@@ -321,7 +321,7 @@ fn base_map_args(b: &BaseMap, th: &Value, spec: &Value) -> Map<String, Value> {
             e
         }
     };
-    args.insert("basemaps".into(), json!([bg, "voyager_nolabels", "voyager", "positron", "osm", "satellite"]));
+    args.insert("basemaps".into(), json!([bg, "ofm_positron", "osm", "satellite"]));
     args.insert("basemap".into(), bg);
     if spec.get("lanes") == Some(&Value::Bool(false)) {          // one centred line for each road
         args.insert("offset_frac".into(), 0.into());

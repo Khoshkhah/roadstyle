@@ -5,9 +5,8 @@ Run from the repo root::
     python docs/build_maps.py        # writes docs/maps/*.html
 
 They are not committed: the docs workflow (.github/workflows/docs.yml) builds them before
-``mkdocs build``, with the CARTO key from the repo secret ``CARTO_API_KEY`` so the base map carries
-no "API KEY REQUIRED" watermark, and with the Google key from the secret ``GOOGLE_MAPS_KEY`` (the live map's
-Google 3D window, Street View's Linked mode). Locally, set ``CARTO_API_KEY`` and ``GOOGLE_MAPS_KEY`` first. Each is a self-contained map the manual embeds in an ``<iframe>``. They use the bundled sample
+``mkdocs build``, with the Google key from the secret ``GOOGLE_MAPS_KEY`` (the live map's
+Google 3D window, Street View's Linked mode). Locally, set ``GOOGLE_MAPS_KEY`` first. Each is a self-contained map the manual embeds in an ``<iframe>``. They use the bundled sample
 edges (``notebooks/data/sodermalm_edges.gpkg``) with a couple of seeded columns so the data-driven
 demos look real.
 """
@@ -30,7 +29,7 @@ random.seed(7)
 g["aadt"] = [random.randint(200, 24000) for _ in range(len(g))]
 g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 
-# 1 — a first map: the default web backend (Voyager base, the settings default)
+# 1 — a first map: the default web backend (OpenFreeMap Positron base, the settings default)
 rs.render_edges(g, backend="web", name="roadstyle — first map").save(OUT / "first_map.html")
 
 # 2 — dynamic recolour: a neutral mono base + a "Colour by" picker (Class / AADT / Speed)
