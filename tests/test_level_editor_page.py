@@ -66,7 +66,9 @@ console.log(JSON.stringify([a.roadCount, a.pairCount]));"""
 PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="/vendor/maplibre-gl.js"></script><link rel="stylesheet" href="/vendor/maplibre-gl.css">
 <link rel="stylesheet" href="/dashboard/dashboard.css"><link rel="stylesheet" href="/popup.css">
-<style>html,body{margin:0;height:100%}#map{position:absolute;inset:0}</style></head><body><div id="map"></div><div id="panel"></div>
+<style>html,body{margin:0;height:100%}#map{position:fixed;inset:0}</style></head><body><div id="map"></div>
+<div id="sb" data-theme="light"><div class="sb-card"><div class="sb-top"><h2>Host steps</h2><button id="sb-hide" title="Hide the panel">x</button></div>
+<div class="sb-body" style="display:flex;flex-direction:column">The host's steps</div></div></div>
 <script>
 // the document's listeners by type (the test's count: a listener left after destroy, or one more after each open, shows here)
 window.listening = {};
@@ -78,7 +80,12 @@ document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] |
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
 import {levelEditor, browserStore, saveArea, areaIsFor} from "/dashboard/editor/level_editor.js";
 import {rsDashboard} from "/dashboard/index.js";
+import {rsFirstPaint} from "/dashboard/template.js";
 await init();
+// the host's panel is the standard dashboard's (data/host_options.json: the classes of <html>, the sheet of a phone, the toolbar)
+const opts = await (await fetch("/data/host_options.json")).json();
+opts.dashboard.panel.hide = [];
+rsFirstPaint(opts.first_paint);
 // the host's part: the area made in the page and kept in the browser, and the host's own map
 const a = pkg.makeArea(new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer()), JSON.stringify({id_col: "edge_id"}));
 const store = browserStore("test-area", "Monaco test");
@@ -109,11 +116,11 @@ for(const [id, src] of Object.entries(own.sources)) map.addSource("host-" + id, 
 for(const l of own.layers) map.addLayer({...JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"host-oneway"')), id: "host-" + l.id, source: "host-" + l.source});
 map.addLayer({id: "host-land", type: "fill", source: "host-roads", "source-layer": "landuse", paint: {"fill-color": "#eeeeee"}});
 window.hostRoads = own.layers.map(l => "host-" + l.id);
-const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: false});
+const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: false, dashboard: opts.dashboard});
 window.host = host;
-const panel = document.getElementById("panel");
+const panel = document.getElementById("sb");
 if(location.search === "?no-dashboard"){                         // the host's dashboard not given: an error, no second dashboard
-  try { await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store}); window.ready = "made a second dashboard"; }
+  try { await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store}); window.ready = "made a second dashboard"; }
   catch(e){ window.ready = e.message; }
   throw new Error("stop");
 }
@@ -123,15 +130,17 @@ window.hostMap = map;
 window.openWith = async (key, levels, edgeHash) => {
   const s = browserStore(key, "Monaco test");
   if(!(await areaIsFor(s, edgeHash))) await saveArea(s, a, edgeHash);
-  window.editor = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store: s, dashboard: host, prefix: "host-", levels});
+  window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store: s, dashboard: host, prefix: "host-", levels});
   return [window.editor.answer().resolve, await areaIsFor(s, edgeHash), await areaIsFor(browserStore("other-" + key), edgeHash)];
 };
 window.hostSources = Object.fromEntries(map.getStyle().layers.filter(l => l.id.startsWith("host-")).map(l => [l.id, l.source]));
 window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening).filter(e => e[1])));
 window.before = counts();
 window.solved = [];
+window.backs = 0;
 window.openEditor = async () => { const t = performance.now();
-  const ed = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-"});
+  const ed = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-"});
+  ed.addEventListener("back", () => window.backs++);
   ed.addEventListener("solved", async e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: (await e.detail.draw()).length}));
   window.editor = ed; return performance.now() - t;
 };
@@ -140,7 +149,7 @@ window.replaced = [];
 window.openHosted = async () => {
   window.RS_SIDE = hostSide;
   const t = performance.now();
-  window.editor = await levelEditor({map, container: panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host,
+  window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host,
     host: {replaceRoads: async rows => { window.replaced.push(rows); }}});
   return performance.now() - t;
 };
@@ -157,6 +166,8 @@ class _Files(SimpleHTTPRequestHandler):
             return str(ASSETS / path.lstrip("/"))
         if path.startswith("/level_editor/pkg/"):
             return str(PKG.parent / path.removeprefix("/level_editor/pkg/"))
+        if path.startswith("/data/"):
+            return str(ASSETS / path.lstrip("/"))
         if path == "/edges.parquet":
             return str(EDGES)
         return super().translate_path(path)
@@ -203,7 +214,10 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate("hostMap.getStyle().layers.filter(l => l.id.startsWith('host-roads')).every(l => l.source === 'host-lv-roads')")
             stored = page.evaluate("stored('levels.csv')")
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
-            assert page.locator("#lv").count() == 1, "the panel is in the host's container"
+            assert page.locator("#lv").count() == 1 and page.locator("#sb .sb-card #lv").count() == 1, "the editor is in the host's panel"
+            assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "none", "the host's body is kept, hidden"
+            assert page.locator("#sb .sb-top .lv-back").inner_text() == "← Steps" and page.locator("#sb .sb-top .t").inner_text() == "Edit levels"
+            assert page.locator("#sb-hide").is_visible(), "the host's hide button stays"
             # the lean road table: only the fields that the page reads (reads.json's table), live data's id and the road that a click picks
             want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road"}
             got = page.evaluate("[...new Set(window.RS_SIDE.props.flatMap(Object.keys))]")
@@ -250,7 +264,9 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
                 assert page.evaluate("counts()") == page.evaluate("window.before"), "no listener of the editor left"
                 assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
                 assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-lv-roads')")
-                assert page.evaluate("window.rs === window.host && !window.lvApi && !document.body.classList.contains('lv-open')")
+                assert page.evaluate("window.rs === window.host && !window.lvApi && !document.querySelector('.lv-title')")
+                assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "flex", "the host's body as it was"
+                assert page.evaluate("getComputedStyle(document.querySelector('#sb .sb-top h2')).display") != "none", "the host's title as it was"
                 page.evaluate("writeAgain()")                  # the same area written again (newer files): the stored levels still hold
                 page.evaluate("window.openEditor()")
                 page.wait_for_function("!!document.getElementById('lv') && !!window.lvApi", timeout=60000)
@@ -271,13 +287,12 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
               return [big.length, (await s.load('pairs.csv')).body === big, edits, localStorage.getItem('lv:big-area:edits.csv'),
                       (await s.load('edits.csv')).body, await s.load('caps.csv')]; }""")
             assert said[0] > 5_500_000 and said[1:] == [True, "old edits", None, "old edits", None], said
-            # the panel follows the page's theme: the system's dark, unless the page sets data-theme on <html>
-            bg = "getComputedStyle(document.querySelector('#lv header')).backgroundColor"
-            assert page.evaluate(bg) == "rgb(255, 255, 255)"
-            page.emulate_media(color_scheme="dark")
-            assert page.evaluate(bg) == "rgb(36, 42, 52)"
-            page.evaluate("document.documentElement.dataset.theme = 'light'")
-            assert page.evaluate(bg) == "rgb(255, 255, 255)"
+            # the panel follows the host panel's theme (#sb[data-theme], the standard tokens)
+            ink = "getComputedStyle(document.querySelector('#lv')).color"
+            assert page.evaluate(ink) == "rgb(22, 24, 29)"
+            page.evaluate("document.getElementById('sb').dataset.theme = 'dark'")
+            assert page.evaluate(ink) == "rgb(233, 236, 241)"
+            page.evaluate("document.getElementById('sb').dataset.theme = 'light'")
             # the map's levels (the option `levels`): with the area's edge_hash (roadstyle_levels::edge_hash: sha256 of the sorted ids, 8 bytes
             # little endian, 32 hex characters), the editor starts from them with no solve; with another one it solves and says why
             ids = sorted(int(x) for x in pq.read_table(EDGES, columns=["edge_id"]).column(0).to_pylist())
@@ -343,58 +358,129 @@ def test_the_level_edges_query_gives_duckosms_load_roads():
             assert [norm(v) for v in got[c]] == [norm(v) for v in want[c]], c
 
 
+VIEWS = {"desktop": dict(viewport={"width": 1400, "height": 900}),
+         "phone": dict(viewport={"width": 390, "height": 844}, device_scale_factor=3, is_mobile=True, has_touch=True)}
+
+
 @needs_pkg
-def test_the_editor_on_a_phone(tmp_path):
-    """The editor on a phone (390 x 844, device scale 3, touch): the panel is a sheet at the bottom (layout "auto" up to 700 px wide), a tap
-    on a road picks it (the wide tap line), a head's change is solved, the handle folds and opens the sheet, and a dashboard window at the
-    bottom (Street View, Google 3D) folds it."""
+@pytest.mark.parametrize("view", VIEWS)
+def test_the_editor_works_in_the_hosts_panel(view):
+    """The editor in the host's standard panel, on a desktop (1400 x 900) and a phone (390 x 844, touch): the host's body is kept and the title line
+    is "← Steps" and "Edit levels" with the host's hide button; the apply bar is at the bottom edge of the panel (the phone's sheet) only while
+    changes wait and stays when the body scrolls; Apply solves; "← Steps" with waiting changes asks apply, discard or stay; the edits.csv download
+    is in the History tab; close puts the host's panel back and clears the picked roads' colour. $LV_SHOTS: a folder for a screenshot."""
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    phone = view == "phone"
     try:
         with pw.sync_playwright() as p:
             b = p.chromium.launch()
-            ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=3, is_mobile=True, has_touch=True)
-            page = ctx.new_page()
+            page = b.new_context(**VIEWS[view]).new_page()
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
+            page.on("dialog", lambda d: d.accept())
             page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html")
             page.wait_for_function("window.ready && !!document.getElementById('lv')", timeout=60000)
-            assert page.evaluate("document.body.classList.contains('lv-sheet') && document.body.dataset.lvSheet") == "half"
-            top = page.evaluate("document.getElementById('lv').getBoundingClientRect().top")
-            assert 380 < top < 470, top                                           # half the height: the map keeps the top
             page.wait_for_timeout(1500)                                           # the tiles of the editor's roads
-            # a road under the map's free part, and a tap on it
+            def box(sel):
+                return page.evaluate(f"(() => {{ const r = document.querySelector({sel!r}).getBoundingClientRect(); return {{top: r.top, bottom: r.bottom, left: r.left, right: r.right, h: r.height}}; }})()")
+            def tap(sel):
+                page.locator(sel).tap() if phone else page.locator(sel).click()
+            # open: the top line, three tabs, no apply bar; on a phone the panel is the sheet at the bottom
+            assert page.locator("#sb .lv-back").inner_text() == "← Steps" and page.locator("#sb .lv-title .t").inner_text() == "Edit levels"
+            assert page.evaluate("[...document.querySelectorAll('#lv-tabs button')].map(b => b.dataset.t).join()") == "edit,history,given"
+            assert page.evaluate("document.getElementById('lv-bar').hidden") and not page.locator("#lv-bar").is_visible()
+            assert page.evaluate("!document.querySelector('#lv-toggle, #lv-handle') && !document.body.classList.contains('lv-open')"), "no frame or fold button of its own"
+            sb = box("#sb")
+            if phone:
+                assert sb["bottom"] == pytest.approx(844, abs=1) and 280 < sb["top"] < 560, sb
+            else:
+                assert sb["left"] == 0 and sb["right"] == pytest.approx(340, abs=1) and sb["h"] > 880, sb      # the panel's width and side are the host's
+            # a road on the map: a click (a tap on a phone) picks it, and the dashboard's own glow marks it
+            top = sb["top"] if phone else 900
             xy = page.evaluate(f"""() => {{ const m = window.hostMap;
               for(const f of m.queryRenderedFeatures({{layers: ['host-lv-tap']}})){{
                 const c = f.geometry.coordinates, pt = m.project(c[Math.floor(c.length / 2)]);
-                if(pt.x > 40 && pt.x < 350 && pt.y > 120 && pt.y < {top} - 40) return [pt.x, pt.y, f.properties.road]; }} return null; }}""")
-            assert xy, "a road above the sheet"
-            page.touchscreen.tap(xy[0], xy[1])
-            page.wait_for_function("document.querySelectorAll('#lv-cards [data-hroad]').length > 0", timeout=20000)
-            # one pick for each tap: the dashboard's pick and the tap line do not both pick (the tap line can hit a road beside it)
+                if(pt.x > {80 if phone else 420} && pt.x < {350 if phone else 1300} && pt.y > 120 && pt.y < {top} - 60) return [pt.x, pt.y, f.properties.road]; }} return null; }}""")
+            assert xy, "a road in the free part of the map"
+            (page.touchscreen.tap if phone else page.mouse.click)(xy[0], xy[1])
+            page.wait_for_function("document.querySelectorAll('#lv-cards .card').length === 1", timeout=20000)
             page.wait_for_timeout(300)
-            assert page.evaluate("document.querySelectorAll('#lv-cards .card .x').length") == 1
-            # an end: the start head to 3 m by its slider (applied when the slider is let go)
-            page.evaluate("""() => { const i = document.querySelector('#lv-cards input[data-hend=start]'); i.value = '3';
-              i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new Event('change', {bubbles: true})); }""")
-            # a head is drawing only: saved at once, with no solve and not in the list (no Apply)
-            page.wait_for_function("document.getElementById('lv-toast').textContent.startsWith('Heads saved')", timeout=60000)
-            assert "not solved again" in page.inner_text("#lv-toast") and page.evaluate("document.getElementById('lv-queue-sec').hidden")
-            # 44 px targets
-            for sel in ("#lv .tabs button", "#lv-cards .seg button", "#lv .find input"):
-                assert page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().height") >= 44, sel
-            page.screenshot(path=str(tmp_path / "phone.png"))
-            # the handle: half -> full -> fold -> half
-            for want in ("full", "fold", "half"):
-                page.locator("#lv-handle").tap()
-                assert page.evaluate("document.body.dataset.lvSheet") == want
-            page.wait_for_timeout(300)
-            assert page.evaluate("document.getElementById('lv').getBoundingClientRect().top") == pytest.approx(top, abs=2)
-            # a dashboard window at the bottom: the sheet folds
-            page.evaluate("const w = document.createElement('div'); w.className = 'rs-svw'; document.body.appendChild(w);")
-            page.wait_for_function("document.body.dataset.lvSheet === 'fold'", timeout=5000)
-            assert not errors, errors
+            assert page.evaluate("document.querySelectorAll('#lv-cards .card .x').length") == 1, "one pick for each click"
+            # two roads and an order wish: the changes wait in the apply bar
+            roads = page.evaluate("[window.editor.roads[0], window.editor.roads.at(-1)]")
+            def stage(top=0):
+                page.evaluate("document.getElementById('lv-clear').click()")
+                page.evaluate("""r => { for (const x of r) document.dispatchEvent(new CustomEvent('rs:select', {detail: {properties: {road: x}, lvTap: true}})); }""", roads)
+                page.wait_for_function("document.querySelectorAll('#lv-cards .card').length === 2", timeout=20000)
+                page.evaluate("t => document.querySelector(`#lv-top-seg button[data-v=\"${t}\"]`).click()", top)
+                page.evaluate("document.getElementById('lv-add').click()")
+            stage()
+            page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
+            assert page.inner_text("#lv-wait").startswith("1 waiting")
+            bar, sb = box("#lv-bar"), box("#sb")
+            assert sb["bottom"] - 16 <= bar["bottom"] <= sb["bottom"], (bar, sb)       # at the bottom edge of the panel (of the sheet)
+            for sel in ("#lv-apply", "#lv-discard"):
+                assert page.locator(sel).is_visible()
+                if phone:
+                    assert box(sel)["h"] >= 44, sel
+            page.evaluate("document.querySelector('#lv .scroll[data-tab=edit]').scrollTop = 400")      # the panel scrolls, the bar stays
+            assert box("#lv-bar") == bar
+            assert page.evaluate("document.getElementById('lv-queue').hidden"), "the list of the waiting changes opens on a tap"
+            tap("#lv-wait")
+            assert page.locator("#lv-queue .q").count() == 1 and page.locator("#lv-queue").is_visible()
+            tap("#lv-wait")
+            if os.environ.get("LV_SHOTS"):
+                page.screenshot(path=str(Path(os.environ["LV_SHOTS"]) / f"{view}.png"))
+            # Discard: the bar goes
+            tap("#lv-discard")
+            assert page.evaluate("document.getElementById('lv-bar').hidden") and page.evaluate("document.querySelector('#lv').classList.contains('has-bar')") is False
+            # Apply and solve: one solve, the rule in edits.csv, the bar goes
+            n = page.evaluate("window.solved.length")
+            before = page.evaluate("stored('edits.csv')").count("\n")
+            stage()
+            page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
+            tap("#lv-apply")
+            page.wait_for_function(f"window.solved.length === {n + 1} && document.getElementById('lv-bar').hidden", timeout=60000)
+            assert page.evaluate("stored('edits.csv')").count("\n") == before + 1
+            # "← Steps" with no change waiting leaves at once
+            assert page.evaluate("window.backs") == 0
+            tap("#lv-back")
+            assert page.evaluate("window.backs") == 1
+            # with changes waiting it asks: Stay stays
+            stage()
+            page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
+            tap("#lv-back")
+            assert page.locator("#lv-ask").is_visible() and not page.locator("#lv-bar-main").is_visible() and "1 waiting" in page.inner_text("#lv-ask-t")
+            assert page.evaluate("window.backs") == 1
+            tap("#lv-ask-stay")
+            assert page.locator("#lv-bar-main").is_visible() and not page.locator("#lv-ask").is_visible() and page.evaluate("window.backs") == 1
+            # Discard leaves, with nothing waiting
+            tap("#lv-back")
+            tap("#lv-ask-discard")
+            assert page.evaluate("window.backs") == 2 and page.evaluate("document.getElementById('lv-bar').hidden")
+            # Apply leaves after the solve
+            stage(1)
+            page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
+            n = page.evaluate("window.solved.length")
+            tap("#lv-back")
+            tap("#lv-ask-apply")
+            page.wait_for_function(f"window.backs === 3 && window.solved.length === {n + 1}", timeout=60000)
+            assert page.evaluate("stored('edits.csv')").count("\n") == before + 2
+            # the edits.csv download is in the History tab
+            tap("#lv-tabs button[data-t=history]")
+            assert page.locator("#lv-dl").is_visible()
+            with page.expect_download() as d:
+                tap("#lv-dl")
+            assert d.value.suggested_filename == "edits.csv"
+            # close: the host's panel as it was, and the picked roads' colour cleared
+            page.evaluate("window.colorCalls = []; const o = window.rsColor; window.rsColor = (...a) => { colorCalls.push(a); return o(...a); }")
+            page.evaluate("window.editor.destroy()")
+            assert page.evaluate("colorCalls.some(a => a[0] === null)"), "destroy clears rsColor"
+            assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "flex" and not page.locator("#sb .lv-title").count()
+            assert page.locator("#sb .sb-top h2").is_visible() and (phone or page.locator("#sb-hide").is_visible())
+            assert not [e for e in errors if e != "boom"], errors
             b.close()
     finally:
         server.shutdown()
