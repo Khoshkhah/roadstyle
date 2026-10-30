@@ -50,8 +50,9 @@ export async function setData(table, opts){
       const col = n => _at(ramp, k > 1 ? n / (k - 1) : 0.5), min = Array(k).fill(Infinity), max = Array(k).fill(-Infinity), count = Array(k).fill(0);
       joined.forEach((r, i) => { const v = r[o.colorBy]; if(typeof v === "number" && isFinite(v)){ const n = setOf(cuts, v);
         cols.set(i, col(n)); count[n]++; min[n] = Math.min(min[n], v); max[n] = Math.max(max[n], v); } });
-      const fmt = v => String(+v.toPrecision(3)), entries = [];
-      for(let n = 0; n < k; n++) if(count[n]) entries.push([(min[n] === max[n] ? fmt(min[n]) : fmt(min[n]) + " – " + fmt(max[n])) + " (" + count[n] + ")", col(n)]);
+      // the entry is [range, colour, number of roads]: the legend writes the count apart, at the right, in a lighter colour
+      const fmt = v => (+v.toPrecision(3)).toLocaleString("en"), entries = [];
+      for(let n = 0; n < k; n++) if(count[n]) entries.push([min[n] === max[n] ? fmt(min[n]) : fmt(min[n]) + " \u2013 " + fmt(max[n]), col(n), count[n]]);
       legend = {kind: "categorical", title: o.colorBy, entries}; }
     else { const cats = [...new Set(vals.filter(v => v != null).map(String))].sort(), col = {};
       cats.forEach((c, k) => { col[c] = _at(ramp, cats.length > 1 ? k / (cats.length - 1) : 0.5, o.stepped); });

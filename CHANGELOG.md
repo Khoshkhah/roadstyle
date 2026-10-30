@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **A person's switch of the 3D buildings shows them**: on, the map is tilted to 55° if it is flat and zoomed in to 15 if it is below 14.5 (where the buildings start); off, it is flattened again if this switch tilted it. There is no 2D / 3D button by default, so the switch did nothing visible on a flat map. A script's `rsBuildings(on)` moves nothing.
+- **`dashboard={"credits": [{"text": ..., "href": ...}]}`**: the credits of the page's own data, first in the credits list. The dashboard's default is "\u00a9 OpenStreetMap contributors" (the source of its roads, ODbL); `[]` leaves it out. It is not added again when the base map's list already names OpenStreetMap.
+- **The legend of live data** writes each range and its number of roads apart: one column, the range at the left, the count at the right in a lighter colour, with aligned digits (an entry is `[range, colour, count]`).
 - **The tool `roads`** (after the base map button): the road filter in the bar. A box with a row for each road class (check box, colour, name, number of roads), All and None, and a click on a name shows only
   that class; Bridges, Tunnels and the access kinds when the data has them. It uses the filter calls of the page, so the map template's Roads box and this tool are one filter. A page with no road classes
   has the button greyed out. A style that comes later (`rs.setStyle`) gets its own classes.
@@ -43,10 +46,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **Every floating surface follows one of the three transparency sliders** (bar and panel, boxes with the popup and the tooltip, card behind the text): the zoom number and the legend of the map template had translucent backgrounds of their own and use the tokens now; the corner strip's colour and blur are on a pseudo element (as the bar's), so the credits box inside it blurs like the other boxes. A test fails for a translucent `background` of its own.
+- **The default base map list has no OpenFreeMap Bright** (it is a colour variant of Liberty): Liberty, Positron, OpenStreetMap, Esri Gray, Streets and Satellite, Blank. A page can still ask for `ofm_bright` by key.
 - **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
   roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:
   `{"*": 0, "service": 14}`) and the key `"@private"` (the first zoom of the private-access roads). `minzoom=False` is still every class at every zoom. The profile's own table (`default.yaml`) is unchanged for the map template.
-- **The explanation marks in the base map box are a "?"** (they were an italic "i"): the "i" is only the credits button.
+- **The base map box has no explanation marks** (the italic "i", then a "?"): the rows of Hillshade, Labels and 3D buildings are self-explaining. The credits list is short: the long lists of image sources ("Sources: Esri, Vantor, ...") are left out and a long text is cut.
 - **A page with a bar has no floating Layers box.** The style's own base-map layers (the duckOSM layers: landcover, water, buildings, ...) have one switch for all of them in the
   base-map box (`overlays_label`, default "Map layers"; `rsSetOverlays(on)`), and the legend box lists them with their colours, each swatch with a thin border so that a white
   or near-white colour shows. A page with no bar, or with no base-map box, keeps the Layers box.

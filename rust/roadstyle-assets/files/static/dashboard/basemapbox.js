@@ -7,16 +7,11 @@
 // labels only from a base map that can show them: the style's own labels (a vector style), or Esri's label tiles (Esri Gray, Esri Satellite).
 // Blank, OpenStreetMap, Esri Streets and CARTO get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit} from "./core.js";
-import {rsBuildings} from "./basemap.js";
+import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
 const _bxGet = k => { try{ return localStorage.getItem("rs-top:" + k); }catch(e){ return null; } };
 const _bxSet = (k, v) => { try{ localStorage.setItem("rs-top:" + k, v ? "1" : "0"); }catch(e){} };
-const _bxTips = {
-  hillshade: "Shaded relief: the hills drawn with shadows from the terrain heights, as if lit from the north-west, so slopes and valleys show.",
-  labels: "Place and street names. The Google 3D window always follows this switch; the 2D map shows them only where the base map can (OpenFreeMap, Esri Gray, Esri Satellite).",
-  buildings: "The buildings of an OpenFreeMap base map, raised to their heights in the tilted view.",
-};
 // a swatch is [land, road, water]: the land color, a diagonal road stroke, and a water triangle in the lower right corner (drawn in CSS)
 const _bxSwatch = b => {
   const s = b.swatch;
@@ -43,7 +38,6 @@ export function buildBox(menu){
   const tops = {};
   const topRow = (id, label) => {
     const lab = _bxEl("label", "rs-bm-row"), c = _bxEl("input"); c.type = "checkbox"; c.id = "rs-top-" + id; lab.append(c, _bxEl("span", "rs-bm-n", label));
-    lab.title = _bxTips[id]; const i = _bxEl("span", "rs-bm-i", "?"); i.title = _bxTips[id]; lab.append(i);
     menu.appendChild(lab); tops[id] = {lab, c}; return c;
   };
   // the first layer of the page that is not the backdrop, the base map or a layer of this box: the layers on top go under it
@@ -86,7 +80,7 @@ export function buildBox(menu){
   syncLayers();
   tops.hillshade.c.onchange = () => { _bxSet("hillshade", tops.hillshade.c.checked); apply(); };
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
-  tops.buildings.c.onchange = () => rsBuildings(tops.buildings.c.checked);
+  tops.buildings.c.onchange = () => rsBuildingsByPerson(tops.buildings.c.checked);
   const mark = () => rows.forEach(([b, r]) => { r.checked = b.key === current || b.dark === current; });
   // a map with a twin shows the swatch of the twin of the current theme
   const swatches = () => rows.forEach(([b, , sw]) => { const tw = b.dark && byKey(b.dark); sw.style.background = _bxSwatch(isDark() && tw ? tw : b); });

@@ -1,4 +1,4 @@
-// the legend of the active "colour by" option: COLOR_OPTIONS[i].legend, {title, kind: "categorical", entries: [[label, colour], ...]}
+// the legend of the active "colour by" option: COLOR_OPTIONS[i].legend, {title, kind: "categorical", entries: [[label, colour, count?], ...]}
 // or {title, kind: "continuous", ramp: [colour, ...], vmin, vmax, stepped} (stylers.bake_color_options; stepped: rs.setData's nearest stops, with
 // a hard edge half-way between two stops). An option with no legend hides the box.
 import {_esc} from "../popup.js";
@@ -24,7 +24,7 @@ export function coLegendHtml(lg){
   if(!lg) return "";
   let h = lg.title ? '<div class="lg-title">'+_esc(lg.title)+'</div>' : "";
   if(lg.kind==="categorical"){ (lg.entries||[]).forEach(e=>{
-    h+='<div class="lg-row"><span class="lg-sw" style="background:'+_esc(e[1])+'"></span>'+_esc(e[0])+'</div>'; }); }
+    h+='<div class="lg-row"><span class="lg-sw" style="background:'+_esc(e[1])+'"></span><span class="lg-t">'+_esc(e[0])+'</span>'+(e[2]!=null ? '<b class="lg-n">'+Number(e[2]).toLocaleString("en")+'</b>' : '')+'</div>'; }); }
   else if(lg.kind==="continuous"){
     const r = lg.ramp||[], n = r.length, at = k => (100*(k-0.5)/(n-1)).toFixed(2)+"%";
     const bar = lg.stepped && n > 1 ? r.map((c,k)=>c+" "+(k ? at(k) : "0%")+" "+(k<n-1 ? at(k+1) : "100%")).join(",") : r.join(",");
