@@ -55,44 +55,44 @@
       "roadstyle:interaction": "8bd55e519f81a314",
       "roadstyle:images": "e9049aa3d5b18840",
       "roadstyle:sources": "8bf9b5c1a82fc4e1",
-      "roadstyle:classes": "4b3653d52e81f023",
+      "roadstyle:classes": "24c3e0f943aad349",
       "roadstyle:controls": "13b74d5d7142a722",
       "roadstyle:generation": "9e412555b660f02c",
       "roadstyle:contract": "d4735e3a265e16ee",
       "roadstyle:arrows": "42d2b70866ba77b8"
     },
-    "hash": "615c7aad194ab03b"
+    "hash": "beb3a6759766f7d1"
   },
   "tiles": {
     "z12": {
       "simple": {
         "tiles": 3,
         "features": 2021,
-        "hash": "2992a99d982dbf26"
+        "hash": "5e73dee0737daf61"
       }
     },
     "z14": {
       "simple": {
         "tiles": 7,
         "features": 10394,
-        "hash": "f4109dc4bfa12c1b"
+        "hash": "80b9ab017e8830ca"
       },
       "slots": {
         "tiles": 7,
         "features": 1334,
-        "hash": "82ca7c77a669c90c"
+        "hash": "c18e61aa98a1655c"
       }
     },
     "z15": {
       "simple": {
         "tiles": 9,
         "features": 9376,
-        "hash": "d37d4f77768aee1a"
+        "hash": "e9f4de26e34d3351"
       },
       "slots": {
         "tiles": 9,
         "features": 1139,
-        "hash": "d90f81ec9c8391b4"
+        "hash": "67e8e797a62242fa"
       }
     }
   }

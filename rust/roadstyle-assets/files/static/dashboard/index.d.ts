@@ -42,7 +42,7 @@ export interface DashboardOptions {
   select_color?: string;
   /** The Roads box: {on, col, classes, swatches, palettes, bridges, tunnels, access}. */
   /** The road filter's facts (roadstyle:controls.filter): the classes that rsSetClasses filters by, their colours, the access kinds. minzoom: {class: its first zoom}. */
-  filter?: { classes: string[]; col?: string; minzoom?: Record<string, number> | null; [k: string]: unknown };
+  filter?: { classes: string[]; /** the class of each number of `__rs_ci` in a tile (the style of a tile has it): the Roads filter hides a class by its place here */ class_key?: string; class_list?: string[]; col?: string; minzoom?: Record<string, number> | null; [k: string]: unknown };
   /** The colour options: [{name, prop, legend}]; the legend is categorical {title, entries} or continuous {title, ramp, vmin, vmax}. */
   color_options?: ColorOption[];
   /** The index of the colour option that shows first. */

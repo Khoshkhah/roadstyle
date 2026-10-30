@@ -1,22 +1,50 @@
 //! Text values that are numbers in a tile (docs/design/tiling.md, "The keys of a tile"). A road feature carries no text that a number can replace:
-//! the class `__rs_cls` is `__rs_cc` (an index of the filter panel's classes), the class column (`highway`) is `__rs_ci` (the index of the class in the
-//! model's classes: a piece has it from the engine, a slot gets it here), the dash pattern `__rs_dash` is the index (from 1) of the pattern in the
-//! road layer's `match`, and the end shape `__rs_cap` is 1 for a flat end and 2 for a square one. The tile cut (`Builder`) writes the numbers, and
-//! `encode_style` makes the style's expressions read them: one rule for every path (the page's archive, the map worker, a server, the program).
+//! the class (`highway`, the class column, and the filter's `__rs_cls`) is the one class number `__rs_ci`, the dash pattern `__rs_dash` is the index (from 1) of
+//! the pattern in the road layer's `match`, and the end shape `__rs_cap` is 1 for a flat end and 2 for a square one. The tile cut (`Builder`) writes the
+//! numbers, and `encode_style` makes the style's expressions read them: one rule for every path (the page's archive, the map worker, a server, the program).
+//!
+//! The class list of a tile is the model's classes (`0..n`), then the number `n` for a class that nobody lists (the fallback of the style's lookups),
+//! then the classes of the Roads filter that the model does not have (`n + 1..`: Monaco has `ferry`). A lookup of the style has the fallback for each of them.
 
 use roadstyle_model::mark::Mark;
 use serde_json::Value;
 
-/// The numbers of the text keys of a road feature: the classes of the filter panel and the dash patterns of the road layer.
+/// The numbers of the text keys of a road feature: the classes and the dash patterns of the road layer.
 #[derive(Clone, Debug, Default)]
 pub struct Codes {
-    /// the classes of the filter panel (`__rs_cc`)
-    pub class: Vec<String>,
-    /// the model's classes (`__rs_ci`: a class that is not in the list has the number of the list)
+    /// the model's classes (`roadstyle:classes`; the engine's `__rs_ci` is a place in this list, or its length for any other class)
     pub classes: Vec<String>,
+    /// the classes of the Roads filter (`roadstyle:controls.filter.classes`) that the model does not have, in the filter's order
+    pub extra: Vec<String>,
     /// the class column of the roads (the pieces' text class, `highway` by default); the slots' own class is `highway`
     pub class_col: String,
     pub dashes: Vec<String>,
+    /// the classes of the Roads filter when it is on another column than the class column (`filter_col`): the filter's own number `__rs_cc` is the place in this
+    /// list; empty when the filter is on the class column (it reads `__rs_ci`)
+    pub filter_codes: Vec<String>,
+}
+
+impl Codes {
+    /// The class number of a class text: its place in the model's classes, the number after them for any other class, or the place after that
+    /// for a class of the Roads filter that the model does not have.
+    pub fn class_no(&self, text: &str) -> i64 {
+        let n = self.classes.len();
+        match (self.classes.iter().position(|c| c == text), self.extra.iter().position(|c| c == text)) {
+            (Some(i), _) => i as i64,
+            (None, Some(j)) => (n + 1 + j) as i64,
+            _ => n as i64,
+        }
+    }
+
+    /// The key that the Roads filter reads, and the class of each of its numbers (the style's `roadstyle:controls.filter.class_key` and `class_list`).
+    pub fn filter_key(&self) -> (&'static str, Vec<String>) {
+        if self.filter_codes.is_empty() { (Mark::ClassIndex.name(), self.class_list()) } else { (Mark::ClassCode.name(), self.filter_codes.clone()) }
+    }
+
+    /// The style's `roadstyle:classes` for a tile: the class of each number (the empty text for the fallback number).
+    pub fn class_list(&self) -> Vec<String> {
+        self.classes.iter().cloned().chain([String::new()]).chain(self.extra.iter().cloned()).collect()
+    }
 }
 
 fn is_dash_match(a: &[Value]) -> bool {
@@ -70,9 +98,16 @@ fn recode_class_match(a: &mut Vec<Value>, classes: &[String]) {
 /// The expressions of the layers in `layers` that read the numbers (the layers of a tile source only: a GeoJSON source keeps its text).
 pub fn encode_style(layers: &mut [Value], codes: &Codes) {
     let (dashes, cols) = (&codes.dashes, [codes.class_col.as_str(), "highway"]);
-    fn walk(v: &mut Value, dashes: &[String], classes: &[String], cols: &[&str]) {
+    fn walk(v: &mut Value, dashes: &[String], classes: &[String], extra: usize, cols: &[&str]) {
         match v {
             Value::Array(a) => {
+                // a lookup by the class number has the fallback (its last value) for each class of the Roads filter that the model does not have
+                if extra > 0 && a.len() == 3 && a[0] == "at" && a[1] == serde_json::json!(["get", Mark::ClassIndex.name()]) {
+                    if let Some(l) = a[2].as_array_mut().filter(|l| l.len() == 2 && l[0] == "literal").and_then(|l| l[1].as_array_mut()) {
+                        let fallback = l.last().cloned().unwrap_or(Value::Null);
+                        l.extend(std::iter::repeat_n(fallback, extra));
+                    }
+                }
                 if !classes.is_empty() && is_class_match(a, cols) {
                     recode_class_match(a, classes);
                 }
@@ -88,13 +123,13 @@ pub fn encode_style(layers: &mut [Value], codes: &Codes) {
                 if a.len() == 3 && a[0] == "==" && a[1] == serde_json::json!(["get", Mark::Cap.name()]) && a[2] == "square" {
                     a[2] = 2.into();
                 }
-                a.iter_mut().for_each(|x| walk(x, dashes, classes, cols));
+                a.iter_mut().for_each(|x| walk(x, dashes, classes, extra, cols));
             }
-            Value::Object(o) => o.values_mut().for_each(|x| walk(x, dashes, classes, cols)),
+            Value::Object(o) => o.values_mut().for_each(|x| walk(x, dashes, classes, extra, cols)),
             _ => {}
         }
     }
-    layers.iter_mut().filter(|l| l.get("source-layer").is_some()).for_each(|l| walk(l, dashes, &codes.classes, &cols));
+    layers.iter_mut().filter(|l| l.get("source-layer").is_some()).for_each(|l| walk(l, dashes, &codes.classes, codes.extra.len(), &cols));
 }
 
 #[cfg(test)]

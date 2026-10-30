@@ -16,13 +16,13 @@
   ],
   "slots": [
     "__rs_cc",
+    "__rs_ci",
     "chain",
     "slot",
     "rank",
     "oneway",
     "highway",
-    "name",
-    "__rs_ci"
+    "name"
   ],
   "table": [
     "__rs_edge2",

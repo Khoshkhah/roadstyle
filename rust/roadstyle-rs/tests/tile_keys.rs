@@ -143,9 +143,8 @@ fn the_tiles_of_the_stage_1_files_have_only_the_listed_keys() {
     check("stage 1 files (the program roadstyle tiles)", &style.to_string(), &keys_of(&tiles, &roads));
 }
 
-/// One rule means one key set. The paths differ only where the style differs, and this list says where: `__rs_cc` is the class for the Roads filter, which
-/// the page look has (its style has the filter panel) and the export look has not; `__rs_arw` marks the slots that carry an arrow, which the export look's
-/// arrow layer reads and the page look has not (the page's `arrows.js` places its own arrows).
+/// One rule means one key set. The paths differ only where the style differs, and this list says where: `__rs_arw` marks the slots that carry an arrow,
+/// which the export look's arrow layer reads and the page look has not (the page's `arrows.js` places its own arrows).
 #[test]
 fn the_paths_differ_only_in_the_documented_keys() {
     let roads = data("monaco/roads.parquet");
@@ -157,6 +156,6 @@ fn the_paths_differ_only_in_the_documented_keys() {
     let (page, export) = (keys(&look(false)), keys(&look(true)));
     let only_page: Vec<String> = page.difference(&export).map(|(l, k)| format!("{l}.{k}")).collect();
     let only_export: Vec<String> = export.difference(&page).map(|(l, k)| format!("{l}.{k}")).collect();
-    assert_eq!(only_page, ["simple.__rs_cc", "slots.__rs_cc"], "keys of the page look only");
+    assert!(only_page.is_empty(), "keys of the page look only: {only_page:?}");
     assert_eq!(only_export, ["slots.__rs_arw"], "keys of the export look only");
 }

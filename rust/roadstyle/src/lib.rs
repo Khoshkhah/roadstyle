@@ -221,6 +221,14 @@ pub fn tiled_style(mut style: Value, tiled: &[String], at: &Value, zooms: (u32, 
         // the road layers of the tiles read the numbers of the text keys (tiles::codes), as the tile cut writes them
         tiles::codes::encode_style(layers, codes);
     }
+    // the class of each number, with the Roads filter's classes that the model lacks after the fallback number (tiles::codes)
+    style["metadata"][roadstyle_model::props::CLASSES] = codes.class_list().into();
+    // the Roads filter hides a class by its place in this list (a page's options have the filter, not the style's metadata)
+    if let Some(f) = style.get_mut("metadata").and_then(|m| m.get_mut("roadstyle:controls")).and_then(|c| c.get_mut("filter")).and_then(Value::as_object_mut) {
+        let (key, list) = codes.filter_key();
+        f.insert("class_key".into(), key.into());
+        f.insert("class_list".into(), list.into());
+    }
     style["metadata"][roadstyle_model::props::CONTRACT_KEY] = roadstyle_model::props::CONTRACT.into();
     let mut sources = serde_json::Map::new();
     sources.insert(tiles::SOURCE.into(), Value::Object(vector));

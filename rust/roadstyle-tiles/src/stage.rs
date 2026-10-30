@@ -27,7 +27,7 @@ pub struct TileOptions {
     pub base: HashSet<String>,
     /// the pieces' own columns: the class, lvl, the metre width and the class filter
     pub pieces: HashSet<String>,
-    /// the numbers of the text keys of a road feature: the classes of the filter panel (`roadstyle:controls.filter.classes`) and the dash patterns of the layers (codes.rs)
+    /// the numbers of the text keys of a road feature: the classes (the model's and the Roads filter's) and the dash patterns of the layers (codes.rs)
     pub codes: crate::codes::Codes,
     /// render(tiles=True)'s page: the columns of the roads and the pieces (tile_keep)
     pub exact: Option<HashSet<String>>,
@@ -67,13 +67,25 @@ impl TileOptions {
         let base = metadata[roadstyle_model::props::BASE_LAYERS].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
         let generation = metadata[roadstyle_model::props::GENERATION].as_str().map(String::from);
         let popups = roadstyle_model::props::overlay_popups(metadata);
+        let classes: Vec<String> = metadata[roadstyle_model::props::CLASSES].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
+        // the Roads filter hides a class by its class number: a class of the filter that the model lacks (Monaco: ferry) has its own number after the model's
+        let mut extra: Vec<String> = Vec::new();
+        for c in metadata["roadstyle:controls"]["filter"]["classes"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+            if !classes.iter().any(|x| x == c) && !extra.iter().any(|x| x == c) {
+                extra.push(c.to_string());
+            }
+        }
+        let class_col = col("class").unwrap_or_else(|| "highway".into());
+        // a Roads filter on another column has its own number: its classes are values of that column, not classes of the model
+        let separate = col("filter").is_some_and(|c| c != class_col);
+        let filter_codes = if separate { metadata["roadstyle:controls"]["filter"]["classes"].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect() } else { Vec::new() };
+        if separate {
+            extra.clear();
+        }
+        let codes = crate::codes::Codes { classes, extra, class_col, dashes: crate::codes::dash_patterns(layers), filter_codes };
         Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, base, generation,
                          pieces, exact: None, only: None, slots_from, wait: false, format: Default::default(),
-                         codes: crate::codes::Codes {
-                             class: metadata["roadstyle:controls"]["filter"]["classes"].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect(),
-                             classes: metadata[roadstyle_model::props::CLASSES].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect(),
-                             class_col: col("class").unwrap_or_else(|| "highway".into()),
-                             dashes: crate::codes::dash_patterns(layers) } })
+                         codes })
     }
 
     /// The rules of a saved style (stage 1's style.json).

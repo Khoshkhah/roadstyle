@@ -134,7 +134,7 @@ impl Tiles {
     }
 
     fn builder(&self, name: &str) -> Builder {
-        Builder { rules: rules::ZoomRules::of(&self.style, name), road_id: road_layer(name), codes: road_layer(name).then(|| self.codes.clone()), slots: name == SLOTS, ..Default::default() }
+        Builder { rules: rules::ZoomRules::of(&self.style, name), road_id: road_layer(name), codes: road_layer(name).then(|| self.codes.clone()), ..Default::default() }
     }
 
     /// A new layer: the caches of the old tiles go.
@@ -235,7 +235,7 @@ impl Tiles {
         let Some((key_at, val_at)) = layer.at.take() else { return };
         let mut b = Builder { keys: std::mem::take(&mut layer.keys), key_at, vals: std::mem::take(&mut layer.vals),
                               encoded: std::mem::take(&mut layer.encoded), val_at, road_id: road_layer(name),
-                              codes: road_layer(name).then(|| self.codes.clone()), slots: name == SLOTS, ..Default::default() };
+                              codes: road_layer(name).then(|| self.codes.clone()), ..Default::default() };
         for (i, c, props) in feats {
             let (props, ..) = b.intern(props.filter(|(k, _)| kept(k.as_ref(), keep)));
             let f = &mut layer.feats[i as usize];
@@ -270,7 +270,7 @@ impl Tiles {
         let (key_at, val_at) = layer.at.take().unwrap_or_else(|| (keys.iter().enumerate().map(|(i, k)| (k.clone(), i as u32)).collect(),
                                                                   encoded.iter().enumerate().map(|(i, m)| (m.clone(), i as u32)).collect()));
         let mut b = Builder { key_at, val_at, keys, encoded, vals: std::mem::take(&mut layer.vals), feats: std::mem::take(&mut layer.feats), boxes, rules,
-                              road_id: road_layer(name), codes: road_layer(name).then(|| self.codes.clone()), slots: name == SLOTS, last: Vec::new(), scratch: Vec::new() };
+                              road_id: road_layer(name), codes: road_layer(name).then(|| self.codes.clone()), last: Vec::new(), scratch: Vec::new() };
         for (j, (c, props)) in feats.enumerate() {
             let Some(c) = c else { continue };
             b.push(Some(first + j as u64), line_geom(c.as_ref()), props.filter(|(k, _)| kept(k.as_ref(), keep)));
