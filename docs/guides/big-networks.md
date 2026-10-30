@@ -18,8 +18,8 @@
 === "Command line"
 
     ```bash
-    roadstyle edges.gpkg --tiles -o map.html    # embedded vector tiles
-    roadstyle edges.gpkg -o map.html            # the roads as GeoJSON (the command line does not turn tiles on by itself)
+    roadstyle edges.gpkg -o map.html             # embedded vector tiles (the default)
+    roadstyle edges.gpkg --no-tiles -o map.html  # the roads as GeoJSON
     ```
 
 ## Tiles are the default

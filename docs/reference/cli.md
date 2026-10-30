@@ -56,7 +56,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 | `--no-labels` | `labels=False` | no street names |
 | `--no-filter` | `filter_control=False` | no effect: the floating Roads box is gone (the dashboard's `roads` tool is the road filter) |
 | `--no-basemap-switcher` | `basemap_switcher=False` | no base-map button |
-| `--tiles` | `tiles=True` | embedded MLT vector tiles. Python embeds tiles by default. The command line writes GeoJSON roads unless you give `--tiles` |
+| `--tiles` / `--no-tiles` | `tiles=True` / `tiles=False` | `--tiles` is the default: the roads are embedded MLT vector tiles, as in `render_edges`. `--no-tiles` writes inline GeoJSON roads |
 | `--no-compress` | `compress=False` | plain JSON data instead of gzip |
 
 ## `--page`

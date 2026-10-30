@@ -88,10 +88,9 @@ def _build_parser() -> argparse.ArgumentParser:
     web.add_argument("--no-filter", action="store_true", help="hide the road-class filter panel.")
     web.add_argument("--no-basemap-switcher", action="store_true",
                      help="hide the in-map base-layer dropdown.")
-    web.add_argument("--tiles", action="store_true",
-                     help="pack the roads as an embedded-PMTiles vector tileset instead of "
-                          "inline GeoJSON (client-side scale for big networks; needs the "
-                          "'tiles' extra).")
+    web.add_argument("--tiles", action=argparse.BooleanOptionalAction, default=True,
+                     help="embed the roads as an optimised MLT vector tileset (the default, "
+                          "as in render_edges). --no-tiles writes inline GeoJSON roads.")
     web.add_argument("--no-compress", action="store_true",
                      help="write the map data as plain JSON instead of gzipped blobs "
                           "(bigger files; for very old browsers without DecompressionStream).")

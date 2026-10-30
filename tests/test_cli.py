@@ -33,6 +33,16 @@ def test_each_format_writes_a_file(tmp_path, fmt):
     assert main([str(SAMPLE), "-o", str(out), "-f", fmt, "--basemap", "ofm_dark"]) == 0
 
 
+def test_roads_are_tiles_by_default_and_geojson_with_no_tiles(tmp_path):
+    """The command line follows render_edges: tiles unless --no-tiles."""
+    tiled, plain = tmp_path / "tiled.html", tmp_path / "plain.html"
+    assert main([str(SAMPLE), "-o", str(tiled), "--basemap", "osm"]) == 0
+    assert main([str(SAMPLE), "-o", str(plain), "--basemap", "osm", "--no-tiles"]) == 0
+    assert _in('"tiles": true', tiled.read_text()) and "pmtiles://roads" in tiled.read_text()
+    assert _in('"tiles": false', plain.read_text()) and "pmtiles://roads" not in plain.read_text()
+    assert tiled.stat().st_size != plain.stat().st_size
+
+
 @pytest.mark.parametrize("page,marker", [("dashboard", '<div id="sb"'), ("street-view", '<div id="sv"')])
 def test_page_writes_that_page(tmp_path, page, marker):
     out = tmp_path / "page.html"

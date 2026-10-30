@@ -62,8 +62,11 @@ fn page_of_monaco() {
     assert!(!html.contains("__MAPLIBRE_JS__") && html.contains("maplibregl") && html.contains("<title>Monaco</title>"));
     assert_eq!((o["basemaps"][0]["key"].as_str(), o["tiles"].as_bool(), o["views"][0]["name"].as_str()), (Some("osm"), Some(false), Some("mono")));
     assert!(o["filter"]["palettes"]["mono"].is_object() && o["camera"]["bounds"][0][0].as_f64().unwrap() > 7.0);
-    let (html, o) = page(&["--basemap", "osm", "--tiles"]);
+    // the default is tiles (one rule, MLT); GeoJSON roads only with --no-tiles
+    let (html, o) = page(&["--basemap", "osm"]);
     assert!(o["tiles"] == true && html.contains("pmtiles://roads"));
+    let (html, o) = page(&["--basemap", "osm", "--no-tiles"]);
+    assert!(o["tiles"] == false && !html.contains("pmtiles://roads"));
     std::fs::remove_dir_all(&dir).ok();
 }
 

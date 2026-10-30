@@ -19,7 +19,7 @@ usage:
                  [--street-view-key KEY] [--<keyword> VALUE] [--no-<keyword>]
       the page in one file (render_edges(backend=\"web\")): the map, its dashboard and MapLibre, offline. The base map's key:
       --api-key, else $ROADSTYLE_API_KEY; the Google Maps key: --street-view-key, else $GOOGLE_MAPS_KEY. Any other option is a
-      keyword of render (--tiles, --views '{\"plain\": {\"road_fill\": false}}').
+      keyword of render (--no-tiles for GeoJSON roads, --views '{\"plain\": {\"road_fill\": false}}').
   roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--tile-format mlt|mvt] [--keep COL,COL] [--base-url URL]
       stage 2: the vector tiles of stage 1's files (tile_geojson): one PMTiles file, or <out>/roads/{z}/{x}/{y} and style.json.
   roadstyle levels make <edges> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
