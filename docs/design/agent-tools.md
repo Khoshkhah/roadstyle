@@ -11,8 +11,6 @@ Changes from the proposal, all found by running it:
 - **Overpass fallback.** `render_place` tries overpass-api.de, then maps.mail.ru. On 2026-09-29 the
   first refused every connection for hours while the mirror answered (kumi.systems and
   private.coffee timed out).
-- **Keyless base map by default.** With no CARTO key and no `basemap` option, the map uses
-  `esri_street` and the summary says so; the default CARTO tiles would come back watermarked.
 
 ## Problem
 

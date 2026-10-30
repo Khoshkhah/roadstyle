@@ -4,7 +4,6 @@
 import {map, O, _emit} from "./core.js";
 import {defineTool, BUILDINGS_ICON, LAYERS_ICON} from "./tools.js";
 import {buildBox} from "./basemapbox.js";
-import {savedKey} from "./settings.js";
 let BASEMAPS = [];
 // A VECTOR STYLE as a base map (Basemap.style_url, e.g. OpenFreeMap): its sources and layers are merged into the page's map with the prefix
 // "vbm-", under the roads, and the raster base map is hidden. Its building extrusion (a fill-extrusion layer) moves to the end, so a road
@@ -31,16 +30,9 @@ const paintBuildings = ()=>{
     else if(/building/.test(l.id) && l.type === "fill") map.setLayoutProperty("vbm-"+l.id, "visibility", vis(!solid));
   }
 };
-// A style with flat buildings and no 3D layer (OpenFreeMap Bright, Positron, Dark, Fiord; only Liberty has one) gets one made from the same
+// A style with flat buildings and no 3D layer (OpenFreeMap Positron, Dark, Fiord; only Liberty has one) gets one made from the same
 // building data: the heights `render_height` and `render_min_height`, the color of the flat layer (an extrusion takes no alpha: its opacity is the layer's).
 const noAlpha = c=>typeof c === "string" ? c.replace(/^(hsl|rgb)a\(([^)]*),[^,)]*\)$/, "$1($2)") : c;
-// a CARTO tile URL takes the key that the person saved in the settings, instead of the page's own
-const keyed = u=>{
-  const k = savedKey("carto");
-  if(!k || !/cartocdn\.com/.test(u)) return u;
-  const bare = u.replace(/([?&])key=[^&]*&?/, "$1").replace(/[?&]$/, "");                // the saved key replaces the page's
-  return bare + (bare.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(k);
-};
 const addExtrusion = s=>{
   if(s.layers.some(l=>l.type === "fill-extrusion")) return;
   const flat = s.layers.find(l=>l.type === "fill" && l["source-layer"] === "building");
@@ -87,7 +79,7 @@ export function rsSetBasemap(keyOrIdx){
     // layer order: back under the layer that follows it in the map.
     const def = map.getStyle().layers.find(l=>l.id==="basemap"), after = afterBase();
     map.removeLayer("basemap"); map.removeSource("bm");
-    map.addSource("bm", {type:"raster", tiles:b.tiles.map(keyed), tileSize:256, maxzoom:b.maxzoom||19, attribution:b.attr||""});
+    map.addSource("bm", {type:"raster", tiles:b.tiles, tileSize:256, maxzoom:b.maxzoom||19, attribution:b.attr||""});
     map.addLayer({...def, layout:{...(def.layout||{}), visibility:"visible"}}, after);
   } else if(map.getLayer("basemap")) map.setLayoutProperty("basemap","visibility","none");
   map.setPaintProperty("bg","background-color", b.bg);
@@ -103,8 +95,6 @@ export function initBasemap(){
   map.on("pitchend", paintBuildings);
   window.RS_BASEMAPS = BASEMAPS;
   if(BASEMAPS[0]) map.getContainer().style.backgroundColor = BASEMAPS[0].bg;
-  // a page that starts on a CARTO map with no key, and a key saved in the settings: the map starts again with it
-  if(BASEMAPS[0] && (BASEMAPS[0].tiles || []).some(t=>keyed(t) !== t)) map.once("load", ()=>rsSetBasemap(0));
   // a page that starts on a vector style (basemap="ofm_liberty") merges it as soon as the style is in, as a click on its row would
   if(BASEMAPS[0] && BASEMAPS[0].style_url){ let done = false; const go = ()=>{ if(done || !map.isStyleLoaded()) return; done = true; rsSetBasemap(0); };
     if(map.isStyleLoaded()) go(); else { map.on("load", go); map.on("styledata", go); } }

@@ -56,8 +56,8 @@ the same settings in every view when they must switch back.
 swatches. A color option with a palette (`{"palette": "carto"}`, above) recolors only the road fills.
 
 ```python
-rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "positron"},
-                              "Night": {"palette": "mono", "basemap": "dark_matter"}})
+rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positron"},
+                              "Night": {"palette": "mono", "basemap": "ofm_dark"}})
 ``` A name the page does not have is an error. From your page: `rsSetView(name)`, and `rsSetRoadFill(on)`
 for the fill alone.
 

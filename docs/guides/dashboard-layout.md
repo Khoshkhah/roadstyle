@@ -45,7 +45,7 @@ The gear button opens the settings; the browser keeps them.
 
 - **Layout.** The bar: left, top, right or bottom. The panel: left or right, as a frame (default) or a card. The scale box can show.
 - **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
-- **Keys.** A Google Maps key (Street View, Google 3D) and a CARTO key. A saved key replaces the page's key. A page needs no Google key at build time.
+- **Keys.** A Google Maps key (Street View, Google 3D). A saved key replaces the page's key. A page needs no Google key at build time.
 
 ## The windows
 

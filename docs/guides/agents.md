@@ -25,7 +25,7 @@ Maps go to `~/roadstyle-maps/`. The preview needs Chromium once: `uvx --from roa
 
 `options` takes any [`render_edges` keyword](../reference/parameters.md), such as
 `{"color_by": "maxspeed", "legend": true}`. A misspelt one is an error naming the closest valid
-keyword. Without a CARTO key the map uses the keyless `esri_street` base map.
+keyword.
 
 **Claude Code plugin.** The MCP server and the skill in one install:
 

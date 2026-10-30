@@ -114,18 +114,12 @@ rs.render_edges(edges, palette="mono", basemap="blank")
 
 ## Base maps
 
-The same map on another background: Voyager (the default), Positron, Dark Matter, satellite, or a blank canvas that works offline.
+The same map on another background: OpenFreeMap Positron (the default) or Liberty, OpenStreetMap, Esri Gray, Streets or Satellite, or a blank canvas that works offline.
 
 ```python
 rs.render_edges(edges, basemap="blank")
 ```
 
-<div class="grid" markdown>
-
-![Monaco in 3D on Voyager](img/gallery/basemap_voyager.jpg)
-
 ![Monaco in 3D on the blank canvas](img/gallery/basemap_blank.jpg)
-
-</div>
 
 More in [Style the roads](guides/style.md).

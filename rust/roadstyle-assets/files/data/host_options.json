@@ -81,7 +81,7 @@
       "title": "Blank",
       "group": "Blank",
       "swatch": "#ffffff",
-      "order": 7,
+      "order": 6,
       "maxzoom": 19,
       "attr": "",
       "is_dark": false,
@@ -108,25 +108,6 @@
       "dark": "ofm_fiord"
     },
     {
-      "key": "ofm_bright",
-      "label": "OpenFreeMap Bright",
-      "tiles": [],
-      "bg": "#e8e6e1",
-      "title": "OpenFreeMap Bright",
-      "group": "OpenFreeMap",
-      "swatch": [
-        "#f8f4f0",
-        "#fff6b3",
-        "#a0c8f0"
-      ],
-      "order": 1,
-      "maxzoom": 19,
-      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
-      "is_dark": false,
-      "style_url": "https://tiles.openfreemap.org/styles/bright",
-      "dark": null
-    },
-    {
       "key": "ofm_positron",
       "label": "OpenFreeMap Positron",
       "tiles": [],
@@ -138,7 +119,7 @@
         "#ffffff",
         "#cdd2d4"
       ],
-      "order": 2,
+      "order": 1,
       "maxzoom": 19,
       "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
       "is_dark": false,
@@ -161,7 +142,7 @@
         "#f4c542",
         "#aad3df"
       ],
-      "order": 3,
+      "order": 2,
       "maxzoom": 19,
       "attr": "© OpenStreetMap contributors",
       "is_dark": false,
@@ -182,7 +163,7 @@
         "#ffffff",
         "#c8d3dc"
       ],
-      "order": 4,
+      "order": 3,
       "maxzoom": 16,
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
       "is_dark": false,
@@ -203,7 +184,7 @@
         "#ffffff",
         "#bfd9e8"
       ],
-      "order": 5,
+      "order": 4,
       "maxzoom": 19,
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, © OpenStreetMap contributors, and the GIS User Community",
       "is_dark": false,
@@ -224,7 +205,7 @@
         "#8a8f84",
         "#1d3b4f"
       ],
-      "order": 6,
+      "order": 5,
       "maxzoom": 19,
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community",
       "is_dark": true,

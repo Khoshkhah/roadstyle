@@ -1,7 +1,6 @@
 # Base maps past their last zoom level
 
-Status: **implemented** 2026-09-29 (unreleased). CARTO measured with a key: tiles at every zoom
-to 22, but from 21 under 1 KB and nearly empty, so its cap is 20.
+Status: **implemented** 2026-09-29 (unreleased). The CARTO base maps of that date are removed since then.
 
 ## Problem
 
@@ -11,7 +10,7 @@ minor streets from zoom 16, which is where people look closely. The two Esri gre
 at zoom 17, and the grey "Map data not yet available" squares look like roadstyle is broken.
 
 A second fault shares the cause: switching base maps swaps only the tile URLs (`setTiles`), so the
-attribution line keeps the first map's text. After switching to an Esri map it still says "© CARTO".
+attribution line keeps the first map's text. After switching to an Esri map it still said the credit of the first map.
 
 ## Data
 
@@ -22,7 +21,6 @@ Measured 2026-09-29, one tile over Södermalm at each zoom (HTTP status / size /
 | `esri_gray` (Light Gray), `esri_dark_gray` | **16** | HTTP **200**, a 2 KB placeholder image, identical at every zoom and for every Esri map |
 | `esri_street`, `satellite` | 19 | the same placeholder from zoom 20 |
 | `osm` | 19 | HTTP 400 from zoom 20 |
-| CARTO (`voyager`, `positron`, `dark_matter`) | not measured (keyed); CARTO documents 20 | |
 
 Esri answers with a valid image and status 200, so the browser can't tell the tile is missing:
 MapLibre draws the placeholder.
@@ -33,9 +31,8 @@ created, so `setTiles` can't change it on a switch.
 
 ## Approach
 
-1. **`Basemap.maxzoom`** (new field, default 19). Set it to 16 for `esri_gray` and `esri_dark_gray`,
-   and to 20 for the CARTO maps (after checking one keyed tile at 20 and 21). User-registered
-   and xyzservices base maps default to 19, or take the provider's `max_zoom` when xyzservices gives one.
+1. **`Basemap.maxzoom`** (new field, default 19). Set it to 16 for `esri_gray` and `esri_dark_gray`.
+   User-registered and xyzservices base maps default to 19, or take the provider's `max_zoom` when xyzservices gives one.
 2. **The source gets it.** `_basemap_style` writes `"maxzoom": bm.maxzoom` into the `bm` source, and
    each switcher entry in `BASEMAPS` carries `maxzoom` and `attr`.
 3. **Switching rebuilds the source.** `rsSetBasemap` removes the `basemap` layer and the `bm`

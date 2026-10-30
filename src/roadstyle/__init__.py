@@ -4,8 +4,8 @@
     from roadstyle import render_edges
 
     edges = gpd.read_file(...)                       # needs a `highway` column
-    render_edges(edges).save("map.html")             # web backend, Voyager base (settings default)
-    render_edges(edges, basemap="dark_matter",
+    render_edges(edges).save("map.html")             # web backend, OpenFreeMap Positron base (settings default)
+    render_edges(edges, basemap="ofm_dark",
                  include=["motorway", "trunk", "primary"]).save("major.html")
 """
 from .basemaps import (

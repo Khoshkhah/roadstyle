@@ -76,8 +76,8 @@ rs.render_edges(edges).save("map.html")    # open map.html: no server (Street Vi
 **More looks:**
 
 ```python
-rs.render_edges(edges, basemap="dark_matter", view_3d=True)            # dark, 3D bridge decks
-rs.render_edges(edges, palette="carto", basemap="positron")            # the classic OSM look
+rs.render_edges(edges, basemap="ofm_dark", view_3d=True)                # dark, 3D bridge decks
+rs.render_edges(edges, palette="carto", basemap="ofm_positron")        # the classic OSM look
 rs.render_edges(edges, color_by="aadt", cmap="viridis")                # colour by your data
 rs.render_edges(edges, palette="mono", color_options={                 # several colourings,
     "Traffic": {"color_by": "aadt", "cmap": "viridis"},                #   switched in the browser
@@ -87,7 +87,7 @@ rs.render_dashboard(edges).save("dashboard.html")                      # map + q
 rs.render_street_view(edges).save("street_view.html")                  # map and Street View side by side
 ```
 
-No Python? `roadstyle edges.gpkg -o map.html --basemap dark_matter`, or click through it in the
+No Python? `roadstyle edges.gpkg -o map.html --basemap ofm_dark`, or click through it in the
 workbench: `pip install "roadstyle[studio]" && roadstyle studio`.
 
 ## Gallery
@@ -181,31 +181,10 @@ Maps are saved in `~/roadstyle-maps/`. The PNG preview needs Chromium, once:
 
 ## API keys
 
-Both keys are optional. roadstyle works without them, just with less.
+The key is optional. roadstyle works without it, just with less. The base maps need no key.
 
-- **CARTO**, for the default base map. Without a key its tiles are stamped *API KEY REQUIRED*;
-  set `CARTO_API_KEY`, or use a keyless base map (`esri_street`, `esri_dark_gray`, `osm`, `blank`).
 - **Google Maps**, for Street View. Street View works with no key. A key adds a **Linked** mode:
   a real panorama, with the map marker walking and turning with you.
-
-<details>
-<summary>Setting up the CARTO key</summary>
-
-The default base map (`voyager`) and `positron` and `dark_matter` come
-from CARTO. Without a key, their tiles are stamped *API KEY REQUIRED*. Get a free key at
-[carto.com/basemaps/apikey](https://carto.com/basemaps/apikey), then use any one of these:
-
-```bash
-export CARTO_API_KEY="…"                                          # environment variable
-```
-```json
-{ "config": { "api_keys": { "carto": "…" } } }
-```
-Save that JSON as `~/.config/roadstyle/roadstyle.json`, or as `roadstyle.json` in the folder you run
-from. In Python you can pass `rs.render_edges(edges, api_key="…")` instead. With no key at all, use
-a keyless base map: `esri_street`, `esri_dark_gray`, `osm` or `blank`.
-
-</details>
 
 <details>
 <summary>Setting up the Google Maps key</summary>
@@ -264,4 +243,4 @@ More: [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/set
 ## License
 
 [MIT](https://github.com/Khoshkhah/roadstyle/blob/main/LICENSE). Base-map tiles come from
-third-party services (CARTO, OSM, Esri) with their own attribution and terms.
+third-party services (OpenFreeMap, OSM, Esri) with their own attribution and terms.

@@ -73,7 +73,7 @@ contract makes changeable (or a value that is not used).
 | `prefix` | text, `""` | `rsDashboard` option | every control that finds a roads layer or source | no | |
 | `engine.props` | `(row) => Promise<props>` | `rsDashboard` option | `select.js` (click, `rsSelect`, the tooltip, the twin `__rs_edge2`) | | the engine port |
 | `engine.restyle` | `(change) => Promise<StylePatch>` | `rsDashboard` option | the controls that need the engine | | the engine port (planned) |
-| `basemaps`, `basemap` | keys, `DEFAULT_SWITCHER`, `"voyager"` | `render`; `rsDashboard` option (`BASEMAPS`) | `basemap.js` | yes | `rsSetBasemap`; `rs:basemapchange`; `window.RS_BASEMAPS` |
+| `basemaps`, `basemap` | keys, `DEFAULT_SWITCHER`, `"ofm_positron"` | `render`; `rsDashboard` option (`BASEMAPS`) | `basemap.js` | yes | `rsSetBasemap`; `rs:basemapchange`; `window.RS_BASEMAPS` |
 | `basemap_switcher` | bool, true | `render`; option | `basemap.js` | no | |
 | `api_key` | text | `render`, `set_api_key` | the base-map URL | no | |
 | `zoom_readout` | bool, true | `render`; option | `zoom.js` | no | |

@@ -53,7 +53,7 @@ m = rs.render_edges(
         "Level": {"color_by": "level", "colors": {"low": "#2a9d8f", "high": "#e63946"}},
         "Road class": {},
     },
-    basemap="positron",                   # positron | voyager | dark_matter | osm | satellite | blank
+    basemap="ofm_positron",               # ofm_liberty | ofm_positron | osm | esri_gray | esri_street | satellite | blank
     tooltip=["name", "flow"],             # hover fields (off by default)
 )
 m.save("map.html")                        # m.html is the page as a string
@@ -153,5 +153,5 @@ inserting HTML before `</body>` in `m.html`.
   lines drawn over the roads double them and hide the road's own styling.
 - **A selection in the base colour shows nothing.** Pick a highlight colour no `color_options`
   entry already uses.
-- **CARTO base maps are watermarked without a key** (`voyager`, `positron`, `dark_matter`). Use
-  `osm` or `blank`, or set a free key: `rs.set_api_key("…", provider="carto")` / `CARTO_API_KEY`.
+- **A base map that was removed gets `ofm_positron` and a warning.** The seven base maps are `ofm_liberty`,
+  `ofm_positron`, `osm`, `esri_gray`, `esri_street`, `satellite` and `blank`. None needs a key.

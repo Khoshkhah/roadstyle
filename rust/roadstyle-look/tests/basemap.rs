@@ -67,8 +67,12 @@ fn the_64_looks_of_mapstyle() {
     let g = golden();
     let mut bad = Vec::new();
     for (choice, idx) in g["choices"].as_object().unwrap() {
-        let want: serde_json::Map<String, Value> = idx.as_object().unwrap().iter()
+        let mut want: serde_json::Map<String, Value> = idx.as_object().unwrap().iter()
             .map(|(k, i)| (k.clone(), g["parts"][k][i.as_u64().unwrap() as usize].clone())).collect();
+        // changed on 2026-10-30: the default base map is ofm_positron (the golden's was a CARTO map, which roadstyle removed)
+        if let Some(b) = want.get_mut("config").and_then(|c| c.get_mut("basemap")) {
+            *b = "ofm_positron".into();
+        }
         let [mode, theme, paths]: [&str; 3] = choice.split('|').collect::<Vec<_>>().try_into().unwrap();
         let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into(), place: None }), args: want["args"].clone(),
                           ..Default::default() };

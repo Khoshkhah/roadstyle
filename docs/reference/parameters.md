@@ -67,8 +67,8 @@ ignore it.
 | `profile` | `None` | all | the name of a profile: every style value that is not a color (`default`, `highsat`, or `./profiles/<name>.yaml`); `None` = the one in force ([Profiles and palettes](settings.md#profiles-and-palettes)) |
 | `backend` | `"web"` | | `"web"` (MapLibre, one offline file): the only backend ([Big networks](../guides/big-networks.md)) |
 | `palette` | `"amber"` | all | `"amber"` (orange to green main roads, slate-grey streets), `"carto"` (soft OSM Carto tones), `"highsat"` (bright), `"mono"` or a registered palette |
-| `basemap` | the `basemap` setting (`"voyager"`) | all | a `BASEMAPS` key, a `Basemap`, a `{z}/{x}/{y}` URL or an xyzservices provider |
-| `basemaps` | web: `esri_gray`, `positron`, `osm`, `satellite`, `voyager`, `dark_matter`, `blank` | web | the base maps offered in the switcher |
+| `basemap` | the `basemap` setting (`"ofm_positron"`) | all | a `BASEMAPS` key, a `Basemap`, a `{z}/{x}/{y}` URL or an xyzservices provider |
+| `basemaps` | web: `ofm_liberty`, `ofm_positron`, `osm`, `esri_gray`, `esri_street`, `satellite`, `blank` | web | the base maps offered in the switcher |
 | `basemap_switcher` | `True` | web | the base-map button (a map control, last in the top-right column) and its menu; `False` with a `basemaps=` list keeps them for `rsSetBasemap` |
 | `zoom_readout` | `True` | web | the small "z 13.2" zoom level beside the scale bar; `False` leaves it out |
 | `api_key` | `None` | all | key for a keyed tile provider ([order](settings.md#base-maps-api-keys)) |
@@ -259,7 +259,7 @@ Built-ins: [Settings & palettes](settings.md#base-maps-api-keys).
 | `is_dark` | `False` | a dark canvas |
 | `satellite` | `False` | apply the satellite colour filter |
 | `bg`, `preview`, `subdomains` | `"#444"`, three greys, `"abc"` | switcher thumbnail, tile subdomains |
-| `maxzoom` | `19` | the provider's last zoom level with real tiles; zoomed in further, the map scales that level up instead of showing missing tiles. Built-ins: Esri grey maps 16, CARTO 20, the rest 19; xyzservices providers bring their own `max_zoom` |
+| `maxzoom` | `19` | the provider's last zoom level with real tiles; zoomed in further, the map scales that level up instead of showing missing tiles. Built-ins: Esri grey maps 16, the rest 19; xyzservices providers bring their own `max_zoom` |
 
 ## StyleConfig
 
@@ -286,7 +286,7 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
 | `casing.drop_below_px` | `1.0` (`0` = always a casing) | no casing piece (a bridge's keeps it) at a zoom where the whole casing line is narrower than this many px: the fill alone, and the casing from the first zoom where it is as wide. The tiles leave out those pieces. Nothing is dropped from a road in metres when `casing_min_px` ≥ this value |
 | `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom (unless `minzoom=False`); the tiles leave out a hidden class |
-| `basemap` | `"voyager"` | the default base map |
+| `basemap` | `"ofm_positron"` | the default base map |
 | `labels` | `color #5b5b5b`, no halo | street-name paint; `size`: `[[zoom, px], ...]`, the names' size per zoom for every class (roads in metres) instead of following each class's width |
 | `arrows` | `color #5b5b5b`, `opacity 0.7` | one-way chevron paint |
 | `camera` | `pitch 0`, `bearing 0`, `pitch_3d 55`, `max_pitch 70` | starting camera and 3D tilt |

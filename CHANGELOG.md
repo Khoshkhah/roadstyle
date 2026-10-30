@@ -89,6 +89,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
   inside the window, as the others do.
 
 ### Removed
+- **The CARTO base maps and OpenFreeMap Bright are removed.** The keys `voyager`, `voyager_nolabels`, `positron`, `dark_matter` and `ofm_bright` are gone from
+  `data/basemaps.json`. The base maps of roadstyle are now seven (each with its dark twin, when it has one): `ofm_liberty` (`ofm_fiord`), `ofm_positron` (`ofm_dark`), `osm`,
+  `esri_gray` (`esri_dark_gray`), `esri_street`, `satellite` and `blank` (`blank_dark`). None needs a key.
+  - **Fallback.** A page that asks for a removed key (`basemap=`, `basemaps=`, a view's `basemap`, the `basemap` of a saved look) gets `ofm_positron` and one warning for each such key.
+    The rule is in one place, `current_key` of `page_options.rs`, with the list `removed` and the key `fallback` in `data/basemaps.json`. `rs.get_basemap` gives an error for a removed key.
+  - **The default base map is `ofm_positron`** (it was `voyager`), in `defaults.json`, `StyleConfig.basemap` and the MCP programs. The MCP programs no longer pick `esri_street` when there is no key.
+  - **No CARTO key.** The settings box has no "CARTO key" row, and the page code has no saved CARTO key. The warning "CARTO base map requested with no API key" is gone. A base map of roadstyle never takes a key:
+    `api_key` goes only into a tile URL that you give, an xyzservices provider and a base map that you register. A key in a tile URL is now always `api_key=` (CARTO's `key=` is gone).
+  - `Basemap.lonboard` (the name of a CARTO style) is gone.
+  - OSM Carto, the colour scheme of OpenStreetMap (the palette `carto`, `basemap/osm_carto.yaml`), stays.
 - **The Roads box is gone** (the floating box with a row for each road class, Bridges, Tunnels and the access kinds, `.flt-ctrl`). A page with a bar has no place for it, and it covered the bar. The filter calls stay
   (`rsSetClasses`, `rsSetBridges`, `rsSetTunnels`, `rsSetAccess`, `rsFilter`, `rsSetModes`, `rs.setFilter`; `rs.setStyle` keeps what a call switched off): the colour box, `rs.setFilter`, the views and the host pages use them.
   The keyword `filter_control` (and `--no-filter`) has no effect now. The class minzoom dimming of the rows went with the box. The map's other old floating boxes (Tunnels, View) are hidden on a page with a bar, as Colour by was.

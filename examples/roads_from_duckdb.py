@@ -44,9 +44,9 @@ def main() -> None:
     spec_out = HERE / "sodermalm_driving_web.html"
 
     # the MapLibre web map: high-saturation palette on the dark base map, hover tooltips
-    rs.render_edges(edges, basemap="dark_matter", tooltip=tooltip).save(str(map_out))
+    rs.render_edges(edges, basemap="ofm_dark", tooltip=tooltip).save(str(map_out))
     # the roadstyle.js spec page (JSON spec + a small renderer), for embedding
-    rs.save(edges, str(spec_out), basemap="dark_matter", tooltip=tooltip)
+    rs.save(edges, str(spec_out), basemap="ofm_dark", tooltip=tooltip)
 
     print(f"wrote {map_out.name} (web) and {spec_out.name} (roadstyle.js) in {HERE}")
 

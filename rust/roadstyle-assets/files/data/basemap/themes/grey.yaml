@@ -1,4 +1,4 @@
-# grey: a quiet, light map for data (docs/design/themes.md), in the manner of CARTO Positron. Your
+# grey: a quiet, light map for data (docs/design/themes.md), in the manner of a light grey base map. Your
 # colours (rsColor, colour options, the dashboard's colour by mode, the planner's route) stand out.
 background: "#f5f5f3"              # the land
 transform:                          # every osm_carto colour not set below:

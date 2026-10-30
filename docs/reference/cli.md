@@ -37,7 +37,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 | `--layer NAME` | `load_edges(layer=)` | layer of a multi-layer file, e.g. a GPKG |
 | **Styling** | | |
 | `--palette {amber,carto,highsat,mono}` | `palette` | class palette (default `amber`) |
-| `--basemap KEY` | `basemap` | base map (default from settings: `voyager`) |
+| `--basemap KEY` | `basemap` | base map (default from settings: `ofm_positron`) |
 | `--tooltip COL [COL …]` | `tooltip` | columns in the hover tooltip |
 | **Filtering** | | |
 | `--include TYPE [TYPE …]` | `include` | keep only these classes |
@@ -96,7 +96,7 @@ Opens the [Studio](../studio.md) workbench in the browser. Everything after `stu
 ## Examples
 
 ```bash
-roadstyle edges.gpkg -o map.html --basemap dark_matter
+roadstyle edges.gpkg -o map.html --basemap ofm_dark
 roadstyle edges.gpkg --include motorway trunk primary -o major.html
 roadstyle edges.gpkg --color-by maxspeed_kmh --cmap viridis --width-by 1 6
 roadstyle edges.gpkg --page street-view --layout below --panel-width 50

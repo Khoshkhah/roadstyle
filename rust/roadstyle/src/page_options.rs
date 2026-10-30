@@ -346,13 +346,25 @@ fn inject_token(url: &str, token: &str) -> String {
     if HOLDERS.iter().any(|h| url.contains(h)) {
         return HOLDERS.iter().fold(url.to_string(), |u, h| u.replace(h, token));
     }
-    let (param, sep) = (if url.contains("cartocdn.com") { "key" } else { "api_key" }, if url.contains('?') { "&" } else { "?" });
-    format!("{url}{sep}{param}={token}")
+    format!("{url}{}api_key={token}", if url.contains('?') { "&" } else { "?" })
+}
+
+/// The base maps that roadstyle removed (data/basemaps.json `removed`: the CARTO company maps and OpenFreeMap Bright). A page that asks for one gets
+/// the base map `fallback` of the same file and a warning, so an old page does not break. This is the one place of the rule.
+fn current_key(v: &Value, warnings: &mut Vec<String>) -> Value {
+    let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
+    let (fallback, removed) = (all["fallback"].as_str().expect("basemaps.json has fallback"), &all["removed"]);
+    let Some(k) = v.as_str().filter(|k| removed.as_array().is_some_and(|l| l.iter().any(|r| r == k))) else { return v.clone() };
+    let w = format!("base map '{k}' was removed; '{fallback}' is used instead");
+    if !warnings.contains(&w) {
+        warnings.push(w);
+    }
+    json!(fallback)
 }
 
 /// A base map: an entry (a JSON object), a key that the caller resolved (`resolved`), a key of data/basemaps.json, or a tile URL with
-/// {z}, {x} and {y} (basemaps.get_basemap, with `api_key` put in; a CARTO base map with no key is a warning, as get_basemap's).
-fn basemap(v: &Value, api_key: Option<&str>, resolved: &[Value], warnings: &mut Vec<String>) -> Result<Value, crate::Error> {
+/// {z}, {x} and {y}. Only a tile URL that the caller gives takes `api_key`: a base map of roadstyle needs no key.
+fn basemap(v: &Value, api_key: Option<&str>, resolved: &[Value]) -> Result<Value, crate::Error> {
     if v.is_object() {
         return Ok(v.clone());
     }
@@ -361,26 +373,17 @@ fn basemap(v: &Value, api_key: Option<&str>, resolved: &[Value], warnings: &mut 
         return Ok(b.clone());
     }
     let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
-    let mut bm = match all["basemaps"].as_array().and_then(|l| l.iter().find(|b| b["key"] == k)) {
+    Ok(match all["basemaps"].as_array().and_then(|l| l.iter().find(|b| b["key"] == k)) {
         Some(b) => b.clone(),
-        None if ["{z}", "{x}", "{y}"].iter().all(|p| k.contains(p)) => json!({"key": "custom", "label": "Custom Basemap", "url": k, "attr": ""}),
+        None if ["{z}", "{x}", "{y}"].iter().all(|p| k.contains(p)) => {
+            let url = api_key.filter(|t| !t.is_empty()).map_or(k.to_string(), |t| inject_token(k, t));
+            json!({"key": "custom", "label": "Custom Basemap", "url": url, "attr": ""})
+        }
         None => {
             let keys: Vec<Value> = all["basemaps"].as_array().into_iter().flatten().map(|b| b["key"].clone()).collect();
             return Err(crate::error::options(format!("unknown basemap '{k}'; choose from {}", repr(&Value::Array(keys)))));
         }
-    };
-    match api_key.filter(|t| !t.is_empty()) {
-        Some(t) => bm["url"] = inject_token(bm["url"].as_str().unwrap_or(""), t).into(),
-        None if bm["url"].as_str().is_some_and(|u| u.contains("cartocdn.com")) => {
-            let w = "CARTO base map requested with no API key: the tiles will come back stamped 'API KEY REQUIRED'. Set one in roadstyle.json, \
-                     or use a keyless base map (esri_street, esri_dark_gray, osm).";
-            if !warnings.iter().any(|x| x == w) {
-                warnings.push(w.into());        // one for the page, not one for each CARTO base map of the switcher
-            }
-        }
-        None => {}
-    }
-    Ok(bm)
+    })
 }
 
 /// the URL template as MapLibre's raster `tiles` (each subdomain, no @2x).
@@ -418,19 +421,23 @@ fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Va
     let api = k.api_key.as_deref();
     let resolved = k.resolved_basemaps.clone();
     let active = Some(&k.basemap).filter(|v| present(v)).cloned().unwrap_or_else(|| json!(look.sections.page.basemap));
-    let active_bm = basemap(&active, api, &resolved, warnings)?;
+    let active = current_key(&active, warnings);
+    let active_bm = basemap(&active, api, &resolved)?;
     let all: Value = serde_json::from_str(BASEMAPS).expect("data/basemaps.json is JSON");
-    let keys = k.basemaps.clone().filter(|l| !l.is_empty()).unwrap_or_else(|| all["switcher"].as_array().cloned().unwrap_or_default());
     let key_of = |v: &Value| if v.is_object() { v["key"].clone() } else { v.clone() };
+    let mut keys: Vec<Value> = k.basemaps.clone().filter(|l| !l.is_empty()).unwrap_or_else(|| all["switcher"].as_array().cloned().unwrap_or_default())
+        .iter().map(|v| current_key(v, warnings)).collect();
+    let mut seen = Vec::new();          // two removed keys are one fallback: it is in the list one time
+    keys.retain(|v| { let k = key_of(v); let new = !seen.contains(&k); seen.push(k); new });
     let mut list = vec![active_bm.clone()];
     for b in keys.iter().filter(|b| key_of(b) != active_bm["key"] && key_of(b) != key_of(&active)) {
-        list.push(basemap(b, api, &resolved, warnings)?);
+        list.push(basemap(b, api, &resolved)?);
     }
     // a map with a dark twin (`dark`) brings its twin: the box lists the pair as one row, and the theme switches between them
     let mut i = 0;
     while i < list.len() {
         if let Some(t) = list[i]["dark"].as_str().filter(|t| !list.iter().any(|b| b["key"] == *t)) {
-            let twin = basemap(&json!(t), api, &resolved, warnings)?;
+            let twin = basemap(&json!(t), api, &resolved)?;
             list.push(twin);
         }
         i += 1;
@@ -536,7 +543,13 @@ fn views(src: &mut Styled, k: &PageKeys, look: &Look, options: &Options, basemap
     let overlays: Vec<Value> = ctl["overlays"].as_array().into_iter().flatten().map(|o| o["label"].clone()).collect();
     let classes = ctl["filter"]["classes"].as_array().cloned().unwrap_or_default();
     let palettes: Vec<Value> = options.style_names("palettes").into_iter().map(Value::from).collect();
-    let views = check_views(&k.views, [("color", colors), ("overlays", overlays), ("classes", classes), ("basemap", basemaps.to_vec()),
+    let mut named = k.views.clone();        // a view that names a removed base map gets the fallback, as the page's list did
+    for set in named.as_object_mut().into_iter().flat_map(|m| m.values_mut()) {
+        if let Some(b) = set.get_mut("basemap") {
+            *b = current_key(b, &mut src.warnings);
+        }
+    }
+    let views = check_views(&named, [("color", colors), ("overlays", overlays), ("classes", classes), ("basemap", basemaps.to_vec()),
                                            ("palette", palettes)])?;
     let mut pals: Vec<String> = Vec::new();
     for p in views.iter().filter_map(|v| v["set"]["palette"].as_str()) {
@@ -625,7 +638,6 @@ mod tests {
 
     #[test]
     fn a_key_goes_into_a_tile_url_as_basemaps_puts_it() {
-        assert_eq!(inject_token("https://a.basemaps.cartocdn.com/x/{z}/{x}/{y}.png", "T"), "https://a.basemaps.cartocdn.com/x/{z}/{x}/{y}.png?key=T");
         assert_eq!(inject_token("https://t.example/{z}/{x}/{y}?s=1", "T"), "https://t.example/{z}/{x}/{y}?s=1&api_key=T");
         assert_eq!(inject_token("https://t.example/{z}/{x}/{y}?token={token}", "T"), "https://t.example/{z}/{x}/{y}?token=T");
         assert_eq!(inject_token("", "T"), "");
@@ -652,6 +664,26 @@ mod tests {
         assert!(o["ontop"]["hillshade"].is_object());
         // a form that is not the dashboard is an error here, as for a page
         assert!(host_options(&look, json!({"template": "map"}).as_object().unwrap()).is_err());
+    }
+
+    /// A removed base map (the CARTO maps, OpenFreeMap Bright) becomes `ofm_positron` with one warning, in the active key, the list and the views;
+    /// the fallback is in the list one time.
+    #[test]
+    fn a_removed_base_map_gets_the_fallback_and_a_warning() {
+        let look = Look::resolve(&Options::from_value(&json!({"args": {"state": "live"}})).unwrap()).unwrap();
+        let all: Value = serde_json::from_str(BASEMAPS).unwrap();
+        let removed = all["removed"].as_array().unwrap();
+        assert_eq!(removed.len(), 5);
+        let given = json!({"basemap": removed[0], "basemaps": [removed[0], removed[1], removed[2], removed[3], removed[4], "osm"]});
+        let (o, warnings) = host_options(&look, given.as_object().unwrap()).unwrap();
+        let keys: Vec<&Value> = o["basemaps"].as_array().unwrap().iter().map(|b| &b["key"]).collect();
+        assert_eq!(keys, ["ofm_positron", "osm", "ofm_dark"]);
+        assert_eq!(o["basemap"], "ofm_positron");
+        assert_eq!(warnings.len(), 5, "{warnings:?}");
+        assert!(warnings[0].contains(&format!("'{}' was removed", removed[0].as_str().unwrap())) && warnings[0].contains("'ofm_positron'"), "{warnings:?}");
+        let mut w = Vec::new();
+        assert_eq!(current_key(&json!("osm"), &mut w), "osm");
+        assert!(w.is_empty());
     }
 
     /// data/host_options.json is what a JavaScript host page fetches (the typed dashboard, its first paint and the base maps), so that the page

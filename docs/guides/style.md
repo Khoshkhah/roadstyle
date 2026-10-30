@@ -11,13 +11,13 @@
     import roadstyle as rs
 
     edges = gpd.read_file("edges.gpkg")
-    rs.render_edges(edges, palette="carto", basemap="positron").save("map.html")   # the default is amber on Voyager
+    rs.render_edges(edges, palette="carto", basemap="ofm_positron").save("map.html")   # the default is amber on OpenFreeMap Positron
     ```
 
 === "Command line"
 
     ```bash
-    roadstyle edges.gpkg --palette carto --basemap positron -o map.html
+    roadstyle edges.gpkg --palette carto --basemap ofm_positron -o map.html
     ```
 
 ## Palettes
@@ -31,7 +31,7 @@ A palette sets each road class's colour, width and casing.
 
 <div class="grid" markdown>
 
-![amber, the default, on Voyager](../img/gallery/road_look.jpg)
+![amber, the default](../img/gallery/road_look.jpg)
 
 ![amber on the blank canvas](../img/gallery/basemap_blank.jpg)
 
@@ -44,18 +44,20 @@ To change a class's colour or add a palette, see [Settings & palettes](../refere
 `basemap=` sets the background, `basemaps=` sets the list in the base-map switcher (bottom-right).
 
 ```python
-rs.render_edges(edges, basemap="dark_matter", basemaps=["dark_matter", "positron", "satellite"])
+rs.render_edges(edges, basemap="ofm_dark", basemaps=["ofm_dark", "ofm_positron", "satellite"])
 rs.render_edges(edges, palette="mono", basemap="blank")      # no tiles: works offline
 ```
 
-- `voyager` (the default), `positron`, `dark_matter`: CARTO.
-- `osm`, `esri_gray`, `esri_street`, `esri_dark_gray`: no key needed.
-- `satellite`: Esri World Imagery.
-- `blank`, `blank_dark`: a plain canvas with no network requests, so the file works offline.
+The seven base maps (none needs a key):
 
-!!! note "CARTO needs a free key"
-    Without one, CARTO tiles show an "API KEY REQUIRED" watermark. Set a key or use a keyless
-    base map: [Base maps & API keys](../reference/settings.md#base-maps-api-keys).
+- `ofm_liberty` and `ofm_positron` (the default): OpenFreeMap vector styles. Their dark twins are `ofm_fiord` and `ofm_dark`.
+- `osm`: OpenStreetMap.
+- `esri_gray` (dark twin `esri_dark_gray`) and `esri_street`: Esri.
+- `satellite`: Esri World Imagery.
+- `blank` (dark twin `blank_dark`): a plain canvas with no network requests, so the file works offline.
+
+A page that asks for a base map that was removed (see the CHANGELOG) gets `ofm_positron` and a warning. See
+[Base maps & API keys](../reference/settings.md#base-maps-api-keys).
 
 ## Map controls
 

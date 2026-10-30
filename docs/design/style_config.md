@@ -77,8 +77,8 @@ already has**. `color` in a view is a `color_options` entry (which data decides 
 
 ```python
 rs.render_edges(roads, profile="default", palette="amber", views={
-    "Day":     {"palette": "amber", "basemap": "positron"},
-    "Night":   {"palette": "mono", "basemap": "dark_matter"},
+    "Day":     {"palette": "amber", "basemap": "ofm_positron"},
+    "Night":   {"palette": "mono", "basemap": "ofm_dark"},
     "Traffic": {"color": "Flow", "road_fill": True},        # as today: a color option
 })
 ```

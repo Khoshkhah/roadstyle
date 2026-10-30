@@ -5,7 +5,7 @@ browser. :func:`snapshot` wraps headless Chromium via Playwright (an *optional* 
 the same pipeline used to verify every rendering change in this project — so a paper figure or
 report image is::
 
-    wm = rs.render_edges(edges, basemap="dark_matter", view_3d=True)
+    wm = rs.render_edges(edges, basemap="ofm_dark", view_3d=True)
     rs.snapshot(wm, "fig.png", center=(18.076, 59.308), zoom=16, pitch=60)
 
 Needs ``pip install playwright`` once, plus ``playwright install chromium``.

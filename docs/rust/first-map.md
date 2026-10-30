@@ -41,11 +41,6 @@ m.save("monaco_rust.html")
 Run the file again. It writes `monaco_rust.html`. Open it in a browser. You see the roads of Monaco on a base map, with
 bridges over tunnels. Move the mouse over a road: the road glows. Click a road: a popup shows its name and its class.
 
-!!! note "A warning about CARTO"
-    The default base map is CARTO Voyager. Without a CARTO key, Python writes a warning and the base-map tiles show
-    "API KEY REQUIRED". The roads are not affected. To use a base map with no key, add `basemap="osm"`, or read
-    [Base maps and API keys](../reference/settings.md#base-maps-api-keys).
-
 ## Put the roads in vector tiles
 
 For a large network, the page can keep the roads as vector tiles (an embedded PMTiles archive). Add these lines:

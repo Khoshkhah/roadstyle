@@ -64,7 +64,7 @@ Every settings level uses one layout. `profile` and `palette` name the look; `co
 {
   "profile": "default",
   "palette": "carto",
-  "config":  { "basemap": "positron", "api_keys": { "carto": "…" } }
+  "config":  { "basemap": "ofm_positron" }
 }
 ```
 
@@ -175,22 +175,30 @@ palette keyed by your classes and pass `highway_col=`.
 
 ## Base maps & API keys
 
-`basemap=` picks the base map; the default is `voyager` (`config.basemap`). All built-ins are in
-`rs.BASEMAPS`.
+`basemap=` picks the base map; the default is `ofm_positron` (`config.basemap`). The seven base maps of roadstyle are in
+`rs.BASEMAPS`. None of them needs a key.
 
-| key | tiles | key needed |
+| key | base map | dark twin |
 |---|---|---|
-| `voyager`, `voyager_nolabels`, `positron`, `dark_matter` | CARTO | yes (see below) |
-| `osm` | OpenStreetMap | no |
-| `esri_gray`, `esri_street`, `esri_dark_gray` | Esri light grey / streets / dark grey | no |
-| `satellite` | Esri World Imagery | no |
-| `blank`, `blank_dark` | none: a plain canvas, no network requests, fully offline | no |
+| `ofm_liberty` | OpenFreeMap Liberty (vector style) | `ofm_fiord` |
+| `ofm_positron` | OpenFreeMap Positron (vector style) | `ofm_dark` |
+| `osm` | OpenStreetMap | none |
+| `esri_gray` | Esri Gray | `esri_dark_gray` |
+| `esri_street` | Esri Streets | none |
+| `satellite` | Esri Satellite (World Imagery) | none |
+| `blank` | none: a plain canvas, no network requests, fully offline | `blank_dark` |
+
+A dark twin comes into the list with its light map, and the page theme switches between the two.
+
+!!! note "Removed base maps"
+    Earlier versions had more base maps. A page that asks for a key that no longer exists gets `ofm_positron` and a warning.
+    `rs.get_basemap` gives an error for such a key. The CHANGELOG lists the removed keys.
 
 Other sources:
 
-- **A tile URL**: `basemap="https://tiles.example.com/{z}/{x}/{y}.png"`. It may contain an
+- **A tile URL**: `basemap="https://tiles.example.com/{z}/{x}/{y}.png"`. It can contain an
   `{api_key}` or `{accessToken}` placeholder.
-- **xyzservices**: any provider object, e.g. `basemap=xyz.CartoDB.Positron`
+- **xyzservices**: any provider object, for example `basemap=xyz.OpenTopoMap`
   (`pip install "roadstyle[basemaps]"`).
 - **Your own, by name**: register it once, then use `basemap="mytiles"` and list it in `basemaps=`.
 
@@ -200,20 +208,15 @@ rs.register_basemap(rs.Basemap("mytiles", "My tiles",
                                maxzoom=18))   # its last zoom level with tiles (default 19)
 ```
 
-!!! warning "CARTO watermark"
-    Without a key, CARTO tiles (`voyager`, `voyager_nolabels`, `positron`, `dark_matter`) load but
-    are stamped *API KEY REQUIRED*. roadstyle warns when it renders one. Get a free key at
-    [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey), or use a keyless map:
-    `esri_street`, `esri_dark_gray`, `osm`, `blank`.
-
-A keyed provider (CARTO, Mapbox, Stadia, MapTiler, …) uses the first key it finds:
+A tile URL, an xyzservices provider and a base map that you register use the first key that roadstyle finds.
+The base maps of roadstyle never take a key.
 
 | order | source | example |
 |---|---|---|
 | 1 | the call | `rs.render_edges(edges, api_key="pk.…")` |
 | 2 | the session, this provider, then any provider | `rs.set_api_key("pk.…", provider="mapbox")`, `rs.set_api_key("…")` |
-| 3 | settings, this provider, then any provider | `{"config": {"api_keys": {"carto": "…"}, "api_key": "…"}}` |
-| 4 | environment, this provider | `CARTO_API_KEY`, `MAPBOX_ACCESS_TOKEN` (suffixes `_API_KEY`, `_ACCESS_TOKEN`, `_TOKEN`, `_KEY`) |
+| 3 | settings, this provider, then any provider | `{"config": {"api_keys": {"mapbox": "…"}, "api_key": "…"}}` |
+| 4 | environment, this provider | `MAPBOX_ACCESS_TOKEN` (suffixes `_API_KEY`, `_ACCESS_TOKEN`, `_TOKEN`, `_KEY`) |
 | 5 | environment, any provider | `ROADSTYLE_API_KEY` |
 
 Settings keep keys out of your code: put them in `~/.config/roadstyle/roadstyle.json`.

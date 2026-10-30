@@ -20,7 +20,7 @@ with st.sidebar:
     with st.expander("Look", expanded=True):
         all_bms = list(rs.BASEMAPS)
         bms = st.multiselect("Base maps offered", all_bms,
-                             default=[b for b in ("voyager", "positron", "dark_matter", "osm",
+                             default=[b for b in ("ofm_positron", "ofm_dark", "osm",
                                                   "satellite", "blank") if b in all_bms])
         basemap = st.selectbox("Initial base map", bms or all_bms)
         view_3d = st.checkbox("3D bridges", value=True)

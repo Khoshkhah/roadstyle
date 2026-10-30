@@ -329,7 +329,7 @@ fn config(cfg: &Map<String, Value>) -> Value {
             ("api_key", _) => Value::Null,
             ("api_keys", _) => json!({}),
             (_, Some(v)) => v.clone(),
-            ("basemap", None) => json!("voyager"),
+            ("basemap", None) => json!("ofm_positron"),
             (_, None) => Value::Null,
         };
         let v = if f == "minor_no_casing" {

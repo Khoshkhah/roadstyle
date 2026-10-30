@@ -234,20 +234,13 @@ fn thousands(n: usize) -> String {
 
 /// The page of a road file, saved; its answer for the agent and the page's path (for the preview).
 fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
-    let mut options = a.options.unwrap_or_default();
+    let options = a.options.unwrap_or_default();
     check_options(&options)?;
     let src = expand(&a.path);
     let (roads, read_warning) = read_file(&src)?;
     let class_col = options.get("highway_col").and_then(Value::as_str).unwrap_or("highway").to_string();
     let text = summary(&roads, &class_col)?;
     let out = out_path(a.output_path.as_deref(), &src.file_stem().unwrap_or_default().to_string_lossy())?;
-    // the default CARTO tiles come back stamped "API KEY REQUIRED" without a key: then a keyless base map
-    let key = ["CARTO_API_KEY", "ROADSTYLE_API_KEY"].iter().find_map(|k| std::env::var(k).ok().filter(|v| !v.is_empty()));
-    let mut notes = Vec::new();
-    if !options.contains_key("basemap") && key.is_none() {
-        options.insert("basemap".into(), "esri_street".into());
-        notes.push("basemap: esri_street (the default CARTO map needs CARTO_API_KEY)".to_string());
-    }
     // the look of render_page: palette, profile and settings apart, the rest as the render's keywords, with state "live"
     let mut args = options;
     let mut look = Map::new();
@@ -262,7 +255,6 @@ fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
     let o = roadstyle::look::Options::from_value(&Value::Object(look))?;
     let resolved = roadstyle::Look::resolve(&o)?;
     let mut given = Map::new();
-    given.insert("api_key".into(), key.map_or(Value::Null, Value::String));
     given.insert("street_view_key".into(), std::env::var("GOOGLE_MAPS_KEY").ok().filter(|v| !v.is_empty()).map_or(Value::Null, Value::String));
     let page = roadstyle::page_options::page_from(roads, None, &resolved, &o, &given)?;
     let html = page.html.replacen("__MAPLIBRE_CSS__", MAPLIBRE_CSS, 1).replacen("__MAPLIBRE_JS__", &MAPLIBRE_JS.replace("</script>", "<\\/script>"), 1);
@@ -270,13 +262,10 @@ fn render_file(a: RenderFile) -> Result<(String, PathBuf), String> {
         std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
     }
     std::fs::write(&out, &html).map_err(|e| format!("{}: {e}", out.display()))?;
-    // the warnings once each, in order; with our keyless base map, CARTO's warning is about the switcher's other entries
+    // the warnings once each, in order
     let mut warnings: Vec<String> = read_warning.into_iter().chain(page.warnings).collect();
     warnings.dedup();
-    if !notes.is_empty() {
-        warnings.retain(|w| !w.starts_with("CARTO base map requested"));
-    }
-    let lines: Vec<String> = std::iter::once(format!("Saved {}", out.display())).chain(std::iter::once(text)).chain(notes)
+    let lines: Vec<String> = std::iter::once(format!("Saved {}", out.display())).chain(std::iter::once(text))
         .chain(warnings.into_iter().map(|w| format!("warning: {w}"))).collect();
     Ok((lines.join("\n"), out))
 }

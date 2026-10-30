@@ -1,6 +1,6 @@
 {
   "config": {
-    "basemap": "voyager",
+    "basemap": "ofm_positron",
     "camera": {
       "pitch": 0,
       "bearing": 0,
