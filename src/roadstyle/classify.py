@@ -33,18 +33,22 @@ def ramp(palette, k):
     t = np.linspace(0, len(pts) - 1, k) if k > 1 else np.array([0.0])
     out = []
     for x in t:
-        i = min(int(x), len(pts) - 2); f = x - i
-        out.append("#%02x%02x%02x" % tuple(int(round(v)) for v in pts[i] * (1 - f) + pts[i + 1] * f))
+        i = min(int(x), len(pts) - 2)
+        f = x - i
+        out.append("#{:02x}{:02x}{:02x}".format(*tuple(int(round(v)) for v in pts[i] * (1 - f) + pts[i + 1] * f)))
     return out
 
 
 def natural_breaks(values, k):
     """The `k - 1` cut points of Fisher-Jenks natural breaks: the smallest value of each class after the first."""
-    x = np.sort(np.asarray(values, float)); x = x[np.isfinite(x)]
+    x = np.sort(np.asarray(values, float))
+    x = x[np.isfinite(x)]
     u, w = np.unique(x, return_counts=True)
     if len(u) > _MAXP:                                  # merge into groups of about the same size, as the JavaScript `rs.naturalBreaks` does
         g = np.array_split(np.arange(len(x)), _MAXP)
-        lo = np.array([x[i[0]] for i in g]); w = np.array([len(i) for i in g], float); u = np.array([x[i].mean() for i in g])
+        lo = np.array([x[i[0]] for i in g])
+        w = np.array([len(i) for i in g], float)
+        u = np.array([x[i].mean() for i in g])
     else:
         lo = u
     n = len(u)
@@ -53,18 +57,24 @@ def natural_breaks(values, k):
     w = w.astype(float)
     s0, s1, s2 = (np.concatenate([[0], np.cumsum(a)]) for a in (w, w * u, w * u * u))
     def cost(i, j):                                     # the spread of points i..j (j included), for every i at once
-        c0 = s0[j + 1] - s0[i]; c1 = s1[j + 1] - s1[i]
+        c0 = s0[j + 1] - s0[i]
+        c1 = s1[j + 1] - s1[i]
         return (s2[j + 1] - s2[i]) - c1 * c1 / c0
-    dp = np.full((k, n), np.inf); back = np.zeros((k, n), int)
+    dp = np.full((k, n), np.inf)
+    back = np.zeros((k, n), int)
     dp[0] = [cost(np.array([0]), j)[0] for j in range(n)]
     for c in range(1, k):
         for j in range(c, n):
             i = np.arange(c, j + 1)
             t = dp[c - 1][i - 1] + cost(i, j)
-            m = int(np.argmin(t)); dp[c, j] = t[m]; back[c, j] = i[m]
+            m = int(np.argmin(t))
+            dp[c, j] = t[m]
+            back[c, j] = i[m]
     cuts, j = [], n - 1
     for c in range(k - 1, 0, -1):
-        i = back[c, j]; cuts.append(float(lo[i])); j = i - 1
+        i = back[c, j]
+        cuts.append(float(lo[i]))
+        j = i - 1
     return cuts[::-1]
 
 
@@ -92,7 +102,8 @@ def classify(values, method="natural", k=5, *, breaks=None, pivot=None, palette=
     elif method == "quantile":
         cuts = sorted(set(float(c) for c in np.quantile(v[ok], np.linspace(0, 1, k + 1)[1:-1])))
     elif method == "equal":
-        lo, hi = float(v[ok].min()), float(v[ok].max()); cuts = [lo + (hi - lo) * i / k for i in range(1, k)]
+        lo, hi = float(v[ok].min()), float(v[ok].max())
+        cuts = [lo + (hi - lo) * i / k for i in range(1, k)]
     else:
         raise ValueError(f"classify: unknown method {method!r} (natural, quantile, equal, fixed)")
     if pivot is not None and cuts and v[ok].min() < pivot <= v[ok].max():
@@ -105,8 +116,8 @@ def classify(values, method="natural", k=5, *, breaks=None, pivot=None, palette=
     if reverse:
         cols = cols[::-1]
     idx = np.searchsorted(cuts, v, side="right")
-    labels = [names[i] if good else missing_label for i, good in zip(idx, ok)]
-    colors = dict(zip(names, cols))
+    labels = [names[i] if good else missing_label for i, good in zip(idx, ok, strict=False)]
+    colors = dict(zip(names, cols, strict=False))
     if not ok.all():
         colors = {missing_label: missing_color, **colors}
     return Classes(labels, cuts, colors)

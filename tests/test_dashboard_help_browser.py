@@ -4,8 +4,9 @@ import pytest
 
 pw = pytest.importorskip("playwright.sync_api")
 
-import roadstyle as rs  # noqa: E402
 from test_dashboard_sections_browser import _edges, _open  # noqa: E402
+
+import roadstyle as rs  # noqa: E402
 
 _HELP = {"title": "How to read this page", "intro": "A <b>bold</b> word.", "terms": [["Term one", "Its text."], ["Term two", "More text."]], "note": "A note."}
 
@@ -41,7 +42,8 @@ def test_the_button_opens_the_window_and_both_ways_close_it(tmp_path):
 def test_the_window_follows_the_theme(tmp_path):
     def body(page):
         page.click("#rs-help-btn")
-        bg = lambda: page.evaluate("getComputedStyle(document.querySelector('#rs-help .rs-help-box')).backgroundColor")
+        def bg():
+            return page.evaluate("getComputedStyle(document.querySelector('#rs-help .rs-help-box')).backgroundColor")
         light = bg()
         page.evaluate("document.documentElement.setAttribute('data-rs-theme', 'dark')")
         page.wait_for_timeout(300)
@@ -76,9 +78,11 @@ def test_the_hover_box_follows_the_pointer_and_stays_in_the_page(tmp_path):
         page.evaluate("rs.hover.show('<b>Hello</b>', {clientX: 20, clientY: 20})")
         box = page.locator("#rs-hover")
         assert box.is_visible() and box.inner_text() == "Hello"
-        r = box.bounding_box(); assert r["x"] >= 8 and r["y"] >= 8
+        r = box.bounding_box()
+        assert r["x"] >= 8 and r["y"] >= 8
         page.evaluate("rs.hover.show('Near the corner', {clientX: innerWidth - 4, clientY: innerHeight - 4})")
-        r = box.bounding_box(); assert r["x"] + r["width"] <= 1280 and r["y"] + r["height"] <= 800        # flipped to the other side
+        r = box.bounding_box()
+        assert r["x"] + r["width"] <= 1280 and r["y"] + r["height"] <= 800        # flipped to the other side
         page.evaluate("rs.hover.hide()")
         assert box.is_hidden()
         assert page.evaluate("getComputedStyle(document.getElementById('rs-hover')).pointerEvents") == "none"
@@ -93,7 +97,8 @@ def test_a_scroll_area_keeps_its_header_and_marks_more_below(tmp_path):
         page.wait_for_function("document.getElementById('t').dataset.rsScroll === '1'")
         assert page.evaluate("document.getElementById('t').hasAttribute('data-more')")
         assert page.evaluate("document.getElementById('t').getBoundingClientRect().height") <= 121
-        page.evaluate("document.getElementById('t').scrollTop = 99999"); page.wait_for_timeout(200)
+        page.evaluate("document.getElementById('t').scrollTop = 99999")
+        page.wait_for_timeout(200)
         assert not page.evaluate("document.getElementById('t').hasAttribute('data-more')")
         assert page.evaluate("getComputedStyle(document.querySelector('#t th')).position") == "sticky"
         assert page.evaluate("getComputedStyle(document.getElementById('t')).overscrollBehaviorY") == "contain"
@@ -112,7 +117,8 @@ def test_tabs_select_by_click_and_arrow_and_the_switch_has_no_panes(tmp_path):
         page.click("[data-tab=b]")
         assert page.locator("[data-pane=b]").is_visible() and page.locator("[data-pane=a]").is_hidden()
         assert page.get_attribute("[data-tab=b]", "aria-selected") == "true" and page.get_attribute("[data-tab=a]", "aria-selected") == "false"
-        page.focus("[data-tab=b]"); page.keyboard.press("ArrowRight")                 # wraps to the first
+        page.focus("[data-tab=b]")
+        page.keyboard.press("ArrowRight")                 # wraps to the first
         assert page.evaluate("T.current()") == "a" and page.locator("[data-pane=a]").is_visible()
         page.evaluate("T.select('b')")                                                 # from the code
         assert page.locator("[data-tab=b]").evaluate("e => e.classList.contains('on')")
@@ -120,7 +126,8 @@ def test_tabs_select_by_click_and_arrow_and_the_switch_has_no_panes(tmp_path):
         assert page.locator("[data-v=y]").evaluate("e => e.classList.contains('on')") and not page.locator("[data-v=x]").evaluate("e => e.classList.contains('on')")
         assert page.locator("[data-pane=b]").is_visible()                              # the switch touches no pane
         assert page.evaluate("seen") == ["tb", "ta", "tb", "sy"]
-        on = lambda: page.evaluate("getComputedStyle(document.querySelector('[data-tab=b]')).backgroundColor")
+        def on():
+            return page.evaluate("getComputedStyle(document.querySelector('[data-tab=b]')).backgroundColor")
         off = page.evaluate("getComputedStyle(document.querySelector('[data-tab=a]')).backgroundColor")
         assert on() != off
     _run(tmp_path, body)
@@ -150,7 +157,8 @@ def test_a_chart_follows_the_theme_with_rs_svg(tmp_path):
         assert page.evaluate("document.querySelector('#ch polygon').getAttribute('stroke-width')") == "1"
         assert page.evaluate("document.querySelector('#ch polygon').getAttribute('fill')") is None        # the variable went to the style
         assert page.evaluate("document.querySelector('#ch text').textContent") == "T"
-        fill = lambda: page.evaluate("getComputedStyle(document.querySelector('#ch polygon')).fill")
+        def fill():
+            return page.evaluate("getComputedStyle(document.querySelector('#ch polygon')).fill")
         light = fill()
         assert light != "none" and light != ""
         page.evaluate("rsSetTheme('dark')")
@@ -163,7 +171,8 @@ def test_inputs_chips_and_dots_use_the_panel_tokens(tmp_path):
         page.evaluate("""() => { const d = document.createElement('div'); d.className = 'sb-sec'; d.id = 'f';
             d.innerHTML = '<input id="i" placeholder="Find"><textarea id="t"></textarea><span class="rs-chip" id="c1">a</span><span class="rs-chip accent" id="c2">b</span><span class="rs-dot" id="d"></span>';
             document.querySelector('#sb .sb-body').appendChild(d); }""")
-        st = lambda sel, prop: page.evaluate("([s, p]) => getComputedStyle(document.querySelector(s))[p]", [sel, prop])
+        def st(sel, prop):
+            return page.evaluate("([s, p]) => getComputedStyle(document.querySelector(s))[p]", [sel, prop])
         assert st("#i", "borderRadius") == "8px" and st("#i", "width") == st("#t", "width")
         assert st("#c1", "backgroundColor") != st("#c2", "backgroundColor") and st("#c1", "borderRadius") == "10px"
         assert st("#d", "width") == "8px"
