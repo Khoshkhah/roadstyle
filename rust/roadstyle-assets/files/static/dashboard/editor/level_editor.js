@@ -97,6 +97,9 @@ function csvRows(text){                                          // the rows of 
 const cell = v => /[",\n]/.test(String(v ?? "")) ? `"${String(v).replaceAll('"', '""')}"` : String(v ?? "");
 const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.map(c => cell(r[c])).join(",")).join("\n") + (rows.length ? "\n" : "");
 
+// the guide of the editor on the site: the help window links to its two sections (they open in a new tab; the anchors are the headings of docs/guides/levels.md)
+const DOCS = "https://khoshkhah.github.io/roadstyle/guides/levels/";
+
 /** The words of the editor's help window (rs.help.set): `c` the colours of the two picked roads, `back` the label of the "← ..." button (null: none). */
 function levelsHelp(c, back){
   const dot = (col, n) => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};vertical-align:middle"></span> road ${n}`;
@@ -115,7 +118,8 @@ function levelsHelp(c, back){
   if(back != null) terms.push([`← ${back}`, "Goes back to the steps of the page. If changes are waiting, the editor asks you to <b>Apply</b>, <b>Discard</b> or <b>Stay</b>."]);
   return {title: "Edit levels", button: "How to use the level editor",
     intro: `A level says which road is drawn over which road: a road at a higher level is drawn over a road at a lower level. Click a road on the map: it is ${dot(c.select, 1)}. Click a second road: it is ${dot(c.second, 2)}. Each road has its colour on the map and in the panel. The panel then shows the rules between the two roads.`,
-    terms};
+    terms,
+    note: `More in the guide: <a href="${DOCS}#edit-the-levels" target="_blank" rel="noopener">Edit the levels</a> and <a href="${DOCS}#edit-the-levels-in-a-dashboard" target="_blank" rel="noopener">Edit the levels in a dashboard</a>.`};
 }
 
 /** The level editor on `map` (or a map of its own in `container`), with the panel in `container`; see the file's head. A page has one

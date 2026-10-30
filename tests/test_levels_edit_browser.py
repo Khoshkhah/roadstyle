@@ -137,6 +137,14 @@ def test_the_help_window_explains_the_editor_in_both_themes_and_on_a_phone(edito
         for word in ("which road is drawn over which road", "road 1", "road 2", "Order", "Stack", "Meet", "On top", "Casing parts", "Add to the list", "Discard",
                      "Apply and solve", "History", "edits.csv", "Issues", "Given up", "Near warnings", "Order wishes not kept"):
             assert word in text, word
+        # the links to the guide: two sections, in a new tab; their anchors are the headings of docs/guides/levels.md
+        links = page.evaluate("[...document.querySelectorAll('#rs-help .rs-help-note a')].map(a => [a.getAttribute('href'), a.target, a.rel, a.textContent])")
+        guide = (ROOT / "docs" / "guides" / "levels.md").read_text()
+        assert [l[0] for l in links] == ["https://khoshkhah.github.io/roadstyle/guides/levels/#edit-the-levels",
+                                         "https://khoshkhah.github.io/roadstyle/guides/levels/#edit-the-levels-in-a-dashboard"], links
+        assert all(l[1] == "_blank" and "noopener" in l[2] for l in links), links
+        for heading in (l[3] for l in links):
+            assert f"\n## {heading}\n" in guide, f"the guide has no section '{heading}'"
         dots = page.evaluate("[...document.querySelectorAll('#rs-help .rs-help-intro span')].map(e => getComputedStyle(e).backgroundColor)")
         assert len(dots) == 2 and dots[0] != dots[1], dots
         box = page.evaluate("document.querySelector('#rs-help .rs-help-box').getBoundingClientRect().toJSON()")

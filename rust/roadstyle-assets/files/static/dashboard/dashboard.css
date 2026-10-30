@@ -544,6 +544,7 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #rs-help .rs-help-terms dt,#rs-help .rs-help-terms dd{margin:0;padding:8px 0;border-bottom:1px solid var(--rs-tb-border);font-size:12.5px}
 #rs-help .rs-help-terms dt{font-weight:700;padding-right:10px}
 #rs-help .rs-help-note{margin-top:12px;padding:8px 10px;background:color-mix(in srgb,#38a3dc 14%,transparent);border-radius:8px;font-size:12px}
+#rs-help a{color:inherit;font-weight:600;text-decoration:underline}
 #rs-help .rs-help-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:20px;color:inherit;cursor:pointer}
 #sb #rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
 #sb #rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}
