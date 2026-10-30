@@ -10,6 +10,9 @@ import {defineTool, GOOGLE3D_ICON} from "./tools.js";
 import {_wPhone} from "./windows.js";
 import {_svKey} from "./streetview.js";
 import {_svLine, _svDist, _svAt} from "./svspot.js";
+// the selection's default colour is the dashboard's accent (the css variable --accent, dashboard.css): its stroke, and its fill at an opacity
+const _g3Accent = () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+const _g3AccentAlpha = a => { const c = _g3Accent(), v = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)); return "rgba(" + v.join(",") + "," + a + ")"; };
 export function rsSetGoogle3D(){}
 export function initGoogle3D(){
   if(O.google_3d){
@@ -270,7 +273,7 @@ export function initGoogle3D(){
     const add=el=>{ el.dataset.rsSel="1"; m3.appendChild(el); made.push(el); return el; };
     const polyline=(r, st, o)=>add(new lib.Polyline3DElement({path:pts(r), altitudeMode:MESH(), strokeColor:st.color||O.select_color, strokeWidth:st.width||4, outerColor:st.outline||"#202124", outerWidth:Math.min(0.5, (st.outlineWidth||1)/(st.width||4)),       // the outline, in px, as a fraction of the stroke: the line stands out on the dark drawn map and on the imagery
       drawsOccludedSegments:true, ...o}));
-    const polygon=(ring, st)=>add(new lib.Polygon3DElement({outerCoordinates:pts(ring), altitudeMode:MESH(), fillColor:st.fill||"rgba(14,127,145,0.35)", strokeColor:st.color||"#0E7F91", strokeWidth:st.outlineWidth||2,
+    const polygon=(ring, st)=>add(new lib.Polygon3DElement({outerCoordinates:pts(ring), altitudeMode:MESH(), fillColor:st.fill||_g3AccentAlpha(0.35), strokeColor:st.color||_g3Accent(), strokeWidth:st.outlineWidth||2,
       drawsOccludedSegments:true}));
     const arrowsOn=(cs, st0)=>{ const {total, at}=along(cs), k=Math.cos(cs[0][1]*Math.PI/180), ev=st0.arrowEvery||20,     // a chevron every `arrowEvery` m, 3 m long, opening backward
         st={...st0, color:st0.arrowColor||st0.color, width:st0.arrowWidth||st0.width};

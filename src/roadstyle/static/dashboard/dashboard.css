@@ -1,3 +1,9 @@
+/* THE ACCENT: one colour for the whole dashboard, the Sonocount teal, defined here and nowhere else (a page does not set its own). `--accent` is for what is drawn
+   in the colour: a link, a selected mark, a focus ring, the accent of a check box or a slider. White on the logo teal is 4.71:1 (`--accent-fill`). The text teal is the same hue a little darker, so that it
+   is 4.6:1 on the light panel's cards (the logo teal is 4.43:1 there). On the dark panel the teal is lighter, of the same hue: 8.5:1 on the panel's background. `--accent-fill` is the colour of a filled control (a selected tab, a primary button, a mode
+   on): its text is white in both themes (4.71:1), so the fill does not get lighter in the dark theme. */
+:root{--accent:#0e7c8e;--accent-fill:#0E7F91}
+html[data-rs-theme=dark],#sb[data-theme=dark]{--accent:#42c2d7}
 /* roadstyle's map dashboard: the look of its controls, panels and windows (docs/design/dashboard_module.md) */
 .rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:var(--rs-tb-ink);pointer-events:none}
@@ -15,7 +21,7 @@
 .bm-menu.open{display:block}
 .bm-menu div{padding:6px 12px;cursor:pointer;white-space:nowrap;border-radius:5px}
 .bm-menu div:hover{background:#f2f4f7}
-.bm-menu div.on{font-weight:700;color:#1a6bd6}
+.bm-menu div.on{font-weight:700;color:var(--accent)}
 /* non-panel: the map's own colour-by + filter cards share one anchored top-left stack, clear of
    the native zoom controls (top-right) and the scale bar (bottom-left). Panel mode docks them. */
 .rs-tl{position:absolute;top:10px;left:10px;z-index:2;display:flex;flex-direction:column;
@@ -103,7 +109,7 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-tl .ov-ctrl{position:static;max-height:none;overflow:auto;min-height:0}
 .ov-ctrl.collapsed .ov-body{display:none}
 .rs-tl .ov-ctrl .ov-hd{cursor:pointer;user-select:none}
-.ov-ctrl label:hover{color:#1a6bd6}
+.ov-ctrl label:hover{color:var(--accent)}
 .ov-ctrl .ov-sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
 /* text: soft slate, never black - popups, the map's own buttons, the scale and attribution */
 .maplibregl-ctrl-group button{color:#334155}
@@ -123,7 +129,6 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svw iframe,.rs-svw-pano{flex:1;width:100%;border:0;background:#eee}
 .rs-svw-mode{display:inline-flex;border:1px solid #555;border-radius:4px;overflow:hidden;cursor:default}
 .rs-svw-bar .rs-svw-mode button{font:11px/1 system-ui;padding:3px 7px;color:#cbd5e1}
-.rs-svw-bar .rs-svw-mode button.on{background:#0E7F91;color:#fff}
 .rs-svw-msg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   padding:14px;text-align:center;color:#666;background:#f4f4f4}
 .rs-svw-msg code{background:#e6e6e6;padding:1px 4px;border-radius:3px;color:#333}
@@ -228,7 +233,7 @@ html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-cont
 html:not(.rs-panel-left) #rs-scalebox .rs-attr-ctrl{order:-1}
 #rs-scalebox #rs-attr-box{position:absolute;top:auto;bottom:calc(100% + 8px);left:auto;right:-8px;width:264px}
 html:not(.rs-panel-left) #rs-scalebox #rs-attr-box{left:-8px;right:auto}
-#rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:46px!important;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 monospace;text-align:right!important;border-radius:0}
+#rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:46px!important;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:right!important;border-radius:0}
 html.rs-theme-in-bar #sb-th{display:none!important}
 html.rs-phone #rs-scalebox{display:none}
 /* thin overlay scrollbars for every scrollable box: 6 px, a rounded thumb in the theme's text color at 30 %, no track, no arrows */
@@ -252,7 +257,6 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-g3d-note{color:#fbbf24;font-size:10.5px;line-height:1.2;flex:1;min-width:0}
 .rs-g3d-note[hidden]{display:none}
 .rs-svw-bar button.rs-g3d-follow{font:11px/1 system-ui;padding:3px 7px;border-radius:4px;color:#cbd5e1;background:none;border:1px solid rgba(255,255,255,.45);white-space:nowrap}
-.rs-svw-bar button.rs-g3d-follow.on{background:#0E7F91;color:#fff;border-color:#0E7F91}
 .rs-g3d-showwrap{position:relative}
 .rs-g3d-showwrap[hidden]{display:none}
 .rs-svw-bar button.rs-g3d-show{font:11px/1 system-ui;padding:3px 7px;border-radius:4px;color:#cbd5e1;background:none;border:1px solid rgba(255,255,255,.45);white-space:nowrap}
@@ -281,7 +285,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-rd-row i{width:14px;height:8px;border-radius:2px;display:block}
 .rs-rd-row span,.rs-rd-row button{text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rs-rd-row b{font-weight:400;opacity:.65;font-variant-numeric:tabular-nums;font-size:11px}
-.rs-rd-row input{margin:0;accent-color:var(--accent,#1a6bd6)}
+.rs-rd-row input{margin:0;accent-color:var(--accent)}
 #rs-toolbar #rs-roads-box button{width:auto;height:auto;min-width:0;border:0;background:none;color:inherit;font:12px/1.3 system-ui,sans-serif;cursor:pointer;padding:0;border-radius:6px}
 #rs-roads-box .rs-rd-row button:hover{text-decoration:underline}
 .rs-rd-row.rs-rd-plain{grid-template-columns:18px 1fr}
@@ -296,7 +300,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 #rs-toolbar.rs-tb-bottom #rs-nav-box{bottom:calc(100% + 12px);right:0}
 .rs-nb-row{display:grid;grid-template-columns:40px 1fr 36px;gap:6px;align-items:center;margin:7px 0}
 .rs-nb-row span{opacity:.8} .rs-nb-row b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
-.rs-nb-row input[type=range]{width:100%;margin:0;accent-color:var(--accent,#1a6bd6)}
+.rs-nb-row input[type=range]{width:100%;margin:0;accent-color:var(--accent)}
 .rs-nb-zoom{display:grid;grid-template-columns:22px 1fr 22px;gap:4px;align-items:center}
 #rs-nav-box button{width:22px;height:22px;padding:0;border:1px solid var(--rs-tb-border);border-radius:6px;background:none;color:inherit;font:600 14px/1 system-ui,sans-serif;cursor:pointer}
 #rs-nav-box button:hover{background:var(--rs-tb-hover)}
@@ -339,6 +343,11 @@ html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-row{display:block;position:relative;f
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;touch-action:pan-x}
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll::-webkit-scrollbar{display:none}
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>*{flex:none}
+/* a tool of one button shrinks from 32 px to 26 px before the row scrolls (a phone of 390 px shows every tool of a bar of ten at once), and the row has 4 px at each
+   end, so that the first and the last tool are whole when the row is at its end */
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll{padding-inline:4px;scroll-padding-inline:4px}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:not(:has(button~button)){flex:0 1 32px;min-width:26px}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:not(:has(button~button))>button,html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:not(:has(button~button))>.maplibregl-ctrl-group>button{width:100%}
 html.rs-phone #rs-toolbar.rs-tb-top .maplibregl-ctrl{transform:none}   /* MapLibre gives each control a transform; it would make the control the frame of its fixed box */
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:first-child{margin-left:auto}
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:last-child{margin-right:auto}
@@ -359,10 +368,10 @@ a.rs-attr-row:hover .rs-attr-out{opacity:1}
    (the bar would be its backdrop root), and it looked more transparent than the bar. */
 #rs-toolbar{border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 #rs-toolbar::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-/* the scale box is of the first level, with the bar */
-#rs-scalebox{background:none!important;border:0!important;color:var(--rs-tb-ink)!important}
-/* the layer of the box (colour, blur, border) is a pseudo element, as the bar's: a box inside this one (the credits list) is not nested in a blurred element, which a browser would not blur behind */
-#rs-scalebox::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:10px;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)}
+/* the corner box (the scale, the zoom number, the credits) is of the first level, with the bar: the same border, radius, colour and blur, in the same two places: the border and the radius on the
+   box, the colour and the blur on a layer behind it (a box inside this one, the credits list, is not nested in a blurred element, which a browser would not blur behind) */
+#rs-scalebox{background:none!important;border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-scalebox::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 /* ---- the card of a sidebar (templates/*.html): the layer between the translucent panel and its text ---- */
 .sb-card{display:contents}
 html.rs-overlay #sb,html.rs-phone.rs-tpl-dashboard #sb{padding:8px;overflow:hidden}
@@ -374,8 +383,8 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 .rs-sel-native{display:none!important}
 #sb .rs-sel-btn,.rs-side .rs-sel-btn,.rs-sel-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:6px 9px;
   border:0;border-radius:12px;background:var(--card,transparent);color:inherit;font:13px system-ui,sans-serif;text-align:left;cursor:pointer}
-.rs-sel-btn:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6)}
-.rs-sel-btn:focus-visible,.rs-sel-btn[aria-expanded=true]{outline:0;box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6),0 0 0 3px color-mix(in srgb,var(--accent,#1a6bd6) 22%,transparent)}
+.rs-sel-btn:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--accent)}
+.rs-sel-btn:focus-visible,.rs-sel-btn[aria-expanded=true]{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-sel-btn:disabled{opacity:.5;cursor:not-allowed}
 .rs-sel-btn svg{flex:none;opacity:.6}
 .rs-sel-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -384,15 +393,15 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 .rs-sel-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 11px;border-radius:10px;cursor:pointer}
 .rs-sel-opt.on{background:var(--rs-tb-hover)}
 .rs-sel-opt.sel{font-weight:600}
-.rs-sel-opt svg{flex:none;color:var(--accent,#1a6bd6)}
+.rs-sel-opt svg{flex:none;color:var(--accent)}
 /* ---- the controls of the panels, in the theme (a dark panel has dark controls) ---- */
 #sb,.rs-side{color-scheme:light}
 #sb[data-theme=dark],html[data-rs-theme=dark] .rs-side{color-scheme:dark}
 :is(#sb,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea){
   box-sizing:border-box;padding:7px 11px;border:0;border-radius:12px;background:var(--card,var(--rs-card-bg));color:var(--ink,var(--rs-tb-ink));font:13px system-ui,sans-serif}
 :is(#sb,.rs-side) :is(input,textarea)::placeholder{color:var(--mut,var(--rs-tb-ink));opacity:.6}
-:is(#sb,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea):focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6),0 0 0 3px color-mix(in srgb,var(--accent,#1a6bd6) 22%,transparent)}
-:is(#sb,.rs-side) :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--accent,#1a6bd6)}
+:is(#sb,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea):focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+:is(#sb,.rs-side) :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--accent)}
 :is(#sb,.rs-side) :is(input[type=checkbox],input[type=radio]){width:16px;height:16px;margin:0}
 :is(#sb,.rs-side) button{border-radius:10px}
 /* ---- the Street View and Google 3D windows: the style of the boxes (the second level of transparency: --rs-box-bg, like the popup and the tooltip) ---- */
@@ -403,14 +412,14 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 .rs-svw-bar button:hover:not(:disabled){background:var(--rs-tb-hover)}
 .rs-svw-mode{display:inline-flex;border:0;border-radius:10px;overflow:hidden;background:var(--rs-tb-hover)}
 .rs-svw-bar .rs-svw-mode button{height:24px;font:11px/1 system-ui;padding:0 9px;color:var(--rs-tb-ink);border-radius:0}
-.rs-svw-bar .rs-svw-mode button.on{background:var(--accent,#1a6bd6);color:#fff}
+.rs-svw-bar .rs-svw-mode button.on{background:var(--accent-fill);color:#fff}
 .rs-svw-bar button.rs-g3d-follow,.rs-svw-bar button.rs-g3d-show{border:0;background:var(--rs-tb-hover);color:var(--rs-tb-ink);border-radius:10px;height:24px;padding:0 10px;font:11px/1 system-ui}
-.rs-svw-bar button.rs-g3d-follow.on{background:var(--accent,#1a6bd6);color:#fff}
+.rs-svw-bar button.rs-g3d-follow.on{background:var(--accent-fill);color:#fff;border-color:var(--accent-fill)}
 .rs-svw-bar a.rs-g3d-src{color:var(--rs-tb-ink);opacity:.6}
 .rs-g3d-warn{color:#d97706}
 .rs-svw-msg{background:var(--rs-card-bg);color:var(--rs-tb-ink)}
 .rs-svw-msg code{background:var(--rs-tb-hover);color:inherit;border-radius:6px;padding:1px 6px}
-.rs-svw-msg a{color:var(--accent,#1a6bd6)}
+.rs-svw-msg a{color:var(--accent)}
 .rs-g3d-menu{background:var(--rs-card-bg);color:var(--rs-tb-ink);border:0;border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.3);padding:6px 10px}
 .rs-svw iframe,.rs-svw-pano{background:var(--rs-card-bg)}
 /* ---- the scroll protocol of a panel (docs/design/dashboard_templates.md): the header (title, theme and hide buttons) stays; only the body scrolls; the
@@ -456,11 +465,11 @@ html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!i
 #rs-settings-box button:disabled{opacity:.4;cursor:not-allowed}
 .rs-set-slide{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;padding:3px 8px}
 .rs-set-slide span{grid-column:1;grid-row:1}
-.rs-set-slide input{grid-column:1/-1;grid-row:2;width:100%;margin:0;accent-color:var(--accent,#1a6bd6)}
+.rs-set-slide input{grid-column:1/-1;grid-row:2;width:100%;margin:0;accent-color:var(--accent)}
 .rs-set-slide b{grid-column:2;grid-row:1;font-weight:600;font-size:11px}      /* the value is in the row of the label: two rows for a slider, not three */
 .rs-set-key{padding:2px 8px 6px}
 .rs-set-key input{width:100%;box-sizing:border-box;margin:4px 0;padding:6px 10px;border:0;border-radius:10px;background:var(--rs-tb-hover);color:inherit;font:12px system-ui,sans-serif}
-.rs-set-key input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent,#1a6bd6)}
+.rs-set-key input:focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent)}
 .rs-set-btns{display:flex;gap:4px}
 .rs-set-note{font-size:11px;opacity:.75;padding:2px 8px 4px}
 .rs-set-key .rs-set-note{padding:4px 0 0}
@@ -518,9 +527,9 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
    page with its own panel (#sb with .sb-top, #sb-hide and #sb-show) needs too. They are at the end, as they were in the template's own style. ---- */
 #sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,400px);box-sizing:border-box;overflow:auto;
   padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
-  --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
+  --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;
   background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
-#sb[data-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026;--accent:#5aa9f8}
+#sb[data-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026}
 .sb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .sb-top h2{margin:0;font-size:15px}
 #sb-th,#sb-hide{background:none;border:1px solid var(--line);border-radius:8px;color:var(--mut);
@@ -549,10 +558,6 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb #rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}
 
 
-/* The strip's blur is a layer behind it, not a property of the strip: a box that opens inside a blurred parent (the attribution) blurs only what the parent
-   holds, and the map behind it stays sharp. The box in the toolbar has no blurred parent, and that is why it looks like glass. */
-#rs-scalebox::before{content:"";position:absolute;inset:-1px;z-index:-1;border-radius:inherit;pointer-events:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-
 /* THE HOVER BOX (hover.js): the popup's look - the box token, the blur and the border - and it never takes the pointer */
 #rs-hover{position:fixed;z-index:3000;max-width:280px;pointer-events:none;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border);
   color:var(--rs-tb-ink);padding:6px 9px;border-radius:8px;font:11.5px/1.45 system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.2)}
@@ -574,11 +579,11 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb .rs-table th[data-sort=asc]::after{content:" \25B2";font-size:8px}
 #sb .rs-table th[data-sort=desc]::after{content:" \25BC";font-size:8px}
 
-/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js): the selected one is in --accent (a page sets it: `#sb{--accent:#0E7F91}`); the rest are the panel's muted ink ---- */
+/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js): the selected one is in --accent-fill / --accent (the dashboard's one accent, above); the rest are the panel's muted ink ---- */
 #sb .rs-tabs{display:flex;flex-wrap:wrap;gap:2px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line)}
 #sb .rs-tab{padding:7px 9px;border:1px solid transparent;border-radius:6px;background:none;color:var(--mut);font:600 12px system-ui,sans-serif;cursor:pointer;user-select:none}
 #sb .rs-tab:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
-#sb .rs-tab.on,#sb .rs-tab.on:hover{color:#fff;background:var(--accent);border-color:var(--accent)}
+#sb .rs-tab.on,#sb .rs-tab.on:hover{color:#fff;background:var(--accent-fill);border-color:var(--accent-fill)}
 #sb .rs-seg{display:flex;padding:2px;margin-bottom:12px;border-radius:8px;background:color-mix(in srgb,var(--mut) 25%,transparent)}
 #sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:6px;background:none;color:var(--mut);font:600 11.5px system-ui,sans-serif;cursor:pointer}
 #sb .rs-seg button:hover{color:var(--ink);border:0}

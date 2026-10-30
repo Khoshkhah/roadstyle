@@ -33,7 +33,7 @@ PNG = _png()
 SQUARE = {"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"name": "a"}, "geometry": {
     "type": "Polygon", "coordinates": [[[18.0, 59.3], [18.01, 59.3], [18.01, 59.31], [18.0, 59.31], [18.0, 59.3]]]}}]}
 HOST = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="FILES/vendor/maplibre-gl.css"><link rel="stylesheet" href="FILES/static/dashboard/dashboard.css">
+<link rel="stylesheet" href="FILES/vendor/maplibre-gl.css"><link rel="stylesheet" href="FILES/static/popup.css"><link rel="stylesheet" href="FILES/static/dashboard/dashboard.css">
 <script src="FILES/vendor/maplibre-gl.js"></script>
 <script>
 const OPTS = __OPTS__;
@@ -45,7 +45,7 @@ if (matchMedia("(max-width:" + d.phone.max_width_px + "px)").matches) c.add("rs-
 </script>
 <style>html,body{margin:0;height:100%}#map{position:fixed;inset:0}</style></head><body>
 <div id="map"></div>
-<div id="sb" data-theme="light"><div class="sb-card"><div class="sb-top"><h2>Host</h2><button id="sb-hide" title="Hide the panel">x</button></div><div class="sb-body">Hello</div></div></div>
+<div id="sb" data-theme="light"><div class="sb-card"><div class="sb-top"><h2>Host</h2><button id="sb-hide" title="Hide the panel">x</button></div><div class="sb-body">Hello <button id="build" title="Build the networks of the area">Build &rarr;</button> <button id="zoomto" title="Zoom to the area" aria-label="Zoom to the area"><svg width="16" height="16"><circle cx="8" cy="8" r="6"/></svg></button></div></div></div>
 <script type="module">
 import {rsDashboard} from "FILES/static/dashboard/index.js";
 window.errors = [];
@@ -411,3 +411,159 @@ def test_the_dark_theme_turns_the_layers_of_the_style_dark_with_no_new_style(hos
     assert dark < 0.45 * light, (light, dark)         # the land, the water and the buildings are dark; the roads keep their fill
     assert layers_only < 0.9 * light, (light, layers_only)      # the base map is the same: the style's own layers are darker
     assert abs(again - light) < 1.0, (light, again)
+
+
+def _hover(page, selector):
+    """The pointer on a control, 700 ms (the box of the tip opens after 350 ms): the box's rectangle and the control's, or None when no box shows."""
+    page.mouse.move(2, 2)
+    page.wait_for_timeout(100)
+    box = page.locator(selector).first.bounding_box()
+    page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.wait_for_timeout(700)
+    return page.evaluate("""(sel) => { const t = document.getElementById('rs-tip'); if (!t || t.hidden) return null;
+        const a = t.getBoundingClientRect(), b = document.querySelector(sel).getBoundingClientRect();
+        return {tip: [a.left, a.top, a.right, a.bottom], control: [b.left, b.top, b.right, b.bottom], text: t.textContent}; }""", selector)
+
+
+def _apart(r):
+    (a0, a1, a2, a3), (b0, b1, b2, b3) = r["tip"], r["control"]
+    return a2 <= b0 or a0 >= b2 or a3 <= b1 or a1 >= b3
+
+
+def test_the_tip_is_for_a_control_with_no_text_and_never_over_the_control(host):
+    """A button with a text of its own (the panel's "Build") shows no box: its text says what it does, and its title becomes its description. An icon button and a tool of
+    the bar show the box, beside the control and never over it, and keep their accessible name."""
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        for width, height in ((1100, 760), (1500, 520)):
+            page = browser.new_page(viewport={"width": width, "height": height})
+            page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+            page.goto(base + "/page.html")
+            page.wait_for_function("window.ready === true", timeout=60_000)
+            assert _hover(page, "#build") is None, "a button with a text shows no box"
+            assert page.evaluate("() => { const b = document.getElementById('build'); return [b.hasAttribute('title'), b.getAttribute('aria-description'), b.dataset.rsTip]; }") == [False, "Build the networks of the area", "Build the networks of the area"]
+            for selector in ("#zoomto", "#sb-hide", "[data-rs-tool='basemap'] button"):
+                shown = _hover(page, selector)
+                assert shown and _apart(shown), (width, selector, shown)
+            assert page.evaluate("() => document.getElementById('zoomto').getAttribute('aria-label')") == "Zoom to the area"
+            page.close()
+        # a phone with touch: a tap shows no box (a finger has no hover), and the page's own tap on the text button works
+        page = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True).new_page()
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        page.evaluate("() => { document.getElementById('build').onclick = () => { window.built = true; }; }")
+        page.tap("#build")
+        page.wait_for_timeout(600)
+        assert page.evaluate("() => window.built === true && (!document.getElementById('rs-tip') || document.getElementById('rs-tip').hidden)")
+        browser.close()
+
+
+_REACH = """async (end) => { const row = document.querySelector('#rs-toolbar .rs-tb-scroll'), box = row.parentElement.getBoundingClientRect();
+  row.scrollLeft = end ? row.scrollWidth : 0;
+  await new Promise(ok => setTimeout(ok, 150));
+  return {scrolls: row.scrollWidth > row.clientWidth + 1, row: [box.left, box.right], fadeR: getComputedStyle(row.parentElement.querySelector('.rs-tb-fade-r')).display,
+    tools: [...row.children].map(e => { const b = e.getBoundingClientRect(); return [e.dataset.rsTool || e.className.slice(0, 12), b.left, b.right]; }), vw: innerWidth}; }"""
+
+
+def test_every_tool_of_the_one_row_bar_is_whole_on_a_phone(host):
+    """At 390 px the tools of the bar (ten here) show whole, at once; with more tools than fit, the row scrolls, and its first and last tool are whole at its ends, with
+    room at the end and no fade over them."""
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True).new_page()
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        fits = page.evaluate(_REACH, False)
+        assert not fits["scrolls"] and all(0 <= a and b <= fits["vw"] for _, a, b in fits["tools"]), fits
+        for i in range(6):                                                    # more tools than the row holds
+            page.evaluate("(i) => rs.tools.add({id: 'extra' + i, title: 'Extra ' + i, icon: 'E' + i, onClick() {}})", i)
+        page.wait_for_timeout(300)
+        start, end = page.evaluate(_REACH, False), page.evaluate(_REACH, True)
+        assert start["scrolls"], start
+        first, last = start["tools"][0], end["tools"][-1]
+        assert first[1] >= start["row"][0] + 3 and last[2] <= end["row"][1] - 3, (start, end)       # whole, with room at each end
+        assert end["fadeR"] == "none", end                                                       # nothing is under the fade at the end
+        assert all(0 <= a and b <= end["vw"] for _, a, b in end["tools"][-4:]), end
+        browser.close()
+
+
+_SHAPE = """() => { const cs = (e, p) => getComputedStyle(e, p), bar = document.getElementById('rs-toolbar'), corner = document.getElementById('rs-scalebox'), zoom = corner.querySelector('.rs-zoom');
+  const pick = (e, p) => ({radius: cs(e, p).borderRadius, border: cs(e, p).borderTopWidth + ' ' + cs(e, p).borderTopStyle + ' ' + cs(e, p).borderTopColor, shadow: cs(e).boxShadow});
+  rs.tools.open('attribution'); const box = document.getElementById('rs-attr-box'); const out = {bar: pick(bar), corner: pick(corner), box: pick(box),
+    barLayer: {bg: cs(bar, '::before').backgroundColor, blur: cs(bar, '::before').backdropFilter, radius: cs(bar, '::before').borderRadius},
+    cornerLayer: {bg: cs(corner, '::before').backgroundColor, blur: cs(corner, '::before').backdropFilter, radius: cs(corner, '::before').borderRadius},
+    zoom: {family: cs(zoom).fontFamily, numbers: cs(zoom).fontVariantNumeric}, barFamily: cs(bar).fontFamily}; rs.tools.close('attribution'); return out; }"""
+
+
+def test_the_corner_box_has_the_shape_and_the_tokens_of_the_bar_and_the_boxes(host):
+    """The corner box (the scale, the zoom number, the credits) had square corners: a second rule of its layer put `border-radius: inherit` over the first, and the box itself had
+    no radius. It has the bar's radius, border, colour and blur in the light and the dark theme and with another transparency, and the type of the bar with tabular numbers."""
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        page.evaluate("() => document.documentElement.classList.remove('rs-hide-scale')")
+        for theme, alpha in (("light", None), ("dark", None), ("dark", "0.8")):
+            page.evaluate("(t) => rsSetTheme(t)", theme)
+            if alpha:
+                page.evaluate("(a) => document.documentElement.style.setProperty('--rs-a-tb', a)", alpha)
+            s = page.evaluate(_SHAPE)
+            assert s["corner"]["radius"] == s["bar"]["radius"] == s["box"]["radius"] == "10px", (theme, s)
+            assert s["corner"]["border"] == s["bar"]["border"] == s["box"]["border"], (theme, s)
+            assert s["cornerLayer"] == s["barLayer"] and s["cornerLayer"]["radius"] == "10px", (theme, alpha, s)
+            assert s["corner"]["shadow"] == s["bar"]["shadow"], (theme, s)
+            assert "system-ui" in s["zoom"]["family"] and "system-ui" in s["barFamily"], s
+            assert "tabular-nums" in s["zoom"]["numbers"], s
+        browser.close()
+
+
+def test_the_accent_is_defined_once_and_every_place_reads_it():
+    """One accent colour for the whole dashboard (dashboard.css): a hex accent colour (the teal, or the two blues that were) appears only on the lines that define the token, and the
+    dark panel's accent keeps a contrast of 4.5 : 1 or more on the panel."""
+    import re
+    files = [*(ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "dashboard").glob("*.css"), *(ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "dashboard").glob("*.js"),
+             *(ROOT / "rust" / "roadstyle-assets" / "files" / "templates").glob("*.html"), ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "level_editor.html"]
+    stray = []
+    for f in files:
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            if re.search(r"1a6bd6|5aa9f8|0e7f91", line, re.I) and not re.search(r"--accent(-fill)?\s*:", line):
+                stray.append(f"{f.name}:{n}: {line.strip()[:90]}")
+    assert not stray, stray
+    css = (ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "dashboard" / "dashboard.css").read_text()
+    assert len(re.findall(r"--accent:\s*#", css)) == 2, "one light and one dark definition in dashboard.css"
+    dark = re.search(r"html\[data-rs-theme=dark\],#sb\[data-theme=dark\]\{--accent:(#[0-9a-f]{6})\}", css).group(1)
+
+    def luminance(c):
+        v = [int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        v = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in v]
+        return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+
+    def contrast(a, b):
+        la, lb = sorted((luminance(a), luminance(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+    light = re.search(r":root\{--accent:(#[0-9a-f]{6});", css).group(1)
+    assert contrast(dark, "#14171c") >= 4.5 and contrast(dark, "#1c2026") >= 4.5, dark                   # text and links on the dark panel and its cards
+    assert contrast(light, "#f7f8fa") >= 4.5 and contrast(light, "#ffffff") >= 4.5, light               # and on the light panel and its cards
+    assert contrast("#ffffff", "#0E7F91") >= 4.5, "white on the fill of a filled control"
+
+
+def test_the_accent_reads_the_same_in_the_panel_and_in_the_windows_and_follows_the_theme(host):
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        read = "() => ['sb', 'rs-toolbar'].map(id => getComputedStyle(document.getElementById(id)).getPropertyValue('--accent').trim()).concat([getComputedStyle(document.body).getPropertyValue('--accent-fill').trim()])"
+        assert page.evaluate(read) == ["#0e7c8e", "#0e7c8e", "#0E7F91"]
+        page.evaluate("() => rsSetTheme('dark')")
+        assert page.evaluate(read) == ["#42c2d7", "#42c2d7", "#0E7F91"]          # a window or the bar reads what the panel reads; the fill keeps its teal for the white text
+        browser.close()

@@ -3,8 +3,9 @@
 A dashboard page looks the same on every project when every page uses the same parts. This page lists them. **Use a part when one exists. Do not write CSS or
 JavaScript for the same thing in a page**: a copy of a part drifts, and it forgets the dark theme.
 
-The panel's tokens change with the theme: `--ink` (text), `--mut` (muted text), `--line`, `--card`, `--accent`. A page sets its own accent with
-`page_style`, for example `#sb{--accent:#0E7F91}`. Details and code for each part: [Add to the panel](dashboard-panel.md).
+The panel's tokens change with the theme: `--ink` (text), `--mut` (muted text), `--line`, `--card`, `--accent`. The accent is one colour for the whole dashboard, the Sonocount teal
+(`#0e7c8e` for text in the light theme, a little darker than the logo's `#0E7F91` for 4.6:1 on the cards, and a lighter teal of the same hue in the dark theme, 8.5:1 on the panel); a page does not set its own. A filled control (a selected tab, a primary button)
+uses `--accent-fill`, the logo teal `#0E7F91`, which takes white text (4.71:1) in both themes. Details and code for each part: [Add to the panel](dashboard-panel.md).
 
 | Part | What it is | Use it for |
 |---|---|---|
