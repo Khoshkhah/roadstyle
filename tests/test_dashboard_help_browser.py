@@ -156,3 +156,24 @@ def test_a_chart_follows_the_theme_with_rs_svg(tmp_path):
         page.evaluate("rsSetTheme('dark')")
         assert fill() != light
     _run(tmp_path, body)
+
+
+def test_inputs_chips_and_dots_use_the_panel_tokens(tmp_path):
+    def body(page):
+        page.evaluate("""() => { const d = document.createElement('div'); d.className = 'sb-sec'; d.id = 'f';
+            d.innerHTML = '<input id="i" placeholder="Find"><textarea id="t"></textarea><span class="rs-chip" id="c1">a</span><span class="rs-chip accent" id="c2">b</span><span class="rs-dot" id="d"></span>';
+            document.querySelector('#sb .sb-body').appendChild(d); }""")
+        st = lambda sel, prop: page.evaluate("([s, p]) => getComputedStyle(document.querySelector(s))[p]", [sel, prop])
+        assert st("#i", "borderRadius") == "8px" and st("#i", "width") == st("#t", "width")
+        assert st("#c1", "backgroundColor") != st("#c2", "backgroundColor") and st("#c1", "borderRadius") == "10px"
+        assert st("#d", "width") == "8px"
+        light = st("#i", "backgroundColor")
+        page.evaluate("rsSetTheme('dark')")
+        assert st("#i", "backgroundColor") != light
+    _run(tmp_path, body)
+
+
+def test_ready_runs_now_when_the_page_is_ready(tmp_path):
+    def body(page):
+        assert page.evaluate("(() => { let n = 0; rs.ready(() => n++); return n; })()") == 1
+    _run(tmp_path, body)

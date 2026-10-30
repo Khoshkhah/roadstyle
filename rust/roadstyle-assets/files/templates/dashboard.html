@@ -4,8 +4,8 @@
      piece is safe to rip out, restyle, or extend. Uses the shared design tokens
      (--bg / --ink / --mut / --line / --card / --accent + a light/dark toggle). Build:  python build.py  -->
 <style>
-#map{right:var(--rs-panel-w,340px)}
-body{--rs-side:var(--rs-panel-w,340px)}   /* shift the map's right-anchored controls left of the panel */
+#map{right:var(--rs-panel-w,400px)}
+body{--rs-side:var(--rs-panel-w,400px)}   /* shift the map's right-anchored controls left of the panel */
 .co-ctrl,.co-lg{display:none}  /* the sidebar owns the colour-by select + legend; hide the built-in ones */
 #sb label{display:block;margin:11px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
   text-transform:uppercase;letter-spacing:.04em}
@@ -81,8 +81,8 @@ document.getElementById("sb-th").onclick = () => sb.dataset.theme = sb.dataset.t
 function panel(show){
   sb.classList.toggle("hidden", !show);
   document.getElementById("sb-show").style.display = show ? "none" : "flex";
-  const mp = document.getElementById("map"); if (mp) mp.style.right = show ? "var(--rs-panel-w,340px)" : "0";
-  document.body.style.setProperty("--rs-side", show ? "var(--rs-panel-w,340px)" : "0px");
+  const mp = document.getElementById("map"); if (mp) mp.style.right = show ? "var(--rs-panel-w,400px)" : "0";
+  document.body.style.setProperty("--rs-side", show ? "var(--rs-panel-w,400px)" : "0px");
   try { map.resize(); } catch (e) {}
 }
 document.getElementById("sb-hide").onclick = () => panel(false);

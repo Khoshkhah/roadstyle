@@ -81,6 +81,7 @@ export function makeApi(extra){
                 "streetView", "google3d", "panel"];
   const api = {
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
+    ready: fn => window.rsReady ? fn() : document.addEventListener("rs:ready", fn, {once: true}),   // run fn now if the page is ready, else when it is
     svg: rsSvg,                  // one SVG element for a chart, with var(--x) colours (svg.js)
     kpi: rsKpi,                  // the HTML of a number tile (kpi.js)
     tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)

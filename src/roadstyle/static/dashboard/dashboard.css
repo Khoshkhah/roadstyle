@@ -394,7 +394,7 @@ html.rs-panel-left #sb,html.rs-panel-left .rs-side{left:0;right:auto}
 html.rs-panel-left #sb{border-left:0;border-right:1px solid var(--line,var(--rs-tb-border))}
 html.rs-panel-left #sb-show,html.rs-panel-left #rs-show-right{left:10px;right:auto}
 html.rs-panel-left :is(#sb-hide,#sb-show,.rs-side-min) svg,html.rs-panel-left #rs-show-right svg{transform:scaleX(-1)}
-html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:var(--rs-panel-w,340px)!important;right:0!important}
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:var(--rs-panel-w,400px)!important;right:0!important}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!important}
 /* the compass: our needle (tools.js) instead of MapLibre's picture, which is pale on a translucent bar */
 /* the icon fills its button and is centered in it (MapLibre's own box is 29 px high and sat at the top of a 32 px button) */
@@ -484,7 +484,7 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb .sb-body[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent)}
 /* ---- The panel's shell (position, tokens, the title row, the hide and show buttons): the rules that the sidebar of a template needs, and that a host
    page with its own panel (#sb with .sb-top, #sb-hide and #sb-show) needs too. They are at the end, as they were in the template's own style. ---- */
-#sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,340px);box-sizing:border-box;overflow:auto;
+#sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,400px);box-sizing:border-box;overflow:auto;
   padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
   --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;--accent:#1a6bd6;
   background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
@@ -571,3 +571,12 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
    For text and lines the panel's own tokens do the same: --ink, --mut, --line, --card. ---- */
 html{--rs-chart-band:#e0f2fe;--rs-chart-band-line:#bae6fd;--rs-chart-grid:#eef2f6;--rs-chart-miss:#e2e8f0}
 html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-line:rgba(90,169,248,.45);--rs-chart-grid:#272b33;--rs-chart-miss:#3a404a}
+
+/* ---- INPUTS, CHIPS AND A DOT in the panel: a text box looks like the panel's select and query box; a chip is a small rounded label (`.accent` tints it with --accent);
+   a dot is a colour mark before a word. A plain <button> and `button.sb-primary` are styled by the template; a page needs no class for them. ---- */
+#sb :is(input[type=text],input[type=search],input[type=number],input:not([type]),textarea){width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;outline:none}
+#sb :is(input,textarea):focus{border-color:var(--accent)}
+#sb :is(input,textarea)::placeholder{color:var(--mut)}
+#sb .rs-chip{display:inline-block;padding:2px 8px;border-radius:10px;background:color-mix(in srgb,var(--mut) 18%,transparent);color:var(--mut);font-size:11px;font-weight:600;line-height:1.35}
+#sb .rs-chip.accent{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+#sb .rs-dot{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:var(--mut)}

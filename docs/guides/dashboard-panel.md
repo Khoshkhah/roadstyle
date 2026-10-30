@@ -57,6 +57,10 @@ document.getElementById("k").innerHTML = rs.kpi("Inside the range", "80.4%", "pr
 
 A card is `.rs-sec-box`: an `h3` is its title and the paragraph right after it is its short muted description. An `svg` in it fills the width. `rs-kpis` is a grid of three tiles (`--rs-kpi-cols` changes the number). All of them use the panel's tokens, so they follow the light and the dark theme.
 
+## Buttons, text boxes, chips and a dot
+
+A plain `<button>` and `<button class="sb-primary">` in the panel are styled already, and so are a `<select>` and a text `<input>` or `<textarea>`: write no class for them. `<span class="rs-chip">road type</span>` is a small label, `rs-chip accent` tints it with the page's `--accent`, and `<span class="rs-dot" style="background:#15803d"></span>` is a colour mark before a word.
+
 ## Charts
 
 ```js

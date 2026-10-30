@@ -117,7 +117,7 @@ def test_a_later_style_brings_its_base_map_layers_a_raster_map_goes_under_the_ro
         page.wait_for_function("window.ready === true", timeout=60_000)
         # gap 8: the panel's shell is dashboard.css (the host has no rule for #sb)
         shell = page.evaluate("""() => { const s = getComputedStyle(document.getElementById("sb")); return {position: s.position, width: s.width}; }""")
-        assert shell["position"] == "fixed" and shell["width"] == "340px", shell
+        assert shell["position"] == "fixed" and shell["width"] == "400px", shell
         # gap 3: no overlay at the start; the style that has them brings the switch (base-map box), the list (legend box) and the 3D tool, and no Layers box
         buildings = "() => rs.tools.list().find(t => t.id === 'buildings').title"
         switch = "() => { rs.tools.open('basemap'); const r = document.querySelector('.rs-bm-layers'); const out = {hidden: r.hidden, label: r.textContent.trim(), on: r.querySelector('input').checked}; rs.tools.close('basemap'); return out; }"

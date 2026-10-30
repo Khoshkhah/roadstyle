@@ -79,7 +79,7 @@ def test_a_desktop_keeps_the_docked_sidebar(tmp_path):
         phone = page.evaluate("document.documentElement.classList.contains('rs-phone')")
         sb, mp = _box(page, "#sb"), _box(page, "#map")
         browser.close()
-    assert not phone and sb["w"] == 340 and mp["w"] == 1280 - 340
+    assert not phone and sb["w"] == 400 and mp["w"] == 1280 - 400
 
 
 def test_a_held_toolbar_shows_when_the_page_has_added_its_tools(tmp_path):

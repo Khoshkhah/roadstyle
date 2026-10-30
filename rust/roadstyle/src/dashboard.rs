@@ -361,7 +361,7 @@ impl Template {
     /// The defaults of the template with a layout (`Map` has no panel, so the layout does not change it).
     pub fn dashboard(self, layout: Layout) -> Dashboard {
         // the panel at the left, with the sections that the bar's boxes already have (the base map, the colour and the legend) hidden (decided 2026-10-29)
-        let panel0 = Some(Panel { side: Edge::Left, width_px: 340, look: PanelLook::Frame, sections: Vec::new(),
+        let panel0 = Some(Panel { side: Edge::Left, width_px: 400, look: PanelLook::Frame, sections: Vec::new(),
                                   hide: ["base_map", "colour_by", "legend"].map(String::from).to_vec() });
         let free = WindowRules { clamp: false, recenter_map: true, restore_open: true, remember: true };
         let phone = Phone { max_width_px: 700, toolbar: Edge::Top };
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn each_form_has_its_defaults() {
         let d = Template::Dashboard.dashboard(Dock);
-        assert_eq!((d.layout, d.panel.as_ref().map(|p| (p.side, p.width_px, p.look)), d.toolbar), (Dock, Some((Edge::Left, 340, PanelLook::Frame)), None));
+        assert_eq!((d.layout, d.panel.as_ref().map(|p| (p.side, p.width_px, p.look)), d.toolbar), (Dock, Some((Edge::Left, 400, PanelLook::Frame)), None));
         assert_eq!(d.panel.as_ref().unwrap().hide, ["base_map", "colour_by", "legend"]);
         let r = Template::Dashboard.dashboard(Overlay);
         assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Left, settings: true, hold: false, navigation: Navigation::Box })));

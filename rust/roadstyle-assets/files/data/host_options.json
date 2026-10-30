@@ -4,7 +4,7 @@
     "layout": "overlay",
     "panel": {
       "side": "left",
-      "width_px": 340,
+      "width_px": 400,
       "look": "frame",
       "sections": [],
       "hide": [
@@ -69,7 +69,7 @@
       "rs-panel-left",
       "rs-hide-scale"
     ],
-    "panel_width_px": 340,
+    "panel_width_px": 400,
     "phone_max_width_px": 700
   },
   "basemaps": [

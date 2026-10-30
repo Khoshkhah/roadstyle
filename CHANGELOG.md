@@ -7,6 +7,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`rs.classify`: discrete colour classes for roads, from data.** `classify(values, method="natural"|"quantile"|"equal"|"fixed", k, breaks=, pivot=, palette=, fmt=)` gives the cuts, the class labels and the colours (`.labels`, `.breaks`, `.colors`, `.option(column)` for `color_options`). Natural breaks are Fisher-Jenks, as in the JavaScript `rs.naturalBreaks`; a `pivot` is always one of the cuts; a missing value has its own grey class. Also `natural_breaks` and `ramp`.
+- **A docs page, "Dashboard parts"**, lists the shared parts of a dashboard page and the rules (width, colours, themes, scroll, transparency).
+- **`rs.ready(fn)`: start-up code of a page.** It runs `fn` now when the page is ready (`window.rsReady`), or when `rs:ready` comes. A page no longer writes `window.rsReady ? main() : addEventListener("rs:ready", main, {once: true})`.
+- **Text boxes, chips and a dot in the panel.** A text `<input>` or `<textarea>` in the panel looks like its select and query box. `.rs-chip` is a small rounded label (`.accent` tints it with `--accent`), and `.rs-dot` is a colour mark before a word. A plain `<button>` and `button.sb-primary` were already styled; the guide says so.
 - **Chart colours and `rs.svg`.** `--rs-chart-band`, `--rs-chart-band-line`, `--rs-chart-grid` and `--rs-chart-miss` have a light and a dark value, for the charts of a page. `rs.svg(parent, tag, attrs, text?)` makes one SVG element; a value that starts with `var(` goes to the style, because an SVG attribute does not read a variable. A chart with these two follows the theme with no code of its own (the event `rs:themechange` is for what is drawn on a canvas).
 - **Cards, number tiles, a caption and a callout in the panel.** `rs.kpi(title, value, sub, color?)` is the HTML of one number tile for a `<div class="rs-kpis">` (a grid of three; `--rs-kpi-cols` changes it). `.rs-cap` is a small capital caption, and `.rs-callout` is the answer in one box with a coloured edge (`--rs-callout`). A card is the existing `.rs-sec-box`; it now styles an `h3` title and the muted description (`h3 + p`) after it, and fits an `svg` to its width.
 - **`rs.tabs.use` and the classes `rs-tabs`, `rs-tab`, `rs-seg`: tabs and the two-way switch of a page.** The page writes the buttons (`data-tab` or `data-v`) and the panes beside them (`data-pane`); a click or an arrow key selects, the chosen button has `on` and `aria-selected`, and the panes show or hide. The selected one is in `--accent`, which a page can set. A page no longer writes its own tab code.
@@ -49,6 +53,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   that show on the light and on the dark map. It was viridis, whose dark end was lost on the dark map.
 
 ### Changed
+- **The panel of a dashboard is 400 px wide by default** (it was 340 px), so the pages of one project share one panel width. A page that needs another width still sets `dashboard={"panel": {"width_px": ...}}`; fit the content to the panel and do not widen the panel for it.
 - **The card behind the text starts at 40 %**, as the bar and the boxes do (`--rs-a-card` was 0.75). All three layers of the settings box start at 0.4; the person can still change each one.
 - **The dashboard has one zoom table** (its default `minzoom`): the service roads and the living streets show from zoom 14; the steps, the platforms, the corridors and the roads (`highway=road`) from zoom 15; the
   roads with private access (`access_col`) not before zoom 15, whatever their class; every other class at every zoom, as in d20. The mapping of `minzoom` takes the key `"*"` (sets every class first:

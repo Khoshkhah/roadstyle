@@ -125,7 +125,7 @@ def _dashboard(html):
 def test_each_page_has_its_template():
     assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
     d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
-    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "left", "width_px": 340, "look": "frame", "sections": [], "hide": ["base_map", "colour_by", "legend"]},
+    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "left", "width_px": 400, "look": "frame", "sections": [], "hide": ["base_map", "colour_by", "legend"]},
                                                                        {"position": "left", "settings": True, "hold": False, "navigation": "box"})
     c = _dashboard(rs.render_dashboard(_edges(), layout="dock").html)
     assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("dashboard", "dock", "frame", None)
