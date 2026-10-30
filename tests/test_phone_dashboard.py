@@ -108,7 +108,7 @@ def _bar(page):
               rowCls: q('.rs-tb-row').className, fold: r(q('.rs-tb-fold button'))}; }""")
 
 
-@pytest.mark.parametrize("w,h", _PHONES)
+@pytest.mark.parametrize("w,h", [(320, 568)])        # a tool shrinks from 32 to 26 px before the row scrolls: the bar of 390 and 360 px shows every tool at once, this one scrolls
 def test_the_bar_is_one_row_that_a_finger_moves_sideways(w, h):
     html, errors = rs.render_dashboard(_edges(), basemap="blank").html, []
     with pw.sync_playwright() as p:

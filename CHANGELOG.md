@@ -6,6 +6,16 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The corner box has the shape of the bar.** The box with the scale, the zoom number and the credits had square corners and its own look: its layer was made by two rules, and the later one (`border-radius: inherit`) put 0
+  over the first, because the box itself had no radius. It has one rule now, as the bar: the border and the radius (10 px) on the box, the colour and the blur on a layer behind it, in the light and the dark theme and with
+  the transparency setting. Its text is the type of the bar (`system-ui`), with tabular numbers for the zoom number, not a monospace font.
+- **The tooltip box is not for a button with a text, and never covers the control.** The panel's "Build" button showed a box with "Build the networks of the area" over it. tip.js now shows its box for a tool of the bar
+  and for a control with no text (an icon button); a button or a link with a text of its own shows none, and its `title` is its accessible description (`aria-description`). The box opens on the first side where it
+  does not cover the control (the side that faces the map's center, then below, above, right, left). An icon button keeps its `aria-label`.
+- **Every tool of the one-row bar of a phone is whole.** At 390 px the last tool (the credits) of ten was at 376-408 px, partly off the screen. A tool of one button now shrinks from 32 px to 26 px before the row scrolls, and the row has 4 px
+  at each end, so the first and the last tool are whole when the row is at its end.
+
 ## [0.26.0] - 2026-10-30
 
 ### Added

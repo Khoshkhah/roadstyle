@@ -228,7 +228,7 @@ html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-cont
 html:not(.rs-panel-left) #rs-scalebox .rs-attr-ctrl{order:-1}
 #rs-scalebox #rs-attr-box{position:absolute;top:auto;bottom:calc(100% + 8px);left:auto;right:-8px;width:264px}
 html:not(.rs-panel-left) #rs-scalebox #rs-attr-box{left:-8px;right:auto}
-#rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:46px!important;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 monospace;text-align:right!important;border-radius:0}
+#rs-scalebox .rs-zoom,#rs-scalebox .rs-zoom-slot{position:static!important;flex:none;width:46px!important;margin:0;padding:0;background:none!important;color:var(--rs-tb-ink)!important;font:11px/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:right!important;border-radius:0}
 html.rs-theme-in-bar #sb-th{display:none!important}
 html.rs-phone #rs-scalebox{display:none}
 /* thin overlay scrollbars for every scrollable box: 6 px, a rounded thumb in the theme's text color at 30 %, no track, no arrows */
@@ -339,6 +339,11 @@ html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-row{display:block;position:relative;f
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain;touch-action:pan-x}
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll::-webkit-scrollbar{display:none}
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>*{flex:none}
+/* a tool of one button shrinks from 32 px to 26 px before the row scrolls (a phone of 390 px shows every tool of a bar of ten at once), and the row has 4 px at each
+   end, so that the first and the last tool are whole when the row is at its end */
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll{padding-inline:4px;scroll-padding-inline:4px}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:not(:has(button~button)){flex:0 1 32px;min-width:26px}
+html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:not(:has(button~button))>button,html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:not(:has(button~button))>.maplibregl-ctrl-group>button{width:100%}
 html.rs-phone #rs-toolbar.rs-tb-top .maplibregl-ctrl{transform:none}   /* MapLibre gives each control a transform; it would make the control the frame of its fixed box */
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:first-child{margin-left:auto}
 html.rs-phone #rs-toolbar.rs-tb-top .rs-tb-scroll>:last-child{margin-right:auto}
@@ -359,10 +364,10 @@ a.rs-attr-row:hover .rs-attr-out{opacity:1}
    (the bar would be its backdrop root), and it looked more transparent than the bar. */
 #rs-toolbar{border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
 #rs-toolbar::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-/* the scale box is of the first level, with the bar */
-#rs-scalebox{background:none!important;border:0!important;color:var(--rs-tb-ink)!important}
-/* the layer of the box (colour, blur, border) is a pseudo element, as the bar's: a box inside this one (the credits list) is not nested in a blurred element, which a browser would not blur behind */
-#rs-scalebox::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:10px;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border)}
+/* the corner box (the scale, the zoom number, the credits) is of the first level, with the bar: the same border, radius, colour and blur, in the same two places: the border and the radius on the
+   box, the colour and the blur on a layer behind it (a box inside this one, the credits list, is not nested in a blurred element, which a browser would not blur behind) */
+#rs-scalebox{background:none!important;border:1px solid var(--rs-tb-border)!important;border-radius:10px!important;color:var(--rs-tb-ink)!important}
+#rs-scalebox::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 /* ---- the card of a sidebar (templates/*.html): the layer between the translucent panel and its text ---- */
 .sb-card{display:contents}
 html.rs-overlay #sb,html.rs-phone.rs-tpl-dashboard #sb{padding:8px;overflow:hidden}
@@ -548,10 +553,6 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb #rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
 #sb #rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}
 
-
-/* The strip's blur is a layer behind it, not a property of the strip: a box that opens inside a blurred parent (the attribution) blurs only what the parent
-   holds, and the map behind it stays sharp. The box in the toolbar has no blurred parent, and that is why it looks like glass. */
-#rs-scalebox::before{content:"";position:absolute;inset:-1px;z-index:-1;border-radius:inherit;pointer-events:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 
 /* THE HOVER BOX (hover.js): the popup's look - the box token, the blur and the border - and it never takes the pointer */
 #rs-hover{position:fixed;z-index:3000;max-width:280px;pointer-events:none;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border);
