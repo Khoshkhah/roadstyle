@@ -98,3 +98,29 @@ def test_a_scroll_area_keeps_its_header_and_marks_more_below(tmp_path):
         assert page.evaluate("getComputedStyle(document.querySelector('#t th')).position") == "sticky"
         assert page.evaluate("getComputedStyle(document.getElementById('t')).overscrollBehaviorY") == "contain"
     _run(tmp_path, body)
+
+
+def test_tabs_select_by_click_and_arrow_and_the_switch_has_no_panes(tmp_path):
+    def body(page):
+        page.evaluate("""() => { const d = document.createElement('div'); d.id = 'w';
+            d.innerHTML = '<nav class="rs-tabs" id="tb"><button class="rs-tab on" data-tab="a">A</button><button class="rs-tab" data-tab="b">B</button></nav>'
+              + '<div data-pane="a">pane a</div><div data-pane="b" hidden>pane b</div>'
+              + '<div class="rs-seg" id="sg"><button class="on" data-v="x">X</button><button data-v="y">Y</button></div>';
+            document.querySelector('#sb .sb-body').appendChild(d);
+            window.seen = []; window.T = rs.tabs.use(document.getElementById('tb'), id => seen.push('t' + id)); rs.tabs.use(document.getElementById('sg'), v => seen.push('s' + v)); }""")
+        assert page.locator("[data-pane=a]").is_visible() and page.locator("[data-pane=b]").is_hidden()
+        page.click("[data-tab=b]")
+        assert page.locator("[data-pane=b]").is_visible() and page.locator("[data-pane=a]").is_hidden()
+        assert page.get_attribute("[data-tab=b]", "aria-selected") == "true" and page.get_attribute("[data-tab=a]", "aria-selected") == "false"
+        page.focus("[data-tab=b]"); page.keyboard.press("ArrowRight")                 # wraps to the first
+        assert page.evaluate("T.current()") == "a" and page.locator("[data-pane=a]").is_visible()
+        page.evaluate("T.select('b')")                                                 # from the code
+        assert page.locator("[data-tab=b]").evaluate("e => e.classList.contains('on')")
+        page.click("[data-v=y]")
+        assert page.locator("[data-v=y]").evaluate("e => e.classList.contains('on')") and not page.locator("[data-v=x]").evaluate("e => e.classList.contains('on')")
+        assert page.locator("[data-pane=b]").is_visible()                              # the switch touches no pane
+        assert page.evaluate("seen") == ["tb", "ta", "tb", "sy"]
+        on = lambda: page.evaluate("getComputedStyle(document.querySelector('[data-tab=b]')).backgroundColor")
+        off = page.evaluate("getComputedStyle(document.querySelector('[data-tab=a]')).backgroundColor")
+        assert on() != off
+    _run(tmp_path, body)

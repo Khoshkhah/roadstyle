@@ -42,6 +42,21 @@ rs.help.set({title: "How to read this page", intro: "What the page shows.",
 
 An "i" button appears in the panel's title. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
 
+## Tabs and a two-way switch
+
+```html
+<nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets</button></nav>
+<div data-pane="a">...</div><div data-pane="b" hidden>...</div>
+<div class="rs-seg" id="mode"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div>
+```
+
+```js
+const tabs = rs.tabs.use(document.querySelector(".rs-tabs"), id => console.log(id));    // tabs.select("b") opens a tab from the code
+rs.tabs.use(document.getElementById("mode"), v => redraw(v));
+```
+
+A click or an arrow key selects. The chosen button has `on` and `aria-selected`; the panes beside the tabs (the siblings with `data-pane`) show the one with the same id. The selected one is in `--accent`: set it for the page with `#sb{--accent:#0E7F91}` in `page_style`.
+
 ## A hover box
 
 ```js

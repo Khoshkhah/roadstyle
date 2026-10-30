@@ -7,6 +7,7 @@ import {rsTools} from "./tools.js";
 import {rsSections} from "./sections.js";
 import {rsHelp} from "./help.js";
 import {rsHover} from "./hover.js";
+import {rsTabs} from "./tabs.js";
 import {rsLegend} from "./legend.js";
 import {rsColorModes} from "./colorbox.js";
 
@@ -78,6 +79,7 @@ export function makeApi(extra){
                 "streetView", "google3d", "panel"];
   const api = {
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
+    tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)
     hover: rsHover,              // the hover box of a page: show, hide, on (hover.js)
     help: rsHelp,                // the page's help window: set, open, close (help.js)
     sections: rsSections,        // the panel's sections: list, get, add, remove, hide, show (sections.js)

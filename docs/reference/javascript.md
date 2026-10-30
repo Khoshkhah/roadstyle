@@ -28,6 +28,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box. Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()`, and `ready()` (with `toolbar.hold`). The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
+| `rs.tabs` | tabs and the two-way switch of a page: `use(nav, onChange)` returns `{select(id), current()}` ([guide](../guides/dashboard-panel.md)) |
 | `rs.hover` | the page's hover box: `show(html, event)`, `hide()`, `on(node, html \| fn)` ([guide](../guides/dashboard-panel.md)) |
 | `rs.help` | the page's help window: `set({title, intro, terms: [[term, text], ...], note})` adds the "i" button to the panel's title and keeps the window, `open`, `close`; event `rs:helpchange` ([guide](../guides/dashboard-panel.md)) |
 | `rs.sections` | the dashboard panel's sections: `add({id, html, el, label, after, before})`, `get`, `list`, `hide`, `show`, `remove`; event `rs:sectionchange` ([guide](../guides/dashboard-panel.md)) |

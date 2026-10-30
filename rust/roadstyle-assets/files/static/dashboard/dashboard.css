@@ -541,3 +541,15 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb .rs-table th[data-sort]{color:var(--accent)}
 #sb .rs-table th[data-sort=asc]::after{content:" \25B2";font-size:8px}
 #sb .rs-table th[data-sort=desc]::after{content:" \25BC";font-size:8px}
+
+/* ---- TABS AND THE TWO-WAY SWITCH (tabs.js): the selected one is in --accent (a page sets it: `#sb{--accent:#0E7F91}`); the rest are the panel's muted ink ---- */
+#sb .rs-tabs{display:flex;flex-wrap:wrap;gap:2px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+#sb .rs-tab{padding:7px 9px;border:1px solid transparent;border-radius:6px;background:none;color:var(--mut);font:600 12px system-ui,sans-serif;cursor:pointer;user-select:none}
+#sb .rs-tab:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
+#sb .rs-tab.on,#sb .rs-tab.on:hover{color:#fff;background:var(--accent);border-color:var(--accent)}
+#sb .rs-seg{display:flex;padding:2px;margin-bottom:12px;border-radius:8px;background:color-mix(in srgb,var(--mut) 25%,transparent)}
+#sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:6px;background:none;color:var(--mut);font:600 11.5px system-ui,sans-serif;cursor:pointer}
+#sb .rs-seg button:hover{color:var(--ink);border:0}
+#sb .rs-seg button.on,#sb .rs-seg button.on:hover{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+#sb .rs-tab:focus-visible,#sb .rs-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#sb [data-pane][hidden]{display:none}
