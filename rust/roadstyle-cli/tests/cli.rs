@@ -108,3 +108,11 @@ fn an_unknown_option_or_command_is_an_error() {
     assert!(!run(&["draw"]).status.success());
     assert!(String::from_utf8_lossy(&run(&["help"]).stdout).contains("roadstyle sources"));
 }
+
+#[test]
+fn levels_edit_needs_a_made_area() {
+    let dir = tmp("edit-empty");
+    let out = Command::new(env!("CARGO_BIN_EXE_roadstyle")).args(["levels", "edit", &dir.to_string_lossy()]).output().unwrap();
+    assert!(!out.status.success() && String::from_utf8_lossy(&out.stderr).contains("no roads.parquet: make the area first"));
+    std::fs::remove_dir_all(&dir).ok();
+}

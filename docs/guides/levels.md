@@ -22,6 +22,9 @@ outline) passes under both. Where the roads only meet, the roundabout is on top.
     roadstyle-levels edit out/area                # the editor, http://localhost:8780/
     ```
 
+    The `roadstyle` program does the same steps with no Python: `roadstyle levels make`, `roadstyle levels solve` and
+    `roadstyle levels edit out/area` (the editor, http://127.0.0.1:8780/level_editor/).
+
 ## The rule
 
 - Every edge has a **casing position** and a **fill position**. They are whole numbers, 0 is the ground, and null counts as 0.
@@ -90,10 +93,10 @@ heads of that time.
 
 ![The level editor: two roads picked, their cards with ends and heads, the Issues tab](../img/level-editor.png)
 
-`roadstyle-levels edit out/area` opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
+`roadstyle levels edit out/area` (or `roadstyle-levels edit out/area`) opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
 second road to see every pair between the two.
 
-The editor is in Rust: the solver runs in the page (WebAssembly), and a small Rust server (`roadstyle serve out/area`) gives the page
+The editor is in Rust: the solver runs in the page (WebAssembly), and a small Rust server (`roadstyle levels edit out/area`; `roadstyle serve out/area` is the same without the check of the area) gives the page
 the area's files and saves your changes. Monaco solves in 0.1 s in the page. `--engine python` opens the earlier editor with its Python
 server. The server answers only on 127.0.0.1, only to its own address (`Host`), and saves only the page's own changes (`Origin`) of at
 most 16 MB. Its page files are in the program; build them in with `rust/roadstyle-wasm/build_editor.sh` before you build roadstyle.

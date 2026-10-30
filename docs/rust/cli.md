@@ -52,14 +52,14 @@ roadstyle tiles out/stage1 out/roads.pmtiles --tile-format mlt
 ```bash
 roadstyle levels make edges.parquet out/area      # roads.parquet, pairs.csv, edits.csv
 roadstyle levels solve out/area                   # levels.csv, levels_info.json
-roadstyle serve out/area                          # the level editor, http://127.0.0.1:8780/level_editor/
+roadstyle levels edit out/area                    # the level editor, http://127.0.0.1:8780/level_editor/
 ```
 
 `levels make` takes the options of `roadstyle-levels make`: `--id-col`, `--band-col`, `--order`, `--band-dist`, `--head-m`,
 `--near-rules` and the tag columns (`--highway-col`, `--layer-col`, `--bridge-col`, `--tunnel-col`, `--junction-col`). It gives the
 same files as Python's `make_area`: Monaco in 0.1 s (Python 2.2 s), Tartu in 0.7 s (Python 13.2 s).
 
-`serve` answers only on 127.0.0.1, only to its own address, and saves only the editor page's own changes. Its page files are in the
+`levels edit` (and `serve`, the same without the check that the folder has `roads.parquet`) answers only on 127.0.0.1, only to its own address, and saves only the editor page's own changes. Its page files are in the
 program. Build the page's WebAssembly package with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
 
 A command for one HTML page (`roadstyle page`) comes with the facade's page call.

@@ -7,6 +7,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`roadstyle levels edit AREA_DIR`**: the level editor from the Rust program, with no Python. It checks that the folder has `roads.parquet`, then serves the editor page
+  (the standard dashboard: one panel, the bar, both themes, the phone sheet) and saves `edits.csv`, `heads.csv`, `caps.csv` and `levels.csv`. `roadstyle serve` is the same
+  without the check. A new test (`tests/test_levels_edit_browser.py`) makes an area with the program and drives the page in Chromium.
 - **The level editor draws into the host's standard panel.** `levelEditor({map, panel, backLabel, ...})` takes the host's `#sb` (`.sb-card` with `.sb-top` and
   `.sb-body`): the host's body is hidden, the top line is "← Steps" and "Edit levels" before the host's hide button, and `destroy()` puts the host's panel back. The
   editor's own frame, fold buttons (`lv-toggle`, `lv-handle`), phone sheet and `layout` option are gone; the panel's side, width, look and phone sheet are the host's. A bar
@@ -72,6 +75,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- `roadstyle serve --page DIR` gives the page `host_options.json` (the program's own file) in place of a 404.
 - **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
   the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
   in tiles).
