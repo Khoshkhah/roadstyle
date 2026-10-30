@@ -31,8 +31,8 @@ def page(tmp_path_factory):
 @pytest.mark.parametrize("size", list(SIZES))
 def test_the_roads_are_drawn_from_mlt_tiles(page, browser, size):
     sync_api = pytest.importorskip("playwright.sync_api")
-    from PIL import Image
     import numpy as np
+    from PIL import Image
 
     with sync_api.sync_playwright() as p:
         try:
