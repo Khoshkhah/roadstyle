@@ -395,18 +395,19 @@ fn compute_levels(py: Python<'_>, roads: &Bound<'_, PyAny>, method: String, cols
     .map_err(|e: String| PyValueError::new_err(e))
 }
 
-/// solve_rules(roads, meets, lifts, near, orders, fixed, steps, min_positions) -> (parts, given_up_parts, orders_not_kept, near_not_kept):
-/// roadstyle's _solve_intervals by the Rust solver, on road indexes (solve_levels(engine="rust")). A meet is (x, x_end, y, y_end) with the
-/// ends 0 (start) or 2 (end); a stack or near rule (upper, lower, part 0, 1 or 2); a fixed road (road, its four numbers in [0, steps]).
+/// solve_rules(roads, meets, lifts, near, orders, fixed, steps, min_positions, crossings) -> (parts, given_up_parts, orders_not_kept,
+/// near_not_kept, crossings_not_kept): roadstyle's _solve_intervals by the Rust solver, on road indexes (solve_levels(engine="rust")). A meet
+/// is (x, x_end, y, y_end) with the ends 0 (start) or 2 (end); a stack or near rule (upper, lower, part 0, 1 or 2); a crossing (road, path,
+/// end 0 or 2); a fixed road (road, its four numbers in [0, steps]).
 #[pyfunction]
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn solve_rules(py: Python<'_>, roads: usize, meets: Vec<(usize, usize, usize, usize)>, lifts: Vec<(usize, usize, usize)>,
-               near: Vec<(usize, usize, usize)>, orders: Vec<(usize, usize)>, fixed: Vec<(usize, [i64; 4])>, steps: i64, min_positions: bool)
-               -> PyResult<(Vec<[i64; 4]>, Vec<(usize, usize, usize)>, Vec<(usize, usize)>, Vec<(usize, usize, usize)>)> {
-    // the Python engine's rules have no crossings (roadstyle-levels' input makes them)
-    let rules = roadstyle::levels::solve::Rules { roads, meets, lifts, crossings: Vec::new(), orders, near, fixed };
+               near: Vec<(usize, usize, usize)>, orders: Vec<(usize, usize)>, fixed: Vec<(usize, [i64; 4])>, steps: i64, min_positions: bool,
+               crossings: Vec<(usize, usize, usize)>)
+               -> PyResult<(Vec<[i64; 4]>, Vec<(usize, usize, usize)>, Vec<(usize, usize)>, Vec<(usize, usize, usize)>, Vec<(usize, usize, usize)>)> {
+    let rules = roadstyle::levels::solve::Rules { roads, meets, lifts, crossings, orders, near, fixed };
     let s = py.detach(|| roadstyle::levels::solve::solve(&rules, steps, min_positions)).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    Ok((s.parts, s.given_up_parts, s.orders_not_kept, s.near_not_kept))
+    Ok((s.parts, s.given_up_parts, s.orders_not_kept, s.near_not_kept, s.crossings_not_kept))
 }
 
 /// The page (roadstyle::page): the page of a live style with the dashboard's options. `parts`: name, cam, bounds,
@@ -529,7 +530,7 @@ fn duckosm_plan(tables: Vec<(String, String)>, columns: Vec<(String, String, Str
     let drop = run.drop_sql(&made.iter().map(|l| l.spec).collect::<Vec<_>>());
     let layers: Vec<serde_json::Value> = made.into_iter()
         .map(|l| serde_json::json!({"spec": l.spec, "name": l.name, "table": run.feature(l.spec), "sql": l.sql})).collect();
-    let meta = (!tags).then_some(duckosm::LEVELS_META_SQL);
+    let meta = (!tags).then(|| duckosm::levels_meta_sql(&cat));
     let subset = (only && !tags).then(|| [duckosm::subset_sql(&run), duckosm::ids_sql(&run)]);
     Ok(serde_json::json!({"run": run.id(), "roads": roads, "roads_error": roads_error, "meta": meta, "select": select, "layers": layers,
                           "subset": subset, "drop": drop, "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())

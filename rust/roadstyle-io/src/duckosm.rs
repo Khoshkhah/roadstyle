@@ -67,6 +67,18 @@ fn roads_union(cat: &Catalog, only: Option<&str>) -> Result<String, Error> {
 /// The SQL of the stored levels' metadata: one row (source, n_edges, edge_hash). The caller checks it with `levels_keyword`.
 pub const LEVELS_META_SQL: &str = "SELECT source, n_edges, edge_hash FROM visualization.edge_levels_meta";
 
+/// The SQL of the stored levels' metadata for the file's own table (`cat`): `LEVELS_META_SQL`, except for a table that roadstyle 0.17.1
+/// wrote (`save_levels`: the columns `method`, ..., `n_edges`, `edge_hash`, and no `source`): the method (`tags` or `solve`) is its source.
+/// The file is not changed. A table with neither column has an empty source: `levels_keyword` says that it is not from a level area.
+pub fn levels_meta_sql(cat: &Catalog) -> String {
+    let (s, t) = ("visualization", "edge_levels_meta");
+    if !cat.has_table(s, t) || cat.has_column(s, t, "source") {                      // no table: the reader's CatalogException, as before
+        return LEVELS_META_SQL.into();
+    }
+    let source = if cat.has_column(s, t, "method") { "method" } else { "''" };
+    format!("SELECT {source} AS source, n_edges, edge_hash FROM {s}.{t}")
+}
+
 /// The look's keyword `levels` of the stored levels: {edge_hash, n_edges}, which the engine checks against the roads. `row`: the row of
 /// `LEVELS_META_SQL` (source, n_edges, edge_hash), or None when the file has no such table or row.
 pub fn levels_keyword(row: Option<(&str, i64, &str)>) -> Result<Value, Error> {
@@ -169,8 +181,14 @@ pub fn roads_sql(cat: &Catalog, tags: bool, only: Option<&str>, run: &Run) -> Re
         MODES.iter().map(|m| format!("max(CASE WHEN pmode = '{m}' THEN access END) AS access_{m}")).collect::<Vec<_>>().join(", "),
         first("geometry"));
     let path = format!("coalesce(highway IN ({}), false)", PATH_CLASSES.iter().map(|c| format!("'{c}'")).collect::<Vec<_>>().join(", "));
+    // the stored levels' columns; a table that roadstyle 0.17.1 wrote has the four numbers only: its heads and caps are NULL (the default
+    // ends), the file is not changed
+    let stored = |c: &str, ty: &str| if !cat.has_table("visualization", "edge_levels") || cat.has_column("visualization", "edge_levels", c) { format!("lv.{c}") }
+                                     else { format!("CAST(NULL AS {ty}) AS {c}") };
     let levels = if tags { NO_LEVELS.to_string() }
-                 else { "lv.casing_start, lv.casing_level, lv.casing_end, lv.fill_level, lv.head_start_m, lv.head_end_m, lv.cap_start, lv.cap_end".into() };
+                 else { [("casing_start", "INTEGER"), ("casing_level", "INTEGER"), ("casing_end", "INTEGER"), ("fill_level", "INTEGER"),
+                         ("head_start_m", "DOUBLE"), ("head_end_m", "DOUBLE"), ("cap_start", "VARCHAR"), ("cap_end", "VARCHAR")]
+                         .map(|(c, ty)| stored(c, ty)).join(", ") };
     let r = format!("CREATE OR REPLACE TEMP TABLE {r_name} AS
     SELECT e.* EXCLUDE (geom), ST_AsWKB(e.geom) AS geometry,
            NOT driving AND NOT cycling AND NOT {path} AND osm_id IN (SELECT osm_id FROM {e_name} WHERE driving OR cycling) AS und,

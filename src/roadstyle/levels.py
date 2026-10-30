@@ -618,7 +618,7 @@ def merged_relations(roads, pairs, edits=None):
     def key(row):
         if row["relation"] == "meet":                          # no direction: the same pair whichever road is named first
             return ("meet", *sorted([(row["a"], row["a_end"]), (row["b"], row["b_end"])]))
-        if row["relation"] in ("stack", "near"):               # one part of A
+        if row["relation"] in ("stack", "near", "crossing"):   # one part of A (a crossing: one end of the road)
             return (row["relation"], row["a"], row["b"], row["a_end"])
         return (row["relation"], row["a"], row["b"])
     rows = _read_pairs(pairs)
@@ -636,7 +636,7 @@ def merged_relations(roads, pairs, edits=None):
             for c in ("a", "b"):
                 if row[c] not in of:
                     raise ValueError(f"edits: {row[c]!r} is not an edge of the roads")
-                if (row["relation"] == "meet" or (row["relation"] in ("stack", "near") and c == "a")) and row[c] in back:   # that edge's start is its road's end
+                if (row["relation"] == "meet" or (row["relation"] in ("stack", "near", "crossing") and c == "a")) and row[c] in back:   # that edge's start is its road's end
                     row[c + "_end"] = {"start": "end", "end": "start"}.get(row[c + "_end"], row[c + "_end"])
                 row[c] = roads["road"].iat[of[row[c]]]
             if str(row.get("enabled", "")).strip().lower() in ("false", "0", "no"):
@@ -653,15 +653,16 @@ _PARTS = ("start", "main", "end")
 
 def _indexed(roads, rel):
     """The rows of ``rel`` (:func:`merged_relations`) on road indexes, as the solver takes them: ``{relation: [(rule, row)]}``; a rule is
-    ``(x, x_end, y, y_end)`` (meet), ``(upper, lower, "s" / "m" / "e")`` (stack, near) or ``(higher, lower)`` (order)."""
+    ``(x, x_end, y, y_end)`` (meet), ``(upper, lower, "s" / "m" / "e")`` (stack, near), ``(road, path, "s" / "e")`` (crossing: the road's
+    head at that end is over the path's fill) or ``(higher, lower)`` (order)."""
     idx = {r: i for i, r in enumerate(roads["road"])}
-    out = {"meet": [], "stack": [], "near": [], "order": []}
+    out = {"meet": [], "stack": [], "near": [], "crossing": [], "order": []}
     for r in rel.values():
         if r["relation"] not in out:
-            raise ValueError(f"pairs: the relation {r['relation']!r} is not meet, stack, near or order")
+            raise ValueError(f"pairs: the relation {r['relation']!r} is not meet, stack, crossing, near or order")
         a, b = idx[r["a"]], idx[r["b"]]
         out[r["relation"]].append(((a, r["a_end"], b, r["b_end"]) if r["relation"] == "meet" else (a, b, r["a_end"][0])
-                                   if r["relation"] in ("stack", "near") else (a, b), r))
+                                   if r["relation"] in ("stack", "near", "crossing") else (a, b), r))
     return out
 
 
@@ -740,7 +741,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     ``engine``: "python" (default) or "rust" (``ROADSTYLE_ENGINE``): the Rust solver solves the same rules, a minimum-cost flow in each stage
     (docs/guides/levels.md); it has no time limit and no ``max_positions``."""
     by = _indexed(roads, merged_relations(roads, pairs, edits))
-    meets, stacks, near, orders = ([t for t, _ in by[k]] for k in ("meet", "stack", "near", "order"))
+    meets, stacks, near, orders, crossings = ([t for t, _ in by[k]] for k in ("meet", "stack", "near", "order", "crossing"))
     idx = {r: i for i, r in enumerate(roads["road"])}
     fix = None
     if fixed:                                                  # an earlier result's numbers (around its ground 0) into the box [0, 2 max_level]
@@ -750,8 +751,11 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     from . import _engine
     if _engine.engine(engine) == "rust" and not (max_positions and _engine.fallback(engine, "solve_levels with max_positions")):
         iv, given, info = _engine.solve_intervals(len(roads), meets, stacks, orders, max_level, margin, min_positions, near,
-                                                  {idx[r]: v for r, v in (fixed or {}).items()})
+                                                  {idx[r]: v for r, v in (fixed or {}).items()}, crossings)
     else:
+        if crossings:
+            raise ValueError(f"solve_levels: the pairs have {len(crossings)} crossing rows, which only the Rust engine solves (the Python engine "
+                             "has no crossing stage): use engine='rust' (the default)")
         iv, given, info = _solve_intervals(list(roads["road"]), meets, stacks, orders, time_limit, max_level, margin, min_positions,
                                            max_positions, near, fix)
     counts = defaultdict(int)                                  # the solution can sit at any height: the main casing number most edges have becomes 0 (the ground)
@@ -766,6 +770,7 @@ def solve_levels(roads, pairs, edits=None, max_level=20, margin=1.0, time_limit=
     out.attrs["levels_given_up_parts"] = [(roads["road"].iat[u], roads["road"].iat[l], h) for u, l, h in info.pop("given_up_parts", [])]
     out.attrs["levels_near"] = [(roads["road"].iat[u], roads["road"].iat[l], h) for u, l, h in info.pop("near_parts", [])]
     out.attrs["levels_orders_not_kept"] = [(roads["road"].iat[x], roads["road"].iat[y]) for x, y in info.pop("orders_not_kept", [])]
+    out.attrs["levels_crossings_not_kept"] = [(roads["road"].iat[r], roads["road"].iat[p], e) for r, p, e in info.pop("crossings_not_kept", [])]
     out.attrs["levels_info"] = info
     return out
 

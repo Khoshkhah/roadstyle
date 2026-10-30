@@ -49,3 +49,36 @@ def test_levels_db_errors(tmp_path):
         rs.render_edges(_edges([1, 2]), basemap="blank", levels_db=db, fill_level_col="x")
     with pytest.raises(ValueError, match="edge_levels_meta"):
         rs.render_edges(_edges([1, 2]), basemap="blank", levels_db=_db(tmp_path / "..", [1, 2], meta=False))
+
+
+def _old_db(tmp_path, ids):
+    """The stored levels as roadstyle 0.17.1 wrote them: the four numbers, and a meta row with `method` and no `source`."""
+    import numpy as np
+
+    from roadstyle.levels_store import _hash
+
+    path = tmp_path / "old.duckdb"
+    con = duckdb.connect(str(path))
+    con.execute("CREATE SCHEMA visualization")
+    rows = ", ".join(f"({i}, {k}, {k}, {k}, {k + 1})" for k, i in enumerate(ids))
+    con.execute(f"CREATE TABLE visualization.edge_levels(edge_id BIGINT, casing_start INTEGER, casing_level INTEGER, casing_end INTEGER, fill_level INTEGER); "
+                f"INSERT INTO visualization.edge_levels VALUES {rows}")
+    con.execute(f"CREATE TABLE visualization.edge_levels_meta AS SELECT 'solve' AS method, 5.0 AS head_m, {len(ids)} AS n_edges, "
+                f"'{_hash(np.array(ids, dtype='int64'))}' AS edge_hash, '0.17.1' AS roadstyle_version")
+    con.close()
+    return path
+
+
+def test_levels_db_reads_the_numbers_of_roadstyle_0_17_1_and_does_not_write(tmp_path):
+    every = [1, 2, BIG, 4]
+    db = _old_db(tmp_path, every)
+    before = db.read_bytes()
+    part = [BIG, 2]
+    by_hand = _edges(part)                                # row k has every number k (fill k + 1); BIG is row 2, 2 is row 1; no heads, no caps
+    for c in AREA_COLS:
+        by_hand[c] = [None, None] if c.endswith("_m") or c.startswith("cap") else [2 + (c == "fill_level"), 1 + (c == "fill_level")]
+    want = rs.render_edges(by_hand, basemap="blank", **LEVEL_KWARGS).html
+    assert rs.render_edges(_edges(part), basemap="blank", levels_db=db).html == want
+    assert db.read_bytes() == before
+    with pytest.raises(ValueError, match="not edges the stored levels were solved for"):
+        rs.render_edges(_edges([1, 3]), basemap="blank", levels_db=db)
