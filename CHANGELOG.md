@@ -73,6 +73,15 @@ All notable changes to **roadstyle** are documented here. The format is based on
   footways and the service roads were hidden below zoom 15). `minzoom=True`, or a dict, brings the hiding back. `render_edges` and the template `map` are as before.
 
 ### Fixed
+- **`duckosm levels` (`solve_area`) takes the `crossing` rows of a level area.** The Rust `make_area` writes `crossing` pair rows (a path at a node where a car road
+  goes on, 2026-10-25), but the Python solve path (`levels._indexed`, `solve_rules`) knew only meet, stack, near and order, so a solve stopped with
+  `pairs: the relation 'crossing' is not meet, stack, near or order`. The Rust solver has the crossing stage: `solve_rules` takes the crossings and gives the ones that it did not
+  keep, `solve_levels` passes them, `levels_info.json` has `crossings` and `crossings_not_kept`, and an edit can switch a crossing off. The Python engine
+  (`engine="python"`) has no such stage: it stops with an error that says so (no silent drop of the rows). Södermalm (8,929 roads): 1,201 crossings, none broken.
+- **Stored levels of roadstyle 0.17.1 are read.** A file whose `visualization.edge_levels` has the four numbers only and whose `edge_levels_meta` has `method` and no `source`
+  gave `Referenced column 'source' not found` (the Rust reader) or "not from a level area" (`load_area_levels`), so the pages drew the automatic order. Both readers now take the method
+  as the source, and the missing heads and caps are NULL (the default ends). The file is not written: no migration is needed. A meta row with neither column is still "not from
+  a level area".
 - **A switch of a base-map layer hides the whole layer.** The style lists the layers of an overlay in `layers`, and some layers that draw the same data are not in the list (the fill pattern of the land, the icons of the points,
   the 3D buildings). `rsSetOverlay` and the one switch (`rsSetOverlays`) hid the listed layers only, so a pattern stayed on the map and an icon never showed. They find every layer of the overlay's source now (its source, or its source layer
   in tiles).

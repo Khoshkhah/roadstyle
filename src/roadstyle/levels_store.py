@@ -151,28 +151,32 @@ def load_area_levels(con, edges, *, schema=SCHEMA, subset=False):
     """``edges`` (a table with ``edge_id``) with the columns of a level area's result stored by ``save_area_levels``: the four numbers and
     each edge's ends (``head_start_m``, ``head_end_m``, ``cap_start``, ``cap_end``). A ``ValueError`` if nothing is stored, if it is not from a
     level area, or if ``edges`` are not the edges it was solved for; nothing is recomputed. ``subset=True``: ``edges`` may be some of the edges it was
-    solved for (a map of one mode of the file: the order was solved for all of them together); an edge it has no row for is an error."""
+    solved for (a map of one mode of the file: the order was solved for all of them together); an edge it has no row for is an error.
+    A table that roadstyle 0.17.1 wrote (``save_levels``: the four numbers, and a meta row with ``method`` and no ``source``) is read as it is: its
+    ``method`` is its source and its heads and caps are None (the default ends). The file is not changed (the Rust reader, ``duckosm.rs``
+    ``levels_meta_sql``, does the same)."""
     import pandas as pd
     try:
         meta = con.execute(f"SELECT * FROM {schema}.edge_levels_meta").df().iloc[0]
     except Exception as e:                                                  # duckdb.CatalogException: no such table
         raise ValueError(f"no {schema}.edge_levels_meta in this file: make and solve its level area (roadstyle-levels, duckosm levels)") from e
-    if meta.get("source") != "area":
+    if meta.get("source", meta.get("method")) not in ("area", "tags", "solve"):          # roadstyle's own sources, as the Rust reader's levels_keyword
         raise ValueError("the stored levels are not from a level area (an older table): make and solve its level area again")
+    where = meta.get("area") or "duckosm levels"
     ids = _ids(edges)
     if subset:
         stored = set(con.execute(f"SELECT edge_id FROM {schema}.edge_levels").df()["edge_id"])
         missing = [i for i in ids if i not in stored]
         if missing:
             raise ValueError(f"{len(missing)} of the edges are not edges the stored levels were solved for (for example {missing[0]}): "
-                             f"make and solve the level area again ({meta['area']})")
+                             f"make and solve the level area again ({where})")
     elif len(ids) != int(meta["n_edges"]) or _hash(ids) != meta["edge_hash"]:
         raise ValueError(f"the edges are not the edges the stored levels were solved for ({len(ids)} given, {int(meta['n_edges'])} stored, "
-                         f"or other edge_id values): make and solve the level area again ({meta['area']})")
+                         f"or other edge_id values): make and solve the level area again ({where})")
     merged = pd.DataFrame({"edge_id": ids}).merge(con.execute(f"SELECT * FROM {schema}.edge_levels").df(), on="edge_id", how="left")
     out = edges.copy()
     for c in AREA_COLS:
-        out[c] = merged[c].to_numpy()
+        out[c] = merged[c].to_numpy() if c in merged else None             # a 0.17.1 table has no heads and caps
     return out
 
 

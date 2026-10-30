@@ -271,3 +271,54 @@ def test_a_building_tag_of_two_digits_gives_its_height(tmp_path):
     assert features.column("levels").to_pylist() == ["25"]
     html = duckosm.page(db, "driving", levels="tags", layers=["buildings"]).html
     assert '"height":91.5' in html.replace(" ", ""), "the building's height in the page's base map"
+
+
+def _old_levels(db, ids=(1, 2)):
+    """The stored levels as roadstyle 0.17.1 wrote them (`save_levels`): edge_levels with the four numbers, and a meta row with `method` and no
+    `source`. Returns the bytes of the file's tables' content for the check that a read does not write."""
+    import duckdb
+    import numpy as np
+
+    from roadstyle.levels_store import _hash
+
+    con = duckdb.connect(str(db))
+    con.execute("CREATE SCHEMA visualization")
+    con.execute("CREATE TABLE visualization.edge_levels(edge_id BIGINT, casing_start INTEGER, casing_level INTEGER, casing_end INTEGER, fill_level INTEGER)")
+    con.execute("INSERT INTO visualization.edge_levels VALUES " + ", ".join(f"({i}, 0, 1, 0, {k + 1})" for k, i in enumerate(ids)))
+    con.execute(f"CREATE TABLE visualization.edge_levels_meta AS SELECT 'solve' AS method, 5.0 AS head_m, 10.0 AS band_dist, 1.0 AS margin, "
+                f"20 AS max_level, {len(ids)} AS n_edges, '{_hash(np.array(ids, dtype='int64'))}' AS edge_hash, '0.17.1' AS roadstyle_version")
+    con.close()
+    return db
+
+
+def test_a_file_with_levels_of_roadstyle_0_17_1_reads_and_is_not_changed(tmp_path):
+    """The stored levels of roadstyle 0.17.1 (the four numbers, no heads and caps; a meta row with `method`, no `source`) are read as they are:
+    the method is the source, the heads and caps are NULL (the default ends), and the file is not written."""
+    pytest.importorskip("pyarrow")
+    from roadstyle import duckosm
+
+    db = _old_levels(_tiny(tmp_path / "old.duckdb"))
+    before = db.read_bytes()
+    roads, _, level_kw = duckosm.read(db, "driving", levels="stored")
+    assert level_kw["n_edges"] == 2 and level_kw["edge_hash"]
+    by_edge = {r["edge_id"]: r for r in roads.to_pylist()}
+    assert [by_edge[i]["fill_level"] for i in (1, 2)] == [1, 2] and by_edge[1]["casing_level"] == 1
+    assert all(by_edge[i][c] is None for i in (1, 2) for c in ("head_start_m", "head_end_m", "cap_start", "cap_end"))
+    assert db.read_bytes() == before, "a read does not write the file"
+    # the one-mode map (only=True) checks the stored rows of its roads the same way
+    _, _, subset_kw = duckosm.read(db, "driving", levels="stored", only=True)
+    assert subset_kw["n_edges"] == 2
+
+
+def test_a_meta_row_that_has_neither_source_nor_method_is_not_from_a_level_area(tmp_path):
+    import duckdb
+
+    pytest.importorskip("pyarrow")
+    from roadstyle import duckosm
+
+    db = _old_levels(_tiny(tmp_path / "odd.duckdb"))
+    con = duckdb.connect(str(db))
+    con.execute("CREATE OR REPLACE TABLE visualization.edge_levels_meta AS SELECT 2 AS n_edges, 'x' AS edge_hash")
+    con.close()
+    with pytest.raises(ValueError, match="not from a level area"):
+        duckosm.read(db, "driving", levels="stored")

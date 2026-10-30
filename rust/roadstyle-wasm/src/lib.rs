@@ -526,7 +526,7 @@ mod wasm {
             Err(e) => (None, Some(e)),
         };
         Ok(serde_json::json!({"catalog": queries, "run": run.id(), "roads": roads, "roads_error": roads_error,
-                              "meta": (!tags).then_some(duckosm::LEVELS_META_SQL),
+                              "meta": (!tags).then(|| duckosm::levels_meta_sql(&cat)),
                               "select": duckosm::roads_select(mode, &run).map_err(String::from).map_err(err)?, "layers": layers,
                               "subset": (only && !tags).then(|| [duckosm::subset_sql(&run), duckosm::ids_sql(&run)]), "drop": drop,
                               "level_edges": duckosm::level_edges_sql(&cat).ok()}).to_string())

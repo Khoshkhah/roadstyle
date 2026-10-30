@@ -275,22 +275,25 @@ def compute_levels(edges, *, layer_col="layer", bridge_col="bridge", tunnel_col=
     return g
 
 
-def solve_intervals(n, meets, stacks, orders, max_level, margin, min_positions, near, fixed):
+def solve_intervals(n, meets, stacks, orders, max_level, margin, min_positions, near, fixed, crossings=()):
     """``levels._solve_intervals`` by the Rust solver: the same rules on road indexes, the same ``(parts, given_up, info)``. ``fixed``:
-    {road index: its four numbers around the ground 0}. The parts are in steps of ``margin`` (only their order matters: solve_levels
-    makes them small consecutive numbers)."""
+    {road index: its four numbers around the ground 0}. ``crossings``: ``(road, path, end)`` (a path at a node where the road goes on:
+    the road's head there is over the path's fill; ``end`` ``"s"`` or ``"e"``). The parts are in steps of ``margin`` (only their order
+    matters: solve_levels makes them small consecutive numbers)."""
     import time
     t0 = time.time()
     ends, part = {"start": 0, "end": 2}, {"s": 0, "m": 1, "e": 2}
     steps = math.floor(2 * max_level / margin + 1e-9)
-    parts, broken, not_kept, near_broken = rust().solve_rules(
+    parts, broken, not_kept, near_broken, crossing_broken = rust().solve_rules(
         n, [(x, ends[ex], y, ends[ey]) for x, ex, y, ey in meets], [(u, l, part[h]) for u, l, h in stacks],
-        [(u, l, part[h]) for u, l, h in near], list(orders), [(r, [x + max_level for x in v]) for r, v in fixed.items()], steps, min_positions)
+        [(u, l, part[h]) for u, l, h in near], list(orders), [(r, [x + max_level for x in v]) for r, v in fixed.items()], steps, min_positions,
+        [(r, p, part[e]) for r, p, e in crossings])
     word = ("start", "main", "end")
     info = {"pairs": len({(u, l) for u, l, _ in [*stacks, *near]}), "roads": n, "meets": len(meets), "order_pairs": len(set(orders)),
             "order_violations": len(not_kept), "orders_not_kept": [tuple(p) for p in not_kept],
             "given_up_parts": sorted({(u, l, word[h]) for u, l, h in broken}), "near_parts": sorted({(u, l, word[h]) for u, l, h in near_broken}),
-            "near_warnings": len({(u, l) for u, l, _ in near_broken}), "solves": 1, "solver": "rust", "status": "OPTIMAL",
+            "near_warnings": len({(u, l) for u, l, _ in near_broken}), "crossings": len(crossings),
+            "crossings_not_kept": sorted({(r, p, word[e]) for r, p, e in crossing_broken}), "solves": 1, "solver": "rust", "status": "OPTIMAL",
             "seconds": round(time.time() - t0, 1)}
     return [tuple(p) for p in parts], sorted({(u, l) for u, l, _ in broken}), info
 
