@@ -396,7 +396,7 @@ def test_the_editor_works_in_the_hosts_panel(view):
             if phone:
                 assert sb["bottom"] == pytest.approx(844, abs=1) and 280 < sb["top"] < 560, sb
             else:
-                assert sb["left"] == 0 and sb["right"] == pytest.approx(340, abs=1) and sb["h"] > 880, sb      # the panel's width and side are the host's
+                assert sb["left"] == 0 and sb["right"] == pytest.approx(400, abs=1) and sb["h"] > 880, sb      # the panel's width (the dashboard default, 400 px) and side are the host's
             # a road on the map: a click (a tap on a phone) picks it, and the dashboard's own glow marks it
             top = sb["top"] if phone else 900
             xy = page.evaluate(f"""() => {{ const m = window.hostMap;

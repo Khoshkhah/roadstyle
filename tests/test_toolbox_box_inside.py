@@ -291,8 +291,11 @@ def test_the_credits_list_has_the_pages_own_data_credit_first_and_not_twice():
             page.close()
         browser.close()
     assert not errors, errors
-    assert rows[0][0] == ["\u00a9 OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"] and rows[0][-1][0] == "MapLibre", rows[0]
-    assert [r[0] for r in rows[1]] == ["MapLibre"], rows[1]                                                      # credits=[] leaves it out
+    # first: the credit of OpenStreetMap's data ("Data from OpenStreetMap" when the style's source gives the credit, else the page's own "\u00a9 OpenStreetMap contributors"), once
+    assert rows[0][0][1] == "https://www.openstreetmap.org/copyright" and "OpenStreetMap" in rows[0][0][0] and rows[0][-1][0] == "MapLibre", rows[0]
+    assert sum("OpenStreetMap" in r[0] for r in rows[0]) == 1, rows[0]
+    # credits=[] leaves out the page's own credit. With the blank base map MapLibre lists no source, so the credit that the style's roads source carries (OpenStreetMap) is the row
+    assert [r[0] for r in rows[1]] == ["Data from OpenStreetMap", "MapLibre"], rows[1]
     assert sum("OpenStreetMap" in r[0] for r in rows[2]) == 1, rows[2]                                           # the base map names it: not twice
 
 
