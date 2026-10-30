@@ -198,21 +198,32 @@ def test_the_credits_button_has_no_tooltip_but_a_label_for_a_screen_reader():
     assert got["title"] is None and got["label"] == "Attribution" and got["tip"] is False and got["tool"] == "Attribution", got
 
 
-def test_the_explanation_marks_of_the_base_map_box_are_a_question_mark():
+def test_the_base_map_box_has_no_explanation_marks_and_the_credits_are_short():
     html, errors = rs.render_dashboard(_edges(), basemap="ofm_liberty").html, []
+    sat = rs.render_dashboard(_edges(), basemap="satellite").html
     with pw.sync_playwright() as p:
         browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
-        page = browser.new_page(viewport={"width": 1200, "height": 800})
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        page.route(_URL, _serve(html))
-        page.goto(_URL)
-        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=90_000)
-        page.evaluate("rs.tools.open('basemap')")
-        page.wait_for_timeout(500)
-        marks = page.evaluate("[...document.querySelectorAll('.rs-bm-i')].map(e => e.textContent)")
+        out = []
+        for page_html in (html, sat):
+            page = browser.new_page(viewport={"width": 1200, "height": 800})
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.route(_URL, _serve(page_html))
+            page.goto(_URL)
+            page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=90_000)
+            page.evaluate("rs.tools.open('basemap')")
+            page.wait_for_timeout(400)
+            marks = page.evaluate("document.querySelectorAll('.rs-bm-i').length")
+            page.evaluate("rs.tools.close('basemap'); rs.tools.open('attribution')")
+            page.wait_for_timeout(400)
+            out.append((marks, page.evaluate("[...document.querySelectorAll('#rs-attr-box .rs-attr-row')].map(r => r.textContent.trim())")))
+            page.close()
         browser.close()
     assert not errors, errors
-    assert marks and set(marks) == {"?"}, marks
+    assert out[0][0] == 0 and out[1][0] == 0, out
+    for _, rows in out:
+        assert rows and all(len(r) <= 50 and "Sources" not in r for r in rows), rows
+        assert any("MapLibre" in r for r in rows), rows
+
 
 
 def test_the_roads_tool_filters_the_road_types_with_all_none_and_show_only():
@@ -242,3 +253,122 @@ def test_the_roads_tool_filters_the_road_types_with_all_none_and_show_only():
     assert got["order"].index("roads") == got["order"].index("basemap") + 1, got["order"]
     assert got["rows"] == [["primary", "2", True], ["residential", "1", True], ["service", "1", True]], got["rows"]
     assert got["only"] == [True, False, False] and got["none"] == "" and got["all"] == "primary,residential,service", got
+
+
+def test_a_long_legend_label_wraps_inside_the_colour_box():
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", color_options={"Road class": {}}).html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, _serve(html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
+        got = page.evaluate("""() => { rs.legend.add({id: 'long', color: '#cccccc', label: 'counted: no range, a label that is much too long for one column'});
+            rs.tools.open('legend'); const box = document.querySelector('#rs-color-box').getBoundingClientRect();
+            return [...document.querySelectorAll('#rs-color-box .lg-row')].map(r => [Math.round(r.getBoundingClientRect().right - box.right), r.scrollWidth <= r.clientWidth + 1]); }""")
+        browser.close()
+    assert not errors, errors
+    assert got and all(right <= 0 and fits for right, fits in got), got
+
+
+def test_the_credits_list_has_the_pages_own_data_credit_first_and_not_twice():
+    blank = rs.render_dashboard(_edges(), basemap="blank").html
+    none = rs.render_dashboard(_edges(), basemap="blank", dashboard={"credits": []}).html
+    liberty = rs.render_dashboard(_edges(), basemap="ofm_liberty").html
+    errors, rows = [], []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        for html in (blank, none, liberty):
+            page = browser.new_page(viewport={"width": 1200, "height": 800})
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.route(_URL, _serve(html))
+            page.goto(_URL)
+            page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=90_000)
+            page.evaluate("rs.tools.open('attribution')")
+            page.wait_for_timeout(400)
+            rows.append(page.evaluate("[...document.querySelectorAll('#rs-attr-box .rs-attr-row')].map(r => [r.textContent.trim(), r.getAttribute('href')])"))
+            page.close()
+        browser.close()
+    assert not errors, errors
+    assert rows[0][0] == ["\u00a9 OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"] and rows[0][-1][0] == "MapLibre", rows[0]
+    assert [r[0] for r in rows[1]] == ["MapLibre"], rows[1]                                                      # credits=[] leaves it out
+    assert sum("OpenStreetMap" in r[0] for r in rows[2]) == 1, rows[2]                                           # the base map names it: not twice
+
+
+def test_the_default_base_map_list_has_no_openfreemap_bright():
+    html, errors = rs.render_dashboard(_edges(), basemap="blank").html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, _serve(html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
+        page.evaluate("rs.tools.open('basemap')")
+        page.wait_for_timeout(400)
+        names = page.evaluate("[...document.querySelectorAll('.bm-menu .rs-bm-n')].map(e => e.textContent.trim())")
+        browser.close()
+    assert not errors, errors
+    assert names[:7] == ["OpenFreeMap Liberty", "OpenFreeMap Positron", "OpenStreetMap", "Esri Gray", "Esri Streets", "Esri Satellite", "Blank"], names
+
+
+def test_the_corner_strip_does_not_blur_itself_so_the_credits_box_inside_it_blurs_like_the_other_boxes():
+    html, errors = rs.render_dashboard(_edges(), basemap="blank").html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, _serve(html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
+        got = page.evaluate("""() => { rs.tools.open('attribution'); const s = document.getElementById('rs-scalebox'), b = document.getElementById('rs-attr-box'), tb = document.getElementById('rs-toolbar');
+            const blur = (e, p) => getComputedStyle(e, p).backdropFilter; return {strip: blur(s), stripLayer: blur(s, '::before'), box: blur(b), bar: blur(tb), barLayer: blur(tb, '::before'),
+              stripBg: getComputedStyle(s, '::before').backgroundColor, barBg: getComputedStyle(tb, '::before').backgroundColor}; }""")
+        browser.close()
+    assert not errors, errors
+    assert got["strip"] == "none" and "blur" in got["stripLayer"] and "blur" in got["box"], got          # nothing blurred around the credits box
+    assert got["bar"] == "none" and "blur" in got["barLayer"] and got["stripBg"] == got["barBg"], got    # the strip is the bar's level
+
+
+def _openfreemap_answers():
+    import urllib.request
+    try:
+        urllib.request.urlopen(urllib.request.Request("https://tiles.openfreemap.org/styles/liberty", headers={"User-Agent": "roadstyle-tests"}), timeout=8).read(10)
+        return True
+    except OSError:
+        return False
+
+
+def test_a_persons_switch_of_the_3d_buildings_tilts_and_zooms_the_map_and_off_flattens_it():
+    if not _openfreemap_answers():
+        pytest.skip("no network: the OpenFreeMap style cannot load")
+    html, errors = rs.render_dashboard(_edges(), basemap="ofm_liberty").html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1200, "height": 800})
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route(_URL, _serve(html))
+        page.goto(_URL)
+        page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=90_000)
+        page.wait_for_function("document.getElementById('rs-top-buildings') === null || !document.getElementById('rs-top-buildings').disabled", timeout=60_000)
+        page.evaluate("map.jumpTo({zoom: 11, pitch: 0})")
+        page.evaluate("rs.tools.open('basemap')")
+        page.wait_for_timeout(500)
+        start = page.evaluate("[document.getElementById('rs-top-buildings').checked, Math.round(map.getPitch()), Math.round(map.getZoom())]")
+        page.evaluate("document.getElementById('rs-top-buildings').click()")           # the box starts with the buildings on: this click switches them off
+        page.wait_for_timeout(300)
+        off = page.evaluate("[rsBuildings(), Math.round(map.getPitch())]")
+        page.evaluate("document.getElementById('rs-top-buildings').click()")           # on again: the map tilts and zooms in
+        page.wait_for_timeout(1500)
+        on = page.evaluate("[rsBuildings(), Math.round(map.getPitch()), Math.round(map.getZoom())]")
+        page.evaluate("document.getElementById('rs-top-buildings').click()")           # off: flat again
+        page.wait_for_timeout(1200)
+        flat = page.evaluate("Math.round(map.getPitch())")
+        scripted = page.evaluate("(() => { rsBuildings(true); return Math.round(map.getPitch()); })()")      # a script moves nothing
+        browser.close()
+    assert not errors, errors
+    assert start[0] is True and start[1] == 0, start
+    assert off == [False, 0], off
+    assert on[0] is True and on[1] >= 50 and on[2] >= 15, on
+    assert flat == 0 and scripted == 0, (flat, scripted)

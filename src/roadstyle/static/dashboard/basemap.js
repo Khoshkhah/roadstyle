@@ -72,6 +72,18 @@ export function rsBuildings(on){
   _emit("rs:buildingschange", {on:buildingsOn, vector:!!vec});
   return buildingsOn;
 }
+// A person's switch of the 3D buildings (the box's row, the bar's button): on, the map is tilted if it is flat and zoomed in to where the buildings start, so that
+// the switch shows something (there is no 2D / 3D button); off, it is flattened again if this switch tilted it. A script calls rsBuildings(on), which moves nothing.
+let _bTilted = false;
+export function rsBuildingsByPerson(on){
+  rsBuildings(on);
+  if(on && vec){
+    const to = {};
+    if(map.getPitch() < 5){ to.pitch = 55; _bTilted = true; }
+    if(map.getZoom() < 14.5) to.zoom = 15;
+    if(Object.keys(to).length) map.easeTo({...to, duration: 600});
+  } else if(!on && _bTilted){ _bTilted = false; map.easeTo({pitch: 0, duration: 400}); }
+}
 export function rsSetBasemap(keyOrIdx){
   let idx = typeof keyOrIdx==="number" ? keyOrIdx
     : BASEMAPS.findIndex(b=>b.key===keyOrIdx || b.label===keyOrIdx);
@@ -115,7 +127,7 @@ export function initBasemap(){
     d.className="maplibregl-ctrl maplibregl-ctrl-group"; bt.type="button"; bt.id="rs-b3d-btn"; bt.innerHTML=BUILDINGS_ICON; d.appendChild(bt);
     const sync=()=>{ bt.disabled=!vec; bt.classList.toggle("rs-on", !!vec && buildingsOn);
                      bt.title=vec ? "Buildings in 3D" : "3D buildings need a vector base map (OpenFreeMap)"; };
-    bt.onclick=()=>rsBuildings(!buildingsOn);
+    bt.onclick=()=>rsBuildingsByPerson(!buildingsOn);
     for(const ev of ["rs:buildingschange", "rs:basemapready", "rs:basemapchange"]) document.addEventListener(ev, ()=>setTimeout(sync, 0));
     sync();
     defineTool("buildings", "toggle", d, {title: bt.title, isOpen: ()=>!!vec && buildingsOn});

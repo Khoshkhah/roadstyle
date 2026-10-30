@@ -326,6 +326,15 @@ impl BoundaryRules {
     }
 }
 
+/// A credit of the credits list (the tool `attribution`): a text and a link. The credits of the base map come from the map itself.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Credit {
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub href: Option<String>,
+}
+
 /// The typed option of the dashboard (the page's `RS_OPTIONS.dashboard`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -341,6 +350,9 @@ pub struct Dashboard {
     pub google_3d: Google3d,
     #[serde(default)]
     pub legend: LegendOptions,
+    /// the credits of the page's own data, in the credits list before the base map's (the dashboard: OpenStreetMap, the source of its roads; `[]`: none)
+    #[serde(default)]
+    pub credits: Vec<Credit>,
     /// the scale bar and the zoom number: shown at the start. The dashboard hides them (the person can show them in the settings)
     #[serde(default)]
     pub scale_box: bool,
@@ -372,6 +384,7 @@ impl Template {
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
         Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(),
+                    credits: if self == Template::Dashboard { vec![Credit { text: "\u{a9} OpenStreetMap contributors".into(), href: Some("https://www.openstreetmap.org/copyright".into()) }] } else { Vec::new() },
                     scale_box: self == Template::Map, phone }
     }
 }
@@ -562,6 +575,8 @@ mod tests {
         assert_eq!(v["template"], "dashboard");
         assert_eq!(v["toolbar"], serde_json::json!({"position": "left", "settings": true, "hold": false, "navigation": "box"}));
         assert_eq!(v["scale_box"], false);
+        assert_eq!(v["credits"][0]["text"].as_str().map(|t| t.contains("OpenStreetMap")), Some(true));        // the dashboard credits its roads
+        assert_eq!(serde_json::to_value(Template::Map.dashboard(Overlay)).unwrap()["credits"], serde_json::json!([]));
         assert_eq!(v["phone"], serde_json::json!({"max_width_px": 700, "toolbar": "top"}));
         assert!(serde_json::from_value::<Dashboard>(serde_json::json!({"template": "map", "layout": "dock", "panel": null, "toolbar": null,
             "windows": {"clamp": false, "recenter_map": true, "restore_open": true, "remember": true}, "boundary": v["boundary"],
