@@ -100,7 +100,7 @@ The gear button opens the settings. The browser keeps them. They do not go into 
 
 ### Credits
 
-The credits button is in a box in the bottom corner of the map, on the side opposite to the panel. The scale and the zoom number are
+The credits button is in a box in the bottom corner of the map, on the side opposite to the panel. With the bar at the right, the box is at the bottom right, below the end of the bar. The scale and the zoom number are
 in the same box, and the person chooses to show them. The box is always shown. On a phone the credits button is in the bar.
 The credits list starts with the credits of your page. The dashboard has "© OpenStreetMap contributors", the source of its roads.
 `dashboard={"credits": [{"text": "My data", "href": "https://example.org"}]}` adds yours, and `dashboard={"credits": []}` leaves out

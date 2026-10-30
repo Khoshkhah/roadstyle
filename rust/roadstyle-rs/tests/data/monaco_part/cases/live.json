@@ -61,13 +61,14 @@
     "roadstyle:images": "e9049aa3d5b18840",
     "roadstyle:live": "65b27abf2a025aab",
     "roadstyle:sources": "3eb959a8e2207438",
+    "roadstyle:classes": "e0a3fe0ab6ac40de",
     "roadstyle:arrows": "42d2b70866ba77b8",
     "roadstyle:contract": "d4735e3a265e16ee",
     "roadstyle:state": "4760686176b546aa",
     "roadstyle:controls": "c5f1ff415b521388",
     "roadstyle:generation": "18db75a661ad967c"
   },
-  "hash": "450e3f768881e673",
+  "hash": "d3b63bc582ff0c58",
   "road_table": {
     "rows": 1373,
     "columns": [

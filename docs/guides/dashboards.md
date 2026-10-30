@@ -48,7 +48,7 @@ Every dashboard has the same parts, in the same places. You do not build them. Y
 - **The panel** is at the left, 400 px wide, with the query box and the selected road. You can add blocks of your own to it
   ([Add to the panel](dashboard-panel.md)). Build them from the shared parts of a dashboard: help window, hover box, tabs, number tiles,
   tables, charts and chips ([Dashboard parts](dashboard-parts.md)).
-- **The toolbox** is one bar next to the panel. Its tools are always in the same places: theme, navigate, Street View, Google 3D,
+- **The toolbox** is one bar at the right edge. Its tools are always in the same places: theme, navigate, Street View, Google 3D,
   base map, roads, 3D buildings, colour and legend, settings, and the credits. A tool that the page cannot use is greyed out, and its
   tooltip says why. You can add tools of your own with `rs.tools` ([Dashboard layout](dashboard-layout.md)).
 - **One `navigate` button** replaces the zoom buttons, the compass and the 2D/3D button. It opens a box with a zoom, a turn and a

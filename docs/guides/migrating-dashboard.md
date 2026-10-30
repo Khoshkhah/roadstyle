@@ -16,7 +16,7 @@
 | `window.rsG3dMeshAltitude = 1.5` | `dashboard={"google_3d": {"mesh_altitude_m": 1.5}}` |
 | `window.rsToolbarHold = true` | `dashboard={"toolbar": {"hold": True}}`, then `rs.tools.ready()` |
 | `google_3d_layers=[...]` | The same keyword. A wrong key is now an error |
-| the panel and the toolbox at the right, the base map `ofm_positron`, the scale box shown | New defaults: panel and toolbox at the **left**, the base map **blank**, the scale box **hidden**, and the base map, colour and legend sections hidden in the panel (the toolbox has them). To get the old ones: `dashboard={"panel": {"side": "right", "hide": []}, "toolbar": {"position": "right"}, "scale_box": True}` and `basemap=` |
+| the panel and the toolbox at the right, the base map `ofm_positron`, the scale box shown | New defaults: the panel at the **left**, the toolbox at the **right edge** (on a phone, at the top), the base map **blank**, the scale box **hidden**, and the base map, colour and legend sections hidden in the panel (the toolbox has them). To get the old panel place: `dashboard={"panel": {"side": "right", "hide": []}, "scale_box": True}` and `basemap=`. `dashboard={"toolbar": {"position": "left"}}` puts the toolbox at the left |
 
 An old keyword that no longer exists stops with an error that says where it went.
 
