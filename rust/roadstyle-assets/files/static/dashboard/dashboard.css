@@ -547,6 +547,10 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #rs-help .rs-help-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:20px;color:inherit;cursor:pointer}
 #sb #rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
 #sb #rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}
+/* a phone: the help window is a sheet at the bottom of the screen, as the panel and the other windows are */
+html.rs-phone #rs-help{align-items:flex-end}
+html.rs-phone #rs-help .rs-help-box{margin:0;width:100%;max-width:none;max-height:85dvh;border-radius:14px 14px 0 0;border-bottom:0}
+html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 
 
 /* The strip's blur is a layer behind it, not a property of the strip: a box that opens inside a blurred parent (the attribution) blurs only what the parent

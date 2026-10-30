@@ -135,6 +135,7 @@ dashboard's panel, toolbox and phone form, and `roadstyle serve` gives it the fi
 
 - **The edge of the area**: `roadstyle levels make edges.parquet out/area --boundary area.geojson` keeps the GeoJSON polygon as
   `out/area/boundary.geojson`, and the editor draws it as a dashed line. An area with no such file has no line.
+- **Help**: the **?** button next to the title opens a window that explains the editor: the two picked roads (red and blue), Order, Stack and Meet, the casing parts, the buttons of the apply bar, History, Issues and **← Steps**. On a phone it is a sheet.
 - **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
   *meet* (join two ends).
 - **Switch off** a pair that the input found. To replace a found stack, switch off its rows, then add your own parts.

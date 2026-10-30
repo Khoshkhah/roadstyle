@@ -121,3 +121,40 @@ def test_an_edit_is_saved_to_edits_csv(editor):
         assert any(r["relation"] == "order" and r["a"] == order["a"] and r["b"] == order["b"] and r["enabled"] == "false" for r in rows), rows
         assert errors == []
         b.close()
+
+
+def test_the_help_window_explains_the_editor_in_both_themes_and_on_a_phone(editor):
+    _, url = editor
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page, errors = _open(b, url, viewport={"width": 1300, "height": 800})
+        btn = page.locator(".lv-title #rs-help-btn")
+        assert btn.is_visible() and btn.get_attribute("title") == "How to use the level editor", "the ? button next to the title"
+        assert page.is_hidden("#rs-help")
+        btn.click()
+        assert page.is_visible("#rs-help .rs-help-box")
+        text = page.inner_text("#rs-help")
+        for word in ("which road is drawn over which road", "road 1", "road 2", "Order", "Stack", "Meet", "On top", "Casing parts", "Add to the list", "Discard",
+                     "Apply and solve", "History", "edits.csv", "Issues", "Given up", "Near warnings", "Order wishes not kept"):
+            assert word in text, word
+        dots = page.evaluate("[...document.querySelectorAll('#rs-help .rs-help-intro span')].map(e => getComputedStyle(e).backgroundColor)")
+        assert len(dots) == 2 and dots[0] != dots[1], dots
+        box = page.evaluate("document.querySelector('#rs-help .rs-help-box').getBoundingClientRect().toJSON()")
+        assert box["top"] >= 0 and box["bottom"] <= 800 and box["right"] <= 1300, box
+        light = page.evaluate("getComputedStyle(document.querySelector('#rs-help .rs-help-box')).backgroundColor")
+        page.keyboard.press("Escape")
+        assert page.is_hidden("#rs-help"), "Esc closes it"
+        page.click("button[title='Light / dark']")
+        btn.click()
+        assert page.evaluate("getComputedStyle(document.querySelector('#rs-help .rs-help-box')).backgroundColor") != light, "the dark theme"
+        page.click("#rs-help .rs-help-x")
+        assert page.is_hidden("#rs-help")
+        assert errors == []
+        b.close()
+        b = p.chromium.launch()
+        page, errors = _open(b, url, viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+        page.locator(".lv-title #rs-help-btn").tap()
+        box = page.evaluate("document.querySelector('#rs-help .rs-help-box').getBoundingClientRect().toJSON()")
+        assert box["width"] == 390 and abs(box["bottom"] - 844) < 1 and box["top"] > 0, ("a sheet at the bottom", box)
+        assert errors == []
+        b.close()

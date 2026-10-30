@@ -42,7 +42,7 @@ rs.help.set({title: "How to read this page", intro: "What the page shows.",
              terms: [["Inside the range", "How often the promise held."]], note: "A short note."});
 ```
 
-An "i" button appears in the panel's title. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
+A "?" button appears in the panel's title (`anchor: element` puts it in another element, for example in the title of a panel that a module draws). `rs.help.get()` gives the words that are set now, and `rs.help.clear()` takes the window and the button away. On a phone the window is a sheet at the bottom of the screen. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
 
 ## Cards, number tiles and a callout
 

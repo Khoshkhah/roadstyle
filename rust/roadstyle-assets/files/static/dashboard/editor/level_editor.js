@@ -97,6 +97,27 @@ function csvRows(text){                                          // the rows of 
 const cell = v => /[",\n]/.test(String(v ?? "")) ? `"${String(v).replaceAll('"', '""')}"` : String(v ?? "");
 const toCsv = (rows, cols = COLS) => cols.join(",") + "\n" + rows.map(r => cols.map(c => cell(r[c])).join(",")).join("\n") + (rows.length ? "\n" : "");
 
+/** The words of the editor's help window (rs.help.set): `c` the colours of the two picked roads, `back` the label of the "← ..." button (null: none). */
+function levelsHelp(c, back){
+  const dot = (col, n) => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};vertical-align:middle"></span> road ${n}`;
+  const terms = [
+    ["Pick roads", "Click a road to pick it. Click a second road to see what is between the two roads. Click a picked road, or press Esc, to cancel. You can also type an edge id or an edge_ref in the find box."],
+    ["Order", "Says which road is drawn on top where the two roads meet. Use <b>on top</b> to choose the road."],
+    ["Stack", "Says that one road crosses over the other road, for example on a bridge. Choose the road that is on top, and the parts of its casing that cross."],
+    ["Meet", "Joins an end of road 1 to an end of road 2. Each end is drawn under the fill of the other road, so the two roads join with no ring."],
+    ["On top", "The road that is drawn over the other road. Click its button."],
+    ["Casing parts", "The casing is the outline of a road. It has three parts: the <b>start head</b>, the <b>main</b> part and the <b>end head</b>. Choose one part, some parts or the whole road. Use the sliders to change the length of a head. Round, square or flat is the shape of a road end."],
+    ["Add to the list", "Puts the new rule in the list of waiting changes. Nothing is solved yet. Use <b>switch off</b> to cancel a rule that the input found."],
+    ["Discard", "Removes all the waiting changes."],
+    ["Apply and solve", "Solves all the waiting changes together, draws again the roads that changed, and saves them. If the solver refuses the changes, nothing is saved."],
+    ["History", "Lists the rules of <b>edits.csv</b>. The button at the bottom downloads the file."],
+    ["Issues", "<b>Given up</b>: a stack that the solver could not keep. It is a flaw on the map. <b>Near warnings</b>: a road that comes near the road below it. <b>Order wishes not kept</b>: an order rule that other rules do not let the solver keep."]];
+  if(back != null) terms.push([`← ${back}`, "Goes back to the steps of the page. If changes are waiting, the editor asks you to <b>Apply</b>, <b>Discard</b> or <b>Stay</b>."]);
+  return {title: "Edit levels", button: "How to use the level editor",
+    intro: `A level says which road is drawn over which road: a road at a higher level is drawn over a road at a lower level. Click a road on the map: it is ${dot(c.select, 1)}. Click a second road: it is ${dot(c.second, 2)}. Each road has its colour on the map and in the panel. The panel then shows the rules between the two roads.`,
+    terms};
+}
+
 /** The level editor on `map` (or a map of its own in `container`), with the panel in `container`; see the file's head. A page has one
  * dashboard (its state is the module's): on a host map that has one, give it as `dashboard` with the `prefix` it was made with; the
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
@@ -539,6 +560,9 @@ initPanelScroll();                                               // the editor's
 if(backLabel == null) document.getElementById("lv-back").remove();      // a page with no steps to go back to
 else document.getElementById("lv-back").textContent = "← " + backLabel;
 document.getElementById("lv").addEventListener("lv:back", () => events.dispatchEvent(new CustomEvent("back")));
+// the help window (rs.help, the dashboard's own): its "?" button is next to the title; destroy() sets the host's own words again, or takes the window away
+const hadHelp = rs.help.get();
+rs.help.set({...levelsHelp(COLORS, backLabel), anchor: document.querySelector(".lv-title .t")});
 
 // a finger's tap on a phone: the wide tap line, when the dashboard picked nothing for this tap (its pick box can be wider than the road layers
 // under the finger, and its pick comes before the map's click); the road table's row of the piece, which has the road
@@ -575,6 +599,7 @@ function destroy(){
   document.removeEventListener("rs:select", heardPick);
   window.rsColor?.(null);                                        // the colour of the picked roads (the panel's paint) and their glow stay on the map otherwise
   window.rsDeselect?.();
+  if(hadHelp) rs.help.set(hadHelp); else rs.help.clear();
   heard.forEach(off => off());
   nodes.forEach(n => n.remove());
   [hostTitle.style.display, hostBody.style.display] = [hostWas.title, hostWas.body];     // the host's panel as it was

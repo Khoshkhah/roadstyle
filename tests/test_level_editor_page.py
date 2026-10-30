@@ -256,12 +256,17 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert len(solved) == 1 and solved[0]["rows"] > roads and solved[0]["draw"] > 0, solved
             assert road in page.evaluate("stored('heads.csv')")
             assert page.evaluate("window.editor.files") == ["edits.csv", "heads.csv", "caps.csv", "levels.csv"]
+            # the help window (rs.help of the host's dashboard): the editor's words with the "<- Steps" line, and the ? button next to its title
+            assert page.evaluate("window.host.help.get().title") == "Edit levels"
+            assert page.evaluate("window.host.help.get().terms.some((t) => t[0] === '\u2190 Steps')")
+            assert page.evaluate("!!document.querySelector('.lv-title #rs-help-btn')")
             # close, open again, close: the same listeners each time, none left; the host's roads, base map and dashboard back
             opened = page.evaluate("counts()")
             back = "JSON.stringify(Object.fromEntries(hostMap.getStyle().layers.filter(l => l.id.startsWith('host-')).map(l => [l.id, l.source])))"
             for _ in range(2):
                 page.evaluate("window.editor.destroy()")
                 assert page.evaluate("counts()") == page.evaluate("window.before"), "no listener of the editor left"
+                assert page.evaluate("window.host.help.get() === null && !document.getElementById('rs-help-btn') && !document.getElementById('rs-help')"), "the help went"
                 assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
                 assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-lv-roads')")
                 assert page.evaluate("window.rs === window.host && !window.lvApi && !document.querySelector('.lv-title')")
