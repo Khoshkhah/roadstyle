@@ -42,6 +42,21 @@ rs.help.set({title: "How to read this page", intro: "What the page shows.",
 
 An "i" button appears in the panel's title. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them; `rs.help.open()` and `rs.help.close()` open and close the window.
 
+## Cards, number tiles and a callout
+
+```html
+<div class="rs-callout" style="--rs-callout:#16a34a"><b>Yes, the promise holds.</b> On 80 % of hours the traffic was inside the range.</div>
+<div class="rs-cap">All counted hours</div>
+<div class="rs-kpis" id="k"></div>
+<div class="rs-sec-box"><h3>By hour of the day</h3><p>How often the range held, hour by hour.</p><svg>...</svg></div>
+```
+
+```js
+document.getElementById("k").innerHTML = rs.kpi("Inside the range", "80.4%", "promised 80 %", "#15803d") + rs.kpi("Typical miss", "10 %", "on one hour");
+```
+
+A card is `.rs-sec-box`: an `h3` is its title and the paragraph right after it is its short muted description. An `svg` in it fills the width. `rs-kpis` is a grid of three tiles (`--rs-kpi-cols` changes the number). All of them use the panel's tokens, so they follow the light and the dark theme.
+
 ## Tabs and a two-way switch
 
 ```html

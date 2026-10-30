@@ -124,3 +124,19 @@ def test_tabs_select_by_click_and_arrow_and_the_switch_has_no_panes(tmp_path):
         off = page.evaluate("getComputedStyle(document.querySelector('[data-tab=a]')).backgroundColor")
         assert on() != off
     _run(tmp_path, body)
+
+
+def test_cards_and_number_tiles(tmp_path):
+    def body(page):
+        page.evaluate("""() => { const d = document.createElement('div'); d.id = 'c'; d.className = 'sb-sec';
+            d.innerHTML = '<div class="rs-callout">Answer</div><div class="rs-kpis" id="k"></div><div class="rs-sec-box"><h3>Title</h3><p>Muted words</p></div>';
+            document.querySelector('#sb .sb-body').appendChild(d);
+            document.getElementById('k').innerHTML = rs.kpi('Inside', '80.4%', 'promised', '#15803d') + rs.kpi('Miss', '10 %') + rs.kpi('Bad', '1', '', 'red;x:y'); }""")
+        assert page.locator(".rs-kpi").count() == 3
+        assert page.locator(".rs-kpi-val").first.evaluate("e => e.style.color") != ""
+        assert page.locator(".rs-kpi-val").nth(2).get_attribute("style") is None        # a colour with a ; is not taken
+        assert page.evaluate("getComputedStyle(document.getElementById('k')).gridTemplateColumns.split(' ').length") == 3
+        muted, ink = (page.evaluate("s => getComputedStyle(document.querySelector(s)).color", s) for s in (".rs-sec-box h3 + p", ".rs-sec-box h3"))
+        assert muted != ink
+        assert page.evaluate("getComputedStyle(document.querySelector('.rs-callout')).borderLeftWidth") == "4px"
+    _run(tmp_path, body)

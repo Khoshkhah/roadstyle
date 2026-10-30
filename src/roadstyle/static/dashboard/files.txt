@@ -17,6 +17,7 @@ tip
 help
 hover
 tabs
+kpi
 toolbar
 panel
 find
