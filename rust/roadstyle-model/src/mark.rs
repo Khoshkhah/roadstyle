@@ -200,6 +200,26 @@ impl Mark {
     }
 }
 
+/// The keys, besides the marks, that a road feature of a tile (the layers `simple` and `slots`) may have (docs/design/tiling.md, "The keys of a
+/// tile"): `r` the rank of the sort key, `lvl` the level (the dashboard's bridge and tunnel switches filter on it), `highway` the class text that the
+/// class minzoom and the arrows' size read, and the name slots' `name`, `chain`, `slot`, `rank` and `oneway`. A data column is not on the list: a
+/// road's fields come from the road table by the feature id (the road's row).
+pub const TILE_ROAD_KEYS: [&str; 8] = ["r", "lvl", "highway", "name", "chain", "slot", "rank", "oneway"];
+
+/// The (layer, key) pairs of a tile that still have a TEXT value. The aim is none on `simple` (a number or a flag is what a style expression needs;
+/// the text is in the road table): `__rs_cls` and `highway` become the class code `__rs_ci`, `__rs_dash` an index of the dash patterns, `__rs_cap` a
+/// code. The test `tile_keys` fails for a text value outside this list and for an entry that has no text value any more (the list only shrinks).
+/// `name` of `slots` stays: MapLibre's `text-field` reads the street name from the tile.
+pub const TILE_TEXT_KEYS: [(&str, &str); 7] = [
+    ("simple", "__rs_cls"), ("simple", "highway"), ("simple", "__rs_dash"), ("simple", "__rs_cap"),
+    ("slots", "__rs_cls"), ("slots", "highway"), ("slots", "name"),
+];
+
+/// A key that a road feature of a tile may have: a mark, or one of `TILE_ROAD_KEYS`.
+pub fn tile_key_allowed(key: &str) -> bool {
+    Mark::of(key).is_some() || TILE_ROAD_KEYS.contains(&key)
+}
+
 /// The keys of the dashboard's filters (class, level, access): a road-derived tile layer (the pieces, the slots) keeps them.
 pub fn filter_keys() -> [&'static str; 3] {
     [Mark::Class.name(), "lvl", Mark::Access.name()]

@@ -1,0 +1,104 @@
+//! The keys of a tile (docs/design/tiling.md, "The keys of a tile"): a road feature in a tile has the geometry, the feature id (the road's row) and
+//! the keys that the style and the dashboard's filters read in MapLibre. No data column, and no text value outside `TILE_TEXT_KEYS`, on every path
+//! that makes tiles: the page's look (the page archive and the map worker), the export look (`export_style`), and the files of stage 1 (the
+//! program `roadstyle tiles`). Each path is checked on the tiles of Monaco at zooms 12, 14 and 15.
+
+mod common;
+
+use roadstyle_rs::tiles::Tiles;
+use roadstyle_rs::Look;
+use serde_json::Value;
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+
+fn data(p: &str) -> Vec<u8> {
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data").join(p);
+    std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
+}
+
+fn look(export: bool) -> Look {
+    let mut look: Value = serde_json::from_slice(&data("look.json")).unwrap();
+    look["args"]["arrows"] = true.into();
+    look["args"]["labels"] = true.into();
+    look["args"]["export"] = export.into();
+    Look::from_value(look).unwrap()
+}
+
+/// Every tile of the roads' box at zooms 12, 14 and 15: (layer, key, is a text) with the number of features that have it.
+fn keys_of(tiles: &Tiles, roads: &[u8]) -> BTreeSet<(String, String, bool)> {
+    let t = roadstyle_rs::read::read_roads(roads.to_vec(), "geometry").unwrap();
+    let (mut x0, mut y0, mut x1, mut y1) = (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for c in (0..t.len()).filter_map(|i| t.line(i)).flatten() {
+        (x0, y0, x1, y1) = (x0.min(c[0]), y0.min(c[1]), x1.max(c[0]), y1.max(c[1]));
+    }
+    let mut out = BTreeSet::new();
+    for z in [12u32, 14, 15] {
+        let k = (1u64 << z) as f64;
+        let tx = |lon: f64| ((lon + 180.0) / 360.0 * k) as u32;
+        let ty = |lat: f64| ((1.0 - lat.to_radians().tan().asinh() / std::f64::consts::PI) / 2.0 * k) as u32;
+        for x in tx(x0)..=tx(x1) {
+            for y in ty(y1)..=ty(y0) {
+                for (layer, feats) in common::decode_tile(&tiles.tile(z, x, y)) {
+                    for (id, props, _, _) in feats {
+                        if layer == "simple" || layer == "slots" {
+                            assert!(id.is_some(), "{layer}: a feature has no id (the id is the road's row)");
+                        }
+                        for (key, v) in props {
+                            out.insert((layer.clone(), key, v.is_string()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+fn check(path: &str, found: &BTreeSet<(String, String, bool)>) {
+    let road = |l: &str| l == "simple" || l == "slots";
+    let text: BTreeSet<(String, String)> = roadstyle_rs::mark::TILE_TEXT_KEYS.iter().map(|(l, k)| (l.to_string(), k.to_string())).collect();
+    let mut errors = Vec::new();
+    for (layer, key, is_text) in found.iter().filter(|(l, ..)| road(l)) {
+        if !roadstyle_rs::mark::tile_key_allowed(key) {
+            errors.push(format!("{layer}.{key}: not on the list of tile keys (a data column goes to the road table, not to a tile)"));
+        }
+        if *is_text && !text.contains(&(layer.clone(), key.clone())) {
+            errors.push(format!("{layer}.{key}: a text value on a road feature (a number or a flag in the tile, the text in the road table)"));
+        }
+    }
+    for (layer, key) in &text {
+        if !found.iter().any(|(l, k, t)| l == layer && k == key && *t) && !found.is_empty() {
+            // a list entry that no tile of this path has as text: the list shrinks (the path may not have the key at all: `slots` of a page with no names)
+            if found.iter().any(|(l, ..)| l == layer) && path != "stage 1 files" && path != "export look" {
+                errors.push(format!("{layer}.{key}: no text value any more on the {path}: take it out of TILE_TEXT_KEYS"));
+            }
+        }
+    }
+    assert!(errors.is_empty(), "{path}:\n{}", errors.join("\n"));
+}
+
+#[test]
+fn the_page_look_tiles_have_only_the_listed_keys() {
+    let roads = data("monaco/roads.parquet");
+    let (_, tiles, _) = roadstyle_rs::tiled_from_parquet(roads.clone(), &look(false), Some(data("monaco/features.parquet")), None, "rs://", &[]).unwrap();
+    check("page look", &keys_of(&tiles, &roads));
+}
+
+#[test]
+fn the_export_look_tiles_have_only_the_listed_keys() {
+    let roads = data("monaco/roads.parquet");
+    let (_, tiles, _) = roadstyle_rs::tiled_from_parquet(roads.clone(), &look(true), Some(data("monaco/features.parquet")), None, "rs://", &[]).unwrap();
+    check("export look", &keys_of(&tiles, &roads));
+}
+
+#[test]
+fn the_tiles_of_the_stage_1_files_have_only_the_listed_keys() {
+    let roads = data("monaco/roads.parquet");
+    let look = look(true);
+    let s = roadstyle_rs::style_sources(roads.clone(), &look, Some(data("monaco/features.parquet")), None, None).unwrap();
+    let dir = std::env::temp_dir().join(format!("roadstyle-tile-keys-{}", std::process::id()));
+    roadstyle_rs::write_sources(&s, &dir, roadstyle_rs::Format::GeoParquet, &[]).unwrap();
+    let (_, tiles) = roadstyle_rs::tiles_of_files(&dir, &[], None, &roadstyle_rs::xyz_at("")).unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    check("stage 1 files", &keys_of(&tiles, &roads));
+}
