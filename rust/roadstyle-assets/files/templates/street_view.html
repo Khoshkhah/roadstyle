@@ -2,6 +2,7 @@
      Injected at the end of the page by rs.render_street_view(); talks to the map only through the public
      API (the rs:select event). Plain HTML/CSS/JS: copy it out with rs.sidebar_html("street_view"). -->
 <style>
+  :root { --accent: #0E7F91; }     /* the dashboard's accent (static/dashboard/dashboard.css): this page has no dashboard.css */
   body { --sv-w: 42%; --rs-side: var(--sv-w); }  /* --rs-side shifts the map's right-anchored controls */
   #map { right: var(--sv-w); }
   #sv { position: fixed; top: 0; right: 0; bottom: 0; width: var(--sv-w); display: flex;
@@ -18,14 +19,14 @@
   /* the flip, with a key only: Linked (the marker walks with the viewer) or Classic (the embed) */
   .sv-mode { display: inline-flex; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; flex: 0 0 auto; }
   .sv-mode button { border: 0; background: #fff; padding: 1px 8px; cursor: pointer; font: inherit; font-size: 12px; color: #475569; }
-  .sv-mode button.on { background: #0E7F91; color: #fff; }
+  .sv-mode button.on { background: var(--accent); color: #fff; }
   #sv [hidden] { display: none !important; }
   /* the divider: drag it to share the width (or, below, the height) between map and Street View */
   #sv-drag { position: fixed; top: 0; bottom: 0; right: var(--sv-w); width: 10px; margin-right: -5px;
              cursor: col-resize; z-index: 5; touch-action: none; }
   #sv-drag::after { content: ""; position: absolute; top: 50%; left: 3px; width: 4px; height: 40px;
                     margin-top: -20px; border-radius: 2px; background: #bbb; }
-  #sv-drag:hover::after, body.sv-dragging #sv-drag::after { background: #1a6bd6; }
+  #sv-drag:hover::after, body.sv-dragging #sv-drag::after { background: var(--accent); }
   body.sv-dragging { cursor: col-resize; user-select: none; }
   body.sv-dragging #sv-frame, body.sv-dragging #sv-pano { pointer-events: none; }  /* else the panel swallows the drag */
   #sv-frame, #sv-pano { flex: 1; width: 100%; border: 0; background: #eee; }

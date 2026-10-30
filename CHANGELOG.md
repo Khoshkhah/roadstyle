@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **One accent colour for the whole dashboard: the Sonocount teal.** `--accent` is `#0e7c8e` in the light theme (the logo's teal, a little darker so that a link is 4.6:1 on the panel's cards: the logo's own is 4.43:1) and a lighter teal of the same hue (`#42c2d7`, 8.5:1 on the dark panel) in the dark theme; `--accent-fill` is the logo teal `#0E7F91` of a
+  filled control (a selected tab, a primary button, the mode and follow buttons of the Street View and Google 3D windows), with white text (4.71:1) in both themes. They are defined once, in `dashboard.css` (the panel's own
+  `#1a6bd6` and `#5aa9f8` and the teal that two rules wrote in hex are gone, with every `var(--accent, #1a6bd6)` fallback), so the floating windows read it too (the token was only on the panel). The Google 3D selection
+  takes the accent for its default colour. A page does not set its own accent any more.
+
 ### Fixed
 - **The corner box has the shape of the bar.** The box with the scale, the zoom number and the credits had square corners and its own look: its layer was made by two rules, and the later one (`border-radius: inherit`) put 0
   over the first, because the box itself had no radius. It has one rule now, as the bar: the border and the radius (10 px) on the box, the colour and the blur on a layer behind it, in the light and the dark theme and with

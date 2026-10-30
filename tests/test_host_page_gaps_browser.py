@@ -522,3 +522,48 @@ def test_the_corner_box_has_the_shape_and_the_tokens_of_the_bar_and_the_boxes(ho
             assert "system-ui" in s["zoom"]["family"] and "system-ui" in s["barFamily"], s
             assert "tabular-nums" in s["zoom"]["numbers"], s
         browser.close()
+
+
+def test_the_accent_is_defined_once_and_every_place_reads_it():
+    """One accent colour for the whole dashboard (dashboard.css): a hex accent colour (the teal, or the two blues that were) appears only on the lines that define the token, and the
+    dark panel's accent keeps a contrast of 4.5 : 1 or more on the panel."""
+    import re
+    files = [*(ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "dashboard").glob("*.css"), *(ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "dashboard").glob("*.js"),
+             *(ROOT / "rust" / "roadstyle-assets" / "files" / "templates").glob("*.html"), ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "level_editor.html"]
+    stray = []
+    for f in files:
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            if re.search(r"1a6bd6|5aa9f8|0e7f91", line, re.I) and not re.search(r"--accent(-fill)?\s*:", line):
+                stray.append(f"{f.name}:{n}: {line.strip()[:90]}")
+    assert not stray, stray
+    css = (ROOT / "rust" / "roadstyle-assets" / "files" / "static" / "dashboard" / "dashboard.css").read_text()
+    assert len(re.findall(r"--accent:\s*#", css)) == 2, "one light and one dark definition in dashboard.css"
+    dark = re.search(r"html\[data-rs-theme=dark\],#sb\[data-theme=dark\]\{--accent:(#[0-9a-f]{6})\}", css).group(1)
+
+    def luminance(c):
+        v = [int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        v = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in v]
+        return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+
+    def contrast(a, b):
+        la, lb = sorted((luminance(a), luminance(b)), reverse=True)
+        return (la + 0.05) / (lb + 0.05)
+    light = re.search(r":root\{--accent:(#[0-9a-f]{6});", css).group(1)
+    assert contrast(dark, "#14171c") >= 4.5 and contrast(dark, "#1c2026") >= 4.5, dark                   # text and links on the dark panel and its cards
+    assert contrast(light, "#f7f8fa") >= 4.5 and contrast(light, "#ffffff") >= 4.5, light               # and on the light panel and its cards
+    assert contrast("#ffffff", "#0E7F91") >= 4.5, "white on the fill of a filled control"
+
+
+def test_the_accent_reads_the_same_in_the_panel_and_in_the_windows_and_follows_the_theme(host):
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        read = "() => ['sb', 'rs-toolbar'].map(id => getComputedStyle(document.getElementById(id)).getPropertyValue('--accent').trim()).concat([getComputedStyle(document.body).getPropertyValue('--accent-fill').trim()])"
+        assert page.evaluate(read) == ["#0e7c8e", "#0e7c8e", "#0E7F91"]
+        page.evaluate("() => rsSetTheme('dark')")
+        assert page.evaluate(read) == ["#42c2d7", "#42c2d7", "#0E7F91"]          # a window or the bar reads what the panel reads; the fill keeps its teal for the white text
+        browser.close()
