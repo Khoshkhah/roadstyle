@@ -11,7 +11,24 @@ export function layoutNow(){
   return {toolbar: s.toolbar || (d && d.toolbar && d.toolbar.position), panel: s.panel || (d && d.panel && d.panel.side), scale: s.scale != null ? s.scale : !d || d.scale_box !== false, look: s.look || (d && d.panel && d.panel.look)};
 }
 // the place of the panel and the scale box at the start: the page's, or the person's saved choice. Always, not only with the settings button
+// The free part of the window, as the padding of a camera: what covers the map is the panel (a card, a frame or the sheet of a phone) and the bar. A box that is
+// taller than it is wide stands on the left or the right (the nearer edge), a box that is wider than it is tall stands on the top or the bottom. The first view fits
+// into what is left (web_template.html calls `window.rsFreePad`).
+export function freePad(){
+  const pad = {top: 30, right: 30, bottom: 30, left: 30};
+  for(const el of document.querySelectorAll("#sb, #rs-toolbar")){
+    if(getComputedStyle(el).display === "none" || getComputedStyle(el).visibility === "hidden") continue;
+    const r = el.getBoundingClientRect();
+    if(!r.width || !r.height) continue;
+    const tall = r.height >= r.width, near = (a, b) => a <= b;
+    if(tall) { if(near(r.left, innerWidth - r.right)) pad.left = Math.max(pad.left, r.right + 8); else pad.right = Math.max(pad.right, innerWidth - r.left + 8); }
+    else if(near(r.top, innerHeight - r.bottom)) pad.top = Math.max(pad.top, r.bottom + 8);
+    else pad.bottom = Math.max(pad.bottom, innerHeight - r.top + 8);
+  }
+  return pad;
+}
 export function initPlacement(){
+  window.rsFreePad = freePad;
   const p = layoutNow();
   setPanelSide(p.panel); setPanelLook(p.look); setScaleShown(p.scale);
 }

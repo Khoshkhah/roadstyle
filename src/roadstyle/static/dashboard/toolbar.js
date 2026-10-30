@@ -11,6 +11,9 @@ const ICON = {
   sun: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   moon: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg>',
   // the attribution: an italic serif "i" in a ring (the filled "info" icon looked like the help's "?" of a page)
+  // the fold button: an arrow that folds the bar (it points up, or to the side on a bar along the top or the bottom), and the three lines of a folded bar
+  fold: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
   info: '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto"><circle cx="12" cy="12" r="9.2" fill="none" stroke="currentColor" stroke-width="1.8"/><text x="12" y="16.7" text-anchor="middle" font-family="Georgia,serif" font-style="italic" font-weight="700" font-size="13.5" fill="currentColor">i</text></svg>',
 };
 const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text) e.textContent = text; return e; };
@@ -66,6 +69,18 @@ function attributionTool(){
   };
   b.onclick = e => { e.stopPropagation(); box.hidden ? open() : (box.hidden = true); };
   defineTool("attribution", "box", d, {title: "Attribution", open, close: () => { box.hidden = true; }, isOpen: () => !box.hidden});
+}
+// the bar folds to one button (`rs-tb-folded` on <html>); the person's choice is kept in this browser
+const _tbFoldKey = "rs-settings:toolbar-folded";
+function foldTool(bar){
+  const b = button("", ICON.fold), w = wrap(b);
+  w.classList.add("rs-tb-fold");
+  const set = on => { document.documentElement.classList.toggle("rs-tb-folded", on); b.innerHTML = on ? ICON.menu : ICON.fold; b.title = on ? "Show the tools" : "Fold the bar"; b.setAttribute("aria-expanded", String(!on)); };
+  let on = false;
+  try{ on = localStorage.getItem(_tbFoldKey) === "1"; }catch(e){}
+  set(on);
+  b.onclick = e => { e.stopPropagation(); closeBoxes(); on = !on; set(on); try{ localStorage.setItem(_tbFoldKey, on ? "1" : "0"); }catch(e){} };
+  bar.insertBefore(w, bar.firstChild);
 }
 // one box is open at a time: a click outside the open box and the Escape key close it, and so does the click on another box's button
 function boxRules(bar){
@@ -127,6 +142,7 @@ export function initToolbar(){
       attr && attr.parentNode === bar && t.id !== "attribution" ? bar.insertBefore(w, attr) : bar.appendChild(w);       // the credits can be in the corner box (overlay.js)
     }
   });
+  foldTool(bar);
   boxRules(bar);
   const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-nav-box, #rs-roads-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
   toolList().forEach(fitBox); setOnReplace(fitBox);
