@@ -135,6 +135,9 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svm{pointer-events:none}
 html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a bottom sheet */left:0!important;right:0!important;top:auto!important;bottom:0!important;
   width:auto!important;height:45%!important;border-radius:14px 14px 0 0;resize:none}
+html.rs-phone .rs-svw-bar{flex-wrap:wrap}   /* the buttons and the credit of a window do not fit in one row: the second row, and the note of the 3D window has a row of its own */
+html.rs-phone .rs-svw-t{flex:1 0 auto}
+html.rs-phone .rs-g3d-note{order:9;flex:1 0 100%}
 /* the phone form of a template (template.js; `rs-phone` and `rs-tpl-*` are on <html> from the first paint). A sidebar template shows its
    panel as a bottom sheet; the map is the full width. */
 .rs-grip{display:none}

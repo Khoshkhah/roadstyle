@@ -8,6 +8,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Fixed
 - **The full sheet on a phone**: the sheet and the boxes of the bar used `vh`, which on a phone with its address bar visible is taller than the screen. The grip of the full sheet went under the bar and the sheet could not be lowered. They use `dvh` now (the visible screen).
+- **The bars of the windows on a phone**: the bar of the Google 3D window (and of Street View) is one row; its tunnel note got a column of one word per line. The bar wraps, and the note has a row of its own.
 
 ### Added
 - **The bar folds** (`dashboard`): a fold button, first in the bar, folds it to one button (three lines); a tap opens it again, and the page keeps the choice in this browser (`rs-settings:toolbar-folded`).

@@ -79,3 +79,19 @@ def test_the_first_view_on_a_desktop_is_beside_the_panel():
         assert road["l"] >= b["sb"]["r"] - 1, (road, b)         # the panel is at the left: the roads start at its edge or beyond
         browser.close()
     assert not errors, errors
+
+
+def test_the_google_3d_window_bar_wraps_on_a_phone():
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", google_3d=True).html, []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = _open(browser, html, errors, viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
+        r = page.evaluate("""() => { const w = document.querySelector('.rs-g3d'); w.hidden = false;
+          const n = w.querySelector('.rs-g3d-note'); n.hidden = false;
+          const box = e => e.getBoundingClientRect(), bar = w.querySelector('.rs-svw-bar');
+          return {bar: box(bar).width, note: box(n).width, noteTop: box(n).top, line: parseFloat(getComputedStyle(n).lineHeight),
+                  noteH: box(n).height, btnBottom: Math.max(...[...bar.querySelectorAll('button')].map(b => box(b).bottom))}; }""")
+        assert r["note"] > r["bar"] * 0.8, r                       # the note has the width of the bar, not a narrow column
+        assert r["noteH"] < r["line"] * 3, r                       # it has one or two lines, not one word on a line
+        browser.close()
+    assert not errors, errors
