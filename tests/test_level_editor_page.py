@@ -102,7 +102,9 @@ map.addLayer({id: "host-water", type: "fill", source: "host-water", paint: {"fil
 // its roads as vector tiles, in one tile source with its base map (duckosm-rust's page: the base map's layers are other source
 // layers of the roads' source)
 const edges = new Uint8Array(await (await fetch("/edges.parquet")).arrayBuffer());
-const hostSources = pkg.styleSources(edges, pkg.resolveLook(JSON.stringify({args: {state: "live"}})), undefined, undefined, "host");
+// (?basemap: the page's look has a colour option, "Road class", so the legend box has its "Colour by" list)
+const hostLook = pkg.resolveLook(JSON.stringify({args: {state: "live", ...(location.search === "?basemap" ? {color_options: {"Road class": {}}} : {})}}));
+const hostSources = pkg.styleSources(edges, hostLook, undefined, undefined, "host");
 window.hostTable = () => JSON.parse(new TextDecoder().decode(hostSources.roadTable()));   // the host's road table (its RS_SIDE)
 const hostSide = window.hostTable();
 const hostTiles = pkg.tilesOfSources(hostSources, "hostt://", ["edge_id", "name", "highway"]);
@@ -116,7 +118,12 @@ for(const [id, src] of Object.entries(own.sources)) map.addSource("host-" + id, 
 for(const l of own.layers) map.addLayer({...JSON.parse(JSON.stringify(l).replaceAll('"oneway"', '"host-oneway"')), id: "host-" + l.id, source: "host-" + l.source});
 map.addLayer({id: "host-land", type: "fill", source: "host-roads", "source-layer": "landuse", paint: {"fill-color": "#eeeeee"}});
 window.hostRoads = own.layers.map(l => "host-" + l.id);
-const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: false, dashboard: opts.dashboard});
+// the base map's layer (the water) is an overlay of the host's style: the dashboard's switch for it, and its entry in the legend box
+own.metadata["roadstyle:controls"] = {...(own.metadata["roadstyle:controls"] || {}), overlays: [{label: "Water", source: "water", layers: ["water"], color: "#aad3df",
+  visible: true, interactive: false, popup: [], tooltip: null, under: true, base: null, select: "road"}]};
+// ?basemap: the standard Base map box too (the page's base maps), and the editor is opened by the test, after the box has been read
+const withBase = location.search === "?basemap";
+const host = rsDashboard(map, {style: own, prefix: "host-", basemap_switcher: withBase, ...(withBase ? {basemaps: opts.basemaps, ontop: opts.ontop} : {}), dashboard: opts.dashboard});
 window.host = host;
 const panel = document.getElementById("sb");
 if(location.search === "?no-dashboard"){                         // the host's dashboard not given: an error, no second dashboard
@@ -138,8 +145,11 @@ window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening
 window.before = counts();
 window.solved = [];
 window.backs = 0;
+// ?dark: the page is in the dark theme before the editor opens; ?carto: the page's own look (another palette) is given to the editor
+window.lookText = location.search === "?carto" ? pkg.resolveLook(JSON.stringify({palette: "carto", args: {state: "live"}})).toJson() : location.search === "?basemap" ? hostLook.toJson() : null;
+if(location.search === "?dark") window.rsSetTheme("dark");
 window.openEditor = async () => { const t = performance.now();
-  const ed = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-"});
+  const ed = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-", look: window.lookText});
   ed.addEventListener("back", () => window.backs++);
   ed.addEventListener("solved", async e => window.solved.push({rows: e.detail.levelsCsv.trim().split("\\n").length - 1, draw: (await e.detail.draw()).length}));
   window.editor = ed; return performance.now() - t;
@@ -153,7 +163,7 @@ window.openHosted = async () => {
     host: {replaceRoads: async rows => { window.replaced.push(rows); }}});
   return performance.now() - t;
 };
-await window.openEditor();
+if(!withBase) await window.openEditor();
 window.ready = a.roadCount;
 </script></body></html>"""
 
@@ -331,6 +341,58 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate("window.RS_SIDE.props.every(p => !('road' in p) && !('s_lon' in p)) && !window.RS_SIDE.lvFields")
             print(f"host open: {ms:.0f} ms")
             assert not [e for e in errors if e != "boom"], errors      # "boom": the stopped worker's own error, which the page reports too
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
+def test_the_editor_keeps_the_dashboards_theme_its_layers_and_its_palette():
+    """The editor draws its own roads on the host's map. The dashboard's theme (rs_theme) stays while it draws, and follows a change made inside the editor; the base map's
+    layers (the overlays of the host's style) keep their switch and their list; and with the page's look the roads have the page's palette."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            roads = "JSON.stringify(hostMap.getLayer('host-roads-simple').paint._values['line-color'].value?.expression ?? hostMap.getStyle().layers.find(l => l.id === 'host-roads-simple').paint['line-color'])"
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            base = f"http://127.0.0.1:{server.server_address[1]}/test.html"
+            page.goto(base + "?dark")
+            page.wait_for_function("window.ready", timeout=60000)
+            # the editor's roads style has its own state (rs_theme "light" among them): the map's own value stays
+            assert page.evaluate("hostMap.getGlobalState().rs_theme") == "dark" and page.evaluate("document.documentElement.dataset.rsTheme") == "dark"
+            assert page.evaluate("window.RS_OVERLAYS.length") == 1 and page.evaluate("rsGetOverlays()"), "the host's overlays are still the dashboard's"
+            page.evaluate("rsSetOverlays(false)")
+            assert page.evaluate("hostMap.getLayoutProperty('host-water', 'visibility')") == "none"       # the switch still hides the base map's layer
+            page.evaluate("rsSetOverlays(true)")
+            page.evaluate("rsSetTheme('light')")                                                        # a change made while the editor is open
+            assert page.evaluate("hostMap.getGlobalState().rs_theme") == "light"
+            page.evaluate("rsSetTheme('dark')")
+            assert page.evaluate("hostMap.getGlobalState().rs_theme") == "dark"
+            page.evaluate("window.editor.destroy()")
+            assert page.evaluate("hostMap.getGlobalState().rs_theme") == "dark" and page.evaluate("window.RS_OVERLAYS.length") == 1
+            plain = page.evaluate(roads)
+            # the standard Base map box and the legend box list the same things before and inside the editor: the maps, the one switch for the area's layers, their list
+            page.goto(base + "?basemap")
+            page.wait_for_function("window.ready", timeout=60000)
+            rows = """() => { const out = {}; for (const [tool, box] of [['basemap', '.bm-menu'], ['legend', '#rs-color-box']]) { host.tools.open(tool);
+                out[tool] = document.querySelector(box).innerText.replace(/\\s+/g, ' ').trim(); host.tools.close(tool); } out.switch = rsGetOverlays(); return out; }"""
+            before = page.evaluate(rows)
+            assert "Map layers" in before["basemap"] and "Road class" in before["legend"] and "Water" in before["legend"] and before["switch"] is True, before
+            page.evaluate("window.openEditor()")
+            page.wait_for_function("!!window.lvApi", timeout=60000)
+            assert page.evaluate(rows) == before, (before, page.evaluate(rows))
+            page.evaluate("window.editor.destroy()")
+            assert page.evaluate(rows) == before, "and the same after it is closed"
+            page.goto(base + "?carto")
+            page.wait_for_function("window.ready", timeout=60000)
+            carto = page.evaluate(roads)
+            assert "#e892a2" in carto and "#e892a2" not in plain, "the page's palette (carto's motorway) is the editor's"
+            assert not [e for e in errors if e != "boom"], errors
             b.close()
     finally:
         server.shutdown()

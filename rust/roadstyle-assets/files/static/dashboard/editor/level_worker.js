@@ -9,10 +9,16 @@ const i32 = (a) => Int32Array.from(a);
 const bytes = (b) => ({bytes: b, transfer: [b.buffer]});
 
 answer({
-  async init({pkgUrl, look: options}){
+  // `base`: the text of the page's saved look. The editor's roads have the page's palette and sections (the colours, the widths, the dark theme), and the page's colour options
+  // (the legend's "Colour by" list), over the editor's own map options: its column names (the page's columns name the page's own table), the state `live` and the colours of its picks
+  async init({pkgUrl, look: options, base}){
     pkg = await import(pkgUrl);
     await pkg.default();
     look = pkg.resolveLook(options);
+    if(base){
+      const page = JSON.parse(base), own = JSON.parse(look.toJson()).map;
+      look = pkg.Look.fromJson(JSON.stringify({...page, map: {...own, color: {...own.color, options: page.map.color.options, active: page.map.color.active}}}));
+    }
   },
   open({roads, pairs}){
     area = new pkg.LevelArea(new Uint8Array(roads), pairs);
