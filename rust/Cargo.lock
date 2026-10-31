@@ -1861,7 +1861,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "base64 0.22.1",
  "flate2",
@@ -1878,11 +1878,11 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-assets"
-version = "0.26.1"
+version = "0.26.2"
 
 [[package]]
 name = "roadstyle-cli"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "roadstyle",
  "roadstyle-serve",
@@ -1892,7 +1892,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-engine"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "base64 0.22.1",
  "foldhash 0.2.0",
@@ -1906,7 +1906,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-io"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -1927,7 +1927,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-levels"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "rstar",
  "sha2",
@@ -1935,7 +1935,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-look"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "base64 0.22.1",
  "crc32fast",
@@ -1953,7 +1953,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-mcp"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "base64 0.22.1",
  "rmcp",
@@ -1967,7 +1967,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-model"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "arrow-array",
  "arrow-schema",
@@ -1980,7 +1980,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-py"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "arrow-array",
  "pyo3",
@@ -1991,7 +1991,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-rs"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "base64 0.22.1",
  "flate2",
@@ -2005,7 +2005,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-serve"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "httparse",
  "roadstyle-assets",
@@ -2013,7 +2013,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-snapshot"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "anyhow",
  "headless_chrome",
@@ -2022,7 +2022,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-tiles"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "flate2",
  "foldhash 0.2.0",
@@ -2035,7 +2035,7 @@ dependencies = [
 
 [[package]]
 name = "roadstyle-wasm"
-version = "0.26.1"
+version = "0.26.2"
 dependencies = [
  "roadstyle",
  "serde_json",
