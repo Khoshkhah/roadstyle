@@ -11,7 +11,7 @@ default-members = ["roadstyle-assets", "roadstyle-model", "roadstyle-look", "roa
 resolver = "2"
 
 [workspace.package]
-version = "0.26.1"
+version = "0.26.2"
 repository = "https://github.com/Khoshkhah/roadstyle"
 homepage = "https://khoshkhah.github.io/roadstyle/"
 edition = "2021"

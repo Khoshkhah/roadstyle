@@ -115,7 +115,7 @@ of the area's edge, as a dashboard does. `levels edit AREA_DIR` checks that the 
 
 </div>
 
-The editor is the standard dashboard. It has the panel, the toolbox and the phone form of [Dashboard layout](dashboard-layout.md), in the light and the dark theme. These parts are the dashboard's own:
+The editor is the standard dashboard. It has the panel, the toolbox and the phone form of [Dashboard layout](dashboard-layout.md), in the light and the dark theme. In a page that already has a dashboard, the editor's map follows the page around it: the same base map, the same layers of the area with their switch, and the light or dark theme (`rs_theme`). A change of theme inside the editor applies at once. The option `look` of `levelEditor` is the text of the page's saved look; it gives the editor's roads the colours of the page. The Base map box shows the same rows as the page: the seven base maps, *On top* and *Map layers*. These parts are the dashboard's own:
 
 - **The base-map box.** The map starts on the blank base map, as every dashboard does. The box has the base maps, the switches under *On top* (Hillshade, Labels, 3D buildings) and the dark twin that follows the theme.
 - **Red and blue picks.** Road 1 is red, and road 2 is blue. The hover has a light color of the road that the next click picks. A long road name ends with "…", so the rows stay inside the panel.

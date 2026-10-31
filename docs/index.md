@@ -87,6 +87,10 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
 </div>
 
+## What is new in 0.26.2
+
+- **The level editor follows its page.** In a page with a dashboard, the editor's map has the same base map, the same layers of the area with their switch, and the same light or dark theme. A theme change inside the editor applies. The Base map box has the same rows as the page's. [Edit the levels](guides/levels.md#edit-the-levels-in-a-dashboard)
+
 ## What is new in 0.26.1
 
 - **One accent colour.** The dashboard uses the Sonocount teal everywhere, in the light and the dark theme, defined once. The corner box has the shape of the bar, a button with a text shows no tooltip box, and every tool of a phone's one-row bar can be reached. [Dashboard layout](guides/dashboard-layout.md)

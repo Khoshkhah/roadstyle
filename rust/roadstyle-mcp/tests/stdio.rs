@@ -99,7 +99,7 @@ fn a_file_of_another_kind_is_an_error_that_says_so() {
 fn render_place_sends_the_agent_to_the_python_server() {
     let (_, res) = call("render_place", json!({"place": "Monaco"}));
     assert_eq!(res["isError"], true);
-    assert!(text(&res).contains("roadstyle-mcp==0.26.1"), "{res}");
+    assert!(text(&res).contains("roadstyle-mcp==0.26.2"), "{res}");
 }
 
 #[test]

@@ -1,6 +1,6 @@
 {
   "name": "roadstyle-wasm",
-  "version": "0.26.1",
+  "version": "0.26.2",
   "description": "roadstyle's Rust engine in the browser: a MapLibre style and vector tiles of a road network, made from a roads Parquet file",
   "license": "MIT",
   "homepage": "https://github.com/Khoshkhah/roadstyle",
