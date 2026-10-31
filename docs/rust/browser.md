@@ -297,7 +297,7 @@ and draws the editor into `panel`. Its tiles have the protocol `lv://`, apart fr
 is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
 then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`, by source and source layer; your base
 map stays, also when it shares a tile source with your roads), draws its roads with your prefix and its own sources (`<prefix>lv-roads`,
-apart from yours) and gives your dashboard its style. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
+apart from yours) and gives your dashboard its style. The dashboard's theme (`rs_theme`) and the base map's layers (the `overlays` of your style's `roadstyle:controls`, with their switch and their entry in the legend box) stay while the editor draws. Give `look` (the text of your saved look, such as the page's `look.json`) so that the editor's roads have your palette and your sections (also the dark theme); the editor puts its own column names, the state `live` and the colours of its picks over it. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
 the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel parts,
 its listeners, its roads, tiles and images, clears the colour and the glow of the picked roads, and puts your panel, your roads, your road table and your dashboard's style back. Your files stay in
 the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files

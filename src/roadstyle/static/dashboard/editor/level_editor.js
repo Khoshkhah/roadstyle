@@ -126,10 +126,12 @@ function levelsHelp(c, back){
  * dashboard (its state is the module's): on a host map that has one, give it as `dashboard` with the `prefix` it was made with; the
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
  * EventTarget (event "solved") with `map`, `area` (the LevelArea), `download(name)` (edits.csv, heads.csv, caps.csv or levels.csv as they
- * are now), `files` (those names) and `answer()` (the last answer of the solver). */
+ * are now), `files` (those names) and `answer()` (the last answer of the solver).
+ * The option `look` (the text of a saved look, such as the page's own look.json) gives the editor's roads the page's palette and sections: the editor then only
+ * sets its own column names, its state `live` and the colours of its picks. */
 export async function levelEditor({map = null, container = document.body, panel, backLabel = "Steps", template = null, basemaps = null, pkgUrl, store,
                                    maplibregl: ml = globalThis.maplibregl, dashboard = null, prefix = dashboard ? null : "lv-rs-",
-                                   levels: given = null, host = null, colors = {}}){
+                                   levels: given = null, host = null, colors = {}, look: lookText = null}){
 // the picked roads and the hover (`colors`: {select, hover, second}): road 1 red, road 2 blue, the hover a lighter red
 const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", hover2: "#82b1ff", ...colors};
 // The dashboard has one select colour and one hover colour for every road; the editor wants road 1 red and road 2 blue, and the hover of the road
@@ -176,7 +178,7 @@ const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: 
 const call = caller(worker);
 // the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
 const boundaryF = map ? null : await store.load("boundary.geojson");
-await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)),
+await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), base: lookText,
   look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundaryF ? {boundary: JSON.parse(boundaryF.body)} : {})}})});
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
@@ -360,8 +362,17 @@ if(host){                                                        // the host's m
     [mine.layers, mine.sources, first] = [layers, sources, false];
     for(const [id, im] of Object.entries(st.metadata["roadstyle:images"] || {}))
       if(!map.hasImage(P + id)){ map.addImage(P + id, (await map.loadImage(im.url)).data, {sdf: im.sdf, pixelRatio: im.pixelRatio}); mine.images.push(P + id); }
-    // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none)
-    for(const [k, v] of Object.entries(st.state || {})) map.setGlobalStateProperty(k, v.default ?? null);
+    // a live style's global state (rs_colors, rs_co, ...): its start values, as a style with them would set them (the base map has none). A name that the map has
+    // keeps its value: the dashboard's theme (rs_theme), and what the person set (the road fill, the Tunnels look) stay while the editor draws its own roads
+    const have = map.getGlobalState();
+    for(const [k, v] of Object.entries(st.state || {})) if(!(k in have)) map.setGlobalStateProperty(k, v.default ?? null);
+    // the area's own layers of the page (the base map's: landcover, water, buildings, ...) stay on the map: the dashboard keeps them (the switch and the legend list) with the
+    // style that it had before, whose controls the editor's roads style does not have
+    const before = (dashboardStyle?.metadata || {})["roadstyle:controls"] || {};
+    if(dashboard && before.overlays?.length){
+      st.metadata = {...(st.metadata || {})};
+      st.metadata["roadstyle:controls"] = {...(st.metadata["roadstyle:controls"] || {}), overlays: before.overlays};
+    }
     for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, src);
     for(const l of st.layers){
       const layer = JSON.parse(JSON.stringify(l).replaceAll('"oneway"', `"${P}oneway"`));

@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The level editor draws its roads in the theme and the look of the page around it.** On a page with a dashboard the editor replaced the roads style of the map with its own, and it set the style's start state over the
+  map's: the theme (`rs_theme`) went back to light, so the dark page showed a light map inside the editor, and the base map's layers (landcover, water, buildings) lost their switch and their entry in the legend box. A name of
+  the state that the map has keeps its value now, and the dashboard keeps the overlays of the style it had. The new option `look` (the text of the page's saved look) gives the editor's roads the page's palette and
+  sections; before, they had the default palette. The theme can be changed while the editor is open. The same code is the editor of `roadstyle levels edit`.
+
 ## [0.26.1] - 2026-10-30
 
 ### Added
