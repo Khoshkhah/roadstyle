@@ -136,6 +136,8 @@ raw GPS fix (often 5–15 m off) and its direction is the camera heading. The wi
 checks the distance (30 m) and the heading (within 45° of the road) of each photo. Near parallel roads, junctions or in tunnels, a
 photo can belong to the neighbouring road, and a drive recorded in one direction may be missing for the other.
 
+The Panoramax viewer opens a flat photo whole and has zoom buttons and the wheel (from the whole photo in to 5°), like panoramax.fr; it reads a photo's crop and field of view the way Panoramax does, and a 360° photo turns freely.
+
 The two viewers are embedded (Photo Sphere Viewer for Panoramax, MapillaryJS for Mapillary) and load from jsDelivr when first used, so
 the page needs a network for them. The map marker turns with the view and follows a step to the next photo. The provider's credit is in the attribution box while its window is open.
 

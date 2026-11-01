@@ -20,11 +20,28 @@ const _spDist = (a, b, c, d) => { const k = Math.cos(a * Math.PI / 180);
 
 // ---- Panoramax photos: one list, filled by the lookups and by the load ahead along the selected road ----
 const _spPan = {photos: new Map(), boxes: [], blobs: new Map(), tok: 0};
+// the part of the sphere a photo covers, as Panoramax itself reads it: the sensor and its visible area, else the XMP panorama tags
+const _spCrop = q => {
+  const io = q["pers:interior_orientation"] || {}, x = q.exif || {}, n = v => parseInt(v);
+  let c = null;
+  if(io.visible_area && io.sensor_array_dimensions){
+    const va = io.visible_area, sd = io.sensor_array_dimensions;
+    c = {fullWidth: n(sd[0]), fullHeight: n(sd[1]), croppedX: n(va[0]), croppedY: n(va[1]),
+         croppedWidth: n(sd[0]) - n(va[2]) - n(va[0]), croppedHeight: n(sd[1]) - n(va[3]) - n(va[1])};
+  } else if(x["Xmp.GPano.FullPanoWidthPixels"]){
+    c = {fullWidth: n(x["Xmp.GPano.FullPanoWidthPixels"]), fullHeight: n(x["Xmp.GPano.FullPanoHeightPixels"]),
+         croppedX: n(x["Xmp.GPano.CroppedAreaLeftPixels"]), croppedY: n(x["Xmp.GPano.CroppedAreaTopPixels"]),
+         croppedWidth: n(x["Xmp.GPano.CroppedAreaImageWidthPixels"]), croppedHeight: n(x["Xmp.GPano.CroppedAreaImageHeightPixels"])};
+    c.fullWidth = Math.max(c.fullWidth, c.croppedWidth); c.fullHeight = Math.max(c.fullHeight, c.croppedHeight);
+  }
+  if(!c || Object.values(c).some(isNaN) || (c.fullWidth === c.croppedWidth && c.fullHeight === c.croppedHeight)) return null;
+  return c;
+};
 const _spPanPhoto = f => {
   const sd = f.assets && (f.assets.sd || f.assets.hd); if(!sd || !f.geometry) return null;
   const q = f.properties || {}, io = q["pers:interior_orientation"] || {};
   return {id: f.id, lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], az: q["view:azimuth"] || 0,
-          by: q["geovisio:producer"], url: sd.href, fov: io.field_of_view || 70};
+          by: q["geovisio:producer"], url: sd.href, fov: io.field_of_view || 70, fovKnown: io.field_of_view != null, crop: _spCrop(q)};
 };
 const _spBoxHas = (b, lat, lng) => lng >= b[0] && lng <= b[2] && lat >= b[1] && lat <= b[3];
 const _spCovered = (lat, lng) => {            // the whole search circle of a spot is inside a box that was loaded in full
@@ -49,7 +66,7 @@ function _spPanPick(list, lat, lng, heading){
     if(sc < bs){ bs = sc; best = q; } }
   if(!best) return null;
   // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
-  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov,
+  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop,
           url: _spPan.blobs.get(best.url) || best.url};
 }
 // Load ahead the photos along a road (line: [[lng, lat], ...]) near the spot (lat, lng): their list, in boxes along the line,
@@ -259,7 +276,7 @@ export function _spDotClick(e){
     if(!r.ok) throw new Error("Panoramax answered " + r.status);
     const ph = _spPanPhoto(await r.json());
     if(!ph) throw new Error("this photo has no image");
-    return {id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, url: _spPan.blobs.get(ph.url) || ph.url};
+    return {id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, fovKnown: ph.fovKnown, crop: ph.crop, url: _spPan.blobs.get(ph.url) || ph.url};
   })());
   return true;
 }
@@ -278,40 +295,44 @@ const _spMly = () => _spMlyLib || (_spMlyLib = new Promise((ok, no) => {
   t.onload = () => ok(window.mapillary); t.onerror = () => { _spMlyLib = null; no(new Error("the Mapillary viewer could not be loaded")); };
   document.head.appendChild(t); }));
 const _spDeg = a => ((a % 360) + 360) % 360;
-// a flat photo is a window onto the sphere: put it in the middle, as wide as its field of view says
-const _spPanoData = fov => img => {
+// a flat photo is a window onto the sphere: put it in the middle, as wide as its field of view says (a portrait photo
+// without a field of view is taken as 35 degrees wide, as Panoramax does)
+const _spFlat = (r, W, H) => {
+  const fov = r.fovKnown || W >= H ? r.fov : 35, fw = W * 360 / fov, fh = H * 180 / (fov * H / W);
+  return {fov, data: {fullWidth: Math.floor(fw), fullHeight: Math.floor(fh), croppedWidth: W, croppedHeight: H,
+                      croppedX: Math.floor((fw - W) / 2), croppedY: Math.floor((fh - H) / 2)}};
+};
+const _spPanoData = r => img => {
   const W = img.width, H = img.height;
-  if(W >= 1.9 * H) return {fullWidth: W, fullHeight: H, croppedWidth: W, croppedHeight: H, croppedX: 0, croppedY: 0};
-  const fw = W * 360 / fov, fh = fw / 2;
-  return {fullWidth: fw, fullHeight: fh, croppedWidth: W, croppedHeight: H, croppedX: (fw - W) / 2, croppedY: (fh - H) / 2};
+  if(r.crop) return {...r.crop};
+  if(r.fov >= 300 || W >= 1.9 * H) return {fullWidth: W, fullHeight: H, croppedWidth: W, croppedHeight: H, croppedX: 0, croppedY: 0};
+  return _spFlat(r, W, H).data;
 };
 
 // open a viewer for the provider inside box; seen(lng, lat, heading) is told where it stands and looks.
 // Resolves {go(photo, heading), destroy()}; rejects when the library cannot be loaded.
 export async function _spOpen(provider, box, seen){
   if(provider === "panoramax"){
-    const lib = await _spPsv(); let v = null, az = 0, at = null, want = 0, info = {flat: false, w: 70, h: 52};
+    const lib = await _spPsv(); let v = null, az = 0, at = null, want = 0, info = {flat: false, w: 360};
     const report = () => { if(v && at) seen(at.lng, at.lat, _spDeg(az + v.getPosition().yaw * 180 / Math.PI)); };
-    // a flat photo covers only its field of view, and the rest of the sphere is black: look at its middle and stay inside it.
-    // A panorama of 360 degrees turns freely and opens along the road.
+    // zoom runs from the whole photo (as wide as it goes) in to 5 degrees, as on panoramax.fr; a 360 photo opens along the road
     const settle = () => {
       if(!v) return;
-      const R = d => d + "deg";
-      v.setOptions(info.flat ? {yawRange: [R(-info.w / 2), R(info.w / 2)], pitchRange: [R(-info.h / 2), R(info.h / 2)],
-                                  minFov: 20, maxFov: Math.max(25, Math.min(90, info.h))} : {yawRange: null, pitchRange: null, minFov: 30, maxFov: 90});
-      v.zoom(0);
+      v.setOptions({minFov: 5, maxFov: Math.min(info.w * 3 / 4, 90)});
+      v.zoom(info.flat ? 0 : 30);
       v.rotate({yaw: (info.flat ? 0 : want) * Math.PI / 180, pitch: 0}); report();
     };
-    const dataFor = fov => img => {
-      info = {flat: img.width < 1.9 * img.height, w: fov, h: fov * img.height / img.width};
-      return _spPanoData(fov)(img); };
+    const dataFor = r => img => {
+      const d = _spPanoData(r)(img), part = d.croppedWidth != null && d.croppedWidth < d.fullWidth * .95;
+      info = {flat: part, w: part ? 360 * d.croppedWidth / d.fullWidth : 360};
+      return d; };
     return {
       go(r, heading){
         at = {lng: r.sx, lat: r.sy}; az = r.azimuth;
         want = (_spDeg(heading == null ? az : heading) - az + 540) % 360 - 180;
-        const pd = dataFor(r.fov);
+        const pd = dataFor(r);
         if(!v){
-          v = new lib.Viewer({container: box, navbar: false, panorama: r.url, panoData: pd, defaultYaw: 0,
+          v = new lib.Viewer({container: box, navbar: ["zoom"], panorama: r.url, panoData: pd, defaultYaw: 0,
                               touchmoveTwoFingers: false, mousewheelCtrlKey: false});
           v.addEventListener("position-updated", report);
           v.addEventListener("ready", settle, {once: true});
