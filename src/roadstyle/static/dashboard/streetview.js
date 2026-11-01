@@ -99,9 +99,9 @@ export function initStreetView(){
     const chrome=()=>{                          // what the bar offers for the provider that is chosen
       provBox.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.p===prov));
       flip.hidden = !_svKey || prov!=="google";
-      covBtn.hidden = prov==="google"; covBtn.classList.toggle("on", cov);
+      covBtn.hidden = prov==="google"; covBtn.style.color=""; covBtn.title="Show where this provider has photos on the map"; covBtn.classList.toggle("on", cov);
       fr.title = SV_PROVIDERS[prov].title+" Street View"; w.dataset.prov=prov; };
-    const drawCov=()=>_spCoverage(!w.hidden && cov ? prov : null);
+    const drawCov=()=>_spCoverage(!w.hidden && cov ? prov : null, e=>{ covBtn.style.color="#e03131"; covBtn.title="The coverage tiles did not load: "+((e&&e.message)||"check the token in Settings \u2192 Keys"); });
     for(const k in SV_PROVIDERS){
       const b=document.createElement("button"); b.type="button"; b.dataset.p=k; b.textContent=SV_PROVIDERS[k].title;
       b.onclick=()=>{ if(k===prov) return; prov=k; try{ localStorage.setItem(PROV_KEY, k); }catch(e){}

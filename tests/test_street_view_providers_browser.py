@@ -135,25 +135,25 @@ def test_mapillary_asks_for_a_token_then_picks_the_nearest_of_its_images(tmp_pat
 
 def test_coverage_is_drawn_for_the_chosen_provider_and_goes_with_the_window(tmp_path):
     def layers(page):
-        return page.evaluate("['rs-sv-cov-lines','rs-sv-cov-dots'].filter(i => map.getLayer(i))")
+        return page.evaluate("['rs-sv-cov-load','rs-sv-cov-lines','rs-sv-cov-dots'].filter(i => map.getLayer(i))")
 
     def body(page, asked):
         _pick(page, "panoramax")
         assert layers(page) == []
         page.click(".rs-svw-cov")
-        assert layers(page) == ["rs-sv-cov-lines", "rs-sv-cov-dots"]
-        assert page.evaluate("map.getLayer('rs-sv-cov-lines').sourceLayer") == "sequences"
+        assert layers(page) == ["rs-sv-cov-load", "rs-sv-cov-lines", "rs-sv-cov-dots"]
+        assert page.evaluate("map.getLayer('rs-sv-cov-load').sourceLayer") == "sequences"
         assert page.evaluate("localStorage.getItem('rs-street-view-cov')") == "1"
         _pick(page, "google")                                                            # Google has none: the layers go
         assert layers(page) == []
         page.evaluate("localStorage.setItem('rs-key:mapillary', 'MLY|test')")
         _pick(page, "mapillary")
-        assert page.evaluate("map.getLayer('rs-sv-cov-lines').sourceLayer") == "sequence"
+        assert page.evaluate("map.getLayer('rs-sv-cov-load').sourceLayer") == "sequence"
         assert "mly1_public" in json.dumps(page.evaluate("map.getSource('rs-sv-cov').serialize().tiles"))
         page.evaluate("rsSetStreetView(false)")
         assert layers(page) == [] and page.evaluate("!map.getSource('rs-sv-cov')")
         page.evaluate("rsSetStreetView(true)")                                           # the switch is remembered: back with the window
-        assert layers(page) == ["rs-sv-cov-lines", "rs-sv-cov-dots"]
+        assert layers(page) == ["rs-sv-cov-load", "rs-sv-cov-lines", "rs-sv-cov-dots"]
     _run(tmp_path, body)
 
 
@@ -161,5 +161,20 @@ def test_mapillary_coverage_waits_for_the_token(tmp_path):
     def body(page, asked):
         _pick(page, "mapillary")
         page.click(".rs-svw-cov")
-        assert page.evaluate("!map.getLayer('rs-sv-cov-lines')")
+        assert page.evaluate("!map.getLayer('rs-sv-cov-load')")
     _run(tmp_path, body)
+
+
+def test_coverage_lines_are_cut_at_the_edge_of_the_area():
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content("<script>" + __import__("pathlib").Path("src/roadstyle/static/dashboard/svproviders.js").read_text().replace("import ", "//import ").replace("export ", "")
+                         .replace("savedKey(", "(()=>'')(") + "</script>")
+        got = page.evaluate("""() => ({
+            cut: _spCut([[-5, 5], [5, 5], [15, 5]], [0, 0, 10, 10]),
+            out: _spCut([[-5, 20], [15, 20]], [0, 0, 10, 10]),
+            twice: _spCut([[-5, 5], [5, 5], [20, 20], [20, 8], [8, 8]], [0, 0, 10, 10])})""")
+        browser.close()
+    assert got["cut"] == [[[0, 5], [5, 5], [10, 5]]] and got["out"] == []
+    assert len(got["twice"]) == 2

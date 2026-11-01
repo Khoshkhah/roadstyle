@@ -47,30 +47,71 @@ export async function _spFind(provider, lat, lng, heading){
 }
 
 // ---- coverage: where a provider has photos, drawn as lines (sequences) and dots (single photos) ----
-const _SP_SRC = "rs-sv-cov", _SP_LAYERS = ["rs-sv-cov-lines", "rs-sv-cov-dots"];
-let _spCov = null, _spHooked = false;
-export function _spCoverage(provider){            // a provider's name draws its coverage; anything else (or null) takes it away
+// Only inside the page's area (the bounds of its roads): the tiles are read back (querySourceFeatures) and their lines cut at the area's edge.
+const _SP_SRC = "rs-sv-cov", _SP_OUT = "rs-sv-cov-out", _SP_LAYERS = ["rs-sv-cov-load", "rs-sv-cov-lines", "rs-sv-cov-dots"];
+let _spCov = null, _spHooked = false, _spTimer = 0, _spWarned = false;
+const _spBox = () => { const b = O.camera && O.camera.bounds; return b ? [b[0][0], b[0][1], b[1][0], b[1][1]] : null; };
+// the parts of the segment a-b inside the box (Liang-Barsky), or null
+function _spSeg(a, b, [x0, y0, x1, y1]){
+  let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+  for(const [p, q] of [[-dx, a[0] - x0], [dx, x1 - a[0]], [-dy, a[1] - y0], [dy, y1 - a[1]]]){
+    if(p === 0){ if(q < 0) return null; continue; }
+    const r = q / p; if(p < 0){ if(r > t1) return null; if(r > t0) t0 = r; } else { if(r < t0) return null; if(r < t1) t1 = r; } }
+  return [[a[0] + t0 * dx, a[1] + t0 * dy], [a[0] + t1 * dx, a[1] + t1 * dy]];
+}
+function _spCut(line, box){
+  const out = []; let cur = null;
+  for(let i = 1; i < line.length; i++){
+    const s = _spSeg(line[i - 1], line[i], box);
+    if(!s){ cur = null; continue; }
+    if(cur && cur[cur.length - 1][0] === s[0][0] && cur[cur.length - 1][1] === s[0][1]) cur.push(s[1]);
+    else { cur = [s[0], s[1]]; out.push(cur); } }
+  return out;
+}
+function _spSync(){
+  _spTimer = 0;
+  const box = _spBox(), out = map.getSource(_SP_OUT);
+  if(!_spCov || !box || !out || !map.getSource(_SP_SRC)) return;
+  const pan = _spCov === "panoramax", feats = [], seen = new Set();
+  for(const f of map.querySourceFeatures(_SP_SRC, {sourceLayer: pan ? "sequences" : "sequence"})){
+    const g = f.geometry, lines = g.type === "LineString" ? [g.coordinates] : g.type === "MultiLineString" ? g.coordinates : [];
+    for(const l of lines) for(const c of _spCut(l, box)){ const k = c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "LineString", coordinates: c}}); } } }
+  for(const f of map.querySourceFeatures(_SP_SRC, {sourceLayer: pan ? "pictures" : "image"})){
+    const c = f.geometry.type === "Point" ? f.geometry.coordinates : null;
+    if(c && c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3]){ const k = "p" + c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "Point", coordinates: c}}); } } }
+  out.setData({type: "FeatureCollection", features: feats});
+}
+const _spLater = () => { if(!_spTimer) _spTimer = setTimeout(_spSync, 120); };
+export function _spCoverage(provider, onError){   // a provider's name draws its coverage; anything else (or null) takes it away
   if(!map) return;
   if(!_spHooked){ _spHooked = true;               // a new base map style drops the layers: draw them again
-    map.on("style.load", () => { const p = _spCov; _spCov = null; _spCoverage(p); }); }
+    map.on("style.load", () => { const p = _spCov; _spCov = null; _spCoverage(p); });
+    map.on("sourcedata", e => { if(e.sourceId === _SP_SRC && e.isSourceLoaded) _spLater(); });
+    map.on("moveend", _spLater);
+    map.on("error", e => { if(_spCov && e.sourceId === _SP_SRC && !_spWarned){ _spWarned = true; console.warn("coverage tiles:", e.error && e.error.message); if(_spOnError) _spOnError(e.error); } }); }
+  _spOnError = onError || _spOnError;
   const want = SV_PROVIDERS[provider] && provider !== "google" && !_spNeedsToken(provider) ? provider : null;
   if(want === _spCov && (want === null || map.getSource(_SP_SRC))) return;
   for(const id of _SP_LAYERS) if(map.getLayer(id)) map.removeLayer(id);
-  if(map.getSource(_SP_SRC)) map.removeSource(_SP_SRC);
-  _spCov = want; if(!want) return;
+  for(const id of [_SP_SRC, _SP_OUT]) if(map.getSource(id)) map.removeSource(id);
+  _spCov = want; _spWarned = false; if(!want) return;
   const color = SV_PROVIDERS[want].color, pan = want === "panoramax";
   map.addSource(_SP_SRC, pan ?
     {type: "vector", tiles: [_SP_PANORAMAX + "/api/map/{z}/{x}/{y}.mvt"], minzoom: 0, maxzoom: 15, attribution: SV_PROVIDERS[want].credit} :
     {type: "vector", tiles: ["https://tiles.mapillary.com/maps/vtp/mly1_public/2/{z}/{x}/{y}?access_token=" + encodeURIComponent(_spToken())],
      minzoom: 6, maxzoom: 14, attribution: SV_PROVIDERS[want].credit});
-  const L = pan ? "sequences" : "sequence", D = pan ? "pictures" : "image";
-  map.addLayer({id: _SP_LAYERS[0], type: "line", source: _SP_SRC, "source-layer": L,
+  map.addSource(_SP_OUT, {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  // an invisible layer keeps the tiles loading; what shows is the cut copy
+  map.addLayer({id: _SP_LAYERS[0], type: "line", source: _SP_SRC, "source-layer": pan ? "sequences" : "sequence", paint: {"line-opacity": 0}});
+  map.addLayer({id: _SP_LAYERS[1], type: "line", source: _SP_OUT, filter: ["==", ["geometry-type"], "LineString"],
     layout: {"line-cap": "round", "line-join": "round"},
-    paint: {"line-color": color, "line-opacity": .75, "line-width": ["interpolate", ["linear"], ["zoom"], 6, 1, 14, 2.5, 18, 4]}});
-  map.addLayer({id: _SP_LAYERS[1], type: "circle", source: _SP_SRC, "source-layer": D, minzoom: 15,
+    paint: {"line-color": color, "line-opacity": .85, "line-width": ["interpolate", ["linear"], ["zoom"], 6, 1, 14, 2.5, 18, 4]}});
+  map.addLayer({id: _SP_LAYERS[2], type: "circle", source: _SP_OUT, filter: ["==", ["geometry-type"], "Point"],
     paint: {"circle-color": color, "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 2.5, 19, 5],
             "circle-stroke-color": "#fff", "circle-stroke-width": 1}});
+  _spLater();
 }
+let _spOnError = null;
 
 // ---- the viewers: one per provider, kept between spots (a reload per spot was slow) ----
 const _SP_PSV = "https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core@5.15.1/", _SP_MLY = "https://cdn.jsdelivr.net/npm/mapillary-js@4.1.2/dist/mapillary.";
