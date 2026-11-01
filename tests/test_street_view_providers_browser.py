@@ -174,7 +174,10 @@ def test_coverage_lines_are_cut_at_the_edge_of_the_area():
         got = page.evaluate("""() => ({
             cut: _spCut([[-5, 5], [5, 5], [15, 5]], [0, 0, 10, 10]),
             out: _spCut([[-5, 20], [15, 20]], [0, 0, 10, 10]),
-            twice: _spCut([[-5, 5], [5, 5], [20, 20], [20, 8], [8, 8]], [0, 0, 10, 10])})""")
+            twice: _spCut([[-5, 5], [5, 5], [20, 20], [20, 8], [8, 8]], [0, 0, 10, 10]),
+            tri: _spCutRings([[-5, 2], [15, 2]], [[[0, 0], [10, 0], [0, 10], [0, 0]]]),
+            pin: [_spIn([[[0, 0], [10, 0], [0, 10], [0, 0]]], 2, 2), _spIn([[[0, 0], [10, 0], [0, 10], [0, 0]]], 8, 8)]})""")
         browser.close()
     assert got["cut"] == [[[0, 5], [5, 5], [10, 5]]] and got["out"] == []
     assert len(got["twice"]) == 2
+    assert got["tri"] == [[[0, 2], [8, 2]]] and got["pin"] == [True, False]          # a boundary that is not a rectangle cuts to its own shape

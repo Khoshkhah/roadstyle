@@ -3,7 +3,7 @@
 // _SP_RADIUS metres, and a viewer (Photo Sphere Viewer for Panoramax, MapillaryJS for Mapillary, loaded from
 // a CDN when first needed) shows it inside the Street View window (streetview.js) and reports where it looks, so
 // the map marker turns with it. Each can also draw where it has photos (its coverage) on the map as vector tiles.
-import {map, O} from "./core.js";
+import {map, O, _src} from "./core.js";
 import {savedKey} from "./settings.js";
 
 export const _SP_RADIUS = 30;
@@ -144,17 +144,53 @@ function _spCut(line, box){
     else { cur = [s[0], s[1]]; out.push(cur); } }
   return out;
 }
+// the page's `boundary` (the outer rings of its polygons), or null when it has none
+function _spRings(){
+  const role = _src("boundary"), src = role && map.getSource(role.source), fc = src && src.serialize().data, rings = [];
+  for(const f of (fc && fc.features) || []){
+    const g = f.geometry; if(!g) continue;
+    if(g.type === "Polygon") rings.push(g.coordinates[0]);
+    else if(g.type === "MultiPolygon") g.coordinates.forEach(q => rings.push(q[0]));
+  }
+  return rings.length ? rings : null;
+}
+const _spIn = (rings, x, y) => { let n = 0;       // inside an odd number of rings (even-odd rule)
+  for(const r of rings) for(let i = 1; i < r.length; i++){
+    const [x0, y0] = r[i - 1], [x1, y1] = r[i];
+    if((y0 > y) !== (y1 > y) && x < x0 + (y - y0) * (x1 - x0) / (y1 - y0)) n++; }
+  return n % 2 === 1; };
+// the parts of a line inside the rings: every segment is split where it crosses a ring, and the pieces whose middle is inside are kept
+function _spCutRings(line, rings){
+  const out = []; let cur = null;
+  for(let i = 1; i < line.length; i++){
+    const [ax, ay] = line[i - 1], [bx, by] = line[i], dx = bx - ax, dy = by - ay, ts = [0, 1];
+    for(const r of rings) for(let j = 1; j < r.length; j++){
+      const [cx, cy] = r[j - 1], ex = r[j][0] - cx, ey = r[j][1] - cy, den = dx * ey - dy * ex;
+      if(!den) continue;
+      const t = ((cx - ax) * ey - (cy - ay) * ex) / den, u = ((cx - ax) * dy - (cy - ay) * dx) / den;
+      if(t > 0 && t < 1 && u >= 0 && u <= 1) ts.push(t); }
+    ts.sort((a, b) => a - b);
+    for(let k = 1; k < ts.length; k++){
+      const m = (ts[k - 1] + ts[k]) / 2;
+      if(ts[k] === ts[k - 1] || !_spIn(rings, ax + dx * m, ay + dy * m)){ cur = null; continue; }
+      const p0 = [ax + dx * ts[k - 1], ay + dy * ts[k - 1]], p1 = [ax + dx * ts[k], ay + dy * ts[k]];
+      if(cur && cur[cur.length - 1][0] === p0[0] && cur[cur.length - 1][1] === p0[1]) cur.push(p1);
+      else { cur = [p0, p1]; out.push(cur); } }
+  }
+  return out;
+}
 function _spSync(){
   _spTimer = 0;
-  const box = _spBox(), out = map.getSource(_SP_OUT);
+  const rings = _spRings(), box = rings ? [Math.min(...rings.flat().map(c => c[0])), Math.min(...rings.flat().map(c => c[1])),
+    Math.max(...rings.flat().map(c => c[0])), Math.max(...rings.flat().map(c => c[1]))] : _spBox(), out = map.getSource(_SP_OUT);
   if(!_spCov || !box || !out || !map.getSource(_SP_SRC)) return;
   const pan = _spCov === "panoramax", feats = [], seen = new Set();
   for(const f of map.querySourceFeatures(_SP_SRC, {sourceLayer: pan ? "sequences" : "sequence"})){
     const g = f.geometry, lines = g.type === "LineString" ? [g.coordinates] : g.type === "MultiLineString" ? g.coordinates : [];
-    for(const l of lines) for(const c of _spCut(l, box)){ const k = c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "LineString", coordinates: c}}); } } }
+    for(const l of lines) for(const c of rings ? _spCutRings(l, rings) : _spCut(l, box)){ const k = c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "LineString", coordinates: c}}); } } }
   for(const f of map.querySourceFeatures(_SP_SRC, {sourceLayer: pan ? "pictures" : "image"})){
     const c = f.geometry.type === "Point" ? f.geometry.coordinates : null;
-    if(c && c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3]){ const k = "p" + c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "Point", coordinates: c}}); } } }
+    if(c && (rings ? _spIn(rings, c[0], c[1]) : c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3])){ const k = "p" + c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "Point", coordinates: c}}); } } }
   out.setData({type: "FeatureCollection", features: feats});
 }
 const _spLater = () => { if(!_spTimer) _spTimer = setTimeout(_spSync, 120); };
