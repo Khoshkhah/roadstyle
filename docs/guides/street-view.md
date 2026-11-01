@@ -131,6 +131,11 @@ window. Mapillary's lines start at zoom 6. Coverage is drawn only inside the pag
 
 **Click a photo.** With Coverage on, click a dot (a single photo, from zoom 15) to open that photo in the window; a ring marks it until the next road or step. The map marker goes exactly where the photo was taken (it is not snapped to the road) and turns the way the photo looks, whichever way that is; the direction rule above is only for the photo chosen for a road.
 
+**Known limit: photos are not map-matched.** Neither Panoramax nor Mapillary snaps its photos to a road. A photo's position is the
+raw GPS fix (often 5–15 m off) and its direction is the camera heading. The window does not match them to the network either: it only
+checks the distance (30 m) and the heading (within 45° of the road) of each photo. Near parallel roads, junctions or in tunnels, a
+photo can belong to the neighbouring road, and a drive recorded in one direction may be missing for the other.
+
 The two viewers are embedded (Photo Sphere Viewer for Panoramax, MapillaryJS for Mapillary) and load from jsDelivr when first used, so
 the page needs a network for them. The map marker turns with the view and follows a step to the next photo. The provider's credit is in the attribution box while its window is open.
 
