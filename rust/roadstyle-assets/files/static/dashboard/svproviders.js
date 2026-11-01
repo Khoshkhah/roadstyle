@@ -6,7 +6,7 @@
 import {map, O} from "./core.js";
 import {savedKey} from "./settings.js";
 
-export const _SP_RADIUS = 50;
+export const _SP_RADIUS = 30;
 const _SP_PANORAMAX = "https://api.panoramax.xyz";
 export const SV_PROVIDERS = {
   google:    {title: "Google"},
@@ -38,7 +38,9 @@ function _spPanPick(list, lat, lng, heading){
   for(const q of list){
     const d = _spDist(lat, lng, q.lat, q.lng); if(d > _SP_RADIUS) continue;
     // a photo that looks along the road either way is good; the way back costs a little, so the travel direction wins a tie
-    const sc = d + (heading == null ? 0 : Math.min(turn(q.az, heading), turn(q.az, heading + 180) + 15) * .5);
+    const t = heading == null ? 0 : Math.min(turn(q.az, heading), turn(q.az, heading + 180) + 15);
+    if(t > 45 && q.fov < 300) continue;        // a flat photo that looks aside shows another street
+    const sc = d + t * .3;
     if(sc < bs){ bs = sc; best = q; } }
   if(!best) return null;
   // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)

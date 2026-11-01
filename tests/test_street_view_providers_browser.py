@@ -80,7 +80,7 @@ def test_panoramax_shows_the_nearest_photo_with_no_key_and_remembers_the_choice(
         page.wait_for_function("window.__psv")
         assert page.evaluate("window.__psv.panorama") == "https://pics.example/pic-123/sd.jpg"
         assert page.locator(".rs-svw-alt").is_visible()
-        assert any("place_position=18.0" in u and "place_distance=0-50" in u for u in asked)
+        assert any("place_position=18.0" in u and "place_distance=0-30" in u for u in asked)
         assert page.evaluate("localStorage.getItem('rs-street-view-provider')") == "panoramax"
         assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-mode").is_hidden()                                  # Linked / Classic are Google's
         _pick(page, "google")
@@ -129,7 +129,7 @@ def test_mapillary_asks_for_a_token_then_picks_the_nearest_of_its_images(tmp_pat
         page.wait_for_function("window.__mly")
         assert page.evaluate("window.__mly.imageId") == "111" and page.evaluate("window.__mly.accessToken") == "MLY|test"   # 111 stands nearer the spot than 999
         graph = [u for u in asked if "graph.mapillary.com" in u]
-        assert graph and "access_token=MLY%7Ctest" in graph[-1] and "bbox=17.99912" in graph[-1]
+        assert graph and "access_token=MLY%7Ctest" in graph[-1] and "bbox=17.999472" in graph[-1]
     _run(tmp_path, body)
 
 
