@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken, _spPrefetch} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
 export let _svWindow = false;
@@ -114,6 +114,24 @@ export function initStreetView(){
       "<span>Make one at <a href=\"https://www.mapillary.com/developer\" target=\"_blank\" rel=\"noopener\">mapillary.com/developer</a> (a client token), then paste it in Settings \u2192 Keys (Save, then Reload). Coverage needs it too.</span>";
     const dropAlt=()=>{ if(alt){ alt.ctl.destroy(); alt=null; } adiv.hidden=true; };
     const note=(html, keep)=>{ fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
+    const failAt=(tok, e)=>{ if(tok===altTok) note("<b>"+_esc(SV_PROVIDERS[prov].title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
+    // r (a photo as _spFind answers) in the provider's viewer, looking h (null: the way the photo looks)
+    const present=(r, h, tok)=>{
+      const fail=e=>failAt(tok, e);
+      const go=()=>{
+        if(tok!==altTok || w.hidden) return;
+        fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
+        alt.ctl.go(r, h).catch(fail); };
+      if(alt && alt.prov===prov) return go();
+      dropAlt(); const mine=tok; adiv.hidden=false;
+      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef) rsSetStreetViewMarkerAt(lng, lat, hd); }).then(c=>{
+        if(mine!==altTok || w.hidden){ c.destroy(); return; }
+        ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail);
+    };
+    // a click on a photo's dot on the map: that photo, and the marker where it was taken, turned the way it looks
+    _spOnDot((provider, photo)=>{
+      if(w.hidden || provider!==prov) return;
+      const tok=++altTok; photo.then(r=>{ if(tok===altTok && !w.hidden) present(r, null, tok); }, e=>failAt(tok, e)); });
     const showAlt=()=>{                         // Panoramax / Mapillary for the spot of the last selection
       const P=SV_PROVIDERS[prov], tok=++altTok;
       if(!last.url) return note("No Street View for this road.");
@@ -121,19 +139,11 @@ export function initStreetView(){
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;
       if(!alt) note("Looking for photos\u2026");   // a viewer that is open stays on screen while the next photo is found
       if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]); }   // the road's other photos, loaded in the background
-      const fail=e=>{ if(tok===altTok) note("<b>"+_esc(P.title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
+      const fail=e=>failAt(tok, e);
       _spFind(prov, +vp[0], +vp[1], h).then(r=>{
         if(tok!==altTok || w.hidden) return;    // a newer spot, another provider, or the window closed meanwhile
         if(!r) return note("No "+P.title+" photos within 30 m of this spot looking along the road.");
-        const go=()=>{
-          if(tok!==altTok || w.hidden) return;
-          fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
-          alt.ctl.go(r, h).catch(fail); };
-        if(alt && alt.prov===prov) return go();
-        dropAlt(); const mine=tok; adiv.hidden=false;
-        _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef) rsSetStreetViewMarkerAt(lng, lat, hd); }).then(c=>{
-          if(mine!==altTok || w.hidden){ c.destroy(); return; }
-          ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail); }, fail);
+        present(r, h, tok); }, fail);
     };
     let last=null, btn=null, ctlRef=null, ahead=false;                   // the latest road selection: {name, url}
     const show=()=>{

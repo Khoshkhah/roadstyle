@@ -193,7 +193,7 @@ function _spSync(){
     for(const l of lines) for(const c of rings ? _spCutRings(l, rings) : _spCut(l, box)){ const k = c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "LineString", coordinates: c}}); } } }
   for(const f of map.querySourceFeatures(_SP_SRC, {sourceLayer: pan ? "pictures" : "image"})){
     const c = f.geometry.type === "Point" ? f.geometry.coordinates : null;
-    if(c && (rings ? _spIn(rings, c[0], c[1]) : c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3])){ const k = "p" + c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: {}, geometry: {type: "Point", coordinates: c}}); } } }
+    if(c && (rings ? _spIn(rings, c[0], c[1]) : c[0] >= box[0] && c[0] <= box[2] && c[1] >= box[1] && c[1] <= box[3])){ const k = "p" + c.join(); if(!seen.has(k)){ seen.add(k); feats.push({type: "Feature", properties: f.properties || {}, geometry: {type: "Point", coordinates: c}}); } } }
   out.setData({type: "FeatureCollection", features: feats});
 }
 const _spLater = () => { if(!_spTimer) _spTimer = setTimeout(_spSync, 120); };
@@ -227,6 +227,30 @@ export function _spCoverage(provider, onError){   // a provider's name draws its
   _spLater();
 }
 let _spOnError = null;
+
+// A click on a photo's dot (while the coverage shows): the photo's own record is asked for and handed to the Street View window.
+// _spOnDot(fn) sets who is told, fn(photo) with the shape _spFind answers, its azimuth the way the photo looks. _spDotClick(e) is for the map's
+// click handler and tells whether the click was on a dot, so that it does not select the road under it.
+let _spDotFn = null;
+export const _spOnDot = fn => { _spDotFn = fn; };
+export function _spDotClick(e){
+  if(!_spCov || !_spDotFn || !map.getLayer(_SP_LAYERS[2])) return false;
+  const r = 7, hit = map.queryRenderedFeatures([[e.point.x - r, e.point.y - r], [e.point.x + r, e.point.y + r]], {layers: [_SP_LAYERS[2]]});
+  if(!hit.length) return false;
+  const d = f => (f.geometry.coordinates[0] - e.lngLat.lng) ** 2 + (f.geometry.coordinates[1] - e.lngLat.lat) ** 2;
+  hit.sort((a, b) => d(a) - d(b));
+  const f = hit[0], q = f.properties, [lng, lat] = f.geometry.coordinates, provider = _spCov;
+  _spDotFn(provider, (async () => {
+    if(provider === "mapillary") return {id: q.id, lng, lat, sx: lng, sy: lat, azimuth: q.is_pano ? 0 : +q.compass_angle || 0};
+    const seq = q.first_sequence || (JSON.parse(q.sequences || "[]")[0]);
+    const r = await fetch(_SP_PANORAMAX + "/api/collections/" + seq + "/items/" + q.id);
+    if(!r.ok) throw new Error("Panoramax answered " + r.status);
+    const ph = _spPanPhoto(await r.json());
+    if(!ph) throw new Error("this photo has no image");
+    return {id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, url: _spPan.blobs.get(ph.url) || ph.url};
+  })());
+  return true;
+}
 
 // ---- the viewers: one per provider, kept between spots (a reload per spot was slow) ----
 const _SP_PSV = "https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core@5.15.1/", _SP_MLY = "https://cdn.jsdelivr.net/npm/mapillary-js@4.1.2/dist/mapillary.";
