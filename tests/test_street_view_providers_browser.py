@@ -177,6 +177,7 @@ def test_a_click_on_a_coverage_dot_opens_that_photo_and_puts_the_marker_there(tm
         page.mouse.click(*xy)
         page.wait_for_function("window.__psvgo && window.__psvgo[0] === 'https://pics.example/dot-1/sd.jpg' || (window.__psv && window.__psv.panorama === 'https://pics.example/dot-1/sd.jpg')")
         assert any("/api/collections/seq-1/items/dot-1" in u for u in asked)
+        assert page.evaluate("map.getSource('rs-sv-cov-sel')._data.geojson.features.length") == 1          # a ring marks the opened photo
         page.evaluate("window.__psvv.yaw = 0; window.__psvl['position-updated']()")                  # looking straight ahead in the photo
         spot = page.evaluate("rsGetStreetViewSpot()")
         assert abs(spot["lng"] - 18.0004) < 1e-4 and abs(spot["lat"] - 59.3052) < 1e-4 and abs(spot["heading"] - 200) < 1

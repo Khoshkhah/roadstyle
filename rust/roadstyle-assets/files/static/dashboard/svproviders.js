@@ -127,7 +127,8 @@ export async function _spFind(provider, lat, lng, heading){
 
 // ---- coverage: where a provider has photos, drawn as lines (sequences) and dots (single photos) ----
 // Only inside the page's area (the bounds of its roads): the tiles are read back (querySourceFeatures) and their lines cut at the area's edge.
-const _SP_SRC = "rs-sv-cov", _SP_OUT = "rs-sv-cov-out", _SP_LAYERS = ["rs-sv-cov-load", "rs-sv-cov-lines", "rs-sv-cov-dots"];
+const _SP_SRC = "rs-sv-cov", _SP_OUT = "rs-sv-cov-out", _SP_SEL = "rs-sv-cov-sel", _SP_LAYERS = ["rs-sv-cov-load", "rs-sv-cov-lines", "rs-sv-cov-dots", "rs-sv-cov-ring"];
+let _spPicked = null;       // the photo opened from a dot: [lng, lat] (drawn as a ring), or null
 let _spCov = null, _spHooked = false, _spTimer = 0, _spWarned = false;
 const _spBox = () => { const b = O.camera && O.camera.bounds; return b ? [b[0][0], b[0][1], b[1][0], b[1][1]] : null; };
 // the parts of the segment a-b inside the box (Liang-Barsky), or null
@@ -208,7 +209,7 @@ export function _spCoverage(provider, onError){   // a provider's name draws its
   const want = SV_PROVIDERS[provider] && provider !== "google" && !_spNeedsToken(provider) ? provider : null;
   if(want === _spCov && (want === null || map.getSource(_SP_SRC))) return;
   for(const id of _SP_LAYERS) if(map.getLayer(id)) map.removeLayer(id);
-  for(const id of [_SP_SRC, _SP_OUT]) if(map.getSource(id)) map.removeSource(id);
+  for(const id of [_SP_SRC, _SP_OUT, _SP_SEL]) if(map.getSource(id)) map.removeSource(id);
   _spCov = want; _spWarned = false; if(!want) return;
   const color = SV_PROVIDERS[want].color, pan = want === "panoramax";
   map.addSource(_SP_SRC, pan ?
@@ -224,7 +225,17 @@ export function _spCoverage(provider, onError){   // a provider's name draws its
   map.addLayer({id: _SP_LAYERS[2], type: "circle", source: _SP_OUT, filter: ["==", ["geometry-type"], "Point"],
     paint: {"circle-color": color, "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 2.5, 19, 5],
             "circle-stroke-color": "#fff", "circle-stroke-width": 1}});
+  map.addSource(_SP_SEL, {type: "geojson", data: {type: "FeatureCollection", features: []}});
+  map.addLayer({id: _SP_LAYERS[3], type: "circle", source: _SP_SEL,
+    paint: {"circle-color": color, "circle-opacity": .15, "circle-radius": 13, "circle-stroke-color": color, "circle-stroke-width": 3}});
+  _spMark(_spPicked);
   _spLater();
+}
+// ring around the photo that is open from a dot (null: no ring)
+export function _spMark(c){
+  _spPicked = c;
+  const src = map && map.getSource(_SP_SEL);
+  if(src) src.setData({type: "FeatureCollection", features: c ? [{type: "Feature", properties: {}, geometry: {type: "Point", coordinates: c}}] : []});
 }
 let _spOnError = null;
 
@@ -240,6 +251,7 @@ export function _spDotClick(e){
   const d = f => (f.geometry.coordinates[0] - e.lngLat.lng) ** 2 + (f.geometry.coordinates[1] - e.lngLat.lat) ** 2;
   hit.sort((a, b) => d(a) - d(b));
   const f = hit[0], q = f.properties, [lng, lat] = f.geometry.coordinates, provider = _spCov;
+  _spMark([lng, lat]);
   _spDotFn(provider, (async () => {
     if(provider === "mapillary") return {id: q.id, lng, lat, sx: lng, sy: lat, azimuth: q.is_pano ? 0 : +q.compass_angle || 0};
     const seq = q.first_sequence || (JSON.parse(q.sequences || "[]")[0]);

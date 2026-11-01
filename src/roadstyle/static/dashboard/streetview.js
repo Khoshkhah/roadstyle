@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
 export let _svWindow = false;
@@ -105,7 +105,7 @@ export function initStreetView(){
     for(const k in SV_PROVIDERS){
       const b=document.createElement("button"); b.type="button"; b.dataset.p=k; b.textContent=SV_PROVIDERS[k].title;
       b.onclick=()=>{ if(k===prov) return; prov=k; try{ localStorage.setItem(PROV_KEY, k); }catch(e){}
-        hideP(); altTok++; dropAlt(); ahead=false; rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
+        hideP(); altTok++; dropAlt(); _spMark(null); ahead=false; rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
       provBox.appendChild(b); }
     covBtn.onclick=()=>{ if(_spNeedsToken(prov)){ altTok++; dropAlt(); return note(NEED_TOKEN); }
       cov=!cov; try{ localStorage.setItem(COV_KEY, cov?"1":"0"); }catch(e){} chrome(); drawCov(); };
@@ -133,7 +133,7 @@ export function initStreetView(){
       if(w.hidden || provider!==prov) return;
       const tok=++altTok; photo.then(r=>{ if(tok===altTok && !w.hidden) present(r, null, tok); }, e=>failAt(tok, e)); });
     const showAlt=()=>{                         // Panoramax / Mapillary for the spot of the last selection
-      const P=SV_PROVIDERS[prov], tok=++altTok;
+      const P=SV_PROVIDERS[prov], tok=++altTok; _spMark(null);
       if(!last.url) return note("No Street View for this road.");
       if(_spNeedsToken(prov)) return note(NEED_TOKEN);
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;

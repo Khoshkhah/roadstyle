@@ -129,7 +129,7 @@ is not in the page. Without a token the Mapillary tab says so and asks for nothi
 sequence, and a dot for each photo from zoom 15. It goes away when you choose Google or close the window, and comes back with the
 window. Mapillary's lines start at zoom 6. Coverage is drawn only inside the page's `boundary` (cut to its shape), or inside the bounds of the roads when the page has no boundary.
 
-**Click a photo.** With Coverage on, click a dot (a single photo, from zoom 15) to open that photo in the window. The map marker moves to where it was taken and turns the way the photo looks, whichever way that is; the direction rule above is only for the photo chosen for a road.
+**Click a photo.** With Coverage on, click a dot (a single photo, from zoom 15) to open that photo in the window; a ring marks it until the next road or step. The map marker moves to where it was taken and turns the way the photo looks, whichever way that is; the direction rule above is only for the photo chosen for a road.
 
 The two viewers are embedded (Photo Sphere Viewer for Panoramax, MapillaryJS for Mapillary) and load from jsDelivr when first used, so
 the page needs a network for them. The map marker turns with the view and follows a step to the next photo. The provider's credit is in the attribution box while its window is open.
