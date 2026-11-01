@@ -37,7 +37,7 @@ def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
                 if "/api/search" in u:
                     return r.fulfill(json=panoramax, headers={"access-control-allow-origin": "*"})
                 if "/api/collections/" in u:
-                    return r.fulfill(json={"id": "dot-1", "geometry": {"type": "Point", "coordinates": [18.0004, 59.3052]},
+                    return r.fulfill(json={"id": "dot-1", "geometry": {"type": "Point", "coordinates": [18.0, 59.3052]},
                                            "properties": {"view:azimuth": 200, "geovisio:producer": "x"},
                                            "assets": {"sd": {"href": "https://pics.example/dot-1/sd.jpg"}}}, headers={"access-control-allow-origin": "*"})
                 if "graph.mapillary.com" in u:
@@ -168,19 +168,19 @@ def test_a_click_on_a_coverage_dot_opens_that_photo_and_puts_the_marker_there(tm
         page.wait_for_function("map.getSource('rs-sv-cov-out')")
         page.evaluate("""() => { const q = map.querySourceFeatures.bind(map);      // the (empty) tiles are given one photo
             map.querySourceFeatures = (id, o) => o.sourceLayer === 'pictures' ? [{type: 'Feature',
-              properties: {id: 'dot-1', first_sequence: 'seq-1', heading: 200}, geometry: {type: 'Point', coordinates: [18.0004, 59.3052]}}] : q(id, o);
+              properties: {id: 'dot-1', first_sequence: 'seq-1', heading: 200}, geometry: {type: 'Point', coordinates: [18.0, 59.3052]}}] : q(id, o);
             map.fire('moveend'); }""")
         page.wait_for_function("map.queryRenderedFeatures({layers: ['rs-sv-cov-dots']}).length > 0")
-        page.evaluate("map.jumpTo({center: [18.0004, 59.3052]}); map.panBy([-400, 0], {duration: 0})")      # the dot, clear of the window
+        page.evaluate("map.jumpTo({center: [18.0, 59.3052]}); map.panBy([-400, 0], {duration: 0})")      # the dot, clear of the window
         page.wait_for_timeout(500)
-        xy = page.evaluate("(() => { const p = map.project([18.0004, 59.3052]); const r = map.getCanvas().getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; })()")
+        xy = page.evaluate("(() => { const p = map.project([18.0, 59.3052]); const r = map.getCanvas().getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; })()")
         page.mouse.click(*xy)
         page.wait_for_function("window.__psvgo && window.__psvgo[0] === 'https://pics.example/dot-1/sd.jpg' || (window.__psv && window.__psv.panorama === 'https://pics.example/dot-1/sd.jpg')")
         assert any("/api/collections/seq-1/items/dot-1" in u for u in asked)
         assert page.evaluate("map.getSource('rs-sv-cov-sel')._data.geojson.features.length") == 1          # a ring marks the opened photo
         page.evaluate("window.__psvv.yaw = 0; window.__psvl['position-updated']()")                  # looking straight ahead in the photo
         spot = page.evaluate("rsGetStreetViewSpot()")
-        assert abs(spot["lng"] - 18.0004) < 1e-4 and abs(spot["lat"] - 59.3052) < 1e-4 and abs(spot["heading"] - 200) < 1
+        assert abs(spot["lng"] - 18.0) < 1e-4 and abs(spot["lat"] - 59.3052) < 1e-4 and abs(spot["heading"] - 200) < 1 and spot["onRoad"] is False      # on the road, yet kept where the photo was taken
     _run(tmp_path, body)
 
 

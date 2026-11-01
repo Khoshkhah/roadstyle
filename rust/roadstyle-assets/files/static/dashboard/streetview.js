@@ -105,7 +105,7 @@ export function initStreetView(){
     for(const k in SV_PROVIDERS){
       const b=document.createElement("button"); b.type="button"; b.dataset.p=k; b.textContent=SV_PROVIDERS[k].title;
       b.onclick=()=>{ if(k===prov) return; prov=k; try{ localStorage.setItem(PROV_KEY, k); }catch(e){}
-        hideP(); altTok++; dropAlt(); _spMark(null); ahead=false; rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
+        hideP(); altTok++; dropAlt(); _spMark(null); exact=false; ahead=false; rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
       provBox.appendChild(b); }
     covBtn.onclick=()=>{ if(_spNeedsToken(prov)){ altTok++; dropAlt(); return note(NEED_TOKEN); }
       cov=!cov; try{ localStorage.setItem(COV_KEY, cov?"1":"0"); }catch(e){} chrome(); drawCov(); };
@@ -124,16 +124,16 @@ export function initStreetView(){
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();
       dropAlt(); const mine=tok; adiv.hidden=false;
-      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef) rsSetStreetViewMarkerAt(lng, lat, hd); }).then(c=>{
+      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef) rsSetStreetViewMarkerAt(lng, lat, hd, exact); }).then(c=>{
         if(mine!==altTok || w.hidden){ c.destroy(); return; }
         ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail);
     };
     // a click on a photo's dot on the map: that photo, and the marker where it was taken, turned the way it looks
     _spOnDot((provider, photo)=>{
       if(w.hidden || provider!==prov) return;
-      const tok=++altTok; photo.then(r=>{ if(tok===altTok && !w.hidden) present(r, null, tok); }, e=>failAt(tok, e)); });
+      const tok=++altTok; exact=true; photo.then(r=>{ if(tok===altTok && !w.hidden) present(r, null, tok); }, e=>failAt(tok, e)); });
     const showAlt=()=>{                         // Panoramax / Mapillary for the spot of the last selection
-      const P=SV_PROVIDERS[prov], tok=++altTok; _spMark(null);
+      const P=SV_PROVIDERS[prov], tok=++altTok; _spMark(null); exact=false;
       if(!last.url) return note("No Street View for this road.");
       if(_spNeedsToken(prov)) return note(NEED_TOKEN);
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;
@@ -145,7 +145,7 @@ export function initStreetView(){
         if(!r) return note("No "+P.title+" photos within 30 m of this spot looking along the road.");
         present(r, h, tok); }, fail);
     };
-    let last=null, btn=null, ctlRef=null, ahead=false;                   // the latest road selection: {name, url}
+    let last=null, btn=null, ctlRef=null, ahead=false, exact=false;                   // the latest road selection: {name, url}
     const show=()=>{
       if(w.hidden || !last) return;
       ttl.textContent=last.name;
