@@ -22,15 +22,22 @@ const _spDist = (a, b, c, d) => { const k = Math.cos(a * Math.PI / 180);
 // rejects when the service cannot be asked (offline, a wrong token)
 export async function _spFind(provider, lat, lng, heading){
   if(provider === "panoramax"){
-    const r = await fetch(_SP_PANORAMAX + "/api/search?limit=1&place_position=" + lng.toFixed(6) + "," + lat.toFixed(6) +
+    const r = await fetch(_SP_PANORAMAX + "/api/search?limit=30&place_position=" + lng.toFixed(6) + "," + lat.toFixed(6) +
                           "&place_distance=0-" + _SP_RADIUS);
     if(!r.ok) throw new Error("Panoramax answered " + r.status);
-    const f = ((await r.json()).features || [])[0]; if(!f) return null;
-    const [x, y] = f.geometry.coordinates, az = f.properties && f.properties["view:azimuth"];
-    const io = (f.properties && f.properties["pers:interior_orientation"]) || {}, sd = f.assets && (f.assets.sd || f.assets.hd);
-    if(!sd) return null;
-    return {id: f.id, lng: x, lat: y, by: f.properties && f.properties["geovisio:producer"],
-            url: sd.href, azimuth: az || 0, fov: io.field_of_view || 70};
+    // the service does not sort by distance: take the photo that is near the spot and looks along the road (its azimuth near the road's heading)
+    const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
+    let best = null, bs = Infinity;
+    for(const f of (await r.json()).features || []){
+      const sd = f.assets && (f.assets.sd || f.assets.hd); if(!sd) continue;
+      const [x, y] = f.geometry.coordinates, az = (f.properties && f.properties["view:azimuth"]) || 0;
+      const sc = _spDist(lat, lng, y, x) + (heading == null ? 0 : turn(az, heading) * .5);
+      if(sc < bs){ bs = sc; best = {f, x, y, az, sd}; } }
+    if(!best) return null;
+    const io = (best.f.properties && best.f.properties["pers:interior_orientation"]) || {};
+    // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
+    return {id: best.f.id, lng: best.x, lat: best.y, sx: lng, sy: lat, by: best.f.properties && best.f.properties["geovisio:producer"],
+            url: best.sd.href, azimuth: best.az, fov: io.field_of_view || 70};
   }
   if(provider === "mapillary"){
     const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));   // a box of the radius around the spot
@@ -144,7 +151,7 @@ export async function _spOpen(provider, box, seen){
     const report = () => { if(v && at) seen(at.lng, at.lat, _spDeg(az + v.getPosition().yaw * 180 / Math.PI)); };
     return {
       go(r, heading){
-        at = r; az = r.azimuth;
+        at = {lng: r.sx, lat: r.sy}; az = r.azimuth;
         const yaw = (_spDeg(heading == null ? az : heading) - az + 540) % 360 - 180;
         const opt = {panoData: _spPanoData(r.fov), position: {yaw: yaw * Math.PI / 180, pitch: 0}, transition: false};
         if(!v){
