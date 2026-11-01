@@ -31,6 +31,13 @@ const _spCovered = (lat, lng) => {            // the whole search circle of a sp
   const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));
   return _spPan.boxes.some(b => _spBoxHas(b, lat - dy, lng - dx) && _spBoxHas(b, lat + dy, lng + dx));
 };
+// What a photo's direction costs, in metres: 0 for a 360 photo or an unknown direction, a little for turning from the road's axis (up to
+// 45 degrees, either way along the road), and Infinity for a photo that looks aside.
+function _spAim(az, fov, heading, turn){
+  if(heading == null || fov >= 300 || az == null) return 0;
+  const fwd = turn(az, heading), back = turn(az, heading + 180);
+  return Math.min(fwd, back) <= 45 ? Math.min(fwd, back) * .3 : Infinity;
+}
 // the photo nearest the spot that looks along the road; the service does not sort by distance
 function _spPanPick(list, lat, lng, heading){
   const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
@@ -38,9 +45,7 @@ function _spPanPick(list, lat, lng, heading){
   for(const q of list){
     const d = _spDist(lat, lng, q.lat, q.lng); if(d > _SP_RADIUS) continue;
     // a flat photo must look the way the road runs (within 45 degrees); a 360 panorama has every direction
-    const t = heading == null || q.fov >= 300 ? 0 : turn(q.az, heading);
-    if(t > 45) continue;
-    const sc = d + t * .3;
+    const sc = d + _spAim(q.az, q.fov, heading, turn); if(sc >= Infinity) continue;
     if(sc < bs){ bs = sc; best = q; } }
   if(!best) return null;
   // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
@@ -112,9 +117,7 @@ export async function _spFind(provider, lat, lng, heading){
     for(const f of (await r.json()).data || []){
       const [x, y] = f.geometry.coordinates, d = _spDist(lat, lng, y, x); if(d > _SP_RADIUS) continue;
       // like Panoramax: a flat image must look the way the road runs (within 45 degrees); a 360 image has every direction
-      const t = heading == null || f.is_pano || f.compass_angle == null ? 0 : turn(f.compass_angle, heading);
-      if(t > 45) continue;
-      const sc = d + t * .3;
+      const sc = d + _spAim(f.compass_angle, f.is_pano ? 360 : 70, heading, turn); if(sc >= Infinity) continue;
       if(sc < bs){ bs = sc; best = {id: f.id, lng: x, lat: y}; } }
     if(!best) return null;
     return best;
