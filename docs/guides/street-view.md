@@ -129,8 +129,8 @@ is not in the page. Without a token the Mapillary tab says so and asks for nothi
 sequence, and a dot for each photo from zoom 15. It goes away when you choose Google or close the window, and comes back with the
 window. Mapillary's lines start at zoom 6.
 
-The two viewers are the providers' own pages in a frame, so the map marker stays where you clicked (the Linked marker that walks with
-the viewer is Google's). The provider's credit is in the attribution box while its window is open.
+The two viewers are embedded (Photo Sphere Viewer for Panoramax, MapillaryJS for Mapillary) and load from jsDelivr when first used, so
+the page needs a network for them. The map marker turns with the view and follows a step to the next photo. The provider's credit is in the attribution box while its window is open.
 
 ## Where it looks
 

@@ -6,8 +6,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Google 3D is on by default for a page with a toolbar** (the template `dashboard`): the button works at once and says it needs a key until one is saved in Settings. `google_3d=False` turns it off.
+
 ### Added
-- **Street View beside Google: Panoramax and Mapillary.** The Street View window has a provider switch (`Google | Panoramax | Mapillary`, remembered in the browser). Panoramax (open data, no key) and Mapillary (a free client token that the person saves in Settings > Keys, or the page carries as `mapillary_token=`, default env `MAPILLARY_TOKEN`) show the photo nearest to the spot (within 50 m) in their own viewer, and follow every road selection and step like Google's. A **Coverage** button draws where the chosen provider has photos on the map (its vector tiles: lines for sequences, dots for single photos). The credit row of the chosen provider is in the attribution box. New module `dashboard/svproviders.js`; Linked mode stays Google's.
+- **Street View beside Google: Panoramax and Mapillary.** The Street View window has a provider switch (`Google | Panoramax | Mapillary`, remembered in the browser). Panoramax (open data, no key) and Mapillary (a free client token that the person saves in Settings > Keys, or the page carries as `mapillary_token=`, default env `MAPILLARY_TOKEN`) show the photo nearest to the spot (within 50 m) in an embedded viewer (Photo Sphere Viewer, MapillaryJS; loaded from jsDelivr on first use; the map marker turns with the view), and follow every road selection and step like Google's. A **Coverage** button draws where the chosen provider has photos on the map (its vector tiles: lines for sequences, dots for single photos). The credit row of the chosen provider is in the attribution box. New module `dashboard/svproviders.js`; Linked mode stays Google's.
 - The goldens of the Monaco page and of the page with views have the new size and hash (`rust_page.json`, `page_views.json`).
 
 ## [0.26.1] - 2026-10-30

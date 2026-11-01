@@ -11,10 +11,17 @@ from test_dashboard_sections_browser import _edges, _open  # noqa: E402
 import roadstyle as rs  # noqa: E402
 
 _PAN = {"features": [{"id": "pic-123", "geometry": {"type": "Point", "coordinates": [18.0, 59.305]},
-                      "properties": {"view:azimuth": 10, "geovisio:producer": "someone"}}]}
+                      "properties": {"view:azimuth": 10, "geovisio:producer": "someone"},
+                      "assets": {"sd": {"href": "https://pics.example/pic-123/sd.jpg"}}}]}
 _MLY = {"data": [{"id": "999", "geometry": {"type": "Point", "coordinates": [18.0003, 59.305]}},
                  {"id": "111", "geometry": {"type": "Point", "coordinates": [18.0, 59.3051]}}]}
 _BLANK = "<html><body>viewer</body></html>"
+# stand-ins for the two viewer libraries (loaded from a CDN): they keep what they were given and their listeners
+_PSV_JS = """export class Viewer{constructor(o){window.__psv=o; window.__psvl={}; this.yaw=0.5; window.__psvv=this;}
+addEventListener(n,f){window.__psvl[n]=f;} setPanorama(u,o){window.__psvgo=[u,o]; return Promise.resolve();}
+getPosition(){return {yaw:this.yaw,pitch:0};} destroy(){window.__psvgone=true;}}"""
+_MLY_JS = """window.mapillary={Viewer:class{constructor(o){window.__mly=o; window.__mlyh={};} on(n,f){window.__mlyh[n]=f;}
+moveTo(id){window.__mlyto=id; return Promise.resolve();} resize(){} remove(){window.__mlygone=true;}}};"""
 
 
 def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
@@ -33,8 +40,12 @@ def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
                     return r.fulfill(json=mapillary, headers={"access-control-allow-origin": "*"})
                 if ".mvt" in u or "tiles.mapillary.com" in u:
                     return r.fulfill(status=204, headers={"access-control-allow-origin": "*"})
+                if "cdn.jsdelivr.net" in u:
+                    js = _PSV_JS if "photo-sphere-viewer" in u and u.endswith("+esm") else _MLY_JS if u.endswith("mapillary.js") else ""
+                    return r.fulfill(body=js, content_type="text/css" if u.endswith(".css") else "application/javascript",
+                                     headers={"access-control-allow-origin": "*"})
                 r.fulfill(body=_BLANK, content_type="text/html")
-            for host in ("api.panoramax.xyz", "panoramax.openstreetmap.fr", "graph.mapillary.com", "tiles.mapillary.com", "www.mapillary.com", "www.google.com"):
+            for host in ("api.panoramax.xyz", "panoramax.openstreetmap.fr", "graph.mapillary.com", "tiles.mapillary.com", "www.mapillary.com", "www.google.com", "cdn.jsdelivr.net"):
                 page.route(f"https://{host}/**", route)
             page.evaluate("localStorage.clear()")
             xy = page.evaluate("(() => { const p = map.project([18.0, 59.305]); const r = map.getCanvas().getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; })()")
@@ -66,23 +77,43 @@ def test_the_window_offers_the_three_providers_and_starts_on_google(tmp_path):
 def test_panoramax_shows_the_nearest_photo_with_no_key_and_remembers_the_choice(tmp_path):
     def body(page, asked):
         _pick(page, "panoramax")
-        page.wait_for_function("(document.querySelector('.rs-svw iframe').getAttribute('src') || '').includes('pic=pic-123')")
-        src = page.get_attribute(".rs-svw iframe", "src")
-        assert src.startswith("https://panoramax.openstreetmap.fr/") and "xyz=" in src
+        page.wait_for_function("window.__psv")
+        assert page.evaluate("window.__psv.panorama") == "https://pics.example/pic-123/sd.jpg"
+        assert page.locator(".rs-svw-alt").is_visible()
         assert any("place_position=18.0" in u and "place_distance=0-50" in u for u in asked)
         assert page.evaluate("localStorage.getItem('rs-street-view-provider')") == "panoramax"
-        assert page.locator(".rs-svw-mode").is_hidden()                                  # Linked / Classic are Google's
+        assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-mode").is_hidden()                                  # Linked / Classic are Google's
         _pick(page, "google")
-        assert page.locator(".rs-svw iframe").is_hidden() and "needs this page served" in page.inner_text(".rs-svw-msg")
+        assert page.locator(".rs-svw-alt").is_hidden() and page.evaluate("window.__psvgone") is True
+        assert "needs this page served" in page.inner_text(".rs-svw-msg")
+    _run(tmp_path, body)
+
+
+def test_the_marker_turns_with_the_view_in_the_panoramax_window(tmp_path):
+    def body(page, asked):
+        _pick(page, "panoramax")
+        page.wait_for_function("window.__psv")
+        page.evaluate("window.__psvv.yaw = 1.0; window.__psvl['position-updated']()")      # turned 1 rad = 57.3 degrees from the photo's 10
+        page.wait_for_function("Math.abs(rsGetStreetViewSpot().heading - 67.3) < 0.5")
+    _run(tmp_path, body)
+
+
+def test_the_marker_turns_and_moves_with_the_view_in_the_mapillary_window(tmp_path):
+    def body(page, asked):
+        page.evaluate("localStorage.setItem('rs-key:mapillary', 'MLY|test')")
+        _pick(page, "mapillary")
+        page.wait_for_function("window.__mly")
+        page.evaluate("window.__mlyh.image({image: {lngLat: {lng: 18.0, lat: 59.3051}}}); window.__mlyh.bearing({bearing: 77})")
+        page.wait_for_function("Math.abs(rsGetStreetViewSpot().heading - 77) < 0.5")
     _run(tmp_path, body)
 
 
 def test_no_photo_within_50_m_is_said_and_not_hidden_behind_the_last_photo(tmp_path):
     def body(page, asked):
         _pick(page, "panoramax")
-        page.wait_for_selector(".rs-svw-msg:visible")
+        page.wait_for_function("document.querySelector('.rs-svw-msg').textContent.startsWith('No Panoramax')")
         assert "No Panoramax photos within 50 m" in page.inner_text(".rs-svw-msg")
-        assert page.locator(".rs-svw iframe").is_hidden()
+        assert page.locator(".rs-svw-alt").is_hidden()
     _run(tmp_path, body, panoramax={"features": []})
 
 
@@ -95,8 +126,8 @@ def test_mapillary_asks_for_a_token_then_picks_the_nearest_of_its_images(tmp_pat
         page.evaluate("localStorage.setItem('rs-key:mapillary', 'MLY|test')")
         _pick(page, "google")
         _pick(page, "mapillary")
-        page.wait_for_function("(document.querySelector('.rs-svw iframe').getAttribute('src') || '').includes('image_key=')")
-        assert page.get_attribute(".rs-svw iframe", "src").endswith("image_key=111")     # 111 stands nearer the spot than 999
+        page.wait_for_function("window.__mly")
+        assert page.evaluate("window.__mly.imageId") == "111" and page.evaluate("window.__mly.accessToken") == "MLY|test"   # 111 stands nearer the spot than 999
         graph = [u for u in asked if "graph.mapillary.com" in u]
         assert graph and "access_token=MLY%7Ctest" in graph[-1] and "radius=50" in graph[-1]
     _run(tmp_path, body)

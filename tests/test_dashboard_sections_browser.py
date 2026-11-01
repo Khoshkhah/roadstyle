@@ -190,7 +190,7 @@ def test_the_toolbox_is_fixed_and_a_tool_that_the_page_cannot_use_is_greyed_out(
     """The same tools are in the bar of every dashboard, in the same order; the ones that this page cannot use are disabled, with a title that says why."""
     fixed = ["theme", "navigate", "street_view", "google_3d", "basemap", "roads", "buildings", "legend", "settings", "attribution"]
     path = tmp_path / "bare.html"
-    rs.render_dashboard(_edges(), basemap="blank", basemap_switcher=False, street_view=False).save(path)         # no colour option, no Google 3D, one base map
+    rs.render_dashboard(_edges(), basemap="blank", basemap_switcher=False, street_view=False, google_3d=False).save(path)         # no colour option, no Google 3D, one base map
     full = tmp_path / "full.html"
     rs.render_dashboard(_edges(), color_options={"Road class": {}}, google_3d=True, street_view_key="AIzaTEST").save(full)
     probe = """() => rs.tools.list().map(t => [t.id, t.disabled, (document.querySelector(`#rs-toolbar [title="${t.title}"]`) || {}).disabled === true])"""

@@ -19,7 +19,7 @@ const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "basemap_switcher": true, "name": "roadstyle", "pitch": null,
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
-    "street_view_key": null, "mapillary_token": null, "google_3d": false, "hover_color": null, "compress": true, "views": null, "tiles": true,
+    "street_view_key": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true,
     "template": null, "layout": null, "dashboard": null, "page_script": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": []}"#;
 
 /// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
@@ -70,7 +70,7 @@ struct PageKeys {
     street_view: Value,
     street_view_key: Option<String>,
     mapillary_token: Option<String>,
-    google_3d: bool,
+    google_3d: Option<bool>,
     google_3d_layers: Vec<crate::dashboard::Layer3d>,
     boundary_dim: bool,
     boundary_limit: bool,
@@ -181,7 +181,7 @@ fn check_keys<'a>(k: &'a PageKeys, look: &Look, dashboard: &crate::dashboard::Da
     crate::dashboard::check_layers(&k.google_3d_layers).map_err(crate::error::options)?;
     let key = k.street_view_key.clone().filter(|v| !v.is_empty());
     // a page with a toolbar has the settings tool, where the person can type the key; a page without one has no place for it
-    if k.google_3d && key.is_none() && dashboard.toolbar.is_none() {
+    if k.google_3d == Some(true) && key.is_none() && dashboard.toolbar.is_none() {
         return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY \
                                           (the template \"dashboard\" lets the person add it in the settings)"));
     }
@@ -282,11 +282,13 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         dashboard = crate::dashboard::merge(&dashboard, over)?;
     }
     let has_panel = dashboard.panel.is_some();
+    // a page with a toolbar has the Google 3D tool working (the key is typed in the settings); `google_3d=False` takes it away
+    let google_3d = k.google_3d.unwrap_or(dashboard.toolbar.is_some());
     let opts = PageOptions {
         dashboard, basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
         popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
-        street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d: k.google_3d,
+        street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d,
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),
         select_color: ctl["select_color"].clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
         color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend,

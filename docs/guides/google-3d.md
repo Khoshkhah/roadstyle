@@ -12,7 +12,7 @@ rs.render_edges(edges, google_3d=True)                        # the key from GOO
 rs.render_edges(edges, google_3d=True, street_view_key=KEY)   # or this key
 ```
 
-Without a key, `google_3d=True` stops with an error. The exception is the template `dashboard`
+Pages with a toolbar (the template `dashboard`) have Google 3D on by default; `google_3d=False` turns it off. Without a key, `google_3d=True` stops with an error. The exception is the template `dashboard`
 (the default of `render_dashboard`): it has a settings tool, where you type the key, so the page can
 start without one. The Google 3D window then says that it needs a key and has an **Open settings**
 button. The default is `google_3d=False`.

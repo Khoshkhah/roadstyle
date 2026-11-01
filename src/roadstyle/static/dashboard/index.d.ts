@@ -37,6 +37,8 @@ export interface DashboardOptions {
   street_view?: "window" | boolean;
   /** A Google Maps JavaScript API key: Street View's Linked mode and Google 3D. */
   street_view_key?: string;
+  /** A Mapillary client token: the Mapillary tab of the Street View window and its coverage layer. */
+  mapillary_token?: string;
   google_3d?: boolean;
   /** The selection colour (the theme's selection.select). */
   select_color?: string;

@@ -235,7 +235,7 @@ def test_webmap_notebook_repr_is_slim_but_saved_file_is_offline():
     r = wm._repr_html_()
     assert "cdn.jsdelivr.net/npm/maplibre-gl" in r
     assert len(r) < len(wm.html)                      # the 800 KB vendored blob stays out
-    assert "__MAPLIBRE_JS__" not in wm.html and "cdn.jsdelivr" not in wm.html
+    assert "__MAPLIBRE_JS__" not in wm.html and "cdn.jsdelivr.net/npm/maplibre-gl" not in wm.html
 
 
 def test_notebook_cdn_maplibre_is_the_vendored_version():

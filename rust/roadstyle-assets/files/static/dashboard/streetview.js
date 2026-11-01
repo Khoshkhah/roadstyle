@@ -48,10 +48,10 @@ export function initStreetView(){
       '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button>'+
       '<button type="button" title="Close">\u2715</button></div>'+
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
-      '<iframe title="Google Street View" allowfullscreen hidden></iframe><div class="rs-svw-pano" hidden></div>';
+      '<iframe title="Google Street View" allowfullscreen hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
-          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), flip=w.querySelector(".rs-svw-mode"),
+          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"), flip=w.querySelector(".rs-svw-mode"),
           provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov");
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked or Classic, remembered in this browser (the same choice as the Street View page's)
@@ -93,7 +93,7 @@ export function initStreetView(){
     // THE PROVIDER: Google (above), or Panoramax / Mapillary: the nearest photo to the spot in their own viewer (svproviders.js).
     // The choice and the coverage switch are remembered in this browser.
     const PROV_KEY="rs-street-view-provider", COV_KEY="rs-street-view-cov";
-    let prov="google", cov=false, altTok=0;
+    let prov="google", cov=false, altTok=0, alt=null;   // alt: the open viewer {prov, ctl}
     try{ prov=localStorage.getItem(PROV_KEY)||"google"; cov=localStorage.getItem(COV_KEY)==="1"; }catch(e){}
     if(!SV_PROVIDERS[prov]) prov="google";
     const chrome=()=>{                          // what the bar offers for the provider that is chosen
@@ -105,26 +105,36 @@ export function initStreetView(){
     for(const k in SV_PROVIDERS){
       const b=document.createElement("button"); b.type="button"; b.dataset.p=k; b.textContent=SV_PROVIDERS[k].title;
       b.onclick=()=>{ if(k===prov) return; prov=k; try{ localStorage.setItem(PROV_KEY, k); }catch(e){}
-        hideP(); rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
+        hideP(); altTok++; dropAlt(); rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
       provBox.appendChild(b); }
-    covBtn.onclick=()=>{ cov=!cov; try{ localStorage.setItem(COV_KEY, cov?"1":"0"); }catch(e){} chrome(); drawCov(); };
+    covBtn.onclick=()=>{ if(_spNeedsToken(prov)){ altTok++; dropAlt(); return note(NEED_TOKEN); }
+      cov=!cov; try{ localStorage.setItem(COV_KEY, cov?"1":"0"); }catch(e){} chrome(); drawCov(); };
     chrome();
-    const note=(html)=>{ fr.hidden=true; hideP(); msg.hidden=false; msg.innerHTML=html; };
+    const NEED_TOKEN="<b>Mapillary needs a free token.</b>"+
+      "<span>Make one at <a href=\"https://www.mapillary.com/developer\" target=\"_blank\" rel=\"noopener\">mapillary.com/developer</a> (a client token), then paste it in Settings \u2192 Keys (Save, then Reload). Coverage needs it too.</span>";
+    const dropAlt=()=>{ if(alt){ alt.ctl.destroy(); alt=null; } adiv.hidden=true; };
+    const note=(html, keep)=>{ fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
     const showAlt=()=>{                         // Panoramax / Mapillary for the spot of the last selection
       const P=SV_PROVIDERS[prov], tok=++altTok;
       if(!last.url) return note("No Street View for this road.");
-      if(_spNeedsToken(prov)) return note("<b>Mapillary needs a free token.</b>"+
-        "<span>Make one at <a href=\"https://www.mapillary.com/developer\" target=\"_blank\" rel=\"noopener\">mapillary.com/developer</a>, then paste it in Settings \u2192 Keys.</span>");
+      if(_spNeedsToken(prov)) return note(NEED_TOKEN);
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;
-      note("Looking for photos\u2026");
+      if(!alt) note("Looking for photos\u2026");   // a viewer that is open stays on screen while the next photo is found
+      const fail=e=>{ if(tok===altTok) note("<b>"+_esc(P.title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
       _spFind(prov, +vp[0], +vp[1], h).then(r=>{
         if(tok!==altTok || w.hidden) return;    // a newer spot, another provider, or the window closed meanwhile
         if(!r) return note("No "+P.title+" photos within 50 m of this spot.");
-        if(fr.getAttribute("src")!==r.src) fr.src=r.src;
-        fr.hidden=false; msg.hidden=true; },
-        e=>{ if(tok===altTok) note("<b>"+_esc(P.title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); });
+        const go=()=>{
+          if(tok!==altTok || w.hidden) return;
+          fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
+          alt.ctl.go(r, h).catch(fail); };
+        if(alt && alt.prov===prov) return go();
+        dropAlt(); const mine=tok; adiv.hidden=false;
+        _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef) rsSetStreetViewMarkerAt(lng, lat, hd); }).then(c=>{
+          if(mine!==altTok || w.hidden){ c.destroy(); return; }
+          ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail); }, fail);
     };
-    let last=null, btn=null;                   // the latest road selection: {name, url}
+    let last=null, btn=null, ctlRef=null;                   // the latest road selection: {name, url}
     const show=()=>{
       if(w.hidden || !last) return;
       ttl.textContent=last.name;
@@ -156,7 +166,7 @@ export function initStreetView(){
       if(!last) return; last.url=e.detail.streetView; ends(e.detail.atStart, e.detail.atEnd); show();
     });
     rsSetStreetView=function(on){
-      if(!on){ hideP();                          // closed: drop the panorama (see hideP)
+      if(!on){ hideP(); altTok++; dropAlt();                          // closed: drop the panorama (see hideP)
         // and forget the road: opened again it waits for a road, not the last one (Kaveh, 2026-10-14)
         last=null; fr.hidden=true; msg.hidden=false; msg.textContent="Click a road to see it in Street View."; ttl.textContent="Street View"; }
       w.hidden=!on; if(on && (dock || !_wPhone())) place(); if(!on && dock) w.__rsUnplace(); rsSetStreetViewMarker(!!on); drawCov();
