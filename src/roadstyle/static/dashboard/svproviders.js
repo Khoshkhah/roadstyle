@@ -147,19 +147,32 @@ const _spPanoData = fov => img => {
 // Resolves {go(photo, heading), destroy()}; rejects when the library cannot be loaded.
 export async function _spOpen(provider, box, seen){
   if(provider === "panoramax"){
-    const lib = await _spPsv(); let v = null, az = 0, at = null;
+    const lib = await _spPsv(); let v = null, az = 0, at = null, want = 0, info = {flat: false, w: 70, h: 52};
     const report = () => { if(v && at) seen(at.lng, at.lat, _spDeg(az + v.getPosition().yaw * 180 / Math.PI)); };
+    // a flat photo covers only its field of view, and the rest of the sphere is black: look at its middle and stay inside it.
+    // A panorama of 360 degrees turns freely and opens along the road.
+    const settle = () => {
+      if(!v) return;
+      const R = d => d + "deg";
+      v.setOptions(info.flat ? {yawRange: [R(-info.w / 2), R(info.w / 2)], pitchRange: [R(-info.h / 2), R(info.h / 2)],
+                                  minFov: 20, maxFov: Math.max(25, Math.min(90, info.h))} : {yawRange: null, pitchRange: null, minFov: 30, maxFov: 90});
+      v.zoom(0);
+      v.rotate({yaw: (info.flat ? 0 : want) * Math.PI / 180, pitch: 0}); report();
+    };
+    const dataFor = fov => img => {
+      info = {flat: img.width < 1.9 * img.height, w: fov, h: fov * img.height / img.width};
+      return _spPanoData(fov)(img); };
     return {
       go(r, heading){
         at = {lng: r.sx, lat: r.sy}; az = r.azimuth;
-        const yaw = (_spDeg(heading == null ? az : heading) - az + 540) % 360 - 180;
-        const opt = {panoData: _spPanoData(r.fov), position: {yaw: yaw * Math.PI / 180, pitch: 0}, transition: false};
+        want = (_spDeg(heading == null ? az : heading) - az + 540) % 360 - 180;
+        const pd = dataFor(r.fov);
         if(!v){
-          v = new lib.Viewer({container: box, navbar: false, panorama: r.url, panoData: opt.panoData,
-                              defaultYaw: opt.position.yaw, touchmoveTwoFingers: false, mousewheelCtrlKey: false});
+          v = new lib.Viewer({container: box, navbar: false, panorama: r.url, panoData: pd, defaultYaw: 0,
+                              touchmoveTwoFingers: false, mousewheelCtrlKey: false});
           v.addEventListener("position-updated", report);
-          v.addEventListener("ready", report, {once: true});
-        } else v.setPanorama(r.url, opt).then(report, () => {});
+          v.addEventListener("ready", settle, {once: true});
+        } else v.setPanorama(r.url, {panoData: pd, position: {yaw: 0, pitch: 0}, transition: false}).then(settle, () => {});
         return Promise.resolve();
       },
       destroy(){ if(v){ try{ v.destroy(); }catch(e){} v = null; } box.textContent = ""; }

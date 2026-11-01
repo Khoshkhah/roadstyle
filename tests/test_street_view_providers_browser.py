@@ -19,7 +19,7 @@ _BLANK = "<html><body>viewer</body></html>"
 # stand-ins for the two viewer libraries (loaded from a CDN): they keep what they were given and their listeners
 _PSV_JS = """export class Viewer{constructor(o){window.__psv=o; window.__psvl={}; this.yaw=0.5; window.__psvv=this;}
 addEventListener(n,f){window.__psvl[n]=f;} setPanorama(u,o){window.__psvgo=[u,o]; return Promise.resolve();}
-getPosition(){return {yaw:this.yaw,pitch:0};} destroy(){window.__psvgone=true;}}"""
+setOptions(o){window.__psvopt=o;} zoom(){} rotate(p){window.__psvrot=p;} getPosition(){return {yaw:this.yaw,pitch:0};} destroy(){window.__psvgone=true;}}"""
 _MLY_JS = """window.mapillary={Viewer:class{constructor(o){window.__mly=o; window.__mlyh={};} on(n,f){window.__mlyh[n]=f;}
 moveTo(id){window.__mlyto=id; return Promise.resolve();} resize(){} remove(){window.__mlygone=true;}}};"""
 
