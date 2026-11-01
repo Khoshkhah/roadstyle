@@ -33,8 +33,9 @@ export async function _spFind(provider, lat, lng, heading){
             url: sd.href, azimuth: az || 0, fov: io.field_of_view || 70};
   }
   if(provider === "mapillary"){
-    const r = await fetch("https://graph.mapillary.com/images?fields=id,geometry&limit=20&radius=" + _SP_RADIUS +
-                          "&closeto=" + lng.toFixed(6) + "," + lat.toFixed(6) + "&access_token=" + encodeURIComponent(_spToken()));
+    const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));   // a box of the radius around the spot
+    const bbox = [lng - dx, lat - dy, lng + dx, lat + dy].map(v => v.toFixed(6)).join(",");
+    const r = await fetch("https://graph.mapillary.com/images?fields=id,geometry&limit=100&bbox=" + bbox + "&access_token=" + encodeURIComponent(_spToken()));
     if(!r.ok) throw new Error(r.status === 400 || r.status === 401 || r.status === 403 ? "Mapillary refused the token." : "Mapillary answered " + r.status);
     let best = null, bd = Infinity;
     for(const f of (await r.json()).data || []){
