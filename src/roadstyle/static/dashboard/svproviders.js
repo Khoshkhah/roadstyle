@@ -31,12 +31,12 @@ const _spCovered = (lat, lng) => {            // the whole search circle of a sp
   const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));
   return _spPan.boxes.some(b => _spBoxHas(b, lat - dy, lng - dx) && _spBoxHas(b, lat + dy, lng + dx));
 };
-// What a photo's direction costs, in metres: 0 for a 360 photo or an unknown direction, a little for turning from the road's axis (up to
-// 45 degrees, either way along the road), and Infinity for a photo that looks aside.
+// What a photo's direction costs, in metres: 0 for a 360 photo or an unknown direction, a little for turning from the road's direction
+// (up to 45 degrees), and Infinity for a photo that looks aside or back. The photo must show the road the way it runs.
 function _spAim(az, fov, heading, turn){
   if(heading == null || fov >= 300 || az == null) return 0;
-  const fwd = turn(az, heading), back = turn(az, heading + 180);
-  return Math.min(fwd, back) <= 45 ? Math.min(fwd, back) * .3 : Infinity;
+  const t = turn(az, heading);
+  return t <= 45 ? t * .3 : Infinity;
 }
 // the photo nearest the spot that looks along the road; the service does not sort by distance
 function _spPanPick(list, lat, lng, heading){

@@ -112,7 +112,7 @@ bills Dynamic Street View per panorama beyond a monthly free allowance. The same
 ## Panoramax and Mapillary
 
 The window's title bar has a switch: **Google**, **Panoramax** and **Mapillary**. The choice is remembered in this browser. Every road
-you click, and every step with the arrows, shows the photo of the provider that is nearest to the spot (within 30 m, and only if it looks along the road (either way along the road counts alike)), looking the
+you click, and every step with the arrows, shows the photo of the provider that is nearest to the spot (within 30 m, and only if it looks along the road (photos of the opposite way are not shown)), looking the
 way the road runs where the provider says which way the photo looks. If the provider has no photo there, the window says so.
 
 | Provider | Key | Photos |
