@@ -154,6 +154,8 @@ fn page_cmd(roads: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) ->
     given.insert("api_key".into(), take(opts, "api_key").map(Value::String).or_else(|| env("ROADSTYLE_API_KEY")).unwrap_or_default());
     given.insert("street_view_key".into(), take(opts, "street_view_key").map(Value::String).or_else(|| env("GOOGLE_MAPS_KEY"))
         .unwrap_or_default());
+    given.insert("mapillary_token".into(), take(opts, "mapillary_token").map(Value::String).or_else(|| env("MAPILLARY_TOKEN"))
+        .unwrap_or_default());
     let o = look_options(opts, |kw| {
         kw.insert("state".into(), "live".into()); // a page's style: the state in the expressions, the interaction contract
     })?;

@@ -55,6 +55,8 @@ pub struct PageOptions {
     pub street_view: Value,
     pub street_view_key: String,
     pub google_3d: bool,
+    /// a Mapillary client token for the Street View window (the person can also save one in the settings)
+    pub mapillary_token: String,
     pub select_color: Value,
     pub filter: Value,
     /// the Roads box (render's filter_control; the dashboard shows it when the filter has classes)

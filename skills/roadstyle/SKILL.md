@@ -89,6 +89,7 @@ m.save("map.html")                        # m.html is the page as a string
   (edge `id`, metres `m` along it, `lng`/`lat`, `heading`, `source`: `"panorama"` = current, only
   with `street_view_key=` (default: env `GOOGLE_MAPS_KEY`); `"map"` = the clicked or stepped spot); `street_view=True` = a plain popup link, `False` = none. Street View loads only
   when the page is served (http/https), not opened from disk: `python -m http.server`.
+  The window's bar also offers Panoramax (no key) and Mapillary (`mapillary_token=`, default env `MAPILLARY_TOKEN`; a free client token from mapillary.com/developer), each with a coverage layer.
 - `google_3d=True` adds a Google 3D button and window (Google's photorealistic 3D view; its camera and the map's
   move together). It needs `street_view_key` (default env `GOOGLE_MAPS_KEY`), else `ValueError`. Key setup:
   `/guides/google-key/` (billing, Maps JavaScript API, Websites list). JS: `rsSetGoogle3D(on)`, `rs:google3dchange`.

@@ -2464,3 +2464,11 @@ def test_the_version_is_the_one_of_a_source_tree():
         pytest.skip("not a source tree")
     assert rs._source_version() == re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
     assert rs.__version__ == rs._source_version()
+
+
+def test_mapillary_token_is_an_option_and_reads_the_environment(monkeypatch):
+    monkeypatch.delenv("MAPILLARY_TOKEN", raising=False)
+    assert _opt(render_edges(_edges(), backend="web").html, "mapillary_token") == ""
+    assert _opt(render_edges(_edges(), backend="web", mapillary_token="MLY|1").html, "mapillary_token") == "MLY|1"
+    monkeypatch.setenv("MAPILLARY_TOKEN", "MLY|env")
+    assert _opt(render_edges(_edges(), backend="web").html, "mapillary_token") == "MLY|env"

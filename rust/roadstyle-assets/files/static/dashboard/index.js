@@ -52,7 +52,7 @@ const RS_DEFAULTS = {
   tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
   tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
-  street_view: "window", street_view_key: "", google_3d: false,
+  street_view: "window", street_view_key: "", mapillary_token: "", google_3d: false,
   filter: {classes: []}, color_active: 0,
   legend: true,                 // the legend box of the colour options (render's keyword; the style always has the legend data)
   overlays: [], overlay_control: true, overlay_popup: true,
