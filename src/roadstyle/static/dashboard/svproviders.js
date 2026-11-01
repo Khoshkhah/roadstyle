@@ -253,7 +253,7 @@ export function _spDotClick(e){
   const f = hit[0], q = f.properties, [lng, lat] = f.geometry.coordinates, provider = _spCov;
   _spMark([lng, lat]);
   _spDotFn(provider, (async () => {
-    if(provider === "mapillary") return {id: q.id, lng, lat, sx: lng, sy: lat, azimuth: q.is_pano ? 0 : +q.compass_angle || 0};
+    if(provider === "mapillary") return {id: q.id, lng, lat, sx: lng, sy: lat, pin: true, azimuth: q.is_pano ? 0 : +q.compass_angle || 0};
     const seq = q.first_sequence || (JSON.parse(q.sequences || "[]")[0]);
     const r = await fetch(_SP_PANORAMAX + "/api/collections/" + seq + "/items/" + q.id);
     if(!r.ok) throw new Error("Panoramax answered " + r.status);
@@ -321,13 +321,14 @@ export async function _spOpen(provider, box, seen){
       destroy(){ if(v){ try{ v.destroy(); }catch(e){} v = null; } box.textContent = ""; }
     };
   }
-  const lib = await _spMly(); let v = null, ro = null, lngLat = null, bearing = 0;
+  const lib = await _spMly(); let v = null, ro = null, lngLat = null, bearing = 0, pin = null;
   const report = () => { if(lngLat) seen(lngLat.lng, lngLat.lat, bearing); };
   return {
     go(r){
+      pin = r.pin ? {id: String(r.id), lng: r.lng, lat: r.lat} : null;       // a photo picked from its dot stays at the dot, not at the viewer's own fix
       if(!v){
         v = new lib.Viewer({accessToken: _spToken(), container: box, imageId: r.id, component: {cover: false}});
-        v.on("image", e => { lngLat = e.image.lngLat; report(); });
+        v.on("image", e => { lngLat = pin && pin.id === String(e.image.id) ? pin : e.image.lngLat; report(); });
         v.on("bearing", e => { bearing = e.bearing; report(); });
         ro = new ResizeObserver(() => { if(v) v.resize(); }); ro.observe(box);
         return Promise.resolve();
