@@ -7,9 +7,9 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken, _spPrefetch} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
-import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep} from "./svspot.js";
+import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
 export let _svWindow = false;
 // with a Maps JavaScript API key (street_view_key=) the window offers Linked - a real panorama that
 // reports every step and turn, so the map marker walks with the viewer - beside Classic, the embed
@@ -105,7 +105,7 @@ export function initStreetView(){
     for(const k in SV_PROVIDERS){
       const b=document.createElement("button"); b.type="button"; b.dataset.p=k; b.textContent=SV_PROVIDERS[k].title;
       b.onclick=()=>{ if(k===prov) return; prov=k; try{ localStorage.setItem(PROV_KEY, k); }catch(e){}
-        hideP(); altTok++; dropAlt(); rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
+        hideP(); altTok++; dropAlt(); ahead=false; rsSetStreetViewMarkerAt(null); chrome(); drawCov(); if(!rsStreetViewStep(0)) show(); };
       provBox.appendChild(b); }
     covBtn.onclick=()=>{ if(_spNeedsToken(prov)){ altTok++; dropAlt(); return note(NEED_TOKEN); }
       cov=!cov; try{ localStorage.setItem(COV_KEY, cov?"1":"0"); }catch(e){} chrome(); drawCov(); };
@@ -120,6 +120,7 @@ export function initStreetView(){
       if(_spNeedsToken(prov)) return note(NEED_TOKEN);
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;
       if(!alt) note("Looking for photos\u2026");   // a viewer that is open stays on screen while the next photo is found
+      if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]); }   // the road's other photos, loaded in the background
       const fail=e=>{ if(tok===altTok) note("<b>"+_esc(P.title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
       _spFind(prov, +vp[0], +vp[1], h).then(r=>{
         if(tok!==altTok || w.hidden) return;    // a newer spot, another provider, or the window closed meanwhile
@@ -134,7 +135,7 @@ export function initStreetView(){
           if(mine!==altTok || w.hidden){ c.destroy(); return; }
           ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail); }, fail);
     };
-    let last=null, btn=null, ctlRef=null;                   // the latest road selection: {name, url}
+    let last=null, btn=null, ctlRef=null, ahead=false;                   // the latest road selection: {name, url}
     const show=()=>{
       if(w.hidden || !last) return;
       ttl.textContent=last.name;
@@ -159,7 +160,7 @@ export function initStreetView(){
     steps.forEach(b=>{ b.onclick=()=>rsStreetViewStep(+b.dataset.step); });
     document.addEventListener("rs:select", e=>{
       const d=e.detail; if(d.overlay) return;  // roads only
-      const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView};
+      const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView}; ahead=false;
       ends(false, false); show();
     });
     document.addEventListener("rs:streetviewmove", e=>{   // the step buttons: same road, new spot

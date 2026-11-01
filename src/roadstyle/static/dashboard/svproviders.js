@@ -18,26 +18,87 @@ export const _spNeedsToken = p => p === "mapillary" && !_spToken();
 const _spDist = (a, b, c, d) => { const k = Math.cos(a * Math.PI / 180);
   return Math.hypot((c - a) * 110540, (d - b) * 110540 * k); };       // metres, short distances
 
+// ---- Panoramax photos: one list, filled by the lookups and by the load ahead along the selected road ----
+const _spPan = {photos: new Map(), boxes: [], blobs: new Map(), tok: 0};
+const _spPanPhoto = f => {
+  const sd = f.assets && (f.assets.sd || f.assets.hd); if(!sd || !f.geometry) return null;
+  const q = f.properties || {}, io = q["pers:interior_orientation"] || {};
+  return {id: f.id, lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], az: q["view:azimuth"] || 0,
+          by: q["geovisio:producer"], url: sd.href, fov: io.field_of_view || 70};
+};
+const _spBoxHas = (b, lat, lng) => lng >= b[0] && lng <= b[2] && lat >= b[1] && lat <= b[3];
+const _spCovered = (lat, lng) => {            // the whole search circle of a spot is inside a box that was loaded in full
+  const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));
+  return _spPan.boxes.some(b => _spBoxHas(b, lat - dy, lng - dx) && _spBoxHas(b, lat + dy, lng + dx));
+};
+// the photo nearest the spot that looks along the road; the service does not sort by distance
+function _spPanPick(list, lat, lng, heading){
+  const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
+  let best = null, bs = Infinity;
+  for(const q of list){
+    const d = _spDist(lat, lng, q.lat, q.lng); if(d > _SP_RADIUS) continue;
+    // a photo that looks along the road either way is good; the way back costs a little, so the travel direction wins a tie
+    const sc = d + (heading == null ? 0 : Math.min(turn(q.az, heading), turn(q.az, heading + 180) + 15) * .5);
+    if(sc < bs){ bs = sc; best = q; } }
+  if(!best) return null;
+  // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
+  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov,
+          url: _spPan.blobs.get(best.url) || best.url};
+}
+// Load ahead the photos along a road (line: [[lng, lat], ...]) near the spot (lat, lng): their list, in boxes along the line,
+// and the images of the nearest ones into memory. A new road cancels the old load.
+export function _spPrefetch(provider, line, lat, lng){
+  const tok = ++_spPan.tok;
+  if(provider !== "panoramax" || !line || line.length < 2) return;
+  const k = Math.cos(lat * Math.PI / 180), pts = [];
+  for(let i = 1; i < line.length; i++){            // a sample every ~100 m along the line
+    const [x0, y0] = line[i - 1], [x1, y1] = line[i], n = Math.max(1, Math.ceil(_spDist(y0, x0, y1, x1) / 100));
+    for(let j = 0; j <= n; j++) pts.push([x0 + (x1 - x0) * j / n, y0 + (y1 - y0) * j / n]);
+  }
+  const near = pts.map(c => [_spDist(lat, lng, c[1], c[0]), c]).sort((a, b) => a[0] - b[0]).slice(0, 16).map(x => x[1]);
+  const dy = 70 / 111320, dx = dy / Math.max(.05, k), have = [];
+  let at = 0;
+  const lane = async () => {
+    while(at < near.length && tok === _spPan.tok){
+      const c = near[at++], box = [c[0] - dx, c[1] - dy, c[0] + dx, c[1] + dy];
+      if(_spPan.boxes.some(b => _spBoxHas(b, box[1], box[0]) && _spBoxHas(b, box[3], box[2]))) continue;
+      try{
+        const r = await fetch(_SP_PANORAMAX + "/api/search?limit=100&bbox=" + box.map(v => v.toFixed(6)).join(","));
+        if(!r.ok) continue;
+        const fs = ((await r.json()).features || []).map(_spPanPhoto).filter(Boolean);
+        fs.forEach(q => _spPan.photos.has(q.id) || _spPan.photos.set(q.id, q));
+        if(fs.length < 100) _spPan.boxes.push(box);        // a full answer may have left photos out
+        have.push(...fs);
+      }catch(e){}
+    } };
+  Promise.all([lane(), lane(), lane()]).then(async () => {
+    if(tok !== _spPan.tok) return;
+    const todo = have.filter(q => !_spPan.blobs.has(q.url)).map(q => [_spDist(lat, lng, q.lat, q.lng), q])
+      .sort((a, b) => a[0] - b[0]).slice(0, 30).map(x => x[1]);
+    let i = 0;
+    const img = async () => {
+      while(i < todo.length && tok === _spPan.tok){
+        const q = todo[i++];
+        try{ const r = await fetch(q.url); if(r.ok) _spPan.blobs.set(q.url, URL.createObjectURL(await r.blob())); }catch(e){}
+      } };
+    await Promise.all([img(), img(), img()]);
+    // keep the memory small: forget the oldest images
+    for(const [u, b] of _spPan.blobs){ if(_spPan.blobs.size <= 80) break; URL.revokeObjectURL(b); _spPan.blobs.delete(u); }
+  });
+}
+
 // the nearest photo to a spot: {id, lat, lng, ...what its viewer needs} | null (none within the radius);
 // rejects when the service cannot be asked (offline, a wrong token)
 export async function _spFind(provider, lat, lng, heading){
   if(provider === "panoramax"){
+    // the photos along the road that were loaded ahead (_spPrefetch) answer at once
+    if(_spCovered(lat, lng)) return _spPanPick([..._spPan.photos.values()], lat, lng, heading);
     const r = await fetch(_SP_PANORAMAX + "/api/search?limit=30&place_position=" + lng.toFixed(6) + "," + lat.toFixed(6) +
                           "&place_distance=0-" + _SP_RADIUS);
     if(!r.ok) throw new Error("Panoramax answered " + r.status);
-    // the service does not sort by distance: take the photo that is near the spot and looks along the road (its azimuth near the road's heading)
-    const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
-    let best = null, bs = Infinity;
-    for(const f of (await r.json()).features || []){
-      const sd = f.assets && (f.assets.sd || f.assets.hd); if(!sd) continue;
-      const [x, y] = f.geometry.coordinates, az = (f.properties && f.properties["view:azimuth"]) || 0;
-      const sc = _spDist(lat, lng, y, x) + (heading == null ? 0 : turn(az, heading) * .5);
-      if(sc < bs){ bs = sc; best = {f, x, y, az, sd}; } }
-    if(!best) return null;
-    const io = (best.f.properties && best.f.properties["pers:interior_orientation"]) || {};
-    // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
-    return {id: best.f.id, lng: best.x, lat: best.y, sx: lng, sy: lat, by: best.f.properties && best.f.properties["geovisio:producer"],
-            url: best.sd.href, azimuth: best.az, fov: io.field_of_view || 70};
+    const got = ((await r.json()).features || []).map(_spPanPhoto).filter(Boolean);
+    got.forEach(q => _spPan.photos.has(q.id) || _spPan.photos.set(q.id, q));
+    return _spPanPick(got, lat, lng, heading);
   }
   if(provider === "mapillary"){
     const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));   // a box of the radius around the spot

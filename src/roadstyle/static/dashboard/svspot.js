@@ -147,6 +147,8 @@ export function rsSetStreetViewMarkerAt(lng, lat, heading){
 export function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
 // move the Street View spot m metres along its edge (negative: back), still looking along it;
 // stops at the edge's ends. Fires rs:streetviewmove {id, streetView, atStart, atEnd}.
+// the selected road's line [[lng, lat], ...], or null
+export function rsStreetViewLine(){ return _svPos ? _svLine(_svPos.f) : null; }
 export function rsStreetViewStep(m){
   if(!_svPos) return null;
   const p=_svAt(_svPos.f, _svPos.m+m); if(!p) return null;
