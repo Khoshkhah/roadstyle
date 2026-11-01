@@ -112,7 +112,7 @@ def test_no_photo_within_50_m_is_said_and_not_hidden_behind_the_last_photo(tmp_p
     def body(page, asked):
         _pick(page, "panoramax")
         page.wait_for_function("document.querySelector('.rs-svw-msg').textContent.startsWith('No Panoramax')")
-        assert "No Panoramax photos within 50 m" in page.inner_text(".rs-svw-msg")
+        assert "No Panoramax photos within 30 m" in page.inner_text(".rs-svw-msg")
         assert page.locator(".rs-svw-alt").is_hidden()
     _run(tmp_path, body, panoramax={"features": []})
 

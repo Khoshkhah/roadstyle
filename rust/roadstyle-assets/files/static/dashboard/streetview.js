@@ -124,7 +124,7 @@ export function initStreetView(){
       const fail=e=>{ if(tok===altTok) note("<b>"+_esc(P.title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
       _spFind(prov, +vp[0], +vp[1], h).then(r=>{
         if(tok!==altTok || w.hidden) return;    // a newer spot, another provider, or the window closed meanwhile
-        if(!r) return note("No "+P.title+" photos within 50 m of this spot.");
+        if(!r) return note("No "+P.title+" photos within 30 m of this spot looking along the road.");
         const go=()=>{
           if(tok!==altTok || w.hidden) return;
           fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
