@@ -105,12 +105,17 @@ export async function _spFind(provider, lat, lng, heading){
   if(provider === "mapillary"){
     const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));   // a box of the radius around the spot
     const bbox = [lng - dx, lat - dy, lng + dx, lat + dy].map(v => v.toFixed(6)).join(",");
-    const r = await fetch("https://graph.mapillary.com/images?fields=id,geometry&limit=100&bbox=" + bbox + "&access_token=" + encodeURIComponent(_spToken()));
+    const r = await fetch("https://graph.mapillary.com/images?fields=id,geometry,compass_angle,is_pano&limit=100&bbox=" + bbox + "&access_token=" + encodeURIComponent(_spToken()));
     if(!r.ok) throw new Error(r.status === 400 || r.status === 401 || r.status === 403 ? "Mapillary refused the token." : "Mapillary answered " + r.status);
-    let best = null, bd = Infinity;
+    let best = null, bs = Infinity;
+    const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
     for(const f of (await r.json()).data || []){
-      const [x, y] = f.geometry.coordinates, d = _spDist(lat, lng, y, x);
-      if(d < bd){ bd = d; best = {id: f.id, lng: x, lat: y}; } }
+      const [x, y] = f.geometry.coordinates, d = _spDist(lat, lng, y, x); if(d > _SP_RADIUS) continue;
+      // like Panoramax: a flat image must look the way the road runs (within 45 degrees); a 360 image has every direction
+      const t = heading == null || f.is_pano || f.compass_angle == null ? 0 : turn(f.compass_angle, heading);
+      if(t > 45) continue;
+      const sc = d + t * .3;
+      if(sc < bs){ bs = sc; best = {id: f.id, lng: x, lat: y}; } }
     if(!best) return null;
     return best;
   }
