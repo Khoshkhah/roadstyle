@@ -37,9 +37,9 @@ function _spPanPick(list, lat, lng, heading){
   let best = null, bs = Infinity;
   for(const q of list){
     const d = _spDist(lat, lng, q.lat, q.lng); if(d > _SP_RADIUS) continue;
-    // a photo that looks along the road either way is good; the way back costs a little, so the travel direction wins a tie
-    const t = heading == null ? 0 : Math.min(turn(q.az, heading), turn(q.az, heading + 180) + 15);
-    if(t > 45 && q.fov < 300) continue;        // a flat photo that looks aside shows another street
+    // a flat photo must look the way the road runs (within 45 degrees); a 360 panorama has every direction
+    const t = heading == null || q.fov >= 300 ? 0 : turn(q.az, heading);
+    if(t > 45) continue;
     const sc = d + t * .3;
     if(sc < bs){ bs = sc; best = q; } }
   if(!best) return null;
