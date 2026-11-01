@@ -26,6 +26,7 @@ zoom
 view3d
 windows
 float
+svproviders
 streetview
 google3d
 basemap

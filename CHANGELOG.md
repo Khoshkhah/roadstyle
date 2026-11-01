@@ -6,6 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Street View beside Google: Panoramax and Mapillary.** The Street View window has a provider switch (`Google | Panoramax | Mapillary`, remembered in the browser). Panoramax (open data, no key) and Mapillary (a free client token that the person saves in Settings > Keys) show the photo nearest to the spot (within 50 m) in their own viewer, and follow every road selection and step like Google's. A **Coverage** button draws where the chosen provider has photos on the map (its vector tiles: lines for sequences, dots for single photos). The credit row of the chosen provider is in the attribution box. New module `dashboard/svproviders.js`; Linked mode stays Google's.
+- The goldens of the Monaco page and of the page with views have the new size and hash (`rust_page.json`, `page_views.json`).
+
 ## [0.26.1] - 2026-10-30
 
 ### Added

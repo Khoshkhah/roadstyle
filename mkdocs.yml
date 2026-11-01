@@ -52,7 +52,7 @@ nav:
       - Which road is on top: guides/levels.md
       - Roads from OpenStreetMap: guides/osmnx.md
       - Add your own layers: guides/overlays.md
-      - Google Street View: guides/street-view.md
+      - Street View: guides/street-view.md
       - Google 3D: guides/google-3d.md
       - Set up a Google key: guides/google-key.md
       - Big networks: guides/big-networks.md

@@ -44,7 +44,7 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   PageOptions, or a line in `PY_ONLY` of `tests/test_unknown_keywords.py`. When a new option seems to do nothing, look for the key in
   `RS_OPTIONS` (`_opt(html, key)`).
 - The road popup and hover tooltip text: `_rfields` (popup/tooltip, `static/popup.js`) and `_rrows` (docked panel,
-  `dashboard/select.js`); Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`.
+  `dashboard/select.js`); Street View: `_svMeasure` / `_svAt` (the spot on the edge, metres along it), `_svPick` / `_svUrl` / `_svUrlOf`, the marker `_svMark` / `_svMarkPlace` / `_svLanePx`, the window `rsSetStreetView`. Panoramax and Mapillary (`dashboard/svproviders.js`): `_spFind` (nearest photo and its viewer's address), `_spCoverage` (the coverage layers); the window's provider switch is in `streetview.js` (`showAlt`).
 - Google's script is loaded once for every window by `_gmLoad(key)`; a floating window (drag, size, place, remembered)
   is `_rsFloat(w, bar, name, left)`. Google 3D (`google_3d=True`, `dashboard/google3d.js`): `toGoogle` / `toMap` convert the
   cameras (zoom <-> range from MapLibre's camera distance), `there` stops echo loops, the map is the judge (it clamps,

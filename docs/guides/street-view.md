@@ -1,6 +1,6 @@
-# Google Street View
+# Street View
 
-<p class="lead">Click a road and see it in Google Street View, looking the way the road runs. No API key needed.</p>
+<p class="lead">Click a road and see it in Google Street View, Panoramax or Mapillary, looking the way the road runs. Google's Classic view and Panoramax need no API key.</p>
 
 <div class="grid cards" markdown>
 
@@ -108,6 +108,29 @@ the clicked road. A switch in the panel's bar flips between the two: **Linked** 
 To make the key and limit it to your own addresses, see [Set up a Google key](google-key.md). Google
 bills Dynamic Street View per panorama beyond a monthly free allowance. The same key also opens the
 [Google 3D](google-3d.md) window.
+
+## Panoramax and Mapillary
+
+The window's title bar has a switch: **Google**, **Panoramax** and **Mapillary**. The choice is remembered in this browser. Every road
+you click, and every step with the arrows, shows the photo of the provider that is nearest to the spot (within 50 m), looking the
+way the road runs where the provider says which way the photo looks. If the provider has no photo there, the window says so.
+
+| Provider | Key | Photos |
+|---|---|---|
+| Google | none for Classic; a [Google key](google-key.md) for Linked | Google |
+| [Panoramax](https://panoramax.fr/) | none | open data (mostly CC-BY-SA), from `api.panoramax.xyz` |
+| [Mapillary](https://www.mapillary.com/) | a free **client token** | crowd-sourced (CC-BY-SA) |
+
+**Mapillary token.** Sign in at [mapillary.com/developer](https://www.mapillary.com/developer), register an application, and copy its
+*client token*. Open **Settings → Keys** on the page, paste it in *Mapillary token*, and click **Save**. The token stays in this browser; it
+is not in the page. Without a token the Mapillary tab says so and asks for nothing.
+
+**Coverage.** With Panoramax or Mapillary chosen, the **Coverage** button draws where that provider has photos: a line for each
+sequence, and a dot for each photo from zoom 15. It goes away when you choose Google or close the window, and comes back with the
+window. Mapillary's lines start at zoom 6.
+
+The two viewers are the providers' own pages in a frame, so the map marker stays where you clicked (the Linked marker that walks with
+the viewer is Google's). The provider's credit is in the attribution box while its window is open.
 
 ## Where it looks
 
