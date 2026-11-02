@@ -30,6 +30,16 @@ The dark colour is the light colour turned by one rule, in one place: the profil
 The selection and hover colours stay. The values were chosen on Monaco (Fiord and the blank dark base map) at zoom 15 and 16.5 on a
 desktop and a phone screen; a different look can change the numbers in its own profile.
 
+## The 3D buildings of a vector base map
+
+The `area` band does not reach the buildings of a vector base map (OpenFreeMap): that style comes from a URL and has its own colors. The dashboard
+makes the 3D layer (`addExtrusion`, `basemap.js`) from the flat building layer of the style and copies its color. The flat buildings of the dark
+styles are as dark as their ground (OpenFreeMap Dark: `rgb(10,10,10)` on `rgb(12,12,12)`), so the 3D shapes were not visible (2026-11-02).
+
+A dark base map in `data/basemaps.json` names the color of its 3D buildings with `building_3d`. The color is lighter than the ground by more than
+0.15 of HSL lightness (`tests/test_buildings_3d_theme_browser.py`). The opacity stays 0.8 and the layer stays above the roads, so a road behind a
+building is hidden. A base map with no `building_3d` (the light maps) keeps the color of its flat layer. The flat building layer of the 2D view does not change.
+
 ## What the engine writes (`roadstyle-engine/src/dark.rs`)
 
 - A colour text of a layer's colour property (`"#rrggbb"`, `"#rgb"`, `rgb(...)`, `rgba(...)`) becomes the `case` above, in the band of the layer's

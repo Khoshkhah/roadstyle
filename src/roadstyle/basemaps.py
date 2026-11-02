@@ -123,6 +123,7 @@ class Basemap:
     title: str = ""
     dark: str | None = None
     swatch: str | tuple[str, str, str] | list[str] = ""
+    building_3d: str = ""          # the color of the 3D buildings of a dark vector style (empty: the color of its flat buildings)
 
 
 def _bundled() -> tuple[dict[str, Basemap], list[str]]:

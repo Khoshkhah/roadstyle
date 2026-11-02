@@ -92,7 +92,8 @@
       "attr": "",
       "is_dark": false,
       "style_url": null,
-      "dark": "blank_dark"
+      "dark": "blank_dark",
+      "building_3d": null
     },
     {
       "key": "ofm_liberty",
@@ -111,7 +112,8 @@
       "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
       "is_dark": false,
       "style_url": "https://tiles.openfreemap.org/styles/liberty",
-      "dark": "ofm_fiord"
+      "dark": "ofm_fiord",
+      "building_3d": null
     },
     {
       "key": "ofm_positron",
@@ -130,7 +132,8 @@
       "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
       "is_dark": false,
       "style_url": "https://tiles.openfreemap.org/styles/positron",
-      "dark": "ofm_dark"
+      "dark": "ofm_dark",
+      "building_3d": null
     },
     {
       "key": "osm",
@@ -153,7 +156,8 @@
       "attr": "© OpenStreetMap contributors",
       "is_dark": false,
       "style_url": null,
-      "dark": null
+      "dark": null,
+      "building_3d": null
     },
     {
       "key": "esri_gray",
@@ -174,7 +178,8 @@
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
       "is_dark": false,
       "style_url": null,
-      "dark": "esri_dark_gray"
+      "dark": "esri_dark_gray",
+      "building_3d": null
     },
     {
       "key": "esri_street",
@@ -195,7 +200,8 @@
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, © OpenStreetMap contributors, and the GIS User Community",
       "is_dark": false,
       "style_url": null,
-      "dark": null
+      "dark": null,
+      "building_3d": null
     },
     {
       "key": "satellite",
@@ -216,7 +222,8 @@
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community",
       "is_dark": true,
       "style_url": null,
-      "dark": null
+      "dark": null,
+      "building_3d": null
     },
     {
       "key": "blank_dark",
@@ -231,7 +238,8 @@
       "attr": "",
       "is_dark": true,
       "style_url": null,
-      "dark": null
+      "dark": null,
+      "building_3d": null
     },
     {
       "key": "ofm_fiord",
@@ -250,7 +258,8 @@
       "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
       "is_dark": true,
       "style_url": "https://tiles.openfreemap.org/styles/fiord",
-      "dark": null
+      "dark": null,
+      "building_3d": "#6a789a"
     },
     {
       "key": "ofm_dark",
@@ -269,7 +278,8 @@
       "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
       "is_dark": true,
       "style_url": "https://tiles.openfreemap.org/styles/dark",
-      "dark": null
+      "dark": null,
+      "building_3d": "#3f444d"
     },
     {
       "key": "esri_dark_gray",
@@ -290,7 +300,8 @@
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
       "is_dark": true,
       "style_url": null,
-      "dark": null
+      "dark": null,
+      "building_3d": null
     }
   ],
   "ontop": {

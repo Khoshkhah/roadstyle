@@ -221,6 +221,7 @@
    "subdomains": "abc",
    "maxzoom": 19,
    "style_url": "https://tiles.openfreemap.org/styles/dark",
+   "building_3d": "#3f444d",
    "group": "OpenFreeMap",
    "title": "OpenFreeMap Dark",
    "swatch": [
@@ -245,6 +246,7 @@
    "subdomains": "abc",
    "maxzoom": 19,
    "style_url": "https://tiles.openfreemap.org/styles/fiord",
+   "building_3d": "#6a789a",
    "group": "OpenFreeMap",
    "title": "OpenFreeMap Fiord",
    "swatch": [

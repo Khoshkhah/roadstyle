@@ -457,7 +457,8 @@ fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Va
                                                          "swatch": b.get("swatch").cloned().unwrap_or(Value::Null), "order": order(b),
                                                          "maxzoom": b.get("maxzoom").cloned().unwrap_or(json!(19)), "attr": b["attr"],
                                                          "is_dark": b["is_dark"], "style_url": b.get("style_url").cloned().unwrap_or(Value::Null),
-                                                         "dark": b.get("dark").cloned().unwrap_or(Value::Null)})).collect();
+                                                         "dark": b.get("dark").cloned().unwrap_or(Value::Null),
+                                                         "building_3d": b.get("building_3d").cloned().unwrap_or(Value::Null)})).collect();
     if !k.basemap_switcher && k.basemaps.as_ref().is_none_or(|l| l.is_empty()) {
         bms.truncate(1);        // no switcher and no list given: only the fixed backdrop (window.rsSetBasemap reaches a given list)
     }

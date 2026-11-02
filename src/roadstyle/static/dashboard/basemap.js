@@ -33,17 +33,19 @@ const paintBuildings = ()=>{
 // A style with flat buildings and no 3D layer (OpenFreeMap Positron, Dark, Fiord; only Liberty has one) gets one made from the same
 // building data: the heights `render_height` and `render_min_height`, the color of the flat layer (an extrusion takes no alpha: its opacity is the layer's).
 const noAlpha = c=>typeof c === "string" ? c.replace(/^(hsl|rgb)a\(([^)]*),[^,)]*\)$/, "$1($2)") : c;
-const addExtrusion = s=>{
+// A dark base map names the color of its 3D buildings (`building_3d` in data/basemaps.json): its flat buildings are as dark as its ground, so
+// their copy would hide the shapes. Another map keeps the color of its flat layer.
+const addExtrusion = (s, b)=>{
   if(s.layers.some(l=>l.type === "fill-extrusion")) return;
   const flat = s.layers.find(l=>l.type === "fill" && l["source-layer"] === "building");
   if(!flat) return;
   s.layers.push({id:"building-3d", type:"fill-extrusion", source:flat.source, "source-layer":"building", minzoom:14, filter:["!", ["has", "hide_3d"]],
                  paint:{"fill-extrusion-base":["get", "render_min_height"], "fill-extrusion-height":["get", "render_height"],
-                        "fill-extrusion-color":noAlpha((flat.paint || {})["fill-color"]) || "#cccccc", "fill-extrusion-opacity":0.8}});
+                        "fill-extrusion-color":b.building_3d || noAlpha((flat.paint || {})["fill-color"]) || "#cccccc", "fill-extrusion-opacity":0.8}});
 };
 const mergeVector = async b=>{
   const s = await (await fetch(b.style_url)).json();
-  addExtrusion(s);
+  addExtrusion(s, b);
   clearVector();
   glyphs0 = glyphs0 || map.getStyle().glyphs;
   if(map.getLayer("basemap")) map.setLayoutProperty("basemap", "visibility", "none");
