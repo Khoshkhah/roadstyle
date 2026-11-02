@@ -175,6 +175,25 @@ pub(super) fn bake(e: &Value, state: &Map<String, Value>) -> Value {
 
 
 
+/// An export has no `let` and no `var` (RustGIS draws them as black): each `let` is replaced by its body, with the variables replaced by their
+/// values. A page and its tiles keep the `let` (the width table's row and the colour tables make the style smaller).
+pub(super) fn inline_lets(e: &Value) -> Value {
+    match e {
+        Value::Array(a) if a.len() >= 4 && a.len() % 2 == 0 && a[0] == "let" => {
+            let mut body = a[a.len() - 1].clone();
+            for pair in a[1..a.len() - 1].chunks(2) {
+                if let Some(name) = pair[0].as_str() {
+                    body = swap(&body, &json!(["var", name]), &inline_lets(&pair[1]));
+                }
+            }
+            inline_lets(&body)
+        }
+        Value::Array(a) => Value::Array(a.iter().map(inline_lets).collect()),
+        Value::Object(o) => Value::Object(o.iter().map(|(k, v)| (k.clone(), inline_lets(v))).collect()),
+        _ => e.clone(),
+    }
+}
+
 pub(super) fn props_of<'a>(fs: &'a [Value], empty: &'a Map<String, Value>) -> Vec<&'a Map<String, Value>> {
     fs.iter().map(|f| f["properties"].as_object().unwrap_or(empty)).collect()
 }
@@ -189,6 +208,15 @@ mod tests {
             Ev::V(v) => Some(v),
             Ev::Maybe => None,
         }
+    }
+
+    #[test]
+    fn inline_lets_replaces_every_let_and_var() {
+        let one = json!(["let", "row", ["get", "k"], ["+", ["var", "row"], ["*", ["var", "row"], 2]]]);
+        assert_eq!(inline_lets(&one), json!(["+", ["get", "k"], ["*", ["get", "k"], 2]]));
+        let two = json!(["let", "a", ["literal", [1, 2]], "b", ["get", "x"], ["case", ["==", ["var", "b"], "dark"], ["var", "a"], 0]]);
+        assert_eq!(inline_lets(&two), json!(["case", ["==", ["get", "x"], "dark"], ["literal", [1, 2]], 0]));
+        assert!(!inline_lets(&json!(["interpolate", ["linear"], ["zoom"], 4, one])).to_string().contains("var"));
     }
 
     #[test]

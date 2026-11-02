@@ -73,6 +73,15 @@ def test_the_style_holds_the_roads_only(tmp_path):
         rs.export_style(_edges(), tmp_path, base_url=BASE, basemap="osm")
 
 
+def test_the_export_has_no_let_unless_keep_let(tmp_path):
+    """An app such as RustGIS cannot read `let`: the default export is the long form; keep_let=True keeps the width table's `let` (smaller)."""
+    import roadstyle as rs
+    long = json.dumps(json.loads(rs.export_style(_edges(), tmp_path / "a", base_url=BASE).read_text()))
+    short = json.dumps(json.loads(rs.export_style(_edges(), tmp_path / "b", base_url=BASE, keep_let=True).read_text()))
+    assert '"let"' not in long and '"var"' not in long
+    assert '"let"' in short and len(short) < len(long)
+
+
 def test_from_a_duckosm_geoparquet_file(tmp_path):
     """Version 2: the edges and their drawing positions from one GeoParquet file; every column in the road tiles, an id past 2**53 as text;
     a file without the positions is an error that says how to save them."""

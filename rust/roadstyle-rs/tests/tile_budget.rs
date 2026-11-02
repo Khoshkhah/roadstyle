@@ -70,6 +70,7 @@ fn look_with(area: &str, kind: Kind, args: &[(&str, &str)]) -> roadstyle_rs::Loo
     let o = common::gz_json(&format!("{area}/golden_options.json.gz"));
     let mut look = roadstyle_rs::Look::resolution_value(&roadstyle_rs::look::Options::from_value(&o).unwrap()).unwrap();
     look["args"]["export"] = (kind == Kind::Full).into();
+    look["args"]["keep_let"] = (kind == Kind::Full).into();      // the budget measures the compact form; the default export has no `let` (a longer style)
     for (k, v) in args {
         look["args"][*k] = json!(v);
     }

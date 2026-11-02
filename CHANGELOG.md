@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The style of `export_style` and `export_inline` has no `let`.** The width table (a newer feature) wrote a `let` into the `line-width` of the road layers, and an app such as RustGIS cannot read `let`, so it drew the widths wrong. The export writes the long form now, with each `let` replaced by its value. The new keyword `keep_let=True` keeps the `let` for an app that can read it: the style is smaller (the `line-width` of the long form is 21 % longer). A page and its tiles are not changed. `tests/test_render.py` tested the removed `folium` and `lonboard` backends; it tests the error of a removed backend now.
+
 ### Added
 - **A dashboard manual in the docs, in three pages: [overview](docs/guides/dashboard-manual/index.md), [Python SDK](docs/guides/dashboard-manual/python.md) and [JavaScript](docs/guides/dashboard-manual/javascript.md).** The Python page has the call, the page keywords and every key of `dashboard=` with its default, and each example shows the page that it makes (`docs/build_maps.py` makes the maps from the page's own `python` blocks). The JavaScript page has a block for each part of `window.rs` and for each `rs:` event. The testbed map stays at the top of the screen, and each `javascript` block has a **Run** button that runs it on that map (`docs/maps/dashboard_testbed.html`, with a blank base map and no key). The test `tests/test_dashboard_manual.py` fails when a page does not name an option, a member or an event, and when a block throws an error. The option `pygments_lang_class` of `mkdocs.yml` is on, so the page can find its `javascript` blocks.
 - The dashboards guide shows one picture of the dashboard, at full width, and it links to the manual. The picture of the phone form stays in Dashboard layout.

@@ -125,7 +125,7 @@ const FLAT: &[(&str, &str)] = &[
     ("offset_frac", "roads.offset_frac"), ("width_frac", "roads.width_frac"), ("offset_zoom", "roads.offset_zoom"),
     ("hover_color", "interaction.hover_color"), ("select_color", "interaction.select_color"),
     ("labels", "labels.on"), ("arrows", "arrows.on"), ("tunnel_control", "tunnels.control"), ("view_3d", "bridges.decks_3d"),
-    ("boundary", "boundary"), ("name", "output.name"), ("state", "output.state"), ("live_data", "output.live_data"),
+    ("boundary", "boundary"), ("name", "output.name"), ("state", "output.state"), ("live_data", "output.live_data"), ("keep_let", "output.keep_let"),
     ("export", "output.export"),
 ];
 

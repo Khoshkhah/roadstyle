@@ -582,7 +582,7 @@ fn finish(cx: &Ctx, layers: Vec<Value>, state: &Map<String, Value>, ovs: &[Overl
         for k in ["paint", "layout", "filter"].into_iter().filter(|_| !live) {
             if let Some(v) = l.get(k) {
                 let b = bake(v, state);
-                l.insert(k.into(), b);
+                l.insert(k.into(), if cx.export && !cx.look.map.output.keep_let { eval::inline_lets(&b) } else { b });
             }
         }
         if cx.export && l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows")) {

@@ -147,6 +147,9 @@ pub struct Output {
     /// the export's arrows (fewer, one in the middle of each slot, and the slots' numbers). A map option because it changes stage 1: its
     /// layers go through every pass, and they change the arrows layer and the controls (2026-10-25).
     pub export: bool,
+    /// an export keeps the `let` of the width table (a smaller style). Off by default: an app such as RustGIS cannot read `let` (it draws the
+    /// widths wrong), so the export writes the long form with each `let` replaced by its value.
+    pub keep_let: bool,
 }
 
 /// A style with its state baked in, or one that keeps MapLibre's global state (a page with the dashboard).
