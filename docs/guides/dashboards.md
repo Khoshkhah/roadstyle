@@ -2,7 +2,7 @@
 
 <p class="lead">Get a finished dashboard page in one call, or put your own panel next to the map and drive it from JavaScript.</p>
 
-To run each JavaScript call on a live map, open the [Dashboard manual](dashboard-manual.md).
+To learn each part, with the result in view, open the [Dashboard manual](dashboard-manual/index.md): the [Python SDK](dashboard-manual/python.md) and [JavaScript](dashboard-manual/javascript.md).
 
 === "Python"
 
@@ -140,4 +140,4 @@ open("host.html", "w").write(m.html.replace("</body>", panel + "</body>"))
 To show a set of edges, recolour them with `rsColor`; don't draw extra lines over the roads.
 Pick a highlight colour that no `color_options` entry already uses.
 
-**See also:** [Dashboard manual](dashboard-manual.md) · [JavaScript API](../reference/javascript.md) · [Command line](../reference/cli.md) · [Every parameter](../reference/parameters.md)
+**See also:** [Dashboard manual](dashboard-manual/index.md) · [JavaScript API](../reference/javascript.md) · [Command line](../reference/cli.md) · [Every parameter](../reference/parameters.md)

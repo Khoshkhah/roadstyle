@@ -1,5 +1,6 @@
-"""docs/guides/dashboard-manual.md names every option of `dashboard=`, every member of `window.rs` and every `rs:` event, and every block marked
-`javascript` runs without an error in a fresh dashboard page (the same page as docs/build_maps.py makes for the manual's testbed). Skipped without playwright."""
+"""The dashboard manual (docs/guides/dashboard-manual/): python.md names every option of `dashboard=` and every python block runs, javascript.md names every
+member of `window.rs` and every `rs:` event, and every block marked `javascript` runs without an error in a fresh dashboard page (the same page as
+docs/build_maps.py makes for the testbed). Skipped without playwright."""
 import json
 import re
 from pathlib import Path
@@ -11,10 +12,12 @@ pw = pytest.importorskip("playwright.sync_api")
 import roadstyle as rs  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-MANUAL = (ROOT / "docs" / "guides" / "dashboard-manual.md").read_text(encoding="utf-8")
+DIR = ROOT / "docs" / "guides" / "dashboard-manual"
+PYTHON = (DIR / "python.md").read_text(encoding="utf-8")
+JAVASCRIPT = (DIR / "javascript.md").read_text(encoding="utf-8")
 _ARGS = ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"]
 # `layers` is a list of the page's own layers, `sections` and `rows` hold the page's HTML: their keys are checked as words in the manual
-_BLOCKS = re.findall(r"```javascript\n(.*?)```", MANUAL, re.S)
+_BLOCKS = re.findall(r"```javascript\n(.*?)```", JAVASCRIPT, re.S)
 
 
 def _edges(n=40):
@@ -52,8 +55,8 @@ def test_the_manual_names_every_option_of_the_dashboard(tmp_path):
     keys |= {"style", "kind", "source", "scope", "match", "max", "on", "arrows", "label", "id",                       # a layer of google_3d
              "dash", "fill", "width_m", "width_prop", "radius", "color", "width", "outline", "outline_width",          # its style
              "html", "after", "before", "fold", "shape"}                                                              # a section, a legend row
-    missing = sorted(k for k in keys if k not in MANUAL)
-    assert not missing, f"the manual does not name these options: {missing}"
+    missing = sorted(k for k in keys if k not in PYTHON)
+    assert not missing, f"python.md does not name these options: {missing}"
 
 
 def test_the_manual_names_every_member_of_rs_and_every_event(tmp_path):
@@ -65,12 +68,12 @@ def test_the_manual_names_every_member_of_rs_and_every_event(tmp_path):
         members = page.evaluate("Object.fromEntries(Object.entries(window.rs).map(([k, v]) => [k, v && typeof v === 'object' ? Object.keys(v) : []]))")
         browser.close()
     # `error` is a value, `destroy` and the rest are named by their words
-    missing = [f"rs.{k}" for k in members if f"rs.{k}" not in MANUAL]
-    missing += [f"rs.{k}.{m}" for k, ms in members.items() for m in ms if not re.search(rf"\b{m}\b", MANUAL)]
+    missing = [f"rs.{k}" for k in members if f"rs.{k}" not in JAVASCRIPT]
+    missing += [f"rs.{k}.{m}" for k, ms in members.items() for m in ms if not re.search(rf"\b{m}\b", JAVASCRIPT)]
     src = ROOT / "rust" / "roadstyle-assets" / "files" / "static"
     events = {m for f in src.rglob("*.js") for m in re.findall(r"""["'`](rs:[a-z0-9]+)["'`]""", f.read_text(encoding="utf-8"))}
-    missing += sorted(e for e in events if e not in MANUAL)
-    assert not missing, f"the manual does not name: {missing}"
+    missing += sorted(e for e in events if e not in JAVASCRIPT)
+    assert not missing, f"javascript.md does not name: {missing}"
 
 
 @pytest.mark.parametrize("n", range(len(_BLOCKS)))
@@ -87,3 +90,12 @@ def test_every_javascript_block_of_the_manual_runs(tmp_path, n):
         page.wait_for_timeout(200)
         browser.close()
     assert not errors, f"block {n}:\n{_BLOCKS[n]}\n{errors}"
+
+
+def test_every_python_block_of_the_manual_runs(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    env = {"edges": _edges()}                       # the blocks run one after another, as docs/build_maps.py runs them
+    for block in re.findall(r"```python\n(.*?)```", PYTHON, re.S):
+        exec(block, env)
+    saved = sorted(p.name for p in tmp_path.glob("dashboard*.html"))
+    assert saved == ["dashboard.html", "dashboard_dock.html", "dashboard_left.html"]       # the maps that python.md shows under its blocks

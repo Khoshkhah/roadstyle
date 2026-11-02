@@ -60,7 +60,10 @@ nav:
       - Set up a Google key: guides/google-key.md
       - Big networks: guides/big-networks.md
       - Dashboards & JavaScript: guides/dashboards.md
-      - Dashboard manual: guides/dashboard-manual.md
+      - Dashboard manual:
+          - guides/dashboard-manual/index.md
+          - Python SDK: guides/dashboard-manual/python.md
+          - JavaScript: guides/dashboard-manual/javascript.md
       - Dashboard layout: guides/dashboard-layout.md
       - Add to the panel: guides/dashboard-panel.md
       - Dashboard parts: guides/dashboard-parts.md

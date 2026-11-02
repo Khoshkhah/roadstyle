@@ -23,6 +23,8 @@
   box-shadow: 0 2px 14px rgba(0, 0, 0, .18); margin: .4em 0 1em;
 }
 .md-typeset iframe.rs-demo.tall { height: 640px; }
+/* the testbed of the dashboard manual stays under the header while the page scrolls: the result is in view next to each block */
+.md-typeset iframe.rs-demo.rs-sticky { position: sticky; top: 100px; z-index: 3; height: 48vh; min-height: 300px; background: var(--md-default-bg-color); }
 
 /* the one-line lead under a page title */
 .md-typeset .lead { font-size: 1.12em; color: var(--md-default-fg-color--light); margin-top: -.4em; }
@@ -46,4 +48,7 @@
   white-space: pre-wrap; margin: .4em 0 0; padding: .6em .8em; max-height: 14em; overflow: auto;
   font-size: .75em; border-radius: 6px; background: var(--md-code-bg-color); border-left: 3px solid var(--md-accent-fg-color);
 }
+.md-typeset .rs-run-out[hidden] { display: none; }          /* Material sets display on every pre */
 .md-typeset .rs-run-out.error { border-left-color: #dc2626; }
+
+.md-typeset .rs-manual-nav { margin-top: -.4em; font-size: .85em; color: var(--md-default-fg-color--light); }

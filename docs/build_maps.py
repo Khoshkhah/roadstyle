@@ -98,6 +98,17 @@ rs.render_dashboard(
     views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}},
 ).save(OUT / "dashboard_testbed.html")
 
+# the maps of docs/guides/dashboard-manual/python.md: every python block that saves a page makes the map under it.
+# The blocks run one after another in one namespace (the first one imports roadstyle), with the sample's edges, in docs/maps.
+import os
+import re
+manual = (REPO / "docs" / "guides" / "dashboard-manual" / "python.md").read_text(encoding="utf-8")
+env = {"edges": g}
+os.chdir(OUT)
+for block in re.findall(r"```python\n(.*?)```", manual, re.S):
+    exec(block, env)
+os.chdir(REPO)
+
 # the live map (README and the docs home link to it): the sample's own columns only, every control on,
 # Google 3D too (it needs GOOGLE_MAPS_KEY: without it, render_edges stops with an error)
 live = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg").to_crs(4326)

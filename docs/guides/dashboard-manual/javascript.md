@@ -1,0 +1,221 @@
+---
+hide:
+  - navigation          # the left menu is hidden: the page is wide enough (over 700 px) for the desktop form of the dashboards on it
+---
+
+# JavaScript
+
+<p class="rs-manual-nav"><a href="../">Dashboard manual</a> &middot; <a href="../python/">Python SDK</a> &middot; <a href="../javascript/">JavaScript</a></p>
+
+<p class="lead">Call each part of a dashboard from JavaScript, and see the result on the map at the same time.</p>
+
+<iframe id="rs-testbed" src="../../../maps/dashboard_testbed.html" loading="lazy" title="A dashboard to try the JavaScript blocks on" class="rs-demo rs-sticky"></iframe>
+
+The map above stays at the top of the screen while you scroll. Under each heading is one part of the dashboard and a block of code. To try a block:
+
+1. Scroll to the block.
+2. Push **Run** under it.
+3. Look at the map above, and at the output under the block.
+
+Each **Run** reloads the map first, so each block starts from the same map. Blocks marked `js` need a Google key or a page option that this map does not have, so they have no button.
+The page has one object, `window.rs`. The global `rs*` functions of the [reference](../../reference/javascript.md) do the same jobs, and a few of them (`rsSetTheme`, `rsSetStreetView`) have no `rs.` form.
+For the Python side of the same page, see [Python SDK](python.md).
+
+The page has one object, `window.rs`. The global `rs*` functions of the [reference](../../reference/javascript.md) do the same jobs, and a few of them (`rsSetTheme`, `rsSetStreetView`) have no `rs.` form.
+
+## Wait for the page
+
+Call your code after `rs.ready`. It runs now if the page is ready, and on the event `rs:ready` if not. In Python, `page_script=` runs your text after that event.
+
+```javascript
+rs.ready(() => console.log("ready, contract", rs.contract));
+```
+
+## Find and read roads
+
+`rs.query` and `rs.find` give the ids of roads. `rs.props` gives the row of one road. These ids are roadstyle's ids, not your `edge_id`. See [Ids past 2**53](../../reference/javascript.md#ids-past-253).
+
+```javascript
+const ids = rs.query({highway: "primary"});      // columns that equal a value
+console.log(ids.length, "primary roads");
+console.log(rs.find("gatan").length, "roads with gatan in a field");
+console.log(rs.props(ids[0]));
+```
+
+## Select, highlight and focus
+
+```javascript
+const ids = rs.query({highway: "primary"});
+rs.select(ids[0]);          // like a click: glow, popup or panel
+rs.focus(ids);              // fit the camera to the set
+rs.highlight(ids.slice(0, 5));
+```
+
+`rs.select(null)` clears the selection. `rs.highlight([])` clears the glow.
+
+## Filter and color
+
+```javascript
+rs.setFilter({classes: ["primary", "secondary", "tertiary"], tunnels: false});   // also: bridges, access, ids
+rs.setColorBy("Speed limit");                   // a name from color_options
+rs.color([{color: "#ef4444", ids: rs.query({highway: "primary"})}]);
+```
+
+`rs.color(null)` removes your colors. `rs.setFilter({})` shows all roads again. `rs.can(part)` is false for a part that the page cannot apply, for example a color option that the style does not have.
+
+## Theme, base map, overlays, views
+
+```javascript
+rsSetTheme("dark");
+rs.setBasemap("blank");
+rs.setView("Casing only");          // a name from views=
+rs.setTunnelStyle({strength: 80});
+```
+
+`rs.setOverlay(label, visible)` shows or hides one overlay of the page. `rsSetBridges`, `rsSetTunnels` and `rsSetClasses` are the single-control forms of `rs.setFilter`.
+
+## Save and share the state
+
+`rs.getState()` gives a copy of the state. `rs.setState(part)` applies a part of it through the controls. `rs.link()` gives the part that differs from the start, as a `#rs=` link. A page opened with that link applies it.
+
+```javascript
+rs.setFilter({classes: ["primary"]});
+const link = rs.link();
+console.log(link);
+rs.setState({classes: null});       // back to all classes
+```
+
+## Sections of the panel
+
+```javascript
+rs.sections.add({id: "notes", label: "Notes", before: "query", fold: true,
+                 html: "<p>Text of the page</p><button class='sb-primary' id='go'>Go</button>"});
+document.getElementById("go").onclick = () => rs.focus(rs.query({highway: "primary"}));
+console.log(rs.sections.list());
+```
+
+Other calls: `get(id)`, `hide(id)`, `show(id)`, `remove(id)`, `fold(id, on)`, `foldAll(on)` and `folded(id)`. A section with `fold: true` needs a `label`.
+
+## Legend rows and color modes
+
+```javascript
+rs.legend.add({id: "sensors", color: "#16a34a", label: "Sensors", shape: "circle"});
+rs.colorModes.set(["Traffic", "Counted"], {active: "Traffic", onChange: name => console.log("mode", name)});
+console.log(rs.legend.list(), rs.colorModes.active);
+```
+
+`rs.legend.remove(id)` removes a row. `rs.colorModes.select(name)` picks a mode, and `rs.colorModes.clear()` takes the list away.
+
+## Toolbox
+
+```javascript
+rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => console.log("pressed")});
+console.log(rs.tools.list().map(t => t.id));
+```
+
+`rs.tools.bind(id, {onClick})` gives a tool its behavior. `open(id)` and `close(id)` open and close the box of a tool. `remove(id)` removes a tool of your page. `ready()` shows a bar that `toolbar.hold` keeps hidden.
+The built-in tools are `theme`, `navigate`, `street_view`, `google_3d`, `basemap`, `roads`, `buildings`, `legend`, `settings` and `attribution`.
+
+## Help window
+
+```javascript
+rs.help.set({title: "How to read this page", intro: "The map shows roads.",
+             terms: [["Primary", "A main road."]], note: "Data: OpenStreetMap."});
+console.log(rs.help.get().title);
+```
+
+`rs.help.button(el, words)` puts a `?` button with its own words in `el`. `rs.help.open(words)` and `rs.help.close()` open and close the window. `rs.help.clear()` removes the window and the button.
+
+## Number tiles, charts, tabs and a hover box
+
+```javascript
+rs.sections.add({id: "stats", label: "Statistics", html: "<div class='rs-kpis' id='kp'></div><div id='ch'></div>"});
+document.getElementById("kp").innerHTML = rs.kpi("Roads", "2 800", "primary and secondary", "#0e7c8e");
+const s = rs.svg(document.getElementById("ch"), "svg", {viewBox: "0 0 100 20", width: "100%"});
+const bar = rs.svg(s, "rect", {x: 0, y: 4, width: 60, height: 12, fill: "var(--accent)"});
+rs.hover.on(bar, "<b>60 %</b> of the roads");
+```
+
+`rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. [Add to the panel](../dashboard-panel.md) shows the HTML.
+
+## Live data
+
+`live_data=True` must be on in Python. `rs.setData` takes an array of rows, an Arrow table, or the URL of a JSON file. Write `edge_id` as text.
+
+```javascript
+const ids = rs.query({highway: "primary"});
+const rows = ids.map(id => ({edge_id: String(rs.props(id).edge_id), flow: Math.round(Math.random() * 1000)}));
+const r = await rs.setData(rows, {colorBy: "flow", legend: {title: "Random flow"}});
+console.log(r);                      // {rows, matched, ms}
+console.log(rs.naturalBreaks(rows.map(x => x.flow), 4));
+```
+
+`rs.clearData()` takes the data away. See [Live data](../live-data.md) for all options.
+
+## Phone sheet and free area
+
+```javascript
+console.log("sheet height:", rs.sheet());        // 0 closed, 1 for 40 %, 2 full, null if the page has no sheet
+console.log(rs.freeArea());                      // {lo, hi, top, bottom}: the part of the map that nothing covers
+```
+
+`rs.sheet(n)` sets the height of the sheet.
+
+## Street View and Google 3D
+
+These windows need a Google key, so the map above cannot run them.
+
+```js
+rsSetStreetView(true);        // street_view="window" only
+rsStreetViewStep(20);         // 20 m along the edge
+console.log(rsGetStreetViewSpot());
+rsSetGoogle3D(true);          // google_3d=True only
+```
+
+[Google Street View](../street-view.md) and [Google 3D](../google-3d.md) explain the options.
+
+## Replace the style, and clean up
+
+`rs.setStyle(style)` gives the page a new roads style. Every control that a style gives follows it. `rs.error` is `null`, or the error of a style that the dashboard cannot read. `rs.destroy()` removes the listeners of the object.
+
+## Events
+
+All events fire on `document` as `CustomEvent`s. Read the data from `e.detail`. `rs.on(name, fn)` listens for the shorter names (`select`, `deselect`, `filter`, `color`, `basemap` and others), calls `fn` with the `detail` itself, and gives the function that stops the listener.
+
+```javascript
+const stop = rs.on("select", d => console.log("selected", d.properties.name));
+document.addEventListener("rs:themechange", e => console.log("theme", e.detail.theme), {once: true});
+rs.select(rs.query({highway: "primary"})[0]);
+stop();
+```
+
+| Event | When |
+|---|---|
+| `rs:ready` | The page is ready. |
+| `rs:select`, `rs:deselect` | A road is selected or cleared. |
+| `rs:filterchange` | A road filter changes. |
+| `rs:colorchange` | The color option or the colors of roads change. |
+| `rs:highlightchange` | The glow changes. |
+| `rs:themechange` | The theme changes. `detail.theme` is `light` or `dark`. |
+| `rs:basemapchange`, `rs:basemapready` | The base map changes, and a vector base map has loaded its layers. |
+| `rs:buildingschange`, `rs:buildings3dchange` | The 3D buildings of the base map, or of the style, switch. |
+| `rs:labelschange` | The map labels switch. |
+| `rs:overlaychange`, `rs:overlayschange` | One overlay, or the list of overlays, changes. |
+| `rs:interactionchange` | The clicks or the popup of an overlay change. |
+| `rs:tunnelchange`, `rs:roadfillchange` | The tunnel look, or the fill of the roads, changes. |
+| `rs:viewchange`, `rs:viewselect` | The 2D or 3D view, or a named view, changes. |
+| `rs:sectionchange` | A section of the panel is added, removed, hidden, shown or folded. |
+| `rs:helpchange` | The words of the help window change. |
+| `rs:colormode` | `rs.colorModes` picks a mode. |
+| `rs:datachange` | `rs.setData` or `rs.clearData` runs. |
+| `rs:toolchange`, `rs:toolsready` | A tool opens, closes or is pressed. The page has added its tools (`rs.tools.ready()`). |
+| `rs:sheetchange`, `rs:layoutchange` | The phone sheet, or the side or look of the panel, changes. |
+| `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot` | The Street View window opens or closes, moves along the edge, or picks a spot. |
+| `rs:google3dchange`, `rs:g3dmodechange` | The Google 3D window opens or closes, or its mode changes. |
+| `rs:tableready` | The table of the level editor is ready. |
+
+The `detail` of each event is in the [reference](../../reference/javascript.md#events).
+
+**See also:** [Dashboard layout](../dashboard-layout.md) · [Add to the panel](../dashboard-panel.md) · [Live data](../live-data.md) · [JavaScript API](../../reference/javascript.md)
+
+**See also:** [Overview](index.md) · [Python SDK](python.md) · [Dashboard layout](../dashboard-layout.md) · [Add to the panel](../dashboard-panel.md) · [Live data](../live-data.md) · [JavaScript API](../../reference/javascript.md)
