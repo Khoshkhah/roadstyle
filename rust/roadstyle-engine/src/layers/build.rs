@@ -120,11 +120,11 @@ pub(super) fn widths(cx: &Ctx, items: bool) -> Widths {
     let wing = s.bridges.wing_scale.f();
     let offset = if cx.metres { m.offset_expr_m(hw, cx.pairs, &wmz) } else { m.offset_expr(hw, cx.pairs) };
     let (casing, fill, wings) = if cx.metres {
-        let ml = MetreLook { wmz: wmz.clone(), bridge_m: json!(s.bridges.casing_m), bridge_px: json!(s.bridges.casing_px), casing_px: cx.casing_px(), wing_scale: wing };
+        let ml = MetreLook { wmz: wmz.clone(), bridge_m: json!(s.bridges.casing_m), bridge_px: json!(s.bridges.casing_px), casing_px: cx.casing_px(), wing_scale: wing, pairs: cx.pairs };
         let mk = |k: &str| m.width_m_expr(hw, k, &ml);
         (mk("casing"), mk("fill"), mk("wings"))
     } else {
-        (m.width_expr(hw, true, 1.0), m.width_expr(hw, false, 1.0), m.width_expr(hw, true, wing))
+        (m.width_expr(hw, true, 1.0, cx.pairs), m.width_expr(hw, false, 1.0, cx.pairs), m.width_expr(hw, true, wing, cx.pairs))
     };
     let (fill0, offset0) = (fill.clone(), offset.clone());
     let metre_zoom = if cx.metres { wmz.as_f64() } else { None };

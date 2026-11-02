@@ -52,7 +52,7 @@ roads:
   links: {classes: ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"], width: 0.6}   # width: of the main class's width
   cap: "round"
   join: "round"
-  split: {offset_frac: 0.28, width_frac: 0.6, offset_zoom: 15, ramp_zooms: 2}   # two-way roads: each direction offset_frac of the road width aside, width_frac wide, from offset_zoom over ramp_zooms
+  split: {offset_frac: 0.28, width_frac: 0.6, offset_zoom: 15, ramp_zooms: 2, overlap_px: 0.15}   # two-way roads: each direction offset_frac of the road width aside, width_frac wide, from offset_zoom over ramp_zooms. Before offset_zoom the two directions of a twin pair are the two halves of the road, side by side (they overlap by overlap_px)
   width_m_zoom: 16   # roads in metres (width_m_col): the zoom where a metre width equals the class width
   twin_end_caps: true   # one road-wide round end under a two-way road's two lanes
   twin_casing: "one"   # a two-way road as two edges: one casing around both, or each its own

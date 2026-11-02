@@ -115,9 +115,9 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     let tw = json!(["to-boolean", ["get", Mark::Twoway.name()]]);
     let (fb, tu) = (&s.roads.fallback, &s.tunnels);
     let (fill, casing, no_casing) = class_colours(look, hw, &tun, &bri)?;
-    let fw = swap(&m.width_expr(hw, false, 1.0), &tw, &two);
-    let cw = swap(&m.width_expr(hw, true, 1.0), &tw, &two);
-    let bcw = swap(&m.width_expr(hw, true, s.bridges.wing_scale.f()), &tw, &two);
+    let fw = swap(&m.width_expr(hw, false, 1.0, false), &tw, &two);
+    let cw = swap(&m.width_expr(hw, true, 1.0, false), &tw, &two);
+    let bcw = swap(&m.width_expr(hw, true, s.bridges.wing_scale.f(), false), &tw, &two);
     let cw = by_feature(&[(bri.clone(), bcw)], &cw);
     let mut off = vec![json!("interpolate"), json!(["linear"]), json!(["zoom"])];
     for (z, zv) in m.stops() {

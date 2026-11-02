@@ -117,7 +117,7 @@ marks! {
     Oneway = "__rs_oneway";
     /// a reverse pair of a single-line class: the later edge
     Dup = "__rs_dup" [Table];
-    /// a two-way pair's one casing
+    /// a piece of a two-way pair: the pair's one casing, or (a fill, shadow, tunnel gap or dash) one direction's half of the road
     Pair = "__rs_pair";
     /// the twin's row
     Twin = "__rs_twin";

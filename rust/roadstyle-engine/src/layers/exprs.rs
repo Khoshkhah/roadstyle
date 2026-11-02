@@ -2,11 +2,19 @@ use super::*;
 
 /// The road layers' MapLibre expressions from the road width model.
 pub trait Exprs {
-    /// _width_expr: interpolate(zoom) of match(class -> width); two-way lanes narrow to width_frac from offset_zoom (over 2 zooms).
-    fn width_expr(&self, col: &str, casing: bool, scale: f64) -> Value;
+    /// _width_expr: interpolate(zoom) of match(class -> width); two-way lanes narrow to width_frac from offset_zoom (over 2 zooms). With
+    /// `pairs`, a line of a twin pair (`pair_half`) is one half of the road at every zoom (`half_frac`).
+    fn width_expr(&self, col: &str, casing: bool, scale: f64, pairs: bool) -> Value;
     /// _offset_match: a two-way direction's offset at zoom z, per class.
     fn offset_match(&self, col: &str, z: f64) -> Value;
-    /// _offset_expr (no metre widths): line-offset of a two-way edge; with `pairs`, a pair's one casing (__rs_pair) is not shifted.
+    /// A twin pair's half: its offset at zoom z, per class (`half_frac`; a quarter of the overlap's pixels is taken off, so the two halves are as wide as the road).
+    fn offset_half(&self, col: &str, z: f64) -> Value;
+    /// A twin pair's half at zoom z: its width as a fraction of the road's, the pixels that it overlaps its twin by, and its offset as a
+    /// fraction of the road's width. Before offset_zoom the two halves lie side by side (the road's width in all); from offset_zoom + ramp_zooms
+    /// they are the two lanes of the profile (offset_frac, width_frac). None: the profile has no lane split (offset_frac 0), so a pair is one line.
+    fn half_frac(&self, z: f64) -> Option<(f64, f64, f64)>;
+    /// _offset_expr (no metre widths): line-offset of a two-way edge; with `pairs`, a pair's one casing (__rs_pair) is not shifted and the
+    /// other lines of a pair are halves (`offset_half`).
     fn offset_expr(&self, col: &str, pairs: bool) -> Value;
     /// _width_m_expr: _width_expr, but a line with a metre width (__rs_wm) is drawn at exactly that width from width_m_zoom on, on a base-2
     /// exponential curve to zoom 22. `kind`: "fill" (the width less two casings), "casing" (the width) or "wings" (a bridge's casing: the
@@ -22,7 +30,7 @@ pub trait Exprs {
 }
 
 impl Exprs for Model {
-    fn width_expr(&self, col: &str, casing: bool, scale: f64) -> Value {
+    fn width_expr(&self, col: &str, casing: bool, scale: f64, pairs: bool) -> Value {
         let (split_zoom, split_frac) = (self.offset_zoom, self.width_frac);
         let mut e = vec![json!("interpolate"), json!(["linear"]), json!(["zoom"])];
         for (z, zv) in self.stops() {
@@ -35,7 +43,16 @@ impl Exprs for Model {
             }
             m.push(json!(w_of(&self.fb_group, false)));
             let f = if z <= split_zoom { 1.0 } else if z >= split_zoom + 2.0 { split_frac } else { 1.0 - (1.0 - split_frac) * (z - split_zoom) / 2.0 };
-            let m = if f < 1.0 { json!(["*", m, ["case", ["to-boolean", ["get", Mark::Twoway.name()]], round_to(f, 3), 1]]) } else { Value::Array(m) };
+            let two = json!(["to-boolean", ["get", Mark::Twoway.name()]]);
+            let m = match self.half_frac(z).filter(|_| pairs) {
+                Some((hf, px, _)) => {
+                    let by = json!(["case", pair_half(), round_to(hf, 3), two, round_to(f, 3), 1]);
+                    let wide = json!(["*", m, by]);
+                    if px > 0.0 { json!(["+", wide, ["case", pair_half(), round_to(px / 2.0, 3), 0]]) } else { wide }
+                }
+                None if f < 1.0 => json!(["*", m, ["case", two, round_to(f, 3), 1]]),
+                None => Value::Array(m),
+            };
             e.push(zv.clone());
             e.push(m);
         }
@@ -55,28 +72,53 @@ impl Exprs for Model {
         Value::Array(m)
     }
 
+    fn offset_half(&self, col: &str, z: f64) -> Value {
+        let (_, px, frac) = self.half_frac(z).unwrap_or_default();
+        let mut m = vec![json!("match"), json!(["get", col])];
+        for c in &self.classes {
+            let (b, lk) = Self::base(c);
+            let w = self.gwidth(self.group_of(b), z) * if lk { self.link_w } else { 1.0 };
+            m.push(json!(c));
+            m.push(json!(round_to(w * frac - px / 4.0, 3)));
+        }
+        m.push(json!(round_to(self.gwidth(&self.fb_group, z) * frac - px / 4.0, 3)));
+        Value::Array(m)
+    }
+
+    fn half_frac(&self, z: f64) -> Option<(f64, f64, f64)> {
+        if self.offset_frac <= 0.0 {
+            return None;
+        }
+        let ramp = ((z - self.offset_zoom) / self.ramp_zooms).clamp(0.0, 1.0);
+        let lerp = |a: f64, b: f64| a + (b - a) * ramp;
+        Some((lerp(0.5, self.width_frac), self.overlap_px * (1.0 - ramp), lerp(0.25, self.offset_frac)))
+    }
+
     fn offset_expr(&self, col: &str, pairs: bool) -> Value {
         let two = json!(["to-boolean", ["get", Mark::Twoway.name()]]);
         let two = if pairs { json!(["all", two, ["!", ["to-boolean", ["get", Mark::Pair.name()]]]]) } else { two };
         let mut e = vec![json!("interpolate"), json!(["linear"]), json!(["zoom"])];
         for (z, zv) in self.stops() {
             e.push(zv.clone());
-            e.push(json!(["case", two, self.offset_match(col, z), 0]));
+            e.push(match self.half_frac(z).filter(|_| pairs) {
+                Some(_) => json!(["case", pair_half(), self.offset_half(col, z), two, self.offset_match(col, z), 0]),
+                None => json!(["case", two, self.offset_match(col, z), 0]),
+            });
         }
         Value::Array(e)
     }
 
     fn width_m_expr(&self, col: &str, kind: &str, ml: &MetreLook) -> Value {
-        let MetreLook { wmz, bridge_m, bridge_px, casing_px, wing_scale } = ml;
+        let MetreLook { wmz, bridge_m, bridge_px, casing_px, wing_scale, pairs } = ml;
         let (wmz, wing_scale) = (wmz, *wing_scale);
         let casing = kind != "fill";
-        let cls_e = self.width_expr(col, casing, if kind == "wings" { wing_scale } else { 1.0 });
+        let cls_e = self.width_expr(col, casing, if kind == "wings" { wing_scale } else { 1.0 }, *pairs);
         let cls: Vec<Value> = cls_e.as_array().unwrap()[4..].iter().step_by(2).cloned().collect();
         let k = match kind { "fill" => -2, "casing" => 0, _ => 2 };
         let cm = if kind == "wings" && crate::roads::yes(bridge_m) { json!(["max", ["get", Mark::CasingM.name()], bridge_m]) } else { json!(["get", Mark::CasingM.name()]) };
         let mut w = json!(["get", Mark::WidthM.name()]);
         if casing {     // a two-way pair's one casing with metres on both: both directions, their two casings in the middle once
-            w = json!(["case", ["all", ["to-boolean", ["get", Mark::Pair.name()]], ["has", Mark::TwinWidthM.name()]], ["+", w, ["get", Mark::TwinWidthM.name()], ["*", -2, ["get", Mark::CasingM.name()]]], w]);
+            w = json!(["case", ["all", pair_casing(), ["has", Mark::TwinWidthM.name()]], ["+", w, ["get", Mark::TwinWidthM.name()], ["*", -2, ["get", Mark::CasingM.name()]]], w]);
         }
         let wm = if k != 0 { json!(["max", ["+", w, ["*", k, cm]], 0]) } else { w.clone() };
         let twice = |v: &Value| if let Some(i) = v.as_i64() { json!(2 * i) } else { json!(2.0 * v.as_f64().unwrap_or(0.0)) };
@@ -118,7 +160,17 @@ impl Exprs for Model {
                 c = json!(["case", ["has", Mark::TwinWidthM.name()], ["*", ["-", ["*", 0.5, ["get", Mark::TwinWidthM.name()]], ["get", Mark::CasingM.name()]], px], c]);
             }
             e.push(zv);
-            e.push(json!(["case", two, c, 0]));
+            e.push(match self.half_frac(z).filter(|_| pairs) {
+                Some(_) => {
+                    let mut h = self.offset_half(col, self.clamp_stop(z));
+                    if z >= wz {
+                        let px = round_to(512.0 * 2f64.powf(z) / 40075016.686, 4);
+                        h = json!(["case", ["has", Mark::TwinWidthM.name()], ["*", ["-", ["*", 0.5, ["get", Mark::TwinWidthM.name()]], ["get", Mark::CasingM.name()]], px], h]);
+                    }
+                    json!(["case", pair_half(), h, two, c, 0])
+                }
+                None => json!(["case", two, c, 0]),
+            });
         }
         Value::Array(e)
     }
@@ -139,7 +191,7 @@ impl Exprs for Model {
             let zf = z.as_f64().unwrap();
             let add = json!(["*", 2, self.offset_match(col, zf.clamp(z0, z1))]);
             match wmz { Some(w) if zf >= w => json!(["case", ["has", Mark::TwinWidthM.name()], 0, add]), _ => add }
-        }, Some(&json!(["to-boolean", ["get", Mark::Pair.name()]])))
+        }, Some(&pair_casing()))
     }
 }
 
@@ -194,6 +246,16 @@ pub(crate) fn tun_dash() -> Value {
     json!(["interpolate", ["linear"], gs("rs_tun_strength"), 0, gs("rs_tun_c0"), 100, gs("rs_tun_toward")])
 }
 
+/// A casing of a twin pair: the one casing that both directions share.
+fn pair_casing() -> Value {
+    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["==", ["get", Mark::PieceKind.name()], 0]])
+}
+
+/// A line of a twin pair that is not its casing (fill, shadow, tunnel gap or dash): one direction's half of the road.
+pub(super) fn pair_half() -> Value {
+    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["!=", ["get", Mark::PieceKind.name()], 0]])
+}
+
 /// The settings of the metre-width curves (_width_m_expr): width_m_zoom, config bridge_casing_m / bridge_casing_px, render's
 /// casing_min_px, and the theme's bridge wing scale.
 pub struct MetreLook {
@@ -202,6 +264,8 @@ pub struct MetreLook {
     pub bridge_px: Value,
     pub casing_px: Value,
     pub wing_scale: f64,
+    /// the roads have twin pairs
+    pub pairs: bool,
 }
 
 /// _plus_px: a zoom curve `px(zoom)` pixels wider at each stop (only where `when` holds, if given).

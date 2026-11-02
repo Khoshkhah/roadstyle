@@ -28,6 +28,7 @@ pub struct RoadModel {
     pub width_frac: f64,
     pub offset_zoom: f64,
     pub ramp_zooms: f64,
+    pub overlap_px: f64,
     pub fb_group: String,
     pub fb_order: Value,
     pub fb_link_order: f64,
@@ -63,6 +64,7 @@ impl RoadModel {
             width_frac: r.width_frac.unwrap_or_else(|| split.width_frac.f()),
             offset_zoom: r.offset_zoom.unwrap_or_else(|| split.offset_zoom.f()),
             ramp_zooms: split.ramp_zooms.f(),
+            overlap_px: split.overlap_px.f(),
             fb_group: fallback.get("group").and_then(Value::as_str).ok_or_else(|| Error::Look("look: no roads.fallback.group".into()))?.to_string(),
             fb_order: fallback.get("order").cloned().unwrap_or(Value::Null),
             fb_link_order: fallback.get("link_order").and_then(Value::as_f64)

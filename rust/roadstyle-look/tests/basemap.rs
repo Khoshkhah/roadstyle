@@ -96,6 +96,10 @@ fn the_64_looks_of_mapstyle() {
         if let Some(t) = got.get_mut("theme").and_then(Value::as_object_mut) {
             t.shift_remove("dark");
         }
+        // added on 2026-11-01: the half-road overlap of a twin pair (roads.split.overlap_px)
+        if let Some(s) = got.pointer_mut("/theme/roads/split").and_then(Value::as_object_mut) {
+            s.shift_remove("overlap_px");
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }

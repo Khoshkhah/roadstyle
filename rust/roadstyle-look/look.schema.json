@@ -1591,6 +1591,10 @@
         },
         "ramp_zooms": {
           "$ref": "#/$defs/Num"
+        },
+        "overlap_px": {
+          "description": "the two halves of a twin pair overlap by this many pixels, so no seam of the casing shows between them",
+          "$ref": "#/$defs/Num"
         }
       },
       "additionalProperties": false,
@@ -1598,7 +1602,8 @@
         "offset_frac",
         "width_frac",
         "offset_zoom",
-        "ramp_zooms"
+        "ramp_zooms",
+        "overlap_px"
       ]
     },
     "ClassStyles": {

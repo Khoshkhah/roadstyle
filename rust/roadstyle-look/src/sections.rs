@@ -169,6 +169,8 @@ pub struct Split {
     pub width_frac: Num,
     pub offset_zoom: Num,
     pub ramp_zooms: Num,
+    /// the two halves of a twin pair overlap by this many pixels, so no seam of the casing shows between them
+    pub overlap_px: Num,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

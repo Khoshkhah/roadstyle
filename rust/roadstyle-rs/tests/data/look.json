@@ -605,7 +605,8 @@
     "offset_frac": 0.28,
     "width_frac": 0.6,
     "offset_zoom": 15,
-    "ramp_zooms": 2
+    "ramp_zooms": 2,
+    "overlap_px": 0.15
    },
    "width_m_zoom": 16,
    "twin_end_caps": true,

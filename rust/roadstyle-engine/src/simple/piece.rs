@@ -129,6 +129,10 @@ impl Piece {
         if let Some(dk) = self.draw {
             put(&mut q, Mark::PieceKind, Cell::Int(dk.kind));
             put(&mut q, Mark::Rank, Cell::Int(rank(dk.key)));
+            // a line of a twin pair that is not the casing (fill, shadow, tunnel gap and dashes) is one direction's half of the road
+            if d.twin.is_some() && (1..=4).contains(&dk.kind) {
+                put(&mut q, Mark::Pair, Cell::Bool(true));
+            }
         }
         put(&mut q, Mark::Class, r.cls_cell());
         q
