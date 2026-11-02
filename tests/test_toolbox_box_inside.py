@@ -46,7 +46,7 @@ def test_the_boxes_of_the_bar_stay_inside_the_window_and_the_settings_have_no_re
 
 def test_a_tooltip_of_the_bar_does_not_cover_the_bar_after_an_earlier_one():
     """The tooltip is measured at the corner of the window. It was measured where the last one stood: at the right edge it wrapped narrower, then grew over the bar."""
-    html, errors = rs.render_dashboard(_edges(), basemap="blank", dashboard={"toolbar": {"position": "right", "navigation": "buttons"}}).html, []
+    html, errors = rs.render_dashboard(_edges(), basemap="blank", google_3d=False, dashboard={"toolbar": {"position": "right", "navigation": "buttons"}}).html, []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
         page = browser.new_page(viewport={"width": 1100, "height": 760})

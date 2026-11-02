@@ -52,7 +52,10 @@ const _tbCredits = () => {
     // the credit of OpenStreetMap's data is the same row as the vector styles give: "Data from" and the link to the copyright page
     /OpenStreetMap/.test(text) && !a ? rows.push({text: "Data from OpenStreetMap", href: "https://www.openstreetmap.org/copyright"}) : rows.push({text, href: a && a.href});
   }
-  if([".rs-g3d", ".rs-svw:not(.rs-g3d)"].some(s => { const w = document.querySelector(s); return w && !w.hidden; }))
+  const shown = s => { const w = document.querySelector(s); return w && !w.hidden ? w : null; }, svw = shown(".rs-svw:not(.rs-g3d)"), sp = svw && svw.dataset.prov;
+  if(sp === "panoramax") rows.push({text: "Photos: Panoramax contributors (CC-BY-SA)", href: "https://panoramax.fr/"});    // the window frames a Panoramax / Mapillary viewer: their credit, not Google's
+  if(sp === "mapillary") rows.push({text: "Photos: Mapillary contributors (CC-BY-SA)", href: "https://www.mapillary.com/"});
+  if(shown(".rs-g3d") || (svw && (!sp || sp === "google")))
     rows.push({text: "Map data \u00a9 Google", href: "https://www.google.com/help/terms_maps/"}, {text: "Ground heights: Mapzen, SRTM", href: "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"});
   // the credits of the page's own data (dashboard.credits: OpenStreetMap by default), first; not again when the base map's list already names the source
   const own = ((O.dashboard && O.dashboard.credits) || []).filter(c => { const w = (c.text.match(/[A-Za-z]+/) || [""])[0].toLowerCase(); return !w || !rows.some(r => r.text.toLowerCase().includes(w)); });

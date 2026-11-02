@@ -112,6 +112,8 @@ contract makes changeable (or a value that is not used).
 | `street_view` | `"window"`, true, false | `render`; option | `streetview.js`, `svspot.js` | yes | `rsSetStreetView`; `rs:streetviewchange` |
 | Street View mode | `"linked"` or classic | `localStorage` `rs-street-view-mode` | `streetview.js` | yes | the window's buttons |
 | `street_view_key` | text, `GOOGLE_MAPS_KEY` | `render`; option | `streetview.js`, `google3d.js` | no | |
+| `mapillary_token` | text, `MAPILLARY_TOKEN` | `render`; option | `svproviders.js` | no | |
+| Street View provider, coverage | `"google"`, `"panoramax"`, `"mapillary"`; on/off | `localStorage` `rs-street-view-provider`, `rs-street-view-cov` | `streetview.js` | yes | the window's buttons |
 | Street View spot and marker | `{edge, m}` | the click; the host | `svspot.js` | yes | `rsSetStreetViewMarkerAt`, `rsSetStreetViewMarker`, `rsStreetViewStep`, `rsGetStreetViewSpot`; `rs:streetviewmove`, `rs:streetviewspot` |
 | `google_3d` | bool, false | `render`; option | `google3d.js` | yes | `rsSetGoogle3D`; `rs:google3dchange` |
 | the place of the two windows | `{left, top, width, height}` | `localStorage` `rs-street-view-window:<path>`, `rs-google-3d-window:<path>` | `float.js` | yes | |

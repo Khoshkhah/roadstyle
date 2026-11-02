@@ -7,6 +7,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
+- **The coverage of Street View shows on any road, and shows which photo is open.** The dots are white with a ring in the provider's colour (orange for Panoramax, green for Mapillary), and the lines have a white edge; before, an orange dot on an orange road could not be seen. The ring of the open photo now also shows for the photo that the window finds for a road, not only for a photo that you open from a dot.
+- **The header of the Street View window keeps the name of the road and the provider tabs.** In a window of 380 px, the three provider tabs, *Coverage*, the two arrows and the close button did not fit: the name of the road disappeared and the label *Panoramax* was cut. The header wraps now on a desktop, as it did on a phone (the name and the tabs in the first row, *Coverage* and the arrows in the second), and the close button stays at the top right.
 - **The style of `export_style` and `export_inline` has no `let`.** The width table (a newer feature) wrote a `let` into the `line-width` of the road layers, and an app such as RustGIS cannot read `let`, so it drew the widths wrong. The export writes the long form now, with each `let` replaced by its value. The new keyword `keep_let=True` keeps the `let` for an app that can read it: the style is smaller (the `line-width` of the long form is 21 % longer). A page and its tiles are not changed. `tests/test_render.py` tested the removed `folium` and `lonboard` backends; it tests the error of a removed backend now.
 
 ### Added
@@ -30,6 +32,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
   map's: the theme (`rs_theme`) went back to light, so the dark page showed a light map inside the editor, and the base map's layers (landcover, water, buildings) lost their switch and their entry in the legend box. A name of
   the state that the map has keeps its value now, and the dashboard keeps the overlays of the style it had. The new option `look` (the text of the page's saved look) gives the editor's roads the page's palette and
   sections; before, they had the default palette. The theme can be changed while the editor is open. The same code is the editor of `roadstyle levels edit`.
+### Changed
+- **Google 3D is on by default for a page with a toolbar** (the template `dashboard`): the button works at once and says it needs a key until one is saved in Settings. `google_3d=False` turns it off.
+
+### Added
+- **Street View beside Google: Panoramax and Mapillary.** The Street View window has a provider switch (`Google | Panoramax | Mapillary`, remembered in the browser). Panoramax (open data, no key) and Mapillary (a free client token that the person saves in Settings > Keys, or the page carries as `mapillary_token=`, default env `MAPILLARY_TOKEN`) show the photo nearest to the spot (within 50 m) in an embedded viewer (Photo Sphere Viewer, MapillaryJS; loaded from jsDelivr on first use; the map marker turns with the view), and follow every road selection and step like Google's. A **Coverage** button draws where the chosen provider has photos on the map (its vector tiles: lines for sequences, dots for single photos). The credit row of the chosen provider is in the attribution box. New module `dashboard/svproviders.js`; Linked mode stays Google's.
+- The goldens of the Monaco page and of the page with views have the new size and hash (`rust_page.json`, `page_views.json`).
 
 ## [0.26.1] - 2026-10-30
 

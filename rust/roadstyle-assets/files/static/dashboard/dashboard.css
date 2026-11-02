@@ -126,13 +126,13 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svw-t{flex:1;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .rs-svw-bar button{border:0;background:none;color:#fff;font:14px/1 system-ui;cursor:pointer;padding:2px 5px}
 .rs-svw-bar button:disabled{opacity:.3;cursor:default}
-.rs-svw iframe,.rs-svw-pano{flex:1;width:100%;border:0;background:#eee}
-.rs-svw-mode{display:inline-flex;border:1px solid #555;border-radius:4px;overflow:hidden;cursor:default}
-.rs-svw-bar .rs-svw-mode button{font:11px/1 system-ui;padding:3px 7px;color:#cbd5e1}
+.rs-svw iframe,.rs-svw-pano,.rs-svw-alt{flex:1;min-height:0;position:relative;width:100%;border:0;background:#eee}
+.rs-svw-mode,.rs-svw-prov{display:inline-flex;border:1px solid #555;border-radius:4px;overflow:hidden;cursor:default}
+.rs-svw-bar .rs-svw-mode button,.rs-svw-bar .rs-svw-prov button{font:11px/1 system-ui;padding:3px 7px;color:#cbd5e1}
 .rs-svw-msg{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   padding:14px;text-align:center;color:#666;background:#f4f4f4}
 .rs-svw-msg code{background:#e6e6e6;padding:1px 4px;border-radius:3px;color:#333}
-.rs-svw.rs-drag iframe,.rs-svw.rs-drag .rs-svw-pano,.rs-svw.rs-drag gmp-map-3d{pointer-events:none}
+.rs-svw.rs-drag iframe,.rs-svw.rs-drag .rs-svw-pano,.rs-svw.rs-drag .rs-svw-alt,.rs-svw.rs-drag gmp-map-3d{pointer-events:none}
 .rs-g3d gmp-map-3d{flex:1;width:100%}
 .rs-svw-bar a.rs-g3d-src{color:#9aa3ad;font-size:10px;text-decoration:none;white-space:nowrap}
 .rs-g3d-warn{color:#fbbf24;font-size:11px;white-space:nowrap}
@@ -140,8 +140,12 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-svm{pointer-events:none}
 html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a bottom sheet */left:0!important;right:0!important;top:auto!important;bottom:0!important;
   width:auto!important;height:45%!important;border-radius:14px 14px 0 0;resize:none}
-html.rs-phone .rs-svw-bar{flex-wrap:wrap}   /* the buttons and the credit of a window do not fit in one row: the second row, and the note of the 3D window has a row of its own */
-html.rs-phone .rs-svw-t{flex:1 0 auto}
+.rs-svw-bar{flex-wrap:wrap}   /* the buttons and the credit of a window do not fit in one row: the second row, and the note of the 3D window has a row of its own */
+.rs-svw-t{flex:1 0 auto;max-width:100%}   /* the name of the road keeps its room: a crowded header wraps, it does not cut the name or the provider tabs */
+.rs-svw-prov{flex:0 0 auto}
+.rs-svw-step{display:inline-flex;flex:0 0 auto}   /* the two arrows wrap together */
+.rs-svw-bar{position:relative}
+.rs-svw-bar button[title="Close"]{position:absolute;top:6px;right:8px}   /* the close button stays at the top right when the header wraps */
 html.rs-phone .rs-svw-bar a.rs-g3d-src{display:none}   /* its credit is in the bar's attribution box on a phone: the header is one row */
 html.rs-phone .rs-g3d-note{order:9;flex:1 0 100%}
 /* the phone form of a template (template.js; `rs-phone` and `rs-tpl-*` are on <html> from the first paint). A sidebar template shows its
@@ -409,13 +413,14 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 :is(#sb,.rs-side) button{border-radius:10px}
 /* ---- the Street View and Google 3D windows: the style of the boxes (the second level of transparency: --rs-box-bg, like the popup and the tooltip) ---- */
 .rs-svw{border-radius:14px;border:0;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 8px 28px rgba(0,0,0,.35);color:var(--rs-tb-ink)}
-.rs-svw-bar{background:var(--rs-card-bg);color:var(--rs-tb-ink);padding:6px 8px 6px 14px;gap:6px}
+.rs-svw-bar{background:var(--rs-card-bg);color:var(--rs-tb-ink);padding:6px 44px 6px 14px;gap:6px}
 .rs-svw-t{font-weight:600}
 .rs-svw-bar button{border:0;background:none;color:var(--rs-tb-ink);min-width:28px;height:28px;padding:0 8px;border-radius:10px;font:13px/1 system-ui;cursor:pointer}
 .rs-svw-bar button:hover:not(:disabled){background:var(--rs-tb-hover)}
-.rs-svw-mode{display:inline-flex;border:0;border-radius:10px;overflow:hidden;background:var(--rs-tb-hover)}
-.rs-svw-bar .rs-svw-mode button{height:24px;font:11px/1 system-ui;padding:0 9px;color:var(--rs-tb-ink);border-radius:0}
-.rs-svw-bar .rs-svw-mode button.on{background:var(--accent-fill);color:#fff}
+.rs-svw-mode,.rs-svw-prov{display:inline-flex;border:0;border-radius:10px;overflow:hidden;background:var(--rs-tb-hover)}
+.rs-svw-bar .rs-svw-mode button,.rs-svw-bar .rs-svw-prov button{height:24px;font:11px/1 system-ui;padding:0 9px;color:var(--rs-tb-ink);border-radius:0}
+.rs-svw-bar .rs-svw-mode button.on,.rs-svw-bar .rs-svw-prov button.on,.rs-svw-bar button.rs-svw-cov.on{background:var(--accent-fill);color:#fff}
+.rs-svw-bar button.rs-svw-cov{background:var(--rs-tb-hover);height:24px;font:11px/1 system-ui;padding:0 9px}
 .rs-svw-bar button.rs-g3d-follow,.rs-svw-bar button.rs-g3d-show{border:0;background:var(--rs-tb-hover);color:var(--rs-tb-ink);border-radius:10px;height:24px;padding:0 10px;font:11px/1 system-ui}
 .rs-svw-bar button.rs-g3d-follow.on{background:var(--accent-fill);color:#fff;border-color:var(--accent-fill)}
 .rs-svw-bar a.rs-g3d-src{color:var(--rs-tb-ink);opacity:.6}
@@ -424,7 +429,7 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 .rs-svw-msg code{background:var(--rs-tb-hover);color:inherit;border-radius:6px;padding:1px 6px}
 .rs-svw-msg a{color:var(--accent)}
 .rs-g3d-menu{background:var(--rs-card-bg);color:var(--rs-tb-ink);border:0;border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.3);padding:6px 10px}
-.rs-svw iframe,.rs-svw-pano{background:var(--rs-card-bg)}
+.rs-svw iframe,.rs-svw-pano,.rs-svw-alt{background:var(--rs-card-bg)}
 /* ---- the scroll protocol of a panel (docs/design/dashboard_templates.md): the header (title, theme and hide buttons) stays; only the body scrolls; the
    body does not hand its scroll to the map; a line under the header shows when the body is scrolled (panelscroll.js); the scrollbar is thin ---- */
 html #sb{padding:0;overflow:hidden}
@@ -644,7 +649,7 @@ html.rs-sv-docked.rs-overlay #map{right:var(--rs-sv-w,42%)!important;width:auto!
 .rs-svw.rs-svw-dock{position:fixed;top:0;right:0;bottom:0;left:auto!important;width:var(--rs-sv-w,42%)!important;height:auto!important;max-width:none;border-radius:0;resize:none;
   box-shadow:none;border-left:1px solid var(--rs-tb-border);-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--rs-card-bg)}
 .rs-svw-drag{position:fixed;top:0;bottom:0;right:calc(var(--rs-sv-w,42%) - 5px);width:10px;cursor:col-resize;z-index:61;touch-action:none}
-.rs-svw.rs-dragging iframe,.rs-svw.rs-dragging .rs-svw-pano{pointer-events:none}
+.rs-svw.rs-dragging iframe,.rs-svw.rs-dragging .rs-svw-pano,.rs-svw.rs-dragging .rs-svw-alt{pointer-events:none}
 .rs-svw-drag:hover{background:color-mix(in srgb,var(--rs-tb-ink) 18%,transparent)}
 .rs-svw-drag[hidden]{display:none}
 html.rs-phone.rs-sv-docked.rs-overlay #map{right:0!important;bottom:45%!important;height:auto!important}

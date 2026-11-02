@@ -116,13 +116,14 @@ function _svOnEdge(f, ll){                      // {f, m, d metres from its cent
   const t=(m-d[i])/((d[i+1]-d[i])||1), x=cs[i][0]+t*(cs[i+1][0]-cs[i][0]), y=cs[i][1]+t*(cs[i+1][1]-cs[i][1]);
   const k=Math.cos(ll.lat*Math.PI/180), h=(Math.atan2((cs[i+1][0]-cs[i][0])*k, cs[i+1][1]-cs[i][1])*180/Math.PI+360)%360;
   return {f:f, m:m, d:Math.hypot((ll.lng-x)*k*_SV_R, (ll.lat-y)*_SV_R), h:h}; }
-export function rsSetStreetViewMarkerAt(lng, lat, heading){
+export function rsSetStreetViewMarkerAt(lng, lat, heading, exact){   // exact: stay at the point, do not snap to a road
   if(lng==null){ _svFree=null; _svLast=null; _svMark(); _svSpotEvent(); return; }
   const ll={lng:+lng, lat:+lat}, look=+heading||0, k=Math.cos(ll.lat*Math.PI/180);
   const moved=_svLast ? Math.hypot((ll.lng-_svLast.lng)*k*_SV_R, (ll.lat-_svLast.lat)*_SV_R) : 0;
   const walk=moved>2 ? (Math.atan2((ll.lng-_svLast.lng)*k, ll.lat-_svLast.lat)*180/Math.PI+360)%360 : null;
   _svLast=ll;
   const off=(a, b)=>{ const x=Math.abs(a-b)%360; return x>180 ? 360-x : x; };
+  if(exact){ _svFree={c:[ll.lng, ll.lat], h:look}; _svMark(); _svSpotEvent(); if(_svMarkOn) _svKeepInView(ll.lng, ll.lat); return; }
   let best=_svPos ? _svOnEdge(_svPos.f, ll) : null;
   if(!best || best.d>_SV_LANE_M+6 || best.m<=0.01 || best.m>=_svAt(best.f, 1e9).len-0.01){
     const q=map.project([ll.lng, ll.lat]), r=40, lays=RS_LEAN ? RS_LEANS : RS_FILL_LAYERS.filter(id=>map.getLayer(id)), cand=[];
@@ -147,6 +148,8 @@ export function rsSetStreetViewMarkerAt(lng, lat, heading){
 export function rsSetStreetViewMarker(on){ _svMarkOn=!!on; _svMark(); }
 // move the Street View spot m metres along its edge (negative: back), still looking along it;
 // stops at the edge's ends. Fires rs:streetviewmove {id, streetView, atStart, atEnd}.
+// the selected road's line [[lng, lat], ...], or null
+export function rsStreetViewLine(){ return _svPos ? _svLine(_svPos.f) : null; }
 export function rsStreetViewStep(m){
   if(!_svPos) return null;
   const p=_svAt(_svPos.f, _svPos.m+m); if(!p) return null;

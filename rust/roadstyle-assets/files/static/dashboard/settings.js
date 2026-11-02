@@ -16,6 +16,7 @@ const _stPut = (k, v) => { try{ v == null ? localStorage.removeItem(k) : localSt
 export const savedKey = name => _stGet("rs-key:" + name) || "";
 const _stKeys = [
   {name: "google", title: "Google Maps key", note: "Street View (Linked) and Google 3D", page: () => !!O.street_view_key, show: () => O.street_view === "window" || O.google_3d},
+  {name: "mapillary", title: "Mapillary token", note: "Street View photos and coverage from Mapillary (a free client token: mapillary.com/developer)", page: () => !!O.mapillary_token, show: () => O.street_view === "window" || O.street_view === "dock"},
 ];
 
 // ---- how transparent: three numbers, the tokens of popup.css (--rs-a-tb: the bar and the panel, --rs-a-box: the boxes, the popup and the tooltip,

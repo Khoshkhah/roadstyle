@@ -1,6 +1,6 @@
-# Google Street View
+# Street View
 
-<p class="lead">Click a road and see it in Google Street View, looking the way the road runs. No API key needed.</p>
+<p class="lead">Click a road and see it in Google Street View, Panoramax or Mapillary, looking the way the road runs. Google's Classic view and Panoramax need no API key.</p>
 
 <div class="grid cards" markdown>
 
@@ -108,6 +108,40 @@ the clicked road. A switch in the panel's bar flips between the two: **Linked** 
 To make the key and limit it to your own addresses, see [Set up a Google key](google-key.md). Google
 bills Dynamic Street View per panorama beyond a monthly free allowance. The same key also opens the
 [Google 3D](google-3d.md) window.
+
+## Panoramax and Mapillary
+
+The window's title bar has a switch: **Google**, **Panoramax** and **Mapillary**. The choice is remembered in this browser. Every road
+you click, and every step with the arrows, shows the photo of the provider that is nearest to the spot (within 30 m, and only if it looks along the road (photos of the opposite way are not shown)), looking the
+way the road runs where the provider says which way the photo looks. If the provider has no photo there, the window says so.
+
+| Provider | Key | Photos |
+|---|---|---|
+| Google | none for Classic; a [Google key](google-key.md) for Linked | Google |
+| [Panoramax](https://panoramax.fr/) | none | open data (mostly CC-BY-SA), from `api.panoramax.xyz` |
+| [Mapillary](https://www.mapillary.com/) | a free **client token** | crowd-sourced (CC-BY-SA) |
+
+**Mapillary token.** Sign in at [mapillary.com/developer](https://www.mapillary.com/developer), register an application, and copy its
+*client token*. Open **Settings → Keys** on the page, paste it in *Mapillary token*, and click **Save**. The token stays in this browser; it
+is not in the page. Without a token the Mapillary tab says so and asks for nothing. A token that you give with `mapillary_token=` or with the variable `MAPILLARY_TOKEN` **is written into the page**, so everyone who opens the page can read it. Use a token that is limited to your site.
+
+**What leaves your browser.** A click on a road sends the place of the road to the provider that you use (Google, Panoramax or Mapillary). The viewers of Panoramax and Mapillary load from the jsDelivr CDN, so these tabs need an internet connection. The rest of the map still works offline.
+
+**Coverage.** With Panoramax or Mapillary chosen, the **Coverage** button draws where that provider has photos: a line for each
+sequence, and a dot for each photo from zoom 15. The dots are white with a ring in the provider's colour, and the lines have a white edge, so they show on any road colour. When a photo is open, a larger ring marks its dot, so you see which photo you look at: on a road with two carriageways it can be a dot on the other carriageway. It goes away when you choose Google or close the window, and comes back with the
+window. Mapillary's lines start at zoom 6. Coverage is drawn only inside the page's `boundary` (cut to its shape), or inside the bounds of the roads when the page has no boundary.
+
+**Click a photo.** With Coverage on, click a dot (a single photo, from zoom 15) to open that photo in the window; a ring marks it until the next road or step. The map marker goes exactly where the photo was taken (it is not snapped to the road) and turns the way the photo looks, whichever way that is; the direction rule above is only for the photo chosen for a road.
+
+**Known limit: photos are not map-matched.** Neither Panoramax nor Mapillary snaps its photos to a road. A photo's position is the
+raw GPS fix (often 5–15 m off) and its direction is the camera heading. The window does not match them to the network either: it only
+checks the distance (30 m) and the heading (within 45° of the road) of each photo. Near parallel roads, junctions or in tunnels, a
+photo can belong to the neighbouring road, and a drive recorded in one direction may be missing for the other.
+
+The Panoramax viewer opens a flat photo whole and has zoom buttons and the wheel (from the whole photo in to 5°), like panoramax.fr; it reads a photo's crop and field of view the way Panoramax does, and a 360° photo turns freely.
+
+The two viewers are embedded (Photo Sphere Viewer for Panoramax, MapillaryJS for Mapillary) and load from jsDelivr when first used, so
+the page needs a network for them. The map marker turns with the view and follows a step to the next photo. The provider's credit is in the attribution box while its window is open.
 
 ## Where it looks
 

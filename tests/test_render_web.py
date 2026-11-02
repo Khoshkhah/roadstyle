@@ -235,7 +235,7 @@ def test_webmap_notebook_repr_is_slim_but_saved_file_is_offline():
     r = wm._repr_html_()
     assert "cdn.jsdelivr.net/npm/maplibre-gl" in r
     assert len(r) < len(wm.html)                      # the 800 KB vendored blob stays out
-    assert "__MAPLIBRE_JS__" not in wm.html and "cdn.jsdelivr" not in wm.html
+    assert "__MAPLIBRE_JS__" not in wm.html and "cdn.jsdelivr.net/npm/maplibre-gl" not in wm.html
 
 
 def test_notebook_cdn_maplibre_is_the_vendored_version():
@@ -2464,3 +2464,11 @@ def test_the_version_is_the_one_of_a_source_tree():
         pytest.skip("not a source tree")
     assert rs._source_version() == re.search(r'^version\s*=\s*"([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
     assert rs.__version__ == rs._source_version()
+
+
+def test_mapillary_token_is_an_option_and_reads_the_environment(monkeypatch):
+    monkeypatch.delenv("MAPILLARY_TOKEN", raising=False)
+    assert _opt(render_edges(_edges(), backend="web").html, "mapillary_token") == ""
+    assert _opt(render_edges(_edges(), backend="web", mapillary_token="MLY|1").html, "mapillary_token") == "MLY|1"
+    monkeypatch.setenv("MAPILLARY_TOKEN", "MLY|env")
+    assert _opt(render_edges(_edges(), backend="web").html, "mapillary_token") == "MLY|env"

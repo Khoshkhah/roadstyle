@@ -69,6 +69,7 @@ The page keywords that matter most for a dashboard:
 | `live_data` | `True` adds the support for `rs.setData` |
 | `views` | Named groups of settings, for `rs.setView` |
 | `street_view`, `street_view_key` | The Street View window, and its Google key |
+| `mapillary_token` | A Mapillary client token for the Street View window (or the variable `MAPILLARY_TOKEN`). Limit it to your site: it is written into the page. |
 | `google_3d`, `google_3d_layers` | The Google 3D window, and the layers that it draws |
 | `boundary`, `boundary_dim`, `boundary_limit` | The outline of the area, the shade outside it, and the camera limit |
 | `minzoom` | The first zoom of each road class |

@@ -184,6 +184,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `pitch_3d` | the camera's `pitch_3d` | `55` | `view3d.js` |
 | `street_view` | `street_view`: `"window"`, `true` or `false` | `"window"` | `streetview.js`, `svspot.js` |
 | `street_view_key` | `street_view_key` | `""` | `streetview.js`, `google3d.js` |
+| `mapillary_token` | `mapillary_token` | `""` | `svproviders.js`, `settings.js` |
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
 | `dashboard.google_3d.layers` | `google_3d_layers`: `[{id, label, kind, source, match, scope, max, on, arrows, style}]` (`roadstyle::dashboard::Layer3d`) | `[]` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
@@ -225,6 +226,7 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `view3d.js` | the 2D/3D button | `pitch_3d` | `rsSetView3D` |
 | `float.js` | Google's script loader, the floating window (drag, size, place, remembered) | | |
 | `streetview.js` | the Street View window, Linked and Classic | `street_view`, `street_view_key` | `rsSetStreetView` |
+| `svproviders.js` | Panoramax and Mapillary: the nearest photo, the viewers, the coverage layers | `mapillary_token` | |
 | `google3d.js` | the Google 3D window and its camera link | `google_3d`, `street_view_key`, `select_color` | `rsSetGoogle3D` |
 | `svspot.js` | the Street View spot on a road, its marker, the step buttons, the Street View link | `street_view`, `fill_layers` | `rsSetStreetViewMarkerAt`, `rsSetStreetViewMarker`, `rsStreetViewStep`, `rsGetStreetViewSpot` |
 | `basemap.js` | the base map button and menu | `basemaps`, `basemap_switcher`; the layers `basemap`, `bg` | `rsSetBasemap`, `RS_BASEMAPS` |

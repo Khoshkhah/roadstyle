@@ -429,7 +429,7 @@ def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=
     from . import render_web as rw
     from . import use_settings as _use
 
-    a = {k: kwargs.get(k) for k in ("basemap", "basemaps", "api_key", "street_view_key")}
+    a = {k: kwargs.get(k) for k in ("basemap", "basemaps", "api_key", "street_view_key", "mapillary_token")}
     pick = {k: v for k, v in (("profile", profile), ("palette", palette)) if v is not None and v != _s.theme()["active"][k]
             and (k == "profile" or v in _s.style_names("palettes"))}
     srcs = [*(settings if isinstance(settings, list) else [settings] if settings is not None else []), *([pick] if pick else [])]
@@ -442,7 +442,8 @@ def page_given(kwargs, palette=None, profile=None, settings=None, lk=None, args=
     finally:
         _use(*prev)
     page = json.loads(rust().given_of(lk, json.dumps({"args": args or {}})))     # the page's keys: page_options::given_of, the one rule
-    return {**page, "resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None}
+    return {**page, "resolved_basemaps": resolved, "street_view_key": a["street_view_key"] or os.environ.get("GOOGLE_MAPS_KEY") or None,
+            "mapillary_token": a["mapillary_token"] or os.environ.get("MAPILLARY_TOKEN") or None}
 
 
 def _pmtiles(t, z0, z1, bounds, names) -> bytes:
