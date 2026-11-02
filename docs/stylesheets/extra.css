@@ -43,7 +43,9 @@
 
 /* the Run button and the output under a javascript block of the dashboard manual (javascripts/testbed.js) */
 .md-typeset .rs-run-bar { margin: -.5em 0 1.2em; }
-.md-typeset .rs-run-bar .rs-run { padding: .2em 1em; font-size: .8em; }
+/* the colors are set here: the theme's own button color is the page color in the dark theme */
+.md-typeset .rs-run-bar .rs-run { padding: .2em 1em; font-size: .8em; color: #fff; background: var(--md-accent-fg-color); border-color: var(--md-accent-fg-color); }
+.md-typeset .rs-run-bar .rs-run:disabled { opacity: .5; }
 .md-typeset .rs-run-out {
   white-space: pre-wrap; margin: .4em 0 0; padding: .6em .8em; max-height: 14em; overflow: auto;
   font-size: .75em; border-radius: 6px; background: var(--md-code-bg-color); border-left: 3px solid var(--md-accent-fg-color);

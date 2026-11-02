@@ -90,12 +90,13 @@ html = rs.render_street_view(g, name="Roads and Street View", layout="below").ht
 (OUT / "street_view_below.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1),
                                                encoding="utf-8")
 
-# the testbed of the dashboard manual: every `javascript` block of docs/guides/dashboard-manual.md runs on it.
+# the testbed of the dashboard manual: every `javascript` block of docs/guides/dashboard-manual/javascript.md runs on it.
 # tests/test_dashboard_manual.py runs the same blocks on a small page with the same keywords. The blank base map needs no key.
 rs.render_dashboard(
-    g, basemap="blank", live_data=True, name="roadstyle: dashboard testbed",
+    g, basemap="blank", live_data=True, name="Testbed",
     color_options={"Road class": {}, "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60}},
     views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}},
+    dashboard={"toolbar": {"position": "top"}},
 ).save(OUT / "dashboard_testbed.html")
 
 # the maps of docs/guides/dashboard-manual/python.md: every python block that saves a page makes the map under it.
