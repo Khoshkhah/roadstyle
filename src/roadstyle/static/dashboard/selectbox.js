@@ -25,18 +25,48 @@ function _sbEnhance(sel){
   const close = () => {
     if(!list) return;
     list.remove(); list = null; btn.setAttribute("aria-expanded", "false"); _sbOpen = null;
-    document.removeEventListener("pointerdown", away, true); document.removeEventListener("keydown", keys, true); removeEventListener("resize", close);
+    document.removeEventListener("pointerdown", away, true);
+    document.removeEventListener("keydown", keys, true);
+    removeEventListener("resize", close);
+    window.removeEventListener("scroll", onScroll, true);
   };
   const away = e => { if(list && !list.contains(e.target) && !btn.contains(e.target)) close(); };
   const pick = i => { sel.selectedIndex = i; sel.dispatchEvent(new Event("change", {bubbles: true})); sync(); close(); btn.focus(); };
-  const mark = i => { at = i; [...list.children].forEach((o, k) => o.classList.toggle("on", k === at)); const e = list.children[at]; if(e) e.scrollIntoView({block: "nearest"}); };
+  const mark = (i, scroll = false) => {
+    at = i;
+    [...list.children].forEach((o, k) => o.classList.toggle("on", k === at));
+    const e = list.children[at];
+    if(e && scroll) e.scrollIntoView({block: "nearest"});
+  };
   const keys = e => {
     if(!list) return;
     if(e.key === "Escape"){ e.preventDefault(); close(); btn.focus(); }
-    else if(e.key === "ArrowDown"){ e.preventDefault(); mark(Math.min(sel.options.length - 1, at + 1)); }
-    else if(e.key === "ArrowUp"){ e.preventDefault(); mark(Math.max(0, at - 1)); }
+    else if(e.key === "ArrowDown"){ e.preventDefault(); mark(Math.min(sel.options.length - 1, at + 1), true); }
+    else if(e.key === "ArrowUp"){ e.preventDefault(); mark(Math.max(0, at - 1), true); }
     else if(e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(at); }
     else if(e.key === "Tab") close();
+  };
+  const updatePos = () => {
+    if(!list || !btn) return;
+    const r = btn.getBoundingClientRect();
+    if(r.bottom < 0 || r.top > innerHeight) { close(); return; }
+    const room = innerHeight - r.bottom - 12, h = Math.min(list.scrollHeight, 280);
+    const up = room < h && r.top > room;
+    list.style.left = r.left + "px";
+    list.style.width = r.width + "px";
+    list.style.maxHeight = Math.min(280, (up ? r.top : room) - 4) + "px";
+    if(up) {
+      list.style.top = "auto";
+      list.style.bottom = (innerHeight - r.top + 4) + "px";
+    } else {
+      list.style.bottom = "auto";
+      list.style.top = (r.bottom + 4) + "px";
+    }
+  };
+  const onScroll = e => {
+    if(!list) return;
+    if(e.target === list || list.contains(e.target)) return;
+    updatePos();
   };
   const open = () => {
     if(sel.disabled) return;
@@ -47,19 +77,18 @@ function _sbEnhance(sel){
       row.className = "rs-sel-opt" + (i === sel.selectedIndex ? " sel" : ""); row.setAttribute("role", "option"); row.setAttribute("aria-selected", String(i === sel.selectedIndex));
       const t = document.createElement("span"); t.textContent = o.textContent; row.append(t);
       if(i === sel.selectedIndex) row.insertAdjacentHTML("beforeend", _sbCheck);
-      row.onpointerdown = e => e.preventDefault();
       row.onclick = () => pick(i);
-      row.onpointerenter = () => mark(i);
+      row.onpointerenter = () => mark(i, false);
       list.append(row);
     });
     document.body.append(list);
-    const r = btn.getBoundingClientRect(), room = innerHeight - r.bottom - 12, h = Math.min(list.scrollHeight, 280);
-    const up = room < h && r.top > room;                                 // not enough room below: the list opens upward
-    Object.assign(list.style, {left: r.left + "px", width: r.width + "px", maxHeight: Math.min(280, (up ? r.top : room) - 4) + "px"});
-    if(up) list.style.bottom = (innerHeight - r.top + 4) + "px"; else list.style.top = (r.bottom + 4) + "px";
-    btn.setAttribute("aria-expanded", "true"); mark(sel.selectedIndex);
+    updatePos();
+    btn.setAttribute("aria-expanded", "true"); mark(sel.selectedIndex, true);
     _sbOpen = {close};
-    document.addEventListener("pointerdown", away, true); document.addEventListener("keydown", keys, true); addEventListener("resize", close);
+    document.addEventListener("pointerdown", away, true);
+    document.addEventListener("keydown", keys, true);
+    addEventListener("resize", close);
+    window.addEventListener("scroll", onScroll, true);
   };
   btn.onclick = () => list ? close() : open();
   btn.addEventListener("keydown", e => { if(!list && (e.key === "ArrowDown" || e.key === "ArrowUp")){ e.preventDefault(); open(); } });
