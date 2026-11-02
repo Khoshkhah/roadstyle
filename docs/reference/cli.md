@@ -50,6 +50,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 | `--width-by MIN MAX` | `width_by` | width in px follows the numeric `--color-by` |
 | **Web map (`-f web`)** | | |
 | `--page {dashboard,street-view}` | `render_dashboard` / `render_street_view` | a ready-made page instead of the plain map |
+| `--dashboard JSON` | `dashboard=` | with `--page dashboard`: the dashboard's options, for example the parts of its panel ([Dashboard options](parameters.md#dashboard-options)) |
 | `--view-3d` | `view_3d=True` | tilted camera and 3D bridge decks |
 | `--pitch DEG`, `--bearing DEG` | `pitch`, `bearing` | starting camera |
 | `--no-arrows` | `arrows=False` | no one-way arrows |
@@ -63,7 +64,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 
 | page | builds |
 |---|---|
-| `dashboard` | the map, an empty panel, and the standard toolbox ([Dashboard layout](../guides/dashboard-layout.md)) |
+| `dashboard` | the map, the standard toolbox and an empty panel. `--dashboard` gives the panel its parts ([Add to the panel](../guides/dashboard-panel.md)) |
 | `street-view` | the map + Google Street View of the clicked road |
 
 `--page` needs `-f web`. For `street-view` only:
@@ -100,6 +101,14 @@ roadstyle edges.gpkg --include motorway trunk primary -o major.html
 roadstyle edges.gpkg --color-by maxspeed_kmh --cmap viridis --width-by 1 6
 roadstyle edges.gpkg --page street-view --layout below --panel-width 50
 roadstyle edges.gpkg --page dashboard -o dashboard.html
+roadstyle edges.gpkg --page dashboard -o dashboard.html \
+  --dashboard '{"panel": {"sections": [{"id": "q", "part": "query", "label": "Query"}, {"id": "road", "part": "road_card", "label": "Selected road"}]}}'
+```
+
+The Rust program takes the same JSON with the keyword `--dashboard`, and the template with `--template dashboard`:
+
+```bash
+roadstyle page edges.gpkg dashboard.html --template dashboard --dashboard '{"panel": {"sections": [{"id": "q", "part": "query"}]}}'
 ```
 
 **See also:** [Every parameter](parameters.md) · [Get started](../get-started.md)

@@ -69,9 +69,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     web = p.add_argument_group("web backend (-f web)")
     web.add_argument("--page", choices=sorted(_PAGES),
-                     help="a ready-made page instead of the plain map: dashboard (query "
-                          "sidebar), street-view (Google Street View "
-                          "beside the map, following the clicked road).")
+                     help="a ready-made page instead of the plain map: dashboard (the map, the "
+                          "toolbox and an empty panel; --dashboard gives its parts), street-view "
+                          "(Google Street View beside the map, following the clicked road).")
+    web.add_argument("--dashboard", metavar="JSON",
+                     help="--page dashboard: the options of the dashboard as JSON (dashboard=), for "
+                          "example the panel's parts: '{\"panel\": {\"sections\": [{\"id\": \"q\", "
+                          "\"part\": \"query\"}, {\"id\": \"road\", \"part\": \"road_card\"}]}}'.")
     web.add_argument("--panel-width", type=float, metavar="PCT",
                      help="--page street-view: Street View's share of the width, 20-80%% "
                           "(default 42).")
@@ -145,6 +149,16 @@ def main(argv: list[str] | None = None) -> int:
         except json.JSONDecodeError as e:
             print(f"roadstyle: --colors is not valid JSON: {e}", file=sys.stderr)
             return 2
+    dashboard = None
+    if args.dashboard:
+        if args.page != "dashboard":
+            print("roadstyle: --dashboard needs --page dashboard", file=sys.stderr)
+            return 2
+        try:
+            dashboard = json.loads(args.dashboard)
+        except json.JSONDecodeError as e:
+            print(f"roadstyle: --dashboard is not valid JSON: {e}", file=sys.stderr)
+            return 2
 
     # Imported lazily so `roadstyle --version` / `--help` stay fast and don't pull in geopandas.
     from .edges import load_edges
@@ -183,6 +197,8 @@ def main(argv: list[str] | None = None) -> int:
                 web_kw["pitch"] = args.pitch
             if args.bearing is not None:
                 web_kw["bearing"] = args.bearing
+            if dashboard is not None:
+                web_kw["dashboard"] = dashboard
             if args.page:
                 from . import pages
                 if args.page == "street-view":

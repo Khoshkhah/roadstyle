@@ -31,6 +31,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   and the query part's list had the browser's thick scrollbar, and their scroll went on to the map. They now have the panel's rules: a thin
   scrollbar that shows only while the pointer is over the area or while it scrolls, no scroll handed on, and, for an area inside a box, a fade at
   the bottom edge while there is more below. `tests/test_dashboard_scroll_browser.py` checks each area.
+- **The command line sets the dashboard's options: `--dashboard JSON`** (with `--page dashboard`), for example the parts of its empty panel.
+  The Rust program `roadstyle page` already took them as the keyword `--dashboard`. The help of `--page` said "query sidebar".
 - **A wrong keyword or value says what to give.** `theme=` said "did you mean 'template'?"; it now says that a page starts light and that
   `page_script="rs.ready(() => rsSetTheme('dark'))"` starts it dark. A colour that is not a text (a MapLibre expression such as
   `["get", "c"]`) said "invalid type: sequence, expected a string"; it now says that a colour is a text and names `color_col=`.

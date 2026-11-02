@@ -83,3 +83,14 @@ def test_bad_colors_json_returns_2(tmp_path):
     out = tmp_path / "x.html"
     assert main([str(SAMPLE), "-o", str(out), "--color-by", "highway",
                  "--colors", "{not json}"]) == 2
+
+
+def test_the_dashboard_page_takes_its_options_as_json(tmp_path):
+    """--page dashboard --dashboard JSON: the panel's parts (the panel starts empty); --dashboard needs --page dashboard; bad JSON is an error."""
+    out = tmp_path / "d.html"
+    sections = '{"panel": {"sections": [{"id": "q", "part": "query", "label": "Query"}, {"id": "road", "part": "road_card"}]}}'
+    assert main([str(SAMPLE), "-o", str(out), "--page", "dashboard", "--dashboard", sections]) == 0
+    html = out.read_text()
+    assert '"part":"query"' in html and '"part":"road_card"' in html
+    assert main([str(SAMPLE), "-o", str(out), "--dashboard", sections]) == 2
+    assert main([str(SAMPLE), "-o", str(out), "--page", "dashboard", "--dashboard", "{nope"]) == 2
