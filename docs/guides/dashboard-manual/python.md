@@ -29,7 +29,7 @@ rs.render_dashboard(
 ).save("dashboard.html")
 ```
 
-<iframe src="../../../maps/dashboard.html" loading="lazy" title="The dashboard that the block above makes" class="rs-demo"></iframe>
+<iframe src="../../../maps/dashboard.html" loading="lazy" title="The dashboard that the block above makes" class="rs-demo tall"></iframe>
 
 `render_dashboard` gives a map object. `.save(path)` writes the file, and `.html` is the same page as text. The command line does the same: `roadstyle edges.gpkg --page dashboard -o dashboard.html`.
 
@@ -45,7 +45,7 @@ rs.render_dashboard(
 ).save("dashboard_left.html")
 ```
 
-<iframe src="../../../maps/dashboard_left.html" loading="lazy" title="The dashboard with the toolbox at the left and the panel at the right" class="rs-demo"></iframe>
+<iframe src="../../../maps/dashboard_left.html" loading="lazy" title="The dashboard with the toolbox at the left and the panel at the right" class="rs-demo tall"></iframe>
 
 ## Dock the panel
 
@@ -55,7 +55,7 @@ rs.render_dashboard(
 rs.render_dashboard(edges, color_options={"Road class": {}}, layout="dock").save("dashboard_dock.html")
 ```
 
-<iframe src="../../../maps/dashboard_dock.html" loading="lazy" title="The dashboard with the panel docked at the left" class="rs-demo"></iframe>
+<iframe src="../../../maps/dashboard_dock.html" loading="lazy" title="The dashboard with the panel docked at the left" class="rs-demo tall"></iframe>
 
 ## Page keywords
 

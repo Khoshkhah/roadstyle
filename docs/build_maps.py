@@ -96,7 +96,7 @@ rs.render_dashboard(
     g, basemap="blank", live_data=True, name="Testbed",
     color_options={"Road class": {}, "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60}},
     views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}},
-    dashboard={"toolbar": {"position": "top"}},
+    dashboard={"toolbar": {"settings": False}},          # one tool less: with the tool of the Toolbox block, 10 tools fit in the 480 px of the map
 ).save(OUT / "dashboard_testbed.html")
 
 # the maps of docs/guides/dashboard-manual/python.md: every python block that saves a page makes the map under it.
