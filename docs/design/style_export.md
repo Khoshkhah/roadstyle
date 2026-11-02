@@ -83,6 +83,10 @@ data come from the same rows. Changes from version 1:
 - **RustGIS fixes.** The road layer with the tunnel dash splits into two layers: solid pieces with no
   `line-dasharray`, and tunnel dash pieces with the dash. The tunnel color becomes a plain `interpolate` without
   `let` (RustGIS draws `let` / `to-rgba` as black).
+  The width table of the road layers has a `let` too. The export replaces every `let` by its value, so the style has no
+  `let` and no `var` (the code is `inline_lets` in `roadstyle-engine`, applied to an export only; a page and its tiles keep the
+  `let`, because it makes the style smaller). The keyword `keep_let=True` keeps it, for an app that can read `let`. The size
+  budget of the tiles measures that compact form.
 - **Arrows.** The thinned arrows of version 1 stay in the style for plain MapLibre apps. In GeoLibre the plugin
   replaces them with the page's own arrows (below).
 - `view_3d=True` stays the default: the style has the bridge decks.
