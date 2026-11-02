@@ -98,12 +98,12 @@ def _check_boxes(page, s):
     assert opened >= 4
 
 
-_SIZES = [(1000, 390), (1000, 530), (940, 480), (1400, 850), (1000, 630), (800, 630), (1000, 315)]
+_SIZES = [(1000, 390), (1000, 530), (940, 480), (1400, 850), (1000, 630), (800, 630), (1000, 315), (850, 172)]
+_TINY = (850, 145)       # a bar along the top and the credits box (95 px) do not both fit in 145 px: only the bars at a side are checked at this height
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-@pytest.mark.parametrize("w, h", _SIZES)
-@pytest.mark.parametrize("edge", ["right", "left", "top"])
+@pytest.mark.parametrize("edge, w, h", [(e, w, h) for e in ("right", "left", "top") for w, h in _SIZES] + [(e, *_TINY) for e in ("right", "left")])
 def test_every_tool_is_in_the_bar_and_nothing_meets(browser, pages, edge, w, h, theme):
     page = _open(browser, pages[edge], w, h, theme)
     _check_boxes(page, _check_layout(page))
@@ -160,6 +160,43 @@ def test_tools_that_a_page_adds_wrap_too(browser, pages, edge, extra, theme):
     s = page.evaluate(_RECTS)
     assert sum(1 for k, v in s["tools"].items() if k.startswith("x") and v["inBar"]) == extra
     _check_layout(page)
+    page.close()
+
+
+@pytest.fixture(scope="module")
+def scale_page(tmp_path_factory):
+    path = tmp_path_factory.mktemp("scale") / "s.html"
+    edges = _edges(8)       # eight road classes: the legend and the roads boxes are tall
+    edges["highway"] = ["motorway", "trunk", "primary", "secondary", "tertiary", "residential", "service", "track"]
+    rs.render_dashboard(edges, basemap="blank", color_options={"Road class": {}}, dashboard={"scale_box": True}).save(path)
+    return path
+
+
+_CORNER = "() => { const r = document.getElementById('rs-scalebox').getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; }"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("w, h", [(1000, 340), (1000, 530)])
+def test_no_box_goes_over_the_scale_box_or_the_credits_button(browser, scale_page, w, h, theme):
+    """With the scale and the zoom number on, the legend, the roads and the credits boxes end above the corner box (which holds the credits button)."""
+    page = _open(browser, scale_page, w, h, theme)
+    corner = page.evaluate(_CORNER)
+    assert corner[2] - corner[0] > 100, "the scale box is on"
+    s = page.evaluate(_RECTS)
+    credits = s["tools"]["attribution"]["r"]
+    opened = 0
+    for tool in ("legend", "roads", "attribution"):
+        page.click(f'[data-rs-tool="{tool}"] button')
+        page.wait_for_timeout(300)
+        for r in page.evaluate(_SHOWN):
+            opened += 1
+            assert _inside(r, [0, 0, *s["win"]], 1), (tool, r)
+            assert not _meet(r, corner), (tool, "box meets the scale box", r, corner)
+            assert not _meet(r, credits), (tool, "box meets the credits button", r, credits)
+            assert not _meet(r, s["bar"]), (tool, "box meets the bar", r, s["bar"])
+        page.keyboard.press("Escape")
+    assert opened == 3
+    assert page.errors == []
     page.close()
 
 

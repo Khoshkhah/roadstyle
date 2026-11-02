@@ -120,20 +120,32 @@ function keepInside(box){
     if(box.hidden || (box.classList.contains("bm-menu") && !box.classList.contains("open"))) return;
     box.style.translate = "0 0";                // a box is anchored at its top or at its bottom edge: it moves with `translate`, which works for both
     const bar = document.getElementById("rs-toolbar"), e = bar && bar.dataset.edge, inBar = !!bar && bar.contains(box), b = bar && !inBar ? bar.getBoundingClientRect() : null;
-    box.style.maxHeight = "";
+    box.style.maxHeight = box.style.maxWidth = "";
     let r = box.getBoundingClientRect();
+    // a box beside a bar at a side keeps clear of the corner box (the scale, the zoom number and the credits) when they meet across: it ends above that box
+    const cb = document.getElementById("rs-scalebox"), c = inBar && (e === "right" || e === "left") && cb ? cb.getBoundingClientRect() : null;
+    let low = c && c.width > 0 && r.left < c.right && r.right > c.left ? c.top - 8 : innerHeight - _tbGap;
     // a box under a bar along the top (over a bar along the bottom) is not taller than the room that it has: it scrolls
-    if(inBar && (e === "top" || e === "bottom")){
-      const room = e === "top" ? innerHeight - r.top - _tbGap : r.bottom - _tbGap;
-      if(r.height > room){ box.style.maxHeight = room + "px"; r = box.getBoundingClientRect(); }
-    }
-    let dx = _tbShift(r.left, r.right, innerWidth), dy = _tbShift(r.top, r.bottom, innerHeight);
+    const room = inBar && e === "top" ? innerHeight - r.top - _tbGap : inBar && e === "bottom" ? r.bottom - _tbGap : low - _tbGap * 2;
+    if(inBar && r.height > room){ box.style.maxHeight = room + "px"; r = box.getBoundingClientRect(); }
+    // a box beside a bar at a side is not wider than the room between the bar and the edge of the window: it is narrower, and it is not moved over the bar
+    const wide = e === "left" ? innerWidth - _tbGap - r.left : e === "right" ? r.right - _tbGap : 0;
+    if(inBar && wide > 120 && r.width > wide){ box.style.maxWidth = wide + "px"; r = box.getBoundingClientRect(); }
+    let dx = _tbShift(r.left, r.right, innerWidth), dy = _tbShift(r.top, r.bottom, low + _tbGap);
     // a box that is not in the bar (the credits, in the corner box) goes round the bar, with the same gap: it moves to the left of a bar at the right edge, and so on
     if(b && b.width > 0){
       const across = r.top + dy < b.bottom && r.bottom + dy > b.top, along = r.left + dx < b.right && r.right + dx > b.left;
-      if(e === "right" && across && r.right + dx > b.left - _tbGap) dx = Math.min(dx, b.left - _tbGap - r.right);
-      else if(e === "left" && across && r.left + dx < b.right + _tbGap) dx = Math.max(dx, b.right + _tbGap - r.left);
+      if((e === "right" || e === "left") && across){
+        // between the bar and the edge of the window; a box that is wider than that is narrower
+        const lo = e === "left" ? b.right + _tbGap : _tbGap, hi = e === "right" ? b.left - _tbGap : innerWidth - _tbGap;
+        if(hi - lo > 120 && r.width > hi - lo){ box.style.maxWidth = hi - lo + "px"; r = box.getBoundingClientRect(); dx = _tbShift(r.left, r.right, innerWidth); }
+        if(e === "right") dx = Math.min(dx, hi - r.right); else dx = Math.max(dx, lo - r.left);
+      }
       else if(e === "bottom" && along && r.bottom + dy > b.top - _tbGap) dy = Math.min(dy, b.top - _tbGap - r.bottom);
+      else if(e === "top" && along && r.top + dy < b.bottom + _tbGap){       // the credits box opens upward: under a bar along the top it keeps its foot and is lower, and it scrolls
+        const room = r.bottom + dy - (b.bottom + _tbGap);
+        if(room > 60){ box.style.maxHeight = room + "px"; r = box.getBoundingClientRect(); dy = _tbShift(r.top, r.bottom, low + _tbGap); }
+      }
     }
     box.style.translate = dx + "px " + dy + "px";
   };

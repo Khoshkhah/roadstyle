@@ -165,7 +165,7 @@ The bar stays in the free part of the window. This is the part that the panel do
 
 - **A bar at the left or right edge** that is too short for its tools takes a second column, and a third column when it must. The first column is at the edge.
 - **A bar at the top or the bottom** is centered between the panel and the edge of the window. When this space is too narrow, the bar takes a second row.
-- **A box** opens beside the whole bar, toward the map. It never opens over a second column or row, and it never goes under the bar. The credits box, which opens from the bottom corner, moves to the side of a bar that is in its way.
+- **A box** opens beside the whole bar, toward the map. It never opens over a second column or row, and it never goes under the bar. The credits box, which opens from the bottom corner, moves to the side of a bar that is in its way. A box that opens beside a bar at a side ends above the scale box and the credits button.
 - **Tools that you add** with `rs.tools.add` take the same lines as the built-in tools.
 
 ## A phone

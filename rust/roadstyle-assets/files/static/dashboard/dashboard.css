@@ -192,8 +192,9 @@ html.rs-tb-folded #rs-toolbar .rs-tb-fold svg{transform:none}
 #rs-toolbar .maplibregl-ctrl-group button+button{border:0}
 #rs-toolbar button:hover:not(:disabled){background:var(--rs-tb-hover)}
 .rs-tb-row,.rs-tb-scroll{display:contents}
-/* a bar that is too short for its tools wraps to a second column (a third, and so on), toward the map; the first column is at the edge. No `overflow`: a box opens outside the bar. */
-#rs-toolbar.rs-tb-right,#rs-toolbar.rs-tb-left{flex-direction:column;flex-wrap:wrap;align-content:flex-start;width:auto;padding-inline:5px;top:50%;transform:translateY(-50%);max-height:calc(100% - 128px)}
+/* a bar that is too short for its tools wraps to a second column (a third, and so on), toward the map; the first column is at the edge. No `overflow`: a box opens outside the bar.
+   The margins of 64 px (the corner box at the bottom) shrink in a tiny window: the bar is never lower than two tools (86 px) and keeps above the corner box (the `top` rule). */
+#rs-toolbar.rs-tb-right,#rs-toolbar.rs-tb-left{flex-direction:column;flex-wrap:wrap;align-content:flex-start;width:auto;padding-inline:5px;top:max(51px,min(50%,calc(100% - 87px)));transform:translateY(-50%);max-height:max(86px,calc(100% - 128px))}
 #rs-toolbar.rs-tb-right{flex-wrap:wrap-reverse}
 #rs-toolbar.rs-tb-right .maplibregl-ctrl-group,#rs-toolbar.rs-tb-left .maplibregl-ctrl-group{flex-direction:column}
 #rs-toolbar.rs-tb-right{right:8px}
