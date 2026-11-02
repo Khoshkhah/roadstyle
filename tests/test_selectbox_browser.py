@@ -66,7 +66,8 @@ def test_the_open_list_follows_its_button_and_closes_when_the_panel_hides_it(tmp
         browser, page, errors = _open(p, tmp_path)
         scroller = """(() => { let e = document.querySelector('.rs-sel:has(#longsel) .rs-sel-btn'); while((e = e.parentElement))
             if(e.scrollHeight > e.clientHeight + 50 && /(auto|scroll)/.test(getComputedStyle(e).overflowY)) return e; })()"""
-        gap = lambda: page.evaluate("document.querySelector('%s').getBoundingClientRect().top - document.querySelector('.rs-sel:has(#longsel) .rs-sel-btn').getBoundingClientRect().bottom" % _LIST)
+        def gap():
+            return page.evaluate("document.querySelector('%s').getBoundingClientRect().top - document.querySelector('.rs-sel:has(#longsel) .rs-sel-btn').getBoundingClientRect().bottom" % _LIST)
         before = gap()
         page.evaluate("(%s).scrollTop += 20" % scroller)
         page.wait_for_timeout(100)

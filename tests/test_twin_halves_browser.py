@@ -53,7 +53,7 @@ def _shoot(p, path, zoom, theme, paint):
 
 
 def _dist(a, b):
-    return sum(abs(i - j) for i, j in zip(a, b))
+    return sum(abs(i - j) for i, j in zip(a, b, strict=True))
 
 
 def _widths(im, fill):
@@ -101,5 +101,5 @@ def test_a_road_that_is_not_painted_looks_as_it_did(tmp_path, zoom, theme):
         got.save(gold)
     want = Image.open(gold).convert("RGB")
     assert got.size == want.size
-    worst = max(_dist(a, b) for a, b in zip(got.getdata(), want.getdata()))
+    worst = max(_dist(a, b) for a, b in zip(got.getdata(), want.getdata(), strict=True))
     assert worst <= 90, f"zoom {zoom} {theme}: a pixel differs by {worst} (sum of the three channels) from {gold.name}"
