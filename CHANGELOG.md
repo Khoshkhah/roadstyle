@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **A select list of the dashboard does not scroll when the pointer moves over it.** The list scrolled to the row under the pointer, so a row at the edge jumped away from the pointer. Only the arrow keys and the opening of the list scroll it now. An open list follows its button when the panel scrolls, and it closes when the panel hides the button (it was left in the air). A browser test is in `tests/test_selectbox_browser.py`.
+
 ## [0.26.2] - 2026-10-30
 
 ### Fixed

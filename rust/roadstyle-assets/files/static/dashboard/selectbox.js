@@ -46,28 +46,16 @@ function _sbEnhance(sel){
     else if(e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(at); }
     else if(e.key === "Tab") close();
   };
+  // put the list at the button; the list closes when the button is no longer seen (out of the window or clipped by its panel)
   const updatePos = () => {
-    if(!list || !btn) return;
-    const r = btn.getBoundingClientRect();
-    if(r.bottom < 0 || r.top > innerHeight) { close(); return; }
+    const r = btn.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if(!hit || !btn.contains(hit)){ close(); return; }
     const room = innerHeight - r.bottom - 12, h = Math.min(list.scrollHeight, 280);
-    const up = room < h && r.top > room;
-    list.style.left = r.left + "px";
-    list.style.width = r.width + "px";
-    list.style.maxHeight = Math.min(280, (up ? r.top : room) - 4) + "px";
-    if(up) {
-      list.style.top = "auto";
-      list.style.bottom = (innerHeight - r.top + 4) + "px";
-    } else {
-      list.style.bottom = "auto";
-      list.style.top = (r.bottom + 4) + "px";
-    }
+    const up = room < h && r.top > room;                                 // not enough room below: the list opens upward
+    Object.assign(list.style, {left: r.left + "px", width: r.width + "px", maxHeight: Math.min(280, (up ? r.top : room) - 4) + "px",
+      top: up ? "auto" : (r.bottom + 4) + "px", bottom: up ? (innerHeight - r.top + 4) + "px" : "auto"});
   };
-  const onScroll = e => {
-    if(!list) return;
-    if(e.target === list || list.contains(e.target)) return;
-    updatePos();
-  };
+  const onScroll = e => { if(list && !list.contains(e.target)) updatePos(); };   // a scroll inside the list does not move it
   const open = () => {
     if(sel.disabled) return;
     if(_sbOpen) _sbOpen.close();
