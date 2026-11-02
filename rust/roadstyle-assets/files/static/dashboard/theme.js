@@ -1,5 +1,5 @@
 // The page's theme: <html data-rs-theme="light|dark">, which the popup, the tooltip and (later) the bar read (popup.css, dashboard.css).
-// A sidebar of a template keeps its own switch (`data-theme` on #sb); this follows it. rsSetTheme(name) sets both.
+// The dashboard's panel keeps its own switch (`data-theme` on #sb); this follows it. rsSetTheme(name) sets both.
 import {map} from "./core.js";
 // the dark theme of the style's layers (dark.rs): the global state rs_theme, which the layers' colours read ("dark" picks the dark colour of each). It is set when
 // the style is loaded (before that MapLibre refuses a global state), and again at each change of the theme

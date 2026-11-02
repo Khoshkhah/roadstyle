@@ -6,12 +6,7 @@
       "side": "left",
       "width_px": 400,
       "look": "frame",
-      "sections": [],
-      "hide": [
-        "base_map",
-        "colour_by",
-        "legend"
-      ]
+      "sections": []
     },
     "toolbar": {
       "position": "right",
@@ -80,19 +75,23 @@
   },
   "basemaps": [
     {
-      "key": "blank",
-      "label": "Blank",
+      "key": "ofm_positron",
+      "label": "OpenFreeMap Positron",
       "tiles": [],
-      "bg": "#efede8",
-      "title": "Blank",
-      "group": "Blank",
-      "swatch": "#ffffff",
-      "order": 6,
+      "bg": "#e8e6e1",
+      "title": "OpenFreeMap Positron",
+      "group": "OpenFreeMap",
+      "swatch": [
+        "#e8e8e8",
+        "#ffffff",
+        "#cdd2d4"
+      ],
+      "order": 1,
       "maxzoom": 19,
-      "attr": "",
+      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
       "is_dark": false,
-      "style_url": null,
-      "dark": "blank_dark",
+      "style_url": "https://tiles.openfreemap.org/styles/positron",
+      "dark": "ofm_dark",
       "building_3d": null
     },
     {
@@ -113,26 +112,6 @@
       "is_dark": false,
       "style_url": "https://tiles.openfreemap.org/styles/liberty",
       "dark": "ofm_fiord",
-      "building_3d": null
-    },
-    {
-      "key": "ofm_positron",
-      "label": "OpenFreeMap Positron",
-      "tiles": [],
-      "bg": "#e8e6e1",
-      "title": "OpenFreeMap Positron",
-      "group": "OpenFreeMap",
-      "swatch": [
-        "#e8e8e8",
-        "#ffffff",
-        "#cdd2d4"
-      ],
-      "order": 1,
-      "maxzoom": 19,
-      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
-      "is_dark": false,
-      "style_url": "https://tiles.openfreemap.org/styles/positron",
-      "dark": "ofm_dark",
       "building_3d": null
     },
     {
@@ -226,40 +205,20 @@
       "building_3d": null
     },
     {
-      "key": "blank_dark",
-      "label": "Blank dark",
+      "key": "blank",
+      "label": "Blank",
       "tiles": [],
-      "bg": "#14181d",
-      "title": "Blank dark",
+      "bg": "#efede8",
+      "title": "Blank",
       "group": "Blank",
-      "swatch": "#14181d",
-      "order": 99,
+      "swatch": "#ffffff",
+      "order": 6,
       "maxzoom": 19,
       "attr": "",
-      "is_dark": true,
+      "is_dark": false,
       "style_url": null,
-      "dark": null,
+      "dark": "blank_dark",
       "building_3d": null
-    },
-    {
-      "key": "ofm_fiord",
-      "label": "OpenFreeMap Fiord",
-      "tiles": [],
-      "bg": "#0e1113",
-      "title": "OpenFreeMap Fiord",
-      "group": "OpenFreeMap",
-      "swatch": [
-        "#45516e",
-        "#a9b7d6",
-        "#2c3750"
-      ],
-      "order": 99,
-      "maxzoom": 19,
-      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
-      "is_dark": true,
-      "style_url": "https://tiles.openfreemap.org/styles/fiord",
-      "dark": null,
-      "building_3d": "#6a789a"
     },
     {
       "key": "ofm_dark",
@@ -282,6 +241,26 @@
       "building_3d": "#3f444d"
     },
     {
+      "key": "ofm_fiord",
+      "label": "OpenFreeMap Fiord",
+      "tiles": [],
+      "bg": "#0e1113",
+      "title": "OpenFreeMap Fiord",
+      "group": "OpenFreeMap",
+      "swatch": [
+        "#45516e",
+        "#a9b7d6",
+        "#2c3750"
+      ],
+      "order": 99,
+      "maxzoom": 19,
+      "attr": "OpenFreeMap © OpenMapTiles Data from OpenStreetMap",
+      "is_dark": true,
+      "style_url": "https://tiles.openfreemap.org/styles/fiord",
+      "dark": null,
+      "building_3d": "#6a789a"
+    },
+    {
       "key": "esri_dark_gray",
       "label": "Dark Gray",
       "tiles": [
@@ -298,6 +277,22 @@
       "order": 99,
       "maxzoom": 16,
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community",
+      "is_dark": true,
+      "style_url": null,
+      "dark": null,
+      "building_3d": null
+    },
+    {
+      "key": "blank_dark",
+      "label": "Blank dark",
+      "tiles": [],
+      "bg": "#14181d",
+      "title": "Blank dark",
+      "group": "Blank",
+      "swatch": "#14181d",
+      "order": 99,
+      "maxzoom": 19,
+      "attr": "",
       "is_dark": true,
       "style_url": null,
       "dark": null,
@@ -326,7 +321,7 @@
       "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Esri, HERE, Garmin, © OpenStreetMap contributors, and the GIS user community"
     }
   },
-  "basemap": "blank",
+  "basemap": "ofm_positron",
   "style": {
     "version": 8,
     "sources": {
@@ -347,7 +342,7 @@
         "id": "bg",
         "type": "background",
         "paint": {
-          "background-color": "#efede8"
+          "background-color": "#e8e6e1"
         }
       },
       {

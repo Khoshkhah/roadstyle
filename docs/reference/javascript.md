@@ -29,17 +29,17 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()` (each tool with its `kind`, `open` and `disabled` state; a tool that the page cannot use is greyed out, and its title says why), and `ready()` (with `toolbar.hold`). `rs.on("tool", fn)` tells of each open, close and press. The built-in tools are `theme`, `navigate`, `street_view`, `google_3d`, `basemap`, `roads`, `buildings`, `legend`, `settings` and `attribution`. The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
 | `rs.ready` | `ready(fn)`: runs `fn` now if the page is ready, else on `rs:ready` |
-| `rs.svg` | `svg(parent, tag, attrs, text?)`: one SVG element of a chart; a value that starts with `var(` goes to the style ([guide](../guides/dashboard-panel.md)) |
-| `rs.kpi` | the HTML of one number tile: `kpi(title, value, sub, color?)`, for a `<div class="rs-kpis">` ([guide](../guides/dashboard-panel.md)) |
-| `rs.tabs` | tabs and the two-way switch of a page: `use(nav, onChange)` returns `{select(id), current()}` ([guide](../guides/dashboard-panel.md)) |
-| `rs.hover` | the page's hover box: `show(html, event)`, `hide()`, `on(node, html \| fn)` ([guide](../guides/dashboard-panel.md)) |
-| `rs.help` | the page's help window: `set({title, intro, terms: [[term, text], ...], note, anchor})` adds the "?" button to the panel's title (or to the element `anchor`) and keeps the window, `button(el, {title, ...})` adds a "?" button with words of its own to `el`, `get()` (the words now), `clear()`, `open({title, ...})`, `close`; event `rs:helpchange` ([guide](../guides/dashboard-panel.md)) |
-| `rs.sections` | the dashboard panel's sections: `add({id, html, el, label, after, before, fold})`, `get`, `list`, `hide`, `show`, `remove`, `fold(id, on)`, `foldAll(on)`, `folded(id)` (a section with `fold: true` has a button for its label and the title row has "Collapse all" / "Expand all"); event `rs:sectionchange` ([guide](../guides/dashboard-panel.md)) |
+| `rs.svg` | `svg(parent, tag, attrs, text?)`: one SVG element of a chart; a value that starts with `var(` goes to the style ([guide](../guides/dashboard-parts.md)) |
+| `rs.kpi` | the HTML of one number tile: `kpi(title, value, sub, color?)`, for a `<div class="rs-kpis">` ([guide](../guides/dashboard-parts.md)) |
+| `rs.tabs` | tabs and the two-way switch of a page: `use(nav, onChange)` returns `{select(id), current()}` ([guide](../guides/dashboard-parts.md)) |
+| `rs.hover` | the page's hover box: `show(html, event)`, `hide()`, `on(node, html \| fn)` ([guide](../guides/dashboard-parts.md)) |
+| `rs.help` | the page's help window: `set({title, intro, terms: [[term, text], ...], note, anchor})` adds the "?" button to the panel's title (or to the element `anchor`) and keeps the window, `button(el, {title, ...})` adds a "?" button with words of its own to `el`, `get()` (the words now), `clear()`, `open({title, ...})`, `close`; event `rs:helpchange` ([guide](../guides/dashboard-parts.md)) |
+| `rs.sections` | the sections of the dashboard panel (the panel starts empty): `add({id, html, el, part, text, fields, label, after, before, fold})` adds a section and returns its box. It holds your HTML (`html`), your element (`el`) or a part of roadstyle (`part`: `"query"` or `"road_card"`). With `fold: true` (and a `label`) its label is a button with a chevron, a click hides its body, and the browser keeps the state. `list()` gives the ids in order. `get(id)` gives the box of a section, so that you can move it into your own tab. `hide(id)`, `show(id)` and `remove(id)` hide, show and remove a section. `fold(id, on)` and `foldAll(on)` fold or unfold one section that folds, or all of those that are shown (a hidden one keeps its state). `folded(id)` tells whether one is folded. The title row of the panel has one button, "Collapse all" / "Expand all", that does `foldAll`; it shows when a section folds. Event `rs:sectionchange` ([guide](../guides/dashboard-panel.md#the-same-from-javascript)) |
 | `rs.colorModes` | the page's own "Colour by" list in the legend box (a live-data page has no colour options of the style): `set(["Traffic", "Counted?"], {active, onChange(name, index)})`, `select(name)`, `clear()`, `active`. Event `rs:colormode` (`detail.name`, `detail.index`) |
 | `rs.naturalBreaks(values, k)` | the `k - 1` cut points (ascending) that split the numbers into `k` sets by Fisher-Jenks natural breaks: the `breaks` of `rs.setData` for a page that colours many calls the same way (an hour slider: the breaks of the whole day) |
-| `rs.legend` | rows that the page adds to the legend: `add({id, color, label, shape})` (`shape`: `square`, `circle` or `line`) or `add({id, html})`, `remove(id)`, `list()` |
+| `rs.legend` | rows that the page adds to the legend: `add({id, color, label, shape})` or `add({id, html})`, `remove(id)`, `list()`. `shape` is the mark of what the page draws in this colour: `square` (default), `circle` or `line` |
 | `rs.setData(rows, options)` | live data (`live_data=True`): colour and size the roads from rows, an Arrow table or the URL of a JSON file; a second call replaces the values. `rs.clearData()` takes them away. `edge_id` must be text. Event `rs:datachange`; Promise `{rows, matched, ms}`; a number goes in `classes` sets by natural breaks, or in your `breaks` ([guide](../guides/live-data.md)) |
-| event `rs:ready` | `window.rs` and the panel's sections are there; `window.rsReady` is true from then on. A `page_script` waits for it |
+| event `rs:ready` | `window.rs` and the panel's sections are there; `window.rsReady` is true from then on. It fires once: a listener added later never runs, so wait with `rs.ready(fn)` |
 | `rs.setStyle(style)` | a new roads style (a page whose roads come later). Every control that a style gives follows each new style: the `roads` tool and its classes, the Tunnels box, the arrows' icon and rules, the boundary's shade and limits, the base-map layers (`ov<i>`) with their switch, hover and 3D switch, the pick layers, the id fields and the parts of `rs.getState()`. They go with a style that has none. A switch that the person turned off stays off. A host's look must be live (`state="live"`) for the style to have the controls |
 | `rs.sheet(n)` | the phone's bottom sheet: `rs.sheet()` is its height (0 closed, 1 40 %, 2 full; `null` when the page has no sheet), `rs.sheet(n)` sets it. The grip of the sheet has a button that goes one height down, and up from closed. Event `rs:sheetchange` |
 | `rs.freeArea()` | the part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates: `{lo, hi, top, bottom}`. A host page pads its map with it |
@@ -78,7 +78,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:highlightchange` |
 | `rsFocus(ids, opt?, layer?)` | fit the camera to one id or a set; `opt` goes to MapLibre `fitBounds` (default `padding` 80, `maxZoom` 17) | |
 | **Selection** | | |
-| `rsSelect(id)` | select one road exactly like a click: glow, popup or panel | `rs:select` |
+| `rsSelect(id)` | select one road exactly like a click: glow, popup, and the road card when the page has one | `rs:select` |
 | `rsDeselect()` | clear the selection | `rs:deselect` |
 | **Built-in controls** | | |
 | `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
@@ -133,6 +133,21 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:google3dchange` | `rsSetGoogle3D` | `open` |
 | `rs:streetviewmove` | `rsStreetViewStep` | `id`, `streetView`, `atStart`, `atEnd` |
 | `rs:streetviewspot` | a pick, a step, a walk or turn in the panorama | the `rsGetStreetViewSpot()` object (or `null`) |
+| `rs:ready` | the page is ready; it fires once | an empty object |
+| `rs:sectionchange` | `rs.sections` adds, removes, hides, shows or folds a section | `id`, `state` (`add`, `remove`, `hide`, `show`, `fold` or `unfold`) |
+| `rs:helpchange` | the help window opens or closes | `open`, and `title` when it opens |
+| `rs:colormode` | `rs.colorModes` picks a mode | `name`, `index` |
+| `rs:datachange` | `rs.setData`, `rs.clearData` | `rows`, `matched`, `colorBy`, `widthBy`, and `ms` from `rs.setData` |
+| `rs:toolchange` | a tool opens, closes or is pressed | `id`, `state` (`open`, `close` or `press`) |
+| `rs:toolsready` | the page has added its tools (`rs.tools.ready()`) | none |
+| `rs:sheetchange` | the phone's bottom sheet changes its height | `height` (0, 1 or 2) |
+| `rs:layoutchange` | the side or the look of the panel changes | `panel` (the side) or `look` |
+| `rs:basemapready` | a vector base map has loaded its layers | `key`, `vector` |
+| `rs:buildingschange` | the 3D buildings of the base map switch | `on`, `vector` |
+| `rs:labelschange` | the map labels switch | `on` |
+| `rs:overlayschange` | the list of overlays changes (the one switch of the base-map layers) | `visible` |
+| `rs:g3dmodechange` | the mode of the Google 3D window changes | none |
+| `rs:tableready` | the table of the level editor is ready | none |
 
 ```js
 document.addEventListener("rs:select", e => {
@@ -182,6 +197,33 @@ Read-only globals for building your own controls.
 
     Or add a small integer column in Python (`pidx = 0..n-1`) and query on it. In pandas, a column
     that mixes big ints and `None` turns into float64 and rounds the ids: use `dtype="Int64"`.
+
+## Drive the map from your own page
+
+`m.html` is the saved page as a string. Put your own panel before `</body>`, and talk to the map through the `window.rs*` functions and the `rs:*` events of this page:
+
+```python
+m = rs.render_edges(edges, palette="mono")
+panel = """
+<div id="side" style="position:fixed;top:0;right:0;bottom:0;width:320px;background:#fff"></div>
+<style>#map{right:320px!important} body{--rs-side:320px}</style>
+<script>
+map.once("load", () => {                  // the roads are queryable once the map loads
+  const ids = rsQuery(p => p.name === "Götgatan");
+  rsColor(ids, "#e63946"); rsFocus(ids);
+});
+document.addEventListener("rs:select", e => {
+  document.getElementById("side").textContent = JSON.stringify(e.detail.properties);
+});
+</script>"""
+open("host.html", "w").write(m.html.replace("</body>", panel + "</body>"))
+```
+
+!!! warning "Traps of a host page"
+    - **Ids past 2**53.** See [Ids past 2**53](#ids-past-253).
+    - **A fixed side panel covers the map.** Inset it: `#map{right:320px!important} body{--rs-side:320px}`. The map's controls, the base-map button among them, move with it. `--rs-side` shifts the rest (the overlay toggle and the Street View window).
+    - **Show a set of edges by recoloring them.** Use `rsColor`, or a `color_options` entry. Extra lines drawn over the roads double them and hide the styling of the road.
+    - **A selection in the base color shows nothing.** Pick a highlight color that no `color_options` entry uses.
 
 ## The dashboard on another map
 

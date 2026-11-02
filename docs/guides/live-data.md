@@ -61,15 +61,14 @@ picker = "<select id='day'>" + "".join(f"<option>{d}</option>" for d in days) + 
 
 m = rs.render_dashboard(
     edges, live_data=True, name="Flow by day",
-    dashboard={"panel": {"sections": [{"id": "day", "label": "Day", "html": picker, "before": "query"}]}},
+    dashboard={"panel": {"sections": [{"id": "day", "label": "Day", "html": picker}]}},
     page_script="""
-      function start() {
+      rs.ready(() => {
         const pick = document.getElementById("day");
         const show = day => rs.setData(`flow-${day}.json`, {colorBy: "flow", legend: {title: "Flow, " + day}});
         pick.onchange = () => show(pick.value);
         show(pick.value);
-      }
-      window.rsReady ? start() : document.addEventListener("rs:ready", start, {once: true});
+      });
     """,
 )
 m.save("flow.html")
@@ -81,6 +80,6 @@ To add a new day, write its `flow-<day>.json` and add the day to `days`. The pag
 ## Good to know
 
 - The call gives `{rows, matched}`. When `matched` is much smaller than `rows`, the ids do not match: check that `edge_id` is text.
-- A click on a road shows the joined values in the popup and in the panel.
-- The event `rs:ready` fires when `window.rs` is there and the panel's sections (your picker) are in place. `window.rsReady` is true from then on.
-  A `page_script` waits for the event, as in the example.
+- A click on a road shows the joined values in the popup, and in the road card when the page adds one (`{"part": "road_card"}`).
+- `rs.ready(fn)` runs `fn` when `window.rs` is there and the panel's sections (your picker) are in place, and at once if they already are.
+  A `page_script` runs before that, so it puts its code in `rs.ready`, as in the example. The event `rs:ready` fires once.

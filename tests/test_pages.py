@@ -24,7 +24,7 @@ def _edges():
 
 def test_sidebar_html_bundled():
     # the templates ship inside the package (importlib.resources), not the repo ui/ dir
-    assert "Roads dashboard" in rs.sidebar_html("dashboard")
+    assert '<div class="sb-body"></div>' in rs.sidebar_html("dashboard")      # the panel, empty
 
 
 def test_render_dashboard_injects_sidebar_once():
@@ -38,8 +38,7 @@ def test_name_shows_as_sidebar_heading():
     # name= is the visible page title, not just the <title> tag (escaped, so markup can't inject)
     h = rs.render_dashboard(_edges(), name="Södermalm <traffic>").html
     assert "<h2>Södermalm &lt;traffic&gt;</h2>" in h
-    assert "<h2>Roads dashboard</h2>" not in h
-    assert "<h2>Roads dashboard</h2>" in rs.render_dashboard(_edges()).html   # default still shows
+    assert "<h2>roadstyle</h2>" in rs.render_dashboard(_edges()).html   # the default: the name of a map page
 
 
 def test_pages_are_web_only():
@@ -125,7 +124,7 @@ def _dashboard(html):
 def test_each_page_has_its_template():
     assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
     d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
-    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "left", "width_px": 400, "look": "frame", "sections": [], "hide": ["base_map", "colour_by", "legend"]},
+    assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "left", "width_px": 400, "look": "frame", "sections": []},
                                                                        {"position": "right", "settings": True, "hold": False, "navigation": "box"})
     c = _dashboard(rs.render_dashboard(_edges(), layout="dock").html)
     assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("dashboard", "dock", "frame", None)
@@ -151,10 +150,14 @@ def test_an_old_keyword_says_where_it_went():
             rs.render_dashboard(_edges(), **{old: 1})
 
 
-def test_the_ids_that_the_migration_guide_keeps_stable_are_in_the_panel():
+def test_the_panel_is_empty_and_keeps_the_ids_of_its_frame():
+    """The panel starts empty (2026-11-02): its frame keeps its ids, and the old blocks (base map, colour, legend, query, selected road) are gone."""
     h = rs.render_dashboard(_edges()).html
-    for i in ("sb", "sb-hide", "sb-show", "sb-th", "bm", "co", "sb-legend", "q", "tbl", "count", "detail"):
+    for i in ("sb", "sb-hide", "sb-show", "sb-th"):
         assert f'id="{i}"' in h, i
+    for i in ("bm", "co", "sb-legend", "q", "tbl", "count", "detail"):
+        assert f'id="{i}"' not in h, i
+    assert '<div class="sb-body"></div>' in h
 
 
 def test_the_dashboard_keyword_merges_typed_options():
@@ -182,7 +185,7 @@ def test_the_dashboard_template_is_the_overlay_form():
     d = _dashboard(h)
     assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True, "hold": False, "navigation": "box"})
     assert d["windows"]["clamp"] is True and d["windows"]["recenter_map"] is False
-    assert '<div id="sb"' in h and "<h2>Roads dashboard</h2>" in h
+    assert '<div id="sb"' in h
     assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-hide-scale")' in h   # the first paint has the form
 
 
@@ -194,7 +197,7 @@ def test_a_template_name_is_checked_and_sidebar_is_gone():
         rs.render_edges(_edges(), backend="web", sidebar="dashboard")
 
 
-def test_the_dashboard_starts_with_a_blank_map_that_needs_no_key_and_with_no_scale_box():
+def test_the_dashboard_starts_with_the_base_map_of_a_map_page_that_needs_no_key_and_with_no_scale_box():
     import json
     import warnings
     with warnings.catch_warnings():
@@ -204,7 +207,7 @@ def test_the_dashboard_starts_with_a_blank_map_that_needs_no_key_and_with_no_sca
     d = opts["dashboard"]
     assert d["scale_box"] is False and d["panel"]["side"] == "left" and d["toolbar"]["position"] == "right"
     got = [b["key"] for b in opts["basemaps"]]
-    assert got[0] == "blank" and len(got) > 1 and not set(_removed_basemaps()) & set(got), got
+    assert got[0] == "ofm_positron" and len(got) > 1 and not set(_removed_basemaps()) & set(got), got
     assert "carto.com" not in "".join(t for b in opts["basemaps"] for t in b.get("tiles", []))
 
 
@@ -221,15 +224,14 @@ def _page_option(html, key):
     return json.JSONDecoder().raw_decode(html, at)[0][key]
 
 
-def test_the_dashboard_has_one_zoom_table_service_roads_from_14_steps_and_more_from_15_and_private_roads_not_before_15():
+def test_the_dashboard_has_the_zoom_table_of_a_map_page():
     classes = ["primary", "residential", "service", "living_street", "steps", "platform", "corridor", "road", "footway"]
     edges = gpd.GeoDataFrame({"highway": classes, "access": [None, None, None, None, None, None, None, None, "private"]}, crs=4326,
                              geometry=[LineString([(17.9 + i * 1e-3, 59.37), (17.91 + i * 1e-3, 59.38)]) for i in range(len(classes))])
 
     def first(html):
         return _page_option(html, "filter")["minzoom"]
-    table = {"service": 14, "living_street": 14, "steps": 15, "platform": 15, "corridor": 15, "road": 15}
-    assert first(rs.render_dashboard(edges).html) == table                                                     # every other class from zoom 0
+    assert first(rs.render_dashboard(edges).html) == first(rs.render_edges(edges, backend="web").html)          # the map of a dashboard is a map page's (2026-11-02)
     assert first(rs.render_dashboard(edges, minzoom=False).html) is None                                       # a call can ask for every class at every zoom
     assert first(rs.render_dashboard(edges, minzoom=True).html)["residential"] == 13                           # or for the profile's table
     assert first(rs.render_dashboard(edges, minzoom={"*": 0, "service": 16}).html) == {"service": 16}          # a star sets every class first

@@ -1,5 +1,6 @@
-"""The panel's sections and the legend's rows (docs/guides/migrating-dashboard.md): the typed options `dashboard.panel.sections`, `hide`, `dashboard.legend.rows`
-and the run-time calls `rs.sections` and `rs.legend`. The HTML that a page adds follows the light and the dark theme. Skipped without playwright."""
+"""The panel's sections and the legend's rows (docs/guides/dashboard-panel.md): the panel starts empty; the typed options `dashboard.panel.sections`
+(the page's HTML or a part: "query", "road_card") and `dashboard.legend.rows`, and the run-time calls `rs.sections` and `rs.legend`. The HTML that a
+page adds and the parts follow the light and the dark theme. Skipped without playwright."""
 import pytest
 
 pw = pytest.importorskip("playwright.sync_api")
@@ -8,9 +9,11 @@ import roadstyle as rs  # noqa: E402
 
 _ARGS = ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"]
 _PANEL = {"sections": [
+    {"id": "q", "part": "query", "label": "Query", "text": "p.edge_id <= 3"},
+    {"id": "road", "part": "road_card", "label": "Selected road", "fields": ["name", "edge_id"]},
     {"id": "notes", "label": "Notes", "html": '<p>Page text</p><p class="sb-note">Small print</p><a href="#x">a link</a>'
-                                              '<div class="rs-sec-box">in a box</div>', "after": "legend"},
-    {"id": "last", "html": "<p>The end</p>"}], "hide": ["base_map"]}
+                                              '<div class="rs-sec-box">in a box</div>', "before": "road"},
+    {"id": "last", "html": "<p>The end</p>"}]}
 _LEGEND = {"rows": [{"color": "#ff0066", "label": "Events"}, {"color": "#16a34a", "label": "Sensors", "shape": "circle"}, {"color": "#2563eb", "label": "Bus route", "shape": "line"}]}
 
 
@@ -39,9 +42,10 @@ def _open(p, path, scrollbars=False):
 
 
 @pytest.mark.parametrize("bad, message", [
-    ({"panel": {"sections": [{"id": "legend", "html": ""}]}}, "used twice"),
-    ({"panel": {"sections": [{"id": "a", "html": "", "after": "nowhere"}]}}, "not a section here"),
-    ({"panel": {"hide": ["nope"]}}, "not a section"),
+    ({"panel": {"sections": [{"id": "a", "html": ""}, {"id": "a", "html": ""}]}}, "used twice"),
+    ({"panel": {"sections": [{"id": "a", "html": "", "after": "nowhere"}]}}, "not an earlier section"),
+    ({"panel": {"sections": [{"id": "a", "part": "chart"}]}}, "unknown variant"),
+    ({"panel": {"hide": ["query"]}}, "panel.hide is gone"),
     ({"legend": {"rows": [{"color": "#f00"}]}}, "label"),
 ])
 def test_a_wrong_section_or_row_is_an_error(tmp_path, bad, message):
@@ -49,37 +53,46 @@ def test_a_wrong_section_or_row_is_an_error(tmp_path, bad, message):
         _page(tmp_path, **bad)
 
 
-def test_the_typed_sections_are_in_the_panel_in_order_and_the_hidden_one_is_hidden(tmp_path):
+def test_the_typed_sections_are_in_the_panel_in_order_and_the_parts_work(tmp_path):
+    """The sections are in the order of the call (`before` moves one); the query part runs its start text and lists the roads; the road card shows the
+    selected road's fields (only `fields`) and empties on a deselect."""
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, _page(tmp_path, panel=_PANEL, legend=_LEGEND))
-        got = page.evaluate("""() => ({ids: rs.sections.list(), hidden: rs.sections.get('base_map').hidden,
-            visible: getComputedStyle(document.getElementById('bm').closest('.sb-sec')).display,
-            shown: rs.sections.get('legend').hidden, notes: !!document.querySelector('[data-rs-section=notes] label'),
-            panelRows: document.querySelectorAll('#sb-legend-extra .sb-lgrow').length,
-            panelShapes: [...document.querySelectorAll('#sb-legend-extra .sb-lgrow i')].map(i => i.className)})""")
+        got = page.evaluate("""() => { const q = document.querySelector('[data-rs-section=q]');
+            q.querySelector('[data-q=run]').click();
+            const out = {ids: rs.sections.list(), notes: !!document.querySelector('[data-rs-section=notes] label'), start: q.querySelector('.rs-q').value,
+                         count: q.querySelector('.rs-q-count').textContent, rows: q.querySelectorAll('.rs-q-list a').length};
+            q.querySelector('.rs-q-list a').click();
+            out.card = document.querySelector('.rs-road-card').textContent;
+            rsDeselect(); out.empty = document.querySelector('.rs-road-card').textContent;
+            return out; }""")
         browser.close()
     assert not errors
-    assert got["ids"] == ["base_map", "colour_by", "legend", "notes", "query", "selected_road", "last"]
-    assert got["hidden"] is True and got["visible"] == "none" and got["shown"] is False and got["notes"] and got["panelRows"] == 3
-    assert got["panelShapes"] == ["square", "circle", "line"]
+    assert got["ids"] == ["q", "notes", "road", "last"] and got["notes"]
+    assert got["start"] == "p.edge_id <= 3" and got["count"] == "3 edges match" and got["rows"] == 3
+    assert "Street 0" in got["card"] and "highway" not in got["card"] and got["empty"] == "Click a road."
 
 
 def test_the_run_time_calls_add_move_and_remove(tmp_path):
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, _page(tmp_path))
         got = page.evaluate("""() => {
-            rs.sections.add({id: 'mine', html: '<p>mine</p>', before: 'query'});
+            const start = rs.sections.list();
+            rs.sections.add({id: 'q', part: 'query', label: 'Query'});
+            rs.sections.add({id: 'mine', html: '<p>mine</p>', before: 'q'});
             const after = rs.sections.list();
-            rs.sections.hide('legend'); rs.sections.show('legend'); rs.sections.remove('mine');
-            let own = null; try { rs.sections.remove('query'); } catch (e) { own = String(e.message); }
+            rs.sections.hide('mine'); const hidden = rs.sections.get('mine').hidden; rs.sections.show('mine');
+            rs.sections.remove('mine'); rs.sections.remove('q');
+            let bad = null; try { rs.sections.add({id: 'c', part: 'chart'}); } catch (e) { bad = String(e.message); }
             rs.legend.add({id: 'ev', color: '#ff0066', label: 'Events'});
-            return {after, end: rs.sections.list(), own, rows: rs.legend.list()}; }""")
+            return {start, after, hidden, end: rs.sections.list(), bad, rows: rs.legend.list()}; }""")
         box_rows = page.evaluate("""() => { rs.tools.open('legend'); return document.querySelectorAll('.rs-cb-lg .lg-row').length; }""")
         text = page.evaluate("document.querySelector('.rs-cb-lg').textContent")
         browser.close()
     assert not errors
-    assert got["after"].index("mine") == got["after"].index("query") - 1 and "mine" not in got["end"]
-    assert "hide it" in got["own"] and got["rows"] == ["ev"] and box_rows >= 2 and "Events" in text
+    assert got["start"] == [] and got["after"] == ["mine", "q"] and got["hidden"] is True and got["end"] == []
+    assert "no part 'chart'" in got["bad"] and "query, road_card" in got["bad"]
+    assert got["rows"] == ["ev"] and box_rows >= 2 and "Events" in text
 
 
 def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
@@ -89,9 +102,12 @@ def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
         const lum = c => { const [r, g, b] = rgb(c).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
         const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + .05) / (y + .05); };
         const sec = document.querySelector('[data-rs-section=notes]'), cs = s => getComputedStyle(sec.querySelector(s));
-        const card = cs('.rs-sec-box').backgroundColor;
-        return {text: cs('p').color, note: cs('.sb-note').color, link: cs('a').color, card,
-                ratios: [cr(cs('p').color, card), cr(cs('.sb-note').color, card), cr(cs('a').color, card), cr(cs('.rs-sec-box').color, card)]}; }"""
+        const card = cs('.rs-sec-box').backgroundColor, part = s => getComputedStyle(document.querySelector(s));
+        rsSelect(1);
+        const rc = part('.rs-road-card'), q = part('.rs-q'), bg = getComputedStyle(document.getElementById('sb')).backgroundColor;
+        return {text: cs('p').color, note: cs('.sb-note').color, link: cs('a').color, card, roadCard: rc.backgroundColor,
+                ratios: [cr(cs('p').color, card), cr(cs('.sb-note').color, card), cr(cs('a').color, card), cr(cs('.rs-sec-box').color, card),
+                         cr(getComputedStyle(document.querySelector('.rs-road-card .rs-kv b')).color, rc.backgroundColor), cr(q.color, q.backgroundColor)]}; }"""
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, _page(tmp_path, panel=_PANEL))
         light = page.evaluate(probe)
@@ -100,7 +116,7 @@ def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
         dark = page.evaluate(probe)
         browser.close()
     assert not errors
-    assert light["text"] != dark["text"] and light["card"] != dark["card"] and light["link"] != dark["link"]
+    assert light["text"] != dark["text"] and light["card"] != dark["card"] and light["link"] != dark["link"] and light["roadCard"] != dark["roadCard"]
     assert min(light["ratios"]) >= 4.5 and min(dark["ratios"]) >= 4.5, (light, dark)
 
 
@@ -153,23 +169,24 @@ def test_the_panel_scrollbar_is_hidden_at_rest_has_enough_contrast_and_the_fade_
     assert light["ratio"] >= 3.0 and dark["ratio"] >= 3.0, (light, dark)
 
 
-def test_the_default_panel_shows_only_the_query_and_the_selected_road_and_the_toolbox_has_the_rest(tmp_path):
-    """The toolbox has boxes for the base map, the colour and the legend, so the panel hides their sections; the page starts with no scale box."""
+def test_the_default_panel_is_empty_and_the_toolbox_has_the_base_map_and_the_legend(tmp_path):
+    """The panel starts empty (2026-11-02): the page adds its parts; the toolbox has boxes for the base map, the colour and the legend; the page starts
+    with no scale box."""
     path = tmp_path / "default.html"
     rs.render_dashboard(_edges(), color_options={"Road class": {}}).save(path)
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         got = page.evaluate("""() => ({shown: rs.sections.list().filter(id => !rs.sections.get(id).hidden), tools: rs.tools.list().map(t => t.id),
-            scale: getComputedStyle(document.querySelector('.maplibregl-ctrl-scale')).display, rows: document.querySelectorAll('#bm option').length})""")
+            scale: getComputedStyle(document.querySelector('.maplibregl-ctrl-scale')).display, body: document.querySelector('#sb .sb-body').children.length})""")
         browser.close()
-    assert not errors and got["shown"] == ["query", "selected_road"]
+    assert not errors and got["shown"] == [] and got["body"] == 0
     assert {"basemap", "legend"} <= set(got["tools"]) and got["scale"] == "none"
 
 
 def test_the_base_map_follows_the_theme_from_the_start(tmp_path):
     """The blank map (and any base map with a dark twin) turns dark with the theme, and light again, with no earlier choice of a base map."""
     path = tmp_path / "theme.html"
-    rs.render_dashboard(_edges(), color_options={"Road class": {}}).save(path)
+    rs.render_dashboard(_edges(), basemap="blank", color_options={"Road class": {}}).save(path)
     probe = "({key: rs.getState().basemap, bg: getComputedStyle(map.getContainer()).backgroundColor})"
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)

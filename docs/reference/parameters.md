@@ -10,7 +10,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 |---|---|---|
 | **Render** | | |
 | `render_edges(gdf, **kw)` | `WebMap` | the main call; every keyword [below](#render_edges) |
-| `render_dashboard(gdf, **kw)` | `WebMap` | the map, a panel and the standard toolbox ([Pages](#pages), [Dashboard layout](../guides/dashboard-layout.md)) |
+| `render_dashboard(gdf, **kw)` | `WebMap` | the map, a panel and the standard toolbox ([Pages](#pages), [Dashboard options](#dashboard-options)) |
 | `render_street_view(gdf, **kw)` | `WebMap` | map + Google Street View side by side ([Pages](#pages)) |
 | `sidebar_html(name)` | `str` | a bundled sidebar fragment: `"dashboard"`, `"street_view"` |
 | `export_style(gdf, out_dir, *, base_url, format="xyz", basemap=<render_edges'>, **kw)` | path of `style.json` | the roads as a MapLibre style + vector tiles (`"xyz"` folder or `"pmtiles"`) + sprite, for other map apps ([Put it on a website](../guides/website.md#a-style-for-other-map-apps)); `basemap=None`: no base map; `kw` go to `render_edges` |
@@ -69,7 +69,7 @@ ignore it.
 | `legend` | `True` | web | a legend for data colouring (class styling has none). Web: a page key; the style always has the legend data (`roadstyle:color_options`) |
 | `name` | `"roadstyle"` | web | the page title |
 | `hover_color` / `select_color` | `"#b388ff"` / `"#7c4dff"` | web | highlight of the hovered / selected road |
-| `minzoom` | `None` (one table for `render_dashboard`: service roads and living streets from zoom 14, steps, platforms, corridors and roads from zoom 15, private-access roads from zoom 15, every other class from zoom 0) | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default of `render_edges`), a dict overrides parts of it (the key `"*"` sets every class first: `{"*": 0, "service": 14}` is every class at every zoom but the service roads; the key `"@private"` is the first zoom of the roads with private access (`access_col`), whatever their class), `False` = all classes at all zooms |
+| `minzoom` | `None` (the same for `render_dashboard`) | web | hide minor classes when zoomed out, as OpenMapTiles and OSM-Carto do: `None` or `True` = the `minzoom` setting (the default of `render_edges`), a dict overrides parts of it (the key `"*"` sets every class first: `{"*": 0, "service": 14}` is every class at every zoom but the service roads; the key `"@private"` is the first zoom of the roads with private access (`access_col`), whatever their class), `False` = all classes at all zooms |
 | `offset_frac` | `0.28` | web | two-way lane offset, fraction of the road's pixel width; `0` = no lane split |
 | `width_frac` | `0.6` | web | each lane's width, fraction of the full road width |
 | `offset_zoom` | `15` | web | zoom where the two directions start to fan apart |
@@ -102,7 +102,7 @@ ignore it.
 | `color_col` | `"color"` | all | the colour column when `color_table` is a DataFrame |
 | `color_options` | `None` | web | `{name: {styler kwargs}}`: a *Colour by* menu that recolours in the browser; the first entry shows on open |
 | `color_active` | `0` | web | the option shown on open (index or name) |
-| `template` | `None` | web | `"map"` (no panel; the default of `render_edges`) or `"dashboard"` (the default of `render_dashboard`). The dashboard sets the panel, the toolbar and the window rules; it also sets `name`, `basemap`, `basemap_switcher`, `filter_control`, `road_popup` and `minzoom` where the call gives none. A future template follows the style of the dashboard. The old `sidebar=` and the names `"classic"` and `"report"` are errors (there is no report page) |
+| `template` | `None` | web | `"map"` (no panel; the default of `render_edges`) or `"dashboard"` (the default of `render_dashboard`). The dashboard sets the panel (empty), the toolbar and the window rules. It sets no keyword of the map: its map has the defaults of `"map"` (since 0.27.0; before, it set `name`, `basemap="blank"`, `road_popup=False` and a `minzoom` table). A future template follows the style of the dashboard. The old `sidebar=` and the names `"classic"` and `"report"` are errors (there is no report page) |
 | `layout` | `None` | web | the dashboard's frame: `"overlay"` (default: the map fills the window, the panel floats, a toolbar) or `"dock"` (the panel is docked at the left and takes its own space, no toolbox). `template="dashboard"` only |
 | `views` | `None` | web | `{name: {setting: value}}`: a *View* menu next to *Colour by*; each view sets several things at once, the first shows on open |
 
@@ -113,6 +113,13 @@ A `views` entry sets only what it names: `color` (a `color_options` name), `road
 (`True` / `False`), `overlays` (`{label: True / False}`), `classes` (a list of road classes), `basemap` (a key), `palette` (a palette
 name: every color of the map, [Profiles and palettes](settings.md#profiles-and-palettes)). An unknown setting, or a name the page does not
 have, is an error. Each palette that a view names is built once more into the page, so the page is somewhat larger.
+
+A view sets only what it names, so name the same settings in every view when they must switch back. `palette` switches every color of the map: the road classes, and also the names, arrows, bridges, tunnels and the swatches of the `roads` tool. A color option with a palette (`{"palette": "carto"}`) recolors only the road fills. A page with the toolbox bar (the dashboard) hides the *View* menu: call `rsSetView(name)` from your own control there. `rsSetRoadFill(on)` sets the fill alone.
+
+```python
+rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positron"},
+                              "Night": {"palette": "mono", "basemap": "ofm_dark"}})
+```
 
 ### Popups & hover
 
@@ -134,7 +141,7 @@ have, is an error. Each palette that a view names is built once more into the pa
 |---|---|---|---|
 | `street_view` | `"window"` | web | `"window"` = a map button and a floating window that follows the clicked road; `"dock"` (dashboard) = Street View beside the map with a divider, and no panel (see [Docked](../guides/street-view.md#docked-beside-the-map)); `True` = a link in the popup; `False` = none. Needs the page served over http(s) ([guide](../guides/street-view.md)) |
 | `street_view_key` | env `GOOGLE_MAPS_KEY` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses ([Set up a Google key](../guides/google-key.md)) |
-| `mapillary_token` | env `MAPILLARY_TOKEN` | web | a free Mapillary client token (mapillary.com/developer): the Street View window's Mapillary tab and its coverage layer. Without it the tab asks for one; the person can also save one in the settings (Keys), which is used instead of the page's. Panoramax needs no key |
+| `mapillary_token` | env `MAPILLARY_TOKEN` | web | a free Mapillary client token (mapillary.com/developer): the Street View window's Mapillary tab and its coverage layer. Without it the tab asks for one; the person can also save one in the settings (Keys), which is used instead of the page's. Panoramax needs no key. Limit the token to your site: it is written into the page |
 | `google_3d` | on with a toolbar, else `False` | web | `True`: a Google 3D button and a floating window with Google's photorealistic 3D view; its camera and the map's move together, and a clicked road is drawn in it. Needs `street_view_key` (an error without it) ([guide](../guides/google-3d.md)) |
 | `google_3d_layers` | `[]` | web | a list of layers for the Google 3D window, each `{id, kind, source, match, scope, max, on, arrows, style}` (typed: a wrong key or `kind` is an error). A layer draws the features of a GeoJSON source of the page; the window's Show menu turns each on or off ([guide](../guides/google-3d.md#your-own-layers)) |
 
@@ -189,8 +196,8 @@ Returns a `WebMap` (`.save()`).
 | `items_popup` | `None` | web | the fields a clicked `pick` item shows (`None`: all of its fields) |
 | `boundary` | `None` | web | a dashed outline on top: shapely geometry, GeoDataFrame or GeoJSON. It is an input: the caller says where it comes from (a duckOSM `main.boundary`, a city limit, a drawn shape) |
 | `boundary_dim` | `False` | web | `True`: shade the outside of `boundary` (the opacity is in the template's `boundary` options) |
-| `dashboard` | `None` | web | a partial dashboard option merged over the template's: `{"toolbar": {"position": "left", "hold": True, "navigation": "buttons"}, "windows": {...}, "google_3d": {"selection_style": {"width": 12}, "mesh_altitude_m": 1.5, "follow": False}, ...}`. Mappings merge field by field. A wrong key or value is an error; the template cannot change. Also `{"panel": {"sections": [...], "hide": [...]}, "legend": {"rows": [...]}}`: the page's blocks in the panel and rows in the legend ([Add to the panel](../guides/dashboard-panel.md)). All fields: `docs/design/dashboard_templates.md` 3.1. `template="dashboard"` only |
-| `page_script` | `None` | web | JavaScript text that the page runs, the last script of the body: it sees the panel and `rs`. Wait for the event `rs:ready` (`window.rs` and the panel's sections are there; `window.rsReady` is true after it) ([Live data](../guides/live-data.md)) |
+| `dashboard` | `None` | web | a partial dashboard option, merged over the defaults of the template `dashboard`: `{"toolbar": {"position": "left"}, "panel": {"sections": [...]}}`. A wrong key or value is an error. Every key, default and meaning: [Dashboard options](#dashboard-options). `template="dashboard"` only |
+| `page_script` | `None` | web | JavaScript text that the page runs, the last script of the body, before the page is ready: it sees `rs`. Put the code in `rs.ready(() => ...)`, which runs it when the panel's sections are there (and at once if they are) ([Live data](../guides/live-data.md)) |
 | `page_style` | `None` | web | CSS text of the page, the last style of the body |
 | `boundary_limit` | `False` | web | `True`: the camera stays near `boundary` (the center inside its bounds grown by `limit_pad`, and the lowest zoom `zoom_out` levels under the fit) |
 
@@ -201,7 +208,7 @@ change the defaults below.
 
 | function | page | changed defaults | own keywords |
 |---|---|---|---|
-| `render_dashboard` | the map, a panel (query box, results table, selected-road read-out) and the standard toolbox (navigate, base map, roads, colour and legend, settings, credits; the panel hides the sections that the toolbox has) | `template="dashboard"`, `name="Roads dashboard"`, `basemap="blank"` (no key), `basemap_switcher=True`, `filter_control=False`, `road_popup=False`; the panel and the toolbox at the left, no scale box | `layout="dock"`: the sidebar docked at the left and no toolbox. The default `"overlay"` floats the sidebar over a full map ([Dashboard layout](../guides/dashboard-layout.md)) |
+| `render_dashboard` | the map, an empty panel to which the page adds parts (`dashboard={"panel": {"sections": [{"id": "q", "part": "query"}]}}`, [Add to the panel](../guides/dashboard-panel.md)), and the standard toolbox (navigate, base map, roads, colour and legend, settings, credits) | `template="dashboard"`; the map keeps the defaults of a map page; the panel at the left, the toolbox at the right edge, no scale box | `layout="dock"`: the panel docked at the left and no toolbox. The default `"overlay"` floats the panel over a full map ([Dashboard layout](../guides/dashboard-layout.md)) |
 | `render_street_view` | map + Google Street View of the clicked road | `name="Roads and Street View"`, `road_popup=False`, `street_view=True` | see below |
 
 | `render_street_view` keyword | default | what |
@@ -210,6 +217,128 @@ change the defaults below.
 | `panel_width` | `42` | Street View's share of the window, 20-80 % (of the height when below) |
 | `resizable` | `True` | a divider the viewer can drag; the choice is remembered in their browser |
 | `street_view_key` | env `GOOGLE_MAPS_KEY` | a Google Maps JavaScript API key: the panel becomes a real panorama, the map marker walks and turns with the viewer, and it shows Google's own street imagery only. Written into the page; restrict it to your site's addresses |
+
+## Dashboard options
+
+`dashboard=` is a partial option of the template `dashboard`. The call merges it over the defaults of the template, field by field. Give only the keys that you change. A wrong key or value is an error, and so is `template` (use the keyword `template=`). Guides: [Dashboard layout](../guides/dashboard-layout.md) for the frame and the toolbox, [Add to the panel](../guides/dashboard-panel.md) for the panel.
+
+```python
+rs.render_dashboard(edges, dashboard={
+    "toolbar": {"position": "left"},
+    "panel": {"side": "right", "look": "card", "width_px": 360},
+})
+```
+
+The options are in groups: the frame (`layout`, `scale_box`), `panel`, `toolbar`, `legend`, `credits`, `windows`, `boundary` and `google_3d`. The defaults below are those of `layout="overlay"`. `layout="dock"` has no toolbar, and its `windows` default to `clamp` False and `recenter_map` True.
+
+**Frame**
+
+| key | default | meaning |
+|---|---|---|
+| `layout` | `"overlay"` | `"overlay"`: the map fills the window and the panel floats over it. `"dock"`: the panel takes its own space at the left and there is no toolbox. The page keyword `layout=` sets it |
+| `scale_box` | `False` | `True` shows the scale and the zoom number at the start. The person can change it in the settings |
+
+**`panel`** (`None` removes the panel: the page is the map and the toolbox)
+
+| key | default | meaning |
+|---|---|---|
+| `side` | `"left"` | `"left"` or `"right"` |
+| `width_px` | `400` | the width of the panel. Fit the content to the panel and do not widen the panel for it |
+| `look` | `"frame"` | `"frame"`: full height, with a translucent frame. `"card"`: a floating card |
+| `sections` | `[]` | the sections that the page adds to the empty panel, in order. A section is a mapping with the keys of the next table |
+
+A section (`panel.sections`; the errors are in [Add to the panel](../guides/dashboard-panel.md#the-errors)):
+
+| key | default | meaning |
+|---|---|---|
+| `id` | required | the name of the section. It is not empty and not used twice |
+| `part` | none | a part of roadstyle: `"query"` or `"road_card"`. A section has `part` or `html`, not both |
+| `html` | none | the page's own HTML |
+| `text` | none | the start text of the part `query` (none: an empty box) |
+| `fields` | none | the columns that the part `road_card` shows (none: every column) |
+| `label` | none | the heading of the section |
+| `after`, `before` | none | the `id` of an earlier section: this section goes after it, or before it. Give one of them |
+| `fold` | `False` | `True`: the label is a button that folds the section. It needs a `label` |
+
+There is no `hide` key and no `phone` option. The page turns to its phone form by itself when the window is 700 px wide or less (a phone, or a narrow desktop window), with the bar at the top. The page data holds these fixed values as `phone.max_width_px` (700) and `phone.toolbar` (top). `dashboard=` cannot change them.
+
+**`toolbar`** (`None`: no toolbox)
+
+| key | default | meaning |
+|---|---|---|
+| `position` | `"right"` | `"right"`, `"left"`, `"top"` or `"bottom"` |
+| `navigation` | `"box"` | `"box"`: one compass-needle button that opens a box with a zoom, a turn and a tilt slider. `"buttons"`: the buttons zoom in, zoom out, compass and 2D/3D |
+| `settings` | `True` | shows the `settings` tool |
+| `hold` | `False` | `True` keeps the bar hidden until your page calls `rs.tools.ready()`, or for 6 s |
+
+**`legend`**
+
+| key | default | meaning |
+|---|---|---|
+| `rows` | `[]` | rows that your page adds to the legend box, after the rows of the colour option. A row is `{color, label, shape}`. `shape` is `"square"` (default), `"circle"` or `"line"`. A wrong shape is an error |
+
+**`credits`**
+
+| key | default | meaning |
+|---|---|---|
+| `credits` | `[{"text": "© OpenStreetMap contributors", "href": "https://www.openstreetmap.org/copyright"}]` | the credits of your own data: `[{"text": ..., "href": ...}]`. They show before the credits of the base map. `[]` shows none of them. `href` is optional |
+
+**`windows`**: the rules of the Street View and Google 3D windows
+
+| key | default | meaning |
+|---|---|---|
+| `clamp` | `True` | keeps a window inside the free part of the screen |
+| `recenter_map` | `False` | `True` moves the map when you drag a window |
+| `restore_open` | `True` | opens again the windows that were open at the last visit |
+| `remember` | `True` | keeps the size and the place of each window in the browser |
+
+**`boundary`**: what the page does with the keyword `boundary=`
+
+| key | default | meaning |
+|---|---|---|
+| `dim` | `False` | shades the outside of the boundary (the keyword `boundary_dim`) |
+| `limit` | `False` | keeps the camera near the boundary (the keyword `boundary_limit`) |
+| `dim_light`, `dim_dark` | `0.16`, `0.4` | the opacity of the shade in the light and in the dark theme |
+| `limit_pad` | `2.0` | the center of the map stays inside the bounds of the boundary, grown by this share of their size |
+| `zoom_out` | `3.0` | the lowest zoom is this many levels under the zoom at which the whole boundary fits the window |
+
+A page with no `boundary=` has neither the shade nor the limit.
+
+**`google_3d`**: the Google 3D window ([guide](../guides/google-3d.md))
+
+| key | default | meaning |
+|---|---|---|
+| `fov_deg` | `None` | Google's vertical field of view. `None`: the range comes from the camera distance of the map |
+| `follow` | `True` | the window starts with **Follow** on |
+| `min_alt_m` | `80.0` | under this camera height, in meters, the window shows a note |
+| `min_zoom_drawn` | `17.0` | over this map zoom, the drawn map shows the note |
+| `mesh_altitude_m` | `1.5` | the height in meters over Google's mesh at which a line or a pin lies. At 0.5 m the bumps of the mesh cut a line into pieces |
+| `selection_style` | see the next table | the line, the outline and the arrows of the selected road |
+| `layers` | `[]` | layers from GeoJSON sources of the page. The keyword `google_3d_layers` sets them |
+
+The keys of `selection_style`:
+
+| key | default | meaning |
+|---|---|---|
+| `color`, `width` | `#22d3ee`, `8` | the line |
+| `outline`, `outline_width` | `#0b1020`, `2` | the outline of the line |
+| `arrow_color`, `arrow_width` | `#ffffff`, `5` | the arrows |
+| `arrow_every` | `25` | meters between two arrows |
+| `fill` | `rgba(34,211,238,0.35)` | the fill of a polygon |
+
+A layer of `google_3d.layers` (an error: a missing `id`, `kind` or `source`, an `id` used twice, or the scope `selection` without `match`):
+
+| key | default | meaning |
+|---|---|---|
+| `id`, `label` | required, none | the name of the layer, and its text in the **Show** menu |
+| `kind` | required | `"line"`, `"ribbon"`, `"polygon"` or `"points"` |
+| `source` | required | the id of a GeoJSON source of the page |
+| `scope` | `"selection"` | `"selection"`: the features tied to the selected road. `"view"`: the features in the visible area |
+| `match` | none | for the scope `selection`: the property that ties a feature to the road |
+| `max` | `500` | for the scope `view`: the most features drawn |
+| `on` | `True` | the layer starts shown |
+| `arrows` | `False` | for the kind `line`: direction arrows along the line |
+| `style` | `{}` | `color`, `width`, `outline`, `outline_width`, `dash` (`[m on, m off]`), `fill`, `width_m`, `width_prop` (the property that holds the ribbon width) and `radius` (for points). A key that does not fit the kind has no effect |
 
 ## Overlay
 

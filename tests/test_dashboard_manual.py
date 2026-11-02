@@ -51,10 +51,12 @@ def _keys(d):
 
 
 def test_the_manual_names_every_option_of_the_dashboard(tmp_path):
-    keys = set(_keys(_dashboard_option(_page(tmp_path).read_text(encoding="utf-8"))))
+    d = _dashboard_option(_page(tmp_path).read_text(encoding="utf-8"))
+    d.pop("phone")                     # fixed values of the page, not an option of dashboard= (an error since 0.27.0)
+    keys = set(_keys(d))
     keys |= {"style", "kind", "source", "scope", "match", "max", "on", "arrows", "label", "id",                       # a layer of google_3d
              "dash", "fill", "width_m", "width_prop", "radius", "color", "width", "outline", "outline_width",          # its style
-             "html", "after", "before", "fold", "shape"}                                                              # a section, a legend row
+             "html", "part", "text", "fields", "after", "before", "fold", "shape"}                                   # a section, a legend row
     missing = sorted(k for k in keys if k not in PYTHON)
     assert not missing, f"python.md does not name these options: {missing}"
 

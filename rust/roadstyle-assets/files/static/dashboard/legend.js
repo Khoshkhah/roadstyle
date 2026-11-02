@@ -16,10 +16,9 @@ const _lgRows = () => {
 };
 // the mark of a row: a square (the default), a circle or a line (the css class; a name that is not one of them is an error)
 const _shape = r => { const k = r.shape || "square"; if(!["square", "circle", "line"].includes(k)) throw new Error("legend row '" + r.id + "': shape must be square, circle or line, not '" + k + "'"); return k; };
-// the colour box's rows (.lg-row) or the panel's (.sb-lgrow: the panel has its own style, in the theme of the panel)
-const _lgExtraHtml = panel => _lgRows().map(r => r.html || (panel
-  ? '<div class="sb-lgrow"><i class="' + _shape(r) + '" style="background:' + _esc(r.color) + '"></i>' + _esc(r.label) + "</div>"
-  : '<div class="lg-row"><span class="lg-sw ' + _shape(r) + '" style="background:' + _esc(r.color) + '"></span>' + _esc(r.label) + "</div>")).join("");
+// the page's rows in the colour box (.lg-row)
+const _lgExtraHtml = () => _lgRows().map(r => r.html ||
+  '<div class="lg-row"><span class="lg-sw ' + _shape(r) + '" style="background:' + _esc(r.color) + '"></span>' + _esc(r.label) + "</div>").join("");
 export function coLegendHtml(lg){
   if(!lg) return "";
   let h = lg.title ? '<div class="lg-title">'+_esc(lg.title)+'</div>' : "";
@@ -53,14 +52,8 @@ export function useLegend(){
 }
 // live data (rs.setData): its legend in the box, in place of the colour option's; null: the colour option's again
 export function setLiveLegend(lg){ _liveLegend = lg; useLegend(); }
-// the rows of the page in the panel's legend too: a box after its list (the template fills the list again at each colour option)
+// the page's rows changed: the colour box shows them again
 export function legendRefresh(){
-  const list = document.getElementById("sb-legend");
-  if(list){
-    let x = document.getElementById("sb-legend-extra");
-    if(!x){ x = document.createElement("div"); x.id = "sb-legend-extra"; list.after(x); }
-    x.innerHTML = _lgExtraHtml(true);
-  }
   useLegend();
 }
 // rs.legend: the page's own rows

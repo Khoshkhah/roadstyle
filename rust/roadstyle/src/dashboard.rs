@@ -5,9 +5,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// The named form of a page. `Map`: the map and its control column. `Dashboard`: the map and the query sidebar (decided 2026-10-29: this is the one
-/// template with a panel; a later template follows its style). The sidebar floats over a full map with the toolbar (`Layout::Overlay`, the
-/// default of `render_dashboard`), or it is docked at the right with no toolbar (`Layout::Dock`).
+/// The named form of a page. `Map`: the map and its control column. `Dashboard`: the same map, the toolbox and a panel that starts empty
+/// (decided 2026-10-29: this is the one template with a panel; a later template follows its style; the panel empty since 2026-11-02). The
+/// panel floats over a full map with the toolbox (`Layout::Overlay`, the default of `render_dashboard`), or it is docked at the left with no
+/// toolbox (`Layout::Dock`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Template {
@@ -43,19 +44,35 @@ pub enum PanelLook {
     Frame,
 }
 
-/// The ids of the panel's own sections, in their order: a section of the page goes `after` or `before` one of them, and `hide` can name them.
-pub const PANEL_SECTIONS: [&str; 5] = ["base_map", "colour_by", "legend", "query", "selected_road"];
+/// A part that roadstyle writes into a section of the panel (docs/guides/dashboard-panel.md). The panel has no part of its own: a page adds them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Part {
+    /// a WHERE clause over the roads' columns, with Run, Filter, Colour and Reset, and the list of the matching roads
+    Query,
+    /// the selected road's fields, on `rs:select`
+    RoadCard,
+}
 
-/// A section that the page adds to the panel: a block of HTML, with an optional heading (a `<label>`), at the end of the panel or beside another
-/// section. The HTML is the page's own: it is written into the page as it is.
+/// A section that the page adds to the panel: the page's own HTML (`html`) or a part of roadstyle (`part`), with an optional heading (a `<label>`),
+/// at the end of the panel or beside an earlier section. The HTML is the page's own: it is written into the page as it is.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Section {
     pub id: String,
-    pub html: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub html: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part: Option<Part>,
+    /// the query's start text (`part: "query"`; none: an empty box)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    /// the columns that the road card shows (`part: "road_card"`; none: every column)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    /// the id of a section (the panel's or an earlier one of the page): this one goes after it
+    /// the id of an earlier section: this one goes after it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after: Option<String>,
     /// the same, before it
@@ -66,7 +83,7 @@ pub struct Section {
     pub fold: bool,
 }
 
-/// The side panel: its edge, its width, its look, the sections that the page adds, and the panel's own sections that it hides. The panel's HTML is
+/// The side panel: its edge, its width, its look, and the sections that the page adds (the panel starts empty). The panel's HTML is
 /// the template's.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -76,8 +93,6 @@ pub struct Panel {
     pub look: PanelLook,
     #[serde(default)]
     pub sections: Vec<Section>,
-    #[serde(default)]
-    pub hide: Vec<String>,
 }
 
 /// The mark of a legend row: what the page draws in this colour (a road is a line, a sensor a circle).
@@ -359,25 +374,26 @@ pub struct Dashboard {
     /// the scale bar and the zoom number: shown at the start. The dashboard hides them (the person can show them in the settings)
     #[serde(default)]
     pub scale_box: bool,
+    /// the phone form: fixed (700 px, the bar at the top); the page turns to it by itself; `dashboard=` cannot change it
     pub phone: Phone,
 }
 
 impl Template {
-    /// The sidebar's HTML, and the keywords that it changes when the call gives none (pages.py's defaults; tests/test_pages.py checks them).
-    /// `map` has no sidebar.
+    /// The panel's HTML, and the keywords that it changes when the call gives none: none, as the map of the dashboard is the map of the
+    /// template `map`, with its defaults (decided 2026-11-02; tests/test_pages.py checks it).
+    /// `map` has no panel.
     pub(crate) fn sidebar(self) -> Option<(&'static str, &'static str)> {
         match self {
             Template::Map => None,
             Template::Dashboard => Some((roadstyle_assets::text!("templates/dashboard.html"),
-                r#"{"name": "Roads dashboard", "basemap": "blank", "basemap_switcher": true, "filter_control": false, "road_popup": false, "minzoom": {"*": 0, "service": 14, "living_street": 14, "steps": 15, "platform": 15, "corridor": 15, "road": 15, "@private": 15}}"#)),
+                "{}")),
         }
     }
 
     /// The defaults of the template with a layout (`Map` has no panel, so the layout does not change it).
     pub fn dashboard(self, layout: Layout) -> Dashboard {
-        // the panel at the left, with the sections that the bar's boxes already have (the base map, the colour and the legend) hidden (decided 2026-10-29)
-        let panel0 = Some(Panel { side: Edge::Left, width_px: 400, look: PanelLook::Frame, sections: Vec::new(),
-                                  hide: ["base_map", "colour_by", "legend"].map(String::from).to_vec() });
+        // the panel at the left and empty: the page adds its parts (decided 2026-11-02)
+        let panel0 = Some(Panel { side: Edge::Left, width_px: 400, look: PanelLook::Frame, sections: Vec::new() });
         let free = WindowRules { clamp: false, recenter_map: true, restore_open: true, remember: true };
         let phone = Phone { max_width_px: 700, toolbar: Edge::Top };
         let (layout, panel, toolbar, windows) = match (self, layout) {
@@ -461,6 +477,14 @@ pub fn merge(base: &Dashboard, over: &Value) -> Result<Dashboard, crate::Error> 
     if o.contains_key("template") {
         return Err(crate::error::options("dashboard= cannot change the template: use template="));
     }
+    if o.contains_key("phone") {
+        return Err(crate::error::options("dashboard=: phone is not an option: the page turns to its phone form by itself when the window is \
+            700 px wide or less (a phone, or a narrow desktop window), with the bar at the top (roadstyle 0.27.0)"));
+    }
+    if o.get("panel").and_then(Value::as_object).is_some_and(|p| p.contains_key("hide")) {
+        return Err(crate::error::options("dashboard=: panel.hide is gone: the panel is empty now (roadstyle 0.27.0), so there is nothing to hide. \
+            Add what the page needs with panel.sections, for example {\"id\": \"q\", \"part\": \"query\"} (docs/guides/dashboard-panel.md)"));
+    }
     let mut v = serde_json::to_value(base).expect("a Dashboard is JSON");
     deep(&mut v, over);
     let merged: Dashboard = serde_json::from_value(v).map_err(|e| crate::error::options(format!("dashboard=: {e}")))?;
@@ -469,15 +493,24 @@ pub fn merge(base: &Dashboard, over: &Value) -> Result<Dashboard, crate::Error> 
 }
 
 impl Dashboard {
-    /// The checks of the panel's sections: an id is used once and is not one of the panel's own; `after` and `before` name a section that is there
-    /// (the panel's, or an earlier one of the page), and not both; `hide` names a section that is there.
+    /// The checks of the panel's sections: an id is used once; a section has `html` or `part`, not both; `text` is the query's and `fields`
+    /// the road card's; `after` and `before` name an earlier section, and not both.
     pub fn check(&self) -> Result<(), crate::Error> {
         let Some(p) = &self.panel else { return Ok(()) };
-        let mut known: Vec<&str> = PANEL_SECTIONS.to_vec();
+        let mut known: Vec<&str> = Vec::new();
         let bad = |m: String| Err(crate::error::options(format!("dashboard=: panel.{m}")));
         for s in &p.sections {
-            if s.id.is_empty() || PANEL_SECTIONS.contains(&s.id.as_str()) || known.contains(&s.id.as_str()) {
-                return bad(format!("sections: the id '{}' is empty or used twice (the panel's own ids: {})", s.id, PANEL_SECTIONS.join(", ")));
+            if s.id.is_empty() || known.contains(&s.id.as_str()) {
+                return bad(format!("sections: the id '{}' is empty or used twice", s.id));
+            }
+            if s.html.is_some() == s.part.is_some() {
+                return bad(format!("sections: '{}' needs `html` (the page's own) or `part` (\"query\" or \"road_card\"), and not both", s.id));
+            }
+            if s.text.is_some() && s.part != Some(Part::Query) {
+                return bad(format!("sections: '{}' has `text`, which only the part \"query\" has", s.id));
+            }
+            if s.fields.is_some() && s.part != Some(Part::RoadCard) {
+                return bad(format!("sections: '{}' has `fields`, which only the part \"road_card\" has", s.id));
             }
             if s.fold && s.label.is_none() {
                 return bad(format!("sections: '{}' folds (`fold`) and has no `label`, which is its button", s.id));
@@ -487,23 +520,20 @@ impl Dashboard {
             }
             for at in s.after.iter().chain(s.before.iter()) {
                 if !known.contains(&at.as_str()) {
-                    return bad(format!("sections: '{}' goes beside '{at}', which is not a section here (it is one of {}, or an earlier section)", s.id, PANEL_SECTIONS.join(", ")));
+                    return bad(format!("sections: '{}' goes beside '{at}', which is not an earlier section (the panel has none of its own)", s.id));
                 }
             }
             known.push(&s.id);
         }
-        match p.hide.iter().find(|h| !known.contains(&h.as_str())) {
-            Some(h) => bad(format!("hide: '{h}' is not a section (the panel's own: {})", PANEL_SECTIONS.join(", "))),
-            None => Ok(()),
-        }
+        Ok(())
     }
 }
 
-/// The keywords that the template with a sidebar changes, and their values (`page_options`' `template_keys`).
+/// The keywords that the template with a panel changes (none), and their values (`page_options`' `template_keys`).
 pub fn template_keys() -> Map<String, Value> {
     [Template::Dashboard].into_iter()
         .map(|t| (serde_json::to_value(t).expect("a name").as_str().expect("a name").to_string(),
-                  serde_json::from_str(t.sidebar().expect("a sidebar").1).expect("a template's defaults are JSON")))
+                  serde_json::from_str(t.sidebar().expect("a panel").1).expect("a template's defaults are JSON")))
         .collect()
 }
 
@@ -517,7 +547,7 @@ mod tests {
     fn each_form_has_its_defaults() {
         let d = Template::Dashboard.dashboard(Dock);
         assert_eq!((d.layout, d.panel.as_ref().map(|p| (p.side, p.width_px, p.look)), d.toolbar), (Dock, Some((Edge::Left, 400, PanelLook::Frame)), None));
-        assert_eq!(d.panel.as_ref().unwrap().hide, ["base_map", "colour_by", "legend"]);
+        assert!(d.panel.as_ref().unwrap().sections.is_empty(), "the panel starts empty");
         let r = Template::Dashboard.dashboard(Overlay);
         assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
@@ -561,7 +591,7 @@ mod tests {
         assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock","rs-panel-left","rs-hide-scale")"#));
         // the width of the panel, and a side and a look that are not the default
         let mut wide = Template::Dashboard.dashboard(Overlay);
-        wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card, sections: Vec::new(), hide: Vec::new() });
+        wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card, sections: Vec::new() });
         let w = wide.first_paint();
         assert!(w.contains(r#""rs-panel-left","rs-panel-card""#) && w.contains(r#"setProperty("--rs-panel-w","420px")"#), "{w}");
     }
@@ -602,10 +632,10 @@ mod tests {
     }
 
     #[test]
-    fn the_sidebar_template_changes_the_keywords_of_its_page() {
+    fn the_sidebar_template_changes_no_keyword_of_its_page() {
         let k = template_keys();
         assert_eq!(k.len(), 1);
-        assert_eq!(k["dashboard"]["name"], "Roads dashboard");
+        assert_eq!(k["dashboard"], serde_json::json!({}), "the map of a dashboard has the defaults of the template map");
     }
 
     #[test]
@@ -624,18 +654,27 @@ mod tests {
     #[test]
     fn the_sections_of_the_panel_are_checked() {
         let base = Template::Dashboard.dashboard(Overlay);
-        let ok = merge(&base, &serde_json::json!({"panel": {"sections": [{"id": "notes", "html": "<p>x</p>", "label": "Notes", "after": "legend"},
-            {"id": "more", "html": "<p>y</p>", "before": "notes"}], "hide": ["base_map", "notes"]}, "legend": {"rows": [{"color": "#f00", "label": "Events", "shape": "circle"}]}})).unwrap();
-        assert_eq!((ok.panel.as_ref().unwrap().sections.len(), ok.legend.rows.len()), (2, 1));
+        let ok = merge(&base, &serde_json::json!({"panel": {"sections": [{"id": "q", "part": "query", "text": "p.lanes >= 2", "label": "Query"},
+            {"id": "notes", "html": "<p>x</p>", "label": "Notes", "after": "q"}, {"id": "road", "part": "road_card", "fields": ["name"], "before": "notes"}]},
+            "legend": {"rows": [{"color": "#f00", "label": "Events", "shape": "circle"}]}})).unwrap();
+        assert_eq!((ok.panel.as_ref().unwrap().sections.len(), ok.legend.rows.len()), (3, 1));
+        assert_eq!(ok.panel.as_ref().unwrap().sections[2].part, Some(Part::RoadCard));
         assert_eq!(ok.legend.rows[0].shape, LegendShape::Circle);
-        for (bad, said) in [(serde_json::json!([{"id": "legend", "html": ""}]), "used twice"), (serde_json::json!([{"id": "a", "html": "", "after": "zzz"}]), "not a section here"),
-                            (serde_json::json!([{"id": "a", "html": "", "after": "legend", "before": "query"}]), "use one"),
+        for (bad, said) in [(serde_json::json!([{"id": "a", "html": "", "after": "legend"}]), "not an earlier section"),
+                            (serde_json::json!([{"id": "a", "html": ""}, {"id": "b", "html": "", "after": "a", "before": "a"}]), "use one"),
                             (serde_json::json!([{"id": "a", "html": ""}, {"id": "a", "html": ""}]), "used twice"),
+                            (serde_json::json!([{"id": "a"}]), "needs `html`"), (serde_json::json!([{"id": "a", "html": "", "part": "query"}]), "not both"),
+                            (serde_json::json!([{"id": "a", "part": "chart"}]), "unknown variant"),
+                            (serde_json::json!([{"id": "a", "part": "road_card", "text": "x"}]), "only the part \"query\""),
+                            (serde_json::json!([{"id": "a", "part": "query", "fields": ["x"]}]), "only the part \"road_card\""),
                             (serde_json::json!([{"id": "a", "html": "", "colour": 1}]), "colour")] {
             let e = merge(&base, &serde_json::json!({"panel": {"sections": bad}})).unwrap_err().to_string();
             assert!(e.contains(said), "{e}");
         }
-        assert!(merge(&base, &serde_json::json!({"panel": {"hide": ["nope"]}})).unwrap_err().to_string().contains("not a section"));
+        let e = merge(&base, &serde_json::json!({"phone": {"max_width_px": 500}})).unwrap_err().to_string();
+        assert!(e.contains("phone is not an option") && e.contains("700 px"), "{e}");
+        let e = merge(&base, &serde_json::json!({"panel": {"hide": ["query"]}})).unwrap_err().to_string();
+        assert!(e.contains("panel.hide is gone") && e.contains("part"), "{e}");
     }
 
     fn layer(v: serde_json::Value) -> Result<Layer3d, serde_json::Error> { serde_json::from_value(v) }

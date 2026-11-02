@@ -12,6 +12,8 @@ selectbox
 placement
 panelscroll
 sections
+query
+roadcard
 settings
 tip
 help

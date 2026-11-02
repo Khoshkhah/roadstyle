@@ -6,6 +6,33 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed (breaking)
+- **The dashboard's panel starts empty, and a page adds what it needs.** The panel had five built-in blocks (base map, colour by, legend,
+  query, selected road), and a page took them away with `dashboard={"panel": {"hide": [...]}}`. Now the panel has only its frame (the
+  title, the theme and the hide buttons). A section of `panel.sections` holds the page's own `html` or a part of roadstyle: `"query"` (the
+  query box, with `text`, its start text, which is empty by default) or `"road_card"` (the selected road's fields, with `fields`). The
+  same is `rs.sections.add({id, part, ...})` in JavaScript. `hide` is an error that says what to do. The ids `bm`, `co`, `sb-legend`, `q`,
+  `tbl`, `count` and `detail` are gone. Docs: [Add to the panel](docs/guides/dashboard-panel.md).
+- **The map of a dashboard has the defaults of a map page.** The template set `name="Roads dashboard"`, `basemap="blank"`,
+  `road_popup=False` and its own `minzoom` table. It sets none of them now: the base map is `ofm_positron` (no key), a click opens the
+  popup, and the classes have the profile's first zooms. A click on a road is the event `rs:select`: the popup, the road card, or both
+  show it. For the card only, give `road_popup=False`. `data/host_options.json` has the same change.
+- **`dashboard={"phone": ...}` is gone.** The page turns to its phone form by itself when the window is 700 px wide or less, on a phone
+  or in a narrow desktop window, so there is nothing to choose. Giving `phone` is an error that says so.
+
+### Fixed
+- **Every part of the dashboard follows the dark theme.** Some parts used fixed colours, not the theme's tokens: the rows of the road card
+  and of the docked read-out had a white line and a fixed grey key in the dark theme, the "on" state of the toolbox's buttons and switches was
+  a white wash (and an old blue in the light theme), the popup's link was a fixed blue, a chip's text, an accent chip and the unchosen button of a two-way switch (`rs-seg`) were too faint, and a number tile in a colour of the page (`rs.kpi(..., color)`) was hard to read in the dark theme; the dark theme now mixes that colour with its text colour. They use the tokens
+  now, and the accent for the "on" state. The tokens (`--bg`, `--ink`, `--mut`, `--line`, `--card`) are set for the whole page, so a box, a
+  window and the popup get them too, and the light muted text is a little darker (`#6b7280`, 4.8:1 on white). The new test
+  `tests/test_dashboard_themes_browser.py` opens each part in both themes and fails on a text under 4.5:1 or a light surface in the dark theme.
+- **A wrong keyword or value says what to give.** `theme=` said "did you mean 'template'?"; it now says that a page starts light and that
+  `page_script="rs.ready(() => rsSetTheme('dark'))"` starts it dark. A colour that is not a text (a MapLibre expression such as
+  `["get", "c"]`) said "invalid type: sequence, expected a string"; it now says that a colour is a text and names `color_col=`.
+- **The docs and the skill say `rs.ready(fn)`, not "wait for the event `rs:ready`".** The event fires once, so a listener added after it
+  never ran. `page_script` runs before the page is ready, and the manual said the opposite.
+
 ## [0.26.3] - 2026-11-02
 
 ### Fixed

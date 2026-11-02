@@ -63,7 +63,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 
 | page | builds |
 |---|---|
-| `dashboard` | the map, a panel with a query box, and the standard toolbox ([Dashboard layout](../guides/dashboard-layout.md)) |
+| `dashboard` | the map, an empty panel, and the standard toolbox ([Dashboard layout](../guides/dashboard-layout.md)) |
 | `street-view` | the map + Google Street View of the clicked road |
 
 `--page` needs `-f web`. For `street-view` only:

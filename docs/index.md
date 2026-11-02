@@ -119,7 +119,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 - **The toolbox is at the right edge** on a desktop, and the panel at the left. On a phone the bar is one row at the top that you move sideways, a fold button hides it,
   there is no hover tooltip on a touch screen, and the Google 3D window has a one-row header.
 - **One zoom table.** The dashboard shows service roads and living streets from zoom 14, and steps, platforms, corridors, roads and
-  private roads from zoom 15. `minzoom=False` shows all. [Dashboard layout](guides/dashboard-layout.md#roads-at-small-zooms)
+  private roads from zoom 15. `minzoom=False` shows all. (Since 0.27.0 a dashboard uses the table of a map page.)
 - **Tiles are the default.** Every page embeds its roads as MLT tiles to zoom 16, with one road layer for every zoom. `tiles=False`
   gives GeoJSON roads, and `tile_format="mvt"` gives MVT. One tiling rule serves the page, the browser worker, `export_style` and
   `roadstyle tiles`. [Big networks](guides/big-networks.md) · [Make tiles and PMTiles](rust/tiles.md) ·
@@ -128,7 +128,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
   standard panel, with the base-map box, red and blue picks, segmented tabs and the area boundary (`levels make --boundary`). The History tab has `edits.csv`.
   [Edit the levels](guides/levels.md#edit-the-levels) · [in a dashboard](guides/levels.md#edit-the-levels-in-a-dashboard)
 - **Parts for a dashboard page.** The panel has shared parts: a help window (`rs.help`), a hover box (`rs.hover`), tabs (`rs.tabs`), number tiles (`rs.kpi`),
-  scroll areas and tables, chart colours (`rs.svg`), chips and text boxes. `rs.classify` makes discrete colour classes for roads. The panel is 400 px wide.
+  scroll areas and tables, chart colours (`rs.svg`), chips and text boxes. `rs.classify` makes discrete colour classes for roads.
   [Dashboard parts](guides/dashboard-parts.md)
 - **Live data.** Colours by natural breaks, a legend with the number of roads, and a guide for a new day.
   [Live data](guides/live-data.md)

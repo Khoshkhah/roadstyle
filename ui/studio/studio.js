@@ -13,6 +13,8 @@ const ID_COLS = new Set(["id", "fid", "gid", "uid", "objectid"]);
 // the pages (pages.render_dashboard: template=), their Python call, title and base maps offered (studio/dashboard.py)
 const PAGES = {map: {fn: "render_edges", file: "map.html"},
                dashboard: {fn: "render_dashboard", file: "dashboard.html", title: "Roads dashboard"}};
+// the Dashboard page's panel, as a demo: the panel of a dashboard starts empty, and a page adds its parts (docs/guides/dashboard-panel.md)
+const DEMO_PANEL = {panel: {sections: [{id: "q", part: "query", label: "Query"}, {id: "road", part: "road_card", label: "Selected road"}]}};
 const OFFERED = ["ofm_positron", "ofm_dark", "osm", "satellite", "blank"];
 const MAPLIBRE = "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist";   // render_web._MAPLIBRE_CDN: the preview's MapLibre (a page's _repr_html_)
 
@@ -31,7 +33,7 @@ window.studio = {debug: () => ({table, columns, allClasses, st})};      // for a
 // render_edges' keywords of the knobs, in their order: the look's args (with state "live", as a page) and the code's keywords
 function keywords(co){
   const P = PAGES[st.page], kw = {palette: st.palette, basemap: st.basemap};
-  if (P.title) { kw.basemaps = st.offered.length ? st.offered : null; kw.name = st.title || P.title; }
+  if (P.title) { kw.basemaps = st.offered.length ? st.offered : null; kw.name = st.title || P.title; kw.dashboard = DEMO_PANEL; }
   if (st.view3d) kw.view_3d = true;
   if (st.tiles) kw.tiles = true;
   if (co.length > 1) kw.color_options = Object.fromEntries(co.map(({name, ...o}) => [name, o]));

@@ -65,9 +65,9 @@ def test_the_page_is_the_dashboards_panel_and_bar_in_both_themes(editor):
         assert page.evaluate("map.getStyle().layers.some(l => l.id.endsWith('boundary'))"), "the area's boundary.geojson: the dashed line"
         assert page.locator("#sb .sb-top .t").inner_text() == "Edit levels" and page.locator("#sb-hide").is_visible()
         assert page.locator("button[title='Light / dark']").is_visible()
-        # the standard base-map box of every dashboard: Blank is the default, and the list has the other maps
+        # the standard base-map box of every dashboard: the default of a map page (ofm_positron), and the list has the other maps
         page.click("button[title='Base map and layers']")
-        assert page.locator(".rs-bm-box input[name='rs-bm']:checked").get_attribute("value") == "blank"
+        assert page.locator(".rs-bm-box input[name='rs-bm']:checked").get_attribute("value") == "ofm_positron"
         assert page.locator(".rs-bm-box .rs-bm-row").count() >= 7
         page.keyboard.press("Escape")
         assert page.get_attribute("#sb", "data-theme") == "light"

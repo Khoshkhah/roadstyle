@@ -30,7 +30,9 @@ rs.Overlay(data, kind=None, placement="over", color=None, opacity=None, outline=
   lines are lines, points are circles.
 - `placement`: `"under"` the roads (zone fills) or `"over"` them (points). The default is `"over"`.
 - `color`, `opacity`, `outline` (fills), `radius` (circles), `width` (lines and outlines): one
-  style for the whole layer. To colour features by a value, split them into one overlay per value.
+  style for the whole layer. A colour is a text (`"#d32f2f"`, `"red"`, `"rgba(0,0,0,.5)"`). A MapLibre expression
+  (`["get", "colour"]`) is an error. To colour each feature, give `color_col`, the property with a CSS colour per feature
+  (a feature without it takes `color`).
 - `label`: the layer's name in the Layers control.
 - `popup`: the fields shown when a feature is clicked. `None` shows every field; `[]` makes the
   layer not clickable.

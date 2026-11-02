@@ -1,5 +1,5 @@
-// panel mode: a full-height side panel hosts the map controls (colour-by, road filter, legend,
-// host tools) and the selected road's record. Built BEFORE the controls, so they mount into it.
+// panel mode (road_popup="panel", popup_mode "panel"; not the dashboard's panel #sb): a full-height side panel hosts the map controls
+// (colour-by, road filter, legend, host tools) and the selected road's record. Built BEFORE the controls, so they mount into it.
 import {_esc} from "../popup.js";
 import {map, O} from "./core.js";
 import {defineTool} from "./tools.js";

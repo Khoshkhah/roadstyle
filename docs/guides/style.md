@@ -103,7 +103,7 @@ rs.render_edges(edges, minzoom=False)                        # every class at ev
 ```
 
 `include` and `exclude` also keep or drop the `*_link` ramps of each class (`match_links=True`).
-`minzoom` can also be a dict such as `{"residential": 14}` to change the zoom for some classes. `render_dashboard` has its own zoom table ([Dashboard layout](dashboard-layout.md#roads-at-small-zooms)).
+`minzoom` can also be a dict such as `{"residential": 14}` to change the zoom for some classes. `render_dashboard` uses the same table.
 
 ## Your own road classes
 

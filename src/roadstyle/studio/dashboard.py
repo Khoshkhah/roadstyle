@@ -1,8 +1,8 @@
 """Dashboard builder — the packaged ``render_dashboard`` page, behind knobs.
 
 Same idea as the map page, but the product is a *dashboard*: :func:`roadstyle.render_dashboard`
-renders the map with every built-in control off and injects the bundled dashboard sidebar (query
-box, colour-by, class filter + legend, table) — wired through the public ``window.rs*`` API.
+renders the map, the toolbox and an empty panel; the studio adds the query box and the road card to the panel as a demo
+— wired through the public ``window.rs*`` API.
 Download ``dashboard.html`` or copy the code (it mirrors ``ui/dashboard/build.py``).
 """
 from __future__ import annotations
@@ -46,10 +46,12 @@ with st.sidebar:
 
     overlays, ov_lines = overlay_section()
 
-# render_dashboard turns the built-in controls off and injects the bundled sidebar; the studio just
-# passes the look/data knobs through.
+# render_dashboard injects the bundled panel, which starts empty: as a demo, the studio adds the query box and the road card
+# (docs/guides/dashboard-panel.md), and passes the look/data knobs through.
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
-      "color_options": color_options, "name": title}
+      "color_options": color_options, "name": title,
+      "dashboard": {"panel": {"sections": [{"id": "q", "part": "query", "label": "Query"},
+                                           {"id": "road", "part": "road_card", "label": "Selected road"}]}}}
 if tiles:
     kw["tiles"] = True
 if minzoom:

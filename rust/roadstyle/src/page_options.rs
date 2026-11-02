@@ -488,7 +488,7 @@ fn basemaps(k: &PageKeys, look: &Look, warnings: &mut Vec<String>) -> Result<(Va
 /// base maps (`basemaps`, `ontop`, the active key and `style`, the page's base style: its background and the hidden raster layer, as `page_from` gives them to the page). `given` has the keys of a call: `layout`, `dashboard`,
 /// `basemap`, `basemaps`, `api_key`, `basemap_switcher`. The same rules as a page that roadstyle writes, so the host has no copy of them.
 /// `data/host_options.json` is its answer for the default look and no keys (a test keeps it current): a host page fetches the file, changes what it needs
-/// (the panel's width, `hide`, the order of the base maps) and loads no WebAssembly module on its main thread for it.
+/// (the panel's width and sections, the order of the base maps) and loads no WebAssembly module on its main thread for it.
 pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, Vec<String>), crate::Error> {
     let mut given = given.clone();
     given.entry("template").or_insert_with(|| "dashboard".into());

@@ -83,10 +83,10 @@ def _style(overlays=True):
 @pytest.fixture(scope="module")
 def host():
     opts = json.loads((ROOT / "rust" / "roadstyle-assets" / "files" / "data" / "host_options.json").read_text())
-    opts["basemaps"] = [b for b in opts["basemaps"] if b["key"] in ("blank", "osm", "blank_dark")]
+    keep = ("blank", "osm", "blank_dark")       # the blank map first: the host's start map (the default list starts with OpenFreeMap)
+    opts["basemaps"] = sorted((b for b in opts["basemaps"] if b["key"] in keep), key=lambda b: keep.index(b["key"]))
     opts["basemaps"].append({"key": "vec", "label": "Vector", "title": "Vector", "group": "", "swatch": None, "order": 90, "tiles": [], "bg": "#ffffff", "maxzoom": 19,
                              "attr": "", "is_dark": False, "style_url": "http://rs.test/vec.json", "dark": None})
-    opts["dashboard"]["panel"]["hide"] = []         # the host has none of roadstyle's own panel sections (the duckOSM page says so in its `dashboard` key)
     page = HOST.replace("FILES", FILES).replace("__OPTS__", json.dumps({k: opts[k] for k in ("dashboard", "basemaps", "ontop")}))
     vec = json.dumps({"version": 8, "sprite": "http://rs.test/vsprite", "sources": {}, "layers": []})
 

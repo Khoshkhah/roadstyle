@@ -78,7 +78,7 @@ rs.setStyle(style, {road_table});
 - **A host page's panel and options.** The shell of the panel (`#sb`, `.sb-top`, `#sb-hide`, `#sb-show`) is at the end of `dashboard.css`, so a
   host page that has its own panel needs no copy of it. The file `data/host_options.json` (written by Rust, `page_options::host_options`; a
   test keeps it current) has the typed `dashboard`, the `first_paint` (`rsFirstPaint`), and the `basemaps`, `ontop` and active key, by the same
-  rules as `pageFrom`. A host fetches it, changes what it needs (the panel's width, `hide`, the order of the base maps) and loads no WebAssembly
+  rules as `pageFrom`. A host fetches it, changes what it needs (the panel's width and sections, the order of the base maps) and loads no WebAssembly
   module on its main thread for it. The host's look must have state `live` (`withArg("state", "\"live\"")`) for the dashboard to find the style's
   controls (the base-map layers `overlays`, the filter, the tunnels) and `color_options` for its colour tool: a style of a static look has the
   pick layers only (`roadstyle-rs/tests/host_style.rs`).
@@ -244,7 +244,7 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `navbox.js` | the tool `navigate` (`toolbar.navigation = "box"`, the default): one button with the compass needle; its box has a zoom slider, a turn slider, a tilt slider and a reset button; the compass drags to turn and tilt | `dashboard.toolbar.navigation` | |
 | `roadsbox.js` | the tool `roads`: the road filter in the bar, one row for each class (check box, colour, name, number of roads), All, None, Bridges, Tunnels and the restricted kinds; it calls the filter calls of `filter.js` | `filter` | |
 | `settings.js` | the tool `settings`: the person's own choices kept in this browser (where the bar and the panel are, the transparency of the layers, the keys of Google and CARTO) | | |
-| `sections.js` | the panel's sections: a page adds a block, hides one of the panel's own or moves one (`rs.sections`, `dashboard.panel.sections` / `hide`) | `dashboard.panel` | `rs.sections` |
+| `sections.js` | the panel's sections: the panel starts empty, and a page adds sections with its HTML or a part (`query.js`, `roadcard.js`), hides, moves or removes them (`rs.sections`, `dashboard.panel.sections`) | `dashboard.panel` | `rs.sections` |
 | `selectbox.js` | a select list in the look of the boxes (the native `<select>` stays in the page, hidden; the page still reads and sets its value) | | |
 | `panelscroll.js` | the scroll protocol of a panel: the header stays, only the body scrolls, with a line under the header and a fade at the bottom | | |
 | `tip.js` | the explanation of a button in a box of the page's look (the `title` is moved to `data-rs-tip`; 350 ms after the pointer comes) | | |

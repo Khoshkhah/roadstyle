@@ -50,7 +50,7 @@ function setS(h, st){ if(h) h.ids.forEach(id=>_fs({source:h.s, id:id}, st)); }
 let _hov=null, _pt=null, _raf=0;
 // a reverse pair drawn as one line (config single_line_classes): its edge names the other direction in __rs_edge2, and the line's popup, panel and tooltip show both
 function _twinDetail(p){ return p && p.__rs_edge2!=null ? {id:p.__rs_edge2, properties:_rprops(p.__rs_edge2)} : undefined; }   // rs:select detail.twin
-function _both(p, rows, only){ const f=rows?_rrows:_rfields, t=p.__rs_edge2!=null ? _rprops(p.__rs_edge2) : null;
+export function _both(p, rows, only){ const f=rows?_rrows:_rfields, t=p.__rs_edge2!=null ? _rprops(p.__rs_edge2) : null;
   if(only && _joinedKeys.length) only = only.concat(_joinedKeys.filter(k => only.indexOf(k) < 0));   // live data: its fields too
   if(!t || !Object.keys(t).length) return f(p, only);
   const sec=(n,q)=>'<div style="color:#777;margin-top:.3em">Direction '+n+'</div>'+f(q, only);
@@ -150,9 +150,9 @@ export function initSelect(){
     if(_spDotClick(e)) return;       // a photo's dot of the Street View coverage opens that photo
     // visual stacking decides the click: an "over" overlay (POIs, in front of the roads) wins;
     // then the roads; an "under" overlay (zone fills) only when the click missed every road —
-    // so a road inside a zone stays selectable and still feeds rs:select / the sidebar.
+    // so a road inside a zone stays selectable and still feeds rs:select (the popup, the road card).
     // (handleOverlayClick deselects the road itself BEFORE dispatching the overlay's rs:select,
-    // so the sidebar isn't wiped by a trailing rs:deselect.)
+    // so the road card is not wiped by a trailing rs:deselect.)
     if(handleOverlayClick(e, "over")) return;
     const f = pick(e.point);
     if(!f){ if(!handleOverlayClick(e, "under")) rsDeselect(); return; }

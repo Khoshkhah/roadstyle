@@ -33,7 +33,7 @@ def _edges(n=6):
 def _page():
     picker = "<select id='day'>" + "".join(f"<option>{d}</option>" for d in _DAYS) + "</select>"
     return rs.render_dashboard(_edges(), basemap="blank", live_data=True, name="Flow by day",
-                               dashboard={"panel": {"sections": [{"id": "day", "label": "Day", "html": picker, "before": "query"}]}},
+                               dashboard={"panel": {"sections": [{"id": "day", "label": "Day", "html": picker}]}},
                                page_script=_SCRIPT).html
 
 
@@ -68,7 +68,7 @@ def test_a_day_picker_gives_each_day_its_numbers_and_the_next_day_replaces_them(
     assert not errors
     assert "Flow, 2026-10-27" in legends[0] and "50" in legends[0] and "900" in legends[0]
     assert "Flow, 2026-10-28" in legends[1] and "20" in legends[1] and "950" in legends[1]
-    assert sections.index("day") == sections.index("query") - 1
+    assert sections == ["day"]                                     # the panel starts empty: the page's picker is its one section
     assert "day" in sections
 
 

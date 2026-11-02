@@ -4,6 +4,9 @@
    on): its text is white in both themes (4.71:1), so the fill does not get lighter in the dark theme. */
 :root{--accent:#0e7c8e;--accent-fill:#0E7F91}
 html[data-rs-theme=dark],#sb[data-theme=dark]{--accent:#42c2d7}
+/* the theme's tokens for every part of the page (the boxes, the windows, the popup), the same values as the panel's (#sb, below) */
+:root{--bg:#fff;--ink:#16181d;--mut:#6b7280;--line:#e6e8ec;--card:#f7f8fa}
+html[data-rs-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026}
 /* roadstyle's map dashboard: the look of its controls, panels and windows (docs/design/dashboard_module.md) */
 .rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:var(--rs-tb-ink);pointer-events:none}
@@ -74,13 +77,15 @@ body.rs-side-hidden #map{right:0}
 body.rs-side-hidden{--rs-side:0px}
 .rs-side .rs-empty{color:#9a9a9a;text-align:center;padding:30px 12px;font-size:12.5px}
 .rs-name{font-size:17px;font-weight:700;margin:0 0 10px;line-height:1.3}
+/* the rows of a road's fields: in the panel (#sb) they take its theme's colours, elsewhere the light ones */
 .rs-kv{display:flex;justify-content:space-between;gap:12px;padding:4px 0;
-  border-bottom:1px solid #f3f3f3;font-variant-numeric:tabular-nums}
-.rs-kv span{color:#8a8a8a;flex:0 0 auto}
+  border-bottom:1px solid var(--line,#f3f3f3);font-variant-numeric:tabular-nums}
+.rs-kv:last-child{border-bottom:0}
+.rs-kv span{color:var(--mut,#8a8a8a);flex:0 0 auto}
 .rs-kv b{font-weight:600;text-align:right;word-break:break-all;min-width:0}
 .co-ctrl,.tn-ctrl,.vw-ctrl{position:absolute;top:10px;right:10px;z-index:2;background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);padding:6px 10px;
-font:11px system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
+font:11px system-ui,sans-serif;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut,#6b7280)}
 .tn-ctrl input{vertical-align:middle;width:120px;margin:0 6px 0 0}
 .tn-row{display:flex;align-items:center;gap:6px;margin:3px 0}
 .co-ctrl select,.tn-ctrl select,.vw-ctrl select{font:13px system-ui,sans-serif;font-weight:600;text-transform:none;letter-spacing:0;
@@ -94,15 +99,15 @@ padding:8px 11px;font:12px system-ui,sans-serif;color:var(--rs-tb-ink)}
 .co-lg .lg-sw.circle{width:10px;height:10px;margin:0 2px;border-radius:50%}
 .co-lg .lg-sw.line{height:3px}
 .co-lg .lg-bar{height:10px;width:150px;border-radius:3px;margin:3px 0}
-.co-lg .lg-ends{display:flex;justify-content:space-between;color:#767c88;font-size:11px}
+.co-lg .lg-ends{display:flex;justify-content:space-between;color:var(--mut,#6b7280);font-size:11px}
 .co-lg .co-lg-hd{cursor:pointer;user-select:none;padding-bottom:5px;
-  font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
+  font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut,#6b7280)}
 .co-lg.collapsed .co-lg-body{display:none}
 .co-lg.collapsed{padding-bottom:8px}
 .ov-ctrl{position:absolute;bottom:88px;right:calc(10px + var(--rs-side,0px));z-index:2;   /* above the base-map button */
 background:#fff;border-radius:8px;
 box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px system-ui,sans-serif;color:#334155}
-.ov-ctrl .ov-hd{padding:8px 11px 6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#767c88}
+.ov-ctrl .ov-hd{padding:8px 11px 6px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut,#6b7280)}
 .ov-ctrl .ov-body{padding:0 11px 8px;display:flex;flex-direction:column;gap:3px}
 .ov-ctrl label{display:flex;align-items:center;gap:6px;white-space:nowrap;cursor:pointer}
 /* box_layout "stack": the Layers box in the top-left stack under Roads, folded like it */
@@ -336,7 +341,7 @@ html.rs-has-toolbar :is(.co-ctrl,.co-lg,.tn-ctrl,.vw-ctrl){display:none!importan
 /* every box of the bar (the base-map box, the colour box, the attribution): the same padding, shadow, font and text side; the base-map and colour boxes the same width */
 #rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box{box-sizing:border-box;padding:8px;box-shadow:0 2px 10px rgba(0,0,0,.2);font:12px/1.3 system-ui,sans-serif;text-align:left;max-height:calc(100dvh - 24px);overflow-y:auto}
 #rs-toolbar .bm-menu.rs-bm-box,#rs-color-box,#rs-attr-box,#rs-nav-box,#rs-roads-box{width:264px!important}
-/* ---- one background for everything that floats over the map: the bar's (--rs-tb-bg in popup.css, 90 % opaque), with the same blur, border and text color ---- */
+/* ---- one background for everything that floats over the map: the bar's (--rs-tb-bg in popup.css), with the same blur, border and text color ---- */
 .rs-zoom,.rs-find,.co-ctrl,.tn-ctrl,.vw-ctrl,.co-lg,.ov-ctrl,.maplibregl-ctrl .bm-menu,html.rs-overlay #sb,html.rs-overlay .rs-side,
 html.rs-phone.rs-tpl-dashboard .rs-grip,html.rs-phone.rs-tpl-dashboard #sb{
   background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border-color:var(--rs-tb-border);color:var(--rs-tb-ink)}
@@ -516,7 +521,6 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 #rs-fold-all[hidden]{display:none}
 #sb #rs-fold-all{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;margin-left:6px;background:none;border:1px solid var(--line);border-radius:8px;color:var(--mut);cursor:pointer;flex:none}
 #sb #rs-fold-all:hover{color:var(--accent);border-color:var(--accent)}
-#sb-legend-extra{margin-top:2px}
 /* the kit for the HTML that a page adds to the panel: the panel's tokens (--ink, --mut, --line, --card, --accent) change with the theme, so a section that
    uses them follows the light and the dark theme. Plain text, links, tables and rules already do. */
 .sb-sec{color:var(--ink)}
@@ -547,7 +551,7 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
    page with its own panel (#sb with .sb-top, #sb-hide and #sb-show) needs too. They are at the end, as they were in the template's own style. ---- */
 #sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,400px);box-sizing:border-box;overflow:auto;
   padding:14px 15px;font:13px/1.5 system-ui,-apple-system,sans-serif;
-  --bg:#fff;--ink:#16181d;--mut:#767c88;--line:#e6e8ec;--card:#f7f8fa;
+  --bg:#fff;--ink:#16181d;--mut:#6b7280;--line:#e6e8ec;--card:#f7f8fa;
   background:var(--bg);color:var(--ink);border-left:1px solid var(--line)}
 #sb[data-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026}
 .sb-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
@@ -610,7 +614,7 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb .rs-tab:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
 #sb .rs-tab.on,#sb .rs-tab.on:hover{color:#fff;background:var(--accent-fill);border-color:var(--accent-fill)}
 #sb .rs-seg{display:flex;padding:2px;margin-bottom:12px;border-radius:8px;background:color-mix(in srgb,var(--mut) 25%,transparent)}
-#sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:6px;background:none;color:var(--mut);font:600 11.5px system-ui,sans-serif;cursor:pointer}
+#sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:6px;background:none;color:color-mix(in srgb,var(--ink) 70%,var(--mut));font:600 11.5px system-ui,sans-serif;cursor:pointer}
 #sb .rs-seg button:hover{color:var(--ink);border:0}
 #sb .rs-seg button.on,#sb .rs-seg button.on:hover{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 #sb .rs-tab:focus-visible,#sb .rs-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
@@ -624,6 +628,9 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb .rs-kpi{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 #sb .rs-kpi-title{font-size:9.5px;font-weight:700;color:var(--mut);text-transform:uppercase}
 #sb .rs-kpi-val{font-size:17px;font-weight:600;line-height:1.25;font-variant-numeric:tabular-nums;color:var(--ink)}
+#sb .rs-kpi-val.rs-c{color:var(--rs-kpi-c)}
+/* the page's colour of a number (rs.kpi's color) in the dark theme: mixed with the light text colour, so that any colour stays readable */
+html[data-rs-theme=dark] #sb .rs-kpi-val.rs-c{color:color-mix(in srgb,var(--rs-kpi-c) 60%,var(--ink))}
 #sb .rs-kpi-sub{font-size:10px;color:var(--mut)}
 #sb .rs-cap{margin:2px 0 6px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
 /* a callout: the answer in one box, with an edge in a colour of the page (`--rs-callout`, or set `border-left-color` from the code) */
@@ -639,8 +646,8 @@ html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-li
 #sb :is(input[type=text],input[type=search],input[type=number],input:not([type]),textarea){width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;outline:none}
 #sb :is(input,textarea):focus{border-color:var(--accent)}
 #sb :is(input,textarea)::placeholder{color:var(--mut)}
-#sb .rs-chip{display:inline-block;padding:2px 8px;border-radius:10px;background:color-mix(in srgb,var(--mut) 18%,transparent);color:var(--mut);font-size:11px;font-weight:600;line-height:1.35}
-#sb .rs-chip.accent{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+#sb .rs-chip{display:inline-block;padding:2px 8px;border-radius:10px;background:color-mix(in srgb,var(--mut) 18%,transparent);color:var(--ink);font-size:11px;font-weight:600;line-height:1.35}
+#sb .rs-chip.accent{background:color-mix(in srgb,var(--accent) 16%,transparent);color:color-mix(in srgb,var(--accent) 70%,var(--ink))}   /* the accent on its own tint: mixed with the text colour, readable in both themes */
 #sb .rs-dot{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:var(--mut)}
 
 /* ---- STREET VIEW DOCKED (street_view="dock", streetview.js): a side of the page. The window takes the right part of the screen with a divider, the map takes the rest;

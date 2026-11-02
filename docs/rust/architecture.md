@@ -572,7 +572,7 @@ saved page still works offline.*
 | `panelscroll.js` | 42 | The scroll protocol of a panel: the header stays, only the body scrolls |  |
 | `placement.js` | 47 | The place of the bar and of the panel | `rsFreePad` |
 | `roadsbox.js` | 58 | The tool `roads`: the road filter in the bar |  |
-| `sections.js` | 67 | The panel's sections: the page adds a block to the panel, hides one of the panel's own, or moves one, with `rs.sections` or with the typed option `dashboard.panel.sections` / `hide`, and no longer edits the template's HTML as text |  |
+| `sections.js` | 67 | The panel's sections: the panel starts empty, and the page adds sections (its HTML, or the parts `query` and `road_card`), with `rs.sections` or with the typed option `dashboard.panel.sections` |  |
 | `select.js` | 178 | hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame) | `rsDeselect`, `rsSelect` |
 | `selectbox.js` | 73 | A select list in the look of the boxes |  |
 | `settings.js` | 86 | The tool `settings`: the person's own choices, kept in this browser only (localStorage, never in the page file): where the bar and the panel are, how transparent the layers are, and the key of Google | `rsOpenSettings` |

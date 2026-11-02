@@ -88,8 +88,12 @@ impl schemars::JsonSchema for Color {
 
 impl<'de> serde::Deserialize<'de> for Color {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Color, D::Error> {
-        let t = String::deserialize(d)?;
-        Color::parse(&t).map_err(serde::de::Error::custom)
+        match serde_json::Value::deserialize(d)? {
+            serde_json::Value::String(t) => Color::parse(&t).map_err(serde::de::Error::custom),
+            // a MapLibre expression (["get", "colour"], ["match", ...]) is the usual mistake: say what to give instead
+            v => Err(serde::de::Error::custom(format!("a colour is a text (\"#d32f2f\", \"red\", \"rgba(0,0,0,.5)\"), not {v}: an expression is not read \
+                here; for a colour of each feature of an overlay, name the property that has it: color_col= of rs.Overlay (color_column in a look)"))),
+        }
     }
 }
 
@@ -101,6 +105,12 @@ pub fn mix(a: [u8; 3], b: [u8; 3], t: f64) -> [u8; 3] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_colour_that_is_not_a_text_says_what_to_give() {
+        let e = serde_json::from_value::<Color>(serde_json::json!(["get", "c"])).unwrap_err().to_string();
+        assert!(e.contains("a colour is a text") && e.contains("color_col="), "{e}");
+    }
 
     #[test]
     fn the_forms_of_a_colour() {

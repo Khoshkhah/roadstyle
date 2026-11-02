@@ -1,38 +1,132 @@
 # Dashboard parts
 
-A dashboard page looks the same on every project when every page uses the same parts. This page lists them. **Use a part when one exists. Do not write CSS or
+A dashboard page looks the same on every project when every page uses the same parts. This page lists the shared pieces and shows the code for each one. **Use a part when one exists. Do not write CSS or
 JavaScript for the same thing in a page**: a copy of a part drifts, and it forgets the dark theme.
 
-The panel's tokens change with the theme: `--ink` (text), `--mut` (muted text), `--line`, `--card`, `--accent`. The accent is one colour for the whole dashboard, the Sonocount teal
-(`#0e7c8e` for text in the light theme, a little darker than the logo's `#0E7F91` for 4.6:1 on the cards, and a lighter teal of the same hue in the dark theme, 8.5:1 on the panel); a page does not set its own. A filled control (a selected tab, a primary button)
-uses `--accent-fill`, the logo teal `#0E7F91`, which takes white text (4.71:1) in both themes. Details and code for each part: [Add to the panel](dashboard-panel.md).
+The panel starts empty. Two parts are whole sections that roadstyle writes: the `query` part and the `road_card` part. They are in [Add to the panel](dashboard-panel.md). The pieces below are for the page's own HTML in a section.
 
 | Part | What it is | Use it for |
 |---|---|---|
-| `rs.help.set({title, intro, terms, note})` | the "i" button in the panel title and its window | "How to read this page" |
-| `rs.help.button(el, {title, ...})`, `rs.help.open({title, ...})` | one more "?" button with its own words, and the same window opened from a link | a card, a label |
-| `rs.sections.add({..., label, fold: true})` | a section that folds; one button in the title row folds all of them, and the state is kept | the page's cards |
-| `rs.hover.show(html, event)`, `rs.hover.on(node, html)` | the hover box, in the look of the popup | words over a chart or a map layer |
-| `class="rs-tabs"` + `rs.tabs.use(nav, onChange)` | tabs, and `rs-seg` for a two-way switch | the parts of a page, a mode |
-| `class="rs-sec-box"` | a card; an `h3` and the paragraph after it are its title and description | one block of a page |
-| `rs.kpi(title, value, sub, color)` in `class="rs-kpis"` | a number tile (a grid of three) | the numbers of a page |
-| `class="rs-cap"`, `class="rs-callout"` | a small capital caption, an answer box with a coloured edge | headings of tiles, the answer |
-| `class="rs-scroll"` + `class="rs-table"` | a scroll area and a table with a fixed header | a list of streets |
-| `rs.svg(parent, tag, attrs)` + `--rs-chart-*` | one SVG element that reads `var(--x)`, and the chart colours | charts |
-| `<input>`, `<select>`, `<button>`, `class="rs-chip"`, `class="rs-dot"` | the panel's own look, a small label, a colour mark | forms, labels |
+| [`rs.help.set({title, intro, terms, note})`](#a-help-window) | the "?" button in the panel title and its window | "How to read this page" |
+| [`rs.help.button(el, {title, ...})`, `rs.help.open({title, ...})`](#a-help-window) | one more "?" button with its own words, and the same window opened from a link | a card, a label |
+| `rs.sections.add({..., label, fold: true})` | a section that folds; one button in the title row folds all of them, and the state is kept ([Add to the panel](dashboard-panel.md)) | the page's cards |
+| [`rs.hover.show(html, event)`, `rs.hover.on(node, html)`](#a-hover-box) | the hover box, in the look of the popup | words over a chart or a map layer |
+| [`class="rs-tabs"` + `rs.tabs.use(nav, onChange)`](#tabs-and-a-two-way-switch) | tabs, and `rs-seg` for a two-way switch | the sections of a page, a mode |
+| [`class="rs-sec-box"`](#cards-number-tiles-and-a-callout) | a card; an `h3` and the paragraph after it are its title and description | one block of a page |
+| [`rs.kpi(title, value, sub, color)` in `class="rs-kpis"`](#cards-number-tiles-and-a-callout) | a number tile (a grid of three) | the numbers of a page |
+| [`class="rs-cap"`, `class="rs-callout"`](#cards-number-tiles-and-a-callout) | a small capital caption, an answer box with a colored edge | headings of tiles, the answer |
+| [`class="rs-scroll"` + `class="rs-table"`](#a-list-or-a-table-that-scrolls) | a scroll area and a table with a fixed header | a list of streets |
+| [`rs.svg(parent, tag, attrs)` + `--rs-chart-*`](#charts) | one SVG element that reads `var(--x)`, and the chart colors | charts |
+| [`<input>`, `<select>`, `<button>`, `class="rs-chip"`, `class="rs-dot"`](#buttons-text-boxes-chips-and-a-dot) | the panel's own look, a small label, a color mark | forms, labels |
 | `rs.ready(fn)` | runs `fn` when the page is ready | the start of a page script |
-| `rs.classify(values, method, k, pivot=..., palette=...)` | the cuts and the colours for discrete road classes | `color_options` |
+| [`rs.classify(values, method, k, pivot=..., palette=...)`](#colour-classes) | the cuts and the colors for discrete road classes | `color_options` |
+
+## The accent color and the theme tokens
+
+The page has a light and a dark theme. Every part of the dashboard and your HTML must follow them. Plain text, links, tables, `hr`, inputs and buttons already do. For your own colors, use the theme's tokens and not fixed colors. The tokens are set for the whole page, so they work in the panel, in a box of the toolbox, in a window and in the popup:
+
+| Token | Use |
+|---|---|
+| `var(--ink)`, `var(--mut)` | text, muted text |
+| `var(--bg)`, `var(--card)` | the background of the panel, a box in it |
+| `var(--line)` | thin lines |
+| `var(--accent)` | links and buttons |
+| `var(--accent-fill)` | a filled control (a selected tab, a primary button) |
+
+The accent is one color for the whole dashboard, the Sonocount teal. A page does not set its own. `--accent` is `#0e7c8e` for text in the light theme (a little darker than the logo's `#0E7F91`, for 4.6:1 on the cards) and a lighter teal of the same hue in the dark theme (8.5:1 on the panel). `--accent-fill` is the logo teal `#0E7F91`, which takes white text (4.71:1) in both themes. The tokens are defined once in `dashboard.css`. A selected tab, a primary button, a link, and the mode and follow buttons of the Street View and Google 3D windows use them, in the panel and in the floating windows.
+
+`.sb-note` is small, muted text and `.rs-sec-box` is a box. Both have a contrast of 4.5 or more in the two themes. The rows of the legend follow the theme too.
+
+`tests/test_dashboard_themes_browser.py` opens each part of a dashboard in the light and the dark theme. It fails on a text with a contrast under 4.5 and on a light surface or line in the dark theme. A new part must pass it.
+
+## A help window
+
+```js
+rs.help.set({title: "How to read this page", intro: "What the page shows.",
+             terms: [["Inside the range", "How often the promise held."]], note: "A short note."});
+```
+
+A "?" button appears in the title of the panel (`anchor: element` puts it in another element, for example in the title of a panel that a module draws). A page with more to explain puts a "?" button with its own words beside the title of a card or a label, and all the buttons open the one window:
+
+```js
+rs.help.button(document.querySelector("#card-3 h2"), {title: "About step 3", intro: "What it does.", html: "<p>Words of the page's own.</p>", button: "About step 3"});
+rs.help.open({title: "Opened by a link", intro: "No button."});     // the same window, from a link or a key
+```
+
+The words are `{title, intro, terms, note, html}`. `html` is HTML of the page's own, shown after the intro. `button` is the name of the button for a screen reader and its tooltip. `rs.help.button` gives the button back.
+
+The window opens inside the screen. On a phone it is a sheet at the bottom of the screen. `rs.help.get()` gives the words that are set now, and `rs.help.clear()` takes the window and the button away. The window is roadstyle's own: it has the card token, the blur and the border of the other windows, so it is the same in both themes and on every page. The words can have HTML (`<b>`). Call `rs.help.set` again to replace them. `rs.help.open()` and `rs.help.close()` open and close the window.
+
+## Cards, number tiles and a callout
+
+```html
+<div class="rs-callout" style="--rs-callout:#16a34a"><b>Yes, the promise holds.</b> On 80 % of hours the traffic was inside the range.</div>
+<div class="rs-cap">All counted hours</div>
+<div class="rs-kpis" id="k"></div>
+<div class="rs-sec-box"><h3>By hour of the day</h3><p>How often the range held, hour by hour.</p><svg>...</svg></div>
+```
+
+```js
+document.getElementById("k").innerHTML = rs.kpi("Inside the range", "80.4%", "promised 80 %", "#15803d") + rs.kpi("Typical miss", "10 %", "on one hour");
+```
+
+In the dark theme the colour of a number (the fourth argument of `rs.kpi`) is mixed with the theme's text colour, so any colour stays readable. A card is `.rs-sec-box`: an `h3` is its title and the paragraph right after it is its short muted description. An `svg` in it fills the width. `rs-kpis` is a grid of three tiles (`--rs-kpi-cols` changes the number). All of them use the tokens of the panel, so they follow the light and the dark theme.
+
+## Buttons, text boxes, chips and a dot
+
+A plain `<button>` and `<button class="sb-primary">` in the panel have their style already, and so have a `<select>` and a text `<input>` or `<textarea>`: write no class for them. `<span class="rs-chip">road type</span>` is a small label, `rs-chip accent` tints it with the page's `--accent`, and `<span class="rs-dot" style="background:#15803d"></span>` is a color mark before a word.
+
+## Charts
+
+```js
+const s = document.querySelector("#chart");
+rs.svg(s, "line", {x1: 0, x2: 300, y1: 40, y2: 40, stroke: "var(--rs-chart-grid)"});
+rs.svg(s, "polygon", {points: "...", fill: "var(--rs-chart-band)", stroke: "var(--rs-chart-band-line)"});
+rs.svg(s, "text", {x: 4, y: 12, fill: "var(--mut)", "font-size": 9}, "0");
+```
+
+`rs.svg` makes one SVG element. An SVG attribute does not read `var(--x)`, so a value that starts with `var(` goes to the style. The chart then follows the theme with no code of its own. The colors that charts share are `--rs-chart-band`, `--rs-chart-band-line`, `--rs-chart-grid` and `--rs-chart-miss`. For text and lines use the tokens `--ink`, `--mut`, `--line` and `--card`. A canvas cannot read a variable: draw it again on the event `rs:themechange`.
+
+## Tabs and a two-way switch
+
+```html
+<nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets</button></nav>
+<div data-pane="a">...</div><div data-pane="b" hidden>...</div>
+<div class="rs-seg" id="mode"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div>
+```
+
+```js
+const tabs = rs.tabs.use(document.querySelector(".rs-tabs"), id => console.log(id));    // tabs.select("b") opens a tab from the code
+rs.tabs.use(document.getElementById("mode"), v => redraw(v));
+```
+
+A click or an arrow key selects. The chosen button has `on` and `aria-selected`. The panes beside the tabs (the siblings with `data-pane`) show the one with the same id. The selected tab uses `--accent-fill`.
+
+## A hover box
+
+```js
+rs.hover.on(chartNode, ev => "<b>Saturday</b><br>24 hours");     // the text, or a function of the event; null hides
+rs.hover.show("<b>A street</b>", mapEvent.originalEvent);         // by hand, over a map layer
+rs.hover.hide();
+```
+
+The box has the look of the popup and follows the pointer. It flips to the other side at the edge of the page and never takes the pointer. The words can have HTML.
+
+## A list or a table that scrolls
+
+```html
+<div class="rs-scroll"><table class="rs-table"><thead><tr><th data-sort="desc">Street</th><th>Hours</th></tr></thead><tbody>...</tbody></table></div>
+```
+
+`rs-scroll` gives the area the scroll rules of the panel body: a thin scrollbar that shows only over the area or while it scrolls, a fade at the bottom edge while there is more below, and a scroll that never goes on to the map. The height is `--rs-scroll-h` (default: the smaller of 520 px and 60 % of the window). `rs-table` keeps the header row in view, lines up the numbers (the first column is text) and tints the row under the pointer. Put `data-sort="asc"` or `"desc"` on the `th` of the sorted column.
 
 ## The rules
 
-- **Width.** The panel is 400 px by default. Fit the content to the panel; do not widen the panel for it. A table that needs more room drops a column or
-  shortens a line.
-- **Colours.** No colour literal for text, lines, cards or chart furniture: use the tokens. A colour that is the page's own *data* (a coverage band, a class) can
-  be a literal, but a theme-aware one is better.
+- **Width.** Fit the content to the panel. Do not widen the panel for it (the width is `panel.width_px`: [Dashboard options](../reference/parameters.md#dashboard-options)). A table that needs more room drops a column or shortens a line.
+- **Colors.** No color literal for text, lines, cards or chart furniture: use the tokens. A color that is the page's own *data* (a coverage band, a class) can be a literal, but a theme-aware one is better.
 - **Both themes.** Look at the page in the light and in the dark theme, with the bar at two edges and at phone width, before you commit it.
-- **Scroll.** A list that can be long goes in `rs-scroll`; the panel body already scrolls.
-- **Transparency.** The three layers (bar and panel, boxes, card behind the text) are set by the person in the settings box. A part reads them with the
-  tokens `--rs-tb-bg`, `--rs-box-bg` and `--rs-card-bg`; a page never sets an opacity.
+- **Scroll.** A list that can be long goes in `rs-scroll`. The panel body already scrolls.
+- **Transparency.** The person sets three layers (bar and panel, boxes, card behind the text) in the settings box. A part reads them with the tokens `--rs-tb-bg`, `--rs-box-bg` and `--rs-card-bg`. A page never sets an opacity.
 
 ## Colour classes
 

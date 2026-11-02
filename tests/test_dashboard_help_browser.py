@@ -140,7 +140,7 @@ def test_cards_and_number_tiles(tmp_path):
             document.querySelector('#sb .sb-body').appendChild(d);
             document.getElementById('k').innerHTML = rs.kpi('Inside', '80.4%', 'promised', '#15803d') + rs.kpi('Miss', '10 %') + rs.kpi('Bad', '1', '', 'red;x:y'); }""")
         assert page.locator(".rs-kpi").count() == 3
-        assert page.locator(".rs-kpi-val").first.evaluate("e => e.style.color") != ""
+        assert page.locator(".rs-kpi-val").first.evaluate("e => e.style.getPropertyValue('--rs-kpi-c')") != ""     # the page's colour, mixed in the dark theme
         assert page.locator(".rs-kpi-val").nth(2).get_attribute("style") is None        # a colour with a ; is not taken
         assert page.evaluate("getComputedStyle(document.getElementById('k')).gridTemplateColumns.split(' ').length") == 3
         muted, ink = (page.evaluate("s => getComputedStyle(document.querySelector(s)).color", s) for s in (".rs-sec-box h3 + p", ".rs-sec-box h3"))

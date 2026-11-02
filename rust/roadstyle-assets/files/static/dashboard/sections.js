@@ -1,28 +1,14 @@
-// The panel's sections (docs/guides/migrating-dashboard.md): the page adds a block to the panel, hides one of the panel's own, or moves one, with
-// `rs.sections` or with the typed option `dashboard.panel.sections` / `hide`, and no longer edits the template's HTML as text. The panel's own
-// sections are found by their controls, and wrapped when the first call needs them: a box with no layout of its own (`.sb-sec`, display: contents).
+// The panel's sections (docs/guides/dashboard-panel.md): the panel starts empty, and the page adds each section, with `rs.sections` or with the
+// typed option `dashboard.panel.sections`. A section holds the page's own HTML (`html` or `el`) or a part of roadstyle (`part`: "query",
+// "road_card"), with an optional label, at the end of the panel or beside an earlier section.
 import {O, _emit} from "./core.js";
 import {legendRefresh} from "./legend.js";
-const _secControl = {base_map: "bm", colour_by: "co", legend: "sb-legend", query: "q", selected_road: "detail"};    // the id of each section's own control
+import {queryPart} from "./query.js";
+import {roadCardPart} from "./roadcard.js";
 const _secEls = new Map();
-let _secWrapped = false;
 const _secBody = () => document.querySelector("#sb .sb-body");
-// each section: its label and its control (the query: through its table), in a box. A control that the page moved is not a section here
-function _secWrap(){
-  const body = _secBody();
-  if(_secWrapped || !body) return;
-  _secWrapped = true;
-  for(const [id, control] of Object.entries(_secControl)){
-    const own = document.getElementById(control), c = own && (own.parentNode === body ? own : own.closest(".rs-sel"));      // a select is wrapped by selectbox.js
-    const last = id === "query" ? document.getElementById("tbl") : id === "legend" ? document.getElementById("sb-legend-extra") || c : c;
-    if(!c || !last || c.parentNode !== body || last.parentNode !== body) continue;
-    const prev = c.previousElementSibling, first = prev && prev.tagName === "LABEL" ? prev : c;
-    const w = document.createElement("div"); w.className = "sb-sec"; w.dataset.rsSection = id;
-    first.before(w);
-    for(let n = first; n; ){ const next = n.nextSibling; w.appendChild(n); if(n === last) break; n = next; }
-    _secEls.set(id, w);
-  }
-}
+// the parts of roadstyle that a section can hold: each makes its element from the section's options
+const _SEC_PARTS = {query: queryPart, road_card: roadCardPart};
 // A section that folds (`fold: true`, with a `label`): its label is a button with a chevron, and what follows the label is its body, which a click hides. The state of each is kept
 // in this browser. One button in the panel's title row (`#rs-fold-all`) folds or unfolds all the sections that fold and are shown now (not the hidden ones).
 const _fdKey = id => "rs-fold:" + location.pathname + ":" + id;
@@ -63,34 +49,36 @@ function _fdMake(w, spec){
   }
   return body;
 }
-const _secNeed = id => { _secWrap(); const w = _secEls.get(id); if(!w) throw new Error("rs.sections: no section '" + id + "' (rs.sections.list())"); return w; };
+const _secNeed = id => { const w = _secEls.get(id); if(!w) throw new Error("rs.sections: no section '" + id + "' (rs.sections.list())"); return w; };
 export const rsSections = {
   // the ids of the sections that are in the panel now, in order
-  list(){ _secWrap(); const b = _secBody(); return b ? [...b.querySelectorAll(".sb-sec")].map(e => e.dataset.rsSection) : []; },
-  // the box of a section (the page can move it: rs.sections.get("query") into its own tab), or null
-  get(id){ _secWrap(); return _secEls.get(id) || null; },
-  // a section of the page: {id, html | el, label, after | before}; at the end of the panel when it has neither
+  list(){ const b = _secBody(); return b ? [...b.querySelectorAll(".sb-sec")].map(e => e.dataset.rsSection) : []; },
+  // the box of a section (the page can move it into its own tab), or null
+  get(id){ return _secEls.get(id) || null; },
+  // a section of the page: {id, html | el | part, label, after | before, fold}; at the end of the panel when it has neither. A part has its
+  // options in the section: `text` (query), `fields` (road_card)
   add(spec){
     if(!spec || !spec.id) throw new Error("rs.sections.add: a section needs an id");
-    _secWrap();
+    if(spec.part != null && !_SEC_PARTS[spec.part]) throw new Error("rs.sections.add: no part '" + spec.part + "' (the parts: " + Object.keys(_SEC_PARTS).join(", ") + ")");
     if(_secEls.has(spec.id)) throw new Error("rs.sections.add: the section '" + spec.id + "' exists");
     const body = _secBody();
     if(!body) throw new Error("rs.sections.add: the page has no panel");
-    const w = document.createElement("div"); w.className = "sb-sec"; w.dataset.rsSection = spec.id; w.dataset.rsAdded = "1";
+    const w = document.createElement("div"); w.className = "sb-sec"; w.dataset.rsSection = spec.id;
+    if(spec.part) w.dataset.rsPart = spec.part;
     const host = spec.fold ? _fdMake(w, spec) : w;                 // the body of a section that folds, else the section itself
     if(spec.label && !spec.fold){ const l = document.createElement("label"); l.textContent = spec.label; w.appendChild(l); }
     if(spec.html) host.insertAdjacentHTML("beforeend", spec.html);
     if(spec.el) host.appendChild(spec.el);
+    if(spec.part) host.appendChild(_SEC_PARTS[spec.part](spec));
     if(spec.after) _secNeed(spec.after).after(w); else if(spec.before) _secNeed(spec.before).before(w); else body.appendChild(w);
     _secEls.set(spec.id, w);
     _fdPaint();
     _emit("rs:sectionchange", {id: spec.id, state: "add"});
     return w;
   },
-  // a section that the page added goes away (the panel's own sections can only be hidden)
+  // a section goes away
   remove(id){
     const w = _secNeed(id);
-    if(!w.dataset.rsAdded) throw new Error("rs.sections.remove: '" + id + "' is one of the panel's own sections: hide it");
     w.remove(); _secEls.delete(id); _fdPaint(); _emit("rs:sectionchange", {id, state: "remove"});
   },
   hide(id){ _secNeed(id).hidden = true; _fdPaint(); _emit("rs:sectionchange", {id, state: "hide"}); },
@@ -106,13 +94,12 @@ export const rsSections = {
   // whether a section that folds is folded
   folded(id){ const w = _secNeed(id); return w.classList.contains("folded"); },
 };
-// the typed options: the sections that the page added and the panel's own that it hides, and the legend's rows
+// the typed options: the sections that the page added, and the legend's rows
 export function initSections(){
   const p = O.dashboard && O.dashboard.panel;
   if(!p) return;
   const run = () => {
     for(const s of p.sections || []) rsSections.add(s);
-    for(const h of p.hide || []) rsSections.hide(h);
     legendRefresh();
   };
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();

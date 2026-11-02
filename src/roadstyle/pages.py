@@ -1,7 +1,7 @@
 """One-call **dashboard** / **street view** pages.
 
-Each renders the styled road map with the built-in map controls off and a bundled sidebar template
-injected on top, wired to the map only through the public ``window.rs*`` API. The sidebars ship
+Each renders the styled road map (with the defaults of a map page) and a bundled panel template
+on top, wired to the map only through the public ``window.rs*`` API. The sidebars ship
 inside the package (``roadstyle/templates/{dashboard,street_view}.html``), so ``pip install roadstyle``
 can build these pages with no repo checkout::
 
@@ -14,7 +14,7 @@ can build these pages with no repo checkout::
 
 Both return a :class:`~roadstyle.render_web.WebMap` — ``.save(path)`` writes the self-contained
 page, and it previews inline in a notebook. Every :func:`~roadstyle.render_edges` keyword passes
-through (``color_options=`` populates the sidebar's *Colour by* picker); the injected sidebar is
+through (``color_options=`` fills the *Colour by* list of the toolbox); the injected panel is
 plain HTML/CSS/JS, safe to copy out and reshape.
 """
 from __future__ import annotations
@@ -52,17 +52,17 @@ def _page(gdf, template: str, *, defaults: dict, edit=None, **kw):
 
 
 def render_dashboard(gdf, *, template="dashboard", **kw):
-    """A self-contained **dashboard** page: the styled map with every built-in control off and the
-    bundled dashboard sidebar injected — base-map + colour-by selects, a class filter with a legend,
-    a WHERE-clause query box with a result table, and a selected-road read-out.
+    """A self-contained **dashboard** page: the styled map (the defaults of a map page), the toolbox (base map, roads, colour and legend,
+    settings, the windows) and a side panel that starts empty. The page adds what it needs to the panel: the parts ``query`` and
+    ``road_card``, or its own HTML, with ``dashboard={"panel": {"sections": [...]}}`` (docs/guides/dashboard-panel.md).
 
-    Populate the *Colour by* picker with ``color_options={...}`` (see :func:`render_edges`); any
+    Populate the *Colour by* list of the toolbox with ``color_options={...}`` (see :func:`render_edges`); any
     other ``render_edges`` keyword passes through. Returns a :class:`WebMap`;
     ``.save("dashboard.html")`` writes the page.
 
-    ``template="dashboard"`` (the default) is the overlay form: the map fills the window, the sidebar floats, a toolbar at the right with
-    the settings and the windows (docs/guides/dashboard-layout.md). ``layout="dock"`` docks the sidebar at the right and has no toolbar (the old form)."""
-    kw.pop("backend", None)                       # web only: the sidebar drives a MapLibre map
+    ``template="dashboard"`` (the default) is the overlay form: the map fills the window, the panel floats, the toolbox at the right edge
+    (docs/guides/dashboard-layout.md). ``layout="dock"`` docks the panel at the left and has no toolbox."""
+    kw.pop("backend", None)                       # web only: the panel drives a MapLibre map
     return render_edges(gdf, backend="web", template=template, **kw)
 
 

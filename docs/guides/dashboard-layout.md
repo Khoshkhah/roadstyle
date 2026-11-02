@@ -1,6 +1,6 @@
 # Dashboard layout
 
-A dashboard is a map with a side panel and a toolbox. `render_dashboard` makes it from your road data. It starts with a blank map (no key), the panel at the left, the toolbox at the right edge, and no scale box.
+A dashboard is a map with a toolbox and a side panel ([Dashboards](dashboards.md)). This page describes the frame and the toolbox: the layouts, the panel frame, each tool, the windows, the dark theme and the phone form. The panel is at the left and the toolbox is at the right edge. The panel is empty, and there is no scale box.
 
 ```python
 import roadstyle as rs
@@ -21,19 +21,15 @@ There is one template with a panel: `dashboard`. `layout` changes the frame:
 
 `template="map"` is the map only (the default of `render_edges`). The `classic` template and the report page are gone.
 
-`dashboard={...}` changes any option of the template. You give only the parts that you change. The call merges them over the template's
-defaults, and a wrong key or value is an error. These are the parts:
+`dashboard={...}` changes any option of the template. Every key, with its default, is in [Dashboard options](../reference/parameters.md#dashboard-options).
 
-| Part | Keys |
-|---|---|
-| `panel` | `None` (no panel: a map with the toolbox), or `side` (`"left"` or `"right"`), `width_px` (400 by default; fit your content to the panel and do not widen the panel for it), `look` (`"frame"` or `"card"`), `sections`, `hide` ([Add to the panel](dashboard-panel.md)) |
-| `toolbar` | `position` (`"left"`, `"top"`, `"right"` or `"bottom"`), `navigation` (`"box"` or `"buttons"`), `settings`, `hold` |
-| `legend` | `rows`: the rows that your page adds to the legend |
-| `credits` | the credits of your own data: `[{"text": ..., "href": ...}]` |
-| `scale_box` | `True` shows the scale and the zoom number at the start |
-| `windows` | `clamp`, `recenter_map`, `restore_open`, `remember`: the rules of the Street View and Google 3D windows |
-| `google_3d` | `fov_deg`, `follow`, `selection_style`, `mesh_altitude_m`, `layers` |
-| `phone` | `max_width_px` (700) and `toolbar`: the phone form |
+## The panel
+
+The panel has a frame: the title (the page's `name`), the theme button and the hide button. The sections that the page adds are in [Add to the panel](dashboard-panel.md). The options `side`, `look` and `width_px` set the edge, the look (`"frame"` or `"card"`) and the width. The person can change the edge and the look in the settings.
+
+The title stays, and only the body scrolls. The scrollbar is at the outer edge of the panel: at the left of a left panel, at the right of a right panel. It shows only when you point at the panel or scroll. A soft fade at the bottom edge shows that more content is below. The scrollbar has a contrast of 3:1 or more in both themes. The sections of the page scroll with the rest, and you do not need CSS for it.
+
+If you must change the text of the template, build the page and change `m.html`. The panel is `<div id="sb">`, and its sections go in `<div class="sb-body">`. These ids of its frame stay stable: `sb-hide`, `sb-show` and `sb-th`.
 
 ## The toolbox
 
@@ -85,9 +81,16 @@ zoom. When you switch it off, the map goes flat again if this switch tilted it. 
 
 ### Colour and legend
 
-The box has the *Colour by* list and the legend of the active colour option. Your own rows follow the legend
-(`dashboard={"legend": {"rows": [...]}}`, or `rs.legend.add`). A row has a colour, a label and a shape: `square` (the default),
-`circle` or `line`. The shape tells the reader what the colour is on the map: a line for a road, a circle for a sensor. A page with
+The box has the *Colour by* list and the legend of the active colour option. Your own rows follow the legend:
+
+```python
+rs.render_dashboard(edges, dashboard={"legend": {"rows": [
+    {"color": "#ff0066", "label": "Events"},
+    {"color": "#16a34a", "label": "Sensors", "shape": "circle"},
+]}})
+```
+
+`rs.legend.add` adds a row from JavaScript. A row has a color, a label and a shape (`square`, `circle` or `line`). The shape tells the reader what the color is on the map: a line for a road, a circle for a sensor. A page with
 live data lists each set of numbers with its range and its number of roads. `rs.colorModes` gives the box a "Colour by" list of your
 own. The tool is grey when the page has no colour option and no live data.
 
@@ -125,6 +128,8 @@ Dark Gray, Blank dark) sets the dark theme too. The style's own layers (land, pa
 colour in the style, and the global state `rs_theme` picks it. A change of theme needs no new style and no new tile. The dark colour is the light one turned by the `dark` block of the profile.
 The fill of a road keeps its colour. Design: `docs/design/dark_theme.md`.
 
+There is no `theme=` keyword. The page starts light. To start dark, use `page_script="rs.ready(() => rsSetTheme('dark'))"`.
+
 ![The dashboard in the dark theme on the OpenFreeMap Fiord base map](../img/gallery/dashboard_dark.jpg)
 
 ## Add a tool
@@ -137,25 +142,11 @@ rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => sav
 
 To hold the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` (the bar shows after 6 s at most).
 
-Your own blocks and legend rows: [Add to the panel](dashboard-panel.md). Older script? [Move a dashboard](migrating-dashboard.md).
-
-## Roads at small zooms
-
-The dashboard hides minor road classes at a small zoom. The table is one default of `minzoom`:
-
-| Roads | First zoom |
-|---|---|
-| service roads, living streets | 14 |
-| steps, platforms, corridors, roads (`highway=road`) | 15 |
-| roads with private access (`access_col`), any class | 15 |
-| every other class | 0 |
-
-`minzoom=False` shows all classes at every zoom. `minzoom={"*": 0, "service": 14}` sets every class first, then changes the ones that you name.
-The key `"@private"` sets the first zoom of the private-access roads. The profile's own table (`default.yaml`) is the table of the `map` template and does not change.
+Your own sections: [Add to the panel](dashboard-panel.md). Older script? [Move a dashboard](migrating-dashboard.md).
 
 ## The windows
 
-Street View and Google 3D open in the free part of the map and keep their size. Google 3D has a view switch, **Imagery** or **Map**, and **Follow** is on at the start.
+Street View and Google 3D open in the free part of the map and keep their size. The `windows` option sets their rules (keep inside the screen, restore, remember: [Dashboard options](../reference/parameters.md#dashboard-options)). Google 3D has a view switch, **Imagery** or **Map**, and **Follow** is on at the start.
 
 `street_view="dock"` docks Street View beside the map, as a side of the page with a divider that you drag. The window takes the right part of the screen (the lower part on a phone). The Street View button of the bar closes and opens it. A dashboard with `dashboard={"panel": None}` has no panel: the page is the map and the toolbox. See [Street View](street-view.md#docked-beside-the-map).
 
@@ -172,7 +163,7 @@ The bar is tested down to a window height of 145 px. At this height, every tool 
 
 ## A phone
 
-At 700 px or less, the bar is at the top and the panel is a bottom sheet.
+At 700 px or less, the page turns to its phone form by itself: the bar is at the top and the panel is a bottom sheet. This is true for a narrow desktop window too. There is no `phone` option.
 
 ![The dashboard on a phone: the bar at the top and the panel as a bottom sheet](../img/dashboard-phone.png){ width="260" }
 
@@ -190,12 +181,10 @@ At 700 px or less, the bar is at the top and the panel is a bottom sheet.
 
 ## The area boundary
 
-`boundary=` (GeoJSON or a shapely geometry) is an input of the page: a dashed line shows it. `boundary_dim=True` shades the outside; `boundary_limit=True` keeps the camera near it.
+`boundary=` (GeoJSON or a shapely geometry) is an input of the page: a dashed line shows it. `boundary_dim=True` shades the outside; `boundary_limit=True` keeps the camera near it. The `boundary` option sets the opacity of the shade and the limit ([Dashboard options](../reference/parameters.md#dashboard-options)).
 
 ## Style
 
-The dashboard has one accent colour, the Sonocount teal: `--accent` is `#0e7c8e` in the light theme and a lighter teal in the dark theme. It is defined once in `dashboard.css`. A selected tab, a primary button, the mode and follow buttons of the Street View and Google 3D windows, and a link use it, in the panel and in the floating windows. A page cannot set its own accent.
-
 The box in the bottom corner (scale, zoom number, credits) has the rounded shape of the bar. A button with a text shows no tooltip box, and a tooltip box never covers its control. On a phone every tool of the one-row bar can be reached: the row scrolls, and the first and the last tool are whole at the ends.
 
-Every part uses the same tokens in both themes (rules: `docs/design/dashboard_templates.md`, 3.4).
+The accent color and the other tokens are the same in both themes. They are in [Dashboard parts](dashboard-parts.md#the-accent-color-and-the-theme-tokens). The rules for each part: `docs/design/dashboard_templates.md`, 3.4.

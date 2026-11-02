@@ -7,11 +7,11 @@ hide:
 
 <p class="rs-manual-nav"><a href="../">Dashboard manual</a> &middot; <a href="../python/">Python SDK</a> &middot; <a href="../javascript/">JavaScript</a></p>
 
-<p class="lead">Call each part of a dashboard from JavaScript, and see the result on the map at the same time.</p>
+<p class="lead">Call each piece of a dashboard from JavaScript, and see the result on the map at the same time.</p>
 
 <iframe id="rs-testbed" src="../../../maps/dashboard_testbed.html" loading="lazy" title="A dashboard to try the JavaScript blocks on" class="rs-demo rs-sticky"></iframe>
 
-The map above stays at the top of the screen while you scroll. Under each heading is one part of the dashboard and a block of code. To try a block:
+The map above stays at the top of the screen while you scroll. Under each heading is one piece of the dashboard and a block of code. To try a block:
 
 1. Scroll to the block.
 2. Push **Run** under it.
@@ -21,11 +21,9 @@ Each **Run** reloads the map first, so each block starts from the same map. Bloc
 The page has one object, `window.rs`. The global `rs*` functions of the [reference](../../reference/javascript.md) do the same jobs, and a few of them (`rsSetTheme`, `rsSetStreetView`) have no `rs.` form.
 For the Python side of the same page, see [Python SDK](python.md).
 
-The page has one object, `window.rs`. The global `rs*` functions of the [reference](../../reference/javascript.md) do the same jobs, and a few of them (`rsSetTheme`, `rsSetStreetView`) have no `rs.` form.
-
 ## Wait for the page
 
-Call your code after `rs.ready`. It runs now if the page is ready, and on the event `rs:ready` if not. In Python, `page_script=` runs your text after that event.
+Call your code in `rs.ready(fn)`. It runs now if the page is ready, and on the event `rs:ready` if not. The event fires once, so a listener that you add later never runs. In Python, `page_script=` runs your text before the page is ready: put it in `rs.ready(() => ...)` too.
 
 ```javascript
 rs.ready(() => console.log("ready, contract", rs.contract));
@@ -46,7 +44,7 @@ console.log(rs.props(ids[0]));
 
 ```javascript
 const ids = rs.query({highway: "primary"});
-rs.select(ids[0]);          // like a click: glow, popup or panel
+rs.select(ids[0]);          // like a click: glow, popup, road card
 rs.focus(ids);              // fit the camera to the set
 rs.highlight(ids.slice(0, 5));
 ```
@@ -87,8 +85,12 @@ rs.setState({classes: null});       // back to all classes
 
 ## Sections of the panel
 
+The panel starts empty. Add a part of roadstyle (`part`: `"query"` or `"road_card"`) or your own HTML (`html`).
+
 ```javascript
-rs.sections.add({id: "notes", label: "Notes", before: "query", fold: true,
+rs.sections.add({id: "q", label: "Query", part: "query", text: "p.highway == 'primary'"});
+rs.sections.add({id: "road", label: "Selected road", part: "road_card", fields: ["name", "highway"]});
+rs.sections.add({id: "notes", label: "Notes", before: "road", fold: true,
                  html: "<p>Text of the page</p><button class='sb-primary' id='go'>Go</button>"});
 document.getElementById("go").onclick = () => rs.focus(rs.query({highway: "primary"}));
 console.log(rs.sections.list());
@@ -136,7 +138,7 @@ const bar = rs.svg(s, "rect", {x: 0, y: 4, width: 60, height: 12, fill: "var(--a
 rs.hover.on(bar, "<b>60 %</b> of the roads");
 ```
 
-`rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. [Add to the panel](../dashboard-panel.md) shows the HTML.
+`rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 
 ## Live data
 
@@ -189,33 +191,8 @@ rs.select(rs.query({highway: "primary"})[0]);
 stop();
 ```
 
-| Event | When |
-|---|---|
-| `rs:ready` | The page is ready. |
-| `rs:select`, `rs:deselect` | A road is selected or cleared. |
-| `rs:filterchange` | A road filter changes. |
-| `rs:colorchange` | The color option or the colors of roads change. |
-| `rs:highlightchange` | The glow changes. |
-| `rs:themechange` | The theme changes. `detail.theme` is `light` or `dark`. |
-| `rs:basemapchange`, `rs:basemapready` | The base map changes, and a vector base map has loaded its layers. |
-| `rs:buildingschange`, `rs:buildings3dchange` | The 3D buildings of the base map, or of the style, switch. |
-| `rs:labelschange` | The map labels switch. |
-| `rs:overlaychange`, `rs:overlayschange` | One overlay, or the list of overlays, changes. |
-| `rs:interactionchange` | The clicks or the popup of an overlay change. |
-| `rs:tunnelchange`, `rs:roadfillchange` | The tunnel look, or the fill of the roads, changes. |
-| `rs:viewchange`, `rs:viewselect` | The 2D or 3D view, or a named view, changes. |
-| `rs:sectionchange` | A section of the panel is added, removed, hidden, shown or folded. |
-| `rs:helpchange` | The words of the help window change. |
-| `rs:colormode` | `rs.colorModes` picks a mode. |
-| `rs:datachange` | `rs.setData` or `rs.clearData` runs. |
-| `rs:toolchange`, `rs:toolsready` | A tool opens, closes or is pressed. The page has added its tools (`rs.tools.ready()`). |
-| `rs:sheetchange`, `rs:layoutchange` | The phone sheet, or the side or look of the panel, changes. |
-| `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot` | The Street View window opens or closes, moves along the edge, or picks a spot. |
-| `rs:google3dchange`, `rs:g3dmodechange` | The Google 3D window opens or closes, or its mode changes. |
-| `rs:tableready` | The table of the level editor is ready. |
+The page sends these events: `rs:ready`, `rs:select`, `rs:deselect`, `rs:filterchange`, `rs:colorchange`, `rs:highlightchange`, `rs:themechange`, `rs:basemapchange`, `rs:basemapready`, `rs:buildingschange`, `rs:buildings3dchange`, `rs:labelschange`, `rs:overlaychange`, `rs:overlayschange`, `rs:interactionchange`, `rs:tunnelchange`, `rs:roadfillchange`, `rs:viewchange`, `rs:viewselect`, `rs:sectionchange`, `rs:helpchange`, `rs:colormode`, `rs:datachange`, `rs:toolchange`, `rs:toolsready`, `rs:sheetchange`, `rs:layoutchange`, `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot`, `rs:google3dchange`, `rs:g3dmodechange` and `rs:tableready`.
 
-The `detail` of each event is in the [reference](../../reference/javascript.md#events).
-
-**See also:** [Dashboard layout](../dashboard-layout.md) · [Add to the panel](../dashboard-panel.md) · [Live data](../live-data.md) · [JavaScript API](../../reference/javascript.md)
+When each event fires, and its `detail`, are in the [reference](../../reference/javascript.md#events).
 
 **See also:** [Overview](index.md) · [Python SDK](python.md) · [Dashboard layout](../dashboard-layout.md) · [Add to the panel](../dashboard-panel.md) · [Live data](../live-data.md) · [JavaScript API](../../reference/javascript.md)

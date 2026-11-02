@@ -26,7 +26,7 @@ moveTo(id){window.__mlyto=id; return Promise.resolve();} resize(){} remove(){win
 
 def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
     path = tmp_path / "d.html"
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window").save(path)
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False).save(path)      # no popup over the coverage dots
     asked = []
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)

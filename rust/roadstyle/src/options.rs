@@ -10,9 +10,11 @@ const WRITER: [&str; 5] = ["data_maxzoom", "data_tolerance", "tile_keep", "tile_
 const PAGE: [&str; 4] = ["hover_delay_ms", "box_layout", "copy_field", "resolved_basemaps"];
 
 /// The keywords of the old dashboard and where each one went (docs/guides/migrating-dashboard.md).
-const MOVED: [(&str, &str); 4] = [
+const MOVED: [(&str, &str); 5] = [
+    ("theme", "a page has no theme keyword: it starts light, and the toolbox's theme tool switches it; to start dark, give \
+               page_script=\"rs.ready(() => rsSetTheme('dark'))\""),
     ("toolbar", "the bar's place is now dashboard={\"toolbar\": {\"position\": \"right\"}}"),
-    ("edit", "there is no edit hook: change the page text after the call (m.html); see the guide \"Move a dashboard to the new version\""),
+    ("edit", "there is no edit hook: add sections to the panel with dashboard={\"panel\": {\"sections\": [...]}} and the page's JavaScript with page_script="),
     ("panel", "there is no report panel: use render_dashboard; the panel's width is dashboard={\"panel\": {\"width_px\": 400}}"),
     ("sidebar", "it is now template=\"dashboard\" or template=\"map\""),
 ];
@@ -46,7 +48,8 @@ mod tests {
 
     #[test]
     fn a_keyword_of_the_old_dashboard_says_where_it_went() {
-        let got = unknown(json!({"toolbar": "right", "edit": 1}).as_object().unwrap());
+        let got = unknown(json!({"toolbar": "right", "edit": 1, "theme": "dark"}).as_object().unwrap());
         assert!(got[0].1.as_deref().unwrap().contains("dashboard={\"toolbar\"") && got[1].1.as_deref().unwrap().contains("no edit hook"), "{got:?}");
+        assert!(got[2].1.as_deref().unwrap().contains("rsSetTheme('dark')"), "{got:?}");
     }
 }
