@@ -13,19 +13,23 @@ const OVERLAP = 1;
 const sideOf = p => { const r = p.getBoundingClientRect(); return r.left + r.width / 2 < innerWidth / 2 ? "left" : "right"; };
 // `edge`: a function that gives the edge of the box now ("right", "left", "top" or "bottom"); only a box on a side follows a panel
 export function followPanels(box, edge){
-  const side = () => { const e = typeof edge === "function" ? edge() : edge; return e === "right" || e === "left" ? e : null; };
+  const edgeNow = () => typeof edge === "function" ? edge() : edge;
+  const side = () => { const e = edgeNow(); return e === "right" || e === "left" ? e : null; };
   const run = () => {
-    const s = side();
-    box.style.left = box.style.right = "";
-    if(!s || phone() || !root.classList.contains("rs-overlay")) { root.style.removeProperty("--rs-tb-off"); return; }
+    const s = side(), e = edgeNow();
+    box.style.left = box.style.right = box.style.maxWidth = "";
+    if(phone() || !root.classList.contains("rs-overlay") || !(s || e === "top" || e === "bottom")) { root.style.removeProperty("--rs-tb-off"); return; }
     if(s === "right") box.style.left = "auto";                  // a box at the right edge: its left is free
-    let off = 8;
+    let off = 8, lo = 0, hi = innerWidth;
     for(const p of document.querySelectorAll("#sb, .rs-side")){
-      if(sideOf(p) !== s) continue;
       const card = p.querySelector(".sb-card");      // the card is what shows: the box has 8 px of space round it (clear in the card look, the translucent frame in the frame look)
       const r = (card || p).getBoundingClientRect();
-      if(getComputedStyle(p).display !== "none" && r.width > 0) off = Math.max(off, (s === "right" ? innerWidth - r.left : r.right) - OVERLAP);
+      if(getComputedStyle(p).display === "none" || r.width <= 0) continue;
+      sideOf(p) === "left" ? lo = Math.max(lo, r.right) : hi = Math.min(hi, r.left);
+      if(sideOf(p) === s) off = Math.max(off, (s === "right" ? innerWidth - r.left : r.right) - OVERLAP);
     }
+    // a box along the top or the bottom is centered in the free part of the window (the part that no panel covers), and wraps to more rows when it is too wide for it
+    if(!s){ box.style.left = (lo + hi) / 2 + "px"; box.style.maxWidth = Math.max(44, hi - lo - 16) + "px"; return; }
     box.style[s] = off + "px";
   };
   const watch = () => {
@@ -35,7 +39,7 @@ export function followPanels(box, edge){
     run();
   };
   addEventListener("resize", run);
-  box.style.transition = "left .15s, right .15s";
+  box.style.transition = "left .15s, right .15s, max-width .15s";
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", watch) : watch();
   return run;
 }

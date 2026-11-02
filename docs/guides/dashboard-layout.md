@@ -159,6 +159,17 @@ Street View and Google 3D open in the free part of the map and keep their size. 
 
 `street_view="dock"` docks Street View beside the map, as a side of the page with a divider that you drag. The window takes the right part of the screen (the lower part on a phone). The Street View button of the bar closes and opens it. A dashboard with `dashboard={"panel": None}` has no panel: the page is the map and the toolbox. See [Street View](street-view.md#docked-beside-the-map).
 
+## When the window is small
+
+The bar stays in the free part of the window. This is the part that the panel does not cover. When the bar does not fit in one line, it takes more lines. It never scrolls.
+
+- **A bar at the left or right edge** that is too short for its tools takes a second column, and a third column when it must. The first column is at the edge.
+- **A bar at the top or the bottom** is centered between the panel and the edge of the window. When this space is too narrow, the bar takes a second row.
+- **A box** opens beside the whole bar, toward the map. It never opens over a second column or row, and it never goes under the bar. The credits box, which opens from the bottom corner, moves to the side of a bar that is in its way. A box that opens beside a bar at a side ends above the scale box and the credits button.
+- **Tools that you add** with `rs.tools.add` take the same lines as the built-in tools.
+
+The bar is tested down to a window height of 145 px. At this height, every tool is inside a bar at the left or right edge. A bar along the top and the credits box can overlap at a height of less than 160 px.
+
 ## A phone
 
 At 700 px or less, the bar is at the top and the panel is a bottom sheet.

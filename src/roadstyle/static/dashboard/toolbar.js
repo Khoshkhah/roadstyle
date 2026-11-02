@@ -119,19 +119,46 @@ function keepInside(box){
   const fit = () => {
     if(box.hidden || (box.classList.contains("bm-menu") && !box.classList.contains("open"))) return;
     box.style.translate = "0 0";                // a box is anchored at its top or at its bottom edge: it moves with `translate`, which works for both
-    const r = box.getBoundingClientRect();
-    box.style.translate = _tbShift(r.left, r.right, innerWidth) + "px " + _tbShift(r.top, r.bottom, innerHeight) + "px";
+    const bar = document.getElementById("rs-toolbar"), e = bar && bar.dataset.edge, inBar = !!bar && bar.contains(box), b = bar && !inBar ? bar.getBoundingClientRect() : null;
+    box.style.maxHeight = box.style.maxWidth = "";
+    let r = box.getBoundingClientRect();
+    // a box beside a bar at a side keeps clear of the corner box (the scale, the zoom number and the credits) when they meet across: it ends above that box
+    const cb = document.getElementById("rs-scalebox"), c = inBar && (e === "right" || e === "left") && cb ? cb.getBoundingClientRect() : null;
+    let low = c && c.width > 0 && r.left < c.right && r.right > c.left ? c.top - 8 : innerHeight - _tbGap;
+    // a box under a bar along the top (over a bar along the bottom) is not taller than the room that it has: it scrolls
+    const room = inBar && e === "top" ? innerHeight - r.top - _tbGap : inBar && e === "bottom" ? r.bottom - _tbGap : low - _tbGap * 2;
+    if(inBar && r.height > room){ box.style.maxHeight = room + "px"; r = box.getBoundingClientRect(); }
+    // a box beside a bar at a side is not wider than the room between the bar and the edge of the window: it is narrower, and it is not moved over the bar
+    const wide = e === "left" ? innerWidth - _tbGap - r.left : e === "right" ? r.right - _tbGap : 0;
+    if(inBar && wide > 120 && r.width > wide){ box.style.maxWidth = wide + "px"; r = box.getBoundingClientRect(); }
+    let dx = _tbShift(r.left, r.right, innerWidth), dy = _tbShift(r.top, r.bottom, low + _tbGap);
+    // a box that is not in the bar (the credits, in the corner box) goes round the bar, with the same gap: it moves to the left of a bar at the right edge, and so on
+    if(b && b.width > 0){
+      const across = r.top + dy < b.bottom && r.bottom + dy > b.top, along = r.left + dx < b.right && r.right + dx > b.left;
+      if((e === "right" || e === "left") && across){
+        // between the bar and the edge of the window; a box that is wider than that is narrower
+        const lo = e === "left" ? b.right + _tbGap : _tbGap, hi = e === "right" ? b.left - _tbGap : innerWidth - _tbGap;
+        if(hi - lo > 120 && r.width > hi - lo){ box.style.maxWidth = hi - lo + "px"; r = box.getBoundingClientRect(); dx = _tbShift(r.left, r.right, innerWidth); }
+        if(e === "right") dx = Math.min(dx, hi - r.right); else dx = Math.max(dx, lo - r.left);
+      }
+      else if(e === "bottom" && along && r.bottom + dy > b.top - _tbGap) dy = Math.min(dy, b.top - _tbGap - r.bottom);
+      else if(e === "top" && along && r.top + dy < b.bottom + _tbGap){       // the credits box opens upward: under a bar along the top it keeps its foot and is lower, and it scrolls
+        const room = r.bottom + dy - (b.bottom + _tbGap);
+        if(room > 60){ box.style.maxHeight = room + "px"; r = box.getBoundingClientRect(); dy = _tbShift(r.top, r.bottom, low + _tbGap); }
+      }
+    }
+    box.style.translate = dx + "px " + dy + "px";
   };
   new MutationObserver(fit).observe(box, {attributes: true, attributeFilter: ["hidden", "class"]});
   new ResizeObserver(fit).observe(box);
   addEventListener("resize", fit);
 }
-let _tbPlace = null, _tbRerun = null, _tbEdge = null;
+let _tbPlace = null, _tbRerun = null, _tbEdge = null, _tbInset = null;
 // the edge that the person chose (settings.js); the phone form is the template's
 // the open box (the settings, from where the person chose the edge) closes first: it opened toward the map from the old edge
 export function setToolbarEdge(edge){
   closeBoxes();
-  _tbEdge = edge; if(_tbPlace) _tbPlace(); if(_tbRerun) _tbRerun();
+  _tbEdge = edge; if(_tbPlace) _tbPlace(); if(_tbInset) _tbInset(); if(_tbRerun) _tbRerun();
 }
 export function initToolbar(){
   const d = O.dashboard;
@@ -169,6 +196,15 @@ export function initToolbar(){
   });
   foldTool(bar);
   scrollHints(row, scroll);
+  // a box opens beside the whole bar, not beside its own tool: a tool in the second column (or row) gives how far its box must go, as `--rs-tb-in` (the css reads it)
+  const inset = () => {
+    const ws = [...scroll.children].map(w => [w, w.getBoundingClientRect()]).filter(([, r]) => r.width > 0), e = bar.dataset.edge;
+    const at = r => e === "right" ? r.left : e === "left" ? -r.right : e === "top" ? -r.bottom : r.top;
+    const near = Math.min(...ws.map(([, r]) => at(r)));
+    for(const [w, r] of ws) w.style.setProperty("--rs-tb-in", Math.round(at(r) - near) + "px");
+  };
+  new ResizeObserver(inset).observe(bar); new MutationObserver(inset).observe(scroll, {childList: true}); addEventListener("resize", inset);
+  _tbInset = inset; inset();
   boxRules(bar);
   const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-nav-box, #rs-roads-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
   toolList().forEach(fitBox); setOnReplace(fitBox);
