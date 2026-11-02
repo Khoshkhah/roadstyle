@@ -2,6 +2,8 @@
 
 <p class="lead">Get a finished dashboard page in one call, or put your own panel next to the map and drive it from JavaScript.</p>
 
+To run each JavaScript call on a live map, open the [Dashboard manual](dashboard-manual.md).
+
 === "Python"
 
     ```python
@@ -31,15 +33,9 @@
 Each takes every `render_edges` keyword and returns the same map object (`.save()`, `.html`).
 `color_options` fills the *Colour by* list in the toolbox. `name=` sets the page title.
 
-<div class="grid" markdown>
-
 ![The dashboard on a desktop: the panel at the left with the selected road, the toolbox at the right edge, and Monaco's roads](../img/dashboard-desktop.png)
 
-![The dashboard on a phone: the bar at the top and the panel as a bottom sheet](../img/dashboard-phone.png){ width="260" }
-
-</div>
-
-The pictures show Monaco, made with `rs.render_dashboard(edges, name="Monaco", basemap="ofm_positron")` at 1400 by 900 and at 390 by 844.
+The picture shows Monaco, made with `rs.render_dashboard(edges, name="Monaco", basemap="ofm_positron")` at 1400 by 900. The phone form is in [Dashboard layout](dashboard-layout.md#a-phone).
 
 ## The standard dashboard
 
