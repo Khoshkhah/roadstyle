@@ -91,9 +91,9 @@ def test_the_phone_form_is_a_sheet_with_the_apply_bar(editor):
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "no horizontal scroll"
         sheet = page.evaluate("(() => { const r = document.querySelector('#sb').getBoundingClientRect(); return [r.top, r.bottom]; })()")
         assert sheet[0] > 100 and sheet[1] <= 844 + 1, sheet            # a bottom sheet: the map stays above it
-        for t in ("Light / dark", "Settings"):
+        for t in ("Light / dark", "Settings"):            # a phone's tool of one button shrinks from 32 px to 26 px (dashboard.css, `.rs-tb-scroll`)
             r = page.evaluate(f"document.querySelector(\"button[title='{t}']\").getBoundingClientRect().toJSON()")
-            assert r["width"] >= 32 and r["height"] >= 32 and 0 <= r["right"] <= 390, (t, r)
+            assert r["width"] >= 26 and r["height"] >= 32 and 0 <= r["right"] <= 390, (t, r)
         assert errors == []
         b.close()
 
