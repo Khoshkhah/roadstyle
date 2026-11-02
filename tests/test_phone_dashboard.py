@@ -184,9 +184,9 @@ def test_the_google_3d_header_is_one_row_on_a_phone(w, h):
         browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
         page = _open(browser, html, errors, viewport={"width": w, "height": h}, **_TOUCH)
         r = page.evaluate("""() => { const win = document.querySelector('.rs-g3d'); win.hidden = false;
-          const bar = win.querySelector('.rs-svw-bar'), kids = [...bar.children].filter(e => e.offsetParent), top = e => { const b = e.getBoundingClientRect(); return Math.round((b.top + b.bottom) / 2 / 6); };   // the centres: items of other heights share a row
-          return {h: bar.getBoundingClientRect().height, tops: [...new Set(kids.map(top))], n: kids.length, credit: getComputedStyle(win.querySelector('.rs-g3d-src')).display}; }""")
-        assert len(r["tops"]) == 1 and r["h"] < 46 and r["credit"] == "none", r      # one row; the credit is in the attribution box
+          const bar = win.querySelector('.rs-svw-bar'), kids = [...bar.children].filter(e => e.offsetParent), mid = e => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }, mids = kids.map(mid);   // the centres: items of other heights share a row
+          return {h: bar.getBoundingClientRect().height, spread: Math.max(...mids) - Math.min(...mids), n: kids.length, credit: getComputedStyle(win.querySelector('.rs-g3d-src')).display}; }""")
+        assert r["spread"] < 6 and r["h"] < 46 and r["credit"] == "none", r      # one row; the credit is in the attribution box
         browser.close()
     assert not errors, errors
 
