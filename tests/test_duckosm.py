@@ -4,6 +4,7 @@ duckOSM file with features.* and stored levels ($DUCKOSM_DB, else ../duckOSM/mon
 skipped without them (CI has neither); the tests of a tiny file made here run everywhere."""
 import json
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -332,6 +333,29 @@ def test_the_page_without_a_dashboard_is_the_dashboard_without_a_panel():
     bare, full = duckosm.page(DB, "all").html, duckosm.page(DB, "all", dashboard=True).html
     assert '"template":"dashboard"' in bare and '"layout":"overlay"' in bare and 'id="sb"' not in bare
     assert '"template":"dashboard"' in full and 'id="sb"' in full
+
+
+@needs_db
+def test_the_tiled_page_draws_few_arrows():
+    """duckosm.page (tiled): the arrows repeat along the slots, so the page thins them: odd slots only (the names are on the even ones), main
+    classes below zoom 17. At Monaco's Boulevard Princesse Charlotte, zoom 16.5, they were 85; now they are a few, and not none."""
+    pw = pytest.importorskip("playwright.sync_api")
+    from roadstyle import duckosm
+
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "monaco.html"
+        duckosm.page(DB, "all").save(str(out))
+        with pw.sync_playwright() as p:
+            browser = p.chromium.launch()
+            pg = browser.new_page(viewport={"width": 1000, "height": 700})
+            pg.goto(out.as_uri())
+            pg.wait_for_function("typeof window.map?.loaded === 'function' && map.loaded()", timeout=90000)
+            pg.evaluate("map.jumpTo({center: [7.4189, 43.7316], zoom: 16.5})")
+            pg.wait_for_function("map.loaded()", timeout=60000)
+            pg.wait_for_timeout(2500)
+            n = pg.evaluate("map.queryRenderedFeatures({layers: map.getStyle().layers.filter(l => /roads-arrows/.test(l.id)).map(l => l.id)}).length")
+            browser.close()
+    assert 0 < n < 30, n
 
 
 @needs_db

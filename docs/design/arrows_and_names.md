@@ -111,6 +111,9 @@ slot pieces carry `__rs_tunnel` from their road.
 ## Limits
 
 - A map from a tile archive (`tiles=True`) has no slot geometry in the page: its arrows are still repeated along the slots.
+  The page thins them as the export does (2026-11-02): below `main_below` only the main classes, and only the odd slots (the names are on
+  the even ones, and an arrow under a name is dropped), every 4th odd slot below zoom 17; an unnamed road keeps the arrow of its first
+  slot. At Monaco, zoom 16.5, the view has a few arrows instead of 85 (`page_options.rs`, `thin_arrows`).
 - A street whose chain is split (a class, level, position or name change half-way) is two roads: two arrows, two sets of names.
 - The name's width is an estimate (letters × 0.6 em): a name of unusually wide letters can still touch its arrow.
 - A one-way road too short for its name and an arrow side by side shows the name and no arrow.

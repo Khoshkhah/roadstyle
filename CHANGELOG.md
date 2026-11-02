@@ -648,6 +648,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `name` column (the boundary of a boundary file: before, its row was skipped and nothing could be clipped). The goldens of Monaco's
   style and tiles changed at the boundary only (35 features are beyond it), and the test of the sea at the tile edge now asserts the
   opposite: the sea beyond the boundary is cut.
+- **A tiled page has fewer arrows.** Its arrows repeat along the slots, one for each piece of a one-way road, so a view had dozens (Monaco,
+  zoom 16.5: 85). The page now thins them as `export_style` does: below `main_below` only the main classes, only the odd slots (the names
+  are on the even ones), and every 4th odd slot below zoom 17. An unnamed road keeps the arrow of its first slot. Monaco, zoom 16.5: 9.
+  (One arrow on each road, as a page that is not tiled has, needs the roads whole: it stays for a later step.)
 - **`duckosm.page(dashboard=False)` is the dashboard without a panel.** It was `template="map"` with the old dock frame (the MapLibre
   buttons, no toolbox). It is now `template="dashboard"` with `dashboard={"panel": None}`: the full-window map and the toolbox.
 - **A duckOSM page draws its base map's textures and icons.** The engine writes them in `roadstyle:images`, but no roadstyle code added

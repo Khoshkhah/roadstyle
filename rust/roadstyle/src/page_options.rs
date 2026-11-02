@@ -633,10 +633,29 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     if let Some(f) = a.get("tile_format").and_then(Value::as_str) {        // the one default is MLT (docs/design/tiling.md)
         o.format = crate::tiles::TileFormat::parse(f)?;
     }
-    let (style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a))?;
+    let (mut style, t) = crate::tile_stage(s, &o, &json!({"url": "pmtiles://roads"}), crate::sources::SourceMode::inline_of(a))?;
+    thin_arrows(&mut style, look);
     // the page gzips the whole archive (page.rs), so its tiles are not gzipped one by one
     let archive = t.archive_in(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names(), true)?;
     Ok((style, Some(archive)))
+}
+
+/// The arrows of a tiled page repeat along the slots (the page has no road to put one arrow on), one for each piece. They are thinned as the
+/// export's are: below `main_below` only the main classes; only the odd slots (the names are on the even ones, and an arrow under a name is
+/// dropped), every 4th slot of them below zoom 17. An unnamed road keeps the arrow of its first slot, so a short one-way road has one.
+fn thin_arrows(style: &mut Value, look: &Look) {
+    let arw = &look.sections.arrows;
+    // the tiles have the class as its index (`__rs_ci`), not its name
+    let main: Vec<usize> = look.model.classes.iter().enumerate()
+        .filter(|(_, c)| arw.main.iter().any(|h| c.as_str() == h.as_str() || c.strip_suffix("_link") == Some(h.as_str()))).map(|(i, _)| i).collect();
+    let slot = json!(["get", "slot"]);
+    for l in style["layers"].as_array_mut().into_iter().flatten() {
+        if l["id"].as_str().is_some_and(|i| i.starts_with("roads-arrows")) {
+            l["filter"] = json!(["all", l["filter"], ["any", ["match", ["coalesce", ["get", roadstyle_engine::layers::CLASS_INDEX], -1], main, true, false], [">=", ["zoom"], arw.main_below]],
+                                 ["any", ["==", ["%", slot, ["step", ["zoom"], 4, 17, 2]], 1],
+                                  ["all", ["==", slot, 0], ["!", ["to-boolean", ["get", "name"]]]]]]);
+        }
+    }
 }
 
 /// A camera key of the call, when it gave one.
