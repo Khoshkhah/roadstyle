@@ -711,7 +711,7 @@ from the same schema.
 | `roadstyle:color_options` | `[{name, prop, legend}]`, and the active option | Python export, Rust; the active option is new (the legend is correct only for option 0 today) |
 | `roadstyle:controls` | what the engine knows and the controls show: the classes and their swatches, the access kinds and their counts, the tunnel look (palettes, colors, steps), the views, the arrow image and rules | new: today Python gives these as `rsDashboard` options, and the Rust users have none |
 | `roadstyle:state` | each global state name and its start value (`rs_co`, `rs_colors`, `rs_base`, `rs_fill_on`, `rs_palette`, `rs_ov_<n>`, `rs_tun_*`) | new: today the names are written in the JS and in `render_web.py` |
-| `roadstyle:images` | the images to add (`oneway`) | Rust |
+| `roadstyle:images` | the images to add (`rs-oneway`) | Rust |
 | `roadstyle:levels` | the source of the numbers (see the render model) | new |
 | `roadstyle:planner`, `roadstyle:planner_skipped` | the route planner's graphs | Rust |
 | layer `metadata["roadstyle:group"]`, `["roadstyle:over"]` | the group of a layer (`roads`, or an overlay's name) | Rust |

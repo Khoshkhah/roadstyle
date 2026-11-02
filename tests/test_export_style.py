@@ -50,9 +50,9 @@ def test_style_points_at_its_own_files(tmp_path):
     assert "roads" not in names and not {"roads-fill", "roads-highlight"} & {lyr["id"] for lyr in s["layers"]}      # D5: the pieces pick and glow
     assert s["metadata"]["roadstyle:contract"] == 2 and s["metadata"]["roadstyle:interaction"]["props"] == f"{BASE}/props.json"
     sprite = json.loads((tmp_path / "sprite.json").read_text())
-    assert sprite["oneway"]["sdf"] is True
+    assert sprite["rs-oneway"]["sdf"] is True and "oneway" not in sprite     # the arrow has a name of its own
     arrows = [lyr for lyr in s["layers"] if lyr["id"].startswith("roads-arrows")]
-    assert arrows and all("icon-color" in lyr["paint"] for lyr in arrows)
+    assert arrows and all(lyr["layout"]["icon-image"] in sprite for lyr in arrows) and all("icon-color" in lyr["paint"] for lyr in arrows)
     assert all(lyr["layout"]["symbol-placement"] == "line-center" and "__rs_arw" in json.dumps(lyr["filter"]) for lyr in arrows)   # fewer arrows
 
 

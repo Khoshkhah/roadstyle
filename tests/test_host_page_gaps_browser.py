@@ -234,7 +234,7 @@ _TOOLS = """() => ({
   layers: (() => { rs.tools.open('legend'); const l = [...document.querySelectorAll('.rs-cb-layers .lg-row')].map(r => r.textContent.trim()); rs.tools.close('legend'); return l; })(),
   tunnel: !!document.querySelector('.tn-ctrl #tn-pre'),
   legend: !rs.tools.list().find(t => t.id === 'legend').disabled,
-  classes: window.RS_CLASSES.length, arrowImage: map.hasImage('oneway'), colourOptions: window.RS_COLOR_OPTIONS.length,
+  classes: window.RS_CLASSES.length, arrowImage: map.hasImage('rs-oneway'), colourOptions: window.RS_COLOR_OPTIONS.length,
 })"""
 
 
@@ -262,7 +262,7 @@ def test_every_control_that_a_style_gives_follows_a_later_style_of_the_engine(ho
         start = page.evaluate(_TOOLS)
         assert not start["layers"] and not start["switchShown"] and not start["tunnel"] and not start["legend"] and not start["arrowImage"], start
         page.evaluate("(s) => addStyle(s)", style)
-        page.wait_for_function("map.hasImage('oneway') && window.RS_CLASSES.length > 3", timeout=20_000)
+        page.wait_for_function("map.hasImage('rs-oneway') && window.RS_CLASSES.length > 3", timeout=20_000)
         first = page.evaluate(_TOOLS)
         assert first["classes"] > 3 and not first["primaryHidden"], first
         # no floating map box on a page with a bar: the base-map box and the legend box have what they showed

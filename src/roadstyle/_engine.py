@@ -15,6 +15,10 @@ ENGINES = ("python", "rust")
 # what the Rust engine needs in the roads
 RUST_COLUMNS = ("highway",)
 
+# the id of the road arrow image (the Rust constant `layers::ARROW_IMAGE`; tests/test_arrow_image_name.py checks that they agree). It has a
+# prefix of its own: the sprite of a base map can have an image `oneway` that points up, and a line placement turns it 90 degrees.
+_ARROW_IMAGE = "rs-oneway"
+
 
 def engine(name: str | None = None) -> str:
     """The engine of the level solver: ``name``, else ``ROADSTYLE_ENGINE``, else "rust"."""
@@ -347,7 +351,7 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds, pro
         if "metadata" in lyr:
             lyr["metadata"] = lyr.pop("metadata")
     images = style.setdefault("metadata", {}).pop("roadstyle:images", None) or {}
-    images.pop("oneway", None)                                          # export_style draws the arrow from the sprite
+    images.pop(_ARROW_IMAGE, None)                                      # export_style draws the arrow from the sprite
     if images:                                                          # the base map's textures and icons (a duckOSM map)
         style["metadata"]["roadstyle:images"] = images
     d = Path(out_dir)
@@ -371,7 +375,7 @@ def _write_export(t, out_dir, base_url: str, format: str, name: str, bounds, pro
                                                   **({"base_props": base_props} if base_props else {})}
     png = _assets.data("data/sprite.png")
     icon = _settings.theme_value("arrows.icon")
-    index = json.dumps({"oneway": {"x": 0, "y": 0, "width": icon["width"], "height": icon["height"], "pixelRatio": icon["pixel_ratio"], "sdf": True}})
+    index = json.dumps({_ARROW_IMAGE: {"x": 0, "y": 0, "width": icon["width"], "height": icon["height"], "pixelRatio": icon["pixel_ratio"], "sdf": True}})
     for n in ("sprite", "sprite@2x"):
         (d / f"{n}.png").write_bytes(png)
         (d / f"{n}.json").write_text(index)

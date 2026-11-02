@@ -65,7 +65,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "9027e97e4a168c172b8fd96be541d40c950dbe0f59599720d03c8cbae475a2df");
+    assert_eq!(style_hash(&area), "ace38881a87cf6dd6c303b47a25309bf7cae83e5ace27db9c7aa23df66699270");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -74,7 +74,7 @@ fn monaco_style() {
 fn tartu_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(style_hash(&area), "49941170e3ad24c171531890c3a040bf2e9bb9f03326a919900b5dacd74dce15");
+    assert_eq!(style_hash(&area), "50f36cdbd45bff05f8cad7c242415504d6d7f9273d93eaddabed72b5248bde65");
 }
 
 /// The vector tiles (tiled_from_parquet): the SHA-256 of the style and of every tile of the roads' box at zooms 12, 14 and 15 (each tile with
@@ -114,7 +114,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "dc0c5e9bb3708ad57231fbb1a7b54cc54d13f084a8b7831c08a6ede06af42006");
+    assert_eq!(tiles_hash(&area), "1539fcffd6e0f384ecc2332070df000b49e0d0810ae67463fe82b9732b2d7a29");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at
@@ -139,5 +139,5 @@ fn the_sea_is_cut_at_the_boundary() {
 fn tartu_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/tartu");
     assert!(area.join("roads.parquet").exists(), "{}: no Tartu inputs, run tests/get_goldens.sh", area.display());
-    assert_eq!(tiles_hash(&area), "b83f129abe86b5fbb12d9a6dec28e9f6180c21896d83132ffd79ec471b11f15e");
+    assert_eq!(tiles_hash(&area), "419ea187141b07e0bf3acd6a0637ba79058468079ff9a00a9327f7eeb0d00a9e");
 }

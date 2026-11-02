@@ -33,7 +33,7 @@
         "roads",
         "c35a8fc270f3cbfb",
         "b9e63a214b296e3e",
-        "2b8bcc41898f5de7"
+        "c0d7392484772b9a"
       ],
       [
         "roads-labels",
@@ -53,7 +53,7 @@
     },
     "metadata": {
       "roadstyle:interaction": "a911c29a8eeae5d8",
-      "roadstyle:images": "e9049aa3d5b18840",
+      "roadstyle:images": "e1cdd78022892b5f",
       "roadstyle:sources": "8bf9b5c1a82fc4e1",
       "roadstyle:classes": "5e19b537d383e607",
       "roadstyle:controls": "13b74d5d7142a722",
@@ -61,7 +61,7 @@
       "roadstyle:contract": "d4735e3a265e16ee",
       "roadstyle:arrows": "42d2b70866ba77b8"
     },
-    "hash": "48037eb367aa8dff"
+    "hash": "0a293f60b58c8a7b"
   },
   "tiles": {
     "z12": {

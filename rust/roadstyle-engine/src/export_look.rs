@@ -92,7 +92,7 @@ fn symbol_layers(look: &crate::Look, cols: &LookCols, mz: Option<&Value>) -> Val
     let all = |v: Vec<Value>| { let mut a = vec![json!("all")]; a.extend(v); Value::Array(a) };
     json!([
         {"id": "arrows", "type": "symbol", "minzoom": arw.minzoom, "filter": all(af),
-         "layout": {"symbol-placement": "line", "icon-image": "oneway", "icon-rotation-alignment": "map", "symbol-spacing": spacing,
+         "layout": {"symbol-placement": "line", "icon-image": crate::layers::ARROW_IMAGE, "icon-rotation-alignment": "map", "symbol-spacing": spacing,
                     "symbol-sort-key": sort, "icon-size": size},
          "paint": {"icon-opacity": arw.opacity, "icon-color": arw.color}},
         {"id": "labels", "type": "symbol", "minzoom": lbl.minzoom, "filter": all(lf),
@@ -151,7 +151,7 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     let (bd, sel, arw) = (&s.boundary, &s.selection, &s.arrows);
     let symbols = symbol_layers(look, cols, mz.as_ref());
     let img = &arw.image;
-    let images = json!({"oneway": {"url": img["url"], "sdf": true, "pixelRatio": arw.icon["pixel_ratio"]}});
+    let images = json!({crate::layers::ARROW_IMAGE: {"url": img["url"], "sdf": true, "pixelRatio": arw.icon["pixel_ratio"]}});
     let mut hover_lay: Map<String, Value> = lay.as_object().cloned().unwrap_or_default();
     hover_lay.shift_remove("line-sort-key");
     let popup: Vec<&String> = s.interaction.popup.iter().filter(|c| *c != "name").collect();

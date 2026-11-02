@@ -275,6 +275,10 @@ pub fn class_index(e: &mut Value, col: &str, classes: &[String]) {
 pub const LIVE_COLOR: &str = "rs_c";
 pub const LIVE_WIDTH: &str = "rs_w";
 
+/// The id of the road arrow image that the host adds (`roadstyle:images`). It has a prefix of its own: the sprite of a vector base map can have an
+/// image `oneway` (the one of OpenFreeMap points up, and a line placement turns it 90 degrees from the road), and the arrows must never take it.
+pub const ARROW_IMAGE: &str = "rs-oneway";
+
 /// `e` with each output of its zoom curve times `f`: a zoom curve must stay at the top of a paint value (MapLibre), so the factor goes
 /// into each stop.
 pub fn times_each_stop(e: &Value, f: &Value) -> Value {
