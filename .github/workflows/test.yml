@@ -40,7 +40,7 @@ jobs:
   # Full suite with playwright installed — runs the browser tests the matrix above skips.
   browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 45          # the full suite with the browser tests takes about 25 minutes on a runner (20 cancelled every run, 2026-11-02)
+    timeout-minutes: 45          # the full suite with the browser tests needs more than 20 minutes on a runner (20 cancelled every run, 2026-11-02)
     steps:
       - uses: actions/checkout@v4
 
