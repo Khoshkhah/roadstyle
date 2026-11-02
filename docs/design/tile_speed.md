@@ -258,7 +258,7 @@ A check of 187,920 combinations of features, zooms and live widths found no diff
 for each row (kind, pair, bridge, two-way), class and stop, and writes the `let`. Two more steps make it smaller than the prototype: the classes that have the same width in all rows
 and stops are one group (13 groups for 29 classes: a second `at` gives the group), and the numbers are rounded to 6 decimals. A width that a feature sets (metres, items) is not in a
 table: `table_form` gives None and the `case` form stays. The new form is 14,580 characters in the budget's styles (before 26,312) and 14,270 in the Burnaby style (before 24,720).
-`tests` in `layers/width_tests.rs` compare the two forms for all 48 rows, all classes, zooms 11 to 21 in halves and two live widths, in three modes (no pairs; pairs; pairs and tunnels).
+The fill of a twin pair has the flag `pair` too (it is one half of the road, see `twin_ends.md`), so the rows (fill, pair) and (fill, pair, two-way) have their own widths. `tests` in `layers/width_tests.rs` compare the two forms for all 48 rows, all classes, zooms 11 to 21 in halves and two live widths, in three modes (no pairs; pairs; pairs and tunnels).
 The same check in MapLibre's own style-spec evaluator (`width_table_check.mjs`) found 0 differences in 187,920 combinations; the largest difference is 8e-7 px.
 
 MapLibre parse and layout of the largest tile (Burnaby, `ml.py tile`, tiles of this branch, ms, median of 28 runs, the runs in brackets). The road layer alone (base-map layers removed),

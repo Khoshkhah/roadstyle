@@ -9,6 +9,8 @@ pub trait Exprs {
     fn offset_match(&self, col: &str, z: f64) -> Value;
     /// A twin pair's half: its offset at zoom z, per class (`half_frac`; a quarter of the overlap's pixels is taken off, so the two halves are as wide as the road).
     fn offset_half(&self, col: &str, z: f64) -> Value;
+    /// The width of each class's fill at zoom z (a link: times the links' width): `offset_expr` times a fraction of it.
+    fn offset_width(&self, col: &str, z: f64) -> Value;
     /// A twin pair's half at zoom z: its width as a fraction of the road's, the pixels that it overlaps its twin by, and its offset as a
     /// fraction of the road's width. Before offset_zoom the two halves lie side by side (the road's width in all); from offset_zoom + ramp_zooms
     /// they are the two lanes of the profile (offset_frac, width_frac). None: the profile has no lane split (offset_frac 0), so a pair is one line.
@@ -85,6 +87,17 @@ impl Exprs for Model {
         Value::Array(m)
     }
 
+    fn offset_width(&self, col: &str, z: f64) -> Value {
+        let mut m = vec![json!("match"), json!(["get", col])];
+        for c in &self.classes {
+            let (b, lk) = Self::base(c);
+            m.push(json!(c));
+            m.push(json!(round_to(self.gwidth(self.group_of(b), z) * if lk { self.link_w } else { 1.0 }, 3)));
+        }
+        m.push(json!(round_to(self.gwidth(&self.fb_group, z), 3)));
+        Value::Array(m)
+    }
+
     fn half_frac(&self, z: f64) -> Option<(f64, f64, f64)> {
         if self.offset_frac <= 0.0 {
             return None;
@@ -101,7 +114,13 @@ impl Exprs for Model {
         for (z, zv) in self.stops() {
             e.push(zv.clone());
             e.push(match self.half_frac(z).filter(|_| pairs) {
-                Some(_) => json!(["case", pair_half(), self.offset_half(col, z), two, self.offset_match(col, z), 0]),
+                // the class's width once: times the fraction of a half, of a lane or 0, less a quarter of the overlap for a half
+                Some((_, px, half)) => {
+                    let ramp = ((z - self.offset_zoom) / self.ramp_zooms).clamp(0.0, 1.0);
+                    let by = json!(["case", pair_half(), round_to(half, 4), two, round_to(self.offset_frac * ramp, 4), 0]);
+                    let lane = json!(["*", self.offset_width(col, z), by]);
+                    if px > 0.0 { json!(["+", lane, ["case", pair_half(), round_to(-px / 4.0, 4), 0]]) } else { lane }
+                }
                 None => json!(["case", two, self.offset_match(col, z), 0]),
             });
         }

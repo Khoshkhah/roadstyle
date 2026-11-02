@@ -72,7 +72,7 @@ worker, `export_style`, `roadstyle tiles`): there is one rule, not one for each 
 
 | layer | key | value | read by the style | read by the page |
 |---|---|---|---|---|
-| simple | `__rs_k`, `__rs_ci`, `r`, `__rs_twoway`, `__rs_pair`, `__rs_bridge`, `__rs_tunnel`, `__rs_seam`, `__rs_lap` | number or flag | road layer and its dash layer | `__rs_k` |
+| simple | `__rs_k`, `__rs_ci`, `r`, `__rs_twoway`, `__rs_pair` (the casing of a twin pair, and its other lines), `__rs_bridge`, `__rs_tunnel`, `__rs_seam`, `__rs_lap` | number or flag | road layer and its dash layer | `__rs_k` |
 | simple | `__rs_ci` | the class: the place in the tile's class list (below) | road layer (widths, offsets, the class minzoom) | the Roads filter (`filter.js`) |
 | simple | `__rs_dash`, `__rs_cap` | the index (from 1) of the dash pattern; 1 flat end, 2 square end | road layer | |
 | simple | `lvl` | number, **only when it is not 0** (a bridge or a tunnel; every reader takes a missing level as 0) | | the Roads filter: Bridges and Tunnels |

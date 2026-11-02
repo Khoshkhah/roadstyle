@@ -70,3 +70,31 @@ fn a_width_that_a_feature_sets_is_not_a_table() {
     let max = json!(["interpolate", ["linear"], ["zoom"], 12, ["max", 1, 2]]);
     assert!(table_form(&max, "highway", &classes, &live).is_none(), "an operator that the evaluator does not know");
 }
+
+/// The two directions of a twin pair are the two halves of the road at every zoom: their outer edges are the road's, they meet at the
+/// road's middle (they overlap by `overlap_px` before offset_zoom, and by the profile's lanes from offset_zoom + ramp_zooms on).
+#[test]
+fn the_two_halves_of_a_twin_pair_lie_side_by_side() {
+    let look = crate::Look::from_value(serde_json::from_slice(LOOK).unwrap()).unwrap();
+    let (m, hw, classes) = (&look.model, "highway", look.model.classes.clone());
+    let class = classes.iter().position(|c| c == "primary").unwrap();
+    let (single, half) = (piece(8, class, hw, &classes), piece(8 + 4 + 1, class, hw, &classes));       // a fill: alone, and in a twin pair
+    let (wide, wide_pair, off) = (m.width_expr(hw, false, 1.0, false), m.width_expr(hw, false, 1.0, true), m.offset_expr(hw, true));
+    let (split_zoom, lanes, offset) = (m.offset_zoom, m.width_frac, m.offset_frac);
+    for z in 10..=20 {
+        let z = z as f64;
+        let road = width_at(&wide, z, &single, None);
+        let (w, o) = (width_at(&wide_pair, z, &half, None), width_at(&off, z, &half, None));
+        if z <= split_zoom {
+            assert!((o + w / 2.0 - road / 2.0).abs() < 0.01, "zoom {z}: the outer edge of a half is the road's: {o} + {w} / 2 against {road} / 2");
+            assert!((w / 2.0 - o - m.overlap_px / 2.0).abs() < 0.01, "zoom {z}: the halves overlap by overlap_px: {o}, {w}");
+        } else if z >= split_zoom + m.ramp_zooms {
+            assert!((w - lanes * road).abs() < 0.02 && (o - offset * road).abs() < 0.02, "zoom {z}: the lanes of the profile: {w}, {o} for a road of {road}");
+        } else {
+            assert!(w / 2.0 - o >= 0.0 && w / 2.0 - o < 0.04 * road + m.overlap_px, "zoom {z}: the halves overlap a little: {o}, {w} for a road of {road}");
+        }
+        // a twin pair's casing and a road with no pair are as they were
+        let casing = piece(5, class, hw, &classes);
+        assert_eq!(width_at(&m.width_expr(hw, true, 1.0, true), z, &casing, None), width_at(&m.width_expr(hw, true, 1.0, false), z, &casing, None));
+    }
+}

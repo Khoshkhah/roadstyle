@@ -98,7 +98,7 @@ Bundled: `default`, `highsat`. The table shows `default`; the others state only 
 | `roads.links` | `{"classes": ["motorway_link", "trunk_link", "primary_link", "secondar…` | width: of the main class's width |
 | `roads.cap` | `"round"` |  |
 | `roads.join` | `"round"` |  |
-| `roads.split` | `{"offset_frac": 0.28, "width_frac": 0.6, "offset_zoom": 15, "ramp_zoo…` | two-way roads: each direction offset_frac of the road width aside, width_frac wide, from offset_zoom over ramp_zooms |
+| `roads.split` | `{"offset_frac": 0.28, "width_frac": 0.6, "offset_zoom": 15, "ramp_zoo…` | two-way roads: each direction offset_frac of the road width aside, width_frac wide, from offset_zoom over ramp_zooms. Before offset_zoom the two directions of a twin pair are the two halves of the road, side by side; they overlap by overlap_px (0.15) |
 | `roads.width_m_zoom` | `16` | roads in metres (width_m_col): the zoom where a metre width equals the class width |
 | `roads.twin_end_caps` | `true` | one road-wide round end under a two-way road's two lanes |
 | `roads.twin_casing` | `"one"` | a two-way road as two edges: one casing around both, or each its own |

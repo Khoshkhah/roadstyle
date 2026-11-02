@@ -146,3 +146,28 @@ Seen at Rue du Castelleretto (Monaco, edges 441704187184649227 / 599021124355277
 A sharp V of two two-way roads still shows the lanes' sideways shift near the tip (the tips are
 apart by the shift). The caps round each road's end, but they don't move the lanes. That stays the
 known limit in `junction_order.md`.
+
+## The two directions are two halves (2026-11-02)
+
+**Problem.** Below `offset_zoom` the two twin lines lay on top of each other, and from `offset_zoom` to `offset_zoom + ramp_zooms` they
+overlapped (the lanes narrow and move apart in the ramp). A direction that has a colour from `rsColor` is drawn over the other lines
+(`rs_top`), so it covered its twin. At zoom 16 a road with one painted direction showed a wide painted line and a thin sliver of the
+other direction. The widths of the two twins were equal: the lines overlapped.
+
+**Rule.** Each line of a twin pair that is not the casing (fill, bridge shadow, tunnel gap, tunnel dashes; `__rs_pair` and `__rs_k` not 0)
+is one half of the road. With the road's width `w`, and `r` the place of the zoom in the ramp (0 before `offset_zoom`, 1 from
+`offset_zoom + ramp_zooms`):
+
+| | width | offset |
+|---|---|---|
+| half | `(0.5 + (width_frac - 0.5) r) w + overlap_px (1 - r) / 2` | `(0.25 + (offset_frac - 0.25) r) w - overlap_px (1 - r) / 4` |
+
+At `r = 0` the outer edges of the two halves are the road's edges and the halves meet at the middle with an overlap of `overlap_px`
+(the overlap hides the seam: two lines that only touch show the casing between them in the pixel where they meet). At `r = 1` the halves
+are the lanes of the profile, as before. The casing of the pair does not change. The half that has a colour covers `overlap_px` of its twin
+(and, from `offset_zoom`, up to `width_frac - 2 offset_frac` of `w`), so the two widths that you see differ by that much: 0.15 px at low zoom.
+
+**Where.** `simple/piece.rs` puts `__rs_pair` on these lines. `layers/exprs.rs` has `pair_half` (the test), `half_frac`, `offset_half` and the
+`pairs` argument of `width_expr`. The `export_look` path has no pairs and does not change. A profile with `offset_frac` 0 (mapstyle: no
+lanes) has no halves. `tests/test_twin_halves_browser.py` measures the visible widths of a painted pair; `width_tests.rs` checks the
+edges of the halves.

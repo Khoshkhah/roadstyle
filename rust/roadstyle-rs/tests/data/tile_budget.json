@@ -7,16 +7,16 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 3773,
+    "view_bytes": 3751,
     "view_features": 113,
-    "max_tile_bytes": 3773,
+    "max_tile_bytes": 3751,
     "max_tile_features": 113,
-    "mlt_view_bytes": 1548,
-    "mlt_max_tile_bytes": 1548,
+    "mlt_view_bytes": 1547,
+    "mlt_max_tile_bytes": 1547,
     "layers": {
      "simple": {
       "features": 113,
-      "bytes": 3773,
+      "bytes": 3751,
       "values": 28,
       "keys": 11,
       "keys_unread": 1,
@@ -25,21 +25,21 @@
       "string_bytes": 1,
       "short_segments": 169,
       "tiny": 18,
-      "property_bytes": 1345
+      "property_bytes": 1322
      }
     }
    },
    "z10": {
-    "view_bytes": 10018,
+    "view_bytes": 9975,
     "view_features": 327,
-    "max_tile_bytes": 10018,
+    "max_tile_bytes": 9975,
     "max_tile_features": 327,
-    "mlt_view_bytes": 3906,
-    "mlt_max_tile_bytes": 3906,
+    "mlt_view_bytes": 3904,
+    "mlt_max_tile_bytes": 3904,
     "layers": {
      "simple": {
       "features": 327,
-      "bytes": 10018,
+      "bytes": 9975,
       "values": 32,
       "keys": 11,
       "keys_unread": 1,
@@ -48,21 +48,21 @@
       "string_bytes": 1,
       "short_segments": 351,
       "tiny": 49,
-      "property_bytes": 3550
+      "property_bytes": 3507
      }
     }
    },
    "z11": {
-    "view_bytes": 29924,
+    "view_bytes": 29851,
     "view_features": 1014,
-    "max_tile_bytes": 29924,
+    "max_tile_bytes": 29851,
     "max_tile_features": 1014,
-    "mlt_view_bytes": 10946,
-    "mlt_max_tile_bytes": 10946,
+    "mlt_view_bytes": 10945,
+    "mlt_max_tile_bytes": 10945,
     "layers": {
      "simple": {
       "features": 1014,
-      "bytes": 29924,
+      "bytes": 29851,
       "values": 36,
       "keys": 11,
       "keys_unread": 1,
@@ -71,21 +71,21 @@
       "string_bytes": 1,
       "short_segments": 941,
       "tiny": 81,
-      "property_bytes": 10294
+      "property_bytes": 10221
      }
     }
    },
    "z12": {
-    "view_bytes": 50704,
+    "view_bytes": 50626,
     "view_features": 1723,
-    "max_tile_bytes": 50704,
+    "max_tile_bytes": 50626,
     "max_tile_features": 1723,
     "mlt_view_bytes": 18672,
     "mlt_max_tile_bytes": 18672,
     "layers": {
      "simple": {
       "features": 1723,
-      "bytes": 50704,
+      "bytes": 50626,
       "values": 42,
       "keys": 11,
       "keys_unread": 1,
@@ -94,39 +94,39 @@
       "string_bytes": 1,
       "short_segments": 1730,
       "tiny": 169,
-      "property_bytes": 16841
+      "property_bytes": 16763
      }
     }
    },
    "z13": {
-    "view_bytes": 169497,
-    "view_features": 5796,
-    "max_tile_bytes": 97254,
-    "max_tile_features": 3322,
-    "mlt_view_bytes": 59472,
-    "mlt_max_tile_bytes": 34202,
+    "view_bytes": 179887,
+    "view_features": 6167,
+    "max_tile_bytes": 99449,
+    "max_tile_features": 3405,
+    "mlt_view_bytes": 62922,
+    "mlt_max_tile_bytes": 34942,
     "layers": {
      "simple": {
-      "features": 3322,
-      "bytes": 97254,
+      "features": 3405,
+      "bytes": 99449,
       "values": 38,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 3100,
-      "tiny": 253,
-      "property_bytes": 31251
+      "short_segments": 3164,
+      "tiny": 286,
+      "property_bytes": 31918
      }
     }
    },
    "z14": {
-    "view_bytes": 258694,
-    "view_features": 7990,
+    "view_bytes": 267074,
+    "view_features": 8285,
     "max_tile_bytes": 162039,
     "max_tile_features": 4972,
-    "mlt_view_bytes": 111196,
+    "mlt_view_bytes": 114249,
     "mlt_max_tile_bytes": 69868,
     "layers": {
      "simple": {
@@ -158,25 +158,25 @@
     }
    },
    "z15": {
-    "view_bytes": 697574,
-    "view_features": 22702,
-    "max_tile_bytes": 227011,
-    "max_tile_features": 7351,
-    "mlt_view_bytes": 276388,
-    "mlt_max_tile_bytes": 90735,
+    "view_bytes": 735427,
+    "view_features": 24040,
+    "max_tile_bytes": 237408,
+    "max_tile_features": 7720,
+    "mlt_view_bytes": 289393,
+    "mlt_max_tile_bytes": 94306,
     "layers": {
      "simple": {
-      "features": 6556,
-      "bytes": 190353,
+      "features": 6925,
+      "bytes": 200750,
       "values": 48,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 914,
-      "tiny": 253,
-      "property_bytes": 60446
+      "short_segments": 960,
+      "tiny": 271,
+      "property_bytes": 63634
      },
      "slots": {
       "features": 795,
@@ -195,19 +195,19 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 47508,
+    "expressions_total": 45714,
     "expressions": {
      "roads-simple-dash": {
       "filter": 722,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-arrows": {
       "filter": 568,
@@ -226,57 +226,57 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 71426,
-    "view_features": 2692,
-    "max_tile_bytes": 40516,
-    "max_tile_features": 1516,
-    "mlt_view_bytes": 18884,
-    "mlt_max_tile_bytes": 10270,
+    "view_bytes": 77023,
+    "view_features": 2907,
+    "max_tile_bytes": 44607,
+    "max_tile_features": 1673,
+    "mlt_view_bytes": 20223,
+    "mlt_max_tile_bytes": 11203,
     "layers": {
      "simple": {
-      "features": 1516,
-      "bytes": 40516,
+      "features": 1673,
+      "bytes": 44607,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 1196,
-      "tiny": 1155,
-      "property_bytes": 13679
+      "short_segments": 1321,
+      "tiny": 1279,
+      "property_bytes": 15039
      }
     }
    },
    "z10": {
-    "view_bytes": 82499,
-    "view_features": 3074,
-    "max_tile_bytes": 45159,
-    "max_tile_features": 1695,
-    "mlt_view_bytes": 22794,
-    "mlt_max_tile_bytes": 12525,
+    "view_bytes": 88568,
+    "view_features": 3302,
+    "max_tile_bytes": 46603,
+    "max_tile_features": 1748,
+    "mlt_view_bytes": 24360,
+    "mlt_max_tile_bytes": 12971,
     "layers": {
      "simple": {
-      "features": 1695,
-      "bytes": 45159,
+      "features": 1748,
+      "bytes": 46603,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 716,
-      "tiny": 578,
-      "property_bytes": 15135
+      "short_segments": 844,
+      "tiny": 706,
+      "property_bytes": 15643
      }
     }
    },
    "z11": {
-    "view_bytes": 198461,
-    "view_features": 7288,
+    "view_bytes": 207780,
+    "view_features": 7631,
     "max_tile_bytes": 83290,
     "max_tile_features": 3070,
-    "mlt_view_bytes": 55272,
+    "mlt_view_bytes": 58064,
     "mlt_max_tile_bytes": 23216,
     "layers": {
      "simple": {
@@ -289,17 +289,17 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1249,
-      "tiny": 662,
+      "tiny": 741,
       "property_bytes": 27516
      }
     }
    },
    "z12": {
-    "view_bytes": 241684,
-    "view_features": 8704,
+    "view_bytes": 247906,
+    "view_features": 8930,
     "max_tile_bytes": 124616,
     "max_tile_features": 4517,
-    "mlt_view_bytes": 70425,
+    "mlt_view_bytes": 72258,
     "mlt_max_tile_bytes": 36199,
     "layers": {
      "simple": {
@@ -312,54 +312,54 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1972,
-      "tiny": 188,
+      "tiny": 201,
       "property_bytes": 39944
      }
     }
    },
    "z13": {
-    "view_bytes": 686097,
-    "view_features": 23783,
-    "max_tile_bytes": 159889,
-    "max_tile_features": 5512,
-    "mlt_view_bytes": 185166,
-    "mlt_max_tile_bytes": 42999,
+    "view_bytes": 712022,
+    "view_features": 24683,
+    "max_tile_bytes": 167592,
+    "max_tile_features": 5780,
+    "mlt_view_bytes": 191962,
+    "mlt_max_tile_bytes": 45146,
     "layers": {
      "simple": {
-      "features": 5512,
-      "bytes": 159889,
+      "features": 5780,
+      "bytes": 167592,
       "values": 22,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 1294,
-      "tiny": 252,
-      "property_bytes": 54379
+      "short_segments": 1351,
+      "tiny": 275,
+      "property_bytes": 56914
      }
     }
    },
    "z14": {
-    "view_bytes": 683275,
-    "view_features": 22027,
-    "max_tile_bytes": 111159,
-    "max_tile_features": 3709,
-    "mlt_view_bytes": 243922,
-    "mlt_max_tile_bytes": 37900,
+    "view_bytes": 704781,
+    "view_features": 22765,
+    "max_tile_bytes": 114021,
+    "max_tile_features": 3808,
+    "mlt_view_bytes": 249863,
+    "mlt_max_tile_bytes": 38707,
     "layers": {
      "simple": {
-      "features": 3143,
-      "bytes": 89247,
+      "features": 3242,
+      "bytes": 92110,
       "values": 24,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 182,
-      "tiny": 46,
-      "property_bytes": 29244
+      "short_segments": 165,
+      "tiny": 59,
+      "property_bytes": 30148
      },
      "slots": {
       "features": 567,
@@ -377,25 +377,25 @@
     }
    },
    "z15": {
-    "view_bytes": 498923,
-    "view_features": 15615,
-    "max_tile_bytes": 107586,
-    "max_tile_features": 3398,
-    "mlt_view_bytes": 176035,
-    "mlt_max_tile_bytes": 36984,
+    "view_bytes": 521033,
+    "view_features": 16333,
+    "max_tile_bytes": 112233,
+    "max_tile_features": 3549,
+    "mlt_view_bytes": 182835,
+    "mlt_max_tile_bytes": 38256,
     "layers": {
      "simple": {
-      "features": 3062,
-      "bytes": 93337,
+      "features": 3212,
+      "bytes": 97984,
       "values": 21,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 415,
-      "tiny": 269,
-      "property_bytes": 32630
+      "short_segments": 455,
+      "tiny": 293,
+      "property_bytes": 34346
      },
      "slots": {
       "features": 337,
@@ -414,19 +414,19 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 47508,
+    "expressions_total": 45714,
     "expressions": {
      "roads-simple-dash": {
       "filter": 722,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-arrows": {
       "filter": 568,
@@ -445,16 +445,16 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 3773,
+    "view_bytes": 3751,
     "view_features": 113,
-    "max_tile_bytes": 3773,
+    "max_tile_bytes": 3751,
     "max_tile_features": 113,
-    "mlt_view_bytes": 1548,
-    "mlt_max_tile_bytes": 1548,
+    "mlt_view_bytes": 1547,
+    "mlt_max_tile_bytes": 1547,
     "layers": {
      "simple": {
       "features": 113,
-      "bytes": 3773,
+      "bytes": 3751,
       "values": 28,
       "keys": 11,
       "keys_unread": 1,
@@ -463,21 +463,21 @@
       "string_bytes": 1,
       "short_segments": 169,
       "tiny": 18,
-      "property_bytes": 1345
+      "property_bytes": 1322
      }
     }
    },
    "z10": {
-    "view_bytes": 10018,
+    "view_bytes": 9975,
     "view_features": 327,
-    "max_tile_bytes": 10018,
+    "max_tile_bytes": 9975,
     "max_tile_features": 327,
-    "mlt_view_bytes": 3906,
-    "mlt_max_tile_bytes": 3906,
+    "mlt_view_bytes": 3904,
+    "mlt_max_tile_bytes": 3904,
     "layers": {
      "simple": {
       "features": 327,
-      "bytes": 10018,
+      "bytes": 9975,
       "values": 32,
       "keys": 11,
       "keys_unread": 1,
@@ -486,21 +486,21 @@
       "string_bytes": 1,
       "short_segments": 351,
       "tiny": 49,
-      "property_bytes": 3550
+      "property_bytes": 3507
      }
     }
    },
    "z11": {
-    "view_bytes": 29924,
+    "view_bytes": 29851,
     "view_features": 1014,
-    "max_tile_bytes": 29924,
+    "max_tile_bytes": 29851,
     "max_tile_features": 1014,
-    "mlt_view_bytes": 10946,
-    "mlt_max_tile_bytes": 10946,
+    "mlt_view_bytes": 10945,
+    "mlt_max_tile_bytes": 10945,
     "layers": {
      "simple": {
       "features": 1014,
-      "bytes": 29924,
+      "bytes": 29851,
       "values": 36,
       "keys": 11,
       "keys_unread": 1,
@@ -509,21 +509,21 @@
       "string_bytes": 1,
       "short_segments": 941,
       "tiny": 81,
-      "property_bytes": 10294
+      "property_bytes": 10221
      }
     }
    },
    "z12": {
-    "view_bytes": 50704,
+    "view_bytes": 50626,
     "view_features": 1723,
-    "max_tile_bytes": 50704,
+    "max_tile_bytes": 50626,
     "max_tile_features": 1723,
     "mlt_view_bytes": 18672,
     "mlt_max_tile_bytes": 18672,
     "layers": {
      "simple": {
       "features": 1723,
-      "bytes": 50704,
+      "bytes": 50626,
       "values": 42,
       "keys": 11,
       "keys_unread": 1,
@@ -532,39 +532,39 @@
       "string_bytes": 1,
       "short_segments": 1730,
       "tiny": 169,
-      "property_bytes": 16841
+      "property_bytes": 16763
      }
     }
    },
    "z13": {
-    "view_bytes": 169497,
-    "view_features": 5796,
-    "max_tile_bytes": 97254,
-    "max_tile_features": 3322,
-    "mlt_view_bytes": 59472,
-    "mlt_max_tile_bytes": 34202,
+    "view_bytes": 179887,
+    "view_features": 6167,
+    "max_tile_bytes": 99449,
+    "max_tile_features": 3405,
+    "mlt_view_bytes": 62922,
+    "mlt_max_tile_bytes": 34942,
     "layers": {
      "simple": {
-      "features": 3322,
-      "bytes": 97254,
+      "features": 3405,
+      "bytes": 99449,
       "values": 38,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 3100,
-      "tiny": 253,
-      "property_bytes": 31251
+      "short_segments": 3164,
+      "tiny": 286,
+      "property_bytes": 31918
      }
     }
    },
    "z14": {
-    "view_bytes": 257960,
-    "view_features": 7990,
+    "view_bytes": 266340,
+    "view_features": 8285,
     "max_tile_bytes": 161508,
     "max_tile_features": 4972,
-    "mlt_view_bytes": 110669,
+    "mlt_view_bytes": 113722,
     "mlt_max_tile_bytes": 69506,
     "layers": {
      "simple": {
@@ -596,25 +596,25 @@
     }
    },
    "z15": {
-    "view_bytes": 696690,
-    "view_features": 22702,
-    "max_tile_bytes": 226648,
-    "max_tile_features": 7351,
-    "mlt_view_bytes": 275732,
-    "mlt_max_tile_bytes": 90485,
+    "view_bytes": 734542,
+    "view_features": 24040,
+    "max_tile_bytes": 237044,
+    "max_tile_features": 7720,
+    "mlt_view_bytes": 288737,
+    "mlt_max_tile_bytes": 94056,
     "layers": {
      "simple": {
-      "features": 6556,
-      "bytes": 190353,
+      "features": 6925,
+      "bytes": 200750,
       "values": 48,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 914,
-      "tiny": 253,
-      "property_bytes": 60446
+      "short_segments": 960,
+      "tiny": 271,
+      "property_bytes": 63634
      },
      "slots": {
       "features": 795,
@@ -633,19 +633,19 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 47352,
+    "expressions_total": 45558,
     "expressions": {
      "roads-simple-dash": {
       "filter": 722,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-arrows": {
       "filter": 362,
@@ -664,57 +664,57 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 71426,
-    "view_features": 2692,
-    "max_tile_bytes": 40516,
-    "max_tile_features": 1516,
-    "mlt_view_bytes": 18884,
-    "mlt_max_tile_bytes": 10270,
+    "view_bytes": 77023,
+    "view_features": 2907,
+    "max_tile_bytes": 44607,
+    "max_tile_features": 1673,
+    "mlt_view_bytes": 20223,
+    "mlt_max_tile_bytes": 11203,
     "layers": {
      "simple": {
-      "features": 1516,
-      "bytes": 40516,
+      "features": 1673,
+      "bytes": 44607,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 1196,
-      "tiny": 1155,
-      "property_bytes": 13679
+      "short_segments": 1321,
+      "tiny": 1279,
+      "property_bytes": 15039
      }
     }
    },
    "z10": {
-    "view_bytes": 82499,
-    "view_features": 3074,
-    "max_tile_bytes": 45159,
-    "max_tile_features": 1695,
-    "mlt_view_bytes": 22794,
-    "mlt_max_tile_bytes": 12525,
+    "view_bytes": 88568,
+    "view_features": 3302,
+    "max_tile_bytes": 46603,
+    "max_tile_features": 1748,
+    "mlt_view_bytes": 24360,
+    "mlt_max_tile_bytes": 12971,
     "layers": {
      "simple": {
-      "features": 1695,
-      "bytes": 45159,
+      "features": 1748,
+      "bytes": 46603,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 716,
-      "tiny": 578,
-      "property_bytes": 15135
+      "short_segments": 844,
+      "tiny": 706,
+      "property_bytes": 15643
      }
     }
    },
    "z11": {
-    "view_bytes": 198461,
-    "view_features": 7288,
+    "view_bytes": 207780,
+    "view_features": 7631,
     "max_tile_bytes": 83290,
     "max_tile_features": 3070,
-    "mlt_view_bytes": 55272,
+    "mlt_view_bytes": 58064,
     "mlt_max_tile_bytes": 23216,
     "layers": {
      "simple": {
@@ -727,17 +727,17 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1249,
-      "tiny": 662,
+      "tiny": 741,
       "property_bytes": 27516
      }
     }
    },
    "z12": {
-    "view_bytes": 241684,
-    "view_features": 8704,
+    "view_bytes": 247906,
+    "view_features": 8930,
     "max_tile_bytes": 124616,
     "max_tile_features": 4517,
-    "mlt_view_bytes": 70425,
+    "mlt_view_bytes": 72258,
     "mlt_max_tile_bytes": 36199,
     "layers": {
      "simple": {
@@ -750,54 +750,54 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1972,
-      "tiny": 188,
+      "tiny": 201,
       "property_bytes": 39944
      }
     }
    },
    "z13": {
-    "view_bytes": 686097,
-    "view_features": 23783,
-    "max_tile_bytes": 159889,
-    "max_tile_features": 5512,
-    "mlt_view_bytes": 185166,
-    "mlt_max_tile_bytes": 42999,
+    "view_bytes": 712022,
+    "view_features": 24683,
+    "max_tile_bytes": 167592,
+    "max_tile_features": 5780,
+    "mlt_view_bytes": 191962,
+    "mlt_max_tile_bytes": 45146,
     "layers": {
      "simple": {
-      "features": 5512,
-      "bytes": 159889,
+      "features": 5780,
+      "bytes": 167592,
       "values": 22,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 1294,
-      "tiny": 252,
-      "property_bytes": 54379
+      "short_segments": 1351,
+      "tiny": 275,
+      "property_bytes": 56914
      }
     }
    },
    "z14": {
-    "view_bytes": 682340,
-    "view_features": 22027,
-    "max_tile_bytes": 110978,
-    "max_tile_features": 3709,
-    "mlt_view_bytes": 243068,
-    "mlt_max_tile_bytes": 37742,
+    "view_bytes": 703845,
+    "view_features": 22765,
+    "max_tile_bytes": 113840,
+    "max_tile_features": 3808,
+    "mlt_view_bytes": 249008,
+    "mlt_max_tile_bytes": 38549,
     "layers": {
      "simple": {
-      "features": 3143,
-      "bytes": 89247,
+      "features": 3242,
+      "bytes": 92110,
       "values": 24,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 182,
-      "tiny": 46,
-      "property_bytes": 29244
+      "short_segments": 165,
+      "tiny": 59,
+      "property_bytes": 30148
      },
      "slots": {
       "features": 567,
@@ -815,25 +815,25 @@
     }
    },
    "z15": {
-    "view_bytes": 498681,
-    "view_features": 15615,
-    "max_tile_bytes": 107482,
-    "max_tile_features": 3398,
-    "mlt_view_bytes": 175742,
-    "mlt_max_tile_bytes": 36906,
+    "view_bytes": 520790,
+    "view_features": 16333,
+    "max_tile_bytes": 112129,
+    "max_tile_features": 3549,
+    "mlt_view_bytes": 182543,
+    "mlt_max_tile_bytes": 38178,
     "layers": {
      "simple": {
-      "features": 3062,
-      "bytes": 93337,
+      "features": 3212,
+      "bytes": 97984,
       "values": 21,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 415,
-      "tiny": 269,
-      "property_bytes": 32630
+      "short_segments": 455,
+      "tiny": 293,
+      "property_bytes": 34346
      },
      "slots": {
       "features": 337,
@@ -852,19 +852,19 @@
    },
    "style": {
     "layers": 5,
-    "expressions_total": 47352,
+    "expressions_total": 45558,
     "expressions": {
      "roads-simple-dash": {
       "filter": 722,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-arrows": {
       "filter": 362,
@@ -883,12 +883,12 @@
     43.73837
    ],
    "z9": {
-    "view_bytes": 9491,
+    "view_bytes": 9468,
     "view_features": 293,
-    "max_tile_bytes": 9491,
+    "max_tile_bytes": 9468,
     "max_tile_features": 293,
-    "mlt_view_bytes": 5056,
-    "mlt_max_tile_bytes": 5056,
+    "mlt_view_bytes": 5055,
+    "mlt_max_tile_bytes": 5055,
     "layers": {
      "ov0": {
       "features": 110,
@@ -1009,7 +1009,7 @@
      },
      "simple": {
       "features": 113,
-      "bytes": 3773,
+      "bytes": 3751,
       "values": 28,
       "keys": 11,
       "keys_unread": 1,
@@ -1018,17 +1018,17 @@
       "string_bytes": 1,
       "short_segments": 169,
       "tiny": 18,
-      "property_bytes": 1345
+      "property_bytes": 1322
      }
     }
    },
    "z10": {
-    "view_bytes": 19466,
+    "view_bytes": 19423,
     "view_features": 616,
-    "max_tile_bytes": 19466,
+    "max_tile_bytes": 19423,
     "max_tile_features": 616,
-    "mlt_view_bytes": 9799,
-    "mlt_max_tile_bytes": 9799,
+    "mlt_view_bytes": 9797,
+    "mlt_max_tile_bytes": 9797,
     "layers": {
      "ov0": {
       "features": 168,
@@ -1149,7 +1149,7 @@
      },
      "simple": {
       "features": 327,
-      "bytes": 10018,
+      "bytes": 9975,
       "values": 32,
       "keys": 11,
       "keys_unread": 1,
@@ -1158,17 +1158,17 @@
       "string_bytes": 1,
       "short_segments": 351,
       "tiny": 49,
-      "property_bytes": 3550
+      "property_bytes": 3507
      }
     }
    },
    "z11": {
-    "view_bytes": 43947,
+    "view_bytes": 43874,
     "view_features": 1426,
-    "max_tile_bytes": 43947,
+    "max_tile_bytes": 43874,
     "max_tile_features": 1426,
-    "mlt_view_bytes": 19812,
-    "mlt_max_tile_bytes": 19812,
+    "mlt_view_bytes": 19811,
+    "mlt_max_tile_bytes": 19811,
     "layers": {
      "ov0": {
       "features": 216,
@@ -1289,7 +1289,7 @@
      },
      "simple": {
       "features": 1014,
-      "bytes": 29924,
+      "bytes": 29851,
       "values": 36,
       "keys": 11,
       "keys_unread": 1,
@@ -1298,14 +1298,14 @@
       "string_bytes": 1,
       "short_segments": 941,
       "tiny": 81,
-      "property_bytes": 10294
+      "property_bytes": 10221
      }
     }
    },
    "z12": {
-    "view_bytes": 68534,
+    "view_bytes": 68457,
     "view_features": 2202,
-    "max_tile_bytes": 68534,
+    "max_tile_bytes": 68457,
     "max_tile_features": 2202,
     "mlt_view_bytes": 30525,
     "mlt_max_tile_bytes": 30525,
@@ -1442,7 +1442,7 @@
      },
      "simple": {
       "features": 1723,
-      "bytes": 50704,
+      "bytes": 50626,
       "values": 42,
       "keys": 11,
       "keys_unread": 1,
@@ -1451,16 +1451,16 @@
       "string_bytes": 1,
       "short_segments": 1730,
       "tiny": 169,
-      "property_bytes": 16841
+      "property_bytes": 16763
      }
     }
    },
    "z13": {
-    "view_bytes": 193305,
-    "view_features": 6375,
-    "max_tile_bytes": 110390,
-    "max_tile_features": 3632,
-    "mlt_view_bytes": 76881,
+    "view_bytes": 203887,
+    "view_features": 6749,
+    "max_tile_bytes": 112656,
+    "max_tile_features": 3716,
+    "mlt_view_bytes": 80500,
     "mlt_max_tile_bytes": 43770,
     "layers": {
      "ov0": {
@@ -1537,7 +1537,7 @@
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 2,
+      "short_segments": 1,
       "tiny": 1,
       "property_bytes": 9
      },
@@ -1582,7 +1582,7 @@
      },
      "ov8": {
       "features": 11,
-      "bytes": 311,
+      "bytes": 331,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
@@ -1590,30 +1590,30 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 2,
-      "tiny": 2,
-      "property_bytes": 21
+      "tiny": 1,
+      "property_bytes": 23
      },
      "simple": {
-      "features": 3322,
-      "bytes": 97254,
+      "features": 3405,
+      "bytes": 99449,
       "values": 38,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 3100,
-      "tiny": 253,
-      "property_bytes": 31251
+      "short_segments": 3164,
+      "tiny": 286,
+      "property_bytes": 31918
      }
     }
    },
    "z14": {
-    "view_bytes": 226434,
-    "view_features": 7272,
+    "view_bytes": 235011,
+    "view_features": 7568,
     "max_tile_bytes": 137388,
     "max_tile_features": 4413,
-    "mlt_view_bytes": 92764,
+    "mlt_view_bytes": 96017,
     "mlt_max_tile_bytes": 55654,
     "layers": {
      "ov0": {
@@ -1762,12 +1762,12 @@
     }
    },
    "z15": {
-    "view_bytes": 752908,
-    "view_features": 23824,
-    "max_tile_bytes": 239731,
-    "max_tile_features": 7761,
-    "mlt_view_bytes": 324229,
-    "mlt_max_tile_bytes": 100489,
+    "view_bytes": 791531,
+    "view_features": 25177,
+    "max_tile_bytes": 250311,
+    "max_tile_features": 8134,
+    "mlt_view_bytes": 337747,
+    "mlt_max_tile_bytes": 104166,
     "layers": {
      "ov0": {
       "features": 86,
@@ -1952,8 +1952,8 @@
       "property_bytes": 15
      },
      "ov7": {
-      "features": 9,
-      "bytes": 247,
+      "features": 13,
+      "bytes": 361,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
@@ -1962,11 +1962,11 @@
       "string_bytes": 1,
       "short_segments": 30,
       "tiny": 2,
-      "property_bytes": 17
+      "property_bytes": 25
      },
      "ov8": {
       "features": 9,
-      "bytes": 232,
+      "bytes": 288,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
@@ -1991,23 +1991,23 @@
       "property_bytes": 39
      },
      "simple": {
-      "features": 6802,
-      "bytes": 199811,
+      "features": 7172,
+      "bytes": 210334,
       "values": 48,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 1514,
-      "tiny": 499,
-      "property_bytes": 63098
+      "short_segments": 1575,
+      "tiny": 518,
+      "property_bytes": 66296
      }
     }
    },
    "style": {
     "layers": 39,
-    "expressions_total": 53698,
+    "expressions_total": 51901,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -2021,14 +2021,14 @@
      "roads-simple-dash": {
       "filter": 722,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -2051,12 +2051,12 @@
     58.36462
    ],
    "z9": {
-    "view_bytes": 166655,
-    "view_features": 6004,
-    "max_tile_bytes": 87293,
-    "max_tile_features": 3173,
-    "mlt_view_bytes": 70530,
-    "mlt_max_tile_bytes": 35770,
+    "view_bytes": 173343,
+    "view_features": 6272,
+    "max_tile_bytes": 91577,
+    "max_tile_features": 3337,
+    "mlt_view_bytes": 72308,
+    "mlt_max_tile_bytes": 36498,
     "layers": {
      "ov0": {
       "features": 1402,
@@ -2067,7 +2067,7 @@
       "no_id": 1,
       "strings": 42,
       "string_bytes": 439,
-      "short_segments": 5049,
+      "short_segments": 5048,
       "tiny": 877,
       "property_bytes": 5606
      },
@@ -2085,17 +2085,17 @@
       "property_bytes": 115
      },
      "ov2": {
-      "features": 148,
-      "bytes": 3261,
+      "features": 170,
+      "bytes": 3672,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 244,
-      "tiny": 56,
-      "property_bytes": 296
+      "short_segments": 264,
+      "tiny": 72,
+      "property_bytes": 339
      },
      "ov3": {
       "features": 37,
@@ -2124,20 +2124,20 @@
       "property_bytes": 3
      },
      "ov6": {
-      "features": 101,
-      "bytes": 2175,
+      "features": 109,
+      "bytes": 2320,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 201,
-      "tiny": 54,
-      "property_bytes": 202
+      "short_segments": 215,
+      "tiny": 59,
+      "property_bytes": 217
      },
      "ov7": {
-      "features": 110,
+      "features": 114,
       "bytes": 2173,
       "values": 1,
       "keys": 1,
@@ -2145,30 +2145,30 @@
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 60,
-      "tiny": 41,
-      "property_bytes": 219
+      "short_segments": 68,
+      "tiny": 48,
+      "property_bytes": 227
      },
      "simple": {
-      "features": 1516,
-      "bytes": 40516,
+      "features": 1673,
+      "bytes": 44607,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 1196,
-      "tiny": 1155,
-      "property_bytes": 13679
+      "short_segments": 1321,
+      "tiny": 1279,
+      "property_bytes": 15039
      }
     }
    },
    "z10": {
-    "view_bytes": 208222,
-    "view_features": 7135,
+    "view_bytes": 214734,
+    "view_features": 7380,
     "max_tile_bytes": 106431,
-    "max_tile_features": 3615,
+    "max_tile_features": 3697,
     "mlt_view_bytes": 95756,
     "mlt_max_tile_bytes": 49215,
     "layers": {
@@ -2251,17 +2251,17 @@
       "property_bytes": 3
      },
      "ov6": {
-      "features": 112,
-      "bytes": 2368,
+      "features": 120,
+      "bytes": 2609,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 186,
-      "tiny": 42,
-      "property_bytes": 223
+      "short_segments": 222,
+      "tiny": 47,
+      "property_bytes": 239
      },
      "ov7": {
       "features": 124,
@@ -2273,30 +2273,30 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 32,
-      "tiny": 23,
+      "tiny": 21,
       "property_bytes": 247
      },
      "simple": {
-      "features": 1695,
-      "bytes": 45159,
+      "features": 1748,
+      "bytes": 46603,
       "values": 18,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 716,
-      "tiny": 578,
-      "property_bytes": 15135
+      "short_segments": 844,
+      "tiny": 706,
+      "property_bytes": 15643
      }
     }
    },
    "z11": {
-    "view_bytes": 361133,
-    "view_features": 12101,
+    "view_bytes": 371051,
+    "view_features": 12458,
     "max_tile_bytes": 148382,
     "max_tile_features": 4982,
-    "mlt_view_bytes": 156040,
+    "mlt_view_bytes": 159251,
     "mlt_max_tile_bytes": 64041,
     "layers": {
      "ov0": {
@@ -2347,8 +2347,8 @@
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 229,
-      "tiny": 41,
+      "short_segments": 239,
+      "tiny": 43,
       "property_bytes": 296
      },
      "ov3": {
@@ -2378,8 +2378,8 @@
       "property_bytes": 3
      },
      "ov6": {
-      "features": 97,
-      "bytes": 2121,
+      "features": 105,
+      "bytes": 2267,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
@@ -2388,7 +2388,7 @@
       "string_bytes": 1,
       "short_segments": 199,
       "tiny": 17,
-      "property_bytes": 194
+      "property_bytes": 209
      },
      "ov7": {
       "features": 127,
@@ -2413,7 +2413,7 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1249,
-      "tiny": 662,
+      "tiny": 741,
       "property_bytes": 27516
      }
     }
@@ -2553,18 +2553,18 @@
       "strings": 1,
       "string_bytes": 1,
       "short_segments": 1972,
-      "tiny": 188,
+      "tiny": 201,
       "property_bytes": 39944
      }
     }
    },
    "z13": {
-    "view_bytes": 883621,
-    "view_features": 28644,
-    "max_tile_bytes": 207292,
-    "max_tile_features": 6776,
-    "mlt_view_bytes": 320398,
-    "mlt_max_tile_bytes": 74117,
+    "view_bytes": 910733,
+    "view_features": 29553,
+    "max_tile_bytes": 215190,
+    "max_tile_features": 7045,
+    "mlt_view_bytes": 328274,
+    "mlt_max_tile_bytes": 76457,
     "layers": {
      "ov0": {
       "features": 1147,
@@ -2620,14 +2620,14 @@
      },
      "ov2": {
       "features": 95,
-      "bytes": 2267,
+      "bytes": 2314,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 42,
+      "short_segments": 39,
       "tiny": 3,
       "property_bytes": 190
      },
@@ -2684,27 +2684,27 @@
       "property_bytes": 239
      },
      "simple": {
-      "features": 5512,
-      "bytes": 159889,
+      "features": 5780,
+      "bytes": 167592,
       "values": 22,
       "keys": 11,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 1294,
-      "tiny": 252,
-      "property_bytes": 54379
+      "short_segments": 1351,
+      "tiny": 275,
+      "property_bytes": 56914
      }
     }
    },
    "z14": {
-    "view_bytes": 633894,
-    "view_features": 20509,
-    "max_tile_bytes": 111096,
-    "max_tile_features": 3504,
-    "mlt_view_bytes": 223292,
-    "mlt_max_tile_bytes": 45750,
+    "view_bytes": 656410,
+    "view_features": 21257,
+    "max_tile_bytes": 114658,
+    "max_tile_features": 3603,
+    "mlt_view_bytes": 230144,
+    "mlt_max_tile_bytes": 46799,
     "layers": {
      "ov0": {
       "features": 724,
@@ -2721,14 +2721,14 @@
      },
      "ov1": {
       "features": 6,
-      "bytes": 357,
+      "bytes": 370,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 15,
+      "short_segments": 13,
       "tiny": 1,
       "property_bytes": 11
      },
@@ -2808,7 +2808,7 @@
       "string_bytes": 1,
       "short_segments": 158,
       "tiny": 1,
-      "property_bytes": 41
+      "property_bytes": 43
      },
      "ov7": {
       "features": 115,
@@ -2824,27 +2824,27 @@
       "property_bytes": 229
      },
      "simple": {
-      "features": 3143,
-      "bytes": 89247,
+      "features": 3242,
+      "bytes": 92110,
       "values": 24,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 182,
-      "tiny": 46,
-      "property_bytes": 29244
+      "short_segments": 165,
+      "tiny": 59,
+      "property_bytes": 30148
      }
     }
    },
    "z15": {
-    "view_bytes": 670728,
-    "view_features": 19624,
-    "max_tile_bytes": 134993,
-    "max_tile_features": 4009,
-    "mlt_view_bytes": 313244,
-    "mlt_max_tile_bytes": 57170,
+    "view_bytes": 694257,
+    "view_features": 20380,
+    "max_tile_bytes": 140116,
+    "max_tile_features": 4174,
+    "mlt_view_bytes": 320457,
+    "mlt_max_tile_bytes": 58582,
     "layers": {
      "ov0": {
       "features": 190,
@@ -2978,7 +2978,7 @@
      },
      "ov6": {
       "features": 4,
-      "bytes": 124,
+      "bytes": 130,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
@@ -2991,16 +2991,16 @@
      },
      "ov7": {
       "features": 55,
-      "bytes": 1596,
+      "bytes": 1656,
       "values": 1,
       "keys": 1,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 2,
+      "short_segments": 4,
       "tiny": 1,
-      "property_bytes": 109
+      "property_bytes": 113
      },
      "ov8": {
       "features": 48,
@@ -3029,23 +3029,23 @@
       "property_bytes": 80
      },
      "simple": {
-      "features": 3243,
-      "bytes": 99884,
+      "features": 3406,
+      "bytes": 104944,
       "values": 21,
       "keys": 13,
       "keys_unread": 1,
       "no_id": 1,
       "strings": 1,
       "string_bytes": 1,
-      "short_segments": 701,
-      "tiny": 450,
-      "property_bytes": 35158
+      "short_segments": 760,
+      "tiny": 487,
+      "property_bytes": 37049
      }
     }
    },
    "style": {
     "layers": 39,
-    "expressions_total": 53693,
+    "expressions_total": 51896,
     "expressions": {
      "ov0-fill": {
       "paint.fill-color": 1222
@@ -3059,14 +3059,14 @@
      "roads-simple-dash": {
       "filter": 722,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2279,
-      "paint.line-width": 14872,
-      "paint.line-offset": 3033
+      "paint.line-width": 12864,
+      "paint.line-offset": 4143
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -5729,6 +5729,315 @@
     "tartu-base.z15.layers.ov8.property_bytes: new, 96",
     "tartu-base.z15.layers.ov9.property_bytes: new, 80",
     "tartu-base.z15.layers.simple.property_bytes: new, 35158"
+   ]
+  },
+  {
+   "date": "2026-11-02",
+   "why": "Twin pairs: the fill pieces of a two-way pair have the flag __rs_pair (instead of __rs_twoway), so each direction is one half of the road (docs/design/twin_ends.md). A fill of a pair no longer has the same properties as a fill of a two-way road that is not a pair, so tile features of the two kinds do not merge: +4 % features and +4 % bytes in Monaco at z13 to z15. The line-offset expression is 4061 bytes (was 3033): it has a branch for the halves.",
+   "changes": [
+    "monaco.z13.view_bytes: 169497 -> 179887",
+    "monaco.z13.view_features: 5796 -> 6167",
+    "monaco.z13.max_tile_bytes: 97254 -> 99449",
+    "monaco.z13.max_tile_features: 3322 -> 3405",
+    "monaco.z13.mlt_view_bytes: 59472 -> 62922",
+    "monaco.z13.mlt_max_tile_bytes: 34202 -> 34942",
+    "monaco.z13.layers.simple.features: 3322 -> 3405",
+    "monaco.z13.layers.simple.bytes: 97254 -> 99449",
+    "monaco.z13.layers.simple.short_segments: 3100 -> 3164",
+    "monaco.z13.layers.simple.tiny: 253 -> 286",
+    "monaco.z13.layers.simple.property_bytes: 31251 -> 31918",
+    "monaco.z14.view_bytes: 257960 -> 266340",
+    "monaco.z14.view_features: 7990 -> 8285",
+    "monaco.z14.mlt_view_bytes: 110669 -> 113722",
+    "monaco.z15.view_bytes: 696690 -> 734542",
+    "monaco.z15.view_features: 22702 -> 24040",
+    "monaco.z15.max_tile_bytes: 226648 -> 237044",
+    "monaco.z15.max_tile_features: 7351 -> 7720",
+    "monaco.z15.mlt_view_bytes: 275732 -> 288737",
+    "monaco.z15.mlt_max_tile_bytes: 90485 -> 94056",
+    "monaco.z15.layers.simple.features: 6556 -> 6925",
+    "monaco.z15.layers.simple.bytes: 190353 -> 200750",
+    "monaco.z15.layers.simple.short_segments: 914 -> 960",
+    "monaco.z15.layers.simple.tiny: 253 -> 271",
+    "monaco.z15.layers.simple.property_bytes: 60446 -> 63634",
+    "monaco.style.expressions.roads-simple-dash.paint.line-offset: 3033 -> 4143",
+    "monaco.style.expressions.roads-simple.paint.line-offset: 3033 -> 4143",
+    "monaco-full.z13.view_bytes: 169497 -> 179887",
+    "monaco-full.z13.view_features: 5796 -> 6167",
+    "monaco-full.z13.max_tile_bytes: 97254 -> 99449",
+    "monaco-full.z13.max_tile_features: 3322 -> 3405",
+    "monaco-full.z13.mlt_view_bytes: 59472 -> 62922",
+    "monaco-full.z13.mlt_max_tile_bytes: 34202 -> 34942",
+    "monaco-full.z13.layers.simple.features: 3322 -> 3405",
+    "monaco-full.z13.layers.simple.bytes: 97254 -> 99449",
+    "monaco-full.z13.layers.simple.short_segments: 3100 -> 3164",
+    "monaco-full.z13.layers.simple.tiny: 253 -> 286",
+    "monaco-full.z13.layers.simple.property_bytes: 31251 -> 31918",
+    "monaco-full.z14.view_bytes: 258694 -> 267074",
+    "monaco-full.z14.view_features: 7990 -> 8285",
+    "monaco-full.z14.mlt_view_bytes: 111196 -> 114249",
+    "monaco-full.z15.view_bytes: 697574 -> 735427",
+    "monaco-full.z15.view_features: 22702 -> 24040",
+    "monaco-full.z15.max_tile_bytes: 227011 -> 237408",
+    "monaco-full.z15.max_tile_features: 7351 -> 7720",
+    "monaco-full.z15.mlt_view_bytes: 276388 -> 289393",
+    "monaco-full.z15.mlt_max_tile_bytes: 90735 -> 94306",
+    "monaco-full.z15.layers.simple.features: 6556 -> 6925",
+    "monaco-full.z15.layers.simple.bytes: 190353 -> 200750",
+    "monaco-full.z15.layers.simple.short_segments: 914 -> 960",
+    "monaco-full.z15.layers.simple.tiny: 253 -> 271",
+    "monaco-full.z15.layers.simple.property_bytes: 60446 -> 63634",
+    "monaco-full.style.expressions.roads-simple-dash.paint.line-offset: 3033 -> 4143",
+    "monaco-full.style.expressions.roads-simple.paint.line-offset: 3033 -> 4143",
+    "monaco-base.z13.view_bytes: 193305 -> 203887",
+    "monaco-base.z13.view_features: 6375 -> 6749",
+    "monaco-base.z13.max_tile_bytes: 110390 -> 112656",
+    "monaco-base.z13.max_tile_features: 3632 -> 3716",
+    "monaco-base.z13.mlt_view_bytes: 76881 -> 80500",
+    "monaco-base.z13.layers.ov8.bytes: 311 -> 331",
+    "monaco-base.z13.layers.ov8.property_bytes: 21 -> 23",
+    "monaco-base.z13.layers.simple.features: 3322 -> 3405",
+    "monaco-base.z13.layers.simple.bytes: 97254 -> 99449",
+    "monaco-base.z13.layers.simple.short_segments: 3100 -> 3164",
+    "monaco-base.z13.layers.simple.tiny: 253 -> 286",
+    "monaco-base.z13.layers.simple.property_bytes: 31251 -> 31918",
+    "monaco-base.z14.view_bytes: 226434 -> 235011",
+    "monaco-base.z14.view_features: 7272 -> 7568",
+    "monaco-base.z14.mlt_view_bytes: 92764 -> 96017",
+    "monaco-base.z15.view_bytes: 752908 -> 791531",
+    "monaco-base.z15.view_features: 23824 -> 25177",
+    "monaco-base.z15.max_tile_bytes: 239731 -> 250311",
+    "monaco-base.z15.max_tile_features: 7761 -> 8134",
+    "monaco-base.z15.mlt_view_bytes: 324229 -> 337747",
+    "monaco-base.z15.mlt_max_tile_bytes: 100489 -> 104166",
+    "monaco-base.z15.layers.ov7.features: 9 -> 13",
+    "monaco-base.z15.layers.ov7.bytes: 247 -> 361",
+    "monaco-base.z15.layers.ov7.property_bytes: 17 -> 25",
+    "monaco-base.z15.layers.ov8.bytes: 232 -> 288",
+    "monaco-base.z15.layers.simple.features: 6802 -> 7172",
+    "monaco-base.z15.layers.simple.bytes: 199811 -> 210334",
+    "monaco-base.z15.layers.simple.short_segments: 1514 -> 1575",
+    "monaco-base.z15.layers.simple.tiny: 499 -> 518",
+    "monaco-base.z15.layers.simple.property_bytes: 63098 -> 66296",
+    "monaco-base.style.expressions.roads-simple-dash.paint.line-offset: 3033 -> 4143",
+    "monaco-base.style.expressions.roads-simple.paint.line-offset: 3033 -> 4143",
+    "tartu.z9.view_bytes: 71426 -> 77023",
+    "tartu.z9.view_features: 2692 -> 2907",
+    "tartu.z9.max_tile_bytes: 40516 -> 44607",
+    "tartu.z9.max_tile_features: 1516 -> 1673",
+    "tartu.z9.mlt_view_bytes: 18884 -> 20223",
+    "tartu.z9.mlt_max_tile_bytes: 10270 -> 11203",
+    "tartu.z9.layers.simple.features: 1516 -> 1673",
+    "tartu.z9.layers.simple.bytes: 40516 -> 44607",
+    "tartu.z9.layers.simple.short_segments: 1196 -> 1321",
+    "tartu.z9.layers.simple.tiny: 1155 -> 1279",
+    "tartu.z9.layers.simple.property_bytes: 13679 -> 15039",
+    "tartu.z10.view_bytes: 82499 -> 88568",
+    "tartu.z10.view_features: 3074 -> 3302",
+    "tartu.z10.max_tile_bytes: 45159 -> 46603",
+    "tartu.z10.max_tile_features: 1695 -> 1748",
+    "tartu.z10.mlt_view_bytes: 22794 -> 24360",
+    "tartu.z10.mlt_max_tile_bytes: 12525 -> 12971",
+    "tartu.z10.layers.simple.features: 1695 -> 1748",
+    "tartu.z10.layers.simple.bytes: 45159 -> 46603",
+    "tartu.z10.layers.simple.short_segments: 716 -> 844",
+    "tartu.z10.layers.simple.tiny: 578 -> 706",
+    "tartu.z10.layers.simple.property_bytes: 15135 -> 15643",
+    "tartu.z11.view_bytes: 198461 -> 207780",
+    "tartu.z11.view_features: 7288 -> 7631",
+    "tartu.z11.mlt_view_bytes: 55272 -> 58064",
+    "tartu.z11.layers.simple.tiny: 662 -> 741",
+    "tartu.z12.view_bytes: 241684 -> 247906",
+    "tartu.z12.view_features: 8704 -> 8930",
+    "tartu.z12.mlt_view_bytes: 70425 -> 72258",
+    "tartu.z12.layers.simple.tiny: 188 -> 201",
+    "tartu.z13.view_bytes: 686097 -> 712022",
+    "tartu.z13.view_features: 23783 -> 24683",
+    "tartu.z13.max_tile_bytes: 159889 -> 167592",
+    "tartu.z13.max_tile_features: 5512 -> 5780",
+    "tartu.z13.mlt_view_bytes: 185166 -> 191962",
+    "tartu.z13.mlt_max_tile_bytes: 42999 -> 45146",
+    "tartu.z13.layers.simple.features: 5512 -> 5780",
+    "tartu.z13.layers.simple.bytes: 159889 -> 167592",
+    "tartu.z13.layers.simple.short_segments: 1294 -> 1351",
+    "tartu.z13.layers.simple.tiny: 252 -> 275",
+    "tartu.z13.layers.simple.property_bytes: 54379 -> 56914",
+    "tartu.z14.view_bytes: 682340 -> 703845",
+    "tartu.z14.view_features: 22027 -> 22765",
+    "tartu.z14.max_tile_bytes: 110978 -> 113840",
+    "tartu.z14.max_tile_features: 3709 -> 3808",
+    "tartu.z14.mlt_view_bytes: 243068 -> 249008",
+    "tartu.z14.mlt_max_tile_bytes: 37742 -> 38549",
+    "tartu.z14.layers.simple.features: 3143 -> 3242",
+    "tartu.z14.layers.simple.bytes: 89247 -> 92110",
+    "tartu.z14.layers.simple.tiny: 46 -> 59",
+    "tartu.z14.layers.simple.property_bytes: 29244 -> 30148",
+    "tartu.z15.view_bytes: 498681 -> 520790",
+    "tartu.z15.view_features: 15615 -> 16333",
+    "tartu.z15.max_tile_bytes: 107482 -> 112129",
+    "tartu.z15.max_tile_features: 3398 -> 3549",
+    "tartu.z15.mlt_view_bytes: 175742 -> 182543",
+    "tartu.z15.mlt_max_tile_bytes: 36906 -> 38178",
+    "tartu.z15.layers.simple.features: 3062 -> 3212",
+    "tartu.z15.layers.simple.bytes: 93337 -> 97984",
+    "tartu.z15.layers.simple.short_segments: 415 -> 455",
+    "tartu.z15.layers.simple.tiny: 269 -> 293",
+    "tartu.z15.layers.simple.property_bytes: 32630 -> 34346",
+    "tartu.style.expressions.roads-simple-dash.paint.line-offset: 3033 -> 4143",
+    "tartu.style.expressions.roads-simple.paint.line-offset: 3033 -> 4143",
+    "tartu-full.z9.view_bytes: 71426 -> 77023",
+    "tartu-full.z9.view_features: 2692 -> 2907",
+    "tartu-full.z9.max_tile_bytes: 40516 -> 44607",
+    "tartu-full.z9.max_tile_features: 1516 -> 1673",
+    "tartu-full.z9.mlt_view_bytes: 18884 -> 20223",
+    "tartu-full.z9.mlt_max_tile_bytes: 10270 -> 11203",
+    "tartu-full.z9.layers.simple.features: 1516 -> 1673",
+    "tartu-full.z9.layers.simple.bytes: 40516 -> 44607",
+    "tartu-full.z9.layers.simple.short_segments: 1196 -> 1321",
+    "tartu-full.z9.layers.simple.tiny: 1155 -> 1279",
+    "tartu-full.z9.layers.simple.property_bytes: 13679 -> 15039",
+    "tartu-full.z10.view_bytes: 82499 -> 88568",
+    "tartu-full.z10.view_features: 3074 -> 3302",
+    "tartu-full.z10.max_tile_bytes: 45159 -> 46603",
+    "tartu-full.z10.max_tile_features: 1695 -> 1748",
+    "tartu-full.z10.mlt_view_bytes: 22794 -> 24360",
+    "tartu-full.z10.mlt_max_tile_bytes: 12525 -> 12971",
+    "tartu-full.z10.layers.simple.features: 1695 -> 1748",
+    "tartu-full.z10.layers.simple.bytes: 45159 -> 46603",
+    "tartu-full.z10.layers.simple.short_segments: 716 -> 844",
+    "tartu-full.z10.layers.simple.tiny: 578 -> 706",
+    "tartu-full.z10.layers.simple.property_bytes: 15135 -> 15643",
+    "tartu-full.z11.view_bytes: 198461 -> 207780",
+    "tartu-full.z11.view_features: 7288 -> 7631",
+    "tartu-full.z11.mlt_view_bytes: 55272 -> 58064",
+    "tartu-full.z11.layers.simple.tiny: 662 -> 741",
+    "tartu-full.z12.view_bytes: 241684 -> 247906",
+    "tartu-full.z12.view_features: 8704 -> 8930",
+    "tartu-full.z12.mlt_view_bytes: 70425 -> 72258",
+    "tartu-full.z12.layers.simple.tiny: 188 -> 201",
+    "tartu-full.z13.view_bytes: 686097 -> 712022",
+    "tartu-full.z13.view_features: 23783 -> 24683",
+    "tartu-full.z13.max_tile_bytes: 159889 -> 167592",
+    "tartu-full.z13.max_tile_features: 5512 -> 5780",
+    "tartu-full.z13.mlt_view_bytes: 185166 -> 191962",
+    "tartu-full.z13.mlt_max_tile_bytes: 42999 -> 45146",
+    "tartu-full.z13.layers.simple.features: 5512 -> 5780",
+    "tartu-full.z13.layers.simple.bytes: 159889 -> 167592",
+    "tartu-full.z13.layers.simple.short_segments: 1294 -> 1351",
+    "tartu-full.z13.layers.simple.tiny: 252 -> 275",
+    "tartu-full.z13.layers.simple.property_bytes: 54379 -> 56914",
+    "tartu-full.z14.view_bytes: 683275 -> 704781",
+    "tartu-full.z14.view_features: 22027 -> 22765",
+    "tartu-full.z14.max_tile_bytes: 111159 -> 114021",
+    "tartu-full.z14.max_tile_features: 3709 -> 3808",
+    "tartu-full.z14.mlt_view_bytes: 243922 -> 249863",
+    "tartu-full.z14.mlt_max_tile_bytes: 37900 -> 38707",
+    "tartu-full.z14.layers.simple.features: 3143 -> 3242",
+    "tartu-full.z14.layers.simple.bytes: 89247 -> 92110",
+    "tartu-full.z14.layers.simple.tiny: 46 -> 59",
+    "tartu-full.z14.layers.simple.property_bytes: 29244 -> 30148",
+    "tartu-full.z15.view_bytes: 498923 -> 521033",
+    "tartu-full.z15.view_features: 15615 -> 16333",
+    "tartu-full.z15.max_tile_bytes: 107586 -> 112233",
+    "tartu-full.z15.max_tile_features: 3398 -> 3549",
+    "tartu-full.z15.mlt_view_bytes: 176035 -> 182835",
+    "tartu-full.z15.mlt_max_tile_bytes: 36984 -> 38256",
+    "tartu-full.z15.layers.simple.features: 3062 -> 3212",
+    "tartu-full.z15.layers.simple.bytes: 93337 -> 97984",
+    "tartu-full.z15.layers.simple.short_segments: 415 -> 455",
+    "tartu-full.z15.layers.simple.tiny: 269 -> 293",
+    "tartu-full.z15.layers.simple.property_bytes: 32630 -> 34346",
+    "tartu-full.style.expressions.roads-simple-dash.paint.line-offset: 3033 -> 4143",
+    "tartu-full.style.expressions.roads-simple.paint.line-offset: 3033 -> 4143",
+    "tartu-base.z9.view_bytes: 166655 -> 173343",
+    "tartu-base.z9.view_features: 6004 -> 6272",
+    "tartu-base.z9.max_tile_bytes: 87293 -> 91577",
+    "tartu-base.z9.max_tile_features: 3173 -> 3337",
+    "tartu-base.z9.mlt_view_bytes: 70530 -> 72308",
+    "tartu-base.z9.mlt_max_tile_bytes: 35770 -> 36498",
+    "tartu-base.z9.layers.ov2.features: 148 -> 170",
+    "tartu-base.z9.layers.ov2.bytes: 3261 -> 3672",
+    "tartu-base.z9.layers.ov2.short_segments: 244 -> 264",
+    "tartu-base.z9.layers.ov2.tiny: 56 -> 72",
+    "tartu-base.z9.layers.ov2.property_bytes: 296 -> 339",
+    "tartu-base.z9.layers.ov6.features: 101 -> 109",
+    "tartu-base.z9.layers.ov6.bytes: 2175 -> 2320",
+    "tartu-base.z9.layers.ov6.short_segments: 201 -> 215",
+    "tartu-base.z9.layers.ov6.tiny: 54 -> 59",
+    "tartu-base.z9.layers.ov6.property_bytes: 202 -> 217",
+    "tartu-base.z9.layers.ov7.features: 110 -> 114",
+    "tartu-base.z9.layers.ov7.short_segments: 60 -> 68",
+    "tartu-base.z9.layers.ov7.tiny: 41 -> 48",
+    "tartu-base.z9.layers.ov7.property_bytes: 219 -> 227",
+    "tartu-base.z9.layers.simple.features: 1516 -> 1673",
+    "tartu-base.z9.layers.simple.bytes: 40516 -> 44607",
+    "tartu-base.z9.layers.simple.short_segments: 1196 -> 1321",
+    "tartu-base.z9.layers.simple.tiny: 1155 -> 1279",
+    "tartu-base.z9.layers.simple.property_bytes: 13679 -> 15039",
+    "tartu-base.z10.view_bytes: 208222 -> 214734",
+    "tartu-base.z10.view_features: 7135 -> 7380",
+    "tartu-base.z10.max_tile_features: 3615 -> 3697",
+    "tartu-base.z10.layers.ov6.features: 112 -> 120",
+    "tartu-base.z10.layers.ov6.bytes: 2368 -> 2609",
+    "tartu-base.z10.layers.ov6.short_segments: 186 -> 222",
+    "tartu-base.z10.layers.ov6.tiny: 42 -> 47",
+    "tartu-base.z10.layers.ov6.property_bytes: 223 -> 239",
+    "tartu-base.z10.layers.simple.features: 1695 -> 1748",
+    "tartu-base.z10.layers.simple.bytes: 45159 -> 46603",
+    "tartu-base.z10.layers.simple.short_segments: 716 -> 844",
+    "tartu-base.z10.layers.simple.tiny: 578 -> 706",
+    "tartu-base.z10.layers.simple.property_bytes: 15135 -> 15643",
+    "tartu-base.z11.view_bytes: 361133 -> 371051",
+    "tartu-base.z11.view_features: 12101 -> 12458",
+    "tartu-base.z11.mlt_view_bytes: 156040 -> 159251",
+    "tartu-base.z11.layers.ov2.short_segments: 229 -> 239",
+    "tartu-base.z11.layers.ov2.tiny: 41 -> 43",
+    "tartu-base.z11.layers.ov6.features: 97 -> 105",
+    "tartu-base.z11.layers.ov6.bytes: 2121 -> 2267",
+    "tartu-base.z11.layers.ov6.property_bytes: 194 -> 209",
+    "tartu-base.z11.layers.simple.tiny: 662 -> 741",
+    "tartu-base.z12.layers.simple.tiny: 188 -> 201",
+    "tartu-base.z13.view_bytes: 883621 -> 910733",
+    "tartu-base.z13.view_features: 28644 -> 29553",
+    "tartu-base.z13.max_tile_bytes: 207292 -> 215190",
+    "tartu-base.z13.max_tile_features: 6776 -> 7045",
+    "tartu-base.z13.mlt_view_bytes: 320398 -> 328274",
+    "tartu-base.z13.mlt_max_tile_bytes: 74117 -> 76457",
+    "tartu-base.z13.layers.ov2.bytes: 2267 -> 2314",
+    "tartu-base.z13.layers.simple.features: 5512 -> 5780",
+    "tartu-base.z13.layers.simple.bytes: 159889 -> 167592",
+    "tartu-base.z13.layers.simple.short_segments: 1294 -> 1351",
+    "tartu-base.z13.layers.simple.tiny: 252 -> 275",
+    "tartu-base.z13.layers.simple.property_bytes: 54379 -> 56914",
+    "tartu-base.z14.view_bytes: 633894 -> 656410",
+    "tartu-base.z14.view_features: 20509 -> 21257",
+    "tartu-base.z14.max_tile_bytes: 111096 -> 114658",
+    "tartu-base.z14.max_tile_features: 3504 -> 3603",
+    "tartu-base.z14.mlt_view_bytes: 223292 -> 230144",
+    "tartu-base.z14.mlt_max_tile_bytes: 45750 -> 46799",
+    "tartu-base.z14.layers.ov1.bytes: 357 -> 370",
+    "tartu-base.z14.layers.ov6.property_bytes: 41 -> 43",
+    "tartu-base.z14.layers.simple.features: 3143 -> 3242",
+    "tartu-base.z14.layers.simple.bytes: 89247 -> 92110",
+    "tartu-base.z14.layers.simple.tiny: 46 -> 59",
+    "tartu-base.z14.layers.simple.property_bytes: 29244 -> 30148",
+    "tartu-base.z15.view_bytes: 670728 -> 694257",
+    "tartu-base.z15.view_features: 19624 -> 20380",
+    "tartu-base.z15.max_tile_bytes: 134993 -> 140116",
+    "tartu-base.z15.max_tile_features: 4009 -> 4174",
+    "tartu-base.z15.mlt_view_bytes: 313244 -> 320457",
+    "tartu-base.z15.mlt_max_tile_bytes: 57170 -> 58582",
+    "tartu-base.z15.layers.ov6.bytes: 124 -> 130",
+    "tartu-base.z15.layers.ov7.bytes: 1596 -> 1656",
+    "tartu-base.z15.layers.ov7.short_segments: 2 -> 4",
+    "tartu-base.z15.layers.ov7.property_bytes: 109 -> 113",
+    "tartu-base.z15.layers.simple.features: 3243 -> 3406",
+    "tartu-base.z15.layers.simple.bytes: 99884 -> 104944",
+    "tartu-base.z15.layers.simple.short_segments: 701 -> 760",
+    "tartu-base.z15.layers.simple.tiny: 450 -> 487",
+    "tartu-base.z15.layers.simple.property_bytes: 35158 -> 37049",
+    "tartu-base.style.expressions.roads-simple-dash.paint.line-offset: 3033 -> 4143",
+    "tartu-base.style.expressions.roads-simple.paint.line-offset: 3033 -> 4143"
    ]
   }
  ]
