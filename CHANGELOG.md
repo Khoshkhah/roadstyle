@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The bar fits in a short or narrow window.** A bar at the left or right edge that was too short for its tools drew the last tools below its box, over the credits button. It now takes a second column (and a third). A bar along the top or the bottom was centered on the window and could cover the panel: it is now centered in the free part of the window and takes a second row when that part is too narrow. A box opens beside the whole bar, so it does not cover a second column or row. The credits box moves to the side of a bar that is in its way, and a box under a bar at the top is not taller than its room. The bar has no `overflow` rule. The phone form is not changed.
+
 ## [0.26.2] - 2026-10-30
 
 ### Fixed
