@@ -87,6 +87,13 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
 </div>
 
+## What is new in 0.26.3
+
+- **A dashboard manual.** Three pages with maps that run: an [overview](guides/dashboard-manual/index.md), the Python SDK and the JavaScript API. Each example has a Run button.
+- **The two directions of a two-way road are two halves of the road at every zoom.** A colour on one direction does not hide the other.
+- **Fewer arrows on a tiled page, and correct arrows on a page with a vector base map.** Monaco, zoom 16.5: 9 arrows, not 85.
+- **Street View:** the coverage shows on any road, and the header of the window keeps the name of the road. `duckosm.page` draws the base map's textures and icons, and `dashboard=False` gives the dashboard without a panel.
+
 ## What is new in 0.26.2
 
 - **The level editor follows its page.** In a page with a dashboard, the editor's map has the same base map, the same layers of the area with their switch, and the same light or dark theme. A theme change inside the editor applies. The Base map box has the same rows as the page's. [Edit the levels](guides/levels.md#edit-the-levels-in-a-dashboard)

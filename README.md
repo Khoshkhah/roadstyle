@@ -46,9 +46,12 @@
 - **Scriptable.** A `window.rs*` JavaScript API and events for your own dashboard, and shared parts for its panel.
 - **Ready for AI agents.** An MCP server and an agent skill.
 
-## What is new in 0.26.2
+## What is new in 0.26.3
 
-- **The level editor follows its page.** In a page with a dashboard, the editor's map has the same base map, the same layers of the area with their switch, and the same light or dark theme. A theme change inside the editor applies. The Base map box has the same rows as the page's.
+- **A dashboard manual.** Three pages with maps that run: an [overview](https://khoshkhah.github.io/roadstyle/guides/dashboard-manual/), the Python SDK and the JavaScript API. Each example has a Run button.
+- **The two directions of a two-way road are two halves of the road at every zoom.** A colour on one direction does not hide the other.
+- **Fewer arrows on a tiled page, and correct arrows on a page with a vector base map.** Monaco, zoom 16.5: 9 arrows, not 85.
+- **Street View:** the coverage shows on any road, and the header of the window keeps the name of the road. `duckosm.page` draws the base map's textures and icons, and `dashboard=False` gives the dashboard without a panel.
 
 ## What is new in 0.26.1
 
@@ -74,7 +77,7 @@
   <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard_dark.jpg" alt="The dashboard in the dark theme with the OpenFreeMap Fiord base map: Monaco, one road selected" width="80%">
 </p>
 
-More: [What is new in 0.26.2](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0262) ·
+More: [What is new in 0.26.3](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0263) ·
 [Dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) ·
 [Dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) ·
 [Big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) ·
