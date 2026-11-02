@@ -98,7 +98,7 @@ def _check_boxes(page, s):
     assert opened >= 4
 
 
-_SIZES = [(1000, 390), (1000, 530), (940, 480), (1400, 850)]
+_SIZES = [(1000, 390), (1000, 530), (940, 480), (1400, 850), (1000, 630), (800, 630), (1000, 315)]
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
