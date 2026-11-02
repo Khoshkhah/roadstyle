@@ -121,7 +121,10 @@ impl LiveTiles {
             std::iter::once(i as u32).chain(ends(table.line(i)).into_iter().flat_map(|p| self.at_node[&p].iter().copied()))
         }).collect();
         let new = if fills { roadstyle_engine::restyle(&self.styled, &self.look)? } else { roadstyle_engine::restyle_same_fills(&self.styled, &self.look)? };
-        let mut out = Redrawn { style_changed: new.layers != self.styled.layers, ..Default::default() };
+        // the style changed when a layer that the redraw makes is not the map's layer of its id (the map's own layers hold the base map's too, which a redraw has none of)
+        let have: HashMap<&str, &Value> = self.styled.layers.iter().filter_map(|l| Some((l["id"].as_str()?, l))).collect();
+        let style_changed = new.layers.iter().any(|l| l["id"].as_str().and_then(|id| have.get(id)).is_none_or(|old| *old != l));
+        let mut out = Redrawn { style_changed, ..Default::default() };
         let mut new_sources: HashMap<String, Src> = new.sources.into_iter().collect();
         for i in 0..self.styled.sources.len() {
             let k = self.styled.sources[i].0.clone();

@@ -331,11 +331,14 @@ serve` does this in `level_editor/app.js`.
 
 ### The editor on your map, with no map of its own
 
-When your page already draws the area's roads and levels, give `host`: the editor then makes no map. It opens with the stored area
-and the panel only (Burnaby, 76,189 roads: 1.7 s, against 7.9 s more for its own map's draw, stage 1, road table and stage 2).
+When your page already draws the area's roads and levels, give `host`: the editor then builds no roads and no tiles. At **open** it loads the
+stored area into its worker (`LevelArea`), starts from the map's levels, and draws its panel. The map does not change: your roads, your road
+table and your tiles stay as they are (Burnaby, 76,189 roads: about 1.7 s, against 7.9 s more for an own map: draw, stage 1, road table
+and stage 2). At a **change** (an apply) the editor solves the changed rules and gives `replaceRoads` only the rows of the edges whose levels,
+heads or caps changed. Your page redraws only those edges and the edges near them (`LiveMap`, below), and the map's other tiles stay.
 
 ```js
-const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
+const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs, prefix: "rs-", look: lookText,
   host: {edgeIdCol: "edge_id", replaceRoads: async (rows) => redraw(rows)},
   colors: {select: "#e53935", hover: "#ff8a80", second: "#1e63d6"}});
 ```
@@ -343,18 +346,27 @@ const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
 - Your map, your roads and your pick stay as they are. Your road table (`window.RS_SIDE`) must keep the edge id field (`edgeIdCol`,
   default `edge_id`) and the lines. The editor adds the fields `road`, `s_lon`, `s_lat`, `e_lon` and `e_lat` to each row, and again
   when you put a new table in `window.RS_SIDE`. `destroy()` takes them off.
+- The picks are the editor's. Give `look`, the text of the look that made your roads' style (such as the page's `look.json`): the editor
+  finds your select and hover colours in it (`map.interaction.select_color` and `hover_color`, else `selection.select` and `hover`) and
+  swaps them in your road layers' paint: road 1 is red, road 2 is blue, and the hover is lighter in the colour of the next pick (`colors`).
+  `destroy()` puts your paint back. While the editor is open, a click shows no popup and a hover shows no tooltip (`quiet`
+  of `dashboard/select.js`). Without `look`, your roads keep your own select and hover colours.
 - After an apply, `replaceRoads(rows)` gets the rows of levels.csv (one object for each edge, its fields as text: `edge`,
   `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`, `head_end_m`, `cap_start`, `cap_end`) of only the edges
-  whose levels, heads or caps changed. Draw them, then resolve the Promise. The `"solved"` event comes too.
+  whose levels, heads or caps changed. Draw them, then resolve the Promise. The `"solved"` event comes too. When the redraw sets a new
+  style, the editor takes your new layers' colours again.
 - To draw the rows fast, make your map's tiles with `LiveMap` in place of `tilesOfSources`: `new LiveMap(styleSources(roads, look), look,
-  prefix, keep)` has the Tiler's `style()` and `tile(source, z, x, y)`, and `relevel(JSON.stringify(rows))` gives the edges their new
+  prefix, keep)` has the Tiler's `style()` and `tile(source, z, x, y)`, and `relevel(JSON.stringify(rows))` gives the edges new
   values. It runs stage 1 again and replaces in the tiles only the pieces of the edges that changed and of the edges at their end
   nodes. The answer is `{edges, pieces_gone, sources, style_changed}`: then load the visible tiles again (with `style_changed`, set
   the style again). Your roads must have the level, head and cap columns that the look names (`casing_start_col`, ...,
   `cap_end_col`). A head or a cap: Monaco about 70 ms, Burnaby 0.8 s; a level change: Monaco about 120 ms, Burnaby 1.7 s (stage 1 of
   the whole area; a new map is about 5 s).
 - `colors` (each optional, also without `host`): `select` is road 1 of the panel, `second` is road 2, `hover` is the hover of the
-  editor's own map (on your map, your style's hover stays).
+  editor's own map.
+
+A test keeps the open fast: with `host`, the editor's worker gets no `build`, `draw` or `tile` call at open or at a change
+(`tests/test_level_editor_page.py`).
 
 ## Keep the main thread free
 

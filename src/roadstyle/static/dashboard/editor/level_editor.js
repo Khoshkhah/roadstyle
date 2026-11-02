@@ -21,6 +21,7 @@ import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
 import {initPanelScroll} from "../panelscroll.js";
+import {quiet} from "../select.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
 const EMPTY = COLS.join(",") + "\n";
@@ -137,6 +138,10 @@ const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", hover2: 
 // The dashboard has one select colour and one hover colour for every road; the editor wants road 1 red and road 2 blue, and the hover of the road
 // that would be the next pick lighter in its colour. The look gets two sentinel colours, which `highlight` replaces in the road layers' paint.
 const SENT = {select: "#fe0a01", hover: "#fe0a02"};
+// On a host's roads (`host`) the colours to swap are the host's own select and hover colours, from its look (the look's interaction colours, else its selection section)
+const hostLook = host && lookText ? JSON.parse(lookText) : null;
+const FIND = !host ? SENT : {select: hostLook?.map?.interaction?.select_color ?? hostLook?.selection?.select ?? "\0",
+  hover: hostLook?.map?.interaction?.hover_color ?? hostLook?.selection?.hover ?? "\0"};
 // the host's panel: the card, its title line (the title first, then the hide button) and its body
 const hostCard = panel?.querySelector?.(".sb-card"), hostBar = hostCard?.querySelector(".sb-top"), hostBody = hostCard?.querySelector(".sb-body");
 if(!hostBar?.firstElementChild || !hostBody)
@@ -155,10 +160,10 @@ const P = map ? prefix : "rs-";                                  // a host map: 
 // that the next click would pick (light red for the first, light blue for the second)
 const hl = {orig: new Map(), groups: null};
 const swapColors = (v, to) => Array.isArray(v) ? v.map(x => swapColors(x, to)) : v && typeof v === "object"
-  ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swapColors(x, to)])) : v === SENT.select ? to.select : v === SENT.hover ? to.hover : v;
-const hasSent = v => { const t = JSON.stringify(v); return t.includes(SENT.select) || t.includes(SENT.hover); };
+  ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swapColors(x, to)])) : v === FIND.select ? to.select : v === FIND.hover ? to.hover : v;
+const hasSent = v => { const t = JSON.stringify(v); return t.includes(FIND.select) || t.includes(FIND.hover); };
+// (a layer that has no sentinel now keeps what it had: its paint is already swapped)
 function captureHL(){
-  hl.orig.clear();
   for(const l of map.getStyle().layers) if(l.paint && hasSent(l.paint)) hl.orig.set(l.id, l.paint);
 }
 function highlight(groups){
@@ -315,9 +320,11 @@ async function addFields(){
     else if(ends && !Number.isNaN(ends[4 * i])) [p.s_lon, p.s_lat, p.e_lon, p.e_lat] = ends.subarray(4 * i, 4 * i + 4);
   });
 }
-if(host){                                                        // the host's map and pick stay as they are
+if(host){                                                        // the host's map and roads stay; its picks are the editor's (colours, no popup)
   await addFields();
   window.map = map;
+  captureHL();
+  quiet(true);
 } else {
   const style = await build();
   // the editor's own tiles (a host's rs:// stays its own), cut in the worker
@@ -468,18 +475,18 @@ async function apply(ops){
   await need(ops.flatMap(o => o.op === "add" ? [o.body?.a, o.body?.b] : [o.road]));
   const heads = {}, caps = {};
   for(const [r, [h, c]] of Object.entries(own)){ heads[r] = [...h]; caps[r] = [...c]; }
-  const mine = r => { heads[r] ??= ["", ""]; caps[r] ??= ["", ""]; };
+  const ownRoad = r => { heads[r] ??= ["", ""]; caps[r] ??= ["", ""]; };
   for(const o of ops){
     const r = roadOf[String(o.road)], k = {start: 0, end: 1}[o.end];
     if(o.op === "cap"){
       const c = o.cap || "";
       if(r == null || k == null || !["", "round", "square", "flat"].includes(c)) throw new Error(`ends: ${o.road} is not a road, ${o.end} not start / end, or ${c} not auto, round, square or flat`);
-      mine(r);
+      ownRoad(r);
       caps[r][k] = c === facts[r].caps_auto[k] ? "" : c;          // the default shape is not stored
     } else if(o.op === "head"){
       const m = String(o.m ?? "").trim();
       if(r == null || k == null || !(m === "" || +m > 0)) throw new Error(`heads: ${o.road} is not a road, ${o.end} not start / end, or ${m} not a positive number of metres`);
-      mine(r);
+      ownRoad(r);
       heads[r][k] = m;
     }
   }
@@ -514,7 +521,7 @@ async function apply(ops){
     said = full ? `solved the whole area in ${s} s${next.resolve.why ? ": the local re-solve did not do (" + next.resolve.why + ")" : ""}`
       : `re-solved the roads around the change in ${s} s`;
   }
-  const was = host ? lastCsv ?? (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv : null;
+  const was = lastCsv ?? (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv;
   await store.save("heads.csv", headsCsv);
   await store.save("caps.csv", capsCsv);
   if(newEdits) await store.save("edits.csv", nextEdits);
@@ -526,13 +533,26 @@ async function apply(ops){
   facts = {};
   const shown = await roadsOf(ops.flatMap(o => o.op === "add" ? [o.body.a, o.body.b] : [o.road]).map(x => roadOf[String(x)])
     .concat(order.filter((r, i) => res.levels[i].some((v, j) => v !== prev.levels[i][j]))).filter(Boolean));
-  if(host){                                                        // the host draws the edges whose row of levels.csv changed
-    const before = new Set(was.split("\n"));
-    const t = performance.now();
-    await host.replaceRoads(csvRows(lastCsv.split("\n").filter((l, i) => i === 0 || !before.has(l)).join("\n")));
+  // the edges whose row of levels.csv changed are drawn again, and only they (and the edges near them): the host's replaceRoads, or the worker's relevel
+  const had = new Set(was.split("\n"));
+  const changedRows = csvRows(lastCsv.split("\n").filter((l, i) => i === 0 || !had.has(l)).join("\n"));
+  const drawStart = performance.now();
+  if(host){
+    await host.replaceRoads(changedRows);
     await addFields();
-    said += ` · drawn in ${((performance.now() - t) / 1000).toFixed(1)} s`;
-  } else await showRoads(await build());                           // the new map in place: new tiles, the roads style swapped
+    captureHL(); highlight(hl.groups); quiet(true);                // (a new style of the host has its own colours and popup again)
+  } else if(changedRows.length){
+    let r = null;
+    try { r = await call({type: "relevel", rows: JSON.stringify(changedRows)}); }
+    catch(err){ console.warn(`level editor: ${err.message}: the whole map is made again`); }       // (the engine says when it cannot redraw a map)
+    if(!r) await showRoads(await build());
+    else if(r.style) await showRoads(ownSources(JSON.parse(r.style)));  // the layers changed: the style swapped
+    else {                                                         // the same style: the tiles are loaded again (the worker cuts again only the pieces of the changed edges)
+      for(const id of mine.sources){ const s = map.getStyle().sources[id]; if(s?.type === "vector") map.getSource(id).setTiles(s.tiles); }
+      await new Promise(ok => { map.once("idle", ok); setTimeout(ok, 30000); });
+    }
+  }
+  if(host) said += ` · drawn in ${((performance.now() - drawStart) / 1000).toFixed(1)} s`;
   return {ok: true, said, full, redrawn: true, facts: shown, stats: stats()};
 }
 window.lvApi = async (path, body) => {
@@ -623,6 +643,8 @@ function destroy(){
   for(const id of [...mine.sources, "lv-ends"]) if(map.getSource(id)) map.removeSource(id);
   mine.images.forEach(id => map.hasImage(id) && map.removeImage(id));
   if(host){
+    quiet(false);
+    for(const [id, paint] of hl.orig) if(map.getLayer(id)) for(const [k, v] of Object.entries(paint)) map.setPaintProperty(id, k, v);   // the host's colours
     const t = window.RS_SIDE;
     if(t && t.lvFields){ t.props.forEach(p => { if(p) for(const k of added) delete p[k]; }); delete t.lvFields; }
     if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
