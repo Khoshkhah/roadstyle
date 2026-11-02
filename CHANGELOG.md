@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **A dashboard manual in the docs: [Dashboard manual](docs/guides/dashboard-manual.md).** One page with every part of a dashboard: the Python call, every key of `dashboard=` with its default, every member of `window.rs` and every `rs:` event. Each `javascript` block has a **Run** button that runs it on a testbed map (`docs/maps/dashboard_testbed.html`, which `docs/build_maps.py` builds, with a blank base map and no key). The test `tests/test_dashboard_manual.py` fails when the page does not name an option, a member or an event, and when a `javascript` block throws an error. The option `pygments_lang_class` of `mkdocs.yml` is on, so the page can find its `javascript` blocks.
+
+### Removed
+- `dashboard_manual.html` (at the root and in `docs/guides/`). It was one hand-written HTML file that the docs site did not list. It called `rs.tools.enable`, `rs.tools.disable` and a four-argument `rs.tools.add`, which do not exist, and it gave `rs.setData` an object that the call does not accept. Its live demo pointed to a file that was not in the repository.
+
 ## [0.26.2] - 2026-10-30
 
 ### Fixed

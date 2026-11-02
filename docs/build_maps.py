@@ -90,6 +90,14 @@ html = rs.render_street_view(g, name="Roads and Street View", layout="below").ht
 (OUT / "street_view_below.html").write_text(html.replace("</body>", OPEN_ON + "</body>", 1),
                                                encoding="utf-8")
 
+# the testbed of the dashboard manual: every `javascript` block of docs/guides/dashboard-manual.md runs on it.
+# tests/test_dashboard_manual.py runs the same blocks on a small page with the same keywords. The blank base map needs no key.
+rs.render_dashboard(
+    g, basemap="blank", live_data=True, name="roadstyle: dashboard testbed",
+    color_options={"Road class": {}, "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60}},
+    views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}},
+).save(OUT / "dashboard_testbed.html")
+
 # the live map (README and the docs home link to it): the sample's own columns only, every control on,
 # Google 3D too (it needs GOOGLE_MAPS_KEY: without it, render_edges stops with an error)
 live = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg").to_crs(4326)

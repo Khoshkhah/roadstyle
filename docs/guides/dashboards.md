@@ -144,4 +144,4 @@ open("host.html", "w").write(m.html.replace("</body>", panel + "</body>"))
 To show a set of edges, recolour them with `rsColor`; don't draw extra lines over the roads.
 Pick a highlight colour that no `color_options` entry already uses.
 
-**See also:** [JavaScript API](../reference/javascript.md) · [Command line](../reference/cli.md) · [Every parameter](../reference/parameters.md)
+**See also:** [Dashboard manual](dashboard-manual.md) · [JavaScript API](../reference/javascript.md) · [Command line](../reference/cli.md) · [Every parameter](../reference/parameters.md)
