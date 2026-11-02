@@ -168,6 +168,8 @@ The bar stays in the free part of the window. This is the part that the panel do
 - **A box** opens beside the whole bar, toward the map. It never opens over a second column or row, and it never goes under the bar. The credits box, which opens from the bottom corner, moves to the side of a bar that is in its way. A box that opens beside a bar at a side ends above the scale box and the credits button.
 - **Tools that you add** with `rs.tools.add` take the same lines as the built-in tools.
 
+The bar is tested down to a window height of 145 px. At this height, every tool is inside a bar at the left or right edge. A bar along the top and the credits box can overlap at a height of less than 160 px.
+
 ## A phone
 
 At 700 px or less, the bar is at the top and the panel is a bottom sheet.
