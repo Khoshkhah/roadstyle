@@ -648,6 +648,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
   `name` column (the boundary of a boundary file: before, its row was skipped and nothing could be clipped). The goldens of Monaco's
   style and tiles changed at the boundary only (35 features are beyond it), and the test of the sea at the tile edge now asserts the
   opposite: the sea beyond the boundary is cut.
+- **`duckosm.page(dashboard=False)` is the dashboard without a panel.** It was `template="map"` with the old dock frame (the MapLibre
+  buttons, no toolbox). It is now `template="dashboard"` with `dashboard={"panel": None}`: the full-window map and the toolbox.
 - **A duckOSM page draws its base map's textures and icons.** The engine writes them in `roadstyle:images`, but no roadstyle code added
   them to the map (only hosts did), so `roadstyle.duckosm.page` drew none. The dashboard now adds each image of the style that the map
   does not have yet, never in place of the host's, with an empty one at once for a layer that asks before the image has loaded (no

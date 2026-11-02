@@ -325,6 +325,16 @@ def test_a_meta_row_that_has_neither_source_nor_method_is_not_from_a_level_area(
 
 
 @needs_db
+def test_the_page_without_a_dashboard_is_the_dashboard_without_a_panel():
+    """duckosm.page(dashboard=False) is the dashboard form (the toolbox over a full-window map) with no panel; dashboard=True adds the panel."""
+    from roadstyle import duckosm
+
+    bare, full = duckosm.page(DB, "all").html, duckosm.page(DB, "all", dashboard=True).html
+    assert '"template":"dashboard"' in bare and '"layout":"overlay"' in bare and 'id="sb"' not in bare
+    assert '"template":"dashboard"' in full and 'id="sb"' in full
+
+
+@needs_db
 def test_the_page_draws_the_base_maps_textures_and_icons(tmp_path):
     """duckosm.page: the base map's patterns and icons (RS_OPTIONS.images; the page writer takes them from roadstyle:images) are in the map
     at their size, and no image is "not found". The road arrow is not among them: arrows.js draws it."""

@@ -127,6 +127,7 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
     """mapstyle's ``render_map`` on the Rust engine: the page of the duckOSM file ``db`` (``read``, its roads in the style of ``mode``, the
     base map of ``features.*`` with ``layers``, the shared dashboard with the base map's controls: modes, kinds, each layer's clicks,
     tooltip and popup). ``interaction``: a layer's start ``{clickable, tooltip, popup}`` (e.g. ``{"landcover": {"clickable": True}}``).
+    ``dashboard=False`` (the default) is the dashboard without a panel: the map and the toolbox (``template="dashboard"``, ``dashboard={"panel": None}``).
     ``dashboard=True``: roadstyle's dashboard page, docked (``template="dashboard", layout="dock"``). ``kwargs``: render_edges' keywords (``basemap``, ``tiles``,
     ``template``, ...). Gives a ``WebMap`` (``.save(path)``)."""
     from . import render_web as rw
@@ -145,6 +146,8 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
         # the panel shows the clicked road: no road hover tooltip
         kw = {"name": f"{Path(db).stem}: dashboard", "tooltip": None, "template": "dashboard", "layout": "dock",
               "color_options": {"Road class": {}, "Modes": {"color_by": "modes", "colors": colors}}, **kw}
+    else:
+        kw = {"template": "dashboard", "dashboard": {"panel": None}, **kw}
     o = _options(db, mode, theme, paths, level_kw, kw)
     lk = rust().resolve_look(json.dumps(o))
     # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
