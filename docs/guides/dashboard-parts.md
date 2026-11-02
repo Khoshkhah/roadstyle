@@ -120,6 +120,8 @@ The box has the look of the popup and follows the pointer. It flips to the other
 
 `rs-scroll` gives the area the scroll rules of the panel body: a thin scrollbar that shows only over the area or while it scrolls, a fade at the bottom edge while there is more below, and a scroll that never goes on to the map. The height is `--rs-scroll-h` (default: the smaller of 520 px and 60 % of the window). `rs-table` keeps the header row in view, lines up the numbers (the first column is text) and tints the row under the pointer. Put `data-sort="asc"` or `"desc"` on the `th` of the sorted column.
 
+Every scroll area of the dashboard has these rules, not only `rs-scroll`: the help window, the boxes of the toolbox, the panel's own select list and the query part's list. A whole box has no fade, because the fade would also take its border. `tests/test_dashboard_scroll_browser.py` checks each area.
+
 ## The rules
 
 - **Width.** Fit the content to the panel. Do not widen the panel for it (the width is `panel.width_px`: [Dashboard options](../reference/parameters.md#dashboard-options)). A table that needs more room drops a column or shortens a line.

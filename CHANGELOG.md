@@ -27,6 +27,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
   now, and the accent for the "on" state. The tokens (`--bg`, `--ink`, `--mut`, `--line`, `--card`) are set for the whole page, so a box, a
   window and the popup get them too, and the light muted text is a little darker (`#6b7280`, 4.8:1 on white). The new test
   `tests/test_dashboard_themes_browser.py` opens each part in both themes and fails on a text under 4.5:1 or a light surface in the dark theme.
+- **Every scroll area of the dashboard scrolls the same way as the panel.** The help window, the boxes of the toolbox, the panel's own select list
+  and the query part's list had the browser's thick scrollbar, and their scroll went on to the map. They now have the panel's rules: a thin
+  scrollbar that shows only while the pointer is over the area or while it scrolls, no scroll handed on, and, for an area inside a box, a fade at
+  the bottom edge while there is more below. `tests/test_dashboard_scroll_browser.py` checks each area.
 - **A wrong keyword or value says what to give.** `theme=` said "did you mean 'template'?"; it now says that a page starts light and that
   `page_script="rs.ready(() => rsSetTheme('dark'))"` starts it dark. A colour that is not a text (a MapLibre expression such as
   `["get", "c"]`) said "invalid type: sequence, expected a string"; it now says that a colour is a text and names `color_col=`.

@@ -21,7 +21,8 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 
 - A new part for dashboard pages (a button, a box, a chart colour) goes in `rust/roadstyle-assets/files/static/dashboard/` and in `docs/guides/dashboard-parts.md`, with a
   browser test (`tests/test_dashboard_help_browser.py` shows how), a place in `tests/test_dashboard_themes_browser.py` (each part in both themes:
-  contrast and no light surface in the dark theme; use the theme's tokens, never a fixed colour) and a look at it in both themes. A page of a project must not carry its own copy.
+  contrast and no light surface in the dark theme; use the theme's tokens, never a fixed colour) and a look at it in both themes. A part that scrolls goes in the one list of scroll areas
+  (`_PS_AREAS` in `dashboard/panelscroll.js` and the same list in `dashboard.css`) and in `tests/test_dashboard_scroll_browser.py`. A page of a project must not carry its own copy.
 
 - roadstyle's files (the profiles and palettes, the base map's files, `cmaps.json`, `basemaps.json`, the dashboard, the popup, the
   page templates, MapLibre) have one copy: `rust/roadstyle-assets/files/`, the crate roadstyle-assets. A crate takes a file with

@@ -592,11 +592,15 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
   color:var(--rs-tb-ink);padding:6px 9px;border-radius:8px;font:11.5px/1.45 system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.2)}
 #rs-hover[hidden]{display:none}
 
-/* ---- A SCROLL AREA IN THE PANEL (panelscroll.js, class rs-scroll): the body's rules for each area - a thin scrollbar that shows over the area or while it scrolls, a
-   fade at the bottom edge while there is more, and no scroll handed on to the map or to the body. Its height is `--rs-scroll-h` (the page can set it). ---- */
-#sb .rs-scroll,#rp .rs-scroll{overflow:auto;overscroll-behavior:contain;max-height:var(--rs-scroll-h,min(520px,60dvh));scrollbar-width:thin;scrollbar-color:transparent transparent}
-#sb .rs-scroll:hover,#sb .rs-scroll.rs-scrolling,#rp .rs-scroll:hover,#rp .rs-scroll.rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
-#sb .rs-scroll[data-more],#rp .rs-scroll[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+/* ---- EVERY SCROLL AREA OF THE DASHBOARD (panelscroll.js, _PS_AREAS: the same list): the panel body's rules - a thin scrollbar that shows only while the
+   pointer is over the area or while it scrolls (rs-scrolling), and no scroll handed on to the map or to the panel body. The areas: a page's `rs-scroll`,
+   the query part's list, the help window, the panel's own select list, the boxes of the toolbox, the docked read-out. An area inside a box (`rs-scroll`,
+   the query's list) also has a fade at its bottom edge while there is more below (data-more); a whole box has none, because the fade would take its
+   border too. The height of a `rs-scroll` is `--rs-scroll-h` (the page can set it). ---- */
+:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res){overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
+:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res):is(:hover,.rs-scrolling){scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
+.rs-scroll{overflow:auto;max-height:var(--rs-scroll-h,min(520px,60dvh))}
+:is(.rs-scroll,.rs-q-list)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
 /* a table in it: the header row stays, the numbers line up, the first column is text. A column that sorts has `data-sort="asc"` or `"desc"` on its th. */
 #sb .rs-table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
 #sb .rs-table th{position:sticky;top:0;z-index:2;text-align:right;padding:4px;border-bottom:1px solid var(--line);color:var(--mut);background:var(--card);cursor:pointer;white-space:nowrap;font-size:10.5px;font-weight:700}

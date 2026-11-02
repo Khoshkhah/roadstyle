@@ -20,7 +20,8 @@ export function initPanelScroll(){
   });
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();
 }
-// A scroll area INSIDE the panel (`class="rs-scroll"`: a list, a table): the same protocol as the body, for each one. The scrollbar shows while the pointer is over the area or
+// Every other scroll area of the dashboard (a page's `rs-scroll`, the query part's list, the help window, the panel's select list, the boxes of the toolbox,
+// the docked read-out; dashboard.css has the same list): the same protocol as the body, for each one. The scrollbar shows while the pointer is over the area or
 // it scrolls (`rs-scrolling`), a fade at its bottom edge shows while there is more below (`data-more`), and its scroll never goes on to the map or to the body (CSS).
 function _psInner(el){
   if(el.dataset.rsScroll) return;
@@ -32,11 +33,12 @@ function _psInner(el){
   new ResizeObserver(more).observe(el);
   new MutationObserver(more).observe(el, {childList: true, subtree: true});            // a table that gets its rows later
 }
+const _PS_AREAS = [".rs-scroll", ".rs-q-list", "#rs-help .rs-help-box", ".rs-sel-list", "#rs-toolbar .bm-menu", "#rs-attr-box", "#rs-color-box", "#rs-nav-box",
+  "#rs-roads-box", "#rs-settings-box", ".rs-side-bd", ".rs-side-ctl", ".rs-side-q-res"].join(", ");
 export function initInnerScroll(){
-  const scan = () => document.querySelectorAll(".rs-scroll:not([data-rs-scroll])").forEach(_psInner);
-  const run = () => {
-    scan();
-    for(const root of document.querySelectorAll("#sb, #rp")) new MutationObserver(scan).observe(root, {childList: true, subtree: true});
-  };
+  const scan = () => document.querySelectorAll(_PS_AREAS).forEach(el => el.dataset.rsScroll || _psInner(el));
+  let queued = false;          // a box or a window that opens later: one scan in the next frame for every change of the page
+  const later = () => { if(!queued){ queued = true; requestAnimationFrame(() => { queued = false; scan(); }); } };
+  const run = () => { scan(); new MutationObserver(later).observe(document.body, {childList: true, subtree: true}); };
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();
 }
