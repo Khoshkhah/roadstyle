@@ -96,7 +96,6 @@ rs.render_dashboard(
     g, basemap="blank", live_data=True, name="Testbed",
     color_options={"Road class": {}, "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60}},
     views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}},
-    dashboard={"toolbar": {"settings": False}},          # one tool less: with the tool of the Toolbox block, 10 tools fit in the 480 px of the map
 ).save(OUT / "dashboard_testbed.html")
 
 # the maps of docs/guides/dashboard-manual/python.md: every python block that saves a page makes the map under it.
@@ -110,15 +109,15 @@ for block in re.findall(r"```python\n(.*?)```", manual, re.S):
     exec(block, env)
 os.chdir(REPO)
 
-# the live map (README and the docs home link to it): the sample's own columns only, every control on,
-# Google 3D too (it needs GOOGLE_MAPS_KEY: without it, render_edges stops with an error)
+# the live map (README and the docs home link to it): the dashboard (panel and toolbox) on the sample's own columns,
+# with the OpenFreeMap Positron base map and Google 3D (it needs GOOGLE_MAPS_KEY: without it, render_dashboard stops with an error)
 live = gpd.read_file(REPO / "notebooks" / "data" / "sodermalm_edges.gpkg").to_crs(4326)
 x0, y0, x1, y1 = live.total_bounds
-mx, my = (x1 - x0) * 0.15, (y1 - y0) * 0.15          # a margin round the data
-# the map stays inside Södermalm (and cannot zoom out past it); the Google 3D camera takes the same box
+mx, my = (x1 - x0) * 2, (y1 - y0) * 2                      # a margin of two data sizes on each side: the data can be dragged out of the window
+# the camera stays near Södermalm (two data sizes beyond it, and no zoom-out past that); the Google 3D camera takes the same box
 KEEP_IN = f"<script>map.setMaxBounds([[{x0 - mx:.5f}, {y0 - my:.5f}], [{x1 + mx:.5f}, {y1 + my:.5f}]]);</script>"
-html = rs.render_edges(
-    live, backend="web", google_3d=True,
+html = rs.render_dashboard(
+    live, basemap="ofm_positron", google_3d=True,
     color_options={
         "Road class": {},
         "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60},

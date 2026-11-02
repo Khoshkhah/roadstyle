@@ -34,8 +34,7 @@ def _page(tmp_path):
     # the same keywords as the testbed in docs/build_maps.py
     rs.render_dashboard(_edges(), basemap="blank", live_data=True,
                         color_options={"Road class": {}, "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60}},
-                        views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}},
-                        dashboard={"toolbar": {"settings": False}}).save(path)
+                        views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}}).save(path)
     return path
 
 
