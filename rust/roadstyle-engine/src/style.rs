@@ -78,7 +78,7 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
         crate::dark::layers(&mut layers, &look.sections.dark, &keep);
         crate::dark::images(&mut images, &look.sections.dark)?;
     }
-    images.insert("oneway".into(), look.sections.arrows.image.clone());
+    images.insert(layers::ARROW_IMAGE.into(), look.sections.arrows.image.clone());
     let mut metadata = metadata(look, images, planned, colors.meta, &layers, contract)?;
     if !popups.is_empty() {
         metadata.insert(roadstyle_model::props::POPUPS.into(), popups.into());

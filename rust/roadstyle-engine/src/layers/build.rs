@@ -412,7 +412,7 @@ fn slot_layers(cx: &Ctx) -> Vec<Value> {
         }
         // the arrows along the slots; stage 3 chooses another kind (the inline page's points: Styled::page_arrows; the export's
         // line-center, below)
-        let layout = json!({"symbol-placement": "line", "symbol-spacing": spacing, "icon-image": "oneway", "icon-rotation-alignment": "map",
+        let layout = json!({"symbol-placement": "line", "symbol-spacing": spacing, "icon-image": crate::layers::ARROW_IMAGE, "icon-rotation-alignment": "map",
                             "symbol-sort-key": sort, "icon-size": icon});
         layers.push(json!({"id": "roads-arrows", "type": "symbol", "source": "slots", "minzoom": arw.minzoom,
             "filter": with_minzoom(json!(["all", ["==", ["get", "oneway"], 1], true, minor_or(&json!(arw.minor_minzoom))]), cx.mz_filter("highway")),

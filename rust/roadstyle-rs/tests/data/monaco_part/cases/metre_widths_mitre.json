@@ -32,7 +32,7 @@
       "slots",
       "bf4dc344d3bca1f4",
       "b9e63a214b296e3e",
-      "7d902068fb67d6a8"
+      "fafec5dddf44702a"
     ],
     [
       "roads-labels",
@@ -57,13 +57,13 @@
   },
   "metadata": {
     "roadstyle:interaction": "a911c29a8eeae5d8",
-    "roadstyle:images": "e9049aa3d5b18840",
+    "roadstyle:images": "e1cdd78022892b5f",
     "roadstyle:sources": "3eb959a8e2207438",
     "roadstyle:classes": "e0a3fe0ab6ac40de",
     "roadstyle:controls": "13b74d5d7142a722",
     "roadstyle:generation": "18db75a661ad967c"
   },
-  "hash": "69217c0a99829dcd",
+  "hash": "19bc76b9e5f5859f",
   "road_table": {
     "rows": 1373,
     "columns": [

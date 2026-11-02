@@ -2,9 +2,10 @@
 import {map, style, O, RS_LOADED, _src, _sfeats, RoadTable} from "./core.js";
 import {_tunOn} from "./tunnel.js";
 import {_svLanePx} from "./svspot.js";
+const ARROW_IMAGE = "rs-oneway";      // the arrow image of roadstyle: its own name, never the `oneway` image that a base map's sprite can have (it can point up)
 let _arSdf = null;         // the icon on the map is an SDF one (a map with tunnels) or not
 export function addArrow(){
-  if(map.hasImage("oneway")){ if(_arSdf === _tunOn) return; map.removeImage("oneway"); }       // a later style with tunnels (or with none) needs the other kind
+  if(map.hasImage(ARROW_IMAGE)){ if(_arSdf === _tunOn) return; map.removeImage(ARROW_IMAGE); }       // a later style with tunnels (or with none) needs the other kind
   // rasterised large (the profile's arrows.icon, 4x by default): the high-zoom size ramp scales the icon up to ~10x, and a 2x raster
   // turns to mush past ~2x
   const I=O.arrow_icon;     // the profile's arrows.icon
@@ -13,7 +14,7 @@ export function addArrow(){
   const img=new Image(I.width,I.height);
   // a map with tunnels: an SDF icon (white), coloured by the arrow layers' icon-color, so the tunnel slider can fade a tunnel's arrows
   // (one symbol layer cannot mix SDF and plain icons)
-  img.onload=()=>{ if(!map.hasImage("oneway")){ _arSdf = _tunOn; map.addImage("oneway",img,{pixelRatio:I.pixel_ratio, sdf:_tunOn}); } };
+  img.onload=()=>{ if(!map.hasImage(ARROW_IMAGE)){ _arSdf = _tunOn; map.addImage(ARROW_IMAGE,img,{pixelRatio:I.pixel_ratio, sdf:_tunOn}); } };
   img.src="data:image/svg+xml;base64,"+btoa(_tunOn ? svg.replace(/fill="[^"]*"/, 'fill="#ffffff"') : svg);
 }
 // one arrow per one-way road in the window (docs/design/arrows_and_names.md): after every move, each one-way chain of the slots (the
@@ -150,14 +151,14 @@ let _rsSlotsN = -1;     // the slots arrive (inflated) after load: place the arr
 let _arBound = false;
 // the arrows of the style of the moment: at the start, and again for a new style (rs.setStyle; a style that has no arrow_icon has none)
 export function initArrows(){
-  if(!O.arrow_icon) return;   // no arrow_icon: the host adds the "oneway" image itself (the Rust engine: the style's metadata roadstyle:images)
+  if(!O.arrow_icon) return;   // no arrow_icon: the host adds the "rs-oneway" image itself (the Rust engine: the style's metadata roadstyle:images)
   _RS_ARROW = {...O.arrow_rules, main: new Set(O.arrow_rules.main)};
   _rsSlotsN = -1;
   if(!_arBound){
     _arBound = true;
     map.on("moveend", _rsArrows);
     map.on("sourcedata", e => { const s = _src("slots"); if(!s || e.sourceId !== s.source) return; const n = _sfeats(s.source).length; if(n !== _rsSlotsN){ _rsSlotsN = n; _rsArrows(); } });
-    map.on("styleimagemissing", e=>{ if(e.id==="oneway") addArrow(); });
+    map.on("styleimagemissing", e=>{ if(e.id===ARROW_IMAGE) addArrow(); });
   }
   const go = () => { addArrow(); _rsArrows(); };
   RS_LOADED ? go() : map.once("load", go);
