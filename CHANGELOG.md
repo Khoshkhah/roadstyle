@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **The "?" of a card that folds is before the chevron.** `rs.help.button(rs.sections.get(id), ...)` put it after the chevron, at the end of the title row. Now the chevron is last. In a card that does not fold, the "?" is still at the right end.
+
 ## [0.27.0] - 2026-11-03
 
 ### Added

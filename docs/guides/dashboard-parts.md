@@ -56,7 +56,7 @@ rs.help.button(rs.sections.get("tabs"), {title: "About the tabs"});   // a secti
 rs.help.open({title: "Opened by a link", intro: "No button."});     // the same window, from a link or a key
 ```
 
-To put a "?" in the title of a card, give the section's box (`rs.sections.get(id)`). The button goes at the right end of the title row, in the same place in every card: after the chevron of a card that folds, and at the end of the `.rs-card-title` of a card in the page's own HTML. A click on the "?" opens the window and does not fold the card.
+To put a "?" in the title of a card, give the section's box (`rs.sections.get(id)`). The button goes at the right end of the title row: before the chevron of a card that folds (the chevron is last), and at the end of the `.rs-card-title` of a card in the page's own HTML. A click on the "?" opens the window and does not fold the card.
 
 The words are `{title, intro, terms, note, html}`. `html` is HTML of the page's own, shown after the intro. `button` is the name of the button for a screen reader and its tooltip. `rs.help.button` gives the button back.
 
