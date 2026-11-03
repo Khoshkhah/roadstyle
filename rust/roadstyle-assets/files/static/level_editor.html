@@ -89,7 +89,7 @@
 #lv .ends label{display:block;font-size:11px;color:var(--lv-mute);margin-bottom:3px}
 #lv .ends .seg button{padding:3px 0;font-size:12px}
 #lv .go{width:100%;border:none;border-radius:8px;padding:8px 0;background:var(--lv-ink);color:var(--lv-card);font:600 13px system-ui;cursor:pointer;margin-top:4px}
-#lv .go:hover{background:#000} #lv .go:disabled{opacity:.5;cursor:default}
+#lv .go:hover:not(:disabled){background:color-mix(in srgb,var(--lv-ink) 82%,var(--lv-card))} #lv .go:disabled{opacity:.5;cursor:default}
 #lv .go.ghost{background:var(--lv-card);color:var(--lv-ink);border:1px solid var(--lv-line2)} #lv .go.ghost:hover{background:var(--lv-hover)}
 /* the busy veil: over the panel only (it is inside #lv; a position:fixed in #sb would be relative to #sb, whose backdrop-filter holds it) */
 #lv-busy{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;
