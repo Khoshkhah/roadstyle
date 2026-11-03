@@ -8,9 +8,9 @@ The panel starts empty. Two parts are whole sections that roadstyle writes: the 
 | Part | What it is | Use it for |
 |---|---|---|
 | [`rs.help.set({title, intro, terms, note})`](#a-help-window) | the "?" button in the panel title and its window | "How to read this page" |
-| [`rs.help.button(el, {title, ...})`, `rs.help.open({title, ...})`](#a-help-window) | one more "?" button with its own words, and the same window opened from a link | a card, a label |
-| `rs.sections.add({..., label, fold: true})` | a section that folds; one button in the title row folds all of them, and the state is kept ([Add to the panel](dashboard-panel.md)) | the page's cards |
-| [`class="rs-card-title"`](dashboard-panel.md#cards-the-panel-standard) | the title row of a plain card: the same row as the title of a card that folds | the first row in an `rs-sec-box` |
+| [`rs.help.button(el, {title, ...})`, `rs.help.open({title, ...})`](#a-help-window) | one more "?" button with its own words, and the same window opened from a link | a card, a label, a section |
+| [`rs.sections.add({..., label, fold, background})`](dashboard-panel.md#cards-the-panel-standard) | a card: with or without a background, that folds or not; one button in the title row folds all the cards that fold, and the state is kept | the page's cards |
+| [`class="rs-card-title"`](dashboard-panel.md#cards-the-panel-standard) | the title row of a card in the page's own HTML: the same row as the title of a section's card | the first row in an `rs-sec-box` |
 | [`--rs-card-gap`, `--rs-card-pad`, `--rs-panel-bottom`](dashboard-panel.md#cards-the-panel-standard) | the space between cards (12 px), inside a card (14 px), under the last card (28 px) | a page that needs other numbers, set on `:root` |
 | [`rs.hover.show(html, event)`, `rs.hover.on(node, html)`](#a-hover-box) | the hover box, in the look of the popup | words over a chart or a map layer |
 | [`class="rs-tabs"` + `rs.tabs.use(nav, onChange)`](#tabs-and-a-two-way-switch) | tabs (the selected tab is filled), and `rs-seg` for a two-way switch (the selected segment is a light chip) | tabs: the sections of a page. Switch: a mode or a setting |
@@ -52,8 +52,11 @@ A "?" button appears in the title of the panel (`anchor: element` puts it in ano
 
 ```js
 rs.help.button(document.querySelector("#card-3 h2"), {title: "About step 3", intro: "What it does.", html: "<p>Words of the page's own.</p>", button: "About step 3"});
+rs.help.button(rs.sections.get("tabs"), {title: "About the tabs"});   // a section: the "?" goes in its title
 rs.help.open({title: "Opened by a link", intro: "No button."});     // the same window, from a link or a key
 ```
+
+To put a "?" in the title of a card, give the section's box (`rs.sections.get(id)`). The button goes at the right end of the title row, in the same place in every card: after the chevron of a card that folds, and at the end of the `.rs-card-title` of a card in the page's own HTML. A click on the "?" opens the window and does not fold the card.
 
 The words are `{title, intro, terms, note, html}`. `html` is HTML of the page's own, shown after the intro. `button` is the name of the button for a screen reader and its tooltip. `rs.help.button` gives the button back.
 

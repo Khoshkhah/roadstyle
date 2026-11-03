@@ -60,7 +60,7 @@ def test_the_typed_sections_are_in_the_panel_in_order_and_the_parts_work(tmp_pat
         browser, page, errors = _open(p, _page(tmp_path, panel=_PANEL, legend=_LEGEND))
         got = page.evaluate("""() => { const q = document.querySelector('[data-rs-section=q]');
             q.querySelector('[data-q=run]').click();
-            const out = {ids: rs.sections.list(), notes: !!document.querySelector('[data-rs-section=notes] label'), start: q.querySelector('.rs-q').value,
+            const out = {ids: rs.sections.list(), notes: !!document.querySelector('[data-rs-section=notes] .rs-sec-title'), start: q.querySelector('.rs-q').value,
                          count: q.querySelector('.rs-q-count').textContent, rows: q.querySelectorAll('.rs-q-list a').length};
             q.querySelector('.rs-q-list a').click();
             out.card = document.querySelector('.rs-road-card').textContent;
@@ -128,9 +128,9 @@ def test_the_scrollbar_of_the_panel_is_at_its_outer_edge(tmp_path, side):
     rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"side": side, "sections": [tall]}}).save(path)
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path, scrollbars=True)
-        got = page.evaluate("""() => { const b = document.querySelector('#sb .sb-body'), l = b.querySelector('[data-rs-section=tall] label').getBoundingClientRect(), r = b.getBoundingClientRect();
+        got = page.evaluate("""() => { const b = document.querySelector('#sb .sb-body'), l = b.querySelector('[data-rs-section=tall] .rs-sec-title').getBoundingClientRect(), r = b.getBoundingClientRect();
             return {bar: b.offsetWidth - b.clientWidth, scrolls: b.scrollHeight > b.clientHeight, gapLeft: l.left - r.left, gapRight: r.right - l.right,
-                    dir: getComputedStyle(b.querySelector('[data-rs-section=tall] label')).direction}; }""")
+                    dir: getComputedStyle(b.querySelector('[data-rs-section=tall] .rs-sec-title')).direction}; }""")
         browser.close()
     assert not errors and got["scrolls"] and got["bar"] > 0 and got["dir"] == "ltr"
     assert (got["gapLeft"] > got["gapRight"]) == (side == "left")        # the scrollbar's width is on the outer side

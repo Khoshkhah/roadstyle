@@ -127,7 +127,7 @@ is not in the page. Without a token the Mapillary tab says so and asks for nothi
 
 **What leaves your browser.** A click on a road sends the place of the road to the provider that you use (Google, Panoramax or Mapillary). The viewers of Panoramax and Mapillary load from the jsDelivr CDN, so these tabs need an internet connection. The rest of the map still works offline.
 
-**Coverage.** With Panoramax or Mapillary chosen, the **Coverage** button draws where that provider has photos: a line for each
+**Coverage.** With Panoramax or Mapillary chosen, the **Coverage** button (the map icon right after the provider switch) draws where that provider has photos: a line for each
 sequence, and a dot for each photo from zoom 15. The dots are white with a ring in the provider's colour, and the lines have a white edge, so they show on any road colour. When a photo is open, a larger ring marks its dot, so you see which photo you look at: on a road with two carriageways it can be a dot on the other carriageway. It goes away when you choose Google or close the window, and comes back with the
 window. Mapillary's lines start at zoom 6. Coverage is drawn only inside the page's `boundary` (cut to its shape), or inside the bounds of the roads when the page has no boundary.
 
