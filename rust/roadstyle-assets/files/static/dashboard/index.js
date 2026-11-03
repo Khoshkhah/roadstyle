@@ -26,6 +26,7 @@ import {initView3D} from "./view3d.js";
 import {initStreetView} from "./streetview.js";
 import {initGoogle3D} from "./google3d.js";
 import {initBasemap} from "./basemap.js";
+import {useTops} from "./basemapbox.js";
 import {initFilter, useFilter} from "./filter.js";
 import {initFind} from "./find.js";
 import {initColor, useColor} from "./color.js";
@@ -136,7 +137,7 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); useRoadsBox(); refreshState();
+      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); useRoadsBox(); useTops(); refreshState();
     },
     // the phone's bottom sheet: rs.sheet() is its height (0 closed, 1 40 %, 2 full; null: no sheet), rs.sheet(n) sets it; rs.freeArea() is the part of
     // the map that the bar, the panel and the sheet leave free, in window coordinates ({lo, hi, top, bottom}): a host pads its map with it

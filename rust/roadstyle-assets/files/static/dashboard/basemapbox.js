@@ -1,5 +1,5 @@
 // The base-map box (docs/design/dashboard_templates.md, 3.3): the heading "Base map", one radio row with a swatch for each map, a divider, and
-// "On top": Hillshade, Labels and 3D buildings. A map with a dark twin is one row that follows the page's theme. The order on the map: the base
+// "On top": Hillshade, Labels, One-way arrows and 3D buildings. A map with a dark twin is one row that follows the page's theme. The order on the map: the base
 // map, the hillshade, the labels, the roads, the page's own layers, the buildings, the selection. The URLs of the layers on top are
 // data/basemaps.json `ontop` (O.ontop).
 //
@@ -18,6 +18,9 @@ const _bxSwatch = b => {
   if(!Array.isArray(s)) return s || b.bg;
   return "linear-gradient(to top left," + s[2] + " 0 32%,transparent 32%),linear-gradient(135deg,transparent 0 40%," + s[1] + " 40% 54%,transparent 54%)," + s[0];
 };
+// the box's layers again after rs.setStyle (index.js): a new roads style brings its arrow layers back as visible
+let _bxApply = null;
+export function useTops(){ if(_bxApply) _bxApply(); }
 export function buildBox(menu){
   const bms = window.RS_BASEMAPS || [], root = document.documentElement, ontop = O.ontop || {};
   const byKey = k => bms.find(b => b.key === k);
@@ -69,9 +72,14 @@ export function buildBox(menu){
     const gray = baseKey() === "esri_gray" ? (current === "esri_dark_gray" ? ontop.labels_gray_dark : ontop.labels_gray_light) : ontop.labels;
     raster("labels", kind === "esri" && on, gray);
     if(vec) for(const l of map.getStyle().layers.filter(x => x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
+    // the one-way arrows: the road style's symbol layers with roadstyle's arrow image (one layer, or more on a map with tunnels); no row on a page without them
+    const arrows = map.getStyle().layers.filter(l => l.type === "symbol" && JSON.stringify((l.layout || {})["icon-image"] || "").includes("rs-oneway"));
+    tops.arrows.lab.hidden = !arrows.length;
+    for(const l of arrows) map.setLayoutProperty(l.id, "visibility", tops.arrows.c.checked ? "visible" : "none");
   };
   topRow("hillshade", "Hillshade").checked = _bxGet("hillshade") === "1";
   topRow("labels", "Labels");
+  topRow("arrows", "One-way arrows").checked = _bxGet("arrows") !== "0";       // on, unless the person turned them off in this browser
   topRow("buildings", "3D buildings");
   // the style's own base-map layers (the overlays of roadstyle:controls): one switch for all of them, in a group of its own, and only for a style that has them
   const layers = _bxEl("div", "rs-bm-layers"), lrow = _bxEl("label", "rs-bm-row"), lc = _bxEl("input"), lname = _bxEl("span", "rs-bm-n");
@@ -82,6 +90,7 @@ export function buildBox(menu){
   syncLayers();
   tops.hillshade.c.onchange = () => { _bxSet("hillshade", tops.hillshade.c.checked); apply(); };
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
+  tops.arrows.c.onchange = () => { _bxSet("arrows", tops.arrows.c.checked); apply(); };
   tops.buildings.c.onchange = () => rsBuildingsByPerson(tops.buildings.c.checked);
   const mark = () => rows.forEach(([b, r]) => { r.checked = b.key === current || b.dark === current; });
   // a map with a twin shows the swatch of the twin of the current theme
@@ -91,5 +100,6 @@ export function buildBox(menu){
   for(const ev of ["rs:buildingschange", "rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, apply);
   document.addEventListener("rs:themechange", swatches);
   map.on("load", apply);
+  _bxApply = apply;
   mark(); swatches(); apply();
 }

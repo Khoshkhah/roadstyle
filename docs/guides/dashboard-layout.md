@@ -68,7 +68,7 @@ of roads. *All* and *None* set every row. A click on a name shows only that clas
 ### Base map
 
 The base-map tool lists the base maps that need no key: OpenFreeMap Liberty and Positron, OpenStreetMap, Esri Gray, Esri Streets,
-Esri Satellite and Blank. Under *On top* it has three switches: Hillshade, Labels and 3D buildings. A page can offer other base maps with `basemaps=`.
+Esri Satellite and Blank. Under *On top* it has four switches: Hillshade, Labels, One-way arrows and 3D buildings. One-way arrows is on by default, and the box keeps the choice in this browser. A page without arrows (`arrows=False`) has no One-way arrows switch. A page can offer other base maps with `basemaps=`.
 
 When the style has base-map layers of its own (the duckOSM layers: land cover, water, buildings and more), the box has one more
 switch for all of them. Its label is *Map layers* (`overlays_label`). The legend box lists the same layers, each with its colour. The
