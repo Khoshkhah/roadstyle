@@ -28,7 +28,7 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
   page templates, MapLibre) have one copy: `rust/roadstyle-assets/files/`, the crate roadstyle-assets. A crate takes a file with
   `roadstyle_assets::text!("data/cmaps.json")` (a wrong name does not compile); Python asks `roadstyle._assets.text(name)`, which
   needs the built extension (`python rust/roadstyle-py/build.py`). Edit the files there. After an edit in `files/static/`, run
-  `python rust/roadstyle-assets/sync_old_paths.py`: it writes the old paths that duckosm-rust copies (until 0.27.0).
+  `python rust/roadstyle-assets/sync_old_paths.py`: it writes the old paths that duckosm-rust copies (until duckosm-rust takes the new paths).
 - `src/roadstyle/render_web.py` — `render(...)`: Python keywords become the `page` dict, which `_page_html` writes as one
   JSON object `RS_OPTIONS` (the placeholder `__RS_OPTIONS__` of `rust/roadstyle-assets/files/static/web_template.html`).
 - The page's controls and road interaction are ES modules in `rust/roadstyle-assets/files/static/dashboard/` (one file for each control,

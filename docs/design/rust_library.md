@@ -1291,7 +1291,7 @@ reads the static files from `src/roadstyle/` when it is built; a crates.io packa
   it) is the one copy. A crate takes a file at compile time with `roadstyle_assets::text!` / `bytes!` (a const evaluation of `get`: a
   wrong name does not compile, and the linker keeps only the named files; the wasm module is 124 bytes smaller). Python asks
   `_rust.asset(name)` (`roadstyle/_assets.py`). The old paths that duckosm-rust copies (`src/roadstyle/static/dashboard/`, `popup.*`,
-  `level_editor.html`) are a generated copy until 0.27.0 (`sync_old_paths.py`, checked by a test). **A temporary edge:**
+  `level_editor.html`) are a generated copy until duckosm-rust takes the new paths (`sync_old_paths.py`, checked by a test). **A temporary edge:**
   roadstyle-model → roadstyle-assets for `reads.json`, until T3's `Mark` makes reads.json.
 
 #### P7's CLI: one `roadstyle` program (audit N31, approved 2026-10-24)

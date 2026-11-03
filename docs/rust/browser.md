@@ -22,7 +22,7 @@ Then put these files in one folder of your site:
 | `level_editor.html` | the level editor's panel (only for the level editor) | `rust/roadstyle-assets/files/static/` |
 | `js/` | `roads_sql.js` and `features_sql.js`, the worker SQL | `rust/roadstyle-wasm/js/` |
 
-`rust/roadstyle-assets/files/` is the one copy of these files (the crate roadstyle-assets). Until roadstyle 0.27.0, the dashboard,
+`rust/roadstyle-assets/files/` is the one copy of these files (the crate roadstyle-assets). Until duckosm-rust takes the new paths, the dashboard,
 the popup files and `level_editor.html` are also at their old paths in `src/roadstyle/static/`, as a generated copy. Take them from
 `rust/roadstyle-assets/files/static/`. The npm package `roadstyle-dashboard` has the same files.
 

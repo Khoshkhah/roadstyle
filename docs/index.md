@@ -87,6 +87,13 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
 </div>
 
+## What is new in 0.27.0
+
+- **The dashboard's panel starts empty, and a page adds what it needs**: its own HTML, the query box or the road card, with `dashboard={"panel": {"sections": [...]}}` or `rs.sections.add`. The map of a dashboard has the defaults of a map page. This is a breaking change: see [Migrate a dashboard](guides/migrating-dashboard.md).
+- **Cards: one standard for the panel.** A section with a `label` is a card, with or without a background (`background: False`), that folds or not (`fold: True`). Every card has the same width, gap, padding and title row, and the "?" of `rs.help.button` is at the end of the title row.
+- **Every part of the dashboard follows the dark theme, and every scroll area scrolls the same way as the panel.**
+- **Street View:** Coverage is an icon after the provider switch, and the close button stays at the top right.
+
 ## What is new in 0.26.3
 
 - **A dashboard manual.** Three pages with maps that run: an [overview](guides/dashboard-manual/index.md), the Python SDK and the JavaScript API. Each example has a Run button.

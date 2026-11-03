@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-03
+
 ### Added
 - **The card standard of the panel.** A section that folds is now one card: the section is the box, its title is a flat row with a chevron, and its body opens inside the same card. A closed card is 44 px high and as wide as all other cards. A plain card is `.rs-sec-box` with the new title row `.rs-card-title`. The space of the cards is three CSS variables: `--rs-card-gap` (12px), `--rs-card-pad` (14px) and `--rs-panel-bottom` (28px). Filled controls use `--accent-fill` (`#0E7F91`) with white text. Docs: [Cards: the panel standard](docs/guides/dashboard-panel.md#cards-the-panel-standard).
 - **Every section with a `label` is a card, with or without a background, that folds or not.** The new section option `background: False` gives a card with no colour behind it and the same padding and title row. A section without a `label` is a block of the page's own HTML with no box, as wide as the cards, with the card gap above and below (it had no layout of its own, so its gap changed with its content). Docs: [Cards: the panel standard](docs/guides/dashboard-panel.md#cards-the-panel-standard).

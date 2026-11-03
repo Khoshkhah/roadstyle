@@ -46,6 +46,13 @@
 - **Scriptable.** A `window.rs*` JavaScript API and events for your own dashboard, and shared parts for its panel.
 - **Ready for AI agents.** An MCP server and an agent skill.
 
+## What is new in 0.27.0
+
+- **The dashboard's panel starts empty, and a page adds what it needs**: its own HTML, the query box or the road card, with `dashboard={"panel": {"sections": [...]}}` or `rs.sections.add`. The map of a dashboard has the defaults of a map page. This is a breaking change: see [Migrate a dashboard](https://khoshkhah.github.io/roadstyle/guides/migrating-dashboard/).
+- **Cards: one standard for the panel.** A section with a `label` is a card, with or without a background (`background: False`), that folds or not (`fold: True`). Every card has the same width, gap, padding and title row, and the "?" of `rs.help.button` is at the end of the title row.
+- **Every part of the dashboard follows the dark theme, and every scroll area scrolls the same way as the panel.**
+- **Street View:** Coverage is an icon after the provider switch, and the close button stays at the top right.
+
 ## What is new in 0.26.3
 
 - **A dashboard manual.** Three pages with maps that run: an [overview](https://khoshkhah.github.io/roadstyle/guides/dashboard-manual/), the Python SDK and the JavaScript API. Each example has a Run button.
@@ -77,7 +84,7 @@
   <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard_dark.jpg" alt="The dashboard in the dark theme with the OpenFreeMap Fiord base map: Monaco, one road selected" width="80%">
 </p>
 
-More: [What is new in 0.26.3](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0263) ·
+More: [What is new in 0.27.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0270) ·
 [Dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) ·
 [Dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) ·
 [Big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) ·
