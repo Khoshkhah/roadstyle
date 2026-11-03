@@ -133,11 +133,11 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
       <div class="ends" id="lv-top" style="grid-template-columns:minmax(0,1fr)"><div><label>on top</label><div class="seg" id="lv-top-seg"></div></div></div>
       <div class="desc" id="lv-desc"></div>
       <div class="ends" id="lv-ends" hidden>
-        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r1)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r1)">○</span></button></div></div>
-        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r2)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r2)">○</span></button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r1)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r1)">■</span></button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r2)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r2)">■</span></button></div></div>
       </div>
       <div class="ends" id="lv-part" hidden style="grid-template-columns:minmax(0,1fr)">
-        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end">end head <span class="mk">○</span></button></div></div>
+        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end">end head <span class="mk">■</span></button></div></div>
       </div>
       <button class="go" id="lv-add">Add to the list</button>
     </section>
@@ -181,7 +181,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   if(/"said":/.test(sessionStorage.getItem("lv-view") || "")){                 // the page again after an apply: covered until drawn at your view
     $("lv-busy").classList.add("solid"); $("lv-busy").hidden = false; $("lv-busy-t").textContent = "Drawing the new map …"; }
   let queue = [];                                             // the changes waiting to be applied
-  const PART = {start: "start head", main: "main", end: "end head"}, END = {start: "●", end: "○"};
+  const PART = {start: "start head", main: "main", end: "end head"}, END = {start: "●", end: "■"};
   const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
                new: ["new", "var(--lv-new)", "added now"]};
   const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
@@ -189,8 +189,8 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   const ref = r => (facts[r] || {}).edge_ref || r;
   const badge = r => { const k = sel.indexOf(r); return k >= 0 ? `<span class="num" style="--c:${C[k]}">${k + 1}</span>` : ""; };
   const who = r => `${badge(r)}${esc(name(r))}`;
-  const mk = (end, r) => { const k = sel.indexOf(r);           // a road's end as the map marks it (lv-ends): ● start, ○ end, in the picked road's colour
-    return end === "start" || end === "end" ? ` <span class="mk"${k >= 0 ? ` style="color:${C[k]}"` : ""}>${end === "start" ? "●" : "○"}</span>` : ""; };
+  const mk = (end, r) => { const k = sel.indexOf(r);           // a road's end as the map marks it (lv-ends): ● start, ■ end, in the picked road's colour
+    return end === "start" || end === "end" ? ` <span class="mk"${k >= 0 ? ` style="color:${C[k]}"` : ""}>${end === "start" ? "●" : "■"}</span>` : ""; };
   $("lv-area").textContent = STATS.area + " · " + STATS.roads + " roads";
   function tab(t){ document.querySelectorAll("#lv-tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
     document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
@@ -219,10 +219,16 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
       f.push({type: "Feature", properties: {c: C[k], open: 0}, geometry: {type: "Point", coordinates: [p.s_lon, p.s_lat]}});
       f.push({type: "Feature", properties: {c: C[k], open: 1}, geometry: {type: "Point", coordinates: [p.e_lon, p.e_lat]}}); });
     const fc = {type: "FeatureCollection", features: f}, src = map.getSource("lv-ends");
+    // the start is a circle and the end is a square, in the road's colour with a white edge (the panel's ● and ■ are the same marks)
+    for(const c of C) if(!map.hasImage("lv-sq-" + c)){ const n = 32, cv = document.createElement("canvas"); cv.width = cv.height = n; const x = cv.getContext("2d");
+      x.fillStyle = "#ffffff"; x.fillRect(0, 0, n, n); x.fillStyle = c; x.fillRect(4, 4, n - 8, n - 8);
+      map.addImage("lv-sq-" + c, x.getImageData(0, 0, n, n), {pixelRatio: 2}); }
     if(src) src.setData(fc);
     else { map.addSource("lv-ends", {type: "geojson", data: fc});
-      map.addLayer({id: "lv-ends", type: "circle", source: "lv-ends", paint: {"circle-radius": 6, "circle-stroke-width": 2.5,
-        "circle-stroke-color": ["get", "c"], "circle-color": ["case", ["==", ["get", "open"], 1], "#ffffff", ["get", "c"]]}}); }
+      map.addLayer({id: "lv-ends", type: "circle", source: "lv-ends", filter: ["==", ["get", "open"], 0],
+        paint: {"circle-radius": 8, "circle-stroke-width": 3, "circle-stroke-color": "#ffffff", "circle-color": ["get", "c"]}});
+      map.addLayer({id: "lv-ends-end", type: "symbol", source: "lv-ends", filter: ["==", ["get", "open"], 1],
+        layout: {"icon-image": ["concat", "lv-sq-", ["get", "c"]], "icon-size": 1, "icon-allow-overlap": true, "icon-ignore-placement": true}}); }
   }
   function focus(roads){ const ids = roads.flatMap(idsOf); if(ids.length) rsFocus(ids, {padding: 90, maxZoom: 18}); }
   // --- selection
@@ -294,7 +300,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
       <div class="hd-h"><span>casing heads <button class="link" data-hnomain title="Heads over the whole road: the end head takes what the start head leaves">no main part</button>
         ${(f.heads_own || []).some(Boolean) ? `<button class="link" data-hauto title="Back to the default lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">default</button>` : ""}</span><span>road ${L} m</span></div>
       <div class="hbar"><i class="s"></i><i class="m"></i><i class="e"></i></div>
-      ${[["start", "●", s], ["end", "○", e]].map(([n, m, v], k) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.1" data-hend="${n}" value="${v}"><b></b>
+      ${[["start", "●", s], ["end", "■", e]].map(([n, m, v], k) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.1" data-hend="${n}" value="${v}"><b></b>
         <small style="grid-column:2/4;margin:-3px 0 2px;font-size:10px">${(f.heads_own || [])[k] ? "set by you" : "default"}</small></label>`).join("")}
     </div>`;
   }
@@ -319,11 +325,11 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
         ${f.modes ? `<span>modes</span><span class="wide" style="grid-column:span 3">${esc(f.modes)}</span>` : ""}
         ${f.bus_lines ? `<span>bus lines</span><span class="wide" style="grid-column:span 3">${esc(f.bus_lines)}</span>` : ""}
         <span>road id</span><span class="wide" style="grid-column:span 3;font-size:11px">${esc(r)}</span>
-        ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→○" : "direction ○→●"}</span><span class="wide" style="grid-column:span 3;font-size:11px"
+        ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→■" : "direction ■→●"}</span><span class="wide" style="grid-column:span 3;font-size:11px"
           title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}${d.lanes != null ? " · lanes " + esc(d.lanes) : sidewalk(d, f) ? " · sidewalk" : ""}${d.modes ? " · " + esc(d.modes) : ""}</span>`).join("")}</div>
       <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
       ${["start", "end"].map((e, i) => `<div class="caps" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">
-        <span style="width:44px">${e} ${i ? "○" : "●"}</span>
+        <span style="width:44px">${e} ${i ? "■" : "●"}</span>
         <div class="seg" data-cap="${esc(r)}" data-end="${e}">${["round", "square", "flat"].map(v =>
           `<button data-v="${v}" class="${(((f.caps || [])[i] || (f.caps_auto || [])[i] || "round") === v) ? "on" : ""}">${v}</button>`).join("")}</div></div>`).join("")}
       ${headsHtml(r, f)}
@@ -457,9 +463,9 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     $("lv-desc").innerHTML = kind === "order" ? `Where they meet, ${who(a)}'s fill is drawn after ${who(b)}'s (a wish the solver keeps when it can).`
       : kind === "stack" && !parts.size ? `<div class="warn">Choose at least one part of ${who(a)}'s casing.</div>`
       : kind === "stack" ? `${who(a)}'s ${["start", "main", "end"].filter(p => parts.has(p)).map(p => PART[p]).join(" and ")} casing is drawn after ${who(b)}'s fill,
-        even where it joins ${who(b)}: one row per part, added to the found ones. ● start ○ end on the map.
+        even where it joins ${who(b)}: one row per part, added to the found ones. ● start ■ end on the map.
         To override a found stack, switch all its rows off above and add your own parts.`
-      : `The ${end1} of ${who(a)} joins the ${end2} of ${who(b)}: each road's head there is drawn under the other's fill. ● start ○ end on the map.`;
+      : `The ${end1} of ${who(a)} joins the ${end2} of ${who(b)}: each road's head there is drawn under the other's fill. ● start ■ end on the map.`;
     const over = kind === "order" ? stacksOver(b, a) : [];
     if(over.length) $("lv-desc").innerHTML += `<div class="warn">⚠ ${over.map(r => `${r.section === "found" ? "A found" : "Your"} stack (${relText(r)})`).join(", ")}
       keeps ${who(b)}'s casing over ${who(a)}'s fill. A stack outranks an order, so this order would be given up and nothing changes.
@@ -490,8 +496,8 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
     if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
-    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `cap ${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap} · ${name(q.road)}`
-      : q.op === "head" ? `head ${q.end} ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `cap ${q.end} ${q.end === "start" ? "●" : "■"} ${q.cap} · ${name(q.road)}`
+      : q.op === "head" ? `head ${q.end} ${q.end === "start" ? "●" : "■"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
       : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
   }
