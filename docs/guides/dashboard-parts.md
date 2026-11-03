@@ -13,7 +13,7 @@ The panel starts empty. Two parts are whole sections that roadstyle writes: the 
 | [`class="rs-card-title"`](dashboard-panel.md#cards-the-panel-standard) | the title row of a plain card: the same row as the title of a card that folds | the first row in an `rs-sec-box` |
 | [`--rs-card-gap`, `--rs-card-pad`, `--rs-panel-bottom`](dashboard-panel.md#cards-the-panel-standard) | the space between cards (12 px), inside a card (14 px), under the last card (28 px) | a page that needs other numbers, set on `:root` |
 | [`rs.hover.show(html, event)`, `rs.hover.on(node, html)`](#a-hover-box) | the hover box, in the look of the popup | words over a chart or a map layer |
-| [`class="rs-tabs"` + `rs.tabs.use(nav, onChange)`](#tabs-and-a-two-way-switch) | tabs, and `rs-seg` for a two-way switch | the sections of a page, a mode |
+| [`class="rs-tabs"` + `rs.tabs.use(nav, onChange)`](#tabs-and-a-two-way-switch) | tabs (the selected tab is filled), and `rs-seg` for a two-way switch (the selected segment is a light chip) | tabs: the sections of a page. Switch: a mode or a setting |
 | [`class="rs-sec-box"`](#cards-number-tiles-and-a-callout) | a card; an `h3` and the paragraph after it are its title and description | one block of a page |
 | [`rs.kpi(title, value, sub, color)` in `class="rs-kpis"`](#cards-number-tiles-and-a-callout) | a number tile (a grid of three) | the numbers of a page |
 | [`class="rs-cap"`, `class="rs-callout"`](#cards-number-tiles-and-a-callout) | a small capital caption, an answer box with a colored edge | headings of tiles, the answer |
@@ -103,6 +103,23 @@ rs.tabs.use(document.getElementById("mode"), v => redraw(v));
 ```
 
 A click or an arrow key selects. The chosen button has `on` and `aria-selected`. The panes beside the tabs (the siblings with `data-pane`) show the one with the same id. The selected tab uses `--accent-fill`.
+
+The two parts look different, because they do different jobs:
+
+| | Tabs (`rs-tabs`) | Two-way switch (`rs-seg`) |
+|---|---|---|
+| Look | A flat row with a line under it. The text is muted | A grey track with a rounded button for each value |
+| Selected | Filled with `--accent-fill`, white text | The card color, `--accent` text, a soft shadow |
+| Use it for | The sections (panes) of a page: the content below changes | A mode or a setting with two or a few values: the same content is drawn in a different way |
+
+Tabs change the pane. A switch changes a setting. Do not use one for the job of the other.
+
+```html
+<!-- tabs: "Overview" and "Streets" are two panes -->
+<nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets</button></nav>
+<!-- a switch: the same chart, with two ways to count -->
+<div class="rs-seg"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div>
+```
 
 ## A hover box
 
