@@ -17,6 +17,7 @@ _PARTS = """<nav class="rs-tabs" id="tb"><button class="rs-tab on" data-tab="a">
 <div data-pane="b" hidden><div class="rs-scroll"><table class="rs-table"><thead><tr><th data-sort="desc">Street</th><th>Hours</th></tr></thead>
 <tbody><tr><td>A street</td><td>24</td></tr><tr><td>B street</td><td>12</td></tr></tbody></table></div></div>
 <div class="rs-seg" id="mode"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div>
+<div id="day"></div>
 <p><button>Plain</button> <button class="sb-primary">Primary</button> <input placeholder="A text box"></p>
 <p class="sb-note">Small print</p><a href="#">a link</a> <span class="rs-chip">chip</span> <span class="rs-chip accent">accent</span>"""
 _SCRIPT = """rs.ready(() => {
@@ -28,6 +29,7 @@ _SCRIPT = """rs.ready(() => {
   rs.svg(s, "text", {x: 4, y: 12, fill: "var(--mut)", "font-size": 9}, "100 %");
   rs.tabs.use(document.getElementById("tb"), () => {});
   rs.tabs.use(document.getElementById("mode"), () => {});
+  rs.days.use(document.getElementById("day"), {days: ["2026-10-01", "2026-10-04", "2026-10-05"]});
   rs.legend.add({id: "ev", color: "#ff0066", label: "Events"});
 });"""
 _PROBE = r"""([scope, dark]) => {
@@ -59,7 +61,7 @@ _STEPS = [("panel", "rsSelect(rsQuery(p => p.name)[5])", "#sb"), ("panel, tab b"
          ("settings box", "rs.tools.open('settings')", ".rs-settings, #rs-settings-box, .rs-st-box"), ("credits box", "rs.tools.open('attribution')", "#rs-attr-box"),
          ("help window", "document.querySelector('#sb .sb-top button[title*=\"read\"], #sb .rs-help-btn, #sb button[aria-label*=\"elp\"]')?.click()", ".rs-help, .rs-help-win, [role=dialog]"),
          ("popup", "rsSelect(rsQuery(p => p.name)[5])", ".maplibregl-popup"),
-         ("street view window", "rsSetStreetView && rsSetStreetView(true)", ".rs-svw"), ("google 3d window", "rs.tools.open('google_3d')", ".rs-g3d")]
+         ("street view window", "rsSetStreetView && rsSetStreetView(true)", ".rs-svw"), ("day calendar", "document.querySelector('.rs-day-field').click()", ".rs-day-cal:not([hidden])"), ("google 3d window", "rs.tools.open('google_3d')", ".rs-g3d")]
 
 
 def _edges(n=6):

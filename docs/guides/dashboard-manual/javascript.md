@@ -138,7 +138,7 @@ const bar = rs.svg(s, "rect", {x: 0, y: 4, width: 60, height: 12, fill: "var(--a
 rs.hover.on(bar, "<b>60 %</b> of the roads");
 ```
 
-`rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
+`rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. `rs.days.use(el, {days, onChange})` builds a day picker in an empty element: a field that opens a calendar of the days with data, the day before and after, and "Latest". It gives `{set(day, quiet), value()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 
 ## Live data
 

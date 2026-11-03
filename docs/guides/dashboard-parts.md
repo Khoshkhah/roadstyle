@@ -14,6 +14,7 @@ The panel starts empty. Two parts are whole sections that roadstyle writes: the 
 | [`--rs-card-gap`, `--rs-card-pad`, `--rs-panel-bottom`](dashboard-panel.md#cards-the-panel-standard) | the space between cards (12 px), inside a card (14 px), under the last card (28 px) | a page that needs other numbers, set on `:root` |
 | [`rs.hover.show(html, event)`, `rs.hover.on(node, html)`](#a-hover-box) | the hover box, in the look of the popup | words over a chart or a map layer |
 | [`class="rs-tabs"` + `rs.tabs.use(nav, onChange)`](#tabs-and-a-two-way-switch) | tabs (the selected tab is filled), and `rs-seg` for a two-way switch (the selected segment is a light chip) | tabs: the sections of a page. Switch: a mode or a setting |
+| [`rs.days.use(el, {days, value, onChange})`](#a-day-picker) | the day picker: a "Day" label, a field that opens a calendar of the days with data, the day before and after, "Latest" | the day of a page with one day of data at a time |
 | [`class="rs-sec-box"`](#cards-number-tiles-and-a-callout) | a card; an `h3` and the paragraph after it are its title and description | one block of a page |
 | [`rs.kpi(title, value, sub, color)` in `class="rs-kpis"`](#cards-number-tiles-and-a-callout) | a number tile (a grid of three) | the numbers of a page |
 | [`class="rs-cap"`, `class="rs-callout"`](#cards-number-tiles-and-a-callout) | a small capital caption, an answer box with a colored edge | headings of tiles, the answer |
@@ -123,6 +124,32 @@ Tabs change the pane. A switch changes a setting. Do not use one for the job of 
 <!-- a switch: the same chart, with two ways to count -->
 <div class="rs-seg"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div>
 ```
+
+## A day picker
+
+Use the day picker on a page that shows one day of data at a time. Give an empty element and the days that have data:
+
+```html
+<div id="day"></div>
+```
+
+```js
+const day = rs.days.use(document.getElementById("day"), {
+  days: ["2026-10-01", "2026-10-04", "2026-10-05"],   // the days with data, "YYYY-MM-DD"
+  value: "2026-10-05",                                // the day at the start (default: the latest)
+  label: "Day",                                       // the label above the field (default: "Day")
+  onChange: d => fetch(`daily_${d}.json`).then(r => r.json()).then(draw),
+});
+day.value();              // "2026-10-05"
+day.set("2026-10-04");    // as a click: calls onChange
+day.set("2026-10-04", true);   // quiet: does not call onChange
+```
+
+The field shows the day ("Mon 5 Oct 2026") with a calendar icon and a "v", and a click opens a calendar. In the calendar, only the days in `days` are buttons. "‹" and "›" go to the day before and the day after in `days`, so they skip a day with no data. "Latest" goes to the last day.
+
+If `onChange` gives a promise, the field pulses and the buttons wait until the promise ends. If the promise fails, the picker goes back to the old day, and a line under the row says "Could not load Mon 5 Oct 2026." A day that is not in `days` is an error.
+
+The field has a border and the page's background, and its icons are `--accent`. On hover and while the calendar is open, it has an `--accent` border, a light accent fill and an accent ring. The calendar is a box like the help window.
 
 ## A hover box
 

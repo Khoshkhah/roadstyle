@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **A day picker for a page: `rs.days.use(el, {days, value, label, onChange})`.** It builds a "Day" label, a field that shows the day and opens a calendar of the days with data, the day before and after, and "Latest". The field has a border, accent icons and an accent hover, so that a person sees that it can be chosen. While `onChange`'s promise runs, the field pulses; if it fails, the old day comes back with a note. Docs: [A day picker](docs/guides/dashboard-parts.md#a-day-picker).
+
 ### Changed
 - **The "?" of a card that folds is before the chevron.** `rs.help.button(rs.sections.get(id), ...)` put it after the chevron, at the end of the title row. Now the chevron is last. In a card that does not fold, the "?" is still at the right end.
 
