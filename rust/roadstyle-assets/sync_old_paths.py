@@ -1,7 +1,7 @@
 """Writes the old paths that duckosm-rust's page build copies (crates/duckosm-wasm/build.sh, at a roadstyle commit) from their one
 source, rust/roadstyle-assets/files/static/: src/roadstyle/static/popup.css, popup.js, level_editor.html and dashboard/ (with its
 subfolders). The copies are exact, so the files that duckosm-rust serves do not change. Do not edit them: edit the source and run
-this script; tests/test_release_files.py fails when a copy differs. They go in roadstyle 0.27.0, after duckosm-rust takes the new
+this script; tests/test_release_files.py fails when a copy differs. They go after duckosm-rust takes the new
 paths (T6).
 
     python rust/roadstyle-assets/sync_old_paths.py
