@@ -496,6 +496,13 @@ def test_the_editor_works_in_the_hosts_panel(view):
             page.wait_for_function("document.querySelectorAll('#lv-cards .card').length === 1", timeout=20000)
             page.wait_for_timeout(300)
             assert page.evaluate("document.querySelectorAll('#lv-cards .card .x').length") == 1, "one pick for each click"
+            # a cap goes to the list as every change does: nothing is applied, saved or drawn until Apply (Discard takes it out)
+            n0 = page.evaluate("window.solved.length")
+            page.evaluate("() => { for (const b of document.querySelectorAll('#lv-cards [data-cap] button')) b.click(); }")
+            page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
+            assert page.evaluate("window.solved.length") == n0 and page.inner_text("#lv-wait").endswith(("waiting ▴", "waiting ▾")), "a cap waits for Apply"
+            page.evaluate("document.getElementById('lv-discard').click()")
+            page.wait_for_function("document.getElementById('lv-bar').hidden", timeout=20000)
             # two roads and an order wish: the changes wait in the apply bar
             roads = page.evaluate("[window.editor.roads[0], window.editor.roads.at(-1)]")
             def stage(top=0):
