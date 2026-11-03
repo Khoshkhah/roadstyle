@@ -78,6 +78,18 @@ def test_the_window_offers_the_three_providers_and_starts_on_google(tmp_path):
     _run(tmp_path, body)
 
 
+def test_the_close_button_stays_at_the_top_right_when_the_pointer_is_on_it(tmp_path):
+    # the tooltip code takes a button's `title` away on hover: a rule that finds the button by its title let it fall into the second row
+    def body(page, asked):
+        _pick(page, "panoramax")
+        x = page.locator(".rs-svw:not(.rs-g3d) .rs-svw-x")
+        x.hover()
+        assert not page.evaluate("document.querySelector('.rs-svw:not(.rs-g3d) .rs-svw-x').hasAttribute('title')")
+        b, w = x.bounding_box(), page.locator(".rs-svw:not(.rs-g3d)").bounding_box()
+        assert b["y"] - w["y"] < 12 and (w["x"] + w["width"]) - (b["x"] + b["width"]) < 12
+    _run(tmp_path, body)
+
+
 def test_panoramax_shows_the_nearest_photo_with_no_key_and_remembers_the_choice(tmp_path):
     def body(page, asked):
         _pick(page, "panoramax")

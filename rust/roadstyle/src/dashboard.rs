@@ -54,8 +54,9 @@ pub enum Part {
     RoadCard,
 }
 
-/// A section that the page adds to the panel: the page's own HTML (`html`) or a part of roadstyle (`part`), with an optional heading (a `<label>`),
-/// at the end of the panel or beside an earlier section. The HTML is the page's own: it is written into the page as it is.
+/// A section that the page adds to the panel: the page's own HTML (`html`) or a part of roadstyle (`part`), at the end of the panel or beside an
+/// earlier section. A section with a `label` is a card (the label is its title row), with or without a background, that folds or not. The HTML is
+/// the page's own: it is written into the page as it is.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Section {
@@ -81,7 +82,13 @@ pub struct Section {
     /// the section folds: its label is a button, its body hides, and the panel's title row has one button for all the sections that fold (needs a `label`)
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fold: bool,
+    /// the card has the card colour behind it (false: no background, the same padding and title row; needs a `label`)
+    #[serde(default = "yes", skip_serializing_if = "is_yes")]
+    pub background: bool,
 }
+
+fn yes() -> bool { true }
+fn is_yes(b: &bool) -> bool { *b }
 
 /// The side panel: its edge, its width, its look, and the sections that the page adds (the panel starts empty). The panel's HTML is
 /// the template's.
@@ -515,6 +522,9 @@ impl Dashboard {
             if s.fold && s.label.is_none() {
                 return bad(format!("sections: '{}' folds (`fold`) and has no `label`, which is its button", s.id));
             }
+            if !s.background && s.label.is_none() {
+                return bad(format!("sections: '{}' has `background: false` and no `label`: a section is a card only with a `label` (its title)", s.id));
+            }
             if s.after.is_some() && s.before.is_some() {
                 return bad(format!("sections: '{}' has `after` and `before`: use one", s.id));
             }
@@ -567,6 +577,19 @@ mod tests {
         // a section that does not fold writes no `fold` key
         let s = serde_json::to_value(with(serde_json::json!({"id": "a", "html": "x"})).unwrap().panel.unwrap().sections).unwrap();
         assert!(s[0].get("fold").is_none(), "{s}");
+    }
+
+    #[test]
+    fn a_card_without_a_background_needs_a_label() {
+        let d = Template::Dashboard.dashboard(Overlay);
+        let with = |v: Value| merge(&d, &serde_json::json!({"panel": {"sections": [v]}}));
+        let s = with(serde_json::json!({"id": "a", "html": "x", "label": "A", "fold": true, "background": false})).unwrap().panel.unwrap().sections;
+        assert!(!s[0].background && s[0].fold);
+        let e = with(serde_json::json!({"id": "a", "html": "x", "background": false})).unwrap_err().to_string();
+        assert!(e.contains("background") && e.contains("label"), "{e}");
+        // a card with a background (the default) writes no `background` key
+        let s = serde_json::to_value(with(serde_json::json!({"id": "a", "html": "x", "label": "A"})).unwrap().panel.unwrap().sections).unwrap();
+        assert!(s[0].get("background").is_none(), "{s}");
     }
 
     #[test]

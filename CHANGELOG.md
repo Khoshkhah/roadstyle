@@ -8,12 +8,20 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 - **The card standard of the panel.** A section that folds is now one card: the section is the box, its title is a flat row with a chevron, and its body opens inside the same card. A closed card is 44 px high and as wide as all other cards. A plain card is `.rs-sec-box` with the new title row `.rs-card-title`. The space of the cards is three CSS variables: `--rs-card-gap` (12px), `--rs-card-pad` (14px) and `--rs-panel-bottom` (28px). Filled controls use `--accent-fill` (`#0E7F91`) with white text. Docs: [Cards: the panel standard](docs/guides/dashboard-panel.md#cards-the-panel-standard).
+- **Every section with a `label` is a card, with or without a background, that folds or not.** The new section option `background: False` gives a card with no colour behind it and the same padding and title row. A section without a `label` is a block of the page's own HTML with no box, as wide as the cards, with the card gap above and below (it had no layout of its own, so its gap changed with its content). Docs: [Cards: the panel standard](docs/guides/dashboard-panel.md#cards-the-panel-standard).
+
+### Changed
+- **The Coverage button of the Street View window is an icon** (a map, with the tooltip "Coverage on the map"), right after the provider switch. The text button made the bar wrap in a 380 px window.
+- A press on the icon of a button in a window's title bar started a drag of the window, so the click was lost. The window's drag now skips every control of the bar and what is inside it.
+- The close button of the Street View and Google 3D windows went to the second row of the title bar when the pointer was on it. The CSS found the button by its `title`, and the tooltip code takes the `title` away on hover. The CSS now finds it by its class `rs-svw-x`.
 
 ### Fixed (card standard)
 - The title row of a section that folds was drawn as a boxed button, because `#sb button` had a higher specificity than the title rules. The title rules now start with `#sb`.
 - "Collapse all" was added after "hide the panel" in the title row, because the template wraps "hide the panel" in a span. It is now added before it.
+- A page could not put a "?" (`rs.help.button`) in the title of a section that folds: the title was one button, and a "?" given the section went to the end of the card. Now `rs.help.button(rs.sections.get(id), ...)` puts the "?" at the right end of the title row, in the same place in every card, and a click on it does not fold the card. The "?" icon in a card was 22 px (the card's chart rule made every SVG as wide as the card); it is 16 px in every box.
 
 ### Changed (breaking)
+- **A section's `label` makes it a card.** A section with a `label` and no `fold` had a small grey heading above the page's HTML, with no box. Now it is a card with the card's title row. A page that put its own `rs-sec-box` in such a section gets a card in a card: remove the `label`, or remove the page's box.
 - **The dashboard's panel starts empty, and a page adds what it needs.** The panel had five built-in blocks (base map, colour by, legend,
   query, selected road), and a page took them away with `dashboard={"panel": {"hide": [...]}}`. Now the panel has only its frame (the
   title, the theme and the hide buttons). A section of `panel.sections` holds the page's own `html` or a part of roadstyle: `"query"` (the

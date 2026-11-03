@@ -10,6 +10,7 @@ import {savedKey} from "./settings.js";
 import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
+const SV_COV_ICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>';   // a folded map
 export let _svWindow = false;
 // with a Maps JavaScript API key (street_view_key=) the window offers Linked - a real panorama that
 // reports every step and turn, so the map marker walks with the viewer - beside Classic, the embed
@@ -41,12 +42,13 @@ export function initStreetView(){
     const w=document.createElement("div"); w.className="rs-svw"+(dock?" rs-svw-dock":""); w.hidden=true;
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Street View</span>'+
       '<span class="rs-svw-prov"></span>'+
-      '<button type="button" class="rs-svw-cov" title="Show where this provider has photos on the map" hidden>Coverage</button>'+
+      // the coverage of the provider that is open: an icon button right after the switch (a text button made the bar wrap in a 380 px window)
+      '<button type="button" class="rs-svw-cov" title="Coverage on the map: where this provider has photos" aria-label="Coverage on the map" hidden>'+SV_COV_ICON+'</button>'+
       '<span class="rs-svw-mode" hidden><button type="button" data-m="linked" title="The map marker walks and turns with you; Google\'s street photos only">Linked</button>'+
       '<button type="button" data-m="classic" title="Google\'s plain Street View: the marker stays where you clicked">Classic</button></span>'+
       '<span class="rs-svw-step"><button type="button" data-step="-15" title="Back 15 m along the road">\u25c0</button>'+
       '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button></span>'+
-      '<button type="button" title="Close">\u2715</button></div>'+
+      '<button type="button" class="rs-svw-x" title="Close">\u2715</button></div>'+
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
       '<iframe title="Google Street View" allowfullscreen hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>';
     document.body.appendChild(w);
@@ -99,7 +101,7 @@ export function initStreetView(){
     const chrome=()=>{                          // what the bar offers for the provider that is chosen
       provBox.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.p===prov));
       flip.hidden = !_svKey || prov!=="google";
-      covBtn.hidden = prov==="google"; covBtn.style.color=""; covBtn.title="Show where this provider has photos on the map"; covBtn.classList.toggle("on", cov);
+      covBtn.hidden = prov==="google"; covBtn.style.color=""; covBtn.title="Coverage on the map: where this provider has photos"; covBtn.classList.toggle("on", cov);
       fr.title = SV_PROVIDERS[prov].title+" Street View"; w.dataset.prov=prov; };
     const drawCov=()=>_spCoverage(!w.hidden && cov ? prov : null, e=>{ covBtn.style.color="#e03131"; covBtn.title="The coverage tiles did not load: "+((e&&e.message)||"check the token in Settings \u2192 Keys"); });
     for(const k in SV_PROVIDERS){

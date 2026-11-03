@@ -84,7 +84,7 @@ Every keyword, with its default, is in [Every parameter](../../reference/paramet
 Give only the keys that you change. The call merges them over the defaults. A wrong key or value is an error. Two examples are above. Every key, with its default and its meaning, is in [Dashboard options](../../reference/parameters.md#dashboard-options). This list shows the keys by group:
 
 - Frame: `layout`, `scale_box`. `template` is a keyword, not a key of `dashboard=`.
-- `panel` (`None` removes the panel): `side`, `width_px`, `look`, `sections`. A section has `id`, `part`, `html`, `text`, `fields`, `label`, `after`, `before` and `fold` ([Add to the panel](../dashboard-panel.md)).
+- `panel` (`None` removes the panel): `side`, `width_px`, `look`, `sections`. A section has `id`, `part`, `html`, `text`, `fields`, `label`, `after`, `before`, `fold` and `background` ([Add to the panel](../dashboard-panel.md)).
 - `toolbar`: `position`, `navigation`, `settings`, `hold`.
 - `legend`: `rows`. A row has `color`, `label` and `shape`.
 - `credits`: a list of `{text, href}`.

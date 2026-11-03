@@ -605,8 +605,8 @@ def test_several_help_buttons_each_with_their_own_words_open_one_window(host):
         for width, height, touch in ((1100, 760, False), (390, 844, True)):
             page, errors = _open_page(browser, base, width, height, "", touch)
             page.evaluate("""() => { rs.sections.add({id: 'one', label: 'One', html: '<p id=p1>First</p>'}); rs.sections.add({id: 'two', label: 'Two', html: '<p id=p2>Second</p>'});
-                rs.help.button(document.querySelector("[data-rs-section=one] label"), {title: 'About one', intro: 'Words of one.', terms: [['a', 'b']], button: 'About section one'});
-                rs.help.button(document.querySelector("[data-rs-section=two] label"), {title: 'About two', html: '<p id=own>Words of two.</p>'}); }""")
+                rs.help.button(rs.sections.get('one'), {title: 'About one', intro: 'Words of one.', terms: [['a', 'b']], button: 'About section one'});
+                rs.help.button(rs.sections.get('two'), {title: 'About two', html: '<p id=own>Words of two.</p>'}); }""")
             if touch:
                 page.evaluate("() => rs.sheet(2)")
                 page.wait_for_timeout(300)

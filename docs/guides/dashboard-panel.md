@@ -13,7 +13,7 @@ A page adds sections with `dashboard={"panel": {"sections": [...]}}`, in their o
     - `"road_card"`: the fields of the selected road. It fills on the event `rs:select` and empties on `rs:deselect`. `fields` is the list of columns that it shows (none: every column).
 - **The page's own HTML** (`html`). Build it from the [shared parts](dashboard-parts.md) of a dashboard.
 
-A section can have a `label` (its heading), `after` or `before` (the id of an earlier section), and `fold: true` (its label is a button that folds it). The keys, with their defaults, are in [Dashboard options](../reference/parameters.md#dashboard-options).
+A section with a `label` is a card, and the label is its title ([Cards: the panel standard](#cards-the-panel-standard)). `fold: true` makes the card fold, and `background: false` takes its colour away. `after` or `before` is the id of an earlier section. The keys, with their defaults, are in [Dashboard options](../reference/parameters.md#dashboard-options).
 
 ```python
 rs.render_dashboard(edges, dashboard={
@@ -21,7 +21,7 @@ rs.render_dashboard(edges, dashboard={
         {"id": "q", "part": "query", "label": "Query", "text": "p.maxspeed_kmh >= 50"},
         {"id": "road", "part": "road_card", "label": "Selected road", "fields": ["name", "highway", "lanes"]},
         {"id": "notes", "label": "Notes", "before": "road",
-         "html": '<p>Your text</p><p class="sb-note">Small print</p><div class="rs-sec-box">In a box</div>'},
+         "html": '<p>Your text</p><p class="sb-note">Small print</p>'},
     ]},
 })
 ```
@@ -35,7 +35,7 @@ These are errors:
 - an unknown `part`;
 - `text` on a part that is not `query`, and `fields` on a part that is not `road_card`;
 - an `after` or `before` that is not an earlier section, or both of them;
-- `fold: true` without a `label`.
+- `fold: true` or `background: false` without a `label`.
 
 There is no `hide`, because the panel has nothing of its own to hide. A page that gives `hide` gets an error that says what to do.
 
@@ -68,19 +68,30 @@ All calls (`add`, `get`, `list`, `hide`, `show`, `remove`, `fold`, `foldAll`, `f
 
 ## Cards: the panel standard
 
-Put each block of a panel in a card. Use the parts below. Do not write your own spacing, padding or corner radius: the panel sets them, and every dashboard then looks the same.
+A section with a `label` is a card. Two options choose which of four kinds of card it is:
+
+| | `background` (default) | `background: false` |
+|---|---|---|
+| does not fold (default) | `{"id", "label", "html"}` | `{"id", "label", "html", "background": False}` |
+| `fold: true` | `{"id", "label", "html", "fold": True}` | `{"id", "label", "html", "fold": True, "background": False}` |
+
+Each kind has the same title row, the same 12 px corners and the same padding (`--rs-card-pad`). A card with `background: false` has no colour behind it. In a card that folds, the title is a button, the row has a chevron, and the body opens inside the same card. A "?" of [`rs.help.button(rs.sections.get(id), ...)`](dashboard-parts.md#a-help-window) is at the right end of the title row, in the same place in every card.
+
+A section without a `label` is not a card. It is a block of the page's own HTML, with no title, no padding and no background, for content that has its own layout: tabs with their panes, a row of number tiles, or the page's own cards. It is as wide as the cards and has `--rs-card-gap` above and below, as a card has. Its first card and its last card do not add a second gap, because their margins join the block's margin.
+
+Do not write your own spacing, padding or corner radius: the panel sets them, and every dashboard then looks the same. Use the parts below:
 
 | What | Use | Result |
 |---|---|---|
-| A card with a title | `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>` | 12 px corners, `--rs-card-pad` inside, `--rs-card-gap` to the next card |
-| A card that folds | `rs.sections.add({id, label, fold: true, html})` | The section is the card. The title row has a chevron. The body opens inside the same card |
+| A card | a section with a `label` (the table above) | The four kinds of card |
+| A card in the page's own HTML (in a tab, or several in one block) | `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>` in a section without a `label` | The same card: 12 px corners, `--rs-card-pad` inside, `--rs-card-gap` to the next card |
 | A number tile | `rs.kpi(...)` in `class="rs-kpis"` | A tile in a grid of three |
 
 Three CSS variables hold the numbers. A page can set them on `:root` to change them for all cards at once:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `--rs-card-gap` | `12px` | The space between two cards |
+| `--rs-card-gap` | `12px` | The space between two cards, and between a card and a section without a label |
 | `--rs-card-pad` | `14px` | The padding inside a card |
 | `--rs-panel-bottom` | `28px` | The space under the last card, at the end of the panel |
 
@@ -88,15 +99,15 @@ A card that is closed shows only its title row. It is 14 + 16 + 14 = 44 px high 
 
 ```python
 rs.render_dashboard(edges, dashboard={"panel": {"sections": [
-    # a plain card with a title
-    {"id": "find", "html": '<div class="rs-sec-box"><div class="rs-card-title">Find</div><input placeholder="Street"></div>'},
-    # a card that folds: the title is the label
-    {"id": "notes", "label": "Notes", "fold": True, "html": "<p>Text of the page</p>"},
+    {"id": "find", "label": "Find", "html": '<input placeholder="Street">'},                      # a card
+    {"id": "notes", "label": "Notes", "fold": True, "html": "<p>Text of the page</p>"},           # a card that folds
+    {"id": "tiles", "label": "Today", "background": False, "html": '<div class="rs-kpis" id="k"></div>'},   # a card with no background
+    {"id": "tabs", "html": '<nav class="rs-tabs">...</nav><div data-pane="a">...</div>'},           # no label: the page's own block
 ]}})
 ```
 
 Rules:
 
-- Do not put an `rs-sec-box` inside a section that folds. The section is already a card, and a box in it makes a card in a card. Put the content directly in `html`.
+- Do not put an `rs-sec-box` inside a section with a `label`. The section is already a card, and a box in it makes a card in a card. Put the content directly in `html`.
 - The buttons in the title row of the panel are in a fixed order: "collapse all" (`#rs-fold-all`) is at the left of "hide the panel" (`#sb-hide`). The panel does this by itself.
 - Use `var(--accent-fill)` (`#0E7F91`) with white text for a filled control (a selected tab, a primary button). Use `var(--accent)` for links and marks. Do not use another teal.

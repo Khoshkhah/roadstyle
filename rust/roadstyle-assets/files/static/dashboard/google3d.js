@@ -25,7 +25,7 @@ export function initGoogle3D(){
       '<span class="rs-svw-mode rs-g3d-view" role="group" aria-label="View"><button type="button" data-v="imagery" class="on" title="Google\'s 3D photos of the city">Imagery</button>'+
       '<button type="button" data-v="map" title="Google\'s drawn 3D map">Map</button></span>'+
       '<button type="button" class="rs-g3d-follow on" title="Follow the map">Following</button>'+
-      '<button type="button" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
+      '<button type="button" class="rs-svw-x" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);

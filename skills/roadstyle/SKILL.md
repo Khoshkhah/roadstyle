@@ -107,7 +107,7 @@ m.save("map.html")                        # m.html is the page as a string
 
 A dashboard is the map, the toolbox and a side panel. Its map is a map page's map, with the same defaults (base map `ofm_positron`,
 `road_popup=True`, the profile's `minzoom`); the template sets no map keyword. **The panel starts empty: add what the page needs.**
-A section is a roadstyle part (`part`: `"query"` with `text`, or `"road_card"` with `fields`) or the page's `html`, with `label`, `after` / `before` (an earlier section) and `fold`. There is no `hide` and no `phone` option: the page turns to its phone form by itself at 700 px or less.
+A section is a roadstyle part (`part`: `"query"` with `text`, or `"road_card"` with `fields`) or the page's `html`, with `label`, `after` / `before` (an earlier section), `fold` and `background`. There is no `hide` and no `phone` option: the page turns to its phone form by itself at 700 px or less.
 
 ```python
 rs.render_dashboard(edges, color_options={"Road class": {}}, dashboard={"panel": {"sections": [
@@ -133,11 +133,13 @@ Fit the content to the panel (its width is `panel.width_px`: "Dashboard options"
 
 ## Dashboard panel standard (use it, do not invent spacing)
 
-Every block of a panel is a card. Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
+Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
 
-- A plain card is `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>`. A card that folds is `rs.sections.add({id, label, fold: true, html})`: the section is the card, and its body opens inside it.
-- **Never put an `rs-sec-box` inside a section that folds.** Put the content in `html`.
-- Never write your own margin, padding or radius for a card. The space is three variables on `:root`: `--rs-card-gap` (12px between cards), `--rs-card-pad` (14px inside), `--rs-panel-bottom` (28px under the last card). A closed card is 44px high.
+- **A section with a `label` is a card**: the label is its title row. `fold: True` makes it fold, `background: False` takes its colour away (four kinds).
+- A section without a `label` is a block of the page's own HTML with no box (tabs, a row of tiles, several cards). A card inside it is `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>`.
+- **Never put an `rs-sec-box` inside a section with a `label`.** Put the content in `html`.
+- A "?" for a card: `rs.help.button(rs.sections.get(id), {title, ...})`. It goes at the right end of the title row, in every card.
+- Never write your own margin, padding or radius for a card. The space is three variables on `:root`: `--rs-card-gap` (12px between cards), `--rs-card-pad` (14px inside), `--rs-panel-bottom` (28px under the last card). A closed card is 44px high. A section without a label has the same gap.
 - In the title row of the panel, "collapse all" is at the left of "hide the panel". The panel does this: do not move the buttons.
 - A filled control (a selected tab, a primary button) is `var(--accent-fill)` (`#0E7F91`) with white text. Links and marks are `var(--accent)`.
 - Tabs (`rs-tabs`) change the pane: the selected tab is filled (`--accent-fill`, white text). A two-way switch (`rs-seg`) changes a mode or a setting: the selected segment is the card colour with `--accent` text. Do not use one for the other's job.

@@ -52,11 +52,13 @@ export const rsHelp = {
   },
   // the page's main words that are set now (a page that puts its own words in for a while sets them again)
   get: () => _hpMain,
-  // one more "?" button, appended to `el` (a card's title, a label), with its own words: {title, intro, terms, note, html, button}. All the buttons open the one window.
-  // It gives the button back.
+  // one more "?" button, at the end of `el` (a card's title, a label), with its own words: {title, intro, terms, note, html, button}. All the buttons
+  // open the one window. `el` can be a section's box (rs.sections.get(id)): the button goes at the end of its title row (the card of a section with a
+  // label, or the `.rs-card-title` of a card in its HTML). It gives the button back.
   button(el, spec){
     if(!(el instanceof Element)) throw new Error("rs.help.button: give the element that the button goes in");
     if(!spec || !spec.title) throw new Error("rs.help.button: the words need a title");
+    if(el.matches(".sb-sec")) el = el.querySelector(":scope > .rs-sec-hd, .rs-card-title") || el;
     const b = _hpButton(spec); el.append(b); return b;
   },
   // takes the window and the main button away

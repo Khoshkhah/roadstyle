@@ -96,7 +96,7 @@ document.getElementById("go").onclick = () => rs.focus(rs.query({highway: "prima
 console.log(rs.sections.list());
 ```
 
-Other calls: `get(id)`, `hide(id)`, `show(id)`, `remove(id)`, `fold(id, on)`, `foldAll(on)` and `folded(id)`. A section with `fold: true` needs a `label`.
+Other calls: `get(id)`, `hide(id)`, `show(id)`, `remove(id)`, `fold(id, on)`, `foldAll(on)` and `folded(id)`. A section with a `label` is a card. A section with `fold: true` or `background: false` needs a `label`.
 
 ## Legend rows and color modes
 

@@ -34,7 +34,7 @@ export function _rsFloat(w, bar, name, left){
     Object.assign(w.style, {left:st.left+"px", top:st.top+"px", right:"auto", bottom:"auto"});
   };
   bar.addEventListener("pointerdown", e=>{    // drag by the title bar
-    if(e.target.tagName==="BUTTON") return;
+    if(e.target.closest("button, a, input, select")) return;   // a control of the bar, or the icon in it (a press on the icon of a button started a drag, and the click was lost)
     const r=w.getBoundingClientRect(), dx=e.clientX-r.left, dy=e.clientY-r.top;
     bar.setPointerCapture(e.pointerId); w.classList.add("rs-drag");   // the iframe mustn't swallow it
     // inside the MAP, not the browser window: a page's side panel covers the rest, and a window

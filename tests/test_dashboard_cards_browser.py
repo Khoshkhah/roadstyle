@@ -65,3 +65,92 @@ def test_the_cards_have_one_width_one_gap_and_a_closed_card_is_44px_high(tmp_pat
 def test_a_page_that_sets_the_gap_variable_gets_that_gap(tmp_path):
     m = _measure(_page(tmp_path, root=":root{--rs-card-gap:20px}"), "light")
     assert m["gaps"] == [20, 20, 20], m["gaps"]
+
+
+_KINDS = [
+    {"id": "card", "label": "A card", "html": "<p>Words</p>"},
+    {"id": "nobg", "label": "No background", "background": False, "html": "<p>Words</p>"},
+    {"id": "fold", "label": "A card that folds", "fold": True, "html": "<p>Words</p>"},
+    {"id": "nobg_fold", "label": "A long title of a card that folds and has no background", "fold": True, "background": False, "html": "<p>Words</p>"},
+    {"id": "block", "html": '<div class="rs-kpis"><div class="rs-kpi">1</div></div><p>A block of the page, no label</p>'},
+    {"id": "own", "html": '<div class="rs-sec-box"><div class="rs-card-title">A card of the page</div><p>Words</p></div>'}]
+
+
+def test_every_kind_of_card_and_a_block_without_a_label_follow_one_standard_and_the_help_button_ends_each_title_row(tmp_path):
+    import geopandas as gpd
+    from shapely.geometry import LineString
+    edges = gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([(18.0, 59.30), (18.0, 59.31)])], crs=4326)
+    path = tmp_path / "k.html"
+    rs.render_dashboard(edges, basemap="blank", dashboard={"panel": {"sections": _KINDS}}).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 1100})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        for theme in ("light", "dark"):
+            m = page.evaluate("""theme => { rsSetTheme(theme); rs.sections.fold('fold', true); rs.sections.fold('nobg_fold', false);
+              if(!document.querySelector('#sb .rs-help-btn')) for(const id of ["card", "nobg", "fold", "nobg_fold", "own"]) rs.help.button(rs.sections.get(id), {title: "About " + id});
+              const r = e => e.getBoundingClientRect(), sec = id => rs.sections.get(id);
+              const box = id => id === "own" ? sec(id).querySelector(".rs-sec-box") : sec(id), ids = ["card", "nobg", "fold", "nobg_fold", "block", "own"];
+              const bs = ids.map(id => r(box(id))), q = id => sec(id).querySelector(".rs-help-btn"), cs = id => getComputedStyle(sec(id));
+              const fold = sec("fold"), tt = fold.querySelector(".rs-sec-title"), chev = fold.querySelector(".rs-sec-hd > svg");
+              return {widths: bs.map(x => Math.round(x.width)), gaps: bs.slice(1).map((x, i) => Math.round(x.top - bs[i].bottom)),
+                      ends: ["card", "nobg", "fold", "nobg_fold", "own"].map(id => Math.round(r(q(id)).right)),
+                      order: r(tt).right <= r(chev).left && r(chev).right <= r(q("fold")).left, inTitle: !!q("fold").closest(".rs-sec-title"),
+                      lastInRow: ["card", "nobg", "fold", "nobg_fold"].every(id => sec(id).querySelector(".rs-sec-hd").lastElementChild === q(id)),
+                      bg: [cs("card").backgroundColor !== "rgba(0, 0, 0, 0)", cs("nobg").backgroundColor, cs("block").backgroundColor],
+                      pad: [cs("nobg").paddingTop, cs("block").paddingTop], shut: r(fold).height, icons: [...document.querySelectorAll("#sb .rs-help-btn svg")].map(e => r(e).width),
+                      noLabel: !sec("block").querySelector(".rs-sec-hd"),
+                      foldAllGap: (() => { const h = document.getElementById("sb-hide"); let w = h; while(w.parentNode !== document.querySelector("#sb .sb-top")) w = w.parentNode;
+                                           return Math.round(r(w).left - r(document.getElementById("rs-fold-all")).right); })()}; }""", theme)
+            assert len(set(m["widths"])) == 1, (theme, m["widths"])                       # the cards, a card without background and a block: one width
+            assert m["gaps"] == [12] * 5, (theme, m["gaps"])                              # and one gap between any two of them
+            assert len(set(m["ends"])) == 1, (theme, m["ends"])                           # the "?" is at the same place in every card
+            assert m["order"] and not m["inTitle"] and m["lastInRow"], (theme, m)        # title, chevron, then the "?" at the end of the row
+            assert m["bg"] == [True, "rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"] and m["pad"] == ["14px", "0px"] and m["noLabel"], (theme, m)
+            assert m["shut"] == 44 and set(m["icons"]) == {16}, (theme, m)
+            assert 0 <= m["foldAllGap"] <= 8, (theme, m["foldAllGap"])                   # "collapse all" is beside "hide the panel", not in the middle of the row
+        page.click("[data-rs-section=fold] .rs-help-btn")
+        assert page.locator("#rs-help .rs-help-ttl").inner_text() == "About fold"
+        assert page.evaluate("rs.sections.get('fold').classList.contains('folded')")             # the "?" opens the help, it does not fold
+        page.keyboard.press("Escape")
+        page.click("[data-rs-section=fold] .rs-sec-title")
+        assert not page.evaluate("rs.sections.get('fold').classList.contains('folded')")
+        assert page.get_attribute("[data-rs-section=fold] .rs-sec-title", "aria-expanded") == "true"
+        assert page.evaluate("rs.sections.get('card').querySelector('.rs-sec-title').tagName") == "DIV"   # a card that does not fold has no button for its title
+        browser.close()
+    assert not errors, errors
+
+
+def test_a_card_that_folds_at_the_end_of_a_scrolled_panel_keeps_its_title_row_in_place(tmp_path):
+    import geopandas as gpd
+    from shapely.geometry import LineString
+    edges = gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([(18.0, 59.30), (18.0, 59.31)])], crs=4326)
+    path = tmp_path / "j.html"
+    tall = "".join(f"<p>Line {i}</p>" for i in range(12))
+    rs.render_dashboard(edges, basemap="blank", dashboard={"panel": {"sections": [{"id": f"c{i}", "label": f"Card {i}", "html": tall} for i in range(3)]
+                                                                     + [{"id": "last", "label": "Last", "fold": True, "html": tall}]}}).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 700})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.evaluate("() => { rs.sections.fold('last', false); const b = document.querySelector('#sb .sb-body'); b.scrollTop = b.scrollHeight; }")
+        hd = "[data-rs-section=last] .rs-sec-hd"
+        y0 = page.locator(hd).bounding_box()["y"]
+        page.click(hd)
+        assert page.evaluate("rs.sections.get('last').classList.contains('folded')")
+        assert abs(page.locator(hd).bounding_box()["y"] - y0) < 1, (y0, page.locator(hd).bounding_box()["y"])   # it did not jump
+        room = "() => parseFloat(document.querySelector('#sb .sb-body').style.getPropertyValue('--rs-fold-room')) || 0"
+        assert page.evaluate(room) > 0
+        page.evaluate("() => { document.querySelector('#sb .sb-body').scrollTop = 0; }")
+        page.wait_for_timeout(100)
+        assert page.evaluate(room) == 0                                                       # the room goes when the panel scrolls up
+        page.click(hd)
+        assert not page.evaluate("rs.sections.get('last').classList.contains('folded')")
+        browser.close()
+    assert not errors, errors
