@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **A "One-way arrows" switch in the base map box**, under *On top*, after Labels. It hides and shows the arrows of the one-way roads. It is on by default, and the box keeps the choice in this browser (`rs-top:arrows`). A page without arrows has no switch.
 - **A day picker for a page: `rs.days.use(el, {days, value, label, onChange})`.** It builds a "Day" label, a field that shows the day and opens a calendar of the days with data, the day before and after, and "Latest". The field has a border, accent icons and an accent hover, so that a person sees that it can be chosen. While `onChange`'s promise runs, the field pulses; if it fails, the old day comes back with a note. Docs: [A day picker](docs/guides/dashboard-parts.md#a-day-picker).
 
 ### Changed
