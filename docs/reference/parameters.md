@@ -258,7 +258,9 @@ A section (`panel.sections`; the errors are in [Add to the panel](../guides/dash
 | `fields` | none | the columns that the part `road_card` shows (none: every column) |
 | `label` | none | the heading of the section |
 | `after`, `before` | none | the `id` of an earlier section: this section goes after it, or before it. Give one of them |
-| `fold` | `False` | `True`: the label is a button that folds the section. It needs a `label` |
+| `fold` | `False` | `True`: the label is a button that folds the section. It needs a `label`. The section is then one card |
+
+The space of the cards is three CSS variables on `:root`: `--rs-card-gap` (12px, between two cards), `--rs-card-pad` (14px, inside a card) and `--rs-panel-bottom` (28px, under the last card). See [Cards: the panel standard](../guides/dashboard-panel.md#cards-the-panel-standard).
 
 There is no `hide` key and no `phone` option. The page turns to its phone form by itself when the window is 700 px wide or less (a phone, or a narrow desktop window), with the bar at the top. The page data holds these fixed values as `phone.max_width_px` (700) and `phone.toolbar` (top). `dashboard=` cannot change them.
 

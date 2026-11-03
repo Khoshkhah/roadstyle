@@ -10,6 +10,8 @@ The panel starts empty. Two parts are whole sections that roadstyle writes: the 
 | [`rs.help.set({title, intro, terms, note})`](#a-help-window) | the "?" button in the panel title and its window | "How to read this page" |
 | [`rs.help.button(el, {title, ...})`, `rs.help.open({title, ...})`](#a-help-window) | one more "?" button with its own words, and the same window opened from a link | a card, a label |
 | `rs.sections.add({..., label, fold: true})` | a section that folds; one button in the title row folds all of them, and the state is kept ([Add to the panel](dashboard-panel.md)) | the page's cards |
+| [`class="rs-card-title"`](dashboard-panel.md#cards-the-panel-standard) | the title row of a plain card: the same row as the title of a card that folds | the first row in an `rs-sec-box` |
+| [`--rs-card-gap`, `--rs-card-pad`, `--rs-panel-bottom`](dashboard-panel.md#cards-the-panel-standard) | the space between cards (12 px), inside a card (14 px), under the last card (28 px) | a page that needs other numbers, set on `:root` |
 | [`rs.hover.show(html, event)`, `rs.hover.on(node, html)`](#a-hover-box) | the hover box, in the look of the popup | words over a chart or a map layer |
 | [`class="rs-tabs"` + `rs.tabs.use(nav, onChange)`](#tabs-and-a-two-way-switch) | tabs, and `rs-seg` for a two-way switch | the sections of a page, a mode |
 | [`class="rs-sec-box"`](#cards-number-tiles-and-a-callout) | a card; an `h3` and the paragraph after it are its title and description | one block of a page |
