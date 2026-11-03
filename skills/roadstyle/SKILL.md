@@ -106,7 +106,9 @@ m.save("map.html")                        # m.html is the page as a string
 ## A dashboard page
 
 A dashboard is the map, the toolbox and a side panel. Its map is a map page's map, with the same defaults (base map `ofm_positron`,
-`road_popup=True`, the profile's `minzoom`); the template sets no map keyword. **The panel starts empty: add what the page needs.**
+`road_popup=True`, the profile's `minzoom`); the template sets no map keyword. The profile's `minzoom` hides minor classes when zoomed out
+(residential below 13, footway below 15). **On a page whose roads carry data (flow, speed, a model's result), give `minzoom=False`**, so that
+every road with data shows at every zoom. **The panel starts empty: add what the page needs.**
 A section is a roadstyle part (`part`: `"query"` with `text`, or `"road_card"` with `fields`) or the page's `html`, with `label`, `after` / `before` (an earlier section), `fold` and `background`. There is no `hide` and no `phone` option: the page turns to its phone form by itself at 700 px or less.
 
 ```python
