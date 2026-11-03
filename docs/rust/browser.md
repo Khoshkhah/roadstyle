@@ -365,6 +365,13 @@ const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs, 
 - `colors` (each optional, also without `host`): `select` is road 1 of the panel, `second` is road 2, `hover` is the hover of the
   editor's own map.
 
+The editor's engine (its worker, the `LevelArea` in it and the parse of the area's files) takes seconds to make, so the editor keeps it. With `host` and
+`levels.edge_hash`, `destroy()` leaves the engine alive, and the next `levelEditor` with the same `edge_hash` and the same `store` uses it: the open then
+starts no worker and loads no area (Burnaby: 0.4 s, against 1.4 s). `prepareEditor({store, pkgUrl, look, edgeHash})` (exported) makes the engine ahead of
+the first open, in the background, for example when the page is idle after it drew the map: the open then waits only for what is left. A new
+`edge_hash` (the area's edges changed) ends the old engine and makes a new one. Each open reads the small files again (`edits.csv`, `heads.csv`, `caps.csv`,
+`levels.csv`) and gives the engine the map's levels (`startFrom`).
+
 A test keeps the open fast: with `host`, the editor's worker gets no `build`, `draw` or `tile` call at open or at a change
 (`tests/test_level_editor_page.py`).
 

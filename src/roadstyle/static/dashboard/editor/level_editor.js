@@ -123,6 +123,47 @@ function levelsHelp(c, back){
     note: `More in the guide: <a href="${DOCS}#edit-the-levels" target="_blank" rel="noopener">Edit the levels</a> and <a href="${DOCS}#edit-the-levels-in-a-dashboard" target="_blank" rel="noopener">Edit the levels in a dashboard</a>.`};
 }
 
+// --- the engine of an area: the worker with its LevelArea and what the editor knows of the roads. It takes seconds to make (the worker's module, the
+// roads' file, the area's parse), so a host that gives the same `levels.edge_hash` again gets the same engine: `destroy()` keeps it, and
+// `prepareEditor` makes it before the first open (when the host is idle). One engine for each store key.
+const engines = new Map();                                       // store key -> {token: edge_hash, ready: Promise of the engine}
+const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", typeof d === "string" ? new TextEncoder().encode(d) : d))]
+  .map(b => b.toString(16).padStart(2, "0")).join("");
+async function startEngine({store, pkgUrl, lookText, boundary}){
+  const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
+  const call = caller(worker);
+  try {
+    const init = call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), base: lookText,
+      look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundary ? {boundary} : {})}})});
+    const [roadsF, pairsF] = await Promise.all([store.load("roads.parquet", true), store.load("pairs.csv")]);
+    if(!roadsF || !pairsF) throw new Error("the store has no roads.parquet or pairs.csv: make the area first (makeArea, or roadstyle levels make)");
+    const roadsBytes = roadsF.body.slice();
+    // the inputs of a solve, by their content (the SHA-256 of roads.parquet, pairs.csv and edits.csv): levels.csv is for them when its
+    // levels_info.json has the same key, also after a page wrote the same area again (a file's time says nothing then). heads.csv and caps.csv
+    // are drawing only: they are not inputs of the solve.
+    const areaKey = `${await sha(roadsBytes)}:${await sha(pairsF.body)}`;
+    await init;
+    const order = (await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer])).roads;   // the road ids, in the roads' order
+    // pairs.csv's lines: the panel's found rules of a road come from them when it asks (relations); the open does not parse them
+    const pairLines = pairsF.body.split(/\r?\n/).filter(l => l.trim());
+    // what the page knows of the roads, asked from the worker when the panel needs them: any edge id -> its road id
+    return {worker, call, areaKey, order, pairLines, roadOf: Object.fromEntries(order.map(r => [r, r]))};
+  } catch(e){ worker.terminate(); throw e; }
+}
+const SENT = {select: "#fe0a01", hover: "#fe0a02"};                 // (the editor's sentinel colours, see levelEditor)
+
+/** Makes the engine of the area in `store` before `levelEditor` is called, in the background: the next `levelEditor({host, levels, ...})` with the same
+ * `levels.edge_hash` (and `store`) finds it and opens at once. Give `look` and `pkgUrl` as for levelEditor. A Promise; an error is also kept for the open. */
+export function prepareEditor({store, pkgUrl, look = null, edgeHash}){
+  const k = store.key ?? "area", old = engines.get(k);
+  if(old?.token === edgeHash) return old.ready.then(() => {});
+  if(old) old.ready.then(e => e.worker.terminate(), () => {});
+  const ready = startEngine({store, pkgUrl, lookText: look});
+  engines.set(k, {token: edgeHash, ready});
+  ready.catch(() => { if(engines.get(k)?.ready === ready) engines.delete(k); });
+  return ready.then(() => {});
+}
+
 /** The level editor on `map` (or a map of its own in `container`), with the panel in `container`; see the file's head. A page has one
  * dashboard (its state is the module's): on a host map that has one, give it as `dashboard` with the `prefix` it was made with; the
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
@@ -137,7 +178,6 @@ export async function levelEditor({map = null, container = document.body, panel,
 const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", hover2: "#82b1ff", ...colors};
 // The dashboard has one select colour and one hover colour for every road; the editor wants road 1 red and road 2 blue, and the hover of the road
 // that would be the next pick lighter in its colour. The look gets two sentinel colours, which `highlight` replaces in the road layers' paint.
-const SENT = {select: "#fe0a01", hover: "#fe0a02"};
 // On a host's roads (`host`) the colours to swap are the host's own select and hover colours, from its look (the look's interaction colours, else its selection section)
 const hostLook = host && lookText ? JSON.parse(lookText) : null;
 const FIND = !host ? SENT : {select: hostLook?.map?.interaction?.select_color ?? hostLook?.selection?.select ?? "\0",
@@ -178,34 +218,29 @@ function highlight(groups){
 const reads = await fetch(new URL("../reads.json", import.meta.url));
 if(!reads.ok) throw new Error(`level editor: the dashboard's reads.json (${reads.status})`);
 const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road", "modes"];   // "modes": the panel's mode box
-// the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
-const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
-const call = caller(worker);
-// the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
-const boundaryF = map ? null : await store.load("boundary.geojson");
-await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), base: lookText,
-  look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundaryF ? {boundary: JSON.parse(boundaryF.body)} : {})}})});
+// the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page. With `host` and `levels.edge_hash`, the engine of this
+// area is the one that an earlier open (or prepareEditor) made, when it has the same hash: `destroy()` keeps it for the next open.
+const engKey = store.key ?? "area", token = host && given ? given.edge_hash : undefined;
+let eng = null;
+const kept = engines.get(engKey);
+if(kept && token !== undefined && kept.token === token){
+  try { eng = await kept.ready; } catch(e){ eng = null; }
+}
+if(!eng){
+  if(kept){ engines.delete(engKey); kept.ready.then(e => e.worker.terminate(), () => {}); }
+  // the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
+  const boundaryF = map ? null : await store.load("boundary.geojson");
+  eng = await startEngine({store, pkgUrl, lookText, boundary: boundaryF ? JSON.parse(boundaryF.body) : null});
+}
+engines.delete(engKey);                                          // in use: destroy() puts it back (host), or ends it
+const {worker, call, areaKey, order, pairLines, roadOf} = eng;
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
 const get = (n, bytes) => store.load(n, bytes);
-const [roadsF, pairsF, editsF, headsF, capsF, levelsF, infoF] = await Promise.all([get("roads.parquet", true), get("pairs.csv"), get("edits.csv"),
-  get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
-if(!roadsF || !pairsF) throw new Error("the store has no roads.parquet or pairs.csv: make the area first (makeArea, or roadstyle levels make)");
-const roadsBytes = roadsF.body.slice();
-// the inputs of a solve, by their content (the SHA-256 of roads.parquet, pairs.csv and edits.csv): levels.csv is for them when its
-// levels_info.json has the same key, also after a page wrote the same area again (a file's time says nothing then). heads.csv and caps.csv
-// are drawing only: they are not inputs of the solve.
-const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", typeof d === "string" ? new TextEncoder().encode(d) : d))]
-  .map(b => b.toString(16).padStart(2, "0")).join("");
-const areaKey = `${await sha(roadsBytes)}:${await sha(pairsF.body)}`;
+const [editsF, headsF, capsF, levelsF, infoF] = await Promise.all([get("edits.csv"), get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
 const inputsKey = async edits => `${areaKey}:${await sha(edits)}`;
-const order = (await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer])).roads;   // the road ids, in the roads' order
-// pairs.csv's lines: the panel's found rules of a road come from them when it asks (relations); the open does not parse them
-const pairLines = pairsF.body.split(/\r?\n/).filter(l => l.trim());
-// what the page knows of the roads, asked from the worker when the panel needs them (need): any edge id -> its road id, and a road's
-// facts (with its levels and ends). A new answer clears the facts.
-const roadOf = Object.fromEntries(order.map(r => [r, r]));
+// the facts of a road, asked from the worker when the panel needs them (need). A new answer clears the facts.
 let facts = {};
 async function need(ids){
   ids = [...new Set(ids.filter(x => x != null && x !== "").map(String))];
@@ -629,7 +664,8 @@ async function download(name){
  * on a host map, the host's roads that it took off go back in their places, with the host's road table and dashboard style. Your
  * files stay in the store. A map of its own is removed. */
 function destroy(){
-  worker.terminate();
+  if(token !== undefined) engines.set(engKey, {token, ready: Promise.resolve(eng)});     // the engine waits for the next open of this area
+  else worker.terminate();
   map.off("click", tap);
   document.removeEventListener("rs:select", heardPick);
   window.rsColor?.(null);                                        // the colour of the picked roads (the panel's paint) and their glow stay on the map otherwise

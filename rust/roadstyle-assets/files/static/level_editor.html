@@ -490,8 +490,8 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
     if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
-    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap} · ${name(q.road)}`
-      : q.op === "head" ? `${q.end} head ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `cap ${q.end} ${q.end === "start" ? "●" : "○"} ${q.cap} · ${name(q.road)}`
+      : q.op === "head" ? `head ${q.end} ${q.end === "start" ? "●" : "○"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
       : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
   }

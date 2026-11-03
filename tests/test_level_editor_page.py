@@ -160,12 +160,12 @@ window.hostLookText = hostLook.toJson();
 window.workerCalls = [];                                         // the types of the messages to any worker (the editor's worker is made inside levelEditor)
 const post = Worker.prototype.postMessage;
 Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string") window.workerCalls.push(m.type); return post.call(this, m, ...r); };
-window.openHosted = async () => {
+window.openHosted = async (levels) => {
   window.RS_SIDE = hostSide;
   window.workerCalls.length = 0;
   const t = performance.now();
   window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-",
-    host: {replaceRoads: async rows => { window.replaced.push(rows); }}, look: window.hostLookText});
+    host: {replaceRoads: async rows => { window.replaced.push(rows); }}, look: window.hostLookText, levels});
   return performance.now() - t;
 };
 if(!withBase) await window.openEditor();
@@ -360,6 +360,20 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             page.evaluate("window.editor.destroy()")
             assert sel in page.evaluate(paint) and "#00ff00" not in page.evaluate(paint) and "#e53935" not in page.evaluate(paint), "the host's own paint is back"
             assert page.evaluate("window.RS_SIDE.props.every(p => !('road' in p) && !('s_lon' in p)) && !window.RS_SIDE.lvFields")
+            # the engine is kept: with the same edge hash, the next open has no init and no open call (the worker and its area are the first open's),
+            # and prepareEditor makes it before the open
+            page.evaluate("([csv, h]) => openHosted({csv, edge_hash: h})", [levels_csv, hsh])
+            first = page.evaluate("window.workerCalls")
+            assert "init" in first and "open" in first, first
+            page.evaluate("window.editor.destroy()")
+            page.evaluate("([csv, h]) => openHosted({csv, edge_hash: h})", [levels_csv, hsh])
+            again = page.evaluate("window.workerCalls")
+            assert "init" not in again and "open" not in again and "levelsOf" in again, again
+            assert page.evaluate("window.editor.answer().resolve.how") in ("stored", "given")
+            page.evaluate("window.editor.destroy()")
+            page.evaluate("([csv, h]) => openHosted({csv, edge_hash: '0' + h.slice(1)})", [levels_csv, hsh])        # another hash: a new engine
+            assert "open" in page.evaluate("window.workerCalls")
+            page.evaluate("window.editor.destroy()")
             print(f"host open: {ms:.0f} ms")
             assert not [e for e in errors if e != "boom"], errors      # "boom": the stopped worker's own error, which the page reports too
             b.close()
