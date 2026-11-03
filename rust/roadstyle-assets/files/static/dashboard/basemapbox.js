@@ -8,6 +8,7 @@
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
+import {rsArrowsOn, rsSetArrows, rsHasArrows} from "./arrows.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
 const _bxGet = k => { try{ return localStorage.getItem("rs-top:" + k); }catch(e){ return null; } };
@@ -63,6 +64,8 @@ export function buildBox(menu){
     tops.buildings.c.disabled = !vec || own; tops.buildings.c.checked = vec && !own && rsBuildings();
     tops.buildings.lab.classList.toggle("rs-bm-off", !vec || own);
     tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
+    const hasArrows = rsHasArrows();                  // the arrow layers of the roads: the row is off while the page has none
+    tops.arrows.c.checked = rsArrowsOn(); tops.arrows.c.disabled = !hasArrows; tops.arrows.lab.classList.toggle("rs-bm-off", !hasArrows);
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
     raster("hillshade", tops.hillshade.c.checked, ontop.hillshade);
@@ -73,6 +76,7 @@ export function buildBox(menu){
   topRow("hillshade", "Hillshade").checked = _bxGet("hillshade") === "1";
   topRow("labels", "Labels");
   topRow("buildings", "3D buildings");
+  topRow("arrows", "Arrows");
   // the style's own base-map layers (the overlays of roadstyle:controls): one switch for all of them, in a group of its own, and only for a style that has them
   const layers = _bxEl("div", "rs-bm-layers"), lrow = _bxEl("label", "rs-bm-row"), lc = _bxEl("input"), lname = _bxEl("span", "rs-bm-n");
   lc.type = "checkbox"; lrow.append(lc, lname); layers.append(_bxEl("hr"), lrow); menu.appendChild(layers);
@@ -83,12 +87,14 @@ export function buildBox(menu){
   tops.hillshade.c.onchange = () => { _bxSet("hillshade", tops.hillshade.c.checked); apply(); };
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
   tops.buildings.c.onchange = () => rsBuildingsByPerson(tops.buildings.c.checked);
+  tops.arrows.c.onchange = () => rsSetArrows(tops.arrows.c.checked);
   const mark = () => rows.forEach(([b, r]) => { r.checked = b.key === current || b.dark === current; });
   // a map with a twin shows the swatch of the twin of the current theme
   const swatches = () => rows.forEach(([b, , sw]) => { const tw = b.dark && byKey(b.dark); sw.style.background = _bxSwatch(isDark() && tw ? tw : b); });
   document.addEventListener("rs:basemapchange", e => { current = e.detail.basemap; mark(); setTimeout(apply, 0); });
   document.addEventListener("rs:basemapready", apply);
-  for(const ev of ["rs:buildingschange", "rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, apply);
+  for(const ev of ["rs:buildingschange", "rs:overlaychange", "rs:overlayschange", "rs:arrowschange"]) document.addEventListener(ev, apply);
+  map.on("idle", () => { const h = rsHasArrows(); if(tops.arrows.c.disabled === h) apply(); });         // the roads (and their arrows) come after the box
   document.addEventListener("rs:themechange", swatches);
   map.on("load", apply);
   mark(); swatches(); apply();

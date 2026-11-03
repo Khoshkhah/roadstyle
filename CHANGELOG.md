@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **An "Arrows" switch in the base-map box**, under *On top*, after 3D buildings. It shows or hides the one-way arrows of the roads (the symbol layers of the role `arrows` or with the one-way icon). The choice is kept in the browser (`rs-top:arrows`), the row is off while the page has no arrow layer, and the event `rs:arrowschange` tells a page. `rsSetArrows(on)`, `rsArrowsOn()` and `rsHasArrows()` are in `dashboard/arrows.js`.
+
 ## [0.27.0] - 2026-11-03
 
 ### Added
