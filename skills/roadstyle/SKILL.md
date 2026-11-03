@@ -140,7 +140,7 @@ Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
 - **A section with a `label` is a card**: the label is its title row. `fold: True` makes it fold, `background: False` takes its colour away (four kinds).
 - A section without a `label` is a block of the page's own HTML with no box (tabs, a row of tiles, several cards). A card inside it is `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>`.
 - **Never put an `rs-sec-box` inside a section with a `label`.** Put the content in `html`.
-- A "?" for a card: `rs.help.button(rs.sections.get(id), {title, ...})`. It goes at the right end of the title row, in every card.
+- A "?" for a card: `rs.help.button(rs.sections.get(id), {title, ...})`. It goes at the right end of the title row, before the chevron of a card that folds.
 - Never write your own margin, padding or radius for a card. The space is three variables on `:root`: `--rs-card-gap` (12px between cards), `--rs-card-pad` (14px inside), `--rs-panel-bottom` (28px under the last card). A closed card is 44px high. A section without a label has the same gap.
 - In the title row of the panel, "collapse all" is at the left of "hide the panel". The panel does this: do not move the buttons.
 - A filled control (a selected tab, a primary button) is `var(--accent-fill)` (`#0E7F91`) with white text. Links and marks are `var(--accent)`.

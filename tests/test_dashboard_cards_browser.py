@@ -76,7 +76,7 @@ _KINDS = [
     {"id": "own", "html": '<div class="rs-sec-box"><div class="rs-card-title">A card of the page</div><p>Words</p></div>'}]
 
 
-def test_every_kind_of_card_and_a_block_without_a_label_follow_one_standard_and_the_help_button_ends_each_title_row(tmp_path):
+def test_every_kind_of_card_and_a_block_without_a_label_follow_one_standard_and_the_help_button_is_before_the_chevron(tmp_path):
     import geopandas as gpd
     from shapely.geometry import LineString
     edges = gpd.GeoDataFrame({"highway": ["primary"]}, geometry=[LineString([(18.0, 59.30), (18.0, 59.31)])], crs=4326)
@@ -97,9 +97,10 @@ def test_every_kind_of_card_and_a_block_without_a_label_follow_one_standard_and_
               const bs = ids.map(id => r(box(id))), q = id => sec(id).querySelector(".rs-help-btn"), cs = id => getComputedStyle(sec(id));
               const fold = sec("fold"), tt = fold.querySelector(".rs-sec-title"), chev = fold.querySelector(".rs-sec-hd > svg");
               return {widths: bs.map(x => Math.round(x.width)), gaps: bs.slice(1).map((x, i) => Math.round(x.top - bs[i].bottom)),
-                      ends: ["card", "nobg", "fold", "nobg_fold", "own"].map(id => Math.round(r(q(id)).right)),
-                      order: r(tt).right <= r(chev).left && r(chev).right <= r(q("fold")).left, inTitle: !!q("fold").closest(".rs-sec-title"),
-                      lastInRow: ["card", "nobg", "fold", "nobg_fold"].every(id => sec(id).querySelector(".rs-sec-hd").lastElementChild === q(id)),
+                      ends: ["card", "nobg", "own"].map(id => Math.round(r(q(id)).right)), foldEnds: ["fold", "nobg_fold"].map(id => Math.round(r(q(id)).right)),
+                      order: r(tt).right <= r(q("fold")).left && r(q("fold")).right <= r(chev).left, inTitle: !!q("fold").closest(".rs-sec-title"),
+                      lastInRow: ["card", "nobg"].every(id => sec(id).querySelector(".rs-sec-hd").lastElementChild === q(id))
+                                 && ["fold", "nobg_fold"].every(id => sec(id).querySelector(".rs-sec-hd").lastElementChild.tagName === "svg"),
                       bg: [cs("card").backgroundColor !== "rgba(0, 0, 0, 0)", cs("nobg").backgroundColor, cs("block").backgroundColor],
                       pad: [cs("nobg").paddingTop, cs("block").paddingTop], shut: r(fold).height, icons: [...document.querySelectorAll("#sb .rs-help-btn svg")].map(e => r(e).width),
                       noLabel: !sec("block").querySelector(".rs-sec-hd"),
@@ -107,8 +108,8 @@ def test_every_kind_of_card_and_a_block_without_a_label_follow_one_standard_and_
                                            return Math.round(r(w).left - r(document.getElementById("rs-fold-all")).right); })()}; }""", theme)
             assert len(set(m["widths"])) == 1, (theme, m["widths"])                       # the cards, a card without background and a block: one width
             assert m["gaps"] == [12] * 5, (theme, m["gaps"])                              # and one gap between any two of them
-            assert len(set(m["ends"])) == 1, (theme, m["ends"])                           # the "?" is at the same place in every card
-            assert m["order"] and not m["inTitle"] and m["lastInRow"], (theme, m)        # title, chevron, then the "?" at the end of the row
+            assert len(set(m["ends"])) == 1 and len(set(m["foldEnds"])) == 1, (theme, m)  # the "?" is at one place in the cards without a chevron, and at one place in the cards that fold
+            assert m["order"] and not m["inTitle"] and m["lastInRow"], (theme, m)        # title, "?", then the chevron at the end of the row (decided 2026-11-03)
             assert m["bg"] == [True, "rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"] and m["pad"] == ["14px", "0px"] and m["noLabel"], (theme, m)
             assert m["shut"] == 44 and set(m["icons"]) == {16}, (theme, m)
             assert 0 <= m["foldAllGap"] <= 8, (theme, m["foldAllGap"])                   # "collapse all" is beside "hide the panel", not in the middle of the row

@@ -32,7 +32,7 @@ function _fdSetOne(w, on){
   _fdSet(w.dataset.rsSection, on);
   _emit("rs:sectionchange", {id: w.dataset.rsSection, state: on ? "fold" : "unfold"});
 }
-// a section with a label is a card: the title row (the title, the chevron of a card that folds, then a "?" of rs.help.button at the end), and the body.
+// a section with a label is a card: the title row (the title, a "?" of rs.help.button, then the chevron of a card that folds at the end), and the body.
 // A card that folds has its title as a button (for the keyboard and a screen reader), and a click anywhere in the row folds it.
 function _cardMake(w, spec){
   w.dataset.rsCard = spec.background === false ? "no-bg" : "bg";
