@@ -3,6 +3,10 @@
    is 4.6:1 on the light panel's cards (the logo teal is 4.43:1 there). On the dark panel the teal is lighter, of the same hue: 8.5:1 on the panel's background. `--accent-fill` is the colour of a filled control (a selected tab, a primary button, a mode
    on): its text is white in both themes (4.71:1), so the fill does not get lighter in the dark theme. */
 :root{--accent:#0e7c8e;--accent-fill:#0E7F91}
+/* THE CARD STANDARD of the panel (docs/guides/dashboard-panel.md, "Cards: the panel standard"): the three numbers a page may change in one place.
+   --rs-card-gap: the space between two cards. --rs-card-pad: the padding inside a card (a closed card is 14 + 16 + 14 = 44px high with the default).
+   --rs-panel-bottom: the room under the last card at the end of the panel. */
+:root{--rs-card-gap:12px;--rs-card-pad:14px;--rs-panel-bottom:28px}
 html[data-rs-theme=dark],#sb[data-theme=dark]{--accent:#42c2d7}
 /* the theme's tokens for every part of the page (the boxes, the windows, the popup), the same values as the panel's (#sb, below) */
 :root{--bg:#fff;--ink:#16181d;--mut:#6b7280;--line:#e6e8ec;--card:#f7f8fa}
@@ -441,7 +445,7 @@ html #sb{padding:0;overflow:hidden}
 html .sb-card{display:flex;flex-direction:column;height:100%;min-height:0;box-sizing:border-box}
 html .sb-top{flex:none;margin:0;padding:14px 15px 10px;position:relative;z-index:1;transition:box-shadow .15s}
 html :is(.sb-top,.rs-phead).scrolled{box-shadow:0 1px 0 var(--line,var(--rs-tb-border)),0 8px 10px -8px rgba(0,0,0,.35)}
-html .sb-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px 14px}
+html .sb-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px var(--rs-panel-bottom)}
 html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display:flex;flex-direction:column;overflow:hidden;padding:0;border-radius:14px}
 /* ---- the side of the panel (placement.js: <html class="rs-panel-left">) ---- */
 html.rs-panel-left #sb,html.rs-panel-left .rs-side{left:0;right:auto}
@@ -509,11 +513,14 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 /* ---- the panel's sections (sections.js): a box with no layout of its own, and the page's rows in the panel's legend ---- */
 .sb-sec{display:contents}
 .sb-sec[hidden]{display:none}
-/* a section that folds (sections.js, `fold: true`): its label is a button with a chevron; what follows the label is its body */
-.sb-sec[data-rs-fold]{display:block;margin:0 0 6px}
-.sb-sec .rs-sec-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:6px 0;border:0;background:none;color:var(--mut);font:600 11px/1.2 system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;text-align:left;cursor:pointer}
-.sb-sec .rs-sec-hd:hover{color:var(--ink)}
-.sb-sec .rs-sec-hd:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
+/* a section that folds (sections.js, `fold: true`) is ONE CARD: the section is the box (the look of `.rs-sec-box`, below), its title is a flat row with a
+   chevron, and its body opens inside the same box. A closed card is the title row only. The title row has `#sb button` over it (specificity 1,0,1), so
+   its rules start with `#sb` to win: without it the title was drawn as a boxed button. */
+.sb-sec[data-rs-fold]{display:block;margin:var(--rs-card-gap) 0;padding:var(--rs-card-pad);border-radius:12px;background:var(--card);color:var(--ink)}
+#sb .sb-sec .rs-sec-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:16px;margin:0 0 10px;padding:0;border:0;border-radius:0;background:none;color:var(--ink);font:600 12px/16px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;text-align:left;cursor:pointer}
+#sb .sb-sec.folded .rs-sec-hd{margin-bottom:0}
+#sb .sb-sec .rs-sec-hd:hover{color:var(--accent);border-color:transparent}
+#sb .sb-sec .rs-sec-hd:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
 .sb-sec .rs-sec-hd svg{flex:none;transition:transform .15s}
 .sb-sec.folded .rs-sec-hd svg{transform:rotate(-90deg)}
 .sb-sec.folded .rs-sec-body{display:none}
@@ -531,7 +538,10 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 .sb-sec table{width:100%;border-collapse:collapse;font-size:12px}
 .sb-sec :is(td,th){padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;color:var(--ink)}
 .sb-sec th{color:var(--mut);font-weight:600}
-.sb-sec :is(.rs-sec-box,details){background:var(--card);color:var(--ink);border-radius:12px;padding:8px 10px;margin:6px 0}
+/* a card (the standard, docs/guides/dashboard-panel.md): 12px corners, --rs-card-pad inside, --rs-card-gap between two cards (the vertical margins of two cards collapse
+   to this one number). Its title is the first row inside it, `.rs-card-title`: the same row as the title of a card that folds. */
+.sb-sec :is(.rs-sec-box,details){background:var(--card);color:var(--ink);border-radius:12px;padding:var(--rs-card-pad);margin:var(--rs-card-gap) 0}
+.sb-sec .rs-card-title{min-height:16px;margin:0 0 10px;font:600 12px/16px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
 .sb-sec summary{cursor:pointer;font-weight:600}
 
 /* ---- the scrollbar of the panel is at its outer edge (decided 2026-10-29): a left panel has it at the left, a right panel at the right. A scroll box with
