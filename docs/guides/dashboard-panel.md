@@ -65,3 +65,38 @@ rs.ready(() => {
 ```
 
 All calls (`add`, `get`, `list`, `hide`, `show`, `remove`, `fold`, `foldAll`, `folded`) and the event `rs:sectionchange` are in the [JavaScript API](../reference/javascript.md#the-rs-object). The legend has `rs.legend`, which is in the same table.
+
+## Cards: the panel standard
+
+Put each block of a panel in a card. Use the parts below. Do not write your own spacing, padding or corner radius: the panel sets them, and every dashboard then looks the same.
+
+| What | Use | Result |
+|---|---|---|
+| A card with a title | `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>` | 12 px corners, `--rs-card-pad` inside, `--rs-card-gap` to the next card |
+| A card that folds | `rs.sections.add({id, label, fold: true, html})` | The section is the card. The title row has a chevron. The body opens inside the same card |
+| A number tile | `rs.kpi(...)` in `class="rs-kpis"` | A tile in a grid of three |
+
+Three CSS variables hold the numbers. A page can set them on `:root` to change them for all cards at once:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `--rs-card-gap` | `12px` | The space between two cards |
+| `--rs-card-pad` | `14px` | The padding inside a card |
+| `--rs-panel-bottom` | `28px` | The space under the last card, at the end of the panel |
+
+A card that is closed shows only its title row. It is 14 + 16 + 14 = 44 px high with the default padding, and it is as wide as all other cards.
+
+```python
+rs.render_dashboard(edges, dashboard={"panel": {"sections": [
+    # a plain card with a title
+    {"id": "find", "html": '<div class="rs-sec-box"><div class="rs-card-title">Find</div><input placeholder="Street"></div>'},
+    # a card that folds: the title is the label
+    {"id": "notes", "label": "Notes", "fold": True, "html": "<p>Text of the page</p>"},
+]}})
+```
+
+Rules:
+
+- Do not put an `rs-sec-box` inside a section that folds. The section is already a card, and a box in it makes a card in a card. Put the content directly in `html`.
+- The buttons in the title row of the panel are in a fixed order: "collapse all" (`#rs-fold-all`) is at the left of "hide the panel" (`#sb-hide`). The panel does this by itself.
+- Use `var(--accent-fill)` (`#0E7F91`) with white text for a filled control (a selected tab, a primary button). Use `var(--accent)` for links and marks. Do not use another teal.

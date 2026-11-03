@@ -131,6 +131,17 @@ rs.render_dashboard(edges, color_options={"Road class": {}}, dashboard={"panel":
 `rs.ready`, `rs.classify`): see `docs/guides/dashboard-parts.md`. **Use a part when one exists; never write CSS or JavaScript for the same thing in a page.**
 Fit the content to the panel (its width is `panel.width_px`: "Dashboard options" in `docs/reference/parameters.md`).
 
+## Dashboard panel standard (use it, do not invent spacing)
+
+Every block of a panel is a card. Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
+
+- A plain card is `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>`. A card that folds is `rs.sections.add({id, label, fold: true, html})`: the section is the card, and its body opens inside it.
+- **Never put an `rs-sec-box` inside a section that folds.** Put the content in `html`.
+- Never write your own margin, padding or radius for a card. The space is three variables on `:root`: `--rs-card-gap` (12px between cards), `--rs-card-pad` (14px inside), `--rs-panel-bottom` (28px under the last card). A closed card is 44px high.
+- In the title row of the panel, "collapse all" is at the left of "hide the panel". The panel does this: do not move the buttons.
+- A filled control (a selected tab, a primary button) is `var(--accent-fill)` (`#0E7F91`) with white text. Links and marks are `var(--accent)`.
+- Tabs (`rs-tabs`) change the pane: the selected tab is filled (`--accent-fill`, white text). A two-way switch (`rs-seg`) changes a mode or a setting: the selected segment is the card colour with `--accent` text. Do not use one for the other's job.
+
 ## Check the result
 
 Look at the map before reporting it done. With `pip install playwright && playwright install chromium`:

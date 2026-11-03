@@ -6,6 +6,13 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The card standard of the panel.** A section that folds is now one card: the section is the box, its title is a flat row with a chevron, and its body opens inside the same card. A closed card is 44 px high and as wide as all other cards. A plain card is `.rs-sec-box` with the new title row `.rs-card-title`. The space of the cards is three CSS variables: `--rs-card-gap` (12px), `--rs-card-pad` (14px) and `--rs-panel-bottom` (28px). Filled controls use `--accent-fill` (`#0E7F91`) with white text. Docs: [Cards: the panel standard](docs/guides/dashboard-panel.md#cards-the-panel-standard).
+
+### Fixed (card standard)
+- The title row of a section that folds was drawn as a boxed button, because `#sb button` had a higher specificity than the title rules. The title rules now start with `#sb`.
+- "Collapse all" was added after "hide the panel" in the title row, because the template wraps "hide the panel" in a span. It is now added before it.
+
 ### Changed (breaking)
 - **The dashboard's panel starts empty, and a page adds what it needs.** The panel had five built-in blocks (base map, colour by, legend,
   query, selected road), and a page took them away with `dashboard={"panel": {"hide": [...]}}`. Now the panel has only its frame (the

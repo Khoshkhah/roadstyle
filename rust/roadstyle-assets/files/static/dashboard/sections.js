@@ -43,7 +43,9 @@ function _fdMake(w, spec){
     const top = document.querySelector("#sb .sb-top");
     if(top){
       _fdBtn = document.createElement("button"); _fdBtn.type = "button"; _fdBtn.id = "rs-fold-all";
-      const hide = document.getElementById("sb-hide"); hide && hide.parentNode === top ? hide.before(_fdBtn) : top.append(_fdBtn);
+      // the button goes BEFORE the hide-panel button, or before the box that holds it in the title row (the template wraps it in a span)
+      let hide = document.getElementById("sb-hide"); while(hide && hide.parentNode !== top) hide = hide.parentNode;
+      hide ? hide.before(_fdBtn) : top.append(_fdBtn);
       _fdBtn.onclick = () => rsSections.foldAll(_fdActive().some(x => !x.classList.contains("folded")));
     }
   }
