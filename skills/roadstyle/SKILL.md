@@ -144,6 +144,7 @@ Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
 - Never write your own margin, padding or radius for a card. The space is three variables on `:root`: `--rs-card-gap` (12px between cards), `--rs-card-pad` (14px inside), `--rs-panel-bottom` (28px under the last card). A closed card is 44px high. A section without a label has the same gap.
 - In the title row of the panel, "collapse all" is at the left of "hide the panel". The panel does this: do not move the buttons.
 - A filled control (a selected tab, a primary button) is `var(--accent-fill)` (`#0E7F91`) with white text. Links and marks are `var(--accent)`.
+- A day picker (a page with one day of data at a time): `rs.days.use(el, {days: ["2026-10-04", ...], onChange: d => load(d)})`. It builds the label, the field, the calendar of the days with data, the arrows and "Latest". Do not write a page's own date field.
 - Tabs (`rs-tabs`) change the pane: the selected tab is filled (`--accent-fill`, white text). A two-way switch (`rs-seg`) changes a mode or a setting: the selected segment is the card colour with `--accent` text. Do not use one for the other's job.
 
 ## Check the result

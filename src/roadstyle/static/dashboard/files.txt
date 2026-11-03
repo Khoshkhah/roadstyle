@@ -19,6 +19,7 @@ tip
 help
 hover
 tabs
+days
 kpi
 svg
 toolbar

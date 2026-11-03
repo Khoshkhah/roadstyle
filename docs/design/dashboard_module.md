@@ -245,6 +245,7 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `roadsbox.js` | the tool `roads`: the road filter in the bar, one row for each class (check box, colour, name, number of roads), All, None, Bridges, Tunnels and the restricted kinds; it calls the filter calls of `filter.js` | `filter` | |
 | `settings.js` | the tool `settings`: the person's own choices kept in this browser (where the bar and the panel are, the transparency of the layers, the keys of Google and CARTO) | | |
 | `sections.js` | the panel's sections: the panel starts empty, and a page adds sections with its HTML or a part (`query.js`, `roadcard.js`), hides, moves or removes them (`rs.sections`, `dashboard.panel.sections`) | `dashboard.panel` | `rs.sections` |
+| `days.js` | the day picker of a page (`rs.days.use`): the label, the field, the calendar of the days with data, the arrows and "Latest" | | `rs.days` |
 | `selectbox.js` | a select list in the look of the boxes (the native `<select>` stays in the page, hidden; the page still reads and sets its value) | | |
 | `panelscroll.js` | the scroll protocol of a panel: the header stays, only the body scrolls, with a line under the header and a fade at the bottom | | |
 | `tip.js` | the explanation of a button in a box of the page's look (the `title` is moved to `data-rs-tip`; 350 ms after the pointer comes) | | |
