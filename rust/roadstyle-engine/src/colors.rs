@@ -20,6 +20,8 @@ pub struct Baked {
     /// every road has its class's colours (no data styler, no colour option, no colour table): a piece needs no colour of its own unless
     /// a road deviates (an access kind), and the road layer reads the class's colour by its class index
     pub class_only: bool,
+    /// the casing colour of every road is its class's (no styler gives a casing of its own): a piece holds none (D1)
+    pub casing_role: bool,
 }
 
 /// The fill and the casing colour of each class of `classes`, as the class styles give them; `fallback` for another class.
@@ -76,18 +78,23 @@ impl Colours {
 }
 
 impl ColourTable {
-    /// The table of the roads after `bake`: the colours in the order that the roads first have them.
-    pub fn of(fs: &Roads, look: &crate::Look, fills: &[String]) -> ColourTable {
+    /// The table of the roads after `bake`: the data colours in the order that the roads first have them. A role colour (`Draw::role`,
+    /// `casing_role`) is not in it: the style gives it by the piece's class and access kind, so the places do not depend on the palette.
+    pub fn of(fs: &Roads, look: &crate::Look, fills: &[String], casing_role: bool) -> ColourTable {
         let r = &look.sections.roads.fallback;
         let (mut fill, mut casing) = (Colours::new(&r["fill"]), Colours::new(&r["casing"]));
         let mut seen = HashSet::new();
-        for d in fs.draw.iter().filter(|d| d.style.is_some_and(|s| seen.insert(s))) {
+        for d in fs.draw.iter().filter(|d| d.style.is_some_and(|s| seen.insert((s, d.role)))) {
             let s = fs.values.style(d.style.expect("a style"));
-            fill.add(fs.values.get(s[0]));
-            casing.add(fs.values.get(s[4]));
+            if d.role & 1 == 0 {
+                fill.add(fs.values.get(s[0]));
+            }
+            if !casing_role {
+                casing.add(fs.values.get(s[4]));
+            }
         }
         for d in &fs.draw {
-            d.fills.iter().for_each(|&f| fill.add(fs.values.get(f)));
+            d.fills.iter().enumerate().filter(|(k, _)| d.role & (1 << (k + 1)) == 0).for_each(|(_, &f)| fill.add(fs.values.get(f)));
         }
         ColourTable { fills: fills.to_vec(), fill, casing }
     }
@@ -121,6 +128,10 @@ struct Frame {
     missing: Option<Vec<bool>>,
     /// missing="self": keep the styler's own no-data colour
     missing_self: bool,
+    /// the fill is each road's class colour (the class styles), a role colour (D1)
+    class_fill: bool,
+    /// the casing is each road's class casing (the class styles and a colour table), a role colour (D1)
+    class_casing: bool,
 }
 
 fn get<'a>(o: &'a Value, k: &str) -> Option<&'a Value> {
@@ -227,6 +238,7 @@ fn class_frame(fs: &Roads, look: &Look) -> Frame {
         let (s, base) = crate::roads::class_style(look, ft.role(roadstyle_model::Role::Class));
         f.push(&s["fill"], &s["width"], &s["opacity"], &s["dash"], &s["casing"], &s["casing_width"], &s["casing_opacity"], &Value::from(base));
     }
+    (f.class_fill, f.class_casing) = (true, true);
     f
 }
 
@@ -234,7 +246,7 @@ impl Frame {
     fn empty(n: usize) -> Frame {
         let v = || Vec::with_capacity(n);
         Frame { fill: v(), width: v(), opacity: v(), dash: v(), casing: v(), casing_width: v(), casing_opacity: v(), klass: v(), legend: None,
-                missing: None, missing_self: false }
+                missing: None, missing_self: false, class_fill: false, class_casing: false }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -321,6 +333,7 @@ fn color_table(fs: &Roads, look: &Look, column: &str) -> Frame {
         miss.push(c.is_none());
     }
     f.missing = Some(miss);
+    f.class_fill = false;      // the own colours are data; the casing stays the class's
     f
 }
 
@@ -375,7 +388,10 @@ pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<Baked, crate:
         // one fill per option; the width, casing and dash from the main styler or the class styles
         let named = &m.color.options;
         let frames = named.iter().map(|o| Ok((o.name.clone(), resolve(fs, look, Styler::of_option(o))?))).collect::<Result<Vec<_>, crate::Error>>()?;
-        bake_props(fs, &main.unwrap_or_else(|| class_frame(fs, look)));
+        let shared = main.unwrap_or_else(|| class_frame(fs, look));
+        bake_props(fs, &shared);
+        let casing_role = shared.class_casing;
+        let base_role = frames[0].1.class_fill;
         let base = &frames[0].1.fill;
         let mut meta = Vec::new();
         let mut props = Vec::new();
@@ -383,7 +399,11 @@ pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<Baked, crate:
             let prop = roadstyle_model::mark::option_fill(idx).into_owned();
             let miss = if idx == 0 || f.missing_self { None } else { f.missing.as_ref() };
             for i in 0..fs.len() {
-                let fill = fs.values.id(if miss.is_some_and(|m| m[i]) { &base[i] } else { &f.fill[i] });
+                let missed = miss.is_some_and(|m| m[i]);
+                if (f.class_fill && !missed) || (missed && base_role) {
+                    fs.draw[i].role |= 1 << idx;
+                }
+                let fill = fs.values.id(if missed { &base[i] } else { &f.fill[i] });
                 match fs.draw[i].style {
                     Some(s) if idx == 0 => {
                         let mut s = fs.values.style(s);
@@ -402,17 +422,21 @@ pub fn bake(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<Baked, crate:
             Some(Active::Name(s)) => named.iter().position(|o| o.name == *s).unwrap_or(0),
             None => 0,
         };
-        return Ok(Baked { props, active, meta, class_only: false });
+        return Ok(Baked { props, active, meta, class_only: false, casing_role });
     }
     let class_only = main.is_none();
     let f = main.unwrap_or_else(|| class_frame(fs, look));
     bake_props(fs, &f);
+    if f.class_fill {
+        fs.draw.iter_mut().for_each(|d| d.role |= 1);
+    }
+    let casing_role = f.class_casing;
     // a data styler's legend as the one "colour by" entry (no menu, only the key)
     let meta = match &f.legend {
         Some(l) => vec![json!({"name": get(l, "title").cloned().unwrap_or_else(|| json!("data")), "prop": Mark::Fill.name(), "legend": l})],
         None => Vec::new(),
     };
-    Ok(Baked { props: vec![Mark::Fill.name().into()], active: 0, meta, class_only })
+    Ok(Baked { props: vec![Mark::Fill.name().into()], active: 0, meta, class_only, casing_role })
 }
 
 #[cfg(test)]

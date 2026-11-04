@@ -164,7 +164,7 @@ The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new sty
 | Phase | Work | Done when |
 |---|---|---|
 | 0 | Measure the parts of stage 1. **Done.** | The table above. |
-| 1 | D1: colours by role (the class-coloured option, the access colour, the dash pattern, the item colour). | D5 part 1 passes; the tile size on Burnaby is not larger than today; the page draws as before. |
+| 1 | D1: colours by role (the class-coloured option, the access colour). **Done 2026-11-04** for the fill and the casing; the dash pattern and the item colour are not changed (see below). | D5 part 1 passes; the tile size on Burnaby is not larger than today; the page draws as before. |
 | 2 | D4: the layers-only path and the split of `feature_overlays`. | Its style equals the style of a new `LiveTiles` for every theme; less than 250 ms natively on Burnaby. |
 | 3 | D2 and D3: the derived key, `PartialEq` for `TileOptions`, the stage-1 hash, `set_look`. | D5 parts 2 and 3 pass. |
 | 4 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the browser test of D6. | D5 part 4 passes. |
@@ -172,6 +172,18 @@ The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new sty
 | 6 | The dashboard and `palettes.rs` can use `set_look` and stop making every palette at the start. Optional. | A separate document. |
 
 Phase 1 alone does not make a theme change faster: the page still makes a new worker and a new prefix. It is the condition for phases 3 to 5.
+
+## Phase 1 result (2026-11-04)
+
+- A piece holds no role colour. `Draw::role` marks, for each road, the colour slots whose fill is a role colour (the class's, or the access
+  kind's); the casing is a role colour when it comes from the class styles. `ColourTable` holds only data colours.
+- The road layer gives a role colour by `__rs_access` (a `match` on the palette's access colours) and by `__rs_ci` (the class lookup). With no data
+  colours, the layer reads no colour of a piece at all, and its expression is shorter than before (the tile budget passes).
+- Tests: `tile_roles.rs` (the same tile bytes for 4 bundled palettes, a palette with two classes in one colour, and a palette with other access
+  colours, with and without the duckOSM page's options); `tile_colour.rs` (each role colour equals the colour of its road in the road table, also
+  for private roads at zoom 15; the colour places of data colours as before; a view's palettes switch the class casing by `rs_palette`).
+- Not changed: the dash pattern stays a place in the sorted list of patterns, and a dashed class has no casing (structure). The colour of the items
+  stays as it is. Neither changes with a palette today (the dashes are in the profile, not in a palette), so they belong to the stage-1 key (D2).
 
 ## Risks
 

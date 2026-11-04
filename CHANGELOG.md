@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **A colour reaches a road piece by its role, not by its value** (`docs/design/restyle_without_retile.md`, phase 1). A piece holds no class colour and no access colour: the road layer gives a piece with no colour of its own the palette's colour of its access kind (`__rs_access`), else its class's colour (by `__rs_ci`), and the casing is the class's. Only data colours (`color_by`, `color_table`, a colour option on a column) are places in the colour table, and that table no longer holds role colours. Before, with a colour option or an access column, every piece held the place of its colour in a table of the distinct colours, so a palette change changed the tiles (on a part of Monaco with the duckOSM page's options: 11 of 11 tiles). Now a look that changes only colours makes the same tile bytes (`tests/tile_roles.rs`), and `tests/tile_colour.rs` checks that each role colour is the colour of its road. The goldens changed only in the paint of `roads-simple` and `roads-simple-dash`, the pieces and the road table, which keeps no fill or casing that no layer reads.
+
 ### Added
 - **A page can add a row to the base-map box**: `window.rsAddTopRow({id, label, get, set, available})` puts a check box of the page under *On top*. The event `rs:toprowschange` makes the box read the state again.
 - **An "Arrows" switch in the base-map box**, under *On top*, after 3D buildings. It shows or hides the one-way arrows of the roads (the symbol layers of the role `arrows` or with the one-way icon). The choice is kept in the browser (`rs-top:arrows`), the row is off while the page has no arrow layer, and the event `rs:arrowschange` tells a page. `rsSetArrows(on)`, `rsArrowsOn()` and `rsHasArrows()` are in `dashboard/arrows.js`.

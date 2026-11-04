@@ -1,5 +1,5 @@
 //! The style must be byte for byte the style of geolibre-roadstyle's Rust port at commit 0806ac2 (its `inline_style`, natively, from the
-//! same inputs), with eighteen changes:
+//! same inputs), with nineteen changes:
 //! - the building heights follow rule C (the higher of the height tag and the levels, features.rs), not 0806ac2's rule A (the height
 //!   tag first): on 2026-10-23 the `height` of 15 buildings of Monaco and 355 of Tartu;
 //! - the slots have Python's key order (__rs_cls before __rs_arw, tests/colors.rs): the same data, other bytes;
@@ -37,6 +37,12 @@
 //!   and a line of such a layer that is together under half a pixel long and stays in the tile is left out.
 //! - the dash (2026-10-29, docs/design/tile_speed.md): only the dashed pieces (the tunnels' dashes and the pieces with a pattern) have
 //!   `line-dasharray`, in a layer of their own (`roads-simple-dash`).
+//! - colours by role (2026-11-04, docs/design/restyle_without_retile.md, D1): a piece holds no class or access colour. The road layer and
+//!   its dash layer give a piece with no colour of its own the palette's colour of its access kind (`__rs_access`), else its class's colour
+//!   (by `__rs_ci`); the casing is the class's. Only data colours (`color_by`, `color_table`, a data colour option) are places in the
+//!   colour table, which no longer holds the role colours. The road table keeps no fill or casing that no layer reads. So a theme that
+//!   changes only colours makes the same tiles (tests/tile_roles.rs); the goldens changed only in the two road layers' paint, the
+//!   pieces and the road table.
 //!
 //! The reference styles are too large for git (Monaco 26 MB, Tartu 151 MB), so the test compares their SHA-256. `tests/old_style.sh`
 //! makes 0806ac2's style again, to see a difference.
@@ -65,7 +71,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "823135151109b3b229a2469272b4c6319f2af7ab8f2bf3101c78df114e35eb7e");
+    assert_eq!(style_hash(&area), "040d10a62b7f5895673a10ab880f8704b29d8aed83ccbee597f21028b1c88b7b");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -114,7 +120,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "6e8baf2567237dff42eb1979a4c438e6a382e3dbff75dd5c510c210c701d4900");
+    assert_eq!(tiles_hash(&area), "2af4af9cd36ef3f44a2047cf8611851b7490cb5a9a5986fee198425f7bfb68ce");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at

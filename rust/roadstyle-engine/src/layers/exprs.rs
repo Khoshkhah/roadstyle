@@ -245,6 +245,12 @@ pub(super) fn place_colour(place: Value, table: &str) -> Value {
     json!(["to-color", ["at", ["number", place, 0], ["var", table]]])
 }
 
+/// The fill of a piece under the active colour option (docs/design/restyle_without_retile.md, D1): its own data colour when it holds
+/// one (a place in the table `table`), else its role colour `role` (by its class index and access kind).
+pub(super) fn fill_or_role(props: &[String], table: &str, role: &Value) -> Value {
+    by_option(props, |p| json!(["case", ["has", p], place_colour(json!(["get", p]), table), role]))
+}
+
 /// The place of a road's fill colour under the active colour option.
 pub(super) fn fill_place(props: &[String], table: &str) -> Value {
     place_colour(by_option(props, |p| json!(["get", p])), table)
