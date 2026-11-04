@@ -7,7 +7,7 @@ use crate::Error;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TileOptions {
     pub min_zoom: u32,
     pub max_zoom: u32,
@@ -49,6 +49,14 @@ pub const TILE_PX: f64 = 512.0;
 pub const COLUMNS: &str = "roadstyle:columns";
 
 impl TileOptions {
+    /// The tiles made by these options are still right for the options `new` of another style of the same stage 1
+    /// (docs/design/restyle_without_retile.md, D2, part 1): every rule is the same, and no zoom needs a larger buffer (a narrower stroke keeps
+    /// the tiles, a wider one needs new tiles). `wait` is the caller's, not a rule.
+    pub fn keeps_tiles(&self, new: &TileOptions) -> bool {
+        let rules = TileOptions { buffers: self.buffers.clone(), wait: self.wait, ..new.clone() } == *self;
+        rules && new.buffers.len() == self.buffers.len() && new.buffers.iter().zip(&self.buffers).all(|(n, h)| n <= h)
+    }
+
     /// The rules of a style: `tiles` the zoom settings (the look's config.tiles, or the style's `roadstyle:tiles`), `columns` the column
     /// names (`roadstyle:columns`), `keep` the caller's columns.
     pub fn new(layers: &[Value], metadata: &Value, tiles: &Value, columns: &Value, keep: &[String]) -> Result<TileOptions, Error> {

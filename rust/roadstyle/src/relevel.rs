@@ -112,8 +112,33 @@ impl LiveTiles {
 
     /// The tiled style of this map for the look `look` (docs/design/restyle_without_retile.md, D4): the look half made again from the held
     /// stage 1 (`roadstyle_engine::restyle_layers`), with the tile options of its layers; the tiles, the pieces and the held state do not
-    /// change. It does not check that the new look makes the same tiles (the key of D2): the caller must.
+    /// change. It does not check that the new look makes the same tiles (the key of D2): `set_look` does.
     pub fn style_for(&mut self, look: &Look) -> Result<String, crate::Error> {
+        let r = self.restyled(look)?;
+        Ok(r.text)
+    }
+
+    /// Give the map the look `look` with no new tile (docs/design/restyle_without_retile.md, D2 and D3), when its tiles are still right for
+    /// it: the same stage-1 key (`stage1_key`: the look without its colours) and the same tile rules with no larger buffer
+    /// (`TileOptions::keeps_tiles`). Then the map takes the new style and look, and keeps its tiles, its pieces, its tile options and its
+    /// cache: nothing that `tile` reads changes (D3). Else nothing changes, and the answer is false: make a new map.
+    pub fn set_look(&mut self, look: &Look) -> Result<bool, crate::Error> {
+        if stage1_key(look) != stage1_key(&self.look) {
+            return Ok(false);
+        }
+        let r = self.restyled(look)?;
+        if !self.options.keeps_tiles(&r.options) {
+            return Ok(false);
+        }
+        let s = &mut self.styled;
+        (s.layers, s.metadata, s.glyphs, s.state, s.saved) = (r.half.layers, r.half.metadata, r.half.glyphs, r.half.state, r.saved);
+        self.style = r.text;
+        self.look = look.clone();
+        Ok(true)
+    }
+
+    /// The new look's half, its saved tile settings, its tile options and its style's text, over the held stage 1 (the held one is the same after).
+    fn restyled(&mut self, look: &Look) -> Result<Restyled, crate::Error> {
         let half = roadstyle_engine::restyle_layers(&self.styled, look)?;
         let mut saved = self.styled.saved.clone();
         saved.insert(tiles::stage::TILES.into(), serde_json::json!(look.sections.tiles));
@@ -126,8 +151,10 @@ impl LiveTiles {
                    std::mem::replace(&mut s.glyphs, half.glyphs), std::mem::replace(&mut s.state, half.state), std::mem::replace(&mut s.saved, saved));
         let style = crate::tiled_style_of(s, &options, &self.at, sources::SourceMode::INLINE);
         let text = crate::style_text(s, &style);
-        (s.layers, s.metadata, s.glyphs, s.state, s.saved) = old;
-        Ok(text)
+        let new = (std::mem::replace(&mut s.layers, old.0), std::mem::replace(&mut s.metadata, old.1), std::mem::replace(&mut s.glyphs, old.2),
+                   std::mem::replace(&mut s.state, old.3), std::mem::replace(&mut s.saved, old.4));
+        Ok(Restyled { half: roadstyle_engine::LookHalf { layers: new.0, metadata: new.1, glyphs: new.2, state: new.3, sources: Vec::new() },
+                      saved: new.4, options, text })
     }
 
     /// The stage 1 that the map holds (its road table's rows and lines; a redraw does not change the lines).
@@ -223,6 +250,41 @@ impl LiveTiles {
         }
         Ok(())
     }
+}
+
+/// A look's half over a held stage 1 (`LiveTiles::restyled`).
+struct Restyled {
+    half: roadstyle_engine::LookHalf,
+    saved: serde_json::Map<String, Value>,
+    options: tiles::stage::TileOptions,
+    text: String,
+}
+
+/// The stage-1 key of a look (docs/design/restyle_without_retile.md, D2, part 2): a hash of the saved look (`Look::to_json`) with its colours
+/// left out, but not in the sections that hold the user's data colours (`map`, `data`, `overlays`: there a colour can be a place in the colour
+/// table of the pieces). Every other value counts, so a change of anything but such a colour gives another key and a new map: that costs time,
+/// never a wrong map.
+pub fn stage1_key(look: &Look) -> u64 {
+    use std::hash::{Hash, Hasher};
+    fn colour(s: &str) -> bool {
+        let hex = s.strip_prefix('#').is_some_and(|h| matches!(h.len(), 3 | 4 | 6 | 8) && h.chars().all(|c| c.is_ascii_hexdigit()));
+        hex || ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|p| s.trim_start().to_ascii_lowercase().starts_with(p))
+    }
+    fn mask(v: &mut Value) {
+        match v {
+            Value::String(s) if colour(s) => *s = "colour".into(),
+            Value::Array(a) => a.iter_mut().for_each(mask),
+            Value::Object(o) => o.values_mut().for_each(mask),
+            _ => {}
+        }
+    }
+    let mut v: Value = serde_json::from_str(&look.to_json()).expect("a look's JSON");
+    if let Value::Object(o) = &mut v {
+        o.iter_mut().filter(|(k, _)| !matches!(k.as_str(), "map" | "data" | "overlays")).for_each(|(_, x)| mask(x));
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    v.to_string().hash(&mut h);
+    h.finish()
 }
 
 /// The end nodes of a line (its first and last point, as bits).

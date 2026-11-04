@@ -116,6 +116,11 @@ classes the same colour, with the page's own options (`access_col`, the colour o
 
 We do not keep a hand-written list of every look value: the review showed that such a list cannot be complete.
 
+**How part 2 is made (phase 3).** The key is a hash of the whole saved look (`Look::to_json`) with only its colours left out, and not in the sections
+that hold the user's data colours (`map`, `data`, `overlays`): there a colour can be a place in the colour table of the pieces. Every other value
+counts: a width, a dash, a zoom, a palette name. So a change of anything but a colour gives a new map. That costs time, never a wrong map. A value
+that is known to be appearance only can leave the key later, with the guard test (D5) as its proof.
+
 ### D3. `LiveTiles::set_look(look)` and the frozen state
 
 `set_look` returns `Restyled { tiles_kept: bool }`. When the key of D2 passes, it replaces the style text and nothing else. The rule:
@@ -168,6 +173,9 @@ Phase 4 checks in a browser:
   the controls again.
 - The global-state defaults (`state`) must be diffable in the pinned MapLibre. If not, the host sets them with `setGlobalStateProperty`.
 - A change of layout or filter makes MapLibre's worker parse the held tiles again, with no new request.
+- **The live colours stay.** MapLibre keeps the feature state of a source while the source stays, so the colours and widths that `rs.setData`,
+  `rsColor` and `rsColorBase` wrote (`rs_c`, `rs_w`) stay after a theme change, and the host does not write them again. The browser test sets live
+  colours, changes the theme, and checks that the roads keep them.
 
 The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new style. This design is for every other change of the look.
 
@@ -178,7 +186,7 @@ The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new sty
 | 0 | Measure the parts of stage 1. **Done.** | The table above. |
 | 1 | D1: colours by role (the class-coloured option, the access colour). **Done 2026-11-04** for the fill and the casing; the dash pattern and the item colour are not changed (see below). | D5 part 1 passes; the tile size on Burnaby is not larger than today; the page draws as before. |
 | 2 | D4: the layers-only path and the split of `feature_overlays`. **Done 2026-11-04.** | Its style equals the style of a new `LiveTiles` for every theme; less than 250 ms natively on Burnaby. |
-| 3 | D2 and D3: the derived key, `PartialEq` for `TileOptions`, the stage-1 hash, `set_look`. | D5 parts 2 and 3 pass. |
+| 3 | D2 and D3: the derived key, `PartialEq` for `TileOptions`, the stage-1 hash, `set_look`. **Done 2026-11-04.** | D5 parts 2 and 3 pass. |
 | 4 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the browser test of D6. | D5 part 4 passes. |
 | 5 | The duckOSM page: the Design panel calls `setLook` and keeps its prefix; the old path only when `tilesKept` is false. | A theme change on Burnaby takes less than 1 s in the browser. |
 | 6 | The dashboard and `palettes.rs` can use `set_look` and stop making every palette at the start. Optional. | A separate document. |
@@ -213,6 +221,18 @@ Phase 1 alone does not make a theme change faster: the page still makes a new wo
 - Time on Burnaby (`examples/time_style_for.rs`, every colour changed): `style_for` 89 to 112 ms, a new map 2.8 to 4.3 s; the same style.
 - Found: every bundled base-map theme other than `liberty` makes other tiles than `liberty` (it sets the first zoom of the base-map layers and the
   roads' dash patterns too). A change of the base-map theme is structure; a change of colours is not. The key of phase 3 must tell them apart.
+
+## Phase 3 result (2026-11-04)
+
+- `LiveTiles::set_look(look)` keeps the tiles when both parts of the key pass: `stage1_key` (the look's JSON with its colours left out, except in
+  `map`, `data` and `overlays`) is the same, and `TileOptions::keeps_tiles` (the same rules, no larger buffer). Then it takes the new style and
+  look and changes nothing that `tile` reads (D3); else it changes nothing and answers false.
+- The guard test (`tests/set_look.rs`, Monaco with its base map and the duckOSM page's options): a theme-like change of colours keeps the tiles, and
+  every tile (made before and after the change) and the style are the new map's; a change of the data colours and a change of the classes' first
+  zoom make a new map; 40 random changes of one to three look values: 6 kept the tiles (each checked tile by tile), 34 needed a new map.
+- Time on Burnaby (`examples/time_style_for.rs`): `set_look` that keeps the tiles 79 to 111 ms; a refusal 3 ms; a new map 2.3 s.
+- Not done: the guard test does not drop the tile cache between the checks; the key is careful on purpose (a width, an opacity, a dash or a
+  palette name gives a new map). Values can leave the key later, each with the guard test as its proof.
 
 ## Risks
 

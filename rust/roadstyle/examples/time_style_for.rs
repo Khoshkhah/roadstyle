@@ -1,4 +1,5 @@
-//! The time of `LiveTiles::style_for` (docs/design/restyle_without_retile.md, phase 2) against a new map, for a look with every colour changed.
+//! The time of `LiveTiles::style_for` and `set_look` (docs/design/restyle_without_retile.md, phases 2 and 3) against a new map, for a look with every
+//! colour of a theme changed.
 //!
 //!     cargo run --release -p roadstyle --example time_style_for -- <roads.parquet> <features.parquet> <levels.json> <look.json>
 use serde_json::Value;
@@ -21,8 +22,9 @@ fn main() {
     let levels: Value = serde_json::from_slice(&read(&a[2])).unwrap();
     let text = String::from_utf8(read(&a[3])).unwrap();
     let look_a = roadstyle::Look::from_json(&text).unwrap().with_arg("levels", levels.clone()).unwrap();
+    // every colour as a theme changes them: not the user's data colours (`map`, `data`, `overlays`), which the stage-1 key counts
     let mut j: Value = serde_json::from_str(&text).unwrap();
-    recolour(&mut j);
+    j.as_object_mut().unwrap().iter_mut().filter(|(k, _)| !matches!(k.as_str(), "map" | "data" | "overlays")).for_each(|(_, v)| recolour(v));
     let look_b = roadstyle::Look::from_json(&j.to_string()).unwrap().with_arg("levels", levels).unwrap();
     let (roads, features) = (read(&a[0]), read(&a[1]));
     let new = |l: &roadstyle::Look| {
@@ -37,6 +39,12 @@ fn main() {
         let t = Instant::now();
         text_b = held.style_for(&look_b).unwrap();
         println!("style_for, round {round}:          {:>6.0} ms  ({} bytes)", t.elapsed().as_secs_f64() * 1e3, text_b.len());
+    }
+    for round in 0..3 {
+        let look = if round % 2 == 0 { &look_b } else { &look_a };
+        let t = Instant::now();
+        let kept = held.set_look(look).unwrap();
+        println!("set_look, round {round}:           {:>6.0} ms  (tiles kept: {kept})", t.elapsed().as_secs_f64() * 1e3);
     }
     let t = Instant::now();
     let fresh = new(&look_b);
