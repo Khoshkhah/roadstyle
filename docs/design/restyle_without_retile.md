@@ -87,12 +87,41 @@ A stale map is the worst failure of this design, because it looks right and is w
 The host keeps its source ids and tile addresses (`prefix`). When `tilesKept` is true, the host gives the new style to MapLibre as a
 change of paint and layout, and the tiles that MapLibre holds stay. The host does not start a new worker.
 
+## Phase 0 result (2026-11-04)
+
+We timed the parts of `style_parts` (the stage that makes the layers and the pieces) on Burnaby, natively, with temporary timers:
+
+| Part | Time | Needed for a new look? |
+|---|---|---|
+| `mark_roads`: each road's drawing values | 180 to 250 ms | no, for a look with class colours only (`class_only`) |
+| the slots (arrows and names) | 220 to 270 ms | no, the slots do not depend on the colours |
+| the base-map overlays (`feature_tables`, `edge_attach`) | 186 ms | the data part: no. The styling part: yes, and it is small |
+| `simple_source`: the pieces | 44 to 72 ms | no |
+| `road_layers`: the layers | 41 to 53 ms | yes |
+| the dark colours and the contract (`dark::layers`, `contract`) | 38 to 44 ms | yes |
+| the metadata | 0 to 8 ms | yes |
+
+The parts that a new look needs (layers, dark colours, contract, metadata) cost about 100 ms. The parts that it does not need cost about 700 ms. A full
+`restyle` costs 650 to 780 ms, because it makes all of them again.
+
+What phase 0 did **not** show: a working layers-only function with a style that equals the style of a new `LiveTiles`. The inputs of `road_layers` must be
+rebuilt without the data. This needs three changes, which are the work of phase 1:
+
+1. `Styled` keeps the facts of each base-map overlay (its name, kind, kinds and whether it is attached to the edges). `feature_overlays` is split in two: the
+   facts, which depend on the data, and the styling, which depends on the look (`look.sections.base_map.style`).
+2. The class colours (`ClassColours::of`) are made again from the new look, and the `simple` source keeps its pieces.
+3. A look with data colours (`ColourTable`, `color_by`) has no layers-only path: its key includes the data colouring (D2).
+
+So the target of phase 0 changes. The first target (less than 100 ms) is the cost of the parts that are certain, with no margin. The new target for phase 1
+is **less than 250 ms natively on Burnaby**, which is 3 to 6 times less than the 650 to 1,450 ms of today, and the style text must equal the style of a new
+`LiveTiles` for every palette.
+
 ## Phases
 
 | Phase | Work | Done when |
 |---|---|---|
-| 0 | A spike for D4: the layers and the style from a new look, with no pieces. | On Burnaby it takes less than 100 ms natively, and its style text equals the style of a new `LiveTiles`. If it cannot, this design stops and we look at the cause. |
-| 1 | `tile_key`, `set_look`, the guard test. | The two parts of D5 pass for all the palettes. |
+| 0 | A measurement for D4: the time of each part of `style_parts`. Done (see above). | The parts that a new look needs cost about 100 ms. |
+| 1 | The split of `feature_overlays`, the layers-only path, `tile_key`, `set_look`, the guard test. | Less than 250 ms natively on Burnaby, and the two parts of D5 pass for all the palettes. |
 | 2 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the Python binding if it is wanted. | A test in the browser sets a look and the style changes with no new tile request. |
 | 3 | The duckOSM page: the Design panel calls `setLook` and uses the old path only when `tilesKept` is false. | A theme change on Burnaby takes less than 1 s in the browser. |
 | 4 | The dashboard theme switch and `palettes.rs` can use `set_look` and stop making every palette at the start. Optional. | The decision is a separate document. |
