@@ -263,12 +263,13 @@ fn role_fill(cx: &Ctx, class_fill: Value) -> Value {
     if kinds.is_empty() {
         return class_fill;
     }
+    // every output of a `match` has one type: the class fill is a colour (`to-color`), so each access colour is one too
     let mut m = vec![json!("match"), json!(["get", Mark::Access.name()])];
     for (k, c) in kinds {
-        m.extend([json!(k), c.clone()]);
+        m.extend([json!(k), json!(["to-color", c])]);
     }
     m.push(class_fill);
-    json!(["to-color", Value::Array(m)])
+    Value::Array(m)
 }
 
 /// The colour of a class (0: its fill, 1: its casing) as a table over the classes (`class_index` makes it one lookup by class index).
