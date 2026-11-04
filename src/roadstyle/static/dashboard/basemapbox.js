@@ -19,6 +19,11 @@ const _bxSwatch = b => {
   if(!Array.isArray(s)) return s || b.bg;
   return "linear-gradient(to top left," + s[2] + " 0 32%,transparent 32%),linear-gradient(135deg,transparent 0 40%," + s[1] + " 40% 54%,transparent 54%)," + s[0];
 };
+// A PAGE'S OWN ROW under "On top": window.rsAddTopRow({id, label, get, set, available}) adds a check box for a layer of the page (get: whether it shows, set(on): the page shows or hides it,
+// available(): false greys the row). The row can be added before or after the box is built. The event rs:toprowschange tells the box that the page changed its state.
+const _hostPending = [];
+let _hostAdd = null;
+window.rsAddTopRow = spec => { if(!spec || !spec.id || !spec.label) throw new Error("rsAddTopRow: give {id, label, get, set}"); _hostAdd ? _hostAdd(spec) : _hostPending.push(spec); };
 export function buildBox(menu){
   const bms = window.RS_BASEMAPS || [], root = document.documentElement, ontop = O.ontop || {};
   const byKey = k => bms.find(b => b.key === k);
@@ -77,6 +82,11 @@ export function buildBox(menu){
   topRow("labels", "Labels");
   topRow("buildings", "3D buildings");
   topRow("arrows", "Arrows");
+  const hostRows = new Map();                        // the rows of the page: id -> {c, lab, spec}
+  const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); });
+  _hostAdd = spec => { if(hostRows.has(spec.id)) return; const c = topRow("host-" + spec.id, spec.label); hostRows.set(spec.id, {c, lab: tops["host-" + spec.id].lab, spec}); c.onchange = () => { spec.set(c.checked); syncHost(); }; syncHost(); };
+  document.addEventListener("rs:toprowschange", syncHost);
+  _hostPending.splice(0).forEach(_hostAdd);
   // the style's own base-map layers (the overlays of roadstyle:controls): one switch for all of them, in a group of its own, and only for a style that has them
   const layers = _bxEl("div", "rs-bm-layers"), lrow = _bxEl("label", "rs-bm-row"), lc = _bxEl("input"), lname = _bxEl("span", "rs-bm-n");
   lc.type = "checkbox"; lrow.append(lc, lname); layers.append(_bxEl("hr"), lrow); menu.appendChild(layers);
