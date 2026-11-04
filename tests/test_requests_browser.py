@@ -123,12 +123,15 @@ def _access_edges():
 
 
 def test_access_col_rows_colours_and_filter(tmp_path):
-    """Item 6: access_col gives each kind its colour, and rsSetAccess hides those roads."""
+    """Item 6: access_col gives each kind its colour, and rsSetAccess hides those roads. The colour is a role colour
+    (docs/design/restyle_without_retile.md, D1): a piece holds its access kind, not a colour, and the road layer gives the kind's colour."""
     path = _page(tmp_path, "access", edges=_access_edges(), access_col="access")
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         counts = page.evaluate("RS_ACCESS")
-        fills = page.evaluate("map.querySourceFeatures('simple').map(f=>f.properties.__rs_fill)")      # simple mode draws the roads from their pieces; the roads source is cut into no tiles
+        kinds = page.evaluate("map.querySourceFeatures('simple').map(f=>f.properties.__rs_access)")      # simple mode draws the roads from their pieces; the roads source is cut into no tiles
+        fills = page.evaluate("map.querySourceFeatures('simple').map(f=>f.properties.__rs_fill)")
+        colour = page.evaluate("JSON.stringify(map.getPaintProperty('roads-simple', 'line-color'))")
         shown = page.evaluate("map.getFilter('roads-simple')")
         page.evaluate("rsSetAccess('private', false)")
         hidden = page.evaluate("JSON.stringify(map.getFilter('roads-simple'))")
@@ -137,7 +140,9 @@ def test_access_col_rows_colours_and_filter(tmp_path):
         bus_off = page.evaluate("rsGetAccess().bus")
         browser.close()
     assert counts == {"private": 2, "bus": 1, "pedestrian": 1, "delivery": 1}
-    assert {'#c8c8c8', '#9db8d9', '#dddde8', '#e8d2b0'} <= set(fills) and "__rs_access" not in json.dumps(shown) and "__rs_access" in hidden
+    assert {"private", "bus", "pedestrian", "delivery"} <= set(kinds) and set(fills) == {None}
+    assert "__rs_access" in colour and all(c in colour for c in ('#c8c8c8', '#9db8d9', '#dddde8', '#e8d2b0'))
+    assert "__rs_access" not in json.dumps(shown) and "__rs_access" in hidden
     assert state["private"] is False and state["bus"] is True and bus_off is False and not errors
 
 
