@@ -187,7 +187,7 @@ The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new sty
 | 1 | D1: colours by role (the class-coloured option, the access colour). **Done 2026-11-04** for the fill and the casing; the dash pattern and the item colour are not changed (see below). | D5 part 1 passes; the tile size on Burnaby is not larger than today; the page draws as before. |
 | 2 | D4: the layers-only path and the split of `feature_overlays`. **Done 2026-11-04.** | Its style equals the style of a new `LiveTiles` for every theme; less than 250 ms natively on Burnaby. |
 | 3 | D2 and D3: the derived key, `PartialEq` for `TileOptions`, the stage-1 hash, `set_look`. **Done 2026-11-04.** | D5 parts 2 and 3 pass. |
-| 4 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the browser test of D6. | D5 part 4 passes. |
+| 4 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the browser test of D6. **Done 2026-11-04.** | D5 part 4 passes. |
 | 5 | The duckOSM page: the Design panel calls `setLook` and keeps its prefix; the old path only when `tilesKept` is false. | A theme change on Burnaby takes less than 1 s in the browser. |
 | 6 | The dashboard and `palettes.rs` can use `set_look` and stop making every palette at the start. Optional. | A separate document. |
 
@@ -233,6 +233,17 @@ Phase 1 alone does not make a theme change faster: the page still makes a new wo
 - Time on Burnaby (`examples/time_style_for.rs`): `set_look` that keeps the tiles 79 to 111 ms; a refusal 3 ms; a new map 2.3 s.
 - Not done: the guard test does not drop the tile cache between the checks; the key is careful on purpose (a width, an opacity, a dash or a
   palette name gives a new map). Values can leave the key later, each with the guard test as its proof.
+
+## Phase 4 result (2026-11-04)
+
+- The wasm `LiveMap.setLook(look, format?)` gives the new style when the map keeps its tiles, and `undefined` when the look needs a new map.
+  `docs/rust/browser.md`, "Change the look of a live map", shows the host's code.
+- The browser test (`tests/test_set_look_browser.py`, Playwright, the web package of `build_editor.sh`, Monaco's part with the page's options): 20
+  roads get a live colour (`rs_c`), a theme-like colour change goes through `setLook` and `setStyle(style, {diff: true})`. The map requests 0 tiles
+  again, keeps its one source, keeps all 20 live colours, has the new class colours in its road layer and gives no error; a change of structure
+  gives `undefined`.
+- Found on the way: a style with no name has `"name": null`, and MapLibre's style check refuses it (the map does not load). The duckOSM page gives a
+  name; the docs say so. Not changed here.
 
 ## Risks
 

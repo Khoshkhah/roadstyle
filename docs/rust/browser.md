@@ -228,7 +228,32 @@ The parts of this page:
 With `engine.props` only, `rs.query`, `rs.find`, `rs.props` and `rs.focus` find nothing: they need all roads' properties in the
 page.
 
-## Write the whole page
+## Change the look of a live map
+
+A theme, a palette or a colour changes only how the roads are drawn, not the roads. `LiveMap.setLook(look, format?)` gives the map the new
+look with no new tile, when the map's tiles are still right for it (docs/design/restyle_without_retile.md):
+
+```js
+const style = live.setLook(Look.fromJson(newLookText), format);
+if (style !== undefined) {
+  map.setStyle(JSON.parse(style), { diff: true });   // the tiles, the sources and the live colours stay
+} else {
+  live = new LiveMap(styleSources(roads, newLook), newLook, prefix, keep);   // the look changes the tiles: make a new map
+  map.setStyle(JSON.parse(live.style(format)));
+}
+```
+
+- **When the tiles stay.** The new look differs from the old one only in colours (the class colours, the access colours, the base map's
+  colours, the dark colours, the labels, the selection). The colours of `map`, `data` and `overlays` count as structure: there a colour can be
+  one of your data colours. A change of anything else (a width, an opacity, a dash, a first zoom, the base-map theme, a palette name) gives
+  `undefined`, and the map stays as it was.
+- **What stays.** The tile addresses (the `prefix`), the source ids, the tiles in MapLibre's cache and the feature state of the roads: the
+  colours and widths of `rs.setData`, `rsColor` and `rsColorBase` (`rs_c`, `rs_w`). Give the style to MapLibre with `{diff: true}`, so that it keeps
+  the sources. The images (`roadstyle:images`) and the controls are in the style's metadata, which the diff does not apply: add the images again,
+  and read the controls again.
+- **Time.** Burnaby (64,221 roads): about 0.1 s natively, against about 2.3 s for a new map. A refusal takes a few milliseconds.
+- A style must have a name: a style with none has `"name": null`, which MapLibre's style check refuses. Give `styleSources` the area's name.
+
 
 `pageFrom` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
 dashboard's options and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same
