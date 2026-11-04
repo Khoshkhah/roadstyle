@@ -25,7 +25,7 @@ look, and the tiles around the centre at zooms 6, 9, 11, 13, 14, 15 and 16 (9 ti
 | the width of the links (`roads.links.width`), the end cap (`roads.cap`) | all the same |
 | the width and the casing width of the palette, the opacity of the casing (`casing.opacity`), `tunnels.opacity_scale` | all the same |
 | the first zoom of each class (`roads.classes.<class>.minzoom`) | different at zooms 6 to 15 |
-| the first zoom of the arrows (`arrows.minzoom`) | different at zoom 14 |
+| the first zoom of the arrows (`arrows.minzoom`) | different at zoom 13 |
 | the wing of a bridge (`bridges.wing_scale`) | different at zooms 9 to 16 |
 
 So a look has two kinds of values. **Structure** changes the pieces or the content of a tile. **Appearance** changes only how the style draws
@@ -72,7 +72,7 @@ features that `Styled` already holds.
 
 ### D5. A test that guards the list
 
-The test `tile_key_guard` uses a small area (a Monaco file in `rust/roadstyle/tests/data`) and has two parts.
+The test `tile_key_guard` uses a small area (a Monaco-size roads file and its features file, in the tests of `roadstyle`; phase 1 chooses it) and has two parts.
 
 1. **The list is right.** For each value of the default look (read from the look's own JSON), change the value, and make the tiles at
    some zooms. The tiles change if and only if the value is on the list of D2. A value that changes tiles and is not on the list fails the
