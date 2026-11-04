@@ -65,6 +65,18 @@ Other values decide the tiles in a way that is correct and stays (structure): th
 bridge wing, the order of the classes, the slot look, the base-map layer list, the popup and tooltip fields (they decide the properties that a tile
 keeps), and the buffer of each zoom (D2).
 
+## Who uses the tiles
+
+roadstyle's tiles are made in two places, and this design reaches them differently. Read from the call sites on 2026-11-04.
+
+| Consumer | Where the tiles are made | Live data | What this design gives it |
+|---|---|---|---|
+| The duckOSM page (`duckosm-rust`, `crates/duckosm-wasm/www/map/map_worker.js`) | in the browser, by `LiveMap` (`LiveTiles`) in a worker | not yet | Phase 1: the same tiles for every theme. Phases 3 to 5: a theme change with no new tiles; the live colours (feature state) stay, because the source stays. |
+| SonoFlow's daily page (`viz/daily.py`: `rs.render_dashboard(..., live_data=True, tiles=True)`) | in Python, when the page is built; the tiles are in the page file | yes: `rs.setData` writes `rs_c` and `rs_w` as feature state | Phase 1, after a release and a new build of the page: the tiles hold no class or access colour (this page has neither an access kind nor a colour option, so its tiles are probably the same bytes; not checked). `set_look` does not reach it: its tiles are fixed in the file. A page that offers several palettes (`palettes.rs`, the state `rs_palette`) no longer needs a colour copy for each palette in every piece. |
+| `export_style`, `roadstyle tiles` (the CLI) | in Rust, once | no | Phase 1 only. |
+
+The live colours (`roadstyle:live`, `rs.setData`) are the first part of the road colour expression (`["coalesce", ["feature-state", "rs_c"], ...]`), and this design does not change that part.
+
 ## The design
 
 ### D1. A tile holds facts. A colour reaches a piece by its role.
