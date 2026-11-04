@@ -1,193 +1,204 @@
 # Changing the look without making the tiles again
 
-Date: 2026-11-04. Status: proposal, not built. A host page changes the look of a map that is already drawn (a theme, a colour, a width).
-Today the host must make the whole map again. On Burnaby (64,221 roads) this takes 2.3 s in the engine on a fast computer and 5.7 s on a
-slower one, and the tiles that come out are the same bytes as before.
+Date: 2026-11-04. Status: proposal, version 3, not built. Versions 1 and 2 are in the history of this file. The section "Review history" at the end
+says what changed and why.
 
-## The problem
+## Summary
 
-`LiveTiles::new` takes stage 1 (`style_sources`), which has the pieces of the roads, and makes the tile index and the style. There is no
-method that takes a new look. A host that wants a new look must read the roads again, run stage 1 again, and build the index again. The
-host (the duckOSM page) starts a new worker for each theme change.
+A host page (the duckOSM page) changes the look of a map that is already drawn: a theme, a colour, a width. Today it must make the whole map
+again. On Burnaby (64,221 roads) a theme change takes 7 s in a browser on a normal PC, and 5.7 s of it is the engine.
 
-## What is already true
+roadstyle's architecture is the standard one, and it stays: the tiles hold the pieces of the roads and their facts, and the MapLibre style draws them.
+Three things in the current design stop a fast theme change:
 
-The tiles hold the pieces of the roads and the class index of each piece (`__rs_ci`). The colours of a class are in the style (`class_only`
-in `colors.rs`; `docs/design/dark_theme.md` says "no new tile: the tiles have the pieces, not their colours").
+1. **Some look values go into the tiles by their value, not by their role.** The main case is the colour table: a piece holds the place of its colour
+   in a table of the distinct colours, and a theme changes the places. A theme change then changes the tiles.
+2. **No API takes a new look.** `LiveTiles` must be made again, and that reads and prepares the roads again.
+3. **The style is made together with the pieces.** A new style costs about 700 ms of work that a new look does not need.
 
-We tested this on Burnaby (`rust/roadstyle/examples/compare_tiles.rs`): stage 1 and `LiveTiles` for the default look and for a changed
-look, and the tiles around the centre at zooms 6, 9, 11, 13, 14, 15 and 16 (9 tiles for each zoom), compared byte by byte.
+This design changes those three things. It does not change the pieces, the levels, the slots, the geometry in the tiles, or the static styles of
+the Python and CLI paths.
 
-| Change in the look | Tiles |
-|---|---|
-| palette `carto`, `highsat`, `mono`, `amber` | all the same |
-| the width of each class at each zoom (`roads.width`), `roads.width_zoom_rate`, `roads.casing_ratio` | all the same |
-| the width of the links (`roads.links.width`), the end cap (`roads.cap`) | all the same |
-| the width and the casing width of the palette, the opacity of the casing (`casing.opacity`), `tunnels.opacity_scale` | all the same |
-| the first zoom of each class (`roads.classes.<class>.minzoom`) | different at zooms 6 to 15 |
-| the first zoom of the arrows (`arrows.minzoom`) | different at zoom 13 |
-| the wing of a bridge (`bridges.wing_scale`) | different at zooms 9 to 16 |
+## The problem, measured
 
-So a look has two kinds of values. **Structure** changes the pieces or the content of a tile. **Appearance** changes only how the style draws
-them. Only the structure needs new tiles.
+| What | Where | Time |
+|---|---|---|
+| A theme change in the duckOSM page, Burnaby | Brave, a normal PC | 7.0 s, of which the engine 5.7 s |
+| The same | headless Chromium, a fast server | 4.4 s, of which the engine 2.3 s |
+| `style_sources` (stage 1) | native, Burnaby | 1.0 to 1.5 s |
+| `LiveTiles::new` (the tile index) | native, Burnaby | 1.4 to 1.5 s |
+| `restyle` (stage 1 from prepared roads) | native, Burnaby | 0.65 to 1.2 s |
 
-## Review of version 1 (2026-11-04)
-
-An independent review of version 1 found three blockers. We checked each one in the code. Version 2 below answers them.
-
-1. **Some values that version 1 called appearance are in the tiles.**
-   - The dash. A dashed class has no casing pieces (`simple/source.rs`, "a dashed class has no casing"). In a tile, `__rs_dash` is a place in the sorted
-     list of all the dash patterns of the map (`dash_patterns` in `layers/build.rs`). A new pattern changes the places of the others.
-   - The access colours. With `access_col`, `look.access` is written into each road's fill (`roads.rs`). A piece keeps a fill that differs from the class colour
-     (`simple/source.rs`), so an old palette's colour stays in the tile.
-   - The colour of the items (`sections.overlays.color`), and the popup and tooltip fields, which decide the properties that a tile keeps.
-2. **The widths are structure for the tile buffer.** `TileOptions::new` takes the buffer of each zoom from the stroke widths of the style's layers
-   (`buffer::buffers_px`). Wider roads need a larger buffer, or the strokes are cut at the tile edges. Our width test showed equal tiles because a width
-   that the function cannot bound gets the fallback buffer, so that test was not evidence. The widths also decide the names' room at zoom 20
-   (`slots/place.rs`).
-3. **The tiles are made late.** `LiveTiles` makes the properties of a piece when a tile is first seen (`fill`), from the held stage-1 data and the held
-   `TileOptions`. If `set_look` changed those, a tile that is made after it would carry the new rules over old pieces.
-
-The review also showed that a hand-written list of structure values (D2 of version 1) cannot be complete, and that a guard test which changes one
-value at a time cannot find it.
-
-## The design (version 2)
-
-### D1. Tiles hold facts. Each look value has one of three homes.
-
-1. **In the style only.** A colour, an opacity, a width, a blur, a label size, the dark colours. A new look changes the style and nothing else.
-2. **In the tile, as a fact.** The class place (`__rs_ci`), the access kind (`__rs_access`), the grade, the direction, the bridge and tunnel flags,
-   the metre widths. The style turns a fact into a look.
-3. **In the tile, as the result of a rule of the look** (structure): the first zoom of a class, the dash of a class, the order of the classes, the
-   metre widths, the bridge wing, the slots' look, the base-map layer list, the colour mode.
-
-The work of this design includes **moving values from home 3 to home 2** where that is cheap and clean. Two cases are known:
-
-- The access colour. A piece keeps `__rs_access` (a fact, already a mark), and the style maps the kind to the palette's colour. The bake stops writing
-  the colour into the fill.
-- The dash. A piece keeps a number that names its class's dash role, not a place in a sorted list of patterns, and the style holds the patterns.
-
-What stays in home 3 is the key (D2).
-
-### D2. The key is derived, not listed
-
-`set_look(look)` decides if the held tiles are still right in two steps:
-
-1. **The style-derived part.** Make the new layers and style. Make `TileOptions` from them (it is cheap). The held tiles are right only if the new
-   options equal the held options (`read`, `source_reads`, the popups, the codes, `slots_from`, `base`, the zooms), and **each new buffer is not
-   larger than the held buffer** of its zoom. `TileOptions` gets `PartialEq` for this. A look with narrower roads keeps the tiles. A look with wider
-   roads than the buffer allows does not.
-2. **The stage-1 part.** A hash of the stage-1 inputs that are not in the style: the order of `model.classes`; the slot look and the deck look;
-   `head_m`, `bridge_shadow`, `single_line`, `twin_casing`, `casing.m`; `base_map.layers_yaml`; the overlays, the items, the columns, the levels; the
-   colour mode; the dash of each class; the access colours while they are home 3. The held tiles are right only if the hash is the same.
-
-Both steps must pass. If one fails, `set_look` changes nothing and returns `tiles_kept: false`.
-
-### D3. `LiveTiles::set_look(look)` and the frozen state
-
-`set_look` returns `Restyled { tiles_kept: bool }`. When `tiles_kept` is true, it replaces the style text **only**. The rule is:
-
-> `set_look` never changes anything that `fill()` or `tile()` reads: `styled`, `options`, the class colours and the piece table stay as they are.
-
-So a tile that is made after `set_look` equals a tile that was made before it, and the style turns the same facts into the new look. The wasm class
-`LiveMap` gets `setLook(look, format)`. It returns the new style and `tilesKept`.
-
-### D4. A path that makes the layers and not the pieces
-
-As in version 1: the layers, the dark colours, the contract and the metadata from the new look, with no pieces, no slots and no per-road bake.
-Version 1 left out three things that make it harder:
-
-- `road_layers` reads per-road marks (the dash list, `any_dup` from `single_line`, the controls). The cheapest correct way is to keep the road marks
-  from stage 1 and run only the class frame of `colors::bake` for the new look.
-- `Overlay` holds the data and the styling together, and `style.rs` moves it into the sources. The split of `feature_overlays` touches
-  `overlays.rs`, `contract.rs` and `layers/*`.
-- The class colours that the pieces were stripped with (`simple.class_colours`) stay from the old look (D3). The new style does not read them from the
-  pieces, so the pieces that kept an explicit fill still show the old colour. This is why the access colour moves to home 2.
-
-### D5. The guard test: one direction, all tiles
-
-The rule that the test guards is: **if `set_look` says `tiles_kept`, then every tile equals the tile of a new `LiveTiles` of the new look**. The test:
-
-1. Makes `LiveTiles(A)` and makes **some tiles**, then calls `set_look(B)`.
-2. Compares every tile of the area at every zoom: the tiles made before `set_look`, the tiles first made after it, and the tiles made again after the
-   cache dropped them. The reference is `LiveTiles(B)`. When `set_look` says `tiles_kept: false`, the test needs no comparison.
-3. Uses the palettes and profiles in `data/`, **and** random changes of the look values, with the options turned on that act only when on (`access_col`,
-   `decks_3d`, items, `width_m`, tunnels, dashes). A change that `set_look` accepts and that changes a tile fails the test.
-4. Does not test the other direction ("a value that changes no tile must be accepted"). A value that is refused for no reason costs time, not a wrong map.
-
-The oracle of `palettes.rs` (`merge` fails when two palettes make other features) is used to check the options.
-
-### D6. The host contract
-
-The host keeps its source ids and tile addresses (`prefix`). With `tilesKept`, it gives the new style to MapLibre with `setStyle(style, { diff: true })`. We
-check these in phase 2, in a browser test:
-
-- MapLibre keeps a source only when its object is deep-equal, so the style's `sources` must not change. The test fails when a source is removed.
-- The images (`roadstyle:images`) and the controls are in the style's metadata, which the diff does not apply. The host adds the images again and reads the
-  controls again.
-- The global-state defaults (`state`) must be diffable in the pinned MapLibre. If not, the host sets them with `setGlobalStateProperty`.
-- A change of layout or filter makes the worker parse the held tiles again, with no new request. The test counts the tile requests.
-
-The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new style. This design is for every other change of the look: the Design panel
-of the duckOSM page, a custom colour, a profile.
-
-## Phase 0 result (2026-11-04)
-
-We timed the parts of `style_parts` (the stage that makes the layers and the pieces) on Burnaby, natively, with temporary timers:
+The parts of stage 1 (native, Burnaby, with temporary timers):
 
 | Part | Time | Needed for a new look? |
 |---|---|---|
-| `mark_roads`: each road's drawing values | 180 to 250 ms | no, for a look with class colours only (`class_only`) |
-| the slots (arrows and names) | 220 to 270 ms | no, the slots do not depend on the colours |
-| the base-map overlays (`feature_tables`, `edge_attach`) | 186 ms | the data part: no. The styling part: yes, and it is small |
+| `mark_roads`: each road's drawing values | 180 to 250 ms | no |
+| the slots (arrows and names) | 220 to 270 ms | no |
+| the base-map overlays: the data (`feature_tables`, `edge_attach`) | 186 ms | no |
 | `simple_source`: the pieces | 44 to 72 ms | no |
 | `road_layers`: the layers | 41 to 53 ms | yes |
-| the dark colours and the contract (`dark::layers`, `contract`) | 38 to 44 ms | yes |
+| the dark colours and the contract | 38 to 44 ms | yes |
 | the metadata | 0 to 8 ms | yes |
 
-The parts that a new look needs (layers, dark colours, contract, metadata) cost about 100 ms. The parts that it does not need cost about 700 ms. A full
-`restyle` costs 650 to 1,200 ms, because it makes all of them again.
+So a new look needs about 100 ms of the about 800 ms.
 
-What phase 0 did **not** show: a working layers-only function with a style that equals the style of a new `LiveTiles`. The inputs of `road_layers` must be
-rebuilt without the data. This needs three changes, which are the work of phase 1:
+## What a tile holds today
 
-1. `Styled` keeps the facts of each base-map overlay (its name, kind, kinds and whether it is attached to the edges). `feature_overlays` is split in two: the
-   facts, which depend on the data, and the styling, which depends on the look (`look.sections.base_map.style`).
-2. The class colours (`ClassColours::of`) are made again from the new look, and the `simple` source keeps its pieces.
-3. A look with data colours (`ColourTable`, `color_by`) has no layers-only path: its key includes the data colouring (D2).
+A piece of a road in a tile holds **facts** (the class place `__rs_ci`, the grade, the direction, bridge and tunnel, the access kind
+`__rs_access`, the metre widths) and, in some cases, **values of the look**. The values of the look in a tile are the problem:
 
-So the target of phase 0 changes. The first target (less than 100 ms) is the cost of the parts that are certain, with no margin. The new target for phase 1
-is **less than 250 ms natively on Burnaby**, which is about 3 to 5 times less than the 650 to 1,200 ms of today, and the style text must equal the style of a new
-`LiveTiles` for every palette.
+| Value of the look in a tile | Code | When | Effect of a theme change |
+|---|---|---|---|
+| The place of a fill and a casing colour in a table of distinct colours (`ColourTable`) | `colors.rs`: `Colours::add` numbers each new value in the order of first use; `put_places` | the look has a colour option, a `color_by` or a `color_table`. **The duckOSM page has a colour option ("Road class").** | When the theme makes other colours equal or unequal, the places change, and every tile changes. |
+| The access colour, written into each road's fill | `roads.rs` (`look.access`) | `access_col` is set. **The duckOSM page sets it.** | The tile keeps the old colour as text, or as a place. |
+| The dash, as a place in the sorted list of all the patterns | `layers/build.rs` (`dash_patterns`) | a class or an item has a dash | A new pattern changes the places of the others. |
+| No casing piece for a dashed class | `simple/source.rs` | as above | A theme that gives a class a dash, or takes it away, changes the pieces. This is structure (see D1). |
+| The colour of the items | `overlays.rs` (`sections.overlays.color`) | the map has items | The tile keeps the old colour. |
 
-## Phases (version 2)
+With the class-only path (no colour option, no access column), the colours are already by role: the style has a lookup from the class to its colour
+(`class_table` in `layers/build.rs`), and a palette change gives the same tile bytes. We measured this on Burnaby for 4 palettes (`compare_tiles.rs`).
+That test passed only because those 4 palettes have the same pattern of equal colours, and it used the class-only colours. It is not evidence for the
+duckOSM page.
+
+Other values decide the tiles in a way that is correct and stays (structure): the first zoom of a class, the first zoom of the arrows and the names, the
+bridge wing, the order of the classes, the slot look, the base-map layer list, the popup and tooltip fields (they decide the properties that a tile
+keeps), and the buffer of each zoom (D2).
+
+## The design
+
+### D1. A tile holds facts. A colour reaches a piece by its role.
+
+A **role** is what a piece is, made only of facts that the tile already has: the class place, the colour option, the access kind, the piece kind
+(fill, casing, shadow, tunnel gap or dash), bridge or tunnel. The style holds the table from a role to a colour. A theme changes the table in the
+style, and no tile byte.
+
+1. **Class colours with a colour option.** A colour option that colours by class (the duckOSM page's "Road class") reads the colour from the class
+   lookup of the style (`class_table`), as the class-only path does today. The piece holds no colour place.
+2. **The access colour.** The style draws a piece with an access kind in the palette's colour of that kind, before the class lookup:
+   `["match", ["get", "__rs_access"], "private", <colour>, ..., <class lookup>]`. The bake stops writing the access colour into the fill.
+3. **The dash.** The dash pattern of a class comes from the style, by the class place. Whether a class has a dash at all stays structure, because it
+   decides if the class has casing pieces.
+4. **The colour of the items.** The style reads it from the look. A piece of an item keeps its own colour only when the item gives one (data).
+5. **Data colours stay data.** A colour from the user's data (`color_by` on a column, `color_table`) is a fact of the data. It stays as it is now (a
+   place in a table), and its colour mode is part of the key (D2), so a change of it makes new tiles.
+
+The test of D1 (D5, part 1): the tiles are the same bytes for every theme and profile of the duckOSM Design panel, and for custom colours that make two
+classes the same colour, with the page's own options (`access_col`, the colour option).
+
+**The size of a tile.** A piece holds fewer properties than today (no fill and casing place for a class-coloured option). The style has one more
+`match` for the access kinds. Phase 1 measures both against the tile size standard (`docs/design/tile_contract.md` on its branch) on Burnaby.
+
+### D2. The key is derived, not listed
+
+`set_look(look)` decides if the held tiles are still right in two steps. Both must pass.
+
+1. **The part that comes from the style.** Make the new layers and style (D4). Make `TileOptions` from them, as `LiveTiles` does today (this is
+   cheap). The held tiles are right only if the new options equal the held options (`read`, `source_reads`, the popups, the codes, `slots_from`,
+   `base`, the zooms), and if **each new buffer is not larger than the held buffer** of its zoom. The buffer comes from the stroke widths of the layers
+   (`buffer::buffers_px`), so a look with wider roads can need new tiles; a look with narrower roads can keep them. `TileOptions` gets `PartialEq`.
+2. **The part that comes from stage 1.** A hash of the stage-1 inputs that are not in the style: the order of `model.classes`; the slot look (with the
+   class width at zoom 20, `width_z20`, which places the names) and the deck look; `head_m`, `bridge_shadow`, `single_line`, `twin_casing`,
+   `casing.m`; `base_map.layers_yaml`; the overlays, the items, the columns and the levels; the colour mode and the data colours; which classes have a
+   dash.
+
+We do not keep a hand-written list of every look value: the review showed that such a list cannot be complete.
+
+### D3. `LiveTiles::set_look(look)` and the frozen state
+
+`set_look` returns `Restyled { tiles_kept: bool }`. When the key of D2 passes, it replaces the style text and nothing else. The rule:
+
+> `set_look` never changes anything that `fill()` or `tile()` reads: `styled`, `options`, the class colours of the pieces and the piece table stay
+> as they are.
+
+`LiveTiles` makes the properties of a piece when a tile is first seen (`fill`). With the frozen state, a tile that is made after `set_look` equals a
+tile that was made before it. After D1, the pieces hold no colour of the look, so the new style shows the new colours on old and new tiles alike.
+
+When the key fails, `set_look` changes nothing and returns `tiles_kept: false`. The host makes a new `LiveTiles`, as today. The wasm class `LiveMap` gets
+`setLook(look, format)`. It returns the new style and `tilesKept`.
+
+### D4. A path that makes the layers and not the pieces
+
+The layers, the dark colours, the contract and the metadata, from the new look, with no pieces, no slots and no per-road bake. The parts that it needs
+cost about 100 ms on Burnaby (see the measured table). Three things make it harder than one call:
+
+- `road_layers` reads some marks of the roads (the dash classes, `any_dup` from `single_line`, the controls). The path keeps the road marks from
+  stage 1 and runs only the class frame of `colors::bake` for the new look.
+- `Overlay` holds the data of a base-map layer and its styling together, and `style.rs` moves it into the sources. `feature_overlays` is split into the
+  facts of each layer (name, kind, kinds, attached to the edges), which `Styled` keeps, and the styling from the look (`look.sections.base_map.style`).
+  This touches `overlays.rs`, `contract.rs` and `layers/*`.
+- After D1, the class colours of the pieces do not depend on the look, so no colour must be compared with the old look's.
+
+The target: **less than 250 ms natively on Burnaby** for `set_look` when the key passes, and the style text equal to the style of a new `LiveTiles` of
+the new look.
+
+### D5. The tests
+
+1. **The tiles are facts (D1).** For the duckOSM page's look, its options on, and every theme and profile of the Design panel, plus custom colours that
+   make two classes equal: every tile of Monaco at zooms 12 to 18, and the tiles around the centre of Burnaby at zooms 6 to 16, are the same bytes. This
+   test runs before `set_look` exists.
+2. **`set_look` is exact (D2, D3).** If `set_look` says `tiles_kept`, every tile equals the tile of a new `LiveTiles` of the new look: the tiles made
+   before `set_look`, the tiles first made after it, and the tiles made again after the cache drops them. The looks are the themes and profiles, and
+   random changes of the look values with the options on that act only when on (`access_col`, `decks_3d`, items, `width_m`, tunnels, dashes). When
+   `set_look` says `tiles_kept: false`, the test needs no comparison. A wrong `tiles_kept: true` fails the test. A refusal that was not needed does not
+   fail it: it costs time, not a wrong map.
+3. **The style is exact.** For each theme, the style of `set_look` equals the style of a new `LiveTiles`.
+4. **The browser (D6).** In the page, a theme change sends no new tile request, removes no source, and the map shows the new colours.
+
+### D6. The host contract
+
+The host keeps its source ids and its tile addresses (`prefix`). Today the duckOSM page makes a new prefix (`rs://<generation>/`) for each draw, so
+MapLibre requests every tile again. With `tilesKept`, the page keeps the prefix and gives the new style to MapLibre with `setStyle(style, { diff: true })`.
+Phase 4 checks in a browser:
+
+- MapLibre keeps a source only when its object is equal, so the style's `sources` must not change.
+- The images (`roadstyle:images`) and the controls are in the style's metadata, which the diff does not apply. The host adds the images again and reads
+  the controls again.
+- The global-state defaults (`state`) must be diffable in the pinned MapLibre. If not, the host sets them with `setGlobalStateProperty`.
+- A change of layout or filter makes MapLibre's worker parse the held tiles again, with no new request.
+
+The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new style. This design is for every other change of the look.
+
+## Phases
 
 | Phase | Work | Done when |
 |---|---|---|
-| 0 | A measurement for D4: the time of each part of `style_parts`. Done (see above). | The parts that a new look needs cost about 100 ms. |
-| 1a | Move the access colour to home 2 (the style maps `__rs_access` to the colour), with the byte test that the tiles of a look with no `access_col` do not change. | The tiles with `access_col` do not carry a palette colour. |
-| 1b | Move the dash to a role number (home 2), the same test. | A new dash pattern does not change the other patterns' tiles. |
-| 1c | The split of `feature_overlays`, the layers-only path (D4), `PartialEq` for `TileOptions`, the stage-1 hash (D2), `set_look` (D3), the guard test (D5). | Less than 250 ms natively on Burnaby, and the guard test passes for all the palettes and for the random changes. |
-| 2 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the browser test of D6, the Python binding if it is wanted. | The test sets a look, the style changes, and no source is removed and no tile is requested again. |
-| 3 | The duckOSM page: the Design panel calls `setLook` and uses the old path only when `tilesKept` is false. | A theme change on Burnaby takes less than 1 s in the browser. |
-| 4 | The dashboard theme switch and `palettes.rs` can use `set_look` and stop making every palette at the start. Optional. | The decision is a separate document. |
+| 0 | Measure the parts of stage 1. **Done.** | The table above. |
+| 1 | D1: colours by role (the class-coloured option, the access colour, the dash pattern, the item colour). | D5 part 1 passes; the tile size on Burnaby is not larger than today; the page draws as before. |
+| 2 | D4: the layers-only path and the split of `feature_overlays`. | Its style equals the style of a new `LiveTiles` for every theme; less than 250 ms natively on Burnaby. |
+| 3 | D2 and D3: the derived key, `PartialEq` for `TileOptions`, the stage-1 hash, `set_look`. | D5 parts 2 and 3 pass. |
+| 4 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the browser test of D6. | D5 part 4 passes. |
+| 5 | The duckOSM page: the Design panel calls `setLook` and keeps its prefix; the old path only when `tilesKept` is false. | A theme change on Burnaby takes less than 1 s in the browser. |
+| 6 | The dashboard and `palettes.rs` can use `set_look` and stop making every palette at the start. Optional. | A separate document. |
+
+Phase 1 alone does not make a theme change faster: the page still makes a new worker and a new prefix. It is the condition for phases 3 to 5.
 
 ## Risks
 
-- **A stale map.** The worst failure, because it looks right. D2 (derived key), D3 (frozen state) and D5 (all tiles, random changes) are the guards. A
-  value that `set_look` accepts by mistake is a bug that the random test must be able to find.
-- **A larger change than the first design.** Phases 1a and 1b change what a tile holds, so they change the tile contract (the size standard and the CI
-  budget, `docs/design/tile_contract.md` on its branch). Each one needs the byte test and a check of the tile size on Burnaby.
-- **The base map.** The layers of the base map come from a YAML file and the features. The split of `Overlay` (D4) is the largest single change.
-- **The data colour.** A look with `color_by` has colours in the pieces. Its colour mode is in the stage-1 hash, so a change of it gives
-  `tiles_kept: false`. This is correct.
-- **The Python and CLI paths** write static styles. They do not use `LiveTiles`, and they are not changed.
+- **A stale map.** The worst failure, because it looks right. The guards are D1 (no look in a tile), D2 (a derived key), D3 (a frozen state) and D5 part 2
+  (all tiles, random changes).
+- **The size of a tile and of the style.** Phase 1 changes what a tile holds. It must meet the size standard and its CI budget.
+- **The tunnel and bridge colours.** The tunnels have their own palettes (`tunnels.palette`). Phase 1 must find whether their colours reach the pieces,
+  and give them roles if they do.
+- **The base map.** The split of `Overlay` (D4) is the largest single change.
+- **The pinned roadstyle.** The duckOSM page pins a roadstyle commit (`ROADSTYLE_COMMIT` in `crates/duckosm-wasm/build.sh`). Each phase that the page uses
+  needs a pushed commit and a new pin. The Design session of the page uses the same pin.
 
 ## Open questions
 
-1. Phases 1a and 1b move values into home 2. Are they in scope, or do we accept `tiles_kept: false` when a dash or an access colour changes? The
-   proposal is to do them: they are what makes the tiles a set of facts, and they are small.
-2. `set_look` with a changed key returns `tiles_kept: false` and changes nothing. A later phase can rebuild by itself from the held roads.
-3. The level editor holds a `LiveTiles` (`relevel`). Does it call `set_look` when the theme changes? The proposal is yes, after phase 1c.
-4. How wide may a road be before the buffer of the held tiles is too small? D2 refuses the new look, and the host builds the tiles again. A later
-   phase can raise the buffer in advance (a larger tile for every zoom has a cost: the tile size standard).
+1. Does the dashboard need the colour option "Road class" on the duckOSM page at all? If not, the page can use the class-only path at once. This does
+   not remove the need for D1 (the access colour, the dash, other hosts).
+2. `set_look` with a failed key returns `tiles_kept: false` and changes nothing. A later phase can rebuild by itself from the held roads.
+3. The level editor holds a `LiveTiles` (`relevel`). Does it call `set_look` when the theme changes? The proposal is yes, after phase 3.
+4. How wide may a road be before the held buffer is too small? A later phase can raise the buffer in advance, at a cost in tile size.
+
+## Review history
+
+- **Version 1** said that a look's appearance never reaches the tiles, with a hand-written list of structure values. An independent review (Opus,
+  2026-11-04) rejected it: the dash, the access colours, the item colour and the popup fields are in the tiles; the buffer comes from the widths (our
+  width test did not show it, because those widths fall back to a fixed buffer); the tiles are made late from the held state; and a hand-written list
+  cannot be complete. We checked each point in the code.
+- **Version 2** answered the review: a derived key, a frozen state, a guard test in one direction, and two small moves (the access colour and the dash).
+- **Version 3** found the main case that version 2 missed: with a colour option (the duckOSM page has one), every piece holds the place of its colour in
+  a table of distinct colours, numbered in the order of first use. D1 now makes all class colours reach a piece by its role, which covers the colour
+  option, the access colour, the dash and the item colour in one rule.
