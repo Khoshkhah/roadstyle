@@ -1,6 +1,6 @@
-//! `LiveTiles::set_look` (docs/design/restyle_without_retile.md, D2, D3 and D5): when it says that the map keeps its tiles, every tile of the
-//! map (the tiles made before the new look and the tiles first made after it) and its style are those of a new map of the new look, byte for
-//! byte. A change of colours only is kept; a change of structure is refused. Random changes of the look's values (colours, numbers, flags) check
+//! `LiveTiles::set_look` (docs/design/restyle_without_retile.md, D2, D3 and D5): when it says that the map keeps its tiles, its style is the
+//! style of a new map of the new look, and every tile of the map (the tiles made before the new look and the tiles first made after it) is the
+//! tile of a new map of the new look cut with the held map's buffers (`LiveTiles::with_buffers`), byte for byte. A change of colours only is kept; a change of structure is refused. Random changes of the look's values (colours, numbers, flags) check
 //! the rule where the key could be wrong: a wrong "kept" fails, a refusal does not (it costs time, not a wrong map). On Monaco with its base map
 //! and the duckOSM page's options.
 
@@ -20,8 +20,13 @@ fn look_json() -> Value {
 }
 
 fn live(look: &roadstyle_rs::Look) -> Option<roadstyle_rs::relevel::LiveTiles> {
+    cut(look, None)
+}
+
+/// A new map of `look`, its tiles cut with `buffers` (None: the style's).
+fn cut(look: &roadstyle_rs::Look, buffers: Option<Vec<f64>>) -> Option<roadstyle_rs::relevel::LiveTiles> {
     let s = roadstyle_rs::style_sources(data("monaco/roads.parquet"), look, Some(data("monaco/features.parquet")), None, None).ok()?;
-    roadstyle_rs::relevel::LiveTiles::new(s, look.clone(), "rs://1/", &["osm_id".to_string()]).ok()
+    roadstyle_rs::relevel::LiveTiles::with_buffers(s, look.clone(), "rs://1/", &["osm_id".to_string()], buffers).ok()
 }
 
 /// Every tile of Monaco's roads at zooms 12 to 16.
@@ -57,8 +62,9 @@ fn set_and_check(name: &str, a: &Value, b: &Value) -> bool {
     if !held.set_look(&lb).unwrap() {
         return false;
     }
-    let mut new = live(&lb).unwrap_or_else(|| panic!("{name}: set_look kept the tiles of a look that makes no map"));
-    assert!(held.style() == new.style(), "{name}: set_look kept the tiles, but the style is not the new map's");
+    let new_style = live(&lb).unwrap_or_else(|| panic!("{name}: set_look kept the tiles of a look that makes no map")).style().to_string();
+    assert!(held.style() == new_style, "{name}: set_look kept the tiles, but the style is not the new map's");
+    let mut new = cut(&lb, Some(held.options().buffers.clone())).unwrap();
     for &(z, x, y) in &numbers {
         assert!(held.tile(z, x, y) == new.tile(z, x, y), "{name}: set_look kept the tiles, but tile {z}/{x}/{y} is not the new map's");
     }

@@ -53,8 +53,17 @@ pub struct LiveTiles {
 impl LiveTiles {
     /// Stage 2 of `s` (`tiles_of_sources`'s), made by the look `look`, which a redraw runs stage 1 with again.
     pub fn new(s: sources::Styled, look: Look, prefix: &str, keep: &[String]) -> Result<LiveTiles, crate::Error> {
+        LiveTiles::with_buffers(s, look, prefix, keep, None)
+    }
+
+    /// `new`, with the tiles cut with these buffers (one for each zoom) in place of the ones that the style gives: the tiles of another map that
+    /// kept its tiles through `set_look` (docs/design/restyle_without_retile.md, the guard test). None: the style's.
+    pub fn with_buffers(s: sources::Styled, look: Look, prefix: &str, keep: &[String], buffers: Option<Vec<f64>>) -> Result<LiveTiles, crate::Error> {
         let mut options = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
         options.wait = true;
+        if let Some(b) = buffers {
+            options.buffers = b;
+        }
         // tiles_of_sources's stage 2, with the pieces that wait
         let at = crate::xyz_at(prefix);
         let (style, tiles) = crate::tile_stage(&s, &options, &at, sources::SourceMode::INLINE)?;
@@ -161,6 +170,11 @@ impl LiveTiles {
                    std::mem::replace(&mut s.state, old.3), std::mem::replace(&mut s.saved, old.4));
         Ok(Restyled { half: roadstyle_engine::LookHalf { layers: new.0, metadata: new.1, glyphs: new.2, state: new.3, sources: Vec::new() },
                       saved: new.4, options, text })
+    }
+
+    /// The tile rules of the map (its zooms, its buffers, the properties that the tiles keep).
+    pub fn options(&self) -> &tiles::stage::TileOptions {
+        &self.options
     }
 
     /// The stage 1 that the map holds (its road table's rows and lines; a redraw does not change the lines).
@@ -270,7 +284,9 @@ struct Restyled {
 /// left out, but not in the sections that hold the user's data colours (`map`, `data`, `overlays`: there a colour can be a place in the colour
 /// table of the pieces), and without the values that only the style reads: the section `arrows`, and the section `labels` but its `slots` and
 /// `slot_m` (the slots' class order, widths at zoom 20 and length: `SlotLook`, stage 1); a first zoom of the names or the arrows is in the tile
-/// options, part 1; and the base map's images (icons and patterns, which only the style's metadata reads). Every other value counts, so a change of anything else gives another key and a new map: that costs time, never a wrong map.
+/// options, part 1; the base map's images (icons and patterns, which only the style's metadata reads); and the road widths of `roads` and
+/// `settings` (a key with `width` in its name, and `casing_ratio`), which reach the tiles only through the buffer that part 1 checks. Every
+/// other value counts, so a change of anything else gives another key and a new map: that costs time, never a wrong map.
 /// The guard test (tests/set_look.rs) found the two traps of a shorter key: `labels.slot_m` places the names (stage 1), and a narrower road
 /// gives tiles with a smaller buffer (so part 1 asks for the same buffer).
 pub fn stage1_key(look: &Look) -> u64 {
@@ -302,6 +318,22 @@ pub fn stage1_text(look: &Look) -> String {
         }
         if let Some(Value::Object(b)) = o.get_mut("base_map") {
             b.shift_remove("images");          // the base map's icons and patterns: only the style's images (metadata) read them
+        }
+        // the road widths reach the tiles only through the buffer, which part 1 checks (the strokes' need against the held buffer)
+        fn no_widths(v: &mut Value) {
+            match v {
+                Value::Object(o) => {
+                    o.retain(|k, _| !k.contains("width") && k != "casing_ratio");
+                    o.values_mut().for_each(no_widths);
+                }
+                Value::Array(a) => a.iter_mut().for_each(no_widths),
+                _ => {}
+            }
+        }
+        for k in ["roads", "settings"] {
+            if let Some(x) = o.get_mut(k) {
+                no_widths(x);
+            }
         }
         o.iter_mut().filter(|(k, _)| !matches!(k.as_str(), "map" | "data" | "overlays")).for_each(|(_, x)| mask(x));
     }

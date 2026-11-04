@@ -35,9 +35,16 @@ fn main() {
         let same = these == base_tiles;
         let bytes = |t: &[Vec<u8>]| t.iter().map(Vec::len).sum::<usize>();
         print!("{:>+6.1}% bytes  ", 100.0 * (bytes(&these) as f64 / bytes(&base_tiles) as f64 - 1.0));
-        let why = new(&base).set_look_why(&l).unwrap();
+        let mut held = new(&base);
+        let why = held.set_look_why(&l).unwrap();
         let kept = why.is_none();
+        // a kept look: the held tiles must be the new look's tiles cut with the held buffers
+        let wrong = kept && {
+            let s = roadstyle::style_sources(roads.clone(), &l, Some(features.clone()), None, None).unwrap();
+            let mut oracle = roadstyle::relevel::LiveTiles::with_buffers(s, l.clone(), "rs://1/", &[], Some(held.options().buffers.clone())).unwrap();
+            tiles(&mut held) != tiles(&mut oracle)
+        };
         println!("{:<14} same tiles: {:<5} set_look kept: {:<5} {} {}", p.file_stem().unwrap().to_str().unwrap(), same, kept,
-                 if kept && !same { "WRONG" } else if same && !kept { "(a refusal that was not needed)" } else { "" }, why.unwrap_or_default());
+                 if wrong { "WRONG" } else if same && !kept { "(a refusal that was not needed)" } else { "" }, why.unwrap_or_default());
     }
 }

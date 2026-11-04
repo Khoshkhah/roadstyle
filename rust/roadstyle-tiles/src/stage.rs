@@ -12,7 +12,10 @@ pub struct TileOptions {
     pub min_zoom: u32,
     pub max_zoom: u32,
     pub buffer_px: f64,
-    /// the buffer of each zoom 0 to max_zoom in px (crate::buffer::buffers_px: from the style's strokes; `buffer_px` where a stroke's
+    /// the buffer that the strokes need at each zoom 0 to max_zoom in px (crate::buffer::buffers_px), before the headroom
+    pub needs: Vec<f64>,
+    /// the buffer of each zoom 0 to max_zoom in px that the tiles are cut with: `needs` times `roadstyle:tiles.buffer_headroom` (none: 1)
+    /// (crate::buffer::buffers_px: from the style's strokes; `buffer_px` where a stroke's
     /// width cannot be bounded)
     pub buffers: Vec<f64>,
     /// the properties that the drawing reads (props::drawn), with the caller's `keep`
@@ -49,9 +52,9 @@ pub const TILE_PX: f64 = 512.0;
 pub const COLUMNS: &str = "roadstyle:columns";
 
 impl TileOptions {
-    /// The tiles made by these options are the tiles of the options `new` of another style of the same stage 1, byte for byte
-    /// (docs/design/restyle_without_retile.md, D2, part 1): every rule is the same, the buffer of each zoom too. (A narrower stroke would draw the
-    /// same from the held tiles, but a new map cuts them with a smaller buffer, so they are not the same bytes.) `wait` is the caller's, not a rule.
+    /// The tiles made by these options are right for the options `new` of another style of the same stage 1
+    /// (docs/design/restyle_without_retile.md, D2, part 1): every rule is the same, and the strokes of `new` need no more buffer than these tiles
+    /// have at any zoom. They are then the tiles that `new`'s rules give with these buffers, byte for byte. `wait` is the caller's, not a rule.
     pub fn keeps_tiles(&self, new: &TileOptions) -> bool {
         self.differs_from(new).is_none()
     }
@@ -59,7 +62,8 @@ impl TileOptions {
     /// The first tile rule that is not the same in `new` (`keeps_tiles`), by its name; None: every rule is the same.
     pub fn differs_from(&self, new: &TileOptions) -> Option<&'static str> {
         let rules: [(&'static str, bool); 15] = [("min_zoom", self.min_zoom == new.min_zoom), ("max_zoom", self.max_zoom == new.max_zoom),
-            ("buffer_px", self.buffer_px == new.buffer_px), ("buffers", self.buffers == new.buffers), ("read", self.read == new.read),
+            ("buffer_px", self.buffer_px == new.buffer_px),
+            ("buffers", new.needs.len() == self.buffers.len() && new.needs.iter().zip(&self.buffers).all(|(n, b)| n <= b)), ("read", self.read == new.read),
             ("source_reads", self.source_reads == new.source_reads), ("popups", self.popups == new.popups), ("generation", self.generation == new.generation),
             ("base", self.base == new.base), ("pieces", self.pieces == new.pieces), ("codes", self.codes == new.codes), ("exact", self.exact == new.exact),
             ("only", self.only == new.only), ("slots_from", self.slots_from == new.slots_from), ("format", self.format == new.format)];
@@ -78,7 +82,9 @@ impl TileOptions {
         let pieces = [col("class").unwrap_or_else(|| "highway".into()), "lvl".into()].into_iter().chain(col("width")).chain(col("filter")).collect();
         let slots_from = layers.iter().filter(|l| l["source"] == "slots").map(|l| l["minzoom"].as_f64().unwrap_or(0.0) as u32).min().unwrap_or(0);
         let (min_zoom, max_zoom, buffer_px) = (num("minzoom")? as u32, num("maxzoom")? as u32, num("buffer_px")?);
-        let buffers = crate::buffer::buffers_px(layers, max_zoom, crate::buffer::LIVE_WIDTH_MAX, buffer_px);
+        let needs = crate::buffer::buffers_px(layers, max_zoom, crate::buffer::LIVE_WIDTH_MAX, buffer_px);
+        let headroom = tiles["buffer_headroom"].as_f64().filter(|h| *h >= 1.0).unwrap_or(1.0);
+        let buffers = needs.iter().map(|n| n * headroom).collect();
         let source_reads = layers.iter().filter_map(|l| l["source"].as_str())
             .map(|k| (k.to_string(), roadstyle_model::props::source_reads(layers, k))).collect();
         let base = metadata[roadstyle_model::props::BASE_LAYERS].as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
@@ -100,7 +106,7 @@ impl TileOptions {
             extra.clear();
         }
         let codes = crate::codes::Codes { classes, extra, class_col, dashes: crate::codes::dash_patterns(layers), filter_codes };
-        Ok(TileOptions { min_zoom, max_zoom, buffer_px, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, base, generation,
+        Ok(TileOptions { min_zoom, max_zoom, buffer_px, needs, buffers, read: roadstyle_model::props::drawn(layers, metadata, keep), source_reads, popups, base, generation,
                          pieces, exact: None, only: None, slots_from, wait: false, format: Default::default(),
                          codes })
     }

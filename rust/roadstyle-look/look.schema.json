@@ -2418,6 +2418,17 @@
         },
         "buffer_px": {
           "$ref": "#/$defs/Num"
+        },
+        "buffer_headroom": {
+          "description": "The tiles' buffer of each zoom is the buffer that the strokes need, times this (none: 1). A host that changes the look of a live map\n(`LiveTiles::set_look`) sets it once, so that a look with wider roads (up to this factor) keeps the tiles\n(docs/design/restyle_without_retile.md, \"The buffer headroom\").",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Num"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false,

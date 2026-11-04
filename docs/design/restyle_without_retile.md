@@ -252,6 +252,21 @@ Phase 1 alone does not make a theme change faster: the page still makes a new wo
 - Found on the way: a style with no name has `"name": null`, and MapLibre's style check refuses it (the map does not load). The duckOSM page gives a
   name; the docs say so. Not changed here.
 
+## The buffer headroom (2026-11-04)
+
+The road widths reach the tiles only through the tile buffer: with Light's widths, the 18 themes of the duckOSM Design panel that make other tiles
+make Light's tiles. A theme's buffer, against Light's, is ×0.73 to ×1.70 (Access ×1.70; Contrast, Minimal and Toner ×1.33; Print ×1.20). So:
+
+- The look's tile settings have `tiles.buffer_headroom` (none: 1). The tiles are cut with the buffer that the strokes need times the headroom
+  (`TileOptions::needs` and `buffers`).
+- Part 1 of the key keeps the tiles when every other tile rule is the same and the new look's strokes need no more buffer than the tiles have at
+  any zoom. The road widths leave part 2 (keys with `width` in `roads` and `settings`, and `casing_ratio`).
+- The guard test compares the held tiles with a new map of the new look cut with the held buffers (`LiveTiles::with_buffers`): the same bytes.
+  With widths free, 13 of 40 random changes keep the tiles, each checked tile by tile.
+- The cost of a headroom on Light's tiles (Burnaby sample, zooms 9 to 16): 1.35, 4.3% more bytes, 32 of 33 themes keep the tiles (Access does not);
+  1.7, 8.5% more bytes, all 33. With 1.7, all 33 themes over Burnaby keep the tiles and none is wrong.
+- roadstyle's own default look has no headroom, so its tiles and its tile budget do not change. A host sets it (the duckOSM page: `make_look.mjs`).
+
 ## Risks
 
 - **A stale map.** The worst failure, because it looks right. The guards are D1 (no look in a tile), D2 (a derived key), D3 (a frozen state) and D5 part 2
