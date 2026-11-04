@@ -116,6 +116,13 @@ classes the same colour, with the page's own options (`access_col`, the colour o
 
 We do not keep a hand-written list of every look value: the review showed that such a list cannot be complete.
 
+**Phase 5 change of the key (2026-11-04).** Part 1 asks for the same buffer at every zoom, not a buffer that is not larger: a narrower road would draw
+the same from the held tiles, but a new map cuts its tiles with a smaller buffer, so they are not the same bytes, and the guard test cannot prove
+them. Part 2 also leaves out the section `arrows` and the section `labels` but its `slots` and `slot_m` (stage 1 reads only those, through
+`SlotLook`). The guard test found both traps of a shorter key (a free `labels.slot_m`, and free widths with a smaller buffer) and passes with this
+key; on the 33 themes of the duckOSM Design panel over Burnaby, 15 keep the tiles, none wrongly. The other 18 have other road widths, which change the
+tile buffer, so their tiles really differ (shown: with Light's widths, all 18 make Light's tiles).
+
 **How part 2 is made (phase 3).** The key is a hash of the whole saved look (`Look::to_json`) with only its colours left out, and not in the sections
 that hold the user's data colours (`map`, `data`, `overlays`): there a colour can be a place in the colour table of the pieces. Every other value
 counts: a width, a dash, a zoom, a palette name. So a change of anything but a colour gives a new map. That costs time, never a wrong map. A value

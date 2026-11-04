@@ -49,12 +49,11 @@ pub const TILE_PX: f64 = 512.0;
 pub const COLUMNS: &str = "roadstyle:columns";
 
 impl TileOptions {
-    /// The tiles made by these options are still right for the options `new` of another style of the same stage 1
-    /// (docs/design/restyle_without_retile.md, D2, part 1): every rule is the same, and no zoom needs a larger buffer (a narrower stroke keeps
-    /// the tiles, a wider one needs new tiles). `wait` is the caller's, not a rule.
+    /// The tiles made by these options are the tiles of the options `new` of another style of the same stage 1, byte for byte
+    /// (docs/design/restyle_without_retile.md, D2, part 1): every rule is the same, the buffer of each zoom too. (A narrower stroke would draw the
+    /// same from the held tiles, but a new map cuts them with a smaller buffer, so they are not the same bytes.) `wait` is the caller's, not a rule.
     pub fn keeps_tiles(&self, new: &TileOptions) -> bool {
-        let rules = TileOptions { buffers: self.buffers.clone(), wait: self.wait, ..new.clone() } == *self;
-        rules && new.buffers.len() == self.buffers.len() && new.buffers.iter().zip(&self.buffers).all(|(n, h)| n <= h)
+        TileOptions { wait: self.wait, ..new.clone() } == *self
     }
 
     /// The rules of a style: `tiles` the zoom settings (the look's config.tiles, or the style's `roadstyle:tiles`), `columns` the column

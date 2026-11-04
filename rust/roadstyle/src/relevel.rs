@@ -262,8 +262,11 @@ struct Restyled {
 
 /// The stage-1 key of a look (docs/design/restyle_without_retile.md, D2, part 2): a hash of the saved look (`Look::to_json`) with its colours
 /// left out, but not in the sections that hold the user's data colours (`map`, `data`, `overlays`: there a colour can be a place in the colour
-/// table of the pieces). Every other value counts, so a change of anything but such a colour gives another key and a new map: that costs time,
-/// never a wrong map.
+/// table of the pieces), and without the values that only the style reads: the section `arrows`, and the section `labels` but its `slots` and
+/// `slot_m` (the slots' class order, widths at zoom 20 and length: `SlotLook`, stage 1); a first zoom of the names or the arrows is in the tile
+/// options, part 1. Every other value counts, so a change of anything else gives another key and a new map: that costs time, never a wrong map.
+/// The guard test (tests/set_look.rs) found the two traps of a shorter key: `labels.slot_m` places the names (stage 1), and a narrower road
+/// gives tiles with a smaller buffer (so part 1 asks for the same buffer).
 pub fn stage1_key(look: &Look) -> u64 {
     use std::hash::{Hash, Hasher};
     fn colour(s: &str) -> bool {
@@ -280,6 +283,10 @@ pub fn stage1_key(look: &Look) -> u64 {
     }
     let mut v: Value = serde_json::from_str(&look.to_json()).expect("a look's JSON");
     if let Value::Object(o) = &mut v {
+        o.shift_remove("arrows");
+        if let Some(Value::Object(l)) = o.get_mut("labels") {
+            l.retain(|k, _| matches!(k.as_str(), "slots" | "slot_m"));
+        }
         o.iter_mut().filter(|(k, _)| !matches!(k.as_str(), "map" | "data" | "overlays")).for_each(|(_, x)| mask(x));
     }
     let mut h = std::collections::hash_map::DefaultHasher::new();

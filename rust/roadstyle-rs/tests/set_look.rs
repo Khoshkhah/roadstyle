@@ -162,3 +162,30 @@ fn random_changes_keep_the_tiles_only_when_they_are_the_same() {
     }
     println!("random changes: {kept} kept the tiles (and gave the new map's tiles and style), {refused} needed a new map");
 }
+
+/// Each value of the sections that the stage-1 key leaves out (`arrows`, and `labels` but its `slots` and `slot_m`), changed one at a time: a change
+/// that `set_look` keeps gives the new map's tiles and style. Most of them must be kept: they are the values that the themes change (the halo, the
+/// sizes of the names and arrows).
+#[test]
+fn each_label_and_arrow_value_keeps_the_tiles_only_when_they_are_the_same() {
+    let a = look_json();
+    let mut paths = Vec::new();
+    for s in ["labels", "arrows"] {
+        leaves(&a[s], &mut vec![s.to_string()], &mut paths);
+    }
+    paths.retain(|p| !(p[0] == "labels" && p.get(1).is_some_and(|k| k == "slots" || k == "slot_m")));
+    let (mut kept, mut refused) = (0, 0);
+    for p in &paths {
+        let mut b = a.clone();
+        let v = at(&mut b, p);
+        *v = match v.clone() {
+            Value::Bool(x) => json!(!x),
+            Value::Number(n) if n.is_i64() => json!(n.as_i64().unwrap() + 1),
+            Value::Number(n) => json!((n.as_f64().unwrap() * 1.37 * 1000.0).round() / 1000.0),
+            _ => json!("#123456"),
+        };
+        if set_and_check(&p.join("."), &a, &b) { kept += 1 } else { refused += 1 }
+    }
+    println!("label and arrow values: {kept} kept the tiles, {refused} needed a new map, of {}", paths.len());
+    assert!(kept > refused, "most label and arrow values are style only");
+}
