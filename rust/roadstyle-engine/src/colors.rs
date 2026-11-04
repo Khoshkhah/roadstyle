@@ -13,6 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 /// The colouring of a map: the baked fill property of each colour option (option 0: __rs_fill), the active option (state rs_co) and the
 /// legend data, the page's COLOR_OPTIONS ({name, prop, legend} for each option; empty for class colours).
+#[derive(Clone)]
 pub struct Baked {
     pub props: Vec<String>,
     pub active: usize,
@@ -22,6 +23,18 @@ pub struct Baked {
     pub class_only: bool,
     /// the casing colour of every road is its class's (no styler gives a casing of its own): a piece holds none (D1)
     pub casing_role: bool,
+}
+
+/// The role fill of a road (docs/design/restyle_without_retile.md, D1), from the look and not from the road's baked values: the palette's colour
+/// of its access kind (with an access column), else its class's fill. It is what the road layer draws for a piece with no colour of its own,
+/// so a new look gives it with no new bake (the legend's swatch, `contract.rs`).
+pub fn role_fill(look: &crate::Look, p: crate::Road) -> Value {
+    let access = crate::roads::named(&look.map.columns.access).and(p.get(Mark::Access.name())).and_then(Cell::as_str)
+        .and_then(|k| look.road.access.get(k)).filter(|c| !c.is_null());
+    match access {
+        Some(c) => c.clone(),
+        None => crate::roads::class_style(&look.road, p.role(roadstyle_model::Role::Class)).0["fill"].clone(),
+    }
 }
 
 /// The fill and the casing colour of each class of `classes`, as the class styles give them; `fallback` for another class.

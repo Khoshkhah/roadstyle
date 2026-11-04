@@ -42,6 +42,9 @@ pub struct Overlay {
     /// A base-map layer's start values of its hover tooltip and its click popup (render_map's `interaction`); None: the overlay's own
     pub tooltip_on: Option<bool>,
     pub popup_on: Option<bool>,
+    /// An overlay on the streets: the (fill number, order) pairs of its features (`edge_overlay`'s answer), once they are known; None: not yet
+    /// (the road layers attach the features and set them; a restyle gives them from the layer's facts, with no data)
+    pub edge_groups: Option<Vec<(i64, i64)>>,
 }
 
 /// An overlay's features: a caller's as a FeatureCollection, the base map's as a typed table (audit R10).
@@ -162,6 +165,38 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
         unknown.sort();
         warnings.push(format!("interaction: no layer {} on this map", unknown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")));
     }
+    let facts: Vec<LayerFacts> = tables.iter().map(|(n, t)| LayerFacts::of(n, t, edge_attached)).collect();
+    let (mut out, images) = styled_layers(&facts, look);
+    for (ov, (_, t)) in out.iter_mut().zip(tables) {
+        ov.data = Data::Table(Box::new(t));
+    }
+    (out, images)
+}
+
+/// The facts of a base-map layer that its styling reads (docs/design/restyle_without_retile.md, D4): its name, the kinds of its features with
+/// their counts, whether it has heights (3D), and whether it is attached to the roads. A new look styles the layer again from them
+/// (`styled_layers`), with no read of its features.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LayerFacts {
+    pub name: String,
+    pub kinds: Vec<(String, usize)>,
+    pub height: bool,
+    pub edge: bool,
+    /// a layer on the streets: the (fill number, order) pairs of its features, which its layers are split by (`Overlay::edge_groups`)
+    pub edge_groups: Option<Vec<(i64, i64)>>,
+}
+
+impl LayerFacts {
+    pub fn of(name: &str, t: &FeatureTable, edge_attached: &[String]) -> LayerFacts {
+        LayerFacts { name: name.to_string(), kinds: kinds(t), height: !t.is_empty() && t.has_key(0, "height"), edge: edge_attached.iter().any(|e| e == name),
+                     edge_groups: None }
+    }
+}
+
+/// The base-map overlays of `facts`, styled by `look` (feature_overlays' look half), and the images that they use. Their data is null: the
+/// caller gives each one its table, or keeps the sources that it has (a restyle).
+pub fn styled_layers(facts: &[LayerFacts], look: &crate::Look) -> (Vec<Overlay>, Map<String, Value>) {
+    let interaction = look.map.base_map.as_ref().map(|b| b.layers.clone()).unwrap_or_default();
     let bm = look.sections.base_map.as_ref();
     let st = bm.map_or(&Value::Null, |b| &b.style);
     let specs = bm.and_then(|b| b.layers_yaml["layers"].as_array()).cloned().unwrap_or_default();
@@ -169,16 +204,17 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
     let (areas, lines, points, icon) = (&st["areas"], &st["lines"], &st["points"], &st["icon"]);
     let mut out = Vec::new();
     let mut images = Map::new();
-    for (name, t) in tables {
+    for f in facts {
+        let name = f.name.clone();
         let spec = specs.iter().find(|s| s["name"] == name.as_str()).cloned().unwrap_or(Value::Null);
         let kind = spec["kind"].as_str().unwrap_or("");
         let ov_kind = match kind { "polygon" => "fill", "line" => "line", _ => "circle" };
         let ticked = spec.get("ticked").is_none_or(|v| v != false);
         let mut l = json!({"label": name, "kind": ov_kind, "ticked": ticked});
-        let mut ov = Overlay { name: name.clone(), kind: ov_kind, under: kind != "point", edge: edge_attached.contains(&name), color: Value::Null,
+        let mut ov = Overlay { name: name.clone(), kind: ov_kind, under: kind != "point", edge: f.edge, color: Value::Null,
                                outline: Value::Null, opacity: Value::Null, width: Value::Null, radius: Value::Null, visible: ticked, data: Data::Json(Value::Null),
-                               l: Value::Null, user: None, edge_id_col: None, clickable: Some(clickable(&name, kind)), kinds: kinds(&t),
-                               tooltip_on: None, popup_on: None };
+                               l: Value::Null, user: None, edge_id_col: None, clickable: Some(clickable(&name, kind)), kinds: f.kinds.clone(),
+                               tooltip_on: None, popup_on: None, edge_groups: f.edge_groups.clone() };
         // mapstyle's start values (clickable by the rule above, no tooltip, the popup), with the layer's `interaction` over them
         if let Some(i) = interaction.get(&name) {
             let set = |k: &str| i.get(k).map(|v| is_yes(Some(v)));
@@ -210,7 +246,7 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
             ov.opacity = a.get("opacity").cloned().unwrap_or(json!(1.0));
             ov.width = json!(0.5);
             l["min_zoom"] = a.get("min_zoom").cloned().unwrap_or(Value::Null);
-            if !t.is_empty() && t.has_key(0, "height") {
+            if f.height {
                 l["extrude"] = json!({"color": a.get("fill").cloned().unwrap_or(Value::Null), "opacity": st["buildings_3d"]["opacity"]});
             }
         } else if kind == "line" {
@@ -244,7 +280,6 @@ pub fn feature_overlays(tables: Vec<(String, FeatureTable)>, look: &crate::Look,
                 l["icon"] = json!({"image": id, "opacity": icon["opacity"], "size": zoom_pairs(&icon["size"], |px| px * size / 48.0)});
             }
         }
-        ov.data = Data::Table(Box::new(t));
         ov.l = l;
         out.push(ov);
     }
@@ -319,7 +354,7 @@ pub fn user_overlays(specs: &[Spec], first: usize) -> Result<Vec<Overlay>, crate
         out.push(Overlay { name, kind, under: u.placement == Placement::Under, edge: u.edge.as_ref().is_some_and(|e| !e.column.is_empty()),
                            color: css(u.color.as_ref()), outline: css(u.outline.as_ref()), opacity: number(u.opacity), width: number(u.width),
                            radius: number(u.radius), visible: u.visible, data: Data::Json(fc), l: Value::Null, user: Some(Box::new(user)),
-                           edge_id_col: None, clickable: None, kinds: Vec::new(), tooltip_on: None, popup_on: None });
+                           edge_id_col: None, clickable: None, kinds: Vec::new(), tooltip_on: None, popup_on: None, edge_groups: None });
     }
     Ok(out)
 }
@@ -572,7 +607,7 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
 pub fn road_items(fc: &Value, roads: &std::collections::HashMap<String, Road>, edge_col: &str, k: usize, look: &crate::Look)
                   -> Result<Vec<crate::simple::Item>, crate::Error> {
     let mut ov = Overlay { name: "items".into(), kind: "line", under: false, edge: true, color: Value::Null, outline: Value::Null, opacity: Value::Null,
-                           width: Value::Null, radius: Value::Null, visible: true, data: Data::Json(fc.clone()), l: Value::Null, clickable: None, kinds: Vec::new(), tooltip_on: None, popup_on: None,
+                           width: Value::Null, radius: Value::Null, visible: true, data: Data::Json(fc.clone()), l: Value::Null, clickable: None, kinds: Vec::new(), tooltip_on: None, popup_on: None, edge_groups: None,
                            user: Some(Box::new(Spec { label: Some("items".into()), color_column: Some("color".into()),
                                                       edge: Some(EdgeLink { column: edge_col.into(), order_column: Some("order".into()),
                                                                             width_m_column: Some("width_m".into()), offset_m_column: Some("offset_m".into()),

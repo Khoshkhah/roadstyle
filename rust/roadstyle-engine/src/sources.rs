@@ -77,6 +77,8 @@ pub struct Styled {
     pub saved: serde_json::Map<String, Value>,
     /// the warnings of the stages, for the caller to give
     pub warnings: Vec<String>,
+    /// what a new look needs from this stage 1 (`crate::restyle_layers`)
+    pub look_inputs: crate::LookInputs,
 }
 
 /// The generation of a road set (`props::GENERATION`); None: the roads have no whole-number edge ids.
@@ -93,7 +95,7 @@ fn generation(roads: &crate::Roads) -> Option<String> {
 impl Styled {
     pub fn new(p: Parts) -> Styled {
         let mut s = Styled { name: p.name, center: p.center, zoom: p.zoom, layers: p.layers, metadata: p.metadata, glyphs: p.glyphs, state: p.state,
-                             sources: p.sources, roads: p.roads, saved: serde_json::Map::new(), warnings: p.warnings };
+                             sources: p.sources, roads: p.roads, saved: serde_json::Map::new(), warnings: p.warnings, look_inputs: p.look_inputs };
         s.set_reads();
         let base: Vec<String> = s.shown().filter(|(_, v)| matches!(v, Source::Features(_))).map(|(k, _)| k.to_string()).collect();
         if let Some(g) = generation(&s.roads.roads) {

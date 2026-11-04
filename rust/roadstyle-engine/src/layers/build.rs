@@ -336,7 +336,15 @@ struct Overlays {
 /// An overlay on edges: a copy of its layers for each (fill number, order), each with its own filter (position and order), which rsFilter keeps.
 fn edge_layers(cx: &Ctx, ov: &mut Overlay, sid: &str, by_id: &HashMap<String, crate::road::Road>) -> Result<Vec<(i64, i64, Value, Vec<Value>)>, crate::Error> {
     let mut out = Vec::new();
-    for (pos, order) in edge_overlay(ov, by_id)? {
+    let groups = match ov.edge_groups.clone() {
+        Some(g) => g,
+        None => {
+            let g = edge_overlay(ov, by_id)?;
+            ov.edge_groups = Some(g.clone());
+            g
+        }
+    };
+    for (pos, order) in groups {
         let flt = json!(["all", ["==", ["get", Mark::FillLevel.name()], pos], ["==", ["get", Mark::ItemOrder.name()], order]]);
         let drawn = crate::overlays::metre_items(ov);
         let mine = overlay_layers(sid, ov, cx.look).into_iter().map(|mut l| {
@@ -638,7 +646,10 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
     let mut info = PageInfo::default();
     let mut cx = Ctx::new(look, roads, decks)?;
     cx.roles = simple.roles.clone();
-    cx.places = simple.colours.as_ref().map(|t| [json!(t.fill.list), json!(t.casing.list)]);
+    // place 0 of a colour table is the look's fallback colour (`ColourTable::of`): it comes from this look, the data colours after it from the roads
+    let fallback = &look.sections.roads.fallback;
+    let table = |list: &[Value], fb: &Value| json!(std::iter::once(fb.clone()).chain(list.iter().skip(1).cloned()).collect::<Vec<_>>());
+    cx.places = simple.colours.as_ref().map(|t| [table(&t.fill.list, &fallback["fill"]), table(&t.casing.list, &fallback["casing"])]);
     let items: Vec<&Props> = simple.items.iter().map(|(_, it)| &it.props).filter(|p| p.get(Mark::PieceKind.name()) == Some(&json!(5))).collect();
     let w = widths(&cx, !items.is_empty());
     let flt = road_filter(&cx, &items);

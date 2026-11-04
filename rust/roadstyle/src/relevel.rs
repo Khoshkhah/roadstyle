@@ -40,6 +40,9 @@ pub struct LiveTiles {
     style: String,
     look: Look,
     options: tiles::stage::TileOptions,
+    /// the tile addresses (`xyz_at` of the prefix) and the keys that the tiles keep, for a style of another look (`style_for`)
+    at: Value,
+    keep: Vec<String>,
     rows: HashMap<i64, usize>,
     /// the rows at each end node (the line's first and last point)
     at_node: HashMap<[u64; 2], Vec<u32>>,
@@ -53,7 +56,8 @@ impl LiveTiles {
         let mut options = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
         options.wait = true;
         // tiles_of_sources's stage 2, with the pieces that wait
-        let (style, tiles) = crate::tile_stage(&s, &options, &crate::xyz_at(prefix), sources::SourceMode::INLINE)?;
+        let at = crate::xyz_at(prefix);
+        let (style, tiles) = crate::tile_stage(&s, &options, &at, sources::SourceMode::INLINE)?;
         let style = crate::style_text(&s, &style);
         let r = &s.roads.roads;
         let id = r.roles.col(Role::EdgeId).ok_or_else(|| crate::error::edits("redraw: the roads have no edge id column"))?;
@@ -64,7 +68,7 @@ impl LiveTiles {
                 at_node.entry(p).or_default().push(i as u32);
             }
         }
-        Ok(LiveTiles { styled: s, tiles, style, look, options, rows, at_node, piece_at: HashMap::new() })
+        Ok(LiveTiles { styled: s, tiles, style, look, options, at, keep: keep.to_vec(), rows, at_node, piece_at: HashMap::new() })
     }
 
     /// The tile z/x/y of the tile source (`Tiles::tile`), after its waiting pieces got their properties.
@@ -104,6 +108,26 @@ impl LiveTiles {
     /// The tiled style (JSON text).
     pub fn style(&self) -> &str {
         &self.style
+    }
+
+    /// The tiled style of this map for the look `look` (docs/design/restyle_without_retile.md, D4): the look half made again from the held
+    /// stage 1 (`roadstyle_engine::restyle_layers`), with the tile options of its layers; the tiles, the pieces and the held state do not
+    /// change. It does not check that the new look makes the same tiles (the key of D2): the caller must.
+    pub fn style_for(&mut self, look: &Look) -> Result<String, crate::Error> {
+        let half = roadstyle_engine::restyle_layers(&self.styled, look)?;
+        let mut saved = self.styled.saved.clone();
+        saved.insert(tiles::stage::TILES.into(), serde_json::json!(look.sections.tiles));
+        saved.insert(tiles::stage::COLUMNS.into(), crate::columns(look));
+        let mut options = tiles::stage::TileOptions::new(&half.layers, &half.metadata, &saved[tiles::stage::TILES], &saved[tiles::stage::COLUMNS], &self.keep)?;
+        options.wait = true;
+        // the held stage 1 with the new look half, for the style's text; then the held one again
+        let s = &mut self.styled;
+        let old = (std::mem::replace(&mut s.layers, half.layers), std::mem::replace(&mut s.metadata, half.metadata),
+                   std::mem::replace(&mut s.glyphs, half.glyphs), std::mem::replace(&mut s.state, half.state), std::mem::replace(&mut s.saved, saved));
+        let style = crate::tiled_style_of(s, &options, &self.at, sources::SourceMode::INLINE);
+        let text = crate::style_text(s, &style);
+        (s.layers, s.metadata, s.glyphs, s.state, s.saved) = old;
+        Ok(text)
     }
 
     /// The stage 1 that the map holds (its road table's rows and lines; a redraw does not change the lines).

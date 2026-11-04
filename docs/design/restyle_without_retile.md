@@ -165,7 +165,7 @@ The light and dark switch (`rs_theme`, `dark_theme.md`) already needs no new sty
 |---|---|---|
 | 0 | Measure the parts of stage 1. **Done.** | The table above. |
 | 1 | D1: colours by role (the class-coloured option, the access colour). **Done 2026-11-04** for the fill and the casing; the dash pattern and the item colour are not changed (see below). | D5 part 1 passes; the tile size on Burnaby is not larger than today; the page draws as before. |
-| 2 | D4: the layers-only path and the split of `feature_overlays`. | Its style equals the style of a new `LiveTiles` for every theme; less than 250 ms natively on Burnaby. |
+| 2 | D4: the layers-only path and the split of `feature_overlays`. **Done 2026-11-04.** | Its style equals the style of a new `LiveTiles` for every theme; less than 250 ms natively on Burnaby. |
 | 3 | D2 and D3: the derived key, `PartialEq` for `TileOptions`, the stage-1 hash, `set_look`. | D5 parts 2 and 3 pass. |
 | 4 | The wasm `setLook`, the documentation (`docs/rust/browser.md`), the browser test of D6. | D5 part 4 passes. |
 | 5 | The duckOSM page: the Design panel calls `setLook` and keeps its prefix; the old path only when `tilesKept` is false. | A theme change on Burnaby takes less than 1 s in the browser. |
@@ -184,6 +184,23 @@ Phase 1 alone does not make a theme change faster: the page still makes a new wo
   for private roads at zoom 15; the colour places of data colours as before; a view's palettes switch the class casing by `rs_palette`).
 - Not changed: the dash pattern stays a place in the sorted list of patterns, and a dashed class has no casing (structure). The colour of the items
   stays as it is. Neither changes with a palette today (the dashes are in the profile, not in a palette), so they belong to the stage-1 key (D2).
+
+## Phase 2 result (2026-11-04)
+
+- `roadstyle_engine::restyle_layers(styled, look)` makes the look half of a style (the layers, the dark colours, the contract, the state, the glyphs,
+  the metadata, the boundary) from a held stage 1. `style_parts` and `restyle_layers` share one function (`look_half`), so they cannot drift.
+- Stage 1 keeps `LookInputs`: the colour bake's result (`Baked`) and the facts of each base-map layer (`LayerFacts`: its name, kinds, heights,
+  whether it is on the streets, and the (fill number, order) groups of a layer on the streets). `feature_overlays` is split into the facts and the
+  styling (`styled_layers`).
+- Two look values were read from data and now come from the look: the legend's swatch of a class (a role colour: `colors::role_fill`) and place 0 of
+  a colour table (the fallback colour).
+- `LiveTiles::style_for(look)` gives the tiled style of another look; it changes nothing that the map holds. `tiled_style_of` is the style part of
+  `tile_stage`.
+- Tests (`tests/restyle.rs`, Monaco with its base map and the duckOSM page's options): the same look, every colour changed (two ways), the base map's
+  colours, and all class fills in one colour each give the style of a new map, byte for byte; the held map does not change.
+- Time on Burnaby (`examples/time_style_for.rs`, every colour changed): `style_for` 89 to 112 ms, a new map 2.8 to 4.3 s; the same style.
+- Found: every bundled base-map theme other than `liberty` makes other tiles than `liberty` (it sets the first zoom of the base-map layers and the
+  roads' dash patterns too). A change of the base-map theme is structure; a change of colours is not. The key of phase 3 must tell them apart.
 
 ## Risks
 
