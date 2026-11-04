@@ -123,18 +123,24 @@ impl LiveTiles {
     /// (`TileOptions::keeps_tiles`). Then the map takes the new style and look, and keeps its tiles, its pieces, its tile options and its
     /// cache: nothing that `tile` reads changes (D3). Else nothing changes, and the answer is false: make a new map.
     pub fn set_look(&mut self, look: &Look) -> Result<bool, crate::Error> {
+        Ok(self.set_look_why(look)?.is_none())
+    }
+
+    /// `set_look`, with the reason when the map needs new tiles: "stage 1" (the stage-1 key), or the name of the tile rule that changes
+    /// (`TileOptions::differs_from`). None: the map took the look and kept its tiles.
+    pub fn set_look_why(&mut self, look: &Look) -> Result<Option<String>, crate::Error> {
         if stage1_key(look) != stage1_key(&self.look) {
-            return Ok(false);
+            return Ok(Some("stage 1".into()));
         }
         let r = self.restyled(look)?;
-        if !self.options.keeps_tiles(&r.options) {
-            return Ok(false);
+        if let Some(rule) = self.options.differs_from(&r.options) {
+            return Ok(Some(format!("tile rule {rule}")));
         }
         let s = &mut self.styled;
         (s.layers, s.metadata, s.glyphs, s.state, s.saved) = (r.half.layers, r.half.metadata, r.half.glyphs, r.half.state, r.saved);
         self.style = r.text;
         self.look = look.clone();
-        Ok(true)
+        Ok(None)
     }
 
     /// The new look's half, its saved tile settings, its tile options and its style's text, over the held stage 1 (the held one is the same after).
@@ -264,11 +270,18 @@ struct Restyled {
 /// left out, but not in the sections that hold the user's data colours (`map`, `data`, `overlays`: there a colour can be a place in the colour
 /// table of the pieces), and without the values that only the style reads: the section `arrows`, and the section `labels` but its `slots` and
 /// `slot_m` (the slots' class order, widths at zoom 20 and length: `SlotLook`, stage 1); a first zoom of the names or the arrows is in the tile
-/// options, part 1. Every other value counts, so a change of anything else gives another key and a new map: that costs time, never a wrong map.
+/// options, part 1; and the base map's images (icons and patterns, which only the style's metadata reads). Every other value counts, so a change of anything else gives another key and a new map: that costs time, never a wrong map.
 /// The guard test (tests/set_look.rs) found the two traps of a shorter key: `labels.slot_m` places the names (stage 1), and a narrower road
 /// gives tiles with a smaller buffer (so part 1 asks for the same buffer).
 pub fn stage1_key(look: &Look) -> u64 {
     use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    stage1_text(look).hash(&mut h);
+    h.finish()
+}
+
+/// The text that `stage1_key` hashes: the look's JSON, without what the key leaves out, with the keys of each object in order.
+pub fn stage1_text(look: &Look) -> String {
     fn colour(s: &str) -> bool {
         let hex = s.strip_prefix('#').is_some_and(|h| matches!(h.len(), 3 | 4 | 6 | 8) && h.chars().all(|c| c.is_ascii_hexdigit()));
         hex || ["rgb(", "rgba(", "hsl(", "hsla("].iter().any(|p| s.trim_start().to_ascii_lowercase().starts_with(p))
@@ -287,11 +300,38 @@ pub fn stage1_key(look: &Look) -> u64 {
         if let Some(Value::Object(l)) = o.get_mut("labels") {
             l.retain(|k, _| matches!(k.as_str(), "slots" | "slot_m"));
         }
+        if let Some(Value::Object(b)) = o.get_mut("base_map") {
+            b.shift_remove("images");          // the base map's icons and patterns: only the style's images (metadata) read them
+        }
         o.iter_mut().filter(|(k, _)| !matches!(k.as_str(), "map" | "data" | "overlays")).for_each(|(_, x)| mask(x));
     }
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    v.to_string().hash(&mut h);
-    h.finish()
+    // the keys of every object in one order: a part of the look that is a hash map (the slots' widths, for one) has another order in each look
+    fn canon(v: &Value, out: &mut String) {
+        match v {
+            Value::Object(o) => {
+                let mut keys: Vec<&String> = o.keys().collect();
+                keys.sort();
+                out.push('{');
+                for k in keys {
+                    out.push_str(&serde_json::to_string(k).expect("a key's JSON"));
+                    out.push(':');
+                    canon(&o[k], out);
+                    out.push(',');
+                }
+                out.push('}');
+            }
+            Value::Array(a) => {
+                out.push('[');
+                a.iter().for_each(|x| { canon(x, out); out.push(','); });
+                out.push(']');
+            }
+            Value::Number(n) => out.push_str(&n.as_f64().map_or_else(|| n.to_string(), |f| f.to_string())),     // 2 and 2.0 are one number
+            x => out.push_str(&x.to_string()),
+        }
+    }
+    let mut text = String::new();
+    canon(&v, &mut text);
+    text
 }
 
 /// The end nodes of a line (its first and last point, as bits).

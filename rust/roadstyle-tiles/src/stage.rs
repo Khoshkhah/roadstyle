@@ -53,7 +53,17 @@ impl TileOptions {
     /// (docs/design/restyle_without_retile.md, D2, part 1): every rule is the same, the buffer of each zoom too. (A narrower stroke would draw the
     /// same from the held tiles, but a new map cuts them with a smaller buffer, so they are not the same bytes.) `wait` is the caller's, not a rule.
     pub fn keeps_tiles(&self, new: &TileOptions) -> bool {
-        TileOptions { wait: self.wait, ..new.clone() } == *self
+        self.differs_from(new).is_none()
+    }
+
+    /// The first tile rule that is not the same in `new` (`keeps_tiles`), by its name; None: every rule is the same.
+    pub fn differs_from(&self, new: &TileOptions) -> Option<&'static str> {
+        let rules: [(&'static str, bool); 15] = [("min_zoom", self.min_zoom == new.min_zoom), ("max_zoom", self.max_zoom == new.max_zoom),
+            ("buffer_px", self.buffer_px == new.buffer_px), ("buffers", self.buffers == new.buffers), ("read", self.read == new.read),
+            ("source_reads", self.source_reads == new.source_reads), ("popups", self.popups == new.popups), ("generation", self.generation == new.generation),
+            ("base", self.base == new.base), ("pieces", self.pieces == new.pieces), ("codes", self.codes == new.codes), ("exact", self.exact == new.exact),
+            ("only", self.only == new.only), ("slots_from", self.slots_from == new.slots_from), ("format", self.format == new.format)];
+        rules.into_iter().find(|(_, same)| !same).map(|(name, _)| name)
     }
 
     /// The rules of a style: `tiles` the zoom settings (the look's config.tiles, or the style's `roadstyle:tiles`), `columns` the column

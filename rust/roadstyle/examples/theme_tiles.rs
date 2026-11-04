@@ -31,9 +31,13 @@ fn main() {
     names.sort();
     for p in names {
         let l = look(p.to_str().unwrap());
-        let same = tiles(&mut new(&l)) == base_tiles;
-        let kept = new(&base).set_look(&l).unwrap();
-        println!("{:<14} same tiles: {:<5} set_look kept: {:<5} {}", p.file_stem().unwrap().to_str().unwrap(), same, kept,
-                 if kept && !same { "WRONG" } else if same && !kept { "(a refusal that was not needed)" } else { "" });
+        let these = tiles(&mut new(&l));
+        let same = these == base_tiles;
+        let bytes = |t: &[Vec<u8>]| t.iter().map(Vec::len).sum::<usize>();
+        print!("{:>+6.1}% bytes  ", 100.0 * (bytes(&these) as f64 / bytes(&base_tiles) as f64 - 1.0));
+        let why = new(&base).set_look_why(&l).unwrap();
+        let kept = why.is_none();
+        println!("{:<14} same tiles: {:<5} set_look kept: {:<5} {} {}", p.file_stem().unwrap().to_str().unwrap(), same, kept,
+                 if kept && !same { "WRONG" } else if same && !kept { "(a refusal that was not needed)" } else { "" }, why.unwrap_or_default());
     }
 }
