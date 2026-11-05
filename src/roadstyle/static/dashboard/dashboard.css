@@ -400,6 +400,8 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 .rs-sel-native{display:none!important}
 #sb .rs-sel-btn,.rs-side .rs-sel-btn,.rs-sel-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:6px 9px;
   border:0;border-radius:12px;background:var(--card,transparent);color:inherit;font:13px system-ui,sans-serif;text-align:left;cursor:pointer}
+/* a select box on a card has the card's colour: a thin line shows that it is a field (as a text field), not a line of text */
+#sb .sb-sec[data-rs-card] .rs-sel-btn{border:1px solid var(--line);padding:5px 8px}
 .rs-sel-btn:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--accent)}
 .rs-sel-btn:focus-visible,.rs-sel-btn[aria-expanded=true]{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-sel-btn:disabled{opacity:.5;cursor:not-allowed}
