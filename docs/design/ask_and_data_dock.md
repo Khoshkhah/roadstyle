@@ -29,6 +29,9 @@ Later the same day, Kaveh also asked for these:
    above a right answer: it goes into the details ([The view](#the-view)).
 9. The agent can also change the map: colour roads, filter the map, and move the map ([The map tools](#the-map-tools)). It still
    cannot change the data.
+10. The agent sees all the host's data, not one table ([The schema](#the-schema)). The conversation scrolls by the panel's own protocol
+   (`rs-pbody`). **Key** is a button, and its form has "Back to chat". The question box is one box with a round send button. A page with
+   Ask has the card look of the panel by default.
 
 ## Problem
 
@@ -373,6 +376,12 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 | `error` | `{question, message}` | The question stopped with an error (no key, a refused key, too many failed queries) |
 | `back` | none | The person clicks Back. Ask closes by itself. |
 
+### The look of the panel
+
+A page with Ask has the **card** look of the panel by default (`dashboard={"panel": {"look": "card"}}`; Kaveh, 2026-11-05): the panel
+floats as a card with round corners and a margin, and the conversation reads as one card. duckOSM Studio sets it. The dashboard's own
+default stays `frame` for other pages, and a look that the person keeps in Settings still wins.
+
 ### The view
 
 ```
@@ -394,18 +403,24 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 +----------------------------------+
 ```
 
-- **One scroll.** While Ask is open, the panel's body (`.sb-body`) does not scroll: the view fills it exactly (a flex column). The view
-  has three rows: the top row, the conversation and the question box. Only the conversation scrolls, so the scroll wheel never moves two
-  areas. The conversation is in `_PS_AREAS`, for the panel's scrollbar look.
-- **The question box stays in view.** It is the last row of the view, under a `--line`, with no background of its own. It is always at
-  the bottom of the panel, and nothing scrolls under it.
+- **One scroll, by the panel's protocol.** While Ask is open, the panel's body (`.sb-body`) does not scroll: the view fills it exactly (a
+  flex column of three rows: the top row, the conversation and the question box). Only the conversation scrolls. It is a panel scroll box,
+  as the design panel's pane is: the class `rs-pbody` with `data-head` = the top row (class `rs-phead`), and `initPanelScroll()` after it
+  is made. So it has the panel's scrollbar at the outer edge of the panel (shown only under the pointer or while it scrolls), the line under
+  the top row while it is scrolled, and the 38 px fade at the bottom edge while more is below. (The mock-up first used `rs-scroll`, the part
+  for a list in a card: Kaveh saw the wrong scrollbar and no fade.)
+- **The question box stays in view.** It is the last row of the view and never scrolls. It is one box (`--card`, a `--line` border, 14 px
+  corners, the accent ring while it has the focus) with the text and a round send button inside it, at the bottom right: 32 px, `--accent-fill`,
+  an up arrow. The box is 44 px high and grows with the text to 6 lines. While the agent works, the button is a stop square (Stop). Enter
+  asks, Shift+Enter is a new line. (The mock-up first had a separate textarea and an "Ask" button of a different height: Kaveh found it not
+  well aligned.)
 - **Order.** The oldest question is at the top and the newest at the bottom, next to the question box. After each step the panel
   scrolls to the end.
-- The top row has Back, the provider and the model, a link "Settings" that opens the Settings box of the toolbox
-  (`window.rsOpenSettings`, which exists for the Google key), and "New" (a new conversation).
+- The top row has Back, the provider and the model, **Key** and **New** (a new conversation). Key and New are buttons of the same look. Key
+  is filled while the key form is open ([The keys](#the-keys)). (A teal word "Key" did not look clickable.)
 - An empty conversation shows one line about what Ask does, and the `examples` as chips. A click on a chip asks it.
 - With no key, the view shows "Ask needs your own key. Google Gemini and Groq give a free key." with the two links, and a button "Add a
-  key" that opens the Settings box.
+  key" that opens the key form.
 - **A card for each question.** A question and its answer are one card with an outline: a `--line` border, 12 px corners and no
   background, so the panel shows through it (Kaveh chose this look from the mock-up, 2026-11-05, over a card with a fill and over a
   card with no border). The question
@@ -468,6 +483,9 @@ SQL as for a question, and the same guard checks it.
 | `filter_roads` | `sql` | Shows only the roads of the query and zooms to them. | `rs.setFilter({ids})`, `rs.focus(ids)` |
 | `move_map` | `sql` | Zooms to the roads of the query. | `rs.focus(ids)` |
 
+Ask also has the read tool `describe_table(name)`: it gives the columns of one table with their types and meanings (the host's
+`describe(name)`), so the prompt needs to list only the map's own table in full.
+
 - **Limit.** A map tool needs every id, not 1000. Its SQL has the row limit `mapLimit` (default 100 000). Over the limit, the tool does
   nothing and tells the model to make the query narrower.
 - **What goes back to the model:** a short text, for example "Coloured 1151 roads (One-way) and 1614 roads (Two-way)." No ids go to
@@ -517,37 +535,53 @@ Schema:
 
 ### The schema
 
-The host's `schema()` gives the tables:
+The agent sees **all the host's data** (Kaveh, 2026-11-05: "just need to access more"). The duckOSM database of Monaco has 46 tables in 9
+schemas (`driving`, `walking`, `cycling`, `bus`, `features`, `raw`, `mm`, `main`, `visualization`) and about 400 columns. A prompt with every
+column is too large for a free tier: a free tier allows some thousand tokens a minute, and each model call sends the prompt again. So the
+prompt has two levels:
+
+1. **Every table, one line each:** its name, its number of rows and one sentence about it.
+2. **The columns of the map's own table only** (the table of `idColumn`), each with its type and its meaning.
+
+The agent asks for the columns of any other table with a fifth tool, `describe_table(name)`, when it needs them. The prompt of Monaco is
+then about 10 000 characters (about 2 500 tokens).
+
+The host gives two functions:
 
 ```js
-{tables: [
-  {name: "edges", about: "The directed road edges. A two-way road has two rows.", rows: 12345,
-   columns: [
-     {name: "edge_id", type: "BIGINT", about: "The id of the edge. Select it to light the roads."},
-     {name: "highway", type: "VARCHAR", about: "The OSM road class.", values: ["residential", "service", "primary", "secondary"]},
-     {name: "length_m", type: "DOUBLE", about: "The length in metres."},
-   ]},
-]}
+schema()            // -> {tables: [{name: "driving.edges", rows: 2765, about: "One row per direction of a road ...", main: true,
+                    //      columns: [{name, type, about}]}, {name: "features.buildings", rows: 1262, about: "..."}, ...]}
+describe(name)      // -> [{name, type, about}]: the columns of one table, for the tool describe_table
 ```
 
-`about` is what the column means: the unit, what one row is, what `null` means. The host knows this, and roadstyle does not. `values`
-(optional) is a few common values of a column of names or classes: the model then writes `highway = 'primary'` and not
-`highway = 'Primary'`.
+`columns` is necessary only on the main table (`main: true`). `about` is what a table or a column means: the unit, what one row is, what
+`null` means. The host knows this, and roadstyle does not.
 
-Ask writes it as compact text, one line for each column:
+Ask writes it as compact text:
 
 ```text
-TABLE edges (12345 rows): The directed road edges. A two-way road has two rows.
-  edge_id BIGINT: The id of the edge. Select it to light the roads.
-  highway VARCHAR: The OSM road class. Values: residential, service, primary, secondary.
-  length_m DOUBLE: The length in metres.
+TABLE driving.edges (2765 rows): One row per direction of a road: a two-way road has two edges.
+  edge_id BIGINT: the edge's id. The same on every rebuild and in every mode.
+  oneway BOOLEAN: TRUE when the edge has no reverse twin of the same way. Never NULL.
+  ...
+TABLE features.buildings (1262 rows): Base-map layer 'buildings' (Shortbread classes): osm_id, osm_type, kind, name, tags, geom.
+TABLE raw.nodes (34326 rows): The OSM nodes of the area as read from the PBF: osm_id, lat, lon, tags (MAP of all OSM tags).
+...
 ```
 
-The schema text is at most 12 000 characters. When it is longer, Ask first removes the `values`, then the `about` of the columns, and
-last the tables that come after the limit (the host gives the important tables first). A test checks the cut.
+A line about a table is at most 140 characters, and a column's meaning at most 160. The host's `about` option (one paragraph for the
+prompt) holds the facts of its database that the model must know, for example for duckOSM Studio: "The map shows the driving network: only
+the `edge_id` of `driving.edges` lights roads", "Geometry is GEOMETRY in longitude / latitude; the spatial functions `ST_*` work" and "In
+this DuckDB, `tags['k']` gives a list: use `tags['k'][1]`".
 
-For duckOSM Studio, the host reads the tables and the types from `information_schema.columns` and adds the `about` texts from a file of
-its own (the meaning of each duckOSM column). This is the host's work, not roadstyle's.
+**For duckOSM Studio** the descriptions come from duckOSM's own reference, `docs/reference/database.md`: each `### table` section has a
+table of `| column | type | description |`. The mock-up reads that file and writes the descriptions into DuckDB as comments
+(`COMMENT ON TABLE`, `COMMENT ON COLUMN`: 206 column comments for Monaco). The host then reads them back with `duckdb_tables()` and
+`duckdb_columns()`, so the descriptions travel with the database file. This is the host's work, not roadstyle's. (The mock-up, as a DuckDB
+host, tells the model to read `duckdb_columns()` with `run_query` in place of the tool `describe_table`.)
+
+Checked in the mock-up: with all 46 tables, the person's SQL and the agent can join any of them, the spatial functions work
+(`ST_Area_Spheroid` found the largest building, Grimaldi Forum, 15 617 m²) and the raw OSM tags can be read.
 
 ### The providers
 
@@ -595,29 +629,31 @@ access to it"). So the page takes the model from the provider's own list:
 
 Not checked yet: that each service gives tool calls in this form with a real key. The first step of the build checks each one.
 
-### The keys and the settings
+### The keys
 
-The keys go in the **Keys** part of roadstyle's Settings box, the same as the Google key (`settings.js`, `_stKeys`). The Ask rows show
-only on a page that has Ask.
+The key form is **in the Ask view**, not in roadstyle's Settings box: the person gets the key where the person needs it, and the
+Settings box does not change. **Key** in the top row shows the form in place of the conversation. The form has a title row "Your key"
+with **‹ Back to chat**. After a Save that works, the form says "The key works: 12 models. Ask uses …" and goes back to the chat by
+itself after 1.6 s.
 
-| Setting | localStorage key | What it is |
+| Field | localStorage key | What it is |
 |---|---|---|
 | Provider | `rs-settings:ask` → `provider` | A list of the five free services of `providers.json` (Gemini first), with the link "Get a free key from ..." under it |
-| Key | `rs-key:ask:<provider>` | One key for each provider, because a key works only with its own service: the person can keep keys of two services and switch. A key row as the Google key has: Save, Clear, Show. Save asks the provider for its models (`GET {address}/models`) and says "The key works: 40 models" or the provider's own error. A free key has a link to the page that gives it |
-| Model | `rs-settings:ask` → `model.<provider>` | A text box with the models of the provider as its list, and the default of `providers.json` |
+| Model | `rs-settings:ask` → `model.<provider>` | A text box with the models of the provider as its list ([The providers](#the-providers)) |
+| Key | `rs-key:ask:<provider>` | One key for each provider, because a key works only with its own service: the person can keep keys of two services and switch. Save, Clear. Save asks the provider for its models (`GET {address}/models`) and says "The key works" or the provider's own error |
 
 - A key stays only in this browser (localStorage). It is never in the page file, never in a URL and never in the conversation. It goes only
   in the header of a request to the provider's own address.
 - An Ask key needs no reload: Ask reads it at each question. The Google key needs a reload because Street View reads it at the start.
 - **Clear** removes the key from this browser.
-- The Settings box says under the Ask keys: "The key stays in this browser. Other pages on the same address (for example the same
+- The key form says under the key: "The key stays in this browser. Other pages on the same address (for example the same
   github.io site) can read it. Use a key with a spending limit." This is true: localStorage belongs to the origin, and all GitHub Pages
   of one user share one origin.
 
 ### What goes to the provider
 
 Kaveh removed the notice card (2026-11-05): no card stops the first question. The person adds the key, and that is the choice to use the
-provider. The Settings box says under the Ask keys, in one muted line, what goes to the provider:
+provider. The key form says under the key, in one muted line, what goes to the provider:
 
 > Ask sends your question, the conversation, the names and descriptions of the tables and columns, and the query results (up to 30 rows
 > each) to the provider's address. The key goes only there.
@@ -670,7 +706,6 @@ Changes in existing parts, all small and with no change of look on a page withou
 |---|---|
 | `toolbar.js` | The low edge of a box is the top of the dock, not `innerHeight`. A bar at a side is centred in the part above the dock |
 | `windows.js` | One sheet at a time also for the dock (a listener of `rs:dockchange`) |
-| `settings.js` | The Ask rows in Keys (only on a page with Ask) |
 | `panelscroll.js`, `dashboard.css` | The dock's table in `_PS_AREAS` (the Ask conversation is in the panel's own scroll) |
 | `api.js` | `rs.dock` |
 
