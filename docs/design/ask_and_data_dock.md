@@ -126,7 +126,9 @@ its CSS), and a page that does not call `rs.dock.add` has no dock on the screen.
 - **The other parts end above the dock.** The floating panel, the toolbox, the boxes of the toolbox and the box in the bottom corner
   (scale, zoom, credits) read `--rs-dock-h`. In `toolbar.js`, the low edge of a box is `innerHeight` now. It becomes the top of the dock.
   This is the only change in an existing part, and it does not change the look of a page without a dock.
-- **Height.** The grip is a strip of 8 px on the top edge of the dock, with the cursor `row-resize`. The person drags it. The height is
+- **Height.** The grip is a strip of 8 px on the top edge of the dock, with the cursor `row-resize`. It has no colour of its own: while the
+  pointer is on it, or while it is dragged, the dock's top edge is `--accent`, as a 2 px inset shadow of the dock. An inset shadow follows
+  the round top corners; a line on the grip went straight across them (Kaveh, 2026-11-05). The person drags it. The height is
   at least 120 px and at most 70 % of the window. The page keeps the height and the open state in this browser
   (`rs-dock:<location.pathname>`), as the docked Street View keeps its share. A double click on the grip closes the dock or opens it again.
 - **Closed.** A closed dock is its title row only (32 px): the tabs, the note, and a button with an up arrow. The map ends above this row.
