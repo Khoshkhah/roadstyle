@@ -44,6 +44,8 @@ pub struct PageOptions {
     pub terrain: bool,
     /// the height of the terrain as a multiple of the DEM's (`terrain_exaggeration=`); `None`: `ontop.terrain.exaggeration` of data/basemaps.json
     pub terrain_exaggeration: Option<f64>,
+    /// the tunnels while the 3D terrain is on: "show" (as they are), "fade" (drawn at `ontop.terrain.tunnel_fade`), "hide" (not drawn). No height of their own: MapLibre has none for a line
+    pub terrain_tunnels: String,
     /// a tiled page (the roads in the embedded PMTiles archive)
     pub tiles: bool,
     /// the road layer ("roads-simple")

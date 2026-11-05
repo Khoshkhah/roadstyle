@@ -317,6 +317,7 @@
     },
     "terrain": {
       "exaggeration": 1.0,
+      "tunnel_fade": 0.25,
       "pitch": 55
     },
     "labels": {

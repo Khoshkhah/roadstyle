@@ -260,7 +260,11 @@ pub(super) fn line_paint(cx: &Ctx, w: &Widths, items: &[&Props], fills: &[String
     let (m, s) = (&cx.look.model, &cx.look.sections);
     let dashes = dash_patterns(cx, items);
     let (is_sh, factor) = (piece_kind(2), json!(["coalesce", ["feature-state", LIVE_WIDTH], 1]));
-    let op = json!(["case", ["all", ["!", gs("rs_fill_on")], piece_kind(1)], 0, 1]);
+    // while the 3D terrain is on (elevation.js), the pieces of a tunnel (its fill, gap and dashes) are drawn at the factor of the state `rs_terrain_tunnel`: 1, the
+    // fade, or 0 (terrain_tunnels=). A tunnel on the ground of the DEM lies on the hill above it: MapLibre has no height for a line. Only a style with tunnels has it
+    let tunnel = json!(["any", ["to-boolean", ["get", Mark::Tunnel.name()]], piece_kind(3), piece_kind(4)]);
+    let shown = if cx.any_tunnel { json!(["case", tunnel, gs("rs_terrain_tunnel"), 1]) } else { json!(1) };
+    let op = json!(["case", ["all", ["!", gs("rs_fill_on")], piece_kind(1)], 0, shown]);
     let (r0v, r1v, _) = bridge_ramp(cx);
     let mut paint = Map::new();
     if !dashes.is_empty() || cx.any_tunnel {

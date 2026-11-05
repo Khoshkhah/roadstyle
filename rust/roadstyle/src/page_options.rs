@@ -21,7 +21,7 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true,
-    "template": null, "layout": null, "dashboard": null, "page_script": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "hillshade": false, "terrain": false, "terrain_exaggeration": null}"#;
+    "template": null, "layout": null, "dashboard": null, "page_script": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "hillshade": false, "terrain": false, "terrain_exaggeration": null, "terrain_tunnels": "fade"}"#;
 
 /// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
 const SIDEBAR_YIELDS: [&str; 3] = ["name", "road_popup", "minzoom"];
@@ -86,6 +86,7 @@ struct PageKeys {
     hillshade: bool,
     terrain: bool,
     terrain_exaggeration: Option<f64>,
+    terrain_tunnels: String,
     #[serde(default)]
     hover_delay_ms: Option<f64>,
     #[serde(default)]
@@ -178,6 +179,9 @@ fn check_keys<'a>(k: &'a PageKeys, look: &Look, dashboard: &crate::dashboard::Da
     let mode = if look.map.interaction.popup == crate::look::options::Popup::Panel { "panel" } else { k.popup_mode.as_deref().filter(|m| !m.is_empty()).unwrap_or("popup") };
     if k.side_panel_html.is_some() && mode == "panel" {
         return Err(crate::error::options("side_panel_html and popup_mode='panel' are two panels on the right: use one"));
+    }
+    if !["show", "fade", "hide"].contains(&k.terrain_tunnels.as_str()) {
+        return Err(crate::error::options(format!("terrain_tunnels must be \"show\", \"fade\" or \"hide\", got {:?}", k.terrain_tunnels)));
     }
     if !k.street_view.is_boolean() && k.street_view != "window" && k.street_view != "dock" {
         return Err(crate::error::options(format!("street_view must be True, False, \"window\" or \"dock\", got {}", repr(&k.street_view))));
@@ -295,7 +299,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d,
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),
         select_color: ctl["select_color"].clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
-        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_exaggeration: k.terrain_exaggeration,
+        color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_exaggeration: k.terrain_exaggeration, terrain_tunnels: k.terrain_tunnels.clone(),
         color_active: ctl["color_active"].clone(), overlays: ctl["overlays"].clone(), overlay_control: k.overlay_control,
         overlay_popup: k.overlay_popup, tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),
