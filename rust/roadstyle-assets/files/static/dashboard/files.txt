@@ -33,6 +33,7 @@ svproviders
 streetview
 google3d
 basemap
+elevation
 basemapbox
 boundary
 filter

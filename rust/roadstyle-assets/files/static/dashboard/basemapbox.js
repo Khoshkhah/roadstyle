@@ -1,5 +1,5 @@
 // The base-map box (docs/design/dashboard_templates.md, 3.3): the heading "Base map", one radio row with a swatch for each map, a divider, and
-// "On top": Hillshade, Labels, One-way arrows and 3D buildings. A map with a dark twin is one row that follows the page's theme. The order on the map: the base
+// "On top": Hillshade, 3D terrain (elevation.js), Labels, One-way arrows and 3D buildings. A map with a dark twin is one row that follows the page's theme. The order on the map: the base
 // map, the hillshade, the labels, the roads, the page's own layers, the buildings, the selection. The URLs of the layers on top are
 // data/basemaps.json `ontop` (O.ontop).
 //
@@ -8,6 +8,7 @@
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
+import {_elHillshade, rsTerrain, _elTerrainByPerson} from "./elevation.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
 const _bxGet = k => { try{ return localStorage.getItem("rs-top:" + k); }catch(e){ return null; } };
@@ -68,7 +69,7 @@ export function buildBox(menu){
     tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
-    raster("hillshade", tops.hillshade.c.checked, ontop.hillshade);
+    _elHillshade(tops.hillshade.c.checked, firstRoad()); rsTerrain(tops.terrain.c.checked);
     const gray = baseKey() === "esri_gray" ? (current === "esri_dark_gray" ? ontop.labels_gray_dark : ontop.labels_gray_light) : ontop.labels;
     raster("labels", kind === "esri" && on, gray);
     if(vec) for(const l of map.getStyle().layers.filter(x => x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
@@ -77,7 +78,9 @@ export function buildBox(menu){
     tops.arrows.lab.hidden = !arrows.length;
     for(const l of arrows) map.setLayoutProperty(l.id, "visibility", tops.arrows.c.checked ? "visible" : "none");
   };
-  topRow("hillshade", "Hillshade").checked = _bxGet("hillshade") === "1";
+  const keep = (id, start) => { const v = _bxGet(id); return v == null ? !!start : v === "1"; };       // the person's saved choice, else the page's start (hillshade=, terrain=)
+  topRow("hillshade", "Hillshade").checked = keep("hillshade", O.hillshade);
+  topRow("terrain", "3D terrain").checked = keep("terrain", O.terrain);
   topRow("labels", "Labels");
   topRow("arrows", "One-way arrows").checked = _bxGet("arrows") !== "0";       // on, unless the person turned them off in this browser
   topRow("buildings", "3D buildings");
@@ -89,6 +92,10 @@ export function buildBox(menu){
   for(const ev of ["rs:overlayschange", "rs:overlaychange"]) document.addEventListener(ev, syncLayers);
   syncLayers();
   tops.hillshade.c.onchange = () => { _bxSet("hillshade", tops.hillshade.c.checked); apply(); };
+  tops.terrain.c.onchange = () => { _bxSet("terrain", tops.terrain.c.checked); _elTerrainByPerson(tops.terrain.c.checked); };
+  window.rsHillshade = on => { if(on === undefined) return tops.hillshade.c.checked; tops.hillshade.c.checked = !!on; apply(); return !!on; };
+  window.rsTerrain = rsTerrain;
+  document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
   tops.arrows.c.onchange = () => { _bxSet("arrows", tops.arrows.c.checked); apply(); };
   tops.buildings.c.onchange = () => rsBuildingsByPerson(tops.buildings.c.checked);
