@@ -52,6 +52,29 @@ def test_the_one_way_arrows_row_hides_the_arrows_and_is_kept(tmp_path):
     assert errors == []
 
 
+def test_rs_set_arrows_and_the_row_show_one_state(tmp_path):
+    """The page's API (rsSetArrows, rsArrowsOn, rsHasArrows, rs:arrowschange) and the box's row show and set one state: the duckOSM page's
+    Design panel uses it."""
+    path = _save(tmp_path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        try:
+            _open(page, path)
+            assert page.evaluate("rsHasArrows() && rsArrowsOn()")
+            page.evaluate("window.heard = []; document.addEventListener('rs:arrowschange', e => heard.push(e.detail.on))")
+            page.evaluate("rsSetArrows(false)")
+            assert set(page.evaluate(_VIS)) == {"none"} and not page.is_checked("#rs-top-arrows") and not page.evaluate("rsArrowsOn()")
+            page.click("#rs-top-arrows")
+            assert set(page.evaluate(_VIS)) == {"visible"} and page.evaluate("rsArrowsOn()")
+            assert page.evaluate("heard") == [False, True]
+        finally:
+            browser.close()
+    assert errors == []
+
+
 def test_a_page_without_arrows_has_no_row(tmp_path):
     path = _save(tmp_path, arrows=False)
     with pw.sync_playwright() as p:

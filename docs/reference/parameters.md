@@ -263,6 +263,7 @@ A section (`panel.sections`; the errors are in [Add to the panel](../guides/dash
 | `label` | none | the title of the section: a section with a `label` is a card, and a section without one is a block of the page's HTML with no box |
 | `after`, `before` | none | the `id` of an earlier section: this section goes after it, or before it. Give one of them |
 | `fold` | `False` | `True`: the card folds; its title is a button, and its row has a chevron. It needs a `label` |
+| `note` | – | one line of state under the card's title (`rs.sections.note` changes it). It needs a `label`. A card that opens something (`open`, a function) is JavaScript only: [A card that opens something](../guides/dashboard-panel.md#a-card-that-opens-something) |
 | `background` | `True` | `False`: the card has no colour behind it (the same padding and title row). It needs a `label` |
 
 The space of the cards is three CSS variables on `:root`: `--rs-card-gap` (12px, between two cards), `--rs-card-pad` (14px, inside a card) and `--rs-panel-bottom` (28px, under the last card). See [Cards: the panel standard](../guides/dashboard-panel.md#cards-the-panel-standard).
