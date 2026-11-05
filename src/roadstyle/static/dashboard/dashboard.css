@@ -737,3 +737,78 @@ html.rs-sv-docked.rs-overlay #map{right:var(--rs-sv-w,42%)!important;width:auto!
 .rs-svw-drag[hidden]{display:none}
 html.rs-phone.rs-sv-docked.rs-overlay #map{right:0!important;bottom:45%!important;height:auto!important}
 html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:45%!important}
+/* The design panel (design/design_panel.js, docs/guides/design-panel.md): in the host's panel, as the level editor. The title line goes into .sb-top (before the
+   host's hide button); the tabs stay, only the pane scrolls (rs-pbody), and the bar is at the bottom. The colors are the theme's tokens. */
+#sb{--rs-dz-soft:color-mix(in srgb,var(--accent) 12%,transparent);--rs-dz-bad:#b91c1c}
+#sb[data-theme=dark],html[data-rs-theme=dark] #sb{--rs-dz-bad:#f87171}
+.rs-dz-title{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.rs-dz-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.rs-dz-title .dname{font-size:12px;color:var(--mut);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rs-dz-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.rs-dz-back:hover{color:var(--accent);border-color:var(--accent-fill)}
+.rs-dz{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.rs-dz [hidden]{display:none!important}
+#sb .rs-dz .rs-tabs{flex:none;margin:0 15px;padding-bottom:8px;margin-bottom:0}
+.rs-dz-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
+.rs-dz-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
+.rs-dz-bar .line{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.rs-dz-bar b{font-weight:600}
+.rs-dz-bar .st{margin:2px 0 0;min-height:1.3em;color:var(--mut);line-height:1.3}
+.rs-dz-bar #design-notice{min-height:0;color:var(--ink)}
+.rs-dz-bar #design-notice:empty{display:none}
+.rs-dz .fsec{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 10px;background:var(--card)}
+.rs-dz .fsec h3{margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.rs-dz .why,.rs-dz .small{font-size:12px;color:var(--mut);line-height:1.4;margin:0 0 8px}
+.rs-dz .small{color:var(--ink)}
+.rs-dz .muted,.rs-dz .col small{color:var(--mut)}
+.rs-dz .row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.rs-dz .row button{flex:1 1 0;white-space:nowrap}
+.rs-dz button.sm{height:28px;padding:0 9px;font-size:12px}
+.rs-dz button.danger{border-color:var(--rs-dz-bad);color:var(--rs-dz-bad)}
+.rs-dz .link{border:0;background:none;color:var(--accent);cursor:pointer;padding:0 2px;font:inherit;white-space:nowrap}
+.rs-dz .drow2{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;margin:0 0 6px;font-size:13px}
+.rs-dz .drow2>span:first-child{min-width:0;overflow-wrap:anywhere}
+.rs-dz .drow2.cls,.rs-dz .rhead{grid-template-columns:1fr 52px 52px}
+.rs-dz .drow2.two{grid-template-columns:1fr 70px 70px}
+.rs-dz .drow2.rng{grid-template-columns:1fr minmax(90px,140px) 3.6em}
+.rs-dz .drow2.rng output{text-align:right;font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
+.rs-dz .drow2:has(input[type=text]){grid-template-columns:4em 1fr}
+.rs-dz .rhead{display:grid;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:4px}
+.rs-dz .rhead span{text-align:center}
+.rs-dz input[type=color]{width:100%;min-width:44px;height:30px;padding:1px 2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer}
+.rs-dz input[type=number],.rs-dz input[type=text],.rs-dz input[type=search]{height:32px;min-width:0;width:100%;box-sizing:border-box}
+.rs-dz input[type=range]{accent-color:var(--accent-fill)}
+.rs-dz .drow2 .rs-sel,.rs-dz .drow2>select{width:auto;max-width:11em}
+.rs-dz .optrow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);cursor:pointer;margin-bottom:6px}
+.rs-dz .optrow:has(input:checked){border-color:var(--accent-fill);background:var(--rs-dz-soft)}
+.rs-dz .optrow input{margin:2px 0 0;accent-color:var(--accent-fill);flex:none}
+.rs-dz .optrow .t{display:flex;flex-direction:column;gap:2px}
+.rs-dz .optrow small{color:var(--mut);font-size:12px;line-height:1.35}
+.rs-dz .themes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rs-dz .theme{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:10px;text-align:left;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;cursor:pointer;height:auto;min-width:0}
+.rs-dz .theme:hover{border-color:var(--accent-fill)}
+.rs-dz .theme[aria-checked=true],.rs-dz .theme.mine[aria-current=true]{border-color:var(--accent-fill);background:var(--rs-dz-soft);box-shadow:inset 3px 0 0 var(--accent-fill)}
+.rs-dz .theme small,.rs-dz .themes .kind small{color:var(--mut);font-size:12px;line-height:1.35}
+.rs-dz .themes .kind{grid-column:1/-1;display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.rs-dz .themes .kind:first-child{margin-top:0}
+.rs-dz .theme.mine{cursor:default}
+.rs-dz .theme.mine .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.rs-dz .sw5{display:flex;width:100%;height:14px;border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.rs-dz .sw5 i{flex:1}
+.rs-dz .sw5 i.none{background:repeating-conic-gradient(#c8c8c8 0 25%,#ffffff 0 50%) 0 0/8px 8px}
+.rs-dz .yours{font-size:10.5px;font-weight:600;padding:0 6px;border-radius:999px;border:1px solid var(--accent-fill);color:var(--accent);background:var(--card);vertical-align:1px}
+.rs-dz #theme-search{margin-bottom:6px}
+.rs-dz .chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px}
+.rs-dz .chip{height:28px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--ink);font:inherit;font-size:12.5px;cursor:pointer}
+.rs-dz .chip[aria-pressed=true]{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+.rs-dz #mine-list{margin:8px 0}
+.rs-dz .cols{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:12.5px}
+.rs-dz .cols .col{display:flex;align-items:center;gap:6px;min-width:0;overflow-wrap:anywhere}
+.rs-dz .cols.two .col{justify-content:space-between}
+.rs-dz .cols.two input[type=number]{width:56px}
+.rs-dz .fix-group{margin:12px 0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.rs-dz .fix-group:first-child{margin-top:0}
+.rs-dz .bad{color:var(--rs-dz-bad)}
+html.rs-phone .rs-dz-back,html.rs-phone .rs-dz .rs-tab,html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
+/* the preview under a transparent ground: the map container has the color of the base map, the checkerboard goes over that color */
+.rs-checker{background-image:repeating-conic-gradient(#d4d4d4 0 25%,#ffffff 0 50%);background-size:24px 24px}

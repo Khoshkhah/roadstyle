@@ -104,3 +104,23 @@ def test_every_part_is_readable_in_the_theme(tmp_path, theme):
         browser.close()
     assert not errors, errors
     assert not problems, json.dumps(problems, indent=1)
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_design_panel_is_readable_in_the_theme(tmp_path, theme):
+    from test_design_panel_browser import open_page, served
+    problems = {}
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = open_page(p, url, 1400, 900)
+        page.evaluate(f"rsSetTheme({json.dumps(theme)})")
+        page.evaluate("dz.open('theme'); document.getElementById('mine-name').value = 'Mine'; document.getElementById('mine-save').click()")
+        page.wait_for_timeout(300)
+        for tab in ("theme", "roads", "text", "layers", "tiles"):
+            page.evaluate(f"dz.tab('{tab}')")
+            page.wait_for_timeout(200)
+            found = page.evaluate(_PROBE, ["#sb .rs-dz, #sb .rs-dz-title", theme == "dark"])
+            if found:
+                problems[tab] = sorted({" | ".join(str(x) for x in f if x != "") for f in found})[:6]
+        browser.close()
+    assert not errors, errors
+    assert not problems, json.dumps(problems, indent=1)

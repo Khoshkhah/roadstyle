@@ -180,6 +180,11 @@ export interface Dashboard {
   readonly contract: number;
   /** A new roads style: add its sources and layers to the map first (with the prefix). The controls stay. more.road_table: its road table. */
   setStyle(style: StyleSpecification, more?: { road_table?: RoadTableData | null }): void;
+  /** A new look on the same tiles (LiveMap.setLook's style): the road layers (and their copies with the prefixes `also`) take its paint, layout and filter.
+   *  false: the new style has other layers (draw a new map). */
+  restyle(style: StyleSpecification, options?: { also?: string[]; imagePrefix?: string }): Promise<boolean>;
+  /** The prefix of the roads style's ids on the map. */
+  readonly prefix: string;
   /** The phone's bottom sheet: its height (0 closed, 1 40 %, 2 full; null where the page has no sheet), or set it. */
   sheet(): 0 | 1 | 2 | null;
   sheet(height: 0 | 1 | 2): void;
