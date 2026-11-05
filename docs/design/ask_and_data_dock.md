@@ -22,6 +22,9 @@ Later the same day, Kaveh also asked for these:
 5. Ask has no scroll in the panel's body: the view fills the panel, and the conversation is its only scroll. The question box is a plain
    row at the bottom of the view. A sticky box over the conversation looked like a white box on the panel and let text show under it.
 6. No privacy notice card before the first question ([What goes to the provider](#what-goes-to-the-provider)).
+7. The result table must scroll. In the mock-up the table's box took the height of all its rows (27 916 px for 1000 rows) and the dock
+   cut it, so it did not scroll. Now the box has the height of the dock, and it scrolls up and down and sideways. Its two scrollbars are
+   always visible ([The dock's table](#the-docks-table)).
 
 ## Problem
 
@@ -153,7 +156,7 @@ const t = rs.dock.table({
   columns: [{name: "edge_id", type: "BIGINT"}, {name: "name", type: "VARCHAR"}, {name: "length_m", type: "DOUBLE"}],
   rows: [[8121729169906061189n, "Riia", 1240.5]],
   idColumn: "edge_id",       // optional: the column with the road ids
-  more: true,                // optional: the rows are not all the rows ("1000 of more")
+  more: true,                // optional: the rows are not all the rows ("1000 rows (there are more)")
 });
 rs.dock.add({id: "roads", label: "Roads", el: t.el});
 t.set({columns, rows});      // new rows in the same table
@@ -162,6 +165,11 @@ t.set({columns, rows});      // new rows in the same table
 - It is a box with a `--line` border and 8 px corners, in an `rs-scroll` area ([Dashboard parts](../guides/dashboard-parts.md#a-list-or-a-table-that-scrolls)).
   The box is as wide as its columns, and it scrolls sideways when the columns are wider than the dock. The columns do not stretch to fill
   the dock: a table of 3 columns is narrow and stays at the left.
+- The box has the height of the dock, never the height of its rows, so it scrolls up and down. A test scrolls a table of 1000 rows with
+  the mouse wheel and checks that the box ends inside the dock and that the header row stays at the top.
+- The two scrollbars of the box are always visible (thin, the dashboard's thumb colour: `--ink` at `--rs-thumb`). This is different from
+  the other scroll areas, where the scrollbar shows only under the pointer: in a data table, the person must see at once that there are
+  more rows and more columns. A browser test must start Chromium without `--hide-scrollbars` to see them.
 - Each column has its own width (`width: max-content`), and a cell is at most 320 px wide. A longer text is cut with "...", and the full
   text is in its tooltip.
 - The header row has the `--card` background and stays in view. Each header shows the column name and, under it in small muted capitals,
@@ -255,7 +263,7 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 ### The parts of the data dock
 
 - **Run.** The data dock checks the SQL with the guard (when `guard` is on), adds the row limit, calls `query`, and shows the table. While
-  it runs, Run becomes Stop. The note is "12 rows · 4 columns · 6 ms" or "1000 of more rows · ...".
+  it runs, Run becomes Stop. The note is "12 rows · 4 columns · 6 ms" or "1000 rows (there are more) · ...".
 - **An error.** The line stays open, and a red line under it shows the database's message. The old table stays. The colour is a new
   token, `--rs-err` (`#b91c1c` light, `#fca5a5` dark), with a contrast of 4.5 or more in both themes. Ask uses it for a failed query.
   The dashboard has no error colour now: `--rs-chart-miss` is a grey.
