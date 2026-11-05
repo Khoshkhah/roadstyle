@@ -1,20 +1,9 @@
 // oneway direction-arrow icon (openstreetmap-carto)
-import {map, style, O, RS_LOADED, _src, _role, _emit, _sfeats, RoadTable} from "./core.js";
+import {map, style, O, RS_LOADED, _src, _sfeats, RoadTable} from "./core.js";
 import {_tunOn} from "./tunnel.js";
 import {_svLanePx} from "./svspot.js";
 const ARROW_IMAGE = "rs-oneway";      // the arrow image of roadstyle: its own name, never the `oneway` image that a base map's sprite can have (it can point up)
 let _arSdf = null;         // the icon on the map is an SDF one (a map with tunnels) or not
-// THE ARROWS SWITCH (the row "Arrows" of the base-map box): one state, kept in this browser (rs-top:arrows). Off hides the arrow layers: the symbol layers whose
-// source has the role "arrows", or whose icon is the one-way arrow (the style's own "line" and "line-center" arrows). The arrows come back with no new tiles.
-const _arKey = "rs-top:arrows";
-let _arOff = false;
-try{ _arOff = localStorage.getItem(_arKey) === "0"; }catch(e){}
-const _arLayers = () => ((map.getStyle() || {}).layers || []).filter(l => l.type === "symbol" && (_role(l) === "arrows" || JSON.stringify((l.layout || {})["icon-image"] || "").indexOf("oneway") >= 0));
-export const rsArrowsOn = () => !_arOff;
-export const rsHasArrows = () => _arLayers().length > 0;
-function _arApply(){ const v = _arOff ? "none" : "visible"; for(const l of _arLayers()) if(map.getLayoutProperty(l.id, "visibility") !== v) map.setLayoutProperty(l.id, "visibility", v); }
-export function rsSetArrows(on){ _arOff = !on; try{ localStorage.setItem(_arKey, on ? "1" : "0"); }catch(e){} _arApply(); _emit("rs:arrowschange", {on: !!on}); }
-let _arWatch = false;
 export function addArrow(){
   if(map.hasImage(ARROW_IMAGE)){ if(_arSdf === _tunOn) return; map.removeImage(ARROW_IMAGE); }       // a later style with tunnels (or with none) needs the other kind
   // rasterised large (the profile's arrows.icon, 4x by default): the high-zoom size ramp scales the icon up to ~10x, and a 2x raster
@@ -162,7 +151,6 @@ let _rsSlotsN = -1;     // the slots arrive (inflated) after load: place the arr
 let _arBound = false;
 // the arrows of the style of the moment: at the start, and again for a new style (rs.setStyle; a style that has no arrow_icon has none)
 export function initArrows(){
-  if(!_arWatch){ _arWatch = true; map.on("styledata", _arApply); map.on("idle", _arApply); }       // a new style, or layers that came later, get the state of the switch
   if(!O.arrow_icon) return;   // no arrow_icon: the host adds the "rs-oneway" image itself (the Rust engine: the style's metadata roadstyle:images)
   _RS_ARROW = {...O.arrow_rules, main: new Set(O.arrow_rules.main)};
   _rsSlotsN = -1;

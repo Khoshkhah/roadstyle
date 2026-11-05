@@ -19,6 +19,7 @@ tip
 help
 hover
 tabs
+days
 kpi
 svg
 toolbar
@@ -32,6 +33,7 @@ svproviders
 streetview
 google3d
 basemap
+elevation
 basemapbox
 boundary
 filter

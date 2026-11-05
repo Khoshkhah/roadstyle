@@ -77,7 +77,7 @@ m.save("map.html")                        # m.html is the page as a string
   (main roads from zoom 15-16, side streets from 17); one-way arrows on main roads from zoom 15, side streets from 17: check
   with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed. `settings={"config": {"tunnel_toward": "Dark"}}` (a name in `tunnel_towards`, or a `#rrggbb`) picks the colour they fade toward (default Sand; Dark or Light matching the base map keeps each class hue).
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (an empty panel and the toolbox; `layout="dock"` docks the panel with no toolbar, the
-  default `"overlay"` floats it; `boundary_dim=True` / `boundary_limit=True` shade and limit the map to `boundary=`; there is no report page; `page_script=` / `page_style=` add the page's own JS and CSS (put the JS in `rs.ready(() => ...)`: the event `rs:ready` fires once, before a late listener); live data for a new day: `live_data=True` + `rs.setData(url, ...)` with `edge_id` as TEXT (a number goes in `classes` sets by natural breaks, or in your `breaks`; `rs.naturalBreaks(values, k)` gives the cuts of a whole day, `fields` names the columns that the popup shows, `rs.colorModes.set(names, {active, onChange})` puts a page's own "Colour by" list in the legend box), guide `guides/live-data.md`; `dashboard={...}` changes any typed option (every key and default: `docs/reference/parameters.md`, "Dashboard options"; the panel's sections: `docs/guides/dashboard-panel.md`) and
+  default `"overlay"` floats it; `boundary_dim=True` / `boundary_limit=True` shade and limit the map to `boundary=`; `hillshade=True` / `terrain=True` start the base-map box's Hillshade and 3D terrain on (a DEM from the Terrain Tiles on AWS, no key; with the terrain on every layer lies on the ground, so a tunnel is not under the hill and a bridge is not above the valley: switch it off for flat roads); there is no report page; `page_script=` / `page_style=` add the page's own JS and CSS (put the JS in `rs.ready(() => ...)`: the event `rs:ready` fires once, before a late listener); live data for a new day: `live_data=True` + `rs.setData(url, ...)` with `edge_id` as TEXT (a number goes in `classes` sets by natural breaks, or in your `breaks`; `rs.naturalBreaks(values, k)` gives the cuts of a whole day, `fields` names the columns that the popup shows, `rs.colorModes.set(names, {active, onChange})` puts a page's own "Colour by" list in the legend box), guide `guides/live-data.md`; `dashboard={...}` changes any typed option (every key and default: `docs/reference/parameters.md`, "Dashboard options"; the panel's sections: `docs/guides/dashboard-panel.md`) and
   `rs.render_street_view(edges, ...)` (Google
   Street View beside the map, or under it with `layout="below"`, following the clicked road;
   `panel_width=42`, `resizable=True`)
@@ -106,7 +106,9 @@ m.save("map.html")                        # m.html is the page as a string
 ## A dashboard page
 
 A dashboard is the map, the toolbox and a side panel. Its map is a map page's map, with the same defaults (base map `ofm_positron`,
-`road_popup=True`, the profile's `minzoom`); the template sets no map keyword. **The panel starts empty: add what the page needs.**
+`road_popup=True`, the profile's `minzoom`); the template sets no map keyword. The profile's `minzoom` hides minor classes when zoomed out
+(residential below 13, footway below 15). **On a page whose roads carry data (flow, speed, a model's result), give `minzoom=False`**, so that
+every road with data shows at every zoom. **The panel starts empty: add what the page needs.**
 A section is a roadstyle part (`part`: `"query"` with `text`, or `"road_card"` with `fields`) or the page's `html`, with `label`, `after` / `before` (an earlier section), `fold` and `background`. There is no `hide` and no `phone` option: the page turns to its phone form by itself at 700 px or less.
 
 ```python
@@ -138,10 +140,11 @@ Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
 - **A section with a `label` is a card**: the label is its title row. `fold: True` makes it fold, `background: False` takes its colour away (four kinds).
 - A section without a `label` is a block of the page's own HTML with no box (tabs, a row of tiles, several cards). A card inside it is `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>`.
 - **Never put an `rs-sec-box` inside a section with a `label`.** Put the content in `html`.
-- A "?" for a card: `rs.help.button(rs.sections.get(id), {title, ...})`. It goes at the right end of the title row, in every card.
+- A "?" for a card: `rs.help.button(rs.sections.get(id), {title, ...})`. It goes at the right end of the title row, before the chevron of a card that folds.
 - Never write your own margin, padding or radius for a card. The space is three variables on `:root`: `--rs-card-gap` (12px between cards), `--rs-card-pad` (14px inside), `--rs-panel-bottom` (28px under the last card). A closed card is 44px high. A section without a label has the same gap.
 - In the title row of the panel, "collapse all" is at the left of "hide the panel". The panel does this: do not move the buttons.
 - A filled control (a selected tab, a primary button) is `var(--accent-fill)` (`#0E7F91`) with white text. Links and marks are `var(--accent)`.
+- A day picker (a page with one day of data at a time): `rs.days.use(el, {days: ["2026-10-04", ...], onChange: d => load(d)})`. It builds the label, the field, the calendar of the days with data, the arrows and "Latest". Do not write a page's own date field.
 - Tabs (`rs-tabs`) change the pane: the selected tab is filled (`--accent-fill`, white text). A two-way switch (`rs-seg`) changes a mode or a setting: the selected segment is the card colour with `--accent` text. Do not use one for the other's job.
 
 ## Check the result

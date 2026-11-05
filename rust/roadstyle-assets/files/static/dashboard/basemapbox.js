@@ -1,5 +1,5 @@
 // The base-map box (docs/design/dashboard_templates.md, 3.3): the heading "Base map", one radio row with a swatch for each map, a divider, and
-// "On top": Hillshade, Labels and 3D buildings. A map with a dark twin is one row that follows the page's theme. The order on the map: the base
+// "On top": Hillshade, 3D terrain (elevation.js), Labels, One-way arrows and 3D buildings. A map with a dark twin is one row that follows the page's theme. The order on the map: the base
 // map, the hillshade, the labels, the roads, the page's own layers, the buildings, the selection. The URLs of the layers on top are
 // data/basemaps.json `ontop` (O.ontop).
 //
@@ -8,7 +8,7 @@
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
-import {rsArrowsOn, rsSetArrows, rsHasArrows} from "./arrows.js";
+import {_elHillshade, rsTerrain, _elTerrainByPerson} from "./elevation.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
 const _bxGet = k => { try{ return localStorage.getItem("rs-top:" + k); }catch(e){ return null; } };
@@ -19,6 +19,9 @@ const _bxSwatch = b => {
   if(!Array.isArray(s)) return s || b.bg;
   return "linear-gradient(to top left," + s[2] + " 0 32%,transparent 32%),linear-gradient(135deg,transparent 0 40%," + s[1] + " 40% 54%,transparent 54%)," + s[0];
 };
+// the box's layers again after rs.setStyle (index.js): a new roads style brings its arrow layers back as visible
+let _bxApply = null;
+export function useTops(){ if(_bxApply) _bxApply(); }
 // A PAGE'S OWN ROW under "On top": window.rsAddTopRow({id, label, get, set, available}) adds a check box for a layer of the page (get: whether it shows, set(on): the page shows or hides it,
 // available(): false greys the row). The row can be added before or after the box is built. The event rs:toprowschange tells the box that the page changed its state.
 const _hostPending = [];
@@ -69,19 +72,23 @@ export function buildBox(menu){
     tops.buildings.c.disabled = !vec || own; tops.buildings.c.checked = vec && !own && rsBuildings();
     tops.buildings.lab.classList.toggle("rs-bm-off", !vec || own);
     tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
-    const hasArrows = rsHasArrows();                  // the arrow layers of the roads: the row is off while the page has none
-    tops.arrows.c.checked = rsArrowsOn(); tops.arrows.c.disabled = !hasArrows; tops.arrows.lab.classList.toggle("rs-bm-off", !hasArrows);
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
-    raster("hillshade", tops.hillshade.c.checked, ontop.hillshade);
+    _elHillshade(tops.hillshade.c.checked, firstRoad()); rsTerrain(tops.terrain.c.checked);
     const gray = baseKey() === "esri_gray" ? (current === "esri_dark_gray" ? ontop.labels_gray_dark : ontop.labels_gray_light) : ontop.labels;
     raster("labels", kind === "esri" && on, gray);
     if(vec) for(const l of map.getStyle().layers.filter(x => x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
+    // the one-way arrows: the road style's symbol layers with roadstyle's arrow image (one layer, or more on a map with tunnels); no row on a page without them
+    const arrows = map.getStyle().layers.filter(l => l.type === "symbol" && JSON.stringify((l.layout || {})["icon-image"] || "").includes("rs-oneway"));
+    tops.arrows.lab.hidden = !arrows.length;
+    for(const l of arrows) map.setLayoutProperty(l.id, "visibility", tops.arrows.c.checked ? "visible" : "none");
   };
-  topRow("hillshade", "Hillshade").checked = _bxGet("hillshade") === "1";
+  const keep = (id, start) => { const v = _bxGet(id); return v == null ? !!start : v === "1"; };       // the person's saved choice, else the page's start (hillshade=, terrain=)
+  topRow("hillshade", "Hillshade").checked = keep("hillshade", O.hillshade);
+  topRow("terrain", "3D terrain").checked = keep("terrain", O.terrain);
   topRow("labels", "Labels");
+  topRow("arrows", "One-way arrows").checked = _bxGet("arrows") !== "0";       // on, unless the person turned them off in this browser
   topRow("buildings", "3D buildings");
-  topRow("arrows", "Arrows");
   const hostRows = new Map();                        // the rows of the page: id -> {c, lab, spec}
   const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); });
   _hostAdd = spec => { if(hostRows.has(spec.id)) return; const c = topRow("host-" + spec.id, spec.label); hostRows.set(spec.id, {c, lab: tops["host-" + spec.id].lab, spec}); c.onchange = () => { spec.set(c.checked); syncHost(); }; syncHost(); };
@@ -95,17 +102,21 @@ export function buildBox(menu){
   for(const ev of ["rs:overlayschange", "rs:overlaychange"]) document.addEventListener(ev, syncLayers);
   syncLayers();
   tops.hillshade.c.onchange = () => { _bxSet("hillshade", tops.hillshade.c.checked); apply(); };
+  tops.terrain.c.onchange = () => { _bxSet("terrain", tops.terrain.c.checked); _elTerrainByPerson(tops.terrain.c.checked); };
+  window.rsHillshade = on => { if(on === undefined) return tops.hillshade.c.checked; tops.hillshade.c.checked = !!on; apply(); return !!on; };
+  window.rsTerrain = rsTerrain;
+  document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
+  tops.arrows.c.onchange = () => { _bxSet("arrows", tops.arrows.c.checked); apply(); };
   tops.buildings.c.onchange = () => rsBuildingsByPerson(tops.buildings.c.checked);
-  tops.arrows.c.onchange = () => rsSetArrows(tops.arrows.c.checked);
   const mark = () => rows.forEach(([b, r]) => { r.checked = b.key === current || b.dark === current; });
   // a map with a twin shows the swatch of the twin of the current theme
   const swatches = () => rows.forEach(([b, , sw]) => { const tw = b.dark && byKey(b.dark); sw.style.background = _bxSwatch(isDark() && tw ? tw : b); });
   document.addEventListener("rs:basemapchange", e => { current = e.detail.basemap; mark(); setTimeout(apply, 0); });
   document.addEventListener("rs:basemapready", apply);
-  for(const ev of ["rs:buildingschange", "rs:overlaychange", "rs:overlayschange", "rs:arrowschange"]) document.addEventListener(ev, apply);
-  map.on("idle", () => { const h = rsHasArrows(); if(tops.arrows.c.disabled === h) apply(); });         // the roads (and their arrows) come after the box
+  for(const ev of ["rs:buildingschange", "rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, apply);
   document.addEventListener("rs:themechange", swatches);
   map.on("load", apply);
+  _bxApply = apply;
   mark(); swatches(); apply();
 }

@@ -39,6 +39,9 @@ pub struct PageOptions {
     /// the layers on top of a base map (data/basemaps.json `ontop`: hillshade, the Esri labels): url, opacity, attribution
     pub ontop: Value,
     pub basemap_switcher: bool,
+    /// the hillshade and the 3D terrain of the base-map box start on (the person's saved choice wins): from the DEM of `ontop.dem`
+    pub hillshade: bool,
+    pub terrain: bool,
     /// a tiled page (the roads in the embedded PMTiles archive)
     pub tiles: bool,
     /// the road layer ("roads-simple")

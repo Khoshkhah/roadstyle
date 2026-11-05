@@ -197,6 +197,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `modes` | a duckOSM map's modes: `[[mode, count], ...]` (`roadstyle:controls.modes`) | `[]` | `filter.js` |
 | `box_layout` | `"stack"`: a base map's page (the Layers box folded); `"corner"`: the Layers box alone in its corner. On a screen 700 px wide or less (`panel._narrow`), every box (Roads, Layers, Legend) starts folded in both layouts, as the side panel starts closed | `"corner"` | `filter.js`, `overlays.js`, `panel.js` |
 | `overlay_control` | `overlay_control` | `true`: on a page with a bar, the base-map box has the one switch for all the layers and the legend box lists them; on a page with no bar (or no base-map box) the Layers box has a row for each. `false`: none of them | `overlays.js`, `basemapbox.js`, `colorbox.js` |
+| `hillshade`, `terrain` | the page's options | `false`: the start of the *Hillshade* and *3D terrain* rows of the base-map box (`basemapbox.js`; the person's saved choice wins); `elevation.js` draws them from `O.ontop.dem` |
 | `overlays_label` | `roadstyle:controls.overlays_label`, else the page's option | `"Map layers"`: the label of the one switch (a duckOSM page: `"duckOSM layers"`) and of the list in the legend box | `basemapbox.js`, `colorbox.js` |
 | `overlay_popup` | `overlay_popup` | `true` | `overlays.js` |
 | `tunnel` | `tunnel_control` and the theme's tunnels: `{layers, control, strength, palette, palettes, ratio, ratios, toward, towards, to, steps}` | `{layers: {}, steps: [], control: false}` | `tunnel.js`, `arrows.js` |
@@ -245,6 +246,7 @@ When a page does not give `road_popup`, `road_tooltip` or `hover_delay_ms`, `ind
 | `roadsbox.js` | the tool `roads`: the road filter in the bar, one row for each class (check box, colour, name, number of roads), All, None, Bridges, Tunnels and the restricted kinds; it calls the filter calls of `filter.js` | `filter` | |
 | `settings.js` | the tool `settings`: the person's own choices kept in this browser (where the bar and the panel are, the transparency of the layers, the keys of Google and CARTO) | | |
 | `sections.js` | the panel's sections: the panel starts empty, and a page adds sections with its HTML or a part (`query.js`, `roadcard.js`), hides, moves or removes them (`rs.sections`, `dashboard.panel.sections`) | `dashboard.panel` | `rs.sections` |
+| `days.js` | the day picker of a page (`rs.days.use`): the label, the field, the calendar of the days with data, the arrows and "Latest" | | `rs.days` |
 | `selectbox.js` | a select list in the look of the boxes (the native `<select>` stays in the page, hidden; the page still reads and sets its value) | | |
 | `panelscroll.js` | the scroll protocol of a panel: the header stays, only the body scrolls, with a line under the header and a fade at the bottom | | |
 | `tip.js` | the explanation of a button in a box of the page's look (the `title` is moved to `data-rs-tip`; 350 ms after the pointer comes) | | |

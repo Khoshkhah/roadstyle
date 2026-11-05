@@ -75,7 +75,7 @@ A section with a `label` is a card. Two options choose which of four kinds of ca
 | does not fold (default) | `{"id", "label", "html"}` | `{"id", "label", "html", "background": False}` |
 | `fold: true` | `{"id", "label", "html", "fold": True}` | `{"id", "label", "html", "fold": True, "background": False}` |
 
-Each kind has the same title row, the same 12 px corners and the same padding (`--rs-card-pad`). A card with `background: false` has no colour behind it. In a card that folds, the title is a button, the row has a chevron, and the body opens inside the same card. A "?" of [`rs.help.button(rs.sections.get(id), ...)`](dashboard-parts.md#a-help-window) is at the right end of the title row, in the same place in every card.
+Each kind has the same title row, the same 12 px corners and the same padding (`--rs-card-pad`). A card with `background: false` has no colour behind it. In a card that folds, the title is a button, the row has a chevron, and the body opens inside the same card. A "?" of [`rs.help.button(rs.sections.get(id), ...)`](dashboard-parts.md#a-help-window) is at the right end of the title row. In a card that folds, it is before the chevron, and the chevron is last.
 
 A section without a `label` is not a card. It is a block of the page's own HTML, with no title, no padding and no background, for content that has its own layout: tabs with their panes, a row of number tiles, or the page's own cards. It is as wide as the cards and has `--rs-card-gap` above and below, as a card has. Its first card and its last card do not add a second gap, because their margins join the block's margin.
 

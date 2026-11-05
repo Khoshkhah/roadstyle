@@ -265,6 +265,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .bm-menu.rs-bm-box div{padding:0!important}
 .bm-menu.rs-bm-box .rs-bm-h{padding:2px 4px!important}
 .rs-bm-row{display:flex;align-items:center;gap:8px;padding:4px;border-radius:6px;cursor:pointer;font:12px/1.3 system-ui,sans-serif}
+.rs-bm-row[hidden]{display:none}   /* a row the page cannot use (One-way arrows on a page without arrows) */
 .rs-bm-row:hover{background:var(--rs-tb-hover,rgba(0,0,0,.08))}
 .rs-bm-sw{box-sizing:border-box;width:32px;height:20px;border-radius:3px;border:1px solid rgba(0,0,0,.2);flex:none}
 .rs-bm-box hr{border:0;border-top:1px solid var(--rs-tb-border,rgba(0,0,0,.12));margin:4px 0;width:100%}
@@ -646,6 +647,40 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb .rs-seg button:hover{color:var(--ink);border:0}
 #sb .rs-seg button.on,#sb .rs-seg button.on:hover{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 #sb .rs-tab:focus-visible,#sb .rs-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* THE DAY PICKER (days.js): a label as the card titles have, then a row. The field looks like a form field (a border, the page's background, the
+   calendar icon and a "v"), so that a person sees that it opens something; the arrows and "Latest" are soft buttons beside it. */
+:is(#sb,body) .rs-day-label{margin:0 0 6px;color:var(--mut);font:600 12px/16px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em}
+:is(#sb,body) .rs-day-row{display:flex;align-items:center;gap:6px}
+:is(#sb,body) .rs-day button{height:34px;box-sizing:border-box;margin:0;border-radius:10px;color:var(--ink);font:13px/1 system-ui,sans-serif;cursor:pointer}
+:is(#sb,body) .rs-day :is(.rs-day-step,.rs-day-last){flex:none;padding:0 12px;border:0;background:var(--card)}
+:is(#sb,body) .rs-day .rs-day-step{width:34px;padding:0;font-size:16px}
+:is(#sb,body) .rs-day :is(.rs-day-step,.rs-day-last):hover:not(:disabled){border:0;background:color-mix(in srgb,var(--accent) 14%,var(--card));color:var(--ink)}
+:is(#sb,body) .rs-day button:disabled{opacity:.4;cursor:default}
+:is(#sb,body) .rs-day .rs-day-field{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;
+  border:1px solid color-mix(in srgb,var(--ink) 35%,var(--bg));background:var(--bg);font-weight:600;text-align:left;transition:background .12s,box-shadow .12s,border-color .12s}
+:is(#sb,body) .rs-day .rs-day-field:is(:hover:not(:disabled),[aria-expanded=true]){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--bg));
+  color:var(--ink);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}   /* the hover: a teal border, fill and ring, seen on a white panel too */
+:is(#sb,body) .rs-day :is(button,.rs-day-cd):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rs-day-field .rs-day-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-day-field svg{flex:none;display:block;color:var(--accent)}   /* the calendar and the "v" in the accent: the colour of what a click opens */
+.rs-day.rs-day-busy .rs-day-field{animation:rs-day-pulse .9s ease-in-out infinite}
+@keyframes rs-day-pulse{0%,100%{opacity:1}50%{opacity:.5}}
+:is(#sb,body) .rs-day-note{margin:6px 0 0;color:var(--mut);font-size:12px}
+.rs-day-cal{position:fixed;z-index:3500;width:284px;box-sizing:border-box;padding:12px;border-radius:12px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  color:var(--rs-tb-ink);border:1px solid var(--rs-tb-border);box-shadow:0 8px 24px rgba(0,0,0,.25);font:13px system-ui,sans-serif}
+.rs-day-cal[hidden]{display:none}
+.rs-day-cal .rs-day-ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.rs-day-cal .rs-day-ch b{font-size:14px}
+.rs-day-cal button{margin:0;padding:0;border:0;border-radius:8px;background:none;color:inherit;font:inherit;cursor:pointer}
+.rs-day-cal .rs-day-ch button{width:30px;height:30px;font-size:18px;background:color-mix(in srgb,currentColor 8%,transparent)}
+.rs-day-cal button:disabled{opacity:.35;cursor:default}
+.rs-day-cal .rs-day-cg{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.rs-day-cal .rs-day-cw{padding:4px 0;font-size:10.5px;font-weight:700;text-align:center;opacity:.7}
+.rs-day-cal .rs-day-cd{height:32px}
+.rs-day-cal .rs-day-cd:not(:disabled){font-weight:600;background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.rs-day-cal .rs-day-cd:not(:disabled):hover{background:color-mix(in srgb,var(--accent) 28%,transparent)}
+.rs-day-cal .rs-day-cd.on,.rs-day-cal .rs-day-cd.on:hover{background:var(--accent-fill);color:#fff}
+.rs-day-cal button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 #sb [data-pane][hidden]{display:none}
 
 /* ---- CARDS, NUMBER TILES, A CAPTION AND A CALLOUT in the panel (the box itself is `.rs-sec-box`, above): a card has a title and, right after it, its short muted description ---- */

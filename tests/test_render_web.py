@@ -2472,3 +2472,17 @@ def test_mapillary_token_is_an_option_and_reads_the_environment(monkeypatch):
     assert _opt(render_edges(_edges(), backend="web", mapillary_token="MLY|1").html, "mapillary_token") == "MLY|1"
     monkeypatch.setenv("MAPILLARY_TOKEN", "MLY|env")
     assert _opt(render_edges(_edges(), backend="web").html, "mapillary_token") == "MLY|env"
+
+
+def test_web_hillshade_and_terrain_keywords():
+    """`hillshade=` and `terrain=` start the base-map box's Hillshade and 3D terrain rows: off by default, no warning for the keywords, and the style
+    has no terrain or DEM of its own (elevation.js adds them at the page's run)."""
+    import warnings
+    off = render_edges(_edges(), backend="web").html
+    assert (_opt(off, "hillshade"), _opt(off, "terrain")) == (False, False)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        on = render_edges(_edges(), backend="web", hillshade=True, terrain=True).html
+    assert (_opt(on, "hillshade"), _opt(on, "terrain")) == (True, True) and not [x for x in w if "hillshade" in str(x.message) or "terrain" in str(x.message)]
+    assert "terrain" not in _style(on) and "dem" not in _style(on)["sources"]
+    assert _opt(on, "ontop")["dem"]["encoding"] == "terrarium"
