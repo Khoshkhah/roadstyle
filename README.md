@@ -47,6 +47,12 @@
   a level editor and a design panel (themes, road colours and widths, names, layers) that any page can open.
 - **Ready for AI agents.** An MCP server and an agent skill.
 
+## What is new in 0.28.0
+
+- **The design panel is a dashboard part:** themes, road colours and widths, names and layers, in any page with a dashboard ([guide](https://khoshkhah.github.io/roadstyle/guides/design-panel/)).
+- **3D buildings:** solid by default (a road behind a building does not show through the roof), an *Opacity* slider and `buildings_opacity=`, and the far buildings of a tilted map.
+- **The open card** has an accent ring and an accent title.
+
 ## What is new in 0.27.0
 
 - **The dashboard's panel starts empty, and a page adds what it needs**: its own HTML, the query box or the road card, with `dashboard={"panel": {"sections": [...]}}` or `rs.sections.add`. The map of a dashboard has the defaults of a map page. This is a breaking change: see [Migrate a dashboard](https://khoshkhah.github.io/roadstyle/guides/migrating-dashboard/).
