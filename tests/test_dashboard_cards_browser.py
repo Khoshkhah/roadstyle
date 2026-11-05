@@ -173,7 +173,8 @@ def test_a_card_that_opens_is_one_button_with_an_arrow_and_a_note(tmp_path):
           rs.sections.add({id: "go", label: "Edit levels", open: () => { window.opened++; }});
           rs.help.button(rs.sections.get("go"), {title: "About go"}); }""")
         sec = "[data-rs-section=go]"
-        h = lambda: page.evaluate(f"document.querySelector('{sec}').getBoundingClientRect().height")
+        def h():
+            return page.evaluate(f"document.querySelector('{sec}').getBoundingClientRect().height")
         assert h() == 44, h()
         hd = page.evaluate(f"""() => {{ const hd = document.querySelector('{sec} .rs-sec-hd'), r = e => e.getBoundingClientRect();
           return {{last: hd.lastElementChild.tagName, order: r(hd.querySelector('.rs-help-btn')).right <= r(hd.lastElementChild).left,

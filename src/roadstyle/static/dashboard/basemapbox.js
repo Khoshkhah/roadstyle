@@ -9,6 +9,7 @@
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
 import {_elHillshade, rsTerrain, _elTerrainByPerson} from "./elevation.js";
+import {rsArrowsOn, rsHasArrows, rsSetArrows, _arApply} from "./arrows.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
 const _bxGet = k => { try{ return localStorage.getItem("rs-top:" + k); }catch(e){ return null; } };
@@ -79,15 +80,14 @@ export function buildBox(menu){
     raster("labels", kind === "esri" && on, gray);
     if(vec) for(const l of map.getStyle().layers.filter(x => x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
     // the one-way arrows: the road style's symbol layers with roadstyle's arrow image (one layer, or more on a map with tunnels); no row on a page without them
-    const arrows = map.getStyle().layers.filter(l => l.type === "symbol" && JSON.stringify((l.layout || {})["icon-image"] || "").includes("rs-oneway"));
-    tops.arrows.lab.hidden = !arrows.length;
-    for(const l of arrows) map.setLayoutProperty(l.id, "visibility", tops.arrows.c.checked ? "visible" : "none");
+    tops.arrows.lab.hidden = !rsHasArrows();
+    _arApply();
   };
   const keep = (id, start) => { const v = _bxGet(id); return v == null ? !!start : v === "1"; };       // the person's saved choice, else the page's start (hillshade=, terrain=)
   topRow("hillshade", "Hillshade").checked = keep("hillshade", O.hillshade);
   topRow("terrain", "3D terrain").checked = keep("terrain", O.terrain);
   topRow("labels", "Labels");
-  topRow("arrows", "One-way arrows").checked = _bxGet("arrows") !== "0";       // on, unless the person turned them off in this browser
+  topRow("arrows", "One-way arrows").checked = rsArrowsOn();       // on, unless the person turned them off in this browser (arrows.js keeps the state)
   topRow("buildings", "3D buildings");
   const hostRows = new Map();                        // the rows of the page: id -> {c, lab, spec}
   const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); });
@@ -107,7 +107,8 @@ export function buildBox(menu){
   window.rsTerrain = rsTerrain;
   document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
-  tops.arrows.c.onchange = () => { _bxSet("arrows", tops.arrows.c.checked); apply(); };
+  tops.arrows.c.onchange = () => rsSetArrows(tops.arrows.c.checked);
+  document.addEventListener("rs:arrowschange", e => { tops.arrows.c.checked = e.detail.on; });
   tops.buildings.c.onchange = () => rsBuildingsByPerson(tops.buildings.c.checked);
   const mark = () => rows.forEach(([b, r]) => { r.checked = b.key === current || b.dark === current; });
   // a map with a twin shows the swatch of the twin of the current theme
