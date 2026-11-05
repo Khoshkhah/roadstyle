@@ -157,9 +157,9 @@ def test_a_card_that_folds_at_the_end_of_a_scrolled_panel_keeps_its_title_row_in
     assert not errors, errors
 
 
-def test_a_card_that_opens_is_one_button_with_an_arrow_and_a_note(tmp_path):
+def test_a_card_that_opens_is_one_button_with_a_pencil_a_tint_and_a_note(tmp_path):
     """A card with `open` (JavaScript only: a function) opens the page's own panel with one click anywhere on the card, or Enter on its title. It
-    never folds ("collapse all" leaves it), it is 44px high like a closed card that folds, its row ends with the arrow after the "?", and its note is
+    never folds ("collapse all" leaves it), it is 44px high like a closed card that folds, its row ends with the pencil after the "?", and its note is
     one line under the title (rs.sections.note). A disabled title does not open."""
     path = _page(tmp_path)
     with pw.sync_playwright() as p:
@@ -180,6 +180,8 @@ def test_a_card_that_opens_is_one_button_with_an_arrow_and_a_note(tmp_path):
           return {{last: hd.lastElementChild.tagName, order: r(hd.querySelector('.rs-help-btn')).right <= r(hd.lastElementChild).left,
                    button: hd.querySelector('.rs-sec-title').tagName}}; }}""")
         assert hd == {"last": "svg", "order": True, "button": "BUTTON"}, hd
+        bg = "id => getComputedStyle(rs.sections.get(id)).backgroundColor"
+        assert page.evaluate(f"({bg})('go') !== ({bg})('shut')"), "the open card has its own tint"
         page.click(f"{sec} .rs-sec-title")
         page.focus(f"{sec} .rs-sec-title")
         page.keyboard.press("Enter")

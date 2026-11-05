@@ -81,12 +81,12 @@ function _fdMake(w, spec, hd, tt){
   }
 }
 // A card that opens (`open: fn`): the card is one button that runs fn(card), for a card whose only work is to open the page's own panel, editor or
-// dialog. Its title is a button (for the keyboard and a screen reader), the row ends with an arrow in place of the chevron, and a click anywhere on
+// dialog. Its title is a button (for the keyboard and a screen reader), the row ends with a pencil in place of the chevron (a chevron would say that it folds), the card has a light tint of the accent colour, and a click anywhere on
 // the card (not in its body) runs fn. It never folds, so "collapse all" leaves it. A card whose title button is disabled does not open.
-const _opArrow = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+const _opIcon = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></svg>';
 function _opMake(w, spec, hd, tt){
   w.dataset.rsOpen = "1"; tt.type = "button";
-  hd.insertAdjacentHTML("beforeend", _opArrow);
+  hd.insertAdjacentHTML("beforeend", _opIcon);
   w.onclick = e => { if(!tt.disabled && !e.target.closest(".rs-sec-body, .rs-help-btn")) spec.open(w); };
 }
 const _secNeed = id => { const w = _secEls.get(id); if(!w) throw new Error("rs.sections: no section '" + id + "' (rs.sections.list())"); return w; };

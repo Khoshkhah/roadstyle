@@ -66,7 +66,7 @@ rs.ready(() => {
 
 ### A card that opens something
 
-When the only work of a card is to open your own panel, editor or dialog, give it `open` (a function) in place of `fold` and a body. The card is then one button: a click anywhere on it, or Enter on its title, runs the function. Its row ends with an arrow in place of the chevron, it never folds, and "Collapse all" leaves it. Its `note` tells the state, and `rs.sections.note(id, text)` changes it. `open` is JavaScript only, because it is a function. A card with `open` and `fold` gets an error.
+When the only work of a card is to open your own panel, editor or dialog, give it `open` (a function) in place of `fold` and a body. The card is then one button: a click anywhere on it, or Enter on its title, runs the function. Its row ends with a pencil in place of the chevron, its background has a light tint of the accent colour, it never folds, and "Collapse all" leaves it. Its `note` tells the state, and `rs.sections.note(id, text)` changes it. `open` is JavaScript only, because it is a function. A card with `open` and `fold` gets an error.
 
 ```js
 rs.sections.add({id: "design", label: "Edit design", note: "Light (Liberty)", open: () => myPanel.open()});
@@ -86,7 +86,7 @@ A section with a `label` is a card. Two options choose which of four kinds of ca
 | does not fold (default) | `{"id", "label", "html"}` | `{"id", "label", "html", "background": False}` |
 | `fold: true` | `{"id", "label", "html", "fold": True}` | `{"id", "label", "html", "fold": True, "background": False}` |
 
-Each kind has the same title row, the same 12 px corners and the same padding (`--rs-card-pad`). A card with `background: false` has no colour behind it. In a card that folds, the title is a button, the row has a chevron, and the body opens inside the same card. A "?" of [`rs.help.button(rs.sections.get(id), ...)`](dashboard-parts.md#a-help-window) is at the right end of the title row. In a card that folds, it is before the chevron, and the chevron is last. A card that opens something ([`open`](#a-card-that-opens-something)) has an arrow in the place of the chevron.
+Each kind has the same title row, the same 12 px corners and the same padding (`--rs-card-pad`). A card with `background: false` has no colour behind it. In a card that folds, the title is a button, the row has a chevron, and the body opens inside the same card. A "?" of [`rs.help.button(rs.sections.get(id), ...)`](dashboard-parts.md#a-help-window) is at the right end of the title row. In a card that folds, it is before the chevron, and the chevron is last. A card that opens something ([`open`](#a-card-that-opens-something)) has a pencil in the place of the chevron, and a light tint of the accent colour.
 
 A section without a `label` is not a card. It is a block of the page's own HTML, with no title, no padding and no background, for content that has its own layout: tabs with their panes, a row of number tiles, or the page's own cards. It is as wide as the cards and has `--rs-card-gap` above and below, as a card has. Its first card and its last card do not add a second gap, because their margins join the block's margin.
 
