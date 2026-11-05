@@ -27,7 +27,7 @@ export function rsTerrain(on){
   _elOn = on;
   if(on){
     if(!map.getSource(_elTerrain)) map.addSource(_elTerrain, _elSource());
-    map.setTerrain({source: _elTerrain, exaggeration: O.ontop.terrain.exaggeration});
+    map.setTerrain({source: _elTerrain, exaggeration: O.terrain_exaggeration ?? O.ontop.terrain.exaggeration});       // the keyword, else the config's
   } else {
     map.setTerrain(null);
     if(map.getSource(_elTerrain)) map.removeSource(_elTerrain);

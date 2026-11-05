@@ -87,3 +87,14 @@ def test_the_keywords_start_them_on_and_a_saved_choice_wins():
         assert page.evaluate("[!!map.getLayer('rs-top-hillshade'), !!map.getTerrain()]") == [True, False]
         browser.close()
     assert not errors, errors
+
+
+def test_terrain_exaggeration_is_the_keyword_else_the_config():
+    tile, errors = _tile(), []
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        for kw, want in (({}, 1.0), ({"terrain_exaggeration": 2.5}, 2.5)):
+            page = _open(browser, rs.render_dashboard(_edges(), basemap="blank", terrain=True, **kw).html, errors, tile)
+            assert page.evaluate("map.getTerrain().exaggeration") == want, kw
+        browser.close()
+    assert not errors, errors

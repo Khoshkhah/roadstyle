@@ -2486,3 +2486,4 @@ def test_web_hillshade_and_terrain_keywords():
     assert (_opt(on, "hillshade"), _opt(on, "terrain")) == (True, True) and not [x for x in w if "hillshade" in str(x.message) or "terrain" in str(x.message)]
     assert "terrain" not in _style(on) and "dem" not in _style(on)["sources"]
     assert _opt(on, "ontop")["dem"]["encoding"] == "terrarium"
+    assert _opt(off, "terrain_exaggeration") is None and _opt(render_edges(_edges(), backend="web", terrain_exaggeration=2.5).html, "terrain_exaggeration") == 2.5
