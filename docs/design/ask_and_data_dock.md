@@ -523,6 +523,10 @@ default stays `frame` for other pages, and a look that the person keeps in Setti
     or a colour, it applies that change again (also after its Undo, which then works again) and takes away the light of another answer. A
     card with no road ids has no Map.
   - **After each answer, both at once:** the dock shows the answer's table (it opens on a desktop) and the map shows its roads.
+  - **Which table is the answer's.** When the answer changed the map (filter, colour, move), its table is the roads of the last map tool,
+    not a later query of the model. A model often runs a small helper query after a filter, for its sentence ("… ORDER BY length_m DESC
+    LIMIT 5" for "the longest"), and the dock showed those 5 rows in place of the 625 filtered roads (Kaveh, 2026-11-05: "why it limits to
+    5?"). The helper query stays in the card's details ("1 query · 5 rows").
 - **Bold and code.** A model writes `**bold**` and `` `code` ``. The view shows them as bold and as code, built from text nodes, so no HTML
   of the model goes into the page.
 - **A short answer, not the table** (Kaveh, 2026-11-05: "not good", about an answer that listed 5 rows with their 19-digit `edge_id`
