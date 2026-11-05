@@ -533,6 +533,17 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 .sb-sec .rs-sec-hd > svg{flex:none;transition:transform .15s}
 .sb-sec.folded .rs-sec-hd > svg{transform:rotate(-90deg)}
 .sb-sec.folded .rs-sec-body{display:none}
+#sb .sb-sec .rs-sec-note{margin:-6px 0 10px;color:var(--mut);font:12.5px/1.4 system-ui,sans-serif}
+#sb .sb-sec .rs-sec-note:empty{display:none}
+#sb .sb-sec.folded > .rs-sec-note{margin:4px 0 0}
+#sb .sb-sec[data-rs-open]{cursor:pointer}
+#sb .sb-sec[data-rs-open][data-rs-card=bg]{background:color-mix(in srgb,var(--card) 94%,var(--accent))}
+#sb .sb-sec[data-rs-open][data-rs-card=bg]:hover{background:color-mix(in srgb,var(--card) 90%,var(--accent))}
+#sb .sb-sec[data-rs-open]:hover > .rs-sec-hd{color:var(--accent)}
+#sb .sb-sec[data-rs-open]:has(> .rs-sec-hd > .rs-sec-title:disabled){cursor:default}
+#sb .sb-sec[data-rs-open] > .rs-sec-hd{margin-bottom:0}
+#sb .sb-sec[data-rs-open] > .rs-sec-note{margin:4px 0 0}
+#sb .sb-sec[data-rs-open] > .rs-sec-body:empty{display:none}
 /* a "?" in a title row keeps the row 16px high, so a closed card stays 44px. In a card of the page's HTML (`.rs-card-title`) it is at the right end too. */
 #sb :is(.rs-sec-hd,.rs-card-title) .rs-help-btn{margin:-3px 0;flex:none}
 #sb .rs-card-title .rs-help-btn{float:right;margin-left:8px}
