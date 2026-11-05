@@ -140,6 +140,7 @@ such `state` block) has no step of its own (`core.js`, `_useState`).
 | `rs_co` | integer | `color_active` | 0 to the number of options - 1 | the fill pieces and items (`match` on the option) | Colour by menu, views | `rsSetColorField`; `rs:colorchange` |
 | `rs_top` | list of rows | `[]` | the rows that `rsColor` painted | the simple look's sort key: a painted road is drawn over the others of its level (the colour is the feature state `rs_c` of the row) | host page | `rsColor` |
 | `rs_fill_on` | bool | `road_fill` | | the fill pieces' opacity | road fill switch, views | `rsSetRoadFill`; `rs:roadfillchange` |
+| `rs_terrain_tunnel` | number | `1` | | a tunnel piece's opacity factor (fill, gap, dashes; only a style with tunnels reads it): `1`, the fade (`ontop.terrain.tunnel_fade`) or `0` while the 3D terrain is on | `terrain_tunnels=`, the terrain switch | `rsTerrainTunnels`; `rs:terrainchange` |
 | `rs_theme` | text | `"light"` | | every colour of a layer: its dark colour (`"dark"`) or its light one, with the casing of the roads, the base map's layers, the names and the arrows | the dashboard's theme switch | `rsSetTheme`; `rs:themechange` ([the dark theme](../design/dark_theme.md)) |
 | `rs_ov_<i>` | object: feature id to color | `{}` | colors | the paint of overlay `i` | host page | `rsColor(..., overlay)` |
 | `rs_palette` | text | the start palette | the palettes that the views name | each color that differs between these palettes (`__rs_fill@<palette>` and the paint values) | View menu | `rsSetView`; `rs:viewselect` |

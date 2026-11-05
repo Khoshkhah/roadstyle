@@ -40,11 +40,21 @@ const addExtrusion = (s, b)=>{
   const flat = s.layers.find(l=>l.type === "fill" && l["source-layer"] === "building");
   if(!flat) return;
   s.layers.push({id:"building-3d", type:"fill-extrusion", source:flat.source, "source-layer":"building", minzoom:14, filter:["!", ["has", "hide_3d"]],
-                 paint:{"fill-extrusion-base":["get", "render_min_height"], "fill-extrusion-height":["get", "render_height"],
+                 paint:{"fill-extrusion-base":["coalesce", ["get", "render_min_height"], 0], "fill-extrusion-height":["coalesce", ["get", "render_height"], 0],
                         "fill-extrusion-color":b.building_3d || noAlpha((flat.paint || {})["fill-color"]) || "#cccccc", "fill-extrusion-opacity":0.8}});
+};
+// A building without a height (`render_height`, `render_min_height`) is flat: MapLibre draws a missing number as 0 and warns each time ("Expected value to
+// be of type number, but found null instead"). The style's own height expressions, `["get", name]`, are made `["coalesce", ["get", name], 0]` in OUR merged copy
+// of the style (OpenFreeMap's served layers stay as they are): the picture is the same, and the console is clear. Another shape of expression is left as it is.
+const flatWithoutHeight = s=>{
+  for(const l of s.layers) if(l.type === "fill-extrusion") for(const k of ["fill-extrusion-height", "fill-extrusion-base"]){
+    const e = (l.paint || {})[k];
+    if(Array.isArray(e) && e[0] === "get" && e.length === 2) l.paint[k] = ["coalesce", e, 0];
+  }
 };
 const mergeVector = async b=>{
   const s = await (await fetch(b.style_url)).json();
+  flatWithoutHeight(s);
   addExtrusion(s, b);
   clearVector();
   glyphs0 = glyphs0 || map.getStyle().glyphs;

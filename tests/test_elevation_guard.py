@@ -22,3 +22,19 @@ def test_every_place_that_offers_the_terrain_says_that_a_tunnel_is_not_under_the
         assert lines, (path, key)
         text = " ".join(lines).lower() if path.endswith(".md") else (ROOT / path).read_text().lower()
         assert "tunnel" in text and "bridge" in text, f"{path} names the terrain but not its limit (tunnels and bridges)"
+
+
+def test_the_docs_of_terrain_tunnels_say_that_a_height_per_edge_is_impossible():
+    """The honest limit: MapLibre has no height for a line, so a `z` column cannot be drawn. The option for the tunnels is a fade or a hide."""
+    for path, key in (("docs/reference/parameters.md", "`terrain_tunnels`"), ("docs/reference/javascript.md", "`rsTerrainTunnels(mode)`"), ("docs/guides/dashboard-layout.md", "terrain_tunnels")):
+        lines = " ".join(ln for ln in (ROOT / path).read_text().splitlines() if key in ln).lower()
+        assert lines, (path, key)
+        assert "no height" in lines and "per-edge" in lines.replace("per edge", "per-edge"), f"{path}: say that a per-edge height is impossible (MapLibre has no height for a line)"
+
+
+def test_the_vector_base_maps_height_expressions_are_made_flat_without_a_height():
+    """A bare `["get", "render_height"]` in basemap.js would warn "Expected value to be of type number" for each building without a height."""
+    text = (DASH / "basemap.js").read_text()
+    bare = re.findall(r'(?<!"coalesce", )\["get", "render_(?:min_)?height"\]', text)
+    assert not bare, "make it [\"coalesce\", [\"get\", ...], 0]"
+    assert "flatWithoutHeight" in text
