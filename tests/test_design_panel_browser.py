@@ -176,6 +176,33 @@ def test_a_new_look_on_the_same_tiles_goes_through_rs_restyle(tmp_path):
     assert not errors, errors
 
 
+def test_the_switch_events_of_a_new_style_are_not_the_persons_and_the_host_fold_button_hides(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = open_page(p, url)
+        page.evaluate("rs.sections.add({id: 'f', label: 'A card that folds', fold: true, html: '<p>x</p>'})")
+        assert page.evaluate("getComputedStyle(document.getElementById('rs-fold-all')).display") != "none"
+        page.evaluate("window.ids = []; document.addEventListener('rs:sectionchange', (e) => window.ids.push(e.detail.id))")
+        page.evaluate("dz.open('theme')")
+        # the host's "Collapse all" is hidden while the panel is open; the panel's event has a detail, as the events of rs.sections have
+        assert page.evaluate("getComputedStyle(document.getElementById('rs-fold-all')).display") == "none"
+        assert "design" in page.evaluate("window.ids")
+        # rs.setStyle switches the layers of the old style again and sends their events before rs:stylechange: a theme stays the theme
+        page.evaluate("""() => { window.nextStyle = structuredClone(style); const orig = rs.restyle;
+          rs.restyle = async (st, o) => { document.dispatchEvent(new CustomEvent('rs:overlaychange', {detail: {overlay: 'water', visible: false}}));
+            document.dispatchEvent(new CustomEvent('rs:arrowschange', {detail: {on: false}})); return orig(st, o); }; }""")
+        page.evaluate("document.querySelector('[data-look=print]').click(); dz.flush()")
+        page.wait_for_function("dz.state().startsWith('The map shows this design')")
+        assert page.evaluate("[dz.get().theme, dz.get().visible.water]") == ["print", True]      # the events of the restyle changed nothing
+        # a person's switch outside a restyle still comes back to the design
+        on = page.evaluate("dz.get().visible.arrows")
+        page.evaluate(f"rsSetArrows({'false' if on else 'true'})")
+        assert page.evaluate("[dz.get().theme, dz.get().visible.arrows]") == ["custom", not on]
+        page.evaluate("dz.close()")
+        assert page.evaluate("getComputedStyle(document.getElementById('rs-fold-all')).display") != "none"
+        browser.close()
+    assert not errors, errors
+
+
 def test_a_host_tab_keeps_its_value_through_a_theme_a_reset_and_the_file(tmp_path):
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser, page, errors = open_page(p, url)
