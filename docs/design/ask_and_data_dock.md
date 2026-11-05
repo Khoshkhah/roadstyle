@@ -2,6 +2,9 @@
 
 Status: **design, for Kaveh's review** (2026-11-05). No code yet. The code starts after Kaveh approves this design.
 
+A mock-up on Monaco (outside the repository) found three points, which are in this text now: the dock must be opaque, the panel's
+control rules must also apply in the dock, and the dashboard needs an error colour (`--rs-err`).
+
 ## Problem
 
 duckOSM Studio (`Khoshkhah/duckosm-studio`) builds a road network into DuckDB in the browser. Until 2026-11-05 it had an SQL box in
@@ -102,8 +105,10 @@ its CSS), and a page that does not call `rs.dock.add` has no dock on the screen.
   A click on a tab or on the arrow opens the dock.
 - **Title row.** The tabs are `rs-tabs` and show only when the dock has two or more contents. With one content, the row shows its
   label as a title. At the right: "Collapse" (closes the dock) and, for a content that the person can remove, "x".
-- **Look.** The dock has `--rs-tb-bg` with the blur of the bar, a `--line` border on its top edge, and `--ink` text. It follows the
-  transparency slider "Bar and panel".
+- **Look.** The dock has `--bg`, a `--line` border on its top edge, and `--ink` text. It is opaque: the dock is not over the map, so
+  `--rs-tb-bg` (40 % opacity) shows the page's white background through it in the dark theme.
+- **Controls.** `dashboard.css` gives buttons, text boxes and `sb-primary` their look only inside the panel (`#sb`). The same rules also
+  apply in the dock (`#rs-dock`), else its buttons are white in the dark theme.
 
 ### The layout on a phone
 
@@ -206,8 +211,9 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 
 - **Run.** The data dock checks the SQL with the guard (when `guard` is on), adds the row limit, calls `query`, and shows the table. While
   it runs, Run becomes Stop. The note of the tab is "12 rows" or "1000 of more".
-- **An error.** The line stays open, and a red line under it shows the database's message (`--rs-chart-miss` on `--card`, with a contrast
-  of 4.5 or more in both themes). The old table stays.
+- **An error.** The line stays open, and a red line under it shows the database's message. The old table stays. The colour is a new
+  token, `--rs-err` (`#b91c1c` light, `#fca5a5` dark), with a contrast of 4.5 or more in both themes. Ask uses it for a failed query.
+  The dashboard has no error colour now: `--rs-chart-miss` is a grey.
 - **CSV.** Downloads the rows of the table as `<label>.csv`: a header row, comma separated, a text with a comma, a quote or a new line in
   quotes, a `BigInt` exactly, `null` as empty. The file has the rows of the table only (at most `limit`). The note in the bar says so when
   there are more.
@@ -504,7 +510,7 @@ with no links and no images.
 | File | What it holds | In every page (`files.txt`) |
 |---|---|---|
 | `dashboard/dock.js` | The bottom dock, `rs.dock`, `rs.dock.table` | Yes (about 4 KB) |
-| `dashboard/dashboard.css` | The CSS of the three parts, with the theme tokens; `--rs-dock-h` for the parts that end above the dock | Yes |
+| `dashboard/dashboard.css` | The CSS of the three parts, with the theme tokens; `--rs-dock-h` for the parts that end above the dock; the new token `--rs-err`; the panel's control rules also for `#rs-dock` | Yes |
 | `dashboard/data/data_dock.js` | The data dock | No: a module that a page imports, as the design panel is |
 | `dashboard/data/guard.js` | The read-only guard and the row limit | No |
 | `dashboard/ask/ask_panel.js` | The card and the agent loop | No |
@@ -518,7 +524,7 @@ Changes in existing parts, all small and with no change of look on a page withou
 
 | File | Change |
 |---|---|
-| `toolbar.js` | The low edge of a box is the top of the dock, not `innerHeight` |
+| `toolbar.js` | The low edge of a box is the top of the dock, not `innerHeight`. A bar at a side is centred in the part above the dock |
 | `windows.js` | One sheet at a time also for the dock (a listener of `rs:dockchange`) |
 | `settings.js` | The Ask rows in Keys (only on a page with Ask) |
 | `panelscroll.js`, `dashboard.css` | The dock's table and the Ask conversation in `_PS_AREAS` |
