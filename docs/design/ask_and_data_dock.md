@@ -5,6 +5,17 @@ Status: **design, for Kaveh's review** (2026-11-05). No code yet. The code start
 A mock-up on Monaco (outside the repository) found three points, which are in this text now: the dock must be opaque, the panel's
 control rules must also apply in the dock, and the dashboard needs an error colour (`--rs-err`).
 
+Kaveh's review of the mock-up (2026-11-05) changed three more points:
+
+1. The result table had a bad layout: four columns spread over the full width, headers centred above left-aligned values, and the
+   actions on a row of their own. Now the columns have their own width, a number is at the right under a right-aligned header, each
+   header shows its type, and the actions are in the title row of the dock ([The data dock](#2-the-data-dock)).
+2. The Ask card had a scroll area inside the scrolling panel: two scrolls, one in the other. Now Ask is a view that takes the whole
+   panel, as the design panel does, and the panel's body is the only scroll ([Ask](#3-ask)).
+3. The question box must stay in view when the person scrolls the panel. Now it stands at the bottom of the panel (`position: sticky`).
+
+Also: the credits box in the bottom corner (`#rs-scalebox`) hides while the dock is open.
+
 ## Problem
 
 duckOSM Studio (`Khoshkhah/duckosm-studio`) builds a road network into DuckDB in the browser. Until 2026-11-05 it had an SQL box in
@@ -104,7 +115,11 @@ its CSS), and a page that does not call `rs.dock.add` has no dock on the screen.
 - **Closed.** A closed dock is its title row only (32 px): the tabs, the note, and a button with an up arrow. The map ends above this row.
   A click on a tab or on the arrow opens the dock.
 - **Title row.** The tabs are `rs-tabs` and show only when the dock has two or more contents. With one content, the row shows its
-  label as a title. At the right: "Collapse" (closes the dock) and, for a content that the person can remove, "x".
+  label as a title. The note follows (for the data dock: "10 rows · 3 columns · 2 ms"). At the right: the actions of the content (for the
+  data dock: Tables, CSV, Show on map), then "Collapse" and, for a content that the person can remove, "x". The actions hide while the
+  dock is closed.
+- **Credits.** The box in the bottom corner (scale, zoom number, credits: `#rs-scalebox`) hides while the dock is open on a desktop, and
+  shows again when the dock closes (Kaveh, 2026-11-05). On a phone the credits button is in the bar, so nothing changes there.
 - **Look.** The dock has `--bg`, a `--line` border on its top edge, and `--ink` text. It is opaque: the dock is not over the map, so
   `--rs-tb-bg` (40 % opacity) shows the page's white background through it in the dark theme.
 - **Controls.** `dashboard.css` gives buttons, text boxes and `sb-primary` their look only inside the panel (`#sb`). The same rules also
@@ -118,8 +133,7 @@ At 700 px or less the dock is a bottom sheet, as the panel, Street View and Goog
 - One sheet is open at a time. When the dock opens, the panel's sheet goes to 0 and Street View and Google 3D close. When one of them
   opens, the dock closes. `windows.js` gets one more listener of `rs:dockchange` for this, next to its listeners of
   `rs:streetviewchange` and `rs:google3dchange`.
-- A closed dock is a small button "Data" (the label of its content) next to the grip of the panel's sheet, so that the person can find
-  it again.
+- A closed dock is a small round button "Data · 10 rows" at the right, above the panel's sheet. It hides while the panel's sheet is full.
 - A wide table scrolls sideways inside the dock. The first column stays in view. The page itself never scrolls sideways.
 
 ### The dock's table
@@ -138,9 +152,18 @@ rs.dock.add({id: "roads", label: "Roads", el: t.el});
 t.set({columns, rows});      // new rows in the same table
 ```
 
-- It uses the existing classes `rs-scroll` and `rs-table` ([Dashboard parts](../guides/dashboard-parts.md#a-list-or-a-table-that-scrolls)):
-  the header row stays in view, numbers are at the right, the row under the pointer has a tint. The table fills the height of the dock.
-- The columns are side by side. A long text is cut at 40 characters with "...", and the full text is in its tooltip.
+- It is a box with a `--line` border and 8 px corners, in an `rs-scroll` area ([Dashboard parts](../guides/dashboard-parts.md#a-list-or-a-table-that-scrolls)).
+  The box is as wide as its columns, and it scrolls sideways when the columns are wider than the dock. The columns do not stretch to fill
+  the dock: a table of 3 columns is narrow and stays at the left.
+- Each column has its own width (`width: max-content`), and a cell is at most 320 px wide. A longer text is cut with "...", and the full
+  text is in its tooltip.
+- The header row has the `--card` background and stays in view. Each header shows the column name and, under it in small muted capitals,
+  its SQL type (VARCHAR, BIGINT, DOUBLE). The tooltip of a header is the column's description from `schema()`.
+- A number column is at the right, its header too, with tabular figures, so the digits line up. Text, a boolean and an id column are at
+  the left.
+- Each row has a `--line` under it, and every second row has a light tint. The row under the pointer has an accent tint, and the selected
+  row a stronger one.
+- The first column stays in view when the table scrolls sideways (a line at its right edge shows it).
 - A BIGINT (a JavaScript `BigInt`) shows exactly. An id is read as text (`String(value)`), never as a `Number`, because a 64-bit
   `edge_id` does not fit a `Number` ([JavaScript API](../reference/javascript.md)).
 - `null` shows as a muted "null".
@@ -155,9 +178,23 @@ The table does not sort when the person clicks a header. The SQL has `ORDER BY` 
 
 The data dock is one content of the bottom dock. It has two rows:
 
-1. **The query line.** It shows the SQL that made the table. It is one line by default (the SQL on one line, cut with "..."). A click
-   opens it to a text box of up to 10 lines. Run or Ctrl+Enter (Cmd+Enter on a Mac) runs the SQL. Escape folds the line again.
-2. **The table** (the dock's table above), with a bar: the number of rows and the time, **CSV**, and **Show on map**.
+1. **The query line** and **Run**. The line shows the SQL that made the table, in a monospace font. It is one line by default (the SQL
+   on one line, cut with "..."). A click opens it to a text box of up to 10 lines. Run or Ctrl+Enter (Cmd+Enter on a Mac) runs the SQL.
+   Escape folds the line again.
+2. **The table** (the dock's table above).
+
+The note and the actions (**Tables**, **CSV**, **Show on map**) are in the title row of the dock, so they take no row of their own:
+
+```
+| Data  10 rows · 3 columns · 2 ms                    [Tables] [CSV] [Show on map]  v |
+| SELECT highway AS road_class, count(*) AS edges, round(sum(len...         [ Run ]  |
+| +---------------------------+                                                      |
+| | road_class | edges |   km |                                                      |
+| | VARCHAR    |BIGINT |DOUBLE|                                                      |
+| | residential|   919 | 31.66|                                                      |
+| | service    |   781 | 20.12|                                                      |
+| +---------------------------+                                                      |
+```
 
 There is no separate SQL editor. The query line is the editor.
 
@@ -210,7 +247,7 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 ### The parts of the data dock
 
 - **Run.** The data dock checks the SQL with the guard (when `guard` is on), adds the row limit, calls `query`, and shows the table. While
-  it runs, Run becomes Stop. The note of the tab is "12 rows" or "1000 of more".
+  it runs, Run becomes Stop. The note is "12 rows · 4 columns · 6 ms" or "1000 of more rows · ...".
 - **An error.** The line stays open, and a red line under it shows the database's message. The old table stays. The colour is a new
   token, `--rs-err` (`#b91c1c` light, `#fca5a5` dark), with a contrast of 4.5 or more in both themes. Ask uses it for a failed query.
   The dashboard has no error colour now: `--rs-chart-miss` is a grey.
@@ -221,7 +258,7 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
   `rs.focus(ids)`. A second click (or a new run) takes the light away (`rs.highlight([])`). An id that is not on the map is not lit, and
   the bar says "40 of 42 roads are on the map".
 - **A click on a row** selects that road and zooms to it (`rs.select(id)`, `rs.focus(id)`). The row stays marked.
-- **The list of tables.** A small button "Tables" in the line opens a list of the tables and their columns (from `schema()`), with the
+- **The list of tables.** The button "Tables" in the title row opens a list of the tables and their columns (from `schema()`), with the
   description of each column in its tooltip. A click on a name puts it in the line at the cursor.
 
 ### The row limit
@@ -241,7 +278,8 @@ checks that an `ORDER BY` in the SQL keeps its order through this wrap in DuckDB
 
 ### What it does
 
-Ask is a card in the side panel. The person types a question in words, for example "Which primary roads are longer than 1 km?". An
+Ask is a view that takes the whole side panel, as the design panel and the level editor do. A card of the host opens it, and Back shows
+the host's cards again. The person types a question in words, for example "Which primary roads are longer than 1 km?". An
 agent writes SQL, runs it with the data dock, reads the result, and writes a short answer. Each answer puts its SQL and its table into the
 data dock and lights the roads.
 
@@ -261,6 +299,7 @@ const ask = askPanel({
   examples: ["Which streets are longer than 1 km?", "How many one-way roads are there?"],
 });
 ask.addEventListener("answer", e => console.log(e.detail));   // {question, text, sql, rows}
+rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data", open: () => ask.open()});   // an "open" card
 ```
 
 | Option | Default | What it is |
@@ -270,13 +309,15 @@ ask.addEventListener("answer", e => console.log(e.detail));   // {question, text
 | `about` | `""` | One or two sentences about the data. They go into the prompt. |
 | `dialect` | `"SQL"` | The name of the database's SQL, for the prompt (`"DuckDB"`). |
 | `examples` | `[]` | Questions that the empty card shows as chips. A click on a chip asks it. |
-| `section` | `{id: "ask", label: "Ask"}` | The card in the panel: the options of `rs.sections.add` (`after`, `before`, `fold`). The card does not fold by itself. |
+| `panel` | `#sb` | The host's dashboard panel. Ask draws into its `.sb-body`, as the design panel does. |
+| `backLabel` | `"Back"` | The text of the back button. |
 | `maxSteps` | `6` | The most model calls for one question. |
 | `sendRows` | `30` | The most rows of one result that go to the model. |
 | `providers` | the two built-in providers | For the tests: a fake provider (see [The tests](#the-tests)). |
 
 | Method | What it does |
 |---|---|
+| `open()`, `close()`, `isOpen()` | Shows the Ask view in the panel (the host's cards hide), or shows the host's cards again. The conversation stays. |
 | `ask(question)` | Asks a question, as the person does. It gives a promise of the answer. |
 | `stop()` | Aborts the question now. |
 | `clear()` | Starts a new conversation (the model forgets the earlier questions). |
@@ -286,37 +327,47 @@ ask.addEventListener("answer", e => console.log(e.detail));   // {question, text
 |---|---|---|
 | `answer` | `{question, text, sql, rows}` | The agent gave an answer |
 | `error` | `{question, message}` | The question stopped with an error (no key, a refused key, too many failed queries) |
+| `back` | none | The person clicks Back. Ask closes by itself. |
 
-### The card
+### The view
 
 ```
 +----------------------------------+
-| Ask                          (?) |
-| Gemini · gemini-flash   Settings |
-| +------------------------------+ |
-| | Which primary roads are lo.. | |
-| +------------------------------+ |
-|                  [New] [ Ask ]   |
+| Monaco                     [<>][]|   the panel's title row
+| [< Back] Gemini · flash  Settings  [New]
 | -------------------------------- |
-| You: Which primary roads are ... |
-| 14 primary roads are longer      |
-| than 1 km. The longest is Riia   |
-| (2.3 km).                        |
-| > 2 queries · 14 rows  [Table]   |
+|      [Which primary roads are  ] |   the question, at the right
+|      [longer than 300 m?       ] |
+| Query 1 failed: column "lenght_m"|   a failed step, in --rs-err
+| 5 primary road edges are longer  |   the answer
+| than 300 m. The longest is ...   |
+| > 2 queries · 5 rows     [Table] |
+| -------------------------------- |   the panel's body scrolls: one scroll
+| +----------------------+ [ Ask ] |   the question box: always at the bottom
+| | Ask a question ...   |         |
+| +----------------------+         |
 +----------------------------------+
 ```
 
-- The first row shows the provider and the model, and a link "Settings" that opens the Settings box of the toolbox
-  (`window.rsOpenSettings`, which exists for the Google key).
-- With no key, the card shows "Ask needs your own key of Gemini or of an OpenAI-compatible service." and a button "Add a key" that opens
+- **One scroll.** The conversation has no scroll area of its own. The panel's body (`.sb-body`) is the only scroll, so the scroll wheel
+  never moves two areas.
+- **The question box stays in view.** It is at the bottom of the view with `position: sticky; bottom: 0` and the `--bg` background, so
+  it stays at the bottom of the panel when the person scrolls the conversation. The view is at least as high as the panel's body, so
+  with a short conversation the box is at the bottom too.
+- **Order.** The oldest question is at the top and the newest at the bottom, next to the question box. After each step the panel
+  scrolls to the end.
+- The top row has Back, the provider and the model, a link "Settings" that opens the Settings box of the toolbox
+  (`window.rsOpenSettings`, which exists for the Google key), and "New" (a new conversation).
+- An empty conversation shows one line about what Ask does, and the `examples` as chips. A click on a chip asks it.
+- With no key, the view shows "Ask needs your own key of Gemini or of an OpenAI-compatible service." and a button "Add a key" that opens
   the Settings box.
+- The question is at the right, in a box with a light accent tint. The answer is plain text (`textContent`) at the left. The view shows
+  no HTML, no images and no links from the model.
 - The question box is a `<textarea>` of 2 lines. Enter asks, Shift+Enter is a new line. While the agent works, Ask becomes Stop and the
-  card shows each step on one muted line: "Writing SQL", "Running query 1", "Query 1 failed: Referenced column "lenght" not found. Trying
-  again", "Writing the answer".
-- The conversation is a scroll area (`rs-scroll`, in `_PS_AREAS`). The answer is plain text (`textContent`). The card shows no HTML, no
-  images and no links from the model.
+  view shows each step on one muted line: "Writing SQL", "Running query 1", "Query 1 failed: Referenced column "lenght" not found. Trying
+  again", "Writing the answer". A failed step stays, in `--rs-err`. The other step lines go when the answer comes.
 - "> 2 queries" opens the SQL of each step. "Table" opens the data dock on the answer's table.
-- "New" starts a new conversation.
+- The privacy notice shows in the conversation, above the question box.
 
 ### The agent loop
 
@@ -342,9 +393,9 @@ question
      "more rows: yes" when the result was cut. A text value is cut at 200 characters.
 4. When the model gives text, that text is the answer. The last query that worked is the answer's query: the data dock shows its SQL and
    its table, and Ask calls "Show on map" when the table has `idColumn`.
-5. The loop stops with an error after `maxSteps` model calls, or after 3 failed queries one after the other. The card shows the last error.
+5. The loop stops with an error after `maxSteps` model calls, or after 3 failed queries one after the other. The view shows the last error.
 6. On a desktop, the data dock opens by itself on an answer with a table. On a phone it does not, because one sheet is open at a time and
-   the person is in the panel's sheet. The card shows "Table" and the roads are lit on the map.
+   the person is in the panel's sheet. The view shows "Table" and the roads are lit on the map.
 
 A question costs 2 to `maxSteps` model calls. Most questions take 2 or 3.
 
@@ -459,7 +510,7 @@ only on a page that has Ask.
 
 ### The privacy notice
 
-On the first question to a provider, the card shows this notice in place of the answer, and the question waits:
+On the first question to a provider, the view shows this notice in place of the answer, and the question waits:
 
 > **Before Ask sends your question**
 >
@@ -513,7 +564,7 @@ with no links and no images.
 | `dashboard/dashboard.css` | The CSS of the three parts, with the theme tokens; `--rs-dock-h` for the parts that end above the dock; the new token `--rs-err`; the panel's control rules also for `#rs-dock` | Yes |
 | `dashboard/data/data_dock.js` | The data dock | No: a module that a page imports, as the design panel is |
 | `dashboard/data/guard.js` | The read-only guard and the row limit | No |
-| `dashboard/ask/ask_panel.js` | The card and the agent loop | No |
+| `dashboard/ask/ask_panel.js` | The view and the agent loop | No |
 | `dashboard/ask/providers.js`, `ask/providers.json` | The two providers, the addresses and the default models | No |
 | `dashboard/ask/prompt.txt` | The system prompt | No |
 | `docs/guides/dashboard-layout.md` | The bottom dock: desktop and phone | |
@@ -527,7 +578,7 @@ Changes in existing parts, all small and with no change of look on a page withou
 | `toolbar.js` | The low edge of a box is the top of the dock, not `innerHeight`. A bar at a side is centred in the part above the dock |
 | `windows.js` | One sheet at a time also for the dock (a listener of `rs:dockchange`) |
 | `settings.js` | The Ask rows in Keys (only on a page with Ask) |
-| `panelscroll.js`, `dashboard.css` | The dock's table and the Ask conversation in `_PS_AREAS` |
+| `panelscroll.js`, `dashboard.css` | The dock's table in `_PS_AREAS` (the Ask conversation is in the panel's own scroll) |
 | `api.js` | `rs.dock` |
 
 ## The tests
@@ -540,9 +591,9 @@ No test needs a key or the network. CI runs them all.
 | `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text. Also: the stop after 3 failed queries and after `maxSteps`, Stop, no model call before Accept, the notice again for a new address, a model text with `<img>` shows as text. |
-| `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the card. |
-| `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask card (with an answer and the notice) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
-| `tests/test_dashboard_scroll_browser.py` | The dock's table and the Ask conversation. |
+| `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
+| `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (with an answer and the notice) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
+| `tests/test_dashboard_scroll_browser.py` | The dock's table. The Ask view: the panel's body is its only scroll, and the question box is in view at each scroll position. |
 
 Before the merge, Kaveh looks at the page on a phone and on a desktop, in both themes.
 
