@@ -1,7 +1,7 @@
 // The panel's sections (docs/guides/dashboard-panel.md): the panel starts empty, and the page adds each section, with `rs.sections` or with the
 // typed option `dashboard.panel.sections`. A section holds the page's own HTML (`html` or `el`) or a part of roadstyle (`part`: "query",
 // "road_card"), at the end of the panel or beside an earlier section. A section with a `label` is a card: the label is its title row, `fold` makes it
-// fold, `background: false` takes its colour away. A section without a label is a block of the page's own, with no box: the card gap above and below.
+// fold, `open` makes the card one button that opens something, `note` is one line of state under the title, `background: false` takes its colour away. A section without a label is a block of the page's own, with no box: the card gap above and below.
 import {O, _emit} from "./core.js";
 import {legendRefresh} from "./legend.js";
 import {queryPart} from "./query.js";
@@ -37,11 +37,13 @@ function _fdSetOne(w, on){
 function _cardMake(w, spec){
   w.dataset.rsCard = spec.background === false ? "no-bg" : "bg";
   const hd = document.createElement("div"); hd.className = "rs-sec-hd";
-  const tt = document.createElement(spec.fold ? "button" : "div"); tt.className = "rs-sec-title"; tt.textContent = spec.label;
+  const tt = document.createElement(spec.fold || spec.open ? "button" : "div"); tt.className = "rs-sec-title"; tt.textContent = spec.label;
   hd.append(tt);
+  const note = document.createElement("p"); note.className = "rs-sec-note"; note.textContent = spec.note || "";
   const body = document.createElement("div"); body.className = "rs-sec-body";
-  w.append(hd, body);
+  w.append(hd, note, body);
   if(spec.fold) _fdMake(w, spec, hd, tt);
+  if(spec.open) _opMake(w, spec, hd, tt);
   return body;
 }
 // A card that folds keeps its title row in its place on the screen (under the pointer). Without this, a card near the end of a scrolled panel jumps:
@@ -78,13 +80,22 @@ function _fdMake(w, spec, hd, tt){
     }
   }
 }
+// A card that opens (`open: fn`): the card is one button that runs fn(card), for a card whose only work is to open the page's own panel, editor or
+// dialog. Its title is a button (for the keyboard and a screen reader), the row ends with an arrow in place of the chevron, and a click anywhere on
+// the card (not in its body) runs fn. It never folds, so "collapse all" leaves it. A card whose title button is disabled does not open.
+const _opArrow = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+function _opMake(w, spec, hd, tt){
+  w.dataset.rsOpen = "1"; tt.type = "button";
+  hd.insertAdjacentHTML("beforeend", _opArrow);
+  w.onclick = e => { if(!tt.disabled && !e.target.closest(".rs-sec-body, .rs-help-btn")) spec.open(w); };
+}
 const _secNeed = id => { const w = _secEls.get(id); if(!w) throw new Error("rs.sections: no section '" + id + "' (rs.sections.list())"); return w; };
 export const rsSections = {
   // the ids of the sections that are in the panel now, in order
   list(){ const b = _secBody(); return b ? [...b.querySelectorAll(".sb-sec")].map(e => e.dataset.rsSection) : []; },
   // the box of a section (the page can move it into its own tab), or null
   get(id){ return _secEls.get(id) || null; },
-  // a section of the page: {id, html | el | part, label, after | before, fold, background}; at the end of the panel when it has neither. A part has its
+  // a section of the page: {id, html | el | part, label, after | before, fold | open, note, background}; at the end of the panel when it has neither. A part has its
   // options in the section: `text` (query), `fields` (road_card)
   add(spec){
     if(!spec || !spec.id) throw new Error("rs.sections.add: a section needs an id");
@@ -94,7 +105,10 @@ export const rsSections = {
     if(!body) throw new Error("rs.sections.add: the page has no panel");
     const w = document.createElement("div"); w.className = "sb-sec"; w.dataset.rsSection = spec.id;
     if(spec.part) w.dataset.rsPart = spec.part;
-    if(!spec.label && (spec.fold || spec.background === false)) throw new Error("rs.sections.add: '" + spec.id + "' has " + (spec.fold ? "fold" : "background: false") + ": it needs a label (its title), because a section is a card only with a label");
+    const card = spec.fold ? "fold" : spec.open ? "open" : spec.note != null ? "note" : spec.background === false ? "background: false" : "";
+    if(!spec.label && card) throw new Error("rs.sections.add: '" + spec.id + "' has " + card + ": it needs a label (its title), because a section is a card only with a label");
+    if(spec.open && spec.fold) throw new Error("rs.sections.add: '" + spec.id + "' has fold and open: a card that opens something does not fold");
+    if(spec.open && typeof spec.open !== "function") throw new Error("rs.sections.add: '" + spec.id + "': open is a function, which runs when the card is clicked");
     const host = spec.label ? _cardMake(w, spec) : w;              // the body of a card, else the section itself
     if(spec.html) host.insertAdjacentHTML("beforeend", spec.html);
     if(spec.el) host.appendChild(spec.el);
@@ -120,6 +134,12 @@ export const rsSections = {
   },
   // fold (true) or unfold (false) every section that folds and is shown now: the button in the panel's title row does this. A hidden section keeps its state
   foldAll(on = true){ for(const w of _fdActive()) _fdSetOne(w, !!on); _fdPaint(); },
+  // the line of state under a card's title (empty text: no line)
+  note(id, text){
+    const n = _secNeed(id).querySelector(":scope > .rs-sec-note");
+    if(!n) throw new Error("rs.sections.note: '" + id + "' is not a card (add it with a label)");
+    n.textContent = text == null ? "" : String(text);
+  },
   // whether a section that folds is folded
   folded(id){ const w = _secNeed(id); return w.classList.contains("folded"); },
 };

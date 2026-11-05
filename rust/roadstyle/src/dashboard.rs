@@ -82,6 +82,10 @@ pub struct Section {
     /// the section folds: its label is a button, its body hides, and the panel's title row has one button for all the sections that fold (needs a `label`)
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub fold: bool,
+    /// one line of state under the card's title (`rs.sections.note` changes it; needs a `label`). A card that opens something (`open`) is
+    /// JavaScript only (`rs.sections.add`): its `open` is a function
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
     /// the card has the card colour behind it (false: no background, the same padding and title row; needs a `label`)
     #[serde(default = "yes", skip_serializing_if = "is_yes")]
     pub background: bool,
@@ -522,6 +526,9 @@ impl Dashboard {
             if s.fold && s.label.is_none() {
                 return bad(format!("sections: '{}' folds (`fold`) and has no `label`, which is its button", s.id));
             }
+            if s.note.is_some() && s.label.is_none() {
+                return bad(format!("sections: '{}' has a `note` and no `label`: the note is the line under a card's title", s.id));
+            }
             if !s.background && s.label.is_none() {
                 return bad(format!("sections: '{}' has `background: false` and no `label`: a section is a card only with a `label` (its title)", s.id));
             }
@@ -577,6 +584,16 @@ mod tests {
         // a section that does not fold writes no `fold` key
         let s = serde_json::to_value(with(serde_json::json!({"id": "a", "html": "x"})).unwrap().panel.unwrap().sections).unwrap();
         assert!(s[0].get("fold").is_none(), "{s}");
+    }
+
+    #[test]
+    fn a_note_needs_a_label() {
+        let d = Template::Dashboard.dashboard(Overlay);
+        let with = |v: Value| merge(&d, &serde_json::json!({"panel": {"sections": [v]}}));
+        let s = with(serde_json::json!({"id": "a", "html": "x", "label": "A", "note": "3 edits"})).unwrap().panel.unwrap().sections;
+        assert_eq!(s[0].note.as_deref(), Some("3 edits"));
+        let e = with(serde_json::json!({"id": "a", "html": "x", "note": "3 edits"})).unwrap_err().to_string();
+        assert!(e.contains("note") && e.contains("label"), "{e}");
     }
 
     #[test]

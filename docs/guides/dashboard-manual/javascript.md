@@ -93,6 +93,8 @@ rs.sections.add({id: "road", label: "Selected road", part: "road_card", fields: 
 rs.sections.add({id: "notes", label: "Notes", before: "road", fold: true,
                  html: "<p>Text of the page</p><button class='sb-primary' id='go'>Go</button>"});
 document.getElementById("go").onclick = () => rs.focus(rs.query({highway: "primary"}));
+rs.sections.add({id: "edit", label: "Edit levels", note: "No edits", open: () => openMyEditor()});   // one click opens your editor
+rs.sections.note("edit", "5 edits applied");
 console.log(rs.sections.list());
 ```
 

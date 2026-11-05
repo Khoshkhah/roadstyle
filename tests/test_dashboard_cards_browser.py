@@ -155,3 +155,47 @@ def test_a_card_that_folds_at_the_end_of_a_scrolled_panel_keeps_its_title_row_in
         assert not page.evaluate("rs.sections.get('last').classList.contains('folded')")
         browser.close()
     assert not errors, errors
+
+
+def test_a_card_that_opens_is_one_button_with_an_arrow_and_a_note(tmp_path):
+    """A card with `open` (JavaScript only: a function) opens the page's own panel with one click anywhere on the card, or Enter on its title. It
+    never folds ("collapse all" leaves it), it is 44px high like a closed card that folds, its row ends with the arrow after the "?", and its note is
+    one line under the title (rs.sections.note). A disabled title does not open."""
+    path = _page(tmp_path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.evaluate("""() => { window.opened = 0;
+          rs.sections.add({id: "go", label: "Edit levels", open: () => { window.opened++; }});
+          rs.help.button(rs.sections.get("go"), {title: "About go"}); }""")
+        sec = "[data-rs-section=go]"
+        h = lambda: page.evaluate(f"document.querySelector('{sec}').getBoundingClientRect().height")
+        assert h() == 44, h()
+        hd = page.evaluate(f"""() => {{ const hd = document.querySelector('{sec} .rs-sec-hd'), r = e => e.getBoundingClientRect();
+          return {{last: hd.lastElementChild.tagName, order: r(hd.querySelector('.rs-help-btn')).right <= r(hd.lastElementChild).left,
+                   button: hd.querySelector('.rs-sec-title').tagName}}; }}""")
+        assert hd == {"last": "svg", "order": True, "button": "BUTTON"}, hd
+        page.click(f"{sec} .rs-sec-title")
+        page.focus(f"{sec} .rs-sec-title")
+        page.keyboard.press("Enter")
+        assert page.evaluate("window.opened") == 2
+        page.click(f"{sec} .rs-help-btn")
+        assert page.evaluate("window.opened") == 2, "the ? opens the help, not the card"
+        page.keyboard.press("Escape")
+        page.evaluate("rs.sections.note('go', '5 edits applied')")
+        assert h() > 44 and page.inner_text(f"{sec} .rs-sec-note") == "5 edits applied"
+        page.click(f"{sec} .rs-sec-note")
+        assert page.evaluate("window.opened") == 3, "a click on the note opens the card too"
+        page.evaluate("rs.sections.foldAll(true)")
+        assert not page.evaluate("rs.sections.get('go').classList.contains('folded')") and page.is_visible(f"{sec} .rs-sec-note")
+        page.evaluate(f"document.querySelector('{sec} .rs-sec-title').disabled = true")
+        page.click(f"{sec} .rs-sec-note")
+        assert page.evaluate("window.opened") == 3, "a disabled card does not open"
+        for bad in ["{id: 'x', label: 'X', open: () => 1, fold: true}", "{id: 'y', open: () => 1}", "{id: 'z', label: 'Z', open: 'no'}"]:
+            assert page.evaluate(f"() => {{ try {{ rs.sections.add({bad}); return false; }} catch(e) {{ return true; }} }}"), bad
+        browser.close()
+    assert not errors, errors
