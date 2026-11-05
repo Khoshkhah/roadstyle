@@ -201,13 +201,15 @@
       "filter": 722,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-arrows": {
       "filter": 568,
@@ -420,13 +422,15 @@
       "filter": 722,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-arrows": {
       "filter": 568,
@@ -639,13 +643,15 @@
       "filter": 722,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-arrows": {
       "filter": 362,
@@ -858,13 +864,15 @@
       "filter": 722,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2239,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-arrows": {
       "filter": 362,
@@ -2022,13 +2030,15 @@
       "filter": 722,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -3060,13 +3070,15 @@
       "filter": 722,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "roads-simple": {
       "filter": 728,
       "paint.line-color": 2279,
       "paint.line-width": 12864,
-      "paint.line-offset": 4143
+      "paint.line-offset": 4143,
+      "paint.line-opacity": 296
      },
      "ov13-circle-lv-1-o0": {
       "paint.circle-color": 473
@@ -6038,6 +6050,24 @@
     "tartu-base.z15.layers.simple.property_bytes: 35158 -> 37049",
     "tartu-base.style.expressions.roads-simple-dash.paint.line-offset: 3033 -> 4143",
     "tartu-base.style.expressions.roads-simple.paint.line-offset: 3033 -> 4143"
+   ]
+  },
+  {
+   "date": "2026-11-04",
+   "why": "Tunnel factor of the 3D terrain (terrain_tunnels=): the one road layer's line-opacity multiplies every piece of a tunnel road by the state rs_terrain_tunnel, so the expression of roads-simple and roads-simple-dash is longer only in a style with tunnels (Monaco, Tartu)",
+   "changes": [
+    "monaco.style.expressions.roads-simple-dash.paint.line-opacity: new, 296",
+    "monaco.style.expressions.roads-simple.paint.line-opacity: new, 296",
+    "monaco-full.style.expressions.roads-simple-dash.paint.line-opacity: new, 296",
+    "monaco-full.style.expressions.roads-simple.paint.line-opacity: new, 296",
+    "monaco-base.style.expressions.roads-simple-dash.paint.line-opacity: new, 296",
+    "monaco-base.style.expressions.roads-simple.paint.line-opacity: new, 296",
+    "tartu.style.expressions.roads-simple-dash.paint.line-opacity: new, 296",
+    "tartu.style.expressions.roads-simple.paint.line-opacity: new, 296",
+    "tartu-full.style.expressions.roads-simple-dash.paint.line-opacity: new, 296",
+    "tartu-full.style.expressions.roads-simple.paint.line-opacity: new, 296",
+    "tartu-base.style.expressions.roads-simple-dash.paint.line-opacity: new, 296",
+    "tartu-base.style.expressions.roads-simple.paint.line-opacity: new, 296"
    ]
   }
  ]
