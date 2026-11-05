@@ -5,6 +5,8 @@ JavaScript for the same thing in a page**: a copy of a part drifts, and it forge
 
 The panel starts empty. Two parts are whole sections that roadstyle writes: the `query` part and the `road_card` part. They are in [Add to the panel](dashboard-panel.md). The pieces below are for the page's own HTML in a section.
 
+Two parts use the whole panel: the level editor ([Edit the levels in a dashboard](levels.md#edit-the-levels-in-a-dashboard)) and the design panel ([Edit the design of a map](design-panel.md)).
+
 | Part | What it is | Use it for |
 |---|---|---|
 | [`rs.help.set({title, intro, terms, note})`](#a-help-window) | the "?" button in the panel title and its window | "How to read this page" |

@@ -138,10 +138,41 @@ export function rsDashboard(map, options){
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
       useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); useRoadsBox(); useTops(); refreshState();
+      _emit("rs:stylechange", {});     // a part that paints on the road layers (the design panel) paints again
+    },
+    // a new look on the same tiles (LiveMap.setLook, docs/guides/design-panel.md): each road layer on the map (the prefix and its id, and its copies with the
+    // prefixes of `also`) takes the new style's paint, layout and filter, the style's images come again (with `imagePrefix` before their names, in the
+    // layers too), and the controls read the new style. The sources, their tiles and the roads' feature state stay. false: the new style has other layers.
+    async restyle(st, {also = [], imagePrefix = ""} = {}){
+      const ids = s => (s ? s.layers.map(l => l.id) : []).sort().join("\n");
+      if(!o.style || ids(o.style) !== ids(st)) return false;
+      const own = (st.metadata || {})["roadstyle:images"] || {};
+      await Promise.all(Object.entries(own).map(([n, v]) => new Promise(done => {
+        const im = typeof v === "string" ? {url: v} : v, img = new Image();
+        img.onload = () => { const id = imagePrefix + n; if(map.hasImage(id)) map.removeImage(id); map.addImage(id, img, {sdf: !!im.sdf, pixelRatio: im.pixelRatio || 1}); done(); };
+        img.onerror = done;
+        img.src = im.url;
+      })));
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b), now = new Map(map.getStyle().layers.map(l => [l.id, l]));
+      for(const l of st.layers){
+        let json = JSON.stringify(l);
+        if(imagePrefix) for(const n of Object.keys(own)) json = json.replaceAll(`"${n}"`, `"${imagePrefix}${n}"`);
+        const layer = JSON.parse(json);
+        for(const id of [(o.prefix || "") + l.id, ...also.map(p => p + l.id)]){
+          const was = now.get(id);
+          if(!was) continue;
+          for(const k of new Set([...Object.keys(was.paint || {}), ...Object.keys(layer.paint || {})])) if(!same(was.paint?.[k], layer.paint?.[k])) map.setPaintProperty(id, k, layer.paint?.[k]);
+          for(const k of new Set([...Object.keys(was.layout || {}), ...Object.keys(layer.layout || {})])) if(!same(was.layout?.[k], layer.layout?.[k])) map.setLayoutProperty(id, k, layer.layout?.[k]);
+          if(!same(was.filter, layer.filter)) map.setFilter(id, layer.filter ?? null);
+        }
+      }
+      rs.setStyle(st);
+      return true;
     },
     // the phone's bottom sheet: rs.sheet() is its height (0 closed, 1 40 %, 2 full; null: no sheet), rs.sheet(n) sets it; rs.freeArea() is the part of
     // the map that the bar, the panel and the sheet leave free, in window coordinates ({lo, hi, top, bottom}): a host pads its map with it
     sheet: n => n === undefined ? getSheet() : setSheet(n),
+    prefix: o.prefix || "",         // the prefix of the roads style's ids on the map (a part that paints the road layers finds them so)
     freeArea,
     // R22, live data: join a table to the roads and colour or size them from it, with no new style; clearData takes it away (live.js)
     setData, clearData,

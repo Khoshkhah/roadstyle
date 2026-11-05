@@ -243,6 +243,9 @@ if (style !== undefined) {
 }
 ```
 
+In a page with a dashboard, give the style to `rs.restyle(style)` in place of `map.setStyle`: it changes the road layers in place, adds
+the images again and reads the controls again ([the design panel](../guides/design-panel.md) does this).
+
 - **When the tiles stay.** The new look differs from the old one only in colours (the class colours, the access colours, the base map's
   colours, the dark colours, the labels, the selection). The colours of `map`, `data` and `overlays` count as structure: there a colour can be
   one of your data colours. A change of anything else (a width, an opacity, a dash, a first zoom, the base-map theme, a palette name) gives

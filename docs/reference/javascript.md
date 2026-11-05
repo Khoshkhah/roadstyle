@@ -42,6 +42,8 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rs.setData(rows, options)` | live data (`live_data=True`): colour and size the roads from rows, an Arrow table or the URL of a JSON file; a second call replaces the values. `rs.clearData()` takes them away. `edge_id` must be text. Event `rs:datachange`; Promise `{rows, matched, ms}`; a number goes in `classes` sets by natural breaks, or in your `breaks` ([guide](../guides/live-data.md)) |
 | event `rs:ready` | `window.rs` and the panel's sections are there; `window.rsReady` is true from then on. It fires once: a listener added later never runs, so wait with `rs.ready(fn)` |
 | `rs.setStyle(style)` | a new roads style (a page whose roads come later). Every control that a style gives follows each new style: the `roads` tool and its classes, the Tunnels box, the arrows' icon and rules, the boundary's shade and limits, the base-map layers (`ov<i>`) with their switch, hover and 3D switch, the pick layers, the id fields and the parts of `rs.getState()`. They go with a style that has none. A switch that the person turned off stays off. A host's look must be live (`state="live"`) for the style to have the controls |
+| `rs.restyle(style, {also, imagePrefix})` | a new look on the same tiles (the style of `LiveMap.setLook`): each road layer on the map takes the new style's paint, layout and filter, the style's images come again, and the controls read the new style (`rs.setStyle`). The sources, the tiles and the live colours stay. `also`: more id prefixes, for copies of the road layers; `imagePrefix`: the host's prefix of the image names. A Promise of `false` when the new style has other layers: then draw a new map ([the design panel](../guides/design-panel.md)) |
+| `rs.prefix` | the prefix of the roads style's ids on the map (the option `prefix`) |
 | `rs.sheet(n)` | the phone's bottom sheet: `rs.sheet()` is its height (0 closed, 1 40 %, 2 full; `null` when the page has no sheet), `rs.sheet(n)` sets it. The grip of the sheet has a button that goes one height down, and up from closed. Event `rs:sheetchange` |
 | `rs.freeArea()` | the part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates: `{lo, hi, top, bottom}`. A host page pads its map with it |
 | `rsFreePad()` | the free part of the window as the `padding` of a camera: `{top, right, bottom, left}`, 30 px at least, more where the panel, the sheet or the bar covers the map. The page's first `fitBounds` uses it; a host page that fits the map itself can call it |
@@ -153,6 +155,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:labelschange` | the map labels switch | `on` |
 | `rs:overlayschange` | the list of overlays changes (the one switch of the base-map layers) | `visible` |
 | `rs:g3dmodechange` | the mode of the Google 3D window changes | none |
+| `rs:stylechange` | `rs.setStyle` (and `rs.restyle`) gave the dashboard a new style: a part that paints on the road layers paints again | none |
 | `rs:tableready` | the table of the level editor is ready | none |
 
 ```js
