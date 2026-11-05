@@ -137,6 +137,10 @@ its CSS), and a page that does not call `rs.dock.add` has no dock on the screen.
   dock is closed.
 - **Credits.** The box in the bottom corner (scale, zoom number, credits: `#rs-scalebox`) hides while the dock is open on a desktop, and
   shows again when the dock closes (Kaveh, 2026-11-05). On a phone the credits button is in the bar, so nothing changes there.
+- **The card look.** The dock follows the look of the panel (Kaveh, 2026-11-05: "a little curve in its corner"). With the card look it
+  floats as a card too: 8 px from the left, right and bottom edges, 14 px corners, a `--line` border and the shadow of the panel's card
+  (`0 6px 24px rgba(0,0,0,.28)`). The map then goes on under the dock, and the panel and the bar end 8 px above it; `freeArea` subtracts
+  the dock, so a window does not open under it. With the frame look it is a square block under the map, as above.
 - **Look.** The dock has `--bg`, a `--line` border on its top edge, and `--ink` text. It is opaque: the dock is not over the map, so
   `--rs-tb-bg` (40 % opacity) shows the page's white background through it in the dark theme.
 - **Controls.** `dashboard.css` gives buttons, text boxes and `sb-primary` their look only inside the panel (`#sb`). The same rules also
@@ -419,6 +423,10 @@ default stays `frame` for other pages, and a look that the person keeps in Setti
 - The top row has Back, the provider and the model, **Key** and **New** (a new conversation). Key and New are buttons of the same look. Key
   is filled while the key form is open ([The keys](#the-keys)). (A teal word "Key" did not look clickable.)
 - An empty conversation shows one line about what Ask does, and the `examples` as chips. A click on a chip asks it.
+- **The examples stay one click away.** After the first question, a small muted button **Examples ▴** is above the question box. It opens
+  the same chips as a list over the chat, just above the box. A click on a chip asks it and closes the list, and a click outside closes
+  it. The conversation stays. (Before, the chips were gone after the first question, and only New brought them back: Kaveh, 2026-11-05.)
+  "New" shows the empty start again, with its hint and chips.
 - With no key, the view shows "Ask needs your own key. Google Gemini and Groq give a free key." with the two links, and a button "Add a
   key" that opens the key form.
 - **A card for each question.** A question and its answer are one card with an outline: a `--line` border, 12 px corners and no
