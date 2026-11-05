@@ -563,18 +563,22 @@ one code covers Gemini too, and a second code for Gemini's own API is not necess
 |---|---|
 | `POST {address}/chat/completions`, with `messages` and `tools: [{type: "function", function}]` | the header `Authorization: Bearer <key>` |
 
-The OpenAI-compatible address covers these services. The Settings box has them in a list, and the person can also type an address:
+Ask offers **only services with a free key** (Kaveh, 2026-11-05). A person can try Ask with no payment. The Settings box has them in a list,
+with a link to the page that gives the key:
 
-| Service | Address | Cost | Key from |
+| Service | Address | Free key from | Note |
 |---|---|---|---|
-| Google Gemini (the default) | `https://generativelanguage.googleapis.com/v1beta/openai` | free tier, no card | https://aistudio.google.com/apikey |
-| Groq | `https://api.groq.com/openai/v1` | free tier, no card | https://console.groq.com/keys |
-| OpenRouter | `https://openrouter.ai/api/v1` | credits (some free models) | https://openrouter.ai/keys |
-| Grok (xAI) | `https://api.x.ai/v1` | credits only | https://console.x.ai |
-| OpenAI | `https://api.openai.com/v1` | credits only | https://platform.openai.com/api-keys |
+| Google Gemini (the default) | `https://generativelanguage.googleapis.com/v1beta/openai` | https://aistudio.google.com/apikey | free tier, no card |
+| Groq | `https://api.groq.com/openai/v1` | https://console.groq.com/keys | free tier, no card |
+| Cerebras | `https://api.cerebras.ai/v1` | https://cloud.cerebras.ai | free tier |
+| Mistral | `https://api.mistral.ai/v1` | https://console.mistral.ai/api-keys | free "Experiment" plan (a phone number to sign up) |
+| OpenRouter | `https://openrouter.ai/api/v1` | https://openrouter.ai/keys | only its free models (names that end in `:free`); the model list shows only these |
 
-Checked on 2026-11-05: each of the five addresses accepts a request from a browser page (CORS) from `http://localhost:8852`. xAI shows the
-secret key only once, when the person makes it. Its list of keys shows only the key ID, which the API refuses.
+Services that need credits (xAI Grok, OpenAI) are not in the list. A free tier has a limit of requests for each minute and each day; one
+question uses 2 to `maxSteps` requests.
+
+Checked on 2026-11-05: each of the five addresses accepts a request from a browser page (CORS) from `http://localhost:8852`. The free
+tiers are as the services said on that day; a service can change them, so the guide `ask.md` names the date.
 
 The addresses are in a data file, `ask/providers.json`. **The model is not a fixed name.** The names of the models change often: on
 2026-11-05 the mock-up's default for Groq, `llama-3.3-70b-versatile`, was refused with HTTP 404 ("does not exist or you do not have
@@ -598,8 +602,8 @@ only on a page that has Ask.
 
 | Setting | localStorage key | What it is |
 |---|---|---|
-| Provider | `rs-settings:ask` → `provider` | A list of the five services of `providers.json` (Gemini first), or "Other address" with a text box |
-| Key | `rs-key:ask` | A key row as the Google key has: Save, Clear, Show. Save asks the provider for its models (`GET {address}/models`) and says "The key works: 40 models" or the provider's own error. A free key has a link to the page that gives it |
+| Provider | `rs-settings:ask` → `provider` | A list of the five free services of `providers.json` (Gemini first), with the link "Get a free key from ..." under it |
+| Key | `rs-key:ask:<provider>` | One key for each provider, because a key works only with its own service: the person can keep keys of two services and switch. A key row as the Google key has: Save, Clear, Show. Save asks the provider for its models (`GET {address}/models`) and says "The key works: 40 models" or the provider's own error. A free key has a link to the page that gives it |
 | Model | `rs-settings:ask` → `model.<provider>` | A text box with the models of the provider as its list, and the default of `providers.json` |
 
 - A key stays only in this browser (localStorage). It is never in the page file, never in a URL and never in the conversation. It goes only
