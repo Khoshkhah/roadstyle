@@ -328,6 +328,18 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 - **The list of tables.** The button "Tables" in the title row opens a list of the tables and their columns (from `schema()`), with the
   description of each column in its tooltip. A click on a name puts it in the line at the cursor.
 
+### The help of the two parts
+
+Each part has a "?" of roadstyle's help part (`rs.help.button`, [Dashboard parts](../guides/dashboard-parts.md#a-help-window)): the same
+button and the same window as the panel's own help (Kaveh, 2026-11-05: "add helper to both sql and ask panel").
+
+| Part | Where the "?" is | The words |
+|---|---|---|
+| The data dock | in its title row, after the note | What the dock is; the SQL line (only SELECT or WITH: the data does not change), Tables, CSV, Show on map (also for a table of street names), a click on a row, the top edge (drag, double click); the 1000-row limit |
+| Ask | in its top row, after the provider and the model | What Ask does; Key (the free keys, the key stays in this browser), Examples, an answer card (its SQL, Map, Table, ✕), MAP and Undo, New; what goes to the AI service, and that an AI service can be wrong |
+
+A host can give its own words with the options `help` of `dataDock` and of `askPanel` (`{title, intro, terms, note}`), or `help: false`.
+
 ### The roads of a result
 
 A model often writes `SELECT DISTINCT name FROM ...` for "which roads ...", although the prompt asks for `edge_id` (Kaveh's test with Groq,
@@ -545,7 +557,9 @@ question
 0. **The data first.** The host's data can still be loading when the person asks: duckOSM Studio loads a build, and the mock-up loaded 46
    tables through an ssh tunnel. The host gives `ready` (a promise; default: ready at once). Ask waits for it, with the step line "Loading
    the data…", before it reads the schema; the data dock's Run waits for it too. Before this, a question asked during the load stopped at
-   once with "Cannot read properties of undefined (reading 'query')", and the card showed nothing.
+   once with "Cannot read properties of undefined (reading 'query')", and the card showed nothing. The test is "all the data is loaded",
+   not "the database is open": the mock-up's first fix waited only for the connection, which opens before the tables load, and a question
+   during the load then failed with "reading 'name'" (the main table was not there yet).
 6. On a desktop, the data dock opens by itself on an answer with a table. On a phone it does not, because one sheet is open at a time and
    the person is in the panel's sheet. The view shows "Table" and the roads are lit on the map.
 
