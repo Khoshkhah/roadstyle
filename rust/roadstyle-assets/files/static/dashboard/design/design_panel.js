@@ -76,7 +76,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   const pane = $("design-pane");
 
   // ---- the map: the layers, the ground, the opacity of the roads and the base map under the map, with roadstyle's own calls ----
-  let painted = design, applying = false, held = false;                                     // painted: the design that the map shows now
+  let painted = design, applying = false, restyling = false, held = false;                                     // painted: the design that the map shows now
   const roadOrig = new Map();                                                               // the original paint of the road layers (see paintRoads)
   const hasLayer = (k) => {                                                                 // true, false, or undefined (no roads on the map: not known)
     const ovs = window.RS_OVERLAYS ?? [], cls = window.RS_CLASSES ?? [];
@@ -126,11 +126,14 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   const announceSoon = () => { if (styleKey(design) !== lastKey) held = true; else { held = false; announce(); } };
   const paintHeld = () => { if (held) { held = false; announce(); } };
   document.addEventListener("rs:stylechange", () => { roadOrig.clear(); paintHeld(); paintMap(); });          // a new style: its own paint is the original
-  for (const [ev, key] of [["rs:arrowschange", "arrows"], ["rs:buildings3dchange", "buildings3d"]]) document.addEventListener(ev, (e) => { if (!applying) setVisible(key, e.detail.on); });
-  document.addEventListener("rs:overlaychange", (e) => { if (!applying) setVisible(e.detail.overlay, e.detail.visible); });
+  // a switch event is the person's choice only when the panel does not make it: not while it paints (applying), and not while a new style or a new map comes
+  // in (restyling: rs.setStyle switches the layers of the old style again and sends their events before rs:stylechange; the held design is painted after it)
+  const quiet = () => applying || restyling;
+  for (const [ev, key] of [["rs:arrowschange", "arrows"], ["rs:buildings3dchange", "buildings3d"]]) document.addEventListener(ev, (e) => { if (!quiet()) setVisible(key, e.detail.on); });
+  document.addEventListener("rs:overlaychange", (e) => { if (!quiet()) setVisible(e.detail.overlay, e.detail.visible); });
   document.addEventListener("rs:filterchange", (e) => {
     const d = e.detail;
-    if (applying) return;
+    if (quiet()) return;
     if ("bridges" in d) setVisible("bridges", d.bridges);
     if ("tunnels" in d) setVisible("tunnels", d.tunnels);
     if (Array.isArray(d.visible)) for (const g of Object.keys(D.ROAD_GROUPS)) {
@@ -270,7 +273,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     pane.setAttribute("aria-labelledby", `design-tab-${tab}`);
     pane.dataset.tab = tab;
     paintBar();
-    if (isOpen()) document.dispatchEvent(new CustomEvent("rs:sectionchange"));         // the panel's select lists in the look of the boxes (selectbox.js)
+    if (isOpen()) document.dispatchEvent(new CustomEvent("rs:sectionchange", { detail: { id: "design", state: "show" } }));         // the panel's select lists in the look of the boxes (selectbox.js)
   }
   /** The list of ready themes again (a filter or a search changed): the search field keeps its focus. */
   function paintThemeList() {
@@ -313,7 +316,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     busy = true;
     note = "Drawing the map…"; paintBar();
     try {
-      lastKey = key;
+      lastKey = key; restyling = true;
       const text = lookText(key), t0 = performance.now();
       let done = null;
       if (setLook) {
@@ -326,7 +329,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     } catch (e) {
       lastKey = null; note = "The map could not draw this design: " + e.message;
     } finally {
-      busy = false; paintHeld(); paintBar();
+      busy = false; restyling = false; paintHeld(); paintBar();
       if (again) { again = false; schedule(0); }
     }
   }
@@ -481,8 +484,10 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   function open(name) {
     if (!isOpen()) {
       const hostTitle = hostBar.firstElementChild;
-      hostWas = { title: hostTitle, display: [hostTitle.style.display, hostBody.style.display], scroll: hostBody.scrollTop };
+      const foldAll = hostBar.querySelector("#rs-fold-all");                     // the host's "Collapse all" is for the host's cards, not for this panel
+      hostWas = { title: hostTitle, foldAll, display: [hostTitle.style.display, hostBody.style.display, foldAll?.style.display], scroll: hostBody.scrollTop };
       hostTitle.style.display = hostBody.style.display = "none";
+      if (foldAll) foldAll.style.display = "none";
       hostBar.prepend(title); hostCard.appendChild(root);
       initPanelScroll();                                       // the pane scrolls by the panel's protocol (the class rs-pbody)
     }
@@ -492,6 +497,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     if (!isOpen()) return;
     title.remove(); root.remove();
     [hostWas.title.style.display, hostBody.style.display] = hostWas.display;
+    if (hostWas.foldAll) hostWas.foldAll.style.display = hostWas.display[2];
     hostBody.scrollTop = hostWas.scroll;
   }
   // the design that this browser kept: it is the design at the start (the host's look gets it, no draw)
