@@ -576,8 +576,18 @@ The OpenAI-compatible address covers these services. The Settings box has them i
 Checked on 2026-11-05: each of the five addresses accepts a request from a browser page (CORS) from `http://localhost:8852`. xAI shows the
 secret key only once, when the person makes it. Its list of keys shows only the key ID, which the API refuses.
 
-The default model of each provider and the addresses are in a data file, `ask/providers.json`, so a new model name is a change of data.
-The person can type another model in the Settings box.
+The addresses are in a data file, `ask/providers.json`. **The model is not a fixed name.** The names of the models change often: on
+2026-11-05 the mock-up's default for Groq, `llama-3.3-70b-versatile`, was refused with HTTP 404 ("does not exist or you do not have
+access to it"). So the page takes the model from the provider's own list:
+
+1. On **Save** of a key, the page asks for the list (`GET {address}/models`; Google names a model `models/<name>`, and the page removes
+   that prefix). The Model field gets the list.
+2. If the model that the person typed is in the list, the page uses it. Else it picks one: the first match of a preference list of
+   models with tool support in `providers.json` (for example `gpt-oss-120b`, `kimi-k2`, `llama-4-maverick`, `qwen3`, `gemini-*-flash`),
+   and never a model for speech, images, embeddings or safety (`whisper`, `guard`, `tts`, `embed`, `image`). The note says which model
+   Ask uses, and why when it is not the typed one.
+3. If the provider refuses the model during a question (HTTP 404, or HTTP 400 that names the model), the page picks another model from
+   the list the same way, keeps it, and sends the request again, once.
 
 Not checked yet: that each service gives tool calls in this form with a real key. The first step of the build checks each one.
 
