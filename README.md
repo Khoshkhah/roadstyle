@@ -43,7 +43,8 @@
 - **Any road data.** A GeoDataFrame, a file, DuckDB, Arrow, [osmnx](https://osmnx.readthedocs.io/)
   or [duckOSM](https://github.com/Khoshkhah/duckOSM).
 - **Colour by your data.** Speed, traffic or any column, with a legend and a menu of colourings.
-- **Scriptable.** A `window.rs*` JavaScript API and events for your own dashboard, and shared parts for its panel.
+- **Scriptable.** A `window.rs*` JavaScript API and events for your own dashboard, and shared parts for its panel:
+  a level editor and a design panel (themes, road colours and widths, names, layers) that any page can open.
 - **Ready for AI agents.** An MCP server and an agent skill.
 
 ## What is new in 0.27.0
@@ -274,7 +275,7 @@ More: [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/set
 | Where | What you find |
 |---|---|
 | **[Get started](https://khoshkhah.github.io/roadstyle/get-started/)** | install, a first map, what your data needs |
-| **Guides** | [style the roads](https://khoshkhah.github.io/roadstyle/guides/style/) · [colour by your data](https://khoshkhah.github.io/roadstyle/guides/colour/) · [your own layers](https://khoshkhah.github.io/roadstyle/guides/overlays/) · [Google Street View](https://khoshkhah.github.io/roadstyle/guides/street-view/) · [big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) · [dashboards & JavaScript](https://khoshkhah.github.io/roadstyle/guides/dashboards/) · [dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) · [dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) · [which road is on top](https://khoshkhah.github.io/roadstyle/guides/levels/) · [on a website](https://khoshkhah.github.io/roadstyle/guides/website/) |
+| **Guides** | [style the roads](https://khoshkhah.github.io/roadstyle/guides/style/) · [colour by your data](https://khoshkhah.github.io/roadstyle/guides/colour/) · [your own layers](https://khoshkhah.github.io/roadstyle/guides/overlays/) · [Google Street View](https://khoshkhah.github.io/roadstyle/guides/street-view/) · [big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) · [dashboards & JavaScript](https://khoshkhah.github.io/roadstyle/guides/dashboards/) · [dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) · [dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) · [which road is on top](https://khoshkhah.github.io/roadstyle/guides/levels/) · [edit the design of a map](https://khoshkhah.github.io/roadstyle/guides/design-panel/) · [on a website](https://khoshkhah.github.io/roadstyle/guides/website/) |
 | **[Gallery](https://khoshkhah.github.io/roadstyle/gallery/)** | a picture and one line of code per look |
 | **[Rust engine](https://khoshkhah.github.io/roadstyle/rust/)** | the one engine: the style, the tiles, the levels and the page; the browser package and the crates |
 | **Reference** | [every parameter](https://khoshkhah.github.io/roadstyle/reference/parameters/) · [JavaScript API](https://khoshkhah.github.io/roadstyle/reference/javascript/) · [settings & base maps](https://khoshkhah.github.io/roadstyle/reference/settings/) · [command line](https://khoshkhah.github.io/roadstyle/reference/cli/) |
