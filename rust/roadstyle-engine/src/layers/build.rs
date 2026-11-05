@@ -41,8 +41,8 @@ pub(super) struct Ctx<'a> {
     h_on: Value,
     /// the minzoom of each class (the class filter)
     mz: Option<Map<String, Value>>,
-    /// the road layer draws the class's fill and casing colours (by class index) of a piece that has none (`colors::Baked::class_only`)
-    class_colours: bool,
+    /// the colours that the pieces do not hold (`simple::Roles`): the road layer gives them by the class index and the access kind (D1)
+    roles: Option<crate::simple::Roles>,
     /// the road layer reads the fill and the casing colours of a piece as places in these tables (`colors::ColourTable`), bound as let variables
     places: Option<[Value; 2]>,
 }
@@ -72,7 +72,7 @@ impl<'a> Ctx<'a> {
             s_on: json!(["boolean", ["feature-state", "select"], false]),
             h_on: json!(["boolean", ["feature-state", "hover"], false]),
             mz: class_minzoom(look),
-            class_colours: false,
+            roles: None,
             places: None,
         })
     }
@@ -208,7 +208,13 @@ fn line_color(cx: &Ctx, fills: &[String]) -> Value {
     let (s, fb_fill) = (&cx.look.sections, cx.fb_fill());
     let (s_on, h_on) = (&cx.s_on, &cx.h_on);
     let class_colour = |i: usize, fallback: &Value| class_table(cx, i, fallback);
-    let own_fill = if cx.places.is_some() { fill_place(fills, FILL_TABLE) } else if cx.class_colours { json!(["coalesce", ["get", fills[0]], class_colour(0, fb_fill)]) } else { fill_base(fills, fb_fill) };
+    let own_fill = match &cx.roles {
+        // with no table of data colours, no piece holds a colour of its own: every fill is a role colour
+        Some(_) if cx.places.is_none() => role_fill(cx, class_colour(0, fb_fill)),
+        Some(_) => fill_or_role(fills, FILL_TABLE, &role_fill(cx, class_colour(0, fb_fill))),
+        None if cx.places.is_some() => fill_place(fills, FILL_TABLE),
+        None => fill_base(fills, fb_fill),
+    };
     let mut fill = json!(["coalesce", ["feature-state", LIVE_COLOR], own_fill]);
     let mut item = json!(["coalesce", ["feature-state", LIVE_COLOR], ["coalesce", ["get", Mark::ItemColor.name()], fb_fill]]);
     let is_b = json!(["to-boolean", ["get", Mark::Bridge.name()]]);
@@ -235,13 +241,35 @@ fn line_color(cx: &Ctx, fills: &[String]) -> Value {
 const FILL_TABLE: &str = "fill_colours";
 const CASING_TABLE: &str = "casing_colours";
 
-/// The casing colour of a piece that is not a bridge: its own (a place in the table, or the colour of its class), else the theme's.
+/// The casing colour of a piece that is not a bridge: its class's when the casing is a role colour (D1: no piece holds one), else its own
+/// (a place in the table, or a colour), else the theme's.
 fn casing_colour(cx: &Ctx, class_colour: impl Fn(usize, &Value) -> Value) -> Value {
     let fallback = &cx.look.sections.roads.fallback["casing"];
+    if cx.roles.as_ref().is_some_and(|r| r.casing) {
+        return class_colour(1, fallback);
+    }
     if cx.places.is_some() {
         return json!(["case", ["has", Mark::Casing.name()], place_colour(json!(["get", Mark::Casing.name()]), CASING_TABLE), fallback]);
     }
-    json!(["coalesce", ["get", Mark::Casing.name()], if cx.class_colours { class_colour(1, fallback) } else { fallback.clone() }])
+    json!(["coalesce", ["get", Mark::Casing.name()], fallback])
+}
+
+/// The role fill of a piece (D1): the palette's colour of its access kind (with an access column), else its class's fill (`class_fill`).
+fn role_fill(cx: &Ctx, class_fill: Value) -> Value {
+    if crate::roads::named(&cx.look.map.columns.access).is_none() {
+        return class_fill;
+    }
+    let kinds: Vec<(&String, &Value)> = cx.look.road.access.iter().filter(|(k, c)| !c.is_null() && crate::draw::ACCESS_KINDS.contains(&k.as_str())).collect();
+    if kinds.is_empty() {
+        return class_fill;
+    }
+    // every output of a `match` has one type: the class fill is a colour (`to-color`), so each access colour is one too
+    let mut m = vec![json!("match"), json!(["get", Mark::Access.name()])];
+    for (k, c) in kinds {
+        m.extend([json!(k), json!(["to-color", c])]);
+    }
+    m.push(class_fill);
+    Value::Array(m)
 }
 
 /// The colour of a class (0: its fill, 1: its casing) as a table over the classes (`class_index` makes it one lookup by class index).
@@ -308,7 +336,15 @@ struct Overlays {
 /// An overlay on edges: a copy of its layers for each (fill number, order), each with its own filter (position and order), which rsFilter keeps.
 fn edge_layers(cx: &Ctx, ov: &mut Overlay, sid: &str, by_id: &HashMap<String, crate::road::Road>) -> Result<Vec<(i64, i64, Value, Vec<Value>)>, crate::Error> {
     let mut out = Vec::new();
-    for (pos, order) in edge_overlay(ov, by_id)? {
+    let groups = match ov.edge_groups.clone() {
+        Some(g) => g,
+        None => {
+            let g = edge_overlay(ov, by_id)?;
+            ov.edge_groups = Some(g.clone());
+            g
+        }
+    };
+    for (pos, order) in groups {
         let flt = json!(["all", ["==", ["get", Mark::FillLevel.name()], pos], ["==", ["get", Mark::ItemOrder.name()], order]]);
         let drawn = crate::overlays::metre_items(ov);
         let mine = overlay_layers(sid, ov, cx.look).into_iter().map(|mut l| {
@@ -609,8 +645,11 @@ pub fn road_layers(look: &crate::Look, roads: &crate::road::Roads, simple: &crat
                    -> Result<(Vec<Value>, PageInfo), crate::Error> {
     let mut info = PageInfo::default();
     let mut cx = Ctx::new(look, roads, decks)?;
-    cx.class_colours = simple.class_colours.is_some() && fills.len() == 1;
-    cx.places = simple.colours.as_ref().map(|t| [json!(t.fill.list), json!(t.casing.list)]);
+    cx.roles = simple.roles.clone();
+    // place 0 of a colour table is the look's fallback colour (`ColourTable::of`): it comes from this look, the data colours after it from the roads
+    let fallback = &look.sections.roads.fallback;
+    let table = |list: &[Value], fb: &Value| json!(std::iter::once(fb.clone()).chain(list.iter().skip(1).cloned()).collect::<Vec<_>>());
+    cx.places = simple.colours.as_ref().map(|t| [table(&t.fill.list, &fallback["fill"]), table(&t.casing.list, &fallback["casing"])]);
     let items: Vec<&Props> = simple.items.iter().map(|(_, it)| &it.props).filter(|p| p.get(Mark::PieceKind.name()) == Some(&json!(5))).collect();
     let w = widths(&cx, !items.is_empty());
     let flt = road_filter(&cx, &items);

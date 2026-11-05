@@ -22,6 +22,7 @@ pub mod simple;
 pub mod slots;
 pub mod sources;
 mod style;
+pub use style::{restyle_layers, LookHalf};
 
 // The core has no I/O (docs/design/rust_library.md, rule 3 of the layers): the engine takes the model's types, and the readers
 // (roadstyle-io) are the facade's.
@@ -72,6 +73,16 @@ pub struct Parts {
     pub state: Option<Value>,
     /// the warnings of the stages
     pub warnings: Vec<String>,
+    /// what a new look needs from this stage 1 (`restyle_layers`)
+    pub look_inputs: LookInputs,
+}
+
+/// What stage 1 keeps for a new look (docs/design/restyle_without_retile.md, D4): the colouring that the bake gave, and the facts of the
+/// base-map layers. With them, `restyle_layers` makes the style of another look with no read of the roads or the features.
+#[derive(Clone)]
+pub struct LookInputs {
+    pub colors: colors::Baked,
+    pub layers: Vec<overlays::LayerFacts>,
 }
 
 /// The style's layers and sources: the roads ("roads", "simple", "slots") and, with `features` (the base map's rows as the worker's SQL
