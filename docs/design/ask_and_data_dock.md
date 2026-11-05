@@ -404,8 +404,8 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 - The top row has Back, the provider and the model, a link "Settings" that opens the Settings box of the toolbox
   (`window.rsOpenSettings`, which exists for the Google key), and "New" (a new conversation).
 - An empty conversation shows one line about what Ask does, and the `examples` as chips. A click on a chip asks it.
-- With no key, the view shows "Ask needs your own key of Gemini or of an OpenAI-compatible service." and a button "Add a key" that opens
-  the Settings box.
+- With no key, the view shows "Ask needs your own key. Google Gemini and Groq give a free key." with the two links, and a button "Add a
+  key" that opens the Settings box.
 - **A card for each question.** A question and its answer are one card with an outline: a `--line` border, 12 px corners and no
   background, so the panel shows through it (Kaveh chose this look from the mock-up, 2026-11-05, over a card with a fill and over a
   card with no border). The question
@@ -588,11 +588,9 @@ only on a page that has Ask.
 
 | Setting | localStorage key | What it is |
 |---|---|---|
-| Gemini key | `rs-key:gemini` | A key row as the Google key has: Save, Clear, Show |
-| OpenAI-compatible key | `rs-key:openai` | The same |
-| Ask with | `rs-settings:ask` → `provider` | A two-way switch (`rs-seg`): Gemini or OpenAI-compatible. Only when both keys are saved |
-| Address | `rs-settings:ask` → `address` | The OpenAI-compatible address: a list of the three services and a text box |
-| Model | `rs-settings:ask` → `model.<provider>` | A text box, with the default of `providers.json` as its placeholder |
+| Provider | `rs-settings:ask` → `provider` | A list of the five services of `providers.json` (Gemini first), or "Other address" with a text box |
+| Key | `rs-key:ask` | A key row as the Google key has: Save, Clear, Show. Save asks the provider for its models (`GET {address}/models`) and says "The key works: 40 models" or the provider's own error. A free key has a link to the page that gives it |
+| Model | `rs-settings:ask` → `model.<provider>` | A text box with the models of the provider as its list, and the default of `providers.json` |
 
 - A key stays only in this browser (localStorage). It is never in the page file, never in a URL and never in the conversation. It goes only
   in the header of a request to the provider's own address.
