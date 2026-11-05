@@ -547,7 +547,7 @@ saved page still works offline.*
 | `api.js` | 170 | the runtime API of the interaction contract: one object for a host page, over the window.rs* functions of the controls |  |
 | `arrows.js` | 164 | oneway direction-arrow icon (openstreetmap-carto) |  |
 | `basemap.js` | 144 | base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's tiles; the road layers stay put); the dropdown is just UI over it and stays in sync | `RS_BASEMAPS`, `rsBuildings`, `rsSetBasemap` |
-| `basemapbox.js` | 95 | The base-map box: the heading "Base map", one radio row with a swatch for each map, a divider, and "On top": Hillshade, Labels and 3D buildings | `rsLabelsOn` |
+| `basemapbox.js` | 95 | The base-map box: the heading "Base map", one radio row with a swatch for each map, a divider, and "On top": Hillshade, 3D terrain (`elevation.js`), Labels and 3D buildings | `rsLabelsOn` |
 | `boundary.js` | 62 | The area boundary: what the dashboard does with the map option `boundary` |  |
 | `breaks.js` | 38 | NATURAL BREAKS for live data (Fisher-Jenks): the cut points that split numbers into k sets so that the numbers inside a set are as close as possible (the least sum of squares) |  |
 | `color.js` | 114 | "colour by" recolouring: each option's fill is baked per edge (__rs_fill / __rs_fill__1 …), and the road layers' expressions (made in Python, render_web._fill_expr) pick the active option from the state rs_co | `RS_COLOR_OPTIONS`, `rsColor`, `rsColorBase`, `rsSetColorField`, `rsSetRoadFill` |

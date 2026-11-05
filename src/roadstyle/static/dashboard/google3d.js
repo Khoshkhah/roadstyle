@@ -56,7 +56,7 @@ export function initGoogle3D(){
           const g=c.getContext("2d", {willReadFrequently:true}); g.drawImage(img, 0, 0);
           t.px=g.getImageData(0, 0, 256, 256).data; if(m3 && follow) setGoogle(); };
         img.onerror=()=>{ warn.hidden=false; console.warn("rs google 3d: no ground heights from", img.src); };
-        img.src="https://s3.amazonaws.com/elevation-tiles-prod/terrarium/"+key+".png"; }
+        img.src=O.ontop.dem.tiles[0].replace("{z}/{x}/{y}", key); }       // the page's one DEM (data/basemaps.json `ontop.dem`; elevation.js draws the hillshade and the terrain from it)
       if(!t.px) return lastGround;
       const i=(Math.min(255, Math.floor(x%1*256))+Math.min(255, Math.floor(y%1*256))*256)*4;
       return lastGround=Math.max(0, t.px[i]*256+t.px[i+1]+t.px[i+2]/256-32768); };

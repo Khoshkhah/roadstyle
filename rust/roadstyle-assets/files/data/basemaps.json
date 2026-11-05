@@ -274,10 +274,22 @@
  ],
  "fallback": "ofm_positron",
  "ontop": {
+  "dem": {
+   "tiles": ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+   "encoding": "terrarium",
+   "tile_size": 256,
+   "maxzoom": 15,
+   "attr": "Ground heights: Terrain Tiles on AWS (<a href=\"https://github.com/tilezen/joerd/blob/master/docs/attribution.md\" target=\"_blank\" rel=\"noopener\">Mapzen, SRTM and other sources</a>)"
+  },
   "hillshade": {
-   "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}",
-   "opacity": 0.4,
-   "attr": "Tiles © <a href=\"https://www.esri.com\" target=\"_blank\" rel=\"noopener\">Esri</a> Sources: Esri, Vantor, Airbus DS, USGS, NGA, NASA, CGIAR, N Robinson, NCEAS, NLS, OS, NMA, Geodatastyrelsen, Rijkswaterstaat, GSA, Geoland, FEMA, Intermap, and the GIS user community"
+   "exaggeration": 0.4,
+   "shadow": "#000000",
+   "highlight": "#ffffff",
+   "accent": "#000000"
+  },
+  "terrain": {
+   "exaggeration": 1.0,
+   "pitch": 55
   },
   "labels": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",

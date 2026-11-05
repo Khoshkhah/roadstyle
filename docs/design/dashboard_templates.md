@@ -118,7 +118,7 @@ the bar. Thus the DOM moves and the 150 ms poll of the old `layout.js` go.
 
 | Part | Rule |
 |---|---|
-| Base-map box | One radio row with a swatch for each map, then "On top": Hillshade, Labels, One-way arrows (decided 2026-11-03), 3D buildings. A themed pair is one row. Labels is one state for the 2D map and the Google 3D window (decided 2026-10-29): the switch is always on, the Google 3D window always follows it (HYBRID with labels, SATELLITE without), and the 2D map gets labels only from the base maps that can show them (the OpenFreeMap styles; Esri Gray and Esri Satellite add Esri's label tiles). Blank, OpenStreetMap, Esri Streets and CARTO get no label layer from the page |
+| Base-map box | One radio row with a swatch for each map, then "On top": Hillshade, 3D terrain (both from the DEM of `ontop.dem`, the Terrain Tiles on AWS), Labels, One-way arrows (decided 2026-11-03), 3D buildings. A themed pair is one row. Labels is one state for the 2D map and the Google 3D window (decided 2026-10-29): the switch is always on, the Google 3D window always follows it (HYBRID with labels, SATELLITE without), and the 2D map gets labels only from the base maps that can show them (the OpenFreeMap styles; Esri Gray and Esri Satellite add Esri's label tiles). Blank, OpenStreetMap, Esri Streets and CARTO get no label layer from the page |
 | Base-map data | `data/basemaps.json` gets `style_url`, `group`, `title`, `dark`, `swatch`, and a `menu` list in place of `switcher`. The Esri label and hillshade URLs move there from the JS |
 | Legend box | The legend of the active color option, the classes in two columns |
 | Attribution box | The base map's text, and Google's when a Google window is open |
