@@ -551,31 +551,35 @@ its own (the meaning of each duckOSM column). This is the host's work, not roads
 
 ### The providers
 
-Two providers, with one interface in `ask/providers.js`:
+One provider code, in `ask/providers.js`: the OpenAI-compatible request. Google gives an OpenAI-compatible address for Gemini, so this
+one code covers Gemini too, and a second code for Gemini's own API is not necessary (found with the mock-up, 2026-11-05).
 
 ```js
 // a provider: one call of the model
 {id, name, call({system, messages, tools, signal}) -> {text} | {toolCalls: [{id, name, args}]}}
 ```
 
-| Provider | Request | The key goes in |
-|---|---|---|
-| Gemini | `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`, with `systemInstruction`, `contents` and `tools: [{functionDeclarations}]` | the header `x-goog-api-key` |
-| OpenAI-compatible | `POST {address}/chat/completions`, with `messages` and `tools: [{type: "function", function}]` | the header `Authorization: Bearer <key>` |
+| Request | The key goes in |
+|---|---|
+| `POST {address}/chat/completions`, with `messages` and `tools: [{type: "function", function}]` | the header `Authorization: Bearer <key>` |
 
 The OpenAI-compatible address covers these services. The Settings box has them in a list, and the person can also type an address:
 
-| Service | Address |
-|---|---|
-| Groq | `https://api.groq.com/openai/v1` |
-| OpenRouter | `https://openrouter.ai/api/v1` |
-| OpenAI | `https://api.openai.com/v1` |
+| Service | Address | Cost | Key from |
+|---|---|---|---|
+| Google Gemini (the default) | `https://generativelanguage.googleapis.com/v1beta/openai` | free tier, no card | https://aistudio.google.com/apikey |
+| Groq | `https://api.groq.com/openai/v1` | free tier, no card | https://console.groq.com/keys |
+| OpenRouter | `https://openrouter.ai/api/v1` | credits (some free models) | https://openrouter.ai/keys |
+| Grok (xAI) | `https://api.x.ai/v1` | credits only | https://console.x.ai |
+| OpenAI | `https://api.openai.com/v1` | credits only | https://platform.openai.com/api-keys |
+
+Checked on 2026-11-05: each of the five addresses accepts a request from a browser page (CORS) from `http://localhost:8852`. xAI shows the
+secret key only once, when the person makes it. Its list of keys shows only the key ID, which the API refuses.
 
 The default model of each provider and the addresses are in a data file, `ask/providers.json`, so a new model name is a change of data.
 The person can type another model in the Settings box.
 
-Not checked yet: that each of the four services accepts a request from a browser page (CORS) and gives tool calls in this form. The
-first step of the build checks each one from a page on `localhost` with a real key, and this design is changed if one does not.
+Not checked yet: that each service gives tool calls in this form with a real key. The first step of the build checks each one.
 
 ### The keys and the settings
 
