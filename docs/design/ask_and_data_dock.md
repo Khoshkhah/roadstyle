@@ -16,6 +16,13 @@ Kaveh's review of the mock-up (2026-11-05) changed three more points:
 
 Also: the credits box in the bottom corner (`#rs-scalebox`) hides while the dock is open.
 
+Later the same day, Kaveh also asked for these:
+
+4. The road's card stands beside the table in the dock, in place of the map's popup ([The road card in the dock](#the-road-card-in-the-dock)).
+5. Ask has no scroll in the panel's body: the view fills the panel, and the conversation is its only scroll. The question box is a plain
+   row at the bottom of the view. A sticky box over the conversation looked like a white box on the panel and let text show under it.
+6. No privacy notice card before the first question ([What goes to the provider](#what-goes-to-the-provider)).
+
 ## Problem
 
 duckOSM Studio (`Khoshkhah/duckosm-studio`) builds a road network into DuckDB in the browser. Until 2026-11-05 it had an SQL box in
@@ -226,6 +233,7 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 | `sql` | `""` | The start text of the line. |
 | `label` | `"Data"` | The tab of the dock. |
 | `limit` | `1000` | The most rows in the table. The data dock asks for one more row, so it knows that there are more. |
+| `card` | `true` | The road card beside the table, in place of the popup (see [The road card in the dock](#the-road-card-in-the-dock)). |
 | `guard` | `true` | `true`: the person's SQL also goes through the read-only guard (see [The read-only guard](#the-read-only-guard)). `false`: only the agent's SQL does. |
 
 | Method | What it does |
@@ -257,9 +265,32 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 - **Show on map.** When the result has `idColumn`, the button lights those roads with `rs.highlight(ids)` and zooms to them with
   `rs.focus(ids)`. A second click (or a new run) takes the light away (`rs.highlight([])`). An id that is not on the map is not lit, and
   the bar says "40 of 42 roads are on the map".
-- **A click on a row** selects that road and zooms to it (`rs.select(id)`, `rs.focus(id)`). The row stays marked.
+- **A click on a row** selects that road and zooms to it (`rs.select(id)`, `rs.focus(id)`). The row stays marked, and the road's card
+  opens beside the table.
 - **The list of tables.** The button "Tables" in the title row opens a list of the tables and their columns (from `schema()`), with the
   description of each column in its tooltip. A click on a name puts it in the line at the cursor.
+
+### The road card in the dock
+
+A click on a row of the table, or on a road of the map, shows the road's fields in a card at the right of the table, in the dock. The
+map's popup is off (`road_popup=False`), so one click has one place for its fields.
+
+```
+| SELECT edge_id, name, highway, round(length_m) AS length_m, ...                     [ Run ] |
+| +----------------------------------------------------------+  +----------------------+     |
+| | edge_id     | name             | highway | length_m | ...|  | Road               x |     |
+| | 1943370...  | Tunnel Albert II | primary |      672 |    |  | Tunnel Albert II     |     |
+| | 6194277...  | Tunnel Rainier   | primary |      353 |    |  | edge_id  1943370...  |     |
+| +----------------------------------------------------------+  | highway      primary |     |
+```
+
+- The card is roadstyle's existing part `road_card` (`roadcard.js`), with no change. It fills on `rs:select` and empties on
+  `rs:deselect`, so a click on the map and a click on a row show the same card. The card shows the same fields as the popup.
+- The card is 320 px wide and stands right after the table. The table's box then has at most the width of the dock minus the card.
+  The card has a title row "Road" and a close button (`rs.select(null)`). The card scrolls by itself when the road has many fields.
+- A click on a road of the map opens the dock (when it is closed) and marks the road's row when the table has it.
+- On a phone the card covers the table inside the dock sheet. Its close button shows the table again.
+- `dataDock({card: true})` turns this on (the default). A page that wants the popup gives `card: false` and keeps `road_popup`.
 
 ### The row limit
 
@@ -342,18 +373,18 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 | 5 primary road edges are longer  |   the answer
 | than 300 m. The longest is ...   |
 | > 2 queries · 5 rows     [Table] |
-| -------------------------------- |   the panel's body scrolls: one scroll
+| -------------------------------- |   only the conversation scrolls
 | +----------------------+ [ Ask ] |   the question box: always at the bottom
 | | Ask a question ...   |         |
 | +----------------------+         |
 +----------------------------------+
 ```
 
-- **One scroll.** The conversation has no scroll area of its own. The panel's body (`.sb-body`) is the only scroll, so the scroll wheel
-  never moves two areas.
-- **The question box stays in view.** It is at the bottom of the view with `position: sticky; bottom: 0` and the `--bg` background, so
-  it stays at the bottom of the panel when the person scrolls the conversation. The view is at least as high as the panel's body, so
-  with a short conversation the box is at the bottom too.
+- **One scroll.** While Ask is open, the panel's body (`.sb-body`) does not scroll: the view fills it exactly (a flex column). The view
+  has three rows: the top row, the conversation and the question box. Only the conversation scrolls, so the scroll wheel never moves two
+  areas. The conversation is in `_PS_AREAS`, for the panel's scrollbar look.
+- **The question box stays in view.** It is the last row of the view, under a `--line`, with no background of its own. It is always at
+  the bottom of the panel, and nothing scrolls under it.
 - **Order.** The oldest question is at the top and the newest at the bottom, next to the question box. After each step the panel
   scrolls to the end.
 - The top row has Back, the provider and the model, a link "Settings" that opens the Settings box of the toolbox
@@ -367,7 +398,6 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
   view shows each step on one muted line: "Writing SQL", "Running query 1", "Query 1 failed: Referenced column "lenght" not found. Trying
   again", "Writing the answer". A failed step stays, in `--rs-err`. The other step lines go when the answer comes.
 - "> 2 queries" opens the SQL of each step. "Table" opens the data dock on the answer's table.
-- The privacy notice shows in the conversation, above the question box.
 
 ### The agent loop
 
@@ -508,28 +538,15 @@ only on a page that has Ask.
   github.io site) can read it. Use a key with a spending limit." This is true: localStorage belongs to the origin, and all GitHub Pages
   of one user share one origin.
 
-### The privacy notice
+### What goes to the provider
 
-On the first question to a provider, the view shows this notice in place of the answer, and the question waits:
+Kaveh removed the notice card (2026-11-05): no card stops the first question. The person adds the key, and that is the choice to use the
+provider. The Settings box says under the Ask keys, in one muted line, what goes to the provider:
 
-> **Before Ask sends your question**
->
-> Ask sends these to **generativelanguage.googleapis.com** (Google Gemini):
->
-> - your question and the earlier questions and answers of this conversation;
-> - the names of the tables and the columns, and their descriptions;
-> - the results of the queries that the agent runs (up to 30 rows each).
->
-> Your key goes to the same address, and only there. Nothing goes to roadstyle or to the author of this page. Google can keep and use
-> what it gets, by its own terms.
->
-> [Accept] [Cancel]
+> Ask sends your question, the conversation, the names and descriptions of the tables and columns, and the query results (up to 30 rows
+> each) to the provider's address. The key goes only there.
 
-- The notice names the real address of the provider (for an OpenAI-compatible service, the host of the address in the settings).
-- **Accept** keeps the consent in this browser (`rs-ask:consent` → `{<host>: <notice version>}`) and sends the question. **Cancel**
-  sends nothing.
-- A new address, or a new version of the notice (a change of what goes), shows the notice again.
-- The fake provider of the tests has no host, and the test checks that no model call happens before Accept.
+The guide `docs/guides/ask.md` says the same.
 
 ### The read-only guard
 
@@ -590,9 +607,9 @@ No test needs a key or the network. CI runs them all.
 | `tests/data_units.js` in `tests/test_data_dock_browser.py` | The guard: a list of SQL that it accepts (with comments, strings that hold `DROP`, `WITH`, a `;` at the end) and a list that it refuses (two statements, each refused word, `read_csv`, `FROM 'x.parquet'`, `'https://...'`, `query('...')`). The row limit wrap. The CSV text (a comma, a quote, a new line, a `BigInt`, `null`). An id as exact text. |
 | `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
-| `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text. Also: the stop after 3 failed queries and after `maxSteps`, Stop, no model call before Accept, the notice again for a new address, a model text with `<img>` shows as text. |
+| `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text. Also: the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
 | `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
-| `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (with an answer and the notice) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
+| `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
 | `tests/test_dashboard_scroll_browser.py` | The dock's table. The Ask view: the panel's body is its only scroll, and the question box is in view at each scroll position. |
 
 Before the merge, Kaveh looks at the page on a phone and on a desktop, in both themes.
