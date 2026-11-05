@@ -284,7 +284,9 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 | `dashboard` | `window.rs` | The page's dashboard. |
 | `query(sql, {signal})` | (necessary) | Runs one statement on the host's data. It gives `{columns: [{name, type}], rows: [[...], ...]}` (a value is a JavaScript string, number, boolean, `BigInt` or `null`), or it throws an `Error` with the database's message. `signal` is an `AbortSignal`: Stop aborts it. |
 | `schema()` | (necessary) | Gives the tables (see [The schema](#the-schema)). Ask uses it, and the data dock uses it for its list of the tables. |
-| `idColumn` | `"edge_id"` | The column with the road ids. A result without this column has no "Show on map", and a click on a row does nothing. |
+| `idColumn` | `"edge_id"` | The column with the road ids. |
+| `keys` | `["osm_id", "name"]` | Other columns that find roads when a result has no `idColumn` (see [The roads of a result](#the-roads-of-a-result)). |
+| `roadsBy(sql, column)` | none | The host's lookup: the SQL that gives the road ids of the result `sql` by its `column`. duckOSM Studio: ``SELECT edge_id FROM driving.edges WHERE "<column>" IN (SELECT "<column>" FROM (<sql>))``. Without it, only `idColumn` finds roads. |
 | `sql` | `""` | The start text of the line. |
 | `label` | `"Data"` | The tab of the dock. |
 | `limit` | `1000` | The most rows in the table. The data dock asks for one more row, so it knows that there are more. |
@@ -324,6 +326,21 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
   opens beside the table.
 - **The list of tables.** The button "Tables" in the title row opens a list of the tables and their columns (from `schema()`), with the
   description of each column in its tooltip. A click on a name puts it in the line at the cursor.
+
+### The roads of a result
+
+A model often writes `SELECT DISTINCT name FROM ...` for "which roads ...", although the prompt asks for `edge_id` (Kaveh's test with Groq,
+2026-11-05: the answer named three streets, and nothing lit on the map; "it is the same!"). A rule that the model can break is not enough,
+so the data dock finds the roads of a result itself:
+
+1. The result has `idColumn`: these are the roads.
+2. Else the first of `keys` that the result has (`osm_id`, then `name`): the host's `roadsBy(sql, column)` gives the road ids of all the
+   values of that column. Monaco: the three street names became 95 road edges.
+3. Else the result has no roads: no Show on map, and the answer card has no Map.
+
+The same lookup serves a click on a row (the roads of that row's name: "Tunnel Albert II" lit its 7 edges), Show on map, the Map button
+of an answer and the light after an answer. The prompt also says it plainly: "Also for a list of street names: `SELECT edge_id, name ...`
+(no DISTINCT), not `SELECT DISTINCT name`."
 
 ### The road card in the dock
 
