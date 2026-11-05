@@ -292,6 +292,9 @@
    "tunnel_fade": 0.25,
    "pitch": 55
   },
+  "buildings": {
+   "opacity": 1
+  },
   "labels": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
    "opacity": 1,

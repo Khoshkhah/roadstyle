@@ -1,5 +1,5 @@
 // The base-map box (docs/design/dashboard_templates.md, 3.3): the heading "Base map", one radio row with a swatch for each map, a divider, and
-// "On top": Hillshade, 3D terrain (elevation.js), Labels, One-way arrows and 3D buildings. A map with a dark twin is one row that follows the page's theme. The order on the map: the base
+// "On top": Hillshade, 3D terrain (elevation.js), Labels, One-way arrows and 3D buildings (with its Opacity slider below it while it is on). A map with a dark twin is one row that follows the page's theme. The order on the map: the base
 // map, the hillshade, the labels, the roads, the page's own layers, the buildings, the selection. The URLs of the layers on top are
 // data/basemaps.json `ontop` (O.ontop).
 //
@@ -7,7 +7,7 @@
 // labels only from a base map that can show them: the style's own labels (a vector style), or Esri's label tiles (Esri Gray, Esri Satellite).
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
-import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
+import {rsBuildings, rsBuildingsByPerson, rsBuildingsOpacity} from "./basemap.js";
 import {_elHillshade, rsTerrain, rsTerrainTunnels, _elTunnels, _elTerrainByPerson} from "./elevation.js";
 import {rsArrowsOn, rsHasArrows, rsSetArrows, _arApply} from "./arrows.js";
 
@@ -73,6 +73,7 @@ export function buildBox(menu){
     tops.buildings.c.disabled = !vec || own; tops.buildings.c.checked = vec && !own && rsBuildings();
     tops.buildings.lab.classList.toggle("rs-bm-off", !vec || own);
     tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
+    opRow.hidden = !tops.buildings.c.checked;
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
     _elHillshade(tops.hillshade.c.checked, firstRoad()); rsTerrain(tops.terrain.c.checked); _elTunnels();
@@ -89,6 +90,14 @@ export function buildBox(menu){
   topRow("labels", "Labels");
   topRow("arrows", "One-way arrows").checked = rsArrowsOn();       // on, unless the person turned them off in this browser (arrows.js keeps the state)
   topRow("buildings", "3D buildings");
+  // the opacity of the 3D buildings: a slider row under the switch, shown only while the switch is on
+  const opRow = _bxEl("label", "rs-set-slide rs-bm-opacity"), opIn = _bxEl("input"), opVal = _bxEl("b");
+  opIn.type = "range"; opIn.min = "0"; opIn.max = "1"; opIn.step = "0.05"; opIn.id = "rs-top-buildings-opacity";
+  const opShow = v => { opIn.value = v; opVal.textContent = (+v).toFixed(2); };
+  opShow(rsBuildingsOpacity());
+  opIn.oninput = () => rsBuildingsOpacity(+opIn.value);
+  document.addEventListener("rs:buildingsopacitychange", e => opShow(e.detail.opacity));
+  opRow.append(_bxEl("span", "", "Opacity"), opIn, opVal); menu.appendChild(opRow);
   const hostRows = new Map();                        // the rows of the page: id -> {c, lab, spec}
   const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); });
   _hostAdd = spec => { if(hostRows.has(spec.id)) return; const c = topRow("host-" + spec.id, spec.label); hostRows.set(spec.id, {c, lab: tops["host-" + spec.id].lab, spec}); c.onchange = () => { spec.set(c.checked); syncHost(); }; syncHost(); };

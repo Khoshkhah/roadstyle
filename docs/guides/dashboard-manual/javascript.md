@@ -72,6 +72,8 @@ rs.setTunnelStyle({strength: 80});
 
 `rsHillshade(on)` and `rsTerrain(on)` switch the hillshade and the 3D terrain of the base-map box (`rsTerrainTunnels(mode)`: "fade", "hide" or "show" for the tunnels meanwhile) (the DEM is the Terrain Tiles on AWS; no argument: whether it is on). With the terrain on, every layer lies on the ground of the DEM, so a tunnel is drawn on the hill above it and a bridge on the valley under it; the roads are flat with it off. `rs.setOverlay(label, visible)` shows or hides one overlay of the page. `rsSetBridges`, `rsSetTunnels` and `rsSetClasses` are the single-control forms of `rs.setFilter`.
 
+`rsBuildingsOpacity(value)` sets the opacity of the 3D buildings of a vector base map, from 0 to 1 (the *Opacity* slider under the *3D buildings* row of the base-map box). No argument gives the opacity now. The event is `rs:buildingsopacitychange` (`opacity`).
+
 ## Save and share the state
 
 `rs.getState()` gives a copy of the state. `rs.setState(part)` applies a part of it through the controls. `rs.link()` gives the part that differs from the start, as a `#rs=` link. A page opened with that link applies it.
@@ -193,7 +195,7 @@ rs.select(rs.query({highway: "primary"})[0]);
 stop();
 ```
 
-The page sends these events: `rs:ready`, `rs:select`, `rs:deselect`, `rs:filterchange`, `rs:colorchange`, `rs:highlightchange`, `rs:themechange`, `rs:basemapchange`, `rs:basemapready`, `rs:buildingschange`, `rs:buildings3dchange`, `rs:terrainchange`, `rs:labelschange`, `rs:overlaychange`, `rs:overlayschange`, `rs:interactionchange`, `rs:tunnelchange`, `rs:roadfillchange`, `rs:viewchange`, `rs:viewselect`, `rs:sectionchange`, `rs:helpchange`, `rs:colormode`, `rs:datachange`, `rs:toolchange`, `rs:toolsready`, `rs:sheetchange`, `rs:layoutchange`, `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot`, `rs:google3dchange`, `rs:g3dmodechange`, `rs:arrowschange`, `rs:stylechange` and `rs:tableready`. Your page sends `rs:toprowschange` when it changes the state of a row that it added with `rsAddTopRow`: the base-map box then reads the row again.
+The page sends these events: `rs:ready`, `rs:select`, `rs:deselect`, `rs:filterchange`, `rs:colorchange`, `rs:highlightchange`, `rs:themechange`, `rs:basemapchange`, `rs:basemapready`, `rs:buildingschange`, `rs:buildings3dchange`, `rs:buildingsopacitychange`, `rs:terrainchange`, `rs:labelschange`, `rs:overlaychange`, `rs:overlayschange`, `rs:interactionchange`, `rs:tunnelchange`, `rs:roadfillchange`, `rs:viewchange`, `rs:viewselect`, `rs:sectionchange`, `rs:helpchange`, `rs:colormode`, `rs:datachange`, `rs:toolchange`, `rs:toolsready`, `rs:sheetchange`, `rs:layoutchange`, `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot`, `rs:google3dchange`, `rs:g3dmodechange`, `rs:arrowschange`, `rs:stylechange` and `rs:tableready`. Your page sends `rs:toprowschange` when it changes the state of a row that it added with `rsAddTopRow`: the base-map box then reads the row again.
 
 When each event fires, and its `detail`, are in the [reference](../../reference/javascript.md#events).
 

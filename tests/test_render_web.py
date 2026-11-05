@@ -2491,3 +2491,7 @@ def test_web_hillshade_and_terrain_keywords():
     with pytest.raises(ValueError, match="terrain_tunnels must be"):
         render_edges(_edges(), backend="web", terrain_tunnels="gone")
     assert _opt(off, "terrain_exaggeration") is None and _opt(render_edges(_edges(), backend="web", terrain_exaggeration=2.5).html, "terrain_exaggeration") == 2.5
+    assert _opt(off, "buildings_opacity") is None and _opt(render_edges(_edges(), backend="web", buildings_opacity=0.6).html, "buildings_opacity") == 0.6
+    assert _opt(on, "ontop")["buildings"]["opacity"] == 1
+    with pytest.raises(ValueError, match="buildings_opacity must be from 0 to 1"):
+        render_edges(_edges(), backend="web", buildings_opacity=1.5)
