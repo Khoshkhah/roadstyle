@@ -72,17 +72,16 @@ fn a_saved_look_of_version_0_1_and_2() {
     assert!(matches!(roadstyle_rs::Look::from_json(&unknown).unwrap_err(), roadstyle_rs::look::Error::Look(m) if m.contains("pallete")));
 }
 
-/// Review D4: a palette colour in export_look ("#fff" panicked there before): the short form, the long form and a colour name are colours
+/// Review D4: a class colour in export_look ("#fff" panicked there before): the short form, the long form and a colour name are colours
 /// (moved toward the tunnel colour), "#zzz" is an error that names it, and "" (a palette's "no casing") stays as it is.
 #[test]
 fn export_look_reads_every_form_of_a_colour() {
     let text = std::fs::read_to_string(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json")).unwrap();
     let base: Value = serde_json::from_str(&text).unwrap();
-    let pal = base["theme"]["active"]["palette"].as_str().unwrap().to_string();
     let cols = roadstyle_rs::export_look::LookCols { highway: "highway", oneway: "oneway", tunnel: "tunnel", bridge: "bridge", id: "edge_id" };
     let with = |fill: &str| {
         let mut v = base.clone();
-        v["theme"]["palettes"][&pal]["residential"]["fill"] = fill.into();
+        v["styles"]["classes"]["residential"][0]["fill"] = fill.into();
         roadstyle_rs::export_look::export_look(&roadstyle_rs::Look::from_value(v).unwrap(), &cols, &[0, 1])
     };
     for ok in ["#fff", "#ffffff", "red", ""] {
@@ -93,4 +92,28 @@ fn export_look_reads_every_form_of_a_colour() {
                serde_json::to_string(&with("#ffffff").unwrap()).unwrap(), "the short form is the long form");
     let e = with("#zzz").unwrap_err();
     assert!(matches!(e, roadstyle_rs::EngineError::Look(_)) && e.to_string().contains("\"#zzz\" is not a colour"), "{e}");
+}
+
+/// export_look has the colours of the map: the class styles (`roads.styles`, the look's palette with the design's colours, a link class its
+/// own), not the palette of `active.palette`; the opacity of the map's road pieces (1); flat casing ends; a class's dash on its fill.
+#[test]
+fn export_look_has_the_colours_of_the_map() {
+    let text = std::fs::read_to_string(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/look.json")).unwrap();
+    let mut v: Value = serde_json::from_str(&text).unwrap();
+    v["styles"]["classes"]["residential"][0]["fill"] = "#123456".into();
+    v["styles"]["classes"]["primary"][1]["fill"] = "#654321".into();
+    v["styles"]["classes"]["steps"][0]["dash"] = "0.6,0.5".into();
+    let cols = roadstyle_rs::export_look::LookCols { highway: "highway", oneway: "oneway", tunnel: "tunnel", bridge: "bridge", id: "edge_id" };
+    let got = roadstyle_rs::export_look::export_look(&roadstyle_rs::Look::from_value(v).unwrap(), &cols, &[0]).unwrap();
+    let (casing, fill) = (&got["layers"][0], &got["layers"][1]);
+    // the fill outside a tunnel: ["case", tunnel, mixed, plain]; plain is ["match", ["get", "highway"], class, colour, ...]
+    let plain = fill["paint"]["line-color"][3].as_array().unwrap();
+    let colour = |c: &str| plain.iter().position(|x| x == c).map(|i| plain[i + 1].clone());
+    assert_eq!(colour("residential"), Some(json!("#123456")), "the class style's fill");
+    assert_eq!(colour("primary_link"), Some(json!("#654321")), "a link class has its own style");
+    assert!(casing["paint"].get("line-opacity").is_none() && fill["paint"].get("line-opacity").is_none(), "opacity 1, as the map's pieces");
+    assert_eq!(casing["layout"]["line-cap"], "butt");
+    let dash = fill["paint"]["line-dasharray"].as_array().unwrap();
+    let at = dash.iter().position(|x| x == "steps").unwrap();
+    assert_eq!(dash[at + 1], json!(["literal", [0.6, 0.5]]));
 }
