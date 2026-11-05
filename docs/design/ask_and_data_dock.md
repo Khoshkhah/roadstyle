@@ -551,8 +551,26 @@ prompt has two levels:
 1. **Every table, one line each:** its name, its number of rows and one sentence about it.
 2. **The columns of the map's own table only** (the table of `idColumn`), each with its type and its meaning.
 
-The agent asks for the columns of any other table with a fifth tool, `describe_table(name)`, when it needs them. The prompt of Monaco is
-then about 10 000 characters (about 2 500 tokens).
+The agent asks for the meaning of a table and for the columns of any other table with a fifth tool, `describe_table(name)`, when it
+needs them.
+
+### The token budget
+
+A free tier has a limit of tokens for each minute, and each step of the agent sends the whole prompt again. On 2026-11-05 Kaveh's
+question "name them" on Groq's free tier stopped with HTTP 429: "Limit 8000, Used 6717, Requested 3402" tokens per minute. The prompt
+with one line of description for each of the 46 tables was about 2 800 tokens. So:
+
+| Rule | Value | Monaco, measured |
+|---|---|---|
+| The tables in the prompt | one line for each schema: the table names with their rows, no description (`driving: edges 2765, nodes 1719, ...`) | 46 tables in 9 lines |
+| The columns in the prompt | only the main table's; a meaning is cut at a word, at most 60 characters, with "…" | 30 columns |
+| The prompt in all | at most 4 000 characters | 3 918 characters, about 1 340 tokens with the tools (before: about 2 800) |
+| One tool result | at most 2 500 characters: the rows are halved until it fits (`rows_sent` tells the model) | 30 rows of 7 columns became 15 rows |
+| A question of 3 steps | under 5 000 tokens | about 4 700 |
+
+**HTTP 429.** The page reads the wait time (the header `Retry-After`, or "try again in 15.9s" in the message), shows "Groq's free limit:
+waiting 16 s" on the card's step line with a count down, and sends the request again: at most 2 times, and only for a wait of 60 s or
+less. Stop ends the wait. A longer wait (a daily limit) is an error on the card with the provider's own text.
 
 The host gives two functions:
 
@@ -728,6 +746,7 @@ No test needs a key or the network. CI runs them all.
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. Also: the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
 | `tests/test_ask_tools_browser.py` | The map tools with the fake provider: `color_roads` with 2 groups colours the right roads and adds 2 legend rows; `filter_roads` sets the id filter; `move_map` moves the camera; Undo and ✕ take away only that card's changes and keep the page's own colours and filter; "New" takes away all; a query without `edge_id` and a query over `mapLimit` give an error to the model; no id goes into a request to the provider. |
+| `tests/test_ask_budget_browser.py` | The prompt of the Monaco test data is at most 4 000 characters; a tool result is at most 2 500; a fake provider answers 429 with "try again in 2.5s" once: the card shows the count down, and the request goes again after the wait; a 429 with a wait over 60 s is an error on the card. |
 | `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
 | `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
 | `tests/test_dashboard_scroll_browser.py` | The dock's table. The Ask view: the panel's body is its only scroll, and the question box is in view at each scroll position. |
