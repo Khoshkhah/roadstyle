@@ -62,6 +62,56 @@ def test_the_cards_have_one_width_one_gap_and_a_closed_card_is_44px_high(tmp_pat
     assert m["top"].index("rs-fold-all") < m["top"].index("sb-hide"), m["top"]
 
 
+_RING = """() => {
+  const el = id => document.querySelector(`[data-rs-section=${id}]`);
+  const accent = getComputedStyle(document.querySelector("#sb")).getPropertyValue("--accent").trim();
+  const probe = document.createElement("i"); probe.style.color = accent; document.body.append(probe);
+  const a = getComputedStyle(probe).color; probe.remove();
+  const ring = id => getComputedStyle(el(id)).boxShadow, title = id => getComputedStyle(el(id).querySelector(".rs-sec-hd")).color;
+  return {openRing: ring("open"), shutRing: ring("shut"), plainRing: ring("plain"), openTitle: title("open"), shutTitle: title("shut"), accent: a,
+          card: getComputedStyle(el("open")).backgroundColor};
+}"""
+
+
+def _rgb(text):
+    import re
+    return [int(v) for v in re.search(r"rgba?\((\d+), (\d+), (\d+)", text).groups()]
+
+
+def _contrast(a, b):
+    def lum(c):
+        c = [v / 255 for v in c]
+        c = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    hi, lo = sorted([lum(a), lum(b)], reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+@pytest.mark.parametrize("theme,width", [("light", 1280), ("dark", 1280), ("light", 390)])
+def test_the_open_card_has_an_accent_ring_and_an_accent_title_and_keeps_its_size(tmp_path, theme, width):
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": width, "height": 900})
+        page.goto(_page(tmp_path).resolve().as_uri())
+        page.wait_for_function("window.map && window.map.loaded()", timeout=60_000)
+        page.evaluate(f"() => {{ rsSetTheme('{theme}'); rs.sections.fold('open', true); rs.sections.fold('shut', true); }}")
+        page.wait_for_timeout(300)
+        h = page.evaluate("document.querySelector('[data-rs-section=open]').getBoundingClientRect().height")
+        page.evaluate("rs.sections.fold('open', false)")
+        page.wait_for_timeout(300)
+        m = page.evaluate(_RING)
+        page.evaluate("rs.sections.fold('open', true)")
+        page.wait_for_timeout(300)
+        h2 = page.evaluate("document.querySelector('[data-rs-section=open]').getBoundingClientRect().height")
+        browser.close()
+    assert "inset" in m["openRing"] and "1.5px" in m["openRing"], m
+    assert m["shutRing"] == "none" and m["plainRing"] == "none", m
+    assert m["openTitle"] == m["accent"] and m["shutTitle"] != m["accent"], m
+    assert _contrast(_rgb(m["openRing"]), _rgb(m["card"])) >= 3, m        # WCAG 1.4.11: a part of the interface, 3:1 on the card
+    assert _contrast(_rgb(m["openTitle"]), _rgb(m["card"])) >= 4.5, m     # WCAG 1.4.3: text, 4.5:1 on the card
+    assert h == h2 == 44, (h, h2)                    # the ring does not change the size of the card
+
+
 def test_a_page_that_sets_the_gap_variable_gets_that_gap(tmp_path):
     m = _measure(_page(tmp_path, root=":root{--rs-card-gap:20px}"), "light")
     assert m["gaps"] == [20, 20, 20], m["gaps"]
