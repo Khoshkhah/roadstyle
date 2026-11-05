@@ -55,7 +55,7 @@ how they get to the browser. Each choice comes after the one before it.
 
 | | Vector tiles (the default) | GeoJSON |
 |---|---|---|
-| Who cuts the roads into tiles | roadstyle, before the browser, with one rule for every way ([Tiling](../design/tiling.md)) | MapLibre, in the browser, for all roads when the page opens |
+| Who cuts the roads into tiles | roadstyle, before the browser, with one rule for every way ([Tiling](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md)) | MapLibre, in the browser, for all roads when the page opens |
 | Format | MLT (MVT when you ask for it) | GeoJSON |
 | Calls | `render_edges(edges)`, `export_style`, `Tiler` | `render_edges(edges, tiles=False)`, `export_inline`, `inlineStyle` |
 | Good for | every network | a small network, or a page with a palette in a view |

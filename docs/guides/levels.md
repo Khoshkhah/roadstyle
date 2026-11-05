@@ -208,5 +208,5 @@ edges["casing_level"] = edges["fill_level"] = edges["kind"].map({"sidewalk": -1,
 To give your own band per edge and let the solver do the rest: `rs.compute_levels(edges, band_col="band")`. `render_edges` takes no band
 and no order: compute the levels first. Each position gets its own layers, so keep the range small.
 
-See also: [the level step, in full](../design/level_input.md) · [divided casing](../design/levels_split_casing.md) ·
+See also: [the level step, in full](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/level_input.md) · [divided casing](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/levels_split_casing.md) ·
 [bridges and tunnels in 2D](style.md#bridges-and-tunnels-in-2d) · [every parameter](../reference/parameters.md)

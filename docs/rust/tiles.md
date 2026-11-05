@@ -3,7 +3,7 @@
 <p class="lead">Make the roads as vector tiles with the Rust engine. The tiles go to the browser in one of three ways: in one
 HTML file, on a server, or made in the browser.</p>
 
-One tiling rule cuts the tiles for every way. The rule is in [Tiling: one algorithm and one protocol](../design/tiling.md). The
+One tiling rule cuts the tiles for every way. The rule is in [Tiling: one algorithm and one protocol](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md). The
 way only moves the tiles to MapLibre. It never changes a tile. These settings are the same in every way:
 
 | Setting | Value |
@@ -191,7 +191,7 @@ The test measures fixed views of Monaco and Tartu, at zoom 9 to 15 (3 by 3 tiles
 - the size of the style expressions.
 
 The reasons for each rule, the measurements and the list of the keys of each layer: [Tiling: one algorithm and one
-protocol](../design/tiling.md).
+protocol](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md).
 
 **See also:** [How a map is drawn](drawing.md) · [Big networks](../guides/big-networks.md) ·
 [Put it on a website](../guides/website.md)

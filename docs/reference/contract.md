@@ -3,7 +3,7 @@
 <p class="lead">What roadstyle's engine, the dashboard and the page share: the style's metadata keys, the dashboard's options, the global
 state, the feature properties, the page's placeholders and the browser storage keys.</p>
 
-The design is in [the Rust library plan](../design/rust_library.md#the-interaction-contract). This page is the inventory.
+The design is in [the Rust library plan](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#the-interaction-contract). This page is the inventory.
 `tests/test_contract_names.py` searches the code for each kind of name below and fails when the code has a name that this page does
 not have, or the reverse. The names in the section "Planned names" are not in the code yet.
 
@@ -141,7 +141,7 @@ such `state` block) has no step of its own (`core.js`, `_useState`).
 | `rs_top` | list of rows | `[]` | the rows that `rsColor` painted | the simple look's sort key: a painted road is drawn over the others of its level (the colour is the feature state `rs_c` of the row) | host page | `rsColor` |
 | `rs_fill_on` | bool | `road_fill` | | the fill pieces' opacity | road fill switch, views | `rsSetRoadFill`; `rs:roadfillchange` |
 | `rs_terrain_tunnel` | number | `1` | | a tunnel piece's opacity factor (fill, gap, dashes; only a style with tunnels reads it): `1`, the fade (`ontop.terrain.tunnel_fade`) or `0` while the 3D terrain is on | `terrain_tunnels=`, the terrain switch | `rsTerrainTunnels`; `rs:terrainchange` |
-| `rs_theme` | text | `"light"` | | every colour of a layer: its dark colour (`"dark"`) or its light one, with the casing of the roads, the base map's layers, the names and the arrows | the dashboard's theme switch | `rsSetTheme`; `rs:themechange` ([the dark theme](../design/dark_theme.md)) |
+| `rs_theme` | text | `"light"` | | every colour of a layer: its dark colour (`"dark"`) or its light one, with the casing of the roads, the base map's layers, the names and the arrows | the dashboard's theme switch | `rsSetTheme`; `rs:themechange` ([the dark theme](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/dark_theme.md)) |
 | `rs_ov_<i>` | object: feature id to color | `{}` | colors | the paint of overlay `i` | host page | `rsColor(..., overlay)` |
 | `rs_palette` | text | the start palette | the palettes that the views name | each color that differs between these palettes (`__rs_fill@<palette>` and the paint values) | View menu | `rsSetView`; `rs:viewselect` |
 | `rs_tun_strength` | number | `tunnel_strength` (60) | 0 to 100 (`steps`) | each tunnel color | Tunnels box | `rsSetTunnelStyle`; `rs:tunnelchange` |

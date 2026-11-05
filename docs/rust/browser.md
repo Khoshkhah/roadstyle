@@ -11,7 +11,7 @@ duckosm-rust's browser page and the GeoLibre plugin use roadstyle this way. The 
 
 ## Get the files
 
-The WebAssembly package is not on npm yet. Build it from a roadstyle checkout ([Build from source](build.md#build-the-webassembly-package)).
+The WebAssembly package is not on npm yet. Build it from a roadstyle checkout ([Build from source](https://github.com/Khoshkhah/roadstyle/blob/main/docs/rust/build.md#build-the-webassembly-package)).
 Then put these files in one folder of your site:
 
 | Folder | Content | From |

@@ -27,7 +27,7 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     [Use roadstyle in the browser](browser.md) ·
     [Make tiles and PMTiles](tiles.md) ·
-    [Build from source](build.md)
+    [Build from source](https://github.com/Khoshkhah/roadstyle/blob/main/docs/rust/build.md)
 
 -   :material-table:{ .lg .middle } **Reference**
 
@@ -43,7 +43,7 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 
     [Architecture of the Rust version](architecture.md) ·
     [How a map is drawn](drawing.md) ·
-    [Tiling: one algorithm and one protocol](../design/tiling.md) ·
+    [Tiling: one algorithm and one protocol](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md) ·
     [How the levels are solved](levels-solver.md)
 
 </div>
