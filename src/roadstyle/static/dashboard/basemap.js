@@ -7,9 +7,11 @@ import {buildBox} from "./basemapbox.js";
 let BASEMAPS = [];
 // A VECTOR STYLE as a base map (Basemap.style_url, e.g. OpenFreeMap): its sources and layers are merged into the page's map with the prefix
 // "vbm-", under the roads, and the raster base map is hidden. Its building extrusion (a fill-extrusion layer) moves to the end, so a road
-// behind a building is hidden as in reality; it shows in 3D (pitch above 0) and the flat building layer shows in 2D. window.rsBuildings(on)
-// hides or shows the buildings in both modes.
-let vec = null, buildingsOn = true, glyphs0 = null, sprite0 = null;
+// behind a building is hidden as in reality; it shows in 3D (pitch above 0). The flat building layer shows in 2D and in 3D: a tilted map loads
+// its far tiles at a lower zoom, and where the 3D buildings stop the flat ones show. window.rsBuildings(on) hides or shows the buildings in both modes.
+// window.rsBuildingsOpacity(value) sets the opacity of the 3D buildings (buildings_opacity=, else `ontop.buildings.opacity` of data/basemaps.json).
+let vec = null, buildingsOn = true, glyphs0 = null, sprite0 = null, bOpacity = null;
+const opacityNow = ()=>bOpacity ?? O.buildings_opacity ?? (O.ontop && O.ontop.buildings || {}).opacity ?? 1;
 // The layer that follows the base map layer in the map: the vector style's layers and a rebuilt raster layer go before it, so they stay under the roads. The map is
 // asked, not the roads style: a host page adds the roads' layers with its prefix, and its own layers `bg` and `basemap` have none.
 const afterBase = ()=>{ const ls = map.getStyle().layers, i = ls.findIndex(l=>l.id === "basemap"); return (ls.slice(i + 1).find(l=>!l.id.startsWith("vbm-")) || {}).id; };
@@ -27,7 +29,7 @@ const paintBuildings = ()=>{
   const solid = map.getPitch() > 0.5, vis = on=>on && buildingsOn && !_ownBuildings() ? "visible" : "none";
   for(const l of vec.layers){
     if(l.type === "fill-extrusion") map.setLayoutProperty("vbm-"+l.id, "visibility", vis(solid));
-    else if(/building/.test(l.id) && l.type === "fill") map.setLayoutProperty("vbm-"+l.id, "visibility", vis(!solid));
+    else if(/building/.test(l.id) && l.type === "fill") map.setLayoutProperty("vbm-"+l.id, "visibility", vis(true));
   }
 };
 // A style with flat buildings and no 3D layer (OpenFreeMap Positron, Dark, Fiord; only Liberty has one) gets one made from the same
@@ -35,13 +37,20 @@ const paintBuildings = ()=>{
 const noAlpha = c=>typeof c === "string" ? c.replace(/^(hsl|rgb)a\(([^)]*),[^,)]*\)$/, "$1($2)") : c;
 // A dark base map names the color of its 3D buildings (`building_3d` in data/basemaps.json): its flat buildings are as dark as its ground, so
 // their copy would hide the shapes. Another map keeps the color of its flat layer.
+// Every 3D layer (the copy and a style's own, Liberty's) gets the opacity of the page and starts at the lowest zoom of the flat building layer (OpenFreeMap Liberty: 13):
+// a layer with a higher minzoom is not drawn in the far tiles of a tilted map, which load at a lower zoom.
 const addExtrusion = (s, b)=>{
-  if(s.layers.some(l=>l.type === "fill-extrusion")) return;
-  const flat = s.layers.find(l=>l.type === "fill" && l["source-layer"] === "building");
-  if(!flat) return;
-  s.layers.push({id:"building-3d", type:"fill-extrusion", source:flat.source, "source-layer":"building", minzoom:14, filter:["!", ["has", "hide_3d"]],
-                 paint:{"fill-extrusion-base":["coalesce", ["get", "render_min_height"], 0], "fill-extrusion-height":["coalesce", ["get", "render_height"], 0],
-                        "fill-extrusion-color":b.building_3d || noAlpha((flat.paint || {})["fill-color"]) || "#cccccc", "fill-extrusion-opacity":0.8}});
+  const flats = s.layers.filter(l=>l.type === "fill" && l["source-layer"] === "building");
+  if(!flats.length) return;
+  if(!s.layers.some(l=>l.type === "fill-extrusion"))
+    s.layers.push({id:"building-3d", type:"fill-extrusion", source:flats[0].source, "source-layer":"building", filter:["!", ["has", "hide_3d"]],
+                   paint:{"fill-extrusion-base":["coalesce", ["get", "render_min_height"], 0], "fill-extrusion-height":["coalesce", ["get", "render_height"], 0],
+                          "fill-extrusion-color":b.building_3d || noAlpha((flats[0].paint || {})["fill-color"]) || "#cccccc"}});
+  const low = Math.min(...flats.map(l=>l.minzoom || 0));
+  for(const l of s.layers) if(l.type === "fill-extrusion"){
+    l.minzoom = Math.min(l.minzoom ?? low, low);
+    l.paint = {...l.paint, "fill-extrusion-opacity":opacityNow()};
+  }
 };
 // A building without a height (`render_height`, `render_min_height`) is flat: MapLibre draws a missing number as 0 and warns each time ("Expected value to
 // be of type number, but found null instead"). The style's own height expressions, `["get", name]`, are made `["coalesce", ["get", name], 0]` in OUR merged copy
@@ -70,6 +79,15 @@ const mergeVector = async b=>{
   for(const l of s.layers) if(l.type === "fill-extrusion") map.moveLayer("vbm-"+l.id);        // after the roads and the page's layers
   _emit("rs:basemapready", {key:b.key, vector:true});      // a page puts its own top layers back on top
 };
+// rsBuildingsOpacity(value): the opacity of the 3D buildings, 0 to 1; no argument: the opacity now. 1 is solid: a road behind a building does not show through its roof.
+export function rsBuildingsOpacity(value){
+  if(value === undefined) return opacityNow();
+  if(typeof value !== "number" || !(value >= 0 && value <= 1)) throw new Error("rsBuildingsOpacity: value must be a number from 0 to 1, got " + JSON.stringify(value));
+  bOpacity = value;
+  if(vec) for(const l of vec.layers) if(l.type === "fill-extrusion") map.setPaintProperty("vbm-"+l.id, "fill-extrusion-opacity", value);
+  _emit("rs:buildingsopacitychange", {opacity:value});
+  return value;
+}
 export function rsBuildings(on){
   if(on === undefined) return buildingsOn;
   buildingsOn = !!on; paintBuildings();
@@ -116,6 +134,7 @@ export function initBasemap(){
   BASEMAPS = O.basemaps;
   window.rsSetBasemap = rsSetBasemap;
   window.rsBuildings = rsBuildings;
+  window.rsBuildingsOpacity = rsBuildingsOpacity;
   map.on("pitchend", paintBuildings);
   for(const ev of ["rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, paintBuildings);        // the page's own buildings on or off
   window.RS_BASEMAPS = BASEMAPS;

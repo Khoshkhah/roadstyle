@@ -46,6 +46,8 @@ pub struct PageOptions {
     pub terrain_exaggeration: Option<f64>,
     /// the tunnels while the 3D terrain is on: "show" (as they are), "fade" (drawn at `ontop.terrain.tunnel_fade`), "hide" (not drawn). No height of their own: MapLibre has none for a line
     pub terrain_tunnels: String,
+    /// the opacity of the 3D buildings of a vector base map, 0 to 1 (`buildings_opacity=`); `None`: `ontop.buildings.opacity` of data/basemaps.json (1, solid)
+    pub buildings_opacity: Option<f64>,
     /// a tiled page (the roads in the embedded PMTiles archive)
     pub tiles: bool,
     /// the road layer ("roads-simple")

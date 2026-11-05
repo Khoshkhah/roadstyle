@@ -49,7 +49,7 @@ const RS_DEFAULTS = {
   arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
   live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)
   dashboard: null,             // the template's typed options (roadstyle::dashboard::Dashboard): layout, panel, toolbar, windows, phone; null: none
-  basemaps: [], ontop: {}, basemap_switcher: true, hillshade: false, terrain: false, terrain_exaggeration: null, terrain_tunnels: "fade",
+  basemaps: [], ontop: {}, basemap_switcher: true, hillshade: false, terrain: false, terrain_exaggeration: null, buildings_opacity: null, terrain_tunnels: "fade",
   tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
   tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,

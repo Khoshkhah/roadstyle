@@ -76,6 +76,7 @@ swatch has a thin border, so that a white colour shows.
 
 The 3D buildings switch tilts a flat map to 55° and zooms in to 15 when the zoom is under 14.5, because the buildings start at that
 zoom. When you switch it off, the map goes flat again if this switch tilted it. A call of `rsBuildings(on)` from a script moves nothing.
+While the 3D buildings are on, an *Opacity* slider under their row sets how solid they are (`buildings_opacity=`, default 1).
 
 ![The base-map box: seven base maps, and Hillshade, Labels and 3D buildings under On top](../img/dashboard-basemap-box.png)
 
