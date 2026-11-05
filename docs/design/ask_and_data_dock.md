@@ -12,7 +12,7 @@ Kaveh's review of the mock-up (2026-11-05) changed three more points:
    header shows its type, and the actions are in the title row of the dock ([The data dock](#2-the-data-dock)).
 2. The Ask card had a scroll area inside the scrolling panel: two scrolls, one in the other. Now Ask is a view that takes the whole
    panel, as the design panel does, and the panel's body is the only scroll ([Ask](#3-ask)).
-3. The question box must stay in view when the person scrolls the panel. Now it stands at the bottom of the panel (`position: sticky`).
+3. The question box must stay in view when the person scrolls the panel. Now it stands at the bottom of the panel (see 5).
 
 Also: the credits box in the bottom corner (`#rs-scalebox`) hides while the dock is open.
 
@@ -27,6 +27,8 @@ Later the same day, Kaveh also asked for these:
    always visible ([The dock's table](#the-docks-table)).
 8. Each question with its answer is a card that the person can remove. A failed query that the agent fixed does not show as a red error
    above a right answer: it goes into the details ([The view](#the-view)).
+9. The agent can also change the map: colour roads, filter the map, and move the map ([The map tools](#the-map-tools)). It still
+   cannot change the data.
 
 ## Problem
 
@@ -46,7 +48,7 @@ This design adds three parts to the roadstyle dashboard:
 |---|---|---|
 | [1. The bottom dock](#1-the-bottom-dock) | A wide area under the map, as wide as the map, with a grip that changes its height. A bottom sheet on a phone. | Any page: an attribute table, a list of changes, sensor readings |
 | [2. The data dock](#2-the-data-dock) | One query line above a wide result table, in the bottom dock | A page that can run SQL on its own data |
-| [3. Ask](#3-ask) | An AI agent in the side panel. It uses the person's own key. Its only tool is a read-only query of the data dock. | A page with the data dock |
+| [3. Ask](#3-ask) | An AI agent in the side panel. It uses the person's own key. Its tools are a read-only query of the data dock and three map tools (colour, filter, move). It cannot change the data. | A page with the data dock |
 
 roadstyle knows no DuckDB. The host page gives two functions: `query(sql)` and `schema()`.
 
@@ -334,7 +336,7 @@ import {askPanel} from "./dashboard/ask/ask_panel.js";
 
 const ask = askPanel({
   dashboard: rs,
-  data,                                         // the data dock: the agent's only tool runs through it
+  data,                                         // the data dock: every tool of the agent runs its SQL through it
   about: "A road network of Tartu, built by duckOSM in this browser. One row of edges is one direction of a road.",
   dialect: "DuckDB",
   examples: ["Which streets are longer than 1 km?", "How many one-way roads are there?"],
@@ -425,17 +427,20 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 
 ```
 question
-  -> model(system prompt + schema + conversation + question, tools: [run_query])
+  -> model(system prompt + schema + conversation + question, tools: [run_query, color_roads, filter_roads, move_map])
        - gives a tool call run_query(sql):
            guard(sql) -> data.run(sql, {source: "ask"}) -> the result (or the error)
+           -> to the model, and loop again
+       - gives a tool call of a map tool:
+           guard(sql) -> the ids -> rs.color / rs.setFilter / rs.focus -> a short result (or the error)
            -> to the model, and loop again
        - gives text: this is the answer -> stop
   stops also after maxSteps model calls, after 3 failed queries one after the other, or on Stop
 ```
 
 1. Ask reads `data.schema()` once for each conversation and writes the schema text (see [The schema](#the-schema)).
-2. Ask sends the system prompt, the schema text, the earlier turns of this conversation and the question to the model, with one tool:
-   `run_query`.
+2. Ask sends the system prompt, the schema text, the earlier turns of this conversation and the question to the model, with four tools:
+   `run_query` and the three [map tools](#the-map-tools).
 3. When the model calls `run_query(sql)`:
    - The guard checks the SQL. A refused SQL goes back to the model as an error ("Only one SELECT or WITH statement is allowed. Found:
      DROP.").
@@ -451,6 +456,33 @@ question
 
 A question costs 2 to `maxSteps` model calls. Most questions take 2 or 3.
 
+### The map tools
+
+Kaveh added these on 2026-11-05. Each one changes only what the person sees on the map, never the data, and each one is a call of the
+`rs` API that already exists. Each tool takes SQL that selects the `idColumn` of the roads, so the agent finds the roads with the same
+SQL as for a question, and the same guard checks it.
+
+| Tool | Arguments | What the page does | `rs` call |
+|---|---|---|---|
+| `color_roads` | `groups: [{label, color, sql}]` (1 to 8 groups; `color` is `#rrggbb`) | Colours the roads of each group and adds one row for each group to the legend (a `line` mark). A group with the label of an earlier group replaces it. | `rs.color([{color, ids}])`, `rs.legend.add` |
+| `filter_roads` | `sql` | Shows only the roads of the query and zooms to them. | `rs.setFilter({ids})`, `rs.focus(ids)` |
+| `move_map` | `sql` | Zooms to the roads of the query. | `rs.focus(ids)` |
+
+- **Limit.** A map tool needs every id, not 1000. Its SQL has the row limit `mapLimit` (default 100 000). Over the limit, the tool does
+  nothing and tells the model to make the query narrower.
+- **What goes back to the model:** a short text, for example "Coloured 1151 roads (One-way) and 1614 roads (Two-way)." No ids go to
+  the provider.
+- **No id column:** the tool gives the error "The query must select the column edge_id." back to the model, which fixes the SQL.
+- **The card.** Each change of the map is one line in the answer's card: a small "MAP" label, the text ("Shows only 625 roads"), and
+  **Undo** for a colour or a filter. A move has no Undo. The details "▸ 2 map queries" show the SQL.
+- **Undo.** The page keeps the map changes of each card. Undo takes away the changes of that card. The ✕ of a card also takes away its
+  changes, and "New" takes away all of them. The page then paints the map again from the changes of the cards that stay, so two cards
+  can colour different roads at the same time.
+- **Only Ask's own changes.** Undo and ✕ remove only the colours, the legend rows and the filter that Ask made. The page's own colours
+  (`colorBy`, live data) and the person's own filter in the roads box stay.
+- **Kept out:** a tool that changes the data (OSM tags, levels, the network). It needs a confirm step before each change. The base map,
+  the theme and the 3D view are also kept out for now: the person changes them with one click in the toolbox.
+
 ### The prompt
 
 The system prompt is short, and it is one file (`ask/prompt.txt`), so a change of it is a change of data and not of code:
@@ -459,9 +491,15 @@ The system prompt is short, and it is one file (`ask/prompt.txt`), so a change o
 You answer questions about the data of a map page. The data is in a {dialect} database.
 {about}
 
-You have one tool: run_query. It runs one read-only SQL statement (SELECT or WITH) and gives
-the first rows of the result. The page shows the result of your last query as a table and
-lights the roads of the rows on the map.
+You have four tools. Each one takes read-only SQL (one SELECT or WITH statement).
+- run_query(sql): gives the first rows of the result. The page shows the result of your last
+  query as a table and lights the roads of the rows on the map.
+- color_roads(groups): colours roads on the map. Each group has a label, a colour (#rrggbb) and
+  SQL that selects {idColumn}. The legend shows the labels.
+- filter_roads(sql): shows only the roads that the SQL selects ({idColumn}).
+- move_map(sql): zooms the map to the roads that the SQL selects ({idColumn}).
+Use a map tool only when the person asks to see, show, colour, filter or zoom.
+You cannot change the data.
 
 Rules:
 - Use only the tables and columns of the schema below. Do not guess a name.
@@ -592,7 +630,7 @@ recommends: the host runs the agent's SQL (`source: "ask"`) between `BEGIN TRANS
 not see is undone. This is the host's work and is not in roadstyle.
 
 Why it matters: the data of a page comes from OSM, and a street name can hold words to the model ("prompt injection"). With this
-design the worst result is a wrong answer: the only tool reads, a query cannot read a file or an address, and the answer is plain text
+design the worst result is a wrong answer or a wrong colour on the map (Undo takes it away): no tool changes the data, a query cannot read a file or an address, and the answer is plain text
 with no links and no images.
 
 ## Where the code goes
@@ -630,6 +668,7 @@ No test needs a key or the network. CI runs them all.
 | `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. Also: the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
+| `tests/test_ask_tools_browser.py` | The map tools with the fake provider: `color_roads` with 2 groups colours the right roads and adds 2 legend rows; `filter_roads` sets the id filter; `move_map` moves the camera; Undo and ✕ take away only that card's changes and keep the page's own colours and filter; "New" takes away all; a query without `edge_id` and a query over `mapLimit` give an error to the model; no id goes into a request to the provider. |
 | `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
 | `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
 | `tests/test_dashboard_scroll_browser.py` | The dock's table. The Ask view: the panel's body is its only scroll, and the question box is in view at each scroll position. |
