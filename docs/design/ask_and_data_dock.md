@@ -25,6 +25,8 @@ Later the same day, Kaveh also asked for these:
 7. The result table must scroll. In the mock-up the table's box took the height of all its rows (27 916 px for 1000 rows) and the dock
    cut it, so it did not scroll. Now the box has the height of the dock, and it scrolls up and down and sideways. Its two scrollbars are
    always visible ([The dock's table](#the-docks-table)).
+8. Each question with its answer is a card that the person can remove. A failed query that the agent fixed does not show as a red error
+   above a right answer: it goes into the details ([The view](#the-view)).
 
 ## Problem
 
@@ -360,6 +362,7 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 | `ask(question)` | Asks a question, as the person does. It gives a promise of the answer. |
 | `stop()` | Aborts the question now. |
 | `clear()` | Starts a new conversation (the model forgets the earlier questions). |
+| `remove(i)` | Removes the question `i` and its answer, as its ✕ does. |
 | `history()` | The questions and answers of this conversation. |
 
 | Event | `detail` | When |
@@ -375,12 +378,13 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 | Monaco                     [<>][]|   the panel's title row
 | [< Back] Gemini · flash  Settings  [New]
 | -------------------------------- |
-|      [Which primary roads are  ] |   the question, at the right
-|      [longer than 300 m?       ] |
-| Query 1 failed: column "lenght_m"|   a failed step, in --rs-err
-| 5 primary road edges are longer  |   the answer
-| than 300 m. The longest is ...   |
-| > 2 queries · 5 rows     [Table] |
+| +------------------------------+ |   one card for each question
+| | Which primary roads are    x | |   the question (bold) and its remove button
+| | longer than 300 m?           | |
+| | 5 primary road edges are     | |   the answer
+| | longer than 300 m. The ...   | |
+| | > 1 query · 5 rows   [Table] | |   the query that made the table
+| +------------------------------+ |
 | -------------------------------- |   only the conversation scrolls
 | +----------------------+ [ Ask ] |   the question box: always at the bottom
 | | Ask a question ...   |         |
@@ -400,12 +404,20 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 - An empty conversation shows one line about what Ask does, and the `examples` as chips. A click on a chip asks it.
 - With no key, the view shows "Ask needs your own key of Gemini or of an OpenAI-compatible service." and a button "Add a key" that opens
   the Settings box.
-- The question is at the right, in a box with a light accent tint. The answer is plain text (`textContent`) at the left. The view shows
-  no HTML, no images and no links from the model.
+- **A card for each question.** A question and its answer are one card (`--rs-card-bg`, a `--line` border, 12 px corners). The question
+  is its bold title. The answer is plain text (`textContent`). The view shows no HTML, no images and no links from the model.
+- **Remove.** The ✕ at the right of the question removes the card. It also removes that question and its answer from the conversation
+  that goes to the model with the next question, so the person can take away a wrong turn and ask again. When no card stays, the view
+  shows the empty start again (the hint and the example chips). "New" removes all the cards.
 - The question box is a `<textarea>` of 2 lines. Enter asks, Shift+Enter is a new line. While the agent works, Ask becomes Stop and the
   view shows each step on one muted line: "Writing SQL", "Running query 1", "Query 1 failed: Referenced column "lenght" not found. Trying
-  again", "Writing the answer". A failed step stays, in `--rs-err`. The other step lines go when the answer comes.
-- "> 2 queries" opens the SQL of each step. "Table" opens the data dock on the answer's table.
+  again", "Writing the answer". All the step lines go when the answer comes.
+- **One query.** The footer counts the query that made the table: "1 query · 5 rows". It opens to that SQL. "Table" opens the data dock
+  on that table.
+- **A failed query that the agent fixed** is not an error for the person. It shows only inside the open details, as a muted line "1
+  failed attempt, fixed by the agent", which opens to the failed SQL and the database's message (in `--rs-err`). A red error shows in the
+  card only when the question fails as a whole: after 3 failed queries, at `maxSteps`, with no key or a refused key.
+- The error text is the database's first line, with no second full stop after its own "!" or ".".
 
 ### The agent loop
 
@@ -431,7 +443,7 @@ question
      "more rows: yes" when the result was cut. A text value is cut at 200 characters.
 4. When the model gives text, that text is the answer. The last query that worked is the answer's query: the data dock shows its SQL and
    its table, and Ask calls "Show on map" when the table has `idColumn`.
-5. The loop stops with an error after `maxSteps` model calls, or after 3 failed queries one after the other. The view shows the last error.
+5. The loop stops with an error after `maxSteps` model calls, or after 3 failed queries one after the other. The card shows the last error.
 6. On a desktop, the data dock opens by itself on an answer with a table. On a phone it does not, because one sheet is open at a time and
    the person is in the panel's sheet. The view shows "Table" and the roads are lit on the map.
 
@@ -615,7 +627,7 @@ No test needs a key or the network. CI runs them all.
 | `tests/data_units.js` in `tests/test_data_dock_browser.py` | The guard: a list of SQL that it accepts (with comments, strings that hold `DROP`, `WITH`, a `;` at the end) and a list that it refuses (two statements, each refused word, `read_csv`, `FROM 'x.parquet'`, `'https://...'`, `query('...')`). The row limit wrap. The CSV text (a comma, a quote, a new line, a `BigInt`, `null`). An id as exact text. |
 | `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
-| `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text. Also: the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
+| `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. Also: the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
 | `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
 | `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
 | `tests/test_dashboard_scroll_browser.py` | The dock's table. The Ask view: the panel's body is its only scroll, and the question box is in view at each scroll position. |
