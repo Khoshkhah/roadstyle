@@ -144,8 +144,12 @@ its CSS), and a page that does not call `rs.dock.add` has no dock on the screen.
   goes on under the dock, so the map shows behind these corners. A soft shadow above the dock (`0 -4px 18px rgba(0,0,0,.16)`) and a
   `--line` on its top edge separate it from the map. With the card look, the panel's card and the bar end 16 px above the dock.
   (A dock that floated as a card, with a margin on three sides, was tried in the mock-up and refused: the table needs all the room.)
-- **Look.** The dock has `--bg`, a `--line` border on its top edge, and `--ink` text. It is opaque: the dock is not over the map, so
-  `--rs-tb-bg` (40 % opacity) shows the page's white background through it in the dark theme.
+- **Look and transparency.** The dock has a `--line` on its top edge and `--ink` text. With the card look the map goes on under the dock,
+  so the dock is the panel's glass: the background of the panel's card, `--rs-card-bg`, with its blur (6 px). It follows the person's
+  slider "Card behind the text" in Settings together with the panel (Kaveh, 2026-11-05: "what about transparency of sql panel?"). The table
+  (`--bg`) and the road card (`--card`) stay solid boxes on the glass: their text reads well, and the rows do not show through the fixed
+  header. With the frame look the dock is opaque (`--bg`): only the page's background is behind it, and a see-through dock showed the white
+  page in the dark theme.
 - **Controls.** `dashboard.css` gives buttons, text boxes and `sb-primary` their look only inside the panel (`#sb`). The same rules also
   apply in the dock (`#rs-dock`), else its buttons are white in the dark theme.
 
@@ -794,7 +798,7 @@ No test needs a key or the network. CI runs them all.
 | `tests/test_ask_align_browser.py` | At 1440 and 1920 px, with the card look and the frame look: the dock touches the left, right and bottom edges of the window; its top corners are round with the card look; the gap between the panel's card and the dock is 16 px; the cards of the conversation, Back and the question box have the same left and right x. |
 | `tests/test_ask_budget_browser.py` | The prompt of the Monaco test data is at most 4 000 characters; a tool result is at most 2 500; a fake provider answers 429 with "try again in 2.5s" once: the card shows the count down, and the request goes again after the wait; a 429 with a wait over 60 s is an error on the card. |
 | `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
-| `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
+| `tests/test_dashboard_themes_browser.py` | The dock (with the card look at the slider values 1, 0.7 and 0.4, and with the frame look), the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
 | `tests/test_dashboard_scroll_browser.py` | The dock's table. The Ask view: the panel's body is its only scroll, and the question box is in view at each scroll position. |
 
 Before the merge, Kaveh looks at the page on a phone and on a desktop, in both themes.
