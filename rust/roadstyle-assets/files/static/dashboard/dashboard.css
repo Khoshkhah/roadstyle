@@ -535,6 +535,10 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 .sb-sec .rs-sec-hd > svg{flex:none;transition:transform .15s}
 .sb-sec.folded .rs-sec-hd > svg{transform:rotate(-90deg)}
 .sb-sec.folded .rs-sec-body{display:none}
+/* the open card of the cards that fold: an accent ring and an accent title, so that it shows in a long panel. A ring inside the card, not a border:
+   the card keeps its width and its height (the card standard). The full accent: 3:1 on the card in both themes (a lighter mix is 2.4:1 in the light theme) */
+#sb .sb-sec[data-rs-fold]:not(.folded){box-shadow:inset 0 0 0 1.5px var(--accent)}
+#sb .sb-sec[data-rs-fold]:not(.folded) > .rs-sec-hd{color:var(--accent)}
 #sb .sb-sec .rs-sec-note{margin:-6px 0 10px;color:var(--mut);font:12.5px/1.4 system-ui,sans-serif}
 #sb .sb-sec .rs-sec-note:empty{display:none}
 #sb .sb-sec.folded > .rs-sec-note{margin:4px 0 0}
