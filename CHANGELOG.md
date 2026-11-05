@@ -6,7 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-11-05
+
 ### Fixed
+- **A select box on a card looks like a field.** It had no border and the card's own colour, so on a card it looked like a line of text (the duckOSM page's H3 level list). On a card it now has a thin border in the line colour, as a text field has.
 - **No console warning for a building without a height** (a vector base map, OpenFreeMap Liberty): its 3D layer reads `["get", "render_height"]`, and a building without it is `null`: MapLibre drew it as 0 and warned "Expected value to be of type number, but found null instead" at each draw. The merged copy of the style (never OpenFreeMap's served layers) has `["coalesce", ["get", name], 0]`: the same picture, a clear console. The 3D layer that roadstyle makes for a style without one has it too.
 
 ### Added
