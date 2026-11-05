@@ -70,7 +70,7 @@ rs.setView("Casing only");          // a name from views=
 rs.setTunnelStyle({strength: 80});
 ```
 
-`rsHillshade(on)` and `rsTerrain(on)` switch the hillshade and the 3D terrain of the base-map box (the DEM is the Terrain Tiles on AWS; no argument: whether it is on). With the terrain on, every layer lies on the ground of the DEM, so a tunnel is drawn on the hill above it and a bridge on the valley under it; the roads are flat with it off. `rs.setOverlay(label, visible)` shows or hides one overlay of the page. `rsSetBridges`, `rsSetTunnels` and `rsSetClasses` are the single-control forms of `rs.setFilter`.
+`rsHillshade(on)` and `rsTerrain(on)` switch the hillshade and the 3D terrain of the base-map box (`rsTerrainTunnels(mode)`: "fade", "hide" or "show" for the tunnels meanwhile) (the DEM is the Terrain Tiles on AWS; no argument: whether it is on). With the terrain on, every layer lies on the ground of the DEM, so a tunnel is drawn on the hill above it and a bridge on the valley under it; the roads are flat with it off. `rs.setOverlay(label, visible)` shows or hides one overlay of the page. `rsSetBridges`, `rsSetTunnels` and `rsSetClasses` are the single-control forms of `rs.setFilter`.
 
 ## Save and share the state
 

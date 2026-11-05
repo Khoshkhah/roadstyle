@@ -8,7 +8,7 @@
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson} from "./basemap.js";
-import {_elHillshade, rsTerrain, _elTerrainByPerson} from "./elevation.js";
+import {_elHillshade, rsTerrain, rsTerrainTunnels, _elTunnels, _elTerrainByPerson} from "./elevation.js";
 import {rsArrowsOn, rsHasArrows, rsSetArrows, _arApply} from "./arrows.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
@@ -75,7 +75,7 @@ export function buildBox(menu){
     tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
-    _elHillshade(tops.hillshade.c.checked, firstRoad()); rsTerrain(tops.terrain.c.checked);
+    _elHillshade(tops.hillshade.c.checked, firstRoad()); rsTerrain(tops.terrain.c.checked); _elTunnels();
     const gray = baseKey() === "esri_gray" ? (current === "esri_dark_gray" ? ontop.labels_gray_dark : ontop.labels_gray_light) : ontop.labels;
     raster("labels", kind === "esri" && on, gray);
     if(vec) for(const l of map.getStyle().layers.filter(x => x.id.startsWith("vbm-") && x.type === "symbol")) map.setLayoutProperty(l.id, "visibility", on ? "visible" : "none");
@@ -105,6 +105,7 @@ export function buildBox(menu){
   tops.terrain.c.onchange = () => { _bxSet("terrain", tops.terrain.c.checked); _elTerrainByPerson(tops.terrain.c.checked); };
   window.rsHillshade = on => { if(on === undefined) return tops.hillshade.c.checked; tops.hillshade.c.checked = !!on; apply(); return !!on; };
   window.rsTerrain = rsTerrain;
+  window.rsTerrainTunnels = rsTerrainTunnels;
   document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
   tops.arrows.c.onchange = () => rsSetArrows(tops.arrows.c.checked);

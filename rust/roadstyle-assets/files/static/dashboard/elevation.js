@@ -3,12 +3,15 @@
 // box (basemapbox.js); the keywords `hillshade=True` and `terrain=True` start them on.
 // MapLibre draws a terrain from one raster-dem source and a hillshade from another, with the same tiles (one source for both would give a hillshade
 // that follows the terrain's zoom), so there are two sources and the browser loads each tile once.
-// THE LIMIT of the terrain: every layer lies on the ground of the DEM, and MapLibre has no height of its own for a line. A tunnel is drawn on the
-// hill above it and a bridge on the valley under it. The roads are flat with the terrain off.
+// THE LIMIT of the terrain: every layer lies on the ground of the DEM, and MapLibre has no height of its own for a line (so a per-edge height, a
+// `z` column, cannot be drawn). A tunnel is drawn on the hill above it and a bridge on the valley under it. The roads are flat with the terrain off.
+// `terrain_tunnels=` says what a tunnel does meanwhile: "show", "fade" (the default: drawn at `ontop.terrain.tunnel_fade`) or "hide". The style's tunnel
+// pieces read the state `rs_terrain_tunnel` (1, the fade, or 0): this file only sets it.
 import {map, O, _emit} from "./core.js";
 
 const _elHill = "rs-top-hillshade", _elTerrain = "rs-dem";
-let _elOn = false, _elTilted = false;
+const _elModes = ["show", "fade", "hide"];
+let _elOn = false, _elTilted = false, _elMode = null;
 const _elSource = () => { const d = O.ontop.dem; return {type: "raster-dem", tiles: d.tiles, encoding: d.encoding, tileSize: d.tile_size, maxzoom: d.maxzoom, attribution: d.attr}; };
 // the hillshade layer goes under `before` (the first road layer, basemapbox.js); no layer and no source when it is off
 export function _elHillshade(on, before){
@@ -27,13 +30,26 @@ export function rsTerrain(on){
   _elOn = on;
   if(on){
     if(!map.getSource(_elTerrain)) map.addSource(_elTerrain, _elSource());
-    map.setTerrain({source: _elTerrain, exaggeration: O.ontop.terrain.exaggeration});
+    map.setTerrain({source: _elTerrain, exaggeration: O.terrain_exaggeration ?? O.ontop.terrain.exaggeration});       // the keyword, else the config's
   } else {
     map.setTerrain(null);
     if(map.getSource(_elTerrain)) map.removeSource(_elTerrain);
   }
+  _elTunnels();
   _emit("rs:terrainchange", {on});
   return _elOn;
+}
+// the state of the tunnels' pieces: 1 with the terrain off or "show", the fade, or 0 for "hide". Again after rs.setStyle (the state starts at 1 with a new style)
+export function _elTunnels(){
+  const mode = _elMode || O.terrain_tunnels, f = {show: 1, fade: O.ontop.terrain.tunnel_fade, hide: 0};
+  map.setGlobalStateProperty("rs_terrain_tunnel", _elOn ? f[mode] : 1);
+}
+// rsTerrainTunnels(mode): "show", "fade" or "hide"; no argument: the mode now
+export function rsTerrainTunnels(mode){
+  if(mode === undefined) return _elMode || O.terrain_tunnels;
+  if(!_elModes.includes(mode)) throw new Error("rsTerrainTunnels: mode must be " + _elModes.join(", ") + ", got " + JSON.stringify(mode));
+  _elMode = mode; _elTunnels();
+  return mode;
 }
 // A person's switch of the terrain (the box's row): on, the map is tilted if it is flat, so that the switch shows something; off, it is flattened again
 // if this switch tilted it. A script calls rsTerrain(on), which moves nothing.
