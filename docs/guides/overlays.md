@@ -71,7 +71,7 @@ What a hover or click on such a feature picks is `select`:
   road (`id`, `properties`), so a panel or Street View can still follow the road. A lane.
 
 Either way the feature hides with its road (`rsFilter`, the class, bridge and tunnel switches).
-Design: [Overlays attached to edges](../design/edge_overlays.md).
+Design: [Overlays attached to edges](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/edge_overlays.md).
 
 ### The look: overlay styles
 
@@ -87,7 +87,7 @@ rs.render_edges(roads, settings=settings, overlays=[rs.Overlay(markings, style="
 `settings=` is a dict or the **address of a JSON or YAML file** (`.yaml`, `.yml`) of the same shape (`render_edges(roads, settings="lanestyle_theme.yaml", ...)`); a file that is missing or cannot be read is an error that names it.
 
 Fields of a style (an argument given to `Overlay` wins): `kind` (`fill`, `line`, `circle`, `text`), `color`, `opacity`, `outline`, `radius`, `width` (px), **`width_m`** (a width in metres, exact from `min_zoom` on),
-**`dash`**, **`min_zoom`** / **`max_zoom`**, and for text `text_col`, `text_size`, `text_color`, `text_halo`. Design: [Overlay styles](../design/overlay_styles.md).
+**`dash`**, **`min_zoom`** / **`max_zoom`**, and for text `text_col`, `text_size`, `text_color`, `text_halo`. Design: [Overlay styles](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/overlay_styles.md).
 
 ### The road without its fill
 

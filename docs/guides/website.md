@@ -79,7 +79,7 @@ but no names, arrows or 3D decks. GeoLibre's own line of the layer becomes trans
 
 **RustGIS:** Home › Add › Basemap › Add Tile Layer with the `style.json` URL, or `?style=<URL>`. RustGIS puts the new layer
 under its sample layers: clear their checkboxes. It does not draw `line-offset`, line labels or 3D
-([what is lost](../design/style_export.md#what-you-lose-outside-roadstyles-page)).
+([what is lost](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/style_export.md#what-you-lose-outside-roadstyles-page)).
 
 **A local test:** the web apps are https pages; they read `http://localhost` only after you allow Chrome's local network access
 (the icon left of the address bar › Site settings › Local network access).

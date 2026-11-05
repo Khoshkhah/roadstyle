@@ -26,7 +26,7 @@
 
 The saved page embeds the roads as a PMTiles vector tileset (`tiles=True`, the default). It opens from disk with no server. You do not
 need to set anything. The tiles are the same for every path that makes them: the page, the browser worker, `export_style` and
-`roadstyle tiles`. One rule makes them ([Tiling: one algorithm and one protocol](../design/tiling.md)):
+`roadstyle tiles`. One rule makes them ([Tiling: one algorithm and one protocol](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md)):
 
 - **MLT** is the tile format. `tile_format="mvt"` gives MVT. An MLT tile has about 60 % of the bytes of an MVT tile after gzip, and the
   map looks the same.
@@ -57,7 +57,7 @@ To get MVT tiles, use `tile_format="mvt"`. Use it for a map app that has MapLibr
 ## The drawing order of a big network
 
 The web map draws every edge by two positions that `render_edges` computes first, with a minimum-cost flow
-([how](../design/levels_split_casing.md)). It takes seconds for a district and longer for a large network, so compute it once.
+([how](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/levels_split_casing.md)). It takes seconds for a district and longer for a large network, so compute it once.
 
 Compute it once with
 `rs.compute_levels`, keep the result with `rs.save_levels` (duckOSM file, schema `visualization`), and draw with the columns.

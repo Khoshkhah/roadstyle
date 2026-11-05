@@ -404,7 +404,7 @@ The road data is the features of the four sources above, with their properties. 
 - **GeoJSON** inside the style (`sources.<name>.data`).
 - **Vector tiles** (MLT by default, MVT 2.1 with `tile_format="mvt"`): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer since 2026-10-27: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page; the popup fields of an overlay are in `props/<source>.json` of `export_style`, by row, not in its tiles), zooms
   6 to 16 (MapLibre scales the last zoom up) and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` and a slot have their road's row as their id (all
-  pieces of a road share it). A road feature in a tile has only the marks and the keys of `TILE_ROAD_KEYS` (the allow-list of [Tiling](../design/tiling.md#the-keys-of-a-tile-2026-10-29)), and no text value: the one exception is the street name of a name slot. It has no `__rs_*` flag that is false (every reader takes a missing flag as false), and no `lvl` when the level is 0. Below the last zoom, a line is
+  pieces of a road share it). A road feature in a tile has only the marks and the keys of `TILE_ROAD_KEYS` (the allow-list of [Tiling](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md#the-keys-of-a-tile-2026-10-29)), and no text value: the one exception is the street name of a name slot. It has no `__rs_*` flag that is false (every reader takes a missing flag as false), and no `lvl` when the level is 0. Below the last zoom, a line is
   simplified to half a tile unit.
 
 Each piece carries its values as `__rs_*` properties, and the style's rules read them

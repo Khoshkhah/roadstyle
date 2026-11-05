@@ -6,7 +6,7 @@ to the page, and the JavaScript side.</p>
 The tables with sizes, modules, APIs, metadata keys and design gaps come from the code. `docs/gen_architecture.py` reads
 `rust/*/Cargo.toml` and the source trees, and the docs build runs it, so these tables show the code that the site is built from.
 Their texts are the first sentences of the code's own comments. The full design, with the parts that are not built, is in
-[the Rust library plan](../design/rust_library.md).
+[the Rust library plan](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md).
 
 ## The big picture: the engine, JavaScript and MapLibre
 
@@ -406,7 +406,7 @@ flowchart TB
 ```
 
 *A map uses one of the two forms, never both. With **vector tiles** (ways A, B and C; the default), stage 2 cuts them first, with one
-rule for every way ([Tiling](../design/tiling.md)). With **GeoJSON** (`tiles=False`), stage 1's sources go to MapLibre with all
+rule for every way ([Tiling](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md)). With **GeoJSON** (`tiles=False`), stage 1's sources go to MapLibre with all
 the road fields in them, and MapLibre cuts the tiles in the browser.*
 
 The road fields (the name, the class, your columns) are a separate, small input for the interaction: the popup, the search and
@@ -426,7 +426,7 @@ row, and **one road table** with the fields of each road, keyed by its row. Stag
 page or the worker gives the dashboard the road table, whole (as the side table does now) or one road at a time (as
 `engine.props` does now). Way B can keep every column in its tiles, as an option of stage 2, for map apps. The row "One road
 table" of [Known design gaps](#known-design-gaps) shows when this is built. A proposal on top of it: keep the data in a DuckDB
-file on a server, and serve the tiles and the roads on request ([the design note](../design/duckdb_server.md)).
+file on a server, and serve the tiles and the roads on request ([the design note](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/duckdb_server.md)).
 
 The one call (the facade, `render_edges`) runs the stages in order. Stage 3 puts the style and the data of the selected form into
 one HTML file.
@@ -695,9 +695,9 @@ an item shows "yes" when the code has it:
 | Stage 2 takes the typed pieces, not JSON | `Value` (serde_json) in `roadstyle-tiles`: 113 times | no |
 <!-- /gen:gaps -->
 
-What each gap means and how the plan closes it: [the architecture](../design/rust_library.md#the-architecture),
-[the typed look](../design/rust_library.md#the-typed-look), [errors](../design/rust_library.md#errors) and
-[the render model](../design/rust_library.md#the-render-model) in the plan.
+What each gap means and how the plan closes it: [the architecture](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#the-architecture),
+[the typed look](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#the-typed-look), [errors](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#errors) and
+[the render model](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#the-render-model) in the plan.
 
 The phases of the plan, on 2026-10-23:
 
@@ -722,4 +722,4 @@ flowchart TB
 
 *Green: done. Yellow: partly done. Grey, dashed: open.*
 
-**See also:** [Build from source](build.md)
+**See also:** [Build from source](https://github.com/Khoshkhah/roadstyle/blob/main/docs/rust/build.md)

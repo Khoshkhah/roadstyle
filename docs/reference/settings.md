@@ -159,7 +159,7 @@ In every palette:
 
 - `*_link` roads take the parent's colour, 0.6 × the width (`link_scale`).
 - Tunnels: on the web map, v2's tunnel slider (`tunnel_strength`) moves everything on a tunnel toward a chosen colour (`tunnel_toward`, default Sand), opaque; the casing is
-  dashes, one colour or a two-colour palette (`tunnel_palette`) ([design](../design/tunnel_look.md)). Bridges get a black casing 1.5 px wider.
+  dashes, one colour or a two-colour palette (`tunnel_palette`) ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tunnel_look.md)). Bridges get a black casing 1.5 px wider.
 - An unknown class draws as `unclassified`.
 
 ## Custom palettes
