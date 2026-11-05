@@ -404,7 +404,9 @@ rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data",
 - An empty conversation shows one line about what Ask does, and the `examples` as chips. A click on a chip asks it.
 - With no key, the view shows "Ask needs your own key of Gemini or of an OpenAI-compatible service." and a button "Add a key" that opens
   the Settings box.
-- **A card for each question.** A question and its answer are one card (`--rs-card-bg`, a `--line` border, 12 px corners). The question
+- **A card for each question.** A question and its answer are one card with an outline: a `--line` border, 12 px corners and no
+  background, so the panel shows through it (Kaveh chose this look from the mock-up, 2026-11-05, over a card with a fill and over a
+  card with no border). The question
   is its bold title. The answer is plain text (`textContent`). The view shows no HTML, no images and no links from the model.
 - **Remove.** The ✕ at the right of the question removes the card. It also removes that question and its answer from the conversation
   that goes to the model with the next question, so the person can take away a wrong turn and ask again. When no card stays, the view
