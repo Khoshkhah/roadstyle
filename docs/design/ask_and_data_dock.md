@@ -238,7 +238,20 @@ t.set({columns, rows});      // new rows in the same table
 - With `idColumn`, a click on a row selects that road and zooms to it: `rs.select(id)` and `rs.focus(id)`.
 - Over 1000 rows, the table draws only the rows in view (it keeps one height per row). This keeps a table of 50 000 rows fast.
 
-The table does not sort when the person clicks a header. The SQL has `ORDER BY` for that. A sort can come later, if a page needs it.
+**Sort** (Kaveh, 2026-11-05: "we need to add sort part for each column"). A click on a column header sorts by that column: rising, then
+falling, then the order of the SQL again. The sorted header has the accent colour and the arrow of the table part (`th[data-sort]`; the
+rule is also for `#rs-dock`, because `dashboard.css` has it only in `#sb`). A result of 1000 rows or fewer sorts in the browser at once.
+A longer one runs its SQL again inside `SELECT * FROM (...) ORDER BY "<column>" ASC|DESC NULLS LAST`, so the first 1000 rows are really
+the smallest or the largest of all the rows. The order follows the type: numbers (also a 64-bit `BigInt`) as numbers, text in the order
+of the language with numbers in it as numbers, and `null` last. The CSV follows the same order.
+
+**The 1000 rows on the screen** (the option `limit`) stay as they are: nobody reads more rows in a table, and a person makes a long result
+shorter with the SQL. The limit is only about what is drawn, never about the data:
+
+- The note gives the true count: "1 000 of 2 765 rows" (one more query: `SELECT count(*) FROM (...)`).
+- **CSV** has all the rows (the SQL runs again with no limit of 1000; at most 1 000 000).
+- **Show on map** lights all the roads of the result, not only the first 1000 (the SQL runs again for the ids; at most 100 000, as the
+  map tools). Before, a result of 2 765 roads lit 1000 of them, and nothing said so.
 
 ## 2. The data dock
 
@@ -856,7 +869,7 @@ No test needs a key or the network. CI runs them all.
 | Test | What it checks |
 |---|---|
 | `tests/data_units.js` in `tests/test_data_dock_browser.py` | The guard: a list of SQL that it accepts (with comments, strings that hold `DROP`, `WITH`, a `;` at the end) and a list that it refuses (two statements, each refused word, `read_csv`, `FROM 'x.parquet'`, `'https://...'`, `query('...')`). The row limit wrap. The CSV text (a comma, a quote, a new line, a `BigInt`, `null`). An id as exact text. |
-| `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. |
+| `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. With 2 765 rows: the note says "1 000 of 2 765 rows", Show on map lights 2 765, the CSV has 2 765 rows; a click on a header sorts rising, falling and back, over all the rows (the first value is the true minimum), also for `BigInt` ids and text with `null`. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. After three answers (a query, a filter, a zoom): the first card's Table shows its own 5 rows in the dock; Undo of the filter card and then its Map apply the filter again; the first card's Map lights its 5 roads; `**x**` in an answer is a `<b>`; an answer that lists 5 rows with their ids shows 3 items with no ids and "… 2 more in the table". Also: a question asked while `ready` waits shows "Loading the data…" and then its answer; an error thrown by `schema()` ends the question with a red line, and the box works again; the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
 | `tests/test_ask_tools_browser.py` | The map tools with the fake provider: `color_roads` with 2 groups colours the right roads and adds 2 legend rows; `filter_roads` sets the id filter; `move_map` moves the camera; Undo and ✕ take away only that card's changes and keep the page's own colours and filter; "New" takes away all; after each map tool the dock has the tool's roads with `edge_id` and Show on map, and a click on a row opens the road card; a query without `edge_id` and a query over `mapLimit` give an error to the model; no id goes into a request to the provider. |
