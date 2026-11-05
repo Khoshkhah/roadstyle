@@ -128,6 +128,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
 | `rs:interactionchange` | `rsSetInteraction` | `overlay` (label), `clickable`, `tooltip`, `popup` |
 | `rs:buildings3dchange` | `rsSetBuildings3D` | `on` |
+| `rs:toprowschange` | your page, when it changes the state of a row of `rsAddTopRow` (the base-map box reads the row again) | none |
 | `rs:viewchange` | `rsSetView3D` | `view3d` |
 | `rs:tunnelchange` | `rsSetTunnelStyle` | `strength`, `palette`, `ratio`, `toward` |
 | `rs:viewselect` | `rsSetView` | `view` (name), `index` |

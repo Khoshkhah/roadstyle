@@ -58,7 +58,9 @@ fn filter_panel(look: &crate::Look, roads: &Roads, m: &Model) -> Value {
             if restricted(p) {
                 by_access.insert(c.to_string());
             }
-            swatches.insert(c.into(), p.get(Mark::Fill.name()).filter(|v| crate::roads::yes(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value));
+            swatches.insert(c.into(), if p.draw().role & 1 != 0 { crate::colors::role_fill(look, p) } else {
+                p.get(Mark::Fill.name()).filter(|v| crate::roads::yes(*v)).map_or_else(|| fb_fill.clone(), Cell::to_value)
+            });
         }
     }
     classes.sort_by(|a, b| m.z_of(b).total_cmp(&m.z_of(a)).then_with(|| a.cmp(b)));

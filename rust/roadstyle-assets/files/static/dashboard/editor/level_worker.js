@@ -1,10 +1,11 @@
 // The level editor's engine in a Web Worker (level_editor.js), so that the page does not stop while it solves, makes the map (the map's
-// table, stage 1, stage 2) or cuts a tile: it keeps the area (roadstyle-wasm's LevelArea) and the tiles of the last map. The calls
+// table, stage 1, stage 2) or cuts a tile: it keeps the area (roadstyle-wasm's LevelArea) and the tiles of its map (a LiveMap). The calls
 // (worker/call.js): init (the package's URL and the map's look), open, roadOf, facts, ownEnds, find, levelsOf, edgeHash, solve,
-// solveLocal, startFrom, check, levelsCsv, draw, build and tile.
+// solveLocal, startFrom, check, levelsCsv, draw, build, relevel and tile. A map of the editor's own is built once (build); a change goes
+// to relevel, which redraws only the edges that changed and the edges near them.
 import {answer} from "../worker/call.js";
 
-let pkg = null, area = null, look = null, tiler = null, gen = 0;
+let pkg = null, area = null, look = null, live = null, gen = 0;
 const i32 = (a) => Int32Array.from(a);
 const bytes = (b) => ({bytes: b, transfer: [b.buffer]});
 
@@ -41,13 +42,18 @@ answer({
   build({levels, heads, caps, keep, table}){
     const src = pkg.styleSources(area.draw(i32(levels), heads, caps), look, undefined, undefined, "Level editor");
     const rows = src.roadTable(table, true);                      // only the fields that the page reads, and the lines
-    if(tiler) tiler.free();
-    tiler = pkg.tilesOfSources(src, `lv://${++gen}/`, keep);
-    src.free();
-    return {style: tiler.style(), table: rows, transfer: [rows.buffer]};
+    if(live) live.free();
+    live = new pkg.LiveMap(src, look, `lv://${++gen}/`, keep);    // takes `src`
+    return {style: live.style(), table: rows, transfer: [rows.buffer]};
+  },
+  // a change: `rows` (JSON text, the levels.csv rows of the edges that changed) give those edges their new levels, heads and caps. The map has the same
+  // generation: the tiles that show those edges are cut again, the other tiles stay. `style` only when the layers changed.
+  relevel({rows}){
+    const counts = JSON.parse(live.relevel(rows));
+    return {counts, style: counts.style_changed ? live.style() : null};
   },
   tile({url}){
     const [g, source, z, x, y] = url.slice("lv://".length).split("?")[0].split("/")     // the style's URL has ?g=<generation>;
-    return bytes(+g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array());
+    return bytes(+g === gen ? live.tile(source, +z, +x, +y) : new Uint8Array());
   },
 });

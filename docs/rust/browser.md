@@ -228,7 +228,32 @@ The parts of this page:
 With `engine.props` only, `rs.query`, `rs.find`, `rs.props` and `rs.focus` find nothing: they need all roads' properties in the
 page.
 
-## Write the whole page
+## Change the look of a live map
+
+A theme, a palette or a colour changes only how the roads are drawn, not the roads. `LiveMap.setLook(look, format?)` gives the map the new
+look with no new tile, when the map's tiles are still right for it (docs/design/restyle_without_retile.md):
+
+```js
+const style = live.setLook(Look.fromJson(newLookText), format);
+if (style !== undefined) {
+  map.setStyle(JSON.parse(style), { diff: true });   // the tiles, the sources and the live colours stay
+} else {
+  live = new LiveMap(styleSources(roads, newLook), newLook, prefix, keep);   // the look changes the tiles: make a new map
+  map.setStyle(JSON.parse(live.style(format)));
+}
+```
+
+- **When the tiles stay.** The new look differs from the old one only in colours (the class colours, the access colours, the base map's
+  colours, the dark colours, the labels, the selection). The colours of `map`, `data` and `overlays` count as structure: there a colour can be
+  one of your data colours. A change of anything else (a width, an opacity, a dash, a first zoom, the base-map theme, a palette name) gives
+  `undefined`, and the map stays as it was.
+- **What stays.** The tile addresses (the `prefix`), the source ids, the tiles in MapLibre's cache and the feature state of the roads: the
+  colours and widths of `rs.setData`, `rsColor` and `rsColorBase` (`rs_c`, `rs_w`). Give the style to MapLibre with `{diff: true}`, so that it keeps
+  the sources. The images (`roadstyle:images`) and the controls are in the style's metadata, which the diff does not apply: add the images again,
+  and read the controls again.
+- **Time.** Burnaby (64,221 roads): about 0.1 s natively, against about 2.3 s for a new map. A refusal takes a few milliseconds.
+- A style must have a name: a style with none has `"name": null`, which MapLibre's style check refuses. Give `styleSources` the area's name.
+
 
 `pageFrom` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
 dashboard's options and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same
@@ -331,11 +356,14 @@ serve` does this in `level_editor/app.js`.
 
 ### The editor on your map, with no map of its own
 
-When your page already draws the area's roads and levels, give `host`: the editor then makes no map. It opens with the stored area
-and the panel only (Burnaby, 76,189 roads: 1.7 s, against 7.9 s more for its own map's draw, stage 1, road table and stage 2).
+When your page already draws the area's roads and levels, give `host`: the editor then builds no roads and no tiles. At **open** it loads the
+stored area into its worker (`LevelArea`), starts from the map's levels, and draws its panel. The map does not change: your roads, your road
+table and your tiles stay as they are (Burnaby, 76,189 roads: about 1.7 s, against 7.9 s more for an own map: draw, stage 1, road table
+and stage 2). At a **change** (an apply) the editor solves the changed rules and gives `replaceRoads` only the rows of the edges whose levels,
+heads or caps changed. Your page redraws only those edges and the edges near them (`LiveMap`, below), and the map's other tiles stay.
 
 ```js
-const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
+const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs, prefix: "rs-", look: lookText,
   host: {edgeIdCol: "edge_id", replaceRoads: async (rows) => redraw(rows)},
   colors: {select: "#e53935", hover: "#ff8a80", second: "#1e63d6"}});
 ```
@@ -343,18 +371,34 @@ const editor = await levelEditor({map, container, pkgUrl, store, dashboard: rs,
 - Your map, your roads and your pick stay as they are. Your road table (`window.RS_SIDE`) must keep the edge id field (`edgeIdCol`,
   default `edge_id`) and the lines. The editor adds the fields `road`, `s_lon`, `s_lat`, `e_lon` and `e_lat` to each row, and again
   when you put a new table in `window.RS_SIDE`. `destroy()` takes them off.
+- The picks are the editor's. Give `look`, the text of the look that made your roads' style (such as the page's `look.json`): the editor
+  finds your select and hover colours in it (`map.interaction.select_color` and `hover_color`, else `selection.select` and `hover`) and
+  swaps them in your road layers' paint: road 1 is red, road 2 is blue, and the hover is lighter in the colour of the next pick (`colors`).
+  `destroy()` puts your paint back. While the editor is open, a click shows no popup and a hover shows no tooltip (`quiet`
+  of `dashboard/select.js`). Without `look`, your roads keep your own select and hover colours.
 - After an apply, `replaceRoads(rows)` gets the rows of levels.csv (one object for each edge, its fields as text: `edge`,
   `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`, `head_end_m`, `cap_start`, `cap_end`) of only the edges
-  whose levels, heads or caps changed. Draw them, then resolve the Promise. The `"solved"` event comes too.
+  whose levels, heads or caps changed. Draw them, then resolve the Promise. The `"solved"` event comes too. When the redraw sets a new
+  style, the editor takes your new layers' colours again.
 - To draw the rows fast, make your map's tiles with `LiveMap` in place of `tilesOfSources`: `new LiveMap(styleSources(roads, look), look,
-  prefix, keep)` has the Tiler's `style()` and `tile(source, z, x, y)`, and `relevel(JSON.stringify(rows))` gives the edges their new
+  prefix, keep)` has the Tiler's `style()` and `tile(source, z, x, y)`, and `relevel(JSON.stringify(rows))` gives the edges new
   values. It runs stage 1 again and replaces in the tiles only the pieces of the edges that changed and of the edges at their end
   nodes. The answer is `{edges, pieces_gone, sources, style_changed}`: then load the visible tiles again (with `style_changed`, set
   the style again). Your roads must have the level, head and cap columns that the look names (`casing_start_col`, ...,
   `cap_end_col`). A head or a cap: Monaco about 70 ms, Burnaby 0.8 s; a level change: Monaco about 120 ms, Burnaby 1.7 s (stage 1 of
   the whole area; a new map is about 5 s).
 - `colors` (each optional, also without `host`): `select` is road 1 of the panel, `second` is road 2, `hover` is the hover of the
-  editor's own map (on your map, your style's hover stays).
+  editor's own map.
+
+The editor's engine (its worker, the `LevelArea` in it and the parse of the area's files) takes seconds to make, so the editor keeps it. With `host` and
+`levels.edge_hash`, `destroy()` leaves the engine alive, and the next `levelEditor` with the same `edge_hash` and the same `store` uses it: the open then
+starts no worker and loads no area (Burnaby: 0.4 s, against 1.4 s). `prepareEditor({store, pkgUrl, look, edgeHash})` (exported) makes the engine ahead of
+the first open, in the background, for example when the page is idle after it drew the map: the open then waits only for what is left. A new
+`edge_hash` (the area's edges changed) ends the old engine and makes a new one. Each open reads the small files again (`edits.csv`, `heads.csv`, `caps.csv`,
+`levels.csv`) and gives the engine the map's levels (`startFrom`).
+
+A test keeps the open fast: with `host`, the editor's worker gets no `build`, `draw` or `tile` call at open or at a change
+(`tests/test_level_editor_page.py`).
 
 ## Keep the main thread free
 

@@ -617,6 +617,18 @@ mod wasm {
             if source == roadstyle::tiles::SOURCE { self.0.tile_in(f, z, x, y).map_err(|e| JsError::new(&e.to_string())) } else { Ok(Vec::new()) }
         }
 
+        /// setLook(look, format?): the look `look` with no new tile (docs/design/restyle_without_retile.md, D2 and D3), when the map's tiles
+        /// are still right for it. The answer is the new style, as `style(format)` gives it: give it to MapLibre with `setStyle(style, {diff:
+        /// true})`, and the tiles and the feature state (the live colours) stay. `undefined`: the look needs new tiles; make a new LiveMap
+        /// (styleSources) for it. The map is the same as before then.
+        #[wasm_bindgen(js_name = setLook)]
+        pub fn set_look(&mut self, look: &JsLook, format: Option<String>) -> Result<Option<String>, JsError> {
+            if !self.0.set_look(&look.0).map_err(|e| JsError::new(&e.to_string()))? {
+                return Ok(None);
+            }
+            style_in(self.0.style(), format).map(Some)
+        }
+
         /// roadLines(rows): as Sources.roadLines, from the stage 1 that the map holds.
         #[wasm_bindgen(js_name = roadLines)]
         pub fn road_lines(&self, ids: Vec<u32>) -> Vec<u8> {

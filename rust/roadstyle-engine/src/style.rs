@@ -22,7 +22,7 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     let (arrows, labels) = (look.map.arrows.on, look.map.labels.on);
     let slots = if let Some(s) = slots { s } else if arrows || labels { slots::slots_source(&feats, &look.slot) }
                 else { json!({"type": "geojson", "data": {"type": "FeatureCollection", "features": []}}) };
-    let (mut ovs, mut images) = all_overlays(&mut feats, look, features)?;
+    let (mut ovs, images) = all_overlays(&mut feats, look, features)?;
     let items = line_items(&feats, &mut ovs, look)?;
     let mut simple = simple::simple_source(&feats, look.road.head_m, look.road.bridge_shadow, roads::named(&look.map.columns.width_m), items)?;
     // everything that reads the roads is done before this: the roads source takes them
@@ -37,29 +37,17 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks); a casing slab names the user's own `highway` column, whatever highway_col is
     let decks = if look.map.bridges.decks_3d { decks::bridge_decks(&roads.roads, &look.deck, &look.model, "highway") } else { Vec::new() };
-    simple.class_colours = colors.class_only.then(|| crate::colors::ClassColours::of(&look.road, &look.model.classes));
-    simple.colours = (!colors.class_only).then(|| crate::colors::ColourTable::of(&roads.roads, look, &colors.props)).map(Box::new);
-    let (mut layers, info) = layers::road_layers(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs,
-                                                 &colors.props, colors.active)?;
+    simple.roles = Some(simple::Roles { fills: colors.props.clone(), casing: colors.casing_role });
+    simple.colours = (!colors.class_only).then(|| crate::colors::ColourTable::of(&roads.roads, look, &colors.props, colors.casing_role)).map(Box::new);
+    let half = look_half(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs, images, &colors, planned)?;
+    // after the road layers: they attached the features of a layer on the streets and set its groups
+    let look_inputs = crate::LookInputs { colors, layers: ovs.iter().filter(|o| o.user.is_none()).map(|o| overlays::LayerFacts {
+        name: o.name.clone(), kinds: o.kinds.clone(), height: !o.l["extrude"].is_null(), edge: o.edge, edge_groups: o.edge_groups.clone() }).collect() };
     simple.classes = Some(look.model.classes.clone());     // R8: the road layer reads each feature's class index
     // audit N2 (2026-10-24): stage 1 gives the road-table form for every style (the pieces draw and glow, by their road's row; the road
     // table has the roads); only an export (render's export_inline, export_style: an app with no road table) asks for the roads source
     let export = export(look);
     roads.in_style = export;
-    let popups: Map<String, Value> = info.overlays.iter().filter(|o| o["popup"].as_array().is_some_and(|a| !a.is_empty()))
-        .filter_map(|o| Some((o["source"].as_str()?.to_string(), o["popup"].clone()))).collect();
-    // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
-    // and the style says what the controls show
-    let live = look.map.output.state == roadstyle_look::options::State::Live;
-    let (contract, state) = if live {
-        let st = contract::page_state(look, colors.active, ovs.len());
-        (Some((contract::controls(look, &roads.roads, info, colors.active)?, st.clone())),
-         Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
-    } else { (None, None) };
-    let mut glyphs = (labels && !source_features(&slots).is_empty()).then(|| json!(look.sections.labels.glyphs));
-    if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
-        glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
-    }
     // render's order: the roads, the overlays (_build_overlays), the 3D decks, the pieces
     let mut sources: Vec<(String, Src)> = ovs.into_iter().enumerate().map(|(i, ov)| (format!("ov{i}"), overlay_source(ov))).collect();
     if !decks.is_empty() {
@@ -69,6 +57,42 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     if !source_features(&slots).is_empty() {        //: no slots source without slots
         sources.push(("slots".into(), Src::Json(slots_for(slots, export))));
     }
+    sources.extend(half.sources);
+    let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
+    Ok(Parts { name, center, zoom, layers: half.layers, roads, sources, metadata: half.metadata, glyphs: half.glyphs, state: half.state, warnings,
+               look_inputs })
+}
+
+/// The look half of a style (docs/design/restyle_without_retile.md, D4): the layers, the metadata, the glyphs, the state and the sources that
+/// the look adds (the boundary). `style_parts` makes it after the roads and the pieces, and `restyle_layers` makes it for a new look from a
+/// held stage 1, so the two give the same style.
+pub struct LookHalf {
+    pub layers: Vec<Value>,
+    pub metadata: Value,
+    pub glyphs: Option<Value>,
+    pub state: Option<Value>,
+    pub sources: Vec<(String, Src)>,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn look_half(look: &Look, roads: &Roads, simple: &simple::SimpleSource, slots: &[Value], decks: bool, ovs: &mut [overlays::Overlay],
+             mut images: Map<String, Value>, colors: &colors::Baked, planned: Option<(&str, Value)>) -> Result<LookHalf, Error> {
+    let (mut layers, info) = layers::road_layers(look, roads, simple, slots, decks, ovs, &colors.props, colors.active)?;
+    let popups: Map<String, Value> = info.overlays.iter().filter(|o| o["popup"].as_array().is_some_and(|a| !a.is_empty()))
+        .filter_map(|o| Some((o["source"].as_str()?.to_string(), o["popup"].clone()))).collect();
+    // state "live" (a page with the dashboard, docs/design/rust_library.md "The interaction contract"): the state stays in the expressions,
+    // and the style says what the controls show
+    let live = look.map.output.state == roadstyle_look::options::State::Live;
+    let (contract, state) = if live {
+        let st = contract::page_state(look, colors.active, ovs.len());
+        (Some((contract::controls(look, roads, info, colors.active)?, st.clone())),
+         Some(Value::Object(st.into_iter().map(|(k, v)| (k, json!({"default": v}))).collect())))
+    } else { (None, None) };
+    let mut glyphs = (look.map.labels.on && !slots.is_empty()).then(|| json!(look.sections.labels.glyphs));
+    if glyphs.is_none() && ovs.iter().any(|o| o.kind == "text") {      // _build_overlays: a text overlay needs a font
+        glyphs = Some(json!("https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"));
+    }
+    let mut sources = Vec::new();
     add_boundary(look, &mut sources, &mut layers);
     // a live style (the dashboard's) has the dark colours too, picked by the global state rs_theme (dark.rs)
     if live {
@@ -79,12 +103,37 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
         crate::dark::images(&mut images, &look.sections.dark)?;
     }
     images.insert(layers::ARROW_IMAGE.into(), look.sections.arrows.image.clone());
-    let mut metadata = metadata(look, images, planned, colors.meta, &layers, contract)?;
+    let mut metadata = metadata(look, images, planned, colors.meta.clone(), &layers, contract)?;
     if !popups.is_empty() {
         metadata.insert(roadstyle_model::props::POPUPS.into(), popups.into());
     }
-    let name = name.or_else(|| look.map.output.name.clone()).map_or(Value::Null, Value::from);
-    Ok(Parts { name, center, zoom, layers, roads, sources, metadata: Value::Object(metadata), glyphs, state, warnings })
+    Ok(LookHalf { layers, metadata: Value::Object(metadata), glyphs, state, sources })
+}
+
+/// The look half of the style of `look` over the stage 1 `s` that another look made (docs/design/restyle_without_retile.md, D4): from the
+/// roads, the pieces, the slots and the base-map facts that `s` holds, with no read of the roads or the features and no piece made. The sources
+/// of `s` stay as they are; the caller checks that the new look makes the same tiles (D2) before it uses the result.
+pub fn restyle_layers(s: &crate::sources::Styled, look: &Look) -> Result<LookHalf, Error> {
+    let simple = s.sources.iter().find_map(|(k, v)| match v { Src::Simple(x) if k == "simple" => Some(x), _ => None })
+        .ok_or_else(|| crate::error::options("restyle: the stage 1 has no pieces (the source `simple`)".to_string()))?;
+    let slots = s.sources.iter().find_map(|(k, v)| match v { Src::Json(x) if k == "slots" => Some(source_features(x)), _ => None }).unwrap_or(&[]);
+    let decks = s.sources.iter().any(|(k, _)| k == "decks");
+    let (mut ovs, images) = overlays::styled_layers(&s.look_inputs.layers, look);
+    // the caller's own overlays (render's overlays=), as all_overlays makes them
+    let first_user = ovs.len();
+    ovs.extend(overlays::user_overlays(&look.map.overlays, ovs.len())?);
+    for ov in ovs[first_user..].iter_mut() {
+        ov.edge_id_col = look.map.columns.edge_id.clone();
+    }
+    let planned = ["roadstyle:planner", "roadstyle:planner_skipped"].into_iter().find_map(|k| s.metadata.get(k).map(|v| (k, v.clone())));
+    let mut half = look_half(look, &s.roads.roads, simple, slots, decks, &mut ovs, images, &s.look_inputs.colors, planned)?;
+    // what `Styled::new` adds to the metadata from the data: the roads' generation and the base-map layers
+    for k in [roadstyle_model::props::GENERATION, roadstyle_model::props::BASE_LAYERS] {
+        if let Some(v) = s.metadata.get(k) {
+            half.metadata[k] = v.clone();
+        }
+    }
+    Ok(half)
 }
 
 /// The base map's overlays (from `features`, the base map's rows), then the caller's own (render's overlays=), and the images of the base map.

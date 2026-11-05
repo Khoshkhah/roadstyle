@@ -21,6 +21,7 @@ import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
 import {initPanelScroll} from "../panelscroll.js";
+import {quiet} from "../select.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
 const EMPTY = COLS.join(",") + "\n";
@@ -122,6 +123,47 @@ function levelsHelp(c, back){
     note: `More in the guide: <a href="${DOCS}#edit-the-levels" target="_blank" rel="noopener">Edit the levels</a> and <a href="${DOCS}#edit-the-levels-in-a-dashboard" target="_blank" rel="noopener">Edit the levels in a dashboard</a>.`};
 }
 
+// --- the engine of an area: the worker with its LevelArea and what the editor knows of the roads. It takes seconds to make (the worker's module, the
+// roads' file, the area's parse), so a host that gives the same `levels.edge_hash` again gets the same engine: `destroy()` keeps it, and
+// `prepareEditor` makes it before the first open (when the host is idle). One engine for each store key.
+const engines = new Map();                                       // store key -> {token: edge_hash, ready: Promise of the engine}
+const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", typeof d === "string" ? new TextEncoder().encode(d) : d))]
+  .map(b => b.toString(16).padStart(2, "0")).join("");
+async function startEngine({store, pkgUrl, lookText, boundary}){
+  const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
+  const call = caller(worker);
+  try {
+    const init = call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), base: lookText,
+      look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundary ? {boundary} : {})}})});
+    const [roadsF, pairsF] = await Promise.all([store.load("roads.parquet", true), store.load("pairs.csv")]);
+    if(!roadsF || !pairsF) throw new Error("the store has no roads.parquet or pairs.csv: make the area first (makeArea, or roadstyle levels make)");
+    const roadsBytes = roadsF.body.slice();
+    // the inputs of a solve, by their content (the SHA-256 of roads.parquet, pairs.csv and edits.csv): levels.csv is for them when its
+    // levels_info.json has the same key, also after a page wrote the same area again (a file's time says nothing then). heads.csv and caps.csv
+    // are drawing only: they are not inputs of the solve.
+    const areaKey = `${await sha(roadsBytes)}:${await sha(pairsF.body)}`;
+    await init;
+    const order = (await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer])).roads;   // the road ids, in the roads' order
+    // pairs.csv's lines: the panel's found rules of a road come from them when it asks (relations); the open does not parse them
+    const pairLines = pairsF.body.split(/\r?\n/).filter(l => l.trim());
+    // what the page knows of the roads, asked from the worker when the panel needs them: any edge id -> its road id
+    return {worker, call, areaKey, order, pairLines, roadOf: Object.fromEntries(order.map(r => [r, r]))};
+  } catch(e){ worker.terminate(); throw e; }
+}
+const SENT = {select: "#fe0a01", hover: "#fe0a02"};                 // (the editor's sentinel colours, see levelEditor)
+
+/** Makes the engine of the area in `store` before `levelEditor` is called, in the background: the next `levelEditor({host, levels, ...})` with the same
+ * `levels.edge_hash` (and `store`) finds it and opens at once. Give `look` and `pkgUrl` as for levelEditor. A Promise; an error is also kept for the open. */
+export function prepareEditor({store, pkgUrl, look = null, edgeHash}){
+  const k = store.key ?? "area", old = engines.get(k);
+  if(old?.token === edgeHash) return old.ready.then(() => {});
+  if(old) old.ready.then(e => e.worker.terminate(), () => {});
+  const ready = startEngine({store, pkgUrl, lookText: look});
+  engines.set(k, {token: edgeHash, ready});
+  ready.catch(() => { if(engines.get(k)?.ready === ready) engines.delete(k); });
+  return ready.then(() => {});
+}
+
 /** The level editor on `map` (or a map of its own in `container`), with the panel in `container`; see the file's head. A page has one
  * dashboard (its state is the module's): on a host map that has one, give it as `dashboard` with the `prefix` it was made with; the
  * editor then draws its roads with that prefix (take your own roads off first) and gives the dashboard its style (setStyle). Gives an
@@ -136,7 +178,10 @@ export async function levelEditor({map = null, container = document.body, panel,
 const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", hover2: "#82b1ff", ...colors};
 // The dashboard has one select colour and one hover colour for every road; the editor wants road 1 red and road 2 blue, and the hover of the road
 // that would be the next pick lighter in its colour. The look gets two sentinel colours, which `highlight` replaces in the road layers' paint.
-const SENT = {select: "#fe0a01", hover: "#fe0a02"};
+// On a host's roads (`host`) the colours to swap are the host's own select and hover colours, from its look (the look's interaction colours, else its selection section)
+const hostLook = host && lookText ? JSON.parse(lookText) : null;
+const FIND = !host ? SENT : {select: hostLook?.map?.interaction?.select_color ?? hostLook?.selection?.select ?? "\0",
+  hover: hostLook?.map?.interaction?.hover_color ?? hostLook?.selection?.hover ?? "\0"};
 // the host's panel: the card, its title line (the title first, then the hide button) and its body
 const hostCard = panel?.querySelector?.(".sb-card"), hostBar = hostCard?.querySelector(".sb-top"), hostBody = hostCard?.querySelector(".sb-body");
 if(!hostBar?.firstElementChild || !hostBody)
@@ -155,10 +200,10 @@ const P = map ? prefix : "rs-";                                  // a host map: 
 // that the next click would pick (light red for the first, light blue for the second)
 const hl = {orig: new Map(), groups: null};
 const swapColors = (v, to) => Array.isArray(v) ? v.map(x => swapColors(x, to)) : v && typeof v === "object"
-  ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swapColors(x, to)])) : v === SENT.select ? to.select : v === SENT.hover ? to.hover : v;
-const hasSent = v => { const t = JSON.stringify(v); return t.includes(SENT.select) || t.includes(SENT.hover); };
+  ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swapColors(x, to)])) : v === FIND.select ? to.select : v === FIND.hover ? to.hover : v;
+const hasSent = v => { const t = JSON.stringify(v); return t.includes(FIND.select) || t.includes(FIND.hover); };
+// (a layer that has no sentinel now keeps what it had: its paint is already swapped)
 function captureHL(){
-  hl.orig.clear();
   for(const l of map.getStyle().layers) if(l.paint && hasSent(l.paint)) hl.orig.set(l.id, l.paint);
 }
 function highlight(groups){
@@ -173,34 +218,29 @@ function highlight(groups){
 const reads = await fetch(new URL("../reads.json", import.meta.url));
 if(!reads.ok) throw new Error(`level editor: the dashboard's reads.json (${reads.status})`);
 const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road", "modes"];   // "modes": the panel's mode box
-// the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page
-const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
-const call = caller(worker);
-// the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
-const boundaryF = map ? null : await store.load("boundary.geojson");
-await call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), base: lookText,
-  look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundaryF ? {boundary: JSON.parse(boundaryF.body)} : {})}})});
+// the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page. With `host` and `levels.edge_hash`, the engine of this
+// area is the one that an earlier open (or prepareEditor) made, when it has the same hash: `destroy()` keeps it for the next open.
+const engKey = store.key ?? "area", token = host && given ? given.edge_hash : undefined;
+let eng = null;
+const kept = engines.get(engKey);
+if(kept && token !== undefined && kept.token === token){
+  try { eng = await kept.ready; } catch(e){ eng = null; }
+}
+if(!eng){
+  if(kept){ engines.delete(engKey); kept.ready.then(e => e.worker.terminate(), () => {}); }
+  // the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
+  const boundaryF = map ? null : await store.load("boundary.geojson");
+  eng = await startEngine({store, pkgUrl, lookText, boundary: boundaryF ? JSON.parse(boundaryF.body) : null});
+}
+engines.delete(engKey);                                          // in use: destroy() puts it back (host), or ends it
+const {worker, call, areaKey, order, pairLines, roadOf} = eng;
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
 const get = (n, bytes) => store.load(n, bytes);
-const [roadsF, pairsF, editsF, headsF, capsF, levelsF, infoF] = await Promise.all([get("roads.parquet", true), get("pairs.csv"), get("edits.csv"),
-  get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
-if(!roadsF || !pairsF) throw new Error("the store has no roads.parquet or pairs.csv: make the area first (makeArea, or roadstyle levels make)");
-const roadsBytes = roadsF.body.slice();
-// the inputs of a solve, by their content (the SHA-256 of roads.parquet, pairs.csv and edits.csv): levels.csv is for them when its
-// levels_info.json has the same key, also after a page wrote the same area again (a file's time says nothing then). heads.csv and caps.csv
-// are drawing only: they are not inputs of the solve.
-const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", typeof d === "string" ? new TextEncoder().encode(d) : d))]
-  .map(b => b.toString(16).padStart(2, "0")).join("");
-const areaKey = `${await sha(roadsBytes)}:${await sha(pairsF.body)}`;
+const [editsF, headsF, capsF, levelsF, infoF] = await Promise.all([get("edits.csv"), get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
 const inputsKey = async edits => `${areaKey}:${await sha(edits)}`;
-const order = (await call({type: "open", roads: roadsBytes.buffer, pairs: pairsF.body}, [roadsBytes.buffer])).roads;   // the road ids, in the roads' order
-// pairs.csv's lines: the panel's found rules of a road come from them when it asks (relations); the open does not parse them
-const pairLines = pairsF.body.split(/\r?\n/).filter(l => l.trim());
-// what the page knows of the roads, asked from the worker when the panel needs them (need): any edge id -> its road id, and a road's
-// facts (with its levels and ends). A new answer clears the facts.
-const roadOf = Object.fromEntries(order.map(r => [r, r]));
+// the facts of a road, asked from the worker when the panel needs them (need). A new answer clears the facts.
 let facts = {};
 async function need(ids){
   ids = [...new Set(ids.filter(x => x != null && x !== "").map(String))];
@@ -315,9 +355,11 @@ async function addFields(){
     else if(ends && !Number.isNaN(ends[4 * i])) [p.s_lon, p.s_lat, p.e_lon, p.e_lat] = ends.subarray(4 * i, 4 * i + 4);
   });
 }
-if(host){                                                        // the host's map and pick stay as they are
+if(host){                                                        // the host's map and roads stay; its picks are the editor's (colours, no popup)
   await addFields();
   window.map = map;
+  captureHL();
+  quiet(true);
 } else {
   const style = await build();
   // the editor's own tiles (a host's rs:// stays its own), cut in the worker
@@ -468,18 +510,18 @@ async function apply(ops){
   await need(ops.flatMap(o => o.op === "add" ? [o.body?.a, o.body?.b] : [o.road]));
   const heads = {}, caps = {};
   for(const [r, [h, c]] of Object.entries(own)){ heads[r] = [...h]; caps[r] = [...c]; }
-  const mine = r => { heads[r] ??= ["", ""]; caps[r] ??= ["", ""]; };
+  const ownRoad = r => { heads[r] ??= ["", ""]; caps[r] ??= ["", ""]; };
   for(const o of ops){
     const r = roadOf[String(o.road)], k = {start: 0, end: 1}[o.end];
     if(o.op === "cap"){
       const c = o.cap || "";
       if(r == null || k == null || !["", "round", "square", "flat"].includes(c)) throw new Error(`ends: ${o.road} is not a road, ${o.end} not start / end, or ${c} not auto, round, square or flat`);
-      mine(r);
+      ownRoad(r);
       caps[r][k] = c === facts[r].caps_auto[k] ? "" : c;          // the default shape is not stored
     } else if(o.op === "head"){
       const m = String(o.m ?? "").trim();
       if(r == null || k == null || !(m === "" || +m > 0)) throw new Error(`heads: ${o.road} is not a road, ${o.end} not start / end, or ${m} not a positive number of metres`);
-      mine(r);
+      ownRoad(r);
       heads[r][k] = m;
     }
   }
@@ -514,7 +556,7 @@ async function apply(ops){
     said = full ? `solved the whole area in ${s} s${next.resolve.why ? ": the local re-solve did not do (" + next.resolve.why + ")" : ""}`
       : `re-solved the roads around the change in ${s} s`;
   }
-  const was = host ? lastCsv ?? (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv : null;
+  const was = lastCsv ?? (await call({type: "levelsCsv", levels: flat(res), heads: headsText, caps: capsText})).csv;
   await store.save("heads.csv", headsCsv);
   await store.save("caps.csv", capsCsv);
   if(newEdits) await store.save("edits.csv", nextEdits);
@@ -526,13 +568,26 @@ async function apply(ops){
   facts = {};
   const shown = await roadsOf(ops.flatMap(o => o.op === "add" ? [o.body.a, o.body.b] : [o.road]).map(x => roadOf[String(x)])
     .concat(order.filter((r, i) => res.levels[i].some((v, j) => v !== prev.levels[i][j]))).filter(Boolean));
-  if(host){                                                        // the host draws the edges whose row of levels.csv changed
-    const before = new Set(was.split("\n"));
-    const t = performance.now();
-    await host.replaceRoads(csvRows(lastCsv.split("\n").filter((l, i) => i === 0 || !before.has(l)).join("\n")));
+  // the edges whose row of levels.csv changed are drawn again, and only they (and the edges near them): the host's replaceRoads, or the worker's relevel
+  const had = new Set(was.split("\n"));
+  const changedRows = csvRows(lastCsv.split("\n").filter((l, i) => i === 0 || !had.has(l)).join("\n"));
+  const drawStart = performance.now();
+  if(host){
+    await host.replaceRoads(changedRows);
     await addFields();
-    said += ` · drawn in ${((performance.now() - t) / 1000).toFixed(1)} s`;
-  } else await showRoads(await build());                           // the new map in place: new tiles, the roads style swapped
+    captureHL(); highlight(hl.groups); quiet(true);                // (a new style of the host has its own colours and popup again)
+  } else if(changedRows.length){
+    let r = null;
+    try { r = await call({type: "relevel", rows: JSON.stringify(changedRows)}); }
+    catch(err){ console.warn(`level editor: ${err.message}: the whole map is made again`); }       // (the engine says when it cannot redraw a map)
+    if(!r) await showRoads(await build());
+    else if(r.style) await showRoads(ownSources(JSON.parse(r.style)));  // the layers changed: the style swapped
+    else {                                                         // the same style: the tiles are loaded again (the worker cuts again only the pieces of the changed edges)
+      for(const id of mine.sources){ const s = map.getStyle().sources[id]; if(s?.type === "vector") map.getSource(id).setTiles(s.tiles); }
+      await new Promise(ok => { map.once("idle", ok); setTimeout(ok, 30000); });
+    }
+  }
+  if(host) said += ` · drawn in ${((performance.now() - drawStart) / 1000).toFixed(1)} s`;
   return {ok: true, said, full, redrawn: true, facts: shown, stats: stats()};
 }
 window.lvApi = async (path, body) => {
@@ -609,7 +664,8 @@ async function download(name){
  * on a host map, the host's roads that it took off go back in their places, with the host's road table and dashboard style. Your
  * files stay in the store. A map of its own is removed. */
 function destroy(){
-  worker.terminate();
+  if(token !== undefined) engines.set(engKey, {token, ready: Promise.resolve(eng)});     // the engine waits for the next open of this area
+  else worker.terminate();
   map.off("click", tap);
   document.removeEventListener("rs:select", heardPick);
   window.rsColor?.(null);                                        // the colour of the picked roads (the panel's paint) and their glow stay on the map otherwise
@@ -619,10 +675,12 @@ function destroy(){
   nodes.forEach(n => n.remove());
   [hostTitle.style.display, hostBody.style.display] = [hostWas.title, hostWas.body];     // the host's panel as it was
   hostBody.scrollTop = hostWas.scroll;
-  for(const id of [...mine.layers, "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
+  for(const id of [...mine.layers, "lv-ends-end", "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
   for(const id of [...mine.sources, "lv-ends"]) if(map.getSource(id)) map.removeSource(id);
   mine.images.forEach(id => map.hasImage(id) && map.removeImage(id));
   if(host){
+    quiet(false);
+    for(const [id, paint] of hl.orig) if(map.getLayer(id)) for(const [k, v] of Object.entries(paint)) map.setPaintProperty(id, k, v);   // the host's colours
     const t = window.RS_SIDE;
     if(t && t.lvFields){ t.props.forEach(p => { if(p) for(const k of added) delete p[k]; }); delete t.lvFields; }
     if(hadApi) window.lvApi = hadApi; else delete window.lvApi;

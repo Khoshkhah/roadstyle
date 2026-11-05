@@ -83,6 +83,8 @@ fn a_redraw_has_the_features_of_a_new_map() {
         after.set_cells(c, &cs).unwrap();
     }
     let mut m = live(before);
+    // a layer of the map's own that a redraw does not make (a base map's layer: the page's map has them): it is no style change
+    m.styled.layers.push(json!({"id": "base-water", "type": "fill", "source": "x"}));
     // a head and a cap (no fill level changes: the slots stay), then the levels of a relation edit
     for (rows, what) in [(vec![head, cap], "head and cap"), (vec![edit], "level change")] {
         let t = std::time::Instant::now();

@@ -159,6 +159,10 @@ pub struct Draw {
     pub keyed: bool,
     /// _mark_cls: the class filter's value
     pub cls: Option<Ix>,
+    /// bit k: the fill of colour slot k (0: `__rs_fill`, k: the option k's) is a role colour (its class's or its access kind's), not data;
+    /// a piece holds no role colour, and the road layer gives it by the piece's class index and access kind
+    /// (docs/design/restyle_without_retile.md, D1)
+    pub role: u16,
 }
 
 impl Draw {

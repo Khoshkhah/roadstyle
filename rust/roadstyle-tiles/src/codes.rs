@@ -10,7 +10,7 @@ use roadstyle_model::mark::Mark;
 use serde_json::Value;
 
 /// The numbers of the text keys of a road feature: the classes and the dash patterns of the road layer.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Codes {
     /// the model's classes (`roadstyle:classes`; the engine's `__rs_ci` is a place in this list, or its length for any other class)
     pub classes: Vec<String>,

@@ -22,6 +22,11 @@ const _bxSwatch = b => {
 // the box's layers again after rs.setStyle (index.js): a new roads style brings its arrow layers back as visible
 let _bxApply = null;
 export function useTops(){ if(_bxApply) _bxApply(); }
+// A PAGE'S OWN ROW under "On top": window.rsAddTopRow({id, label, get, set, available}) adds a check box for a layer of the page (get: whether it shows, set(on): the page shows or hides it,
+// available(): false greys the row). The row can be added before or after the box is built. The event rs:toprowschange tells the box that the page changed its state.
+const _hostPending = [];
+let _hostAdd = null;
+window.rsAddTopRow = spec => { if(!spec || !spec.id || !spec.label) throw new Error("rsAddTopRow: give {id, label, get, set}"); _hostAdd ? _hostAdd(spec) : _hostPending.push(spec); };
 export function buildBox(menu){
   const bms = window.RS_BASEMAPS || [], root = document.documentElement, ontop = O.ontop || {};
   const byKey = k => bms.find(b => b.key === k);
@@ -84,6 +89,11 @@ export function buildBox(menu){
   topRow("labels", "Labels");
   topRow("arrows", "One-way arrows").checked = _bxGet("arrows") !== "0";       // on, unless the person turned them off in this browser
   topRow("buildings", "3D buildings");
+  const hostRows = new Map();                        // the rows of the page: id -> {c, lab, spec}
+  const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); });
+  _hostAdd = spec => { if(hostRows.has(spec.id)) return; const c = topRow("host-" + spec.id, spec.label); hostRows.set(spec.id, {c, lab: tops["host-" + spec.id].lab, spec}); c.onchange = () => { spec.set(c.checked); syncHost(); }; syncHost(); };
+  document.addEventListener("rs:toprowschange", syncHost);
+  _hostPending.splice(0).forEach(_hostAdd);
   // the style's own base-map layers (the overlays of roadstyle:controls): one switch for all of them, in a group of its own, and only for a style that has them
   const layers = _bxEl("div", "rs-bm-layers"), lrow = _bxEl("label", "rs-bm-row"), lc = _bxEl("input"), lname = _bxEl("span", "rs-bm-n");
   lc.type = "checkbox"; lrow.append(lc, lname); layers.append(_bxEl("hr"), lrow); menu.appendChild(layers);

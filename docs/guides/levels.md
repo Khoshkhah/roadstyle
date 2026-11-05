@@ -183,7 +183,7 @@ The calls and the options are in [Use roadstyle in the browser](../rust/browser.
 - **The host's panel.** `panel` is the host's `.sb-card`, with `.sb-top` and `.sb-body`. The editor hides the host's body and shows its own tabs:
   Edit, History and Issues. The top line has the button "← Steps" (`backLabel`) and "Edit levels", before the host's hide button.
 - **The apply bar.** A bar at the bottom of the panel (on a phone: of the sheet) shows "N waiting", *Discard* and *Apply and solve*. It shows only when
-  changes wait. "N waiting" opens the list, and you can take out each change. A cap or a head length needs no solve: the editor saves it at once.
+  changes wait. "N waiting" opens the list, and you can take out each change. A cap or a head length goes to the list like the other changes. Apply needs no solve for it: it only draws again.
 - **Back, with changes waiting.** "← Steps" with no change waiting sends the event `"back"` at once. With changes waiting, the bar asks: *Apply*
   (solves, then sends `"back"`), *Discard* (drops the changes, then sends `"back"`) or *Stay*. The host answers `"back"` with `editor.destroy()`,
   which puts the host's panel back.

@@ -456,6 +456,11 @@ pub struct TileLook {
     pub maxzoom: Num,
     pub extent: Num,
     pub buffer_px: Num,
+    /// The tiles' buffer of each zoom is the buffer that the strokes need, times this (none: 1). A host that changes the look of a live map
+    /// (`LiveTiles::set_look`) sets it once, so that a look with wider roads (up to this factor) keeps the tiles
+    /// (docs/design/restyle_without_retile.md, "The buffer headroom").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buffer_headroom: Option<Num>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

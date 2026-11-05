@@ -169,10 +169,15 @@ fn json_lines(src: &Value) -> bool {
 pub fn tile_stage(s: &sources::Styled, o: &tiles::stage::TileOptions, at: &Value, inline: sources::SourceMode)
                   -> Result<(Value, tiles::Tiles), tiles::Error> {
     let tiles = tile_sources(s, o)?;
+    Ok((tiled_style_of(s, o, at, inline), tiles))
+}
+
+/// The style of `tile_stage` alone: stage 1's style with its tiled sources as the one vector source (no tile is made).
+pub fn tiled_style_of(s: &sources::Styled, o: &tiles::stage::TileOptions, at: &Value, inline: sources::SourceMode) -> Value {
     let mut style = s.style_with(inline, true);
     without_roads(&mut style);
     let tiled: Vec<String> = s.shown().filter(|(k, _)| o.wants(k)).map(|(k, _)| k.to_string()).collect();
-    Ok((tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom), o.format, &o.codes), tiles))
+    tiled_style(style, &tiled, at, (o.min_zoom, o.max_zoom), o.format, &o.codes)
 }
 
 /// An export's style without the whole roads (the source `roads` and the layers on it: the pick and the highlight): the pieces pick and

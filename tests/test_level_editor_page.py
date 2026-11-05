@@ -156,11 +156,16 @@ window.openEditor = async () => { const t = performance.now();
 };
 // the option host: the editor on the host's roads and road table; replaceRoads keeps the rows that it gets
 window.replaced = [];
-window.openHosted = async () => {
+window.hostLookText = hostLook.toJson();
+window.workerCalls = [];                                         // the types of the messages to any worker (the editor's worker is made inside levelEditor)
+const post = Worker.prototype.postMessage;
+Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string") window.workerCalls.push(m.type); return post.call(this, m, ...r); };
+window.openHosted = async (levels) => {
   window.RS_SIDE = hostSide;
+  window.workerCalls.length = 0;
   const t = performance.now();
-  window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host,
-    host: {replaceRoads: async rows => { window.replaced.push(rows); }}});
+  window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-",
+    host: {replaceRoads: async rows => { window.replaced.push(rows); }}, look: window.hostLookText, levels});
   return performance.now() - t;
 };
 if(!withBase) await window.openEditor();
@@ -249,6 +254,9 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate("!!window.editor && !('area' in window.editor)")
             said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'end', m: '7'}]})", road)
             assert said["ok"] and said["redrawn"] and said["said"] == "not solved again (heads and caps are drawing only)", said
+            # the editor's own map is built once (at open); a change redraws only the changed edges (relevel), it builds no new generation of all tiles
+            calls = page.evaluate("window.workerCalls")
+            assert calls.count("build") == 1 and calls.count("relevel") == 1, calls
             assert said["facts"][road]["heads_own"] == [False, True] and said["facts"][road]["levels"], said["facts"]
             # the panel's other questions: the page asks the worker for the roads that they name (2026-10-26)
             f = said["facts"][road]
@@ -331,14 +339,41 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
             assert page.evaluate("!hostMap.getSource('host-lv-roads') && window.RS_SIDE.props.every(p => p.road != null)")
             assert page.evaluate("window.editor.answer().resolve.how") == "stored"
+            # the open on the host's roads builds no map: its worker is not asked to draw, style or cut anything (the guard of the fast open)
+            calls = page.evaluate("window.workerCalls")
+            assert calls and not {"build", "draw", "tile"} & set(calls), calls
+            # the host's picks are the editor's: the colours that the host's look gives its select and hover are swapped in the host's road layers
+            # (picked road 1 here green), and the host's own paint comes back with destroy
+            sel = page.evaluate("JSON.parse(window.hostLookText).selection.select")
+            paint = "hostMap.getStyle().layers.filter(l => l.id.startsWith('host-')).map(l => JSON.stringify(l.paint)).join()"
+            assert sel not in page.evaluate(paint) and "#e53935" in page.evaluate(paint), "the editor's red replaces the host's select colour at open"
+            page.evaluate("window.lvHighlight([[[0], '#00ff00']])")
+            assert "#00ff00" in page.evaluate(paint), "a picked road has its colour"
             road = page.evaluate("window.editor.facts([window.editor.roads[0]]).then(f => Object.values(f)[0])")
             said = page.evaluate("r => window.lvApi('/api/apply', {ops: [{op: 'head', road: r, end: 'start', m: '3'}]})", road["road"])
             assert said["ok"] and " · drawn in " in said["said"], said
             rows = page.evaluate("window.replaced")
             assert len(rows) == 1 and {r["edge"] for r in rows[0]} == {d["edge"] for d in road["directions"]}, (rows, road)
             assert all(3 in (float(r["head_start_m"]), float(r["head_end_m"])) for r in rows[0]), rows[0]
+            calls = page.evaluate("window.workerCalls")
+            assert not {"build", "draw", "tile"} & set(calls), ("a change on the host's roads builds no map", calls)
             page.evaluate("window.editor.destroy()")
+            assert sel in page.evaluate(paint) and "#00ff00" not in page.evaluate(paint) and "#e53935" not in page.evaluate(paint), "the host's own paint is back"
             assert page.evaluate("window.RS_SIDE.props.every(p => !('road' in p) && !('s_lon' in p)) && !window.RS_SIDE.lvFields")
+            # the engine is kept: with the same edge hash, the next open has no init and no open call (the worker and its area are the first open's),
+            # and prepareEditor makes it before the open
+            page.evaluate("([csv, h]) => openHosted({csv, edge_hash: h})", [levels_csv, hsh])
+            first = page.evaluate("window.workerCalls")
+            assert "init" in first and "open" in first, first
+            page.evaluate("window.editor.destroy()")
+            page.evaluate("([csv, h]) => openHosted({csv, edge_hash: h})", [levels_csv, hsh])
+            again = page.evaluate("window.workerCalls")
+            assert "init" not in again and "open" not in again and "levelsOf" in again, again
+            assert page.evaluate("window.editor.answer().resolve.how") in ("stored", "given")
+            page.evaluate("window.editor.destroy()")
+            page.evaluate("([csv, h]) => openHosted({csv, edge_hash: '0' + h.slice(1)})", [levels_csv, hsh])        # another hash: a new engine
+            assert "open" in page.evaluate("window.workerCalls")
+            page.evaluate("window.editor.destroy()")
             print(f"host open: {ms:.0f} ms")
             assert not [e for e in errors if e != "boom"], errors      # "boom": the stopped worker's own error, which the page reports too
             b.close()
@@ -475,6 +510,13 @@ def test_the_editor_works_in_the_hosts_panel(view):
             page.wait_for_function("document.querySelectorAll('#lv-cards .card').length === 1", timeout=20000)
             page.wait_for_timeout(300)
             assert page.evaluate("document.querySelectorAll('#lv-cards .card .x').length") == 1, "one pick for each click"
+            # a cap goes to the list as every change does: nothing is applied, saved or drawn until Apply (Discard takes it out)
+            n0 = page.evaluate("window.solved.length")
+            page.evaluate("() => { for (const b of document.querySelectorAll('#lv-cards [data-cap] button')) b.click(); }")
+            page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
+            assert page.evaluate("window.solved.length") == n0 and page.inner_text("#lv-wait").endswith(("waiting ▴", "waiting ▾")), "a cap waits for Apply"
+            page.evaluate("document.getElementById('lv-discard').click()")
+            page.wait_for_function("document.getElementById('lv-bar').hidden", timeout=20000)
             # two roads and an order wish: the changes wait in the apply bar
             roads = page.evaluate("[window.editor.roads[0], window.editor.roads.at(-1)]")
             def stage(top=0):
