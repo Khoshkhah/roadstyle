@@ -17,16 +17,22 @@ pub struct LookCols<'a> {
     pub id: &'a str,
 }
 
-/// The fill and casing colours by class (the active palette, the tunnel look baked in), and the classes that have no casing.
-fn class_colours(look: &crate::Look, hw: &str, tun: &Value, bri: &Value) -> Result<(Value, Value, Vec<Value>), crate::Error> {
+/// The fill and casing colours by class, the tunnel look baked in, the classes that have no casing, and the fill's dash by class (none: no
+/// class has a dash). The colours are the class styles that the map draws with (`roads.styles`, ClassStyler: the look's palette with the
+/// design's colours; a link class has its own entry), so another app's layer has the colours of the map.
+fn class_colours(look: &crate::Look, hw: &str, tun: &Value, bri: &Value) -> Result<(Value, Value, Vec<Value>, Option<Value>), crate::Error> {
     let s = &look.sections;
-    let key = &s.active.palette;
-    let classes = s.palettes.get(key).and_then(Value::as_object).cloned().unwrap_or_default();
-    let (fb, tu) = (&s.roads.fallback, &s.tunnels);
+    let st = &s.roads.styles;
+    let mut classes: Vec<(String, &Value)> = Vec::new();
+    for (c, [plain, link]) in &st.classes {
+        classes.push((c.clone(), plain));
+        classes.push((format!("{c}_link"), link));
+    }
+    let (fb, tu) = (&st.fallback[0], &s.tunnels);
     let toward = color::parse(tu.toward_color())?;
     let strength = tu.strength.f() / 100.0;
-    // a palette colour that is not a colour is an error that names it (review D4: "#fff" is one, "#zzz" is not)
-    for c in classes.values().flat_map(|e| [&e["fill"], &e["casing"]]).filter_map(Value::as_str).filter(|c| c.starts_with('#')) {
+    // a colour that is not a colour is an error that names it (review D4: "#fff" is one, "#zzz" is not)
+    for c in classes.iter().map(|(_, e)| *e).chain([fb]).flat_map(|e| [&e["fill"], &e["casing"]]).filter_map(Value::as_str).filter(|c| c.starts_with('#')) {
         color::parse(c)?;
     }
     // the tunnel look baked: a colour moved toward the tunnel colour (an app has no slider)
@@ -39,11 +45,11 @@ fn class_colours(look: &crate::Look, hw: &str, tun: &Value, bri: &Value) -> Resu
                 vals.push(f(&e[field]));
             }
         }
-        let default = f(&fb[if field == "fill" { "fill" } else { "casing" }]);
-        if vals.is_empty() { default } else {
+        let fallback = if fb.get(field).is_some_and(crate::roads::yes) { &fb[field] } else { &s.roads.fallback[field] };
+        if vals.is_empty() { f(fallback) } else {
             let mut e = vec![json!("match"), json!(["get", hw])];
             e.extend(vals);
-            e.push(default);
+            e.push(f(fallback));
             Value::Array(e)
         }
     };
@@ -56,7 +62,21 @@ fn class_colours(look: &crate::Look, hw: &str, tun: &Value, bri: &Value) -> Resu
     let mut flagged = s.roads.flagged("no_casing");
     flagged.sort();        // the config's sorted minor_no_casing
     no_casing.extend(flagged.into_iter().map(Value::from));
-    Ok((fill, casing, no_casing))
+    // a class's dash ("0.6,0.5": dash and gap, in widths of the line), as the map draws `steps`
+    let dash_of = |e: &Value| -> Option<Value> {
+        let parts: Vec<f64> = e.get("dash")?.as_str()?.split(',').map(|x| x.trim().parse().ok()).collect::<Option<_>>()?;
+        (parts.len() >= 2).then(|| json!(["literal", parts]))
+    };
+    let mut dash = vec![json!("match"), json!(["get", hw])];
+    for (c, e) in &classes {
+        if let Some(d) = dash_of(e) {
+            dash.push(json!(c));
+            dash.push(d);
+        }
+    }
+    dash.push(json!(["literal", [1, 0]]));
+    let dash = (dash.len() > 3).then_some(Value::Array(dash));
+    Ok((fill, casing, no_casing, dash))
 }
 
 /// The arrows' and the names' layers (symbols along the lines). `mz`: the class minzoom filter.
@@ -107,14 +127,14 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     let s = &look.sections;
     let m = &look.model;
     let hw = cols.highway;
-    let key = &s.active.palette;
+    let key = &look.palette;          // the palette of the map (the class styles are made from it)
     // the yes/no tags by the engine's rule (roadstyle_model::flags): tunnel=covered is a tunnel here as on the map
     let two = json!(["!", flags::maplibre_yes(json!(["get", cols.oneway]))]);
     let tun = flags::maplibre_yes(json!(["get", cols.tunnel]));
     let bri = flags::maplibre_yes(json!(["get", cols.bridge]));
     let tw = json!(["to-boolean", ["get", Mark::Twoway.name()]]);
     let (fb, tu) = (&s.roads.fallback, &s.tunnels);
-    let (fill, casing, no_casing) = class_colours(look, hw, &tun, &bri)?;
+    let (fill, casing, no_casing, fill_dash) = class_colours(look, hw, &tun, &bri)?;
     let fw = swap(&m.width_expr(hw, false, 1.0, false), &tw, &two);
     let cw = swap(&m.width_expr(hw, true, 1.0, false), &tw, &two);
     let bcw = swap(&m.width_expr(hw, true, s.bridges.wing_scale.f(), false), &tw, &two);
@@ -133,6 +153,10 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     order.push(fb["order"].clone());
     let mz = Some(s.roads.class_values("minzoom")).filter(|t| !t.is_empty()).map(|t| minzoom_filter(hw, &t));
     let lay = json!({"line-cap": s.roads.cap, "line-join": s.roads.join, "line-sort-key": order});
+    // a casing has a flat end, as the map's pieces have where a road goes on: a round end lies over the fill of the next edge when that
+    // edge is drawn lower
+    let mut casing_lay = lay.clone();
+    casing_lay["line-cap"] = json!("butt");
     let flt = |f: Value| match &mz { Some(z) => json!(["all", f, z]), None => f };
     let ratio: Vec<Value> = Some(&tu.casing_dash).filter(|a| !a.is_empty()).map(|a| a.iter().map(|x| json!(x.f())).collect())
         .unwrap_or_else(|| vec![json!(1.0), json!(1.0)]);
@@ -141,12 +165,17 @@ pub fn export_look(look: &crate::Look, cols: &LookCols, positions: &[i64]) -> Re
     ps.sort();
     for p in ps {
         let at = |col: &str| json!(["==", ["coalesce", ["get", col], 0], p]);
+        // the opacity is the map's: its road pieces are drawn at 1 (casing.opacity and fill_opacity are for folium)
         layers.push(json!({"id": format!("casing-{p}"), "type": "line", "metadata": {"roadstyle:position": p},
             "filter": flt(json!(["all", at("casing_level"), ["!", ["in", ["get", hw], ["literal", no_casing]]]])),
-            "layout": lay, "paint": {"line-color": casing, "line-width": cw, "line-offset": off, "line-opacity": s.casing.opacity,
-                                     "line-dasharray": ["case", tun, ["literal", ratio], ["literal", [1, 0]]]}}));
+            "layout": casing_lay, "paint": {"line-color": casing, "line-width": cw, "line-offset": off,
+                                            "line-dasharray": ["case", tun, ["literal", ratio], ["literal", [1, 0]]]}}));
+        let mut fill_paint = json!({"line-color": fill, "line-width": fw, "line-offset": off});
+        if let Some(d) = &fill_dash {
+            fill_paint["line-dasharray"] = d.clone();
+        }
         layers.push(json!({"id": format!("fill-{p}"), "type": "line", "metadata": {"roadstyle:position": p}, "filter": flt(at("fill_level")),
-            "layout": lay, "paint": {"line-color": fill, "line-width": fw, "line-offset": off, "line-opacity": s.roads.fill_opacity}}));
+            "layout": lay, "paint": fill_paint}));
     }
     let (bd, sel, arw) = (&s.boundary, &s.selection, &s.arrows);
     let symbols = symbol_layers(look, cols, mz.as_ref());

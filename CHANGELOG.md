@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **`export_look` has the colours of the map.** It read the palette of `active.palette` ("amber" in the default look), but the map draws with the class styles (`roads.styles`: the look's palette with the colours of a design, a link class with its own entry). Now `export_look` reads the class styles, as the map does. A class's dash (`steps`) is on its fill. The casings and fills have the opacity of the map's road pieces (1, no `line-opacity`), and a casing has a flat end, as the map's pieces have where a road goes on. A round end of a casing lay over the fill of the next, lower edge. The duckOSM page's QGIS and kepler.gl exports use `export_look`. Tests: `look.rs` (`export_look_has_the_colours_of_the_map`), the case golden `export_look.json`.
+
 ## [0.27.1] - 2026-11-05
 
 ### Fixed
