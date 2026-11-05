@@ -675,7 +675,7 @@ function destroy(){
   nodes.forEach(n => n.remove());
   [hostTitle.style.display, hostBody.style.display] = [hostWas.title, hostWas.body];     // the host's panel as it was
   hostBody.scrollTop = hostWas.scroll;
-  for(const id of [...mine.layers, "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
+  for(const id of [...mine.layers, "lv-ends-end", "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
   for(const id of [...mine.sources, "lv-ends"]) if(map.getSource(id)) map.removeSource(id);
   mine.images.forEach(id => map.hasImage(id) && map.removeImage(id));
   if(host){

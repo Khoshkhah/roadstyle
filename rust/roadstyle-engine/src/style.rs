@@ -75,7 +75,7 @@ pub struct LookHalf {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn look_half(look: &Look, roads: &Roads, simple: &simple::SimpleSource, slots: &[Value], decks: bool, ovs: &mut Vec<overlays::Overlay>,
+fn look_half(look: &Look, roads: &Roads, simple: &simple::SimpleSource, slots: &[Value], decks: bool, ovs: &mut [overlays::Overlay],
              mut images: Map<String, Value>, colors: &colors::Baked, planned: Option<(&str, Value)>) -> Result<LookHalf, Error> {
     let (mut layers, info) = layers::road_layers(look, roads, simple, slots, decks, ovs, &colors.props, colors.active)?;
     let popups: Map<String, Value> = info.overlays.iter().filter(|o| o["popup"].as_array().is_some_and(|a| !a.is_empty()))
