@@ -62,6 +62,8 @@ export function _rrows(p, only){   // the side panel's layout: big name, then al
 export let _popupFields = null;   // curated field list, or null => all columns
 export let _ID_KEYS = [];         // the road's id fields: the panel search always reads them
 let _roadPopup = true;            // road_popup=False: a click selects and fires rs:select, no popup
+let _quiet = false;              // quiet(true): no popup and no tooltip, also when the style has them (the level editor on a host's roads)
+export function quiet(on){ _quiet = !!on; if(_quiet && _tip) _tip.remove(); }
 export function rsDeselect(){
   if(_sel){ setS(_sel,{select:false});
     if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false});
@@ -95,7 +97,7 @@ export function rsSelect(id){
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   _emit("rs:select", {id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _road(id), id)});
   const sv = _sv(cll, _road(id));
-  if(_roadPopup){
+  if(_roadPopup && !_quiet){
     if(_popupMode === "panel"){ rsInfoShow(_both(props||{}, true, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
       .setLngLat(c).setHTML(_both(props||{}, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
@@ -117,7 +119,7 @@ function hoverFrame(){ _raf=0; if(!_pt) return;
   const p = _pt;
   _tipT = setTimeout(()=>{ if(_pt !== p) return;                                          // the mouse rested on it: light it up
     _hov=h; setS(_hov,{hover:true});
-    if(_tip) _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); }, _TIP_DELAY);
+    if(_tip && !_quiet) _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); }, _TIP_DELAY);
 }
 let _sel=null;
 // what the style decides: the layers a road is picked on, the popup and tooltip fields, the hover delay. Again for a new style
@@ -171,7 +173,7 @@ export function initSelect(){
         if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+_esc(io.label)+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
         else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth}).setLngLat(e.lngLat)
           .setHTML('<span style="color:#777">'+_esc(io.label)+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
-    else if(_roadPopup){
+    else if(_roadPopup && !_quiet){
       if(_popupMode === "panel"){ rsInfoShow(_both(props, true, _popupFields) + sv + _ovSections(ovs)); }
       else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
         .setLngLat(e.lngLat).setHTML(_both(props, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);

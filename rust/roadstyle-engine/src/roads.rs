@@ -60,6 +60,7 @@ pub fn mark_roads(fs: &mut Roads, look: &Look, m: &MapOptions) -> Result<crate::
             fs.draw[i].style = Some(fs.values.style_ix(s));
         }
         fs.draw[i].fills.iter_mut().for_each(|f| *f = c);
+        fs.draw[i].role = u16::MAX;          // the access kind's colour is a role colour in every option (D1)
     }
     if !look.single_line.is_empty() {
         mark_single_line(fs, &look.single_line);

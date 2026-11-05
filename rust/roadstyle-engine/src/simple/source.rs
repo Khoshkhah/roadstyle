@@ -16,18 +16,26 @@ pub struct SimpleSource {
     pub read: Option<std::collections::HashSet<String>>,
     /// R8: the classes of the road layer's class index (`__rs_ci`, the last property of every feature), None: no index
     pub classes: Option<Vec<String>>,
-    /// the road layer draws the class's colours for a piece that has no colour of its own: a piece whose fill or casing is its class's
-    /// has none (tile_v2_plan.md, step 6)
-    pub class_colours: Option<crate::colors::ClassColours>,
+    /// the colours that a piece never holds, because the road layer gives them by the piece's class and access kind
+    /// (docs/design/restyle_without_retile.md, D1): the fill of each slot whose bit is set in the road's `Draw::role`, and the casing
+    pub roles: Option<Roles>,
     /// the other colour modes: a piece holds the place of its fill and casing colour in a table of the style, never the colour text
     pub colours: Option<Box<crate::colors::ColourTable>>,
     /// the colour tables of a view's other palettes (palettes.rs), for the pieces' copies of the colours that differ
     pub palette_colours: Vec<(String, crate::colors::ColourTable)>,
 }
 
+/// The colour properties that the pieces never hold (`SimpleSource::roles`): the fill of each colour slot (in the order of `Draw::role`'s
+/// bits), and the casing when every road's casing is its class's.
+#[derive(Clone, Debug, Default)]
+pub struct Roles {
+    pub fills: Vec<String>,
+    pub casing: bool,
+}
+
 impl SimpleSource {
     pub fn empty(cols: Cols) -> SimpleSource {
-        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None, colours: None, palette_colours: Vec::new() }
+        SimpleSource { pieces: Vec::new(), items: Vec::new(), cols, tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, roles: None, colours: None, palette_colours: Vec::new() }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -109,12 +117,13 @@ impl SimpleSource {
         if let Some(i) = index.filter(|_| run.marks.as_ref().is_none_or(|r| r[Mark::ClassIndex as usize])) {
             q.insert_name(crate::layers::CLASS_INDEX, Cell::Int(i as i64));
         }
-        if let Some(colours) = &self.class_colours {
-            let of = colours.of_class(q.get(&self.cols.class).and_then(|c| c.as_str()));
-            for (mark, own) in [(Mark::Fill, &of[0]), (Mark::Casing, &of[1])] {
-                if q.get(mark.name()).is_some_and(|v| v.to_value() == *own) {
-                    q.shift_remove(mark.name());
-                }
+        if let Some(roles) = &self.roles {
+            let role = roads.road(p.edge as usize).draw().role;
+            for (_, f) in roles.fills.iter().enumerate().filter(|(k, _)| role & (1 << k) != 0) {
+                q.shift_remove(f.as_str());
+            }
+            if roles.casing {
+                q.shift_remove(Mark::Casing.name());
             }
         }
         if let Some(t) = &self.colours {
@@ -303,5 +312,5 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
         }
         placed.push((id, f));
     }
-    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, class_colours: None, colours: None, palette_colours: Vec::new() })
+    Ok(SimpleSource { pieces, items: placed, cols: Cols::new(roads.roles.name(&roads.table, roadstyle_model::Role::Class).unwrap_or(roadstyle_model::Role::Class.name()), &roads.cls, width_col), tolerance: 0.05, maxzoom: None, palette: Vec::new(), read: None, classes: None, roles: None, colours: None, palette_colours: Vec::new() })
 }

@@ -272,6 +272,7 @@ pub fn colour_args(case: &str) -> Value {
                                                     "access": {"color_by": "access", "colors": {"private": "#d62728"}, "missing": "self"}},
                                   "color_active": "lanes"}),
         "no_legend" => json!({"color_by": "lanes", "cmap": "magma", "legend": false}),
+        "class_access" => json!({"color_options": {"Road class": {}}, "access_col": "access"}),
         _ => unreachable!("no case {case}"),
     }
 }
