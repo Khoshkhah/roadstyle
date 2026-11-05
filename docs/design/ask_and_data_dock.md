@@ -137,13 +137,11 @@ its CSS), and a page that does not call `rs.dock.add` has no dock on the screen.
   dock is closed.
 - **Credits.** The box in the bottom corner (scale, zoom number, credits: `#rs-scalebox`) hides while the dock is open on a desktop, and
   shows again when the dock closes (Kaveh, 2026-11-05). On a phone the credits button is in the bar, so nothing changes there.
-- **The card look.** The dock follows the look of the panel (Kaveh, 2026-11-05: "a little curve in its corner"). With the card look it
-  floats as a card too: 14 px corners, a `--line` border and the shadow of the panel's card (`0 6px 24px rgba(0,0,0,.28)`). Its edges
-  line up with its neighbours (Kaveh, 2026-11-05: "not aligned"): the edge on the panel's side with the panel's visible card (16 px from
-  the window), the other edge with the bar (8 px), and the bottom 16 px from the window, the same as the card's top. The gap between the
-  panel's card and the dock is 16 px too. The dock reads the card and the bar with `getBoundingClientRect` at each change of the layout. The
-  map then goes on under the dock, and the panel and the bar end above it; `freeArea` subtracts
-  the dock, so a window does not open under it. With the frame look it is a square block under the map, as above.
+- **Edge to edge, round top corners.** The dock uses all the width and goes down to the bottom of the window, with no gap at the left, the
+  right or the bottom (Kaveh, 2026-11-05). Its two top corners are round (14 px, as the panel's card), and with the card look the map
+  goes on under the dock, so the map shows behind these corners. A soft shadow above the dock (`0 -4px 18px rgba(0,0,0,.16)`) and a
+  `--line` on its top edge separate it from the map. With the card look, the panel's card and the bar end 16 px above the dock.
+  (A dock that floated as a card, with a margin on three sides, was tried in the mock-up and refused: the table needs all the room.)
 - **Look.** The dock has `--bg`, a `--line` border on its top edge, and `--ink` text. It is opaque: the dock is not over the map, so
   `--rs-tb-bg` (40 % opacity) shows the page's white background through it in the dark theme.
 - **Controls.** `dashboard.css` gives buttons, text boxes and `sb-primary` their look only inside the panel (`#sb`). The same rules also
@@ -751,7 +749,7 @@ No test needs a key or the network. CI runs them all.
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. Also: the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
 | `tests/test_ask_tools_browser.py` | The map tools with the fake provider: `color_roads` with 2 groups colours the right roads and adds 2 legend rows; `filter_roads` sets the id filter; `move_map` moves the camera; Undo and ✕ take away only that card's changes and keep the page's own colours and filter; "New" takes away all; a query without `edge_id` and a query over `mapLimit` give an error to the model; no id goes into a request to the provider. |
-| `tests/test_ask_align_browser.py` | With the card look, at 1440 and 1920 px: the dock's left edge is the panel card's, its right edge the bar's, its bottom 16 px; the gap between the card and the dock is 16 px; the cards of the conversation, Back and the question box have the same left and right x. |
+| `tests/test_ask_align_browser.py` | At 1440 and 1920 px, with the card look and the frame look: the dock touches the left, right and bottom edges of the window; its top corners are round with the card look; the gap between the panel's card and the dock is 16 px; the cards of the conversation, Back and the question box have the same left and right x. |
 | `tests/test_ask_budget_browser.py` | The prompt of the Monaco test data is at most 4 000 characters; a tool result is at most 2 500; a fake provider answers 429 with "try again in 2.5s" once: the card shows the count down, and the request goes again after the wait; a 429 with a wait over 60 s is an error on the card. |
 | `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
 | `tests/test_dashboard_themes_browser.py` | The dock, the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
