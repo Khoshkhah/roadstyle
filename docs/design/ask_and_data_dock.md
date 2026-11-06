@@ -68,6 +68,40 @@ roadstyle knows no DuckDB. The host page gives two functions: `query(sql)` and `
   (`panelscroll.js`, `dashboard.css`) and in `tests/test_dashboard_scroll_browser.py` (`AGENTS.md`).
 - No key goes into a page file. No request goes to a server of roadstyle or of the page's author.
 
+## The map: four operations
+
+Kaveh (2026-11-05): "it's not clear when it should show in map and when must automatically undo showing", "we have three parts related to
+the map: filtering, selecting, coloring … also we can add fading", and "instead of remove card, we can add active or deactive". This
+section is the rule; the parts below follow it.
+
+| Operation | What the map shows | How many at once | Made by | Removed by |
+|---|---|---|---|---|
+| **Select** | one road with a strong glow, and its card beside the table | one road | a click on the map or on a row (a row of names: its first road) | the card's ✕, another click |
+| **Light** | a glow on the roads of **the dock's table** | one set: the table now in the dock | follows the dock by itself: a new table (an SQL run, an answer, a card's **Show**) replaces the light | the switch **Show on map** (on by default), or a new table |
+| **Colour** | groups of roads in colours, with a legend row for each group | several; the newest wins where two meet | an Ask answer (`color_roads`), or **Colour** in the dock | its chip: a click turns it off and on, ✕ removes it |
+| **Focus** | one set stays; every other road **fades** (to 0.18 of its opacity, with its names and arrows) or is **hidden** | one at a time: turning one on turns the others off | an Ask answer (`focus_roads`), or **Focus** in the dock | its chip: a click turns it off and on, ✕ removes it; a switch **Fade / Hide** in the chip |
+
+- **Lasting changes are layers.** Colour and Focus stay until the person removes them. Each is a chip in one strip, "On the map", at the
+  top of the data dock: the chip of a colour shows its groups with their colours, the chip of a focus shows its number of roads and Fade /
+  Hide. A click on a chip turns that layer off (the chip fades and its name is struck through) and on again: an undo that can be undone.
+  ✕ removes it. Nothing else removes a layer: not a new question, not ✕ of an answer card, not "New".
+- **The light is transient.** It always shows the dock's table, so there is exactly one lit set, and it changes with the table. A table
+  that a colour or a focus already shows (the table of a colour answer or of a focus) is not lit: a purple glow over all the coloured
+  roads hid their colours.
+- **The drawing order:** Focus (fade or hide) at the bottom, then Colour, then Light, then Select on top.
+- **The camera** moves to the roads after an answer, on **Show**, on **Focus**, and when the switch is turned on. Else only the person
+  moves it: an SQL run of the person does not move the map.
+- **One place for actions.** The dock has the actions on its table: the switch **Show on map**, **Colour** (one colour for each value of
+  the first text or yes/no column that has 2 to 8 values, for example `highway`; else one colour) and **Focus** (fade). Ask's tools call
+  the same actions, so the map does not depend on where a change came from.
+- **Only these layers.** The strip removes only the colours, the legend rows and the focus that it made. The page's own colours (`colorBy`,
+  live data) and the person's own filter in the roads box stay.
+
+**New in roadstyle: `rs.fade(ids, {opacity})`** and `rs.fade(null)`: every road that is not in the set (edge ids, as `rs.highlight`) is
+drawn at `opacity` (default 0.18) of its own opacity, with its names and arrows; the same id lookup as `rsFilter` (the twin of a pair drawn
+as one line too). Event `rs:fadechange`, and `fade` in `rs.getState()`. The mock-up does it with the opacity of the four road layers (each
+value of a zoom curve times `["case", ["in", ["id"], ids], 1, 0.18]`).
+
 ## 1. The bottom dock
 
 ### What it does
@@ -341,11 +375,10 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 - **CSV.** Downloads the rows of the table as `<label>.csv`: a header row, comma separated, a text with a comma, a quote or a new line in
   quotes, a `BigInt` exactly, `null` as empty. The file has the rows of the table only (at most `limit`). The note in the bar says so when
   there are more.
-- **Show on map.** When the result has `idColumn`, the button lights those roads with `rs.highlight(ids)` and zooms to them with
-  `rs.focus(ids)`. A second click (or a new run) takes the light away (`rs.highlight([])`). An id that is not on the map is not lit, and
-  the bar says "40 of 42 roads are on the map".
+- **Show on map, Colour, Focus.** See [The map: four operations](#the-map-four-operations). Show on map is a switch (on by default) for the
+  light of the table; Colour and Focus add a layer to the strip "On the map".
 - **A click on a row** selects that road and zooms to it (`rs.select(id)`, `rs.focus(id)`). The row stays marked, and the road's card
-  opens beside the table.
+  opens beside the table. The light does not change.
 - **The list of tables.** The button "Tables" in the title row opens a list of the tables and their columns (from `schema()`), with the
   description of each column in its tooltip. A click on a name puts it in the line at the cursor.
 
@@ -357,7 +390,7 @@ button and the same window as the panel's own help (Kaveh, 2026-11-05: "add help
 | Part | Where the "?" is | The words |
 |---|---|---|
 | The data dock | in its title row, after the note | What the dock is; the SQL line (only SELECT or WITH: the data does not change), Tables, CSV, Show on map (also for a table of street names), a click on a row, the top edge (drag, double click); the 1000-row limit |
-| Ask | in its top row, after the provider and the model | What Ask does; Key (the free keys, the key stays in this browser), Examples, an answer card (its SQL, Map, Table, ✕), MAP and Undo, New; what goes to the AI service, and that an AI service can be wrong |
+| Ask | in its top row, after the provider and the model | What Ask does; Key (the free keys, the key stays in this browser), Examples, an answer card (its SQL, Map, Table, ✕), MAP and "On the map", New; what goes to the AI service, and that an AI service can be wrong |
 
 A host can give its own words with the options `help` of `dataDock` and of `askPanel` (`{title, intro, terms, note}`), or `help: false`.
 
@@ -370,10 +403,10 @@ so the data dock finds the roads of a result itself:
 1. The result has `idColumn`: these are the roads.
 2. Else the first of `keys` that the result has (`osm_id`, then `name`): the host's `roadsBy(sql, column)` gives the road ids of all the
    values of that column. Monaco: the three street names became 95 road edges.
-3. Else the result has no roads: no Show on map, and the answer card has no Map.
+3. Else the result has no roads: no light, no Colour and no Focus.
 
-The same lookup serves a click on a row (the roads of that row's name: "Tunnel Albert II" lit its 7 edges), Show on map, the Map button
-of an answer and the light after an answer. The prompt also says it plainly: "Also for a list of street names: `SELECT edge_id, name ...`
+The same lookup serves a click on a row (the roads of that row's name: "Tunnel Albert II" selects its first road and fits its 7
+edges), the light, Colour and Focus. The prompt also says it plainly: "Also for a list of street names: `SELECT edge_id, name ...`
 (no DISTINCT), not `SELECT DISTINCT name`."
 
 ### The road card in the dock
@@ -529,15 +562,11 @@ default stays `frame` for other pages, and a look that the person keeps in Setti
   view shows each step on one muted line: "Writing SQL", "Running query 1", "Query 1 failed: Referenced column "lenght" not found. Trying
   again", "Writing the answer". All the step lines go when the answer comes.
 - **One query.** The footer counts the query that made the table: "1 query · 5 rows". It opens to that SQL.
-- **Each answer keeps its table and its map** (Kaveh, 2026-11-05: "table bottom doesnt work", "we should have map bottom too", "by default
-  after answer apply both table and map"). A card keeps the result that it put into the dock and the map changes that it made. Its footer
-  has two buttons at the right, **Map** and **Table**:
-  - **Table** puts this answer's table back into the dock (its SQL in the line) and opens the dock. Before, Table only opened the dock,
-    which showed the newest table: after a second question, the first card's Table showed the second table.
-  - **Map** shows this answer's roads again and zooms to them: for a query, it lights the rows of its table (`rs.highlight`); for a filter
-    or a colour, it applies that change again (also after its Undo, which then works again) and takes away the light of another answer. A
-    card with no road ids has no Map.
-  - **After each answer, both at once:** the dock shows the answer's table (it opens on a desktop) and the map shows its roads.
+- **Each answer keeps its table.** Its footer has one button, **Show**: it puts this answer's table back into the dock (its SQL in the line),
+  so its roads light on the map, opens the dock and moves the camera to them. **After each answer** the same happens by itself (the dock
+  opens on a desktop). The card has no Undo and no Map: a colour or a focus of the answer is a layer in "On the map", and the card's map
+  line says so ("Focus on 625 roads … in "On the map""). ✕ of the card removes only the card. (An earlier form had Map, Table and Undo
+  in the cards: Kaveh found it unclear when the map shows what.)
   - **Which table is the answer's.** When the answer changed the map (filter, colour, move), its table is the roads of the last map tool,
     not a later query of the model. A model often runs a small helper query after a filter, for its sentence ("… ORDER BY length_m DESC
     LIMIT 5" for "the longest"), and the dock showed those 5 rows in place of the 625 filtered roads (Kaveh, 2026-11-05: "why it limits to
@@ -559,7 +588,7 @@ default stays `frame` for other pages, and a look that the person keeps in Setti
 
 ```
 question
-  -> model(system prompt + schema + conversation + question, tools: [run_query, color_roads, filter_roads, move_map])
+  -> model(system prompt + schema + conversation + question, tools: [run_query, describe_table, color_roads, focus_roads, move_map])
        - gives a tool call run_query(sql):
            guard(sql) -> data.run(sql, {source: "ask"}) -> the result (or the error)
            -> to the model, and loop again
@@ -581,7 +610,7 @@ question
    - A result goes back to the model as: the column names and types, the first `sendRows` rows as JSON arrays, the number of rows, and
      "more rows: yes" when the result was cut. A text value is cut at 200 characters.
 4. When the model gives text, that text is the answer. The last query that worked is the answer's query: the data dock shows its SQL and
-   its table, and Ask calls "Show on map" when the table has `idColumn`.
+   its table, so its roads light (see [The map: four operations](#the-map-four-operations)).
 5. The loop stops with an error after `maxSteps` model calls, or after 3 failed queries one after the other. The card shows the last error.
    **No silent stop:** any error of the agent (also one outside the loop, for example in the schema) ends the question with a red line on
    its card, and the question box works again. (Kaveh, 2026-11-05: a card with the question and nothing else.)
@@ -604,8 +633,8 @@ SQL as for a question, and the same guard checks it.
 
 | Tool | Arguments | What the page does | `rs` call |
 |---|---|---|---|
-| `color_roads` | `groups: [{label, color, sql}]` (1 to 8 groups; `color` is `#rrggbb`) | Colours the roads of each group and adds one row for each group to the legend (a `line` mark). A group with the label of an earlier group replaces it. | `rs.color([{color, ids}])`, `rs.legend.add` |
-| `filter_roads` | `sql` | Shows only the roads of the query and zooms to them. | `rs.setFilter({ids})`, `rs.focus(ids)` |
+| `color_roads` | `groups: [{label, color, sql}]` (1 to 8 groups; `color` is `#rrggbb`) | Adds a colour layer: the roads of each group in its colour, a legend row for each group (a `line` mark). | `rs.color([{color, ids}])`, `rs.legend.add` |
+| `focus_roads` | `sql`, `mode`: `"fade"` (default) or `"hide"` | Adds a focus layer (and turns another focus off): the other roads fade, or are hidden when the person says "only". Zooms to the roads. | `rs.fade(ids)` or `rs.setFilter({ids})`, `rs.focus(ids)` |
 | `move_map` | `sql` | Zooms to the roads of the query. | `rs.focus(ids)` |
 
 Ask also has the read tool `describe_table(name)`: it gives the columns of one table with their types and meanings (the host's
@@ -622,14 +651,10 @@ Ask also has the read tool `describe_table(name)`: it gives the columns of one t
   its card. (Before, the dock kept the person's older table, with no `edge_id`, and Kaveh saw "no Show on map", 2026-11-05.) The SQL in the
   dock's line is the tool's SQL inside `WHERE edge_id IN (...)`, so the person can change it and run it again. A `;` at the end of the
   model's SQL is removed first.
-- **The card.** Each change of the map is one line in the answer's card: a small "MAP" label, the text ("Shows only 625 roads"), and
-  **Undo** for a colour or a filter. A move has no Undo. The footer is the same as for a query: "▸ 2 map queries" (the SQL) at the left and
-  **Table** at the right.
-- **Undo.** The page keeps the map changes of each card. Undo takes away the changes of that card. The ✕ of a card also takes away its
-  changes, and "New" takes away all of them. The page then paints the map again from the changes of the cards that stay, so two cards
-  can colour different roads at the same time.
-- **Only Ask's own changes.** Undo and ✕ remove only the colours, the legend rows and the filter that Ask made. The page's own colours
-  (`colorBy`, live data) and the person's own filter in the roads box stay.
+- **The card.** Each change of the map is one line in the answer's card: a small "MAP" label, the text ("Focus on 625 roads (the others
+  hidden)") and "in "On the map"". The footer is the same as for a query: "▸ 2 map queries" (the SQL) at the left and **Show** at the right.
+- **The layers.** A colour or a focus of an answer is a layer in the strip "On the map" (see [The map: four operations](#the-map-four-operations)):
+  a click on its chip turns it off and on, ✕ removes it. A new question, ✕ of a card and "New" leave the layers as they are.
 - **Kept out:** a tool that changes the data (OSM tags, levels, the network). It needs a confirm step before each change. The base map,
   the theme and the 3D view are also kept out for now: the person changes them with one click in the toolbox.
 
@@ -646,7 +671,8 @@ You have four tools. Each one takes read-only SQL (one SELECT or WITH statement)
   query as a table and lights the roads of the rows on the map.
 - color_roads(groups): colours roads on the map. Each group has a label, a colour (#rrggbb) and
   SQL that selects {idColumn}. The legend shows the labels.
-- filter_roads(sql): shows only the roads that the SQL selects ({idColumn}).
+- focus_roads(sql, mode): the roads that the SQL selects ({idColumn}) stay; the others are faded
+  (mode "fade", the default) or hidden (mode "hide": use it when the person says "only").
 - move_map(sql): zooms the map to the roads that the SQL selects ({idColumn}).
 Use a map tool only when the person asks to see, show, colour, filter or zoom.
 You cannot change the data.
@@ -834,7 +860,7 @@ recommends: the host runs the agent's SQL (`source: "ask"`) between `BEGIN TRANS
 not see is undone. This is the host's work and is not in roadstyle.
 
 Why it matters: the data of a page comes from OSM, and a street name can hold words to the model ("prompt injection"). With this
-design the worst result is a wrong answer or a wrong colour on the map (Undo takes it away): no tool changes the data, a query cannot read a file or an address, and the answer is plain text
+design the worst result is a wrong answer or a wrong colour on the map (its chip takes it away): no tool changes the data, a query cannot read a file or an address, and the answer is plain text
 with no links and no images.
 
 ## One hover for the whole dashboard
@@ -904,8 +930,9 @@ No test needs a key or the network. CI runs them all.
 | `tests/data_units.js` in `tests/test_data_dock_browser.py` | The guard: a list of SQL that it accepts (with comments, strings that hold `DROP`, `WITH`, a `;` at the end) and a list that it refuses (two statements, each refused word, `read_csv`, `FROM 'x.parquet'`, `'https://...'`, `query('...')`). The row limit wrap. The CSV text (a comma, a quote, a new line, a `BigInt`, `null`). An id as exact text. |
 | `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. With 2 765 rows: the note says "1 000 of 2 765 rows", Show on map lights 2 765, the CSV has 2 765 rows; a click on a header sorts rising, falling and back, over all the rows (the first value is the true minimum), also for `BigInt` ids and text with `null`. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
-| `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. After three answers (a query, a filter, a zoom): the first card's Table shows its own 5 rows in the dock; Undo of the filter card and then its Map apply the filter again; the first card's Map lights its 5 roads; `**x**` in an answer is a `<b>`; an answer that lists 5 rows with their ids shows 3 items with no ids and "… 2 more in the table". Also: a question asked while `ready` waits shows "Loading the data…" and then its answer; an error thrown by `schema()` ends the question with a red line, and the box works again; the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
-| `tests/test_ask_tools_browser.py` | The map tools with the fake provider: `color_roads` with 2 groups colours the right roads and adds 2 legend rows; `filter_roads` sets the id filter; `move_map` moves the camera; Undo and ✕ take away only that card's changes and keep the page's own colours and filter; "New" takes away all; after each map tool the dock has the tool's roads with `edge_id` and Show on map, and a click on a row opens the road card; a query without `edge_id` and a query over `mapLimit` give an error to the model; no id goes into a request to the provider. |
+| `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. After three answers (a query, a filter, a zoom): the first card's Table shows its own 5 rows in the dock; a click on the focus chip turns the focus off and on again; the first card's Show lights its 5 roads again; `**x**` in an answer is a `<b>`; an answer that lists 5 rows with their ids shows 3 items with no ids and "… 2 more in the table". Also: a question asked while `ready` waits shows "Loading the data…" and then its answer; an error thrown by `schema()` ends the question with a red line, and the box works again; the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
+| `tests/test_map_operations_browser.py` | The four operations: a new table changes the light and the switch turns it off and on; a colour answer's table is not lit; two colours on, the newest wins; a second focus turns the first off; a click on a chip turns it off and on; ✕ removes it; Fade and Hide; a person's SQL does not move the camera; `rs.fade` fades the other roads with their names and arrows, in both themes. |
+| `tests/test_ask_tools_browser.py` | The map tools with the fake provider: `color_roads` with 2 groups colours the right roads and adds 2 legend rows; `focus_roads` adds a focus layer; `focus_roads` fades (and with mode hide, hides) the other roads; `move_map` moves the camera; a click on a chip turns its layer off and on, its ✕ removes it, and only a chip changes a layer (not a new question, a card's ✕ or New); the page's own colours and filter stay; after each map tool the dock has the tool's roads with `edge_id` and Show on map, and a click on a row opens the road card; a query without `edge_id` and a query over `mapLimit` give an error to the model; no id goes into a request to the provider. |
 | `tests/test_dock_toolbar_browser.py` | With the dock open, at 1366 × 900, 768, 650 and 560 px and the bar at each of the four edges: the bar and each open box of the toolbox end above the dock, and a box taller than its room scrolls to its end with the wheel and stays there. A bar along the top or the bottom with `align` left, middle and right: 8 px after the panel's card, in the middle of the free part, 8 px from the other edge; the choice in Settings stays after a reload. |
 | `tests/test_ask_align_browser.py` | At 1440 and 1920 px, with the card look and the frame look: the dock touches the left, right and bottom edges of the window; its top corners are round with the card look; the gap between the panel's card and the dock is 16 px; the cards of the conversation, Back and the question box have the same left and right x. |
 | `tests/test_ask_budget_browser.py` | The prompt of the Monaco test data is at most 4 000 characters; a tool result is at most 2 500; a fake provider answers 429 with "try again in 2.5s" once: the card shows the count down, and the request goes again after the wait; a 429 with a wait over 60 s is an error on the card. |
