@@ -1160,6 +1160,9 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-dd-chart{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px}
 /* three cards in the Chart view: the settings, the chart and the road (Kaveh, 2026-11-06: "divide this to 3 parts not two"); flat cards, no fill */
 .rs-dd-chartrow,.rs-dd-cmain{border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:8px;background:transparent;padding:8px 12px}
+/* the side card of the Chart view (the road, or the list of tables) is flat as the two chart cards (Kaveh, 2026-11-06: "this card is not like"
+   the others); the Table view keeps the fill of its table */
+.rs-dd-chart:not([hidden])~.rs-dd-side :is(.rs-dd-card,.rs-dd-tables){border-color:color-mix(in srgb,var(--line) 70%,transparent);background:transparent}
 .rs-dd-chart[hidden],#rs-dock .rs-dock-table[hidden]{display:none}
 .rs-dd-chartrow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px}
 .rs-dd-cl{display:inline-flex;gap:6px;align-items:center;color:var(--mut);font-size:12px}
