@@ -97,6 +97,19 @@ section is the rule; the parts below follow it.
 - **The light is transient.** It always shows the dock's table, so there is exactly one lit set, and it changes with the table. A table
   that a colour or a focus already shows (the table of a colour answer or of a focus) is not lit: a purple glow over all the coloured
   roads hid their colours.
+- **The look of Light and Select** (Kaveh, 2026-11-05: "wrong color and style for showing on the map … selected edges have wrong color
+  too … you click on a road but another road's colour is changed to yellow"). roadstyle's `rs.highlight` and `rs.select` set the same
+  feature state, `select`, and that state paints the road's **fill** in `select_color` (default `#7c4dff`, an older purple): a lit set lost
+  its colours, and a click, which first clears the `select` of the road selected before, put a lit road back to its own yellow. So:
+
+  | State | Feature state | Look |
+  |---|---|---|
+  | Light | `lit` (new; `rs.highlight` sets it) | the **casing** of the road in `--accent`, twice as wide; the fill keeps its colour |
+  | Select | `select` (as now) | the **fill** in `--accent` (the default of `select_color` becomes the accent) |
+  | Hover | `hover` (as now) | the fill in a light accent (the default of `hover_color`) |
+
+  Select and deselect never touch `lit`, so a click does not change the lit set. Checked in the mock-up at street level in both themes:
+  625 lit roads stay lit after two clicks, and only the clicked road has the accent fill.
 - **The drawing order:** Focus (fade or hide) at the bottom, then Colour, then Light, then Select on top.
 - **The camera** moves to the roads after an answer, on **Show**, on **Focus**, and when the switch is turned on. Else only the person
   moves it: an SQL run of the person does not move the map.
@@ -922,6 +935,7 @@ Changes in existing parts, all small and with no change of look on a page withou
 | File | Change |
 |---|---|
 | `dashboard.css`, the page template | **One hover** (see [One hover for the whole dashboard](#one-hover-for-the-whole-dashboard)): the token `--rs-hover-bg`; the three looks in place of the 13 of now; the panel's hide and show buttons; `#sb button:hover:not(:disabled)`; links underlined on hover only. A change of the look of every page, so it is a separate PR, before the dock |
+| `core.js`, the road layer's paint (Rust style writer) | `rs.highlight` sets the new feature state `lit` (not `select`); the road casing's colour and width read `lit`; the defaults of `select_color` and `hover_color` become the accent and a light accent |
 | `toolbar.js` | `keepInside` keeps a box's scroll across its fit and does not fit again for the class `rs-scrolling` (a fault now: a box that it makes shorter cannot scroll). The low edge of a box is the dock's top, not `innerHeight` (`keepInside`). A bar at a side has the free height above the dock as its largest height, and is centred there; a bar along the bottom ends above the dock |
 | `overlay.js` | `followPanels`: the place of a bar along the top or the bottom, `left`, `middle` or `right` (`toolbar.align`) |
 | `settings.js`, `placement.js` | The row "Toolbar place" (only for a bar at the top or the bottom); the choice is kept as the other layout choices |
