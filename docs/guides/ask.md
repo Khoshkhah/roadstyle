@@ -126,7 +126,12 @@ localStorage.setItem("rs-key:ask:fake", "not-a-key");
 
 ### Graph questions
 
-With `dialect: "DuckDB"`, the prompt also has a pattern for graph work in SQL: the shortest distances from one node with `WITH RECURSIVE ... USING KEY (node)` on a table of directed edges (a start node, an end node, a length). For the diameter the model runs it twice, a "double sweep": from any node, then from the farthest node of the first run. On Monaco's driving network each run takes about one second. The prompt tells the model not to compute all the pairs at once, because that is too slow for a page.
+With `dialect: "DuckDB"`, the prompt also has a pattern for graph work in SQL: the shortest distances from a few start nodes at once, with `WITH RECURSIVE ... USING KEY (src, node)` on a table of directed edges (a start node, an end node, a length). For the diameter, the model uses two queries:
+
+1. A forward run from the 4 nodes at the edges of the map (the smallest and the largest x and y).
+2. A backward run, on the reversed edges, from each farthest node of the first run.
+
+The largest distance of the two runs is the diameter. On Monaco's driving network this gives the exact value, 6 066 m, in 0.6 s. A double sweep from one node gave only 4 319 m, because of the one-way streets, and all the pairs at once took 322 s. The prompt tells the model not to compute all the pairs at once.
 
 ### draw_chart
 

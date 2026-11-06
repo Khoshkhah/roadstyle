@@ -63,17 +63,22 @@ const LOOKUP = `Look up:
   its columns: SELECT column_name, data_type, comment FROM duckdb_columns() WHERE schema_name = 's' AND table_name = 't'`;
 
 // graph work in SQL (Kaveh, 2026-11-06: "compute diameter of driving network" got "there is no graph function"): DuckDB's recursive CTE with USING KEY
-// keeps one row for each node, so a shortest-path search is one query (Monaco: 1.9 s for two of them). All pairs at once is too slow for a page.
+// keeps one row for each start and node, so a shortest-path search from a few start nodes is one query. The diameter by sweeps (forward from the 4 nodes
+// at the edges of the map, then backward from each farthest node) gave the exact value on Monaco's driving network, 6 066 m, in 0.6 s for both queries;
+// a double sweep from one node gave only 4 319 m (one-way streets), and all pairs at once took 322 s.
 const GRAPH = `Graph questions (a route, a distance on the network, the farthest node, the diameter, connected parts): the network is a
-table of directed edges with a start node, an end node and a length (look up its columns). Shortest distances from one node:
-  WITH RECURSIVE dist(node, d) USING KEY (node) AS (
-    SELECT <start node>::BIGINT, 0.0::DOUBLE
+table of directed edges with a start node, an end node and a length, and its nodes have a position (look up the columns).
+Shortest distances from some start nodes at once:
+  WITH RECURSIVE dist(src, node, d) USING KEY (src, node) AS (
+    SELECT n, n, 0.0::DOUBLE FROM (<start nodes>) AS s(n)
     UNION
-    (SELECT e.<end>, min(d0.d + e.<length>)::DOUBLE FROM recurring.dist AS d0 JOIN <edges> AS e ON e.<start> = d0.node
-     LEFT JOIN recurring.dist AS old ON old.node = e.<end> GROUP BY e.<end>, old.d HAVING old.d IS NULL OR min(d0.d + e.<length>) < old.d))
-  SELECT node, d FROM dist ORDER BY d DESC
-The diameter: run it from any node, take the farthest node, run it again from that node: its largest d is the diameter (a
-double sweep; say that it is the usual estimate). Do not compute all pairs at once: it is too slow.`;
+    (SELECT d0.src, e.<end>, min(d0.d + e.<length>)::DOUBLE FROM recurring.dist AS d0 JOIN <edges> AS e ON e.<start> = d0.node
+     LEFT JOIN recurring.dist AS old ON old.src = d0.src AND old.node = e.<end>
+     GROUP BY d0.src, e.<end>, old.d HAVING old.d IS NULL OR min(d0.d + e.<length>) < old.d))
+  SELECT src, arg_max(node, d) AS far_node, max(d) AS d FROM dist GROUP BY src
+The diameter (the longest shortest path) in two queries: 1. start at the 4 nodes at the edges of the map (the smallest and the
+largest x and y); 2. run it on the reversed edges (swap <start> and <end>) from each far_node of step 1. The largest d of the
+two runs is the diameter. Say that sweeps found it. Never compute all pairs at once: it takes minutes.`;
 
 // an answer as the person reads it: no raw ids ("edge 3363728794791538739", any number of 12 digits or more): the table has them
 const noIds = (t) => t.replace(/\b(edges?|edge_id|id)\s*[:=]?\s*\d{12,}\b\s*/gi, "").replace(/\s*\(?\b\d{12,}\b\)?/g, "").replace(/\(\s*\)/g, "")
