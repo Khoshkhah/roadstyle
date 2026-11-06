@@ -132,7 +132,7 @@ export function askPanel(o = {}){
 
   // the empty start: one line about Ask, the key note when there is no key, the examples as chips
   const ex = $("div", "rs-ask-ex"), needKey = $("div", "rs-ask-need");
-  const chips = (onPick) => examples.map((q) => { const c = $("button", "rs-chip", q); c.type = "button"; c.onclick = () => { onPick(); ask(q); }; return c; });
+  const chips = (onPick) => examples.map((q) => { const c = $("button", "rs-ask-q", q); c.type = "button"; c.onclick = () => { onPick(); ask(q); }; return c; });
   ex.append($("p", "rs-ask-hint", "Ask a question in words. The agent writes the SQL, the table goes to the data dock and the roads light on the map."), needKey, ...chips(() => {}));
   log.append(ex);
 
@@ -460,6 +460,10 @@ export function askPanel(o = {}){
   function open(){ frame.open(); paintWho(); toEnd(); note("Open"); }
   function close(){ frame.close(); exOpen(false); note(turns.length ? plural(turns.length, "question", "questions") : "Ask a question about the data"); }
   frame.addEventListener("back", () => { close(); emit("back"); });
+  // a road click while Ask is open: no popup; the data dock opens with the road in its card, where a question can use it (Kaveh, 2026-11-06: "for ask
+  // and query part, we should disable popup"). rs:select comes before the popup, so the hold is right for each click, also after a close by the host
+  document.addEventListener("rs:select", (e) => { const on = frame.isOpen() && !e.detail.overlay;
+    if(rs.holdPopup) rs.holdPopup("ask", on); if(on) data.open(); });
   paintWho(); paintStart();
   return Object.assign(events, {open, close, isOpen: frame.isOpen, ask, stop, clear, remove,
     history: () => turns.map(({question, text, res}) => ({question, text: text ?? null, sql: res ? res.sql : null, rows: res ? res.rows : []}))});
