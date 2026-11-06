@@ -295,7 +295,8 @@ fn base_map_args(b: &BaseMap, th: &Value, spec: &Value) -> Map<String, Value> {
         let theme = if b.theme == "osm" { String::new() } else { format!(", {}", b.theme) };
         args.insert("name".into(), format!("{place} ({}, {}{theme})", b.mode, b.paths).into());
     }
-    args.insert("tooltip".into(), json!(["edge_id", "osm_id", "highway", "name", "access"]));
+    // the hover tooltip: the name and the class only; the ids and the other columns are in the popup or the road card (Kaveh, 2026-11-06)
+    args.insert("tooltip".into(), json!(["name", "highway"]));
     args.insert("copy_field".into(), "edge_id".into());
     // duckOSM stores every path, and a one-way street's walking-only reverse, as a reverse edge too: a pair is two lanes only when both
     // edges are directed; the arrows only on cars' one-ways (and a private or bus-only road)

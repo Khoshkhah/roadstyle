@@ -85,11 +85,11 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
 
 
 @contextlib.contextmanager
-def served(tmp_path):
+def served(tmp_path, **page):
     shutil.copytree(DASH, tmp_path / "dashboard")
-    page = tmp_path / "page.html"
-    rs.render_dashboard(_edges(), basemap="blank", color_options={"Road class": {}}, name="Ask").save(page)
-    page.write_text(page.read_text().replace("</body>", _HOST + "</body>"))
+    path = tmp_path / "page.html"
+    rs.render_dashboard(_edges(), basemap="blank", color_options={"Road class": {}}, name="Ask", **page).save(path)
+    path.write_text(path.read_text().replace("</body>", _HOST + "</body>"))
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(tmp_path)))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
@@ -124,7 +124,7 @@ def test_the_agent_fixes_its_sql_and_its_answer_goes_to_the_dock(tmp_path):
         try:
             page.click("#sb [data-rs-section=ask] .rs-sec-title")
             assert page.is_visible("#ask-head .rs-ask-top") and "Fake AI · fake-1" in page.inner_text("#ask-head")
-            assert page.is_visible(".rs-ask-ex .rs-chip") and not page.is_visible(".rs-ask-exbar")
+            assert page.is_visible(".rs-ask-ex .rs-ask-q") and not page.is_visible(".rs-ask-exbar")
             # a question during the load: "Loading the data…", then the loop. Wrong SQL, right SQL, text: 3 model calls.
             page.evaluate("""window.script = [tool('run_query', {sql: 'SELECT edge_id, lenght FROM edges'}),
                                               tool('run_query', {sql: 'SELECT edge_id, name, highway FROM edges'}),
@@ -178,7 +178,7 @@ def test_the_agent_fixes_its_sql_and_its_answer_goes_to_the_dock(tmp_path):
             assert "How many roads?" not in sent and "Which roads are primary?" in sent
             # New: the empty start again
             page.click(".rs-ask-new")
-            assert page.locator(".rs-ask-turn").count() == 0 and page.is_visible(".rs-ask-ex .rs-chip")
+            assert page.locator(".rs-ask-turn").count() == 0 and page.is_visible(".rs-ask-ex .rs-ask-q")
         finally:
             browser.close()
     assert errors == [], errors
@@ -398,6 +398,36 @@ def test_the_duckdb_prompt_has_the_graph_rule(tmp_path):
             _ask(page, "What is the diameter of the network?", ["say('About 4 km.')"])
             system = page.evaluate("window.calls[0].messages[0].content")
             assert "USING KEY (src, node)" in system and "reversed edges" in system and "Never compute all pairs at once" in system
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_road_click_while_ask_is_open_opens_the_dock_card_and_no_popup(tmp_path):
+    """Ask closed: a click on a road opens its popup, and the road's tooltip closes (it showed through the popup). Ask open: no popup; the data
+    dock opens with the road in its card (Kaveh, 2026-11-06). Ask closed again: the popup again."""
+    popups = "document.querySelectorAll('.maplibregl-popup:not(.rs-tip)').length"
+    with served(tmp_path, road_tooltip=["highway"]) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad()")
+            x, y = page.evaluate("(() => { const q = map.project([18.002, 59.305]); return [q.x, q.y]; })()")
+            page.mouse.move(x, y)
+            page.wait_for_selector(".maplibregl-popup.rs-tip", timeout=5000)
+            page.mouse.click(x, y)
+            page.wait_for_timeout(300)
+            assert page.evaluate(popups) == 1 and page.locator(".rs-tip").count() == 0
+            page.evaluate("document.querySelector('.maplibregl-popup-close-button').click()")
+            page.click("#sb [data-rs-section=ask] .rs-sec-title")
+            page.mouse.click(x, y)
+            page.wait_for_timeout(300)
+            assert page.evaluate(popups) == 0 and page.evaluate("rs.dock.isOpen()")
+            assert "Street 2" in page.inner_text("#rs-dock .rs-dd-card")
+            page.click(".rs-frame-back")
+            page.evaluate("rs.dock.close()")
+            page.mouse.click(x, y)
+            page.wait_for_timeout(300)
+            assert page.evaluate(popups) == 1
         finally:
             browser.close()
     assert errors == [], errors
