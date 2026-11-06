@@ -909,7 +909,7 @@ html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
 /* the dock's table: as wide as its columns, the height of the dock, both scrollbars always visible, the header row and the first column in view */
 #rs-dock .rs-dock-table{flex:1;min-height:0;max-height:none;align-self:flex-start;max-width:100%;box-sizing:border-box;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg);
   scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent;-webkit-mask-image:none;mask-image:none}
-#rs-dock .rs-dock-table table{width:max-content;border-collapse:separate;border-spacing:0;font:12.5px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums}
+#rs-dock .rs-dock-table table{table-layout:fixed;width:max-content;border-collapse:separate;border-spacing:0;font:12.5px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums}
 #rs-dock .rs-dock-table :is(th,td){white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis;padding:5px 14px;text-align:left;border-bottom:1px solid var(--line);height:15px}
 #rs-dock .rs-dock-table th{position:sticky;top:0;z-index:2;background:var(--card);font-weight:600;vertical-align:bottom;cursor:pointer;user-select:none}
 #rs-dock .rs-dock-table th small{display:block;font:500 10px/1.2 system-ui,sans-serif;color:var(--mut);letter-spacing:.03em}
