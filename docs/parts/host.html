@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard parts on a map</title>
+<!-- The parts that need the map (docs/guides/dashboard-parts.md): a host page with MapLibre, dashboard.css and rsDashboard on the page's own map and panel,
+     as duckOSM Studio has (tests/test_host_page_gaps_browser.py, HOST). The files are the real dashboard files (docs/copy_parts.py). It has no tiles: the map
+     is a background and three roads. ?theme=dark starts in the dark theme. -->
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="static/popup.css">
+<link rel="stylesheet" href="static/dashboard/dashboard.css">
+<link rel="stylesheet" href="template.css">
+<script src="vendor/maplibre-gl.js"></script>
+<style>html,body{margin:0;height:100%}#map{position:fixed;inset:0}</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="sb" data-theme="light"><div class="sb-card"><div class="sb-top"><h2>On a map</h2><button id="sb-hide" title="Hide the panel" aria-label="Hide the panel">&#x2715;</button></div><div class="sb-body"></div></div></div>
+<script type="module">
+import {rsDashboard} from "./static/dashboard/index.js";
+const opts = await (await fetch("data/host_options.json")).json(), d = opts.dashboard, c = document.documentElement.classList;
+c.add("rs-tpl-dashboard", "rs-overlay", "rs-has-toolbar", "rs-tb-" + d.toolbar.position, "rs-panel-left", "rs-hide-scale");
+document.documentElement.style.setProperty("--rs-panel-w", Math.min(d.panel.width_px, 360) + "px");
+if(matchMedia("(max-width:" + d.phone.max_width_px + "px)").matches) c.add("rs-phone");
+const road = (a, b) => ({type: "Feature", properties: {}, geometry: {type: "LineString", coordinates: [a, b]}});
+const roads = {type: "FeatureCollection", features: [road([18.05, 59.300], [18.09, 59.300]), road([18.07, 59.292], [18.07, 59.312]), road([18.055, 59.308], [18.085, 59.293])]};
+window.map = new maplibregl.Map({container: "map", center: [18.07, 59.30], zoom: 13, attributionControl: false,
+  style: {version: 8, sources: {}, layers: [{id: "bg", type: "background", paint: {"background-color": "#efede8"}}]}});
+const rs = window.rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, basemaps: opts.basemaps.filter(b => b.key === "blank"), ontop: opts.ontop, basemap_switcher: true, dashboard: d});
+await map.once("load");
+map.addSource("rs-roads", {type: "geojson", data: roads});
+map.addLayer({id: "rs-roads", type: "line", source: "rs-roads", paint: {"line-color": "#0E7F91", "line-width": 4}});
+// the ground of this map follows the theme (a dashboard page has a dark base map for it)
+document.addEventListener("rs:themechange", e => map.setPaintProperty("bg", "background-color", e.detail.theme === "dark" ? "#1b1e24" : "#efede8"));
+// the theme: ?theme=dark, else in an iframe of the docs site the site's light and dark switch (mkdocs-material: <body data-md-color-scheme="slate">)
+const theme = new URLSearchParams(location.search).get("theme");
+if(theme) rsSetTheme(theme);
+else try {
+  const site = window.parent !== window && window.parent.document.body;
+  if(site && site.hasAttribute("data-md-color-scheme")){
+    const follow = () => rsSetTheme(site.getAttribute("data-md-color-scheme") === "slate" ? "dark" : "light");
+    follow(); new MutationObserver(follow).observe(site, {attributes: true, attributeFilter: ["data-md-color-scheme"]});
+  }
+} catch(e){ /* another origin: the light theme */ }
+
+// the bottom dock and its table
+const t = rs.dock.table({columns: [{name: "edge_id", type: "BIGINT"}, {name: "name", type: "VARCHAR"}, {name: "highway", type: "VARCHAR"}, {name: "length_m", type: "DOUBLE"}],
+  rows: [[8121729169906061189n, "Götgatan", "primary", 1240.5], [8121729169906061190n, "Ringvägen", "secondary", 2210.25], [8121729169906061191n, "Hornsgatan", "primary", 1730], [8121729169906061192n, null, "service", 88.5]]});
+rs.sections.add({id: "dock", label: "Bottom dock", html: '<p>A table in the dock under the map. Drag its grip, sort a column, close it.</p><div class="sb-actions"><button type="button" class="sb-primary" id="dock-open">Show the table</button><button type="button" id="dock-close">Close the dock</button></div>'});
+document.getElementById("dock-open").onclick = () => { if(!rs.dock.list().includes("roads")) rs.dock.add({id: "roads", label: "Roads", el: t.el, note: "4 rows"}); rs.dock.open("roads"); };
+document.getElementById("dock-close").onclick = () => rs.dock.close();
+rs.sections.add({id: "more", label: "The toolbox", fold: true, html: "<p>The bar at the right edge is the toolbox of a dashboard. Its boxes, the select lists in them and the tips of its buttons are the same parts.</p>"});
+window.hostReady = true;
+</script>
+</body>
+</html>
