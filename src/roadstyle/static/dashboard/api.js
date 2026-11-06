@@ -14,6 +14,7 @@ import {rsDock} from "./dock.js";
 import {rsKpi} from "./kpi.js";
 import {rsSvg} from "./svg.js";
 import {rsChart} from "./chart.js";
+import {holdPopup} from "./select.js";
 import {rsLegend} from "./legend.js";
 import {rsColorModes} from "./colorbox.js";
 
@@ -101,6 +102,7 @@ export function makeApi(extra){
     colorModes: rsColorModes,    // the page's own "Colour by" list in the legend box: set, select, clear, active (colorbox.js)
     contract: CONTRACT,          // the newest roadstyle:contract that this dashboard reads (core.js)
     select(id){ if(id == null) call("rsDeselect"); else call("rsSelect", row(id)); },
+    holdPopup,                   // holdPopup(key, on): no road popup while a part that shows the road's facts is in view (select.js)
     fade(ids, o){ call("rsFade", ids == null ? null : rows(ids), o); },   // every other road at o.opacity (0.18) of its opacity; null ends it
     highlight(ids, set){ call("rsHighlight", rows(ids) || [], set && typeof set === "object" ? set : undefined); },   // set: {set, color, opacity} (a named set)
     focus(ids){ call("rsFocus", rows(Array.isArray(ids) ? ids : [ids])); },
