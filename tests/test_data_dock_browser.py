@@ -113,6 +113,19 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             w0 = page.evaluate(w)
             assert page.is_visible("#rs-dock .rs-dd-side-hint") and w0 > 600, w0
             assert page.evaluate("window.lights.at(-1)") == 6                                    # the roads of the table light
+            # Light off: the map's own colours, the table stays; on again: the light comes back. A closed dock lights nothing.
+            page.click("#rs-dock .rs-dd-light")
+            page.wait_for_timeout(200)
+            assert page.evaluate("window.lights.at(-1)") == 0 and page.is_visible("#rs-dock .rs-dock-table")
+            page.click("#rs-dock .rs-dd-light")
+            page.wait_for_timeout(200)
+            assert page.evaluate("window.lights.at(-1)") == 6
+            page.evaluate("rs.dock.close()")
+            page.wait_for_timeout(200)
+            assert page.evaluate("window.lights.at(-1)") == 0
+            page.evaluate("rs.dock.open()")
+            page.wait_for_timeout(200)
+            assert page.evaluate("window.lights.at(-1)") == 6
             # a row click selects its road; the light stays
             page.click("#rs-dock tbody tr >> nth=1")
             page.wait_for_timeout(200)

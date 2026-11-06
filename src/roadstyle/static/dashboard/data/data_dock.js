@@ -53,7 +53,17 @@ export function dataDock(o = {}){
   // Table | Chart: two views of the same result (the design's "4. Charts")
   const viewSw = $("span", "rs-seg rs-dd-view"), tableB = $("button", "on", "Table"), chartB = $("button", "", "Chart");
   tableB.type = chartB.type = "button"; viewSw.append(tableB, chartB);
-  acts.append(viewSw, tablesB, csvB, colourB, focusB);
+  // Light: the roads of the table in purple on the map, on by default; off, the map shows its own colours (Kaveh, 2026-11-06: "there is no easy way to
+  // see map with default colors after opening a table"). The browser keeps the choice. A closed dock lights nothing.
+  const LIGHT_KEY = "rs-data-light:" + location.pathname;
+  let lightOn = (() => { try{ return localStorage.getItem(LIGHT_KEY) !== "0"; }catch(e){ return true; } })();
+  const lightB = $("button", "rs-dd-light"); lightB.type = "button";
+  lightB.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg> Light';
+  const paintLight = () => { lightB.classList.toggle("on", lightOn); lightB.setAttribute("aria-pressed", String(lightOn));
+    lightB.title = lightOn ? "The roads of the table are lit on the map. Click: the map's own colours" : "The map shows its own colours. Click: light the roads of the table"; };
+  lightB.onclick = () => { lightOn = !lightOn; try{ localStorage.setItem(LIGHT_KEY, lightOn ? "1" : "0"); }catch(e){} paintLight(); light(); };
+  paintLight();
+  acts.append(viewSw, tablesB, csvB, lightB, colourB, focusB);
   const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
   q.append(line, run);
@@ -218,9 +228,11 @@ export function dataDock(o = {}){
   let lightSeq = 0;
   async function light(){
     const me = ++lightSeq, r = res;
-    const ids = r && !r.byLayer && keyOf(r) ? await roadsOf(r).catch(() => []) : [];
+    const ids = lightOn && rs.dock.isOpen() && r && !r.byLayer && keyOf(r) ? await roadsOf(r).catch(() => []) : [];
     if(me === lightSeq) rs.highlight(onMap(ids), LIGHT);
   }
+  document.addEventListener("rs:dockchange", (e) => { if(e.detail.id === id && !!e.detail.open !== lightWasOpen){ lightWasOpen = !!e.detail.open; light(); } });
+  let lightWasOpen = false;
   async function rowClick(r, cols){
     const i = cols.findIndex((c) => c.name === ID);
     if(i >= 0){ const idv = String(r[i]); rs.select(idv); rs.focus([idv]); return; }

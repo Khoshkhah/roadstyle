@@ -961,6 +961,8 @@ html[data-rs-theme=dark]{--rs-err:#fca5a5}
 #rs-dock .rs-dd{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
 .rs-dd-acts{display:flex;gap:6px;align-items:center}
 #rs-dock .rs-dd-acts button.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+#rs-dock .rs-dd-light{display:inline-flex;align-items:center;gap:4px}
+#rs-dock .rs-dd-light.on{background:color-mix(in srgb,#7c4dff 16%,var(--card));border-color:#7c4dff;color:var(--ink)}      /* on: the colour of the light itself */
 .rs-dd-count{min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:999px;background:var(--accent-fill);color:#fff;font:600 10.5px/16px system-ui,sans-serif;text-align:center;display:inline-block}
 .rs-dd-count[hidden]{display:none}
 .rs-dd-q{display:flex;gap:8px;align-items:flex-start}
