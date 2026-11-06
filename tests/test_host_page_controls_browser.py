@@ -113,7 +113,8 @@ def test_the_cards_of_style_f_have_the_light_edge_and_the_tinted_card_has_an_acc
         found = page.evaluate(_EDGES)
         browser.close()
     tint, accent = found["tint"], found["accent"]
-    assert tint is not None and sum(abs(a - b) for a, b in zip(tint, accent)) < sum(abs(a - b) for a, b in zip(tint, [255 * (theme == "light")] * 3)), found   # nearer the accent than the panel's white or black
+    far = lambda c: sum(abs(a - b) for a, b in zip(tint[:3], c[:3], strict=True))   # noqa: E731
+    assert tint is not None and far(accent) < far([255 * (theme == "light")] * 3), found   # nearer the accent than the panel's white or black
     assert 1.3 < found["plain"] < 3 and abs(found["plain"] - found["fold"]) < 0.01, found     # light 1.6:1, dark 2.8:1 (the old edge was 3:1 or more)
 
 
