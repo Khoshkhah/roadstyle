@@ -187,6 +187,30 @@ export interface EditorFrame extends EventTarget {
   tab(name?: string): string | null;
 }
 
+/** A column of the dock's table: its name, its SQL type and its description (the header's tooltip). */
+export interface DockColumn { name: string; type?: string; about?: string }
+/** rs.dock.table: the dock's table. */
+export interface DockTable {
+  el: HTMLElement;
+  set(change: { columns?: DockColumn[]; rows?: unknown[][]; more?: boolean }): void;
+  rows(): unknown[][];
+  sort(): { col: string; dir: "asc" | "desc" } | null;
+}
+/** rs.dock: the bottom dock under the map (dock.js). Event rs:dockchange {open, id, height}. */
+export interface Dock {
+  add(content: { id: string; label?: string; el: HTMLElement; note?: string; actions?: HTMLElement; closable?: boolean }): void;
+  remove(id: string): void;
+  open(id?: string): void;
+  close(): void;
+  isOpen(): boolean;
+  show(id: string): void;
+  note(id: string, text: string): void;
+  height(px?: number): number;
+  list(): string[];
+  table(options: { columns: DockColumn[]; rows: unknown[][]; idColumn?: string; more?: boolean;
+                   onSort?: (column: string | null, dir: "asc" | "desc" | null) => Promise<{ rows: unknown[][] } | null> }): DockTable;
+}
+
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
   tools: Tools;
@@ -194,6 +218,7 @@ export interface Dashboard {
   legend: LegendRows;
   colorModes: ColorModes;
   /** The frame of an editor in the panel. Events: "back" (the back button), "tab" ({tab}: a click on a tab). */
+  dock: Dock;
   frame(options: { panel: HTMLElement; title: string; back?: string | null; tabs?: [string, string][]; head?: HTMLElement; id?: string; label?: string }): EditorFrame;
   /** The cut points of Fisher-Jenks natural breaks that split the numbers in k sets (what rs.setData uses for a number). */
   naturalBreaks(values: number[], k: number): number[];
@@ -214,7 +239,8 @@ export interface Dashboard {
   /** The part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates. */
   freeArea(): { lo: number; hi: number; top: number; bottom: number };
   select(id: EdgeId | null): void;
-  highlight(ids: EdgeId[]): void;
+  /** The selection glow on these roads; with `set`, the roads of a named set in its own colour ([] with the set clears it). */
+  highlight(ids: EdgeId[], set?: { set: string; color?: string; opacity?: number }): void;
   focus(ids: EdgeId | EdgeId[]): void;
   query(where: Record<string, unknown>): EdgeId[];
   find(text: string): EdgeId[];

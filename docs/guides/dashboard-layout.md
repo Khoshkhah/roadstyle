@@ -151,12 +151,40 @@ Street View and Google 3D open in the free part of the map and keep their size. 
 
 `street_view="dock"` docks Street View beside the map, as a side of the page with a divider that you drag. The window takes the right part of the screen (the lower part on a phone). The Street View button of the bar closes and opens it. A dashboard with `dashboard={"panel": None}` has no panel: the page is the map and the toolbox. See [Street View](street-view.md#docked-beside-the-map).
 
+## The bottom dock
+
+The bottom dock is a wide area under the map, for a table, a chart or a list. A page puts its own element in it. A dock with no content is not on the page.
+
+```javascript
+const t = rs.dock.table({columns: [{name: "edge_id", type: "BIGINT"}, {name: "name", type: "VARCHAR"}, {name: "length_m", type: "DOUBLE"}],
+                         rows: [[8121729169906061189n, "Riia", 1240.5]], idColumn: "edge_id"});
+rs.dock.add({id: "roads", label: "Roads", el: t.el, note: "1 row"});   // the dock shows, closed: its title row
+rs.dock.open("roads");
+```
+
+- **A desktop.** The dock has the left and the right edge of the map. In `layout="overlay"` it goes from edge to edge of the window, with round top corners. The map ends at the top of the dock. With the card look the map goes on under the dock, and the dock is the glass of the panel's card. The panel, the toolbox, its boxes and a bar along the bottom end above the dock, and the camera fits the roads above it. The box with the scale and the credits hides while the dock is open.
+- **The height.** Drag the grip on the top edge of the dock. The height is 120 px to 70 % of the window. A double click on the grip closes the dock or opens it again. A closed dock is its title row (32 px). The browser keeps the height and the open state for each page.
+- **The title row.** With one content, the row shows its label. With two or more, the row shows tabs. After the label: the content's `note` ("12 rows"), its `actions` (an element: buttons of the content), the arrow that closes or opens the dock, and ✕ for a content with `closable: true`.
+- **A phone.** The dock is a bottom sheet of 40 % of the screen. A tap on its grip goes to the full height and back. A drag down closes it. One sheet is open at a time: when the dock opens, the panel's sheet goes down and Street View and Google 3D close, and when one of them opens, the dock closes. A closed dock is a round button with its label and note.
+
+**The dock's table.** `rs.dock.table({columns, rows, idColumn, more, onSort})` gives `{el, set({columns, rows, more}), rows(), sort()}`, a table in the same look on every page:
+
+- The box is as wide as its columns and has the height of the dock. Its two scrollbars are always visible. The header row stays at the top, and the first column stays in view when the table scrolls sideways.
+- A header shows the column's name and, under it, its type (`type`). Its tooltip is the column's `about`. A number column is at the right.
+- A 64-bit id (a `BigInt`) shows exactly. `null` shows as a muted "null". A cell is at most 320 px wide; a longer text ends with "…" and the full text is in its tooltip.
+- A click on a header sorts by that column: rising, falling, then the order of the rows again. With `more: true` (the rows are not all the rows) and `onSort(column, dir)`, the host sorts all its rows and gives `{rows}` back.
+- With `idColumn`, a click on a row selects that road and zooms to it.
+- A table of more than 1000 rows draws only the rows in view, so 50 000 rows stay fast.
+
+The event `rs:dockchange` (`open`, `id`, `height`) comes when the dock opens, closes, changes its content, or changes its height. `tests/test_dashboard_bottom_dock_browser.py` checks the dock on a desktop (the frame and the card look), on a phone, and with 5000 rows.
+
 ## When the window is small
 
 The bar stays in the free part of the window. This is the part that the panel does not cover. When the bar does not fit in one line, it takes more lines. It never scrolls.
 
 - **A bar at the left or right edge** that is too short for its tools takes a second column, and a third column when it must. The first column is at the edge.
 - **A bar at the top or the bottom** is centered between the panel and the edge of the window. When this space is too narrow, the bar takes a second row.
+- **A box** that is too tall for the window is shorter and scrolls, and it keeps its scroll while it fits again.
 - **A box** opens beside the whole bar, toward the map. It never opens over a second column or row, and it never goes under the bar. The credits box, which opens from the bottom corner, moves to the side of a bar that is in its way. A box that opens beside a bar at a side ends above the scale box and the credits button.
 - **Tools that you add** with `rs.tools.add` take the same lines as the built-in tools.
 

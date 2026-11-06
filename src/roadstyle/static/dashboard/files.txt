@@ -23,6 +23,7 @@ tabs
 days
 kpi
 svg
+dock
 toolbar
 panel
 find

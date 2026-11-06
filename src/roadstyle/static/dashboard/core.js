@@ -265,6 +265,10 @@ export function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set)
     const g=fs[i] && fs[i].geometry;
     if(g && g.coordinates) _bbExtend(g.coordinates, bb);
   });
+  // the roads fit above the bottom dock where it covers the map (the card look; dock.js): 80 px and the covered part at the bottom
+  const dk=document.getElementById("rs-dock"), mb=map.getContainer().getBoundingClientRect().bottom;
+  const cover=dk && document.documentElement.classList.contains("rs-dock-has") ? Math.max(0, mb - dk.getBoundingClientRect().top) : 0;
+  const padding = cover ? {top:80, right:80, left:80, bottom:80+cover} : 80;
   if(bb.ok) map.fitBounds([[bb.minx,bb.miny],[bb.maxx,bb.maxy]],
-    {padding:80, maxZoom:17, duration:700, ...(opt||{})});
+    {padding, maxZoom:17, duration:700, ...(opt||{})});
 }

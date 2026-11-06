@@ -1,6 +1,7 @@
 // The bar (docs/design/dashboard_templates.md, 3.2 and 3.3): the tools of the registry on one bar at an edge of the window, in the look of the
 // theme. The template gives the edge (`dashboard.toolbar.position`, and `phone.toolbar` on a phone). Two tools are the bar's own: `theme`, the
 // first, and `attribution`, the last. A box (the base map, the attribution) opens toward the map's center, and one box is open at a time.
+import {dockTop} from "./dock.js";
 import {map, O} from "./core.js";
 import {closeBoxes, defineTool, fillToolbox, mountTools, setOnReplace, toolList, wrap} from "./tools.js";
 import {rsSetTheme} from "./theme.js";
@@ -121,15 +122,17 @@ const _tbShift = (lo, hi, size) => { const over = hi - (size - _tbGap), under = 
 function keepInside(box){
   const fit = () => {
     if(box.hidden || (box.classList.contains("bm-menu") && !box.classList.contains("open"))) return;
+    const scroll = box.scrollTop;               // the fit clears maxHeight for a moment, and the browser would set scrollTop to 0: the box keeps its scroll
     box.style.translate = "0 0";                // a box is anchored at its top or at its bottom edge: it moves with `translate`, which works for both
     const bar = document.getElementById("rs-toolbar"), e = bar && bar.dataset.edge, inBar = !!bar && bar.contains(box), b = bar && !inBar ? bar.getBoundingClientRect() : null;
     box.style.maxHeight = box.style.maxWidth = "";
     let r = box.getBoundingClientRect();
     // a box beside a bar at a side keeps clear of the corner box (the scale, the zoom number and the credits) when they meet across: it ends above that box
     const cb = document.getElementById("rs-scalebox"), c = inBar && (e === "right" || e === "left") && cb ? cb.getBoundingClientRect() : null;
-    let low = c && c.width > 0 && r.left < c.right && r.right > c.left ? c.top - 8 : innerHeight - _tbGap;
+    // the low edge is the top of the bottom dock (dock.js), or the bottom of the window
+    let low = c && c.width > 0 && r.left < c.right && r.right > c.left ? c.top - 8 : dockTop() - _tbGap;
     // a box under a bar along the top (over a bar along the bottom) is not taller than the room that it has: it scrolls
-    const room = inBar && e === "top" ? innerHeight - r.top - _tbGap : inBar && e === "bottom" ? r.bottom - _tbGap : low - _tbGap * 2;
+    const room = inBar && e === "top" ? dockTop() - r.top - _tbGap : inBar && e === "bottom" ? r.bottom - _tbGap : low - _tbGap * 2;
     if(inBar && r.height > room){ box.style.maxHeight = room + "px"; r = box.getBoundingClientRect(); }
     // a box beside a bar at a side is not wider than the room between the bar and the edge of the window: it is narrower, and it is not moved over the bar
     const wide = e === "left" ? innerWidth - _tbGap - r.left : e === "right" ? r.right - _tbGap : 0;
@@ -151,8 +154,13 @@ function keepInside(box){
       }
     }
     box.style.translate = dx + "px " + dy + "px";
+    box.scrollTop = scroll;
   };
-  new MutationObserver(fit).observe(box, {attributes: true, attributeFilter: ["hidden", "class"]});
+  // a change of the class `rs-scrolling` only (panelscroll.js, at each scroll) is no reason to fit: a fit at each scroll sent the box back to its top
+  const bare = s => (s || "").replace(/\brs-scrolling\b/g, "").trim();
+  new MutationObserver(ms => { if(ms.some(m => m.attributeName !== "class" || bare(m.oldValue) !== bare(box.className))) fit(); })
+    .observe(box, {attributes: true, attributeFilter: ["hidden", "class"], attributeOldValue: true});
+  document.addEventListener("rs:dockchange", fit);
   new ResizeObserver(fit).observe(box);
   addEventListener("resize", fit);
 }
