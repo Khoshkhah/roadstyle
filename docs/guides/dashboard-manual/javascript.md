@@ -166,6 +166,21 @@ fr.close();
 
 `rs.frame({panel, title, back, tabs, head})` is the frame of an editor that uses the whole panel. `open(tab)` hides the host's title, body and "Collapse all", and shows the title line (`top`), the `head` row that does not scroll (the tabs, or the editor's own element `head`), one `body` that scrolls and a `bar` at the bottom edge. `close()` shows the host's panel again. The events are `back` and `tab`.
 
+```javascript
+const t = rs.dock.table({columns: [{name: "edge_id", type: "BIGINT"}, {name: "name", type: "VARCHAR"}],
+                         rows: [[1n, "Street 0"], [2n, "Street 1"]], idColumn: "edge_id"});
+rs.dock.add({id: "roads", label: "Roads", el: t.el, note: "2 rows"});
+rs.dock.open("roads");
+document.addEventListener("rs:dockchange", (e) => console.log(e.detail.open, e.detail.height));
+rs.dock.note("roads", "2 rows · sorted");
+console.log(rs.dock.isOpen(), rs.dock.height(), rs.dock.list());
+rs.dock.show("roads");
+rs.dock.close();
+rs.dock.remove("roads");
+```
+
+`rs.dock` is the bottom dock under the map ([The bottom dock](../dashboard-layout.md#the-bottom-dock)). `add({id, label, el, note, actions, closable})` adds a content, `open(id)` and `close()` open and close the dock, `show(id)` shows a content, `note(id, text)` changes its note, `height(px)` gives or sets the height, `list()` gives the ids and `remove(id)` removes a content. `table({columns, rows, idColumn})` gives the dock's table (`el`, `set`). The event `rs:dockchange` has `open`, `id` and `height`.
+
 `rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. `rs.days.use(el, {days, onChange})` builds a day picker in an empty element: a field that opens a calendar of the days with data, the day before and after, and "Latest". It gives `{set(day, quiet), value()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 
 ## Live data

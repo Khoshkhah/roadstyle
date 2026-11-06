@@ -852,3 +852,78 @@ html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
 :is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]:is(:hover,:focus-visible){text-decoration:underline}
 :is(#sb,#rs-help,.rs-help-box) summary{border-radius:6px;cursor:pointer}
 :is(#sb,#rs-help,.rs-help-box) summary:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
+/* ---- THE BOTTOM DOCK (dock.js, docs/guides/dashboard-layout.md): a wide area under the map. html.rs-dock-has while it has a content, rs-dock-open or
+   rs-dock-shut, and --rs-dock-h its height on a desktop (0 on a phone). The map, the panel, the bar along the bottom and the corner box end above it;
+   with the card look the map goes on under it, and the dock is the panel's glass. Only its top corners are round. ---- */
+html{--rs-dock-h:0px}
+html.rs-dock-has:not(.rs-phone):not(.rs-panel-card) #map{bottom:var(--rs-dock-h)!important;height:auto!important}
+html.rs-dock-has:not(.rs-phone).rs-overlay #sb{bottom:var(--rs-dock-h)}
+html.rs-dock-has:not(.rs-phone).rs-overlay.rs-panel-card #sb{bottom:calc(var(--rs-dock-h) + 8px)}
+html.rs-dock-has:not(.rs-phone) #rs-toolbar.rs-tb-bottom{bottom:calc(var(--rs-dock-h) + 8px)}
+/* a bar at a side: the rule of the bar above (centred, at most the free height, wraps to a second column), in the part above the dock */
+html.rs-dock-has:not(.rs-phone) #rs-toolbar:is(.rs-tb-right,.rs-tb-left){top:max(51px,min(calc((100% - var(--rs-dock-h)) / 2),calc(100% - var(--rs-dock-h) - 87px)));max-height:max(86px,calc(100% - var(--rs-dock-h) - 128px))}
+html.rs-dock-has:not(.rs-phone) #rs-scalebox{bottom:calc(var(--rs-dock-h) + 8px)}
+html.rs-dock-open:not(.rs-phone) #rs-scalebox{display:none}      /* the credits: back when the dock closes; on a phone they are in the bar */
+#rs-dock{position:fixed;left:0;right:0;bottom:0;z-index:7;height:var(--rs-dock-h);display:flex;flex-direction:column;box-sizing:border-box;
+  background:var(--bg);color:var(--ink);border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -4px 18px rgba(0,0,0,.16);font:13px/1.4 system-ui,sans-serif}
+html:not(.rs-dock-has) #rs-dock,html:not(.rs-dock-has) #rs-dock-pill{display:none}
+html.rs-panel-card:not(.rs-phone) #rs-dock{background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* the grip: no colour of its own; under the pointer or while it is dragged, the dock's top edge is the accent (an inset shadow follows the round corners) */
+.rs-dock-grip{position:absolute;top:-4px;left:14px;right:14px;height:8px;cursor:row-resize;touch-action:none;z-index:1}
+#rs-dock:has(.rs-dock-grip:hover),#rs-dock:has(.rs-dock-grip.on){box-shadow:inset 0 2px 0 0 var(--accent),0 -4px 18px rgba(0,0,0,.16)}
+.rs-dock-hd{display:flex;align-items:center;gap:10px;height:32px;flex:0 0 32px;padding:0 8px 0 14px;border-bottom:1px solid var(--line);min-width:0}
+html.rs-dock-shut .rs-dock-hd{border-bottom:0;cursor:pointer}
+.rs-dock-title{font-weight:650;white-space:nowrap}
+.rs-dock-tabs{display:flex;gap:2px}
+#rs-dock .rs-dock-tabs[hidden],.rs-dock-title[hidden],#rs-dock .rs-dock-x[hidden]{display:none}
+.rs-dock-note{color:var(--mut);font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-dock-sp{flex:1}
+.rs-dock-acts{display:flex;gap:6px;align-items:center}
+html.rs-dock-shut .rs-dock-acts{display:none}
+.rs-dock-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:8px 14px 10px;gap:6px}
+html.rs-dock-shut .rs-dock-body{display:none}
+html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
+/* the controls: the panel's look (the template gives it only inside #sb) */
+#rs-dock button{font:inherit;font-size:12px;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:3px 10px;cursor:pointer}
+#rs-dock button.sb-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600}
+#rs-dock :is(.rs-dock-arrow,.rs-dock-x){border:0;background:none;color:var(--mut);padding:4px 6px;display:inline-flex;align-items:center}
+#rs-dock .rs-tab{border:1px solid transparent;background:none;color:var(--mut);font-weight:600;padding:3px 10px;border-radius:7px}
+#rs-dock .rs-tab.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+#rs-dock button:is(:hover,:focus-visible):not(:disabled):not(.sb-primary):not(.rs-tab.on){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
+#rs-dock :is(.rs-dock-arrow,.rs-dock-x,.rs-tab):is(:hover,:focus-visible):not(.on){border-color:transparent}
+#rs-dock :is(button.sb-primary,.rs-tab.on):is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1)}
+#rs-dock :is(button,select,summary,a[href],th):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+#rs-dock input,#rs-dock select,#rs-dock textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
+/* the dock's table: as wide as its columns, the height of the dock, both scrollbars always visible, the header row and the first column in view */
+#rs-dock .rs-dock-table{flex:1;min-height:0;max-height:none;align-self:flex-start;max-width:100%;box-sizing:border-box;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg);
+  scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent;-webkit-mask-image:none;mask-image:none}
+#rs-dock .rs-dock-table table{width:max-content;border-collapse:separate;border-spacing:0;font:12.5px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums}
+#rs-dock .rs-dock-table :is(th,td){white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis;padding:5px 14px;text-align:left;border-bottom:1px solid var(--line);height:15px}
+#rs-dock .rs-dock-table th{position:sticky;top:0;z-index:2;background:var(--card);font-weight:600;vertical-align:bottom;cursor:pointer;user-select:none}
+#rs-dock .rs-dock-table th small{display:block;font:500 10px/1.2 system-ui,sans-serif;color:var(--mut);letter-spacing:.03em}
+#rs-dock .rs-dock-table .n{text-align:right}
+#rs-dock .rs-dock-table tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--card) 55%,var(--bg))}
+#rs-dock .rs-dock-table :is(td,th):first-child{position:sticky;left:0;z-index:1;background:var(--bg);box-shadow:inset -1px 0 var(--line)}
+#rs-dock .rs-dock-table th:first-child{z-index:3;background:var(--card)}
+#rs-dock .rs-dock-table tr.rs-dock-id{cursor:pointer}
+#rs-dock .rs-dock-table :is(thead th,tbody tr:hover td){background:var(--card)}
+#rs-dock .rs-dock-table :is(thead th:is(:hover,:focus-visible),tbody tr.rs-dock-id:hover td){background:color-mix(in srgb,var(--accent) 12%,var(--bg));color:var(--accent)}
+#rs-dock .rs-dock-table thead th:is(:hover,:focus-visible) small{color:var(--accent)}
+#rs-dock .rs-dock-table tr.on td{background:color-mix(in srgb,var(--accent) 22%,var(--bg))}
+#rs-dock .rs-dock-table tr.rs-dock-pad td{padding:0;border:0;background:none}
+#rs-dock .rs-dock-null{color:var(--mut);font-style:italic}
+#rs-dock .rs-dock-table th[data-sort] span{color:var(--accent)}
+#rs-dock .rs-dock-table th[data-sort=asc] span::after{content:" \25B2";font-size:8px;vertical-align:1px}
+#rs-dock .rs-dock-table th[data-sort=desc] span::after{content:" \25BC";font-size:8px;vertical-align:1px}
+/* a phone: a bottom sheet (40 % or full), one sheet at a time (windows.js); a closed dock is a round button above the panel's sheet */
+html.rs-phone #rs-dock{left:0;right:0;height:40dvh;z-index:30}
+html.rs-phone.rs-dock-full #rs-dock{height:calc(100dvh - 64px)}
+html.rs-phone.rs-dock-shut #rs-dock{display:none}
+html.rs-phone .rs-dock-grip{position:static;height:44px;flex:0 0 22px;margin:-11px 0;cursor:pointer;display:flex;justify-content:center;align-items:center;z-index:2}
+html.rs-phone .rs-dock-grip::before{content:"";width:40px;height:4px;border-radius:2px;background:var(--mut);opacity:.6}
+html.rs-phone #rs-dock .rs-dock-table{max-width:100%}
+#rs-dock-pill{position:fixed;right:12px;bottom:calc(40dvh + 8px);z-index:29;display:none;border-radius:999px;padding:6px 12px;font:600 12px system-ui,sans-serif;background:var(--accent-fill);color:#fff;border:0;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;max-width:60vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rs-dock-pill:is(:hover,:focus-visible){filter:brightness(1.1)}
+html.rs-phone.rs-dock-shut #rs-dock-pill{display:block}
+html.rs-phone.rs-dock-shut.rs-sheet-0 #rs-dock-pill{bottom:56px}
+html.rs-phone.rs-dock-shut.rs-sheet-2 #rs-dock-pill{display:none}

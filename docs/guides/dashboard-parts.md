@@ -24,6 +24,7 @@ Two parts use the whole panel: the level editor ([Edit the levels in a dashboard
 | [`rs.svg(parent, tag, attrs)` + `--rs-chart-*`](#charts) | one SVG element that reads `var(--x)`, and the chart colors | charts |
 | [`<input>`, `<select>`, `<button>`, `class="rs-chip"`, `class="rs-dot"`](#buttons-text-boxes-chips-and-a-dot) | the panel's own look, a small label, a color mark | forms, labels |
 | [`rs.frame({panel, title, back, tabs})`](#an-editor-in-the-panel) | the frame of an editor that uses the whole panel: a title line with "← back", a tab row, one body that scrolls and a bar at the bottom edge | an editor, as Edit design |
+| [`rs.dock.add({id, label, el})`, `rs.dock.table({columns, rows})`](dashboard-layout.md#the-bottom-dock) | the bottom dock under the map and its table | a wide table of roads |
 | `rs.ready(fn)` | runs `fn` when the page is ready | the start of a page script |
 | [`rs.classify(values, method, k, pivot=..., palette=...)`](#colour-classes) | the cuts and the colors for discrete road classes | `color_options` |
 

@@ -10,6 +10,7 @@ import {rsHover} from "./hover.js";
 import {rsTabs} from "./tabs.js";
 import {rsDays} from "./days.js";
 import {editorFrame} from "./frame.js";
+import {rsDock} from "./dock.js";
 import {rsKpi} from "./kpi.js";
 import {rsSvg} from "./svg.js";
 import {rsLegend} from "./legend.js";
@@ -89,6 +90,7 @@ export function makeApi(extra){
     tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)
     days: rsDays,                // the day picker of a page: use (days.js)
     frame: editorFrame,          // the frame of an editor that uses the whole panel: open, close, tab (frame.js)
+    dock: rsDock,                // the bottom dock under the map: add, remove, open, close, show, note, height, table (dock.js)
     hover: rsHover,              // the hover box of a page: show, hide, on (hover.js)
     help: rsHelp,                // the page's help window: set, open, close (help.js)
     sections: rsSections,        // the panel's sections: list, get, add, remove, hide, show (sections.js)
