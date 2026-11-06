@@ -369,7 +369,8 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 | `schema()` | (necessary) | Gives the tables (see [The schema](#the-schema)). Ask uses it, and the data dock uses it for its list of the tables. |
 | `ready` | none (ready at once) | A promise that ends when the host's data is loaded. Run and Ask wait for it. |
 | `idColumn` | `"edge_id"` | The column with the road ids. |
-| `addFile(file, {name, about})` | none | The host loads a file of the person into the schema `mine` and gives the table's name back (see [Add a file](#add-a-file)). Without it, there is no "+ Add a file". |
+| `tables` | `[]` | The page's own tables: `[{name, url, about}]`, a CSV, Parquet, GeoJSON or JSON file each (see [The page's own data](#the-pages-own-data)). |
+| `load({name, url, about})` | none | The host loads one of `tables` into the schema `extra`, before `ready` ends. Necessary when `tables` is not empty. |
 | `keys` | `["osm_id", "name"]` | Other columns that find roads when a result has no `idColumn` (see [The roads of a result](#the-roads-of-a-result)). |
 | `roadsBy(sql, column)` | none | The host's lookup: the SQL that gives the road ids of the result `sql` by its `column`. duckOSM Studio: ``SELECT edge_id FROM driving.edges WHERE "<column>" IN (SELECT "<column>" FROM (<sql>))``. Without it, only `idColumn` finds roads. |
 | `sql` | `""` | The start text of the line. |
@@ -425,33 +426,42 @@ button and the same window as the panel's own help (Kaveh, 2026-11-05: "add help
 
 A host can give its own words with the options `help` of `dataDock` and of `askPanel` (`{title, intro, terms, note}`), or `help: false`.
 
-### Add a file
+### The page's own data
 
-Kaveh (2026-11-05): "how can I add more data like table or geojson for using by ai agent there?" The person adds a file of their own, and
-the agent and the person's SQL can use it at once.
+Kaveh (2026-11-05): "I want the dashboard to support more data when we create an ask panel", and "I don't want to add a file manually
+there." The page that makes the data dock and Ask also names its own tables: a CSV, a Parquet, a GeoJSON or a JSON file, each with a
+sentence about what it holds. The agent and the data dock can use them from the start. The person adds nothing by hand, and there is no
+"+ Add a file" button.
 
-- **Where:** "+ Add a file" at the top of the **Tables** list of the data dock; a file can also be dropped onto the dock (the dock shows a
-  dashed accent edge while a file is over it).
-- **Kinds:** CSV (also TSV), Parquet, GeoJSON and JSON. A GeoJSON becomes a table with the properties as columns and the geometry as a
-  real geometry column, `geom`, so the spatial functions work (the mock-up: "the roads within about 30 m of each sensor" is one join).
-- **A short form** before the load: the table name (from the file name, made safe: `sensors`) and "What is in this file? (for the agent,
-  optional)". The description becomes the table's comment, so the agent reads it as it reads duckOSM's own descriptions.
-- **Where it goes:** the schema `mine`. The Tables list shows "mine (your files)" first, each table with its rows and its description in
-  the tooltip, and ✕ to remove it. The dock shows the new table at once; a table with road ids lights its roads (`counts.csv` with
-  `edge_id` lit its 40 roads).
-- **The agent** sees it in the schema of the prompt ("mine: counts 40, sensors 6") and the prompt says: "Tables in the schema mine are
-  files that the person added: read their columns before you use them."
+```js
+const data = dataDock({
+  query, schema, ready,
+  tables: [
+    {name: "sensors", url: "sensors.geojson", about: "Traffic sensors: one point each (geom), its id, its kind and its install date."},
+    {name: "counts",  url: "counts.csv",      about: "Measured vehicles per hour on a road: edge_id, vehicles_per_hour, counted_on."},
+  ],
+  load: t => host.loadTable(t),           // the host loads one table into the schema "extra"
+});
+const ask = askPanel({dashboard: rs, data});
+```
+
+- **Who loads it:** the host, as it loads its other data (roadstyle knows no DuckDB). The data dock gives each entry of `tables` to the
+  host's `load({name, url, about})` once, at the start, before `ready` ends. So Run and Ask wait for these tables too.
+- **Where it goes:** the schema `extra`: `extra.sensors`, `extra.counts`. The `about` text becomes the table's comment
+  (`COMMENT ON TABLE`), so the agent reads it as it reads duckOSM's own descriptions.
+- **A GeoJSON** becomes a table with the properties as columns and the geometry as a real geometry column, `geom`. The spatial functions
+  work on it: "Which roads are near the sensors?" is one join (the mock-up: 317 road edges within about 30 m of the 6 sensors).
+- **A table with road ids** lights its roads, as each result does (`counts.csv` has `edge_id`).
+- **The Tables list** shows `extra` first, each table with its rows and its `about` in the tooltip.
+- **The agent** gets the `extra` tables with their `about` in the schema text of the prompt ("extra.counts: Measured vehicles per hour on
+  a road: …"), because they are few and the page added them for the questions. The prompt says: "The schema extra has the page's own
+  data: read its columns before you use it."
+- **A table that does not load** (a wrong URL, a bad file) does not stop the page: the other tables load, and the host writes the error
+  in the console.
 - **Values that a person can read:** the table, the CSV and the rows that go to the agent show a DATE as `2026-06-10` and a TIMESTAMP
   as `2026-06-10 08:30:00`, not as milliseconds (`1781049600000`), and a geometry as `(32 bytes)`, not as a list of bytes. The data dock
-  does this once for each value type of the result, so each table gets it (the first `sensors.geojson` showed both faults).
-- **No data, a hint:** when the data has no answer ("show all sensors" with no sensor table), the agent says so and names "+ Add a file".
-  The mock-up also has "Try a sample: sensors.geojson · counts.csv" under the button, because the person's PC cannot pick a file of the
-  server's disk. The real dashboard has no samples.
-- **Privacy:** the file stays in this browser; nothing is uploaded. Only what the agent reads with a query goes to the AI service.
-- **How long:** the mock-up keeps it in memory only (a reload loses it). duckOSM Studio can keep it with the saved area, as the area's
-  own tables.
-- **The API:** the host's `addFile(file, {name, about})` loads it (roadstyle knows no DuckDB): the data dock draws the button, the drop,
-  the form and the list, and gives the file to the host. Without `addFile`, there is no "+ Add a file".
+  does this once for each value type of the result, so each table gets it (the sensors GeoJSON showed both faults).
+- **Privacy:** the tables are the page's own files. Only what the agent reads with a query goes to the AI service.
 
 ### The networks of the map
 
@@ -677,8 +687,12 @@ question
      This is the retry.
    - A result goes back to the model as: the column names and types, the first `sendRows` rows as JSON arrays, the number of rows, and
      "more rows: yes" when the result was cut. A text value is cut at 200 characters.
-4. When the model gives text, that text is the answer. The last query that worked is the answer's query: the data dock shows its SQL and
-   its table, so its roads light (see [The map: four operations](#the-map-four-operations)).
+4. When the model gives text, that text is the answer. **The answer's query** is the query with roads (a road id column or one of `keys`)
+   that has the most rows; with no such query, the one with the most rows. The data dock shows its SQL and its table, so its roads light
+   (see [The map: four operations](#the-map-four-operations)). The other queries are in the card's details, as "2 more queries of the
+   agent". Not the last query: a model often runs the full list, then a count, then `ORDER BY length_m DESC LIMIT 2` for the longest
+   road. Kaveh, 2026-11-05, "why it limited to two rows!?": the table showed the 2 rows of that last query, not the 2 083 roads. The
+   prompt also asks for one full query (see [The prompt](#the-prompt)), because the page cannot make a list that the model did not ask for.
 5. **The last call gives the answer.** The model call number `maxSteps` goes with `tool_choice: "none"` and the message "Answer now in 1
    to 3 short sentences with the results that you have. Do not call more tools." So a model that calls tools again and again still gives
    an answer from the queries that it ran. (Kaveh, 2026-11-05: "No answer after 6 calls of the model", and the card had nothing else.)
@@ -765,8 +779,10 @@ Rules:
 - When a query fails, read the error, fix the SQL and run it again.
 - Answer in the language of the question, in one to three short sentences, with the numbers.
   Do not repeat the table: the page shows it.
-- If the data cannot answer the question, say so in one sentence, and say that the person can add a file with that data
-  (CSV, Parquet or GeoJSON) with "+ Add a file" in the data dock. Then it is in the schema "mine".
+- About a set of roads: run one query that gives all of them (edge_id, name and the useful columns), with no LIMIT,
+  sorted by the most important column. The page shows it as the table. A count or a "longest" query alone is not enough.
+- If the data cannot answer the question, say so.
+- The schema extra has the page's own data: read its columns before you use it.
 
 Schema:
 {schema}
@@ -1008,7 +1024,7 @@ No test needs a key or the network. CI runs them all.
 | Test | What it checks |
 |---|---|
 | `tests/data_units.js` in `tests/test_data_dock_browser.py` | The guard: a list of SQL that it accepts (with comments, strings that hold `DROP`, `WITH`, a `;` at the end) and a list that it refuses (two statements, each refused word, `read_csv`, `FROM 'x.parquet'`, `'https://...'`, `query('...')`). The row limit wrap. The CSV text (a comma, a quote, a new line, a `BigInt`, `null`). An id as exact text. |
-| `tests/test_add_file_browser.py` | "+ Add a file" with a CSV, a Parquet, a GeoJSON and a JSON (a fake host `addFile`): the form, the name made safe, the description in the comment; the table in "mine (your files)" with ✕; a table with road ids lights its roads; a file dropped onto the dock; a file of another kind gives a clear message. |
+| `tests/test_page_tables_browser.py` | `tables` with a CSV, a Parquet, a GeoJSON and a JSON (a fake host `load`): Run and Ask wait for them; each is in `extra` with its `about` as the comment and in the prompt's schema text; the GeoJSON has a geometry column `geom`; a table with road ids lights its roads; a wrong URL does not stop the other tables; a DATE shows as `2026-06-10`. Also the answer's query: a fake model that runs the full list, a count and a `LIMIT 2` query gets the full list in the dock. |
 | `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "the table's roads are lit (the state `lit`), a click on a row selects and zooms, the CSV download, Stop. With 2 765 rows: the note says "1 000 of 2 765 rows", the light covers 2 765, the CSV has 2 765 rows; a click on a header sorts rising, falling and back, over all the rows (the first value is the true minimum), also for `BigInt` ids and text with `null`. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. After three answers (a query, a filter, a zoom): the first card's Table shows its own 5 rows in the dock; a click on the focus chip turns the focus off and on again; the first card's Show lights its 5 roads again; `**x**` in an answer is a `<b>`; an answer that lists 5 rows with their ids shows 3 items with no ids and "… 2 more in the table". Also: a question asked while `ready` waits shows "Loading the data…" and then its answer; an error thrown by `schema()` ends the question with a red line, and the box works again; the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
