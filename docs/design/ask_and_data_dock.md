@@ -835,6 +835,32 @@ Why it matters: the data of a page comes from OSM, and a street name can hold wo
 design the worst result is a wrong answer or a wrong colour on the map (Undo takes it away): no tool changes the data, a query cannot read a file or an address, and the answer is plain text
 with no links and no images.
 
+## One hover for the whole dashboard
+
+Kaveh (2026-11-05): "some of the buttons on the dashboard don't have hover! is not it as default every activation part of dashboard has
+hover?" and then "use a consistent hover for every part. check all part of the roadstyle dashboard for that".
+
+**The audit.** A browser test opens every state of the dashboard (the toolbox and each of its boxes, the panel's title row, cards that fold
+or open, tabs, a two-way switch, chips, a link, a plain and a primary button, a list, the day picker and its calendar, the help window, the
+road card, the dock, Ask and its key form, and the hidden panel), puts the pointer on every clickable control (at most two of each kind in
+each place), and reads what changes: the control, its parent row and its children. Before the change, in the light theme: **61 kinds of
+control, 13 different hover looks** (a grey background, an accent border and text, brighter, a shadow, an underline, and mixes), and **15
+with no hover at all**: among them the help window's close, the roads box's "All" and its rows, the month arrow of the day picker, a
+`<details>` summary, the provider list, the dock's buttons and Ask's send button. Two faults of roadstyle came out too: the panel's hide and
+show buttons have no hover, and the template's `#sb button:hover` also colours a **disabled** button ("Latest" of the day picker).
+
+**The rule: every control reacts, in one of three looks, by its kind.**
+
+| Kind | Hover (and keyboard focus) | Examples |
+|---|---|---|
+| Not filled | the background is the new token `--rs-hover-bg` (`--accent` at 12 %, so it follows the theme), and the text or the icon is `--accent`; a border, if the control has one, is `--accent` | the toolbox's buttons, ✕, "?", fold, hide and show panel, plain buttons, chips, tabs and a switch that are not filled, the rows of the boxes, table rows and headers, the day picker, a list, a summary |
+| Filled | brighter: `filter: brightness(1.1)` | a primary button, the open tab, Run, Ask's send button, Key while its form is open, "Shown on map" |
+| A link | underlined (a link has no underline until then) | "Get a free key …", links in the help window |
+
+A disabled control has no hover. Keyboard focus (`:focus-visible`) has the same look and a 2 px `--accent` ring. The dock's top edge keeps
+its own drag look (the accent edge). **After the change, in both themes:** 50 controls have the tint, 6 the brighter look, 2 the underline;
+the 2 disabled ones have none.
+
 ## Where the code goes
 
 | File | What it holds | In every page (`files.txt`) |
@@ -854,6 +880,7 @@ Changes in existing parts, all small and with no change of look on a page withou
 
 | File | Change |
 |---|---|
+| `dashboard.css`, the page template | **One hover** (see [One hover for the whole dashboard](#one-hover-for-the-whole-dashboard)): the token `--rs-hover-bg`; the three looks in place of the 13 of now; the panel's hide and show buttons; `#sb button:hover:not(:disabled)`; links underlined on hover only. A change of the look of every page, so it is a separate PR, before the dock |
 | `toolbar.js` | `keepInside` keeps a box's scroll across its fit and does not fit again for the class `rs-scrolling` (a fault now: a box that it makes shorter cannot scroll). The low edge of a box is the dock's top, not `innerHeight` (`keepInside`). A bar at a side has the free height above the dock as its largest height, and is centred there; a bar along the bottom ends above the dock |
 | `overlay.js` | `followPanels`: the place of a bar along the top or the bottom, `left`, `middle` or `right` (`toolbar.align`) |
 | `settings.js`, `placement.js` | The row "Toolbar place" (only for a bar at the top or the bottom); the choice is kept as the other layout choices |
@@ -877,6 +904,7 @@ No test needs a key or the network. CI runs them all.
 | `tests/test_ask_align_browser.py` | At 1440 and 1920 px, with the card look and the frame look: the dock touches the left, right and bottom edges of the window; its top corners are round with the card look; the gap between the panel's card and the dock is 16 px; the cards of the conversation, Back and the question box have the same left and right x. |
 | `tests/test_ask_budget_browser.py` | The prompt of the Monaco test data is at most 4 000 characters; a tool result is at most 2 500; a fake provider answers 429 with "try again in 2.5s" once: the card shows the count down, and the request goes again after the wait; a 429 with a wait over 60 s is an error on the card. |
 | `tests/test_ask_providers_browser.py` | The two providers' requests and answers, with `page.route` on their addresses (no network): the body has the tool, the key is in the header and not in the URL, a tool call and a text are read right, an HTTP 400, 401 and 429 give a clear error in the view. |
+| `tests/test_dashboard_hover_browser.py` | The hover audit above, in both themes: every enabled clickable control changes under the pointer, with one of the three looks for its kind; a disabled control does not change. |
 | `tests/test_dashboard_themes_browser.py` | The dock (with the card look at the slider values 1, 0.7 and 0.4, and with the frame look), the data dock (with a table, an error line and the open line), the Ask view (empty, and with answers) and the Ask rows of Settings, in the light and the dark theme: contrast 4.5 or more, no light surface in the dark theme. |
 | `tests/test_dashboard_scroll_browser.py` | The dock's table. The Ask view: the panel's body is its only scroll, and the question box is in view at each scroll position. |
 
@@ -886,6 +914,7 @@ Before the merge, Kaveh looks at the page on a phone and on a desktop, in both t
 
 Each step is one PR, with its tests and its guide.
 
+0. **One hover for the dashboard**: the rule and its audit test. It changes every page a little, so it goes first and alone.
 1. **The bottom dock** and `rs.dock.table`. A page can then show a table under the map.
 2. **The data dock** with the guard and the row limit.
 3. **duckOSM Studio** uses the data dock (in its own repository): `query` and `schema` from its DuckDB, and the `about` texts of its
