@@ -207,7 +207,29 @@ export function _deckIdsForRoad(i){
 }
 let _qHl=[], _qHlD=[];
 const _qHlOv={};   // per-overlay highlighted ids
-export function rsHighlight(ids, layer){ // selection glow on an id set; rsHighlight([]) clears
+// THE HIGHLIGHT SETS: rsHighlight(ids, {set, color, opacity}) lights the roads of a named set in its colour, at the road's own width. Each
+// road row (and the decks of a bridge row) gets the feature state rs_hl (the CSS colour) and rs_hlo (the opacity; null: the look's
+// selection.opacity), which the road layer reads. A Map keeps the order of its keys: the set that was set last is last, and wins on a shared row.
+const _hlSets = new Map();        // set name -> {ids, color, opacity}
+let _hlNow = new Map();           // "roads:<row>" / "decks:<id>" -> the state that it has now
+function _hlSet(ids, o){
+  _hlSets.delete(o.set);
+  if(ids != null && ids.length) _hlSets.set(o.set, {ids:Array.from(ids), color:o.color, opacity:o.opacity == null ? null : o.opacity});
+  const next = new Map();
+  for(const s of _hlSets.values()){ const st = {rs_hl:s.color, rs_hlo:s.opacity};
+    for(const i of s.ids){ next.set("roads:"+i, st);
+      const p=_rprops(i);
+      if(p && p.lvl>0) _deckIdsForRoad(i).forEach(d=>next.set("decks:"+d, st)); } }
+  const write = (k, st) => { const c = k.indexOf(":"); _fs({source:k.slice(0, c), id:+k.slice(c+1)}, st); };
+  for(const k of _hlNow.keys()) if(!next.has(k)) write(k, {rs_hl:null, rs_hlo:null});
+  for(const [k, st] of next) write(k, st);
+  _hlNow = next;
+  _emit("rs:highlightchange", {set:o.set, ids:ids == null ? [] : Array.from(ids)});
+}
+// rsHighlight(ids, layer?): the selection glow on an id set, of the roads or of an overlay; rsHighlight([]) clears.
+// rsHighlight(ids, {set, color, opacity?}): the roads of the named set in that colour (_hlSet); rsHighlight([], {set}) clears that set.
+export function rsHighlight(ids, layer){
+  if(layer != null && typeof layer === "object") return _hlSet(ids, layer);
   const L=_lyr(layer); if(!L) return;
   if(L.ov){
     (_qHlOv[L.ov.label]||[]).forEach(i=>map.setFeatureState({source:L.src,id:i},{select:false}));
