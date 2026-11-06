@@ -345,6 +345,8 @@ def test_draw_chart_shows_the_chart_in_the_dock_and_a_copy_in_the_card(tmp_path)
             assert page.is_visible("#rs-dock .rs-dd-chart") and page.locator("#rs-dock .rs-dd-chart svg path").count() == 3
             card = page.locator(".rs-ask-turn").last
             assert card.locator(".rs-ask-chart svg path").count() == 3 and "Half of the 6 roads" in card.inner_text()
+            box = "(() => { const e = document.querySelector('.rs-ask-turn:last-child .rs-ask-chart'); return [e.scrollHeight <= e.clientHeight + 1, e.scrollWidth <= e.clientWidth + 1]; })()"
+            assert page.evaluate(box) == [True, True], "the small copy has no scroll"
             page.click("#rs-dock .rs-dd-view button:has-text('Table')")
             card.locator(".rs-ask-show").click()
             page.wait_for_timeout(200)

@@ -49,7 +49,7 @@ export const rsChart = (() => {
 
   function chart(el, spec){
     let s = {...spec}, svg = null, foot = null;
-    el.classList.add("rs-chart");
+    el.classList.add("rs-chart"); el.classList.toggle("rs-chart-small", !!spec.small);
     let lastW = 0;                                             // draw again when the width changes, not for a change of the content
     const ro = new ResizeObserver(() => { const w = el.clientWidth; if(Math.abs(w - lastW) > 2){ lastW = w; draw(); } }); ro.observe(el);
     function set(change){ s = {...s, ...change}; draw(); }
@@ -65,13 +65,14 @@ export const rsChart = (() => {
         sub.textContent = `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(t, sub); el.append(hd); }
       const legend = !s.small && (ys.length > 1 || s.kind === "pie") ? document.createElement("div") : null;     // a small copy has no legend
       if(legend){ legend.className = "rs-chart-legend"; el.append(legend); }
-      let H = Math.max(100, el.clientHeight - (legend ? 24 : 0) - (s.small ? 4 : 44));
+      const cs = getComputedStyle(el), inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);   // the box's height without its padding
+      let H = s.small ? Math.max(40, inner) : Math.max(100, inner - (legend ? 24 : 0) - 44);
       // horizontal bars have at least 18 px each: a long list is taller than the box, and the box scrolls
       const rowsH = s.kind === "bar" && !s.small && s.rows.slice(0, BARS).some((r) => String(r[at(s.x)] ?? "").length > 8) ? s.rows.slice(0, BARS).length * 18 * Math.max(1, ys.length * 0.6) + 26 : 0;
       if(rowsH > H) H = rowsH;
       // width 100 % and a viewBox: the chart is never wider than its box, also when the box gets narrower before the next draw
       svg = rsSvg(el, "svg", {width: "100%", height: H, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMidYMin meet", role: "img", "aria-label": s.title || `${s.kind} chart of ${ys.join(", ") || s.x}`});
-      foot = document.createElement("div"); foot.className = "rs-chart-foot"; el.append(foot);
+      foot = document.createElement("div"); foot.className = "rs-chart-foot"; if(!s.small) el.append(foot);     // a small copy: the chart only, no scroll
       const kinds = {bar, line, histogram, scatter, pie};
       kinds[s.kind](W, H, ys, legend);
     }

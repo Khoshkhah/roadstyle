@@ -143,6 +143,12 @@ export function dataDock(o = {}){
     if(res.chart === undefined){ const m = new Set(measures(res));   // the first chart: from the columns, with the ids as text (never a measure)
       res.chart = rs.chart.guess(res.columns.filter((col) => col.name !== ID).map((col) => rs.chart.isNumber(col.type) && !m.has(col.name) ? {...col, type: "VARCHAR"} : col), ID);
       if(res.chart && ["bar", "line", "pie"].includes(res.chart.kind) && !res.chart.y) res.chart.y = COUNT;
+      // a bar: X is the text column with the fewest values (2 or more), never an id (edge_ref) - for SELECT * of the roads: the roads by highway;
+      // when each value is once in the rows (a result of GROUP BY), Y is its first measure, else the count of rows
+      if(res.chart && res.chart.kind === "bar"){
+        const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
+          .filter(([col, n]) => col.name !== ID && !ID_NAME.test(col.name) && !rs.chart.isNumber(col.type) && !rs.chart.isTime(col.type) && n >= 2).sort((a, b) => a[1] - b[1])[0];
+        if(t){ const once = t[1] === res.rows.length && !res.more; res.chart = {kind: "bar", x: t[0].name, y: once && m.size ? [...m][0] : COUNT}; } }
       // no measure: the rows for each value of the text column with the fewest values (2 or more), for example highway
       if(!res.chart || (res.chart.kind === "histogram" && !m.size)){ const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
           .filter(([col, n]) => col.name !== ID && !rs.chart.isNumber(col.type) && n >= 2).sort((a, b) => a[1] - b[1])[0];
