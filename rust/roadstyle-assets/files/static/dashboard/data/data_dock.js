@@ -146,9 +146,10 @@ export function dataDock(o = {}){
       // a bar: X is the text column with the fewest values (2 or more), never an id (edge_ref) - for SELECT * of the roads: the roads by highway;
       // when each value is once in the rows (a result of GROUP BY), Y is its first measure, else the count of rows
       if(res.chart && res.chart.kind === "bar"){
-        const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
-          .filter(([col, n]) => col.name !== ID && !ID_NAME.test(col.name) && !rs.chart.isNumber(col.type) && !rs.chart.isTime(col.type) && n >= 2)
-          .sort((a, b) => (a[1] < 3) - (b[1] < 3) || a[1] - b[1])[0];             // 3 to 40 values first (highway): a yes/no column is the last choice
+        // the order: 3 to 40 values (a yes/no column last), less than half null (tunnel is mostly null), then the most values (highway)
+        const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size, res.rows.filter((x) => x[i] == null).length / Math.max(1, res.rows.length)])
+          .filter(([col, n]) => col.name !== ID && !ID_NAME.test(col.name) && !NOT_X.test(String(col.type)) && !rs.chart.isNumber(col.type) && !rs.chart.isTime(col.type) && n >= 2 && n <= 40)
+          .sort((a, b) => (a[1] < 3) - (b[1] < 3) || (a[2] > 0.5) - (b[2] > 0.5) || b[1] - a[1])[0];
         if(t){ const once = t[1] === res.rows.length && !res.more; res.chart = {kind: "bar", x: t[0].name, y: once && m.size ? [...m][0] : COUNT}; } }
       // no measure: the rows for each value of the text column with the fewest values (2 or more), for example highway
       if(!res.chart || (res.chart.kind === "histogram" && !m.size)){ const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
@@ -203,12 +204,13 @@ export function dataDock(o = {}){
   const COUNT = "(count of rows)";
   // a number column that is a measure, not an id: not the id column, not a name of an id (osm_id, source, target, ..._ref), and no value of 10^12 or more
   const ID_NAME = /(^|_)(id|ref)$|^(source|target|from_node|to_node)$/i;
+  const NOT_X = /GEOMETRY|BLOB|BYTEA|BINARY|^MAP|^STRUCT|^UNION|\[\]|^LIST|JSON/i;      // no chart of geometries, bytes, maps, structs or lists
   const measures = (r) => r.columns.filter((col, i) => rs.chart.isNumber(col.type) && col.name !== ID && !ID_NAME.test(col.name) &&
     !r.rows.slice(0, 200).some((x) => { const v = x[i]; return v != null && Math.abs(Number(v)) >= 1e12; })).map((col) => col.name);
   let chartSeq = 0;
   async function drawChart(){
     const r = res, me = ++chartSeq; if(!r) return;
-    const sp = r.chart || {kind: "bar"}, names = r.columns.map((c) => c.name).filter((n) => n !== ID);
+    const sp = r.chart || {kind: "bar"}, names = r.columns.filter((c) => c.name !== ID && !NOT_X.test(String(c.type))).map((c) => c.name);
     const nums = measures(r);
     const ys = [].concat(sp.y || []), grouped = ["bar", "line", "pie"].includes(sp.kind);
     kindS.value = sp.kind; fill(xS, names, sp.x);
