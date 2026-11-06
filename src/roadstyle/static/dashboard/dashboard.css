@@ -1100,10 +1100,16 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-dd-chart{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:8px 12px}
 .rs-dd-chart[hidden],#rs-dock .rs-dock-table[hidden]{display:none}
 .rs-dd-chartrow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px}
-.rs-dd-cl{display:inline-flex;gap:5px;align-items:center;color:var(--mut)}
-#rs-dock .rs-dd-cl select{padding:2px 6px;max-width:180px}
+.rs-dd-cl{display:inline-flex;gap:6px;align-items:center;color:var(--mut);font-size:12px}
+.rs-dd-cl .rs-sel{width:170px}
+#rs-dock .rs-dd-cl .rs-sel-btn{padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--rs-dk-solid);color:var(--ink);font-size:12.5px}
+#rs-dock .rs-dd-cl .rs-sel-btn:hover:not(:disabled){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
+.rs-dd-kinds{display:inline-flex;padding:2px;gap:2px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-solid)}
+#rs-dock .rs-dd-kind{display:grid;place-items:center;width:30px;height:26px;padding:0;border:0;border-radius:6px;background:none;color:var(--mut)}
+#rs-dock .rs-dd-kind:is(:hover,:focus-visible):not(.on){background:var(--rs-hover-bg);color:var(--accent)}
+#rs-dock .rs-dd-kind.on{background:var(--accent-fill);color:#fff}
 .rs-dd-sp{flex:1}
 .rs-dd-chartel{flex:1;min-height:0}
 
 /* a chart answer of Ask: a small copy of its chart in the card (the chart is in the data dock) */
-#sb .rs-ask-chart{height:140px;margin:8px 0 4px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--bg)}
+#sb .rs-ask-chart{height:140px;margin:8px 0 4px;padding:0;background:none;border:0}      /* no box: the chart sits on the card (Kaveh, 2026-11-06) */

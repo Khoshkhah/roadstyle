@@ -103,21 +103,23 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         page.evaluate("data.run('SELECT edge_id, length_m FROM big')")
         page.click("#rs-dock .rs-dd-view button:has-text('Chart')")
         page.wait_for_timeout(300)
-        assert page.is_hidden("#rs-dock .rs-dock-table") and page.is_visible("#rs-dock .rs-dd-chart svg")
+        assert page.is_hidden("#rs-dock .rs-dock-table") and page.is_visible("#rs-dock .rs-dd-chartel svg")
         # the first chart of a result with one number column is a histogram over all its 2765 rows (not the table's 1000)
-        assert page.input_value("#rs-dock .rs-dd-chartrow select >> nth=0") == "histogram"
+        assert page.evaluate("document.querySelector('#rs-dock .rs-dd-kind.on').dataset.kind") == "histogram"
+        # the controls: Kind is five icon buttons, X and Y are roadstyle's select boxes (not the browser's list)
+        assert page.locator("#rs-dock .rs-dd-kind").count() == 5 and page.locator("#rs-dock .rs-dd-chartrow .rs-sel-btn").count() == 2
         assert "2 765 values" in page.inner_text("#rs-dock .rs-chart-hd")
         # a result of a text and a number: a bar chart in the open view
         page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
         page.wait_for_timeout(300)
         # no measure (edge_id is an id): the rows for each value of the text column with the fewest values, highway
         assert page.evaluate("JSON.stringify(data.result().chart)") == '{"kind":"bar","x":"highway","y":"(count of rows)"}'
-        assert page.locator("#rs-dock .rs-dd-chart svg path").count() == 3
+        assert page.locator("#rs-dock .rs-dd-chartel svg path").count() == 3
         page.evaluate("data.run('SELECT edge_id, length_m FROM big')")
-        page.select_option("#rs-dock .rs-dd-chartrow select >> nth=0", "scatter")
-        assert "edge_id" not in page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-chartrow select')[1].options].map(o => o.value)")   # no chart over road ids
+        page.click("#rs-dock .rs-dd-kind[data-kind=scatter]")
+        assert "edge_id" not in page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-chartrow select')[0].options].map(o => o.value)")   # no chart over road ids
         page.wait_for_timeout(300)
-        assert page.locator("#rs-dock .rs-dd-chart svg circle").count() >= 6
+        assert page.locator("#rs-dock .rs-dd-chartel svg circle").count() >= 6
         # data.chart(spec), as Ask's draw_chart: a spec that does not fit is an error
         assert page.evaluate("(() => { try { data.chart({kind: 'pie', x: 'nope', y: 'length_m'}); return 'no error'; } catch(e) { return e.message; } })()").startswith("The column")
         page.click("#rs-dock .rs-dd-view button:has-text('Table')")

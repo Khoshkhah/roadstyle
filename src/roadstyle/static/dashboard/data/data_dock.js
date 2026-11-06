@@ -6,6 +6,7 @@
 //     csv, stop, open, close, ready, roads, idColumn, keyOf, roadsOf, colour, focus, layers, remove, lightOff, schema}
 //   events: "run" {sql, columns, rows, more, ms, source}, "error" {sql, message, source}, "layers" {layers}
 import {guard as guardSql, inner} from "./guard.js";
+import {rsSelectBoxes} from "../selectbox.js";
 
 const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
 const PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4", "#f032e6", "#9a6324"];
@@ -69,7 +70,17 @@ export function dataDock(o = {}){
   svgB.type = "button"; svgB.title = "The chart as an SVG file";
   for(const [k, t] of [["bar", "Bar"], ["line", "Line"], ["histogram", "Histogram"], ["scatter", "Scatter"], ["pie", "Pie"]]) kindS.append(Object.assign($("option", "", t), {value: k}));
   const lab = (t, e) => { const l = $("label", "rs-dd-cl"); l.append($("span", "", t), e); return l; };
-  chartRow.append(lab("Kind", kindS), lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
+  // Kind: five icon buttons, the chosen one filled (Kaveh, 2026-11-06: "also design of these parts too"); X and Y: roadstyle's select box
+  const ICON = {bar: '<path d="M5 20V11M10 20V5M15 20v-6M20 20V8"/>', line: '<path d="m3 17 5-6 4 3 5-7 4 4"/>', histogram: '<path d="M3 20h18M4 20v-6h4v6M8 20V8h4v12M12 20v-9h4v9M16 20v-4h4v4"/>',
+                scatter: '<circle cx="6" cy="16" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15" cy="13" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="8" cy="5" r="1.6"/>',
+                pie: '<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>'};
+  const kinds = $("span", "rs-dd-kinds"); kinds.setAttribute("role", "radiogroup"); kinds.setAttribute("aria-label", "The kind of chart");
+  for(const o2 of kindS.options){ const b = $("button", "rs-dd-kind"); b.type = "button"; b.dataset.kind = o2.value; b.title = o2.textContent; b.setAttribute("aria-label", o2.textContent); b.setAttribute("role", "radio");
+    b.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[o2.value]}</svg>`;
+    b.onclick = () => { kindS.value = o2.value; change(); }; kinds.append(b); }
+  const paintKinds = () => kinds.querySelectorAll("button").forEach((b) => { const on = b.dataset.kind === kindS.value; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
+  chartRow.append(kinds, lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
+  rsSelectBoxes(chartRow);
   chartBox.append(chartRow, chartEl);
   side.append(list, card, hint); side.classList.add("empty");
   split.append(table.el, chartBox, side);
@@ -244,7 +255,7 @@ export function dataDock(o = {}){
     const sp = r.chart || {kind: "bar"}, names = r.columns.filter((c) => c.name !== ID && !NOT_X.test(String(c.type))).map((c) => c.name);
     const nums = measures(r);
     const ys = [].concat(sp.y || []), grouped = ["bar", "line", "pie"].includes(sp.kind);
-    kindS.value = sp.kind; fill(xS, names, sp.x);
+    kindS.value = sp.kind; paintKinds(); fill(xS, names, sp.x);
     fill(yS, grouped ? [COUNT, ...nums] : nums, ys[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
     let spec = {...sp, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};
     const xi = r.columns.findIndex((c) => c.name === sp.x);

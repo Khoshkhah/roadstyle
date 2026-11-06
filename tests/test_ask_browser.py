@@ -342,7 +342,7 @@ def test_draw_chart_shows_the_chart_in_the_dock_and_a_copy_in_the_card(tmp_path)
                 "say('Half of the 6 roads are primary.')"])
             assert "draw_chart" in page.evaluate("window.calls[0].tools")
             assert "nope" in page.evaluate("window.calls[1].messages.at(-1).content")                 # the bad spec: an error for the model
-            assert page.is_visible("#rs-dock .rs-dd-chart") and page.locator("#rs-dock .rs-dd-chart svg path").count() == 3
+            assert page.is_visible("#rs-dock .rs-dd-chart") and page.locator("#rs-dock .rs-dd-chartel svg path").count() == 3
             card = page.locator(".rs-ask-turn").last
             assert card.locator(".rs-ask-chart svg path").count() == 3 and "Half of the 6 roads" in card.inner_text()
             box = "(() => { const e = document.querySelector('.rs-ask-turn:last-child .rs-ask-chart'); return [e.scrollHeight <= e.clientHeight + 1, e.scrollWidth <= e.clientWidth + 1]; })()"
@@ -350,7 +350,7 @@ def test_draw_chart_shows_the_chart_in_the_dock_and_a_copy_in_the_card(tmp_path)
             page.click("#rs-dock .rs-dd-view button:has-text('Table')")
             card.locator(".rs-ask-show").click()
             page.wait_for_timeout(200)
-            assert page.is_visible("#rs-dock .rs-dd-chart svg")                                           # Show: the chart again
+            assert page.is_visible("#rs-dock .rs-dd-chartel svg")                                           # Show: the chart again
         finally:
             browser.close()
     assert errors == [], errors
