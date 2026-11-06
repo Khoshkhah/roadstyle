@@ -15,6 +15,12 @@ export function run(look, data) {
   const base = D.defaultsOf(look), hbase = D.defaultsOf(look, [host]);
 
   ok(JSON.stringify(D.applyToLook(look, base)) === JSON.stringify(look), "the default design changes nothing in the look");
+  // the 3D walls: off with the fixes editor's colours; a bad colour keeps the default; not in the look; a theme keeps them
+  eq(base.walls, D.defaultWalls(), "the walls at the start");
+  const walls = D.normalize({ ...base, walls: { on: true, front: "#112233", back: "red" } }, base).walls;
+  eq([walls.on, walls.front, walls.back], [true, "#112233", base.walls.back], "the walls normalized");
+  ok(JSON.stringify(D.applyToLook(look, { ...base, walls })) === JSON.stringify(look), "the walls are not in the look");
+  eq(THEMES.find((t) => !t.look).make(base, { ...base, walls }).walls, walls, "a theme keeps the walls");
   eq(D.changes(base, base), []);
   const looks = {};
   for (const t of THEMES) {
