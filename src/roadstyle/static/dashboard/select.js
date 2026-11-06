@@ -162,6 +162,7 @@ export function initSelect(){
     if(handleOverlayClick(e, "over")) return;
     const f = pick(e.point);
     if(!f){ if(!handleOverlayClick(e, "under")) rsDeselect(); return; }
+    clearTimeout(_tipT); if(_tip) _tip.remove();      // the clicked road's facts go to its popup or card: its tooltip closes (it showed through the popup)
     const w = srcOf(f)==="roads" && RoadTable.load(f.id); if(w) await w;   // the road's line first (a table without lines)
     clearOvSel();
     if(_sel) setS(_sel,{select:false});

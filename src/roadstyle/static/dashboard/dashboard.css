@@ -1102,12 +1102,16 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #sb .rs-ask-top > button:not(.rs-help-btn){font-size:12px;padding:3px 10px}
 #sb .rs-ask-top button.rs-ask-keyb.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 #sb .rs-ask-top button.rs-ask-keyb.on:is(:hover,:focus-visible){filter:brightness(1.1);background:var(--accent-fill);color:#fff}
-.rs-ask-ex{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:0 0 4px}
+.rs-ask-ex{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:0 0 4px}
 .rs-ask-hint{color:var(--mut);font-size:12px;margin:0 0 4px}
 .rs-ask-need{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:0 0 6px;font-size:12.5px}
 .rs-ask-need:empty{display:none}
 .rs-ask-need p{margin:0}
-#sb .rs-ask button.rs-chip{cursor:pointer;text-align:left;white-space:normal;font-size:12px;border-radius:10px;padding:4px 10px}
+/* an example question: a row of the panel's button look, the full width, its text at the left (Kaveh, 2026-11-06: the grey pills, "i dont like
+   this style and color"; a pill is also the look of a tag that does not click) */
+#sb .rs-ask button.rs-ask-q{display:block;width:100%;box-sizing:border-box;padding:7px 11px;border:1px solid var(--line);border-radius:8px;
+  background:var(--card);color:var(--ink);text-align:left;white-space:normal;font:13px/1.4 system-ui,sans-serif;cursor:pointer}
+#sb .rs-ask button.rs-ask-q:is(:hover,:focus-visible){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
 .rs-ask-turn{margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:transparent}
 .rs-ask-turn-hd{display:flex;align-items:flex-start;gap:8px}
 .rs-ask-turn .q{flex:1;min-width:0;margin:0 0 6px;font-weight:600;overflow-wrap:anywhere}
@@ -1144,7 +1148,7 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-ask-exbar{position:relative;display:flex;margin-bottom:6px}
 #sb .rs-ask-exb{border:0;background:none;padding:2px 6px;font:500 12px system-ui,sans-serif;color:var(--mut);display:inline-flex;align-items:center;gap:4px;border-radius:6px}
 .rs-ask-exb[aria-expanded=false] svg{transform:rotate(180deg)}
-.rs-ask-exlist{position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px;
+.rs-ask-exlist{position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:10px;
   background:var(--bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
 .rs-ask-comp{display:flex;align-items:flex-end;gap:6px;padding:5px 5px 5px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 .rs-ask-comp:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
