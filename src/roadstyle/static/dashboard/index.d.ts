@@ -239,6 +239,8 @@ export interface Dashboard {
   /** The part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates. */
   freeArea(): { lo: number; hi: number; top: number; bottom: number };
   select(id: EdgeId | null): void;
+  /** A part that shows the road's facts itself holds the road popup while it is in view (the data dock's road card): no popup for a selection. */
+  holdPopup(key: string, on: boolean): void;
   /** Every road that is not in `ids` at `opacity` (0.18) of its own opacity, with its arrows and names; null ends it (rs:fadechange). */
   fade(ids: EdgeId[] | null, options?: { opacity?: number }): void;
   /** The selection glow on these roads; with `set`, the roads of a named set in its own colour ([] with the set clears it). */

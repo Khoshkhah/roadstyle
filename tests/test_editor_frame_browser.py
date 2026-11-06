@@ -181,3 +181,52 @@ def test_kavehs_review_selects_tabs_and_the_sheet(tmp_path, width):
             assert page.evaluate("rs.sheet()") is None
         browser.close()
     assert not errors, errors
+
+
+def test_the_boxes_of_a_page_with_no_toolbar_are_not_over_the_back_button(tmp_path):
+    """layout="dock" (duckosm edit): the panel at the left and no toolbar, so a box such as Layers stands in the top-left stack (#rs-tl).
+    The stack starts at the map's left edge, not over the frame's back button; with the panel hidden, at the window's edge."""
+    path = tmp_path / "dock.html"
+    rs.render_dashboard(_edges(), basemap="blank", layout="dock").save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.goto(path.as_uri())
+        page.wait_for_function("window.map && map.loaded() && window.rsReady", timeout=60_000)
+        page.evaluate(_OPEN)
+        page.evaluate("() => { if(!document.getElementById('rs-tl')){ const t = document.createElement('div'); t.id = 'rs-tl'; t.className = 'rs-tl'; t.textContent = 'Layers'; document.body.append(t); } }")
+        left = "() => [document.getElementById('rs-tl').getBoundingClientRect().left, document.getElementById('sb').getBoundingClientRect().right]"
+        tl, sb = page.evaluate(left)
+        assert tl >= sb, (tl, sb)
+        page.evaluate("() => document.getElementById('sb').classList.add('hidden')")
+        assert page.evaluate(left)[0] == 10
+        browser.close()
+
+
+def test_the_frame_has_one_line_under_its_head_when_the_host_was_scrolled(tmp_path):
+    """Kaveh: "it has an extra separating line under Ask". The host's body was scrolled, so its title row had the line `scrolled`; the frame
+    opened over it and its head row added a second line. Now the frame takes the host's line away, and close() gives it back only while the
+    host's body is still scrolled."""
+    path = tmp_path / "page.html"
+    rs.render_dashboard(_edges(), basemap="blank", name="Frame").save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 700})
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && window.rsReady", timeout=60_000)
+        page.evaluate("() => { for (let i = 0; i < 12; i++) rs.sections.add({id: 's' + i, label: 'Card ' + i, html: '<p>x</p><p>y</p><p>z</p>'}); }")
+        page.evaluate("() => { document.querySelector('#sb .sb-body').scrollTop = 400; document.querySelector('#sb .sb-body').dispatchEvent(new Event('scroll')); }")
+        page.wait_for_timeout(200)
+        top = "document.querySelector('#sb .sb-top').classList.contains('scrolled')"
+        assert page.evaluate(top)
+        page.evaluate(_OPEN)
+        assert not page.evaluate(top)                                     # one line: the frame's own
+        # the bar's line is inset as the head row's line (Kaveh: "make it better and shorter")
+        ends = page.evaluate("[fr.head, fr.bar].map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; })")
+        assert ends[0] == ends[1], ends
+        # the body's content starts where the head row starts: the room of the scrollbar at the left comes out of the body's padding
+        lefts = page.evaluate("[fr.head, fr.body.firstElementChild].map((e) => Math.round(e.getBoundingClientRect().left))")
+        assert lefts[0] == lefts[1], lefts
+        page.evaluate("fr.close()")
+        assert page.evaluate(top)                                         # the host's body is still scrolled: its line again
+        browser.close()

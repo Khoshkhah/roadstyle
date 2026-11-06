@@ -23,10 +23,17 @@ export function pickModel(ids){
   return ids.find((i) => !SKIP.test(i)) || ids[0];
 }
 
-// the provider's own words of an error: {error: {message}}, {error: "..."}, {message} or the text
-const said = (text) => { try{ const b = JSON.parse(text); return (b.error && (b.error.message || b.error)) || b.message || text; }catch(e){ return text; } };
+// the provider's own words of an error: {error: {message}}, {error: "..."}, {message}, a list of one of these (Google's OpenAI-compatible
+// address sends [{error: ...}]) or the text
+const said = (text) => { try{ let b = JSON.parse(text); if(Array.isArray(b)) b = b[0] || {}; return (b.error && (b.error.message || b.error)) || b.message || text; }
+  catch(e){ return text; } };
+// the error of a call. A server error (HTTP 500, 502, 503, 504) is a service that is busy or down for a short time, not a refusal: Ask waits
+// and tries again (ask_panel.js, callModel), and the person reads "busy", not "refused".
+export const BUSY = new Set([500, 502, 503, 504]);
 function refused(p, r, text){
-  const e = new Error(`${p.name} refused the request (HTTP ${r.status}): ${String(said(text)).slice(0, 300)}`);
+  const why = String(said(text)).slice(0, 300);
+  const e = new Error(BUSY.has(r.status) ? `${p.name} is busy now (HTTP ${r.status}): ${why} Try again in a minute, or choose another service under Key.`
+    : r.status === 429 ? `${p.name}'s free limit (HTTP 429): ${why}` : `${p.name} refused the request (HTTP ${r.status}): ${why}`);
   e.status = r.status; e.wait = Number(r.headers.get("retry-after")) || null;
   return e;
 }

@@ -179,6 +179,8 @@ rs.dock.close();
 rs.dock.remove("roads");
 rs.fade(["1", "2"], {opacity: 0.18});   // the other roads fade; the event rs:fadechange
 rs.fade(null);
+rs.holdPopup("my-card", true);           // a part that shows the road's facts: no road popup while it is in view
+rs.holdPopup("my-card", false);
 const box = document.createElement("div"); box.style.height = "200px"; document.body.append(box);
 const chart = rs.chart(box, {kind: "bar", x: "highway", y: "km",
   columns: [{name: "highway", type: "VARCHAR"}, {name: "km", type: "DOUBLE"}], rows: [["primary", 12.5], ["residential", 30.5]]});
@@ -186,6 +188,8 @@ chart.set({kind: "pie"});
 ```
 
 `rs.dock` is the bottom dock under the map ([The bottom dock](../dashboard-layout.md#the-bottom-dock)). `add({id, label, el, note, actions, closable})` adds a content, `open(id)` and `close()` open and close the dock, `show(id)` shows a content, `note(id, text)` changes its note, `height(px)` gives or sets the height, `list()` gives the ids and `remove(id)` removes a content. `table({columns, rows, idColumn})` gives the dock's table (`el`, `set`). The event `rs:dockchange` has `open`, `id` and `height`.
+
+`rs.holdPopup(key, on)` holds the road popup while a part that shows the road's facts itself is in view (the data dock's road card): a selection then has no popup. The popup comes back when no key holds it.
 
 `rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. `rs.days.use(el, {days, onChange})` builds a day picker in an empty element: a field that opens a calendar of the days with data, the day before and after, and "Latest". It gives `{set(day, quiet), value()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 

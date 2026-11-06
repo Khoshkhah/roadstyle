@@ -64,6 +64,10 @@ export let _ID_KEYS = [];         // the road's id fields: the panel search alwa
 let _roadPopup = true;            // road_popup=False: a click selects and fires rs:select, no popup
 let _quiet = false;              // quiet(true): no popup and no tooltip, also when the style has them (the level editor on a host's roads)
 export function quiet(on){ _quiet = !!on; if(_quiet && _tip) _tip.remove(); }
+// holdPopup(key, on): a part that shows the road's facts itself (the data dock's road card) holds the road popup while it is in view, so a
+// selection, from the map or from the part, has one place for its facts. The tooltip stays. A page with road_popup=False stays so after the hold.
+const _holds = new Set();
+export function holdPopup(key, on){ if(on) _holds.add(key); else _holds.delete(key); }
 export function rsDeselect(){
   if(_sel){ setS(_sel,{select:false});
     if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false});
@@ -97,7 +101,7 @@ export function rsSelect(id){
   const cll = c ? {lng:c[0], lat:c[1]} : null;
   _emit("rs:select", {id:id, layer:null, properties:props || {}, twin:_twinDetail(props), overlays:ovs, streetView:_svPick(cll, _road(id), id)});
   const sv = _sv(cll, _road(id));
-  if(_roadPopup && !_quiet){
+  if(_roadPopup && !_quiet && !_holds.size){
     if(_popupMode === "panel"){ rsInfoShow(_both(props||{}, true, _popupFields) + sv + _ovSections(ovs)); }
     else if(c) new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
       .setLngLat(c).setHTML(_both(props||{}, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);
@@ -173,7 +177,7 @@ export function initSelect(){
         if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+_esc(io.label)+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
         else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth}).setLngLat(e.lngLat)
           .setHTML('<span style="color:#777">'+_esc(io.label)+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }
-    else if(_roadPopup && !_quiet){
+    else if(_roadPopup && !_quiet && !_holds.size){
       if(_popupMode === "panel"){ rsInfoShow(_both(props, true, _popupFields) + sv + _ovSections(ovs)); }
       else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth})
         .setLngLat(e.lngLat).setHTML(_both(props, false, _popupFields) + sv + _ovSections(ovs)).addTo(map);

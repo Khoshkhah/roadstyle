@@ -286,6 +286,37 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
     assert errors == [], errors
 
 
+
+_BUSY = '[{"error": {"code": 503, "message": "The model is overloaded. Please try again later.", "status": "UNAVAILABLE"}}]'
+
+
+def test_a_busy_service_is_tried_again_and_its_error_says_busy(tmp_path):
+    """Kaveh's screenshot: "Google Gemini refused the request (HTTP 503): [{." A 503 is a busy service, not a refusal, and Google sends its
+    error as a list. Ask waits and tries again (at most 2 times); when the service stays busy, the red line says "busy" with Google's words."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        seen = []
+        busy = {"n": 1}
+
+        def gemini(route):
+            seen.append(1)
+            if busy["n"] > 0:
+                busy["n"] -= 1
+                route.fulfill(status=503, content_type="application/json", body=_BUSY)
+            else:
+                route.fulfill(status=200, content_type="application/json", body='{"choices": [{"message": {"role": "assistant", "content": "Six roads."}}]}')
+        try:
+            page.route("https://generativelanguage.googleapis.com/**", gemini)
+            page.evaluate("releaseLoad(); localStorage.setItem('rs-key:ask:gemini', 'test-key-123'); makeReal(); ask.open()")
+            assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads." and len(seen) == 2       # one 503, then the answer
+            busy["n"] = 3
+            assert page.evaluate("ask.ask('How many again?')") is None
+            line = page.evaluate("[...document.querySelectorAll('.rs-ask-turn')].at(-1).querySelector('.rs-ask-err').innerText")
+            assert len(seen) == 5 and "Google Gemini is busy now (HTTP 503): The model is overloaded." in line and "refused" not in line and "[{" not in line, line
+        finally:
+            browser.close()
+    assert errors == [], errors
+
 def test_the_phone_keeps_the_tool_row_and_the_box_in_view(tmp_path):
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser, page, errors = _open(p, url, 390, 844)
@@ -314,6 +345,7 @@ def test_the_ask_view_is_readable_in_the_theme(tmp_path, theme):
             page.evaluate(f"rsSetTheme({json.dumps(theme)}); releaseLoad(); localStorage.removeItem('rs-key:ask:fake'); ask.open()")
             page.wait_for_timeout(300)
             found = {"empty": page.evaluate(_PROBE, ["#sb", theme == "dark"])}
+            assert page.evaluate("getComputedStyle(document.querySelector('.rs-frame-bar')).borderTopWidth") == "0px"   # no line above Examples: the box has its edge
             page.evaluate("localStorage.setItem('rs-key:ask:fake', 'not-a-key')")
             _ask(page, "Primary?", ["tool('run_query', {sql: 'SELECT x'})", "tool('run_query', {sql: \"SELECT edge_id, name FROM edges WHERE highway = 'primary'\"})",
                                     "say('**3** roads. `Street 5`.\\n- a\\n- b\\n- c\\n- d')"])
