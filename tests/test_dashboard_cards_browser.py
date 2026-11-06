@@ -74,8 +74,12 @@ _RING = """() => {
 
 
 def _rgb(text):
+    """The first colour in a computed value: rgb(…) or rgba(…), or color(srgb r g b) (a color-mix() gives that form)."""
     import re
-    return [int(v) for v in re.search(r"rgba?\((\d+), (\d+), (\d+)", text).groups()]
+    m = re.search(r"rgba?\((\d+), (\d+), (\d+)", text)
+    if m:
+        return [int(v) for v in m.groups()]
+    return [round(float(v) * 255) for v in re.search(r"color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)", text).groups()]
 
 
 def _contrast(a, b):
@@ -105,7 +109,9 @@ def test_the_open_card_has_an_accent_ring_and_an_accent_title_and_keeps_its_size
         h2 = page.evaluate("document.querySelector('[data-rs-section=open]').getBoundingClientRect().height")
         browser.close()
     assert "inset" in m["openRing"] and "1.5px" in m["openRing"], m
-    assert m["shutRing"] == "none" and m["plainRing"] == "none", m
+    # a closed card that folds has the thin edge (Kaveh's variant F), 3:1 or more on its card; a card that does not fold has none
+    assert "inset" in m["shutRing"] and "1px" in m["shutRing"] and m["plainRing"] == "none", m
+    assert _contrast(_rgb(m["shutRing"]), _rgb(m["card"])) >= 3, m
     assert m["openTitle"] == m["accent"] and m["shutTitle"] != m["accent"], m
     assert _contrast(_rgb(m["openRing"]), _rgb(m["card"])) >= 3, m        # WCAG 1.4.11: a part of the interface, 3:1 on the card
     assert _contrast(_rgb(m["openTitle"]), _rgb(m["card"])) >= 4.5, m     # WCAG 1.4.3: text, 4.5:1 on the card
@@ -207,7 +213,7 @@ def test_a_card_that_folds_at_the_end_of_a_scrolled_panel_keeps_its_title_row_in
     assert not errors, errors
 
 
-def test_a_card_that_opens_is_one_button_with_a_pencil_a_tint_and_a_note(tmp_path):
+def test_a_card_that_opens_is_one_button_with_a_pencil_an_edge_and_a_note(tmp_path):
     """A card with `open` (JavaScript only: a function) opens the page's own panel with one click anywhere on the card, or Enter on its title. It
     never folds ("collapse all" leaves it), it is 44px high like a closed card that folds, its row ends with the pencil after the "?", and its note is
     one line under the title (rs.sections.note). A disabled title does not open."""
@@ -230,8 +236,18 @@ def test_a_card_that_opens_is_one_button_with_a_pencil_a_tint_and_a_note(tmp_pat
           return {{last: hd.lastElementChild.tagName, order: r(hd.querySelector('.rs-help-btn')).right <= r(hd.lastElementChild).left,
                    button: hd.querySelector('.rs-sec-title').tagName}}; }}""")
         assert hd == {"last": "svg", "order": True, "button": "BUTTON"}, hd
-        bg = "id => getComputedStyle(rs.sections.get(id)).backgroundColor"
-        assert page.evaluate(f"({bg})('go') !== ({bg})('shut')"), "the open card has its own tint"
+        # no background and the thin edge (3:1 on the panel); the tint under the pointer. `background: true` (Ask) has the tint and the same edge; `icon: "ask"`
+        page.evaluate("rs.sections.add({id: 'ask', label: 'Ask', open: () => 1, icon: 'ask', background: true})")
+        look = """id => { const s = getComputedStyle(rs.sections.get(id)); return [s.backgroundColor, s.boxShadow]; }"""
+        go, ask = page.evaluate(f"({look})('go')"), page.evaluate(f"({look})('ask')")
+        panel = page.evaluate("getComputedStyle(document.querySelector('#sb .sb-card')).backgroundColor")
+        assert go[0] == "rgba(0, 0, 0, 0)" and "1px" in go[1] and _contrast(_rgb(go[1]), _rgb(panel)) >= 3, (go, panel)
+        assert ask[0] != "rgba(0, 0, 0, 0)" and ask[1] == go[1], (ask, go)
+        page.hover(f"{sec} .rs-sec-hd")
+        assert page.evaluate(f"({look})('go')")[0] != "rgba(0, 0, 0, 0)", "the tint under the pointer"
+        page.mouse.move(1, 1)
+        icon = "id => rs.sections.get(id).querySelector('.rs-sec-hd > svg').innerHTML"
+        assert page.evaluate(f"({icon})('go')") != page.evaluate(f"({icon})('ask')"), "Ask has its own icon"
         page.click(f"{sec} .rs-sec-title")
         page.focus(f"{sec} .rs-sec-title")
         page.keyboard.press("Enter")
@@ -248,7 +264,8 @@ def test_a_card_that_opens_is_one_button_with_a_pencil_a_tint_and_a_note(tmp_pat
         page.evaluate(f"document.querySelector('{sec} .rs-sec-title').disabled = true")
         page.click(f"{sec} .rs-sec-note")
         assert page.evaluate("window.opened") == 3, "a disabled card does not open"
-        for bad in ["{id: 'x', label: 'X', open: () => 1, fold: true}", "{id: 'y', open: () => 1}", "{id: 'z', label: 'Z', open: 'no'}"]:
+        for bad in ["{id: 'x', label: 'X', open: () => 1, fold: true}", "{id: 'y', open: () => 1}", "{id: 'z', label: 'Z', open: 'no'}",
+                    "{id: 'i', label: 'I', open: () => 1, icon: 'star'}", "{id: 't', label: 'T', html: 'x', icon: 'ask'}"]:
             assert page.evaluate(f"() => {{ try {{ rs.sections.add({bad}); return false; }} catch(e) {{ return true; }} }}"), bad
         browser.close()
     assert not errors, errors

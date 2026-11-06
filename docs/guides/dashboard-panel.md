@@ -66,11 +66,17 @@ rs.ready(() => {
 
 ### A card that opens something
 
-When the only work of a card is to open your own panel, editor or dialog, give it `open` (a function) in place of `fold` and a body. The card is then one button: a click anywhere on it, or Enter on its title, runs the function. Its row ends with a pencil in place of the chevron, its background has a light tint of the accent colour, it never folds, and "Collapse all" leaves it. Its `note` tells the state, and `rs.sections.note(id, text)` changes it. `open` is JavaScript only, because it is a function. A card with `open` and `fold` gets an error.
+When the only work of a card is to open your own panel, editor or dialog, give it `open` (a function) in place of `fold` and a body. The card is then one button: a click anywhere on it, or Enter on its title, runs the function. Its row ends with a pencil in place of the chevron. It has no background, only a thin edge, and it gets a light tint of the accent colour under the pointer. It never folds, and "Collapse all" leaves it. Its `note` tells the state, and `rs.sections.note(id, text)` changes it. `open` is JavaScript only, because it is a function. A card with `open` and `fold` gets an error.
 
 ```js
 rs.sections.add({id: "design", label: "Edit design", note: "Light (Liberty)", open: () => myPanel.open()});
 rs.sections.note("design", "Your theme");
+```
+
+`icon` changes the mark at the end of the row: `"edit"` (the pencil, the default), `"ask"` (a speech bubble with a question mark), or your own `<svg>`. The background is the only choice of the card's look. A card that opens something has none by default; `background: true` gives it the light accent tint, so that one card stands out from the others, as the Ask card does. The edge stays. `icon` does not depend on the background:
+
+```js
+rs.sections.add({id: "ask", label: "Ask", note: "A question about the data", open: () => ask.open(), icon: "ask", background: true});
 ```
 
 To keep a card from opening (a step that is not ready), disable its title button: `rs.sections.get(id).querySelector(".rs-sec-title").disabled = true`.
@@ -86,7 +92,7 @@ A section with a `label` is a card. Two options choose which of four kinds of ca
 | does not fold (default) | `{"id", "label", "html"}` | `{"id", "label", "html", "background": False}` |
 | `fold: true` | `{"id", "label", "html", "fold": True}` | `{"id", "label", "html", "fold": True, "background": False}` |
 
-Each kind has the same title row, the same 12 px corners and the same padding (`--rs-card-pad`). A card with `background: false` has no colour behind it. In a card that folds, the title is a button, the row has a chevron, and the body opens inside the same card. An open card that folds has a thin accent ring inside its edge and an accent title, so that it shows in a long panel. The ring does not change the size of the card. A "?" of [`rs.help.button(rs.sections.get(id), ...)`](dashboard-parts.md#a-help-window) is at the right end of the title row. In a card that folds, it is before the chevron, and the chevron is last. A card that opens something ([`open`](#a-card-that-opens-something)) has a pencil in the place of the chevron, and a light tint of the accent colour.
+Each kind has the same title row, the same 12 px corners and the same padding (`--rs-card-pad`). A card with `background: false` has no colour behind it. In a card that folds, the title is a button, the row has a chevron, and the body opens inside the same card. A closed card that folds has a thin gray edge (`--rs-card-edge`). Open, it has a thin accent ring in the place of the edge and an accent title, so that it shows in a long panel. The edge and the ring are inside the card, so they do not change its size. The edge has a contrast of 3:1 or more on the card and on the panel, in both themes. A "?" of [`rs.help.button(rs.sections.get(id), ...)`](dashboard-parts.md#a-help-window) is at the right end of the title row. In a card that folds, it is before the chevron, and the chevron is last. A card that opens something ([`open`](#a-card-that-opens-something)) has a pencil in the place of the chevron, no background and the same thin edge; under the pointer it gets a light tint of the accent colour. With `background: true` it has the tint, and the same edge.
 
 A section without a `label` is not a card. It is a block of the page's own HTML, with no title, no padding and no background, for content that has its own layout: tabs with their panes, a row of number tiles, or the page's own cards. It is as wide as the cards and has `--rs-card-gap` above and below, as a card has. Its first card and its last card do not add a second gap, because their margins join the block's margin.
 
