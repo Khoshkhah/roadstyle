@@ -993,9 +993,13 @@ html[data-rs-theme=dark]{--rs-err:#fca5a5}
 .rs-dd-tc-about{font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rs-dd-tgrid{align-items:start}
 .rs-dd-split{flex:1;min-height:0;display:flex;gap:10px}
-.rs-dd-split .rs-dock-table{flex:0 1 auto}
+.rs-dd-split .rs-dock-table{flex:1 1 0;min-width:0;align-self:stretch;max-width:none}
 .rs-dd-side{flex:0 0 300px;min-height:0;display:flex;flex-direction:column}
 .rs-dd-side[hidden],.rs-dd-card[hidden]{display:none!important}
+.rs-dd-side-hint{margin:auto 0;padding:0 20px;text-align:center;color:var(--mut);font-size:12px}
+.rs-dd-side-hint[hidden]{display:none}
+.rs-dd-side.empty{border:1px dashed var(--line);border-radius:8px}
+html.rs-phone .rs-dd-side.empty{display:none}
 .rs-dd-card{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:10px 12px;font:12px/1.4 system-ui,sans-serif;scrollbar-width:thin}
 .rs-dd-rc-hd{display:flex;align-items:flex-start;gap:8px}
 .rs-dd-rc-name{flex:1;min-width:0;font:600 14px/1.3 system-ui,sans-serif;color:var(--ink);overflow-wrap:anywhere}
@@ -1093,7 +1097,7 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #rs-dock .rs-dd-view{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 #rs-dock .rs-dd-view button{border:0;border-radius:0;padding:3px 10px}
 #rs-dock .rs-dd-view button.on{background:var(--accent-fill);color:#fff}
-.rs-dd-chart{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:8px 12px}
+.rs-dd-chart{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:8px 12px}
 .rs-dd-chart[hidden],#rs-dock .rs-dock-table[hidden]{display:none}
 .rs-dd-chartrow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px}
 .rs-dd-cl{display:inline-flex;gap:5px;align-items:center;color:var(--mut)}

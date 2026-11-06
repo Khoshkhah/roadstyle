@@ -59,7 +59,10 @@ export function dataDock(o = {}){
   const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
   // the side column beside the table or the chart (Kaveh, 2026-11-06: the list of the tables "in the same place" as the card of a road): one of the
   // two at a time, the last one opened; the table and the chart stay in view
-  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"); side.hidden = card.hidden = true;
+  // the table and the chart always have the same width (Kaveh, 2026-11-06: "I want to fix the length of table and chart part"): on a desktop the side
+  // column always keeps its place, with a hint while it has neither a card nor the list; on a phone it shows only with one of the two
+  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road on the map or in the table, or open Tables.");
+  card.hidden = true;
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
   const chartBox = $("div", "rs-dd-chart"), chartRow = $("div", "rs-dd-chartrow"), chartEl = $("div", "rs-dd-chartel"); chartBox.hidden = true;
   const kindS = $("select"), xS = $("select"), yS = $("select"), svgB = $("button", "", "SVG");
@@ -68,7 +71,7 @@ export function dataDock(o = {}){
   const lab = (t, e) => { const l = $("label", "rs-dd-cl"); l.append($("span", "", t), e); return l; };
   chartRow.append(lab("Kind", kindS), lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
   chartBox.append(chartRow, chartEl);
-  side.append(list, card);
+  side.append(list, card, hint); side.classList.add("empty");
   split.append(table.el, chartBox, side);
   el.append(q, err, split);
   const label = o.label || "Data", id = "data";
@@ -107,7 +110,7 @@ export function dataDock(o = {}){
     foot.append($("span", "rs-dd-rc-id", `${ID} ${idv}`), copy, zoom);
     card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), foot);
   }
-  const paintSide = () => { side.hidden = list.hidden && card.hidden; };
+  const paintSide = () => { const none = list.hidden && card.hidden; hint.hidden = !none; side.classList.toggle("empty", none); };
   document.addEventListener("rs:select", (e) => { if(o.card === false || e.detail.overlay) return; drawCard(e.detail.properties || {}, e.detail.id);
     list.hidden = true; tablesB.classList.remove("on"); tablesB.setAttribute("aria-expanded", "false"); card.hidden = false; paintSide(); });
   document.addEventListener("rs:deselect", () => { card.hidden = true; paintSide(); });

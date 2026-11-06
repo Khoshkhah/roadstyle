@@ -108,11 +108,16 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.evaluate("releaseLoad()")
             page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 6")
             assert page.inner_text("#rs-dock .rs-dock-note").startswith("6 rows · 3 columns")
+            # the table has its fixed width: the side column keeps its place with a hint, before and after a card
+            w = "() => Math.round(document.querySelector('#rs-dock .rs-dock-table').getBoundingClientRect().width)"
+            w0 = page.evaluate(w)
+            assert page.is_visible("#rs-dock .rs-dd-side-hint") and w0 > 600, w0
             assert page.evaluate("window.lights.at(-1)") == 6                                    # the roads of the table light
             # a row click selects its road; the light stays
             page.click("#rs-dock tbody tr >> nth=1")
             page.wait_for_timeout(200)
             assert page.evaluate("rs.getState().selection") == "2" and page.evaluate("window.lights.at(-1)") == 6
+            assert page.evaluate(w) == w0 and page.is_hidden("#rs-dock .rs-dd-side-hint")
             # the road card beside the table: the name, the class as a chip, the id at its foot; no field of roadstyle's drawing
             card = page.inner_text("#rs-dock .rs-dd-card")
             assert page.inner_text("#rs-dock .rs-dd-rc-name") == "Street 1" and "edge_id 2" in page.inner_text("#rs-dock .rs-dd-rc-id"), card
