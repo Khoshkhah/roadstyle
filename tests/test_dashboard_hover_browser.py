@@ -77,6 +77,8 @@ def test_every_control_has_one_of_the_three_hover_looks(tmp_path, theme):
             page.evaluate(_PARTS)
             page.evaluate(f"rsSetTheme('{theme}')")
             page.wait_for_timeout(300)
+            link_color, accent = page.evaluate("""() => { const a = document.querySelector('#sb a[href="#x"]'), t = document.createElement('i');
+              t.style.color = 'var(--accent)'; a.parentElement.append(t); const r = [getComputedStyle(a).color, getComputedStyle(t).color]; t.remove(); return r; }""")
             seen, rows = set(), []
             rows += _looks(page, seen)
             page.click("#h-day .rs-day-field")
@@ -105,4 +107,5 @@ def test_every_control_has_one_of_the_three_hover_looks(tmp_path, theme):
     assert [r[0] for r in rows if r[1] and r[2]] == [], "a disabled control reacts"
     bad = [r[0] for r in rows if not r[1] and r[2] is None]
     assert bad == [], "no hover: " + " | ".join(bad)
+    assert link_color == accent, (link_color, accent)                     # a link in the panel has the accent, not the browser's blue
     assert [e for e in errors if "accelerometer" not in e] == []

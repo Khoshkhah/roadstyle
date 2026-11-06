@@ -848,6 +848,7 @@ html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
 /* ONE HOVER, the rest: keyboard focus has a ring as well as the hover look; a link is underlined under the pointer */
 :is(#sb,#rs-toolbar,#rs-help,.rs-help-box,#rs-scalebox,.rs-day-cal,.rs-svw) :is(button,select,summary,a[href]):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 :is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]{text-decoration:none}
+:where(#sb) a[href]{color:var(--accent)}      /* a link in the panel has the accent (a page's own link rule is more specific and wins); before, it had the browser's blue */
 :is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]:is(:hover,:focus-visible){text-decoration:underline}
 :is(#sb,#rs-help,.rs-help-box) summary{border-radius:6px;cursor:pointer}
 :is(#sb,#rs-help,.rs-help-box) summary:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
