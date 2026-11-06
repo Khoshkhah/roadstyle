@@ -22,12 +22,17 @@ const _fltLayers=()=>map.getStyle().layers.filter(l=>RS_ROLES.has(_role(l)) || _
 // short property tests: every piece and item carries its edge's class (__rs_cls: FILTER.col of the edge, also on a name or an arrow,
 // which carry the chain's highway) and level (lvl; an attached item has it baked as __rs_lvl). The rsFilter id set goes through the id (the road's row) and the twin from the road table (a two-way pair's shared piece shows while
 // either edge shows). A shadow line or a 3D deck covers several edges (__rs_edges): it shows while any of them shows, decided here.
-export function _applyRoadFilters(){
+// _roadTest(): the switches of the moment, and edgeOn(row): whether that road shows now (also a chart card that follows the map, `follow`)
+export function _roadTest(){
   // the id set: rsFilter's and the modes' (both: the rows in each)
   const ids = _qIds && _modeRows ? _qIds.filter(i=>_modeRows.has(i)) : _qIds || (_modeRows && [..._modeRows]);
   const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c)), hid=new Set(hidden), q=ids && new Set(ids);
   const edgeOn = i=>{ const p=_rprops(i), v=p.lvl||0;
     return !hid.has(p.__rs_cls) && !(p.__rs_access && _accHid.has(p.__rs_access)) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
+  return {hidden, q, edgeOn};
+}
+export function _applyRoadFilters(){
+  const {hidden, q, edgeOn} = _roadTest();
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
     ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });

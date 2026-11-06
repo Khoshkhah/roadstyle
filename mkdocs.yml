@@ -69,6 +69,7 @@ nav:
       - Dashboard parts: guides/dashboard-parts.md
       - Edit the design of a map: guides/design-panel.md
       - The data dock: guides/data-dock.md
+      - Charts: guides/charts.md
       - Ask: guides/ask.md
       - "Live data: a new day": guides/live-data.md
       - Move a dashboard to the new version: guides/migrating-dashboard.md

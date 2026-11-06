@@ -15,6 +15,7 @@ frame
 sections
 query
 roadcard
+chartcard
 settings
 tip
 help

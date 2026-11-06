@@ -3,7 +3,9 @@
 // thin, a bar has round ends at its data end, a line is 2 px; the pointer on a mark shows its values (rs.hover); a click on a mark gives its row (onPick).
 //
 //   rs.chart(el, {kind, columns, rows, x, y, title, values, onPick, small}) -> {set(change), spec(), svg(), destroy()}
-//     columns: [{name, type}]; rows: [[...]]; x: a column name; y: a column name or a list of them (bar, line); values: all the numbers of x (histogram)
+//     columns: [{name, type}]; rows: [[...]]; x: a column name; y: a column name or a list of them (bar, line); values: all the numbers of x (histogram);
+//     title: false: no title, only the count (a card has its label as the title); count: the text of the count ("13 298 roads")
+//   rs.chart.ranges(numbers, parts) -> {n, of(v), label(k)}: about `parts` ranges of the numbers (a bar or a pie of a number x with many values)
 import {rsSvg} from "./svg.js";
 import {rsHover} from "./hover.js";
 
@@ -62,9 +64,9 @@ export const rsChart = (() => {
       const W = Math.max(160, el.clientWidth - 2), ys = [].concat(s.y || []); lastW = el.clientWidth;
       // the title and a muted line under it: what is drawn, and from how many rows (a small copy has neither: its card says it)
       if(!s.small){ const hd = document.createElement("div"), t = document.createElement("b"), sub = document.createElement("span"); hd.className = "rs-chart-hd";
-        t.textContent = s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
+        t.textContent = s.title === false ? "" : s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
         const n = s.kind === "histogram" && s.values ? s.values.length : s.rows.length;
-        sub.textContent = `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(t, sub); el.append(hd); }
+        sub.textContent = s.count != null ? s.count : `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(...(s.title === false ? [sub] : [t, sub])); el.append(hd); }
       const legend = !s.small && (ys.length > 1 || s.kind === "pie") ? document.createElement("div") : null;     // a small copy has no legend
       if(legend){ legend.className = "rs-chart-legend"; el.append(legend); }
       const cs = getComputedStyle(el), inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);   // the box's height without its padding
@@ -198,8 +200,12 @@ export const rsChart = (() => {
       const y = ys[0], order = s.rows.map((r, i) => [i, num(r[at(y)]) ?? 0]).filter((p) => p[1] > 0).sort((a, b) => b[1] - a[1]);
       const keep = order.length > SLICES ? order.slice(0, SLICES - 1) : order, rest = order.slice(keep.length).reduce((t, p) => t + p[1], 0);
       const parts = keep.map(([i, v]) => ({i, v, name: ((x) => x == null ? "null" : typeof x === "number" || typeof x === "bigint" ? fmt(x) : String(x))(s.rows[i][at(s.x)])})).concat(rest > 0 ? [{i: null, v: rest, name: `Other (${order.length - keep.length})`}] : []);
-      const total = parts.reduce((t, p) => t + p.v, 0), cx = W / 2, cy = H / 2, R = Math.max(10, Math.min(W, H) / 2 - 6);      // the names are in the legend, not round the pie
+      const total = parts.reduce((t, p) => t + p.v, 0);
       legendOf(legend, parts.map((p, k) => [`${p.name} ${Math.round((p.v / total) * 100)} %`, col(k)]));
+      // a legend of more than one line (a narrow card): the pie is smaller by the extra lines, so the chart stays in its box
+      const extra = legend ? Math.max(0, legend.offsetHeight - 24) : 0;
+      if(extra && H - extra >= 60){ H -= extra; svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); }
+      const cx = W / 2, cy = H / 2, R = Math.max(10, Math.min(W, H) / 2 - 6);      // the names are in the legend, not round the pie
       let a0 = -Math.PI / 2;
       parts.forEach((p, k) => {
         const a1 = a0 + (p.v / total) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0, pt = (a) => `${cx + R * Math.cos(a)},${cy + R * Math.sin(a)}`;
@@ -221,6 +227,16 @@ export const rsChart = (() => {
     if(n.length >= 2) return {kind: "scatter", x: n[0].name, y: n[1].name};
     if(n.length === 1) return {kind: "histogram", x: n[0].name};
     return null;
+  };
+  // the ranges of many numbers, for a bar (about 12) or a pie (about 6) of a number x with more than 40 values (the data dock, the chart card): a step of
+  // 1, 2, 2.5 or 5 times a power of ten, from a multiple of the step at or under the smallest number. of(v): the range of v; label(k): "0–250"
+  chart.ranges = (vals, parts) => {
+    let lo = Infinity, hi = -Infinity; for(const v of vals){ if(v < lo) lo = v; if(v > hi) hi = v; }
+    if(!isFinite(lo)){ lo = 0; hi = 0; }
+    const raw = (hi - lo) / parts || 1, pw = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map((k) => k * pw).find((x) => x >= raw);
+    const start = Math.floor(lo / step) * step, n = Math.max(1, Math.ceil((hi - start) / step + 1e-9));
+    const f = (v) => (+v.toPrecision(6)).toLocaleString("en", {maximumFractionDigits: 6}).replace(/,/g, " ");
+    return {n, of: (v) => Math.max(0, Math.min(n - 1, Math.floor((v - start) / step))), label: (k) => `${f(start + k * step)}\u2013${f(start + (k + 1) * step)}`};
   };
   chart.check = check;
   chart.isNumber = (type) => isNum(type);

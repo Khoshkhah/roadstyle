@@ -99,11 +99,15 @@ rs.setState({classes: null});       // back to all classes
 
 ## Sections of the panel
 
-The panel starts empty. Add a part of roadstyle (`part`: `"query"` or `"road_card"`) or your own HTML (`html`).
+The panel starts empty. Add a part of roadstyle (`part`: `"query"`, `"road_card"` or `"chart"`) or your own HTML (`html`).
 
 ```javascript
 rs.sections.add({id: "q", label: "Query", part: "query", text: "p.highway == 'primary'"});
 rs.sections.add({id: "road", label: "Selected road", part: "road_card", fields: ["name", "highway"]});
+rs.sections.add({id: "classes", label: "Roads by class", part: "chart", chart: {kind: "bar", x: "highway"}});
+rs.sections.add({id: "flow", label: "Vehicles per hour", part: "chart",
+                 chart: {kind: "line", x: "hour", y: "vehicles", data: [{hour: 7, vehicles: 820}, {hour: 8, vehicles: 1140}]}});
+document.addEventListener("rs:chartpick", (e) => console.log(e.detail.id, e.detail.row));   // a click on a mark of your own rows
 rs.sections.add({id: "notes", label: "Notes", before: "road", fold: true,
                  html: "<p>Text of the page</p><button class='sb-primary' id='go'>Go</button>"});
 document.getElementById("go").onclick = () => rs.focus(rs.query({highway: "primary"}));
@@ -240,7 +244,7 @@ rs.select(rs.query({highway: "primary"})[0]);
 stop();
 ```
 
-The page sends these events: `rs:ready`, `rs:select`, `rs:deselect`, `rs:filterchange`, `rs:colorchange`, `rs:highlightchange`, `rs:themechange`, `rs:basemapchange`, `rs:basemapready`, `rs:buildingschange`, `rs:buildings3dchange`, `rs:buildingsopacitychange`, `rs:terrainchange`, `rs:labelschange`, `rs:overlaychange`, `rs:overlayschange`, `rs:interactionchange`, `rs:tunnelchange`, `rs:roadfillchange`, `rs:viewchange`, `rs:viewselect`, `rs:sectionchange`, `rs:helpchange`, `rs:colormode`, `rs:datachange`, `rs:toolchange`, `rs:toolsready`, `rs:sheetchange`, `rs:layoutchange`, `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot`, `rs:google3dchange`, `rs:g3dmodechange`, `rs:arrowschange`, `rs:stylechange` and `rs:tableready`. Your page sends `rs:toprowschange` when it changes the state of a row that it added with `rsAddTopRow`: the base-map box then reads the row again.
+The page sends these events: `rs:ready`, `rs:select`, `rs:deselect`, `rs:filterchange`, `rs:colorchange`, `rs:highlightchange`, `rs:themechange`, `rs:basemapchange`, `rs:basemapready`, `rs:buildingschange`, `rs:buildings3dchange`, `rs:buildingsopacitychange`, `rs:terrainchange`, `rs:labelschange`, `rs:overlaychange`, `rs:overlayschange`, `rs:interactionchange`, `rs:tunnelchange`, `rs:roadfillchange`, `rs:viewchange`, `rs:viewselect`, `rs:sectionchange`, `rs:chartpick`, `rs:helpchange`, `rs:colormode`, `rs:datachange`, `rs:toolchange`, `rs:toolsready`, `rs:sheetchange`, `rs:layoutchange`, `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot`, `rs:google3dchange`, `rs:g3dmodechange`, `rs:arrowschange`, `rs:stylechange` and `rs:tableready`. Your page sends `rs:toprowschange` when it changes the state of a row that it added with `rsAddTopRow`: the base-map box then reads the row again.
 
 When each event fires, and its `detail`, are in the [reference](../../reference/javascript.md#events).
 

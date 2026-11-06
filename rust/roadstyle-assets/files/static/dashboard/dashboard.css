@@ -757,11 +757,11 @@ html[data-rs-theme=dark]{--rs-chart-1:#159cb1;--rs-chart-2:#d95926;--rs-chart-3:
 .rs-chart svg{flex:none}
 .rs-chart.rs-chart-small{overflow:hidden;min-height:0}
 .rs-chart svg{display:block;overflow:visible;font-family:system-ui,sans-serif;font-variant-numeric:tabular-nums}
-.rs-chart-legend{display:flex;flex-wrap:wrap;gap:4px 12px;min-height:20px;color:var(--ink);font-size:11.5px}
+.rs-chart-legend{flex:none;display:flex;flex-wrap:wrap;gap:4px 12px;min-height:20px;color:var(--ink);font-size:11.5px}
 .rs-chart-legend span{display:inline-flex;align-items:center;gap:5px}
 .rs-chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
 .rs-chart-foot{color:var(--mut);font-size:11px;min-height:16px}
-.rs-chart-hd{display:flex;align-items:baseline;gap:8px;min-height:22px;flex-wrap:wrap}
+.rs-chart-hd{flex:none;display:flex;align-items:baseline;gap:8px;min-height:22px;flex-wrap:wrap}
 .rs-chart-hd b{font:600 12.5px system-ui,sans-serif;color:var(--ink)}
 .rs-chart-hd span{font-size:11px;color:var(--mut)}
 .rs-chart svg .rs-mk{transition:opacity .12s,fill-opacity .12s;fill-opacity:.85}

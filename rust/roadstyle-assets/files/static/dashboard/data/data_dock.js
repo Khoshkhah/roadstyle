@@ -299,11 +299,9 @@ export function dataDock(o = {}){
     if(many){
       const all = await allRows(r, CSV_LIMIT); if(me !== chartSeq) return;
       const yi = ys[0] && ys[0] !== COUNT ? r.columns.findIndex((col) => col.name === ys[0]) : -1, vals = all.map((x) => [Number(x[xi]), yi < 0 ? 1 : Number(x[yi]) || 0]).filter(([v]) => isFinite(v));
-      let lo = Infinity, hi = -Infinity; for(const [v] of vals){ if(v < lo) lo = v; if(v > hi) hi = v; }
-      const raw = (hi - lo) / (sp.kind === "pie" ? 6 : 12) || 1, pw = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map((k) => k * pw).find((s) => s >= raw);
-      const start = Math.floor(lo / step) * step, n = Math.max(1, Math.ceil((hi - start) / step + 1e-9)), sums = new Array(n).fill(0);
-      for(const [v, w] of vals) sums[Math.min(n - 1, Math.floor((v - start) / step))] += w;
-      const yName = yi < 0 ? "rows" : `sum of ${ys[0]}`, rows = sums.map((s, k) => [`${fmt(+(start + k * step).toPrecision(6))}\u2013${fmt(+(start + (k + 1) * step).toPrecision(6))}`, s]).filter(([, s]) => s > 0);
+      const rg = rs.chart.ranges(vals.map(([v]) => v), sp.kind === "pie" ? 6 : 12), sums = new Array(rg.n).fill(0);
+      for(const [v, w] of vals) sums[rg.of(v)] += w;
+      const yName = yi < 0 ? "rows" : `sum of ${ys[0]}`, rows = sums.map((s, k) => [rg.label(k), s]).filter(([, s]) => s > 0);
       note = ` (${sp.x} has many values: in ranges)`; hintEl.textContent = (HINT[sp.kind] || "") + note;
       spec = {...spec, x: sp.x, y: yName, columns: [{name: sp.x, type: "VARCHAR"}, {name: yName, type: "DOUBLE"}], rows, onPick: null};
     }

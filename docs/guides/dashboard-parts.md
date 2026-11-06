@@ -3,7 +3,7 @@
 A dashboard page looks the same on every project when every page uses the same parts. This page lists the shared pieces and shows the code for each one. **Use a part when one exists. Do not write CSS or
 JavaScript for the same thing in a page**: a copy of a part drifts, and it forgets the dark theme.
 
-The panel starts empty. Two parts are whole sections that roadstyle writes: the `query` part and the `road_card` part. They are in [Add to the panel](dashboard-panel.md). The pieces below are for the page's own HTML in a section.
+The panel starts empty. Three parts are whole sections that roadstyle writes: the `query` part, the `road_card` part and the `chart` part. They are in [Add to the panel](dashboard-panel.md) and [Charts](charts.md). The pieces below are for the page's own HTML in a section.
 
 Two parts use the whole panel: the level editor ([Edit the levels in a dashboard](levels.md#edit-the-levels-in-a-dashboard)) and the design panel ([Edit the design of a map](design-panel.md)). An editor of your own uses the same frame: [An editor in the panel](#an-editor-in-the-panel).
 
@@ -111,7 +111,7 @@ rs.svg(s, "text", {x: 4, y: 12, fill: "var(--mut)", "font-size": 9}, "0");
 
 ## A chart
 
-`rs.chart(el, spec)` draws a chart of a table of rows in an element: bar, line, histogram, scatter or pie. It is SVG with the theme's tokens, so it follows the theme. The data dock uses it for its **Chart** view ([The data dock](data-dock.md)).
+`rs.chart(el, spec)` draws a chart of a table of rows in an element: bar, line, histogram, scatter or pie. It is SVG with the theme's tokens, so it follows the theme. The data dock uses it for its **Chart** view ([The data dock](data-dock.md)), and the chart card uses it in the panel ([Charts](charts.md): a chart from Python, with no JavaScript).
 
 ```js
 const c = rs.chart(document.getElementById("km"), {kind: "bar", x: "highway", y: "km",
@@ -130,11 +130,12 @@ c.set({kind: "pie"});        // the same data, another kind
 | `pie` | a column of labels | one number column of 0 or more | one slice for each row, largest first, at most 6: the rest is "Other" |
 
 - The series have the colours `--rs-chart-1` to `--rs-chart-8`, in this order: the dashboard's teal first (one series has it), then orange, blue, yellow, pink, green, violet and red, checked for colour vision deficiency in both themes. The marks are a little see-through, and the mark under the pointer has its full colour. Two or more series, and a pie, have a legend.
-- The chart has a title (`title`, else from the kind and the columns: "km by highway") and the number of rows under it. The axis ticks are compact (0, 2.5K, 5K) on hairline grid lines over a darker base line. A bar of one series has its value at its tip, of each bar up to 15 bars, else of the largest only; a single line has a soft wash under it and its last value at its end. A bar is at most 24 px thick. While the pointer is on a mark, the other marks fade.
+- The chart has a title (`title`, else from the kind and the columns: "km by highway"; `false`: no title) and the number of rows under it (`count`: your own text, for example "13 298 roads"). The axis ticks are compact (0, 2.5K, 5K) on hairline grid lines over a darker base line. A bar of one series has its value at its tip, of each bar up to 15 bars, else of the largest only; a single line has a soft wash under it and its last value at its end. A bar is at most 24 px thick. While the pointer is on a mark, the other marks fade.
 - The pointer on a bar, a point or a slice shows its values. A click on it calls `onPick(row)`.
 - A kind that does not fit the columns shows a line in place of the chart, for example "A pie chart needs a text column and one number column of 0 or more."
 - `small: true` draws a copy with no labels and no hover (the card of an Ask answer).
 - `set(change)` draws again with a change of the spec; `svg()` gives the SVG element.
+- `rs.chart.ranges(numbers, parts)` puts many numbers in about `parts` ranges: `{n, of(v), label(k)}`. The data dock and the chart card use it for a bar (12) or a pie (6) of a number `x` with more than 40 values.
 
 `tests/test_chart_browser.py` checks each kind in both themes and at 390 px.
 
