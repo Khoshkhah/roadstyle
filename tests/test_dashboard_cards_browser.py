@@ -237,13 +237,13 @@ def test_a_card_that_opens_is_one_button_with_a_pencil_an_edge_and_a_note(tmp_pa
           return {{last: hd.lastElementChild.tagName, order: r(hd.querySelector('.rs-help-btn')).right <= r(hd.lastElementChild).left,
                    button: hd.querySelector('.rs-sec-title').tagName}}; }}""")
         assert hd == {"last": "svg", "order": True, "button": "BUTTON"}, hd
-        # no background and the thin light edge; the tint under the pointer. `background: true` (Ask) has the tint and no edge (variant F); `icon: "ask"`
+        # no background and the thin light edge; the tint under the pointer. `background: true` (Ask) has the tint and an accent edge (Kaveh, 2026-11-06); `icon: "ask"`
         page.evaluate("rs.sections.add({id: 'ask', label: 'Ask', open: () => 1, icon: 'ask', background: true})")
         look = """id => { const s = getComputedStyle(rs.sections.get(id)); return [s.backgroundColor, s.boxShadow]; }"""
         go, ask = page.evaluate(f"({look})('go')"), page.evaluate(f"({look})('ask')")
         panel = page.evaluate("getComputedStyle(document.querySelector('#sb .sb-card')).backgroundColor")
         assert go[0] == "rgba(0, 0, 0, 0)" and "1px" in go[1] and 1.3 < _contrast(_rgb(go[1]), _rgb(panel)) < 3, (go, panel)
-        assert ask[0] != "rgba(0, 0, 0, 0)" and ask[1] == "none", (ask, go)
+        assert ask[0] != "rgba(0, 0, 0, 0)" and "1px" in ask[1] and ask[1] != go[1], (ask, go)
         page.hover(f"{sec} .rs-sec-hd")
         assert page.evaluate(f"({look})('go')")[0] != "rgba(0, 0, 0, 0)", "the tint under the pointer"
         page.mouse.move(1, 1)

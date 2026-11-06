@@ -98,6 +98,22 @@ A plain `<button>` and `<button class="sb-primary">` in the panel have their sty
 
 A disabled control does not react. Keyboard focus has the same look and a 2 px `--accent` ring. A card's title row has the card's own hover (see [Cards](dashboard-panel.md)). Your own controls get the look when they are a `<button>`, a `<summary>` or a link in the panel. For a control of your own in another place, use `background: var(--rs-hover-bg); color: var(--accent)`. `tests/test_dashboard_hover_browser.py` puts the pointer on every control of the panel, the toolbox and its boxes, the help window and the day picker, in both themes, and fails on a control with no hover.
 
+## Option rows
+
+A setting with a checkbox or a radio and a short note, or a choice from a list, is an option row:
+
+```html
+<div class="rs-opts">
+  <label class="rs-opt"><input type="checkbox" checked><span><b>Layers</b><small>Water, land use, buildings and more.</small></span></label>
+  <label class="rs-opt"><input type="radio" name="x"><span><b>Monaco</b><small>2 km²</small></span><button type="button">Get</button></label>
+</div>
+<div class="rs-opts rs-opts-row">
+  <label class="rs-opt"><input type="checkbox" checked><span>Driving</span></label><label class="rs-opt"><input type="checkbox"><span>Walking</span></label>
+</div>
+```
+
+`rs-opts` is a list, one row under the other. `rs-opts rs-opts-row` puts the rows side by side, as chips. A row has the light edge of a card. Under the pointer it has the hover tint and the accent edge. A checked row has the accent tint and the accent edge. A button at the end of a row is a plain button. Use a switch (`rs-seg`) for one value of a setting, and option rows when each value has a note or when more than one value can be on.
+
 ## Charts
 
 ```js

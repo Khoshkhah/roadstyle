@@ -794,6 +794,24 @@ html.rs-phone .rs-chart[data-more]{-webkit-mask-image:linear-gradient(to bottom,
 #sb :is(input[type=text],input[type=search],input[type=number],input:not([type]),textarea){width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;outline:none}
 #sb :is(input,textarea):focus{border-color:var(--accent)}
 #sb :is(input,textarea)::placeholder{color:var(--mut)}
+/* an option row (docs/guides/dashboard-parts.md, "Option rows"): a <label class="rs-opt"> with a checkbox or a radio, a title (<b>) and a note (<small>), and
+   an optional button at its end. `rs-opts` is a list of them, `rs-opts rs-opts-row` puts them side by side as chips. The edge is the card's light edge; the
+   pointer (or the key focus) gives the hover tint and the accent edge; a checked row has the accent tint and the accent edge (ONE HOVER above). */
+:is(#sb,.rs-side) .rs-opts{display:grid;gap:6px}
+:is(#sb,.rs-side) .rs-opts.rs-opts-row{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+:is(#sb,.rs-side) .rs-opt{display:flex;align-items:flex-start;gap:10px;margin:0;padding:9px 10px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--rs-card-edge);color:var(--ink);font:13px/1.35 system-ui,sans-serif;cursor:pointer}
+:is(#sb,.rs-side) .rs-opts-row .rs-opt{align-items:center;justify-content:center;gap:7px;padding:9px 6px;font-weight:500}
+:is(#sb,.rs-side) .rs-opt[hidden]{display:none}
+:is(#sb,.rs-side) .rs-opt>input{flex:none;margin:2px 0 0}
+:is(#sb,.rs-side) .rs-opts-row .rs-opt>input{margin:0}
+:is(#sb,.rs-side) .rs-opt>span{display:flex;flex:1;flex-direction:column;gap:2px;min-width:0}
+:is(#sb,.rs-side) .rs-opts-row .rs-opt>span{flex:none}
+:is(#sb,.rs-side) .rs-opt b{font-weight:600}
+:is(#sb,.rs-side) .rs-opt small{color:var(--mut);font-size:12px;line-height:1.35}
+:is(#sb,.rs-side) .rs-opt>button{flex:none;align-self:center}
+:is(#sb,.rs-side) .rs-opt:is(:hover,:focus-within){background:var(--rs-hover-bg);box-shadow:inset 0 0 0 1px var(--accent)}
+:is(#sb,.rs-side) .rs-opt:has(>input:checked){background:color-mix(in srgb,var(--card) 88%,var(--accent));box-shadow:inset 0 0 0 1.5px var(--accent)}
+:is(#sb,.rs-side) .rs-opt:has(>input:disabled){opacity:.55;cursor:not-allowed}
 #sb .rs-chip{display:inline-block;padding:2px 8px;border-radius:10px;background:color-mix(in srgb,var(--mut) 18%,transparent);color:var(--ink);font-size:11px;font-weight:600;line-height:1.35}
 #sb .rs-chip.accent{background:color-mix(in srgb,var(--accent) 16%,transparent);color:color-mix(in srgb,var(--accent) 70%,var(--ink))}   /* the accent on its own tint: mixed with the text colour, readable in both themes */
 #sb .rs-dot{display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:var(--mut)}
