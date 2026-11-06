@@ -593,7 +593,8 @@ default stays `frame` for other pages, and a look that the person keeps in Setti
 `head` is Ask's tool row (the provider, Key, New), which does not scroll; the conversation is the frame's `body` (`rs-pbody`), and the
 question box is the frame's `bar`. The mock-up's own view had two faults that the frame removes: on a phone the tool row scrolled and
 covered the first answer, and the dock's note was cut to "5 ro…". The Ask card in the panel is an open card with `icon: "ask"` and
-`tint: true` (Kaveh's variant F: the other open cards have no background and a thin edge).
+`tint: true` (Kaveh's variant F: the other open cards have no background and a thin edge). Since 2026-11-06 the tinted card also has an
+accent edge: with the tint only, Kaveh found that it did not look like a card to press.
 
 ```
 +----------------------------------+

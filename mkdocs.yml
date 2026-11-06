@@ -126,6 +126,7 @@ plugins:
 hooks:
   - docs/gen_architecture.py
   - docs/gen_formats.py            # docs/reference/formats.md: the keys of the bundled profile and palette
+  - docs/copy_parts.py             # site/parts/: the real dashboard files for the live parts (docs/parts/gallery.html)
 
 markdown_extensions:
   - admonition

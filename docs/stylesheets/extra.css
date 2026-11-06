@@ -26,6 +26,10 @@
 /* the testbed of the dashboard manual stays under the header while the page scrolls: the result is in view next to each block */
 .md-typeset iframe.rs-demo.rs-sticky { position: sticky; top: 100px; z-index: 3; height: 48vh; min-height: 300px; background: var(--md-default-bg-color); }
 
+/* a live part of the dashboard (docs/parts/gallery.html?part=...): the frame fits the part, and the page in it sets the height */
+.md-typeset iframe.rs-live { display: block; width: 100%; max-width: 440px; height: 160px; border: 0; margin: .4em 0 1em; background: transparent; color-scheme: normal; }
+.md-typeset iframe.rs-live.rs-live-map { max-width: none; height: 520px; border-radius: 10px; box-shadow: 0 2px 14px rgba(0, 0, 0, .18); }
+
 /* the one-line lead under a page title */
 .md-typeset .lead { font-size: 1.12em; color: var(--md-default-fg-color--light); margin-top: -.4em; }
 
