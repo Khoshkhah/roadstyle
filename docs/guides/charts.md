@@ -35,7 +35,7 @@ Each picture shows one card and the `chart` that made it. The script `docs/img/c
 
 ### Horizontal bar
 
-A bar chart is horizontal when a label of `x` is longer than 8 characters. A long list scrolls in the card.
+A bar chart is horizontal when a label of `x` is longer than 8 characters. The bars get thinner to fit the card; only a list that is too long for its minimum (a row of 12 px) scrolls in the card.
 
 ```python
 {"kind": "bar", "x": "highway", "y": "length_m", "scale": 0.001, "height": 300}

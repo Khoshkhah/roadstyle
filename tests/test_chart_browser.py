@@ -1,7 +1,9 @@
 """The chart part (dashboard/chart.js, docs/guides/dashboard-parts.md, "A chart"): each kind in both themes and at 390 px, with no mark outside its box; at
 most 40 bars and a "more" line; a pie of 12 rows has 8 slices with "Other"; a histogram counts the numbers it gets (all the rows, not the table's); the
-pointer on a mark shows its values and a click gives its row; a kind with no fitting columns shows a line in place of the chart. In the data dock: Table |
-Chart, the first chart of a result, and Kind. Skipped without playwright."""
+pointer on a mark shows its values and a click gives its row; a kind with no fitting columns shows a line in place of the chart. The chart fits its box:
+the bars get thinner, and only past their minimum the box scrolls; a pie is the largest circle beside or above its legend; the axis titles of a scatter
+are outside the plot; a line has value labels only when all of them fit. In the data dock: Table | Chart, the first chart of a result, and Kind; the
+Chart view takes the width of an empty side column. Skipped without playwright."""
 import json
 
 import pytest
@@ -15,7 +17,7 @@ import roadstyle as rs  # noqa: E402
 
 _COLS = [{"name": "highway", "type": "VARCHAR"}, {"name": "km", "type": "DOUBLE"}, {"name": "edges", "type": "BIGINT"}, {"name": "day", "type": "DATE"}]
 _ROWS = [["primary", 12.5, 40, "2026-06-01"], ["secondary", 8.25, 31, "2026-06-02"], ["tertiary", 6.0, 22, "2026-06-03"], ["residential", 30.5, 220, "2026-06-04"]]
-_DRAW = """([kind, x, y, cols, rows, w]) => { const el = document.createElement('div'); el.id = 'c'; el.style.cssText = `width:${w}px;height:260px`;
+_DRAW = """([kind, x, y, cols, rows, w, h = 260]) => { const el = document.createElement('div'); el.id = 'c'; el.style.cssText = `width:${w}px;height:${h}px`;
   document.getElementById('sb').querySelector('.sb-body').prepend(el);
   window.picked = []; window.C = rs.chart(el, {kind, x, y, columns: cols, rows, onPick: i => picked.push(i)}); }"""
 _INSIDE = """() => { const el = document.getElementById('c'), b = el.getBoundingClientRect(), s = el.querySelector('svg');
@@ -95,6 +97,111 @@ def test_limits_hover_click_and_the_line_for_no_data(tmp_path):
     assert errors == [], errors
 
 
+_STREETS = [{"name": "name", "type": "VARCHAR"}, {"name": "length_m", "type": "DOUBLE"}, {"name": "maxspeed_kmh", "type": "DOUBLE"}]
+_LONG = [[f"Street number {i}", 40.0 + (i * 37) % 300, 30.0 + (i * 13) % 60] for i in range(40)]
+# the bars of the chart, and which of them are not in the visible part of its box
+_BARS = """() => { const el = document.getElementById('c'), b = el.getBoundingClientRect(), bars = [...el.querySelectorAll('svg path.rs-mk')];
+  return {bars: bars.length, cut: bars.filter(m => { const r = m.getBoundingClientRect(); return r.top < b.top - 1 || r.bottom > b.bottom + 1; }).length,
+          scrolls: el.scrollHeight > el.clientHeight + 1, more: el.hasAttribute('data-more'), overflow: getComputedStyle(el).overflowY,
+          bar: [getComputedStyle(el).scrollbarWidth, getComputedStyle(el).scrollbarColor]}; }"""
+
+
+@pytest.mark.parametrize("phone", [False, True])
+def test_the_bars_fit_the_box_and_scroll_only_past_their_minimum(tmp_path, phone):
+    """Reviewer: "Bar, two series" with 8 rows showed 4 groups; a bar chart of 15 rows on a phone showed 3 bars."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path, phone)
+        try:
+            w = 340 if phone else 600
+            for y, n, h in [(["length_m", "maxspeed_kmh"], 8, 220), ("length_m", 15, 260)]:
+                page.evaluate("document.getElementById('c') && document.getElementById('c').remove()")
+                page.evaluate(_DRAW, ["bar", "name", y, _STREETS, _LONG[:n], w, h])
+                page.wait_for_timeout(80)
+                m = page.evaluate(_BARS)
+                assert m["bars"] == n * (len(y) if isinstance(y, list) else 1) and m["cut"] == 0 and not m["scrolls"], (y, n, m)
+            # 40 bars do not fit at their minimum: the box scrolls (a phone: a fade at the bottom), and it scrolls to each bar. The scrollbar is thin and
+            # has a colour (the headless browser hides every scrollbar, so the test reads the style)
+            page.evaluate("C.set({rows: " + json.dumps(_LONG) + "})")
+            page.wait_for_timeout(80)
+            m = page.evaluate(_BARS)
+            assert m["scrolls"] and m["cut"] > 0 and m["overflow"] == "auto" and m["more"], m
+            assert m["bar"][0] == "thin" and not m["bar"][1].startswith(("auto", "rgba(0, 0, 0, 0)")), m
+            reach = page.evaluate("""() => { const el = document.getElementById('c'), b = el.getBoundingClientRect();
+              return [...el.querySelectorAll('svg path.rs-mk')].filter(m => { m.scrollIntoView({block: 'nearest'}); const r = m.getBoundingClientRect(), b = el.getBoundingClientRect();
+                return r.top >= b.top - 1 && r.bottom <= b.bottom + 1; }).length; }""")
+            assert reach == 40, reach
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+@pytest.mark.parametrize("w,h", [(900, 200), (340, 340)])
+def test_a_pie_takes_the_room_it_has(tmp_path, w, h):
+    """Reviewer: a pie of about 90 px in a large chart area. The free area is the box without the title line; the pie and its legend share it."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_DRAW, ["pie", "name", "length_m", _STREETS, _LONG[:6], w, h])
+            page.wait_for_timeout(80)
+            m = page.evaluate("""() => { const el = document.getElementById('c'), b = el.getBoundingClientRect(), hd = el.querySelector('.rs-chart-hd').getBoundingClientRect();
+              const ps = [...el.querySelectorAll('svg path')].map(p => p.getBoundingClientRect()), lg = el.querySelector('.rs-chart-legend').getBoundingClientRect();
+              const l = Math.min(...ps.map(r => r.left)), r = Math.max(...ps.map(r => r.right)), t = Math.min(...ps.map(r => r.top)), bt = Math.max(...ps.map(r => r.bottom));
+              return {d: Math.min(r - l, bt - t), free: Math.min(b.width, b.bottom - hd.bottom), inside: t >= b.top && bt <= b.bottom && l >= b.left && r <= b.right,
+                      apart: r <= lg.left || bt <= lg.top || t >= lg.bottom || l >= lg.right, scrolls: el.scrollHeight > el.clientHeight + 1}; }""")
+            assert m["d"] >= 0.7 * m["free"] and m["inside"] and m["apart"] and not m["scrolls"], m
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+@pytest.mark.parametrize("theme,phone", [("light", False), ("dark", True)])
+def test_the_axis_titles_of_a_scatter_are_outside_the_plot(tmp_path, theme, phone):
+    """Reviewer: "maxspeed_kmh" at the top left and "length_m" at the bottom right lay on the tick numbers and the grid."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path, phone)
+        try:
+            page.evaluate(f"rsSetTheme('{theme}')")
+            page.evaluate(_DRAW, ["scatter", "length_m", "maxspeed_kmh", _STREETS, _LONG[:15], 340 if phone else 600, 300])
+            page.wait_for_timeout(80)
+            m = page.evaluate("""() => { const s = document.querySelector('#c svg'), box = e => e.getBoundingClientRect(), texts = [...s.querySelectorAll('text')];
+              const titles = texts.filter(t => ['length_m', 'maxspeed_kmh'].includes(t.textContent)), ticks = texts.filter(t => !titles.includes(t)), grid = [...s.querySelectorAll('line')].map(box);
+              const plot = {left: Math.min(...grid.map(r => r.left)), right: Math.max(...grid.map(r => r.right)), top: Math.min(...grid.map(r => r.top)), bottom: Math.max(...grid.map(r => r.bottom))};
+              const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+              return {titles: titles.length, ticks: ticks.length, hits: titles.flatMap(t => [plot, ...ticks.map(box)].filter(b => hit(box(t), b)).map(() => t.textContent))}; }""")
+            assert m["titles"] == 2 and m["ticks"] >= 6 and m["hits"] == [], m
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_line_has_value_labels_only_when_all_fit(tmp_path):
+    """Reviewer: only the last point had a value label. The rule: one line of at most 15 points, each label narrower than the space to the next point:
+    a label over each point; else none, and the hover shows the value."""
+    days = [{"name": "day", "type": "DATE"}, {"name": "cars", "type": "DOUBLE"}, {"name": "vans", "type": "DOUBLE"}]
+    rows = [[f"2026-06-{i + 1:02d}", 100.0 + (i * 37) % 90, 20.0 + i] for i in range(30)]
+    vals = "() => [...document.querySelectorAll('#c svg .rs-chart-val')].map(t => t.textContent)"
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_DRAW, ["line", "day", "cars", days, rows[:5], 600])
+            page.wait_for_timeout(80)
+            assert page.evaluate(vals) == ["100", "137", "174", "121", "158"]
+            page.evaluate("C.set({rows: " + json.dumps(rows) + "})")                      # 30 points: no label; the hover shows the value
+            assert page.evaluate(vals) == []
+            page.locator("#c svg circle").nth(3).hover()
+            page.wait_for_timeout(100)
+            assert "121" in page.inner_text("#rs-hover")
+            page.evaluate("C.set({rows: " + json.dumps(rows[:5]) + ", y: ['cars', 'vans']})")   # two lines: no label
+            assert page.evaluate(vals) == []
+            page.evaluate("document.getElementById('c').style.width = '300px'")              # 15 points in 300 px: the labels do not fit, none
+            page.evaluate("C.set({y: 'cars', rows: " + json.dumps(rows[:15]) + "})")
+            page.wait_for_timeout(150)
+            assert page.evaluate(vals) == []
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 def test_the_data_dock_has_table_and_chart(tmp_path):
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser = p.chromium.launch(args=_ARGS)
@@ -108,6 +215,16 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         page.click("#rs-dock .rs-dd-view button:has-text('Chart')")
         page.wait_for_timeout(300)
         assert page.is_hidden("#rs-dock .rs-dock-table") and page.is_visible("#rs-dock .rs-dd-chartel svg")
+        # reviewer: the side column kept 300 px with only its hint. In the Chart view the chart takes that width while no card and no list show.
+        widths = "() => ['.rs-dd-chart', '.rs-dd-split'].map(c => Math.round(document.querySelector('#rs-dock ' + c).getBoundingClientRect().width))"
+        chart_w, split_w = page.evaluate(widths)
+        assert chart_w == split_w and page.is_hidden("#rs-dock .rs-dd-side"), (chart_w, split_w)
+        page.evaluate("rs.select('2')")                                                   # a road card: the side column comes back
+        page.wait_for_timeout(200)
+        assert page.is_visible("#rs-dock .rs-dd-card") and page.evaluate(widths)[0] < split_w - 250
+        page.evaluate("rs.select(null)")
+        page.wait_for_timeout(200)
+        assert page.evaluate(widths)[0] == split_w
         # the first chart of a result with one number column is a histogram over all its 2765 rows (not the table's 1000)
         assert page.evaluate("document.querySelector('#rs-dock .rs-dd-kind.on').dataset.kind") == "histogram"
         # the controls: Kind is five icon buttons, X and Y are roadstyle's select boxes (not the browser's list)

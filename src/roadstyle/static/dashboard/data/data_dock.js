@@ -70,8 +70,9 @@ export function dataDock(o = {}){
   const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
   // the side column beside the table or the chart (Kaveh, 2026-11-06: the list of the tables "in the same place" as the card of a road): one of the
   // two at a time, the last one opened; the table and the chart stay in view
-  // the table and the chart always have the same width (Kaveh, 2026-11-06: "I want to fix the length of table and chart part"): on a desktop the side
-  // column always keeps its place, with a hint while it has neither a card nor the list; on a phone it shows only with one of the two
+  // the table has a fixed width (Kaveh, 2026-11-06: "I want to fix the length of table and chart part"): on a desktop the side column always keeps
+  // its place beside the table, with a hint while it has neither a card nor the list; on a phone it shows only with one of the two. The chart takes
+  // the width of an empty side column (a reviewer, 2026-11-06: 300 px with only the hint in it); CSS .rs-dd-chart:not([hidden]) ~ .rs-dd-side.empty
   const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road on the map or in the table, or open Tables.");
   card.hidden = true;
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});

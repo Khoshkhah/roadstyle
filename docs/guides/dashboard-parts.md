@@ -130,14 +130,16 @@ c.set({kind: "pie"});        // the same data, another kind
 | `pie` | a column of labels | one number column of 0 or more | one slice for each row, largest first, at most 6: the rest is "Other" |
 
 - The series have the colours `--rs-chart-1` to `--rs-chart-8`, in this order: the dashboard's teal first (one series has it), then orange, blue, yellow, pink, green, violet and red, checked for colour vision deficiency in both themes. The marks are a little see-through, and the mark under the pointer has its full colour. Two or more series, and a pie, have a legend.
-- The chart has a title (`title`, else from the kind and the columns: "km by highway"; `false`: no title) and the number of rows under it (`count`: your own text, for example "13 298 roads"). The axis ticks are compact (0, 2.5K, 5K) on hairline grid lines over a darker base line. A bar of one series has its value at its tip, of each bar up to 15 bars, else of the largest only; a single line has a soft wash under it and its last value at its end. A bar is at most 24 px thick. While the pointer is on a mark, the other marks fade.
+- The chart has a title (`title`, else from the kind and the columns: "km by highway"; `false`: no title) and the number of rows under it (`count`: your own text, for example "13 298 roads"). The axis ticks are compact (0, 2.5K, 5K) on hairline grid lines over a darker base line. A scatter has its axis titles outside the plot: the `y` name over the `y` ticks, the `x` name under the `x` ticks. While the pointer is on a mark, the other marks fade.
+- Value labels: a bar of one series has its value at its tip, of each bar up to 15 bars, else of the largest only. A single line has a soft wash under it. It has a value over each point only when all of them fit: at most 15 points, and each label is narrower than the space to the next point. Else the line has no value labels, and the pointer on a point shows its value. Two or more lines have no value labels.
+- The chart fits its box, and draws again when the box changes its width or its height. A bar is at most 24 px thick. Horizontal bars get thinner to fit the height, down to a row of 12 px (a bar of 4 px for each series). Past that minimum, the box scrolls: on a desktop it has a thin scrollbar, on a phone a fade at its bottom edge while there is more below. A pie is the largest circle that fits in the box with its legend: above the pie, or in a column beside it when that gives a larger pie (a wide, low box).
 - The pointer on a bar, a point or a slice shows its values. A click on it calls `onPick(row)`.
 - A kind that does not fit the columns shows a line in place of the chart, for example "A pie chart needs a text column and one number column of 0 or more."
 - `small: true` draws a copy with no labels and no hover (the card of an Ask answer).
 - `set(change)` draws again with a change of the spec; `svg()` gives the SVG element.
 - `rs.chart.ranges(numbers, parts)` puts many numbers in about `parts` ranges: `{n, of(v), label(k)}`. The data dock and the chart card use it for a bar (12) or a pie (6) of a number `x` with more than 40 values.
 
-`tests/test_chart_browser.py` checks each kind in both themes and at 390 px.
+`tests/test_chart_browser.py` checks each kind in both themes and at 390 px, the fit of the bars and the pie, the axis titles of a scatter and the value labels of a line.
 
 ## Tabs and a two-way switch
 
