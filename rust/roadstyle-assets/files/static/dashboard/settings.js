@@ -5,7 +5,7 @@
 import {O} from "./core.js";
 import {defineTool, wrap} from "./tools.js";
 import {EDGES, layoutNow, savePlace, setPanelSide, setPanelLook, setScaleShown} from "./placement.js";
-import {setToolbarEdge} from "./toolbar.js";
+import {setToolbarAlign, setToolbarEdge} from "./toolbar.js";
 
 const _stGear = '<svg viewBox="0 0 24 24" width="20" height="20" style="display:block;margin:auto" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.66 5.13 L10.75 2.48 L13.25 2.48 L13.34 5.13 L15.91 6.20 L17.84 4.38 L19.62 6.16 L17.80 8.09 L18.87 10.66 L21.52 10.75 L21.52 13.25 L18.87 13.34 L17.80 15.91 L19.62 17.84 L17.84 19.62 L15.91 17.80 L13.34 18.87 L13.25 21.52 L10.75 21.52 L10.66 18.87 L8.09 17.80 L6.16 19.62 L4.38 17.84 L6.20 15.91 L5.13 13.34 L2.48 13.25 L2.48 10.75 L5.13 10.66 L6.20 8.09 L4.38 6.16 L6.16 4.38 L8.09 6.20Z"/><circle cx="12" cy="12" r="3"/></svg>';
 const _stEl = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text) e.textContent = text; return e; };
@@ -61,7 +61,10 @@ export function initSettings(){
     box.replaceChildren(_stEl("div", "rs-bm-h", "Settings"));
     const now = layoutNow(), lay = _stEl("div", "rs-set-layout");
     lay.append(_stEl("div", "rs-set-h", "Layout"),
-      _stSeg("Toolbar", EDGES.map(e => [e, e[0].toUpperCase() + e.slice(1)]), now.toolbar, e => { savePlace("toolbar", e); setToolbarEdge(e); }));
+      _stSeg("Toolbar", EDGES.map(e => [e, e[0].toUpperCase() + e.slice(1)]), now.toolbar, e => { savePlace("toolbar", e); setToolbarEdge(e); fill(); }),
+      // the bar's place along its edge; the names follow the edge (Kaveh, 2026-11-06: "it can select middle or left or right corner")
+      _stSeg("Toolbar place", ["start", "middle", "end"].map((v, i) => [v, (now.toolbar === "top" || now.toolbar === "bottom" ? ["Left", "Middle", "Right"] : ["Top", "Middle", "Bottom"])[i]]),
+             now.align, a => { savePlace("align", a); setToolbarAlign(a); }));
     if(d.panel) lay.append(_stSeg("Panel", [["left", "Left"], ["right", "Right"]], now.panel, s => { savePlace("panel", s); setPanelSide(s); }));
     if(d.panel && d.layout === "overlay") lay.append(_stSeg("Panel look", [["frame", "Frame"], ["card", "Card"]], now.look, v => { savePlace("look", v); setPanelLook(v); }));
     lay.append(_stSeg("Scale and zoom", [["show", "Show"], ["hide", "Hide"]], now.scale ? "show" : "hide", v => { savePlace("scale", v === "show"); setScaleShown(v === "show"); }));

@@ -85,7 +85,7 @@ Give only the keys that you change. The call merges them over the defaults. A wr
 
 - Frame: `layout`, `scale_box`. `template` is a keyword, not a key of `dashboard=`.
 - `panel` (`None` removes the panel): `side`, `width_px`, `look`, `sections`. A section has `id`, `part`, `html`, `text`, `fields`, `chart`, `label`, `after`, `before`, `fold` and `background` ([Add to the panel](../dashboard-panel.md)). A chart card (`part: "chart"`) has `chart` with `kind`, `x`, `y`, `agg`, `scale`, `data`, `title`, `height` and `follow` ([Charts](../charts.md)).
-- `toolbar`: `position`, `navigation`, `settings`, `hold`.
+- `toolbar`: `position`, `align`, `navigation`, `settings`, `hold`.
 - `legend`: `rows`. A row has `color`, `label` and `shape`.
 - `credits`: a list of `{text, href}`.
 - `windows`: `clamp`, `recenter_map`, `restore_open`, `remember`.
