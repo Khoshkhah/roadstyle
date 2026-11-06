@@ -78,22 +78,26 @@ section is the rule; the parts below follow it.
 |---|---|---|---|---|
 | **Select** | one road with a strong glow, and its card beside the table | one road | a click on the map or on a row (a row of names: its first road) | the card's ✕, another click |
 | **Light** | a glow on the roads of **the dock's table** | one set: the table now in the dock | follows the dock by itself: a new table (an SQL run, an answer, a card's **Show**) replaces the light | the switch **Show on map** (on by default), or a new table |
-| **Colour** | groups of roads in colours, with a legend row for each group | several; the newest wins where two meet | an Ask answer (`color_roads`), or **Colour** in the dock | its chip: a click turns it off and on, ✕ removes it |
-| **Focus** | one set stays; every other road **fades** (to 0.18 of its opacity, with its names and arrows) or is **hidden** | one at a time: turning one on turns the others off | an Ask answer (`focus_roads`), or **Focus** in the dock | its chip: a click turns it off and on, ✕ removes it; a switch **Fade / Hide** in the chip |
+| **Colour** | groups of roads in colours, with a legend row for each group | several; the newest wins where two meet | an Ask answer (`color_roads`), or "+ Colour" in **Colour ▾** | its row in **Colour ▾**: the check box turns it off and on, ✕ removes it |
+| **Focus** | one set stays; every other road **fades** (to 0.18 of its opacity, with its names and arrows) or is **hidden** | one at a time: turning one on turns the others off | an Ask answer (`focus_roads`), or "+ Focus" in **Focus ▾** | its row in **Focus ▾**: the radio button (None turns all off), ✕ removes it; **Fade / Hide** in the row |
 
-- **Lasting changes are layers.** Colour and Focus stay until the person removes them. Each is a chip in one strip, "On the map", at the
-  top of the data dock: the chip of a colour shows its groups with their colours, the chip of a focus shows its number of roads and Fade /
-  Hide. A click on a chip turns that layer off (the chip fades and its name is struck through) and on again: an undo that can be undone.
-  ✕ removes it. Nothing else removes a layer: not a new question, not ✕ of an answer card, not "New".
-- **One chip for each change.** The same kind on the same roads is the same chip (a key of the kind and the set of road ids; for a
-  colour, its groups). A second Focus on the same table, or an Ask answer with the same roads, does not add a chip: it turns the existing
-  chip on (and a mode that it names, for example Hide, goes to that chip). Kaveh's test (2026-11-05): four clicks on Focus made four equal
+- **Lasting changes are layers, listed in their buttons.** Colour and Focus stay until the person removes them. They are not in a row of
+  their own (a first form had a strip "On the map" above the SQL line; Kaveh: "shouldn't we make them like a selected list instead of add
+  something in a new line"): the dock's buttons are **Colour ▾** and **Focus ▾**, with a small count of the layers that are on.
+  - **Colour ▾** opens a list: "+ Colour the roads of this table" at the top, then each colour layer, the newest first, with a **check box**
+    (several can be on), its swatches, its groups or condition, and ✕.
+  - **Focus ▾** opens a list: "+ Focus on the roads of this table", **None: all the roads**, then each focus with a **radio button** (one
+    on), its condition and number of roads, **Fade / Hide**, and ✕.
+  - The list is a box in the look of the toolbox's boxes, under its button; a click outside or Escape closes it. A row's tooltip has the
+    full SQL. To turn a layer off and on again is an undo that can be undone; ✕ removes it. Nothing else removes a layer: not a new
+    question, not ✕ of an answer card, not "New".
+- **One layer for each change.** The same kind on the same roads is the same layer (a key of the kind and the set of road ids; for a
+  colour, its groups). A second "+ Focus" on the same table, or an Ask answer with the same roads, does not add a layer: it turns the
+  existing one on (and a mode that it names, for example Hide, goes to it). Kaveh's test (2026-11-05): four clicks on Focus made four equal
   chips "Focus 95 roads".
-- **The dock's Colour and Focus switch.** The button is filled while this table's colour or focus is on, and a click turns it off and on,
-  the same as its chip.
-- **A chip says what it is:** its kind, the condition of its SQL (the part after `WHERE`, at most 38 characters, cut at a word; the
+- **A layer says what it is:** its kind, the condition of its SQL (the part after `WHERE`, at most 38 characters, cut at a word; the
   brackets that close nothing go; with no `WHERE`, the table's name), and its number of roads, small: "Focus highway IN ('primary',
-  'secondary') 625". The chip's tooltip has the full SQL.
+  'secondary') 625". The row's tooltip has the full SQL.
 - **The light is transient.** It always shows the dock's table, so there is exactly one lit set, and it changes with the table. A table
   that a colour or a focus already shows (the table of a colour answer or of a focus) is not lit: a purple glow over all the coloured
   roads hid their colours.
@@ -104,10 +108,12 @@ section is the rule; the parts below follow it.
 
   | State | Feature state | Look |
   |---|---|---|
-  | Light | `lit` (new; `rs.highlight` sets it) | the **casing** of the road in `--accent`, twice as wide; the fill keeps its colour |
-  | Select | `select` (as now) | the **fill** in `--accent` (the default of `select_color` becomes the accent) |
-  | Hover | `hover` (as now) | the fill in a light accent (the default of `hover_color`) |
+  | Light | `lit` (new; `rs.highlight` sets it) | the **casing** of the road in roadstyle's select purple (`select_color`, `#7c4dff`), twice as wide; the fill keeps its colour |
+  | Select | `select` (as now) | the **fill** in `select_color` (`#7c4dff`), as always |
+  | Hover | `hover` (as now) | the fill in `hover_color` (`#b388ff`), as always |
 
+  Purple stays roadstyle's colour of everything that marks roads (Kaveh: "we always used purple for roads hover and selected"; a first try
+  in the accent teal was refused, also for the light: "I don't like the type of color you are using for roads from the table").
   Select and deselect never touch `lit`, so a click does not change the lit set. Checked in the mock-up at street level in both themes:
   625 lit roads stay lit after two clicks, and only the clicked road has the accent fill.
 - **The drawing order:** Focus (fade or hide) at the bottom, then Colour, then Light, then Select on top.
@@ -398,7 +404,7 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
   quotes, a `BigInt` exactly, `null` as empty. The file has the rows of the table only (at most `limit`). The note in the bar says so when
   there are more.
 - **Show on map, Colour, Focus.** See [The map: four operations](#the-map-four-operations). Show on map is a switch (on by default) for the
-  light of the table; Colour and Focus add a layer to the strip "On the map".
+  light of the table; Colour ▾ and Focus ▾ list their layers.
 - **A click on a row** selects that road and zooms to it (`rs.select(id)`, `rs.focus(id)`). The row stays marked, and the road's card
   opens beside the table. The light does not change.
 - **The list of tables.** The button "Tables" in the title row opens a list of the tables and their columns (from `schema()`), with the
@@ -412,7 +418,7 @@ button and the same window as the panel's own help (Kaveh, 2026-11-05: "add help
 | Part | Where the "?" is | The words |
 |---|---|---|
 | The data dock | in its title row, after the note | What the dock is; the SQL line (only SELECT or WITH: the data does not change), Tables, CSV, Show on map (also for a table of street names), a click on a row, the top edge (drag, double click); the 1000-row limit |
-| Ask | in its top row, after the provider and the model | What Ask does; Key (the free keys, the key stays in this browser), Examples, an answer card (its SQL, Map, Table, ✕), MAP and "On the map", New; what goes to the AI service, and that an AI service can be wrong |
+| Ask | in its top row, after the provider and the model | What Ask does; Key (the free keys, the key stays in this browser), Examples, an answer card (its SQL, Map, Table, ✕), MAP, Colour ▾ and Focus ▾, New; what goes to the AI service, and that an AI service can be wrong |
 
 A host can give its own words with the options `help` of `dataDock` and of `askPanel` (`{title, intro, terms, note}`), or `help: false`.
 
@@ -586,8 +592,8 @@ default stays `frame` for other pages, and a look that the person keeps in Setti
 - **One query.** The footer counts the query that made the table: "1 query · 5 rows". It opens to that SQL.
 - **Each answer keeps its table.** Its footer has one button, **Show**: it puts this answer's table back into the dock (its SQL in the line),
   so its roads light on the map, opens the dock and moves the camera to them. **After each answer** the same happens by itself (the dock
-  opens on a desktop). The card has no Undo and no Map: a colour or a focus of the answer is a layer in "On the map", and the card's map
-  line says so ("Focus on 625 roads … in "On the map""). ✕ of the card removes only the card. (An earlier form had Map, Table and Undo
+  opens on a desktop). The card has no Undo and no Map: a colour or a focus of the answer is a layer in the list of Colour ▾ or Focus ▾, and the card's map
+  line says so ("Focus on 625 roads … in the list of Colour or Focus"). ✕ of the card removes only the card. (An earlier form had Map, Table and Undo
   in the cards: Kaveh found it unclear when the map shows what.)
   - **Which table is the answer's.** When the answer changed the map (filter, colour, move), its table is the roads of the last map tool,
     not a later query of the model. A model often runs a small helper query after a filter, for its sentence ("… ORDER BY length_m DESC
@@ -674,9 +680,9 @@ Ask also has the read tool `describe_table(name)`: it gives the columns of one t
   dock's line is the tool's SQL inside `WHERE edge_id IN (...)`, so the person can change it and run it again. A `;` at the end of the
   model's SQL is removed first.
 - **The card.** Each change of the map is one line in the answer's card: a small "MAP" label, the text ("Focus on 625 roads (the others
-  hidden)") and "in "On the map"". The footer is the same as for a query: "▸ 2 map queries" (the SQL) at the left and **Show** at the right.
-- **The layers.** A colour or a focus of an answer is a layer in the strip "On the map" (see [The map: four operations](#the-map-four-operations)):
-  a click on its chip turns it off and on, ✕ removes it. A new question, ✕ of a card and "New" leave the layers as they are.
+  hidden)") and "in the list of Colour or Focus". The footer is the same as for a query: "▸ 2 map queries" (the SQL) at the left and **Show** at the right.
+- **The layers.** A colour or a focus of an answer is a layer in the list of **Colour ▾** or **Focus ▾** (see [The map: four
+  operations](#the-map-four-operations)): its check box or radio button turns it off and on, ✕ removes it. A new question, ✕ of a card and "New" leave the layers as they are.
 - **Kept out:** a tool that changes the data (OSM tags, levels, the network). It needs a confirm step before each change. The base map,
   the theme and the 3D view are also kept out for now: the person changes them with one click in the toolbox.
 
@@ -882,7 +888,7 @@ recommends: the host runs the agent's SQL (`source: "ask"`) between `BEGIN TRANS
 not see is undone. This is the host's work and is not in roadstyle.
 
 Why it matters: the data of a page comes from OSM, and a street name can hold words to the model ("prompt injection"). With this
-design the worst result is a wrong answer or a wrong colour on the map (its chip takes it away): no tool changes the data, a query cannot read a file or an address, and the answer is plain text
+design the worst result is a wrong answer or a wrong colour on the map (its row in Colour ▾ takes it away): no tool changes the data, a query cannot read a file or an address, and the answer is plain text
 with no links and no images.
 
 ## One hover for the whole dashboard
@@ -935,7 +941,7 @@ Changes in existing parts, all small and with no change of look on a page withou
 | File | Change |
 |---|---|
 | `dashboard.css`, the page template | **One hover** (see [One hover for the whole dashboard](#one-hover-for-the-whole-dashboard)): the token `--rs-hover-bg`; the three looks in place of the 13 of now; the panel's hide and show buttons; `#sb button:hover:not(:disabled)`; links underlined on hover only. A change of the look of every page, so it is a separate PR, before the dock |
-| `core.js`, the road layer's paint (Rust style writer) | `rs.highlight` sets the new feature state `lit` (not `select`); the road casing's colour and width read `lit`; the defaults of `select_color` and `hover_color` become the accent and a light accent |
+| `core.js`, the road layer's paint (Rust style writer) | `rs.highlight` sets the new feature state `lit` (not `select`); the road casing's colour (`select_color`) and width read `lit`. `select_color` and `hover_color` do not change |
 | `toolbar.js` | `keepInside` keeps a box's scroll across its fit and does not fit again for the class `rs-scrolling` (a fault now: a box that it makes shorter cannot scroll). The low edge of a box is the dock's top, not `innerHeight` (`keepInside`). A bar at a side has the free height above the dock as its largest height, and is centred there; a bar along the bottom ends above the dock |
 | `overlay.js` | `followPanels`: the place of a bar along the top or the bottom, `left`, `middle` or `right` (`toolbar.align`) |
 | `settings.js`, `placement.js` | The row "Toolbar place" (only for a bar at the top or the bottom); the choice is kept as the other layout choices |
