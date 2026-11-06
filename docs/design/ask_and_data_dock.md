@@ -77,7 +77,7 @@ section is the rule; the parts below follow it.
 | Operation | What the map shows | How many at once | Made by | Removed by |
 |---|---|---|---|---|
 | **Select** | one road with a strong glow, and its card beside the table | one road | a click on the map or on a row (a row of names: its first road) | the card's ✕, another click |
-| **Light** | a glow on the roads of **the dock's table** | one set: the table now in the dock | follows the dock by itself: a new table (an SQL run, an answer, a card's **Show**) replaces the light | the switch **Show on map** (on by default), or a new table |
+| **Light** | a glow on the roads of **the dock's table** | one set: the table now in the dock | follows the dock by itself: a new table (an SQL run, an answer, a card's **Show**) replaces the light | a new table (there is no switch: Kaveh, 2026-11-05) |
 | **Colour** | groups of roads in colours, with a legend row for each group | several; the newest wins where two meet | an Ask answer (`color_roads`), or "+ Colour" in **Colour ▾** | its row in **Colour ▾**: the check box turns it off and on, ✕ removes it |
 | **Focus** | one set stays; every other road **fades** (to 0.18 of its opacity, with its names and arrows) or is **hidden** | one at a time: turning one on turns the others off | an Ask answer (`focus_roads`), or "+ Focus" in **Focus ▾** | its row in **Focus ▾**: the radio button (None turns all off), ✕ removes it; **Fade / Hide** in the row |
 
@@ -119,7 +119,7 @@ section is the rule; the parts below follow it.
 - **The drawing order:** Focus (fade or hide) at the bottom, then Colour, then Light, then Select on top.
 - **The camera** moves to the roads after an answer, on **Show**, on **Focus**, and when the switch is turned on. Else only the person
   moves it: an SQL run of the person does not move the map.
-- **One place for actions.** The dock has the actions on its table: the switch **Show on map**, **Colour** (one colour for each value of
+- **One place for actions.** The dock has the actions on its table: **Colour** (one colour for each value of
   the first text or yes/no column that has 2 to 8 values, for example `highway`; else one colour) and **Focus** (fade). Ask's tools call
   the same actions, so the map does not depend on where a change came from.
 - **Only these layers.** The strip removes only the colours, the legend rows and the focus that it made. The page's own colours (`colorBy`,
@@ -199,7 +199,7 @@ its CSS), and a page that does not call `rs.dock.add` has no dock on the screen.
   A click on a tab or on the arrow opens the dock.
 - **Title row.** The tabs are `rs-tabs` and show only when the dock has two or more contents. With one content, the row shows its
   label as a title. The note follows (for the data dock: "10 rows · 3 columns · 2 ms"). At the right: the actions of the content (for the
-  data dock: Tables, CSV, Show on map), then "Collapse" and, for a content that the person can remove, "x". The actions hide while the
+  data dock: Tables, CSV, Colour ▾, Focus ▾), then "Collapse" and, for a content that the person can remove, "x". The actions hide while the
   dock is closed.
 - **Credits.** The box in the bottom corner (scale, zoom number, credits: `#rs-scalebox`) hides while the dock is open on a desktop, and
   shows again when the dock closes (Kaveh, 2026-11-05). On a phone the credits button is in the bar, so nothing changes there.
@@ -314,7 +314,7 @@ shorter with the SQL. The limit is only about what is drawn, never about the dat
 
 - The note gives the true count: "1 000 of 2 765 rows" (one more query: `SELECT count(*) FROM (...)`).
 - **CSV** has all the rows (the SQL runs again with no limit of 1000; at most 1 000 000).
-- **Show on map** lights all the roads of the result, not only the first 1000 (the SQL runs again for the ids; at most 100 000, as the
+- **The light** covers all the roads of the result, not only the first 1000 (the SQL runs again for the ids; at most 100 000, as the
   map tools). Before, a result of 2 765 roads lit 1000 of them, and nothing said so.
 
 ## 2. The data dock
@@ -328,10 +328,10 @@ The data dock is one content of the bottom dock. It has two rows:
    Escape folds the line again.
 2. **The table** (the dock's table above).
 
-The note and the actions (**Tables**, **CSV**, **Show on map**) are in the title row of the dock, so they take no row of their own:
+The note and the actions (**Tables**, **CSV**, **Colour ▾**, **Focus ▾**) are in the title row of the dock, so they take no row of their own:
 
 ```
-| Data  10 rows · 3 columns · 2 ms                    [Tables] [CSV] [Show on map]  v |
+| Data  10 rows · 3 columns · 2 ms           [Tables] [CSV] [Colour ▾] [Focus ▾ 1]  v |
 | SELECT highway AS road_class, count(*) AS edges, round(sum(len...         [ Run ]  |
 | +---------------------------+                                                      |
 | | road_class | edges |   km |                                                      |
@@ -403,8 +403,10 @@ data.addEventListener("run", e => console.log(e.detail));  // {sql, columns, row
 - **CSV.** Downloads the rows of the table as `<label>.csv`: a header row, comma separated, a text with a comma, a quote or a new line in
   quotes, a `BigInt` exactly, `null` as empty. The file has the rows of the table only (at most `limit`). The note in the bar says so when
   there are more.
-- **Show on map, Colour, Focus.** See [The map: four operations](#the-map-four-operations). Show on map is a switch (on by default) for the
-  light of the table; Colour ▾ and Focus ▾ list their layers.
+- **The light, Colour, Focus.** See [The map: four operations](#the-map-four-operations). The roads of the table are always lit (there is
+  no switch); Colour ▾ and Focus ▾ list their layers. **No "Show on map" button** (Kaveh, 2026-11-05: "show on map button doesn't work
+  anymore! we should remove it or what?"): the light follows the table by itself, so a switch only turned it off, its name said the
+  opposite, and for the table of a colour or a focus (not lit) it did nothing.
 - **A click on a row** selects that road and zooms to it (`rs.select(id)`, `rs.focus(id)`). The row stays marked, and the road's card
   opens beside the table. The light does not change.
 - **The list of tables.** The button "Tables" in the title row opens a list of the tables and their columns (from `schema()`), with the
@@ -417,7 +419,7 @@ button and the same window as the panel's own help (Kaveh, 2026-11-05: "add help
 
 | Part | Where the "?" is | The words |
 |---|---|---|
-| The data dock | in its title row, after the note | What the dock is; the SQL line (only SELECT or WITH: the data does not change), Tables, CSV, Show on map (also for a table of street names), a click on a row, the top edge (drag, double click); the 1000-row limit |
+| The data dock | in its title row, after the note | What the dock is; the SQL line (only SELECT or WITH: the data does not change), Tables, CSV, the light (also for a table of street names), a click on a row, the top edge (drag, double click); the 1000-row limit |
 | Ask | in its top row, after the provider and the model | What Ask does; Key (the free keys, the key stays in this browser), Examples, an answer card (its SQL, Map, Table, ✕), MAP, Colour ▾ and Focus ▾, New; what goes to the AI service, and that an AI service can be wrong |
 
 A host can give its own words with the options `help` of `dataDock` and of `askPanel` (`{title, intro, terms, note}`), or `help: false`.
@@ -680,7 +682,7 @@ Ask also has the read tool `describe_table(name)`: it gives the columns of one t
   `walking.edges`; the map went empty, and the dock had 0 rows.) The host's `about` names the networks that its map draws.
 - **The dock follows the map.** Each map tool also puts its roads into the data dock: `idColumn`, the name, the class and the length of
   each road (the host's main table gives these columns), and for `color_roads` a first column `colour` with the label of the group. The
-  dock opens on a desktop. So the table is what the map shows, **Show on map** is there, and a click on a row selects that road and opens
+  dock opens on a desktop. So the table is what the map shows, its roads are lit, and a click on a row selects that road and opens
   its card. (Before, the dock kept the person's older table, with no `edge_id`, and Kaveh saw "no Show on map", 2026-11-05.) The SQL in the
   dock's line is the tool's SQL inside `WHERE edge_id IN (...)`, so the person can change it and run it again. A `;` at the end of the
   model's SQL is removed first.
@@ -962,7 +964,7 @@ No test needs a key or the network. CI runs them all.
 | Test | What it checks |
 |---|---|
 | `tests/data_units.js` in `tests/test_data_dock_browser.py` | The guard: a list of SQL that it accepts (with comments, strings that hold `DROP`, `WITH`, a `;` at the end) and a list that it refuses (two statements, each refused word, `read_csv`, `FROM 'x.parquet'`, `'https://...'`, `query('...')`). The row limit wrap. The CSV text (a comma, a quote, a new line, a `BigInt`, `null`). An id as exact text. |
-| `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "Show on map" lights the right roads (`rs.getState().highlight`), a click on a row selects and zooms, the CSV download, Stop. With 2 765 rows: the note says "1 000 of 2 765 rows", Show on map lights 2 765, the CSV has 2 765 rows; a click on a header sorts rising, falling and back, over all the rows (the first value is the true minimum), also for `BigInt` ids and text with `null`. |
+| `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "the table's roads are lit (the state `lit`), a click on a row selects and zooms, the CSV download, Stop. With 2 765 rows: the note says "1 000 of 2 765 rows", the light covers 2 765, the CSV has 2 765 rows; a click on a header sorts rising, falling and back, over all the rows (the first value is the true minimum), also for `BigInt` ids and text with `null`. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. After three answers (a query, a filter, a zoom): the first card's Table shows its own 5 rows in the dock; a click on the focus chip turns the focus off and on again; the first card's Show lights its 5 roads again; `**x**` in an answer is a `<b>`; an answer that lists 5 rows with their ids shows 3 items with no ids and "… 2 more in the table". Also: a question asked while `ready` waits shows "Loading the data…" and then its answer; an error thrown by `schema()` ends the question with a red line, and the box works again; the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
 | `tests/test_map_operations_browser.py` | The four operations: a new table changes the light and the switch turns it off and on; a colour answer's table is not lit; two colours on, the newest wins; a second focus turns the first off; a click on a chip turns it off and on; ✕ removes it; Fade and Hide; a person's SQL does not move the camera; `rs.fade` fades the other roads with their names and arrows, in both themes. |
