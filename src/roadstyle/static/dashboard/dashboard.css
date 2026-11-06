@@ -1075,6 +1075,10 @@ html.rs-phone .rs-dd-side.empty{display:none}
 .rs-dd-card[hidden]{display:none}
 html.rs-phone .rs-dd-split{flex-direction:column}
 html.rs-phone .rs-dd-side{flex:0 0 auto;max-height:55%}
+/* a phone's Chart view: the dock has no height for the settings, the chart and a side card together (they overlapped); the side card (the road or
+   the list of tables) takes the place of the chart while it shows, and its ✕ gives the chart back: one thing at a time, as the phone's sheets */
+html.rs-phone .rs-dd-chart:has(~ .rs-dd-side:not(.empty)){display:none}
+html.rs-phone .rs-dd-chart:not([hidden]) ~ .rs-dd-side:not(.empty){flex:1 1 0;max-height:none}
 html.rs-phone .rs-dd-q{flex-wrap:wrap}
 /* the lists of Colour and Focus: a box in the look of the toolbox's boxes, under its button */
 .rs-dd-menu{position:fixed;z-index:31;min-width:300px;max-width:min(420px,calc(100vw - 16px));max-height:50dvh;overflow:auto;box-sizing:border-box;padding:6px;border:1px solid var(--rs-tb-border,var(--line));border-radius:10px;
