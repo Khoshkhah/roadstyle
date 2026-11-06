@@ -246,3 +246,27 @@ def test_colour_and_focus_are_layers_in_their_lists(tmp_path):
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_the_road_card_is_the_one_place_for_a_road_while_the_dock_is_open(tmp_path):
+    """road_popup is on (the default): a selection from the table, from the page (Ask) or the map shows the card and no popup while the
+    dock shows the data dock; when the dock closes, the popup comes back."""
+    popups = "document.querySelectorAll('.maplibregl-popup').length"
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); data.open(); data.run()")
+            page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 6")
+            page.click("#rs-dock tbody tr >> nth=1")
+            page.wait_for_timeout(300)
+            assert page.evaluate("rs.getState().selection") == "2" and page.is_visible("#rs-dock .rs-dd-card")
+            assert page.evaluate(popups) == 0
+            page.evaluate("rs.select('3')")                                     # Ask and a click on the map select through the same rsSelect
+            page.wait_for_timeout(300)
+            assert page.evaluate("rs.getState().selection") == "3" and page.evaluate(popups) == 0
+            page.evaluate("rs.dock.close(); rs.select('4')")
+            page.wait_for_timeout(300)
+            assert page.evaluate(popups) == 1                                   # no card in view: the popup again
+        finally:
+            browser.close()
+    assert errors == [], errors

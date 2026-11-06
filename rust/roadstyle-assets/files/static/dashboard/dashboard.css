@@ -468,6 +468,9 @@ html.rs-panel-left #sb-show,html.rs-panel-left #rs-show-right{left:10px;right:au
 html.rs-panel-left :is(#sb-hide,#sb-show,.rs-side-min) svg,html.rs-panel-left #rs-show-right svg{transform:scaleX(-1)}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:var(--rs-panel-w,400px)!important;right:0!important}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!important}
+/* the boxes of a page with no toolbar (Layers) stand on the map, not over the docked panel at the left (the back button of an editor frame) */
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone) .rs-tl{left:calc(10px + var(--rs-panel-w,400px))}
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) .rs-tl{left:10px}
 /* the compass: our needle (tools.js) instead of MapLibre's picture, which is pale on a translucent bar */
 /* the icon fills its button and is centered in it (MapLibre's own box is 29 px high and sat at the top of a 32 px button) */
 .maplibregl-ctrl-compass{position:relative}
@@ -914,6 +917,13 @@ html.rs-dock-shut .rs-dock-hd{border-bottom:0;cursor:pointer}
 .rs-dock-sp{flex:1}
 .rs-dock-acts{display:flex;gap:6px;align-items:center}
 html.rs-dock-shut .rs-dock-acts{display:none}
+/* a phone: the actions go to a row of their own under the title (the title row was wider than the screen); the row scrolls sideways */
+html.rs-phone .rs-dock-hd{flex-wrap:wrap;height:auto;flex:0 0 auto;min-height:32px;row-gap:4px;padding-bottom:4px}
+html.rs-phone .rs-dock-hd > :not(.rs-dock-acts){flex:none}
+html.rs-phone .rs-dock-hd > .rs-dock-sp{flex:1 1 0}
+html.rs-phone .rs-dock-hd > .rs-dock-note{flex:0 1 auto;min-width:0}
+html.rs-phone .rs-dock-acts{order:9;flex:1 0 100%;min-width:0;overflow-x:auto;scrollbar-width:thin}
+html.rs-phone .rs-dock-acts > *{flex:none}
 .rs-dock-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:8px 14px 10px;gap:6px}
 html.rs-dock-shut .rs-dock-body{display:none}
 html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}

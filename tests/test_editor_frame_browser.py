@@ -181,3 +181,23 @@ def test_kavehs_review_selects_tabs_and_the_sheet(tmp_path, width):
             assert page.evaluate("rs.sheet()") is None
         browser.close()
     assert not errors, errors
+
+
+def test_the_boxes_of_a_page_with_no_toolbar_are_not_over_the_back_button(tmp_path):
+    """layout="dock" (duckosm edit): the panel at the left and no toolbar, so a box such as Layers stands in the top-left stack (#rs-tl).
+    The stack starts at the map's left edge, not over the frame's back button; with the panel hidden, at the window's edge."""
+    path = tmp_path / "dock.html"
+    rs.render_dashboard(_edges(), basemap="blank", layout="dock").save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        page.goto(path.as_uri())
+        page.wait_for_function("window.map && map.loaded() && window.rsReady", timeout=60_000)
+        page.evaluate(_OPEN)
+        page.evaluate("() => { if(!document.getElementById('rs-tl')){ const t = document.createElement('div'); t.id = 'rs-tl'; t.className = 'rs-tl'; t.textContent = 'Layers'; document.body.append(t); } }")
+        left = "() => [document.getElementById('rs-tl').getBoundingClientRect().left, document.getElementById('sb').getBoundingClientRect().right]"
+        tl, sb = page.evaluate(left)
+        assert tl >= sb, (tl, sb)
+        page.evaluate("() => document.getElementById('sb').classList.add('hidden')")
+        assert page.evaluate(left)[0] == 10
+        browser.close()
