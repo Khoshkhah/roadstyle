@@ -61,7 +61,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   lastKey = styleKey(base);                                          // the host's map shows `look` at the start
 
   // ---- the markup: the editor frame (../frame.js) gives the title line, the tabs, the body and the bar; the classes rs-dz* are for the panel's own content ----
-  const { root, head: title, body, bar } = frame;
+  const { root, top: title, body, bar } = frame;
   root.classList.add("rs-dz"); root.id = "design-panel"; root.querySelector("#design-tabs").setAttribute("aria-label", "What to design");
   title.classList.add("rs-dz-title"); title.querySelector(".rs-frame-back")?.classList.add("rs-dz-back");
   title.insertAdjacentHTML("beforeend", '<span class="dname" id="design-name"></span>');

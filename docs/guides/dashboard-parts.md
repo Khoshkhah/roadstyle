@@ -188,18 +188,27 @@ fr.addEventListener("back", () => fr.close());
 fr.open("tags");
 ```
 
+A panel with no tabs and a row of its own tools under the title (the Ask panel: the name of the provider, **Key** and **New**):
+
+```javascript
+const tools = document.createElement("div");
+tools.innerHTML = "<b>Provider</b> <button type='button'>Key</button> <button type='button'>New</button>";
+const ask = rs.frame({panel: document.getElementById("sb"), title: "Ask", back: null, head: tools, id: "ask"});
+ask.open();
+```
+
 `panel` is the host's standard panel: `#sb` with `.sb-card`, and in it `.sb-top` (the title first, then the hide button) and `.sb-body`. A module page that does not have `window.rs` imports the same function: `import {editorFrame} from "./dashboard/frame.js"`.
 
 `open(tab)` hides the host's title, its body and the **Collapse all** button (`#rs-fold-all`), and shows the frame:
 
-- **The title line** (`head`) goes into `.sb-top`, before the host's hide button: "← `back`" and the `title`. With `back: null`, the line has no back button. You can add more to the line, for example the name of the item that you edit.
-- **The tab row** is roadstyle's `rs-tabs`, with a line under it. A click on a tab selects it and sends the event `tab` (`detail.tab`). The frame does not change the body: draw the tab's content in the body when the event comes. `tab(name)` selects a tab with no event, and `tab()` gives the selected tab. With no `tabs`, the frame has no tab row.
+- **The title line** (`top`) goes into `.sb-top`, before the host's hide button: "← `back`" and the `title`. With `back: null`, the line has no back button. You can add more to the line, for example the name of the item that you edit.
+- **The head row** (`head`) is under the title line, with a line under it. It does not scroll. `tabs` puts roadstyle's tab row (`rs-tabs`) in it. A click on a tab selects it and sends the event `tab` (`detail.tab`). The frame does not change the body: draw the tab's content in the body when the event comes. `tab(name)` selects a tab with no event, and `tab()` gives the selected tab. A panel with no tabs can put its own row in it: give the option `head` (an element), or add to `frame.head` before `open()`. An empty head row does not show.
 - **The body** (`body`) is the one area that scrolls. It has the class `rs-pbody`, so it has the scroll protocol of the panel: a thin scrollbar that shows only over the body or while it scrolls, a line under the tab row while the body is scrolled, and a fade at the bottom edge while there is more below.
 - **The bar** (`bar`) is under the body and outside it, at the bottom edge of the panel. Nothing scrolls under it, so it has the color of the panel. Put the state and the buttons of the editor in it. An empty bar does not show.
 
-`close()` removes the frame and shows the host's title, body and **Collapse all** again, with the body at its old scroll position. The back button sends the event `back`: the host then calls `close()`. `id` is the start of the ids of the frame's elements (`<id>-back`, `<id>-tabs`, `<id>-tab-<tab>`, `<id>-body`; default `rs-frame`). The classes are `rs-frame`, `rs-frame-title`, `rs-frame-back`, `rs-frame-body` and `rs-frame-bar`. Use them to find the elements, not to change the frame.
+`close()` removes the frame and shows the host's title, body and **Collapse all** again, with the body at its old scroll position. The back button sends the event `back`: the host then calls `close()`. `id` is the start of the ids of the frame's elements (`<id>-back`, `<id>-head`, `<id>-tabs`, `<id>-tab-<tab>`, `<id>-body`; default `rs-frame`). The classes are `rs-frame`, `rs-frame-title`, `rs-frame-back`, `rs-frame-head`, `rs-frame-body` and `rs-frame-bar`. Use them to find the elements, not to change the frame.
 
-On a phone the panel is a bottom sheet, and the frame fills it: the bar is at the bottom of the sheet, and the back button and the tabs are 44 px high. The colors are the theme's tokens, so the frame has the look of the panel in the light and the dark theme. `tests/test_editor_frame_browser.py` checks the frame in both themes and at 390 px.
+On a phone the panel is a bottom sheet, and the frame fills it: the bar is at the bottom of the sheet, and the back button and the tabs are 44 px high. The colors are the theme's tokens, so the frame has the look of the panel in the light and the dark theme. `tests/test_editor_frame_browser.py` checks the frame in both themes and at 390 px, with tabs and with a head row of its own.
 
 ## The rules
 

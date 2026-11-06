@@ -164,7 +164,7 @@ fr.open("a");
 fr.close();
 ```
 
-`rs.frame({panel, title, back, tabs})` is the frame of an editor that uses the whole panel. `open(tab)` hides the host's title, body and "Collapse all", and shows the title line, the tab row, one `body` that scrolls and a `bar` at the bottom edge. `close()` shows the host's panel again. The events are `back` and `tab`.
+`rs.frame({panel, title, back, tabs, head})` is the frame of an editor that uses the whole panel. `open(tab)` hides the host's title, body and "Collapse all", and shows the title line (`top`), the `head` row that does not scroll (the tabs, or the editor's own element `head`), one `body` that scrolls and a `bar` at the bottom edge. `close()` shows the host's panel again. The events are `back` and `tab`.
 
 `rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. `rs.days.use(el, {days, onChange})` builds a day picker in an empty element: a field that opens a calendar of the days with data, the day before and after, and "Latest". It gives `{set(day, quiet), value()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 

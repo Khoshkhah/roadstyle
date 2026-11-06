@@ -124,7 +124,7 @@ not depend on the look that it was made from. The panel reads the old format `"d
 | `dashboard/design/design.js` | The design model: `defaultsOf(look)`, `normalize`, `applyToLook`, `makeTheme`, the road opacity expressions, the design file. No page code. |
 | `dashboard/design/user_themes.js` | The person's themes: save, rename, delete, the themes file. No page code. |
 | `dashboard/design/design_panel.js` | The panel: the content of its tabs and its bar. |
-| `dashboard/frame.js` | The editor frame (`editorFrame`, also `rs.frame`): the title line, the tab row, the body that scrolls and the bar. The panel draws into it ([An editor in the panel](dashboard-parts.md#an-editor-in-the-panel)). |
+| `dashboard/frame.js` | The editor frame (`editorFrame`, also `rs.frame`): the title line, the head row with the tabs, the body that scrolls and the bar. The panel draws into it ([An editor in the panel](dashboard-parts.md#an-editor-in-the-panel)). |
 | `dashboard/design/themes.json` | The ready themes. A colour is a style value, so it is in a data file, not in the code. It is in the dashboard folder, because a host copies that folder (duckosm-rust). |
 | `dashboard/dashboard.css` | The panel's CSS, with the theme tokens, in the light and the dark theme. |
 

@@ -168,9 +168,11 @@ export interface ColorModes {
 
 /** rs.frame: the frame of an editor that uses the whole panel (frame.js). The editor fills `body` and `bar`. */
 export interface EditorFrame extends EventTarget {
-  /** The frame under the host's title line: the tab row, the body and the bar. */
+  /** The frame under the host's title line: the head row, the body and the bar. */
   readonly root: HTMLElement;
   /** The title line in the host's .sb-top: "← back", the title; the editor can add more after it. */
+  readonly top: HTMLElement;
+  /** The head row under the title line: it does not scroll. It holds the tab row (`tabs`) and the editor's own element (`head`). An empty row does not show. */
   readonly head: HTMLElement;
   /** The one body that scrolls (the class rs-pbody: the panel's scroll protocol). */
   readonly body: HTMLElement;
@@ -192,7 +194,7 @@ export interface Dashboard {
   legend: LegendRows;
   colorModes: ColorModes;
   /** The frame of an editor in the panel. Events: "back" (the back button), "tab" ({tab}: a click on a tab). */
-  frame(options: { panel: HTMLElement; title: string; back?: string | null; tabs?: [string, string][]; id?: string; label?: string }): EditorFrame;
+  frame(options: { panel: HTMLElement; title: string; back?: string | null; tabs?: [string, string][]; head?: HTMLElement; id?: string; label?: string }): EditorFrame;
   /** The cut points of Fisher-Jenks natural breaks that split the numbers in k sets (what rs.setData uses for a number). */
   naturalBreaks(values: number[], k: number): number[];
   /** null, or the error of a style whose interaction contract (roadstyle:contract) is newer than this dashboard reads: then the
