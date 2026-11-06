@@ -154,6 +154,18 @@ const bar = rs.svg(s, "rect", {x: 0, y: 4, width: 60, height: 12, fill: "var(--a
 rs.hover.on(bar, "<b>60 %</b> of the roads");
 ```
 
+```javascript
+const fr = rs.frame({panel: document.getElementById("sb"), title: "Edit notes", back: "Back", tabs: [["a", "Notes"], ["b", "Links"]]});
+fr.body.innerHTML = "<p>The notes of the area.</p>";
+fr.bar.innerHTML = "<button type='button'>Save</button>";
+fr.addEventListener("back", () => fr.close());
+fr.addEventListener("tab", (e) => { fr.body.innerHTML = e.detail.tab === "a" ? "<p>Notes</p>" : "<p>Links</p>"; });
+fr.open("a");
+fr.close();
+```
+
+`rs.frame({panel, title, back, tabs, head})` is the frame of an editor that uses the whole panel. `open(tab)` hides the host's title, body and "Collapse all", and shows the title line (`top`), the `head` row that does not scroll (the tabs, or the editor's own element `head`), one `body` that scrolls and a `bar` at the bottom edge. `close()` shows the host's panel again. The events are `back` and `tab`.
+
 `rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. `rs.days.use(el, {days, onChange})` builds a day picker in an empty element: a field that opens a calendar of the days with data, the day before and after, and "Latest". It gives `{set(day, quiet), value()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 
 ## Live data

@@ -589,12 +589,15 @@ html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody) > *{direction:ltr}
 
 /* ---- the panel's scrollbar (decided 2026-10-29): the thumb shows only while the pointer is over the panel or the body scrolls (panelscroll.js sets
    .rs-scrolling). A host panel with its own scroll boxes (the level editor's tabs) gives them the class `rs-pbody` and `data-head`, the selector of their header (class `rs-phead`); the space stays reserved, so nothing jumps. The thumb is the text color at 47 % in the light theme and 40 % in the dark theme: 3:1 against the
-   panel, the least that a part of an interface needs. A soft fade at the bottom edge shows that more is below (panelscroll.js sets data-more). ---- */
+   panel, the least that a part of an interface needs. A soft fade at the bottom edge shows that more is below (panelscroll.js sets data-more), and the same
+   fade at the top edge shows that more is above (data-above). The line under the header stays: it is the edge of the header, the fade is the body's. ---- */
 #sb :is(.sb-body,.rs-pbody){scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:transparent transparent}
 html #sb{--rs-thumb:47%}
 html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb :is(.sb-body,.rs-pbody):hover,#sb :is(.sb-body,.rs-pbody).rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb),transparent) transparent}
 #sb :is(.sb-body,.rs-pbody)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent)}
+#sb :is(.sb-body,.rs-pbody)[data-above]{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 38px);mask-image:linear-gradient(to bottom,transparent,#000 38px)}
+#sb :is(.sb-body,.rs-pbody)[data-above][data-more]{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 38px,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,transparent,#000 38px,#000 calc(100% - 38px),transparent)}
 /* ---- The panel's shell (position, tokens, the title row, the hide and show buttons): the rules that the sidebar of a template needs, and that a host
    page with its own panel (#sb with .sb-top, #sb-hide and #sb-show) needs too. They are at the end, as they were in the template's own style. ---- */
 #sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,400px);box-sizing:border-box;overflow:auto;
@@ -648,12 +651,14 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 /* ---- EVERY SCROLL AREA OF THE DASHBOARD (panelscroll.js, _PS_AREAS: the same list): the panel body's rules - a thin scrollbar that shows only while the
    pointer is over the area or while it scrolls (rs-scrolling), and no scroll handed on to the map or to the panel body. The areas: a page's `rs-scroll`,
    the query part's list, the help window, the panel's own select list, the boxes of the toolbox, the docked read-out. An area inside a box (`rs-scroll`,
-   the query's list) also has a fade at its bottom edge while there is more below (data-more); a whole box has none, because the fade would take its
-   border too. The height of a `rs-scroll` is `--rs-scroll-h` (the page can set it). ---- */
+   the query's list) also has a fade at its bottom edge while there is more below (data-more), and at its top edge while there is more above (data-above);
+   a whole box has none, because the fade would take its border too. An area with a table has no top fade: the table's header row stays at the top. The height of a `rs-scroll` is `--rs-scroll-h` (the page can set it). ---- */
 :is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res){overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
 :is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res):is(:hover,.rs-scrolling){scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
 .rs-scroll{overflow:auto;max-height:var(--rs-scroll-h,min(520px,60dvh))}
 :is(.rs-scroll,.rs-q-list)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+:is(.rs-scroll,.rs-q-list)[data-above]:not(:has(th)){-webkit-mask-image:linear-gradient(to bottom,transparent,#000 28px);mask-image:linear-gradient(to bottom,transparent,#000 28px)}
+:is(.rs-scroll,.rs-q-list)[data-above][data-more]:not(:has(th)){-webkit-mask-image:linear-gradient(to bottom,transparent,#000 28px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
 /* a table in it: the header row stays, the numbers line up, the first column is text. A column that sorts has `data-sort="asc"` or `"desc"` on its th. */
 #sb .rs-table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
 #sb .rs-table th{position:sticky;top:0;z-index:2;text-align:right;padding:4px;border-bottom:1px solid var(--line);color:var(--mut);background:var(--card);cursor:pointer;white-space:nowrap;font-size:10.5px;font-weight:700}
@@ -755,20 +760,30 @@ html.rs-sv-docked.rs-overlay #map{right:var(--rs-sv-w,42%)!important;width:auto!
 .rs-svw-drag[hidden]{display:none}
 html.rs-phone.rs-sv-docked.rs-overlay #map{right:0!important;bottom:45%!important;height:auto!important}
 html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:45%!important}
-/* The design panel (design/design_panel.js, docs/guides/design-panel.md): in the host's panel, as the level editor. The title line goes into .sb-top (before the
-   host's hide button); the tabs stay, only the pane scrolls (rs-pbody), and the bar is at the bottom. The colors are the theme's tokens. */
+/* The editor frame (frame.js, docs/guides/dashboard-parts.md): an editor that uses the whole panel. The title line goes into .sb-top (before the host's hide
+   button); the head row (the tab row, the editor's own row) stays, only the body scrolls (rs-pbody), and the bar is a flex item under the body, at the bottom
+   edge of the panel. The bar has no background of its own: nothing scrolls under it, so it has the color of the panel. An empty head row or bar does not show.
+   The colors are the theme's tokens. */
+.rs-frame-title{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.rs-frame-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.rs-frame-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.rs-frame-back:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
+.rs-frame{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.rs-frame [hidden]{display:none!important}
+#sb .rs-frame-head{flex:none;margin:0 15px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+#sb .rs-frame-head:empty{display:none}
+#sb .rs-frame-head .rs-tabs{padding:0;margin:0;border:0}
+.rs-frame-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
+.rs-frame-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
+.rs-frame-bar:empty{display:none}
+html.rs-phone .rs-frame-back,html.rs-phone .rs-frame .rs-tab{min-height:44px}
+/* on a phone the tab row is one row that scrolls sideways (frame.js scrolls the selected tab into view): the body keeps its room */
+html.rs-phone #sb .rs-frame-head .rs-tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
+/* The design panel (design/design_panel.js, docs/guides/design-panel.md): its content in the editor frame. */
 #sb{--rs-dz-soft:color-mix(in srgb,var(--accent) 12%,transparent);--rs-dz-bad:#b91c1c}
 #sb[data-theme=dark],html[data-rs-theme=dark] #sb{--rs-dz-bad:#f87171}
-.rs-dz-title{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
-.rs-dz-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
 .rs-dz-title .dname{font-size:12px;color:var(--mut);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.rs-dz-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
-.rs-dz-back:hover{background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
-.rs-dz{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-.rs-dz [hidden]{display:none!important}
-#sb .rs-dz .rs-tabs{flex:none;margin:0 15px;padding-bottom:8px;margin-bottom:0}
-.rs-dz-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
-.rs-dz-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
 .rs-dz-bar .line{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .rs-dz-bar b{font-weight:600}
 .rs-dz-bar .st{margin:2px 0 0;min-height:1.3em;color:var(--mut);line-height:1.3}
@@ -827,7 +842,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 .rs-dz .fix-group{margin:12px 0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
 .rs-dz .fix-group:first-child{margin-top:0}
 .rs-dz .bad{color:var(--rs-dz-bad)}
-html.rs-phone .rs-dz-back,html.rs-phone .rs-dz .rs-tab,html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
+html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
 /* the preview under a transparent ground: the map container has the color of the base map, the checkerboard goes over that color */
 .rs-checker{background-image:repeating-conic-gradient(#d4d4d4 0 25%,#ffffff 0 50%);background-size:24px 24px}
 /* ONE HOVER, the rest: keyboard focus has a ring as well as the hover look; a link is underlined under the pointer */
