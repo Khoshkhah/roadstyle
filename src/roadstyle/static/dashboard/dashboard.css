@@ -959,11 +959,28 @@ html[data-rs-theme=dark]{--rs-err:#fca5a5}
 #rs-dock .rs-dd-run{border-radius:8px;padding:6px 16px;white-space:nowrap}
 .rs-dd-err{color:var(--rs-err);font-size:12px;white-space:pre-wrap}
 .rs-dd-err:empty{display:none}
-.rs-dd-tables{display:flex;flex-direction:column;gap:4px;font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);max-height:30%;overflow:auto}
-.rs-dd-tables[hidden]{display:none}
-.rs-dd-tgroup{display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center}
-.rs-dd-tgroup b{min-width:70px;color:var(--mut);font-weight:600}
-#rs-dock .rs-dd-tgroup button{border:0;background:none;padding:1px 4px;text-decoration:underline dotted;color:var(--ink)}
+/* the list of the tables: in the place of the table while it is open; a search field, a group for each schema, a card for each table */
+.rs-dd-tables{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;background:var(--bg);overflow:hidden}
+.rs-dd-tables[hidden],.rs-dd-split[hidden],.rs-dd-tgroup[hidden],.rs-dd-tcard[hidden]{display:none!important}
+.rs-dd-thead{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--card)}
+#rs-dock .rs-dd-tfind{flex:0 1 320px;min-width:0;padding:5px 10px;border-radius:7px;font-size:12.5px}
+#rs-dock .rs-dd-tfind:focus{outline:2px solid color-mix(in srgb,var(--accent) 30%,transparent);border-color:var(--accent)}
+.rs-dd-tcount{flex:1;color:var(--mut);font-size:12px}
+#rs-dock .rs-dd-tclose{border:0;background:none;color:var(--mut);padding:2px 8px}
+.rs-dd-tbody{flex:1;min-height:0;overflow:auto;padding:4px 10px 10px;scrollbar-width:thin}
+.rs-dd-tgroup{margin-top:8px}
+.rs-dd-tg-h{display:flex;align-items:baseline;gap:8px;margin:0 0 6px;font-size:12px;color:var(--mut)}
+.rs-dd-tg-h b{font:600 11px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.rs-dd-tg-own{color:var(--accent);font-weight:600}
+.rs-dd-tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+#rs-dock .rs-dd-tcard{display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);cursor:pointer}
+#rs-dock .rs-dd-tcard:is(:hover,:focus-visible){border-color:var(--accent);background:var(--rs-hover-bg);color:inherit}
+.rs-dd-tc-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.rs-dd-tc-name{flex:1;min-width:0;font:600 12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rs-dock .rs-dd-tcard:is(:hover,:focus-visible) .rs-dd-tc-name{color:var(--accent)}
+.rs-dd-tc-rows{flex:none;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+.rs-dd-tc-about{font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-dd-tgrid{align-items:start}
 .rs-dd-split{flex:1;min-height:0;display:flex;gap:10px}
 .rs-dd-split .rs-dock-table{flex:0 1 auto}
 .rs-dd-card{flex:0 0 300px;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:0 12px 10px}

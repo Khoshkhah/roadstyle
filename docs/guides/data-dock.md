@@ -37,7 +37,7 @@ data.open();
 
 ## What the person does
 
-- **Tables.** The tables of the data, in groups by schema, with what each one holds in the tooltip. A click on a table shows its rows: the line gets `SELECT * FROM <table>`, which you can change and run again.
+- **Tables.** The list of the tables takes the place of the table while it is open. It has a search field (by name or description; Enter opens the first table, Escape closes the list), a group for each schema with its number of tables (the page's own `extra` first), and a card for each table with its name, its number of rows and one line of what it holds. A click on a card shows the table's rows and closes the list: the line gets `SELECT * FROM <table>`, which you can change and run again.
 - **The line.** A click on it opens it as a text box. **Ctrl+Enter** or **Run** runs it, and **Escape** folds it. An error shows under the line, in the database's words. Only one `SELECT` or `WITH` statement runs: the guard refuses a statement that writes, loads, or reads a file or an address.
 - **The table.** The note in the dock's title row has the number of rows: "1 000 of 2 765 rows · 3 columns · 5 ms". The table shows at most `limit` rows, but **CSV** has all the rows (at most 1 000 000), and a click on a header sorts all the rows. A DATE shows as `2026-06-10`, a TIMESTAMP as `2026-06-10 08:30:00`, and a geometry as `(32 bytes)`.
 - **The light.** The roads of the table light on the map (the highlight set `dock`, in roadstyle's select purple). A new table changes the light. A table that a colour or a focus already shows has no light.

@@ -246,18 +246,44 @@ export function dataDock(o = {}){
   csvB.onclick = async () => { const a = $("a"); a.href = URL.createObjectURL(new Blob([await csv()], {type: "text/csv"})); a.download = "data.csv"; a.click(); };
 
   // ---- Tables: the schema's tables in groups; a click puts the name into the line ----
+  // the list of the tables (Kaveh, 2026-11-06: "tables part need to better design and style"): it takes the place of the table while it is open; a search
+  // field; one group for each schema with its number of tables (the page's own "extra" first); each table a card with its name, its rows and one line of
+  // what it holds. A click shows the rows of the table and closes the list; the line then has its SQL, to change.
+  const fmtRows = (n) => n == null ? "" : Number(n) >= 1e6 ? (Number(n) / 1e6).toFixed(1) + "M rows" : Number(n) >= 1e4 ? Math.round(Number(n) / 1e3) + "K rows" : fmt(n) + (Number(n) === 1 ? " row" : " rows");
   async function drawTables(){
-    const s = await o.schema(), groups = {};
-    for(const t of s.tables || []){ const g = t.name.includes(".") ? t.name.split(".")[0] : ""; (groups[g] = groups[g] || []).push(t); }
-    list.replaceChildren(...Object.keys(groups).sort((a, b) => (b === "extra") - (a === "extra")).map((g) => {
-      const row = $("div", "rs-dd-tgroup"); if(g) row.append($("b", "", g));
-      // a click shows the rows of the table (Kaveh, 2026-11-06: "by select a table can see each rows"); the line then has its SQL, to change
-      for(const t of groups[g]){ const b = $("button", "", t.name.split(".").pop()); b.type = "button"; b.title = `${t.rows ?? "?"} rows${t.about ? ": " + t.about : ""}. Click to see its rows.`;
-        const name = t.name.split(".").map((p) => /^[A-Za-z_]\w*$/.test(p) ? p : quoteId(p)).join(".");
-        b.onclick = () => { runSql(`SELECT * FROM ${name}`).catch(() => {}); }; row.append(b); }
-      return row; }));
+    const s = await o.schema(), groups = new Map();                  // each time: a table of the page can come later
+    for(const t of s.tables || []){ const g = t.name.includes(".") ? t.name.split(".")[0] : ""; if(!groups.has(g)) groups.set(g, []); groups.get(g).push(t); }
+    const find = $("input", "rs-dd-tfind"), close = $("button", "rs-dd-tclose", "\u2715"), head = $("div", "rs-dd-thead"), body = $("div", "rs-dd-tbody");
+    find.type = "search"; find.placeholder = "Find a table"; find.setAttribute("aria-label", "Find a table"); close.type = "button"; close.title = "Close the list"; close.setAttribute("aria-label", close.title);
+    head.append(find, $("span", "rs-dd-tcount", `${(s.tables || []).length} tables`), close);
+    const order = [...groups.keys()].sort((a, b) => (b === "extra") - (a === "extra") || (b === "main") - (a === "main") || a.localeCompare(b));
+    const cards = [];
+    for(const g of order){
+      const sec = $("section", "rs-dd-tgroup"), h = $("div", "rs-dd-tg-h"), grid = $("div", "rs-dd-tgrid");
+      h.append($("b", "", g || "tables"), $("span", "", `${groups.get(g).length} table${groups.get(g).length === 1 ? "" : "s"}`));
+      if(g === "extra") h.append($("span", "rs-dd-tg-own", "the page's own data"));
+      for(const t of groups.get(g)){
+        const b = $("button", "rs-dd-tcard"), name = t.name.split(".").map((p) => /^[A-Za-z_]\w*$/.test(p) ? p : quoteId(p)).join(".");
+        b.type = "button"; b.title = `${t.name}${t.about ? "\n" + t.about : ""}\nClick to see its rows.`;
+        const top = $("span", "rs-dd-tc-top"); top.append($("span", "rs-dd-tc-name", t.name.split(".").pop()), $("span", "rs-dd-tc-rows", fmtRows(t.rows)));
+        b.append(top); if(t.about) b.append($("span", "rs-dd-tc-about", t.about));        // no description: no empty line
+        b.onclick = () => { setList(false); runSql(`SELECT * FROM ${name}`).catch(() => {}); };
+        b.dataset.find = (t.name + " " + (t.about || "")).toLowerCase(); grid.append(b); cards.push([b, sec]);
+      }
+      sec.append(h, grid); body.append(sec);
+    }
+    find.oninput = () => { const q = find.value.trim().toLowerCase(); for(const [b] of cards) b.hidden = !!q && !b.dataset.find.includes(q);
+      body.querySelectorAll(".rs-dd-tgroup").forEach((sec) => { sec.hidden = ![...sec.querySelectorAll(".rs-dd-tcard")].some((b) => !b.hidden); }); };
+    find.onkeydown = (e) => { if(e.key === "Escape") setList(false); if(e.key === "Enter"){ const first = cards.find(([b]) => !b.hidden); if(first) first[0].click(); } };
+    close.onclick = () => setList(false);
+    list.replaceChildren(head, body);
+    setTimeout(() => find.focus(), 0);
   }
-  tablesB.onclick = async () => { if(list.hidden){ await drawTables(); list.hidden = false; tablesB.classList.add("on"); } else { list.hidden = true; tablesB.classList.remove("on"); } };
+  async function setList(on){
+    if(on) await drawTables();
+    list.hidden = !on; split.hidden = on; tablesB.classList.toggle("on", on); tablesB.setAttribute("aria-expanded", String(on));
+  }
+  tablesB.onclick = () => setList(list.hidden);
 
   // ---- the layers of the map: Colour (several on) and Focus (one on; fade or hide). One layer for each kind and set of roads. ----
   const layers = []; let legendIds = [], seq = 0;

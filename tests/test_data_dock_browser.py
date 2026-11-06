@@ -132,7 +132,16 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             assert page.evaluate("rs.getState().selection") == "2"
             # Tables: a click on a table shows its rows
             page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
+            # the list takes the place of the table: a search field, a group for each schema (the page's own "extra" first), a card with the rows
+            assert page.is_hidden("#rs-dock .rs-dd-split") and page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-tg-h b')].map(b => b.textContent)") == ["extra", "main"]
+            assert "6 rows" in page.inner_text("#rs-dock .rs-dd-tcard:has-text('edges')")
+            page.fill("#rs-dock .rs-dd-tfind", "sensor")
+            assert page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-tcard')].filter(b => !b.hidden).map(b => b.querySelector('.rs-dd-tc-name').textContent)") == ["sensors"]
+            page.keyboard.press("Escape")
+            assert page.is_hidden("#rs-dock .rs-dd-tables") and page.is_visible("#rs-dock .rs-dd-split")
+            page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
             page.click("#rs-dock .rs-dd-tables button:has-text('edges')")
+            assert page.is_hidden("#rs-dock .rs-dd-tables")
             page.wait_for_timeout(300)
             assert "SELECT * FROM main.edges" in page.evaluate("window.queries.at(-1)")
             # a DATE that comes as milliseconds shows as a day
