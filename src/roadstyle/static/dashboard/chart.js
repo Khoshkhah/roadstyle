@@ -111,7 +111,8 @@ export const rsChart = (() => {
                 : `M${x},${y}V${y + h - r}Q${x},${y + h} ${x + r},${y + h}H${x + w - r}Q${x + w},${y + h} ${x + w},${y + h - r}V${y}Z`; };
 
     function bar(W, H, ys, legend){
-      const rows = s.rows.slice(0, BARS), labels = rows.map((r) => String(r[at(s.x)] ?? "null")), yr = yRange(ys, rows);
+      const lab = (v) => v == null ? "null" : typeof v === "number" || typeof v === "bigint" ? fmt(v) : String(v);     // a number label: rounded
+      const rows = s.rows.slice(0, BARS), labels = rows.map((r) => lab(r[at(s.x)])), yr = yRange(ys, rows);
       if(s.rows.length > BARS) foot.textContent = `… ${fmt(s.rows.length - BARS)} more in the table`;
       legendOf(legend, ys.map((y, k) => [y, col(k)]));
       const horizontal = !s.small && labels.some((l) => l.length > 8);
@@ -196,7 +197,7 @@ export const rsChart = (() => {
     function pie(W, H, ys, legend){
       const y = ys[0], order = s.rows.map((r, i) => [i, num(r[at(y)]) ?? 0]).filter((p) => p[1] > 0).sort((a, b) => b[1] - a[1]);
       const keep = order.length > SLICES ? order.slice(0, SLICES - 1) : order, rest = order.slice(keep.length).reduce((t, p) => t + p[1], 0);
-      const parts = keep.map(([i, v]) => ({i, v, name: String(s.rows[i][at(s.x)] ?? "null")})).concat(rest > 0 ? [{i: null, v: rest, name: `Other (${order.length - keep.length})`}] : []);
+      const parts = keep.map(([i, v]) => ({i, v, name: ((x) => x == null ? "null" : typeof x === "number" || typeof x === "bigint" ? fmt(x) : String(x))(s.rows[i][at(s.x)])})).concat(rest > 0 ? [{i: null, v: rest, name: `Other (${order.length - keep.length})`}] : []);
       const total = parts.reduce((t, p) => t + p.v, 0), cx = W / 2, cy = H / 2, R = Math.max(10, Math.min(W, H) / 2 - 6);      // the names are in the legend, not round the pie
       legendOf(legend, parts.map((p, k) => [`${p.name} ${Math.round((p.v / total) * 100)} %`, col(k)]));
       let a0 = -Math.PI / 2;

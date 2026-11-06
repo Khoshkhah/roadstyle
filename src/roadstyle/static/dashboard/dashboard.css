@@ -739,10 +739,11 @@ html[data-rs-theme=dark] #sb .rs-kpi-val.rs-c{color:color-mix(in srgb,var(--rs-k
    For text and lines the panel's own tokens do the same: --ink, --mut, --line, --card. ---- */
 html{--rs-chart-band:#e0f2fe;--rs-chart-band-line:#bae6fd;--rs-chart-grid:#eef2f6;--rs-chart-miss:#e2e8f0}
 html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-line:rgba(90,169,248,.45);--rs-chart-grid:#272b33;--rs-chart-miss:#3a404a}
-/* the 8 colours of the series of a chart (chart.js), in a fixed order: the reference palette of the dataviz method, checked for colour vision deficiency
-   (adjacent CVD ΔE 9.1 light, 8.4 dark) in both themes. In the light theme slots 3, 4 and 5 are under 3:1 on white: a chart has its table, and a pie its labels. */
-html{--rs-chart-1:#2a78d6;--rs-chart-2:#eb6834;--rs-chart-3:#1baf7a;--rs-chart-4:#eda100;--rs-chart-5:#e87ba4;--rs-chart-6:#008300;--rs-chart-7:#6250d6;--rs-chart-8:#e34948}
-html[data-rs-theme=dark]{--rs-chart-1:#3987e5;--rs-chart-2:#d95926;--rs-chart-3:#199e70;--rs-chart-4:#c98500;--rs-chart-5:#d55181;--rs-chart-6:#008300;--rs-chart-7:#9085e9;--rs-chart-8:#e66767}
+/* the 8 colours of the series of a chart (chart.js), in a fixed order: the dashboard's teal first (one series has it), then the reference palette of the
+   dataviz method; checked with its validator for colour vision deficiency in both themes (all checks pass; adjacent CVD ΔE 14.5 light). In the light
+   theme slots 4 and 5 are under 3:1 on white: a chart has its table, and a pie its legend. (Kaveh, 2026-11-06: "better style and color") */
+html{--rs-chart-1:#008a9e;--rs-chart-2:#eb6834;--rs-chart-3:#2a78d6;--rs-chart-4:#eda100;--rs-chart-5:#e87ba4;--rs-chart-6:#008300;--rs-chart-7:#6250d6;--rs-chart-8:#e34948}
+html[data-rs-theme=dark]{--rs-chart-1:#159cb1;--rs-chart-2:#d95926;--rs-chart-3:#3987e5;--rs-chart-4:#c98500;--rs-chart-5:#d55181;--rs-chart-6:#008300;--rs-chart-7:#9085e9;--rs-chart-8:#e66767}
 .rs-chart{position:relative;min-height:120px;display:flex;flex-direction:column;font:11px system-ui,sans-serif;color:var(--ink);overflow:auto;scrollbar-width:thin}
 .rs-chart svg{flex:none}
 .rs-chart.rs-chart-small{overflow:hidden;min-height:0}
@@ -754,7 +755,8 @@ html[data-rs-theme=dark]{--rs-chart-1:#3987e5;--rs-chart-2:#d95926;--rs-chart-3:
 .rs-chart-hd{display:flex;align-items:baseline;gap:8px;min-height:22px;flex-wrap:wrap}
 .rs-chart-hd b{font:600 12.5px system-ui,sans-serif;color:var(--ink)}
 .rs-chart-hd span{font-size:11px;color:var(--mut)}
-.rs-chart svg .rs-mk{transition:opacity .12s}
+.rs-chart svg .rs-mk{transition:opacity .12s,fill-opacity .12s;fill-opacity:.85}
+.rs-chart svg .rs-mk.on{fill-opacity:1}      /* a little see-through; the mark under the pointer in its full colour */
 .rs-chart svg.rs-chart-dim .rs-mk:not(.on){opacity:.35}
 .rs-chart-none{color:var(--mut);margin:12px 0}
 
@@ -1101,7 +1103,7 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #rs-dock .rs-dd-view{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
 #rs-dock .rs-dd-view button{border:0;border-radius:0;padding:3px 10px}
 #rs-dock .rs-dd-view button.on{background:var(--accent-fill);color:#fff}
-.rs-dd-chart{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:8px 12px}
+.rs-dd-chart{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:8px;background:transparent;padding:8px 12px}
 .rs-dd-chart[hidden],#rs-dock .rs-dock-table[hidden]{display:none}
 .rs-dd-chartrow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px}
 .rs-dd-cl{display:inline-flex;gap:6px;align-items:center;color:var(--mut);font-size:12px}

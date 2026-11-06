@@ -283,16 +283,31 @@ export function dataDock(o = {}){
   let chartSeq = 0;
   async function drawChart(){
     const r = res, me = ++chartSeq; if(!r) return;
+    let note = "";
     const sp = r.chart || {kind: "bar"}, f = fits(sp.kind, r);
     const ys = [].concat(sp.y || []), grouped = ["bar", "line", "pie"].includes(sp.kind);
-    kindS.value = sp.kind; paintKinds(); hintEl.textContent = HINT[sp.kind] || "";
+    kindS.value = sp.kind; paintKinds(); hintEl.textContent = (HINT[sp.kind] || "") + note;
     fill(xS, f.xs, sp.x); fill(yS, f.ys, ys[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
     if(!f.xs.length || (sp.kind === "scatter" && f.ys.length < 1)){
       chartEl.replaceChildren(Object.assign($("p", "rs-chart-none"), {textContent: `This result has no column for a ${sp.kind} chart. ${HINT[sp.kind]}`})); return; }
-    let spec = {...sp, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};
+    let spec = {...sp, title: sp.title, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};   // (title: also when none)
     const xi = r.columns.findIndex((c) => c.name === sp.x);
     const repeats = xi >= 0 && new Set(table.rows().map((x) => String(x[xi]))).size < table.rows().length;
-    if(grouped && xi >= 0 && (ys[0] === COUNT || repeats || r.more)){
+    // a bar or a pie whose X is a number with more than 40 values (a length): the rows in ranges of X, about 6 for a pie and 12 for a bar, over all
+    // the rows (Kaveh, 2026-11-06: a pie of the lengths had one slice of 0 % for each road)
+    const many = xi >= 0 && ["bar", "pie"].includes(sp.kind) && measures(r).includes(sp.x) && new Set(table.rows().map((x) => x[xi])).size > 40;
+    if(many){
+      const all = await allRows(r, CSV_LIMIT); if(me !== chartSeq) return;
+      const yi = ys[0] && ys[0] !== COUNT ? r.columns.findIndex((col) => col.name === ys[0]) : -1, vals = all.map((x) => [Number(x[xi]), yi < 0 ? 1 : Number(x[yi]) || 0]).filter(([v]) => isFinite(v));
+      let lo = Infinity, hi = -Infinity; for(const [v] of vals){ if(v < lo) lo = v; if(v > hi) hi = v; }
+      const raw = (hi - lo) / (sp.kind === "pie" ? 6 : 12) || 1, pw = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map((k) => k * pw).find((s) => s >= raw);
+      const start = Math.floor(lo / step) * step, n = Math.max(1, Math.ceil((hi - start) / step + 1e-9)), sums = new Array(n).fill(0);
+      for(const [v, w] of vals) sums[Math.min(n - 1, Math.floor((v - start) / step))] += w;
+      const yName = yi < 0 ? "rows" : `sum of ${ys[0]}`, rows = sums.map((s, k) => [`${fmt(+(start + k * step).toPrecision(6))}\u2013${fmt(+(start + (k + 1) * step).toPrecision(6))}`, s]).filter(([, s]) => s > 0);
+      note = ` (${sp.x} has many values: in ranges)`; hintEl.textContent = (HINT[sp.kind] || "") + note;
+      spec = {...spec, x: sp.x, y: yName, columns: [{name: sp.x, type: "VARCHAR"}, {name: yName, type: "DOUBLE"}], rows, onPick: null};
+    }
+    else if(grouped && xi >= 0 && (ys[0] === COUNT || repeats || r.more)){
       const time = rs.chart.isTime(r.columns[xi].type) || rs.chart.isNumber(r.columns[xi].type), yName = ys[0] === COUNT || !ys.length ? "rows" : `sum of ${ys[0]}`;
       const agg = ys[0] === COUNT || !ys.length ? "count(*)" : `sum(${quoteId(ys[0])})`;
       const g = await query(`SELECT ${quoteId(sp.x)}, ${agg} AS ${quoteId(yName)} FROM (${inner(r.sql)}) AS rs_a GROUP BY 1 ORDER BY ${sp.kind === "line" || (sp.kind === "bar" && time) ? 1 : 2} ${sp.kind === "line" || time ? "ASC" : "DESC"} LIMIT 500`, null).catch((e) => ({error: e}));
@@ -312,7 +327,7 @@ export function dataDock(o = {}){
     let y = k === "histogram" ? undefined : pick(yS.value, f.ys, [].concat(old.y || [])[0]);
     if(["bar", "line", "pie"].includes(k) && y === x) y = COUNT;                                     // the sum of x for each x says nothing: the rows
     if(k === "scatter" && y === x) y = f.ys.find((n) => n !== x) || y;
-    res.chart = {...old, kind: k, x, y}; drawChart(); };
+    res.chart = {kind: k, x, y}; drawChart(); };      // the person's own chart: its own title, not the one of the model
   kindS.onchange = xS.onchange = yS.onchange = change;
   svgB.onclick = () => { const s = chartObj && chartObj.svg(); if(!s) return;
     const copy = s.cloneNode(true), css = getComputedStyle(document.documentElement);
@@ -463,7 +478,12 @@ export function dataDock(o = {}){
     idColumn: ID, keyOf, roadsOf: async (r) => keyOf(r) ? onMap(await roadsOf(r)) : [],
     query: (text, limit = LIMIT) => query(text, limit),
     // the chart of the result now: {kind, x, y, title}; it opens the chart view (Ask's draw_chart). A spec that does not fit gives an error.
-    chart(spec){ if(!res) throw new Error("There is no result to draw."); const s = {...spec, columns: res.columns, rows: res.rows};
+    chart(spec){ if(!res) throw new Error("There is no result to draw.");
+      // a bar, a line or a pie with no y (or "(count of rows)"): the count of rows for each value of x
+      if(["bar", "line", "pie"].includes(spec.kind) && (!spec.y || spec.y === COUNT)){
+        if(!res.columns.some((col) => col.name === spec.x)) throw new Error(`The column "${spec.x}" is not in the result.`);
+        res.chart = {kind: spec.kind, x: spec.x, y: COUNT, title: spec.title}; return setView("chart").then(() => res.chart); }
+      const s = {...spec, columns: res.columns, rows: res.rows};
       const why = rs.chart.check ? rs.chart.check(s) : null; if(why) throw new Error(why); res.chart = {kind: spec.kind, x: spec.x, y: spec.y, title: spec.title}; return setView("chart").then(() => res.chart); },
     // the chart that the dock drew last: its kind, columns and rows (the rows for each value of x when it grouped them), for a copy of it
     drawnChart: () => (chartObj ? chartObj.spec() : null),

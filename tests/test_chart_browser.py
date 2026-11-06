@@ -126,6 +126,14 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         assert page.locator("#rs-dock .rs-dd-chartel svg circle").count() >= 6
         # data.chart(spec), as Ask's draw_chart: a spec that does not fit is an error
         assert page.evaluate("(() => { try { data.chart({kind: 'pie', x: 'nope', y: 'length_m'}); return 'no error'; } catch(e) { return e.message; } })()").startswith("The column")
+        # Kaveh's case: a pie of a number X with many values (the 2765 lengths) has the rows in ranges, about 6 slices; a change of the kind drops the title
+        page.evaluate("data.chart({kind: 'bar', x: 'length_m', title: 'Histogram of lengths'})")
+        page.wait_for_timeout(300)
+        page.click("#rs-dock .rs-dd-kind[data-kind=pie]")
+        page.wait_for_timeout(500)
+        slices = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-chart-legend span')].map(s => s.textContent)")
+        assert 3 <= len(slices) <= 6 and all("\u2013" in s for s in slices if not s.startswith("Other")), slices
+        assert "in ranges" in page.inner_text("#rs-dock .rs-dd-chint") and "Histogram of lengths" not in page.inner_text("#rs-dock .rs-chart-hd")
         # Kaveh's case: a kind that needs a number X never takes the road ids; the hint says how to use the kind
         page.click("#rs-dock .rs-dd-kind[data-kind=bar]")
         page.click("#rs-dock .rs-dd-kind[data-kind=histogram]")

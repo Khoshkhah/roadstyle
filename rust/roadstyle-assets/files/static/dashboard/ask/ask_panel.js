@@ -38,7 +38,7 @@ Tools (each takes one read-only SELECT or WITH statement):
   x is the column of the labels (bar, pie), of the order (line) or of the numbers (histogram, scatter); y is a number column
   (not for a histogram). Use it when the person asks for a chart, a graph, a plot or a diagram, or when a comparison of 3 to
   40 values is clearer as a chart. Aggregate in the SQL (GROUP BY): a chart draws the rows as they are. A pie needs values
-  of 0 or more and at most 8 slices.
+  of 0 or more and at most 6 slices. For the distribution of a number (lengths, speeds) use histogram, not bar.
 Use a map tool only when the person asks to see, show, colour, filter or zoom. You cannot change the data.
 
 Rules:
@@ -117,7 +117,7 @@ export function askPanel(o = {}){
   tools.append(who, keyB, newB);
   const helpB = o.help !== false && rs.help && rs.help.button(tools, {title: "Ask", button: "About Ask",
     intro: "Ask a question about the roads in words. An AI service writes the SQL, runs it on the data of this page, and answers in a few sentences. The table goes to the data dock, and the roads light on the map.",
-    terms: [["Key", "Your own key of an AI service. Google Gemini and Groq give a free key. The key stays in this browser and goes only to that service."],
+    terms: [["Key", "Your own key of an AI service. Google Gemini and Groq give a free key. The key stays in this browser and goes only to that service. Other pages on the same address (for example the same github.io site) can read it: use a key with a spending limit."],
             ["Examples", "Questions to try. After the first question, they are above the question box."],
             ["An answer", "The question, the answer and the SQL (open “1 query”). Show puts its table in the dock again, and its roads light on the map. ✕ removes the card."],
             ["MAP", "An answer can colour the roads, focus on some roads (the others fade or hide) or move the map. A colour and a focus stay: they are in the lists of Colour ▾ and Focus ▾ in the data dock."],
@@ -179,13 +179,12 @@ export function askPanel(o = {}){
     const save = $("button", "sb-primary", "Save"), clear = $("button", "", "Clear"), note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
     save.type = clear.type = "button"; btns.append(clear, save);
     const link = $("a", "", "Get a free key from " + p.name); if(p.keys){ link.href = p.keys; link.target = "_blank"; link.rel = "noopener"; } else link.hidden = true;
-    const host = (() => { try{ return new URL(p.base).host; }catch(e){ return p.name; } })();
-    note.textContent = `The key stays in this browser and goes only to ${host}. Other pages on the same address (for example the same github.io site) can read it. Use a key with a spending limit.`;
-    const sends = $("p", "rs-ask-keynote", "Ask sends your question, the conversation, the names and descriptions of the tables and columns, and the query results (up to 30 rows each) to the provider's address. The key goes only there.");
+    // no notes under the form (Kaveh, 2026-11-06: "I think we should remove this part too"): the "?" of Ask says where the key and the data go; the line
+    // here shows only the state of a save
     const row = (l, el) => { const r = $("label", "rs-ask-krow"); r.append($("span", "", l), el); return r; };
     const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "‹ Back to chat"); back.type = "button"; back.onclick = () => showKey(false);
     hd.append($("b", "", "Your key"), back);
-    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), list, row("Key", key), btns, note, sends);
+    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), list, row("Key", key), btns, note);
     sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(); paintWho(); };
     clear.onclick = () => { lsPut("rs-key:ask:" + prov().id, null); drawKey(); paintWho(); };
     save.onclick = async () => {
@@ -282,7 +281,7 @@ export function askPanel(o = {}){
   ];
   TOOLS.push({name: "draw_chart", description: "Draw a chart of the result of one SQL statement in the data dock.", required: ["sql", "kind", "x"],
     parameters: {sql: SQL, kind: {type: "string", enum: ["bar", "line", "histogram", "scatter", "pie"]}, x: {type: "string", description: "A column of the result."},
-                 y: {type: "string", description: "A number column of the result (not for histogram)."}, title: {type: "string"}},
+                 y: {type: "string", description: "A number column of the result (not for histogram). Leave it out for a bar, line or pie of the count of rows."}, title: {type: "string"}},
     step: () => "Drawing the chart",
     async run({sql, kind, x, y, title}, c){
       const r = await data.run(String(sql || ""), {source: "ask"}); c.ok.push(r);
