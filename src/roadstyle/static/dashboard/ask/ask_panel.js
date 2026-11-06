@@ -34,6 +34,11 @@ Tools (each takes one read-only SELECT or WITH statement):
 - focus_roads(sql, mode): the roads that the sql selects ({id}) stay; the others are faded
   (mode "fade", the default) or hidden (mode "hide": use it when the person says "only").
 - move_map(sql): zooms to the roads that the sql selects ({id}).
+- draw_chart(sql, kind, x, y, title): a chart of the result in the data dock; kind is bar, line, histogram, scatter or pie;
+  x is the column of the labels (bar, pie), of the order (line) or of the numbers (histogram, scatter); y is a number column
+  (not for a histogram). Use it when the person asks for a chart, a graph, a plot or a diagram, or when a comparison of 3 to
+  40 values is clearer as a chart. Aggregate in the SQL (GROUP BY): a chart draws the rows as they are. A pie needs values
+  of 0 or more and at most 8 slices.
 Use a map tool only when the person asks to see, show, colour, filter or zoom. You cannot change the data.
 
 Rules:
@@ -257,6 +262,16 @@ export function askPanel(o = {}){
        return {done: text + "."};
      }},
   ];
+  TOOLS.push({name: "draw_chart", description: "Draw a chart of the result of one SQL statement in the data dock.", required: ["sql", "kind", "x"],
+    parameters: {sql: SQL, kind: {type: "string", enum: ["bar", "line", "histogram", "scatter", "pie"]}, x: {type: "string", description: "A column of the result."},
+                 y: {type: "string", description: "A number column of the result (not for histogram)."}, title: {type: "string"}},
+    step: () => "Drawing the chart",
+    async run({sql, kind, x, y, title}, c){
+      const r = await data.run(String(sql || ""), {source: "ask"}); c.ok.push(r);
+      await data.chart({kind, x, y: kind === "histogram" ? undefined : y, title});      // a column that is not in the result: an error for the model
+      c.chart = {res: data.result(), spec: data.drawnChart(), title};
+      return {done: `Drew a ${kind} chart of ${y ? y + " by " : ""}${x} (${fmt(r.total ?? r.rows.length)} rows).`};
+    }});
   const SPECS = TOOLS.map((t) => ({type: "function", function: {name: t.name, description: t.description, parameters: {type: "object", properties: t.parameters, required: t.required}}}));
 
   // ---- one model call: a wait on the free limit (HTTP 429: at most 2 times, each at most 60 s), and one switch to another model that the key can use ----
@@ -372,7 +387,10 @@ export function askPanel(o = {}){
       foot = $("div", "rs-ask-foot"); foot.append(d); t.el.append(foot);
     }
     if(c.maps.length){ const sqls = c.maps.flatMap((m) => m.sql); foot = $("div", "rs-ask-foot"); foot.append(fold("rs-ask-sqls", plural(sqls.length, "map query", "map queries"), ...codes(sqls))); t.el.append(foot); }
-    t.res = [...c.maps].reverse().map((m) => m.res).find(Boolean) || best;
+    t.res = c.chart ? c.chart.res : [...c.maps].reverse().map((m) => m.res).find(Boolean) || best;
+    // a chart answer: a small copy of the chart in the card (no labels, no hover); Show puts the chart in the dock again
+    if(c.chart && c.chart.spec){ t.chart = true; const box = $("div", "rs-ask-chart"); t.el.insertBefore(box, foot || null);
+      rs.chart(box, {...c.chart.spec, small: true, onPick: null}); if(c.chart.title) box.title = c.chart.title; }
     if(t.res){
       const acts = $("div", "rs-ask-acts"), show = $("button", "rs-ask-show", "Show"); show.type = "button";
       show.title = "Put the table of this answer in the dock again: its roads light on the map"; show.onclick = () => showTurn(t);
@@ -386,6 +404,7 @@ export function askPanel(o = {}){
   // a card's table back into the dock (its roads light), the dock open (on a phone only on a click: one sheet at a time) and the camera on its roads
   function showTurn(t, first){
     data.show(t.res);
+    if(data.view) data.view(t.chart ? "chart" : "table");
     if(!first || !phone()) data.open();
     if(data.roadsOf) data.roadsOf(t.res).then((ids) => { if(ids.length) rs.focus(ids); }, () => {});
   }

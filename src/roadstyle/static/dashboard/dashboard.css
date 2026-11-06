@@ -1055,3 +1055,6 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #rs-dock .rs-dd-cl select{padding:2px 6px;max-width:180px}
 .rs-dd-sp{flex:1}
 .rs-dd-chartel{flex:1;min-height:0}
+
+/* a chart answer of Ask: a small copy of its chart in the card (the chart is in the data dock) */
+#sb .rs-ask-chart{height:140px;margin:8px 0 4px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--bg)}

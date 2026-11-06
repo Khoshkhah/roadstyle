@@ -185,7 +185,7 @@ export function dataDock(o = {}){
   function setView(v){
     view = v; tableB.classList.toggle("on", v === "table"); chartB.classList.toggle("on", v === "chart");
     table.el.hidden = v !== "table"; chartBox.hidden = v !== "chart";
-    if(v === "chart") drawChart();
+    return v === "chart" ? drawChart() : Promise.resolve();
   }
   tableB.onclick = () => setView("table");
   chartB.onclick = () => setView("chart");
@@ -355,7 +355,9 @@ export function dataDock(o = {}){
     query: (text, limit = LIMIT) => query(text, limit),
     // the chart of the result now: {kind, x, y, title}; it opens the chart view (Ask's draw_chart). A spec that does not fit gives an error.
     chart(spec){ if(!res) throw new Error("There is no result to draw."); const s = {...spec, columns: res.columns, rows: res.rows};
-      const why = rs.chart.check ? rs.chart.check(s) : null; if(why) throw new Error(why); res.chart = {kind: spec.kind, x: spec.x, y: spec.y, title: spec.title}; setView("chart"); return res.chart; },
+      const why = rs.chart.check ? rs.chart.check(s) : null; if(why) throw new Error(why); res.chart = {kind: spec.kind, x: spec.x, y: spec.y, title: spec.title}; return setView("chart").then(() => res.chart); },
+    // the chart that the dock drew last: its kind, columns and rows (the rows for each value of x when it grouped them), for a copy of it
+    drawnChart: () => (chartObj ? chartObj.spec() : null),
     view: (v) => (v ? setView(v) : view),
     colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },

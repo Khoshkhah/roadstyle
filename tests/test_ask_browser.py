@@ -31,12 +31,14 @@ const CANNED = {
   "SELECT edge_id, name FROM edges WHERE highway = 'primary'": [["edge_id", "BIGINT"], ["name", "VARCHAR"]],
   "SELECT edge_id, name FROM edges ORDER BY name LIMIT 2": [["edge_id", "BIGINT"], ["name", "VARCHAR"]],
   "SELECT count(*) AS n FROM edges": [["n", "BIGINT"]],
+  "SELECT highway, count(*) AS roads FROM edges GROUP BY highway": [["highway", "VARCHAR"], ["roads", "BIGINT"]],
 };
 const ROWS = {
   "SELECT edge_id, name, highway FROM edges": EDGES,
   "SELECT edge_id, name FROM edges WHERE highway = 'primary'": EDGES.filter(r => r[2] === "primary").map(r => r.slice(0, 2)),
   "SELECT edge_id, name FROM edges ORDER BY name LIMIT 2": EDGES.slice(0, 2).map(r => r.slice(0, 2)),
   "SELECT count(*) AS n FROM edges": [[6n]],
+  "SELECT highway, count(*) AS roads FROM edges GROUP BY highway": [["primary", 3n], ["secondary", 2n], ["residential", 1n]],
 };
 const strip = s => s.trim().replace(/;\\s*$/, "");
 function answer(sql){
@@ -133,7 +135,7 @@ def test_the_agent_fixes_its_sql_and_its_answer_goes_to_the_dock(tmp_path):
             page.evaluate("releaseLoad()")
             page.wait_for_function("window.answers.length === 1")
             calls = page.evaluate("window.calls")
-            assert len(calls) == 3 and calls[0]["tools"] == ["run_query", "color_roads", "focus_roads", "move_map"]
+            assert len(calls) == 3 and calls[0]["tools"] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart"]
             system = calls[0]["messages"][0]["content"]
             assert "Columns of main.edges" in system and "extra.sensors: Traffic sensors" in system and "Six test roads." in system
             tool_msg = calls[1]["messages"][-1]
@@ -277,7 +279,7 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
             r = seen[-1]
             assert r["url"] == "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" and "test-key-123" not in r["url"]
             assert r["auth"] == "Bearer test-key-123" and r["body"]["model"] == "gemini-2.5-flash" and r["body"]["tool_choice"] == "auto"
-            assert [t["function"]["name"] for t in r["body"]["tools"]] == ["run_query", "color_roads", "focus_roads", "move_map"]
+            assert [t["function"]["name"] for t in r["body"]["tools"]] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart"]
             assert "test-key-123" not in json.dumps(r["body"])
         finally:
             browser.close()
@@ -322,6 +324,31 @@ def test_the_ask_view_is_readable_in_the_theme(tmp_path, theme):
             found["key form"] = page.evaluate(_PROBE, ["#sb", theme == "dark"])
             problems = {k: sorted({" | ".join(str(x) for x in f if x != "") for f in v})[:6] for k, v in found.items() if v}
             assert not problems, json.dumps(problems, indent=1)
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_draw_chart_shows_the_chart_in_the_dock_and_a_copy_in_the_card(tmp_path):
+    """The tool draw_chart: the dock shows the chart of its SQL, the card a small copy; Show brings the chart back; a column that is not in the result is
+    an error that goes back to the model."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open()")
+            _ask(page, "A pie chart of the road classes", [
+                "tool('draw_chart', {sql: 'SELECT highway, count(*) AS roads FROM edges GROUP BY highway', kind: 'pie', x: 'highway', y: 'nope'})",
+                "tool('draw_chart', {sql: 'SELECT highway, count(*) AS roads FROM edges GROUP BY highway', kind: 'pie', x: 'highway', y: 'roads', title: 'Roads by class'})",
+                "say('Half of the 6 roads are primary.')"])
+            assert "draw_chart" in page.evaluate("window.calls[0].tools")
+            assert "nope" in page.evaluate("window.calls[1].messages.at(-1).content")                 # the bad spec: an error for the model
+            assert page.is_visible("#rs-dock .rs-dd-chart") and page.locator("#rs-dock .rs-dd-chart svg path").count() == 3
+            card = page.locator(".rs-ask-turn").last
+            assert card.locator(".rs-ask-chart svg path").count() == 3 and "Half of the 6 roads" in card.inner_text()
+            page.click("#rs-dock .rs-dd-view button:has-text('Table')")
+            card.locator(".rs-ask-show").click()
+            page.wait_for_timeout(200)
+            assert page.is_visible("#rs-dock .rs-dd-chart svg")                                           # Show: the chart again
         finally:
             browser.close()
     assert errors == [], errors

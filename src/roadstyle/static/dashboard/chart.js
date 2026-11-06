@@ -54,7 +54,7 @@ export const rsChart = (() => {
       const bad = s.columns && s.rows ? check(s) : "No data.";
       if(bad){ el.append(Object.assign(document.createElement("p"), {className: "rs-chart-none", textContent: bad})); return; }
       const W = Math.max(160, el.clientWidth - 2), ys = [].concat(s.y || []); lastW = el.clientWidth;
-      const legend = ys.length > 1 || s.kind === "pie" ? document.createElement("div") : null;
+      const legend = !s.small && (ys.length > 1 || s.kind === "pie") ? document.createElement("div") : null;     // a small copy has no legend
       if(legend){ legend.className = "rs-chart-legend"; el.append(legend); }
       let H = Math.max(100, el.clientHeight - (legend ? 24 : 0) - 20);
       // horizontal bars have at least 18 px each: a long list is taller than the box, and the box scrolls
@@ -169,7 +169,7 @@ export const rsChart = (() => {
       const y = ys[0], order = s.rows.map((r, i) => [i, num(r[at(y)]) ?? 0]).filter((p) => p[1] > 0).sort((a, b) => b[1] - a[1]);
       const keep = order.length > SLICES ? order.slice(0, SLICES - 1) : order, rest = order.slice(keep.length).reduce((t, p) => t + p[1], 0);
       const parts = keep.map(([i, v]) => ({i, v, name: String(s.rows[i][at(s.x)] ?? "null")})).concat(rest > 0 ? [{i: null, v: rest, name: `Other (${order.length - keep.length})`}] : []);
-      const total = parts.reduce((t, p) => t + p.v, 0), cx = W / 2, cy = H / 2, R = Math.max(10, Math.min(W, H) / 2 - (s.small ? 4 : 26));
+      const total = parts.reduce((t, p) => t + p.v, 0), cx = W / 2, cy = H / 2, R = Math.max(10, Math.min(W, H) / 2 - 6);      // the names are in the legend, not round the pie
       legendOf(legend, parts.map((p, k) => [`${p.name} ${Math.round((p.v / total) * 100)} %`, col(k)]));
       let a0 = -Math.PI / 2;
       parts.forEach((p, k) => {

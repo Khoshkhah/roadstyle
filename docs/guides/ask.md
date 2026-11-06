@@ -123,3 +123,7 @@ localStorage.setItem("rs-key:ask:fake", "not-a-key");
 ```
 
 `chat` gives an assistant message in the OpenAI form: `{content}` or `{content: "", tool_calls: [{id, type: "function", function: {name, arguments}}]}`. An error with `status` 429 and a "try again in 2.5s" message makes Ask wait. `tests/test_ask_browser.py` checks Ask with a fake host and a fake provider, the request of a built-in service with `page.route`, and the phone.
+
+### draw_chart
+
+`draw_chart(sql, kind, x, y, title)` draws a chart of the result of its SQL in the data dock: `bar`, `line`, `histogram`, `scatter` or `pie` ([A chart](dashboard-parts.md#a-chart)). The dock switches to its **Chart** view, and the answer card shows a small copy of the chart. **Show** on the card puts its table and its chart in the dock again. The prompt tells the model to use it when the person asks for a chart, a graph, a plot or a diagram, and to aggregate in the SQL (`GROUP BY`). A column that is not in the result, or a kind that does not fit the columns, goes back to the model as an error, as a failed query does.
