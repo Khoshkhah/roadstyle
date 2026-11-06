@@ -117,3 +117,14 @@ fn export_look_has_the_colours_of_the_map() {
     let at = dash.iter().position(|x| x == "steps").unwrap();
     assert_eq!(dash[at + 1], json!(["literal", [0.6, 0.5]]));
 }
+
+/// building_heights (a page's own parts of a building: the dashboard's rsSetWalls) gives the heights of the tiles' rule, with the look's m_per_level.
+#[test]
+fn building_heights_follow_the_looks_rule() {
+    let l = roadstyle_rs::Look::resolve(&roadstyle_rs::look::Options::from_value(&json!({"base_map": {"mode": "all", "theme": "liberty"}})).unwrap()).unwrap();
+    let m = l.sections.base_map.as_ref().unwrap().buildings_3d["m_per_level"].as_f64().unwrap();
+    let s = |v: &str| Some(v.to_string());
+    let hb = roadstyle_rs::features::building_heights(&l, &[[None, s("3"), None, s("house"), None, s("1")], [s("12 m"), None, None, None, None, None]]).unwrap();
+    assert!((hb[0].0.as_f64().unwrap() - 3.0 * m).abs() < 1e-9 && (hb[0].1.as_f64().unwrap() - m).abs() < 1e-9, "{hb:?}");
+    assert_eq!((hb[1].0.as_f64(), hb[1].1.as_f64()), (Some(12.0), Some(0.0)));
+}

@@ -46,6 +46,14 @@ The panel has four tabs: **Theme**, **Roads**, **Text** and **Layers**. A host c
 | `link` | none | One link in the bar: `{label, onClick}`. The duckOSM page has "Export →". |
 | `tabs` | `[]` | The host's own tabs (see [Host tabs](#host-tabs)). |
 
+## The 3D walls
+
+The section **3D walls** of the Layers tab is `design.walls` = `{on, front, back, side, party, court, roof, roof_dark}`. When the page gives the
+walls of its buildings (`rsSetWalls`, [the JavaScript API](../reference/javascript.md)), each wall of a building shows in the color of its type,
+and the roof shows in the roof color. A building with no walls keeps its 3D color. The default is off. The default colors are those of the walls in
+duckOSM's fixes editor: front `#16a34a`, back `#dc2626`, side `#6b7280`, party wall `#7c3aed`, courtyard wall `#0891b2`; the roof is
+`#a8a29e` (`#57534e` in the dark theme). The walls are not in the look: a change paints the map at once (`rsSetWallStyle`), and draws no new map.
+
 ## A change of the style
 
 After 0.5 s with no new change, the panel writes the design into a copy of `look` (`applyToLook`) and gives it to the host:

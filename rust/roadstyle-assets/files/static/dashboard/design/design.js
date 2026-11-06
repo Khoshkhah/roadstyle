@@ -14,6 +14,8 @@
 //   visible  `design.visible` = one boolean for each layer that the map can show (VISIBLE_GROUPS): the road groups, bridges, tunnels, arrows, names, the
 //            3D buildings, and the base-map layers. It is the state of roadstyle's switches too (the panel calls rsSetOverlay, rsSetClasses and the others, and
 //            reads roadstyle's events), so there is one state in two places. The boundary has its own `boundary.show`.
+//   walls    `design.walls` = {on, front, back, side, party, court, roof, roof_dark}: the 3D walls by type (roadstyle's rsSetWallStyle, walls.js), when the
+//            host gives the walls (rsSetWalls). It is not in the look: the panel paints it at once, so a change draws no new map.
 //   host     the value of each host tab (`design[tab.key]`, as the tile profile of the duckOSM page): the host gives `make` and `normalize` (`hosts`)
 //
 // The style is written into roadstyle's look (the sections of its version 2) with `applyToLook`. The host gives that look to its map (LiveMap.setLook on the
@@ -65,6 +67,9 @@ export function defaultVisible(look) {
   return Object.fromEntries(VISIBLE_KEYS.map((k) => [k, k === "arrows" || k === "buildings3d" ? false : OVERLAY_KEYS.includes(k) ? ticked[k] ?? true : true]));
 }
 export const defaultRoadOpacity = () => ({ fill: 1, casing: 1, outline: false });
+/** The 3D walls: off; the colours of the wall types are those of duckOSM's fixes editor, so the 2D and the 3D map agree. */
+export const defaultWalls = () => ({ on: false, front: "#16a34a", back: "#dc2626", side: "#6b7280", party: "#7c3aed", court: "#0891b2", roof: "#a8a29e", roof_dark: "#57534e" });
+export const WALL_KEYS = ["front", "back", "side", "party", "court", "roof", "roof_dark"];
 export const defaultGround = () => ({ transparent: false, opacity: 0 });
 /** The alpha of the ground of the map (roadstyle's layer `bg`): 1, or the opacity when the ground is transparent. */
 export const groundAlpha = (d) => (d.ground.transparent ? d.ground.opacity : 1);
@@ -106,7 +111,7 @@ export function defaultsOf(look, hosts = []) {
       railways: toHex(look.base_map.style.lines?.railways?.color) ?? "#bbbbbb", waterways: toHex(look.base_map.style.lines?.waterways?.color) ?? "#a0c8f0",
       m_per_level: num(b3?.m_per_level, 3.66), max_height: num(b3?.max_height, 200), height_opacity: num(b3?.opacity, 0.9),
     },
-    boundary: defaultBoundary(), ground: defaultGround(), visible: defaultVisible(look),
+    boundary: defaultBoundary(), ground: defaultGround(), visible: defaultVisible(look), walls: defaultWalls(),
     dark: { roads: [...look.dark.line.lightness], casing: [...look.dark.casing.lightness], areas: [...look.dark.area.lightness], labels: [...look.dark.label.lightness], background: toHex(look.background.dark) ?? "#0e1113" },
   };
   for (const h of hosts) d[h.key] = h.make();
@@ -145,6 +150,7 @@ export function normalize(d, base, hosts = []) {
   };
   out.boundary.show = !!out.boundary.show; out.boundary.fillOnRoads = !!out.boundary.fillOnRoads;
   out.ground = { transparent: !!(d.ground?.transparent ?? out.ground.transparent), opacity: clamp(num(d.ground?.opacity, out.ground.opacity), [0, 1]) };
+  out.walls = { on: !!(d.walls?.on ?? out.walls.on), ...Object.fromEntries(WALL_KEYS.map((k) => [k, hex(d.walls?.[k], out.walls[k])])) };
   out.visible = Object.fromEntries(VISIBLE_KEYS.map((k) => [k, typeof d.visible?.[k] === "boolean" ? d.visible[k] : out.visible[k]]));
   for (const h of hosts) out[h.key] = h.normalize(d[h.key] ?? out[h.key]);
   return out;
@@ -245,7 +251,7 @@ const expand = (map, keys, now) => Object.fromEntries(keys.map((k) => [k, map[k]
  */
 export function makeTheme(b, t, now = b) {
   const d = clone(t.roadsOnly ? now : b);
-  d.name = t.name; d.theme = t.id;
+  d.name = t.name; d.theme = t.id; d.walls = clone(now.walls ?? d.walls);          // a theme keeps the walls of the design that is on now
   if (t.look) return d;
   d.roads = { fill: expand(t.roads.fill, CLASSES, d.roads.fill), casing: expand(t.roads.casing, CLASSES, d.roads.casing), width: t.roads.width ? expand(t.roads.width, GROUPS.map(([g]) => g), d.roads.width) : d.roads.width,
     opacity: { ...defaultRoadOpacity(), ...t.roads.opacity } };

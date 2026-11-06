@@ -33,6 +33,7 @@ import {initColor, useColor} from "./color.js";
 import {useLegend} from "./legend.js";
 import {initOverlays, useOverlays} from "./overlays.js";
 import {initFeatures, useFeatures} from "./features.js";
+import {initWalls} from "./walls.js";
 import {initTunnel} from "./tunnel.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
@@ -112,6 +113,7 @@ export function rsDashboard(map, options){
   useLegend();
   initOverlays();
   initFeatures();
+  initWalls();
   initTunnel();
   initViews();
   initArrows();
