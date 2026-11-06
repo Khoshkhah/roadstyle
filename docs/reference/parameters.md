@@ -257,15 +257,30 @@ A section (`panel.sections`; the errors are in [Add to the panel](../guides/dash
 | key | default | meaning |
 |---|---|---|
 | `id` | required | the name of the section. It is not empty and not used twice |
-| `part` | none | a part of roadstyle: `"query"` or `"road_card"`. A section has `part` or `html`, not both |
+| `part` | none | a part of roadstyle: `"query"`, `"road_card"` or `"chart"`. A section has `part` or `html`, not both |
 | `html` | none | the page's own HTML |
 | `text` | none | the start text of the part `query` (none: an empty box) |
 | `fields` | none | the columns that the part `road_card` shows (none: every column) |
+| `chart` | none | the options of the part `chart`: the next table ([Charts](../guides/charts.md)) |
 | `label` | none | the title of the section: a section with a `label` is a card, and a section without one is a block of the page's HTML with no box |
 | `after`, `before` | none | the `id` of an earlier section: this section goes after it, or before it. Give one of them |
 | `fold` | `False` | `True`: the card folds; its title is a button, and its row has a chevron. It needs a `label` |
 | `note` | – | one line of state under the card's title (`rs.sections.note` changes it). It needs a `label`. A card that opens something (`open`, a function) is JavaScript only: [A card that opens something](../guides/dashboard-panel.md#a-card-that-opens-something) |
 | `background` | `True` | `False`: the card has no colour behind it (the same padding and title row). It needs a `label` |
+
+A chart card (`chart` of a section with `part: "chart"`; [Charts](../guides/charts.md)):
+
+| key | default | meaning |
+|---|---|---|
+| `kind` | required | `"bar"`, `"line"`, `"histogram"`, `"scatter"` or `"pie"` |
+| `x` | required | a column: the groups (bar, pie), the order (line), the numbers (histogram, scatter) |
+| `y` | none | a number column, or a list of up to 3 (bar, line). None: the count of rows. Not for a histogram; necessary for a scatter |
+| `agg` | `"sum"` | how the rows of one value of `x` join: `"sum"`, `"mean"`, `"min"`, `"max"` or `"count"` |
+| `scale` | `1` | a factor for the values of `y` (`0.001`: metres to km). Not 0 |
+| `data` | none | the page's own rows: a DataFrame, a GeoDataFrame (its geometry is not used), a list of dicts, or `{"columns": [{"name", "type"}], "rows": [[...]]}`. None: the map's roads. `x` and `y` are columns of `data` |
+| `title` | none | the title of the chart (none: the card's `label` is the title) |
+| `height` | `220` | the height of the chart in pixels, 80 or more |
+| `follow` | `False` | the map's roads only: `True` draws the chart again for the roads that the map shows now |
 
 The space of the cards is three CSS variables on `:root`: `--rs-card-gap` (12px, between two cards), `--rs-card-pad` (14px, inside a card) and `--rs-panel-bottom` (28px, under the last card). See [Cards: the panel standard](../guides/dashboard-panel.md#cards-the-panel-standard).
 

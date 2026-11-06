@@ -1,9 +1,13 @@
 // A chart of a table of rows (docs/design/ask_and_data_dock.md, "4. Charts"; docs/guides/dashboard-parts.md, "A chart"): bar, line, histogram, scatter
 // or pie, in SVG with the theme's tokens (--rs-chart-1 to -8, --rs-chart-grid, --mut, --ink), so it follows the theme with no code of its own. The marks are
 // thin, a bar has round ends at its data end, a line is 2 px; the pointer on a mark shows its values (rs.hover); a click on a mark gives its row (onPick).
+// The chart fits its box: the bars get thinner to fit the height, down to a minimum; only past it the box scrolls. A pie is the largest circle that
+// fits above or beside its legend. A value label is on each bar or point only when all of them fit (at most 15); else the hover shows the value.
 //
-//   rs.chart(el, {kind, columns, rows, x, y, title, values, onPick, small}) -> {set(change), spec(), svg(), destroy()}
-//     columns: [{name, type}]; rows: [[...]]; x: a column name; y: a column name or a list of them (bar, line); values: all the numbers of x (histogram)
+//   rs.chart(el, {kind, columns, rows, x, y, title, values, onPick, small, head}) -> {set(change), spec(), svg(), destroy()}
+//     columns: [{name, type}]; rows: [[...]]; x: a column name; y: a column name or a list of them (bar, line); values: all the numbers of x (histogram);
+//     title: false: no title, only the count (a card has its label as the title); count: the text of the count ("13 298 roads")
+//   rs.chart.ranges(numbers, parts) -> {n, of(v), label(k)}: about `parts` ranges of the numbers (a bar or a pie of a number x with many values)
 import {rsSvg} from "./svg.js";
 import {rsHover} from "./hover.js";
 
@@ -52,32 +56,47 @@ export const rsChart = (() => {
   function chart(el, spec){
     let s = {...spec}, svg = null, foot = null;
     el.classList.add("rs-chart"); el.classList.toggle("rs-chart-small", !!spec.small);
-    let lastW = 0;                                             // draw again when the width changes, not for a change of the content
-    const ro = new ResizeObserver(() => { const w = el.clientWidth; if(Math.abs(w - lastW) > 2){ lastW = w; draw(); } }); ro.observe(el);
+    // draw again when the box gets wider, narrower, taller or shorter (the dock is resized); the size after a draw is the base, so the content's own
+    // change of the size does not draw again
+    let lastW = 0, lastH = 0;
+    const ro = new ResizeObserver(() => { if(Math.abs(el.clientWidth - lastW) > 2 || Math.abs(el.clientHeight - lastH) > 2) draw(); }); ro.observe(el);
     function set(change){ s = {...s, ...change}; draw(); }
     function draw(){
-      el.replaceChildren();
+      el.replaceChildren(); el.classList.remove("rs-chart-side");
       const bad = s.columns && s.rows ? check(s) : "No data.";
-      if(bad){ el.append(Object.assign(document.createElement("p"), {className: "rs-chart-none", textContent: bad})); return; }
-      const W = Math.max(160, el.clientWidth - 2), ys = [].concat(s.y || []); lastW = el.clientWidth;
+      if(bad){ el.append(Object.assign(document.createElement("p"), {className: "rs-chart-none", textContent: bad})); lastW = el.clientWidth; lastH = el.clientHeight; return; }
+      const W = Math.max(160, el.clientWidth - 2), ys = [].concat(s.y || []);
       // the title and a muted line under it: what is drawn, and from how many rows (a small copy has neither: its card says it)
       if(!s.small){ const hd = document.createElement("div"), t = document.createElement("b"), sub = document.createElement("span"); hd.className = "rs-chart-hd";
-        t.textContent = s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
+        t.textContent = s.title === false ? "" : s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
         const n = s.kind === "histogram" && s.values ? s.values.length : s.rows.length;
-        sub.textContent = `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(t, sub); el.append(hd); }
-      const legend = !s.small && (ys.length > 1 || s.kind === "pie") ? document.createElement("div") : null;     // a small copy has no legend
-      if(legend){ legend.className = "rs-chart-legend"; el.append(legend); }
-      const cs = getComputedStyle(el), inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);   // the box's height without its padding
-      let H = s.small ? Math.max(40, inner) : Math.max(100, inner - (legend ? 24 : 0) - 44);
-      // horizontal bars have at least 18 px each: a long list is taller than the box, and the box scrolls
-      const rowsH = s.kind === "bar" && !s.small && s.rows.slice(0, BARS).some((r) => String(r[at(s.x)] ?? "").length > 8) ? s.rows.slice(0, BARS).length * 18 * Math.max(1, ys.length * 0.6) + 26 : 0;
-      if(rowsH > H) H = rowsH;
+        sub.textContent = s.count != null ? s.count : `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(...(s.title === false ? [sub] : [t, sub]));
+        if(s.head) s.head.replaceChildren(hd); else el.append(hd); }      // head: an element of the host for the title line (the data dock's tool row)
+      // a small copy has no legend, but a pie keeps it: its slices have no names of their own (Kaveh: "legend is not there", the pie in Ask's card)
+      const legend = s.kind === "pie" || (!s.small && ys.length > 1) ? document.createElement("div") : null;
+      if(legend){ legend.className = "rs-chart-legend"; el.append(legend); if(s.kind !== "pie") legendOf(legend, ys.map((y, k) => [y, col(k)])); }
+      // the foot: a line under the chart when it does not show all the rows (empty: no line); a small copy has none
+      foot = document.createElement("div"); foot.className = "rs-chart-foot"; if(!s.small) el.append(foot);
+      foot.textContent = s.kind === "bar" && s.rows.length > BARS ? `… ${fmt(s.rows.length - BARS)} more in the table` : s.kind === "scatter" && s.rows.length > POINTS ? `The first ${fmt(POINTS)} of ${fmt(s.rows.length)} rows` : "";
+      // the height of the plot: the box's height without its padding, the title, the legend and the foot (as drawn: a legend can have two lines)
+      const cs = getComputedStyle(el); inner = Math.floor(el.getBoundingClientRect().height - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom));
+      const H = s.small ? Math.max(40, inner) : Math.max(s.kind === "pie" || s.kind === "bar" ? 60 : 100, room());      // (a bar chart has its own minimum)
       // width 100 % and a viewBox: the chart is never wider than its box, also when the box gets narrower before the next draw
-      svg = rsSvg(el, "svg", {width: "100%", height: H, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMidYMin meet", role: "img", "aria-label": s.title || `${s.kind} chart of ${ys.join(", ") || s.x}`});
-      foot = document.createElement("div"); foot.className = "rs-chart-foot"; if(!s.small) el.append(foot);     // a small copy: the chart only, no scroll
+      svg = rsSvg(null, "svg", {width: "100%", height: H, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMidYMin meet", role: "img", "aria-label": s.title || `${s.kind} chart of ${ys.join(", ") || s.x}`});
+      el.insertBefore(svg, s.small ? null : foot);
       const kinds = {bar, line, histogram, scatter, pie};
       kinds[s.kind](W, H, ys, legend);
+      // the box scrolls only when the drawing is taller than the box (bars at their least height); else nothing in it can make a scrollbar
+      el.classList.toggle("rs-chart-scrolls", Number(svg.getAttribute("height")) > inner + 1);
+      lastW = el.clientWidth; lastH = el.clientHeight; more();
     }
+    // a chart taller than its box: the box scrolls; data-more while there is more below (a phone shows a fade there: its scrollbar shows only in a scroll)
+    const more = () => el.toggleAttribute("data-more", el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+    el.addEventListener("scroll", more, {passive: true});
+    let inner = 0;
+    // whole pixels: a box of 191.6 px (a scaled screen) with a 192 px drawing scrolls (Kaveh: "why it has scrol in this position?")
+    const room = () => Math.floor(inner - [...el.children].reduce((t, c) => t + (c === svg ? 0 : c.getBoundingClientRect().height), 0));
+    const size = (w, h) => { svg.setAttribute("height", h); svg.setAttribute("viewBox", `0 0 ${w} ${h}`); };
     const at = (n) => s.columns.findIndex((c) => c.name === n);
     const tip = (node, i, extra) => { if(s.small) return;
       node.style.cursor = s.onPick ? "pointer" : "default";
@@ -91,14 +110,16 @@ export const rsChart = (() => {
     const legendOf = (legend, items) => { if(!legend) return; for(const [name, c] of items){ const k = document.createElement("span"), sw = document.createElement("i");
       sw.style.background = c; k.append(sw, document.createTextNode(name)); legend.append(k); } };
     // the axes of a plot: grid lines of y and their labels at the left, the x labels under the plot; small: no labels
-    function frame(W, H, yr, {left = 44, bottom = 22, xt = null} = {}){
-      const pad = s.small ? {l: 4, r: 4, t: 6, b: 4} : {l: left, r: 12, t: 10, b: bottom};
+    function frame(W, H, yr, {left = 44, top = 10, bottom = 22, xt = null} = {}){
+      const pad = s.small ? {l: 4, r: 4, t: 6, b: 4} : {l: left, r: 12, t: top, b: bottom};
       const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b, Y = (v) => pad.t + ih - ((v - yr.lo) / (yr.hi - yr.lo)) * ih;
       for(const v of yr.list){ rsSvg(svg, "line", {x1: pad.l, x2: pad.l + iw, y1: Y(v), y2: Y(v), stroke: "var(--rs-chart-grid)", "stroke-width": 1});
         if(!s.small) rsSvg(svg, "text", {x: pad.l - 6, y: Y(v) + 3.5, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, tick(v)); }
       const base = Y(Math.max(yr.lo, Math.min(yr.hi, 0)));            // the base line: one step darker than the grid
       rsSvg(svg, "line", {x1: pad.l, x2: pad.l + iw, y1: base, y2: base, stroke: "var(--line)", "stroke-width": 1});
-      if(xt && !s.small) for(const [x, label] of xt) rsSvg(svg, "text", {x, y: H - 6, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, label);
+      // an x label stays inside the chart: a long one (a day) at an edge moves in
+      if(xt && !s.small) for(const [x, label] of xt){ const half = String(label).length * 3.1 + 2;
+        rsSvg(svg, "text", {x: Math.max(half, Math.min(W - half, x)), y: pad.t + ih + 16, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, label); }
       return {pad, iw, ih, Y};
     }
     const yRange = (ys, rows, zero = true) => { let lo = zero ? 0 : Infinity, hi = zero ? 0 : -Infinity;
@@ -113,12 +134,13 @@ export const rsChart = (() => {
     function bar(W, H, ys, legend){
       const lab = (v) => v == null ? "null" : typeof v === "number" || typeof v === "bigint" ? fmt(v) : String(v);     // a number label: rounded
       const rows = s.rows.slice(0, BARS), labels = rows.map((r) => lab(r[at(s.x)])), yr = yRange(ys, rows);
-      if(s.rows.length > BARS) foot.textContent = `… ${fmt(s.rows.length - BARS)} more in the table`;
-      legendOf(legend, ys.map((y, k) => [y, col(k)]));
       const horizontal = !s.small && labels.some((l) => l.length > 8);
       const top = ys.length ? rows.reduce((b, r, i) => (num(r[at(ys[0])]) ?? -Infinity) > (num(rows[b][at(ys[0])]) ?? -Infinity) ? i : b, 0) : -1;
       if(horizontal){
         const lw = Math.min(160, 10 + 6.2 * Math.max(...labels.map((l) => l.length))), pad = {l: lw, r: 56, t: 6, b: 18};
+        // the bars fit the height: a row is at least 12 px (its label) and each bar 4 px; a longer list is taller than the box, and the box scrolls
+        const need = rows.length * Math.max(12, 5 * ys.length + 4) + pad.t + pad.b;
+        if(need > H){ H = need; size(W, H); }
         const iw = W - pad.l - pad.r, band = (H - pad.t - pad.b) / rows.length, X = (v) => pad.l + ((v - yr.lo) / (yr.hi - yr.lo)) * iw;
         for(const v of yr.list){ rsSvg(svg, "line", {x1: X(v), x2: X(v), y1: pad.t, y2: H - pad.b, stroke: "var(--rs-chart-grid)"}); rsSvg(svg, "text", {x: X(v), y: H - 4, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, tick(v)); }
         const bh = Math.max(2, Math.min(22, (band - 2) / ys.length));
@@ -127,23 +149,24 @@ export const rsChart = (() => {
           ys.forEach((y, k) => { const v = num(r[at(y)]) ?? 0, y0 = pad.t + band * i + (band - bh * ys.length) / 2 + bh * k;
             tip(rsSvg(svg, "path", {d: barPath(X(Math.min(0, v)), y0 + 1, Math.abs(X(v) - X(0)), bh - 2, true), fill: col(k)}), i);
             // the value at the tip: of each bar up to 15 bars, else of the largest; in the text colour, never the bar's
-            if(ys.length === 1 && (rows.length <= LABELS || i === top)) rsSvg(svg, "text", {x: X(Math.max(0, v)) + 5, y: y0 + bh / 2 + 3.5, fill: "var(--ink)", "font-size": 10.5}, fmt(v)); });
+            if(ys.length === 1 && (rows.length <= LABELS || i === top)) rsSvg(svg, "text", {class: "rs-chart-val", x: X(Math.max(0, v)) + 5, y: y0 + bh / 2 + 3.5, fill: "var(--ink)", "font-size": 10.5}, fmt(v)); });
         });
         return;
       }
+      if(H < 100){ H = 100; size(W, H); }                              // upright bars: a plot of at least 100 px
       const {pad, iw, Y} = frame(W, H, yr), band = iw / rows.length, bw = Math.max(2, Math.min(26, (band - 2) / ys.length));     // a bar is at most 24 px
       rows.forEach((r, i) => ys.forEach((y, k) => { const v = num(r[at(y)]) ?? 0, x0 = pad.l + band * i + (band - bw * ys.length) / 2 + bw * k;
         tip(rsSvg(svg, "path", {d: barPath(x0 + 1, Math.min(Y(v), Y(0)), bw - 2, Math.abs(Y(v) - Y(0)), false, v >= 0), fill: col(k)}), i);
         // the value on the cap, when it fits over its bar's slot: of each bar up to 15 bars, else of the largest
-        if(!s.small && ys.length === 1 && (rows.length <= LABELS || i === top) && fmt(v).length * 6.2 < band) rsSvg(svg, "text", {x: x0 + bw / 2, y: Math.min(Y(v), Y(0)) - 5, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, fmt(v)); }));
+        if(!s.small && ys.length === 1 && (rows.length <= LABELS || i === top) && fmt(v).length * 6.2 < band) rsSvg(svg, "text", {class: "rs-chart-val", x: x0 + bw / 2, y: Math.min(Y(v), Y(0)) - 5, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, fmt(v)); }));
       if(!s.small){ const every = Math.ceil(rows.length / Math.max(1, Math.floor(iw / 56)));
         rows.forEach((r, i) => { if(i % every === 0) rsSvg(svg, "text", {x: pad.l + band * i + band / 2, y: H - 6, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, labels[i]); }); }
     }
     function line(W, H, ys, legend){
       const t = TIME.test(String(s.columns[at(s.x)].type)), xv = (r) => t ? when(r[at(s.x)]) : num(r[at(s.x)]);
       const idx = s.rows.map((r, i) => i).filter((i) => xv(s.rows[i]) != null).sort((a, b) => xv(s.rows[a]) - xv(s.rows[b]));
-      legendOf(legend, ys.map((y, k) => [y, col(k)]));
-      const xs = idx.map((i) => xv(s.rows[i])), lo = Math.min(...xs), hi = Math.max(...xs), yr = yRange(ys, s.rows, !s.rows.some((r) => ys.some((y) => (num(r[at(y)]) ?? 0) < 0))), xr = ticks(lo, hi);   // values of 0 or more: from 0
+      // values of 0 or more: from 0; as many x ticks as fit (a day label needs about 80 px, a number 48 px)
+      const xs = idx.map((i) => xv(s.rows[i])), lo = Math.min(...xs), hi = Math.max(...xs), yr = yRange(ys, s.rows, !s.rows.some((r) => ys.some((y) => (num(r[at(y)]) ?? 0) < 0))), xr = ticks(lo, hi, Math.max(1, Math.min(5, Math.floor((W - 56) / (t ? 80 : 48)))));
       const pad0 = s.small ? 4 : 44, iw0 = W - pad0 - 12, X = (v) => pad0 + ((v - xr.lo) / (xr.hi - xr.lo || 1)) * iw0;
       const {Y} = frame(W, H, yr, {xt: xr.list.map((v) => [X(v), t ? dayFmt(v, hi - lo) : tick(v)])});
       ys.forEach((y, k) => {
@@ -152,9 +175,12 @@ export const rsChart = (() => {
           const fx = pts[0].split(",")[0], lx = pts[pts.length - 1].split(",")[0], b = Y(Math.max(yr.lo, Math.min(yr.hi, 0)));
           rsSvg(svg, "polygon", {points: `${fx},${b} ${pts.join(" ")} ${lx},${b}`, fill: col(k), "fill-opacity": 0.1, stroke: "none"}); }
         rsSvg(svg, "polyline", {points: pts.join(" "), fill: "none", stroke: col(k), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"});
-        const last = idx.length ? num(s.rows[idx[idx.length - 1]][at(y)]) : null;
-        if(!s.small && last != null && pts.length){ const [lx, ly] = pts[pts.length - 1].split(",").map(Number);
-          rsSvg(svg, "text", {x: Math.min(lx + 6, W - 4), y: ly - 6, "text-anchor": lx + 40 > W ? "end" : "start", fill: "var(--ink)", "font-size": 10.5}, fmt(last)); }
+        // the value over each point only when all of them fit: one line, at most 15 points, each label narrower than the space to the next point;
+        // else no label (the hover shows the value)
+        const pv = idx.map((i) => [X(xv(s.rows[i])), num(s.rows[i][at(y)])]).filter((p) => p[1] != null), lw = (v) => fmt(v).length * 6.2 + 6;
+        if(!s.small && ys.length === 1 && pv.length <= LABELS && pv.every(([x, v], j) => j === 0 || x - pv[j - 1][0] >= (lw(v) + lw(pv[j - 1][1])) / 2))
+          for(const [x, v] of pv){ const w = lw(v) / 2, cy = Y(v);
+            rsSvg(svg, "text", {class: "rs-chart-val", x: Math.max(w, Math.min(W - w, x)), y: cy - 8 < 10 ? cy + 16 : cy - 8, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, fmt(v)); }
         if(idx.length <= 60 && !s.small) idx.forEach((i) => { const v = num(s.rows[i][at(y)]); if(v == null) return;
           tip(rsSvg(svg, "circle", {cx: X(xv(s.rows[i])), cy: Y(v), r: 4, fill: col(k), stroke: "var(--bg)", "stroke-width": 2}), i); });
       });
@@ -180,26 +206,34 @@ export const rsChart = (() => {
       n.forEach((c, b) => { const a = xr.lo + step * b; if(!c) return;
         tip(rsSvg(svg, "path", {d: barPath(X(a) + 1, Y(c), X(a + step) - X(a) - 2, Y(0) - Y(c), false, true), fill: col(0)}), null,
             {head: `${fmt(a)} to ${fmt(a + step)}`, lines: `<br>${fmt(c)} row${c === 1 ? "" : "s"}`}); });
-      if(s.small) foot.textContent = "";                              // (the subtitle has the number of values)
     }
     function scatter(W, H, ys){
       const y = ys[0], rows = s.rows.slice(0, POINTS), xs = rows.map((r) => num(r[at(s.x)])), yv = rows.map((r) => num(r[at(y)]));
-      if(s.rows.length > POINTS) foot.textContent = `The first ${fmt(POINTS)} of ${fmt(s.rows.length)} rows`;
       const okx = xs.filter((v) => v != null), xr = ticks(Math.min(...okx), Math.max(...okx)), yr = ticks(Math.min(...yv.filter((v) => v != null)), Math.max(...yv.filter((v) => v != null)));
       const pad0 = s.small ? 4 : 44, iw = W - pad0 - 12, X = (v) => pad0 + ((v - xr.lo) / (xr.hi - xr.lo)) * iw;
-      const {Y} = frame(W, H, yr, {xt: xr.list.map((v) => [X(v), tick(v)])});
+      // the axis titles are outside the plot: y over the y ticks, x under the x ticks (a small copy has none)
+      const {Y} = frame(W, H, yr, {top: 24, bottom: 36, xt: xr.list.map((v) => [X(v), tick(v)])});
       rows.forEach((r, i) => { if(xs[i] == null || yv[i] == null) return;
         tip(rsSvg(svg, "circle", {cx: X(xs[i]), cy: Y(yv[i]), r: s.small ? 2 : 4, fill: col(0), "fill-opacity": 0.75, stroke: "var(--bg)", "stroke-width": 2}), i,
             {head: String(r[at(s.x)] != null ? `${s.x}: ${fmt(xs[i])}` : ""), lines: `<br>${esc(y)}: ${fmt(yv[i])}`}); });
-      if(!s.small){ rsSvg(svg, "text", {x: W - 12, y: H - 22, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, s.x);
-                    rsSvg(svg, "text", {x: pad0 + 4, y: 12, fill: "var(--mut)", "font-size": 10.5}, y); }
+      if(!s.small){ rsSvg(svg, "text", {x: W - 12, y: H - 3, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, s.x);
+                    rsSvg(svg, "text", {x: 2, y: 11, fill: "var(--mut)", "font-size": 10.5}, y); }
     }
     function pie(W, H, ys, legend){
       const y = ys[0], order = s.rows.map((r, i) => [i, num(r[at(y)]) ?? 0]).filter((p) => p[1] > 0).sort((a, b) => b[1] - a[1]);
       const keep = order.length > SLICES ? order.slice(0, SLICES - 1) : order, rest = order.slice(keep.length).reduce((t, p) => t + p[1], 0);
       const parts = keep.map(([i, v]) => ({i, v, name: ((x) => x == null ? "null" : typeof x === "number" || typeof x === "bigint" ? fmt(x) : String(x))(s.rows[i][at(s.x)])})).concat(rest > 0 ? [{i: null, v: rest, name: `Other (${order.length - keep.length})`}] : []);
-      const total = parts.reduce((t, p) => t + p.v, 0), cx = W / 2, cy = H / 2, R = Math.max(10, Math.min(W, H) / 2 - 6);      // the names are in the legend, not round the pie
+      const total = parts.reduce((t, p) => t + p.v, 0);
       legendOf(legend, parts.map((p, k) => [`${p.name} ${Math.round((p.v / total) * 100)} %`, col(k)]));
+      // the largest pie that fits: with the legend above it (in lines over the full width) or beside it (a column at its right); the two are in the
+      // middle of the box (CSS .rs-chart-side)
+      if(legend){ const above = Math.min(W, room());
+        el.classList.add("rs-chart-side"); svg.setAttribute("width", 0);              // (the legend's own width, with no pie beside it)
+        const tall = room() + legend.offsetHeight, lw = legend.offsetWidth + 16, side = legend.offsetHeight <= tall ? Math.min(W - lw, tall) : 0;
+        if(side > above){ H = Math.max(60, tall); W = Math.max(60, side); svg.setAttribute("width", W); }
+        else { el.classList.remove("rs-chart-side"); svg.setAttribute("width", "100%"); H = Math.max(60, room()); }
+        size(W, H); }
+      const cx = W / 2, cy = H / 2, R = Math.max(10, Math.min(W, H) / 2 - 6);      // the names are in the legend, not round the pie
       let a0 = -Math.PI / 2;
       parts.forEach((p, k) => {
         const a1 = a0 + (p.v / total) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0, pt = (a) => `${cx + R * Math.cos(a)},${cy + R * Math.sin(a)}`;
@@ -221,6 +255,16 @@ export const rsChart = (() => {
     if(n.length >= 2) return {kind: "scatter", x: n[0].name, y: n[1].name};
     if(n.length === 1) return {kind: "histogram", x: n[0].name};
     return null;
+  };
+  // the ranges of many numbers, for a bar (about 12) or a pie (about 6) of a number x with more than 40 values (the data dock, the chart card): a step of
+  // 1, 2, 2.5 or 5 times a power of ten, from a multiple of the step at or under the smallest number. of(v): the range of v; label(k): "0–250"
+  chart.ranges = (vals, parts) => {
+    let lo = Infinity, hi = -Infinity; for(const v of vals){ if(v < lo) lo = v; if(v > hi) hi = v; }
+    if(!isFinite(lo)){ lo = 0; hi = 0; }
+    const raw = (hi - lo) / parts || 1, pw = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map((k) => k * pw).find((x) => x >= raw);
+    const start = Math.floor(lo / step) * step, n = Math.max(1, Math.ceil((hi - start) / step + 1e-9));
+    const f = (v) => (+v.toPrecision(6)).toLocaleString("en", {maximumFractionDigits: 6}).replace(/,/g, " ");
+    return {n, of: (v) => Math.max(0, Math.min(n - 1, Math.floor((v - start) / step))), label: (k) => `${f(start + k * step)}\u2013${f(start + (k + 1) * step)}`};
   };
   chart.check = check;
   chart.isNumber = (type) => isNum(type);

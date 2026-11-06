@@ -63,15 +63,19 @@ export function dataDock(o = {}){
     lightB.title = lightOn ? "The roads of the table are lit on the map. Click: the map's own colours" : "The map shows its own colours. Click: light the roads of the table"; };
   lightB.onclick = () => { lightOn = !lightOn; try{ localStorage.setItem(LIGHT_KEY, lightOn ? "1" : "0"); }catch(e){} paintLight(); light(); };
   paintLight();
-  acts.append(viewSw, tablesB, csvB, lightB, colourB, focusB);
+  // three joined controls in the look of Table | Chart (Kaveh chose "connected groups"): what the dock shows, the data (Tables, CSV), and the
+  // map (Light, Colour, Focus)
+  const grp = (cls, ...els) => { const g = $("span", "rs-dd-grp " + cls); g.append(...els); return g; };
+  acts.append(viewSw, grp("rs-dd-g-data", tablesB, csvB), grp("rs-dd-g-map", lightB, colourB, focusB));
   const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
   q.append(line, run);
   const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
   // the side column beside the table or the chart (Kaveh, 2026-11-06: the list of the tables "in the same place" as the card of a road): one of the
   // two at a time, the last one opened; the table and the chart stay in view
-  // the table and the chart always have the same width (Kaveh, 2026-11-06: "I want to fix the length of table and chart part"): on a desktop the side
-  // column always keeps its place, with a hint while it has neither a card nor the list; on a phone it shows only with one of the two
+  // the table has a fixed width (Kaveh, 2026-11-06: "I want to fix the length of table and chart part"): on a desktop the side column always keeps
+  // its place beside the table, with a hint while it has neither a card nor the list; on a phone it shows only with one of the two. The chart takes
+  // the width of an empty side column (a reviewer, 2026-11-06: 300 px with only the hint in it); CSS .rs-dd-chart:not([hidden]) ~ .rs-dd-side.empty
   const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road on the map or in the table, or open Tables.");
   card.hidden = true;
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
@@ -95,18 +99,29 @@ export function dataDock(o = {}){
     b.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[o2.value]}</svg>`;
     b.onclick = () => { kindS.value = o2.value; change(); }; kinds.append(b); }
   const paintKinds = () => kinds.querySelectorAll("button").forEach((b) => { const on = b.dataset.kind === kindS.value; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
-  chartRow.append(kinds, lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
+  // the chart's title line is in this row, so the chart has the height of the box under it (Kaveh, 2026-11-06: "most of rows spend by other
+  // than thing in compare to show the chart"); the hint of a kind is its button's tooltip, not a line
+  const titleEl = $("div", "rs-dd-ctitle");
+  chartRow.append(kinds, lab("X", xS), lab("Y", yS));
+  // no title line: the chart has the whole height, and SVG is in its top right corner (Kaveh: "remove 'rows by km 14 rows'"); the chart's own
+  // title line goes to titleEl, which is not on the page (its name stays in the chart's aria-label)
+  const chartMain = $("div", "rs-dd-cmain");
+  svgB.classList.add("rs-dd-svg"); chartMain.append(chartEl, svgB);
   rsSelectBoxes(chartRow);
-  const hintEl = $("p", "rs-dd-chint");
-  chartBox.append(chartRow, hintEl, chartEl);
+  chartBox.append(chartRow, chartMain);
   side.append(list, card, hint); side.classList.add("empty");
   split.append(table.el, chartBox, side);
   el.append(q, err, split);
   const label = o.label || "Data", id = "data";
   rs.dock.add({id, label, el, actions: acts});
-  if(o.help !== false && rs.help) rs.help.button(acts, {title: "The data dock", intro: "One SQL line over a table of the result. A click on the line edits it, Ctrl+Enter or Run runs it. The roads of the result light on the map. A click on a row selects its road. Colour and Focus keep a change of the map until you turn it off.",
-    terms: [["Tables", "The tables of the data, with what each one holds. A click puts its name into the line."], ["CSV", "All the rows of the result as a file."],
-            ["Colour", "Colours the roads of the table, one colour for each value of a column with 2 to 8 values."], ["Focus", "The other roads fade or hide."]]});
+  // the help window: one row for each control of the title row, in its order (Kaveh, 2026-11-06: "needs to update")
+  if(o.help !== false && rs.help) rs.help.button(acts, {title: "The data dock", intro: "One SQL line over the result. Click the line to edit it. Ctrl+Enter or Run runs it. Click a row to select its road: its card shows beside the table.",
+    terms: [["Table | Chart", "The result as a table or as a chart. In the chart, the column at the left sets the kind, X and Y, and SVG saves the chart as a file."],
+            ["Tables", "The tables of the data, with what each one holds. Click a table to show its rows."],
+            ["CSV", "All the rows of the result as a file (at most 1\u00a0000\u00a0000)."],
+            ["Light", "On: the roads of the result are purple on the map. Off: the map shows its own colours. A closed dock lights no roads."],
+            ["Colour ▾", "A layer that colours the roads of the result: one colour for each value of a text column with 2 to 8 values, else one colour. It stays until you remove it."],
+            ["Focus ▾", "Keeps the roads of the result: the other roads fade or hide. One focus at a time; None turns it off."]]});
 
   // the road card, beside the table in place of the popup (Kaveh, 2026-11-06: "that card need to redesign and better style and also font size"): the
   // name; the main facts as small chips (class, length, speed limit, one-way, the networks); the other fields in 12 px with rounded numbers and yes/no;
@@ -285,14 +300,13 @@ export function dataDock(o = {}){
   let chartSeq = 0;
   async function drawChart(){
     const r = res, me = ++chartSeq; if(!r) return;
-    let note = "";
     const sp = r.chart || {kind: "bar"}, f = fits(sp.kind, r);
     const ys = [].concat(sp.y || []), grouped = ["bar", "line", "pie"].includes(sp.kind);
-    kindS.value = sp.kind; paintKinds(); hintEl.textContent = (HINT[sp.kind] || "") + note;
+    kindS.value = sp.kind; paintKinds();
     fill(xS, f.xs, sp.x); fill(yS, f.ys, ys[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
     if(!f.xs.length || (sp.kind === "scatter" && f.ys.length < 1)){
       chartEl.replaceChildren(Object.assign($("p", "rs-chart-none"), {textContent: `This result has no column for a ${sp.kind} chart. ${HINT[sp.kind]}`})); return; }
-    let spec = {...sp, title: sp.title, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};   // (title: also when none)
+    let spec = {...sp, title: sp.title, head: titleEl, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};   // (title: also when none)
     const xi = r.columns.findIndex((c) => c.name === sp.x);
     const repeats = xi >= 0 && new Set(table.rows().map((x) => String(x[xi]))).size < table.rows().length;
     // a bar or a pie whose X is a number with more than 40 values (a length): the rows in ranges of X, about 6 for a pie and 12 for a bar, over all
@@ -301,13 +315,10 @@ export function dataDock(o = {}){
     if(many){
       const all = await allRows(r, CSV_LIMIT); if(me !== chartSeq) return;
       const yi = ys[0] && ys[0] !== COUNT ? r.columns.findIndex((col) => col.name === ys[0]) : -1, vals = all.map((x) => [Number(x[xi]), yi < 0 ? 1 : Number(x[yi]) || 0]).filter(([v]) => isFinite(v));
-      let lo = Infinity, hi = -Infinity; for(const [v] of vals){ if(v < lo) lo = v; if(v > hi) hi = v; }
-      const raw = (hi - lo) / (sp.kind === "pie" ? 6 : 12) || 1, pw = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map((k) => k * pw).find((s) => s >= raw);
-      const start = Math.floor(lo / step) * step, n = Math.max(1, Math.ceil((hi - start) / step + 1e-9)), sums = new Array(n).fill(0);
-      for(const [v, w] of vals) sums[Math.min(n - 1, Math.floor((v - start) / step))] += w;
-      const yName = yi < 0 ? "rows" : `sum of ${ys[0]}`, rows = sums.map((s, k) => [`${fmt(+(start + k * step).toPrecision(6))}\u2013${fmt(+(start + (k + 1) * step).toPrecision(6))}`, s]).filter(([, s]) => s > 0);
-      note = ` (${sp.x} has many values: in ranges)`; hintEl.textContent = (HINT[sp.kind] || "") + note;
-      spec = {...spec, x: sp.x, y: yName, columns: [{name: sp.x, type: "VARCHAR"}, {name: yName, type: "DOUBLE"}], rows, onPick: null};
+      const rg = rs.chart.ranges(vals.map(([v]) => v), sp.kind === "pie" ? 6 : 12), sums = new Array(rg.n).fill(0);
+      for(const [v, w] of vals) sums[rg.of(v)] += w;
+      const yName = yi < 0 ? "rows" : `sum of ${ys[0]}`, rows = sums.map((s, k) => [rg.label(k), s]).filter(([, s]) => s > 0);
+            spec = {...spec, x: sp.x, y: yName, count: `${sp.x} in ranges`, columns: [{name: sp.x, type: "VARCHAR"}, {name: yName, type: "DOUBLE"}], rows, onPick: null};
     }
     else if(grouped && xi >= 0 && (ys[0] === COUNT || repeats || r.more)){
       const time = rs.chart.isTime(r.columns[xi].type) || rs.chart.isNumber(r.columns[xi].type), yName = ys[0] === COUNT || !ys.length ? "rows" : `sum of ${ys[0]}`;

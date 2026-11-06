@@ -168,6 +168,9 @@ def _look_and_options(kwargs):
     if items is not None:          # render's items=: the road's own line items, as GeoJSON (read with items_popup)
         from .overlays import to_fc
         kwargs["items"] = to_fc(items)
+    if isinstance(kwargs.get("dashboard"), dict):   # a chart card's `data` (a DataFrame, a list of dicts): {columns, rows} (pages.chart_rows)
+        from .pages import _with_chart_rows
+        kwargs["dashboard"] = _with_chart_rows(kwargs["dashboard"])
     if kwargs.get("boundary") is not None:   # a shapely geometry or a GeoDataFrame: GeoJSON, as render does (_boundary_fc)
         from .render_web import _boundary_fc
         kwargs["boundary"] = json.loads(json.dumps(_boundary_fc(kwargs["boundary"])))

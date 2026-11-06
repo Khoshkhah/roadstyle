@@ -59,7 +59,7 @@ A new page, **Charts** (`docs/guides/charts.md`), in the site's menu after "The 
 
 1. A chart card from Python, in three lines (the example above), with its picture.
 2. **One picture of each kind** (bar, horizontal bar, line, histogram, scatter, pie), each with the spec that made it. A script
-   (`docs/images/charts/make.py`) draws them from a Monaco page in Playwright, in the light theme, so they can be made again.
+   (`docs/img/charts/make.py`) draws them from a Monaco page in Playwright, in the light theme, so they can be made again.
 3. The options table, the two sources, groups and ranges, a click, and the same from JavaScript (`rs.sections.add`, `rs.chart`).
 4. Links: the data dock's Table | Chart, and Ask's `draw_chart`, which use the same chart.
 

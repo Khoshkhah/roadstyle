@@ -1,15 +1,16 @@
 // The panel's sections (docs/guides/dashboard-panel.md): the panel starts empty, and the page adds each section, with `rs.sections` or with the
 // typed option `dashboard.panel.sections`. A section holds the page's own HTML (`html` or `el`) or a part of roadstyle (`part`: "query",
-// "road_card"), at the end of the panel or beside an earlier section. A section with a `label` is a card: the label is its title row, `fold` makes it
+// "road_card", "chart"), at the end of the panel or beside an earlier section. A section with a `label` is a card: the label is its title row, `fold` makes it
 // fold, `open` makes the card one button that opens something, `note` is one line of state under the title, `background: false` takes its colour away (a card that opens something has none: `background: true` gives it the tint). A section without a label is a block of the page's own, with no box: the card gap above and below.
 import {O, _emit} from "./core.js";
 import {legendRefresh} from "./legend.js";
 import {queryPart} from "./query.js";
 import {roadCardPart} from "./roadcard.js";
+import {chartCardPart} from "./chartcard.js";
 const _secEls = new Map();
 const _secBody = () => document.querySelector("#sb .sb-body");
 // the parts of roadstyle that a section can hold: each makes its element from the section's options
-const _SEC_PARTS = {query: queryPart, road_card: roadCardPart};
+const _SEC_PARTS = {query: queryPart, road_card: roadCardPart, chart: chartCardPart};
 // A card that folds (`fold: true`): its title is a button, the row has a chevron, and a click hides the body. The state of each is kept
 // in this browser. One button in the panel's title row (`#rs-fold-all`) folds or unfolds all the sections that fold and are shown now (not the hidden ones).
 const _fdKey = id => "rs-fold:" + location.pathname + ":" + id;
@@ -100,7 +101,7 @@ export const rsSections = {
   // the box of a section (the page can move it into its own tab), or null
   get(id){ return _secEls.get(id) || null; },
   // a section of the page: {id, html | el | part, label, after | before, fold | open, note, background}; at the end of the panel when it has neither. A part has its
-  // options in the section: `text` (query), `fields` (road_card)
+  // options in the section: `text` (query), `fields` (road_card), `chart` (chart)
   add(spec){
     if(!spec || !spec.id) throw new Error("rs.sections.add: a section needs an id");
     if(spec.part != null && !_SEC_PARTS[spec.part]) throw new Error("rs.sections.add: no part '" + spec.part + "' (the parts: " + Object.keys(_SEC_PARTS).join(", ") + ")");

@@ -51,10 +51,76 @@ def _page(gdf, template: str, *, defaults: dict, edit=None, **kw):
     return m
 
 
+_MAX_SAFE = 2**53       # a larger integer goes into the page as text: JavaScript's numbers keep 53 bits
+
+
+def chart_rows(data) -> dict:
+    """The page's own rows of a chart card (``chart.data``, docs/guides/charts.md) as the page reads them: ``{"columns": [{"name", "type"}],
+    "rows": [[...]]}``, with the SQL type names of the data dock (VARCHAR, DOUBLE, BIGINT, DATE, TIMESTAMP, BOOLEAN). ``data``: a pandas
+    DataFrame, a GeoDataFrame (its geometry is left out) or a list of dicts. An integer of 2**53 or more is text, so it stays exact (as the road
+    ids); a missing value is ``None``; a date is ``YYYY-MM-DD`` and a time ``YYYY-MM-DD HH:MM:SS``."""
+    import datetime as dt
+
+    import pandas as pd
+    df = pd.DataFrame(data) if isinstance(data, (list, tuple)) else data
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError(f"chart data must be a DataFrame or a list of dicts, got {type(data).__name__}")
+    geo = getattr(df, "_geometry_column_name", None)
+    df = df[[c for c in df.columns if c != geo and str(df[c].dtype) != "geometry"]]
+
+    def kind(s):
+        t = s.dtype
+        if pd.api.types.is_bool_dtype(t):
+            return "BOOLEAN"
+        if pd.api.types.is_integer_dtype(t):
+            return "BIGINT"
+        if pd.api.types.is_float_dtype(t):
+            return "DOUBLE"
+        if pd.api.types.is_datetime64_any_dtype(t):
+            return "TIMESTAMP"
+        v = next((x for x in s if x is not None and x == x), None)
+        return "DATE" if isinstance(v, dt.date) and not isinstance(v, dt.datetime) else "TIMESTAMP" if isinstance(v, dt.datetime) else "VARCHAR"
+
+    def value(v, t):
+        if v is None or (not isinstance(v, (list, tuple, dict)) and pd.isna(v)):
+            return None
+        if t == "BOOLEAN":
+            return bool(v)
+        if t == "BIGINT":
+            return int(v) if abs(int(v)) < _MAX_SAFE else str(int(v))
+        if t == "DOUBLE":
+            return float(v)
+        if t == "DATE":
+            return v.isoformat()[:10]
+        if t == "TIMESTAMP":
+            return pd.Timestamp(v).strftime("%Y-%m-%d %H:%M:%S")
+        return str(v)
+
+    types = [kind(df[c]) for c in df.columns]
+    return {"columns": [{"name": str(c), "type": t} for c, t in zip(df.columns, types, strict=True)],
+            "rows": [[value(v, t) for v, t in zip(r, types, strict=True)] for r in df.itertuples(index=False, name=None)]}
+
+
+def _with_chart_rows(dashboard: dict) -> dict:
+    """``dashboard=`` with each chart card's ``data`` as ``chart_rows`` makes it (a mapping stays: it is ``{columns, rows}``)."""
+    panel = dashboard.get("panel")
+    if not isinstance(panel, dict) or not isinstance(panel.get("sections"), list):
+        return dashboard
+
+    def rows_of(s):
+        c = s.get("chart") if isinstance(s, dict) else None
+        if isinstance(c, dict) and c.get("data") is not None and not isinstance(c["data"], dict):
+            return {**s, "chart": {**c, "data": chart_rows(c["data"])}}
+        return s
+    return {**dashboard, "panel": {**panel, "sections": [rows_of(s) for s in panel["sections"]]}}
+
+
 def render_dashboard(gdf, *, template="dashboard", **kw):
     """A self-contained **dashboard** page: the styled map (the defaults of a map page), the toolbox (base map, roads, colour and legend,
-    settings, the windows) and a side panel that starts empty. The page adds what it needs to the panel: the parts ``query`` and
-    ``road_card``, or its own HTML, with ``dashboard={"panel": {"sections": [...]}}`` (docs/guides/dashboard-panel.md).
+    settings, the windows) and a side panel that starts empty. The page adds what it needs to the panel: the parts ``query``,
+    ``road_card`` and ``chart``, or its own HTML, with ``dashboard={"panel": {"sections": [...]}}`` (docs/guides/dashboard-panel.md). A chart card
+    reads the map's roads, or its own rows: ``"chart": {"kind": "line", "x": "hour", "y": "vehicles", "data": df}`` (a DataFrame or a list of dicts;
+    docs/guides/charts.md).
 
     Populate the *Colour by* list of the toolbox with ``color_options={...}`` (see :func:`render_edges`); any
     other ``render_edges`` keyword passes through. Returns a :class:`WebMap`;
