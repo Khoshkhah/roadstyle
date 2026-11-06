@@ -1,7 +1,7 @@
 // The panel's sections (docs/guides/dashboard-panel.md): the panel starts empty, and the page adds each section, with `rs.sections` or with the
 // typed option `dashboard.panel.sections`. A section holds the page's own HTML (`html` or `el`) or a part of roadstyle (`part`: "query",
 // "road_card"), at the end of the panel or beside an earlier section. A section with a `label` is a card: the label is its title row, `fold` makes it
-// fold, `open` makes the card one button that opens something, `note` is one line of state under the title, `background: false` takes its colour away. A section without a label is a block of the page's own, with no box: the card gap above and below.
+// fold, `open` makes the card one button that opens something, `note` is one line of state under the title, `background: false` takes its colour away (a card that opens something has none: `background: true` gives it the tint). A section without a label is a block of the page's own, with no box: the card gap above and below.
 import {O, _emit} from "./core.js";
 import {legendRefresh} from "./legend.js";
 import {queryPart} from "./query.js";
@@ -35,7 +35,8 @@ function _fdSetOne(w, on){
 // a section with a label is a card: the title row (the title, a "?" of rs.help.button, then the chevron of a card that folds at the end), and the body.
 // A card that folds has its title as a button (for the keyboard and a screen reader), and a click anywhere in the row folds it.
 function _cardMake(w, spec){
-  w.dataset.rsCard = spec.background === false ? "no-bg" : "bg";
+  // a card that opens something has no background unless `background: true` (Kaveh, variant F: "just the background should be selectable")
+  w.dataset.rsCard = (spec.open ? spec.background === true : spec.background !== false) ? "bg" : "no-bg";
   const hd = document.createElement("div"); hd.className = "rs-sec-hd";
   const tt = document.createElement(spec.fold || spec.open ? "button" : "div"); tt.className = "rs-sec-title"; tt.textContent = spec.label;
   hd.append(tt);
@@ -83,10 +84,13 @@ function _fdMake(w, spec, hd, tt){
 // A card that opens (`open: fn`): the card is one button that runs fn(card), for a card whose only work is to open the page's own panel, editor or
 // dialog. Its title is a button (for the keyboard and a screen reader), the row ends with a pencil in place of the chevron (a chevron would say that it folds), the card has a light tint of the accent colour, and a click anywhere on
 // the card (not in its body) runs fn. It never folds, so "collapse all" leaves it. A card whose title button is disabled does not open.
+// `icon` is the mark at the end of its row: "edit" (the pencil, the default), "ask" (a speech bubble with a question mark) or the page's own <svg>.
+// The card has no background and the thin edge of every closed card; `background: true` gives it the light accent tint (one card that stands out: Ask).
 const _opIcon = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></svg>';
+const _opAsk = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>';
 function _opMake(w, spec, hd, tt){
   w.dataset.rsOpen = "1"; tt.type = "button";
-  hd.insertAdjacentHTML("beforeend", _opIcon);
+  hd.insertAdjacentHTML("beforeend", spec.icon === "ask" ? _opAsk : spec.icon && spec.icon !== "edit" ? spec.icon : _opIcon);
   w.onclick = e => { if(!tt.disabled && !e.target.closest(".rs-sec-body, .rs-help-btn")) spec.open(w); };
 }
 const _secNeed = id => { const w = _secEls.get(id); if(!w) throw new Error("rs.sections: no section '" + id + "' (rs.sections.list())"); return w; };
@@ -108,6 +112,8 @@ export const rsSections = {
     const card = spec.fold ? "fold" : spec.open ? "open" : spec.note != null ? "note" : spec.background === false ? "background: false" : "";
     if(!spec.label && card) throw new Error("rs.sections.add: '" + spec.id + "' has " + card + ": it needs a label (its title), because a section is a card only with a label");
     if(spec.open && spec.fold) throw new Error("rs.sections.add: '" + spec.id + "' has fold and open: a card that opens something does not fold");
+    if(spec.icon != null && !(spec.icon === "edit" || spec.icon === "ask" || /^\s*<svg[\s>]/.test(spec.icon))) throw new Error("rs.sections.add: '" + spec.id + "' icon must be \"edit\", \"ask\" or an <svg>");
+    if(spec.icon != null && !spec.open) throw new Error("rs.sections.add: '" + spec.id + "' icon is for a card that opens something (open)");
     if(spec.open && typeof spec.open !== "function") throw new Error("rs.sections.add: '" + spec.id + "': open is a function, which runs when the card is clicked");
     const host = spec.label ? _cardMake(w, spec) : w;              // the body of a card, else the section itself
     if(spec.html) host.insertAdjacentHTML("beforeend", spec.html);
