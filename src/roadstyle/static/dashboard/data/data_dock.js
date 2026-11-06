@@ -147,7 +147,8 @@ export function dataDock(o = {}){
       // when each value is once in the rows (a result of GROUP BY), Y is its first measure, else the count of rows
       if(res.chart && res.chart.kind === "bar"){
         const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
-          .filter(([col, n]) => col.name !== ID && !ID_NAME.test(col.name) && !rs.chart.isNumber(col.type) && !rs.chart.isTime(col.type) && n >= 2).sort((a, b) => a[1] - b[1])[0];
+          .filter(([col, n]) => col.name !== ID && !ID_NAME.test(col.name) && !rs.chart.isNumber(col.type) && !rs.chart.isTime(col.type) && n >= 2)
+          .sort((a, b) => (a[1] < 3) - (b[1] < 3) || a[1] - b[1])[0];             // 3 to 40 values first (highway): a yes/no column is the last choice
         if(t){ const once = t[1] === res.rows.length && !res.more; res.chart = {kind: "bar", x: t[0].name, y: once && m.size ? [...m][0] : COUNT}; } }
       // no measure: the rows for each value of the text column with the fewest values (2 or more), for example highway
       if(!res.chart || (res.chart.kind === "histogram" && !m.size)){ const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
