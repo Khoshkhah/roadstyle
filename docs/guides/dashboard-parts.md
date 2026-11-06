@@ -203,12 +203,14 @@ ask.open();
 
 - **The title line** (`top`) goes into `.sb-top`, before the host's hide button: "← `back`" and the `title`. With `back: null`, the line has no back button. You can add more to the line, for example the name of the item that you edit.
 - **The head row** (`head`) is under the title line, with a line under it. It does not scroll. `tabs` puts roadstyle's tab row (`rs-tabs`) in it. A click on a tab selects it and sends the event `tab` (`detail.tab`). The frame does not change the body: draw the tab's content in the body when the event comes. `tab(name)` selects a tab with no event, and `tab()` gives the selected tab. A panel with no tabs can put its own row in it: give the option `head` (an element), or add to `frame.head` before `open()`. An empty head row does not show.
-- **The body** (`body`) is the one area that scrolls. It has the class `rs-pbody`, so it has the scroll protocol of the panel: a thin scrollbar that shows only over the body or while it scrolls, a line under the tab row while the body is scrolled, and a fade at the bottom edge while there is more below.
+- **The body** (`body`) is the one area that scrolls. It has the class `rs-pbody`, so it has the scroll protocol of the panel: a thin scrollbar that shows only over the body or while it scrolls, a line under the tab row while the body is scrolled, a fade at the bottom edge while there is more below, and a fade at the top edge while there is more above.
 - **The bar** (`bar`) is under the body and outside it, at the bottom edge of the panel. Nothing scrolls under it, so it has the color of the panel. Put the state and the buttons of the editor in it. An empty bar does not show.
 
 `close()` removes the frame and shows the host's title, body and **Collapse all** again, with the body at its old scroll position. The back button sends the event `back`: the host then calls `close()`. `id` is the start of the ids of the frame's elements (`<id>-back`, `<id>-head`, `<id>-tabs`, `<id>-tab-<tab>`, `<id>-body`; default `rs-frame`). The classes are `rs-frame`, `rs-frame-title`, `rs-frame-back`, `rs-frame-head`, `rs-frame-body` and `rs-frame-bar`. Use them to find the elements, not to change the frame.
 
-On a phone the panel is a bottom sheet, and the frame fills it: the bar is at the bottom of the sheet, and the back button and the tabs are 44 px high. The colors are the theme's tokens, so the frame has the look of the panel in the light and the dark theme. `tests/test_editor_frame_browser.py` checks the frame in both themes and at 390 px, with tabs and with a head row of its own.
+Each `<select>` in the frame (in the head row, the body or the bar, also one that you add after `open()`) gets roadstyle's select box: round corners and the theme's colors, not the browser's list.
+
+On a phone the panel is a bottom sheet, and the frame fills it: `open()` puts the sheet at its full height, and `close()` gives back the height that it had. The bar is at the bottom of the sheet, and the back button and the tabs are 44 px high. The tab row is one row that scrolls sideways, and the selected tab comes into view. The colors are the theme's tokens, so the frame has the look of the panel in the light and the dark theme. `tests/test_editor_frame_browser.py` checks the frame in both themes and at 390 px, with tabs and with a head row of its own.
 
 ## The rules
 

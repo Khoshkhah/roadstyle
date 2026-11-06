@@ -128,3 +128,56 @@ def test_a_frame_with_a_head_row_and_no_tabs_keeps_the_row_over_the_body(tmp_pat
         assert not found, found
         browser.close()
     assert not errors, errors
+
+
+_REVIEW = """() => {
+  const row = document.createElement('div');
+  row.innerHTML = '<select id="hsel"><option>Groq</option><option>Gemini</option></select>';
+  window.fr = rs.frame({panel: document.getElementById('sb'), title: 'Six tabs', head: row, id: 'six',
+                        tabs: [['a', 'Ways'], ['b', 'Turns'], ['c', 'Buildings'], ['d', 'Nodes'], ['e', 'New roads'], ['f', 'Changes']]});
+  fr.body.innerHTML = '<select id="bsel"><option>One</option></select>' + Array.from({length: 40}, (_, i) => `<p>Line ${i}</p>`).join('');
+  fr.bar.innerHTML = '<select id="rsel"><option>All</option></select>';
+  fr.open('a');
+}"""
+
+
+@pytest.mark.parametrize("width", [1280, 390])
+def test_kavehs_review_selects_tabs_and_the_sheet(tmp_path, width):
+    """Kaveh's review of the frame: every <select> in it is roadstyle's select box (also one added after open); on a phone the six tabs are one row that
+    scrolls sideways and brings the selected tab into view, and the sheet opens to its full height while the frame is open and goes back on close."""
+    path = tmp_path / "page.html"
+    rs.render_dashboard(_edges(), basemap="blank", name="Frame").save(path)
+    phone = width < 700
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": width, "height": 844 if phone else 900}, has_touch=phone, is_mobile=phone)
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && window.rsReady", timeout=60_000)
+        if phone:
+            page.evaluate("rs.sheet(1)")
+            page.wait_for_timeout(300)
+        page.evaluate(_REVIEW)
+        page.evaluate("() => { const s = document.createElement('select'); s.id = 'lsel'; s.innerHTML = '<option>Later</option>'; fr.body.prepend(s); }")
+        page.wait_for_timeout(300)
+        boxed = "id => !!document.getElementById(id).closest('.rs-sel')"
+        assert [page.evaluate(f"({boxed})('{i}')") for i in ("hsel", "bsel", "rsel", "lsel")] == [True] * 4
+        tops = page.evaluate("[...document.querySelectorAll('#six-tabs .rs-tab')].map(b => Math.round(b.getBoundingClientRect().top))")
+        if phone:
+            assert len(set(tops)) == 1, tops                                                      # one row
+            row = "document.getElementById('six-tabs')"
+            assert page.evaluate(f"{row}.scrollWidth > {row}.clientWidth + 20")                     # it scrolls sideways
+            page.evaluate("fr.tab('f')")
+            page.wait_for_timeout(200)
+            r = page.evaluate(f"(() => {{ const r = {row}.getBoundingClientRect(), t = document.getElementById('six-tab-f').getBoundingClientRect(); return [t.left >= r.left - 1, t.right <= r.right + 1]; }})()")
+            assert r == [True, True], r                                                             # the selected tab is in view
+            assert page.evaluate("document.documentElement.scrollWidth - innerWidth") <= 1           # the page itself does not scroll sideways
+            assert page.evaluate("rs.sheet()") == 2
+            page.evaluate("fr.close()")
+            page.wait_for_timeout(200)
+            assert page.evaluate("rs.sheet()") == 1
+        else:
+            assert page.evaluate("rs.sheet()") is None
+        browser.close()
+    assert not errors, errors

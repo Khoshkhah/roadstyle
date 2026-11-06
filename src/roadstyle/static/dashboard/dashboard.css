@@ -583,12 +583,15 @@ html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody) > *{direction:ltr}
 
 /* ---- the panel's scrollbar (decided 2026-10-29): the thumb shows only while the pointer is over the panel or the body scrolls (panelscroll.js sets
    .rs-scrolling). A host panel with its own scroll boxes (the level editor's tabs) gives them the class `rs-pbody` and `data-head`, the selector of their header (class `rs-phead`); the space stays reserved, so nothing jumps. The thumb is the text color at 47 % in the light theme and 40 % in the dark theme: 3:1 against the
-   panel, the least that a part of an interface needs. A soft fade at the bottom edge shows that more is below (panelscroll.js sets data-more). ---- */
+   panel, the least that a part of an interface needs. A soft fade at the bottom edge shows that more is below (panelscroll.js sets data-more), and the same
+   fade at the top edge shows that more is above (data-above). The line under the header stays: it is the edge of the header, the fade is the body's. ---- */
 #sb :is(.sb-body,.rs-pbody){scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:transparent transparent}
 html #sb{--rs-thumb:47%}
 html #sb[data-theme=dark]{--rs-thumb:40%}
 #sb :is(.sb-body,.rs-pbody):hover,#sb :is(.sb-body,.rs-pbody).rs-scrolling{scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb),transparent) transparent}
 #sb :is(.sb-body,.rs-pbody)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 38px),transparent)}
+#sb :is(.sb-body,.rs-pbody)[data-above]{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 38px);mask-image:linear-gradient(to bottom,transparent,#000 38px)}
+#sb :is(.sb-body,.rs-pbody)[data-above][data-more]{-webkit-mask-image:linear-gradient(to bottom,transparent,#000 38px,#000 calc(100% - 38px),transparent);mask-image:linear-gradient(to bottom,transparent,#000 38px,#000 calc(100% - 38px),transparent)}
 /* ---- The panel's shell (position, tokens, the title row, the hide and show buttons): the rules that the sidebar of a template needs, and that a host
    page with its own panel (#sb with .sb-top, #sb-hide and #sb-show) needs too. They are at the end, as they were in the template's own style. ---- */
 #sb{position:fixed;top:0;right:0;bottom:0;width:var(--rs-panel-w,400px);box-sizing:border-box;overflow:auto;
@@ -639,12 +642,14 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 /* ---- EVERY SCROLL AREA OF THE DASHBOARD (panelscroll.js, _PS_AREAS: the same list): the panel body's rules - a thin scrollbar that shows only while the
    pointer is over the area or while it scrolls (rs-scrolling), and no scroll handed on to the map or to the panel body. The areas: a page's `rs-scroll`,
    the query part's list, the help window, the panel's own select list, the boxes of the toolbox, the docked read-out. An area inside a box (`rs-scroll`,
-   the query's list) also has a fade at its bottom edge while there is more below (data-more); a whole box has none, because the fade would take its
-   border too. The height of a `rs-scroll` is `--rs-scroll-h` (the page can set it). ---- */
+   the query's list) also has a fade at its bottom edge while there is more below (data-more), and at its top edge while there is more above (data-above);
+   a whole box has none, because the fade would take its border too. An area with a table has no top fade: the table's header row stays at the top. The height of a `rs-scroll` is `--rs-scroll-h` (the page can set it). ---- */
 :is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res){overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
 :is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res):is(:hover,.rs-scrolling){scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
 .rs-scroll{overflow:auto;max-height:var(--rs-scroll-h,min(520px,60dvh))}
 :is(.rs-scroll,.rs-q-list)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+:is(.rs-scroll,.rs-q-list)[data-above]:not(:has(th)){-webkit-mask-image:linear-gradient(to bottom,transparent,#000 28px);mask-image:linear-gradient(to bottom,transparent,#000 28px)}
+:is(.rs-scroll,.rs-q-list)[data-above][data-more]:not(:has(th)){-webkit-mask-image:linear-gradient(to bottom,transparent,#000 28px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
 /* a table in it: the header row stays, the numbers line up, the first column is text. A column that sorts has `data-sort="asc"` or `"desc"` on its th. */
 #sb .rs-table{border-collapse:collapse;width:100%;font-size:11.5px;font-variant-numeric:tabular-nums}
 #sb .rs-table th{position:sticky;top:0;z-index:2;text-align:right;padding:4px;border-bottom:1px solid var(--line);color:var(--mut);background:var(--card);cursor:pointer;white-space:nowrap;font-size:10.5px;font-weight:700}
@@ -760,6 +765,9 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 .rs-frame-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
 .rs-frame-bar:empty{display:none}
 html.rs-phone .rs-frame-back,html.rs-phone .rs-frame .rs-tab{min-height:44px}
+/* on a phone the tab row is one row that scrolls sideways (frame.js scrolls the selected tab into view): the body keeps its room */
+html.rs-phone #sb .rs-frame-head .rs-tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
 /* The design panel (design/design_panel.js, docs/guides/design-panel.md): its content in the editor frame. */
 #sb{--rs-dz-soft:color-mix(in srgb,var(--accent) 12%,transparent);--rs-dz-bad:#b91c1c}
 #sb[data-theme=dark],html[data-rs-theme=dark] #sb{--rs-dz-bad:#f87171}
