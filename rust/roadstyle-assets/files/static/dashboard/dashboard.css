@@ -459,6 +459,9 @@ html #sb{padding:0;overflow:hidden}
 html .sb-card{display:flex;flex-direction:column;height:100%;min-height:0;box-sizing:border-box}
 html .sb-top{flex:none;margin:0;padding:14px 15px 10px;position:relative;z-index:1;transition:box-shadow .15s}
 html :is(.sb-top,.rs-phead).scrolled{box-shadow:0 1px 0 var(--line,var(--rs-tb-border)),0 8px 10px -8px rgba(0,0,0,.35)}
+/* the dark theme: a black shadow at 35 % does not show on the dark panel (Kaveh: "the fading part in light theme is much more better than dark theme"). So the title row is
+   a little lighter while the body is scrolled (a raised surface is lighter in a dark theme), with a lighter line and a deeper shadow */
+html[data-rs-theme=dark] :is(.sb-top,.rs-phead).scrolled{background:color-mix(in srgb,var(--ink) 7%,transparent);box-shadow:0 1px 0 color-mix(in srgb,var(--ink) 16%,transparent),0 10px 16px -6px rgba(0,0,0,.95)}
 html .sb-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px calc(var(--rs-panel-bottom) + var(--rs-fold-room,0px))}      /* --rs-fold-room: sections.js, _fdKeep */
 html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display:flex;flex-direction:column;overflow:hidden;padding:0;border-radius:14px}
 /* ---- the side of the panel (placement.js: <html class="rs-panel-left">) ---- */
