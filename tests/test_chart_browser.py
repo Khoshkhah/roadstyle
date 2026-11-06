@@ -252,7 +252,16 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         assert page.evaluate("document.querySelector('#rs-dock .rs-dd-kind.on').dataset.kind") == "histogram"
         # the controls: Kind is five icon buttons, X and Y are roadstyle's select boxes (not the browser's list)
         assert page.locator("#rs-dock .rs-dd-kind").count() == 5 and page.locator("#rs-dock .rs-dd-chartrow .rs-sel-btn").count() == 2
-        assert "2 765 values" in page.inner_text("#rs-dock .rs-chart-hd")
+        # Kaveh's layout (2026-11-06): no hint line and no title line; on a computer the kinds, X and Y are a column at the chart's left, SVG is in the
+        # chart's top right corner, and the box does not scroll while the chart fits it
+        lay = page.evaluate("""(() => { const q = (s) => document.querySelector('#rs-dock ' + s), r = (s) => q(s).getBoundingClientRect();
+          return {title: !!q('.rs-chart-hd'), hint: !!q('.rs-dd-chint'), column: r('.rs-dd-chartrow').right <= r('.rs-dd-chartel').left,
+                  svgIn: q('.rs-dd-cmain').contains(q('.rs-dd-svg')) && r('.rs-dd-svg').top <= r('.rs-dd-chartel').top + 1,
+                  scroll: getComputedStyle(q('.rs-dd-chartel')).overflowY}; })()""")
+        assert lay == {"title": False, "hint": False, "column": True, "svgIn": True, "scroll": "hidden"}, lay
+        # the title row has three joined groups: Table | Chart, Tables | CSV, Light | Colour | Focus (Kaveh chose "connected groups")
+        groups = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-acts > .rs-dd-view, #rs-dock .rs-dd-acts > .rs-dd-grp')].map(g => g.innerText.replace(/\\s+/g, ' ').trim())")
+        assert len(groups) == 3 and groups[1] == "Tables CSV" and groups[2].startswith("Light Colour"), groups
         # a result of a text and a number: a bar chart in the open view
         page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
         page.wait_for_timeout(300)
@@ -273,11 +282,11 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         page.wait_for_timeout(500)
         slices = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-chart-legend span')].map(s => s.textContent)")
         assert 3 <= len(slices) <= 6 and all("\u2013" in s for s in slices if not s.startswith("Other")), slices
-        assert "in ranges" in page.inner_text("#rs-dock .rs-dd-chint") and "Histogram of lengths" not in page.inner_text("#rs-dock .rs-chart-hd")
-        # Kaveh's case: a kind that needs a number X never takes the road ids; the hint says how to use the kind
+        assert "Histogram of lengths" not in page.get_attribute("#rs-dock .rs-dd-chartel svg", "aria-label")
+        # Kaveh's case: a kind that needs a number X never takes the road ids; the kind's tooltip says how to use it
         page.click("#rs-dock .rs-dd-kind[data-kind=bar]")
         page.click("#rs-dock .rs-dd-kind[data-kind=histogram]")
-        assert page.evaluate("data.result().chart.x") == "length_m" and "20 equal ranges" in page.inner_text("#rs-dock .rs-dd-chint")
+        assert page.evaluate("data.result().chart.x") == "length_m" and "20 equal ranges" in page.get_attribute("#rs-dock .rs-dd-kind[data-kind=histogram]", "title")
         page.click("#rs-dock .rs-dd-view button:has-text('Table')")
         assert page.is_visible("#rs-dock .rs-dock-table")
         browser.close()

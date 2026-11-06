@@ -97,8 +97,8 @@ def chart_rows(data) -> dict:
         return str(v)
 
     types = [kind(df[c]) for c in df.columns]
-    return {"columns": [{"name": str(c), "type": t} for c, t in zip(df.columns, types)],
-            "rows": [[value(v, t) for v, t in zip(r, types)] for r in df.itertuples(index=False, name=None)]}
+    return {"columns": [{"name": str(c), "type": t} for c, t in zip(df.columns, types, strict=True)],
+            "rows": [[value(v, t) for v, t in zip(r, types, strict=True)] for r in df.itertuples(index=False, name=None)]}
 
 
 def _with_chart_rows(dashboard: dict) -> dict:

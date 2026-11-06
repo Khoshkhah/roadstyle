@@ -4,7 +4,7 @@
 // The chart fits its box: the bars get thinner to fit the height, down to a minimum; only past it the box scrolls. A pie is the largest circle that
 // fits above or beside its legend. A value label is on each bar or point only when all of them fit (at most 15); else the hover shows the value.
 //
-//   rs.chart(el, {kind, columns, rows, x, y, title, values, onPick, small}) -> {set(change), spec(), svg(), destroy()}
+//   rs.chart(el, {kind, columns, rows, x, y, title, values, onPick, small, head}) -> {set(change), spec(), svg(), destroy()}
 //     columns: [{name, type}]; rows: [[...]]; x: a column name; y: a column name or a list of them (bar, line); values: all the numbers of x (histogram);
 //     title: false: no title, only the count (a card has its label as the title); count: the text of the count ("13 298 roads")
 //   rs.chart.ranges(numbers, parts) -> {n, of(v), label(k)}: about `parts` ranges of the numbers (a bar or a pie of a number x with many values)
@@ -70,7 +70,8 @@ export const rsChart = (() => {
       if(!s.small){ const hd = document.createElement("div"), t = document.createElement("b"), sub = document.createElement("span"); hd.className = "rs-chart-hd";
         t.textContent = s.title === false ? "" : s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
         const n = s.kind === "histogram" && s.values ? s.values.length : s.rows.length;
-        sub.textContent = s.count != null ? s.count : `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(...(s.title === false ? [sub] : [t, sub])); el.append(hd); }
+        sub.textContent = s.count != null ? s.count : `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(...(s.title === false ? [sub] : [t, sub]));
+        if(s.head) s.head.replaceChildren(hd); else el.append(hd); }      // head: an element of the host for the title line (the data dock's tool row)
       // a small copy has no legend, but a pie keeps it: its slices have no names of their own (Kaveh: "legend is not there", the pie in Ask's card)
       const legend = s.kind === "pie" || (!s.small && ys.length > 1) ? document.createElement("div") : null;
       if(legend){ legend.className = "rs-chart-legend"; el.append(legend); if(s.kind !== "pie") legendOf(legend, ys.map((y, k) => [y, col(k)])); }
@@ -78,20 +79,23 @@ export const rsChart = (() => {
       foot = document.createElement("div"); foot.className = "rs-chart-foot"; if(!s.small) el.append(foot);
       foot.textContent = s.kind === "bar" && s.rows.length > BARS ? `… ${fmt(s.rows.length - BARS)} more in the table` : s.kind === "scatter" && s.rows.length > POINTS ? `The first ${fmt(POINTS)} of ${fmt(s.rows.length)} rows` : "";
       // the height of the plot: the box's height without its padding, the title, the legend and the foot (as drawn: a legend can have two lines)
-      const cs = getComputedStyle(el); inner = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const cs = getComputedStyle(el); inner = Math.floor(el.getBoundingClientRect().height - parseFloat(cs.borderTopWidth) - parseFloat(cs.borderBottomWidth) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom));
       const H = s.small ? Math.max(40, inner) : Math.max(s.kind === "pie" || s.kind === "bar" ? 60 : 100, room());      // (a bar chart has its own minimum)
       // width 100 % and a viewBox: the chart is never wider than its box, also when the box gets narrower before the next draw
       svg = rsSvg(null, "svg", {width: "100%", height: H, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMidYMin meet", role: "img", "aria-label": s.title || `${s.kind} chart of ${ys.join(", ") || s.x}`});
       el.insertBefore(svg, s.small ? null : foot);
       const kinds = {bar, line, histogram, scatter, pie};
       kinds[s.kind](W, H, ys, legend);
+      // the box scrolls only when the drawing is taller than the box (bars at their least height); else nothing in it can make a scrollbar
+      el.classList.toggle("rs-chart-scrolls", Number(svg.getAttribute("height")) > inner + 1);
       lastW = el.clientWidth; lastH = el.clientHeight; more();
     }
     // a chart taller than its box: the box scrolls; data-more while there is more below (a phone shows a fade there: its scrollbar shows only in a scroll)
     const more = () => el.toggleAttribute("data-more", el.scrollTop + el.clientHeight < el.scrollHeight - 2);
     el.addEventListener("scroll", more, {passive: true});
     let inner = 0;
-    const room = () => inner - [...el.children].reduce((t, c) => t + (c === svg ? 0 : c.offsetHeight), 0);
+    // whole pixels: a box of 191.6 px (a scaled screen) with a 192 px drawing scrolls (Kaveh: "why it has scrol in this position?")
+    const room = () => Math.floor(inner - [...el.children].reduce((t, c) => t + (c === svg ? 0 : c.getBoundingClientRect().height), 0));
     const size = (w, h) => { svg.setAttribute("height", h); svg.setAttribute("viewBox", `0 0 ${w} ${h}`); };
     const at = (n) => s.columns.findIndex((c) => c.name === n);
     const tip = (node, i, extra) => { if(s.small) return;

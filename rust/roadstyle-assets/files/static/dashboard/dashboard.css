@@ -755,6 +755,7 @@ html{--rs-chart-1:#008a9e;--rs-chart-2:#eb6834;--rs-chart-3:#2a78d6;--rs-chart-4
 html[data-rs-theme=dark]{--rs-chart-1:#159cb1;--rs-chart-2:#d95926;--rs-chart-3:#3987e5;--rs-chart-4:#c98500;--rs-chart-5:#d55181;--rs-chart-6:#008300;--rs-chart-7:#9085e9;--rs-chart-8:#e66767}
 .rs-chart{position:relative;min-height:120px;display:flex;flex-direction:column;font:11px system-ui,sans-serif;color:var(--ink);overflow:auto;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) 47%,transparent) transparent}      /* a chart taller than its box: a scrollbar that shows */
 .rs-chart svg{flex:none}
+.rs-chart:not(.rs-chart-scrolls){overflow:hidden}      /* (chart.js: only a drawing taller than its box scrolls) */
 .rs-chart.rs-chart-small{overflow:hidden;min-height:0}
 /* a small pie (Ask's card): the pie at the left at its full height, its legend at its right (Kaveh: "just need to shift left and add legend there") */
 .rs-chart-small .rs-chart-legend{min-height:0}
@@ -980,7 +981,13 @@ html.rs-phone.rs-dock-shut.rs-sheet-2 #rs-dock-pill{display:none}
 :root{--rs-err:#b91c1c}
 html[data-rs-theme=dark]{--rs-err:#fca5a5}
 #rs-dock .rs-dd{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
-.rs-dd-acts{display:flex;gap:6px;align-items:center}
+.rs-dd-acts{display:flex;gap:12px;align-items:center}      /* the groups: their edge is the card edge, clear in the dark theme too (Kaveh) */
+/* a group is one joined control, as Table | Chart: one edge round it and a thin line between its buttons; a button that is on (Tables open, Light
+   on) is filled */
+#rs-dock .rs-dd-grp{display:inline-flex;flex:none;border:1px solid var(--rs-card-edge);border-radius:8px;overflow:hidden}
+#rs-dock .rs-dd-grp > button{border:0;border-radius:0;padding:3px 10px}
+#rs-dock .rs-dd-grp > button + button{border-left:1px solid var(--rs-card-edge)}
+#rs-dock .rs-dd-grp > button.on{background:var(--accent-fill);color:#fff}
 #rs-dock .rs-dd-acts button.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 #rs-dock .rs-dd-light{display:inline-flex;align-items:center;gap:4px}
 #rs-dock .rs-dd-light.on{background:color-mix(in srgb,#7c4dff 16%,var(--card));border-color:#7c4dff;color:var(--ink)}      /* on: the colour of the light itself */
@@ -1120,7 +1127,7 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #sb .rs-ask-comp .rs-ask-send:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1)}
 #sb .rs-ask-comp .rs-ask-send.stop{background:var(--ink)!important;color:var(--bg)!important}
 /* the data dock's chart view: the row of Kind, X, Y and SVG over the chart; the chart fills the dock */
-#rs-dock .rs-dd-view{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#rs-dock .rs-dd-view{display:inline-flex;border:1px solid var(--rs-card-edge);border-radius:8px;overflow:hidden}
 #rs-dock .rs-dd-view button{border:0;border-radius:0;padding:3px 10px}
 #rs-dock .rs-dd-view button.on{background:var(--accent-fill);color:#fff}
 .rs-dd-chart{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:8px;background:transparent;padding:8px 12px}
@@ -1136,7 +1143,19 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #rs-dock .rs-dd-kind.on{background:var(--accent-fill);color:#fff}
 .rs-dd-sp{flex:1}
 .rs-dd-chartel{flex:1;min-height:0}
-.rs-dd-chint{margin:-2px 0 0;font-size:11.5px;color:var(--mut)}
+.rs-dd-cmain{position:relative;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column}
+#rs-dock .rs-dd-svg{position:absolute;top:0;right:0;z-index:1;padding:2px 8px;font-size:11.5px;opacity:.75}
+#rs-dock .rs-dd-svg:is(:hover,:focus-visible){opacity:1}
+/* a computer: the kinds, X and Y are a column at the chart's left, and the chart has the height of the box under its title line (Kaveh,
+   2026-11-06: "this part can be vertical"); a phone keeps them in a row over the chart */
+html:not(.rs-phone) .rs-dd-chart{flex-direction:row;gap:16px}
+html:not(.rs-phone) .rs-dd-chartrow{flex:none;width:180px;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:6px;min-height:0;overflow:hidden auto;
+  direction:rtl;scrollbar-width:thin;padding-left:2px}      /* a short dock: the column scrolls, its thin scrollbar at the left (Kaveh), as the left panel's */
+html:not(.rs-phone) .rs-dd-chartrow > *{direction:ltr}
+html:not(.rs-phone) .rs-dd-chartrow .rs-dd-kinds{display:flex;box-sizing:border-box;width:100%}   /* the kinds share the column's width: no sideways scroll (Kaveh: "it got scroll!") */
+html:not(.rs-phone) #rs-dock .rs-dd-chartrow .rs-dd-kind{flex:1 1 0;width:auto;min-width:0}
+html:not(.rs-phone) .rs-dd-chartrow .rs-dd-cl{display:grid;grid-template-columns:12px minmax(0,1fr)}
+html:not(.rs-phone) .rs-dd-chartrow .rs-dd-cl .rs-sel{width:auto;min-width:0}
 
 /* a chart answer of Ask: a small copy of its chart in the card (the chart is in the data dock) */
 #sb .rs-ask-chart{height:140px;margin:8px 0 4px;padding:0;background:none;border:0}      /* no box: the chart sits on the card (Kaveh, 2026-11-06) */

@@ -135,7 +135,8 @@ c.set({kind: "pie"});        // the same data, another kind
 - The chart fits its box, and draws again when the box changes its width or its height. A bar is at most 24 px thick. Horizontal bars get thinner to fit the height, down to a row of 12 px (a bar of 4 px for each series). Past that minimum, the box scrolls: on a desktop it has a thin scrollbar, on a phone a fade at its bottom edge while there is more below. A pie is the largest circle that fits in the box with its legend: above the pie, or in a column beside it when that gives a larger pie (a wide, low box).
 - The pointer on a bar, a point or a slice shows its values. A click on it calls `onPick(row)`.
 - A kind that does not fit the columns shows a line in place of the chart, for example "A pie chart needs a text column and one number column of 0 or more."
-- `small: true` draws a copy with no labels and no hover (the card of an Ask answer).
+- `small: true` draws a copy with no labels and no hover (the card of an Ask answer). A small pie keeps its legend: the pie at the left at its full height, the legend at its right.
+- `head: el` puts the chart's title line into another element (the data dock gives an element that is not on the page, so its chart has no title line).
 - `set(change)` draws again with a change of the spec; `svg()` gives the SVG element.
 - `rs.chart.ranges(numbers, parts)` puts many numbers in about `parts` ranges: `{n, of(v), label(k)}`. The data dock and the chart card use it for a bar (12) or a pie (6) of a number `x` with more than 40 values.
 
