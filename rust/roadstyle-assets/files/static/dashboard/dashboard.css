@@ -65,12 +65,12 @@ body.rs-panel #map{right:320px}
   border-radius:7px;font:12.5px system-ui,sans-serif;outline:none}
 .rs-side-q input:focus{border-color:#7c4dff}
 .rs-side-q-res{max-height:200px;overflow:auto}
-.rs-qrow{padding:4px 2px;border-bottom:1px solid #f3f3f3;cursor:pointer;display:flex;
+.rs-qrow{padding:4px 2px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;
   justify-content:space-between;gap:10px;font-variant-numeric:tabular-nums}
 .rs-qrow:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .rs-qrow b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rs-qrow span{color:#8a8a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:58%}
-.rs-qmore{color:#9a9a9a;padding:5px 2px;font-size:12px}
+.rs-qrow span{color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:58%}
+.rs-qmore{color:var(--mut);padding:5px 2px;font-size:12px}
 /* a slot for host-page controls (filters, toggles) pinned above the record */
 .rs-side-tools{padding:9px 14px;border-bottom:1px solid #ececec;display:none}
 .rs-side-tools:not(:empty){display:block}
@@ -590,7 +590,9 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 .sb-sec th{color:var(--mut);font-weight:600}
 /* a card (the standard, docs/guides/dashboard-panel.md): 12px corners, --rs-card-pad inside, --rs-card-gap between two cards (the vertical margins of two cards collapse
    to this one number). Its title is the first row inside it, `.rs-card-title`: the same row as the title of a card that folds. */
-.sb-sec :is(.rs-sec-box,details){background:var(--card);color:var(--ink);border-radius:12px;padding:var(--rs-card-pad);margin:var(--rs-card-gap) 0}
+.sb-card .rs-sec-box,.sb-sec details{background:var(--card);color:var(--ink);border-radius:12px;padding:var(--rs-card-pad);margin:var(--rs-card-gap) 0}
+/* a box anywhere in the panel and in an editor frame, not only in a section. In a card (or in a box) it has the card's colour, so it gets the card's thin edge in its place */
+.sb-card :is([data-rs-card],.rs-sec-box) .rs-sec-box{background:transparent;box-shadow:inset 0 0 0 1px var(--rs-card-edge)}
 .sb-sec .rs-card-title{min-height:16px;margin:0 0 10px;font:600 12px/16px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
 .sb-sec summary{cursor:pointer;font-weight:600}
 
@@ -737,9 +739,9 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb [data-pane][hidden]{display:none}
 
 /* ---- CARDS, NUMBER TILES, A CAPTION AND A CALLOUT in the panel (the box itself is `.rs-sec-box`, above): a card has a title and, right after it, its short muted description ---- */
-.sb-sec .rs-sec-box h3{font-size:12px;font-weight:700;margin:0 0 3px;color:var(--ink)}
-.sb-sec .rs-sec-box h3 + p{color:var(--mut);font-size:11.5px;line-height:1.45;margin:0 0 7px}
-.sb-sec .rs-sec-box svg{width:100%;height:auto;display:block;overflow:hidden}
+.sb-card .rs-sec-box h3{font-size:12px;font-weight:700;margin:0 0 3px;color:var(--ink)}
+.sb-card .rs-sec-box h3 + p{color:var(--mut);font-size:11.5px;line-height:1.45;margin:0 0 7px}
+.sb-card .rs-sec-box svg{width:100%;height:auto;display:block;overflow:hidden}
 #sb .rs-kpis{display:grid;grid-template-columns:repeat(var(--rs-kpi-cols,3),1fr);gap:8px;margin:0 0 12px}
 #sb .rs-kpi{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 #sb .rs-kpi-title{font-size:9.5px;font-weight:700;color:var(--mut);text-transform:uppercase}
@@ -907,7 +909,7 @@ html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
 /* ONE HOVER, the rest: keyboard focus has a ring as well as the hover look; a link is underlined under the pointer */
 :is(#sb,#rs-toolbar,#rs-help,.rs-help-box,#rs-scalebox,.rs-day-cal,.rs-svw) :is(button,select,summary,a[href]):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 :is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]{text-decoration:none}
-:where(#sb) a[href]{color:var(--accent)}      /* a link in the panel has the accent (a page's own link rule is more specific and wins); before, it had the browser's blue */
+.sb-card a[href]{color:var(--accent)}      /* a link in the panel has the accent (a page's own link rule is more specific and wins); before, it had the browser's blue */
 :is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]:is(:hover,:focus-visible){text-decoration:underline}
 :is(#sb,#rs-help,.rs-help-box) summary{border-radius:6px;cursor:pointer}
 :is(#sb,#rs-help,.rs-help-box) summary:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
@@ -1221,3 +1223,15 @@ html:not(.rs-phone) .rs-dd-chartrow .rs-dd-cl .rs-sel{width:auto;min-width:0}
 #sb .rs-road-card-none{color:var(--mut)}
 #sb .rs-road-card b{color:var(--ink)}
 #sb .rs-road-card-ov{color:var(--mut)}
+/* the panel's own controls: a label, a select box and a plain button. They were in the dashboard template only, so a host page with its own panel
+   (duckOSM Studio, duckosm edit) got the browser's buttons. At the end of the file, where the template's rules were, so each wins as before. */
+#sb label{display:block;margin:11px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.04em}
+#sb select{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
+  border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
+#sb select:focus{border-color:var(--accent)}
+#sb button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;
+  background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
+#sb button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+#sb button:disabled{opacity:.5;cursor:default}
+#sb button.sb-primary:disabled{filter:saturate(.6)}
