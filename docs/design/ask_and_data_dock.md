@@ -673,6 +673,11 @@ Ask also has the read tool `describe_table(name)`: it gives the columns of one t
 - **What goes back to the model:** a short text, for example "Coloured 1151 roads (One-way) and 1614 roads (Two-way)." No ids go to
   the provider.
 - **No id column:** the tool gives the error "The query must select the column edge_id." back to the model, which fixes the SQL.
+- **Only roads that the map draws.** A tool keeps only the ids that the map has (`rs.query({})`). With none of them, it changes nothing
+  (no layer, no table) and gives the model the error "None of these 472 roads is on the map. The map shows the driving network
+  (driving.edges); the ways of walking.edges and cycling.edges are not drawn." With some, it uses those and says "197 of 669 are on the
+  map" to the model and on the card. (Kaveh's test, 2026-11-05: "show pedestrian roads" made a focus with Hide on 472 ways of
+  `walking.edges`; the map went empty, and the dock had 0 rows.) The host's `about` names the networks that its map draws.
 - **The dock follows the map.** Each map tool also puts its roads into the data dock: `idColumn`, the name, the class and the length of
   each road (the host's main table gives these columns), and for `color_roads` a first column `colour` with the label of the group. The
   dock opens on a desktop. So the table is what the map shows, **Show on map** is there, and a click on a row selects that road and opens
