@@ -5,6 +5,7 @@
 import {map, O} from "./core.js";
 import {getTool} from "./tools.js";
 import {setSheet} from "./template.js";
+import {dockTop, rsDock} from "./dock.js";
 
 const _wGap = 12;
 export const _wPhone = () => document.documentElement.classList.contains("rs-phone");
@@ -26,6 +27,7 @@ export function freeArea(){
     const r = p.getBoundingClientRect();
     (r.left + r.right) / 2 < innerWidth / 2 ? lo = Math.max(lo, r.right) : hi = Math.min(hi, r.left);
   }
+  bottom = Math.min(bottom, dockTop());                // the bottom dock covers the map (the card look) or ends it
   if(_wVis(bar)){
     const r = bar.getBoundingClientRect(), e = bar.dataset.edge;
     if(e === "right") hi = Math.min(hi, r.left - 8); else if(e === "left") lo = Math.max(lo, r.right + 8);
@@ -51,9 +53,13 @@ export function initWindows(){
   const wins = () => [...document.querySelectorAll(".rs-svw:not(.rs-svw-dock)")];
   // a phone: one sheet is open at a time (the panel's, the Street View window, the Google 3D window)
   const close = id => { const t = getTool(id); if(t && t.isOpen && t.isOpen()) t.close(); };
-  document.addEventListener("rs:streetviewchange", e => { if(e.detail.open && _wPhone()){ close("google_3d"); setSheet(0); } });
-  document.addEventListener("rs:google3dchange", e => { if(e.detail.open && _wPhone()){ close("street_view"); setSheet(0); } });
-  document.addEventListener("rs:sheetchange", e => { if(e.detail.height > 0 && _wPhone()){ close("street_view"); close("google_3d"); } });
+  // (and the bottom dock's: when it opens, the panel's sheet goes to 0 and the windows close; when one of them opens, the dock closes)
+  const shutDock = () => { if(rsDock.isOpen()) rsDock.close(); };
+  document.addEventListener("rs:streetviewchange", e => { if(e.detail.open && _wPhone()){ close("google_3d"); shutDock(); setSheet(0); } });
+  document.addEventListener("rs:google3dchange", e => { if(e.detail.open && _wPhone()){ close("street_view"); shutDock(); setSheet(0); } });
+  document.addEventListener("rs:sheetchange", e => { if(e.detail.height > 0 && _wPhone()){ close("street_view"); close("google_3d"); shutDock(); } });
+  let dockWas = false;                                   // only the opening of the dock, not a new content or a new note while it is open
+  document.addEventListener("rs:dockchange", e => { const now = e.detail.open; if(now && !dockWas && _wPhone()){ close("street_view"); close("google_3d"); setSheet(0); } dockWas = now; });
   if(!D.windows.clamp) return;
   const keep = () => { if(!_wPhone()) wins().forEach(_wFit); };
   // the free part changes: a panel opens or closes (with its slide), the bar moves or slides, the window is resized, the layout changes

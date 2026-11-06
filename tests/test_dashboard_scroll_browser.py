@@ -67,3 +67,33 @@ def test_every_scroll_area_has_the_panels_scroll_rules(tmp_path):
     for name in ("help window", "settings box", "select list", "query list", "page's rs-scroll"):                        # these are taller than the window here,
         assert got[name]["scrolls"], (name, got[name])                                                                  # so the check means something
     assert got["query list"]["more"] and got["page's rs-scroll"]["more"]                                                  # the fade of an area inside a box
+
+
+def test_a_scroll_area_fades_at_the_top_while_there_is_more_above(tmp_path):
+    """Kaveh: "the scroll does not fade at the top". The panel's body and a page's `rs-scroll` list have a fade at the top edge while there is more above
+    (`data-above`), and at both edges in the middle. A `rs-scroll` with a table has no top fade: its header row stays at the top."""
+    path = tmp_path / "fade.html"
+    lst = "<div class='rs-scroll' id='lst' style='--rs-scroll-h:120px'>" + "".join(f"<p>Item {i}</p>" for i in range(40)) + "</div>"
+    table = "<div class='rs-scroll' id='tbl' style='--rs-scroll-h:120px'><table class='rs-table'><thead><tr><th>Name</th></tr></thead><tbody>" + \
+            "".join(f"<tr><td>Row {i}</td></tr>" for i in range(40)) + "</tbody></table></div>"
+    long = "".join(f"<p>Text {i}</p>" for i in range(80))
+    rs.render_dashboard(_edges(), basemap="blank", dashboard={"panel": {"sections": [
+        {"id": "l", "label": "A list", "html": lst}, {"id": "t", "label": "A table", "html": table}, {"id": "x", "label": "Long", "html": long}]}}).save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 700})
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && window.rsReady", timeout=60_000)
+        fade = """sel => { const e = document.querySelector(sel), m = getComputedStyle(e).maskImage || getComputedStyle(e).webkitMaskImage;
+                   return {above: e.hasAttribute('data-above'), more: e.hasAttribute('data-more'), top: m.startsWith('linear-gradient(rgba(0, 0, 0, 0)')}; }"""
+        got = {}
+        for sel in ("#sb .sb-body", "#lst", "#tbl"):
+            got[sel, "start"] = page.evaluate(f"({fade})({json.dumps(sel)})")
+            page.evaluate(f"(() => {{ const e = document.querySelector({json.dumps(sel)}); e.scrollTop = 60; e.dispatchEvent(new Event('scroll')); }})()")
+            page.wait_for_timeout(150)
+            got[sel, "middle"] = page.evaluate(f"({fade})({json.dumps(sel)})")
+        browser.close()
+    for sel in ("#sb .sb-body", "#lst"):
+        assert got[sel, "start"] == {"above": False, "more": True, "top": False}, got
+        assert got[sel, "middle"] == {"above": True, "more": True, "top": True}, got
+    assert got["#tbl", "middle"]["above"] and not got["#tbl", "middle"]["top"], got

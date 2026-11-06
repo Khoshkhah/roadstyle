@@ -82,6 +82,8 @@ function _sbEnhance(sel){
   btn.addEventListener("keydown", e => { if(!list && (e.key === "ArrowDown" || e.key === "ArrowUp")){ e.preventDefault(); open(); } });
   sync();
 }
+// every select in `el` (the editor frame, frame.js: its head row, body and bar)
+export function rsSelectBoxes(el){ el.querySelectorAll("select").forEach(_sbEnhance); }
 // every select of a panel (the dashboard sidebar, the docked panel, a host panel)
 export function initSelectBox(){
   const run = () => document.querySelectorAll("#sb select, .rs-side select, .rs-host select").forEach(_sbEnhance);

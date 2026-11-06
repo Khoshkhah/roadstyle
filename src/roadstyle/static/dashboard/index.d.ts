@@ -166,12 +166,60 @@ export interface ColorModes {
   readonly active: string | null;
 }
 
+/** rs.frame: the frame of an editor that uses the whole panel (frame.js). The editor fills `body` and `bar`. */
+export interface EditorFrame extends EventTarget {
+  /** The frame under the host's title line: the head row, the body and the bar. */
+  readonly root: HTMLElement;
+  /** The title line in the host's .sb-top: "← back", the title; the editor can add more after it. */
+  readonly top: HTMLElement;
+  /** The head row under the title line: it does not scroll. It holds the tab row (`tabs`) and the editor's own element (`head`). An empty row does not show. */
+  readonly head: HTMLElement;
+  /** The one body that scrolls (the class rs-pbody: the panel's scroll protocol). */
+  readonly body: HTMLElement;
+  /** The bar under the body, at the bottom edge of the panel. An empty bar does not show. */
+  readonly bar: HTMLElement;
+  /** Hides the host's title, body and "Collapse all" and shows the frame; `tab` selects a tab. */
+  open(tab?: string): void;
+  /** Shows the host's panel again. */
+  close(): void;
+  isOpen(): boolean;
+  /** Selects a tab (no event); with no argument it gives the selected tab. */
+  tab(name?: string): string | null;
+}
+
+/** A column of the dock's table: its name, its SQL type and its description (the header's tooltip). */
+export interface DockColumn { name: string; type?: string; about?: string }
+/** rs.dock.table: the dock's table. */
+export interface DockTable {
+  el: HTMLElement;
+  set(change: { columns?: DockColumn[]; rows?: unknown[][]; more?: boolean }): void;
+  rows(): unknown[][];
+  sort(): { col: string; dir: "asc" | "desc" } | null;
+}
+/** rs.dock: the bottom dock under the map (dock.js). Event rs:dockchange {open, id, height}. */
+export interface Dock {
+  add(content: { id: string; label?: string; el: HTMLElement; note?: string; actions?: HTMLElement; closable?: boolean }): void;
+  remove(id: string): void;
+  open(id?: string): void;
+  close(): void;
+  isOpen(): boolean;
+  show(id: string): void;
+  note(id: string, text: string): void;
+  height(px?: number): number;
+  list(): string[];
+  table(options: { columns: DockColumn[]; rows: unknown[][]; idColumn?: string; more?: boolean;
+                   onSort?: (column: string | null, dir: "asc" | "desc" | null) => Promise<{ rows: unknown[][] } | null> }): DockTable;
+}
+
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
   tools: Tools;
   sections: Sections;
   legend: LegendRows;
   colorModes: ColorModes;
+  /** The frame of an editor in the panel. Events: "back" (the back button), "tab" ({tab}: a click on a tab). */
+  dock: Dock;
+  frame(options: { panel: HTMLElement; title: string; back?: string | null; tabs?: [string, string][]; head?: HTMLElement; id?: string; label?: string }): EditorFrame;
   /** The cut points of Fisher-Jenks natural breaks that split the numbers in k sets (what rs.setData uses for a number). */
   naturalBreaks(values: number[], k: number): number[];
   /** null, or the error of a style whose interaction contract (roadstyle:contract) is newer than this dashboard reads: then the
@@ -191,7 +239,8 @@ export interface Dashboard {
   /** The part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates. */
   freeArea(): { lo: number; hi: number; top: number; bottom: number };
   select(id: EdgeId | null): void;
-  highlight(ids: EdgeId[]): void;
+  /** The selection glow on these roads; with `set`, the roads of a named set in its own colour ([] with the set clears it). */
+  highlight(ids: EdgeId[], set?: { set: string; color?: string; opacity?: number }): void;
   focus(ids: EdgeId | EdgeId[]): void;
   query(where: Record<string, unknown>): EdgeId[];
   find(text: string): EdgeId[];

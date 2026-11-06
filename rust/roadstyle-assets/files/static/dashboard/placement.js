@@ -25,6 +25,12 @@ export function freePad(){
     else if(near(r.top, innerHeight - r.bottom)) pad.top = Math.max(pad.top, r.bottom + 8);
     else pad.bottom = Math.max(pad.bottom, innerHeight - r.top + 8);
   }
+  // the bottom dock: the camera fits above it (it covers the map in the card look; in the frame look the map ends at it, and this adds nothing)
+  const d = document.getElementById("rs-dock");
+  if(d && document.documentElement.classList.contains("rs-dock-has") && !document.documentElement.classList.contains("rs-phone")){
+    const m = (document.getElementById("map") || document.body).getBoundingClientRect(), t = d.getBoundingClientRect().top;
+    if(m.bottom > t) pad.bottom = Math.max(pad.bottom, innerHeight - t + 8);
+  }
   return pad;
 }
 export function initPlacement(){

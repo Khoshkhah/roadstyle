@@ -11,6 +11,7 @@ navbox
 selectbox
 placement
 panelscroll
+frame
 sections
 query
 roadcard
@@ -22,6 +23,7 @@ tabs
 days
 kpi
 svg
+dock
 toolbar
 panel
 find
