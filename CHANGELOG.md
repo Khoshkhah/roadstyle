@@ -6,6 +6,12 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`rs.frame({panel, title, back, tabs})`: the editor frame, a dashboard part** (`dashboard/frame.js`, [An editor in the panel](docs/guides/dashboard-parts.md#an-editor-in-the-panel)). It is the frame of an editor that uses the whole panel, as Edit design. In the host's standard panel it makes the title line with "← back", roadstyle's tab row with a line under it, one body that scrolls by the panel's scroll protocol (`rs-pbody`) and a bar under the body at the bottom edge of the panel, in the panel's color. While it is open, the host's title, body and **Collapse all** are hidden. It gives `root`, `head`, `body`, `bar`, `open(tab)`, `close()`, `isOpen()`, `tab(name)` and the events `back` and `tab`. A module page imports `editorFrame` from `dashboard/frame.js`. The classes are `rs-frame`, `rs-frame-title`, `rs-frame-back`, `rs-frame-body` and `rs-frame-bar`. Test: `test_editor_frame_browser.py` (the light and the dark theme, a desktop and 390 px).
+
+### Changed
+- **Edit design uses the editor frame.** The frame's CSS moved from the design panel's names (`.rs-dz`, `.rs-dz-title`, `.rs-dz-back`, `.rs-dz-body`, `.rs-dz-bar`) to the frame's names. The design panel keeps its own classes and its content CSS, and it looks the same: the screenshots before and after the change are equal, pixel for pixel (a desktop and a phone, both themes).
+
 ## [0.28.0] - 2026-11-05
 
 ### Added

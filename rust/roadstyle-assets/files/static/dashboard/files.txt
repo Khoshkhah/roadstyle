@@ -11,6 +11,7 @@ navbox
 selectbox
 placement
 panelscroll
+frame
 sections
 query
 roadcard

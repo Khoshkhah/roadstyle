@@ -166,12 +166,33 @@ export interface ColorModes {
   readonly active: string | null;
 }
 
+/** rs.frame: the frame of an editor that uses the whole panel (frame.js). The editor fills `body` and `bar`. */
+export interface EditorFrame extends EventTarget {
+  /** The frame under the host's title line: the tab row, the body and the bar. */
+  readonly root: HTMLElement;
+  /** The title line in the host's .sb-top: "← back", the title; the editor can add more after it. */
+  readonly head: HTMLElement;
+  /** The one body that scrolls (the class rs-pbody: the panel's scroll protocol). */
+  readonly body: HTMLElement;
+  /** The bar under the body, at the bottom edge of the panel. An empty bar does not show. */
+  readonly bar: HTMLElement;
+  /** Hides the host's title, body and "Collapse all" and shows the frame; `tab` selects a tab. */
+  open(tab?: string): void;
+  /** Shows the host's panel again. */
+  close(): void;
+  isOpen(): boolean;
+  /** Selects a tab (no event); with no argument it gives the selected tab. */
+  tab(name?: string): string | null;
+}
+
 /** The object that rsDashboard returns (the Python page sets window.rs to it). */
 export interface Dashboard {
   tools: Tools;
   sections: Sections;
   legend: LegendRows;
   colorModes: ColorModes;
+  /** The frame of an editor in the panel. Events: "back" (the back button), "tab" ({tab}: a click on a tab). */
+  frame(options: { panel: HTMLElement; title: string; back?: string | null; tabs?: [string, string][]; id?: string; label?: string }): EditorFrame;
   /** The cut points of Fisher-Jenks natural breaks that split the numbers in k sets (what rs.setData uses for a number). */
   naturalBreaks(values: number[], k: number): number[];
   /** null, or the error of a style whose interaction contract (roadstyle:contract) is newer than this dashboard reads: then the

@@ -1,7 +1,7 @@
 // The design panel (docs/guides/design-panel.md): the style of the map, as a part that any page with a dashboard can hold. It draws into the host's standard
-// dashboard panel (#sb > .sb-card with .sb-top and .sb-body), as the level editor does: open() hides the host's title and body and shows the panel's title line,
-// its tabs (Theme, Roads, Text, Layers and the host's own tabs) and its bar; close() shows the host's panel again. This file owns the design (design.js) and
-// draws the tabs; the host gives the look, the way to show a new look (setLook: the same tiles; redraw: a new map) and its own values (host tabs, the boundary).
+// dashboard panel (#sb > .sb-card with .sb-top and .sb-body) in roadstyle's editor frame (../frame.js): open() hides the host's title and body and shows the
+// frame's title line, its tabs (Theme, Roads, Text, Layers and the host's own tabs), the body and the bar; close() shows the host's panel again. This file owns the
+// design (design.js) and draws the tabs; the host gives the look, the way to show a new look (setLook: the same tiles; redraw: a new map) and its own values (host tabs, the boundary).
 //
 //   designPanel({ panel, dashboard, map, look, setLook, redraw, restyle, backLabel, storageKey, boundary, link, tabs })
 //     -> EventTarget + { open, close, isOpen, tab, get, text, set, load, setHost, refresh, flush, base, state, restored }
@@ -12,7 +12,7 @@
 // again after each new style (rs:stylechange). A change that also changes the look (a theme) paints them when the new look shows: one change on the map.
 import * as D from "./design.js";
 import * as UT from "./user_themes.js";
-import {initPanelScroll} from "../panelscroll.js";
+import {editorFrame} from "../frame.js";
 
 const TABS = [["theme", "Theme"], ["roads", "Roads"], ["text", "Text"], ["layers", "Layers"]];
 const LABEL = { motorway: "Motorway", trunk: "Trunk", primary: "Primary", secondary: "Secondary", tertiary: "Tertiary", unclassified: "Unclassified", residential: "Residential",
@@ -38,9 +38,7 @@ export const controls = { color, range, number, check, sec, esc };
 
 export async function designPanel({ panel, dashboard = window.rs, map = window.map, look, setLook = null, redraw, restyle = {}, backLabel = "Steps", storageKey = "roadstyle",
                                     boundary = null, link = null, tabs: hostTabs = [] }) {
-  const hostCard = panel?.querySelector?.(".sb-card"), hostBar = hostCard?.querySelector(".sb-top"), hostBody = hostCard?.querySelector(".sb-body");
-  if (!hostBar?.firstElementChild || !hostBody)
-    throw new Error("design panel: give `panel`, the host's dashboard panel: an element with .sb-card, in it .sb-top (the title first, then the hide button) and .sb-body");
+  const frame = editorFrame({ panel, title: "Edit design", back: backLabel, id: "design", tabs: [...TABS, ...hostTabs.map((h) => [h.id, h.name])] });          // a bad `panel` throws
   if (!look || typeof redraw !== "function") throw new Error("design panel: give `look` (the look of the map, as an object) and `redraw(text, draw)`");
   const r = await fetch(new URL("themes.json", import.meta.url));
   if (!r.ok) throw new Error(`design panel: the ready themes (themes.json, ${r.status})`);
@@ -62,16 +60,14 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   };
   lastKey = styleKey(base);                                          // the host's map shows `look` at the start
 
-  // ---- the markup: the title line goes into the host's .sb-top (before its hide button), the rest into the card ----
-  const title = document.createElement("div");
-  title.className = "rs-dz-title";
-  title.innerHTML = `${backLabel == null ? "" : `<button type="button" class="rs-dz-back" id="design-back">← ${esc(backLabel)}</button>`}<span class="t">Edit design</span><span class="dname" id="design-name"></span>`;
-  const root = document.createElement("div");
-  root.className = "rs-dz"; root.id = "design-panel"; root.setAttribute("aria-label", "Edit design");
-  root.innerHTML = `<nav class="rs-tabs rs-phead" id="design-tabs" role="tablist" aria-label="What to design">${[...TABS, ...HOSTS.map((h) => [h.id, h.name])].map(([t, n]) =>
-      `<button type="button" class="rs-tab" role="tab" id="design-tab-${t}" data-tab="${t}" aria-controls="design-pane" aria-selected="false">${esc(n)}</button>`).join("")}</nav>
-    <div class="rs-pbody rs-dz-body" data-head="#design-tabs"><div id="design-pane" role="tabpanel"></div></div>
-    <div class="rs-dz-bar"><div class="line"><b id="design-changes">Style: default</b>${link ? `<button type="button" class="link" id="design-link">${esc(link.label)}</button>` : ""}</div><p class="st" id="design-state" role="status" aria-live="polite"></p><p class="st" id="design-notice" role="status"></p></div>`;
+  // ---- the markup: the editor frame (../frame.js) gives the title line, the tabs, the body and the bar; the classes rs-dz* are for the panel's own content ----
+  const { root, head: title, body, bar } = frame;
+  root.classList.add("rs-dz"); root.id = "design-panel"; root.querySelector("#design-tabs").setAttribute("aria-label", "What to design");
+  title.classList.add("rs-dz-title"); title.querySelector(".rs-frame-back")?.classList.add("rs-dz-back");
+  title.insertAdjacentHTML("beforeend", '<span class="dname" id="design-name"></span>');
+  body.classList.add("rs-dz-body"); bar.classList.add("rs-dz-bar");
+  body.innerHTML = '<div id="design-pane"></div>';
+  bar.innerHTML = `<div class="line"><b id="design-changes">Style: default</b>${link ? `<button type="button" class="link" id="design-link">${esc(link.label)}</button>` : ""}</div><p class="st" id="design-state" role="status" aria-live="polite"></p><p class="st" id="design-notice" role="status"></p>`;
   const $ = (id) => root.querySelector("#" + id) ?? title.querySelector("#" + id);
   const pane = $("design-pane");
 
@@ -268,9 +264,8 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     const h = HOSTS.find((x) => x.id === tab);
     if (h) { pane.innerHTML = `<div data-host="${h.key}"></div>`; h.draw(pane.firstElementChild, design[h.key], putHost(h), controls); }
     else pane.innerHTML = PANES[tab]();
-    for (const t of TAB_IDS) { const b = $(`design-tab-${t}`); b.setAttribute("aria-selected", String(t === tab)); b.classList.toggle("on", t === tab); }
+    frame.tab(tab);
     if (tab === "theme") paintThemeList();
-    pane.setAttribute("aria-labelledby", `design-tab-${tab}`);
     pane.dataset.tab = tab;
     paintBar();
     if (isOpen()) document.dispatchEvent(new CustomEvent("rs:sectionchange", { detail: { id: "design", state: "show" } }));         // the panel's select lists in the look of the boxes (selectbox.js)
@@ -296,7 +291,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   }
   function tabTo(name) {
     tab = TAB_IDS.includes(name) ? name : "theme";
-    const body = pane.parentElement, keep = body.scrollTop;
+    const keep = body.scrollTop;
     paint();
     body.scrollTop = name === tab ? keep : 0;
   }
@@ -446,8 +441,8 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     catch (err) { $("design-where").textContent = "The file was not loaded: " + err.message + "."; }
     e.target.value = "";
   });
-  for (const t of TAB_IDS) $(`design-tab-${t}`).onclick = () => tabTo(t);
-  $("design-back")?.addEventListener("click", () => events.dispatchEvent(new CustomEvent("back")));
+  frame.addEventListener("tab", (e) => tabTo(e.detail.tab));
+  frame.addEventListener("back", () => events.dispatchEvent(new CustomEvent("back")));
   if (link) $("design-link").onclick = () => link.onClick();
 
   function set(d) { design = norm(d); save(); schedule(0); announceSoon(); paint(); }
@@ -478,27 +473,11 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     design.visible[key] = !!on; design.theme = "custom";
     save(); paintBar(); if (isOpen() && tab === "layers") { const el = pane.querySelector(`[data-p="visible.${key}"]`); if (el) el.checked = !!on; }
   }
-  // ---- open and close: the host's title and body are kept and hidden ----
-  let hostWas = null;
-  const isOpen = () => root.isConnected;
+  // ---- open and close: the frame hides the host's title, body and "Collapse all", and shows them again ----
+  const isOpen = frame.isOpen, close = frame.close;
   function open(name) {
-    if (!isOpen()) {
-      const hostTitle = hostBar.firstElementChild;
-      const foldAll = hostBar.querySelector("#rs-fold-all");                     // the host's "Collapse all" is for the host's cards, not for this panel
-      hostWas = { title: hostTitle, foldAll, display: [hostTitle.style.display, hostBody.style.display, foldAll?.style.display], scroll: hostBody.scrollTop };
-      hostTitle.style.display = hostBody.style.display = "none";
-      if (foldAll) foldAll.style.display = "none";
-      hostBar.prepend(title); hostCard.appendChild(root);
-      initPanelScroll();                                       // the pane scrolls by the panel's protocol (the class rs-pbody)
-    }
+    frame.open();
     name ? tabTo(name) : paint();
-  }
-  function close() {
-    if (!isOpen()) return;
-    title.remove(); root.remove();
-    [hostWas.title.style.display, hostBody.style.display] = hostWas.display;
-    if (hostWas.foldAll) hostWas.foldAll.style.display = hostWas.display[2];
-    hostBody.scrollTop = hostWas.scroll;
   }
   // the design that this browser kept: it is the design at the start (the host's look gets it, no draw)
   let stored = null;

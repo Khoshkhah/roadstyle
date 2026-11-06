@@ -743,20 +743,25 @@ html.rs-sv-docked.rs-overlay #map{right:var(--rs-sv-w,42%)!important;width:auto!
 .rs-svw-drag[hidden]{display:none}
 html.rs-phone.rs-sv-docked.rs-overlay #map{right:0!important;bottom:45%!important;height:auto!important}
 html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!important;bottom:0!important;width:100%!important;height:45%!important}
-/* The design panel (design/design_panel.js, docs/guides/design-panel.md): in the host's panel, as the level editor. The title line goes into .sb-top (before the
-   host's hide button); the tabs stay, only the pane scrolls (rs-pbody), and the bar is at the bottom. The colors are the theme's tokens. */
+/* The editor frame (frame.js, docs/guides/dashboard-parts.md): an editor that uses the whole panel. The title line goes into .sb-top (before the host's hide
+   button); the tab row stays, only the body scrolls (rs-pbody), and the bar is a flex item under the body, at the bottom edge of the panel. The bar has no
+   background of its own: nothing scrolls under it, so it has the color of the panel.
+   An empty bar does not show. The colors are the theme's tokens. */
+.rs-frame-title{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.rs-frame-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+.rs-frame-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.rs-frame-back:hover{color:var(--accent);border-color:var(--accent-fill)}
+.rs-frame{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.rs-frame [hidden]{display:none!important}
+#sb .rs-frame .rs-tabs{flex:none;margin:0 15px;padding-bottom:8px;margin-bottom:0}
+.rs-frame-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
+.rs-frame-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
+.rs-frame-bar:empty{display:none}
+html.rs-phone .rs-frame-back,html.rs-phone .rs-frame .rs-tab{min-height:44px}
+/* The design panel (design/design_panel.js, docs/guides/design-panel.md): its content in the editor frame. */
 #sb{--rs-dz-soft:color-mix(in srgb,var(--accent) 12%,transparent);--rs-dz-bad:#b91c1c}
 #sb[data-theme=dark],html[data-rs-theme=dark] #sb{--rs-dz-bad:#f87171}
-.rs-dz-title{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
-.rs-dz-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
 .rs-dz-title .dname{font-size:12px;color:var(--mut);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.rs-dz-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
-.rs-dz-back:hover{color:var(--accent);border-color:var(--accent-fill)}
-.rs-dz{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-.rs-dz [hidden]{display:none!important}
-#sb .rs-dz .rs-tabs{flex:none;margin:0 15px;padding-bottom:8px;margin-bottom:0}
-.rs-dz-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
-.rs-dz-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
 .rs-dz-bar .line{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .rs-dz-bar b{font-weight:600}
 .rs-dz-bar .st{margin:2px 0 0;min-height:1.3em;color:var(--mut);line-height:1.3}
@@ -815,6 +820,6 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 .rs-dz .fix-group{margin:12px 0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
 .rs-dz .fix-group:first-child{margin-top:0}
 .rs-dz .bad{color:var(--rs-dz-bad)}
-html.rs-phone .rs-dz-back,html.rs-phone .rs-dz .rs-tab,html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
+html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
 /* the preview under a transparent ground: the map container has the color of the base map, the checkerboard goes over that color */
 .rs-checker{background-image:repeating-conic-gradient(#d4d4d4 0 25%,#ffffff 0 50%);background-size:24px 24px}
