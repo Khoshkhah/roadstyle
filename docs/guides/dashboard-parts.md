@@ -311,7 +311,7 @@ A plain `<button>` and `<button class="sb-primary">` in the panel have their loo
 <div class="sb-actions"><button type="button" class="sb-primary">Run</button><button type="button">Reset</button></div>
 ```
 
-`sb-actions` is a row of buttons with a gap of 6 px that wraps. The look of a plain `<button>`, a `<select>` and a `<label>` in the panel comes from the dashboard template (`templates/dashboard.html`), not from `dashboard.css`. A host page with its own panel and no template does not get it.
+`sb-actions` is a row of buttons with a gap of 6 px that wraps. The look of a plain `<button>`, a `<select>` and a `<label>` in the panel is in `dashboard.css`, so a host page with its own panel (`#sb`) and no dashboard template gets it too. A disabled button, also a primary one, is dimmed.
 
 **Hover.** Every control of the dashboard reacts under the pointer and on keyboard focus, in one of three looks by its kind:
 
