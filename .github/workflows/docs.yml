@@ -9,6 +9,7 @@ on:
     paths:
       - "docs/**"
       - "src/roadstyle/**"
+      - "rust/roadstyle-assets/files/**"   # the live parts of the docs (docs/copy_parts.py) are these files
       - "mkdocs.yml"
       - "pyproject.toml"
       - ".github/workflows/docs.yml"
