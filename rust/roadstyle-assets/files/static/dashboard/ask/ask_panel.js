@@ -62,6 +62,19 @@ const LOOKUP = `Look up:
   what a table holds: SELECT table_name, comment FROM duckdb_tables() WHERE schema_name = 's'
   its columns: SELECT column_name, data_type, comment FROM duckdb_columns() WHERE schema_name = 's' AND table_name = 't'`;
 
+// graph work in SQL (Kaveh, 2026-11-06: "compute diameter of driving network" got "there is no graph function"): DuckDB's recursive CTE with USING KEY
+// keeps one row for each node, so a shortest-path search is one query (Monaco: 1.9 s for two of them). All pairs at once is too slow for a page.
+const GRAPH = `Graph questions (a route, a distance on the network, the farthest node, the diameter, connected parts): the network is a
+table of directed edges with a start node, an end node and a length (look up its columns). Shortest distances from one node:
+  WITH RECURSIVE dist(node, d) USING KEY (node) AS (
+    SELECT <start node>::BIGINT, 0.0::DOUBLE
+    UNION
+    (SELECT e.<end>, min(d0.d + e.<length>)::DOUBLE FROM recurring.dist AS d0 JOIN <edges> AS e ON e.<start> = d0.node
+     LEFT JOIN recurring.dist AS old ON old.node = e.<end> GROUP BY e.<end>, old.d HAVING old.d IS NULL OR min(d0.d + e.<length>) < old.d))
+  SELECT node, d FROM dist ORDER BY d DESC
+The diameter: run it from any node, take the farthest node, run it again from that node: its largest d is the diameter (a
+double sweep; say that it is the usual estimate). Do not compute all pairs at once: it is too slow.`;
+
 // an answer as the person reads it: no raw ids ("edge 3363728794791538739", any number of 12 digits or more): the table has them
 const noIds = (t) => t.replace(/\b(edges?|edge_id|id)\s*[:=]?\s*\d{12,}\b\s*/gi, "").replace(/\s*\(?\b\d{12,}\b\)?/g, "").replace(/\(\s*\)/g, "")
   .replace(/\s{2,}/g, " ").trim().replace(/^\(([^()]+)\)/, "$1");
@@ -195,7 +208,7 @@ export function askPanel(o = {}){
       schemaTxt = [Object.entries(groups).map(([sc, ts]) => `${sc}: ${ts.join(", ")}`).join("\n"),
         mainTable && mainTable.columns ? `Columns of ${mainTable.name}:\n` + mainTable.columns.map((c) => `  ${c.name} ${c.type || ""}${c.about ? ": " + short(String(c.about), 60) : ""}`).join("\n") : "",
         extra.length ? "The page's own data:\n" + extra.map((t) => `  ${t.name}: ${short(String(t.about), 140)}`).join("\n") : "",
-        /duckdb/i.test(dialect) ? LOOKUP : ""].filter(Boolean).join("\n\n");
+        /duckdb/i.test(dialect) ? LOOKUP : "", /duckdb/i.test(dialect) ? GRAPH : ""].filter(Boolean).join("\n\n");
     }
     return PROMPT.replace("{dialect}", dialect).replace("{about}", o.about || "").replace(/\{id\}/g, ID) + schemaTxt;
   }

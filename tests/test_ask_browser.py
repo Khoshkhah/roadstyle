@@ -352,3 +352,18 @@ def test_draw_chart_shows_the_chart_in_the_dock_and_a_copy_in_the_card(tmp_path)
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_the_duckdb_prompt_has_the_graph_rule(tmp_path):
+    """Kaveh: "compute diameter of driving network" got "there is no graph function". With dialect DuckDB the prompt has the shortest-path pattern
+    (WITH RECURSIVE ... USING KEY) and the double sweep for the diameter."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open()")
+            _ask(page, "What is the diameter of the network?", ["say('About 4 km.')"])
+            system = page.evaluate("window.calls[0].messages[0].content")
+            assert "USING KEY (node)" in system and "double sweep" in system and "all pairs at once" in system
+        finally:
+            browser.close()
+    assert errors == [], errors
