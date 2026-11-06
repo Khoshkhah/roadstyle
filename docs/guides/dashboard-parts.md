@@ -338,6 +338,26 @@ A text `<input>` (no `type`, `text`, `search`, `number` or `url`) and a `<textar
 
 Use a check box for an on and off value that the person sets once, and a [two-way switch](#a-two-way-switch) for a mode that changes the view at once.
 
+## Option rows
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=opt" title="Option rows, live" loading="lazy"></iframe>
+
+An option row is a setting with a check box or a radio button and a short note, or one choice of a list. A button at the end of a row is a plain button.
+
+```html
+<div class="rs-opts">
+  <label class="rs-opt"><input type="checkbox" checked><span><b>Layers</b><small>Water, land use, buildings and more.</small></span></label>
+  <label class="rs-opt"><input type="radio" name="x"><span><b>Monaco</b><small>2 km²</small></span><button type="button">Get</button></label>
+</div>
+<div class="rs-opts rs-opts-row">
+  <label class="rs-opt"><input type="checkbox" checked><span>Driving</span></label><label class="rs-opt"><input type="checkbox"><span>Walking</span></label>
+</div>
+```
+
+`rs-opts` is a list, one row under the other. `rs-opts rs-opts-row` puts the rows side by side, as chips. A row has the light edge of a card. Under the pointer it has the hover tint and the accent edge. A checked row has the accent tint and the accent edge, and it is darker under the pointer.
+
+Use option rows when each value has a note or when more than one value can be on. Use a [two-way switch](#a-two-way-switch) for one value of a setting.
+
 ## Chips and a dot
 
 <iframe class="rs-live" src="../../parts/gallery.html?part=chips" title="Chips and a dot, live" loading="lazy"></iframe>

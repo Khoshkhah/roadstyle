@@ -190,6 +190,12 @@ const PARTS = [
       '<label>Show</label><div class="gl-row"><input type="checkbox" id="gl-c1" checked><span>Bridges</span><input type="checkbox" id="gl-c2"><span>Tunnels</span></div>' +
       '<label>Count</label><div class="gl-row"><input type="radio" name="gl-r" checked><span>Every day</span><input type="radio" name="gl-r"><span>First day</span></div>'});
   }},
+  {id: "opt", name: "Option rows", make(){
+    rs.sections.add({id: "opt", html: '<div class="rs-opts rs-opts-row"><label class="rs-opt"><input type="checkbox" checked><span>Driving</span></label><label class="rs-opt"><input type="checkbox" checked><span>Walking</span></label><label class="rs-opt"><input type="checkbox"><span>Cycling</span></label></div>' +
+      '<div class="rs-opts" style="margin-top:10px"><label class="rs-opt"><input type="checkbox" checked><span><b>Layers</b><small>Water, land use, buildings and more.</small></span></label>' +
+      '<label class="rs-opt"><input type="radio" name="gl-o"><span><b>Monaco</b><small>2 km²</small></span><button type="button">Get</button></label>' +
+      '<label class="rs-opt"><input type="radio" name="gl-o"><span><b>Alps</b><small>243 789 km²</small></span><button type="button">Get</button></label></div>'});
+  }},
   {id: "chips", name: "Chips and a dot", make(){
     rs.sections.add({id: "chips", html: '<div class="gl-row"><span class="rs-chip">road type</span><span class="rs-chip accent">primary</span><span><span class="rs-dot" style="background:#15803d"></span>inside the range</span><span><span class="rs-dot"></span>no data</span></div>'});
   }},

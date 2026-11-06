@@ -95,14 +95,15 @@ _EDGES = """() => {
   const ratio = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return (h + 0.05) / (l + 0.05); };
   const sb = getComputedStyle(document.getElementById('sb')), card = rgb(sb.getPropertyValue('--card'));
   const edge = (id) => { const s = getComputedStyle(rs.sections.get(id)).boxShadow; return s === 'none' ? null : rgb(s.match(/^(rgba?|color)\\([^)]*\\)/)[0]); };
-  return {tint: edge('tint'), plain: ratio(edge('plain'), card), fold: ratio(edge('fold'), card)};
+  const accent = rgb(sb.getPropertyValue('--accent'));
+  return {tint: edge('tint'), accent, plain: ratio(edge('plain'), card), fold: ratio(edge('fold'), card)};
 }"""
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_the_cards_of_style_f_have_the_light_edge_and_the_tinted_card_has_none(tmp_path, theme):
+def test_the_cards_of_style_f_have_the_light_edge_and_the_tinted_card_has_an_accent_edge(tmp_path, theme):
     """Kaveh's style F (the mock-up he chose): the edge of a closed card is a light line (1.6:1 on the card in the light theme, 2.8:1 in the dark, not 3:1 or more), and a card
-    with the tint (`background: true`, the Ask card) has no edge."""
+    with the tint (`background: true`, the Ask card) has an edge of the accent (Kaveh, 2026-11-06: with no edge it did not look like a card to press)."""
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser = p.chromium.launch(args=_ARGS)
         page = browser.new_page(viewport={"width": 1400, "height": 900})
@@ -111,7 +112,9 @@ def test_the_cards_of_style_f_have_the_light_edge_and_the_tinted_card_has_none(t
         page.evaluate(f"rsSetTheme({json.dumps(theme)})")
         found = page.evaluate(_EDGES)
         browser.close()
-    assert found["tint"] is None, found
+    tint, accent = found["tint"], found["accent"]
+    far = lambda c: sum(abs(a - b) for a, b in zip(tint[:3], c[:3], strict=True))   # noqa: E731
+    assert tint is not None and far(accent) < far([255 * (theme == "light")] * 3), found   # nearer the accent than the panel's white or black
     assert 1.3 < found["plain"] < 3 and abs(found["plain"] - found["fold"]) < 0.01, found     # light 1.6:1, dark 2.8:1 (the old edge was 3:1 or more)
 
 
