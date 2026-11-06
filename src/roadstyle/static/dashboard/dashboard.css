@@ -16,8 +16,8 @@ html[data-rs-theme=dark],#sb[data-theme=dark]{--accent:#42c2d7}
 :root{--bg:#fff;--ink:#16181d;--mut:#6b7280;--line:#e6e8ec;--card:#f7f8fa}
 html[data-rs-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33;--card:#1c2026}
 /* the edge of a closed card and of a card that opens something ("Cards: the panel standard"): a thin line of 3:1 or more on the card and on the panel */
-:root{--rs-card-edge:color-mix(in srgb,var(--line) 20%,var(--mut))}
-html[data-rs-theme=dark],#sb[data-theme=dark]{--rs-card-edge:color-mix(in srgb,var(--line) 30%,var(--mut))}
+:root{--rs-card-edge:color-mix(in srgb,var(--line) 70%,var(--mut))}      /* the light edge that Kaveh tested and chose (variant F) */
+html[data-rs-theme=dark],#sb[data-theme=dark]{--rs-card-edge:color-mix(in srgb,var(--line) 45%,var(--mut))}
 /* roadstyle's map dashboard: the look of its controls, panels and windows (docs/design/dashboard_module.md) */
 .rs-zoom{position:absolute;bottom:10px;left:140px;z-index:2;background:var(--rs-tb-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   padding:2px 6px;border-radius:4px;font:11px/1.5 monospace;color:var(--rs-tb-ink);pointer-events:none}
@@ -430,7 +430,7 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 :is(#sb,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea):focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 :is(#sb,.rs-side) :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--accent)}
 :is(#sb,.rs-side) :is(input[type=checkbox],input[type=radio]){width:16px;height:16px;margin:0}
-:is(#sb,.rs-side) button{border-radius:10px}
+:is(#sb,.rs-side) button:not(:where(.rs-frame *,#rs-dock *)){border-radius:10px}   /* a part's buttons keep the 6 px of :where(.rs-frame, #rs-dock) */
 /* ---- the Street View and Google 3D windows: the style of the boxes (the second level of transparency: --rs-box-bg, like the popup and the tooltip) ---- */
 .rs-svw{border-radius:14px;border:0;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 8px 28px rgba(0,0,0,.35);color:var(--rs-tb-ink)}
 .rs-svw-bar{background:var(--rs-card-bg);color:var(--rs-tb-ink);padding:6px 44px 6px 14px;gap:6px}
@@ -468,6 +468,9 @@ html.rs-panel-left #sb-show,html.rs-panel-left #rs-show-right{left:10px;right:au
 html.rs-panel-left :is(#sb-hide,#sb-show,.rs-side-min) svg,html.rs-panel-left #rs-show-right svg{transform:scaleX(-1)}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone) #map{left:var(--rs-panel-w,400px)!important;right:0!important}
 html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!important}
+/* the boxes of a page with no toolbar (Layers) stand on the map, not over the docked panel at the left (the back button of an editor frame) */
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone) .rs-tl{left:calc(10px + var(--rs-panel-w,400px))}
+html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) .rs-tl{left:10px}
 /* the compass: our needle (tools.js) instead of MapLibre's picture, which is pale on a translucent bar */
 /* the icon fills its button and is centered in it (MapLibre's own box is 29 px high and sat at the top of a 32 px button) */
 .maplibregl-ctrl-compass{position:relative}
@@ -558,7 +561,7 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
    tint under the pointer, or `background: true`, the tint (the Ask card: it stands out). The edge is inside the card, so the size does not change. */
 #sb .sb-sec[data-rs-open]{box-shadow:inset 0 0 0 1px var(--rs-card-edge)}
 #sb .sb-sec[data-rs-open][data-rs-card=no-bg]:hover{background:color-mix(in srgb,var(--card) 92%,var(--accent))}
-#sb .sb-sec[data-rs-open][data-rs-card=bg]{background:color-mix(in srgb,var(--card) 88%,var(--accent))}
+#sb .sb-sec[data-rs-open][data-rs-card=bg]{background:color-mix(in srgb,var(--card) 88%,var(--accent));box-shadow:none}      /* the tint and no edge (variant F) */
 #sb .sb-sec[data-rs-open][data-rs-card=bg]:hover{background:color-mix(in srgb,var(--card) 82%,var(--accent))}
 /* a closed card that folds has the thin edge; open, it has the accent ring in its place */
 #sb .sb-sec[data-rs-fold].folded{box-shadow:inset 0 0 0 1px var(--rs-card-edge)}
@@ -595,6 +598,11 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
    `direction: rtl` puts its scrollbar at the left; the content keeps its own direction. Not on a phone: the sheet has no side. ---- */
 html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody){direction:rtl}
 html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody) > *{direction:ltr}
+/* the body keeps its scrollbar space on the left, and the rows above and under it do not scroll: they move by the same space (--rs-gutter, panelscroll.js),
+   so all start at the same edge (Kaveh: the Ask head row and the answers did not) */
+html.rs-panel-left:not(.rs-phone) #sb .sb-top{padding-left:calc(15px + var(--rs-gutter,0px))}
+html.rs-panel-left:not(.rs-phone) #sb .rs-frame-head{margin-left:calc(15px + var(--rs-gutter,0px))}
+html.rs-panel-left:not(.rs-phone) #sb .rs-frame-bar{margin-left:calc(15px + var(--rs-gutter,0px))}
 
 /* ---- the panel's scrollbar (decided 2026-10-29): the thumb shows only while the pointer is over the panel or the body scrolls (panelscroll.js sets
    .rs-scrolling). A host panel with its own scroll boxes (the level editor's tabs) gives them the class `rs-pbody` and `data-head`, the selector of their header (class `rs-phead`); the space stays reserved, so nothing jumps. The thumb is the text color at 47 % in the light theme and 40 % in the dark theme: 3:1 against the
@@ -748,6 +756,37 @@ html[data-rs-theme=dark] #sb .rs-kpi-val.rs-c{color:color-mix(in srgb,var(--rs-k
    For text and lines the panel's own tokens do the same: --ink, --mut, --line, --card. ---- */
 html{--rs-chart-band:#e0f2fe;--rs-chart-band-line:#bae6fd;--rs-chart-grid:#eef2f6;--rs-chart-miss:#e2e8f0}
 html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-line:rgba(90,169,248,.45);--rs-chart-grid:#272b33;--rs-chart-miss:#3a404a}
+/* the 8 colours of the series of a chart (chart.js), in a fixed order: the dashboard's teal first (one series has it), then the reference palette of the
+   dataviz method; checked with its validator for colour vision deficiency in both themes (all checks pass; adjacent CVD ΔE 14.5 light). In the light
+   theme slots 4 and 5 are under 3:1 on white: a chart has its table, and a pie its legend. (Kaveh, 2026-11-06: "better style and color") */
+html{--rs-chart-1:#008a9e;--rs-chart-2:#eb6834;--rs-chart-3:#2a78d6;--rs-chart-4:#eda100;--rs-chart-5:#e87ba4;--rs-chart-6:#008300;--rs-chart-7:#6250d6;--rs-chart-8:#e34948}
+html[data-rs-theme=dark]{--rs-chart-1:#159cb1;--rs-chart-2:#d95926;--rs-chart-3:#3987e5;--rs-chart-4:#c98500;--rs-chart-5:#d55181;--rs-chart-6:#008300;--rs-chart-7:#9085e9;--rs-chart-8:#e66767}
+.rs-chart{position:relative;min-height:120px;display:flex;flex-direction:column;font:11px system-ui,sans-serif;color:var(--ink);overflow:auto;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) 47%,transparent) transparent}      /* a chart taller than its box: a scrollbar that shows */
+.rs-chart svg{flex:none}
+.rs-chart:not(.rs-chart-scrolls){overflow:hidden}      /* (chart.js: only a drawing taller than its box scrolls) */
+.rs-chart.rs-chart-small{overflow:hidden;min-height:0}
+/* a small pie (Ask's card): the pie at the left at its full height, its legend at its right (Kaveh: "just need to shift left and add legend there") */
+.rs-chart-small .rs-chart-legend{min-height:0}
+.rs-chart.rs-chart-small.rs-chart-side{grid-template-columns:0 auto auto 1fr}
+.rs-chart svg{display:block;overflow:visible;font-family:system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.rs-chart-legend{flex:none;display:flex;flex-wrap:wrap;gap:4px 12px;min-height:20px;color:var(--ink);font-size:11.5px}
+.rs-chart-legend span{display:inline-flex;align-items:center;gap:5px}
+.rs-chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.rs-chart-foot{color:var(--mut);font-size:11px;min-height:16px}
+.rs-chart-foot:empty{display:none}
+html.rs-phone .rs-chart[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+.rs-chart-hd{flex:none;display:flex;align-items:baseline;gap:8px;min-height:22px;flex-wrap:wrap}
+.rs-chart-hd b{font:600 12.5px system-ui,sans-serif;color:var(--ink)}
+.rs-chart-hd span{font-size:11px;color:var(--mut)}
+.rs-chart svg .rs-mk{transition:opacity .12s,fill-opacity .12s;fill-opacity:.85}
+.rs-chart svg .rs-mk.on{fill-opacity:1}      /* a little see-through; the mark under the pointer in its full colour */
+.rs-chart svg.rs-chart-dim .rs-mk:not(.on){opacity:.35}
+.rs-chart-none{color:var(--mut);margin:12px 0}
+/* a pie with its legend beside it (chart.js puts it there when the pie is larger so): the pie and the legend in the middle of the box */
+.rs-chart.rs-chart-side{display:grid;grid-template-columns:1fr auto auto 1fr;align-content:start}
+.rs-chart-side>*{grid-column:1/-1}
+.rs-chart-side>svg{grid-area:2/2}
+.rs-chart-side>.rs-chart-legend{grid-area:2/3;flex-direction:column;flex-wrap:nowrap;align-self:center;margin-left:16px}
 
 /* ---- INPUTS, CHIPS AND A DOT in the panel: a text box looks like the panel's select and query box; a chip is a small rounded label (`.accent` tints it with --accent);
    a dot is a colour mark before a word. A plain <button> and `button.sb-primary` are styled by the template; a page needs no class for them. ---- */
@@ -777,13 +816,24 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 .rs-frame-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
 .rs-frame-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
 .rs-frame-back:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
+/* the base look of a plain button and a field in roadstyle's parts (a frame: Ask, Edit design, an editor; the bottom dock), on every page: a roadstyle
+   page has the same rules for all of #sb in its template, but a host page (duckOSM Studio, duckosm edit) has no template. :where() gives them no
+   weight, so the part's own rules win. */
+:where(.rs-frame, #rs-dock) button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
+:where(.rs-frame, #rs-dock) button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+:where(.rs-frame, #rs-dock) :is(input:not([type=checkbox],[type=radio],[type=range],[type=color]),textarea){box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
+:where(.rs-frame) :is(input[type=password],input[type=text]){width:100%}
+:where(.rs-frame, #rs-dock) :is(input,textarea):focus{border-color:var(--accent)}
 .rs-frame{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 .rs-frame [hidden]{display:none!important}
 #sb .rs-frame-head{flex:none;margin:0 15px;padding-bottom:8px;border-bottom:1px solid var(--line)}
 #sb .rs-frame-head:empty{display:none}
 #sb .rs-frame-head .rs-tabs{padding:0;margin:0;border:0}
 .rs-frame-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
-.rs-frame-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
+/* the bar's line is inset as the head row's line (Kaveh: the full-width line above Examples, "make it better and shorter"); Ask has no line: its
+   question box has its own edge */
+.rs-frame-bar{flex:none;margin:0 15px;padding:8px 0 10px;border-top:1px solid var(--line);font-size:12.5px}
+.rs-frame-bar:has(> .rs-ask-comp){border-top:0}
 .rs-frame-bar:empty{display:none}
 html.rs-phone .rs-frame-back,html.rs-phone .rs-frame .rs-tab{min-height:44px}
 /* on a phone the tab row is one row that scrolls sideways (frame.js scrolls the selected tab into view): the body keeps its room */
@@ -877,6 +927,11 @@ html.rs-dock-open:not(.rs-phone) #rs-scalebox{display:none}      /* the credits:
   background:var(--bg);color:var(--ink);border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -4px 18px rgba(0,0,0,.16);font:13px/1.4 system-ui,sans-serif}
 html:not(.rs-dock-has) #rs-dock,html:not(.rs-dock-has) #rs-dock-pill{display:none}
 html.rs-panel-card:not(.rs-phone) #rs-dock{background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+/* the boxes in the dock (the table, the chart, the list of the tables, the road card): with the card look the map shows through them too (Kaveh,
+   2026-11-06: "background of table, chart need more transparent"); the fixed header row and first column stay nearly solid, else the rows that scroll
+   under them show through their text. With the frame look and on a phone they are solid. */
+#rs-dock{--rs-dk-box:var(--bg);--rs-dk-solid:var(--bg);--rs-dk-head:var(--card)}
+html.rs-panel-card:not(.rs-phone) #rs-dock{--rs-dk-box:color-mix(in srgb,var(--bg) 35%,transparent);--rs-dk-solid:color-mix(in srgb,var(--bg) 88%,transparent);--rs-dk-head:color-mix(in srgb,var(--card) 88%,transparent)}
 /* the grip: no colour of its own; under the pointer or while it is dragged, the dock's top edge is the accent (an inset shadow follows the round corners) */
 .rs-dock-grip{position:absolute;top:-4px;left:14px;right:14px;height:8px;cursor:row-resize;touch-action:none;z-index:1}
 #rs-dock:has(.rs-dock-grip:hover),#rs-dock:has(.rs-dock-grip.on){box-shadow:inset 0 2px 0 0 var(--accent),0 -4px 18px rgba(0,0,0,.16)}
@@ -889,6 +944,13 @@ html.rs-dock-shut .rs-dock-hd{border-bottom:0;cursor:pointer}
 .rs-dock-sp{flex:1}
 .rs-dock-acts{display:flex;gap:6px;align-items:center}
 html.rs-dock-shut .rs-dock-acts{display:none}
+/* a phone: the actions go to a row of their own under the title (the title row was wider than the screen); the row scrolls sideways */
+html.rs-phone .rs-dock-hd{flex-wrap:wrap;height:auto;flex:0 0 auto;min-height:32px;row-gap:4px;padding-bottom:4px}
+html.rs-phone .rs-dock-hd > :not(.rs-dock-acts){flex:none}
+html.rs-phone .rs-dock-hd > .rs-dock-sp{flex:1 1 0}
+html.rs-phone .rs-dock-hd > .rs-dock-note{flex:0 1 auto;min-width:0}
+html.rs-phone .rs-dock-acts{order:9;flex:1 0 100%;min-width:0;overflow-x:auto;scrollbar-width:thin}
+html.rs-phone .rs-dock-acts > *{flex:none}
 .rs-dock-body{flex:1;min-height:0;display:flex;flex-direction:column;padding:8px 14px 10px;gap:6px}
 html.rs-dock-shut .rs-dock-body{display:none}
 html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
@@ -904,21 +966,26 @@ html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
 #rs-dock :is(button,select,summary,a[href],th):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 #rs-dock input,#rs-dock select,#rs-dock textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px}
 /* the dock's table: as wide as its columns, the height of the dock, both scrollbars always visible, the header row and the first column in view */
-#rs-dock .rs-dock-table{flex:1;min-height:0;max-height:none;align-self:flex-start;max-width:100%;box-sizing:border-box;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg);
+#rs-dock .rs-dock-table{flex:1;min-height:0;max-height:none;align-self:flex-start;max-width:100%;box-sizing:border-box;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);
   scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent;-webkit-mask-image:none;mask-image:none}
-#rs-dock .rs-dock-table table{width:max-content;border-collapse:separate;border-spacing:0;font:12.5px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums}
+#rs-dock .rs-dock-table table{table-layout:fixed;width:max-content;border-collapse:separate;border-spacing:0;font:12.5px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums}
 #rs-dock .rs-dock-table :is(th,td){white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis;padding:5px 14px;text-align:left;border-bottom:1px solid var(--line);height:15px}
-#rs-dock .rs-dock-table th{position:sticky;top:0;z-index:2;background:var(--card);font-weight:600;vertical-align:bottom;cursor:pointer;user-select:none}
+#rs-dock .rs-dock-table th{position:sticky;top:0;z-index:2;background:var(--rs-dk-head);font-weight:600;vertical-align:bottom;cursor:pointer;user-select:none}
 #rs-dock .rs-dock-table th small{display:block;font:500 10px/1.2 system-ui,sans-serif;color:var(--mut);letter-spacing:.03em}
 #rs-dock .rs-dock-table .n{text-align:right}
-#rs-dock .rs-dock-table tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--card) 55%,var(--bg))}
-#rs-dock .rs-dock-table :is(td,th):first-child{position:sticky;left:0;z-index:1;background:var(--bg);box-shadow:inset -1px 0 var(--line)}
-#rs-dock .rs-dock-table th:first-child{z-index:3;background:var(--card)}
+#rs-dock .rs-dock-table tbody tr:nth-child(even){--rs-row:color-mix(in srgb,var(--ink) 4%,transparent)}
+#rs-dock .rs-dock-table td{background:var(--rs-row,transparent)}
+#rs-dock .rs-dock-table :is(td,th):first-child{position:sticky;left:0;z-index:1;box-shadow:inset -1px 0 var(--line)}
+/* the first column stays in view over the cells that scroll under it: the tint of its row over a nearly solid layer */
+#rs-dock .rs-dock-table td:first-child{background:linear-gradient(var(--rs-row,transparent),var(--rs-row,transparent)),var(--rs-dk-solid)}
+#rs-dock .rs-dock-table th:first-child{z-index:3;background:var(--rs-dk-head)}
 #rs-dock .rs-dock-table tr.rs-dock-id{cursor:pointer}
-#rs-dock .rs-dock-table :is(thead th,tbody tr:hover td){background:var(--card)}
-#rs-dock .rs-dock-table :is(thead th:is(:hover,:focus-visible),tbody tr.rs-dock-id:hover td){background:color-mix(in srgb,var(--accent) 12%,var(--bg));color:var(--accent)}
+#rs-dock .rs-dock-table tbody tr:hover{--rs-row:color-mix(in srgb,var(--ink) 7%,transparent)}
+#rs-dock .rs-dock-table thead th:is(:hover,:focus-visible){background:color-mix(in srgb,var(--accent) 12%,var(--rs-dk-head));color:var(--accent)}
+#rs-dock .rs-dock-table tbody tr.rs-dock-id:hover{--rs-row:color-mix(in srgb,var(--accent) 14%,transparent)}
+#rs-dock .rs-dock-table tbody tr.rs-dock-id:hover td{color:var(--accent)}
 #rs-dock .rs-dock-table thead th:is(:hover,:focus-visible) small{color:var(--accent)}
-#rs-dock .rs-dock-table tr.on td{background:color-mix(in srgb,var(--accent) 22%,var(--bg))}
+#rs-dock .rs-dock-table tr.on{--rs-row:color-mix(in srgb,var(--accent) 24%,transparent)}
 #rs-dock .rs-dock-table tr.rs-dock-pad td{padding:0;border:0;background:none}
 #rs-dock .rs-dock-null{color:var(--mut);font-style:italic}
 #rs-dock .rs-dock-table th[data-sort] span{color:var(--accent)}
@@ -936,3 +1003,208 @@ html.rs-phone #rs-dock .rs-dock-table{max-width:100%}
 html.rs-phone.rs-dock-shut #rs-dock-pill{display:block}
 html.rs-phone.rs-dock-shut.rs-sheet-0 #rs-dock-pill{bottom:56px}
 html.rs-phone.rs-dock-shut.rs-sheet-2 #rs-dock-pill{display:none}
+/* ---- THE DATA DOCK (data/data_dock.js, docs/guides/data-dock.md): in the bottom dock, the SQL line over the table and the road card beside it ---- */
+:root{--rs-err:#b91c1c}
+html[data-rs-theme=dark]{--rs-err:#fca5a5}
+#rs-dock .rs-dd{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
+.rs-dd-acts{display:flex;gap:12px;align-items:center}      /* the groups: their edge is the card edge, clear in the dark theme too (Kaveh) */
+/* a group is one joined control, as Table | Chart: one edge round it and a thin line between its buttons; a button that is on (Tables open, Light
+   on) is filled */
+#rs-dock .rs-dd-grp{display:inline-flex;flex:none;border:1px solid var(--rs-card-edge);border-radius:8px;overflow:hidden}
+#rs-dock .rs-dd-grp > button{border:0;border-radius:0;padding:3px 10px}
+#rs-dock .rs-dd-grp > button + button{border-left:1px solid var(--rs-card-edge)}
+#rs-dock .rs-dd-grp > button.on{background:var(--accent-fill);color:#fff}
+#rs-dock .rs-dd-acts button.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+#rs-dock .rs-dd-light{display:inline-flex;align-items:center;gap:4px}
+#rs-dock .rs-dd-light.on{background:color-mix(in srgb,#7c4dff 16%,var(--card));border-color:#7c4dff;color:var(--ink)}      /* on: the colour of the light itself */
+.rs-dd-count{min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:999px;background:var(--accent-fill);color:#fff;font:600 10.5px/16px system-ui,sans-serif;text-align:center;display:inline-block}
+.rs-dd-count[hidden]{display:none}
+.rs-dd-q{display:flex;gap:8px;align-items:flex-start}
+#rs-dock .rs-dd-line{flex:1;min-width:0;text-align:left;cursor:text;background:var(--card);border-radius:8px;padding:6px 10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#rs-dock .rs-dd-line.empty{color:var(--mut)}
+.rs-dd-edit{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.rs-dd-edit-hint{font-size:11px;color:var(--mut);padding-left:4px}
+.rs-dd-ta{flex:1;min-width:0;width:100%;box-sizing:border-box;resize:none;border:1px solid var(--accent)!important;border-radius:8px;padding:6px 10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;outline:2px solid color-mix(in srgb,var(--accent) 25%,transparent)}
+#rs-dock .rs-dd-run{border-radius:8px;padding:6px 16px;white-space:nowrap}
+.rs-dd-err{color:var(--rs-err);font-size:12px;white-space:pre-wrap}
+.rs-dd-err:empty{display:none}
+/* the list of the tables: in the place of the table while it is open; a search field, a group for each schema, a card for each table */
+.rs-dd-tables{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);overflow:hidden}
+.rs-dd-tables[hidden],.rs-dd-split[hidden],.rs-dd-tgroup[hidden],.rs-dd-tcard[hidden]{display:none!important}
+.rs-dd-thead{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--rs-dk-head)}
+#rs-dock .rs-dd-tfind{flex:1;min-width:0;padding:5px 10px;border-radius:7px;font-size:12.5px}
+#rs-dock .rs-dd-tfind:focus{outline:2px solid color-mix(in srgb,var(--accent) 30%,transparent);border-color:var(--accent)}
+.rs-dd-tcount{flex:1;color:var(--mut);font-size:12px}
+#rs-dock .rs-dd-tclose{border:0;background:none;color:var(--mut);padding:2px 8px}
+.rs-dd-tbody{flex:1;min-height:0;overflow:auto;padding:4px 10px 10px;scrollbar-width:thin}
+.rs-dd-tgroup{margin-top:8px}
+.rs-dd-tg-h{display:flex;align-items:baseline;gap:8px;margin:0 0 6px;font-size:12px;color:var(--mut)}
+.rs-dd-tg-h b{font:600 11px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.rs-dd-tg-own{color:var(--accent);font-weight:600}
+.rs-dd-tgrid{display:grid;grid-template-columns:1fr;gap:5px}      /* one card under the other in the side column */
+#rs-dock .rs-dd-tcard{display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--card) 55%,transparent);cursor:pointer}
+#rs-dock .rs-dd-tcard:is(:hover,:focus-visible){border-color:var(--accent);background:var(--rs-hover-bg);color:inherit}
+.rs-dd-tc-top{display:flex;align-items:baseline;gap:8px;min-width:0}
+.rs-dd-tc-name{flex:1;min-width:0;font:600 12.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rs-dock .rs-dd-tcard:is(:hover,:focus-visible) .rs-dd-tc-name{color:var(--accent)}
+.rs-dd-tc-rows{flex:none;font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
+.rs-dd-tc-about{font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-dd-tgrid{align-items:start}
+.rs-dd-split{flex:1;min-height:0;display:flex;gap:10px}
+#rs-dock .rs-dd-split .rs-dock-table{flex:1 1 0;min-width:0;min-height:0;align-self:stretch;max-width:none}      /* (#rs-dock: over the table's own align-self: flex-start, which gave it the height of its rows: no scroll) */
+.rs-dd-side{flex:0 0 300px;box-sizing:border-box;min-height:0;display:flex;flex-direction:column}
+.rs-dd-side[hidden],.rs-dd-card[hidden]{display:none!important}
+.rs-dd-side-hint{margin:auto 0;padding:0 20px;text-align:center;color:var(--mut);font-size:12px}
+.rs-dd-side-hint[hidden]{display:none}
+.rs-dd-side.empty{border:1px dashed var(--line);border-radius:8px}
+html.rs-phone .rs-dd-side.empty{display:none}
+.rs-dd-chart:not([hidden])~.rs-dd-side.empty{display:none}      /* the Chart view: the chart takes the width of an empty side column (the Table view keeps it) */
+.rs-dd-card{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:10px 12px;font:12px/1.4 system-ui,sans-serif;scrollbar-width:thin}
+.rs-dd-rc-hd{display:flex;align-items:flex-start;gap:8px}
+.rs-dd-rc-name{flex:1;min-width:0;font:600 14px/1.3 system-ui,sans-serif;color:var(--ink);overflow-wrap:anywhere}
+#rs-dock .rs-dd-rc-x{flex:none;border:0;background:none;color:var(--mut);padding:0 4px;font-size:12px;line-height:20px}
+.rs-dd-rc-chips{display:flex;flex-wrap:wrap;gap:4px}
+.rs-dd-rc-chip{padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink);font-size:11.5px;white-space:nowrap}
+.rs-dd-rc-chip.strong{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:600}
+.rs-dd-rc-rows{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;padding-top:6px;border-top:1px solid var(--line)}
+.rs-dd-rc-rows dt{color:var(--mut);white-space:nowrap}
+.rs-dd-rc-rows dd{margin:0;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-dd-rc-foot{display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px solid var(--line)}
+.rs-dd-rc-id{flex:1;min-width:0;color:var(--mut);font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rs-dock .rs-dd-rc-foot button{padding:2px 8px;font-size:11.5px}
+.rs-dd-card[hidden]{display:none}
+html.rs-phone .rs-dd-split{flex-direction:column}
+html.rs-phone .rs-dd-side{flex:0 0 auto;max-height:55%}
+html.rs-phone .rs-dd-q{flex-wrap:wrap}
+/* the lists of Colour and Focus: a box in the look of the toolbox's boxes, under its button */
+.rs-dd-menu{position:fixed;z-index:31;min-width:300px;max-width:min(420px,calc(100vw - 16px));max-height:50dvh;overflow:auto;box-sizing:border-box;padding:6px;border:1px solid var(--rs-tb-border,var(--line));border-radius:10px;
+  background:var(--rs-box-bg,var(--bg));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--ink);font:12px/1.35 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.22)}
+.rs-dd-menu[hidden]{display:none}
+.rs-dd-menu button{font:inherit;color:inherit;background:none;border:0;border-radius:6px;padding:3px 8px;cursor:pointer}
+.rs-dd-menu button:is(:hover,:focus-visible):not(:disabled){background:var(--rs-hover-bg);color:var(--accent)}
+.rs-dd-menu button:disabled{opacity:.45;cursor:default}
+.rs-dd-menu-add{display:block;width:100%;text-align:left;font-weight:600!important;color:var(--accent)!important}
+.rs-dd-menu-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer}
+.rs-dd-menu-row:hover{background:var(--rs-hover-bg)}
+.rs-dd-menu-row.off{opacity:.6}
+.rs-dd-menu-row input{margin:0;accent-color:var(--accent)}
+.rs-dd-menu-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-dd-menu-row small{color:var(--mut);font-variant-numeric:tabular-nums}
+.rs-dd-sw{width:12px;height:4px;border-radius:2px;display:inline-block}
+.rs-dd-seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.rs-dd-menu .rs-dd-seg button{border-radius:0;padding:1px 7px}
+.rs-dd-menu .rs-dd-seg button.on{background:var(--accent-fill);color:#fff}
+.rs-dd-menu-empty{margin:4px 8px;color:var(--mut)}
+/* ---- ASK (ask/ask_panel.js, docs/guides/ask.md): an editor frame in the panel. The head row is the tool row, the body the conversation (one card for
+   each question, an outline with no fill), the bar the question box: one box with the text and a round send button inside it ---- */
+#sb .rs-ask-top{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
+.rs-ask-who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#sb .rs-ask-top > button:not(.rs-help-btn){font-size:12px;padding:3px 10px}
+#sb .rs-ask-top button.rs-ask-keyb.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+#sb .rs-ask-top button.rs-ask-keyb.on:is(:hover,:focus-visible){filter:brightness(1.1);background:var(--accent-fill);color:#fff}
+.rs-ask-ex{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:0 0 4px}
+.rs-ask-hint{color:var(--mut);font-size:12px;margin:0 0 4px}
+.rs-ask-need{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:0 0 6px;font-size:12.5px}
+.rs-ask-need:empty{display:none}
+.rs-ask-need p{margin:0}
+#sb .rs-ask button.rs-chip{cursor:pointer;text-align:left;white-space:normal;font-size:12px;border-radius:10px;padding:4px 10px}
+.rs-ask-turn{margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:transparent}
+.rs-ask-turn-hd{display:flex;align-items:flex-start;gap:8px}
+.rs-ask-turn .q{flex:1;min-width:0;margin:0 0 6px;font-weight:600;overflow-wrap:anywhere}
+#sb .rs-ask-x{flex:none;border:0;background:none;color:var(--mut);font-size:12px;padding:2px 6px;border-radius:6px}
+.rs-ask-turn .step{color:var(--mut);font-size:12px;margin:2px 0}
+.rs-ask-turn .a{margin:4px 0 6px;overflow-wrap:anywhere}
+.rs-ask-turn .a p{margin:0 0 6px}
+.rs-ask-turn .a ul{margin:0 0 4px;padding-left:18px}
+.rs-ask-turn .a li{margin:2px 0}
+.rs-ask-turn .a code{font:12px ui-monospace,Menlo,monospace;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:0 3px}
+#sb .rs-ask-more{border:0;background:none;padding:0 0 4px;color:var(--accent);font-size:12px}
+.rs-ask-turn .rs-ask-err{color:var(--rs-err);margin:0 0 6px;font-size:12.5px}
+.rs-ask-map{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:12px;margin:4px 0}
+.rs-ask-map-k{font:600 10px/1 system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:3px 6px}
+.rs-ask-map-to{color:var(--mut);font-size:11.5px;margin-left:auto}
+.rs-ask-foot{display:flex;align-items:flex-start;gap:8px;justify-content:space-between;margin-top:4px}
+.rs-ask-turn details{font-size:12px;color:var(--mut);flex:1;min-width:0}
+.rs-ask-turn details code{display:block;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.45 ui-monospace,Menlo,monospace;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:4px 0}
+.rs-ask-turn .rs-ask-failed{margin:2px 0 0 12px}
+.rs-ask-acts{flex:none;display:flex;gap:6px}
+#sb .rs-ask-show{font-size:12px;padding:2px 10px}
+/* the key form: in place of the conversation, with its own way back to the chat */
+.rs-ask-key{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.rs-ask-keyhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.rs-ask-keyhd b{font-size:13px}
+#sb .rs-ask-keyhd button{font-size:12px;padding:3px 10px}
+#sb .rs-ask-krow{margin:0}
+#sb .rs-ask-krow > span{display:block;margin-bottom:3px}
+.rs-ask-key > a{font-size:12px}
+.rs-ask-btns{display:flex;justify-content:flex-end;gap:6px}
+.rs-ask-keynote{font-size:11.5px;color:var(--mut);margin:0}
+#sb .rs-ask-key .rs-q{font:13px system-ui,-apple-system,"Segoe UI",sans-serif;text-transform:none;letter-spacing:0}   /* not the 11 px of the template's label around it */
+/* the bar: "Examples ▴" (after the first question; its list opens over the chat, above the box) and the question box */
+.rs-ask-exbar{position:relative;display:flex;margin-bottom:6px}
+#sb .rs-ask-exb{border:0;background:none;padding:2px 6px;font:500 12px system-ui,sans-serif;color:var(--mut);display:inline-flex;align-items:center;gap:4px;border-radius:6px}
+.rs-ask-exb[aria-expanded=false] svg{transform:rotate(180deg)}
+.rs-ask-exlist{position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px;
+  background:var(--bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.rs-ask-comp{display:flex;align-items:flex-end;gap:6px;padding:5px 5px 5px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.rs-ask-comp:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+#sb .rs-ask-comp textarea{flex:1;min-width:0;border:0!important;background:transparent!important;box-shadow:none!important;outline:none;resize:none;
+  padding:6px 0!important;margin:0;font:13px/20px system-ui,-apple-system,sans-serif;color:var(--ink);height:32px;max-height:132px;overflow-y:auto}
+#sb .rs-ask-comp .rs-ask-send{flex:none;width:32px;height:32px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:var(--accent-fill)!important;color:#fff!important}
+#sb .rs-ask-comp .rs-ask-send:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1)}
+#sb .rs-ask-comp .rs-ask-send.stop{background:var(--ink)!important;color:var(--bg)!important}
+/* the data dock's chart view: the row of Kind, X, Y and SVG over the chart; the chart fills the dock */
+#rs-dock .rs-dd-view{display:inline-flex;border:1px solid var(--rs-card-edge);border-radius:8px;overflow:hidden}
+#rs-dock .rs-dd-view button{border:0;border-radius:0;padding:3px 10px}
+#rs-dock .rs-dd-view button.on{background:var(--accent-fill);color:#fff}
+.rs-dd-chart{flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:8px;background:transparent;padding:8px 12px}
+.rs-dd-chart[hidden],#rs-dock .rs-dock-table[hidden]{display:none}
+.rs-dd-chartrow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px}
+.rs-dd-cl{display:inline-flex;gap:6px;align-items:center;color:var(--mut);font-size:12px}
+.rs-dd-cl .rs-sel{width:170px}
+#rs-dock .rs-dd-cl .rs-sel-btn{padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--rs-dk-solid);color:var(--ink);font-size:12.5px}
+#rs-dock .rs-dd-cl .rs-sel-btn:hover:not(:disabled){background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
+.rs-dd-kinds{display:inline-flex;padding:2px;gap:2px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-solid)}
+#rs-dock .rs-dd-kind{display:grid;place-items:center;width:30px;height:26px;padding:0;border:0;border-radius:6px;background:none;color:var(--mut)}
+#rs-dock .rs-dd-kind:is(:hover,:focus-visible):not(.on){background:var(--rs-hover-bg);color:var(--accent)}
+#rs-dock .rs-dd-kind.on{background:var(--accent-fill);color:#fff}
+.rs-dd-sp{flex:1}
+.rs-dd-chartel{flex:1;min-height:0}
+.rs-dd-cmain{position:relative;flex:1 1 0;min-width:0;min-height:0;display:flex;flex-direction:column}
+#rs-dock .rs-dd-svg{position:absolute;top:0;right:0;z-index:1;padding:2px 8px;font-size:11.5px;opacity:.75}
+#rs-dock .rs-dd-svg:is(:hover,:focus-visible){opacity:1}
+/* a computer: the kinds, X and Y are a column at the chart's left, and the chart has the height of the box under its title line (Kaveh,
+   2026-11-06: "this part can be vertical"); a phone keeps them in a row over the chart */
+html:not(.rs-phone) .rs-dd-chart{flex-direction:row;gap:16px}
+html:not(.rs-phone) .rs-dd-chartrow{flex:none;width:180px;flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:6px;min-height:0;overflow:hidden auto;
+  direction:rtl;scrollbar-width:thin;padding-left:2px}      /* a short dock: the column scrolls, its thin scrollbar at the left (Kaveh), as the left panel's */
+html:not(.rs-phone) .rs-dd-chartrow > *{direction:ltr}
+html:not(.rs-phone) .rs-dd-chartrow .rs-dd-kinds{display:flex;box-sizing:border-box;width:100%}   /* the kinds share the column's width: no sideways scroll (Kaveh: "it got scroll!") */
+html:not(.rs-phone) #rs-dock .rs-dd-chartrow .rs-dd-kind{flex:1 1 0;width:auto;min-width:0}
+html:not(.rs-phone) .rs-dd-chartrow .rs-dd-cl{display:grid;grid-template-columns:12px minmax(0,1fr)}
+html:not(.rs-phone) .rs-dd-chartrow .rs-dd-cl .rs-sel{width:auto;min-width:0}
+
+/* a chart answer of Ask: a small copy of its chart in the card (the chart is in the data dock) */
+#sb .rs-ask-chart{height:140px;margin:8px 0 4px;padding:0;background:none;border:0}      /* no box: the chart sits on the card (Kaveh, 2026-11-06) */
+/* the look of roadstyle's own classes in the panel: the query field (.rs-q, also Ask's fields), the filled button (.sb-primary), the parts query
+   and road_card. They were in the dashboard template only, so a host page (duckOSM Studio, duckosm edit) did not have them. They are classes,
+   so a host's own elements do not change; the template keeps only its rules for the elements (#sb button, select, label). At the end of
+   the file, where the template's rules were, so each wins as before. */
+#sb .rs-q{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);outline:none}
+#sb .rs-q:focus{border-color:var(--accent)}
+#sb .rs-q{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sb-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+#sb button.sb-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600}
+#sb button.sb-primary:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1);color:#fff;background:var(--accent-fill)}
+#sb .rs-q-col{width:28px;height:28px;padding:1px;border:1px solid var(--line);border-radius:6px;
+  vertical-align:middle;cursor:pointer;background:var(--bg)}
+#sb .rs-q-count{color:var(--mut);font-size:12px;margin:10px 0 2px;font-variant-numeric:tabular-nums}
+#sb .rs-q-list{max-height:230px;overflow:auto}
+#sb .rs-q-list div{padding:4px 0;border-bottom:1px solid var(--line)}
+#sb .rs-q-list a{color:var(--accent);text-decoration:none}
+#sb .rs-q-list a:hover{text-decoration:underline}
+#sb .rs-road-card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px;
+  margin-top:6px;min-height:38px;color:var(--ink)}
+#sb .rs-road-card-none{color:var(--mut)}
+#sb .rs-road-card b{color:var(--ink)}
+#sb .rs-road-card-ov{color:var(--mut)}

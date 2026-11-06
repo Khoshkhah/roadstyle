@@ -52,6 +52,10 @@ jobs:
 
       - name: Install (+ headless Chromium, + mcp for the Python MCP server's tests until it retires)
         run: |
+          # the runner's Azure mirror of Ubuntu was so slow (2026-11-06: 7 to 40 s for each package) that the browsers' packages did not install in
+          # 45 minutes; Ubuntu's own archive is used for them. The runner's apt reads its mirror from apt-mirrors.txt (mirror+file:), not from the
+          # sources file
+          echo "http://archive.ubuntu.com/ubuntu/" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           pip install -e ".[dev]" playwright "mcp>=2.2,<3"
           playwright install --with-deps chromium firefox webkit     # Firefox and WebKit for tests/test_mlt_browsers.py
 
@@ -60,8 +64,10 @@ jobs:
           rustup toolchain install 1.99.1 --profile minimal    # the version of the Rust workflow
           (cd rust && cargo +1.99.1 build --locked -p roadstyle-cli)
 
+      # 4 workers (the runner has 4 cores); each test file stays on one worker (loadfile), so the tests of a file that share a server or a page run
+      # in order. The suite took 22 minutes on one worker (Kaveh, 2026-11-06: "25 min is too much")
       - name: Tests (incl. browser)
-        run: pytest -q
+        run: pytest -q -n 4 --dist loadfile
         env:
           ROADSTYLE_BIN: rust/target/debug/roadstyle
 

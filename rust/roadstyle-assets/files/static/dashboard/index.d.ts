@@ -143,12 +143,36 @@ export interface Sections {
   list(): string[];
   /** The box of a section (the page can move it), or null. */
   get(id: string): HTMLElement | null;
-  /** A section of the page: html or el, at the end of the panel when it has neither after nor before. */
-  add(spec: { id: string; html?: string; el?: HTMLElement; label?: string | null; after?: string; before?: string }): void;
+  /** A section of the page: html, el or a part of roadstyle, at the end of the panel when it has neither after nor before. */
+  add(spec: { id: string; html?: string; el?: HTMLElement; part?: "query" | "road_card" | "chart"; text?: string; fields?: string[]; chart?: ChartCard;
+              label?: string | null; after?: string; before?: string }): HTMLElement;
   remove(id: string): void;
   hide(id: string): void;
   show(id: string): void;
 }
+
+/** The options of a chart card (`part: "chart"`, chartcard.js; docs/guides/charts.md). No `data`: the map's roads. */
+export interface ChartCard {
+  kind: "bar" | "line" | "histogram" | "scatter" | "pie";
+  /** The groups (bar, pie), the order (line), the numbers (histogram, scatter). */
+  x: string;
+  /** A number column, or up to 3 (bar, line); none: the count of rows. Not for a histogram. */
+  y?: string | string[];
+  agg?: "sum" | "mean" | "min" | "max" | "count";
+  /** A factor for the values of y (default 1). */
+  scale?: number;
+  /** The page's own rows: {columns, rows} or a list of objects. */
+  data?: { columns: { name: string; type: string }[]; rows: unknown[][] } | Record<string, unknown>[];
+  /** None: the card's label is the title. */
+  title?: string;
+  /** Pixels (default 220). */
+  height?: number;
+  /** The map's roads only: draw again for the roads that the map shows now. */
+  follow?: boolean;
+}
+
+/** The detail of rs:chartpick: a click on a mark of a chart card with `data`. */
+export interface ChartPick { id: string; row: Record<string, unknown>; rows: number[] }
 
 /** rs.legend: the page's own rows in the legend (legend.js). */
 export interface LegendRows {
@@ -239,6 +263,10 @@ export interface Dashboard {
   /** The part of the map that the bar, the panel and the phone's sheet leave free, in window coordinates. */
   freeArea(): { lo: number; hi: number; top: number; bottom: number };
   select(id: EdgeId | null): void;
+  /** A part that shows the road's facts itself holds the road popup while it is in view (the data dock's road card): no popup for a selection. */
+  holdPopup(key: string, on: boolean): void;
+  /** Every road that is not in `ids` at `opacity` (0.18) of its own opacity, with its arrows and names; null ends it (rs:fadechange). */
+  fade(ids: EdgeId[] | null, options?: { opacity?: number }): void;
   /** The selection glow on these roads; with `set`, the roads of a named set in its own colour ([] with the set clears it). */
   highlight(ids: EdgeId[], set?: { set: string; color?: string; opacity?: number }): void;
   focus(ids: EdgeId | EdgeId[]): void;

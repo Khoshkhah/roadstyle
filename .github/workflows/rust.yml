@@ -126,18 +126,18 @@ jobs:
             rust/target
           key: rust-py-${{ env.RUST }}-${{ hashFiles('rust/Cargo.lock') }}
 
-      - name: Install roadstyle (maturin builds the extension roadstyle._rust) and a headless Chromium for the browser tests
-        run: |
-          pip install -e ".[dev]" playwright
-          playwright install --with-deps chromium
+      - name: Install roadstyle (maturin builds the extension roadstyle._rust)
+        run: pip install -e ".[dev]"
 
       - name: Clippy of the binding
         run: |
           (cd rust && cargo fetch --locked)
           (cd rust && cargo clippy --offline -p roadstyle-py -- -D warnings)
 
-      - name: The whole suite, with the browser tests (docs/design/rust_library.md, P5's golden test)
-        run: pytest -q
+      # the binding gives the Rust engine's texts byte for byte (P5's golden test). The whole suite, with the browser tests, runs once, in the
+      # job browser-smoke of the workflow Tests: two runs of it made each pull request wait 25 minutes (Kaveh, 2026-11-06)
+      - name: The binding's golden test (docs/design/rust_library.md, P5)
+        run: pytest -q tests/test_binding.py
 
   tartu:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

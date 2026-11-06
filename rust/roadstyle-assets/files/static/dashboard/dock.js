@@ -133,13 +133,34 @@ export const rsDock = (() => {
     : (typeof a === "number" || typeof a === "bigint") && (typeof b === "number" || typeof b === "bigint") ? (a < b ? -1 : a > b ? 1 : 0)
     : String(a).localeCompare(String(b), undefined, {numeric: true});
 
-  function table({columns = [], rows = [], idColumn = null, more = false, onSort = null} = {}){
+  function table({columns = [], rows = [], idColumn = null, more = false, onSort = null, onRow = null} = {}){
     const box = el("div", "rs-dock-table rs-scroll"), t = el("table", "rs-table"), head = el("thead"), tb = el("tbody");
     t.append(head, tb); box.append(t);
     let cols = columns, data = rows, orig = rows, sort = null, picked = null;
     const isNum = c => NUM.test(String(c.type || "")) && c.name !== idColumn;
     const idAt = () => idColumn ? cols.findIndex(c => c.name === idColumn) : -1;
+    // the width of each column (Kaveh, 2026-11-06: "is there any algorithm to make suitable width size for every column?"): measured on a sample of
+    // up to 200 rows in the table's font. A number column has its widest value (a number is never cut); a text column the width that 90 % of its
+    // values fit, at least its header and at most 320 px (a longer value ends with "..." and has its text in the tooltip). The table then has fixed widths.
+    const colgroup = el("colgroup"); t.prepend(colgroup);
+    let measure = null;
+    const widths = () => {
+      if(!measure){ measure = document.createElement("canvas").getContext("2d"); }
+      // the font of the dock's table (dashboard.css): the table may not be on the page yet, so its computed font is not known
+      const pad = 30, sample = data.length <= 200 ? data : Array.from({length: 200}, (_, i) => data[Math.floor(i * data.length / 200)]);
+      const w = (s, bold) => { measure.font = `${bold ? 600 : 400} 12.5px system-ui, sans-serif`; return measure.measureText(s).width; };
+      const out = cols.map((c, j) => {
+        const vals = sample.map((r) => w(text(r[j]))).sort((a, b) => a - b), head = Math.max(w(c.name, true), w(String(c.type || "")) * 0.85) + pad;
+        const p = vals.length ? (isNum(c) ? vals[vals.length - 1] * 1.1 : vals[Math.floor((vals.length - 1) * 0.9)]) + pad : 0;   // (the table's digits are tabular: wider)
+        return Math.round(Math.max(56, head, Math.min(isNum(c) ? 400 : 320, p)));
+      });
+      colgroup.replaceChildren(...out.map((x) => { const e = el("col"); e.style.width = x + "px"; return e; }));
+      t.style.width = out.reduce((a, b) => a + b, 0) + "px";
+      return out;
+    };
+    let colW = [];
     const drawHead = () => {
+      colW = widths();
       const tr = el("tr");
       cols.forEach(c => {
         const th = el("th", isNum(c) ? "n" : ""); th.tabIndex = 0; th.title = c.about || c.name;
@@ -153,8 +174,10 @@ export const rsDock = (() => {
     };
     const rowEl = (r, i) => {
       const tr = el("tr"), k = idAt();
-      if(k >= 0){ tr.className = "rs-dock-id" + (picked != null && String(r[k]) === picked ? " on" : ""); tr.onclick = () => pick(String(r[k])); }
-      r.forEach((v, j) => { const td = el("td", (v == null ? "rs-dock-null " : "") + (isNum(cols[j]) ? "n" : ""), text(v)); const s = text(v); if(s.length > 40) td.title = s; tr.append(td); });
+      // onRow(row, index, columns): the host's own click (the data dock: a row of names selects its roads); else a row with an id selects its road
+      if(onRow){ tr.className = "rs-dock-id" + (picked === "#" + i ? " on" : ""); tr.onclick = () => { picked = "#" + i; mark(); onRow(r, i, cols); }; }
+      else if(k >= 0){ tr.className = "rs-dock-id" + (picked != null && String(r[k]) === picked ? " on" : ""); tr.onclick = () => pick(String(r[k])); }
+      r.forEach((v, j) => { const td = el("td", (v == null ? "rs-dock-null " : "") + (isNum(cols[j]) ? "n" : ""), text(v)); const s = text(v); if(s.length * 6.5 > (colW[j] || 320) - 28) td.title = s; tr.append(td); });
       tr.dataset.i = i;
       return tr;
     };
@@ -173,11 +196,12 @@ export const rsDock = (() => {
       else { const i = cols.findIndex(c => c.name === col), k = sort.dir === "asc" ? 1 : -1; data = [...orig].sort((x, y) => x[i] == null || y[i] == null ? cmpVal(x[i], y[i]) : k * cmpVal(x[i], y[i])); }
       drawHead(); drawBody();
     }
+    const mark = () => tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", "#" + tr.dataset.i === picked));
     function pick(id){
       picked = id; tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", String(data[+tr.dataset.i][idAt()]) === id));
       if(window.rs){ window.rs.select(id); window.rs.focus([id]); }
     }
-    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; } if("more" in x) more = x.more; box.scrollTop = 0; drawHead(); drawBody(); };
+    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; picked = null; } if("more" in x) more = x.more; box.scrollTop = 0; drawHead(); drawBody(); };
     set({});
     return {el: box, set, rows: () => data, sort: () => sort};
   }

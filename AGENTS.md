@@ -13,6 +13,8 @@ roadstyle. Every keyword with its default: `docs/reference/parameters.md`; the f
 ```bash
 conda activate roadstyle            # or: pip install -e ".[dev]"
 pytest                              # ~200 tests, ~20 s; browser tests need `pip install playwright`
+pytest -n 4 --dist loadfile         # the whole suite on 4 workers, as CI runs it (about 6 minutes with the browser tests)
+scripts/check.sh                    # before `git push`: lint, the guards, the copies, the manual and the changed tests (about 30 s)
 ```
 
 A consumer project that does not install it runs with `PYTHONPATH=<this repo>/src`.

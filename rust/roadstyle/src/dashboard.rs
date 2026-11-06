@@ -52,6 +52,131 @@ pub enum Part {
     Query,
     /// the selected road's fields, on `rs:select`
     RoadCard,
+    /// a chart of the map's roads or of the page's own rows (`chart`; docs/guides/charts.md)
+    Chart,
+}
+
+/// The kind of a chart card, as `rs.chart` draws it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChartKind {
+    Bar,
+    Line,
+    Histogram,
+    Scatter,
+    Pie,
+}
+
+/// How the rows of one value of `x` join into one value of the chart.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChartAgg {
+    #[default]
+    Sum,
+    Mean,
+    Min,
+    Max,
+    Count,
+}
+
+/// `y` of a chart: one number column, or a list of them (bar, line).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ChartY {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl ChartY {
+    fn names(&self) -> Vec<&str> {
+        match self { ChartY::One(n) => vec![n.as_str()], ChartY::Many(v) => v.iter().map(String::as_str).collect() }
+    }
+}
+
+/// A column of the page's own rows: its name and its SQL type name (VARCHAR, DOUBLE, BIGINT, DATE, TIMESTAMP, BOOLEAN).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChartColumn {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub ty: String,
+}
+
+/// The page's own rows of a chart card (the Python binding makes them of a DataFrame or of a list of dicts). They are written into the page.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChartData {
+    pub columns: Vec<ChartColumn>,
+    pub rows: Vec<Vec<Value>>,
+}
+
+/// The options of a chart card (`part: "chart"`; docs/guides/charts.md). With no `data`, the chart reads the map's own road table.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChartSpec {
+    pub kind: ChartKind,
+    /// the groups (bar, pie), the order (line), the numbers (histogram, scatter)
+    pub x: String,
+    /// a number column, or up to 3 (bar, line); none: the count of rows. Not for a histogram
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub y: Option<ChartY>,
+    #[serde(default)]
+    pub agg: ChartAgg,
+    /// a factor for the values of `y` (0.001: metres to km)
+    #[serde(default = "one")]
+    pub scale: f64,
+    /// the page's own rows; none: the map's roads
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<ChartData>,
+    /// none: the card's label is the title
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default = "chart_height")]
+    pub height: u32,
+    /// the map's roads only: draw again for the roads that the map shows now
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub follow: bool,
+}
+
+fn one() -> f64 { 1.0 }
+fn chart_height() -> u32 { 220 }
+
+impl ChartSpec {
+    /// The checks of a chart card that serde does not do (`id`: the section's id, for the message).
+    fn check(&self, id: &str) -> Result<(), String> {
+        let ys = self.y.as_ref().map(ChartY::names).unwrap_or_default();
+        let kind = serde_json::to_value(self.kind).expect("a name");
+        if self.kind == ChartKind::Histogram && !ys.is_empty() {
+            return Err(format!("'{id}': a histogram has no `y`: it counts the values of `x`"));
+        }
+        if ys.len() > 3 || (ys.len() > 1 && !matches!(self.kind, ChartKind::Bar | ChartKind::Line)) {
+            return Err(format!("'{id}': a {} chart has {} `y` columns: a bar or a line has up to 3, a pie and a scatter 1", kind.as_str().unwrap(), ys.len()));
+        }
+        if self.kind == ChartKind::Scatter && ys.is_empty() {
+            return Err(format!("'{id}': a scatter chart needs `y`, a number column"));
+        }
+        if !self.scale.is_finite() || self.scale == 0.0 {
+            return Err(format!("'{id}': `scale` is {}: it must be a number that is not 0", self.scale));
+        }
+        if self.height < 80 {
+            return Err(format!("'{id}': `height` is {} px: a chart needs 80 px or more", self.height));
+        }
+        if let Some(d) = &self.data {
+            if self.follow {
+                return Err(format!("'{id}': `follow` is for the map's roads, and this chart has `data`, the page's own rows"));
+            }
+            for c in std::iter::once(self.x.as_str()).chain(ys) {
+                if !d.columns.iter().any(|k| k.name == c) {
+                    let names: Vec<&str> = d.columns.iter().map(|k| k.name.as_str()).collect();
+                    return Err(format!("'{id}': the column '{c}' is not in `data` (its columns: {})", names.join(", ")));
+                }
+            }
+            if let Some(r) = d.rows.iter().find(|r| r.len() != d.columns.len()) {
+                return Err(format!("'{id}': a row of `data` has {} values and `data` has {} columns", r.len(), d.columns.len()));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// A section that the page adds to the panel: the page's own HTML (`html`) or a part of roadstyle (`part`), at the end of the panel or beside an
@@ -71,6 +196,9 @@ pub struct Section {
     /// the columns that the road card shows (`part: "road_card"`; none: every column)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<String>>,
+    /// the chart's options (`part: "chart"`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chart: Option<ChartSpec>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// the id of an earlier section: this one goes after it
@@ -410,7 +538,8 @@ impl Template {
         let (layout, panel, toolbar, windows) = match (self, layout) {
             (Template::Map, _) => (Layout::Dock, None, None, free),
             (Template::Dashboard, Layout::Dock) => (Layout::Dock, panel0.clone(), None, free),
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone(), Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box }),
+            // the panel over the map is the floating card, see-through (Kaveh, 2026-11-06: the look of the chart demo is the default)
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone().map(|p| Panel { look: PanelLook::Card, ..p }), Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
         Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(),
@@ -504,8 +633,8 @@ pub fn merge(base: &Dashboard, over: &Value) -> Result<Dashboard, crate::Error> 
 }
 
 impl Dashboard {
-    /// The checks of the panel's sections: an id is used once; a section has `html` or `part`, not both; `text` is the query's and `fields`
-    /// the road card's; `after` and `before` name an earlier section, and not both.
+    /// The checks of the panel's sections: an id is used once; a section has `html` or `part`, not both; `text` is the query's, `fields`
+    /// the road card's and `chart` the chart's (ChartSpec::check); `after` and `before` name an earlier section, and not both.
     pub fn check(&self) -> Result<(), crate::Error> {
         let Some(p) = &self.panel else { return Ok(()) };
         let mut known: Vec<&str> = Vec::new();
@@ -515,13 +644,20 @@ impl Dashboard {
                 return bad(format!("sections: the id '{}' is empty or used twice", s.id));
             }
             if s.html.is_some() == s.part.is_some() {
-                return bad(format!("sections: '{}' needs `html` (the page's own) or `part` (\"query\" or \"road_card\"), and not both", s.id));
+                return bad(format!("sections: '{}' needs `html` (the page's own) or `part` (\"query\", \"road_card\" or \"chart\"), and not both", s.id));
             }
             if s.text.is_some() && s.part != Some(Part::Query) {
                 return bad(format!("sections: '{}' has `text`, which only the part \"query\" has", s.id));
             }
             if s.fields.is_some() && s.part != Some(Part::RoadCard) {
                 return bad(format!("sections: '{}' has `fields`, which only the part \"road_card\" has", s.id));
+            }
+            if s.chart.is_some() != (s.part == Some(Part::Chart)) {
+                return bad(if s.chart.is_some() { format!("sections: '{}' has `chart`, which only the part \"chart\" has", s.id) }
+                           else { format!("sections: '{}' is the part \"chart\" and has no `chart` (its options: kind, x, ...)", s.id) });
+            }
+            if let Some(c) = &s.chart {
+                c.check(&s.id).map_err(|m| crate::error::options(format!("dashboard=: panel.sections: {m}")))?;
             }
             if s.fold && s.label.is_none() {
                 return bad(format!("sections: '{}' folds (`fold`) and has no `label`, which is its button", s.id));
@@ -627,7 +763,7 @@ mod tests {
     #[test]
     fn the_first_paint_script_names_the_classes_of_the_form() {
         let r = Template::Dashboard.dashboard(Overlay).first_paint();
-        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-hide-scale")"#) && r.contains("(max-width:700px)"), "{r}");
+        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-panel-card","rs-hide-scale")"#) && r.contains("(max-width:700px)"), "{r}");
         assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock","rs-panel-left","rs-hide-scale")"#));
         // the width of the panel, and a side and a look that are not the default
         let mut wide = Template::Dashboard.dashboard(Overlay);
@@ -704,7 +840,7 @@ mod tests {
                             (serde_json::json!([{"id": "a", "html": ""}, {"id": "b", "html": "", "after": "a", "before": "a"}]), "use one"),
                             (serde_json::json!([{"id": "a", "html": ""}, {"id": "a", "html": ""}]), "used twice"),
                             (serde_json::json!([{"id": "a"}]), "needs `html`"), (serde_json::json!([{"id": "a", "html": "", "part": "query"}]), "not both"),
-                            (serde_json::json!([{"id": "a", "part": "chart"}]), "unknown variant"),
+                            (serde_json::json!([{"id": "a", "part": "graph"}]), "unknown variant"),
                             (serde_json::json!([{"id": "a", "part": "road_card", "text": "x"}]), "only the part \"query\""),
                             (serde_json::json!([{"id": "a", "part": "query", "fields": ["x"]}]), "only the part \"road_card\""),
                             (serde_json::json!([{"id": "a", "html": "", "colour": 1}]), "colour")] {
@@ -715,6 +851,36 @@ mod tests {
         assert!(e.contains("phone is not an option") && e.contains("700 px"), "{e}");
         let e = merge(&base, &serde_json::json!({"panel": {"hide": ["query"]}})).unwrap_err().to_string();
         assert!(e.contains("panel.hide is gone") && e.contains("part"), "{e}");
+    }
+
+    #[test]
+    fn a_chart_card_is_checked() {
+        let base = Template::Dashboard.dashboard(Overlay);
+        let sec = |chart: serde_json::Value| merge(&base, &serde_json::json!({"panel": {"sections": [{"id": "c", "part": "chart", "chart": chart}]}}));
+        let ok = sec(serde_json::json!({"kind": "bar", "x": "highway", "y": "length_m", "scale": 0.001})).unwrap();
+        let c = ok.panel.unwrap().sections[0].chart.clone().unwrap();
+        assert_eq!((c.kind, c.agg, c.height, c.follow, c.scale), (ChartKind::Bar, ChartAgg::Sum, 220, false, 0.001));
+        let data = serde_json::json!({"columns": [{"name": "hour", "type": "BIGINT"}, {"name": "vehicles", "type": "DOUBLE"}], "rows": [[7, 820.0], ["9007199254740993", 1.0]]});
+        let ok = sec(serde_json::json!({"kind": "line", "x": "hour", "y": ["vehicles"], "data": data})).unwrap();
+        // the rows go into the page as they are: a 64-bit integer as text stays exact
+        assert_eq!(serde_json::to_value(&ok.panel.unwrap().sections[0]).unwrap()["chart"]["data"]["rows"][1][0], "9007199254740993");
+        for (bad, said) in [(serde_json::json!({"kind": "donut", "x": "a"}), "unknown variant"), (serde_json::json!({"kind": "bar"}), "missing field `x`"),
+                            (serde_json::json!({"kind": "histogram", "x": "a", "y": "b"}), "a histogram has no `y`"),
+                            (serde_json::json!({"kind": "pie", "x": "a", "y": ["b", "c"]}), "a pie and a scatter 1"),
+                            (serde_json::json!({"kind": "scatter", "x": "a"}), "needs `y`"),
+                            (serde_json::json!({"kind": "bar", "x": "a", "agg": "median"}), "unknown variant"),
+                            (serde_json::json!({"kind": "bar", "x": "a", "colour": 1}), "colour"),
+                            (serde_json::json!({"kind": "bar", "x": "a", "scale": 0}), "not 0"),
+                            (serde_json::json!({"kind": "bar", "x": "day", "y": "vehicles", "data": data}), "the column 'day' is not in `data`"),
+                            (serde_json::json!({"kind": "bar", "x": "hour", "data": data, "follow": true}), "`follow` is for the map's roads"),
+                            (serde_json::json!({"kind": "bar", "x": "hour", "data": {"columns": [{"name": "hour", "type": "BIGINT"}], "rows": [[1, 2]]}}), "has 2 values")] {
+            let e = sec(bad.clone()).unwrap_err().to_string();
+            assert!(e.contains(said), "{bad}: {e}");
+        }
+        let e = merge(&base, &serde_json::json!({"panel": {"sections": [{"id": "c", "part": "chart"}]}})).unwrap_err().to_string();
+        assert!(e.contains("has no `chart`"), "{e}");
+        let e = merge(&base, &serde_json::json!({"panel": {"sections": [{"id": "c", "part": "query", "chart": {"kind": "bar", "x": "a"}}]}})).unwrap_err().to_string();
+        assert!(e.contains("only the part \"chart\""), "{e}");
     }
 
     fn layer(v: serde_json::Value) -> Result<Layer3d, serde_json::Error> { serde_json::from_value(v) }

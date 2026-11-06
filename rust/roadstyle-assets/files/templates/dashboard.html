@@ -9,28 +9,12 @@ body{--rs-side:var(--rs-panel-w,400px)}   /* shift the map's right-anchored cont
 .co-ctrl,.co-lg{display:none}  /* the toolbox has the colour and the legend: no floating copies */
 #sb label{display:block;margin:11px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
   text-transform:uppercase;letter-spacing:.04em}
-#sb select,#sb .rs-q{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
+#sb select{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
   border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
-#sb .rs-q{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
-#sb select:focus,#sb .rs-q:focus{border-color:var(--accent)}
-.sb-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+#sb select:focus{border-color:var(--accent)}
 #sb button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;
   background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
 #sb button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
-#sb button.sb-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600}
-#sb button.sb-primary:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1);color:#fff;background:var(--accent-fill)}
-#sb .rs-q-col{width:28px;height:28px;padding:1px;border:1px solid var(--line);border-radius:6px;
-  vertical-align:middle;cursor:pointer;background:var(--bg)}
-#sb .rs-q-count{color:var(--mut);font-size:12px;margin:10px 0 2px;font-variant-numeric:tabular-nums}
-#sb .rs-q-list{max-height:230px;overflow:auto}
-#sb .rs-q-list div{padding:4px 0;border-bottom:1px solid var(--line)}
-#sb .rs-q-list a{color:var(--accent);text-decoration:none}
-#sb .rs-q-list a:hover{text-decoration:underline}
-#sb .rs-road-card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px;
-  margin-top:6px;min-height:38px;color:var(--ink)}
-#sb .rs-road-card-none{color:var(--mut)}
-#sb .rs-road-card b{color:var(--ink)}
-#sb .rs-road-card-ov{color:var(--mut)}
 </style>
 <div id="sb" data-theme="light">
 <div class="sb-card">

@@ -22,12 +22,17 @@ const _fltLayers=()=>map.getStyle().layers.filter(l=>RS_ROLES.has(_role(l)) || _
 // short property tests: every piece and item carries its edge's class (__rs_cls: FILTER.col of the edge, also on a name or an arrow,
 // which carry the chain's highway) and level (lvl; an attached item has it baked as __rs_lvl). The rsFilter id set goes through the id (the road's row) and the twin from the road table (a two-way pair's shared piece shows while
 // either edge shows). A shadow line or a 3D deck covers several edges (__rs_edges): it shows while any of them shows, decided here.
-export function _applyRoadFilters(){
+// _roadTest(): the switches of the moment, and edgeOn(row): whether that road shows now (also a chart card that follows the map, `follow`)
+export function _roadTest(){
   // the id set: rsFilter's and the modes' (both: the rows in each)
   const ids = _qIds && _modeRows ? _qIds.filter(i=>_modeRows.has(i)) : _qIds || (_modeRows && [..._modeRows]);
   const hidden = _fltVis===null ? [] : FILTER.classes.filter(c=>!_fltVis.has(c)), hid=new Set(hidden), q=ids && new Set(ids);
   const edgeOn = i=>{ const p=_rprops(i), v=p.lvl||0;
     return !hid.has(p.__rs_cls) && !(p.__rs_access && _accHid.has(p.__rs_access)) && (_bridgesOn || v<1) && (_tunnelsOn || v>=0) && (!q || q.has(i)); };
+  return {hidden, q, edgeOn};
+}
+export function _applyRoadFilters(){
+  const {hidden, q, edgeOn} = _roadTest();
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
     ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
@@ -71,6 +76,34 @@ export function rsSetBridges(on){
 export function rsSetTunnels(on){
   _tunnelsOn=!!on; _applyRoadFilters();
   _emit("rs:filterchange", {tunnels:_tunnelsOn});
+}
+// rsFade(rows, {opacity}): every road that is not in the set is drawn at `opacity` (default 0.18) of its own opacity, with its arrows and names; the
+// pair drawn as one line follows either edge, as in rsFilter. rsFade(null) ends it. Each value of a zoom curve is multiplied, so the curve stays.
+const _fadeBase = {};
+let _fadeRows = null, _fadeK = 0.18;
+const _fadeTimes = (b, k) => {
+  if(b == null) return k;
+  if(Array.isArray(b) && b[0] === "interpolate" && JSON.stringify(b[2]) === '["zoom"]') return [...b.slice(0, 3), ...b.slice(3).map((v, i) => i % 2 ? ["*", v, k] : v)];
+  if(Array.isArray(b) && b[0] === "step" && JSON.stringify(b[1]) === '["zoom"]') return [...b.slice(0, 2), ...b.slice(2).map((v, i) => i % 2 ? v : ["*", v, k])];
+  return ["*", b, k];
+};
+function _fadeApply(){
+  const q = _fadeRows && _has(["id"], [..._fadeRows, ..._fadeRows.map(i => (_rprops(i) || {}).__rs_edge2).filter(t => t != null)]);
+  _fltLayers().forEach(l => {
+    if(_itemOv(l.id)) return;                                     // the roads only, not an overlay
+    const props = l.type === "line" ? ["line-opacity"] : l.type === "symbol" ? ["icon-opacity", "text-opacity"] : [];
+    props.forEach(p => {
+      const key = l.id + "|" + p;
+      if(!(key in _fadeBase)) _fadeBase[key] = map.getPaintProperty(l.id, p) ?? null;
+      map.setPaintProperty(l.id, p, q ? _fadeTimes(_fadeBase[key], ["case", q, 1, _fadeK]) : _fadeBase[key]);
+    });
+  });
+}
+export function rsFade(ids, o){
+  _fadeRows = ids == null ? null : Array.from(ids);
+  if(o && o.opacity != null) _fadeK = Math.max(0, Math.min(1, +o.opacity));
+  _fadeApply();
+  _emit("rs:fadechange", {ids: _fadeRows && _fadeRows.slice()});
 }
 export function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
   const L=_lyr(layer); if(!L) return;
@@ -141,6 +174,9 @@ export function initFilter(){
   window.rsSetBridges = rsSetBridges;
   window.rsSetTunnels = rsSetTunnels;
   window.rsFilter = rsFilter;
+  window.rsFade = rsFade;
+  // a new roads style (rs.restyle): its own opacities are the base, and the fade goes on it again
+  document.addEventListener("rs:stylechange", () => { for(const k in _fadeBase) delete _fadeBase[k]; if(_fadeRows) _fadeApply(); });
   window.rsSetModes = rsSetModes;
   window.rsGetModes = ()=>_modes && _modes.slice();
   window.rsSetKinds = rsSetKinds;

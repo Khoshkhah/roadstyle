@@ -58,6 +58,7 @@ export function editorFrame({ panel, title, back = null, tabs = [], head: own = 
                   sheet: window.rs?.sheet?.() ?? null };                   // the phone's sheet: null where the page has none
       hostTitle.style.display = hostBody.style.display = "none";
       if (foldAll) foldAll.style.display = "none";
+      hostBar.classList.remove("scrolled");     // the line of the host's scrolled body is not the frame's: the frame's head row has its own line
       hostBar.prepend(top); hostCard.appendChild(root);
       // the header of the body: the head row, or the host's .sb-top when the head row is empty (it does not show). The scroll protocol reads it once.
       if (!body.dataset.head) body.dataset.head = head.firstChild ? `#${id}-head` : ".sb-top";
@@ -75,6 +76,7 @@ export function editorFrame({ panel, title, back = null, tabs = [], head: own = 
     [hostWas.title.style.display, hostBody.style.display] = hostWas.display;
     if (hostWas.foldAll) hostWas.foldAll.style.display = hostWas.display[2];
     hostBody.scrollTop = hostWas.scroll;
+    hostBar.classList.toggle("scrolled", hostBody.scrollTop > 0);      // the title row shows the line again only while the host's body is scrolled
     if (hostWas.sheet != null && window.rs.sheet() !== hostWas.sheet) window.rs.sheet(hostWas.sheet);
   }
   return Object.assign(events, { root, top, head, body, bar, open, close, isOpen, tab });

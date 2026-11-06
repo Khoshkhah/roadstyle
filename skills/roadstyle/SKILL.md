@@ -142,6 +142,9 @@ Use these parts. Never draw a chart with your own SVG code, and never make your 
   chart colours (`--rs-chart-1..8`, teal first, checked for colour vision deficiency in both themes), compact ticks, hover, a legend for 2
   or more series, and the light and the dark theme. `c.set({kind: "pie"})` draws again. A spec that does not fit the columns shows a line
   that says why. Guide: `docs/guides/dashboard-parts.md`, "A chart".
+- **A chart in a card** (from Python, no JavaScript): `{"id": "km", "label": "km by class", "part": "chart", "chart": {"kind": "bar",
+  "x": "highway", "y": "length_m", "agg": "sum", "scale": 0.001}}`. With no `data`, it reads the map's roads; `"data": df` (a DataFrame or
+  a list of dicts) gives the page's own rows. A click on a bar lights its roads, or sends `rs:chartpick` with `data`. Guide: `docs/guides/charts.md`.
 - **The bottom dock: `rs.dock`** is the wide area under the map (a phone: a bottom sheet). `rs.dock.add({id, label, el, note, actions})`,
   `open(id)`, `close()`, `note(id, text)`. `rs.dock.table({columns, rows, idColumn, more, onSort})` is the dock's table: a header with the
   type, exact 64-bit ids, sort, a click on a row selects its road, and 50 000 rows stay fast. Guide: `docs/guides/dashboard-layout.md`,
@@ -156,7 +159,7 @@ Use these parts. Never draw a chart with your own SVG code, and never make your 
 - **An editor that uses the whole panel: `rs.frame({panel, title, back, tabs, head})`** gives the title line, the tab row, the body that
   scrolls and the bar at the bottom. Never make the frame in the page. Guide: `docs/guides/dashboard-parts.md`, "An editor in the panel".
 - **Light and fade.** `rs.highlight(ids, {set, color, opacity})` is a named highlight set; `rs.fade(ids)` fades every other road;
-  `rs.fade(null)` ends it.
+  `rs.fade(null)` ends it. `rs.holdPopup(key, on)`: no road popup while a part of yours shows the road's facts itself (the data dock's card).
 
 ## Dashboard panel standard (use it, do not invent spacing)
 

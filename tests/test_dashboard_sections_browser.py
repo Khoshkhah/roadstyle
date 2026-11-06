@@ -44,7 +44,7 @@ def _open(p, path, scrollbars=False):
 @pytest.mark.parametrize("bad, message", [
     ({"panel": {"sections": [{"id": "a", "html": ""}, {"id": "a", "html": ""}]}}, "used twice"),
     ({"panel": {"sections": [{"id": "a", "html": "", "after": "nowhere"}]}}, "not an earlier section"),
-    ({"panel": {"sections": [{"id": "a", "part": "chart"}]}}, "unknown variant"),
+    ({"panel": {"sections": [{"id": "a", "part": "graph"}]}}, "unknown variant"),
     ({"panel": {"hide": ["query"]}}, "panel.hide is gone"),
     ({"legend": {"rows": [{"color": "#f00"}]}}, "label"),
 ])
@@ -83,7 +83,7 @@ def test_the_run_time_calls_add_move_and_remove(tmp_path):
             const after = rs.sections.list();
             rs.sections.hide('mine'); const hidden = rs.sections.get('mine').hidden; rs.sections.show('mine');
             rs.sections.remove('mine'); rs.sections.remove('q');
-            let bad = null; try { rs.sections.add({id: 'c', part: 'chart'}); } catch (e) { bad = String(e.message); }
+            let bad = null; try { rs.sections.add({id: 'c', part: 'graph'}); } catch (e) { bad = String(e.message); }
             rs.legend.add({id: 'ev', color: '#ff0066', label: 'Events'});
             return {start, after, hidden, end: rs.sections.list(), bad, rows: rs.legend.list()}; }""")
         box_rows = page.evaluate("""() => { rs.tools.open('legend'); return document.querySelectorAll('.rs-cb-lg .lg-row').length; }""")
@@ -91,7 +91,7 @@ def test_the_run_time_calls_add_move_and_remove(tmp_path):
         browser.close()
     assert not errors
     assert got["start"] == [] and got["after"] == ["mine", "q"] and got["hidden"] is True and got["end"] == []
-    assert "no part 'chart'" in got["bad"] and "query, road_card" in got["bad"]
+    assert "no part 'graph'" in got["bad"] and "query, road_card, chart" in got["bad"]
     assert got["rows"] == ["ev"] and box_rows >= 2 and "Events" in text
 
 

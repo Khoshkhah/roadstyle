@@ -99,11 +99,15 @@ rs.setState({classes: null});       // back to all classes
 
 ## Sections of the panel
 
-The panel starts empty. Add a part of roadstyle (`part`: `"query"` or `"road_card"`) or your own HTML (`html`).
+The panel starts empty. Add a part of roadstyle (`part`: `"query"`, `"road_card"` or `"chart"`) or your own HTML (`html`).
 
 ```javascript
 rs.sections.add({id: "q", label: "Query", part: "query", text: "p.highway == 'primary'"});
 rs.sections.add({id: "road", label: "Selected road", part: "road_card", fields: ["name", "highway"]});
+rs.sections.add({id: "classes", label: "Roads by class", part: "chart", chart: {kind: "bar", x: "highway"}});
+rs.sections.add({id: "flow", label: "Vehicles per hour", part: "chart",
+                 chart: {kind: "line", x: "hour", y: "vehicles", data: [{hour: 7, vehicles: 820}, {hour: 8, vehicles: 1140}]}});
+document.addEventListener("rs:chartpick", (e) => console.log(e.detail.id, e.detail.row));   // a click on a mark of your own rows
 rs.sections.add({id: "notes", label: "Notes", before: "road", fold: true,
                  html: "<p>Text of the page</p><button class='sb-primary' id='go'>Go</button>"});
 document.getElementById("go").onclick = () => rs.focus(rs.query({highway: "primary"}));
@@ -177,9 +181,19 @@ console.log(rs.dock.isOpen(), rs.dock.height(), rs.dock.list());
 rs.dock.show("roads");
 rs.dock.close();
 rs.dock.remove("roads");
+rs.fade(["1", "2"], {opacity: 0.18});   // the other roads fade; the event rs:fadechange
+rs.fade(null);
+rs.holdPopup("my-card", true);           // a part that shows the road's facts: no road popup while it is in view
+rs.holdPopup("my-card", false);
+const box = document.createElement("div"); box.style.height = "200px"; document.body.append(box);
+const chart = rs.chart(box, {kind: "bar", x: "highway", y: "km",
+  columns: [{name: "highway", type: "VARCHAR"}, {name: "km", type: "DOUBLE"}], rows: [["primary", 12.5], ["residential", 30.5]]});
+chart.set({kind: "pie"});
 ```
 
 `rs.dock` is the bottom dock under the map ([The bottom dock](../dashboard-layout.md#the-bottom-dock)). `add({id, label, el, note, actions, closable})` adds a content, `open(id)` and `close()` open and close the dock, `show(id)` shows a content, `note(id, text)` changes its note, `height(px)` gives or sets the height, `list()` gives the ids and `remove(id)` removes a content. `table({columns, rows, idColumn})` gives the dock's table (`el`, `set`). The event `rs:dockchange` has `open`, `id` and `height`.
+
+`rs.holdPopup(key, on)` holds the road popup while a part that shows the road's facts itself is in view (the data dock's road card): a selection then has no popup. The popup comes back when no key holds it.
 
 `rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. `rs.days.use(el, {days, onChange})` builds a day picker in an empty element: a field that opens a calendar of the days with data, the day before and after, and "Latest". It gives `{set(day, quiet), value()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 
@@ -234,7 +248,7 @@ rs.select(rs.query({highway: "primary"})[0]);
 stop();
 ```
 
-The page sends these events: `rs:ready`, `rs:select`, `rs:deselect`, `rs:filterchange`, `rs:colorchange`, `rs:highlightchange`, `rs:themechange`, `rs:basemapchange`, `rs:basemapready`, `rs:buildingschange`, `rs:buildings3dchange`, `rs:buildingsopacitychange`, `rs:terrainchange`, `rs:labelschange`, `rs:overlaychange`, `rs:overlayschange`, `rs:interactionchange`, `rs:tunnelchange`, `rs:roadfillchange`, `rs:viewchange`, `rs:viewselect`, `rs:sectionchange`, `rs:helpchange`, `rs:colormode`, `rs:datachange`, `rs:toolchange`, `rs:toolsready`, `rs:sheetchange`, `rs:layoutchange`, `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot`, `rs:google3dchange`, `rs:g3dmodechange`, `rs:arrowschange`, `rs:stylechange` and `rs:tableready`. Your page sends `rs:toprowschange` when it changes the state of a row that it added with `rsAddTopRow`: the base-map box then reads the row again.
+The page sends these events: `rs:ready`, `rs:select`, `rs:deselect`, `rs:filterchange`, `rs:colorchange`, `rs:highlightchange`, `rs:themechange`, `rs:basemapchange`, `rs:basemapready`, `rs:buildingschange`, `rs:buildings3dchange`, `rs:buildingsopacitychange`, `rs:terrainchange`, `rs:labelschange`, `rs:overlaychange`, `rs:overlayschange`, `rs:interactionchange`, `rs:tunnelchange`, `rs:roadfillchange`, `rs:viewchange`, `rs:viewselect`, `rs:sectionchange`, `rs:chartpick`, `rs:helpchange`, `rs:colormode`, `rs:datachange`, `rs:toolchange`, `rs:toolsready`, `rs:sheetchange`, `rs:layoutchange`, `rs:streetviewchange`, `rs:streetviewmove`, `rs:streetviewspot`, `rs:google3dchange`, `rs:g3dmodechange`, `rs:arrowschange`, `rs:stylechange` and `rs:tableready`. Your page sends `rs:toprowschange` when it changes the state of a row that it added with `rsAddTopRow`: the base-map box then reads the row again.
 
 When each event fires, and its `detail`, are in the [reference](../../reference/javascript.md#events).
 

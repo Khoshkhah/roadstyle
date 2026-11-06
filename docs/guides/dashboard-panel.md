@@ -1,6 +1,6 @@
 # Add to the panel
 
-<p class="lead">The panel of a dashboard starts empty. A page adds what it needs: a part of roadstyle (the query box, the road card) or its own HTML. No edit of the HTML of the template is necessary. The frame, the toolbox and the phone form are in [Dashboard layout](dashboard-layout.md).</p>
+<p class="lead">The panel of a dashboard starts empty. A page adds what it needs: a part of roadstyle (the query box, the road card, a chart) or its own HTML. No edit of the HTML of the template is necessary. The frame, the toolbox and the phone form are in [Dashboard layout](dashboard-layout.md).</p>
 
 ## The panel starts empty
 
@@ -11,6 +11,7 @@ A page adds sections with `dashboard={"panel": {"sections": [...]}}`, in their o
 - **A part of roadstyle** (`part`):
     - `"query"`: a WHERE clause over the columns of the roads, with *Run*, *Filter*, *Colour* and *Reset*, and the list of the matching roads. `text` is the start text (none: an empty box).
     - `"road_card"`: the fields of the selected road. It fills on the event `rs:select` and empties on `rs:deselect`. `fields` is the list of columns that it shows (none: every column).
+    - `"chart"`: a chart of the map's roads or of your own rows. `chart` holds its options: `{"kind": "bar", "x": "highway"}`. See [Charts](charts.md).
 - **The page's own HTML** (`html`). Build it from the [shared parts](dashboard-parts.md) of a dashboard.
 
 A section with a `label` is a card, and the label is its title ([Cards: the panel standard](#cards-the-panel-standard)). `fold: true` makes the card fold, `note` is one line of state under the title, and `background: false` takes its colour away. `after` or `before` is the id of an earlier section. The keys, with their defaults, are in [Dashboard options](../reference/parameters.md#dashboard-options).
@@ -20,6 +21,7 @@ rs.render_dashboard(edges, dashboard={
     "panel": {"sections": [
         {"id": "q", "part": "query", "label": "Query", "text": "p.maxspeed_kmh >= 50"},
         {"id": "road", "part": "road_card", "label": "Selected road", "fields": ["name", "highway", "lanes"]},
+        {"id": "classes", "part": "chart", "label": "Roads by class", "chart": {"kind": "pie", "x": "highway"}},
         {"id": "notes", "label": "Notes", "before": "road",
          "html": '<p>Your text</p><p class="sb-note">Small print</p>'},
     ]},
@@ -33,7 +35,8 @@ These are errors:
 - an `id` that is empty or used twice;
 - a section with both `html` and `part`, or with neither;
 - an unknown `part`;
-- `text` on a part that is not `query`, and `fields` on a part that is not `road_card`;
+- `text` on a part that is not `query`, `fields` on a part that is not `road_card`, and `chart` on a part that is not `chart`;
+- a part `chart` with no `chart`, or a wrong `chart` ([Charts](charts.md#the-errors));
 - an `after` or `before` that is not an earlier section, or both of them;
 - `fold: true`, `note` or `background: false` without a `label`.
 
