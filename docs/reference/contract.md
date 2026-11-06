@@ -152,6 +152,15 @@ such `state` block) has no step of its own (`core.js`, `_useState`).
 
 With `state: baked` (the export, RustGIS), the engine writes the start values in place of these expressions.
 
+The road layer also reads feature states on the road's row (the source of the role `simple`, and `decks` for a bridge deck). They are
+not global state: the dashboard sets them on each road with `setFeatureState`.
+
+| Name | Type | Read by | Set by |
+|---|---|---|---|
+| `select`, `hover` | bool | the glow of a selected or hovered road | a click, the pointer, `rsSelect`, `rsHighlight(ids)` |
+| `rs_c`, `rs_w` | colour, number | the road's colour and width factor (`roadstyle:live`) | `rsColor`, `rsColorBase`, `rs.setData` |
+| `rs_hl`, `rs_hlo` | colour, number | the colour and the opacity of a highlight set. It is over the select and hover glow. No `rs_hlo`: the look's `selection.opacity` | `rsHighlight(ids, {set, color, opacity})` |
+
 ## The feature properties `__rs_*`
 
 67 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard

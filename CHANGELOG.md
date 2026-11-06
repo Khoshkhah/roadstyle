@@ -6,6 +6,9 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Highlight sets:** `rsHighlight(ids, {set, color, opacity})` lights the roads of a named set in its own colour, at the road's own width at every zoom. More than one set can be on. When a road is in two sets, the set that was set last wins, and the other colour comes back when that set clears. `rsHighlight([], {set})` clears one set. A bridge road lights its 3D deck too. `rsHighlight(ids)` without a set does not change. The event `rs:highlightchange` has `set` and `ids`. The road layer, its dash layer, `roads-highlight` and the bridge decks read the new feature states `rs_hl` (the colour) and `rs_hlo` (the opacity; none: the look's `selection.opacity`). The road layer's colour reads the states `select`, `hover` and `rs_hl` as `let` variables, so it stays in the tile budget. The style goldens changed only in the paint of these layers; the tiles are the same. Test: `test_highlight_sets_browser.py`.
+
 ## [0.28.0] - 2026-11-05
 
 ### Added

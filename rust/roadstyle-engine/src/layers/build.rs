@@ -77,6 +77,17 @@ impl<'a> Ctx<'a> {
         })
     }
 
+    /// The colour of a road of a highlight set (the feature state HL_COLOR), else `c` (the select / hover case).
+    fn hl(&self, c: Value) -> Value {
+        json!(["coalesce", ["feature-state", HL_COLOR], c])
+    }
+
+    /// The opacity of the glow: a highlight set's own (HL_OPACITY), else the selection's opacity on a road that is lit (`on`: the tests of
+    /// the select, the hover and the highlight set), else 0.
+    fn glow_opacity(&self, on: Value) -> Value {
+        json!(["coalesce", ["feature-state", HL_OPACITY], ["case", on, self.look.sections.selection.opacity, 0]])
+    }
+
     fn fb_fill(&self) -> &Value {
         &self.look.sections.roads.fallback["fill"]
     }
@@ -206,7 +217,9 @@ fn line_width(cx: &Ctx, w: &Widths, items: bool) -> Value {
 /// its road's row. The glow of a selected or hovered road is its pieces' feature state, by its row (promoteId).
 fn line_color(cx: &Ctx, fills: &[String]) -> Value {
     let (s, fb_fill) = (&cx.look.sections, cx.fb_fill());
-    let (s_on, h_on) = (&cx.s_on, &cx.h_on);
+    // the glow reads the feature states select, hover and HL_COLOR as let variables: each one is in the expression once (the road layer's
+    // colour is in the tile budget, tests/tile_budget.rs)
+    let (s_on, h_on, hl) = (&json!(["var", "s"]), &json!(["var", "h"]), &json!(["var", "hl"]));
     let class_colour = |i: usize, fallback: &Value| class_table(cx, i, fallback);
     let own_fill = match &cx.roles {
         // with no table of data colours, no piece holds a colour of its own: every fill is a role colour
@@ -225,15 +238,18 @@ fn line_color(cx: &Ctx, fills: &[String]) -> Value {
         item = tun_mix(&item);
         cases.extend([piece_kind(3), tun_gap(), piece_kind(4), tun_dash()]);
     }
-    item = json!(["case", s_on, cx.select, h_on, cx.hover, item]);
-    // the fill, or the fill mixed with the select or hover colour by the selection's opacity (the fill once, not three times)
-    fill = json!(["interpolate", ["linear"], ["case", ["any", s_on, h_on], s.selection.opacity, 0], 0, fill, 1, ["case", s_on, cx.select, cx.hover]]);
+    item = json!(["coalesce", hl, ["case", s_on, cx.select, h_on, cx.hover, item]]);
+    // the fill, or the fill mixed with the colour of a highlight set, else the select or the hover colour, by the glow's opacity (the fill
+    // once, not three times)
+    let op = cx.glow_opacity(json!(["any", s_on, h_on, ["to-boolean", hl]]));
+    fill = json!(["interpolate", ["linear"], op, 0, fill, 1, ["coalesce", hl, ["case", s_on, cx.select, cx.hover]]]);
     let mut color = vec![json!("case")];
     color.extend(cases);
     color.extend([piece_kind(5), item, fill]);
+    let color = json!(["let", "s", cx.s_on, "h", cx.h_on, "hl", ["feature-state", HL_COLOR], Value::Array(color)]);
     match &cx.places {
-        Some([f, c]) => json!(["let", FILL_TABLE, ["literal", f], CASING_TABLE, ["literal", c], Value::Array(color)]),
-        None => Value::Array(color),
+        Some([f, c]) => json!(["let", FILL_TABLE, ["literal", f], CASING_TABLE, ["literal", c], color]),
+        None => color,
     }
 }
 
@@ -319,8 +335,9 @@ fn road_pick_highlight(cx: &Ctx, w: &Widths, flt: &Value, paint: Value) -> (Valu
     let pick = json!({"id": "roads-fill", "type": "line", "source": "roads", "layout": lay, "filter": flt,
                       "paint": {"line-color": ["coalesce", ["get", Mark::Fill.name()], fb_fill], "line-width": w.fill, "line-offset": w.offset, "line-opacity": 0}});
     let mut highlight = json!({"id": "roads-highlight", "type": "line", "source": "roads", "layout": lay,
-                               "paint": {"line-color": ["case", cx.s_on, cx.select, cx.hover],
-                                         "line-opacity": ["case", ["any", cx.h_on, cx.s_on], s.selection.opacity, 0], "line-width": w.fill0, "line-offset": w.offset0}});
+                               "paint": {"line-color": cx.hl(json!(["case", cx.s_on, cx.select, cx.hover])),
+                                         "line-opacity": cx.glow_opacity(json!(["any", cx.h_on, cx.s_on, ["to-boolean", ["feature-state", HL_COLOR]]])),
+                                         "line-width": w.fill0, "line-offset": w.offset0}});
     if cx.decks {        // a bridge glows on its deck from flat_below up; in position mode the flat bridge layers do not exist
         highlight["filter"] = json!(["!", ["!", ["to-boolean", 1]]]);
     }
@@ -488,7 +505,7 @@ fn deck_layers(cx: &Ctx) -> Vec<Value> {
     vec![
         deck("roads-deck-casing", json!(["has", Mark::CasingSlab.name()]), json!(s.bridges.casing_color)),
         deck("roads-bridge-decks", json!(["!", ["has", Mark::CasingSlab.name()]]),
-             json!(["case", cx.s_on, cx.select, cx.h_on, cx.hover, ["coalesce", ["get", Mark::Fill.name()], cx.fb_fill()]])),
+             cx.hl(json!(["case", cx.s_on, cx.select, cx.h_on, cx.hover, ["coalesce", ["get", Mark::Fill.name()], cx.fb_fill()]]))),
     ]
 }
 

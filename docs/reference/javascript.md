@@ -83,6 +83,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsHillshade(on)` / `rsTerrain(on)` | the *Hillshade* and *3D terrain* switches of the base-map box, from the DEM of `ontop.dem`. No argument: whether it is on. They move no camera (a person's click on the terrain row tilts a flat map to `ontop.terrain.pitch`). With the terrain on, every layer lies on the ground of the DEM: a tunnel is drawn on the hill above it and a bridge on the valley under it, because MapLibre has no height of its own for a line. The roads are flat with the terrain off. | `rs:terrainchange` (`on`) |
 | `rsTerrainTunnels(mode)` | what a tunnel does while the 3D terrain is on: `"show"`, `"fade"` (the default) or `"hide"`; no argument: the mode now; another value throws. MapLibre has no height for a line, so a per-edge height (a `z` column) cannot be drawn | |
 | `rsHighlight(ids, layer?)` | selection glow on the set; `[]` clears | `rs:highlightchange` |
+| `rsHighlight(ids, {set, color, opacity?})` | a highlight set: the roads of the named set in `color` (a CSS colour), at the road's own width at every zoom. `opacity` (0 to 1) mixes the colour with the road's fill; the default is the look's `selection.opacity`. More than one set can be on. When a road is in two sets, the set that you set last has the road. When that set clears, the road gets the colour of the other set again. `rsHighlight([], {set})` clears only that set. A bridge road lights its 3D deck too. The colour is over the select and hover glow. The road layer reads the feature states `rs_hl` (the colour) and `rs_hlo` (the opacity) on the road's row | `rs:highlightchange` (`set`, `ids`) |
 | `rsFocus(ids, opt?, layer?)` | fit the camera to one id or a set; `opt` goes to MapLibre `fitBounds` (default `padding` 80, `maxZoom` 17) | |
 | **Selection** | | |
 | `rsSelect(id)` | select one road exactly like a click: glow, popup, and the road card when the page has one | `rs:select` |
@@ -126,7 +127,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:colorchange` | `rsSetColorField` | `option` (the `RS_COLOR_OPTIONS` entry), `index` |
 | | `rsColor` with one set / several | `ids`, `color` / `groups: [{ids, color}]` |
 | | `rsColor` on an overlay | `overlay`, `ids`, `color` |
-| `rs:highlightchange` | `rsHighlight` | `ids` (plus `overlay` on an overlay) |
+| `rs:highlightchange` | `rsHighlight` | `ids` (plus `overlay` on an overlay, or `set` for a highlight set) |
 | `rs:themechange` | `rsSetTheme`, the theme button | `theme` (`light` or `dark`) |
 | `rs:basemapchange` | `rsSetBasemap` | `basemap` (key), `index` |
 | `rs:overlaychange` | `rsSetOverlay` | `overlay` (label), `visible` |
