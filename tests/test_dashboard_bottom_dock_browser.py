@@ -54,6 +54,11 @@ def test_the_dock_on_a_desktop(tmp_path, look):
             assert page.evaluate(_BOX, "#rs-settings-box")[1] <= 500
             page.keyboard.press("Escape")
             assert page.evaluate("rsFreePad().bottom") >= (300 if look == "card" else 30)        # the card look: the map is under the dock
+            # rs.focus fits the roads above the dock: their lowest point is above the dock's top
+            page.evaluate("rs.focus(['1', '6'])")
+            page.wait_for_timeout(1200)
+            y = page.evaluate("(() => { const p = map.project([18.0, 59.30]); return map.getContainer().getBoundingClientRect().top + p.y; })()")
+            assert y <= 500, y
             # the table: a 64-bit id exactly, numbers at the right, the type under the name, the description in the tooltip
             assert page.evaluate("document.querySelector('#rs-dock th:nth-child(2)').title") == "The street name."
             assert page.evaluate("[...document.querySelectorAll('#rs-dock th small')].map(s => s.textContent)") == ["BIGINT", "VARCHAR", "DOUBLE"]

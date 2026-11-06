@@ -22,7 +22,7 @@ with the controls hidden. How to use them together: [Dashboards & JavaScript](..
 | `rs.can(part)` | false for a part that this page cannot apply (an unknown key, a colour option the style does not have) |
 | `rs.link()` | the part that differs from the start, as `#rs=` and base64url JSON; a page opened with it applies it |
 | `rs.on(event, fn)` | `event`: `state` (each change, as the part of the state that changed), or `select`, `deselect`, `filter`, `color`, `overlay`, `tunnel`, `view`, `view3d`, `basemap`, `highlight`, `roadfill`, `streetview`, `google3d` (the `rs:*` event's `detail`); returns the function that removes it |
-| `rs.select(id)`, `rs.highlight(ids)`, `rs.focus(ids)` | as `rsSelect`, `rsHighlight`, `rsFocus`, with edge ids (`null`: deselect) |
+| `rs.select(id)`, `rs.highlight(ids, set?)`, `rs.focus(ids)` | as `rsSelect`, `rsHighlight`, `rsFocus`, with edge ids (`null`: deselect). `rs.highlight(ids, {set, color, opacity})` lights a named set in its own colour, as `rsHighlight` does. `rs.focus` fits the roads above the bottom dock where the dock covers the map |
 | `rs.query({column: value})`, `rs.find(text)`, `rs.props(id)` | edge ids of the roads that match; one road's properties |
 | `rs.setColorBy(name)`, `rs.color([{color, ids}])`, `rs.setFilter({classes, bridges, tunnels, access, ids})` | as the controls |
 | `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box (its label is `overlays_label`, default "Map layers"). Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |

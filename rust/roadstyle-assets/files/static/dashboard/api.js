@@ -98,7 +98,7 @@ export function makeApi(extra){
     colorModes: rsColorModes,    // the page's own "Colour by" list in the legend box: set, select, clear, active (colorbox.js)
     contract: CONTRACT,          // the newest roadstyle:contract that this dashboard reads (core.js)
     select(id){ if(id == null) call("rsDeselect"); else call("rsSelect", row(id)); },
-    highlight(ids){ call("rsHighlight", rows(ids) || []); },
+    highlight(ids, set){ call("rsHighlight", rows(ids) || [], set && typeof set === "object" ? set : undefined); },   // set: {set, color, opacity} (a named set)
     focus(ids){ call("rsFocus", rows(Array.isArray(ids) ? ids : [ids])); },
     query(where){ const w = where || {}; return (call("rsQuery", p => Object.keys(w).every(k => p[k] === w[k])) || []).map(edge); },
     find(text){ return (call("rsFind", text) || []).map(edge); },
