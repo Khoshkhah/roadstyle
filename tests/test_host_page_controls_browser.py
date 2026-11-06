@@ -14,7 +14,7 @@ import pytest
 pw = pytest.importorskip("playwright.sync_api")
 
 from test_ask_browser import _HOST as _ASK  # noqa: E402
-from test_ask_browser import served
+from test_ask_browser import served  # noqa: E402
 from test_dashboard_sections_browser import _ARGS  # noqa: E402
 from test_host_page_gaps_browser import HOST  # noqa: E402
 
