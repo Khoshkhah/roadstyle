@@ -32,7 +32,7 @@ data.open();
 | `sql` | `""` | The start text of the line. |
 | `label` | `"Data"` | The label of the dock. |
 | `limit` | `1000` | The most rows in the table. |
-| `card` | `true` | The road card beside the table, in place of the popup. |
+| `card` | `true` | The road card beside the table, in place of the popup. While the dock shows the data dock, a road that the person selects (a row, a name, Ask, or a click on the map) shows only in the card: the dock holds the popup (`rs.holdPopup`). When the dock closes, the popup comes back. |
 | `guard` | `true` | `false`: the person's own SQL does not go through the read-only guard. |
 
 ## What the person does

@@ -7,7 +7,7 @@
 //     clear, remove, history}
 //   events: "answer" {question, text, sql, rows}, "error" {question, message}, "back"
 import {editorFrame} from "../frame.js";
-import {PROVIDERS, chat, models, pickModel} from "./providers.js";
+import {PROVIDERS, BUSY, chat, models, pickModel} from "./providers.js";
 import {inner} from "../data/guard.js";
 
 const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
@@ -300,9 +300,12 @@ export function askPanel(o = {}){
       catch(e){
         if(signal.aborted) throw e;
         const s = e.wait || parseFloat((String(e.message).match(/try again in ([\d.]+)\s*s/i) || [])[1]) || 20;
-        if(e.status === 429 && waited < 2 && s <= 60){
+        // the free limit (429) or a busy service (500, 502, 503, 504: Gemini's 503 "The model is overloaded"): wait, then try again, at most 2 times
+        const busy = BUSY.has(e.status);
+        if((e.status === 429 || busy) && waited < 2 && s <= 60){
           waited++;
-          for(let k = Math.ceil(s); k > 0; k--){ if(signal.aborted) throw new Error("Stopped."); say(`${p.name}'s free limit: waiting ${k} s`); await wait(1000); }
+          const n = busy && !e.wait ? 5 * waited : Math.ceil(s);
+          for(let k = n; k > 0; k--){ if(signal.aborted) throw new Error("Stopped."); say(busy ? `${p.name} is busy: trying again in ${k} s` : `${p.name}'s free limit: waiting ${k} s`); await wait(1000); }
           continue;
         }
         if(!switched && (e.status === 404 || (e.status === 400 && /model/i.test(String(e.message))))){

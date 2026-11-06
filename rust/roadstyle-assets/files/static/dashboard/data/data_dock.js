@@ -253,7 +253,9 @@ export function dataDock(o = {}){
     const ids = lightOn && rs.dock.isOpen() && r && !r.byLayer && keyOf(r) ? await roadsOf(r).catch(() => []) : [];
     if(me === lightSeq) rs.highlight(onMap(ids), LIGHT);
   }
-  document.addEventListener("rs:dockchange", (e) => { if(e.detail.id === id && !!e.detail.open !== lightWasOpen){ lightWasOpen = !!e.detail.open; light(); } });
+  document.addEventListener("rs:dockchange", (e) => { if(e.detail.id === id && !!e.detail.open !== lightWasOpen){ lightWasOpen = !!e.detail.open; light(); }
+    // the road card is the one place for a road's facts while the dock shows it: no popup for a selection from the table, Ask or the map
+    if(o.card !== false && rs.holdPopup) rs.holdPopup("data-dock", !!e.detail.open && e.detail.id === id); });
   let lightWasOpen = false;
   async function rowClick(r, cols){
     const i = cols.findIndex((c) => c.name === ID);

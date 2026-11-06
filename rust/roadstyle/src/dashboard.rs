@@ -538,7 +538,8 @@ impl Template {
         let (layout, panel, toolbar, windows) = match (self, layout) {
             (Template::Map, _) => (Layout::Dock, None, None, free),
             (Template::Dashboard, Layout::Dock) => (Layout::Dock, panel0.clone(), None, free),
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone(), Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box }),
+            // the panel over the map is the floating card, see-through (Kaveh, 2026-11-06: the look of the chart demo is the default)
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone().map(|p| Panel { look: PanelLook::Card, ..p }), Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
         Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(),
@@ -762,7 +763,7 @@ mod tests {
     #[test]
     fn the_first_paint_script_names_the_classes_of_the_form() {
         let r = Template::Dashboard.dashboard(Overlay).first_paint();
-        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-hide-scale")"#) && r.contains("(max-width:700px)"), "{r}");
+        assert!(r.contains(r#"c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-panel-card","rs-hide-scale")"#) && r.contains("(max-width:700px)"), "{r}");
         assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock","rs-panel-left","rs-hide-scale")"#));
         // the width of the panel, and a side and a look that are not the default
         let mut wide = Template::Dashboard.dashboard(Overlay);

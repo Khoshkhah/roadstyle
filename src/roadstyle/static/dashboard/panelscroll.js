@@ -16,7 +16,9 @@ export function initPanelScroll(){
     }, {passive: true});
     mark(); more();
     addEventListener("resize", more);
-    new ResizeObserver(more).observe(body);                                              // a section that the page adds or hides changes the height
+    const gutter = () => body.offsetWidth && body.parentElement.style.setProperty("--rs-gutter", (body.offsetWidth - body.clientWidth) + "px");   // the scrollbar space of the body: the rows above and under it keep the same edge (dashboard.css); a hidden body keeps its value
+    gutter();
+    new ResizeObserver(() => { more(); gutter(); }).observe(body);                                              // a section that the page adds or hides changes the height
     new MutationObserver(more).observe(body, {childList: true, subtree: true});
   });
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();

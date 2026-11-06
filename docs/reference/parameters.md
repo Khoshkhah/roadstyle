@@ -249,7 +249,7 @@ The options are in groups: the frame (`layout`, `scale_box`), `panel`, `toolbar`
 |---|---|---|
 | `side` | `"left"` | `"left"` or `"right"` |
 | `width_px` | `400` | the width of the panel. Fit the content to the panel and do not widen the panel for it |
-| `look` | `"frame"` | `"frame"`: full height, with a translucent frame. `"card"`: a floating card |
+| `look` | `"card"` (`layout="overlay"`), `"frame"` (`layout="dock"`) | `"card"`: a floating card, see-through, over the map. `"frame"`: full height, with a translucent frame and solid cards. Since 0.29.0 the overlay layout has the card look by default |
 | `sections` | `[]` | the sections that the page adds to the empty panel, in order. A section is a mapping with the keys of the next table |
 
 A section (`panel.sections`; the errors are in [Add to the panel](../guides/dashboard-panel.md#the-errors)):
