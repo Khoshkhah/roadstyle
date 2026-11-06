@@ -66,3 +66,19 @@ same files as Python's `make_area`: Monaco in 0.1 s (Python 2.2 s), Tartu in 0.7
 program. Build the page's WebAssembly package with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
 
 The guide [Which road is on top](../guides/levels.md#edit-the-levels) shows the editor.
+
+## Edit the design of a map
+
+```bash
+roadstyle design edit roads.parquet                       # the design editor, http://127.0.0.1:8781/design_editor/?roads=...
+roadstyle design edit roads.geojson --design night.json   # another design file in the same folder
+roadstyle design edit roads.shp --port 8790               # a Shapefile (its .dbf and .prj beside it), another port
+```
+
+`design edit ROADS` opens the roads on a map with the design panel: the theme, the road colours and widths, bridges and tunnels, the
+street names, the one-way arrows and the layers ([Edit the design of a map](../guides/design-panel.md#the-design-editor-on-its-own-page)).
+The page reads a GeoParquet, GeoJSON or Shapefile file. It does not read a GeoPackage: write it as GeoParquet first. The program prints
+the address. Each change of the design goes into the design file, by default `<roads name>.design.json` in the folder of the roads.
+`--design NAME` gives another file name in that folder. The server answers only on 127.0.0.1, only to its own address. The page can
+read only the roads file (with the `.dbf` and `.prj` of a Shapefile) and the design file, and it can write only the design file.
+It uses the same WebAssembly package as the level editor: build it with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
