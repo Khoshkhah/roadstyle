@@ -128,13 +128,18 @@ export function dataDock(o = {}){
 
   // ---- the SQL line: one line; a click opens it as a text box, Escape folds it ----
   let sql = o.sql || "", res = null, ctl = null, ta = null;
-  const fold = () => { if(ta){ sql = ta.value; ta.replaceWith(line); ta = null; } line.textContent = sql.replace(/\s+/g, " ") || "Write SQL here"; line.classList.toggle("empty", !sql); };
+  // the open box folds back to one line on Escape and on a click outside it (Kaveh, 2026-11-06: an open box by an accidental click had "no way except
+  // click on run"); the text stays, and Run runs it. A hint under the open box says so.
+  let edit = null;
+  const fold = () => { if(ta){ sql = ta.value; edit.replaceWith(line); ta = edit = null; } line.textContent = sql.replace(/\s+/g, " ") || "Write SQL here"; line.classList.toggle("empty", !sql); };
   const size = () => { ta.rows = Math.min(10, Math.max(3, ta.value.split("\n").length + 1)); };
   line.onclick = () => {
-    ta = $("textarea", "rs-dd-ta"); ta.value = sql; ta.spellcheck = false; ta.setAttribute("aria-label", "SQL"); size();
-    line.replaceWith(ta); ta.focus();
+    edit = $("div", "rs-dd-edit"); ta = $("textarea", "rs-dd-ta"); ta.value = sql; ta.spellcheck = false; ta.setAttribute("aria-label", "SQL"); size();
+    edit.append(ta, $("span", "rs-dd-edit-hint", "Ctrl+Enter runs \u00b7 Esc or a click outside closes"));
+    line.replaceWith(edit); ta.focus();
     ta.onkeydown = (e) => { if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); runSql().catch(() => {}); } else if(e.key === "Escape") fold(); };
     ta.oninput = size;
+    ta.onblur = () => setTimeout(() => { if(ta && document.activeElement !== ta) fold(); }, 0);
   };
   fold();
 

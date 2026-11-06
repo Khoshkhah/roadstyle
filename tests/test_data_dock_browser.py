@@ -123,6 +123,13 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             assert page.inner_text("#rs-dock .rs-dd-rc-name") == "Street 1" and "edge_id 2" in page.inner_text("#rs-dock .rs-dd-rc-id"), card
             assert page.locator("#rs-dock .rs-dd-rc-chip.strong").count() == 1 and "casing" not in card and "__rs" not in card, card
             # the line opens on a click, Ctrl+Enter runs, an error shows in its line, the guard refuses a statement that writes (no query)
+            # the open box folds back on a click outside it, and keeps its text
+            page.click("#rs-dock .rs-dd-line")
+            page.fill("#rs-dock .rs-dd-ta", "SELECT edge_id, name, highway FROM edges -- kept")
+            assert "Esc" in page.inner_text("#rs-dock .rs-dd-edit-hint")
+            page.mouse.click(640, 200)
+            page.wait_for_timeout(100)
+            assert page.locator("#rs-dock .rs-dd-ta").count() == 0 and "-- kept" in page.inner_text("#rs-dock .rs-dd-line")
             page.click("#rs-dock .rs-dd-line")
             page.fill("#rs-dock .rs-dd-ta", "SELECT nope FROM edges")
             page.keyboard.press("Control+Enter")

@@ -966,7 +966,9 @@ html[data-rs-theme=dark]{--rs-err:#fca5a5}
 .rs-dd-q{display:flex;gap:8px;align-items:flex-start}
 #rs-dock .rs-dd-line{flex:1;min-width:0;text-align:left;cursor:text;background:var(--card);border-radius:8px;padding:6px 10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #rs-dock .rs-dd-line.empty{color:var(--mut)}
-.rs-dd-ta{flex:1;min-width:0;box-sizing:border-box;resize:none;border:1px solid var(--accent)!important;border-radius:8px;padding:6px 10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;outline:2px solid color-mix(in srgb,var(--accent) 25%,transparent)}
+.rs-dd-edit{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.rs-dd-edit-hint{font-size:11px;color:var(--mut);padding-left:4px}
+.rs-dd-ta{flex:1;min-width:0;width:100%;box-sizing:border-box;resize:none;border:1px solid var(--accent)!important;border-radius:8px;padding:6px 10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;outline:2px solid color-mix(in srgb,var(--accent) 25%,transparent)}
 #rs-dock .rs-dd-run{border-radius:8px;padding:6px 16px;white-space:nowrap}
 .rs-dd-err{color:var(--rs-err);font-size:12px;white-space:pre-wrap}
 .rs-dd-err:empty{display:none}
