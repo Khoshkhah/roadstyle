@@ -561,7 +561,8 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
    tint under the pointer, or `background: true`, the tint (the Ask card: it stands out). The edge is inside the card, so the size does not change. */
 #sb .sb-sec[data-rs-open]{box-shadow:inset 0 0 0 1px var(--rs-card-edge)}
 #sb .sb-sec[data-rs-open][data-rs-card=no-bg]:hover{background:color-mix(in srgb,var(--card) 92%,var(--accent))}
-#sb .sb-sec[data-rs-open][data-rs-card=bg]{background:color-mix(in srgb,var(--card) 88%,var(--accent));box-shadow:none}      /* the tint and no edge (variant F) */
+/* the tint and an accent edge: with the tint only, the card did not look like a card to press, on a phone most of all (no pointer, no hover; Kaveh, 2026-11-06) */
+#sb .sb-sec[data-rs-open][data-rs-card=bg]{background:color-mix(in srgb,var(--card) 88%,var(--accent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 55%,var(--rs-card-edge))}
 #sb .sb-sec[data-rs-open][data-rs-card=bg]:hover{background:color-mix(in srgb,var(--card) 82%,var(--accent))}
 /* a closed card that folds has the thin edge; open, it has the accent ring in its place */
 #sb .sb-sec[data-rs-fold].folded{box-shadow:inset 0 0 0 1px var(--rs-card-edge)}
