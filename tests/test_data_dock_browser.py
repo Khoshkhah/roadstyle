@@ -112,6 +112,13 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             w = "() => Math.round(document.querySelector('#rs-dock .rs-dock-table').getBoundingClientRect().width)"
             w0 = page.evaluate(w)
             assert page.is_visible("#rs-dock .rs-dd-side-hint") and w0 > 600, w0
+            # the box ends inside the dock and scrolls (Kaveh: "it doesnt have scroll table!" - the box had the height of its rows)
+            page.evaluate("data.run('SELECT edge_id, length_m FROM big')")
+            page.wait_for_timeout(300)
+            fit = page.evaluate("(() => { const b = document.querySelector('#rs-dock .rs-dock-table'), d = document.getElementById('rs-dock'); return [b.getBoundingClientRect().bottom <= d.getBoundingClientRect().bottom + 1, b.scrollHeight > b.clientHeight + 100]; })()")
+            assert fit == [True, True], fit
+            page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
+            page.wait_for_timeout(300)
             assert page.evaluate("window.lights.at(-1)") == 6                                    # the roads of the table light
             # Light off: the map's own colours, the table stays; on again: the light comes back. A closed dock lights nothing.
             page.click("#rs-dock .rs-dd-light")
