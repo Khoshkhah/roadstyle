@@ -70,9 +70,9 @@ def test_limits_hover_click_and_the_line_for_no_data(tmp_path):
             m = page.evaluate(_INSIDE)
             assert m["marks"] == 40 and "15 more" in m["foot"], m
             page.evaluate("C.set({kind: 'pie', y: 'km', rows: " + json.dumps(many[:12]) + "})")
-            assert page.locator("#c svg path").count() == 8 and "Other (5)" in page.inner_text("#c .rs-chart-legend")
+            assert page.locator("#c svg path").count() == 6 and "Other (7)" in page.inner_text("#c .rs-chart-legend")
             page.evaluate("C.set({kind: 'histogram', x: 'km', values: Array.from({length: 2765}, (_, i) => i % 97)})")
-            assert "2 765 values" in page.inner_text("#c .rs-chart-foot")
+            assert "2 765 values" in page.inner_text("#c .rs-chart-hd")
             # the pointer on a bar shows its values; a click gives its row
             page.evaluate("C.set({kind: 'bar', x: 'highway', y: 'km', rows: " + json.dumps(_ROWS) + ", values: null})")
             bar = page.locator("#c svg path").nth(3)
@@ -106,7 +106,7 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         assert page.is_hidden("#rs-dock .rs-dock-table") and page.is_visible("#rs-dock .rs-dd-chart svg")
         # the first chart of a result with one number column is a histogram over all its 2765 rows (not the table's 1000)
         assert page.input_value("#rs-dock .rs-dd-chartrow select >> nth=0") == "histogram"
-        assert "2 765 values" in page.inner_text("#rs-dock .rs-chart-foot")
+        assert "2 765 values" in page.inner_text("#rs-dock .rs-chart-hd")
         # a result of a text and a number: a bar chart in the open view
         page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
         page.wait_for_timeout(300)

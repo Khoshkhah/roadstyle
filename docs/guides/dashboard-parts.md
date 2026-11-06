@@ -127,7 +127,7 @@ c.set({kind: "pie"});        // the same data, another kind
 | `line` | a number, a date or a time | one number column, or a list | one line through the rows in the order of `x` |
 | `histogram` | a number column | none | the rows in each of 20 equal ranges; `values` (all the numbers) can give more rows than `rows` |
 | `scatter` | a number column | a number column | one point for each row, at most 5000 |
-| `pie` | a column of labels | one number column of 0 or more | one slice for each row, largest first, at most 8: the rest is "Other" |
+| `pie` | a column of labels | one number column of 0 or more | one slice for each row, largest first, at most 6: the rest is "Other" |
 
 - The series have the colours `--rs-chart-1` to `--rs-chart-8`, in this order. Two or more series, and a pie, have a legend.
 - The pointer on a bar, a point or a slice shows its values. A click on it calls `onPick(row)`.

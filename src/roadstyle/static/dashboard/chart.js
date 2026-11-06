@@ -8,7 +8,7 @@ import {rsSvg} from "./svg.js";
 import {rsHover} from "./hover.js";
 
 export const rsChart = (() => {
-  const SLOTS = 8, BARS = 40, POINTS = 5000, SLICES = 8, BINS = 20;
+  const SLOTS = 8, BARS = 40, POINTS = 5000, SLICES = 6, BINS = 20, LABELS = 15;   // a pie is for a few parts: 5 and "Other"; values on at most 15 bars
   const NUM = /^(TINYINT|SMALLINT|INT|INTEGER|BIGINT|HUGEINT|UTINYINT|USMALLINT|UINTEGER|UBIGINT|FLOAT|REAL|DOUBLE|DECIMAL|NUMERIC|Int|Uint|Float|Decimal|number)/i;
   const TIME = /^(DATE|TIMESTAMP|Date|Timestamp)/i;
   const isNum = (t) => NUM.test(String(t || "")) && !/\[\]|^(MAP|STRUCT|LIST)/i.test(String(t || ""));     // a list (BIGINT[]) is not a number
@@ -16,6 +16,8 @@ export const rsChart = (() => {
   const fmt = (v) => { const n = Number(v); if(!isFinite(n)) return String(v);
     const s = Math.abs(n) >= 100 || Number.isInteger(n) ? Math.round(n).toLocaleString("en") : (+n.toPrecision(3)).toLocaleString("en", {maximumFractionDigits: 3});
     return s.replace(/,/g, " "); };
+  // an axis tick, compact from 1 000 up: 2.5K, 1.2M (the hover and the labels give the full value)
+  const tick = (v) => { const a = Math.abs(v); return a >= 1e6 ? +(v / 1e6).toFixed(1) + "M" : a >= 1e3 ? +(v / 1e3).toFixed(1) + "K" : fmt(v); };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
   const num = (v) => v == null || v === "" ? null : typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : isFinite(+v) ? +v : null;
   const when = (v) => v == null ? null : typeof v === "number" || typeof v === "bigint" ? Number(v) : Date.parse(String(v).replace(" ", "T")) || null;
@@ -23,8 +25,10 @@ export const rsChart = (() => {
   function ticks(lo, hi, n = 5){
     if(!(hi > lo)){ hi = lo + 1; }
     const raw = (hi - lo) / n, p = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 5, 10].map((m) => m * p).find((s) => s >= raw);
-    const out = []; for(let v = Math.ceil(lo / step) * step; v <= hi + step * 1e-9; v += step) out.push(+v.toPrecision(12));
-    return {list: out, lo: Math.min(lo, out[0]), hi: Math.max(hi, out[out.length - 1])};
+    // from a tick at or under the smallest value to a tick at or over the largest: the axis covers every value
+    const out = []; for(let v = Math.floor(lo / step + 1e-9) * step; v < hi + step * (1 - 1e-9); v += step) out.push(+v.toPrecision(12));
+    if(out[out.length - 1] < hi) out.push(+(out[out.length - 1] + step).toPrecision(12));
+    return {list: out, lo: out[0], hi: out[out.length - 1]};
   }
   const dayFmt = (ms, span) => { const d = new Date(ms); return span > 3 * 365 * 864e5 ? String(d.getUTCFullYear()) : span > 90 * 864e5 ? d.toISOString().slice(0, 7) : d.toISOString().slice(0, 10); };
 
@@ -54,9 +58,14 @@ export const rsChart = (() => {
       const bad = s.columns && s.rows ? check(s) : "No data.";
       if(bad){ el.append(Object.assign(document.createElement("p"), {className: "rs-chart-none", textContent: bad})); return; }
       const W = Math.max(160, el.clientWidth - 2), ys = [].concat(s.y || []); lastW = el.clientWidth;
+      // the title and a muted line under it: what is drawn, and from how many rows (a small copy has neither: its card says it)
+      if(!s.small){ const hd = document.createElement("div"), t = document.createElement("b"), sub = document.createElement("span"); hd.className = "rs-chart-hd";
+        t.textContent = s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
+        const n = s.kind === "histogram" && s.values ? s.values.length : s.rows.length;
+        sub.textContent = `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(t, sub); el.append(hd); }
       const legend = !s.small && (ys.length > 1 || s.kind === "pie") ? document.createElement("div") : null;     // a small copy has no legend
       if(legend){ legend.className = "rs-chart-legend"; el.append(legend); }
-      let H = Math.max(100, el.clientHeight - (legend ? 24 : 0) - 20);
+      let H = Math.max(100, el.clientHeight - (legend ? 24 : 0) - (s.small ? 4 : 44));
       // horizontal bars have at least 18 px each: a long list is taller than the box, and the box scrolls
       const rowsH = s.kind === "bar" && !s.small && s.rows.slice(0, BARS).some((r) => String(r[at(s.x)] ?? "").length > 8) ? s.rows.slice(0, BARS).length * 18 * Math.max(1, ys.length * 0.6) + 26 : 0;
       if(rowsH > H) H = rowsH;
@@ -69,6 +78,9 @@ export const rsChart = (() => {
     const at = (n) => s.columns.findIndex((c) => c.name === n);
     const tip = (node, i, extra) => { if(s.small) return;
       node.style.cursor = s.onPick ? "pointer" : "default";
+      node.classList.add("rs-mk");                                   // under the pointer: this mark, the others fade (CSS)
+      node.addEventListener("mouseenter", () => { svg.classList.add("rs-chart-dim"); node.classList.add("on"); });
+      node.addEventListener("mouseleave", () => { svg.classList.remove("rs-chart-dim"); node.classList.remove("on"); });
       rsHover.on(node, () => `<b>${esc(extra ? extra.head : s.rows[i][at(s.x)])}</b>` + (extra ? extra.lines : [].concat(s.y).map((y) => `<br>${esc(y)}: ${fmt(s.rows[i][at(y)])}`).join("")));
       node.addEventListener("mouseleave", () => rsHover.hide());
       if(s.onPick && i != null) node.addEventListener("click", () => s.onPick(i));
@@ -80,7 +92,9 @@ export const rsChart = (() => {
       const pad = s.small ? {l: 4, r: 4, t: 6, b: 4} : {l: left, r: 12, t: 10, b: bottom};
       const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b, Y = (v) => pad.t + ih - ((v - yr.lo) / (yr.hi - yr.lo)) * ih;
       for(const v of yr.list){ rsSvg(svg, "line", {x1: pad.l, x2: pad.l + iw, y1: Y(v), y2: Y(v), stroke: "var(--rs-chart-grid)", "stroke-width": 1});
-        if(!s.small) rsSvg(svg, "text", {x: pad.l - 6, y: Y(v) + 3.5, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, fmt(v)); }
+        if(!s.small) rsSvg(svg, "text", {x: pad.l - 6, y: Y(v) + 3.5, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, tick(v)); }
+      const base = Y(Math.max(yr.lo, Math.min(yr.hi, 0)));            // the base line: one step darker than the grid
+      rsSvg(svg, "line", {x1: pad.l, x2: pad.l + iw, y1: base, y2: base, stroke: "var(--line)", "stroke-width": 1});
       if(xt && !s.small) for(const [x, label] of xt) rsSvg(svg, "text", {x, y: H - 6, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, label);
       return {pad, iw, ih, Y};
     }
@@ -98,21 +112,26 @@ export const rsChart = (() => {
       if(s.rows.length > BARS) foot.textContent = `… ${fmt(s.rows.length - BARS)} more in the table`;
       legendOf(legend, ys.map((y, k) => [y, col(k)]));
       const horizontal = !s.small && labels.some((l) => l.length > 8);
+      const top = ys.length ? rows.reduce((b, r, i) => (num(r[at(ys[0])]) ?? -Infinity) > (num(rows[b][at(ys[0])]) ?? -Infinity) ? i : b, 0) : -1;
       if(horizontal){
-        const lw = Math.min(160, 10 + 6.2 * Math.max(...labels.map((l) => l.length))), pad = {l: lw, r: 40, t: 6, b: 18};
+        const lw = Math.min(160, 10 + 6.2 * Math.max(...labels.map((l) => l.length))), pad = {l: lw, r: 56, t: 6, b: 18};
         const iw = W - pad.l - pad.r, band = (H - pad.t - pad.b) / rows.length, X = (v) => pad.l + ((v - yr.lo) / (yr.hi - yr.lo)) * iw;
-        for(const v of yr.list){ rsSvg(svg, "line", {x1: X(v), x2: X(v), y1: pad.t, y2: H - pad.b, stroke: "var(--rs-chart-grid)"}); rsSvg(svg, "text", {x: X(v), y: H - 4, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, fmt(v)); }
+        for(const v of yr.list){ rsSvg(svg, "line", {x1: X(v), x2: X(v), y1: pad.t, y2: H - pad.b, stroke: "var(--rs-chart-grid)"}); rsSvg(svg, "text", {x: X(v), y: H - 4, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, tick(v)); }
         const bh = Math.max(2, Math.min(22, (band - 2) / ys.length));
         rows.forEach((r, i) => {
           rsSvg(svg, "text", {x: pad.l - 6, y: pad.t + band * i + band / 2 + 3.5, "text-anchor": "end", fill: "var(--ink)", "font-size": 11}, labels[i].length > 24 ? labels[i].slice(0, 23) + "…" : labels[i]);
           ys.forEach((y, k) => { const v = num(r[at(y)]) ?? 0, y0 = pad.t + band * i + (band - bh * ys.length) / 2 + bh * k;
-            tip(rsSvg(svg, "path", {d: barPath(X(Math.min(0, v)), y0 + 1, Math.abs(X(v) - X(0)), bh - 2, true), fill: col(k)}), i); });
+            tip(rsSvg(svg, "path", {d: barPath(X(Math.min(0, v)), y0 + 1, Math.abs(X(v) - X(0)), bh - 2, true), fill: col(k)}), i);
+            // the value at the tip: of each bar up to 15 bars, else of the largest; in the text colour, never the bar's
+            if(ys.length === 1 && (rows.length <= LABELS || i === top)) rsSvg(svg, "text", {x: X(Math.max(0, v)) + 5, y: y0 + bh / 2 + 3.5, fill: "var(--ink)", "font-size": 10.5}, fmt(v)); });
         });
         return;
       }
-      const {pad, iw, Y} = frame(W, H, yr), band = iw / rows.length, bw = Math.max(2, Math.min(36, (band - 2) / ys.length));
+      const {pad, iw, Y} = frame(W, H, yr), band = iw / rows.length, bw = Math.max(2, Math.min(26, (band - 2) / ys.length));     // a bar is at most 24 px
       rows.forEach((r, i) => ys.forEach((y, k) => { const v = num(r[at(y)]) ?? 0, x0 = pad.l + band * i + (band - bw * ys.length) / 2 + bw * k;
-        tip(rsSvg(svg, "path", {d: barPath(x0 + 1, Math.min(Y(v), Y(0)), bw - 2, Math.abs(Y(v) - Y(0)), false, v >= 0), fill: col(k)}), i); }));
+        tip(rsSvg(svg, "path", {d: barPath(x0 + 1, Math.min(Y(v), Y(0)), bw - 2, Math.abs(Y(v) - Y(0)), false, v >= 0), fill: col(k)}), i);
+        // the value on the cap, when it fits over its bar's slot: of each bar up to 15 bars, else of the largest
+        if(!s.small && ys.length === 1 && (rows.length <= LABELS || i === top) && fmt(v).length * 6.2 < band) rsSvg(svg, "text", {x: x0 + bw / 2, y: Math.min(Y(v), Y(0)) - 5, "text-anchor": "middle", fill: "var(--ink)", "font-size": 10.5}, fmt(v)); }));
       if(!s.small){ const every = Math.ceil(rows.length / Math.max(1, Math.floor(iw / 56)));
         rows.forEach((r, i) => { if(i % every === 0) rsSvg(svg, "text", {x: pad.l + band * i + band / 2, y: H - 6, "text-anchor": "middle", fill: "var(--mut)", "font-size": 10.5}, labels[i]); }); }
     }
@@ -120,12 +139,18 @@ export const rsChart = (() => {
       const t = TIME.test(String(s.columns[at(s.x)].type)), xv = (r) => t ? when(r[at(s.x)]) : num(r[at(s.x)]);
       const idx = s.rows.map((r, i) => i).filter((i) => xv(s.rows[i]) != null).sort((a, b) => xv(s.rows[a]) - xv(s.rows[b]));
       legendOf(legend, ys.map((y, k) => [y, col(k)]));
-      const xs = idx.map((i) => xv(s.rows[i])), lo = Math.min(...xs), hi = Math.max(...xs), yr = yRange(ys, s.rows, false), xr = ticks(lo, hi);
+      const xs = idx.map((i) => xv(s.rows[i])), lo = Math.min(...xs), hi = Math.max(...xs), yr = yRange(ys, s.rows, !s.rows.some((r) => ys.some((y) => (num(r[at(y)]) ?? 0) < 0))), xr = ticks(lo, hi);   // values of 0 or more: from 0
       const pad0 = s.small ? 4 : 44, iw0 = W - pad0 - 12, X = (v) => pad0 + ((v - xr.lo) / (xr.hi - xr.lo || 1)) * iw0;
-      const {Y} = frame(W, H, yr, {xt: xr.list.map((v) => [X(v), t ? dayFmt(v, hi - lo) : fmt(v)])});
+      const {Y} = frame(W, H, yr, {xt: xr.list.map((v) => [X(v), t ? dayFmt(v, hi - lo) : tick(v)])});
       ys.forEach((y, k) => {
         const pts = idx.map((i) => [X(xv(s.rows[i])), num(s.rows[i][at(y)])]).filter((p) => p[1] != null).map(([x, v]) => `${x},${Y(v)}`);
+        if(ys.length === 1 && pts.length > 1){                        // one series: a soft wash under its line (10 %), and its last value at the end
+          const fx = pts[0].split(",")[0], lx = pts[pts.length - 1].split(",")[0], b = Y(Math.max(yr.lo, Math.min(yr.hi, 0)));
+          rsSvg(svg, "polygon", {points: `${fx},${b} ${pts.join(" ")} ${lx},${b}`, fill: col(k), "fill-opacity": 0.1, stroke: "none"}); }
         rsSvg(svg, "polyline", {points: pts.join(" "), fill: "none", stroke: col(k), "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round"});
+        const last = idx.length ? num(s.rows[idx[idx.length - 1]][at(y)]) : null;
+        if(!s.small && last != null && pts.length){ const [lx, ly] = pts[pts.length - 1].split(",").map(Number);
+          rsSvg(svg, "text", {x: Math.min(lx + 6, W - 4), y: ly - 6, "text-anchor": lx + 40 > W ? "end" : "start", fill: "var(--ink)", "font-size": 10.5}, fmt(last)); }
         if(idx.length <= 60 && !s.small) idx.forEach((i) => { const v = num(s.rows[i][at(y)]); if(v == null) return;
           tip(rsSvg(svg, "circle", {cx: X(xv(s.rows[i])), cy: Y(v), r: 4, fill: col(k), stroke: "var(--bg)", "stroke-width": 2}), i); });
       });
@@ -147,20 +172,20 @@ export const rsChart = (() => {
       const xr = ticks(lo, hi, BINS), step = (xr.hi - xr.lo) / BINS, n = new Array(BINS).fill(0);
       for(const v of vals) n[Math.min(BINS - 1, Math.floor((v - xr.lo) / step))]++;
       const yr = ticks(0, Math.max(...n)), pad0 = s.small ? 4 : 44, iw = W - pad0 - 12, X = (v) => pad0 + ((v - xr.lo) / (xr.hi - xr.lo)) * iw;
-      const {Y} = frame(W, H, yr, {xt: ticks(xr.lo, xr.hi).list.map((v) => [X(v), fmt(v)])});
+      const {Y} = frame(W, H, yr, {xt: ticks(xr.lo, xr.hi).list.map((v) => [X(v), tick(v)])});
       n.forEach((c, b) => { const a = xr.lo + step * b; if(!c) return;
         tip(rsSvg(svg, "path", {d: barPath(X(a) + 1, Y(c), X(a + step) - X(a) - 2, Y(0) - Y(c), false, true), fill: col(0)}), null,
             {head: `${fmt(a)} to ${fmt(a + step)}`, lines: `<br>${fmt(c)} row${c === 1 ? "" : "s"}`}); });
-      foot.textContent = `${fmt(vals.length)} values of ${s.x} in ${BINS} ranges`;
+      if(s.small) foot.textContent = "";                              // (the subtitle has the number of values)
     }
     function scatter(W, H, ys){
       const y = ys[0], rows = s.rows.slice(0, POINTS), xs = rows.map((r) => num(r[at(s.x)])), yv = rows.map((r) => num(r[at(y)]));
       if(s.rows.length > POINTS) foot.textContent = `The first ${fmt(POINTS)} of ${fmt(s.rows.length)} rows`;
       const okx = xs.filter((v) => v != null), xr = ticks(Math.min(...okx), Math.max(...okx)), yr = ticks(Math.min(...yv.filter((v) => v != null)), Math.max(...yv.filter((v) => v != null)));
       const pad0 = s.small ? 4 : 44, iw = W - pad0 - 12, X = (v) => pad0 + ((v - xr.lo) / (xr.hi - xr.lo)) * iw;
-      const {Y} = frame(W, H, yr, {xt: xr.list.map((v) => [X(v), fmt(v)])});
+      const {Y} = frame(W, H, yr, {xt: xr.list.map((v) => [X(v), tick(v)])});
       rows.forEach((r, i) => { if(xs[i] == null || yv[i] == null) return;
-        tip(rsSvg(svg, "circle", {cx: X(xs[i]), cy: Y(yv[i]), r: s.small ? 2 : 4, fill: col(0), "fill-opacity": 0.75, stroke: "var(--bg)", "stroke-width": 1.5}), i,
+        tip(rsSvg(svg, "circle", {cx: X(xs[i]), cy: Y(yv[i]), r: s.small ? 2 : 4, fill: col(0), "fill-opacity": 0.75, stroke: "var(--bg)", "stroke-width": 2}), i,
             {head: String(r[at(s.x)] != null ? `${s.x}: ${fmt(xs[i])}` : ""), lines: `<br>${esc(y)}: ${fmt(yv[i])}`}); });
       if(!s.small){ rsSvg(svg, "text", {x: W - 12, y: H - 22, "text-anchor": "end", fill: "var(--mut)", "font-size": 10.5}, s.x);
                     rsSvg(svg, "text", {x: pad0 + 4, y: 12, fill: "var(--mut)", "font-size": 10.5}, y); }

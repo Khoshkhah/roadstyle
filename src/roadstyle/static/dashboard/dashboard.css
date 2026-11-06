@@ -750,6 +750,11 @@ html[data-rs-theme=dark]{--rs-chart-1:#3987e5;--rs-chart-2:#d95926;--rs-chart-3:
 .rs-chart-legend span{display:inline-flex;align-items:center;gap:5px}
 .rs-chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
 .rs-chart-foot{color:var(--mut);font-size:11px;min-height:16px}
+.rs-chart-hd{display:flex;align-items:baseline;gap:8px;min-height:22px;flex-wrap:wrap}
+.rs-chart-hd b{font:600 12.5px system-ui,sans-serif;color:var(--ink)}
+.rs-chart-hd span{font-size:11px;color:var(--mut)}
+.rs-chart svg .rs-mk{transition:opacity .12s}
+.rs-chart svg.rs-chart-dim .rs-mk:not(.on){opacity:.35}
 .rs-chart-none{color:var(--mut);margin:12px 0}
 
 /* ---- INPUTS, CHIPS AND A DOT in the panel: a text box looks like the panel's select and query box; a chip is a small rounded label (`.accent` tints it with --accent);
