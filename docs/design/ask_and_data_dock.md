@@ -967,6 +967,73 @@ Why it matters: the data of a page comes from OSM, and a street name can hold wo
 design the worst result is a wrong answer or a wrong colour on the map (its row in Colour ▾ takes it away): no tool changes the data, a query cannot read a file or an address, and the answer is plain text
 with no links and no images.
 
+## 4. Charts
+
+Kaveh (2026-11-05): "I want to add capability for drawing chart too". His choices: the chart is a second view of the data dock, **Table |
+Chart**, over the same result; an Ask answer card shows a small copy of its chart, and **Show** puts it in the dock again. The kinds:
+**bar, line, histogram, scatter and pie**.
+
+### The chart part
+
+A dashboard part, `rs.chart(el, spec)` (`dashboard/chart.js`, in `files.txt`), so a page can also put a chart in a card of the panel. It draws
+SVG with `rs.svg`, so it follows the theme with no code of its own. The data dock and Ask use it.
+
+```js
+const c = rs.chart(el, {kind: "bar", columns, rows, x: "highway", y: "km", title: "km of road by road class"});
+c.set({kind: "pie"});        // the same data, another kind
+```
+
+| Kind | The data | What it draws |
+|---|---|---|
+| `bar` | a text (or yes/no) column `x` and a number column `y` | one bar for each row, in the order of the rows; horizontal when a label is longer than 8 characters. At most 40 bars: "… 12 more in the table". |
+| `line` | an ordered column `x` (a number, a date or a time) and a number column `y` | one line through the rows, in the order of `x`, with a point at each row when there are 60 rows or fewer |
+| `histogram` | one number column `x` | the number of rows in each of 20 equal ranges of `x`, over all the rows of the result (not only the table's 1000) |
+| `scatter` | two number columns `x` and `y` | one point for each row, at most 5000 points |
+| `pie` | a text column `x` and a number column `y` (of 0 or more) | one slice for each row, largest first, at most 8 slices: the rest is one slice "Other". A label shows the share in % |
+
+- **More than one number column** (`y: ["km", "edges"]`): bars side by side and one line for each column, with a legend. Not for `pie`,
+  `histogram` and `scatter`.
+- **The colours:** a new set of 8 chart colours, `--rs-chart-1` … `--rs-chart-8`, in both themes, that a person with a colour vision
+  deficiency can tell apart, and that keep 3:1 on the panel and on the dock. One series is `--rs-chart-1`. The grid is `--rs-chart-grid`,
+  the text `--mut`.
+- **The axes:** numbers with a thin space between thousands (`2 765`), at most 6 ticks; a date axis by day, month or year. The axis titles
+  are the column names.
+- **Hover:** the pointer on a bar, a point or a slice shows its values in the hover box (`rs.hover`): the `x` value, then each `y` with its
+  column name. A click on it does what a click on its row does: it selects its road, or the roads of its name (the data dock's row click).
+- **No data for the kind:** a clear line in place of the chart, for example "A pie chart needs a text column and a number column of 0 or
+  more."
+- **Size:** the chart fills its box; it draws again when the box changes its size or the theme changes.
+- **Access:** the SVG has `role="img"` and the title as its label; the table is the text form of the same data.
+
+### The data dock: Table | Chart
+
+- A switch **Table | Chart** in the dock's title row, before Tables and CSV. The chart uses the same result as the table: a new run shows
+  the new result in the view that is open.
+- **The chart's own row** over the chart: **Kind ▾**, **X ▾** and **Y ▾** (roadstyle's select box), with the columns that fit the kind.
+- **The first chart of a result** is chosen from its columns: a date or time column and a number column: `line`; a text column and a number
+  column: `bar`; one number column: `histogram`; two number columns: `scatter`. A pie is drawn only when the person or Ask asks for it.
+- The light and the row click stay as they are. The road card beside the table stays beside the chart too.
+- **Save:** "SVG" in the chart's row downloads the chart as an SVG file (CSV stays for the data).
+
+### Ask: the tool draw_chart
+
+`draw_chart({sql, kind, x, y, title})`: Ask runs the SQL through the data dock (so it is the dock's table), switches the dock to **Chart** with
+this spec, and its answer card shows a small copy of the chart (the width of the card, 140 px high; no hover in the copy). **Show** on the
+card puts its table and its chart in the dock again. The prompt says: "Use draw_chart when the person asks for a chart, a graph or a plot,
+or when a comparison of 3 to 40 values is clearer as a chart. Aggregate in the SQL (GROUP BY): a chart draws the rows as they are." A bad
+spec (a column that is not in the result, a kind that does not fit) goes back to the model as an error, as a failed query does.
+
+### Tests
+
+`tests/test_chart_browser.py`: each kind in both themes and at 390 px (no part outside its box, the colours 3:1 on the background); 40 bars
+and the "more" line; a pie of 12 rows has 8 slices with "Other"; a histogram over 2 765 rows (all rows, not 1000); the hover values; a click
+on a bar selects its road; a kind with no fitting columns shows its line. In `test_data_dock_browser.py`: Table | Chart, the first chart of
+a result, Kind/X/Y. In `test_ask_browser.py`: a fake model that calls `draw_chart`: the dock shows the chart, the card its copy, Show.
+
+### The order
+
+After Ask: the chart part, then the data dock's Chart view, then the Ask tool. All in the same release.
+
 ## One hover for the whole dashboard
 
 Kaveh (2026-11-05): "some of the buttons on the dashboard don't have hover! is not it as default every activation part of dashboard has
