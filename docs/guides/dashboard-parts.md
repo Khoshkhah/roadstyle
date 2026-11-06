@@ -5,7 +5,7 @@ JavaScript for the same thing in a page**: a copy of a part drifts, and it forge
 
 The panel starts empty. Two parts are whole sections that roadstyle writes: the `query` part and the `road_card` part. They are in [Add to the panel](dashboard-panel.md). The pieces below are for the page's own HTML in a section.
 
-Two parts use the whole panel: the level editor ([Edit the levels in a dashboard](levels.md#edit-the-levels-in-a-dashboard)) and the design panel ([Edit the design of a map](design-panel.md)).
+Two parts use the whole panel: the level editor ([Edit the levels in a dashboard](levels.md#edit-the-levels-in-a-dashboard)) and the design panel ([Edit the design of a map](design-panel.md)). An editor of your own uses the same frame: [An editor in the panel](#an-editor-in-the-panel).
 
 | Part | What it is | Use it for |
 |---|---|---|
@@ -23,6 +23,7 @@ Two parts use the whole panel: the level editor ([Edit the levels in a dashboard
 | [`class="rs-scroll"` + `class="rs-table"`](#a-list-or-a-table-that-scrolls) | a scroll area and a table with a fixed header | a list of streets |
 | [`rs.svg(parent, tag, attrs)` + `--rs-chart-*`](#charts) | one SVG element that reads `var(--x)`, and the chart colors | charts |
 | [`<input>`, `<select>`, `<button>`, `class="rs-chip"`, `class="rs-dot"`](#buttons-text-boxes-chips-and-a-dot) | the panel's own look, a small label, a color mark | forms, labels |
+| [`rs.frame({panel, title, back, tabs})`](#an-editor-in-the-panel) | the frame of an editor that uses the whole panel: a title line with "← back", a tab row, one body that scrolls and a bar at the bottom edge | an editor, as Edit design |
 | `rs.ready(fn)` | runs `fn` when the page is ready | the start of a page script |
 | [`rs.classify(values, method, k, pivot=..., palette=...)`](#colour-classes) | the cuts and the colors for discrete road classes | `color_options` |
 
@@ -172,6 +173,44 @@ The box has the look of the popup and follows the pointer. It flips to the other
 `rs-scroll` gives the area the scroll rules of the panel body: a thin scrollbar that shows only over the area or while it scrolls, a fade at the bottom edge while there is more below, and a scroll that never goes on to the map. The height is `--rs-scroll-h` (default: the smaller of 520 px and 60 % of the window). `rs-table` keeps the header row in view, lines up the numbers (the first column is text) and tints the row under the pointer. Put `data-sort="asc"` or `"desc"` on the `th` of the sorted column.
 
 Every scroll area of the dashboard has these rules, not only `rs-scroll`: the help window, the boxes of the toolbox, the panel's own select list and the query part's list. A whole box has no fade, because the fade would also take its border. `tests/test_dashboard_scroll_browser.py` checks each area.
+
+## An editor in the panel
+
+An editor that uses the whole panel (Edit design, a form with tabs) gets its frame from roadstyle. Do not make the frame in the page: a frame of your own gets the browser's scrollbar, a bar that scrolls with the form, or tabs in another look.
+
+```javascript
+const fr = rs.frame({panel: document.getElementById("sb"), title: "Edit roads", back: "Steps", id: "ed",
+                     tabs: [["tags", "Tags"], ["geometry", "Geometry"], ["notes", "Notes"]]});
+fr.body.innerHTML = "<p>The form of the tab Tags.</p>";
+fr.bar.innerHTML = "<b>2 changes</b> <button type='button'>Apply</button>";
+fr.addEventListener("tab", (e) => { fr.body.innerHTML = formOf(e.detail.tab); });
+fr.addEventListener("back", () => fr.close());
+fr.open("tags");
+```
+
+A panel with no tabs and a row of its own tools under the title (the Ask panel: the name of the provider, **Key** and **New**):
+
+```javascript
+const tools = document.createElement("div");
+tools.innerHTML = "<b>Provider</b> <button type='button'>Key</button> <button type='button'>New</button>";
+const ask = rs.frame({panel: document.getElementById("sb"), title: "Ask", back: null, head: tools, id: "ask"});
+ask.open();
+```
+
+`panel` is the host's standard panel: `#sb` with `.sb-card`, and in it `.sb-top` (the title first, then the hide button) and `.sb-body`. A module page that does not have `window.rs` imports the same function: `import {editorFrame} from "./dashboard/frame.js"`.
+
+`open(tab)` hides the host's title, its body and the **Collapse all** button (`#rs-fold-all`), and shows the frame:
+
+- **The title line** (`top`) goes into `.sb-top`, before the host's hide button: "← `back`" and the `title`. With `back: null`, the line has no back button. You can add more to the line, for example the name of the item that you edit.
+- **The head row** (`head`) is under the title line, with a line under it. It does not scroll. `tabs` puts roadstyle's tab row (`rs-tabs`) in it. A click on a tab selects it and sends the event `tab` (`detail.tab`). The frame does not change the body: draw the tab's content in the body when the event comes. `tab(name)` selects a tab with no event, and `tab()` gives the selected tab. A panel with no tabs can put its own row in it: give the option `head` (an element), or add to `frame.head` before `open()`. An empty head row does not show.
+- **The body** (`body`) is the one area that scrolls. It has the class `rs-pbody`, so it has the scroll protocol of the panel: a thin scrollbar that shows only over the body or while it scrolls, a line under the tab row while the body is scrolled, a fade at the bottom edge while there is more below, and a fade at the top edge while there is more above.
+- **The bar** (`bar`) is under the body and outside it, at the bottom edge of the panel. Nothing scrolls under it, so it has the color of the panel. Put the state and the buttons of the editor in it. An empty bar does not show.
+
+`close()` removes the frame and shows the host's title, body and **Collapse all** again, with the body at its old scroll position. The back button sends the event `back`: the host then calls `close()`. `id` is the start of the ids of the frame's elements (`<id>-back`, `<id>-head`, `<id>-tabs`, `<id>-tab-<tab>`, `<id>-body`; default `rs-frame`). The classes are `rs-frame`, `rs-frame-title`, `rs-frame-back`, `rs-frame-head`, `rs-frame-body` and `rs-frame-bar`. Use them to find the elements, not to change the frame.
+
+Each `<select>` in the frame (in the head row, the body or the bar, also one that you add after `open()`) gets roadstyle's select box: round corners and the theme's colors, not the browser's list.
+
+On a phone the panel is a bottom sheet, and the frame fills it: `open()` puts the sheet at its full height, and `close()` gives back the height that it had. The bar is at the bottom of the sheet, and the back button and the tabs are 44 px high. The tab row is one row that scrolls sideways, and the selected tab comes into view. The colors are the theme's tokens, so the frame has the look of the panel in the light and the dark theme. `tests/test_editor_frame_browser.py` checks the frame in both themes and at 390 px, with tabs and with a head row of its own.
 
 ## The rules
 

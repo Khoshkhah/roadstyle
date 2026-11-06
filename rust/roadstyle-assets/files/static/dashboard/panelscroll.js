@@ -1,5 +1,6 @@
 // The scroll protocol of a panel (docs/design/dashboard_templates.md): the header stays, only the body scrolls. A line under the header shows when
-// the body is scrolled, so the person sees that there is more above; the body has `data-more` while there is more below (a fade at its bottom edge), and
+// the body is scrolled, so the person sees that there is more above; the body has `data-more` while there is more below (a fade at its bottom edge),
+// `data-above` while there is more above (a fade at its top edge), and
 // `rs-scrolling` while it scrolls (the scrollbar shows). (The rest of the protocol is CSS: the body does not hand its scroll to the map.)
 export function initPanelScroll(){
   const run = () => document.querySelectorAll(".sb-body, .rp-body, .rs-pbody").forEach(body => {
@@ -7,7 +8,7 @@ export function initPanelScroll(){
     if(!head || body.dataset.rsScroll) return;
     body.dataset.rsScroll = "1";
     const mark = () => head.classList.toggle("scrolled", body.scrollTop > 0);
-    const more = () => body.toggleAttribute("data-more", body.scrollTop + body.clientHeight < body.scrollHeight - 2);
+    const more = () => { body.toggleAttribute("data-more", body.scrollTop + body.clientHeight < body.scrollHeight - 2); body.toggleAttribute("data-above", body.scrollTop > 2); };
     let t = 0;
     body.addEventListener("scroll", () => {
       mark(); more();
@@ -22,11 +23,11 @@ export function initPanelScroll(){
 }
 // Every other scroll area of the dashboard (a page's `rs-scroll`, the query part's list, the help window, the panel's select list, the boxes of the toolbox,
 // the docked read-out; dashboard.css has the same list): the same protocol as the body, for each one. The scrollbar shows while the pointer is over the area or
-// it scrolls (`rs-scrolling`), a fade at its bottom edge shows while there is more below (`data-more`), and its scroll never goes on to the map or to the body (CSS).
+// it scrolls (`rs-scrolling`), a fade at its bottom edge shows while there is more below (`data-more`) and at its top edge while there is more above (`data-above`), and its scroll never goes on to the map or to the body (CSS).
 function _psInner(el){
   if(el.dataset.rsScroll) return;
   el.dataset.rsScroll = "1";
-  const more = () => el.toggleAttribute("data-more", el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+  const more = () => { el.toggleAttribute("data-more", el.scrollTop + el.clientHeight < el.scrollHeight - 2); el.toggleAttribute("data-above", el.scrollTop > 2); };
   let t = 0;
   el.addEventListener("scroll", () => { more(); el.classList.add("rs-scrolling"); clearTimeout(t); t = setTimeout(() => el.classList.remove("rs-scrolling"), 900); }, {passive: true});
   more();
