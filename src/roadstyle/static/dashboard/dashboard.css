@@ -756,6 +756,9 @@ html[data-rs-theme=dark]{--rs-chart-1:#159cb1;--rs-chart-2:#d95926;--rs-chart-3:
 .rs-chart{position:relative;min-height:120px;display:flex;flex-direction:column;font:11px system-ui,sans-serif;color:var(--ink);overflow:auto;scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) 47%,transparent) transparent}      /* a chart taller than its box: a scrollbar that shows */
 .rs-chart svg{flex:none}
 .rs-chart.rs-chart-small{overflow:hidden;min-height:0}
+/* a small pie (Ask's card): the pie at the left at its full height, its legend at its right (Kaveh: "just need to shift left and add legend there") */
+.rs-chart-small .rs-chart-legend{min-height:0}
+.rs-chart.rs-chart-small.rs-chart-side{grid-template-columns:0 auto auto 1fr}
 .rs-chart svg{display:block;overflow:visible;font-family:system-ui,sans-serif;font-variant-numeric:tabular-nums}
 .rs-chart-legend{flex:none;display:flex;flex-wrap:wrap;gap:4px 12px;min-height:20px;color:var(--ink);font-size:11.5px}
 .rs-chart-legend span{display:inline-flex;align-items:center;gap:5px}

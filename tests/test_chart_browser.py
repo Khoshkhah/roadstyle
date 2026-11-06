@@ -154,6 +154,29 @@ def test_a_pie_takes_the_room_it_has(tmp_path, w, h):
     assert errors == [], errors
 
 
+
+def test_a_small_pie_keeps_its_legend(tmp_path):
+    """Kaveh: "legend is not there" (the pie in Ask's card, a small copy). A small copy has no labels, but a pie keeps its legend: the pie at
+    the left at its full height, the legend at its right ("just need to shift left and add legend there"). The other small kinds still have no legend."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_DRAW, ["pie", "name", "length_m", _STREETS, _LONG[:6], 320, 140])
+            page.evaluate("C.set({small: true})")
+            page.wait_for_timeout(80)
+            m = page.evaluate("""() => { const el = document.getElementById('c'), b = el.getBoundingClientRect(), lg = el.querySelector('.rs-chart-legend');
+              const ps = [...el.querySelectorAll('svg path')].map(p => p.getBoundingClientRect()), g = lg && lg.getBoundingClientRect();
+              const l = Math.min(...ps.map(r => r.left)), r = Math.max(...ps.map(r => r.right)), t = Math.min(...ps.map(r => r.top)), bt = Math.max(...ps.map(r => r.bottom));
+              return {names: lg ? lg.children.length : 0, d: Math.min(r - l, bt - t), left: l - b.left, legendIn: !!g && g.top >= b.top - 1 && g.bottom <= b.bottom + 1 && g.right <= b.right + 1,
+                      apart: !!g && (r <= g.left || bt <= g.top), title: !!el.querySelector('.rs-chart-hd')}; }""")
+            assert m["names"] == 6 and m["legendIn"] and m["apart"] and not m["title"], m
+            assert m["d"] >= 120 and m["left"] <= 24, m                         # the full height of the box (140 px), at its left (its padding and 6 px)
+            page.evaluate("C.set({kind: 'bar'})")
+            assert page.evaluate("!document.querySelector('#c .rs-chart-legend')")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
 @pytest.mark.parametrize("theme,phone", [("light", False), ("dark", True)])
 def test_the_axis_titles_of_a_scatter_are_outside_the_plot(tmp_path, theme, phone):
     """Reviewer: "maxspeed_kmh" at the top left and "length_m" at the bottom right lay on the tick numbers and the grid."""

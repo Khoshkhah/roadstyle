@@ -71,7 +71,8 @@ export const rsChart = (() => {
         t.textContent = s.title === false ? "" : s.title || (s.kind === "histogram" ? `${s.x}: the rows in each range` : s.kind === "scatter" ? `${ys[0]} against ${s.x}` : `${ys.join(" and ")} by ${s.x}`);
         const n = s.kind === "histogram" && s.values ? s.values.length : s.rows.length;
         sub.textContent = s.count != null ? s.count : `${fmt(n)} ${s.kind === "histogram" ? "values" : "rows"}`; hd.append(...(s.title === false ? [sub] : [t, sub])); el.append(hd); }
-      const legend = !s.small && (ys.length > 1 || s.kind === "pie") ? document.createElement("div") : null;     // a small copy has no legend
+      // a small copy has no legend, but a pie keeps it: its slices have no names of their own (Kaveh: "legend is not there", the pie in Ask's card)
+      const legend = s.kind === "pie" || (!s.small && ys.length > 1) ? document.createElement("div") : null;
       if(legend){ legend.className = "rs-chart-legend"; el.append(legend); if(s.kind !== "pie") legendOf(legend, ys.map((y, k) => [y, col(k)])); }
       // the foot: a line under the chart when it does not show all the rows (empty: no line); a small copy has none
       foot = document.createElement("div"); foot.className = "rs-chart-foot"; if(!s.small) el.append(foot);
