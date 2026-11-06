@@ -1,6 +1,6 @@
 ---
 name: roadstyle
-description: Render road networks (a GeoDataFrame of edges with a `highway` column, e.g. from OSM or duckOSM) into styled, interactive, offline HTML maps with the roadstyle Python library, and script the saved map from JavaScript (rsQuery, rsColor, rsSelect, rs:select). Use when drawing roads or per-edge data (traffic flow, speed, clusters, routes) on a map, building a map dashboard page, or embedding a roadstyle map in a host page.
+description: Render road networks (a GeoDataFrame of edges with a `highway` column, e.g. from OSM or duckOSM) into styled, interactive, offline HTML maps with the roadstyle Python library, and script the saved map from JavaScript (rsQuery, rsColor, rsSelect, rs:select). Use when drawing roads or per-edge data (traffic flow, speed, clusters, routes) on a map, building a map dashboard page (with charts, a SQL data dock under the map, or an AI Ask panel), or embedding a roadstyle map in a host page.
 ---
 
 # roadstyle
@@ -132,6 +132,31 @@ rs.render_dashboard(edges, color_options={"Road class": {}}, dashboard={"panel":
 `render_dashboard` pages share one set of parts (help window, hover box, tabs, cards, number tiles, scroll area and table, chart colours, inputs, chips,
 `rs.ready`, `rs.classify`): see `docs/guides/dashboard-parts.md`. **Use a part when one exists; never write CSS or JavaScript for the same thing in a page.**
 Fit the content to the panel (its width is `panel.width_px`: "Dashboard options" in `docs/reference/parameters.md`).
+
+## A chart, the bottom dock, the data dock and Ask
+
+Use these parts. Never draw a chart with your own SVG code, and never make your own table under the map.
+
+- **A chart: `rs.chart(el, spec)`** draws `bar`, `line`, `histogram`, `scatter` or `pie` from `{columns: [{name, type}], rows}` (a
+  value is a string, number, `BigInt` or `null`), with `x`, `y` (a column, or a list of up to 3), `title`, `onPick(row)`. It has the 8
+  chart colours (`--rs-chart-1..8`, teal first, checked for colour vision deficiency in both themes), compact ticks, hover, a legend for 2
+  or more series, and the light and the dark theme. `c.set({kind: "pie"})` draws again. A spec that does not fit the columns shows a line
+  that says why. Guide: `docs/guides/dashboard-parts.md`, "A chart".
+- **The bottom dock: `rs.dock`** is the wide area under the map (a phone: a bottom sheet). `rs.dock.add({id, label, el, note, actions})`,
+  `open(id)`, `close()`, `note(id, text)`. `rs.dock.table({columns, rows, idColumn, more, onSort})` is the dock's table: a header with the
+  type, exact 64-bit ids, sort, a click on a row selects its road, and 50 000 rows stay fast. Guide: `docs/guides/dashboard-layout.md`,
+  "The bottom dock".
+- **The data dock** is one SQL line over the dock's table, with **Table | Chart**, a **Tables** list, and **Colour**, **Focus** and **Light**
+  for the roads of the result. Your page runs the SQL: roadstyle has no database. `import {dataDock} from "./dashboard/data/data_dock.js"`,
+  then `dataDock({query, schema, ready, tables, load})`. Guide: `docs/guides/data-dock.md`.
+- **Ask** is an AI agent in the panel on the person's own key of a free service (the key stays in the browser and goes only to that
+  service). It writes SQL through the data dock, colours and focuses roads, moves the map and draws a chart. `import {askPanel} from
+  "./dashboard/ask/ask_panel.js"`, then `askPanel({data, about, dialect: "DuckDB", examples})`. Give `main: true` and `columns` on the
+  map's table in `schema()`. Never put a key in a file or a test: a test gives a fake provider. Guide: `docs/guides/ask.md`.
+- **An editor that uses the whole panel: `rs.frame({panel, title, back, tabs, head})`** gives the title line, the tab row, the body that
+  scrolls and the bar at the bottom. Never make the frame in the page. Guide: `docs/guides/dashboard-parts.md`, "An editor in the panel".
+- **Light and fade.** `rs.highlight(ids, {set, color, opacity})` is a named highlight set; `rs.fade(ids)` fades every other road;
+  `rs.fade(null)` ends it.
 
 ## Dashboard panel standard (use it, do not invent spacing)
 
