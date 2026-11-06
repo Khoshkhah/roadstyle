@@ -2,6 +2,8 @@
 
 Status: **design, for Kaveh's review** (2026-11-05). No code yet. The code starts after Kaveh approves this design.
 
+The mock-up runs on **roadstyle 0.28.0** from PyPI (it started on 0.27.1, which has no accent ring on an open card that folds).
+
 A mock-up on Monaco (outside the repository) found three points, which are in this text now: the dock must be opaque, the panel's
 control rules must also apply in the dock, and the dashboard needs an error colour (`--rs-err`).
 
@@ -857,7 +859,11 @@ show buttons have no hover, and the template's `#sb button:hover` also colours a
 | Filled | brighter: `filter: brightness(1.1)` | a primary button, the open tab, Run, Ask's send button, Key while its form is open, "Shown on map" |
 | A link | underlined (a link has no underline until then) | "Get a free key …", links in the help window |
 
-A disabled control has no hover. Keyboard focus (`:focus-visible`) has the same look and a 2 px `--accent` ring. The dock's top edge keeps
+A disabled control has no hover. Keyboard focus (`:focus-visible`) has the same look and a 2 px `--accent` ring. **A card's title row is not a
+control of its own:** the general rule leaves it to the card rules of the standard (a card that folds: an accent title under the pointer,
+and an accent ring and title while it is open; a card that opens something: a tint of the whole card, stronger under the pointer). The
+first try of the rule tinted the title button and the title row each on its own, and they did not line up (Kaveh: "wrong style for
+opened card"). The dock's top edge keeps
 its own drag look (the accent edge). **After the change, in both themes:** 50 controls have the tint, 6 the brighter look, 2 the underline;
 the 2 disabled ones have none.
 
