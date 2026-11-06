@@ -133,7 +133,7 @@ export const rsDock = (() => {
     : (typeof a === "number" || typeof a === "bigint") && (typeof b === "number" || typeof b === "bigint") ? (a < b ? -1 : a > b ? 1 : 0)
     : String(a).localeCompare(String(b), undefined, {numeric: true});
 
-  function table({columns = [], rows = [], idColumn = null, more = false, onSort = null} = {}){
+  function table({columns = [], rows = [], idColumn = null, more = false, onSort = null, onRow = null} = {}){
     const box = el("div", "rs-dock-table rs-scroll"), t = el("table", "rs-table"), head = el("thead"), tb = el("tbody");
     t.append(head, tb); box.append(t);
     let cols = columns, data = rows, orig = rows, sort = null, picked = null;
@@ -153,7 +153,9 @@ export const rsDock = (() => {
     };
     const rowEl = (r, i) => {
       const tr = el("tr"), k = idAt();
-      if(k >= 0){ tr.className = "rs-dock-id" + (picked != null && String(r[k]) === picked ? " on" : ""); tr.onclick = () => pick(String(r[k])); }
+      // onRow(row, index, columns): the host's own click (the data dock: a row of names selects its roads); else a row with an id selects its road
+      if(onRow){ tr.className = "rs-dock-id" + (picked === "#" + i ? " on" : ""); tr.onclick = () => { picked = "#" + i; mark(); onRow(r, i, cols); }; }
+      else if(k >= 0){ tr.className = "rs-dock-id" + (picked != null && String(r[k]) === picked ? " on" : ""); tr.onclick = () => pick(String(r[k])); }
       r.forEach((v, j) => { const td = el("td", (v == null ? "rs-dock-null " : "") + (isNum(cols[j]) ? "n" : ""), text(v)); const s = text(v); if(s.length > 40) td.title = s; tr.append(td); });
       tr.dataset.i = i;
       return tr;
@@ -173,11 +175,12 @@ export const rsDock = (() => {
       else { const i = cols.findIndex(c => c.name === col), k = sort.dir === "asc" ? 1 : -1; data = [...orig].sort((x, y) => x[i] == null || y[i] == null ? cmpVal(x[i], y[i]) : k * cmpVal(x[i], y[i])); }
       drawHead(); drawBody();
     }
+    const mark = () => tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", "#" + tr.dataset.i === picked));
     function pick(id){
       picked = id; tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", String(data[+tr.dataset.i][idAt()]) === id));
       if(window.rs){ window.rs.select(id); window.rs.focus([id]); }
     }
-    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; } if("more" in x) more = x.more; box.scrollTop = 0; drawHead(); drawBody(); };
+    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; picked = null; } if("more" in x) more = x.more; box.scrollTop = 0; drawHead(); drawBody(); };
     set({});
     return {el: box, set, rows: () => data, sort: () => sort};
   }

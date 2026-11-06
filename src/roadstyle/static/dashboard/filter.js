@@ -72,6 +72,34 @@ export function rsSetTunnels(on){
   _tunnelsOn=!!on; _applyRoadFilters();
   _emit("rs:filterchange", {tunnels:_tunnelsOn});
 }
+// rsFade(rows, {opacity}): every road that is not in the set is drawn at `opacity` (default 0.18) of its own opacity, with its arrows and names; the
+// pair drawn as one line follows either edge, as in rsFilter. rsFade(null) ends it. Each value of a zoom curve is multiplied, so the curve stays.
+const _fadeBase = {};
+let _fadeRows = null, _fadeK = 0.18;
+const _fadeTimes = (b, k) => {
+  if(b == null) return k;
+  if(Array.isArray(b) && b[0] === "interpolate" && JSON.stringify(b[2]) === '["zoom"]') return [...b.slice(0, 3), ...b.slice(3).map((v, i) => i % 2 ? ["*", v, k] : v)];
+  if(Array.isArray(b) && b[0] === "step" && JSON.stringify(b[1]) === '["zoom"]') return [...b.slice(0, 2), ...b.slice(2).map((v, i) => i % 2 ? v : ["*", v, k])];
+  return ["*", b, k];
+};
+function _fadeApply(){
+  const q = _fadeRows && _has(["id"], [..._fadeRows, ..._fadeRows.map(i => (_rprops(i) || {}).__rs_edge2).filter(t => t != null)]);
+  _fltLayers().forEach(l => {
+    if(_itemOv(l.id)) return;                                     // the roads only, not an overlay
+    const props = l.type === "line" ? ["line-opacity"] : l.type === "symbol" ? ["icon-opacity", "text-opacity"] : [];
+    props.forEach(p => {
+      const key = l.id + "|" + p;
+      if(!(key in _fadeBase)) _fadeBase[key] = map.getPaintProperty(l.id, p) ?? null;
+      map.setPaintProperty(l.id, p, q ? _fadeTimes(_fadeBase[key], ["case", q, 1, _fadeK]) : _fadeBase[key]);
+    });
+  });
+}
+export function rsFade(ids, o){
+  _fadeRows = ids == null ? null : Array.from(ids);
+  if(o && o.opacity != null) _fadeK = Math.max(0, Math.min(1, +o.opacity));
+  _fadeApply();
+  _emit("rs:fadechange", {ids: _fadeRows && _fadeRows.slice()});
+}
 export function rsFilter(ids, layer){   // show only these features; rsFilter(null) resets
   const L=_lyr(layer); if(!L) return;
   if(L.ov){
@@ -141,6 +169,9 @@ export function initFilter(){
   window.rsSetBridges = rsSetBridges;
   window.rsSetTunnels = rsSetTunnels;
   window.rsFilter = rsFilter;
+  window.rsFade = rsFade;
+  // a new roads style (rs.restyle): its own opacities are the base, and the fade goes on it again
+  document.addEventListener("rs:stylechange", () => { for(const k in _fadeBase) delete _fadeBase[k]; if(_fadeRows) _fadeApply(); });
   window.rsSetModes = rsSetModes;
   window.rsGetModes = ()=>_modes && _modes.slice();
   window.rsSetKinds = rsSetKinds;

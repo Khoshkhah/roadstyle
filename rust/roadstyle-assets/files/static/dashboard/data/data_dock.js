@@ -1,0 +1,279 @@
+// The data dock (docs/design/ask_and_data_dock.md, "2. The data dock"; docs/guides/data-dock.md): one SQL line over a wide table, in the bottom dock. The host
+// runs the SQL on its own data (`query`) and tells what the data has (`schema`); roadstyle knows no database. The dock shows the result in rs.dock.table,
+// lights the result's roads on the map (the highlight set "dock"), and keeps the lasting map changes of the page as layers in its buttons Colour and Focus.
+//
+//   dataDock({dashboard, query, schema, ready, tables, load, idColumn, keys, roadsBy, sql, label, limit, card, guard}) -> EventTarget + {run, show, sql, result,
+//     csv, stop, open, close, ready, roads, colour, focus, layers, remove, schema}
+//   events: "run" {sql, columns, rows, more, ms, source}, "error" {sql, message, source}, "layers" {layers}
+import {guard as guardSql, inner} from "./guard.js";
+
+const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
+const PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4", "#f032e6", "#9a6324"];
+const LIGHT = {set: "dock", color: "#7c4dff", opacity: 0.55};          // the light: roadstyle's select purple on the road's own fill
+const MAP_LIMIT = 100000, CSV_LIMIT = 1000000;
+const quoteId = (c) => '"' + String(c).replace(/"/g, '""') + '"';
+const lit = (v) => typeof v === "string" ? "'" + v.replace(/'/g, "''") + "'" : typeof v === "bigint" ? String(v) : String(v);
+const fmt = (n) => Number(n).toLocaleString("en").replace(/,/g, " ");
+const sentence = (s) => { const t = String(s || "").split("\n")[0].replace(/^.*?Error: /, "").trim(); return /[.!?]$/.test(t) ? t : t + "."; };
+
+// a value that a person can read: a DATE and a TIMESTAMP that come as milliseconds, a geometry that comes as bytes (the design: "Values that a person can read")
+function readable(columns, rows){
+  const conv = columns.map((c) => { const t = String(c.type || "");
+    return /^date/i.test(t) ? (v) => typeof v === "number" || typeof v === "bigint" ? new Date(Number(v)).toISOString().slice(0, 10) : v
+      : /^timestamp/i.test(t) ? (v) => typeof v === "number" || typeof v === "bigint" ? new Date(Number(v)).toISOString().slice(0, 19).replace("T", " ") : v
+      : (v) => v instanceof Uint8Array ? `(${v.length} bytes)` : v; });
+  return rows.map((r) => r.map((v, i) => v == null ? v : conv[i](v)));
+}
+// the condition of a query, short (the name of a layer): the part after WHERE, at most 38 characters, cut at a word; with no WHERE, the table
+export function shortOf(sql){
+  const s = String(sql || "").replace(/\s+/g, " ").trim(), m = s.match(/\bWHERE\b(.*?)(\bGROUP BY\b|\bORDER BY\b|\bLIMIT\b|$)/i);
+  let t = m && m[1].trim() ? m[1].trim() : ((s.match(/\bFROM\s+([\w."]+)/i) || [])[1] || "roads");
+  while(t.endsWith(")") && (t.match(/\)/g) || []).length > (t.match(/\(/g) || []).length) t = t.slice(0, -1).trim();
+  return t.length > 38 ? t.slice(0, t.lastIndexOf(" ", 38) > 20 ? t.lastIndexOf(" ", 38) : 38) + "…" : t;
+}
+const idsKey = (ids) => { let h = 0; for(const s of [...ids].sort()) for(let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return ids.length + ":" + h; };
+
+export function dataDock(o = {}){
+  const rs = o.dashboard || window.rs, ID = o.idColumn || "edge_id", KEYS = o.keys || ["osm_id", "name"], LIMIT = o.limit || 1000;
+  if(typeof o.query !== "function" || typeof o.schema !== "function") throw new Error("dataDock: query and schema are necessary.");
+  if((o.tables || []).length && typeof o.load !== "function") throw new Error("dataDock: tables need load (the host loads each one).");
+  const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
+  // the data is ready when the host's data is loaded and every table of the page too; a table that does not load does not stop the others
+  const ready = (async () => { await o.ready; for(const t of o.tables || []) await Promise.resolve(o.load(t)).catch((e) => console.warn(`dataDock: the table ${t.name} did not load: ${e.message}`)); })();
+  let loaded = false; ready.then(() => { loaded = true; }, () => {});
+
+  // ---- the parts: the actions in the dock's title row, the SQL line, the error line, the list of tables, the table and the road card beside it ----
+  const el = $("div", "rs-dd"), acts = $("span", "rs-dd-acts");
+  const tablesB = $("button", "", "Tables"), csvB = $("button", "", "CSV"), colourB = $("button", "rs-dd-mb"), focusB = $("button", "rs-dd-mb");
+  for(const b of [tablesB, csvB, colourB, focusB]) b.type = "button";
+  colourB.innerHTML = 'Colour <span class="rs-dd-count" hidden></span> ▾'; focusB.innerHTML = 'Focus <span class="rs-dd-count" hidden></span> ▾';
+  colourB.title = "The colour layers of the map"; focusB.title = "The focus of the map: the other roads fade or hide";
+  tablesB.title = "The tables of the data"; csvB.title = "All the rows of this result as a CSV file";
+  acts.append(tablesB, csvB, colourB, focusB);
+  const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
+  line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
+  q.append(line, run);
+  const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
+  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-card"), sideHd = $("div", "rs-dd-card-hd"), sideX = $("button", "", "✕");
+  sideX.type = "button"; sideX.title = "Close the card"; sideX.setAttribute("aria-label", sideX.title); side.hidden = true;
+  sideHd.append($("b", "", "Road"), sideX); side.append(sideHd);
+  const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
+  split.append(table.el, side);
+  el.append(q, err, list, split);
+  const label = o.label || "Data", id = "data";
+  rs.dock.add({id, label, el, actions: acts});
+  if(o.help !== false && rs.help) rs.help.button(acts, {title: "The data dock", intro: "One SQL line over a table of the result. A click on the line edits it, Ctrl+Enter or Run runs it. The roads of the result light on the map. A click on a row selects its road. Colour and Focus keep a change of the map until you turn it off.",
+    terms: [["Tables", "The tables of the data, with what each one holds. A click puts its name into the line."], ["CSV", "All the rows of the result as a file."],
+            ["Colour", "Colours the roads of the table, one colour for each value of a column with 2 to 8 values."], ["Focus", "The other roads fade or hide."]]});
+
+  // the road card: roadstyle's part, beside the table in place of the popup (the design: "The road card in the dock")
+  if(o.card !== false && rs.sections){
+    try{ rs.sections.add({id: "rs-dd-road", part: "road_card"}); const sec = rs.sections.get("rs-dd-road"); side.append(sec.querySelector(".rs-road-card") || sec); rs.sections.hide("rs-dd-road"); }catch(e){}
+  }
+  sideX.onclick = () => rs.select(null);
+  document.addEventListener("rs:select", (e) => { if(o.card === false || e.detail.overlay) return; side.hidden = false; });
+  document.addEventListener("rs:deselect", () => { side.hidden = true; });
+
+  // ---- the SQL line: one line; a click opens it as a text box, Escape folds it ----
+  let sql = o.sql || "", res = null, ctl = null, ta = null;
+  const fold = () => { if(ta){ sql = ta.value; ta.replaceWith(line); ta = null; } line.textContent = sql.replace(/\s+/g, " ") || "Write SQL here"; line.classList.toggle("empty", !sql); };
+  const size = () => { ta.rows = Math.min(10, Math.max(3, ta.value.split("\n").length + 1)); };
+  line.onclick = () => {
+    ta = $("textarea", "rs-dd-ta"); ta.value = sql; ta.spellcheck = false; ta.setAttribute("aria-label", "SQL"); size();
+    line.replaceWith(ta); ta.focus();
+    ta.onkeydown = (e) => { if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); runSql().catch(() => {}); } else if(e.key === "Escape") fold(); };
+    ta.oninput = size;
+  };
+  fold();
+
+  // ---- a run: the guard, the row limit (one row more), the true count when there are more ----
+  async function query(text, limit, signal){ if(!loaded) await ready; const g = guardOf(text, limit); return readableResult(await o.query(g, {signal})); }
+  const guardOf = (text, limit) => { if(o.guard === false) return limit == null ? inner(text) : `SELECT * FROM (${inner(text)}) AS rs_q LIMIT ${limit + 1}`;
+    const g = guardSql(text, limit); if(!g.ok) throw new Error(g.reason); return g.sql; };
+  const readableResult = (r) => ({columns: r.columns, rows: readable(r.columns, r.rows)});
+  async function runSql(text, {source = "person"} = {}){
+    if(text != null){ sql = text; if(ta) ta.value = text; }
+    if(ta) sql = ta.value;
+    if(ctl) ctl.abort();
+    const me = ctl = new AbortController(), t0 = performance.now();
+    err.textContent = ""; run.textContent = "Stop";
+    try{
+      const g = o.guard === false && source === "person" ? null : guardSql(sql, LIMIT);
+      if(g && !g.ok) throw new Error(g.reason);
+      if(!loaded){ rs.dock.note(id, "Loading the data…"); await ready; }
+      const r = readableResult(await o.query(g ? g.sql : `SELECT * FROM (${inner(sql)}) AS rs_q LIMIT ${LIMIT + 1}`, {signal: me.signal}));
+      if(me.signal.aborted) throw new Error("Stopped.");
+      const out = {sql, columns: r.columns, rows: r.rows.slice(0, LIMIT), more: r.rows.length > LIMIT, ms: Math.round(performance.now() - t0), source};
+      if(out.more) out.total = await countOf(sql).catch(() => null);
+      fold(); show(out, true);
+      emit("run", out);
+      return out;
+    }catch(e){
+      const message = me.signal.aborted ? "Stopped." : sentence(e.message);
+      err.textContent = message; if(source === "person" && !ta) line.click();
+      emit("error", {sql, message, source});
+      throw e;
+    }finally{ if(ctl === me){ ctl = null; run.textContent = "Run"; } }
+  }
+  async function countOf(text){ const r = await o.query(`SELECT count(*) AS n FROM (${guardOf(text, null)}) AS rs_c`, {}); return Number(r.rows[0][0]); }
+  // all the rows of a result, not only the ones in the table: for the CSV, the light and the map layers
+  async function allRows(r, limit){ if(!r.more) return r === res ? table.rows() : r.rows; return (await query(sorted(r), limit)).rows.slice(0, limit); }   // (the table's order: a sort)
+  const sorted = (r) => r.sort ? `SELECT * FROM (${inner(r.sql)}) AS rs_s ORDER BY ${quoteId(r.sort.col)} ${r.sort.dir === "desc" ? "DESC" : "ASC"} NULLS LAST` : r.sql;
+  async function sortAll(col, dir){ if(!res || !res.more) return null; res.sort = col ? {col, dir} : null; const r = await query(sorted(res), LIMIT); res.rows = r.rows.slice(0, LIMIT); return {rows: res.rows}; }
+  run.onclick = () => { if(ctl){ ctl.abort(); return; } runSql().catch(() => {}); };
+
+  // ---- show a result: the table, the note, the light ----
+  function show(r, ran){
+    res = {...r, columns: r.columns, rows: r.rows, more: !!r.more};
+    if(!ran){ sql = r.sql || sql; fold(); }
+    table.set({columns: res.columns, rows: res.rows, more: res.more});
+    const n = res.more ? (res.total ? `${fmt(res.rows.length)} of ${fmt(res.total)} rows` : `${fmt(res.rows.length)} rows (there are more)`) : `${fmt(res.rows.length)} row${res.rows.length === 1 ? "" : "s"}`;
+    rs.dock.note(id, `${n} · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"}${res.ms != null ? ` · ${res.ms} ms` : ""}`);
+    paintButtons(); light();
+    return res;
+  }
+  // the roads of a result: its id column; else a key column (osm_id, name) through the host's roadsBy; else none
+  const keyOf = (r) => r.columns.some((c) => c.name === ID) ? ID : KEYS.find((k) => r.columns.some((c) => c.name === k) && o.roadsBy) || null;
+  async function roadsOf(r){
+    if(r.__ids) return r.__ids;
+    const k = keyOf(r); if(!k) return [];
+    if(k === ID){ const i = r.columns.findIndex((c) => c.name === ID); return (r.__ids = (await allRows(r, MAP_LIMIT)).map((x) => String(x[i]))); }
+    const q = await query(o.roadsBy(inner(r.sql), k), MAP_LIMIT), i = q.columns.findIndex((c) => c.name === ID);
+    return (r.__ids = q.rows.map((x) => String(x[i < 0 ? 0 : i])));
+  }
+  // the light: always the dock's table, one set; a table that a colour or a focus already shows is not lit (the light would hide its colours)
+  let lightSeq = 0;
+  async function light(){
+    const me = ++lightSeq, r = res;
+    const ids = r && !r.byLayer && keyOf(r) ? await roadsOf(r).catch(() => []) : [];
+    if(me === lightSeq) rs.highlight(onMap(ids), LIGHT);
+  }
+  async function rowClick(r, cols){
+    const i = cols.findIndex((c) => c.name === ID);
+    if(i >= 0){ const idv = String(r[i]); rs.select(idv); rs.focus([idv]); return; }
+    const k = res && keyOf(res); if(!k) return;
+    const v = r[cols.findIndex((c) => c.name === k)]; if(v == null) return;
+    const q = await query(o.roadsBy(`SELECT ${quoteId(k)} FROM (SELECT ${lit(v)} AS ${quoteId(k)}) AS rs_v`, k), MAP_LIMIT), j = q.columns.findIndex((c) => c.name === ID);
+    const ids = onMap(q.rows.map((x) => String(x[j < 0 ? 0 : j])));
+    if(ids.length){ rs.select(ids[0]); rs.focus(ids); }
+  }
+  // only the roads that the map draws: a road that is not on the map changes nothing
+  let mapIds = null;
+  const onMap = (ids) => { if(!mapIds) mapIds = new Set((rs.query({}) || []).map(String)); return ids.filter((i) => mapIds.has(String(i))); };
+  document.addEventListener("rs:tableready", () => { mapIds = null; });
+
+  // ---- CSV: all the rows (at most 1 000 000), in the order of the table ----
+  async function csv(){
+    const cell = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const rows = res ? await allRows(res, CSV_LIMIT) : [];
+    return res ? [res.columns.map((c) => cell(c.name)).join(","), ...rows.map((r) => r.map(cell).join(","))].join("\n") : "";
+  }
+  csvB.onclick = async () => { const a = $("a"); a.href = URL.createObjectURL(new Blob([await csv()], {type: "text/csv"})); a.download = "data.csv"; a.click(); };
+
+  // ---- Tables: the schema's tables in groups; a click puts the name into the line ----
+  async function drawTables(){
+    const s = await o.schema(), groups = {};
+    for(const t of s.tables || []){ const g = t.name.includes(".") ? t.name.split(".")[0] : ""; (groups[g] = groups[g] || []).push(t); }
+    list.replaceChildren(...Object.keys(groups).sort((a, b) => (b === "extra") - (a === "extra")).map((g) => {
+      const row = $("div", "rs-dd-tgroup"); if(g) row.append($("b", "", g));
+      for(const t of groups[g]){ const b = $("button", "", t.name.split(".").pop()); b.type = "button"; b.title = `${t.rows ?? "?"} rows${t.about ? ": " + t.about : ""}`;
+        b.onclick = () => { if(!ta) line.click(); ta.setRangeText(t.name, ta.selectionStart, ta.selectionEnd, "end"); ta.focus(); }; row.append(b); }
+      return row; }));
+  }
+  tablesB.onclick = async () => { if(list.hidden){ await drawTables(); list.hidden = false; tablesB.classList.add("on"); } else { list.hidden = true; tablesB.classList.remove("on"); } };
+
+  // ---- the layers of the map: Colour (several on) and Focus (one on; fade or hide). One layer for each kind and set of roads. ----
+  const layers = []; let legendIds = [], seq = 0;
+  const layerKey = (l) => l.kind + "|" + (l.kind === "colour" ? l.groups.map((g) => g.label + "=" + idsKey(g.ids)).join("|") : idsKey(l.ids));
+  function addLayer(l){
+    l.key = layerKey(l);
+    const old = layers.find((x) => x.key === l.key);
+    if(old){ layers.splice(layers.indexOf(old), 1); if(l.mode) old.mode = l.mode; l = old; } else l.n = ++seq;
+    l.on = true;
+    if(l.kind === "focus") layers.forEach((x) => { if(x.kind === "focus" && x !== l) x.on = false; });
+    layers.push(l); paint(); return l;
+  }
+  function paint(){
+    const colours = layers.filter((l) => l.kind === "colour" && l.on).reverse();        // the newest first: where two meet, the newest wins
+    rs.color(colours.flatMap((l) => l.groups.map((g) => ({color: g.color, ids: g.ids}))));
+    legendIds.forEach((x) => rs.legend.remove(x));
+    legendIds = colours.flatMap((l) => l.groups).map((g, k) => { const x = "rs-dd-" + k; rs.legend.add({id: x, color: g.color, label: g.label, shape: "line"}); return x; });
+    const f = layers.find((l) => l.kind === "focus" && l.on);
+    rs.setFilter({ids: f && f.mode === "hide" ? f.ids : null});
+    if(rs.fade) rs.fade(f && f.mode === "fade" ? f.ids : null);
+    paintButtons(); drawMenu();
+    emit("layers", {layers: layers.map(({kind, label, sql, on, mode, n}) => ({kind, label, sql, on, mode, n}))});
+  }
+  const count = (b, n) => { const c = b.querySelector(".rs-dd-count"); c.hidden = !n; c.textContent = n || ""; };
+  function paintButtons(){ count(colourB, layers.filter((l) => l.kind === "colour" && l.on).length); count(focusB, layers.some((l) => l.kind === "focus" && l.on) ? 1 : 0); }
+  // the dock's own actions on its table (Ask's tools call the same: colour and focus)
+  async function colourThis(){
+    const r = res; if(!r || !keyOf(r)) return;
+    const idx = r.columns.findIndex((c) => c.name === ID), rows = idx >= 0 ? await allRows(r, MAP_LIMIT) : [];
+    const col = idx < 0 ? -1 : r.columns.findIndex((c, i) => i !== idx && !KEYS.includes(c.name) && /utf8|bool|varchar|text|string/i.test(String(c.type)) && ((n) => n >= 2 && n <= 8)(new Set(rows.map((x) => x[i])).size));
+    const groups = col >= 0 ? [...new Set(rows.map((x) => x[col]))].map((v, k) => ({label: String(v), color: PALETTE[k % PALETTE.length], ids: onMap(rows.filter((x) => x[col] === v).map((x) => String(x[idx])))}))
+      : [{label: shortOf(r.sql), color: PALETTE[layers.filter((l) => l.kind === "colour").length % PALETTE.length], ids: onMap(await roadsOf(r))}];
+    colour(groups, {sql: r.sql}); r.byLayer = true; light();
+  }
+  async function focusThis(mode){ const r = res; if(!r || !keyOf(r)) return; const ids = onMap(await roadsOf(r)); focus(ids, {sql: r.sql, mode}); r.byLayer = true; light(); }
+  function colour(groups, {sql: s = "", label} = {}){ return addLayer({kind: "colour", groups, sql: s, label: label || groups.map((g) => g.label).join(", ")}); }
+  function focus(ids, {sql: s = "", mode = "fade", label} = {}){ const l = addLayer({kind: "focus", ids, sql: s, mode, label: label || shortOf(s)}); rs.focus(ids); return l; }
+
+  // ---- the lists of Colour and Focus: a box under the button, in the look of the toolbox's boxes ----
+  const menu = $("div", "rs-dd-menu"); menu.hidden = true; menu.setAttribute("role", "menu"); document.body.append(menu);
+  let menuOf = null;
+  function openMenu(kind, btn){
+    if(menuOf === kind && !menu.hidden){ closeMenu(); return; }
+    menuOf = kind; drawMenu(); menu.hidden = false; btn.setAttribute("aria-expanded", "true");
+    const b = btn.getBoundingClientRect();
+    Object.assign(menu.style, {top: Math.round(b.bottom + 4) + "px", right: Math.max(8, Math.round(innerWidth - b.right)) + "px"});
+  }
+  function closeMenu(){ menu.hidden = true; menuOf = null; colourB.setAttribute("aria-expanded", "false"); focusB.setAttribute("aria-expanded", "false"); }
+  document.addEventListener("pointerdown", (e) => { if(!menu.hidden && !menu.contains(e.target) && !colourB.contains(e.target) && !focusB.contains(e.target)) closeMenu(); }, true);
+  document.addEventListener("keydown", (e) => { if(e.key === "Escape" && !menu.hidden) closeMenu(); });
+  colourB.onclick = () => openMenu("colour", colourB);
+  focusB.onclick = () => openMenu("focus", focusB);
+  function drawMenu(){
+    if(!menuOf) return;
+    const kind = menuOf, mine = layers.filter((l) => l.kind === kind).slice().reverse(), rows = [];
+    const add = $("button", "rs-dd-menu-add", kind === "colour" ? "+ Colour the roads of this table" : "+ Focus on the roads of this table");
+    add.type = "button"; add.disabled = !res || !keyOf(res); add.onclick = () => (kind === "colour" ? colourThis() : focusThis());
+    rows.push(add);
+    if(kind === "focus"){
+      const none = $("label", "rs-dd-menu-row"), rb = $("input"); rb.type = "radio"; rb.name = "rs-dd-focus"; rb.checked = !mine.some((l) => l.on);
+      rb.onchange = () => { layers.forEach((l) => { if(l.kind === "focus") l.on = false; }); paint(); };
+      none.append(rb, $("span", "", "None: all the roads")); rows.push(none);
+    }
+    for(const l of mine){
+      const row = $("label", "rs-dd-menu-row" + (l.on ? "" : " off")), box = $("input"); row.title = l.sql || l.label;
+      box.type = kind === "colour" ? "checkbox" : "radio"; box.name = "rs-dd-focus"; box.checked = l.on;
+      box.onchange = () => { if(kind === "focus") layers.forEach((x) => { if(x.kind === "focus") x.on = false; }); l.on = box.checked; paint(); };
+      row.append(box);
+      if(kind === "colour") row.append(...l.groups.slice(0, 6).map((g) => { const i = $("i", "rs-dd-sw"); i.style.background = g.color; i.title = g.label; return i; }));
+      row.append($("span", "rs-dd-menu-t", l.label), $("small", "", fmt(kind === "colour" ? l.groups.reduce((n, g) => n + g.ids.length, 0) : l.ids.length)));
+      if(kind === "focus"){
+        const seg = $("span", "rs-dd-seg");
+        for(const m of ["fade", "hide"]){ const b = $("button", m === l.mode ? "on" : "", m === "fade" ? "Fade" : "Hide"); b.type = "button";
+          b.onclick = (e) => { e.preventDefault(); l.mode = m; l.on = true; layers.forEach((x) => { if(x.kind === "focus" && x !== l) x.on = false; }); paint(); }; seg.append(b); }
+        row.append(seg);
+      }
+      const x = $("button", "rs-dd-menu-x", "✕"); x.type = "button"; x.title = "Remove this layer"; x.setAttribute("aria-label", x.title);
+      x.onclick = (e) => { e.preventDefault(); layers.splice(layers.indexOf(l), 1); paint(); };
+      row.append(x); rows.push(row);
+    }
+    if(!mine.length) rows.push($("p", "rs-dd-menu-empty", kind === "colour" ? "No colour layer yet." : "No focus yet."));
+    menu.replaceChildren(...rows);
+  }
+
+  return Object.assign(events, {
+    run: runSql, show: (r) => show(r, false), sql: () => (ta ? ta.value : sql), result: () => res, csv, stop: () => ctl && ctl.abort(),
+    open: () => rs.dock.open(id), close: () => rs.dock.close(), ready: () => ready, schema: () => (loaded ? o.schema() : ready.then(() => o.schema())),
+    // for Ask's tools: the roads (on the map) that SQL selects by its id column, and the same layers as the buttons
+    async roads(text){ const r = await query(text, MAP_LIMIT), i = r.columns.findIndex((c) => c.name === ID);
+      if(i < 0) throw new Error(`The query must select the column ${ID}.`);
+      const all = r.rows.map((x) => String(x[i])), ids = onMap(all); ids.missing = all.length - ids.length; return ids; },
+    query: (text, limit = LIMIT) => query(text, limit),
+    colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
+    lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
+  });
+}
