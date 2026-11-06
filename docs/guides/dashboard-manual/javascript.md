@@ -51,6 +51,18 @@ rs.highlight(ids.slice(0, 5));
 
 `rs.select(null)` clears the selection. `rs.highlight([])` clears the glow.
 
+To light more than one group of roads, each in its own colour, give each group a set name. The light is as wide as the road at every zoom.
+When a road is in two sets, the set that you set last has the road. `rsHighlight` uses the road rows, as `rsQuery` gives them.
+
+```javascript
+const rows = rsQuery(p => p.highway === "primary");
+rsHighlight(rows.slice(0, 3), {set: "edit", color: "#2563eb", opacity: 1});
+rsHighlight(rows.slice(3, 6), {set: "turn", color: "#16a34a"});   // opacity: the look's selection opacity
+rsHighlight([], {set: "turn"});                                     // clears only this set
+```
+
+Each change sends `rs:highlightchange` with `set` and `ids`.
+
 ## Filter and color
 
 ```javascript

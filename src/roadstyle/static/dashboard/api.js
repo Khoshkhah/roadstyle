@@ -53,7 +53,7 @@ export function makeApi(extra){
   const track = (type, fn) => { const h = e => { const part = fn(e.detail || {}); if(part) emit("state", part); }; document.addEventListener(type, h); listeners.set(type + ":" + listeners.size, [type, h]); };
   track("rs:select", d => d.overlay ? null : {selection: state.selection = edge(d.id)});
   track("rs:deselect", () => ({selection: state.selection = null}));
-  track("rs:highlightchange", d => d.overlay ? null : {highlight: state.highlight = (d.ids || []).map(edge)});
+  track("rs:highlightchange", d => d.overlay || d.set != null ? null : {highlight: state.highlight = (d.ids || []).map(edge)});
   track("rs:colorchange", d => {
     if(d.option) return {colorBy: state.colorBy = d.option.name};
     if(d.base || d.overlay) return null;

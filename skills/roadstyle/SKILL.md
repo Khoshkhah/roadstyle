@@ -162,6 +162,7 @@ rs.snapshot(m, "map.png", zoom=15)        # headless screenshot; then view map.p
 | `rsQuery(p => bool)` | features whose properties match -> **roadstyle feature ids** |
 | `rsColor(ids, "#hex")` / `rsColor([[idsA, c1], [idsB, c2]])` / `rsColor(null)` | paint sets over the base colours / reset |
 | `rsHighlight(ids)` | selection glow (`[]` clears) |
+| `rsHighlight(ids, {set, color, opacity})` | a named highlight set in its own colour, at the road's width; `rsHighlight([], {set})` clears it |
 | `rsFocus(ids)` | fit the camera |
 | `rsSelect(id)` / `rsDeselect()` | select like a click (glow + popup) |
 | `rsFilter(ids)` / `rsFilter(null)` | show only these / all |

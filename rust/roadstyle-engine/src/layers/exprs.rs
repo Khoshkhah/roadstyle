@@ -363,6 +363,10 @@ pub fn class_index(e: &mut Value, col: &str, classes: &[String]) {
 
 pub const LIVE_COLOR: &str = "rs_c";
 pub const LIVE_WIDTH: &str = "rs_w";
+/// The highlight sets (the dashboard's rsHighlight(ids, {set, color, opacity})): the CSS colour of a lit road and its opacity (none: the
+/// look's selection.opacity), as feature state on its row.
+pub const HL_COLOR: &str = "rs_hl";
+pub const HL_OPACITY: &str = "rs_hlo";
 
 /// The id of the road arrow image that the host adds (`roadstyle:images`). It has a prefix of its own: the sprite of a vector base map can have an
 /// image `oneway` (the one of OpenFreeMap points up, and a line placement turns it 90 degrees from the road), and the arrows must never take it.
