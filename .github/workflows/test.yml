@@ -53,8 +53,9 @@ jobs:
       - name: Install (+ headless Chromium, + mcp for the Python MCP server's tests until it retires)
         run: |
           # the runner's Azure mirror of Ubuntu was so slow (2026-11-06: 7 to 40 s for each package) that the browsers' packages did not install in
-          # 45 minutes; Ubuntu's own archive is used for them
-          sudo sed -i 's#http://azure.archive.ubuntu.com#http://archive.ubuntu.com#g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
+          # 45 minutes; Ubuntu's own archive is used for them. The runner's apt reads its mirror from apt-mirrors.txt (mirror+file:), not from the
+          # sources file
+          echo "http://archive.ubuntu.com/ubuntu/" | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           pip install -e ".[dev]" playwright "mcp>=2.2,<3"
           playwright install --with-deps chromium firefox webkit     # Firefox and WebKit for tests/test_mlt_browsers.py
 
