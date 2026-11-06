@@ -49,7 +49,10 @@ export function dataDock(o = {}){
   colourB.innerHTML = 'Colour <span class="rs-dd-count" hidden></span> ▾'; focusB.innerHTML = 'Focus <span class="rs-dd-count" hidden></span> ▾';
   colourB.title = "The colour layers of the map"; focusB.title = "The focus of the map: the other roads fade or hide";
   tablesB.title = "The tables of the data"; csvB.title = "All the rows of this result as a CSV file";
-  acts.append(tablesB, csvB, colourB, focusB);
+  // Table | Chart: two views of the same result (the design's "4. Charts")
+  const viewSw = $("span", "rs-seg rs-dd-view"), tableB = $("button", "on", "Table"), chartB = $("button", "", "Chart");
+  tableB.type = chartB.type = "button"; viewSw.append(tableB, chartB);
+  acts.append(viewSw, tablesB, csvB, colourB, focusB);
   const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
   q.append(line, run);
@@ -58,7 +61,14 @@ export function dataDock(o = {}){
   sideX.type = "button"; sideX.title = "Close the card"; sideX.setAttribute("aria-label", sideX.title); side.hidden = true;
   sideHd.append($("b", "", "Road"), sideX); side.append(sideHd);
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
-  split.append(table.el, side);
+  const chartBox = $("div", "rs-dd-chart"), chartRow = $("div", "rs-dd-chartrow"), chartEl = $("div", "rs-dd-chartel"); chartBox.hidden = true;
+  const kindS = $("select"), xS = $("select"), yS = $("select"), svgB = $("button", "", "SVG");
+  svgB.type = "button"; svgB.title = "The chart as an SVG file";
+  for(const [k, t] of [["bar", "Bar"], ["line", "Line"], ["histogram", "Histogram"], ["scatter", "Scatter"], ["pie", "Pie"]]) kindS.append(Object.assign($("option", "", t), {value: k}));
+  const lab = (t, e) => { const l = $("label", "rs-dd-cl"); l.append($("span", "", t), e); return l; };
+  chartRow.append(lab("Kind", kindS), lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
+  chartBox.append(chartRow, chartEl);
+  split.append(table.el, chartBox, side);
   el.append(q, err, list, split);
   const label = o.label || "Data", id = "data";
   rs.dock.add({id, label, el, actions: acts});
@@ -130,6 +140,14 @@ export function dataDock(o = {}){
     const n = res.more ? (res.total ? `${fmt(res.rows.length)} of ${fmt(res.total)} rows` : `${fmt(res.rows.length)} rows (there are more)`) : `${fmt(res.rows.length)} row${res.rows.length === 1 ? "" : "s"}`;
     rs.dock.note(id, `${n} · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"}${res.ms != null ? ` · ${res.ms} ms` : ""}`);
     paintButtons(); light();
+    if(res.chart === undefined){ const m = new Set(measures(res));   // the first chart: from the columns, with the ids as text (never a measure)
+      res.chart = rs.chart.guess(res.columns.filter((col) => col.name !== ID).map((col) => rs.chart.isNumber(col.type) && !m.has(col.name) ? {...col, type: "VARCHAR"} : col), ID);
+      if(res.chart && ["bar", "line", "pie"].includes(res.chart.kind) && !res.chart.y) res.chart.y = COUNT;
+      // no measure: the rows for each value of the text column with the fewest values (2 or more), for example highway
+      if(!res.chart || (res.chart.kind === "histogram" && !m.size)){ const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
+          .filter(([col, n]) => col.name !== ID && !rs.chart.isNumber(col.type) && n >= 2).sort((a, b) => a[1] - b[1])[0];
+        res.chart = t ? {kind: "bar", x: t[0].name, y: COUNT} : null; } }
+    if(view === "chart") drawChart();
     return res;
   }
   // the roads of a result: its id column; else a key column (osm_id, name) through the host's roadsBy; else none
@@ -162,6 +180,63 @@ export function dataDock(o = {}){
   const onMap = (ids) => { if(!mapIds) mapIds = new Set((rs.query({}) || []).map(String)); return ids.filter((i) => mapIds.has(String(i))); };
   document.addEventListener("rs:tableready", () => { mapIds = null; });
 
+  // ---- the chart view: the same result as the table; Kind, X and Y choose the chart; a click on a mark does what a click on its row does ----
+  let view = "table", chartObj = null;
+  function setView(v){
+    view = v; tableB.classList.toggle("on", v === "table"); chartB.classList.toggle("on", v === "chart");
+    table.el.hidden = v !== "table"; chartBox.hidden = v !== "chart";
+    if(v === "chart") drawChart();
+  }
+  tableB.onclick = () => setView("table");
+  chartB.onclick = () => setView("chart");
+  const fill = (sel, names, v, any) => { sel.replaceChildren(...(any ? [Object.assign($("option", "", "(none)"), {value: ""})] : []), ...names.map((n) => Object.assign($("option", "", n), {value: n}))); sel.value = v ?? ""; };
+  // Y "count of rows": the rows for each value of X. A bar, a line or a pie whose X has a value more than once (or a result of more rows than the
+  // table) is drawn from all the rows, one mark for each value of X: the count of rows, or the sum of Y (Kaveh, 2026-11-06: a pie of lanes had one
+  // slice for each road). The road ids are never a choice of Y or X: a chart of ids says nothing.
+  const COUNT = "(count of rows)";
+  // a number column that is a measure, not an id: not the id column, not a name of an id (osm_id, source, target, ..._ref), and no value of 10^12 or more
+  const ID_NAME = /(^|_)(id|ref)$|^(source|target|from_node|to_node)$/i;
+  const measures = (r) => r.columns.filter((col, i) => rs.chart.isNumber(col.type) && col.name !== ID && !ID_NAME.test(col.name) &&
+    !r.rows.slice(0, 200).some((x) => { const v = x[i]; return v != null && Math.abs(Number(v)) >= 1e12; })).map((col) => col.name);
+  let chartSeq = 0;
+  async function drawChart(){
+    const r = res, me = ++chartSeq; if(!r) return;
+    const sp = r.chart || {kind: "bar"}, names = r.columns.map((c) => c.name).filter((n) => n !== ID);
+    const nums = measures(r);
+    const ys = [].concat(sp.y || []), grouped = ["bar", "line", "pie"].includes(sp.kind);
+    kindS.value = sp.kind; fill(xS, names, sp.x);
+    fill(yS, grouped ? [COUNT, ...nums] : nums, ys[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
+    let spec = {...sp, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};
+    const xi = r.columns.findIndex((c) => c.name === sp.x);
+    const repeats = xi >= 0 && new Set(table.rows().map((x) => String(x[xi]))).size < table.rows().length;
+    if(grouped && xi >= 0 && (ys[0] === COUNT || repeats || r.more)){
+      const time = rs.chart.isTime(r.columns[xi].type) || rs.chart.isNumber(r.columns[xi].type), yName = ys[0] === COUNT || !ys.length ? "rows" : `sum of ${ys[0]}`;
+      const agg = ys[0] === COUNT || !ys.length ? "count(*)" : `sum(${quoteId(ys[0])})`;
+      const g = await query(`SELECT ${quoteId(sp.x)}, ${agg} AS ${quoteId(yName)} FROM (${inner(r.sql)}) AS rs_a GROUP BY 1 ORDER BY ${sp.kind === "line" || (sp.kind === "bar" && time) ? 1 : 2} ${sp.kind === "line" || time ? "ASC" : "DESC"} LIMIT 500`, null).catch((e) => ({error: e}));
+      if(me !== chartSeq) return;
+      if(g.error){ chartEl.replaceChildren(Object.assign($("p", "rs-chart-none"), {textContent: sentence(g.error.message)})); return; }
+      const key = r.columns[xi].name;
+      spec = {...spec, y: yName, columns: g.columns, rows: g.rows, onPick: (i) => rowClick([g.rows[i][0]], [{name: key, type: r.columns[xi].type}])};
+    }
+    if(sp.kind === "histogram" && r.more){ const v = await allRows(r, CSV_LIMIT); if(me !== chartSeq) return; spec.values = v.map((x) => x[xi]); }
+    if(!chartObj) chartObj = rs.chart(chartEl, spec); else chartObj.set(spec);
+  }
+  const change = () => { if(!res) return; const k = kindS.value, old = res.chart || {};
+    res.chart = {...old, kind: k, x: xS.value || old.x, y: k === "histogram" ? undefined : (yS.value || [].concat(old.y || [])[0])};
+    if(["bar", "line", "pie"].includes(k) && res.chart.y === res.chart.x) res.chart.y = COUNT;      // the sum of x for each x says nothing: the rows
+    if(k === "histogram" && !rs.chart.isNumber((res.columns.find((c) => c.name === res.chart.x) || {}).type)) res.chart.x = (res.columns.find((c) => rs.chart.isNumber(c.type)) || {}).name;
+    // a kind that needs y and has none (from a histogram): a number column, another than x where there is one
+    if(k !== "histogram" && !res.chart.y){ const n = measures(res);
+      res.chart.y = k === "scatter" ? n.find((x) => x !== res.chart.x) || n[0] : COUNT; }
+    if(k === "scatter" && res.chart.y === COUNT){ const n = measures(res); res.chart.y = n.find((x) => x !== res.chart.x) || n[0]; }
+    drawChart(); };
+  kindS.onchange = xS.onchange = yS.onchange = change;
+  svgB.onclick = () => { const s = chartObj && chartObj.svg(); if(!s) return;
+    const copy = s.cloneNode(true), css = getComputedStyle(document.documentElement);
+    copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    copy.querySelectorAll("*").forEach((e) => { for(const p of ["fill", "stroke"]){ const v = e.style[p]; if(v && v.startsWith("var(")) e.style[p] = css.getPropertyValue(v.slice(4, -1).trim()).trim(); } });
+    const a = $("a"); a.href = URL.createObjectURL(new Blob([copy.outerHTML], {type: "image/svg+xml"})); a.download = "chart.svg"; a.click(); };
+
   // ---- CSV: all the rows (at most 1 000 000), in the order of the table ----
   async function csv(){
     const cell = (v) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -176,8 +251,10 @@ export function dataDock(o = {}){
     for(const t of s.tables || []){ const g = t.name.includes(".") ? t.name.split(".")[0] : ""; (groups[g] = groups[g] || []).push(t); }
     list.replaceChildren(...Object.keys(groups).sort((a, b) => (b === "extra") - (a === "extra")).map((g) => {
       const row = $("div", "rs-dd-tgroup"); if(g) row.append($("b", "", g));
-      for(const t of groups[g]){ const b = $("button", "", t.name.split(".").pop()); b.type = "button"; b.title = `${t.rows ?? "?"} rows${t.about ? ": " + t.about : ""}`;
-        b.onclick = () => { if(!ta) line.click(); ta.setRangeText(t.name, ta.selectionStart, ta.selectionEnd, "end"); ta.focus(); }; row.append(b); }
+      // a click shows the rows of the table (Kaveh, 2026-11-06: "by select a table can see each rows"); the line then has its SQL, to change
+      for(const t of groups[g]){ const b = $("button", "", t.name.split(".").pop()); b.type = "button"; b.title = `${t.rows ?? "?"} rows${t.about ? ": " + t.about : ""}. Click to see its rows.`;
+        const name = t.name.split(".").map((p) => /^[A-Za-z_]\w*$/.test(p) ? p : quoteId(p)).join(".");
+        b.onclick = () => { runSql(`SELECT * FROM ${name}`).catch(() => {}); }; row.append(b); }
       return row; }));
   }
   tablesB.onclick = async () => { if(list.hidden){ await drawTables(); list.hidden = false; tablesB.classList.add("on"); } else { list.hidden = true; tablesB.classList.remove("on"); } };
@@ -276,6 +353,10 @@ export function dataDock(o = {}){
     // for Ask's answer: the id column, the column that finds the roads of a result (or null), and its roads on the map (for the camera)
     idColumn: ID, keyOf, roadsOf: async (r) => keyOf(r) ? onMap(await roadsOf(r)) : [],
     query: (text, limit = LIMIT) => query(text, limit),
+    // the chart of the result now: {kind, x, y, title}; it opens the chart view (Ask's draw_chart). A spec that does not fit gives an error.
+    chart(spec){ if(!res) throw new Error("There is no result to draw."); const s = {...spec, columns: res.columns, rows: res.rows};
+      const why = rs.chart.check ? rs.chart.check(s) : null; if(why) throw new Error(why); res.chart = {kind: spec.kind, x: spec.x, y: spec.y, title: spec.title}; setView("chart"); return res.chart; },
+    view: (v) => (v ? setView(v) : view),
     colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
   });

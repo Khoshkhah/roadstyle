@@ -30,6 +30,7 @@ const CANNED = {
   "SELECT edge_id, length_m FROM big": {columns: [["edge_id", "BIGINT"], ["length_m", "DOUBLE"]],
      rows: Array.from({length: 2765}, (_, i) => [BigInt(i % 6 + 1), (i * 7919) % 2765 + 0.5])},
   "SELECT name FROM edges": {columns: [["name", "VARCHAR"]], rows: [["Street 1"], ["Street 4"]]},
+  "SELECT * FROM main.edges": {columns: [["edge_id", "BIGINT"], ["name", "VARCHAR"]], rows: [[1n, "Street 0"]]},
   "SELECT day FROM days": {columns: [["day", "Date32<DAY>"]], rows: [[1781049600000]]},
 };
 window.queries = []; window.loads = [];
@@ -41,6 +42,10 @@ function answer(sql){
   if((m = sql.match(/^SELECT \\* FROM \\(([\\s\\S]*)\\) AS rs_s ORDER BY "(\\w+)" (ASC|DESC) NULLS LAST$/))) {
     const r = answer(m[1]), i = r.columns.findIndex(c => c.name === m[2]), k = m[3] === "ASC" ? 1 : -1;
     return {columns: r.columns, rows: [...r.rows].sort((a, b) => k * (a[i] < b[i] ? -1 : a[i] > b[i] ? 1 : 0))}; }
+  if((m = sql.match(/^SELECT "(\\w+)", (count\\(\\*\\)|sum\\("(\\w+)"\\)) AS "([^"]+)" FROM \\(([\\s\\S]*)\\) AS rs_a GROUP BY 1/))) {   // the chart's rows for each value of x
+    const r = answer(m[5]), xi = r.columns.findIndex(c => c.name === m[1]), yi = m[3] ? r.columns.findIndex(c => c.name === m[3]) : -1, g = new Map();
+    for(const row of r.rows){ const k = row[xi]; g.set(k, (g.get(k) || 0) + (yi < 0 ? 1 : Number(row[yi]))); }
+    return {columns: [r.columns[xi], {name: m[4], type: "BIGINT"}], rows: [...g].sort((a, b) => b[1] - a[1])}; }
   if(/FROM rs_roads WHERE/.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: [[2n], [5n]]};
   const c = CANNED[strip(sql)];
   if(!c) throw new Error("Binder Error: Referenced column \\"nope\\" not found in FROM clause!");
@@ -125,6 +130,11 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.click("#rs-dock tbody tr >> nth=0")
             page.wait_for_timeout(300)
             assert page.evaluate("rs.getState().selection") == "2"
+            # Tables: a click on a table shows its rows
+            page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
+            page.click("#rs-dock .rs-dd-tables button:has-text('edges')")
+            page.wait_for_timeout(300)
+            assert "SELECT * FROM main.edges" in page.evaluate("window.queries.at(-1)")
             # a DATE that comes as milliseconds shows as a day
             page.evaluate("data.run('SELECT day FROM days')")
             page.wait_for_timeout(200)

@@ -739,6 +739,18 @@ html[data-rs-theme=dark] #sb .rs-kpi-val.rs-c{color:color-mix(in srgb,var(--rs-k
    For text and lines the panel's own tokens do the same: --ink, --mut, --line, --card. ---- */
 html{--rs-chart-band:#e0f2fe;--rs-chart-band-line:#bae6fd;--rs-chart-grid:#eef2f6;--rs-chart-miss:#e2e8f0}
 html[data-rs-theme=dark]{--rs-chart-band:rgba(90,169,248,.20);--rs-chart-band-line:rgba(90,169,248,.45);--rs-chart-grid:#272b33;--rs-chart-miss:#3a404a}
+/* the 8 colours of the series of a chart (chart.js), in a fixed order: the reference palette of the dataviz method, checked for colour vision deficiency
+   (adjacent CVD ΔE 9.1 light, 8.4 dark) in both themes. In the light theme slots 3, 4 and 5 are under 3:1 on white: a chart has its table, and a pie its labels. */
+html{--rs-chart-1:#2a78d6;--rs-chart-2:#eb6834;--rs-chart-3:#1baf7a;--rs-chart-4:#eda100;--rs-chart-5:#e87ba4;--rs-chart-6:#008300;--rs-chart-7:#6250d6;--rs-chart-8:#e34948}
+html[data-rs-theme=dark]{--rs-chart-1:#3987e5;--rs-chart-2:#d95926;--rs-chart-3:#199e70;--rs-chart-4:#c98500;--rs-chart-5:#d55181;--rs-chart-6:#008300;--rs-chart-7:#9085e9;--rs-chart-8:#e66767}
+.rs-chart{position:relative;min-height:120px;display:flex;flex-direction:column;font:11px system-ui,sans-serif;color:var(--ink);overflow:auto;scrollbar-width:thin}
+.rs-chart svg{flex:none}
+.rs-chart svg{display:block;overflow:visible;font-family:system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.rs-chart-legend{display:flex;flex-wrap:wrap;gap:4px 12px;min-height:20px;color:var(--ink);font-size:11.5px}
+.rs-chart-legend span{display:inline-flex;align-items:center;gap:5px}
+.rs-chart-legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.rs-chart-foot{color:var(--mut);font-size:11px;min-height:16px}
+.rs-chart-none{color:var(--mut);margin:12px 0}
 
 /* ---- INPUTS, CHIPS AND A DOT in the panel: a text box looks like the panel's select and query box; a chip is a small rounded label (`.accent` tints it with --accent);
    a dot is a colour mark before a word. A plain <button> and `button.sb-primary` are styled by the template; a page needs no class for them. ---- */
@@ -897,7 +909,7 @@ html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
 /* the dock's table: as wide as its columns, the height of the dock, both scrollbars always visible, the header row and the first column in view */
 #rs-dock .rs-dock-table{flex:1;min-height:0;max-height:none;align-self:flex-start;max-width:100%;box-sizing:border-box;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--bg);
   scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent;-webkit-mask-image:none;mask-image:none}
-#rs-dock .rs-dock-table table{width:max-content;border-collapse:separate;border-spacing:0;font:12.5px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums}
+#rs-dock .rs-dock-table table{table-layout:fixed;width:max-content;border-collapse:separate;border-spacing:0;font:12.5px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums}
 #rs-dock .rs-dock-table :is(th,td){white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis;padding:5px 14px;text-align:left;border-bottom:1px solid var(--line);height:15px}
 #rs-dock .rs-dock-table th{position:sticky;top:0;z-index:2;background:var(--card);font-weight:600;vertical-align:bottom;cursor:pointer;user-select:none}
 #rs-dock .rs-dock-table th small{display:block;font:500 10px/1.2 system-ui,sans-serif;color:var(--mut);letter-spacing:.03em}
@@ -957,7 +969,7 @@ html.rs-phone .rs-dd-split{flex-direction:column}
 html.rs-phone .rs-dd-card{flex:0 0 auto;max-height:45%}
 html.rs-phone .rs-dd-q{flex-wrap:wrap}
 /* the lists of Colour and Focus: a box in the look of the toolbox's boxes, under its button */
-.rs-dd-menu{position:fixed;z-index:31;min-width:300px;max-width:min(420px,calc(100vw - 16px));max-height:50vh;overflow:auto;box-sizing:border-box;padding:6px;border:1px solid var(--rs-tb-border,var(--line));border-radius:10px;
+.rs-dd-menu{position:fixed;z-index:31;min-width:300px;max-width:min(420px,calc(100vw - 16px));max-height:50dvh;overflow:auto;box-sizing:border-box;padding:6px;border:1px solid var(--rs-tb-border,var(--line));border-radius:10px;
   background:var(--rs-box-bg,var(--bg));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:var(--ink);font:12px/1.35 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.22)}
 .rs-dd-menu[hidden]{display:none}
 .rs-dd-menu button{font:inherit;color:inherit;background:none;border:0;border-radius:6px;padding:3px 8px;cursor:pointer}
@@ -1032,3 +1044,14 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #sb .rs-ask-comp .rs-ask-send{flex:none;width:32px;height:32px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;background:var(--accent-fill)!important;color:#fff!important}
 #sb .rs-ask-comp .rs-ask-send:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1)}
 #sb .rs-ask-comp .rs-ask-send.stop{background:var(--ink)!important;color:var(--bg)!important}
+/* the data dock's chart view: the row of Kind, X, Y and SVG over the chart; the chart fills the dock */
+#rs-dock .rs-dd-view{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#rs-dock .rs-dd-view button{border:0;border-radius:0;padding:3px 10px}
+#rs-dock .rs-dd-view button.on{background:var(--accent-fill);color:#fff}
+.rs-dd-chart{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:8px 12px}
+.rs-dd-chart[hidden],#rs-dock .rs-dock-table[hidden]{display:none}
+.rs-dd-chartrow{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px}
+.rs-dd-cl{display:inline-flex;gap:5px;align-items:center;color:var(--mut)}
+#rs-dock .rs-dd-cl select{padding:2px 6px;max-width:180px}
+.rs-dd-sp{flex:1}
+.rs-dd-chartel{flex:1;min-height:0}

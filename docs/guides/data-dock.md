@@ -37,10 +37,12 @@ data.open();
 
 ## What the person does
 
+- **Tables.** The tables of the data, in groups by schema, with what each one holds in the tooltip. A click on a table shows its rows: the line gets `SELECT * FROM <table>`, which you can change and run again.
 - **The line.** A click on it opens it as a text box. **Ctrl+Enter** or **Run** runs it, and **Escape** folds it. An error shows under the line, in the database's words. Only one `SELECT` or `WITH` statement runs: the guard refuses a statement that writes, loads, or reads a file or an address.
 - **The table.** The note in the dock's title row has the number of rows: "1 000 of 2 765 rows · 3 columns · 5 ms". The table shows at most `limit` rows, but **CSV** has all the rows (at most 1 000 000), and a click on a header sorts all the rows. A DATE shows as `2026-06-10`, a TIMESTAMP as `2026-06-10 08:30:00`, and a geometry as `(32 bytes)`.
 - **The light.** The roads of the table light on the map (the highlight set `dock`, in roadstyle's select purple). A new table changes the light. A table that a colour or a focus already shows has no light.
 - **A row.** A click selects its road and zooms to it. In a result of names, a click selects the roads of that name.
+- **Table | Chart.** The same result as a chart ([A chart](dashboard-parts.md#a-chart)). The first chart comes from the columns: a date or a time and a number give a line, a text and a number a bar, one number a histogram, two numbers a scatter. **Kind**, **X** and **Y** change it, and **SVG** downloads it. A histogram counts all the rows, not only the table's. `data.chart({kind, x, y, title})` shows a chart from JavaScript, and `data.view("table" | "chart")` switches the view.
 - **Colour ▾.** "+ Colour the roads of this table" gives one colour for each value of a text column with 2 to 8 values (for example `highway`), else one colour, with a legend row for each colour. Each layer has a check box that turns it off and on, and ✕ that removes it.
 - **Focus ▾.** "+ Focus on the roads of this table" keeps these roads, and the other roads fade (`rs.fade`) or hide. One focus is on at a time; **None** turns it off. Each focus has **Fade / Hide** and ✕.
 
