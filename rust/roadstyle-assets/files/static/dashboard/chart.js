@@ -11,6 +11,7 @@ export const rsChart = (() => {
   const SLOTS = 8, BARS = 40, POINTS = 5000, SLICES = 8, BINS = 20;
   const NUM = /^(TINYINT|SMALLINT|INT|INTEGER|BIGINT|HUGEINT|UTINYINT|USMALLINT|UINTEGER|UBIGINT|FLOAT|REAL|DOUBLE|DECIMAL|NUMERIC|Int|Uint|Float|Decimal|number)/i;
   const TIME = /^(DATE|TIMESTAMP|Date|Timestamp)/i;
+  const isNum = (t) => NUM.test(String(t || "")) && !/\[\]|^(MAP|STRUCT|LIST)/i.test(String(t || ""));     // a list (BIGINT[]) is not a number
   const col = (c) => `var(--rs-chart-${(c % SLOTS) + 1})`;
   const fmt = (v) => { const n = Number(v); if(!isFinite(n)) return String(v);
     const s = Math.abs(n) >= 100 || Number.isInteger(n) ? Math.round(n).toLocaleString("en") : (+n.toPrecision(3)).toLocaleString("en", {maximumFractionDigits: 3});
@@ -29,7 +30,7 @@ export const rsChart = (() => {
 
   // the kind's columns: the error line when the result has none that fit
   function check(s){
-    const by = (n) => s.columns.findIndex((c) => c.name === n), ys = [].concat(s.y || []), isN = (n) => NUM.test(String((s.columns[by(n)] || {}).type || ""));
+    const by = (n) => s.columns.findIndex((c) => c.name === n), ys = [].concat(s.y || []), isN = (n) => isNum((s.columns[by(n)] || {}).type);
     if(by(s.x) < 0) return `The column "${s.x}" is not in the result.`;
     for(const y of ys) if(by(y) < 0) return `The column "${y}" is not in the result.`;
     if(s.kind === "histogram") return isN(s.x) ? null : "A histogram needs a number column.";
@@ -45,20 +46,22 @@ export const rsChart = (() => {
   function chart(el, spec){
     let s = {...spec}, svg = null, foot = null;
     el.classList.add("rs-chart");
-    const ro = new ResizeObserver(() => draw()); ro.observe(el);
+    let lastW = 0;                                             // draw again when the width changes, not for a change of the content
+    const ro = new ResizeObserver(() => { const w = el.clientWidth; if(Math.abs(w - lastW) > 2){ lastW = w; draw(); } }); ro.observe(el);
     function set(change){ s = {...s, ...change}; draw(); }
     function draw(){
       el.replaceChildren();
       const bad = s.columns && s.rows ? check(s) : "No data.";
       if(bad){ el.append(Object.assign(document.createElement("p"), {className: "rs-chart-none", textContent: bad})); return; }
-      const W = Math.max(160, el.clientWidth), ys = [].concat(s.y || []);
+      const W = Math.max(160, el.clientWidth - 2), ys = [].concat(s.y || []); lastW = el.clientWidth;
       const legend = ys.length > 1 || s.kind === "pie" ? document.createElement("div") : null;
       if(legend){ legend.className = "rs-chart-legend"; el.append(legend); }
       let H = Math.max(100, el.clientHeight - (legend ? 24 : 0) - 20);
       // horizontal bars have at least 18 px each: a long list is taller than the box, and the box scrolls
       const rowsH = s.kind === "bar" && !s.small && s.rows.slice(0, BARS).some((r) => String(r[at(s.x)] ?? "").length > 8) ? s.rows.slice(0, BARS).length * 18 * Math.max(1, ys.length * 0.6) + 26 : 0;
       if(rowsH > H) H = rowsH;
-      svg = rsSvg(el, "svg", {width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": s.title || `${s.kind} chart of ${ys.join(", ") || s.x}`});
+      // width 100 % and a viewBox: the chart is never wider than its box, also when the box gets narrower before the next draw
+      svg = rsSvg(el, "svg", {width: "100%", height: H, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMidYMin meet", role: "img", "aria-label": s.title || `${s.kind} chart of ${ys.join(", ") || s.x}`});
       foot = document.createElement("div"); foot.className = "rs-chart-foot"; el.append(foot);
       const kinds = {bar, line, histogram, scatter, pie};
       kinds[s.kind](W, H, ys, legend);
@@ -182,8 +185,8 @@ export const rsChart = (() => {
   }
   // the first chart of a result, from its columns: a date or a time and a number: line; a text and a number: bar; one number: histogram; two numbers: scatter
   chart.guess = (columns, idColumn) => {
-    const c = columns.filter((x) => x.name !== idColumn), n = c.filter((x) => NUM.test(String(x.type))), t = c.find((x) => TIME.test(String(x.type)));
-    const txt = c.find((x) => !NUM.test(String(x.type)) && !TIME.test(String(x.type)));
+    const c = columns.filter((x) => x.name !== idColumn), n = c.filter((x) => isNum(x.type)), t = c.find((x) => TIME.test(String(x.type)));
+    const txt = c.find((x) => !isNum(x.type) && !TIME.test(String(x.type)));
     if(t && n.length) return {kind: "line", x: t.name, y: n[0].name};
     if(txt && n.length) return {kind: "bar", x: txt.name, y: n[0].name};
     if(n.length >= 2) return {kind: "scatter", x: n[0].name, y: n[1].name};
@@ -191,7 +194,7 @@ export const rsChart = (() => {
     return null;
   };
   chart.check = check;
-  chart.isNumber = (type) => NUM.test(String(type || ""));
+  chart.isNumber = (type) => isNum(type);
   chart.isTime = (type) => TIME.test(String(type || ""));
   return chart;
 })();

@@ -140,7 +140,13 @@ export function dataDock(o = {}){
     const n = res.more ? (res.total ? `${fmt(res.rows.length)} of ${fmt(res.total)} rows` : `${fmt(res.rows.length)} rows (there are more)`) : `${fmt(res.rows.length)} row${res.rows.length === 1 ? "" : "s"}`;
     rs.dock.note(id, `${n} · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"}${res.ms != null ? ` · ${res.ms} ms` : ""}`);
     paintButtons(); light();
-    if(res.chart === undefined) res.chart = rs.chart.guess(res.columns, ID);
+    if(res.chart === undefined){ const m = new Set(measures(res));   // the first chart: from the columns, with the ids as text (never a measure)
+      res.chart = rs.chart.guess(res.columns.filter((col) => col.name !== ID).map((col) => rs.chart.isNumber(col.type) && !m.has(col.name) ? {...col, type: "VARCHAR"} : col), ID);
+      if(res.chart && ["bar", "line", "pie"].includes(res.chart.kind) && !res.chart.y) res.chart.y = COUNT;
+      // no measure: the rows for each value of the text column with the fewest values (2 or more), for example highway
+      if(!res.chart || (res.chart.kind === "histogram" && !m.size)){ const t = res.columns.map((col, i) => [col, new Set(res.rows.map((x) => String(x[i]))).size])
+          .filter(([col, n]) => col.name !== ID && !rs.chart.isNumber(col.type) && n >= 2).sort((a, b) => a[1] - b[1])[0];
+        res.chart = t ? {kind: "bar", x: t[0].name, y: COUNT} : null; } }
     if(view === "chart") drawChart();
     return res;
   }
@@ -184,20 +190,45 @@ export function dataDock(o = {}){
   tableB.onclick = () => setView("table");
   chartB.onclick = () => setView("chart");
   const fill = (sel, names, v, any) => { sel.replaceChildren(...(any ? [Object.assign($("option", "", "(none)"), {value: ""})] : []), ...names.map((n) => Object.assign($("option", "", n), {value: n}))); sel.value = v ?? ""; };
+  // Y "count of rows": the rows for each value of X. A bar, a line or a pie whose X has a value more than once (or a result of more rows than the
+  // table) is drawn from all the rows, one mark for each value of X: the count of rows, or the sum of Y (Kaveh, 2026-11-06: a pie of lanes had one
+  // slice for each road). The road ids are never a choice of Y or X: a chart of ids says nothing.
+  const COUNT = "(count of rows)";
+  // a number column that is a measure, not an id: not the id column, not a name of an id (osm_id, source, target, ..._ref), and no value of 10^12 or more
+  const ID_NAME = /(^|_)(id|ref)$|^(source|target|from_node|to_node)$/i;
+  const measures = (r) => r.columns.filter((col, i) => rs.chart.isNumber(col.type) && col.name !== ID && !ID_NAME.test(col.name) &&
+    !r.rows.slice(0, 200).some((x) => { const v = x[i]; return v != null && Math.abs(Number(v)) >= 1e12; })).map((col) => col.name);
+  let chartSeq = 0;
   async function drawChart(){
-    const r = res; if(!r) return;
-    const sp = r.chart || {kind: "bar"}, names = r.columns.map((c) => c.name).filter((n) => n !== ID || sp.x === ID);
-    const nums = r.columns.filter((c) => rs.chart.isNumber(c.type)).map((c) => c.name);
-    kindS.value = sp.kind; fill(xS, names, sp.x); fill(yS, nums, [].concat(sp.y || [])[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
-    const values = sp.kind === "histogram" && r.more ? (await allRows(r, CSV_LIMIT)).map((x) => x[r.columns.findIndex((c) => c.name === sp.x)]) : null;
-    const spec = {...sp, columns: r.columns, rows: table.rows(), values, onPick: (i) => rowClick(table.rows()[i], r.columns)};
+    const r = res, me = ++chartSeq; if(!r) return;
+    const sp = r.chart || {kind: "bar"}, names = r.columns.map((c) => c.name).filter((n) => n !== ID);
+    const nums = measures(r);
+    const ys = [].concat(sp.y || []), grouped = ["bar", "line", "pie"].includes(sp.kind);
+    kindS.value = sp.kind; fill(xS, names, sp.x);
+    fill(yS, grouped ? [COUNT, ...nums] : nums, ys[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
+    let spec = {...sp, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};
+    const xi = r.columns.findIndex((c) => c.name === sp.x);
+    const repeats = xi >= 0 && new Set(table.rows().map((x) => String(x[xi]))).size < table.rows().length;
+    if(grouped && xi >= 0 && (ys[0] === COUNT || repeats || r.more)){
+      const time = rs.chart.isTime(r.columns[xi].type) || rs.chart.isNumber(r.columns[xi].type), yName = ys[0] === COUNT || !ys.length ? "rows" : `sum of ${ys[0]}`;
+      const agg = ys[0] === COUNT || !ys.length ? "count(*)" : `sum(${quoteId(ys[0])})`;
+      const g = await query(`SELECT ${quoteId(sp.x)}, ${agg} AS ${quoteId(yName)} FROM (${inner(r.sql)}) AS rs_a GROUP BY 1 ORDER BY ${sp.kind === "line" || (sp.kind === "bar" && time) ? 1 : 2} ${sp.kind === "line" || time ? "ASC" : "DESC"} LIMIT 500`, null).catch((e) => ({error: e}));
+      if(me !== chartSeq) return;
+      if(g.error){ chartEl.replaceChildren(Object.assign($("p", "rs-chart-none"), {textContent: sentence(g.error.message)})); return; }
+      const key = r.columns[xi].name;
+      spec = {...spec, y: yName, columns: g.columns, rows: g.rows, onPick: (i) => rowClick([g.rows[i][0]], [{name: key, type: r.columns[xi].type}])};
+    }
+    if(sp.kind === "histogram" && r.more){ const v = await allRows(r, CSV_LIMIT); if(me !== chartSeq) return; spec.values = v.map((x) => x[xi]); }
     if(!chartObj) chartObj = rs.chart(chartEl, spec); else chartObj.set(spec);
   }
   const change = () => { if(!res) return; const k = kindS.value, old = res.chart || {};
     res.chart = {...old, kind: k, x: xS.value || old.x, y: k === "histogram" ? undefined : (yS.value || [].concat(old.y || [])[0])};
+    if(["bar", "line", "pie"].includes(k) && res.chart.y === res.chart.x) res.chart.y = COUNT;      // the sum of x for each x says nothing: the rows
     if(k === "histogram" && !rs.chart.isNumber((res.columns.find((c) => c.name === res.chart.x) || {}).type)) res.chart.x = (res.columns.find((c) => rs.chart.isNumber(c.type)) || {}).name;
     // a kind that needs y and has none (from a histogram): a number column, another than x where there is one
-    if(k !== "histogram" && !res.chart.y){ const n = res.columns.filter((c) => rs.chart.isNumber(c.type) && c.name !== ID).map((c) => c.name); res.chart.y = n.find((x) => x !== res.chart.x) || n[0]; }
+    if(k !== "histogram" && !res.chart.y){ const n = measures(res);
+      res.chart.y = k === "scatter" ? n.find((x) => x !== res.chart.x) || n[0] : COUNT; }
+    if(k === "scatter" && res.chart.y === COUNT){ const n = measures(res); res.chart.y = n.find((x) => x !== res.chart.x) || n[0]; }
     drawChart(); };
   kindS.onchange = xS.onchange = yS.onchange = change;
   svgB.onclick = () => { const s = chartObj && chartObj.svg(); if(!s) return;

@@ -110,7 +110,9 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         # a result of a text and a number: a bar chart in the open view
         page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
         page.wait_for_timeout(300)
-        assert page.is_visible("#rs-dock .rs-dd-chart") and page.locator("#rs-dock .rs-chart-none").count() == 1   # no number column: the line
+        # no measure (edge_id is an id): the rows for each value of the text column with the fewest values, highway
+        assert page.evaluate("JSON.stringify(data.result().chart)") == '{"kind":"bar","x":"highway","y":"(count of rows)"}'
+        assert page.locator("#rs-dock .rs-dd-chart svg path").count() == 3
         page.evaluate("data.run('SELECT edge_id, length_m FROM big')")
         page.select_option("#rs-dock .rs-dd-chartrow select >> nth=0", "scatter")
         assert "edge_id" not in page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-chartrow select')[1].options].map(o => o.value)")   # no chart over road ids

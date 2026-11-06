@@ -42,6 +42,10 @@ function answer(sql){
   if((m = sql.match(/^SELECT \\* FROM \\(([\\s\\S]*)\\) AS rs_s ORDER BY "(\\w+)" (ASC|DESC) NULLS LAST$/))) {
     const r = answer(m[1]), i = r.columns.findIndex(c => c.name === m[2]), k = m[3] === "ASC" ? 1 : -1;
     return {columns: r.columns, rows: [...r.rows].sort((a, b) => k * (a[i] < b[i] ? -1 : a[i] > b[i] ? 1 : 0))}; }
+  if((m = sql.match(/^SELECT "(\\w+)", (count\\(\\*\\)|sum\\("(\\w+)"\\)) AS "([^"]+)" FROM \\(([\\s\\S]*)\\) AS rs_a GROUP BY 1/))) {   // the chart's rows for each value of x
+    const r = answer(m[5]), xi = r.columns.findIndex(c => c.name === m[1]), yi = m[3] ? r.columns.findIndex(c => c.name === m[3]) : -1, g = new Map();
+    for(const row of r.rows){ const k = row[xi]; g.set(k, (g.get(k) || 0) + (yi < 0 ? 1 : Number(row[yi]))); }
+    return {columns: [r.columns[xi], {name: m[4], type: "BIGINT"}], rows: [...g].sort((a, b) => b[1] - a[1])}; }
   if(/FROM rs_roads WHERE/.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: [[2n], [5n]]};
   const c = CANNED[strip(sql)];
   if(!c) throw new Error("Binder Error: Referenced column \\"nope\\" not found in FROM clause!");
