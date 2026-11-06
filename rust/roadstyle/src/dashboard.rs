@@ -102,7 +102,7 @@ pub struct ChartColumn {
     pub ty: String,
 }
 
-/// The page's own rows of a chart card (the Python side makes them of a DataFrame or of a list of dicts). They are written into the page.
+/// The page's own rows of a chart card (the Python binding makes them of a DataFrame or of a list of dicts). They are written into the page.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ChartData {
