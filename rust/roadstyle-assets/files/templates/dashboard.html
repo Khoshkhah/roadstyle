@@ -16,9 +16,9 @@ body{--rs-side:var(--rs-panel-w,400px)}   /* shift the map's right-anchored cont
 .sb-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
 #sb button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;
   background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
-#sb button:hover{border-color:var(--accent);color:var(--accent)}
+#sb button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
 #sb button.sb-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600}
-#sb button.sb-primary:hover{filter:brightness(1.08);color:#fff}
+#sb button.sb-primary:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1);color:#fff;background:var(--accent-fill)}
 #sb .rs-q-col{width:28px;height:28px;padding:1px;border:1px solid var(--line);border-radius:6px;
   vertical-align:middle;cursor:pointer;background:var(--bg)}
 #sb .rs-q-count{color:var(--mut);font-size:12px;margin:10px 0 2px;font-variant-numeric:tabular-nums}

@@ -38,6 +38,7 @@ The page has a light and a dark theme. Every part of the dashboard and your HTML
 | `var(--line)` | thin lines |
 | `var(--accent)` | links and buttons |
 | `var(--accent-fill)` | a filled control (a selected tab, a primary button) |
+| `var(--rs-hover-bg)` | the tint behind a control under the pointer (`--accent` at 12 %) |
 
 The accent is one color for the whole dashboard, the Sonocount teal. A page does not set its own. `--accent` is `#0e7c8e` for text in the light theme (a little darker than the logo's `#0E7F91`, for 4.6:1 on the cards) and a lighter teal of the same hue in the dark theme (8.5:1 on the panel). `--accent-fill` is the logo teal `#0E7F91`, which takes white text (4.71:1) in both themes. The tokens are defined once in `dashboard.css`. A selected tab, a primary button, a link, and the mode and follow buttons of the Street View and Google 3D windows use them, in the panel and in the floating windows.
 
@@ -84,6 +85,16 @@ In the dark theme the colour of a number (the fourth argument of `rs.kpi`) is mi
 ## Buttons, text boxes, chips and a dot
 
 A plain `<button>` and `<button class="sb-primary">` in the panel have their style already, and so have a `<select>` and a text `<input>` or `<textarea>`: write no class for them. `<span class="rs-chip">road type</span>` is a small label, `rs-chip accent` tints it with the page's `--accent`, and `<span class="rs-dot" style="background:#15803d"></span>` is a color mark before a word.
+
+**Hover.** Every control of the dashboard reacts under the pointer and on keyboard focus, in one of three looks by its kind:
+
+| Kind | Hover | Examples |
+|---|---|---|
+| Not filled | the tint `--rs-hover-bg` behind it, and its text or icon in `--accent`; a border, if it has one, is `--accent` too | the toolbox's buttons, the rows of its boxes, a plain button, a chip, a tab, a summary, ✕ |
+| Filled | brighter (`filter: brightness(1.1)`) | a primary button, the open tab, a selected day |
+| A link | underlined (a link in the panel, the help window or a window has no underline until then) | "How to set up the key ↗" |
+
+A disabled control does not react. Keyboard focus has the same look and a 2 px `--accent` ring. A card's title row has the card's own hover (see [Cards](dashboard-panel.md)). Your own controls get the look when they are a `<button>`, a `<summary>` or a link in the panel. For a control of your own in another place, use `background: var(--rs-hover-bg); color: var(--accent)`. `tests/test_dashboard_hover_browser.py` puts the pointer on every control of the panel, the toolbox and its boxes, the help window and the day picker, in both themes, and fails on a control with no hover.
 
 ## Charts
 
