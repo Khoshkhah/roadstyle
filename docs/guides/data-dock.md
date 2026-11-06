@@ -46,6 +46,6 @@ data.open();
 
 ## From JavaScript
 
-`data.run(sql?)` puts `sql` in the line and runs it, and gives the result. `data.show({sql, columns, rows, more})` shows a result that you made. `data.sql()`, `data.result()`, `data.csv()` and `data.stop()` give the line, the result, the CSV text, and stop a run. `data.roads(sql)` gives the road ids (on the map) that the SQL selects by `idColumn`. `data.colour(groups, {sql})` and `data.focus(ids, {sql, mode})` add the same layers as the buttons; `data.layers()` lists them. The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`) and `layers`.
+`data.run(sql?)` puts `sql` in the line and runs it, and gives the result. `data.show({sql, columns, rows, more})` shows a result that you made. `data.sql()`, `data.result()`, `data.csv()` and `data.stop()` give the line, the result, the CSV text, and stop a run. `data.roads(sql)` gives the road ids (on the map) that the SQL selects by `idColumn`. `data.colour(groups, {sql})` and `data.focus(ids, {sql, mode})` add the same layers as the buttons; `data.layers()` lists them. For [Ask](ask.md): `data.idColumn`, `data.keyOf(result)` (the column that finds the roads of a result, or `null`) and `data.roadsOf(result)` (its roads on the map). `data.roads(sql)` refuses a query of more than 100 000 roads. The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`) and `layers`.
 
 `tests/test_data_dock_browser.py` checks the data dock with a fake host.

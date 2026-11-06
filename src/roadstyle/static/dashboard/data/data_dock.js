@@ -3,7 +3,7 @@
 // lights the result's roads on the map (the highlight set "dock"), and keeps the lasting map changes of the page as layers in its buttons Colour and Focus.
 //
 //   dataDock({dashboard, query, schema, ready, tables, load, idColumn, keys, roadsBy, sql, label, limit, card, guard}) -> EventTarget + {run, show, sql, result,
-//     csv, stop, open, close, ready, roads, colour, focus, layers, remove, schema}
+//     csv, stop, open, close, ready, roads, idColumn, keyOf, roadsOf, colour, focus, layers, remove, lightOff, schema}
 //   events: "run" {sql, columns, rows, more, ms, source}, "error" {sql, message, source}, "layers" {layers}
 import {guard as guardSql, inner} from "./guard.js";
 
@@ -271,7 +271,10 @@ export function dataDock(o = {}){
     // for Ask's tools: the roads (on the map) that SQL selects by its id column, and the same layers as the buttons
     async roads(text){ const r = await query(text, MAP_LIMIT), i = r.columns.findIndex((c) => c.name === ID);
       if(i < 0) throw new Error(`The query must select the column ${ID}.`);
+      if(r.rows.length > MAP_LIMIT) throw new Error(`The query selects more than ${fmt(MAP_LIMIT)} roads. Make it narrower.`);
       const all = r.rows.map((x) => String(x[i])), ids = onMap(all); ids.missing = all.length - ids.length; return ids; },
+    // for Ask's answer: the id column, the column that finds the roads of a result (or null), and its roads on the map (for the camera)
+    idColumn: ID, keyOf, roadsOf: async (r) => keyOf(r) ? onMap(await roadsOf(r)) : [],
     query: (text, limit = LIMIT) => query(text, limit),
     colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
