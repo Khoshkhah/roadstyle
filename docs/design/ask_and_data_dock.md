@@ -108,13 +108,16 @@ section is the rule; the parts below follow it.
 
   | State | Feature state | Look |
   |---|---|---|
-  | Light | `lit` (new; `rs.highlight` sets it) | the **casing** of the road in roadstyle's select purple (`select_color`, `#7c4dff`), twice as wide; the fill keeps its colour |
+  | Light | the highlight set `dock` (`rsHighlight(ids, {set: "dock", color: "#7c4dff", opacity: 0.55})`, roadstyle #48) | the road's own fill piece in roadstyle's select purple, at the road's width at every zoom |
   | Select | `select` (as now) | the **fill** in `select_color` (`#7c4dff`), as always |
   | Hover | `hover` (as now) | the fill in `hover_color` (`#b388ff`), as always |
 
   Purple stays roadstyle's colour of everything that marks roads (Kaveh: "we always used purple for roads hover and selected"; a first try
   in the accent teal was refused, also for the light: "I don't like the type of color you are using for roads from the table").
-  Select and deselect never touch `lit`, so a click does not change the lit set. Checked in the mock-up at street level in both themes:
+  **Changed (2026-11-05, the handover from the duckOSM Studio session):** the light uses roadstyle's highlight sets (#48, on main), not a new
+  feature state `lit`. A set has its own state (`rs_hl`), so select and deselect never touch it, and no change of the road layer's paint is
+  needed. A table that a colour or a focus already shows is not lit, so the light does not hide their colours.
+  Select and deselect never touch the set `dock`, so a click does not change the lit set. Checked in the mock-up at street level in both themes:
   625 lit roads stay lit after two clicks, and only the clicked road has the accent fill.
 - **The drawing order:** Focus (fade or hide) at the bottom, then Colour, then Light, then Select on top.
 - **The camera** moves to the roads after an answer, on **Show**, on **Focus**, and when the switch is turned on. Else only the person
@@ -547,7 +550,7 @@ const ask = askPanel({
   examples: ["Which streets are longer than 1 km?", "How many one-way roads are there?"],
 });
 ask.addEventListener("answer", e => console.log(e.detail));   // {question, text, sql, rows}
-rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data", open: () => ask.open()});   // an "open" card
+rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data", open: () => ask.open(), icon: "ask", tint: true});   // an "open" card that stands out
 ```
 
 | Option | Default | What it is |
@@ -585,6 +588,12 @@ floats as a card with round corners and a margin, and the conversation reads as 
 default stays `frame` for other pages, and a look that the person keeps in Settings still wins.
 
 ### The view
+
+**The frame (2026-11-05, the handover):** the Ask view is an `rs.frame({panel, title: "Ask", back, head, id: "ask"})` (roadstyle #49). Its
+`head` is Ask's tool row (the provider, Key, New), which does not scroll; the conversation is the frame's `body` (`rs-pbody`), and the
+question box is the frame's `bar`. The mock-up's own view had two faults that the frame removes: on a phone the tool row scrolled and
+covered the first answer, and the dock's note was cut to "5 ro…". The Ask card in the panel is an open card with `icon: "ask"` and
+`tint: true` (Kaveh's variant F: the other open cards have no background and a thin edge).
 
 ```
 +----------------------------------+
@@ -1008,7 +1017,6 @@ Changes in existing parts, all small and with no change of look on a page withou
 | File | Change |
 |---|---|
 | `dashboard.css`, the page template | **One hover** (see [One hover for the whole dashboard](#one-hover-for-the-whole-dashboard)): the token `--rs-hover-bg`; the three looks in place of the 13 of now; the panel's hide and show buttons; `#sb button:hover:not(:disabled)`; links underlined on hover only. A change of the look of every page, so it is a separate PR, before the dock |
-| `core.js`, the road layer's paint (Rust style writer) | `rs.highlight` sets the new feature state `lit` (not `select`); the road casing's colour (`select_color`) and width read `lit`. `select_color` and `hover_color` do not change |
 | `toolbar.js` | `keepInside` keeps a box's scroll across its fit and does not fit again for the class `rs-scrolling` (a fault now: a box that it makes shorter cannot scroll). The low edge of a box is the dock's top, not `innerHeight` (`keepInside`). A bar at a side has the free height above the dock as its largest height, and is centred there; a bar along the bottom ends above the dock |
 | `overlay.js` | `followPanels`: the place of a bar along the top or the bottom, `left`, `middle` or `right` (`toolbar.align`) |
 | `settings.js`, `placement.js` | The row "Toolbar place" (only for a bar at the top or the bottom); the choice is kept as the other layout choices |
@@ -1025,7 +1033,7 @@ No test needs a key or the network. CI runs them all.
 |---|---|
 | `tests/data_units.js` in `tests/test_data_dock_browser.py` | The guard: a list of SQL that it accepts (with comments, strings that hold `DROP`, `WITH`, a `;` at the end) and a list that it refuses (two statements, each refused word, `read_csv`, `FROM 'x.parquet'`, `'https://...'`, `query('...')`). The row limit wrap. The CSV text (a comma, a quote, a new line, a `BigInt`, `null`). An id as exact text. |
 | `tests/test_page_tables_browser.py` | `tables` with a CSV, a Parquet, a GeoJSON and a JSON (a fake host `load`): Run and Ask wait for them; each is in `extra` with its `about` as the comment and in the prompt's schema text; the GeoJSON has a geometry column `geom`; a table with road ids lights its roads; a wrong URL does not stop the other tables; a DATE shows as `2026-06-10`. Also the answer's query: a fake model that runs the full list, a count and a `LIMIT 2` query gets the full list in the dock. |
-| `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, "the table's roads are lit (the state `lit`), a click on a row selects and zooms, the CSV download, Stop. With 2 765 rows: the note says "1 000 of 2 765 rows", the light covers 2 765, the CSV has 2 765 rows; a click on a header sorts rising, falling and back, over all the rows (the first value is the true minimum), also for `BigInt` ids and text with `null`. |
+| `tests/test_data_dock_browser.py` | A dashboard page with a fake host `query` in JavaScript (no DuckDB): the line folds and opens, Run and Ctrl+Enter, the error line, the table's roads are lit (the highlight set `dock`), a click on a row selects and zooms, the CSV download, Stop. With 2 765 rows: the note says "1 000 of 2 765 rows", the light covers 2 765, the CSV has 2 765 rows; a click on a header sorts rising, falling and back, over all the rows (the first value is the true minimum), also for `BigInt` ids and text with `null`. |
 | `tests/test_dock_browser.py` | The bottom dock: the map ends at the dock, the panel and the toolbox and the corner box end above it, the grip drags the height between 120 px and 70 %, the height and the state stay after a reload, `rs:dockchange`. In `layout="dock"` and with `street_view="dock"` the dock is as wide as the map. At 390 × 844: the dock is a sheet, one sheet at a time (dock, panel, Street View), a wide table scrolls inside the dock and the page does not scroll sideways. |
 | `tests/test_ask_browser.py` | Ask with a **fake provider** (an object with `call()` that gives scripted answers). The script: a tool call with wrong SQL, then a tool call with right SQL, then text. The test checks: 3 model calls, the error text of the database goes to the model, the dock shows the last SQL and its table, the roads are lit, the answer is plain text, the footer says "1 query" and the failed query is only in the details. A ✕ removes a card, and the next model call has no turn of it. After three answers (a query, a filter, a zoom): the first card's Table shows its own 5 rows in the dock; a click on the focus chip turns the focus off and on again; the first card's Show lights its 5 roads again; `**x**` in an answer is a `<b>`; an answer that lists 5 rows with their ids shows 3 items with no ids and "… 2 more in the table". Also: a question asked while `ready` waits shows "Loading the data…" and then its answer; an error thrown by `schema()` ends the question with a red line, and the box works again; the stop after 3 failed queries and after `maxSteps`, Stop, a model text with `<img>` shows as text. |
 | `tests/test_map_operations_browser.py` | The four operations: a new table changes the light and the switch turns it off and on; a colour answer's table is not lit; two colours on, the newest wins; a second focus turns the first off; a click on a chip turns it off and on; ✕ removes it; Fade and Hide; a person's SQL does not move the camera; `rs.fade` fades the other roads with their names and arrows, in both themes. |
