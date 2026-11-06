@@ -21,7 +21,14 @@ tip
 help
 hover
 tabs
+menu
 days
+hours
+fields
+search
+drop
+notice
+more
 kpi
 svg
 chart

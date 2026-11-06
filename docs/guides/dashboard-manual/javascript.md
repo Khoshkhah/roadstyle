@@ -197,6 +197,20 @@ chart.set({kind: "pie"});
 
 `rs.tabs.use(nav, onChange)` makes the tabs of a `nav` element work and gives `{select(id), current()}`. `rs.days.use(el, {days, onChange})` builds a day picker in an empty element: a field that opens a calendar of the days with data, the day before and after, and "Latest". It gives `{set(day, quiet), value()}`. [Dashboard parts](../dashboard-parts.md) shows the HTML and the other shared pieces.
 
+The parts for a form or a list:
+
+```javascript
+rs.sections.add({id: "period", label: "Period", html: "<div id='per'></div><div id='hr'></div><div id='lst'></div>"});
+rs.days.range(document.getElementById("per"), {unit: "week", min: "2026-09-01", max: "2026-11-06", onChange: ([from, to]) => console.log(from, to)});
+rs.hours.use(document.getElementById("hr"), {value: [7, 9], range: true, label: "Rush hours"});
+rs.more(document.getElementById("lst"), {items: rs.find("Storgatan"), page: 5, noun: "roads", render: id => `<div class="rs-qrow"><b>${id}</b></div>`});
+rs.sections.button("period", {icon: "<svg viewBox='0 0 16 16'><circle cx='8' cy='8' r='5'/></svg>", title: "Zoom to the period", onClick: () => {}});
+rs.panel.bar().innerHTML = "<span>3 fixes not saved</span><button type='button' class='sb-primary'>Build</button>";
+rs.toast("The period is set.", {kind: "ok"});
+```
+
+`rs.days.range(el, {unit, min, max, value, onChange})` is a period: from a day to a day, a week or a month. `rs.hours.use(el, {value, range, onChange})` is the hour picker: a field that opens a list of the hours. `rs.slider`, `rs.number` and `rs.colorPick` are a slider, a number field with "−" and "+", and a colour picker. `rs.search` is a search field with suggestions, `rs.drop` a file drop zone, `rs.progress` a progress bar and `rs.busy(button, promise)` a button that waits. `rs.toast(text, {kind})` is a message that goes after some seconds, and `await rs.confirm({title, ok, danger})` is the confirm dialog in place of `confirm()`. `rs.menu(button, items)` and `rs.menu.button(items)` are an action menu. `rs.toggle(button, onChange)` is a button that stays pressed. `rs.more(el, {items, page, render})` shows a long list page by page. `rs.sections.button(id, {icon, title, onClick})` is an icon button in a card's title row, and `rs.panel.bar()` is the fixed bar at the bottom edge of the panel. [Dashboard parts](../dashboard-parts.md) shows each one live.
+
 ## Live data
 
 `live_data=True` must be on in Python. `rs.setData` takes an array of rows, an Arrow table, or the URL of a JSON file. Write `edge_id` as text.

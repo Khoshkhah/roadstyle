@@ -4,11 +4,18 @@
 // functions as the controls, so the page and the host never disagree. The page sets window.rs to it.
 import {map, O, CONTRACT} from "./core.js";
 import {rsTools} from "./tools.js";
-import {rsSections} from "./sections.js";
+import {rsSections, rsPanelBar} from "./sections.js";
 import {rsHelp} from "./help.js";
 import {rsHover} from "./hover.js";
-import {rsTabs} from "./tabs.js";
+import {rsTabs, rsToggle} from "./tabs.js";
 import {rsDays} from "./days.js";
+import {rsHours} from "./hours.js";
+import {rsSlider, rsNumber, rsColorPick} from "./fields.js";
+import {rsSearch} from "./search.js";
+import {rsDrop} from "./drop.js";
+import {rsToast, rsConfirm, rsProgress, rsBusy} from "./notice.js";
+import {rsMenu} from "./menu.js";
+import {rsMore} from "./more.js";
 import {editorFrame} from "./frame.js";
 import {rsDock} from "./dock.js";
 import {rsKpi} from "./kpi.js";
@@ -92,12 +99,26 @@ export function makeApi(extra){
     chart: rsChart,              // a chart of rows: bar, line, histogram, scatter, pie (chart.js)
     kpi: rsKpi,                  // the HTML of a number tile (kpi.js)
     tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)
-    days: rsDays,                // the day picker of a page: use (days.js)
+    days: rsDays,                // the day picker of a page: use, and range (a period: days, a week, a month) (days.js)
+    hours: rsHours,              // the hour picker: one hour or a range (hours.js)
+    toggle: rsToggle,            // a button that stays pressed (tabs.js)
+    slider: rsSlider,            // a slider, one value or two handles (fields.js)
+    number: rsNumber,            // a number field with - and + (fields.js)
+    colorPick: rsColorPick,      // a colour picker: a swatch, a palette, a hex field (fields.js)
+    search: rsSearch,            // a search field with a list of suggestions (search.js)
+    drop: rsDrop,                // a file drop zone (drop.js)
+    toast: rsToast,              // a message that goes after some seconds (notice.js)
+    confirm: rsConfirm,          // the confirm dialog: a promise of true or false (notice.js)
+    progress: rsProgress,        // a progress bar (notice.js)
+    busy: rsBusy,                // the busy state of a button (notice.js)
+    menu: rsMenu,                // an action menu, and menu.button: a "⋯" button with its menu (menu.js)
+    more: rsMore,                // "show more" of a long list (more.js)
     frame: editorFrame,          // the frame of an editor that uses the whole panel: open, close, tab (frame.js)
     dock: rsDock,                // the bottom dock under the map: add, remove, open, close, show, note, height, table (dock.js)
     hover: rsHover,              // the hover box of a page: show, hide, on (hover.js)
     help: rsHelp,                // the page's help window: set, open, close (help.js)
-    sections: rsSections,        // the panel's sections: list, get, add, remove, hide, show (sections.js)
+    sections: rsSections,        // the panel's sections: list, get, add, remove, hide, show, button (sections.js)
+    panel: {bar: rsPanelBar},    // the fixed bar at the bottom edge of the panel (sections.js)
     legend: rsLegend,            // the legend's own rows for the page: add, remove, list (legend.js)
     colorModes: rsColorModes,    // the page's own "Colour by" list in the legend box: set, select, clear, active (colorbox.js)
     contract: CONTRACT,          // the newest roadstyle:contract that this dashboard reads (core.js)

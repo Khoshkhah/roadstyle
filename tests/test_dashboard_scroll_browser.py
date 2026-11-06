@@ -1,7 +1,7 @@
 """Every scroll area of a dashboard uses the panel's scroll rules (dashboard.css and panelscroll.js, `_PS_AREAS`): a thin scrollbar that is transparent at
 rest and shows while the pointer is over the area, no scroll handed on to the map (`overscroll-behavior: contain`), and the scroll script on it. The areas:
-the help window, the boxes of the toolbox, the panel's own select list, the query part's list (with a fade while there is more below) and a page's
-`rs-scroll`. The window is short, so that the boxes scroll. Skipped without playwright."""
+the help window, the boxes of the toolbox, the panel's own select list, the query part's list (with a fade while there is more below), a page's
+`rs-scroll`, the action menu, the hour list and the search list. The window is short, so that the boxes scroll. Skipped without playwright."""
 import json
 
 import pytest
@@ -19,6 +19,12 @@ _AREAS = [   # (the area, the call that opens it, its selector)
     ("select list", "document.querySelector('[data-rs-section=pick] .rs-sel-btn').click()", ".rs-sel-list"),
     ("query list", "document.querySelector('#sb [data-q=run]').click()", "#sb .rs-q-list"),
     ("page's rs-scroll", None, "#sb .rs-scroll"),
+    ("action menu", "const b = rs.menu.button(Array.from({length: 30}, (_, i) => ({label: 'Action ' + i}))); document.querySelector('[data-rs-section=pick] .rs-sec-body').append(b); b.click()",
+     ".rs-menu:not(.rs-hours-list):not([hidden])"),
+    ("hour list", "const d = document.createElement('div'); document.querySelector('[data-rs-section=pick] .rs-sec-body').append(d); rs.hours.use(d, {value: 8}); d.querySelector('.rs-hours-field').click()",
+     ".rs-hours-list:not([hidden])"),
+    ("search list", "const d = document.createElement('div'); document.querySelector('[data-rs-section=pick] .rs-sec-body').append(d); const s = rs.search(d, {suggest: () => [{label: 'A'}, {label: 'B'}]}); s.set('a'); d.querySelector('input').dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}))",
+     ".rs-search-list:not([hidden])"),
 ]
 
 
@@ -64,7 +70,7 @@ def test_every_scroll_area_has_the_panels_scroll_rules(tmp_path):
     for name, g in got.items():
         assert g["contain"] == "contain" and g["width"] == "thin" and g["wired"], (name, g)
         assert g["color"].startswith("rgba(0, 0, 0, 0)") and not g["hover"].startswith("rgba(0, 0, 0, 0)"), (name, g)      # hidden at rest, shown over it
-    for name in ("help window", "settings box", "select list", "query list", "page's rs-scroll"):                        # these are taller than the window here,
+    for name in ("help window", "settings box", "select list", "query list", "page's rs-scroll", "action menu", "hour list"):                        # these are taller than the window here,
         assert got[name]["scrolls"], (name, got[name])                                                                  # so the check means something
     assert got["query list"]["more"] and got["page's rs-scroll"]["more"]                                                  # the fade of an area inside a box
 

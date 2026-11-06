@@ -86,7 +86,6 @@ body.rs-panel #map{right:320px}
 body.rs-side-hidden .rs-side{display:none}
 body.rs-side-hidden #map{right:0}
 body.rs-side-hidden{--rs-side:0px}
-.rs-side .rs-empty{color:#9a9a9a;text-align:center;padding:30px 12px;font-size:12.5px}
 .rs-name{font-size:17px;font-weight:700;margin:0 0 10px;line-height:1.3}
 /* the rows of a road's fields: in the panel (#sb) they take its theme's colours, elsewhere the light ones */
 .rs-kv{display:flex;justify-content:space-between;gap:12px;padding:4px 0;
@@ -676,8 +675,8 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
    the query part's list, the help window, the panel's own select list, the boxes of the toolbox, the docked read-out. An area inside a box (`rs-scroll`,
    the query's list) also has a fade at its bottom edge while there is more below (data-more), and at its top edge while there is more above (data-above);
    a whole box has none, because the fade would take its border too. An area with a table has no top fade: the table's header row stays at the top. The height of a `rs-scroll` is `--rs-scroll-h` (the page can set it). ---- */
-:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res){overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
-:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res):is(:hover,.rs-scrolling){scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
+:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res,.rs-menu,.rs-color-box,.rs-search-list){overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
+:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res,.rs-menu,.rs-color-box,.rs-search-list):is(:hover,.rs-scrolling){scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
 .rs-scroll{overflow:auto;max-height:var(--rs-scroll-h,min(520px,60dvh))}
 :is(.rs-scroll,.rs-q-list)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
 :is(.rs-scroll,.rs-q-list)[data-above]:not(:has(th)){-webkit-mask-image:linear-gradient(to bottom,transparent,#000 28px);mask-image:linear-gradient(to bottom,transparent,#000 28px)}
@@ -1258,3 +1257,280 @@ html:not(.rs-phone) .rs-dd-chartrow .rs-dd-cl .rs-sel{width:auto;min-width:0}
 #sb button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
 #sb button:disabled{opacity:.5;cursor:default}
 #sb button.sb-primary:disabled{filter:saturate(.6)}
+
+/* ==== DASHBOARD PARTS 2 (docs/design/dashboard_parts_2.md): the controls that a page drew itself before. Each is a class with the theme's tokens;
+   the parts with behaviour have a function on `rs` (days.js range, hours.js, fields.js, search.js, drop.js, notice.js, menu.js, more.js). ==== */
+/* the state colours: a warning, a good result, the "not saved" dot, and the fill of a button that deletes (white text on it: 6.5:1) */
+:root{--rs-warn:#b45309;--rs-ok:#15803d;--rs-unsaved:#d97706;--rs-danger-fill:#b91c1c}
+/* the accent as text on an accent tint (a pressed button, a selected row, the row under the pointer in a list): mixed with the text colour, 4.5:1 or more in both themes */
+:root{--rs-accent-text:color-mix(in srgb,var(--accent) 72%,var(--ink))}
+html[data-rs-theme=dark]{--rs-warn:#fbbf24;--rs-ok:#4ade80;--rs-unsaved:#fbbf24}
+/* the label above a field and its value at the right: the look of the day picker's label */
+:is(#sb,body) .rs-slider-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 6px}
+:is(#sb,body) :is(.rs-slider-l,.rs-num-l,.rs-color-l){color:var(--mut);font:600 12px/16px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em}
+:is(#sb,body) :is(.rs-num-l,.rs-color-l){display:block;margin:0 0 6px}
+:is(#sb,body) .rs-slider-v{color:var(--ink);font:600 13px system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* 1. the date range and the week or month: the day picker's field (.rs-day); the days of the range are tinted, its two ends are filled */
+.rs-day-cal .rs-day-cd.in{background:color-mix(in srgb,var(--accent) 26%,transparent)}
+.rs-day-cal .rs-day-cd.hov:not(.on){box-shadow:inset 0 0 0 1.5px var(--accent);color:var(--accent)}
+.rs-range-cal .rs-day-cd:disabled{background:none}
+.rs-range-mg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.rs-range-mg .rs-day-cd{height:40px}
+.rs-range-hint{margin-top:8px;font-size:12px;opacity:.75;text-align:center}
+/* 2. the hour picker: the day picker's field (.rs-day), with a clock; a click opens a list of the hours in the look of the menu, with a tick at
+   the chosen hour. A range: "From" and "To", each a field with its list, and the number of hours at the end */
+.rs-menu.rs-hours-list{max-height:min(236px,calc(100dvh - 16px));min-width:120px}
+.rs-hours-list .rs-menu-item{justify-content:space-between;font-variant-numeric:tabular-nums}
+.rs-hours-list .rs-menu-item.on{font-weight:600;color:var(--rs-accent-text)}
+.rs-hours-list .rs-menu-item svg{width:14px;height:14px;opacity:1}
+:is(#sb,body) .rs-hours-tag{flex:none;color:var(--mut);font:600 12px system-ui,sans-serif}
+:is(#sb,body) .rs-hours .rs-hours-field{font-variant-numeric:tabular-nums}
+:is(#sb,body) .rs-hours-n{flex:none;min-width:30px;color:var(--mut);font:600 12.5px system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:right}
+/* 3. the slider: the browser's range input on a thin track; the fill is the chosen part. Two handles: two inputs on one track */
+:is(#sb,body) .rs-slider-track{position:relative;height:24px}
+:is(#sb,body) .rs-slider-track::before,.rs-slider-fill{content:"";position:absolute;top:10px;height:4px;border-radius:2px}
+:is(#sb,body) .rs-slider-track::before{left:0;right:0;background:color-mix(in srgb,var(--mut) 30%,transparent)}
+.rs-slider-fill{background:var(--accent-fill)}
+:is(#sb,body) .rs-slider input[type=range]{position:absolute;inset:0;width:100%;height:24px;margin:0;background:none;-webkit-appearance:none;appearance:none;pointer-events:none}
+:is(#sb,body) .rs-slider input[type=range]:focus{outline:0}
+.rs-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--bg);border:2px solid var(--accent-fill);box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:grab;pointer-events:auto}
+.rs-slider input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--bg);border:2px solid var(--accent-fill);box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:grab;pointer-events:auto}
+.rs-slider input[type=range]::-moz-range-track{background:none}
+.rs-slider input[type=range]:hover::-webkit-slider-thumb{box-shadow:0 0 0 6px var(--rs-hover-bg)}
+.rs-slider input[type=range]:hover::-moz-range-thumb{box-shadow:0 0 0 6px var(--rs-hover-bg)}
+.rs-slider input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.rs-slider input[type=range]:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+/* 4. the number field: one box with "−", the number, the unit and "+" */
+:is(#sb,body) .rs-num-box{display:inline-flex;align-items:center;height:34px;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--ink) 35%,var(--bg));border-radius:10px;background:var(--bg);overflow:hidden}
+:is(#sb,body) .rs-num-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+:is(#sb,body) .rs-num-box input[type=number]{width:64px;height:100%;padding:0 4px;border:0;border-radius:0;background:none;box-shadow:none;color:var(--ink);font:600 13px system-ui,sans-serif;text-align:right;font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield}
+:is(#sb,body) .rs-num-box input::-webkit-inner-spin-button,:is(#sb,body) .rs-num-box input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+:is(#sb,body) .rs-num-u{padding:0 4px 0 2px;color:var(--mut);font-size:12.5px}
+:is(#sb,body) .rs-num-st{width:32px;height:100%;margin:0;padding:0;border:0;border-radius:0;background:var(--card);color:var(--ink);font:500 17px/1 system-ui,sans-serif;cursor:pointer}
+:is(#sb,body) .rs-num-st:hover:not(:disabled){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+:is(#sb,body) .rs-num-st:disabled{opacity:.35;cursor:default}
+/* 5. the colour picker: a field with the swatch and its hex; a box with the palette, a hex field and the system's colour window */
+:is(#sb,body) .rs-color-btn{display:inline-flex;align-items:center;gap:8px;height:34px;box-sizing:border-box;margin:0;padding:0 10px 0 6px;border:1px solid color-mix(in srgb,var(--ink) 35%,var(--bg));
+  border-radius:10px;background:var(--bg);color:var(--ink);font:600 12.5px ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer}
+:is(#sb,body) .rs-color-btn:is(:hover,[aria-expanded=true]){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--bg));color:var(--ink);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+:is(#sb,body) .rs-color-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rs-color-btn svg{color:var(--accent)}
+.rs-color-sw{width:22px;height:22px;border-radius:6px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ink) 25%,transparent)}
+/* the boxes that open under a control (the menu, the colour box, the search list): the look of the select list (.rs-sel-list) */
+:is(.rs-menu,.rs-color-box,.rs-search-list){position:fixed;z-index:3500;box-sizing:border-box;max-height:min(360px,calc(100dvh - 16px));overflow-y:auto;padding:5px;border-radius:14px;
+  background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);border:1px solid var(--rs-tb-border);box-shadow:0 6px 22px rgba(0,0,0,.3);color:var(--rs-tb-ink);font:13px system-ui,sans-serif}
+:is(.rs-menu,.rs-color-box,.rs-search-list)[hidden]{display:none}
+.rs-color-box{width:196px;padding:10px}
+.rs-color-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.rs-color-c{height:34px;margin:0;padding:0;border:0;border-radius:8px;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.rs-color-c:is(:hover,:focus-visible){outline:2px solid var(--accent);outline-offset:2px;filter:brightness(1.1)}      /* a swatch is filled: brighter */
+.rs-color-c.on{box-shadow:inset 0 0 0 2px var(--rs-card-bg),0 0 0 2px var(--rs-tb-ink)}
+.rs-color-row{display:flex;gap:6px;margin-top:10px}
+.rs-color-in{flex:1;min-width:0;box-sizing:border-box;height:32px;padding:0 8px;border:1px solid var(--rs-tb-border);border-radius:8px;background:var(--rs-tb-hover);color:inherit;font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;outline:0}
+.rs-color-in:focus{border-color:var(--accent)}
+.rs-color-in.bad{border-color:var(--rs-err)}
+.rs-color-more{position:relative;display:inline-flex;align-items:center;padding:0 10px;border-radius:8px;background:var(--rs-tb-hover);font-size:12px;cursor:pointer;white-space:nowrap}
+.rs-color-more:is(:hover,:focus-within){background:var(--rs-hover-bg);color:var(--accent)}
+.rs-color-more input{position:absolute;inset:0;opacity:0;cursor:pointer}
+/* 6. the on/off switch: a check box with role=switch; the label at its right */
+:is(#sb,body) label.rs-switch{display:flex;align-items:center;gap:10px;margin:6px 0;color:var(--ink);font:13px/1.35 system-ui,sans-serif;text-transform:none;letter-spacing:0;cursor:pointer}
+:is(#sb,body) .rs-switch input{flex:none;position:relative;width:34px;height:20px;margin:0;border-radius:10px;background:color-mix(in srgb,var(--mut) 55%,transparent);-webkit-appearance:none;appearance:none;cursor:pointer;transition:background .15s}
+:is(#sb,body) .rs-switch input::before{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+:is(#sb,body) .rs-switch input:checked{background:var(--accent-fill)}
+:is(#sb,body) .rs-switch input:checked::before{transform:translateX(14px)}
+:is(#sb,body) .rs-switch:hover input:not(:disabled){box-shadow:0 0 0 4px var(--rs-hover-bg)}
+:is(#sb,body) .rs-switch:hover{color:var(--accent)}
+:is(#sb,body) .rs-switch input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(#sb,body) .rs-switch:has(input:disabled){opacity:.5;cursor:default}
+/* 7. the search field: the magnifier, the text, the clear button and a button at the end, in one field; the list under it */
+:is(#sb,body) .rs-search-box{display:flex;align-items:center;height:36px;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--ink) 35%,var(--bg));border-radius:10px;background:var(--bg);overflow:hidden}
+:is(#sb,body) .rs-search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+:is(#sb,body) .rs-search-i{display:flex;padding:0 4px 0 10px;color:var(--mut)}
+:is(#sb,body) .rs-search-busy .rs-search-i svg{visibility:hidden}
+:is(#sb,body) .rs-search-busy .rs-search-i{position:relative}
+:is(#sb,body) .rs-search-busy .rs-search-i::after{content:"";position:absolute;left:10px;top:0;width:11px;height:11px;border:2px solid var(--accent);border-right-color:transparent;border-radius:50%;animation:rs-spin .7s linear infinite}
+:is(#sb,body) .rs-search-box input[type=search]{flex:1;min-width:0;height:100%;padding:0 6px;border:0;border-radius:0;background:none;box-shadow:none;color:var(--ink);font:13px system-ui,sans-serif;outline:0}
+:is(#sb,body) .rs-search-box input::-webkit-search-cancel-button{-webkit-appearance:none}
+:is(#sb,body) .rs-search-x{width:28px;height:28px;margin:0 2px;padding:0;border:0;border-radius:50%;background:none;color:var(--mut);font:18px/1 system-ui,sans-serif;cursor:pointer}
+:is(#sb,body) .rs-search-x:is(:hover,:focus-visible){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+:is(#sb,body) .rs-search-go{align-self:stretch;margin:0;padding:0 14px;border:0;border-left:1px solid var(--line);border-radius:0;background:var(--accent-fill);color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer}
+:is(#sb,body) .rs-search-go:is(:hover,:focus-visible){border-color:var(--line);background:var(--accent-fill);color:#fff;filter:brightness(1.1)}
+.rs-search-opt{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 11px;border-radius:10px;cursor:pointer}
+.rs-search-opt b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-search-opt span{opacity:.7;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+.rs-search-opt:hover,.rs-search-opt.on{background:var(--rs-hover-bg);color:var(--rs-accent-text)}
+.rs-search-note{padding:8px 11px;opacity:.75}
+/* 8. the file drop zone: a dashed box; a file over it fills it with the accent; then a row with the file's name, its size and "×" */
+:is(#sb,body) .rs-drop-zone{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;box-sizing:border-box;margin:0;padding:18px 12px;
+  border:1.5px dashed color-mix(in srgb,var(--ink) 35%,var(--bg));border-radius:12px;background:var(--bg);color:var(--ink);font:13px/1.4 system-ui,sans-serif;text-align:center;cursor:pointer}
+:is(#sb,body) .rs-drop-zone svg{color:var(--accent)}
+:is(#sb,body) .rs-drop-zone u{color:var(--accent);text-decoration:none;font-weight:600}
+:is(#sb,body) .rs-drop-zone:is(:hover,:focus-visible),:is(#sb,body) .rs-drop-over .rs-drop-zone{border-color:var(--accent);background:var(--rs-hover-bg);color:var(--ink)}
+:is(#sb,body) .rs-drop-zone:hover u{text-decoration:underline}
+:is(#sb,body) .rs-drop-zone:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(#sb,body) .rs-drop-h{color:var(--mut);font-size:12px}
+:is(#sb,body) .rs-drop-has .rs-drop-zone{flex-direction:row;justify-content:center;padding:8px 12px}
+:is(#sb,body) .rs-drop-has .rs-drop-zone :is(svg,.rs-drop-h){display:none}
+:is(#sb,body) .rs-drop-files{margin-top:6px}
+:is(#sb,body) .rs-drop-file{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 10px;border-radius:10px;background:var(--card);color:var(--ink)}
+:is(#sb,body) .rs-drop-file svg{flex:none;color:var(--accent)}
+:is(#sb,body) .rs-drop-file b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+:is(#sb,body) .rs-drop-file span{color:var(--mut);font-size:12px;white-space:nowrap}
+:is(#sb,body) .rs-drop-x{width:28px;height:28px;margin:0;padding:0;border:0;border-radius:50%;background:none;color:var(--mut);font:18px/1 system-ui,sans-serif;cursor:pointer}
+:is(#sb,body) .rs-drop-x:is(:hover,:focus-visible){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+/* 9. the progress bar (a label, the value, a bar; with no value a part of the bar moves) and the busy state of a button (a turning ring) */
+:is(#sb,body) .rs-progress-head{display:flex;justify-content:space-between;gap:8px;margin:0 0 5px;color:var(--ink);font:12.5px system-ui,sans-serif}
+:is(#sb,body) .rs-progress-v{color:var(--mut);font-variant-numeric:tabular-nums}
+:is(#sb,body) .rs-progress-bar{position:relative;height:6px;border-radius:3px;background:color-mix(in srgb,var(--mut) 25%,transparent);overflow:hidden}
+.rs-progress-fill{height:100%;border-radius:3px;background:var(--accent-fill);transition:width .25s}
+.rs-progress-wait .rs-progress-fill{position:absolute;width:35%;animation:rs-progress-move 1.2s ease-in-out infinite}
+@keyframes rs-progress-move{0%{left:-35%}100%{left:100%}}
+@keyframes rs-spin{to{transform:rotate(360deg)}}
+.rs-busy::before,.rs-spinner{content:"";display:inline-block;width:11px;height:11px;margin-right:7px;vertical-align:-1px;box-sizing:border-box;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rs-spin .7s linear infinite}
+.rs-spinner{margin:0}
+:is(#sb,body) button.rs-busy:disabled{opacity:.8;cursor:progress}
+/* 10. the toast: a box over the map at the bottom (at the top of a phone, over the sheet), with an icon in the colour of its kind; a status line is
+   the same look in a card: <div class="rs-status warn">...</div> */
+#rs-toasts{position:fixed;z-index:4500;left:50%;bottom:16px;transform:translateX(-50%);display:flex;flex-direction:column-reverse;gap:8px;width:max-content;max-width:min(440px,calc(100vw - 32px));pointer-events:none}
+.rs-toast,:is(#sb,body) .rs-status{display:flex;align-items:flex-start;gap:9px;box-sizing:border-box;padding:9px 10px 9px 15px;border-radius:12px;box-shadow:inset 4px 0 0 var(--rs-k);font:13px/1.45 system-ui,sans-serif}      /* the edge in the kind's colour: a shadow, not a border */
+.rs-toast{--rs-k:var(--accent);pointer-events:auto;background:var(--rs-pop-bg);color:var(--rs-pop-ink);box-shadow:inset 4px 0 0 var(--rs-k),0 6px 22px rgba(0,0,0,.28);animation:rs-toast-in .18s ease-out}
+.rs-toast.out{opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s}
+@keyframes rs-toast-in{from{opacity:0;transform:translateY(8px)}}
+:is(#sb,body) .rs-status{--rs-k:var(--accent);margin:0 0 10px;padding:7px 10px 7px 13px;background:var(--card);color:var(--ink);border-radius:0 8px 8px 0;font-size:12.5px}
+/* the kind of a toast or a status line: its colour (the edge and the icon) and, for a status line, its icon (a mask in the colour) */
+:is(#sb,body) .rs-status{--rs-ki:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='6.5'/%3E%3Cpath d='M8 7.2v4M8 4.8v.1'/%3E%3C/svg%3E")}
+.rs-toast.ok,:is(#sb,body) .rs-status.ok{--rs-k:var(--rs-ok);--rs-ki:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='8' cy='8' r='6.5'/%3E%3Cpath d='m5.2 8.2 2 2 3.6-4'/%3E%3C/svg%3E")}
+.rs-toast.warn,:is(#sb,body) .rs-status.warn{--rs-k:var(--rs-warn);--rs-ki:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M8 1.8 15 14H1z'/%3E%3Cpath d='M8 6.3v3.6M8 11.8v.1'/%3E%3C/svg%3E")}
+.rs-toast.error,:is(#sb,body) .rs-status.error{--rs-k:var(--rs-err);--rs-ki:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='6.5'/%3E%3Cpath d='m5.6 5.6 4.8 4.8m0-4.8-4.8 4.8'/%3E%3C/svg%3E")}
+:is(#sb,body) .rs-status::before{content:"";flex:none;width:16px;height:16px;margin-top:1px;background:var(--rs-k);-webkit-mask:var(--rs-ki) center/16px no-repeat;mask:var(--rs-ki) center/16px no-repeat}
+.rs-toast-i{flex:none;color:var(--rs-k);display:flex;margin-top:1px}
+.rs-toast-t{flex:1;min-width:0}
+.rs-toast :is(.rs-toast-x,.rs-toast-a){flex:none;margin:-3px 0;border:0;background:none;color:inherit;cursor:pointer;border-radius:8px}
+.rs-toast .rs-toast-x{width:26px;height:26px;padding:0;font:18px/1 system-ui,sans-serif;opacity:.7}
+.rs-toast .rs-toast-a{height:26px;padding:0 9px;color:var(--accent);font:600 12.5px system-ui,sans-serif}
+.rs-toast :is(.rs-toast-x,.rs-toast-a):is(:hover,:focus-visible){opacity:1;background:var(--rs-hover-bg);color:var(--accent)}
+html.rs-phone #rs-toasts{left:50%!important;top:max(8px,env(safe-area-inset-top));bottom:auto;flex-direction:column;width:calc(100vw - 16px)}
+/* 11. the confirm dialog: the look of the help window; a sheet at the bottom of a phone. The OK button is filled (.sb-primary), or red (.sb-danger) */
+.rs-dialog{width:min(400px,calc(100vw - 32px));box-sizing:border-box;margin:auto;padding:18px 20px 16px;border:1px solid var(--rs-tb-border);border-radius:14px;
+  background:var(--rs-pop-bg);color:var(--rs-pop-ink);box-shadow:0 12px 36px rgba(0,0,0,.35);font:13px/1.5 system-ui,sans-serif}
+.rs-dialog::backdrop{background:var(--rs-box-bg);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}      /* the boxes' layer of the settings, not a colour of its own */
+.rs-dialog-ttl{font-size:16px;font-weight:700;margin-bottom:4px}
+.rs-dialog-text{color:color-mix(in srgb,var(--rs-pop-ink) 80%,var(--rs-pop-bg))}
+.rs-dialog-bar{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.rs-dialog button{height:34px;padding:0 16px;border:1px solid var(--rs-tb-border);border-radius:10px;background:none;color:inherit;font:600 13px system-ui,sans-serif;cursor:pointer}
+.rs-dialog button:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--rs-accent-text);border-color:var(--rs-tb-border);box-shadow:inset 0 0 0 1px var(--accent)}
+.rs-dialog button:focus-visible,:is(#sb,body) button.sb-danger:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rs-dialog button.sb-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
+:is(#sb,body,.rs-dialog) button.sb-danger{background:var(--rs-danger-fill);border-color:var(--rs-danger-fill);color:#fff;font-weight:600}
+.rs-dialog button:is(.sb-primary,.sb-danger):is(:hover,:focus-visible),:is(#sb,body) button.sb-danger:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1);color:#fff}
+.rs-dialog button.sb-primary:is(:hover,:focus-visible){background:var(--accent-fill);border-color:var(--accent-fill)}
+:is(#sb,body,.rs-dialog) button.sb-danger:is(:hover,:focus-visible):not(:disabled){background:var(--rs-danger-fill);border-color:var(--rs-danger-fill)}
+html.rs-phone .rs-dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:14px 14px 0 0;border-bottom:0;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+html.rs-phone .rs-dialog-bar button{flex:1;height:44px}
+/* 12. the action menu: the "⋯" button, and its list */
+:is(#sb,body) .rs-more-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;margin:0;padding:0;border:0;border-radius:8px;background:none;color:var(--mut);cursor:pointer;vertical-align:middle}
+:is(#sb,body) .rs-more-btn:is(:hover,:focus-visible,[aria-expanded=true]){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+:is(#sb,body) .rs-more-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rs-menu{min-width:180px}
+.rs-menu-item{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;margin:0;padding:8px 11px;border:0;border-radius:10px;background:none;color:inherit;font:13px system-ui,sans-serif;text-align:left;cursor:pointer}
+.rs-menu-item svg{flex:none;width:16px;height:16px;opacity:.8}
+.rs-menu-item:is(:hover,:focus-visible):not(:disabled){outline:0;background:var(--rs-hover-bg);color:var(--rs-accent-text)}
+.rs-menu-item.danger{color:var(--rs-err)}
+.rs-menu-item.danger:is(:hover,:focus-visible):not(:disabled){background:color-mix(in srgb,var(--rs-err) 14%,transparent);color:var(--rs-err)}
+.rs-menu-item:disabled{opacity:.45;cursor:default}
+.rs-menu-line{height:1px;margin:4px 6px;background:var(--rs-tb-border)}
+html.rs-phone .rs-menu-item{padding:12px 13px}
+/* 13. a count on a tab or a button, and the amber "not saved" dot */
+.rs-badge{display:inline-block;min-width:18px;height:18px;box-sizing:border-box;margin-left:6px;padding:0 5px;border-radius:9px;background:color-mix(in srgb,var(--accent) 16%,transparent);
+  color:color-mix(in srgb,var(--accent) 70%,var(--ink));font:700 11px/18px system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums;vertical-align:1px}
+:is(.on,.sb-primary,[aria-selected=true]) > .rs-badge{background:color-mix(in srgb,var(--accent-fill) 55%,#000);color:#fff}      /* on a fill: a darker teal with white text (8:1 or more), in both themes */
+.rs-unsaved{display:inline-block;width:8px;height:8px;margin-left:6px;border-radius:50%;background:var(--rs-unsaved);vertical-align:1px}
+:is(.on,[aria-selected=true]) > .rs-unsaved{box-shadow:0 0 0 2px #fff}
+/* 14. steps: numbered cards; a done step has a check mark, the open step an accent edge, a step that waits is dimmed and says what it waits for */
+:is(#sb,body) .rs-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--rs-card-gap,12px)}
+:is(#sb,body) .rs-step{display:flex;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink)}
+:is(#sb,body) .rs-step.on{border-color:transparent;box-shadow:inset 0 0 0 1px var(--accent),inset 3px 0 0 var(--accent)}
+:is(#sb,body) .rs-step-b{flex:1;min-width:0}
+:is(#sb,body) .rs-step-b > b{display:block;font-size:13.5px;line-height:24px}
+:is(#sb,body) .rs-step-b > p{margin:2px 0 0;color:color-mix(in srgb,var(--ink) 72%,var(--card));font-size:12.5px}
+:is(#sb,body) .rs-step-n{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;box-sizing:border-box;border-radius:50%;
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--ink) 40%,var(--card));color:var(--ink);font:700 12px/1 system-ui,sans-serif}
+:is(#sb,body) .rs-step.on .rs-step-n{box-shadow:none;background:var(--accent-fill);color:#fff}
+:is(#sb,body) .rs-step.done .rs-step-n{box-shadow:inset 0 0 0 1.5px var(--accent);font-size:0;position:relative}      /* the check mark in place of the number */
+:is(#sb,body) .rs-step.done .rs-step-n::after{content:"";position:absolute;left:7px;top:4px;width:5px;height:10px;border:solid var(--accent);border-width:0 2px 2px 0;transform:rotate(45deg)}
+:is(#sb,body) .rs-step.wait{opacity:.6}
+:is(#sb,body) .rs-step-note{display:inline-block;margin-top:4px;padding:1px 8px;border-radius:9px;background:color-mix(in srgb,var(--mut) 18%,transparent);color:var(--ink);font-size:11.5px;font-weight:600}
+/* 15. a tool row: icon buttons in one group; the pressed one has the accent tint and edge (one pressed: rs.tabs.use on it) */
+:is(#sb,body) .rs-toolrow{display:inline-flex;gap:2px;padding:2px;border-radius:10px;background:color-mix(in srgb,var(--mut) 18%,transparent)}
+:is(#sb,body) .rs-toolrow button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;margin:0;padding:0;border:0;border-radius:8px;background:none;color:var(--ink);cursor:pointer}
+:is(#sb,body) .rs-toolrow button svg{width:18px;height:18px}
+:is(#sb,body) .rs-toolrow button:is(:hover,:focus-visible):not(:disabled){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+:is(#sb,body) .rs-toolrow button:is(.on,[aria-pressed=true]){background:var(--card);color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent)}
+:is(#sb,body) .rs-toolrow button:is(.on,[aria-pressed=true]):is(:hover,:focus-visible){background:color-mix(in srgb,var(--accent) 12%,var(--card))}      /* as the selected button of rs-seg */
+:is(#sb,body) .rs-toolrow button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+:is(#sb,body) .rs-toolrow button:disabled{opacity:.4;cursor:default}
+/* 16. an empty state: a line in the middle, and a button under it (any place, not only the old side panel) */
+:is(#sb,body) .rs-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 12px;color:var(--mut);font:12.5px/1.5 system-ui,sans-serif;text-align:center}
+:is(#sb,body) .rs-empty svg{width:28px;height:28px;opacity:.7}
+:is(#sb,body) .rs-empty b{color:var(--ink);font-size:13px}
+/* 17. "show more": the count of the list and a button to show the next page */
+:is(#sb,body) .rs-more{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 2px 2px;color:var(--mut);font:12px system-ui,sans-serif}
+:is(#sb,body) .rs-more[hidden]{display:none}
+:is(#sb,body) .rs-more-b{margin:0;padding:4px 10px;border:0;border-radius:8px;background:none;color:var(--accent);font:600 12.5px system-ui,sans-serif;cursor:pointer}
+:is(#sb,body) .rs-more-b:is(:hover,:focus-visible){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+/* 18. a list of rows that a click selects (no check box): a title, a line under it, a value at the end; the selected row has the accent tint and an accent bar */
+:is(#sb,body) .rs-rows{display:flex;flex-direction:column;gap:2px}
+:is(#sb,body) .rs-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:10px;width:100%;box-sizing:border-box;margin:0;padding:7px 10px;
+  border:0;border-radius:8px;background:none;color:var(--ink);font:13px/1.35 system-ui,sans-serif;text-align:left;cursor:pointer}
+:is(#sb,body) .rs-row > :not(.rs-row-i,.rs-row-v){grid-column:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:is(#sb,body) .rs-row > b{font-weight:600}
+:is(#sb,body) .rs-row > small{color:var(--mut);font-size:12px}
+:is(#sb,body) .rs-row-i{grid-column:1;grid-row:1 / span 2;display:flex;color:var(--mut)}
+:is(#sb,body) .rs-row-i svg{width:18px;height:18px}
+:is(#sb,body) .rs-row-v{grid-column:3;grid-row:1 / span 2;color:var(--mut);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+:is(#sb,body) .rs-row:is(:hover,:focus-visible):not(:disabled){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+:is(#sb,body) .rs-row:is(.on,[aria-selected=true]){background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
+:is(#sb,body) .rs-row:is(.on,[aria-selected=true]) :is(.rs-row-i,.rs-row-v){color:var(--rs-accent-text)}
+:is(#sb,body) .rs-row:is(.on,[aria-selected=true]) > small{color:color-mix(in srgb,var(--ink) 78%,var(--mut))}
+:is(#sb,body) .rs-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+/* 19. a toggle button: a plain button that stays pressed (aria-pressed): the accent tint, the accent edge and text */
+:is(#sb,body) button.rs-toggle{display:inline-flex;align-items:center;gap:6px}
+:is(#sb,body) button.rs-toggle svg{width:16px;height:16px;flex:none}
+:is(#sb,body) button.rs-toggle[aria-pressed=true],:is(#sb,body) button.rs-toggle[aria-pressed=true]:hover{background:color-mix(in srgb,var(--accent) 16%,var(--card));border-color:transparent;box-shadow:inset 0 0 0 1px var(--accent);color:var(--rs-accent-text);font-weight:600}
+/* 20. an icon button for a card's title row (and any place): 24 px, no edge, muted; in a title row it is at the right end, before the "?" and the chevron */
+:is(#sb,body) .rs-icon-btn{display:inline-flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;margin:-4px 0;padding:0;border:0;border-radius:6px;background:none;color:var(--mut);cursor:pointer;vertical-align:middle}
+:is(#sb,body) .rs-icon-btn svg{width:16px;height:16px;display:block}
+:is(#sb,body) .rs-icon-btn:is(:hover,:focus-visible):not(:disabled){border:0;background:var(--rs-hover-bg);color:var(--accent)}
+:is(#sb,body) .rs-icon-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+:is(#sb,body) .rs-icon-btn:disabled{opacity:.4;cursor:default}
+#sb .rs-card-title .rs-icon-btn{float:right;margin:-4px 0 -4px 6px}
+html.rs-phone :is(#sb,body) .rs-row{padding:11px 10px}
+html.rs-phone :is(#sb,body) .rs-icon-btn{width:36px;height:36px;margin:-10px 0}
+/* 21. the fixed bar of the panel (rs.panel.bar()): the look of the editor frame's bar (.rs-frame-bar), under the cards; the frame's own bar takes its place */
+.sb-card:has(> .rs-frame) > .rs-panel-bar{display:none}
+.rs-panel-bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.rs-panel-bar > :is(b,span,.sb-note):first-child{flex:1;min-width:0;margin:0}
+/* 22. a select box in an editor frame has the thin edge of a field, as on a card (a form in a frame) */
+#sb .rs-frame .rs-sel-btn{border:1px solid var(--line);padding:5px 8px}
+/* 23. a field's error and warning: a line under the field (red or amber, with an icon) and a red edge on the field that is wrong (aria-invalid="true") */
+:is(#sb,body) :is(input,textarea,.rs-sel-btn)[aria-invalid=true],:is(#sb,body) .rs-sel:has(select[aria-invalid=true]) .rs-sel-btn{border-color:var(--rs-err)!important;box-shadow:0 0 0 1px var(--rs-err)}
+:is(#sb,body) .rs-field-msg{display:flex;gap:6px;align-items:flex-start;margin:4px 0 0;color:var(--rs-err);font:12px/1.4 system-ui,sans-serif}
+:is(#sb,body) .rs-field-msg.warn{color:var(--rs-warn)}
+:is(#sb,body) .rs-field-msg::before{content:"";flex:none;width:14px;height:14px;margin-top:1px;background:currentColor;
+  -webkit-mask:var(--rs-fm-i) center/14px no-repeat;mask:var(--rs-fm-i) center/14px no-repeat;
+  --rs-fm-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='6.5'/%3E%3Cpath d='M8 4.6v4.2M8 11.3v.1'/%3E%3C/svg%3E")}
+:is(#sb,body) .rs-field-msg:empty{display:none}
+/* 24. a row of rs-rows with a control in it (a select box, a button): the row is a <div tabindex="0">, and the control is at its end */
+:is(#sb,body) div.rs-row > :is(select,.rs-sel,button){grid-column:3;grid-row:1 / span 2;width:auto;min-width:96px;margin:0}
+/* a phone: the controls are 40 px or more high, so that a finger hits them */
+html.rs-phone :is(#sb,body) :is(.rs-num-box,.rs-color-btn,.rs-search-box){height:42px}
+html.rs-phone :is(#sb,body) .rs-day :is(button,.rs-day-step){height:42px}      /* the day picker, the date range and the hour picker */
+html.rs-phone :is(#sb,body) .rs-day .rs-day-step{width:42px}
+html.rs-phone :is(#sb,body) .rs-num-st{width:42px}
+html.rs-phone :is(#sb,body) :is(.rs-toolrow button,.rs-more-btn){width:40px;height:40px}
+html.rs-phone :is(#sb,body) .rs-slider-track{height:36px}
+html.rs-phone :is(#sb,body) .rs-slider input[type=range]{height:36px}
+html.rs-phone :is(#sb,body) .rs-slider-track::before,html.rs-phone .rs-slider-fill{top:16px}
+html.rs-phone .rs-slider input[type=range]::-webkit-slider-thumb{width:24px;height:24px}
+html.rs-phone :is(#sb,body) .rs-more-b{padding:10px 12px}
+html.rs-phone :is(#sb,body) label.rs-switch{min-height:40px;margin:2px 0}

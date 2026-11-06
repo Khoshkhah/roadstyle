@@ -69,7 +69,7 @@ function _fdKeep(w, on){
 function _fdMake(w, spec, hd, tt){
   w.dataset.rsFold = "1"; tt.type = "button";
   hd.insertAdjacentHTML("beforeend", _fdChev);
-  hd.onclick = () => { _fdKeep(w, !w.classList.contains("folded")); _fdPaint(); };
+  hd.onclick = e => { if(e.target.closest(".rs-icon-btn")) return; _fdKeep(w, !w.classList.contains("folded")); _fdPaint(); };   // an icon button of the row does its own work
   w.classList.toggle("folded", _fdGet(spec.id)); tt.setAttribute("aria-expanded", String(!w.classList.contains("folded")));
   if(!_fdBtn){
     const top = document.querySelector("#sb .sb-top");
@@ -92,7 +92,7 @@ const _opAsk = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stro
 function _opMake(w, spec, hd, tt){
   w.dataset.rsOpen = "1"; tt.type = "button";
   hd.insertAdjacentHTML("beforeend", spec.icon === "ask" ? _opAsk : spec.icon && spec.icon !== "edit" ? spec.icon : _opIcon);
-  w.onclick = e => { if(!tt.disabled && !e.target.closest(".rs-sec-body, .rs-help-btn")) spec.open(w); };
+  w.onclick = e => { if(!tt.disabled && !e.target.closest(".rs-sec-body, .rs-help-btn, .rs-icon-btn")) spec.open(w); };
 }
 const _secNeed = id => { const w = _secEls.get(id); if(!w) throw new Error("rs.sections: no section '" + id + "' (rs.sections.list())"); return w; };
 export const rsSections = {
@@ -100,6 +100,17 @@ export const rsSections = {
   list(){ const b = _secBody(); return b ? [...b.querySelectorAll(".sb-sec")].map(e => e.dataset.rsSection) : []; },
   // the box of a section (the page can move it into its own tab), or null
   get(id){ return _secEls.get(id) || null; },
+  // an icon button in the title row of a card (`rs-icon-btn`), after the title: rs.sections.button("area", {icon: svg, title: "Zoom to the area", onClick}).
+  // Its click does not fold or open the card. It gives the button back.
+  button(id, {icon, title, onClick} = {}){
+    const tt = _secEls.get(id)?.querySelector(":scope > .rs-sec-hd > .rs-sec-title");
+    if(!tt) throw new Error("rs.sections.button: " + id + " is not a card with a title");
+    const b = document.createElement("button"); b.type = "button"; b.className = "rs-icon-btn"; b.innerHTML = icon || "";
+    if(title){ b.title = title; b.setAttribute("aria-label", title); }
+    b.addEventListener("click", e => { e.stopPropagation(); onClick?.(e); });
+    tt.after(b);
+    return b;
+  },
   // a section of the page: {id, html | el | part, label, after | before, fold | open, note, background}; at the end of the panel when it has neither. A part has its
   // options in the section: `text` (query), `fields` (road_card), `chart` (chart)
   add(spec){
@@ -159,4 +170,16 @@ export function initSections(){
     legendRefresh();
   };
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();
+}
+// The fixed bar of the panel (docs/guides/dashboard-parts.md): `rs.panel.bar()` gives the element at the bottom edge of the panel, under the cards and
+// outside the part that scrolls, in the look of the editor frame's bar. The page puts its state and its buttons in it. Empty, it does not show; while an
+// editor frame is open, the frame's own bar is there and this one does not show. A second call gives the same element.
+export function rsPanelBar(){
+  let bar = document.querySelector("#sb .rs-panel-bar");
+  if(bar) return bar;
+  const card = document.querySelector("#sb .sb-card"), body = card?.querySelector(":scope > .sb-body");
+  if(!body) throw new Error("rs.panel.bar: the page has no panel (#sb .sb-card .sb-body)");
+  bar = document.createElement("div"); bar.className = "rs-frame-bar rs-panel-bar";
+  body.after(bar);
+  return bar;
 }
