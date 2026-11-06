@@ -86,12 +86,13 @@ _EDGES = """() => {
   rs.sections.add({id: 'plain', label: 'Open', note: 'Opens a thing', open: () => {}});
   rs.sections.add({id: 'fold', label: 'Folds', fold: true, html: '<p>x</p>'});
   const rgb = (c) => { const p = document.createElement('i'); p.style.color = c; document.body.append(p);
-    const m = getComputedStyle(p).color.match(/[\\d.]+/g).map(Number); p.remove(); return m; };
+    const v = getComputedStyle(p).color; p.remove(); const m = v.match(/[\\d.]+/g).map(Number);
+    return v.startsWith('color(') ? m.map((x) => x * 255) : m; };          // a color-mix() is color(srgb r g b), 0 to 1
   const lum = (c) => { const v = c.slice(0, 3).map((x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
     return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
   const ratio = (a, b) => { const [h, l] = [lum(a), lum(b)].sort((x, y) => y - x); return (h + 0.05) / (l + 0.05); };
   const sb = getComputedStyle(document.getElementById('sb')), card = rgb(sb.getPropertyValue('--card'));
-  const edge = (id) => { const s = getComputedStyle(rs.sections.get(id)).boxShadow; return s === 'none' ? null : rgb(s.match(/rgba?\\([^)]*\\)/)[0]); };
+  const edge = (id) => { const s = getComputedStyle(rs.sections.get(id)).boxShadow; return s === 'none' ? null : rgb(s.match(/^(rgba?|color)\\([^)]*\\)/)[0]); };
   return {tint: edge('tint'), plain: ratio(edge('plain'), card), fold: ratio(edge('fold'), card)};
 }"""
 

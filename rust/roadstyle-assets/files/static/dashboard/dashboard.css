@@ -430,7 +430,7 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 :is(#sb,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea):focus{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 :is(#sb,.rs-side) :is(input[type=checkbox],input[type=radio],input[type=range]){accent-color:var(--accent)}
 :is(#sb,.rs-side) :is(input[type=checkbox],input[type=radio]){width:16px;height:16px;margin:0}
-:is(#sb,.rs-side) button{border-radius:10px}
+:is(#sb,.rs-side) button:not(:where(.rs-frame *,#rs-dock *)){border-radius:10px}   /* a part's buttons keep the 6 px of :where(.rs-frame, #rs-dock) */
 /* ---- the Street View and Google 3D windows: the style of the boxes (the second level of transparency: --rs-box-bg, like the popup and the tooltip) ---- */
 .rs-svw{border-radius:14px;border:0;background:var(--rs-box-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 8px 28px rgba(0,0,0,.35);color:var(--rs-tb-ink)}
 .rs-svw-bar{background:var(--rs-card-bg);color:var(--rs-tb-ink);padding:6px 44px 6px 14px;gap:6px}
@@ -814,7 +814,10 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 #sb .rs-frame-head:empty{display:none}
 #sb .rs-frame-head .rs-tabs{padding:0;margin:0;border:0}
 .rs-frame-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
-.rs-frame-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--line);font-size:12.5px}
+/* the bar's line is inset as the head row's line (Kaveh: the full-width line above Examples, "make it better and shorter"); Ask has no line: its
+   question box has its own edge */
+.rs-frame-bar{flex:none;margin:0 15px;padding:8px 0 10px;border-top:1px solid var(--line);font-size:12.5px}
+.rs-frame-bar:has(> .rs-ask-comp){border-top:0}
 .rs-frame-bar:empty{display:none}
 html.rs-phone .rs-frame-back,html.rs-phone .rs-frame .rs-tab{min-height:44px}
 /* on a phone the tab row is one row that scrolls sideways (frame.js scrolls the selected tab into view): the body keeps its room */
@@ -1113,6 +1116,7 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-ask-key > a{font-size:12px}
 .rs-ask-btns{display:flex;justify-content:flex-end;gap:6px}
 .rs-ask-keynote{font-size:11.5px;color:var(--mut);margin:0}
+#sb .rs-ask-key .rs-q{font:13px system-ui,-apple-system,"Segoe UI",sans-serif;text-transform:none;letter-spacing:0}   /* not the 11 px of the template's label around it */
 /* the bar: "Examples ▴" (after the first question; its list opens over the chat, above the box) and the question box */
 .rs-ask-exbar{position:relative;display:flex;margin-bottom:6px}
 #sb .rs-ask-exb{border:0;background:none;padding:2px 6px;font:500 12px system-ui,sans-serif;color:var(--mut);display:inline-flex;align-items:center;gap:4px;border-radius:6px}
@@ -1147,3 +1151,25 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 
 /* a chart answer of Ask: a small copy of its chart in the card (the chart is in the data dock) */
 #sb .rs-ask-chart{height:140px;margin:8px 0 4px;padding:0;background:none;border:0}      /* no box: the chart sits on the card (Kaveh, 2026-11-06) */
+/* the look of roadstyle's own classes in the panel: the query field (.rs-q, also Ask's fields), the filled button (.sb-primary), the parts query
+   and road_card. They were in the dashboard template only, so a host page (duckOSM Studio, duckosm edit) did not have them. They are classes,
+   so a host's own elements do not change; the template keeps only its rules for the elements (#sb button, select, label). At the end of
+   the file, where the template's rules were, so each wins as before. */
+#sb .rs-q{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);outline:none}
+#sb .rs-q:focus{border-color:var(--accent)}
+#sb .rs-q{font:12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.sb-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+#sb button.sb-primary{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff;font-weight:600}
+#sb button.sb-primary:is(:hover,:focus-visible):not(:disabled){filter:brightness(1.1);color:#fff;background:var(--accent-fill)}
+#sb .rs-q-col{width:28px;height:28px;padding:1px;border:1px solid var(--line);border-radius:6px;
+  vertical-align:middle;cursor:pointer;background:var(--bg)}
+#sb .rs-q-count{color:var(--mut);font-size:12px;margin:10px 0 2px;font-variant-numeric:tabular-nums}
+#sb .rs-q-list{max-height:230px;overflow:auto}
+#sb .rs-q-list div{padding:4px 0;border-bottom:1px solid var(--line)}
+#sb .rs-q-list a{color:var(--accent);text-decoration:none}
+#sb .rs-q-list a:hover{text-decoration:underline}
+#sb .rs-road-card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px;
+  margin-top:6px;min-height:38px;color:var(--ink)}
+#sb .rs-road-card-none{color:var(--mut)}
+#sb .rs-road-card b{color:var(--ink)}
+#sb .rs-road-card-ov{color:var(--mut)}
