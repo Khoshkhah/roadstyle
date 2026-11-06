@@ -13,12 +13,13 @@ import {editorFrame} from "./frame.js";
 import {rsDock} from "./dock.js";
 import {rsKpi} from "./kpi.js";
 import {rsSvg} from "./svg.js";
+import {rsChart} from "./chart.js";
 import {rsLegend} from "./legend.js";
 import {rsColorModes} from "./colorbox.js";
 
 const EVENTS = {select: "rs:select", deselect: "rs:deselect", filter: "rs:filterchange", color: "rs:colorchange", overlay: "rs:overlaychange",
                 tunnel: "rs:tunnelchange", view: "rs:viewselect", view3d: "rs:viewchange", basemap: "rs:basemapchange", highlight: "rs:highlightchange",
-                roadfill: "rs:roadfillchange", streetview: "rs:streetviewchange", google3d: "rs:google3dchange", data: "rs:datachange",
+                roadfill: "rs:roadfillchange", fade: "rs:fadechange", streetview: "rs:streetviewchange", google3d: "rs:google3dchange", data: "rs:datachange",
                 tool: "rs:toolchange"};
 
 let _refresh = null;
@@ -36,7 +37,7 @@ export function makeApi(extra){
   const edge = r => { index(); return edgeOf.has(r) ? edgeOf.get(r) : (r == null ? null : String(r)); };
   const rows = ids => ids == null ? null : Array.from(ids, row);
   const state = {v: 1, selection: null, highlight: [], colorBy: ((O.color_options || [])[O.color_active] || {}).name || null, colors: [],
-                 filter: {classes: null, bridges: true, tunnels: true, access: [], ids: null}, overlays: {},
+                 filter: {classes: null, bridges: true, tunnels: true, access: [], ids: null}, fade: null, overlays: {},
                  roadFill: !O.road_fill || O.road_fill.on !== false, tunnel: null, palette: null, view: null,
                  basemap: ((O.basemaps || [])[0] || {}).key || null, view3d: false, streetView: {mode: "off"}, google3d: false, panel: null};
   // the parts of the state that a style gives: at the start, and again for a new style (refreshState)
@@ -54,6 +55,7 @@ export function makeApi(extra){
   const track = (type, fn) => { const h = e => { const part = fn(e.detail || {}); if(part) emit("state", part); }; document.addEventListener(type, h); listeners.set(type + ":" + listeners.size, [type, h]); };
   track("rs:select", d => d.overlay ? null : {selection: state.selection = edge(d.id)});
   track("rs:deselect", () => ({selection: state.selection = null}));
+  track("rs:fadechange", d => ({fade: state.fade = d.ids ? d.ids.map(edge) : null}));
   track("rs:highlightchange", d => d.overlay || d.set != null ? null : {highlight: state.highlight = (d.ids || []).map(edge)});
   track("rs:colorchange", d => {
     if(d.option) return {colorBy: state.colorBy = d.option.name};
@@ -80,12 +82,13 @@ export function makeApi(extra){
   track("rs:google3dchange", d => ({google3d: state.google3d = !!d.open}));
   const call = (name, ...a) => { if(typeof window[name] === "function") return window[name](...a); };
   const camera = () => { if(!map) return null; const c = map.getCenter(); return {center: [c.lng, c.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing()}; };
-  const KEYS = ["selection", "highlight", "colorBy", "colors", "filter", "overlays", "roadFill", "tunnel", "view", "basemap", "view3d", "camera",
+  const KEYS = ["selection", "highlight", "colorBy", "colors", "filter", "fade", "overlays", "roadFill", "tunnel", "view", "basemap", "view3d", "camera",
                 "streetView", "google3d", "panel"];
   const api = {
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
     ready: fn => window.rsReady ? fn() : document.addEventListener("rs:ready", fn, {once: true}),   // run fn now if the page is ready, else when it is
     svg: rsSvg,                  // one SVG element for a chart, with var(--x) colours (svg.js)
+    chart: rsChart,              // a chart of rows: bar, line, histogram, scatter, pie (chart.js)
     kpi: rsKpi,                  // the HTML of a number tile (kpi.js)
     tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)
     days: rsDays,                // the day picker of a page: use (days.js)
@@ -98,6 +101,7 @@ export function makeApi(extra){
     colorModes: rsColorModes,    // the page's own "Colour by" list in the legend box: set, select, clear, active (colorbox.js)
     contract: CONTRACT,          // the newest roadstyle:contract that this dashboard reads (core.js)
     select(id){ if(id == null) call("rsDeselect"); else call("rsSelect", row(id)); },
+    fade(ids, o){ call("rsFade", ids == null ? null : rows(ids), o); },   // every other road at o.opacity (0.18) of its opacity; null ends it
     highlight(ids, set){ call("rsHighlight", rows(ids) || [], set && typeof set === "object" ? set : undefined); },   // set: {set, color, opacity} (a named set)
     focus(ids){ call("rsFocus", rows(Array.isArray(ids) ? ids : [ids])); },
     query(where){ const w = where || {}; return (call("rsQuery", p => Object.keys(w).every(k => p[k] === w[k])) || []).map(edge); },
@@ -127,6 +131,7 @@ export function makeApi(extra){
       if("colorBy" in c && c.colorBy != null) api.setColorBy(c.colorBy);
       if("colors" in c) api.color(c.colors);
       if("filter" in c) api.setFilter(c.filter);
+      if("fade" in c) api.fade(c.fade);
       if("overlays" in c) Object.entries(c.overlays || {}).forEach(([n, o]) => api.setOverlay(n, o.visible));
       if("roadFill" in c) call("rsSetRoadFill", !!c.roadFill);
       if("tunnel" in c && c.tunnel) api.setTunnelStyle(c.tunnel);

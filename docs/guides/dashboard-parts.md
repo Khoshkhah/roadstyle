@@ -22,6 +22,7 @@ Two parts use the whole panel: the level editor ([Edit the levels in a dashboard
 | [`class="rs-cap"`, `class="rs-callout"`](#cards-number-tiles-and-a-callout) | a small capital caption, an answer box with a colored edge | headings of tiles, the answer |
 | [`class="rs-scroll"` + `class="rs-table"`](#a-list-or-a-table-that-scrolls) | a scroll area and a table with a fixed header | a list of streets |
 | [`rs.svg(parent, tag, attrs)` + `--rs-chart-*`](#charts) | one SVG element that reads `var(--x)`, and the chart colors | charts |
+| [`rs.chart(el, {kind, x, y, columns, rows})`](#a-chart) | a bar, line, histogram, scatter or pie chart of rows | a chart of a result |
 | [`<input>`, `<select>`, `<button>`, `class="rs-chip"`, `class="rs-dot"`](#buttons-text-boxes-chips-and-a-dot) | the panel's own look, a small label, a color mark | forms, labels |
 | [`rs.frame({panel, title, back, tabs})`](#an-editor-in-the-panel) | the frame of an editor that uses the whole panel: a title line with "← back", a tab row, one body that scrolls and a bar at the bottom edge | an editor, as Edit design |
 | [`rs.dock.add({id, label, el})`, `rs.dock.table({columns, rows})`](dashboard-layout.md#the-bottom-dock) | the bottom dock under the map and its table | a wide table of roads |
@@ -107,6 +108,35 @@ rs.svg(s, "text", {x: 4, y: 12, fill: "var(--mut)", "font-size": 9}, "0");
 ```
 
 `rs.svg` makes one SVG element. An SVG attribute does not read `var(--x)`, so a value that starts with `var(` goes to the style. The chart then follows the theme with no code of its own. The colors that charts share are `--rs-chart-band`, `--rs-chart-band-line`, `--rs-chart-grid` and `--rs-chart-miss`. For text and lines use the tokens `--ink`, `--mut`, `--line` and `--card`. A canvas cannot read a variable: draw it again on the event `rs:themechange`.
+
+## A chart
+
+`rs.chart(el, spec)` draws a chart of a table of rows in an element: bar, line, histogram, scatter or pie. It is SVG with the theme's tokens, so it follows the theme. The data dock uses it for its **Chart** view ([The data dock](data-dock.md)).
+
+```js
+const c = rs.chart(document.getElementById("km"), {kind: "bar", x: "highway", y: "km",
+  columns: [{name: "highway", type: "VARCHAR"}, {name: "km", type: "DOUBLE"}],
+  rows: [["residential", 30.5], ["primary", 12.5], ["secondary", 8.25]],
+  onPick: (i) => console.log("row", i)});
+c.set({kind: "pie"});        // the same data, another kind
+```
+
+| Kind | `x` | `y` | What it draws |
+|---|---|---|---|
+| `bar` | a column of labels | one number column, or a list of up to 3 | one bar for each row, at most 40; horizontal when a label is longer than 8 characters |
+| `line` | a number, a date or a time | one number column, or a list | one line through the rows in the order of `x` |
+| `histogram` | a number column | none | the rows in each of 20 equal ranges; `values` (all the numbers) can give more rows than `rows` |
+| `scatter` | a number column | a number column | one point for each row, at most 5000 |
+| `pie` | a column of labels | one number column of 0 or more | one slice for each row, largest first, at most 6: the rest is "Other" |
+
+- The series have the colours `--rs-chart-1` to `--rs-chart-8`, in this order: the dashboard's teal first (one series has it), then orange, blue, yellow, pink, green, violet and red, checked for colour vision deficiency in both themes. The marks are a little see-through, and the mark under the pointer has its full colour. Two or more series, and a pie, have a legend.
+- The chart has a title (`title`, else from the kind and the columns: "km by highway") and the number of rows under it. The axis ticks are compact (0, 2.5K, 5K) on hairline grid lines over a darker base line. A bar of one series has its value at its tip, of each bar up to 15 bars, else of the largest only; a single line has a soft wash under it and its last value at its end. A bar is at most 24 px thick. While the pointer is on a mark, the other marks fade.
+- The pointer on a bar, a point or a slice shows its values. A click on it calls `onPick(row)`.
+- A kind that does not fit the columns shows a line in place of the chart, for example "A pie chart needs a text column and one number column of 0 or more."
+- `small: true` draws a copy with no labels and no hover (the card of an Ask answer).
+- `set(change)` draws again with a change of the spec; `svg()` gives the SVG element.
+
+`tests/test_chart_browser.py` checks each kind in both themes and at 390 px.
 
 ## Tabs and a two-way switch
 

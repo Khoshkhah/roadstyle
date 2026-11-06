@@ -177,6 +177,12 @@ console.log(rs.dock.isOpen(), rs.dock.height(), rs.dock.list());
 rs.dock.show("roads");
 rs.dock.close();
 rs.dock.remove("roads");
+rs.fade(["1", "2"], {opacity: 0.18});   // the other roads fade; the event rs:fadechange
+rs.fade(null);
+const box = document.createElement("div"); box.style.height = "200px"; document.body.append(box);
+const chart = rs.chart(box, {kind: "bar", x: "highway", y: "km",
+  columns: [{name: "highway", type: "VARCHAR"}, {name: "km", type: "DOUBLE"}], rows: [["primary", 12.5], ["residential", 30.5]]});
+chart.set({kind: "pie"});
 ```
 
 `rs.dock` is the bottom dock under the map ([The bottom dock](../dashboard-layout.md#the-bottom-dock)). `add({id, label, el, note, actions, closable})` adds a content, `open(id)` and `close()` open and close the dock, `show(id)` shows a content, `note(id, text)` changes its note, `height(px)` gives or sets the height, `list()` gives the ids and `remove(id)` removes a content. `table({columns, rows, idColumn})` gives the dock's table (`el`, `set`). The event `rs:dockchange` has `open`, `id` and `height`.

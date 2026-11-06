@@ -178,3 +178,24 @@ def test_a_box_that_keep_inside_makes_shorter_scrolls_to_its_end(tmp_path):
         page.wait_for_timeout(1000)                      # after the class rs-scrolling goes
         assert page.evaluate("(() => { const e = document.getElementById('rs-settings-box'); return e.scrollTop + e.clientHeight >= e.scrollHeight - 2; })()")
         browser.close()
+
+
+def test_each_column_gets_a_width_that_fits_most_of_its_values(tmp_path):
+    """One long text in 200 rows does not make its column wide: a text column fits 90 % of its values (at most 320 px; the rest ends with "..." and
+    has its text in the tooltip). A number column fits its widest value, so a number is never cut."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate("""() => { const rows = Array.from({length: 200}, (_, i) => [BigInt(i + 1), i === 7 ? 'A very long name of a road that goes on and on and on for ever, longer than any column' : 'roof', 1234567.5 + i]);
+              window.T = rs.dock.table({columns: [{name: 'osm_id', type: 'BIGINT'}, {name: 'kind', type: 'VARCHAR'}, {name: 'area_m2', type: 'DOUBLE'}], rows});
+              rs.dock.add({id: 'w', label: 'Widths', el: T.el}); rs.dock.open(); }""")
+            page.wait_for_timeout(300)
+            w = page.evaluate("[...document.querySelectorAll('#rs-dock thead th')].map(th => Math.round(th.getBoundingClientRect().width))")
+            assert w[1] < 120, w                                                                          # "kind": the width of "roof", not of the long name
+            cut = page.evaluate("""(() => { const td = document.querySelectorAll('#rs-dock tbody tr')[7].children[1]; return [td.scrollWidth > td.clientWidth, td.title.startsWith('A very long')]; })()""")
+            assert cut == [True, True], cut
+            num = page.evaluate("[...document.querySelectorAll('#rs-dock tbody td:nth-child(3)')].every(td => td.scrollWidth <= td.clientWidth)")
+            assert num, "a number is never cut"
+        finally:
+            browser.close()
+    assert errors == []
