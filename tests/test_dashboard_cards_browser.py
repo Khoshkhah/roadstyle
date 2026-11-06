@@ -109,9 +109,10 @@ def test_the_open_card_has_an_accent_ring_and_an_accent_title_and_keeps_its_size
         h2 = page.evaluate("document.querySelector('[data-rs-section=open]').getBoundingClientRect().height")
         browser.close()
     assert "inset" in m["openRing"] and "1.5px" in m["openRing"], m
-    # a closed card that folds has the thin edge (Kaveh's variant F), 3:1 or more on its card; a card that does not fold has none
+    # a closed card that folds has the thin edge (Kaveh's variant F), the light line that he chose: about 1.6:1 on its card in the light theme and
+    # 2.8:1 in the dark (the card's title names it, so the edge is not the only sign of the card); a card that does not fold has none
     assert "inset" in m["shutRing"] and "1px" in m["shutRing"] and m["plainRing"] == "none", m
-    assert _contrast(_rgb(m["shutRing"]), _rgb(m["card"])) >= 3, m
+    assert 1.3 < _contrast(_rgb(m["shutRing"]), _rgb(m["card"])) < 3, m
     assert m["openTitle"] == m["accent"] and m["shutTitle"] != m["accent"], m
     assert _contrast(_rgb(m["openRing"]), _rgb(m["card"])) >= 3, m        # WCAG 1.4.11: a part of the interface, 3:1 on the card
     assert _contrast(_rgb(m["openTitle"]), _rgb(m["card"])) >= 4.5, m     # WCAG 1.4.3: text, 4.5:1 on the card
@@ -236,13 +237,13 @@ def test_a_card_that_opens_is_one_button_with_a_pencil_an_edge_and_a_note(tmp_pa
           return {{last: hd.lastElementChild.tagName, order: r(hd.querySelector('.rs-help-btn')).right <= r(hd.lastElementChild).left,
                    button: hd.querySelector('.rs-sec-title').tagName}}; }}""")
         assert hd == {"last": "svg", "order": True, "button": "BUTTON"}, hd
-        # no background and the thin edge (3:1 on the panel); the tint under the pointer. `background: true` (Ask) has the tint and the same edge; `icon: "ask"`
+        # no background and the thin light edge; the tint under the pointer. `background: true` (Ask) has the tint and no edge (variant F); `icon: "ask"`
         page.evaluate("rs.sections.add({id: 'ask', label: 'Ask', open: () => 1, icon: 'ask', background: true})")
         look = """id => { const s = getComputedStyle(rs.sections.get(id)); return [s.backgroundColor, s.boxShadow]; }"""
         go, ask = page.evaluate(f"({look})('go')"), page.evaluate(f"({look})('ask')")
         panel = page.evaluate("getComputedStyle(document.querySelector('#sb .sb-card')).backgroundColor")
-        assert go[0] == "rgba(0, 0, 0, 0)" and "1px" in go[1] and _contrast(_rgb(go[1]), _rgb(panel)) >= 3, (go, panel)
-        assert ask[0] != "rgba(0, 0, 0, 0)" and ask[1] == go[1], (ask, go)
+        assert go[0] == "rgba(0, 0, 0, 0)" and "1px" in go[1] and 1.3 < _contrast(_rgb(go[1]), _rgb(panel)) < 3, (go, panel)
+        assert ask[0] != "rgba(0, 0, 0, 0)" and ask[1] == "none", (ask, go)
         page.hover(f"{sec} .rs-sec-hd")
         assert page.evaluate(f"({look})('go')")[0] != "rgba(0, 0, 0, 0)", "the tint under the pointer"
         page.mouse.move(1, 1)
