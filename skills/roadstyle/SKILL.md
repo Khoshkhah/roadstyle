@@ -133,6 +133,10 @@ rs.render_dashboard(edges, color_options={"Road class": {}}, dashboard={"panel":
 `rs.ready`, `rs.classify`): see `docs/guides/dashboard-parts.md`. **Use a part when one exists; never write CSS or JavaScript for the same thing in a page.**
 Fit the content to the panel (its width is `panel.width_px`: "Dashboard options" in `docs/reference/parameters.md`).
 
+- **A chart in a card** (from Python, no JavaScript): `{"id": "km", "label": "km by class", "part": "chart", "chart": {"kind": "bar",
+  "x": "highway", "y": "length_m", "agg": "sum", "scale": 0.001}}`. With no `data`, it reads the map's roads; `"data": df` (a DataFrame or
+  a list of dicts) gives the page's own rows. A click on a bar lights its roads, or sends `rs:chartpick` with `data`. Guide: `docs/guides/charts.md`.
+
 ## Dashboard panel standard (use it, do not invent spacing)
 
 Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
