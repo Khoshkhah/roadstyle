@@ -974,7 +974,7 @@ html[data-rs-theme=dark]{--rs-err:#fca5a5}
 .rs-dd-tables{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);overflow:hidden}
 .rs-dd-tables[hidden],.rs-dd-split[hidden],.rs-dd-tgroup[hidden],.rs-dd-tcard[hidden]{display:none!important}
 .rs-dd-thead{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--rs-dk-head)}
-#rs-dock .rs-dd-tfind{flex:0 1 320px;min-width:0;padding:5px 10px;border-radius:7px;font-size:12.5px}
+#rs-dock .rs-dd-tfind{flex:1;min-width:0;padding:5px 10px;border-radius:7px;font-size:12.5px}
 #rs-dock .rs-dd-tfind:focus{outline:2px solid color-mix(in srgb,var(--accent) 30%,transparent);border-color:var(--accent)}
 .rs-dd-tcount{flex:1;color:var(--mut);font-size:12px}
 #rs-dock .rs-dd-tclose{border:0;background:none;color:var(--mut);padding:2px 8px}
@@ -983,7 +983,7 @@ html[data-rs-theme=dark]{--rs-err:#fca5a5}
 .rs-dd-tg-h{display:flex;align-items:baseline;gap:8px;margin:0 0 6px;font-size:12px;color:var(--mut)}
 .rs-dd-tg-h b{font:600 11px system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .rs-dd-tg-own{color:var(--accent);font-weight:600}
-.rs-dd-tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.rs-dd-tgrid{display:grid;grid-template-columns:1fr;gap:5px}      /* one card under the other in the side column */
 #rs-dock .rs-dd-tcard{display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--card) 55%,transparent);cursor:pointer}
 #rs-dock .rs-dd-tcard:is(:hover,:focus-visible){border-color:var(--accent);background:var(--rs-hover-bg);color:inherit}
 .rs-dd-tc-top{display:flex;align-items:baseline;gap:8px;min-width:0}
@@ -994,12 +994,24 @@ html[data-rs-theme=dark]{--rs-err:#fca5a5}
 .rs-dd-tgrid{align-items:start}
 .rs-dd-split{flex:1;min-height:0;display:flex;gap:10px}
 .rs-dd-split .rs-dock-table{flex:0 1 auto}
-.rs-dd-card{flex:0 0 300px;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:0 12px 10px}
+.rs-dd-side{flex:0 0 300px;min-height:0;display:flex;flex-direction:column}
+.rs-dd-side[hidden],.rs-dd-card[hidden]{display:none!important}
+.rs-dd-card{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;background:var(--rs-dk-box);padding:10px 12px;font:12px/1.4 system-ui,sans-serif;scrollbar-width:thin}
+.rs-dd-rc-hd{display:flex;align-items:flex-start;gap:8px}
+.rs-dd-rc-name{flex:1;min-width:0;font:600 14px/1.3 system-ui,sans-serif;color:var(--ink);overflow-wrap:anywhere}
+#rs-dock .rs-dd-rc-x{flex:none;border:0;background:none;color:var(--mut);padding:0 4px;font-size:12px;line-height:20px}
+.rs-dd-rc-chips{display:flex;flex-wrap:wrap;gap:4px}
+.rs-dd-rc-chip{padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink);font-size:11.5px;white-space:nowrap}
+.rs-dd-rc-chip.strong{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-weight:600}
+.rs-dd-rc-rows{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;padding-top:6px;border-top:1px solid var(--line)}
+.rs-dd-rc-rows dt{color:var(--mut);white-space:nowrap}
+.rs-dd-rc-rows dd{margin:0;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-dd-rc-foot{display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px solid var(--line)}
+.rs-dd-rc-id{flex:1;min-width:0;color:var(--mut);font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rs-dock .rs-dd-rc-foot button{padding:2px 8px;font-size:11.5px}
 .rs-dd-card[hidden]{display:none}
-.rs-dd-card-hd{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--rs-dk-head);padding:8px 0 6px}
-.rs-dd-card .rs-road-card{border:0!important;padding:0!important;margin:0!important;background:none!important}
 html.rs-phone .rs-dd-split{flex-direction:column}
-html.rs-phone .rs-dd-card{flex:0 0 auto;max-height:45%}
+html.rs-phone .rs-dd-side{flex:0 0 auto;max-height:55%}
 html.rs-phone .rs-dd-q{flex-wrap:wrap}
 /* the lists of Colour and Focus: a box in the look of the toolbox's boxes, under its button */
 .rs-dd-menu{position:fixed;z-index:31;min-width:300px;max-width:min(420px,calc(100vw - 16px));max-height:50dvh;overflow:auto;box-sizing:border-box;padding:6px;border:1px solid var(--rs-tb-border,var(--line));border-radius:10px;

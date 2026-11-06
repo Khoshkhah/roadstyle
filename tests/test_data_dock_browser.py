@@ -113,6 +113,10 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.click("#rs-dock tbody tr >> nth=1")
             page.wait_for_timeout(200)
             assert page.evaluate("rs.getState().selection") == "2" and page.evaluate("window.lights.at(-1)") == 6
+            # the road card beside the table: the name, the class as a chip, the id at its foot; no field of roadstyle's drawing
+            card = page.inner_text("#rs-dock .rs-dd-card")
+            assert page.inner_text("#rs-dock .rs-dd-rc-name") == "Street 1" and "edge_id 2" in page.inner_text("#rs-dock .rs-dd-rc-id"), card
+            assert page.locator("#rs-dock .rs-dd-rc-chip.strong").count() == 1 and "casing" not in card and "__rs" not in card, card
             # the line opens on a click, Ctrl+Enter runs, an error shows in its line, the guard refuses a statement that writes (no query)
             page.click("#rs-dock .rs-dd-line")
             page.fill("#rs-dock .rs-dd-ta", "SELECT nope FROM edges")
@@ -133,12 +137,14 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             # Tables: a click on a table shows its rows
             page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
             # the list takes the place of the table: a search field, a group for each schema (the page's own "extra" first), a card with the rows
-            assert page.is_hidden("#rs-dock .rs-dd-split") and page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-tg-h b')].map(b => b.textContent)") == ["extra", "main"]
+            # the list is in the side column (where the card of a road is), and the table stays in view
+            assert page.is_visible("#rs-dock .rs-dd-side .rs-dd-tables") and page.is_visible("#rs-dock .rs-dock-table") and page.is_hidden("#rs-dock .rs-dd-card")
+            assert page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-tg-h b')].map(b => b.textContent)") == ["extra", "main"]
             assert "6 rows" in page.inner_text("#rs-dock .rs-dd-tcard:has-text('edges')")
             page.fill("#rs-dock .rs-dd-tfind", "sensor")
             assert page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-tcard')].filter(b => !b.hidden).map(b => b.querySelector('.rs-dd-tc-name').textContent)") == ["sensors"]
             page.keyboard.press("Escape")
-            assert page.is_hidden("#rs-dock .rs-dd-tables") and page.is_visible("#rs-dock .rs-dd-split")
+            assert page.is_hidden("#rs-dock .rs-dd-tables") and page.is_visible("#rs-dock .rs-dock-table")
             page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
             page.click("#rs-dock .rs-dd-tables button:has-text('edges')")
             assert page.is_hidden("#rs-dock .rs-dd-tables")

@@ -57,9 +57,9 @@ export function dataDock(o = {}){
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
   q.append(line, run);
   const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
-  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-card"), sideHd = $("div", "rs-dd-card-hd"), sideX = $("button", "", "✕");
-  sideX.type = "button"; sideX.title = "Close the card"; sideX.setAttribute("aria-label", sideX.title); side.hidden = true;
-  sideHd.append($("b", "", "Road"), sideX); side.append(sideHd);
+  // the side column beside the table or the chart (Kaveh, 2026-11-06: the list of the tables "in the same place" as the card of a road): one of the
+  // two at a time, the last one opened; the table and the chart stay in view
+  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"); side.hidden = card.hidden = true;
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
   const chartBox = $("div", "rs-dd-chart"), chartRow = $("div", "rs-dd-chartrow"), chartEl = $("div", "rs-dd-chartel"); chartBox.hidden = true;
   const kindS = $("select"), xS = $("select"), yS = $("select"), svgB = $("button", "", "SVG");
@@ -68,21 +68,49 @@ export function dataDock(o = {}){
   const lab = (t, e) => { const l = $("label", "rs-dd-cl"); l.append($("span", "", t), e); return l; };
   chartRow.append(lab("Kind", kindS), lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
   chartBox.append(chartRow, chartEl);
+  side.append(list, card);
   split.append(table.el, chartBox, side);
-  el.append(q, err, list, split);
+  el.append(q, err, split);
   const label = o.label || "Data", id = "data";
   rs.dock.add({id, label, el, actions: acts});
   if(o.help !== false && rs.help) rs.help.button(acts, {title: "The data dock", intro: "One SQL line over a table of the result. A click on the line edits it, Ctrl+Enter or Run runs it. The roads of the result light on the map. A click on a row selects its road. Colour and Focus keep a change of the map until you turn it off.",
     terms: [["Tables", "The tables of the data, with what each one holds. A click puts its name into the line."], ["CSV", "All the rows of the result as a file."],
             ["Colour", "Colours the roads of the table, one colour for each value of a column with 2 to 8 values."], ["Focus", "The other roads fade or hide."]]});
 
-  // the road card: roadstyle's part, beside the table in place of the popup (the design: "The road card in the dock")
-  if(o.card !== false && rs.sections){
-    try{ rs.sections.add({id: "rs-dd-road", part: "road_card"}); const sec = rs.sections.get("rs-dd-road"); side.append(sec.querySelector(".rs-road-card") || sec); rs.sections.hide("rs-dd-road"); }catch(e){}
+  // the road card, beside the table in place of the popup (Kaveh, 2026-11-06: "that card need to redesign and better style and also font size"): the
+  // name; the main facts as small chips (class, length, speed limit, one-way, the networks); the other fields in 12 px with rounded numbers and yes/no;
+  // no empty field and no field of roadstyle's drawing (casing_*, fill_level, ...); the id, Copy id and Zoom at its foot
+  const DRAWING = /^(__|casing_|fill_level$|head_(start|end)_m$|cap_(start|end)$|is_directed$|has_arrows$|lvl$|geometry$|geom$|edge_ref$)/;
+  const CHIPS = new Set(["name", "highway", "length_m", "maxspeed_kmh", "oneway", "driving", "walking", "cycling", ID]);
+  const val = (v) => typeof v === "boolean" ? (v ? "yes" : "no") : typeof v === "number" ? (Number.isInteger(v) ? fmt(v) : fmt(+v.toFixed(Math.abs(v) < 100 ? 1 : 0))) : String(v);
+  const metres = (m) => m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`;
+  function drawCard(p, roadId){
+    const hd = $("div", "rs-dd-rc-hd"), x = $("button", "rs-dd-rc-x", "\u2715");
+    x.type = "button"; x.title = "Close the card"; x.setAttribute("aria-label", x.title); x.onclick = () => rs.select(null);
+    hd.append($("b", "rs-dd-rc-name", p.name || p.ref || "A road with no name"), x);
+    const chips = $("div", "rs-dd-rc-chips"), chip = (t, cls = "") => chips.append($("span", "rs-dd-rc-chip " + cls, t));
+    if(p.highway) chip(String(p.highway).replace(/_/g, " "), "strong");
+    if(typeof p.length_m === "number") chip(metres(p.length_m));
+    if(p.maxspeed_kmh != null) chip(`${p.maxspeed_kmh} km/h`);
+    if(p.oneway === true) chip("one-way");
+    const nets = [["driving", "cars"], ["walking", "foot"], ["cycling", "bikes"]].filter(([k]) => p[k] === true).map(([, t]) => t);
+    if(nets.length) chip(nets.join(" \u00b7 "));
+    const rows = $("dl", "rs-dd-rc-rows");
+    for(const [k, v] of Object.entries(p)){
+      if(CHIPS.has(k) || DRAWING.test(k) || v == null || v === "" || typeof v === "object") continue;
+      const dt = $("dt", "", k.replace(/_/g, " ")), dd = $("dd", "", val(v)); if(String(v).length > 28) dd.title = String(v); rows.append(dt, dd);
+    }
+    const foot = $("div", "rs-dd-rc-foot"), idv = String(p[ID] ?? roadId ?? ""), copy = $("button", "", "Copy id"), zoom = $("button", "", "Zoom");
+    copy.type = zoom.type = "button";
+    copy.onclick = async () => { try{ await navigator.clipboard.writeText(idv); copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy id"; }, 1200); }catch(e){} };
+    zoom.onclick = () => rs.focus([idv]);
+    foot.append($("span", "rs-dd-rc-id", `${ID} ${idv}`), copy, zoom);
+    card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), foot);
   }
-  sideX.onclick = () => rs.select(null);
-  document.addEventListener("rs:select", (e) => { if(o.card === false || e.detail.overlay) return; side.hidden = false; });
-  document.addEventListener("rs:deselect", () => { side.hidden = true; });
+  const paintSide = () => { side.hidden = list.hidden && card.hidden; };
+  document.addEventListener("rs:select", (e) => { if(o.card === false || e.detail.overlay) return; drawCard(e.detail.properties || {}, e.detail.id);
+    list.hidden = true; tablesB.classList.remove("on"); tablesB.setAttribute("aria-expanded", "false"); card.hidden = false; paintSide(); });
+  document.addEventListener("rs:deselect", () => { card.hidden = true; paintSide(); });
 
   // ---- the SQL line: one line; a click opens it as a text box, Escape folds it ----
   let sql = o.sql || "", res = null, ctl = null, ta = null;
@@ -290,7 +318,7 @@ export function dataDock(o = {}){
   }
   async function setList(on){
     if(on) await drawTables();
-    list.hidden = !on; split.hidden = on; tablesB.classList.toggle("on", on); tablesB.setAttribute("aria-expanded", String(on));
+    list.hidden = !on; if(on) card.hidden = true; tablesB.classList.toggle("on", on); tablesB.setAttribute("aria-expanded", String(on)); paintSide();
   }
   tablesB.onclick = () => setList(list.hidden);
 
