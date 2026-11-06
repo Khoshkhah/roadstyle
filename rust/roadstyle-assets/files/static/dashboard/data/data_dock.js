@@ -49,7 +49,10 @@ export function dataDock(o = {}){
   colourB.innerHTML = 'Colour <span class="rs-dd-count" hidden></span> ▾'; focusB.innerHTML = 'Focus <span class="rs-dd-count" hidden></span> ▾';
   colourB.title = "The colour layers of the map"; focusB.title = "The focus of the map: the other roads fade or hide";
   tablesB.title = "The tables of the data"; csvB.title = "All the rows of this result as a CSV file";
-  acts.append(tablesB, csvB, colourB, focusB);
+  // Table | Chart: two views of the same result (the design's "4. Charts")
+  const viewSw = $("span", "rs-seg rs-dd-view"), tableB = $("button", "on", "Table"), chartB = $("button", "", "Chart");
+  tableB.type = chartB.type = "button"; viewSw.append(tableB, chartB);
+  acts.append(viewSw, tablesB, csvB, colourB, focusB);
   const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
   q.append(line, run);
@@ -58,7 +61,14 @@ export function dataDock(o = {}){
   sideX.type = "button"; sideX.title = "Close the card"; sideX.setAttribute("aria-label", sideX.title); side.hidden = true;
   sideHd.append($("b", "", "Road"), sideX); side.append(sideHd);
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
-  split.append(table.el, side);
+  const chartBox = $("div", "rs-dd-chart"), chartRow = $("div", "rs-dd-chartrow"), chartEl = $("div", "rs-dd-chartel"); chartBox.hidden = true;
+  const kindS = $("select"), xS = $("select"), yS = $("select"), svgB = $("button", "", "SVG");
+  svgB.type = "button"; svgB.title = "The chart as an SVG file";
+  for(const [k, t] of [["bar", "Bar"], ["line", "Line"], ["histogram", "Histogram"], ["scatter", "Scatter"], ["pie", "Pie"]]) kindS.append(Object.assign($("option", "", t), {value: k}));
+  const lab = (t, e) => { const l = $("label", "rs-dd-cl"); l.append($("span", "", t), e); return l; };
+  chartRow.append(lab("Kind", kindS), lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
+  chartBox.append(chartRow, chartEl);
+  split.append(table.el, chartBox, side);
   el.append(q, err, list, split);
   const label = o.label || "Data", id = "data";
   rs.dock.add({id, label, el, actions: acts});
@@ -130,6 +140,8 @@ export function dataDock(o = {}){
     const n = res.more ? (res.total ? `${fmt(res.rows.length)} of ${fmt(res.total)} rows` : `${fmt(res.rows.length)} rows (there are more)`) : `${fmt(res.rows.length)} row${res.rows.length === 1 ? "" : "s"}`;
     rs.dock.note(id, `${n} · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"}${res.ms != null ? ` · ${res.ms} ms` : ""}`);
     paintButtons(); light();
+    if(res.chart === undefined) res.chart = rs.chart.guess(res.columns, ID);
+    if(view === "chart") drawChart();
     return res;
   }
   // the roads of a result: its id column; else a key column (osm_id, name) through the host's roadsBy; else none
@@ -161,6 +173,38 @@ export function dataDock(o = {}){
   let mapIds = null;
   const onMap = (ids) => { if(!mapIds) mapIds = new Set((rs.query({}) || []).map(String)); return ids.filter((i) => mapIds.has(String(i))); };
   document.addEventListener("rs:tableready", () => { mapIds = null; });
+
+  // ---- the chart view: the same result as the table; Kind, X and Y choose the chart; a click on a mark does what a click on its row does ----
+  let view = "table", chartObj = null;
+  function setView(v){
+    view = v; tableB.classList.toggle("on", v === "table"); chartB.classList.toggle("on", v === "chart");
+    table.el.hidden = v !== "table"; chartBox.hidden = v !== "chart";
+    if(v === "chart") drawChart();
+  }
+  tableB.onclick = () => setView("table");
+  chartB.onclick = () => setView("chart");
+  const fill = (sel, names, v, any) => { sel.replaceChildren(...(any ? [Object.assign($("option", "", "(none)"), {value: ""})] : []), ...names.map((n) => Object.assign($("option", "", n), {value: n}))); sel.value = v ?? ""; };
+  async function drawChart(){
+    const r = res; if(!r) return;
+    const sp = r.chart || {kind: "bar"}, names = r.columns.map((c) => c.name).filter((n) => n !== ID || sp.x === ID);
+    const nums = r.columns.filter((c) => rs.chart.isNumber(c.type)).map((c) => c.name);
+    kindS.value = sp.kind; fill(xS, names, sp.x); fill(yS, nums, [].concat(sp.y || [])[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
+    const values = sp.kind === "histogram" && r.more ? (await allRows(r, CSV_LIMIT)).map((x) => x[r.columns.findIndex((c) => c.name === sp.x)]) : null;
+    const spec = {...sp, columns: r.columns, rows: table.rows(), values, onPick: (i) => rowClick(table.rows()[i], r.columns)};
+    if(!chartObj) chartObj = rs.chart(chartEl, spec); else chartObj.set(spec);
+  }
+  const change = () => { if(!res) return; const k = kindS.value, old = res.chart || {};
+    res.chart = {...old, kind: k, x: xS.value || old.x, y: k === "histogram" ? undefined : (yS.value || [].concat(old.y || [])[0])};
+    if(k === "histogram" && !rs.chart.isNumber((res.columns.find((c) => c.name === res.chart.x) || {}).type)) res.chart.x = (res.columns.find((c) => rs.chart.isNumber(c.type)) || {}).name;
+    // a kind that needs y and has none (from a histogram): a number column, another than x where there is one
+    if(k !== "histogram" && !res.chart.y){ const n = res.columns.filter((c) => rs.chart.isNumber(c.type) && c.name !== ID).map((c) => c.name); res.chart.y = n.find((x) => x !== res.chart.x) || n[0]; }
+    drawChart(); };
+  kindS.onchange = xS.onchange = yS.onchange = change;
+  svgB.onclick = () => { const s = chartObj && chartObj.svg(); if(!s) return;
+    const copy = s.cloneNode(true), css = getComputedStyle(document.documentElement);
+    copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    copy.querySelectorAll("*").forEach((e) => { for(const p of ["fill", "stroke"]){ const v = e.style[p]; if(v && v.startsWith("var(")) e.style[p] = css.getPropertyValue(v.slice(4, -1).trim()).trim(); } });
+    const a = $("a"); a.href = URL.createObjectURL(new Blob([copy.outerHTML], {type: "image/svg+xml"})); a.download = "chart.svg"; a.click(); };
 
   // ---- CSV: all the rows (at most 1 000 000), in the order of the table ----
   async function csv(){
@@ -273,6 +317,10 @@ export function dataDock(o = {}){
       if(i < 0) throw new Error(`The query must select the column ${ID}.`);
       const all = r.rows.map((x) => String(x[i])), ids = onMap(all); ids.missing = all.length - ids.length; return ids; },
     query: (text, limit = LIMIT) => query(text, limit),
+    // the chart of the result now: {kind, x, y, title}; it opens the chart view (Ask's draw_chart). A spec that does not fit gives an error.
+    chart(spec){ if(!res) throw new Error("There is no result to draw."); const s = {...spec, columns: res.columns, rows: res.rows};
+      const why = rs.chart.check ? rs.chart.check(s) : null; if(why) throw new Error(why); res.chart = {kind: spec.kind, x: spec.x, y: spec.y, title: spec.title}; setView("chart"); return res.chart; },
+    view: (v) => (v ? setView(v) : view),
     colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
   });

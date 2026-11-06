@@ -23,6 +23,7 @@ tabs
 days
 kpi
 svg
+chart
 dock
 toolbar
 panel

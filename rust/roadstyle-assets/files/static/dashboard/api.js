@@ -13,6 +13,7 @@ import {editorFrame} from "./frame.js";
 import {rsDock} from "./dock.js";
 import {rsKpi} from "./kpi.js";
 import {rsSvg} from "./svg.js";
+import {rsChart} from "./chart.js";
 import {rsLegend} from "./legend.js";
 import {rsColorModes} from "./colorbox.js";
 
@@ -87,6 +88,7 @@ export function makeApi(extra){
     tools: rsTools,              // the toolbox: add, bind, remove, open, close, list (tools.js)
     ready: fn => window.rsReady ? fn() : document.addEventListener("rs:ready", fn, {once: true}),   // run fn now if the page is ready, else when it is
     svg: rsSvg,                  // one SVG element for a chart, with var(--x) colours (svg.js)
+    chart: rsChart,              // a chart of rows: bar, line, histogram, scatter, pie (chart.js)
     kpi: rsKpi,                  // the HTML of a number tile (kpi.js)
     tabs: rsTabs,                // tabs and the two-way switch of a page: use (tabs.js)
     days: rsDays,                // the day picker of a page: use (days.js)
