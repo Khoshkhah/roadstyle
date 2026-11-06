@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard parts, live</title>
+<!-- The live parts of a roadstyle dashboard (docs/guides/dashboard-parts.md). The CSS and the JavaScript are the real dashboard files: the docs build copies
+     them from rust/roadstyle-assets/files into site/parts/ (docs/copy_parts.py). This page writes only its own frame: the bar at the top, the place of the
+     panel and the gallery captions (the class prefix "gl-"). It does not change a part.
+       gallery.html                  every part in one panel, with a theme switch and a width switch
+       gallery.html?part=tabs        one part (the docs page puts each one in an iframe); its height fits the part
+       ?theme=dark | light           the theme; without it, a page in an iframe of the docs site follows the theme of the site
+       ?phone=1                      the phone look (the width switch puts the page in an iframe of 390 px) -->
+<link rel="stylesheet" href="static/popup.css">
+<link rel="stylesheet" href="static/dashboard/dashboard.css">
+<link rel="stylesheet" href="template.css">
+<style>
+:root{--gl-page:#e7eaee;--gl-ink:#16181d;--gl-mut:#4b5260;--gl-on:#fff}
+html[data-rs-theme=dark]{--gl-page:#0b0d10;--gl-ink:#e9ecf1;--gl-mut:#9aa3b2;--gl-on:#1c2026}
+html,body{margin:0;height:100%}
+body{background:var(--gl-page);color:var(--gl-ink);font:14px/1.5 system-ui,sans-serif}
+.gl-bar{position:fixed;top:0;left:0;right:0;height:52px;box-sizing:border-box;display:flex;align-items:center;gap:16px;padding:0 16px;z-index:6}
+.gl-bar b{font-size:15px}
+.gl-bar a{color:var(--accent)}
+.gl-bar #sbx{display:flex;gap:12px;align-items:center}
+.gl-seg{display:flex;gap:2px;padding:2px;border-radius:10px;background:color-mix(in srgb,var(--gl-mut) 22%,transparent)}
+.gl-seg button{border:0;border-radius:8px;padding:5px 10px;background:none;color:var(--gl-ink);font:600 12px system-ui,sans-serif;cursor:pointer}
+.gl-seg button.on{background:var(--gl-on);color:var(--accent)}
+.gl-about{position:fixed;top:72px;left:430px;right:24px;max-width:520px;color:var(--gl-mut)}
+html.gl-phone-on .gl-about,html.rs-phone .gl-about,html.rs-phone #gl-width{display:none}
+html.rs-phone .gl-side{display:none}
+.gl-side{margin-left:auto;color:var(--gl-mut);font-size:13px}
+/* the place of the panel: the host page sets it (a dashboard page sets it with its template) */
+#sb{top:52px;left:0;right:auto;bottom:0;width:min(400px,100%);border:1px solid var(--line);border-radius:0 14px 0 0}
+.gl-phone{position:fixed;top:52px;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:flex-start;padding-top:12px}
+.gl-bar[hidden],.gl-phone[hidden],.gl-about[hidden]{display:none}
+.gl-phone iframe{width:390px;height:min(844px,calc(100% - 24px));border:1px solid var(--line);border-radius:22px;background:var(--gl-page)}
+.gl-name{margin:20px 0 8px;font:700 11px/1.3 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.gl-name a{color:inherit;text-decoration:none}
+.gl-out{margin:8px 0 0;font-size:12px;color:var(--mut)}
+.gl-out b{color:var(--ink)}
+.gl-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gl-target{padding:22px 12px;border:1px dashed var(--line);border-radius:10px;color:var(--mut);text-align:center}
+/* one part in an iframe of the docs: the panel fills the frame, with no page around it */
+html.gl-one body{background:transparent}
+html.gl-one #sb{top:0;bottom:0;border-radius:14px}
+html.gl-one .sb-body > .sb-sec:first-child{margin-top:0}
+html.gl-phone-look #sb{width:100%;border:0;border-radius:0}
+html.gl-phone-look:has(#gl-bar[hidden]) #sb{top:0}
+</style>
+</head>
+<body>
+<header class="gl-bar" id="gl-bar" hidden>
+  <b>Dashboard parts</b>
+  <div id="sbx">
+    <div class="gl-seg" id="gl-theme" aria-label="Theme"><button class="on" data-v="light">Light</button><button data-v="dark">Dark</button></div>
+    <div class="gl-seg" id="gl-width" aria-label="Width"><button class="on" data-v="desktop">Desktop</button><button data-v="phone">Phone 390 px</button></div>
+  </div>
+  <span class="gl-side"><a href="../guides/dashboard-parts/">The guide</a></span>
+</header>
+<p class="gl-about" id="gl-about" hidden>The panel at the left is a dashboard panel with each part in it. The CSS and the JavaScript are the files of
+  every roadstyle page, not copies. Click, fold, open and type: each part works. The guide gives the code of each part.</p>
+<div id="sb" data-theme="light"><div class="sb-card">
+  <div class="sb-top"><h2>Dashboard parts</h2><span><button id="sb-hide" title="Hide the panel" aria-label="Hide the panel"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m8.5 9.5 2.5 2.5-2.5 2.5"/></svg></button></span></div>
+  <div class="sb-body"></div>
+</div></div>
+<script type="module">
+import {rsSections} from "./static/dashboard/sections.js";
+import {rsHelp} from "./static/dashboard/help.js";
+import {rsHover} from "./static/dashboard/hover.js";
+import {rsTabs} from "./static/dashboard/tabs.js";
+import {rsDays} from "./static/dashboard/days.js";
+import {rsKpi} from "./static/dashboard/kpi.js";
+import {rsSvg} from "./static/dashboard/svg.js";
+import {rsChart} from "./static/dashboard/chart.js";
+import {editorFrame} from "./static/dashboard/frame.js";
+import {initSelectBox} from "./static/dashboard/selectbox.js";
+import {initTip} from "./static/dashboard/tip.js";
+import {initPanelScroll, initInnerScroll} from "./static/dashboard/panelscroll.js";
+
+// the page's `rs`: the same functions as rs.<name> of a dashboard page (api.js), without the map
+const rs = window.rs = {sections: rsSections, help: rsHelp, hover: rsHover, tabs: rsTabs, days: rsDays, kpi: rsKpi, svg: rsSvg, chart: rsChart, frame: editorFrame};
+const q = new URLSearchParams(location.search), one = q.get("part"), html = document.documentElement, sb = document.getElementById("sb");
+const top = (() => { try { return window.top.innerWidth; } catch(e){ return innerWidth; } })();
+const phone = q.has("phone") || top <= 700;       // the phone look of a dashboard: a screen of 700 px or less (dashboard.phone.max_width_px)
+html.classList.toggle("gl-one", !!one);
+html.classList.toggle("gl-phone-look", phone && !one);
+if(phone) html.classList.add("rs-phone");
+
+// the theme, as rsSetTheme does it (theme.js; it also sets the map's state, and this page has no map)
+function theme(name){
+  const t = name === "dark" ? "dark" : "light";
+  if(html.dataset.rsTheme === t) return;
+  html.dataset.rsTheme = t; sb.dataset.theme = t;
+  document.dispatchEvent(new CustomEvent("rs:themechange", {detail: {theme: t}}));
+}
+theme(q.get("theme") || "light");
+// in an iframe of the docs site with no ?theme: follow the site's light and dark switch (mkdocs-material: <body data-md-color-scheme="slate">)
+if(!q.get("theme")) try {
+  const site = window.parent !== window && window.parent.document.body;
+  if(site && site.hasAttribute("data-md-color-scheme")){
+    const follow = () => theme(site.getAttribute("data-md-color-scheme") === "slate" ? "dark" : "light");
+    follow(); new MutationObserver(follow).observe(site, {attributes: true, attributeFilter: ["data-md-color-scheme"]});
+  }
+} catch(e){ /* another origin: the light theme */ }
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
+const caption = (id, name) => `<div class="gl-name" id="${id}"><a href="#${id}">${esc(name)}</a></div>`;
+const out = (id, text) => { document.getElementById(id).innerHTML = text; };
+let frame = null;
+function openFrame(){
+  if(!frame){
+    frame = rs.frame({panel: sb, title: "Edit roads", back: "Parts", id: "gl-ed", tabs: [["tags", "Tags"], ["geometry", "Geometry"], ["notes", "Notes"]]});
+    const draw = t => {
+      frame.body.innerHTML = {
+        tags: '<label>Road class</label><select><option>primary</option><option>secondary</option><option>residential</option></select><label>Name</label><input value="Götgatan">',
+        geometry: "<p>The body is the one area that scrolls.</p>" + Array.from({length: 24}, (_, i) => `<p class="sb-note">Point ${i + 1}: 18.07, 59.31</p>`).join(""),
+        notes: '<label>Note</label><textarea rows="4">The road is closed in July.</textarea>'}[t];
+      frame.bar.innerHTML = `<b>Tab: ${t}</b> <button type="button" class="sb-primary">Apply</button>`;
+    };
+    frame.addEventListener("tab", e => draw(e.detail.tab));
+    frame.addEventListener("back", () => frame.close());
+    draw("tags");
+  }
+  frame.open(frame.tab() || "tags");
+}
+
+// each part: its id (the anchor), its name, the room that its window or list needs under it in an iframe (px), and the code that adds it
+const PARTS = [
+  {id: "tabs", name: "Tabs", make(){
+    rs.sections.add({id: "tabs", html: '<nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets</button><button class="rs-tab" data-tab="c">Hours</button></nav>' +
+      '<div data-pane="a"><p>The pane of the tab Overview.</p></div><div data-pane="b" hidden><p>The pane of the tab Streets.</p></div><div data-pane="c" hidden><p>The pane of the tab Hours.</p></div>' +
+      '<p class="gl-out" id="tabs-out">onChange: none yet</p>'});
+    rs.tabs.use(document.querySelector('[data-rs-section="tabs"] .rs-tabs'), id => out("tabs-out", `onChange: <b>${id}</b>`));
+  }},
+  {id: "switch", name: "Two-way switch", make(){
+    rs.sections.add({id: "switch", html: '<div class="rs-seg" id="gl-seg"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div><p class="gl-out" id="seg-out">onChange: none yet</p>'});
+    rs.tabs.use(document.getElementById("gl-seg"), v => out("seg-out", `onChange: <b>${v}</b>`));
+  }},
+  {id: "select", name: "Select box", room: 170, make(){
+    rs.sections.add({id: "select", label: "Colour by", html: '<select id="gl-sel"><option value="class">Road class</option><option value="speed">Speed limit</option><option value="flow">Flow, all vehicles</option><option value="lanes">Lanes</option></select>' +
+      '<p class="gl-out" id="sel-out">select.value: <b>class</b></p>'});
+    document.getElementById("gl-sel").addEventListener("change", e => out("sel-out", `select.value: <b>${esc(e.target.value)}</b>`));
+  }},
+  {id: "days", name: "Day picker", room: 330, make(){
+    rs.sections.add({id: "days", html: '<div id="gl-day"></div><p class="gl-out" id="day-out">onChange: none yet</p>'});
+    rs.days.use(document.getElementById("gl-day"), {days: ["2026-10-01", "2026-10-02", "2026-10-04", "2026-10-05", "2026-10-07", "2026-10-08"], value: "2026-10-05",
+      onChange: d => { out("day-out", `onChange: <b>${d}</b>`); return new Promise(r => setTimeout(r, 400)); }});
+  }},
+  {id: "cards", name: "Cards", make(){
+    rs.sections.add({id: "card", label: "A card", html: "<p>A section with a label. It does not fold.</p>"});
+    rs.sections.add({id: "card-fold", label: "A card that folds", fold: true, note: "Click the title row", html: "<p>The body opens inside the same card.</p>"});
+    rs.sections.add({id: "card-nobg", label: "No background", background: false, html: "<p><code>background: false</code>: no colour behind it.</p>"});
+    rs.sections.add({id: "card-nobg-fold", label: "No background, folds", background: false, fold: true, html: "<p>A card with no background that folds.</p>"});
+    rs.help.button(rs.sections.get("card"), {title: "About this card", intro: "A “?” in the title row of a card opens the help window with its own words."});
+  }},
+  {id: "open", name: "A card that opens something", make(){
+    rs.sections.add({id: "open-edit", label: "Edit roads", note: "Opens the editor frame", open: () => openFrame()});
+    let n = 0;
+    rs.sections.add({id: "open-ask", label: "Ask", note: "A question about the data", icon: "ask", background: true,
+      open: () => rs.sections.note("open-ask", `Opened ${++n} time${n === 1 ? "" : "s"}`)});
+  }},
+  {id: "frame", name: "The editor frame", room: 260, make(){
+    rs.sections.add({id: "frame", html: '<p>An editor that uses the whole panel. Its title line has “← Parts”, a tab row and a bar at the bottom edge.</p><button type="button" class="sb-primary" id="gl-frame">Open the editor frame</button>'});
+    document.getElementById("gl-frame").onclick = openFrame;
+  }},
+  {id: "page-card", name: "A card in the page's own HTML", make(){
+    rs.sections.add({id: "page-card", html: '<div class="rs-sec-box"><div class="rs-card-title">By hour of the day</div><p>The same card as a section card: 12 px corners and the card padding.</p></div>' +
+      '<div class="rs-sec-box"><h3>A card with an h3</h3><p>The paragraph after the h3 is its short, muted description.</p><p>More text of the card.</p></div>'});
+  }},
+  {id: "help", name: "Help window", room: 320, make(){
+    rs.sections.add({id: "help", html: '<p>The “?” in the title of the panel opens the window. <a href="#" id="gl-help-link">A link opens it too.</a></p>'});
+    rs.help.set({title: "How to read this page", intro: "Each block of the panel is one part of the dashboard.",
+                 terms: [["Part", "A control that every dashboard page shares."], ["Token", "A theme colour, for example <code>--accent</code>."]], note: "Escape closes the window."});
+    document.getElementById("gl-help-link").onclick = e => { e.preventDefault(); rs.help.open({title: "Opened by a link", intro: "The same window, with words of its own."}); };
+  }},
+  {id: "hover", name: "Hover box", room: 60, make(){
+    rs.sections.add({id: "hover", html: '<div class="gl-target" id="gl-hover">Move the pointer over this box</div>'});
+    rs.hover.on(document.getElementById("gl-hover"), ev => `<b>Saturday</b><br>x ${Math.round(ev.offsetX)} px, y ${Math.round(ev.offsetY)} px`);
+  }},
+  {id: "tip", name: "Button tip", room: 50, make(){
+    rs.sections.add({id: "tip", html: '<div class="gl-row"><button type="button" title="Zoom to the area" aria-label="Zoom to the area"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg></button>' +
+      '<button type="button" title="Build the networks of the area">Build →</button></div><p class="gl-out">The icon button shows its tip. The button with a text shows none.</p>'});
+  }},
+  {id: "buttons", name: "Buttons", make(){
+    rs.sections.add({id: "buttons", html: '<div class="gl-row"><button type="button">Reset</button><button type="button" class="sb-primary">Run</button><button type="button" disabled>Disabled</button></div>'});
+  }},
+  {id: "inputs", name: "Text box, check box and radio", make(){
+    rs.sections.add({id: "inputs", html: '<label>Street</label><input placeholder="Götgatan"><label>Note</label><textarea rows="3" placeholder="A note"></textarea>' +
+      '<label>Show</label><div class="gl-row"><input type="checkbox" id="gl-c1" checked><span>Bridges</span><input type="checkbox" id="gl-c2"><span>Tunnels</span></div>' +
+      '<label>Count</label><div class="gl-row"><input type="radio" name="gl-r" checked><span>Every day</span><input type="radio" name="gl-r"><span>First day</span></div>'});
+  }},
+  {id: "chips", name: "Chips and a dot", make(){
+    rs.sections.add({id: "chips", html: '<div class="gl-row"><span class="rs-chip">road type</span><span class="rs-chip accent">primary</span><span><span class="rs-dot" style="background:#15803d"></span>inside the range</span><span><span class="rs-dot"></span>no data</span></div>'});
+  }},
+  {id: "kpi", name: "Number tiles", make(){
+    rs.sections.add({id: "kpi", html: '<div class="rs-cap">All counted hours</div><div class="rs-kpis" id="gl-k"></div>'});
+    document.getElementById("gl-k").innerHTML = rs.kpi("Inside the range", "80.4%", "promised 80 %", "#15803d") + rs.kpi("Typical miss", "10 %", "on one hour") + rs.kpi("Hours", "1 412", "of 1 440");
+  }},
+  {id: "callout", name: "Callout", make(){
+    rs.sections.add({id: "callout", html: '<div class="rs-callout" style="--rs-callout:#16a34a"><b>Yes, the promise holds.</b> On 80 % of hours the traffic was inside the range.</div>' +
+      '<div class="rs-callout"><b>No colour given:</b> the edge is <code>--accent</code>.</div>'});
+  }},
+  {id: "kv", name: "Rows of fields", make(){
+    rs.sections.add({id: "kv", html: '<div class="rs-name">Götgatan</div><div class="rs-kv"><span>highway</span><b>primary</b></div><div class="rs-kv"><span>lanes</span><b>2</b></div><div class="rs-kv"><span>maxspeed</span><b>40 km/h</b></div><div class="rs-kv"><span>edge_id</span><b>8121729169906061189</b></div>'});
+  }},
+  {id: "list", name: "List rows", make(){
+    rs.sections.add({id: "list", html: ["Götgatan|highway: primary", "Ringvägen|highway: secondary", "Hornsgatan|highway: primary", "Folkungagatan|highway: secondary"]
+        .map(r => { const [a, b] = r.split("|"); return `<div class="rs-qrow"><b>${a}</b><span>${b}</span></div>`; }).join("")});
+  }},
+  {id: "chart", name: "Chart", room: 40, make(){
+    rs.sections.add({id: "chart", html: '<div class="rs-seg" id="gl-kind"><button class="on" data-v="bar">Bar</button><button data-v="pie">Pie</button><button data-v="line">Line</button></div><div id="gl-chart" style="height:220px"></div><p class="gl-out" id="chart-out">onPick: none yet</p>'});
+    const rows = [["residential", 30.5], ["primary", 12.5], ["secondary", 8.25], ["tertiary", 6], ["service", 4.5]];
+    const c = rs.chart(document.getElementById("gl-chart"), {kind: "bar", x: "highway", y: "km", columns: [{name: "highway", type: "VARCHAR"}, {name: "km", type: "DOUBLE"}], rows,
+      onPick: i => out("chart-out", `onPick: row <b>${i}</b> (${rows[i][0]})`)});
+    const line = {kind: "line", x: "hour", y: "flow", columns: [{name: "hour", type: "INTEGER"}, {name: "flow", type: "DOUBLE"}], rows: [[0, 40], [3, 12], [6, 210], [9, 380], [12, 300], [15, 420], [18, 360], [21, 120]]};
+    rs.tabs.use(document.getElementById("gl-kind"), k => c.set(k === "line" ? line : {kind: k, x: "highway", y: "km", columns: [{name: "highway", type: "VARCHAR"}, {name: "km", type: "DOUBLE"}], rows}));
+  }},
+  {id: "svg", name: "A chart of your own (rs.svg)", make(){
+    rs.sections.add({id: "svg", html: '<div class="rs-sec-box"><h3>Flow and its band</h3><p>Drawn with rs.svg and the chart tokens.</p><svg id="gl-svg" viewBox="0 0 300 90"></svg></div>'});
+    const s = document.getElementById("gl-svg");
+    for(const y of [20, 50, 80]) rs.svg(s, "line", {x1: 24, x2: 300, y1: y, y2: y, stroke: "var(--rs-chart-grid)"});
+    rs.svg(s, "polygon", {points: "24,60 80,40 140,30 200,35 260,25 300,30 300,70 260,62 200,70 140,66 80,75 24,85", fill: "var(--rs-chart-band)", stroke: "var(--rs-chart-band-line)"});
+    rs.svg(s, "polyline", {points: "24,72 80,58 140,48 200,52 260,42 300,50", fill: "none", stroke: "var(--ink)", "stroke-width": 1.5});
+    rs.svg(s, "circle", {cx: 200, cy: 20, r: 3, fill: "var(--rs-chart-miss)"});
+    for(const [y, t] of [[23, "400"], [53, "200"], [83, "0"]]) rs.svg(s, "text", {x: 2, y, fill: "var(--mut)", "font-size": 9}, t);
+  }},
+  {id: "scroll", name: "A table that scrolls", make(){
+    const rows = Array.from({length: 30}, (_, i) => `<tr><td>Street ${i + 1}</td><td>${(30 - i) * 7}</td><td>${(i % 4) + 1}</td></tr>`).join("");
+    rs.sections.add({id: "scroll", html: `<div class="rs-scroll" style="--rs-scroll-h:220px"><table class="rs-table"><thead><tr><th>Street</th><th data-sort="desc">Hours</th><th>Lanes</th></tr></thead><tbody>${rows}</tbody></table></div>`});
+  }},
+];
+
+const list = one ? PARTS.filter(p => p.id === one) : PARTS;
+if(one && !list.length) document.querySelector(".sb-body").innerHTML = `<p>No part "${esc(one)}".</p>`;
+if(one) document.querySelector(".sb-top h2").textContent = list[0] ? list[0].name : "Dashboard parts";
+for(const p of list){ if(!one) rs.sections.add({id: p.id + "-cap", html: caption(p.id, p.name)}); p.make(); }
+initSelectBox(); initPanelScroll(); initInnerScroll(); initTip();
+
+if(!one && !q.has("phone")){
+  document.getElementById("gl-bar").hidden = document.getElementById("gl-about").hidden = false;
+  rs.tabs.use(document.getElementById("gl-theme"), theme);
+  const box = document.createElement("div"); box.className = "gl-phone"; box.hidden = true; document.body.append(box);
+  rs.tabs.use(document.getElementById("gl-width"), w => {
+    box.hidden = w !== "phone"; sb.hidden = w === "phone"; html.classList.toggle("gl-phone-on", w === "phone");
+    if(w === "phone") box.innerHTML = `<iframe title="The parts at 390 px" src="?phone=1&theme=${html.dataset.rsTheme}${location.hash}"></iframe>`;
+  });
+  document.addEventListener("rs:themechange", () => { const f = box.querySelector("iframe"); if(f && !box.hidden) f.src = `?phone=1&theme=${html.dataset.rsTheme}`; });
+}
+if(location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+
+// in an iframe: the frame is as high as the part, and as the room of its window or list under it
+if(one && window.frameElement){
+  const room = list[0] && list[0].room || 0, card = sb.querySelector(".sb-card"), body = sb.querySelector(".sb-body");
+  const fit = () => {
+    const last = body.lastElementChild, cs = getComputedStyle(body);
+    const content = last ? last.getBoundingClientRect().bottom - body.getBoundingClientRect().top + body.scrollTop + parseFloat(cs.paddingBottom) : 0;
+    const h = sb.querySelector(".sb-top").offsetHeight + (frame && frame.isOpen() ? 420 : content) + 2;
+    window.frameElement.style.height = (h + room) + "px";
+    sb.style.bottom = room + "px";
+  };
+  new ResizeObserver(fit).observe(card); new MutationObserver(fit).observe(card, {childList: true, subtree: true, attributes: true});
+  fit();
+}
+window.galleryReady = true;
+</script>
+</body>
+</html>
