@@ -595,6 +595,11 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
    `direction: rtl` puts its scrollbar at the left; the content keeps its own direction. Not on a phone: the sheet has no side. ---- */
 html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody){direction:rtl}
 html.rs-panel-left:not(.rs-phone) :is(.sb-body,.rs-pbody) > *{direction:ltr}
+/* the body keeps its scrollbar space on the left, and the rows above and under it do not scroll: they move by the same space (--rs-gutter, panelscroll.js),
+   so all start at the same edge (Kaveh: the Ask head row and the answers did not) */
+html.rs-panel-left:not(.rs-phone) #sb .sb-top{padding-left:calc(15px + var(--rs-gutter,0px))}
+html.rs-panel-left:not(.rs-phone) #sb .rs-frame-head{margin-left:calc(15px + var(--rs-gutter,0px))}
+html.rs-panel-left:not(.rs-phone) #sb .rs-frame-bar{padding-left:calc(15px + var(--rs-gutter,0px))}
 
 /* ---- the panel's scrollbar (decided 2026-10-29): the thumb shows only while the pointer is over the panel or the body scrolls (panelscroll.js sets
    .rs-scrolling). A host panel with its own scroll boxes (the level editor's tabs) gives them the class `rs-pbody` and `data-head`, the selector of their header (class `rs-phead`); the space stays reserved, so nothing jumps. The thumb is the text color at 47 % in the light theme and 40 % in the dark theme: 3:1 against the

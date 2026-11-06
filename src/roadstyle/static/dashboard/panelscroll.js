@@ -8,6 +8,7 @@ export function initPanelScroll(){
     if(!head || body.dataset.rsScroll) return;
     body.dataset.rsScroll = "1";
     const mark = () => head.classList.toggle("scrolled", body.scrollTop > 0);
+    const gutter = () => body.offsetWidth && body.parentElement.style.setProperty("--rs-gutter", (body.offsetWidth - body.clientWidth) + "px");   // the scrollbar space of the body: the rows above and under it keep the same edge (dashboard.css); a hidden body keeps its value
     const more = () => { body.toggleAttribute("data-more", body.scrollTop + body.clientHeight < body.scrollHeight - 2); body.toggleAttribute("data-above", body.scrollTop > 2); };
     let t = 0;
     body.addEventListener("scroll", () => {
@@ -16,7 +17,8 @@ export function initPanelScroll(){
     }, {passive: true});
     mark(); more();
     addEventListener("resize", more);
-    new ResizeObserver(more).observe(body);                                              // a section that the page adds or hides changes the height
+    gutter();
+    new ResizeObserver(() => { more(); gutter(); }).observe(body);                                              // a section that the page adds or hides changes the height
     new MutationObserver(more).observe(body, {childList: true, subtree: true});
   });
   document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", run) : run();
