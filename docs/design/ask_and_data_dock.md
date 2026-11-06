@@ -441,6 +441,12 @@ the agent and the person's SQL can use it at once.
   `edge_id` lit its 40 roads).
 - **The agent** sees it in the schema of the prompt ("mine: counts 40, sensors 6") and the prompt says: "Tables in the schema mine are
   files that the person added: read their columns before you use them."
+- **Values that a person can read:** the table, the CSV and the rows that go to the agent show a DATE as `2026-06-10` and a TIMESTAMP
+  as `2026-06-10 08:30:00`, not as milliseconds (`1781049600000`), and a geometry as `(32 bytes)`, not as a list of bytes. The data dock
+  does this once for each value type of the result, so each table gets it (the first `sensors.geojson` showed both faults).
+- **No data, a hint:** when the data has no answer ("show all sensors" with no sensor table), the agent says so and names "+ Add a file".
+  The mock-up also has "Try a sample: sensors.geojson · counts.csv" under the button, because the person's PC cannot pick a file of the
+  server's disk. The real dashboard has no samples.
 - **Privacy:** the file stays in this browser; nothing is uploaded. Only what the agent reads with a query goes to the AI service.
 - **How long:** the mock-up keeps it in memory only (a reload loses it). duckOSM Studio can keep it with the saved area, as the area's
   own tables.
@@ -673,7 +679,12 @@ question
      "more rows: yes" when the result was cut. A text value is cut at 200 characters.
 4. When the model gives text, that text is the answer. The last query that worked is the answer's query: the data dock shows its SQL and
    its table, so its roads light (see [The map: four operations](#the-map-four-operations)).
-5. The loop stops with an error after `maxSteps` model calls, or after 3 failed queries one after the other. The card shows the last error.
+5. **The last call gives the answer.** The model call number `maxSteps` goes with `tool_choice: "none"` and the message "Answer now in 1
+   to 3 short sentences with the results that you have. Do not call more tools." So a model that calls tools again and again still gives
+   an answer from the queries that it ran. (Kaveh, 2026-11-05: "No answer after 6 calls of the model", and the card had nothing else.)
+   When that last call also gives no text, the question stops with the error "The model gave no answer in 6 calls. Its last table is in
+   the data dock", and the details "5 queries ran before the stop" keep each query that ran, the good ones and the failed ones. The loop
+   also stops with an error after 3 failed queries one after the other. The card shows the last error.
    **No silent stop:** any error of the agent (also one outside the loop, for example in the schema) ends the question with a red line on
    its card, and the question box works again. (Kaveh, 2026-11-05: a card with the question and nothing else.)
 0. **The data first.** The host's data can still be loading when the person asks: duckOSM Studio loads a build, and the mock-up loaded 46
@@ -754,7 +765,8 @@ Rules:
 - When a query fails, read the error, fix the SQL and run it again.
 - Answer in the language of the question, in one to three short sentences, with the numbers.
   Do not repeat the table: the page shows it.
-- If the data cannot answer the question, say so.
+- If the data cannot answer the question, say so in one sentence, and say that the person can add a file with that data
+  (CSV, Parquet or GeoJSON) with "+ Add a file" in the data dock. Then it is in the schema "mine".
 
 Schema:
 {schema}
