@@ -1114,6 +1114,7 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #rs-dock .rs-dd-kind.on{background:var(--accent-fill);color:#fff}
 .rs-dd-sp{flex:1}
 .rs-dd-chartel{flex:1;min-height:0}
+.rs-dd-chint{margin:-2px 0 0;font-size:11.5px;color:var(--mut)}
 
 /* a chart answer of Ask: a small copy of its chart in the card (the chart is in the data dock) */
 #sb .rs-ask-chart{height:140px;margin:8px 0 4px;padding:0;background:none;border:0}      /* no box: the chart sits on the card (Kaveh, 2026-11-06) */

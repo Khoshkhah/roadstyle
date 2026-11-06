@@ -17,7 +17,9 @@ export const rsChart = (() => {
     const s = Math.abs(n) >= 100 || Number.isInteger(n) ? Math.round(n).toLocaleString("en") : (+n.toPrecision(3)).toLocaleString("en", {maximumFractionDigits: 3});
     return s.replace(/,/g, " "); };
   // an axis tick, compact from 1 000 up: 2.5K, 1.2M (the hover and the labels give the full value)
-  const tick = (v) => { const a = Math.abs(v); return a >= 1e6 ? +(v / 1e6).toFixed(1) + "M" : a >= 1e3 ? +(v / 1e3).toFixed(1) + "K" : fmt(v); };
+  const tick = (v) => { const a = Math.abs(v); if(a >= 1e15) return v.toExponential(1).replace("e+", "e").replace(".0e", "e");          // 1.2e18: an id range, say
+    for(const [d, u] of [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) if(a >= d) return +(v / d).toFixed(1) + u;
+    return fmt(v); };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
   const num = (v) => v == null || v === "" ? null : typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : isFinite(+v) ? +v : null;
   const when = (v) => v == null ? null : typeof v === "number" || typeof v === "bigint" ? Number(v) : Date.parse(String(v).replace(" ", "T")) || null;

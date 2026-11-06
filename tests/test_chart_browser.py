@@ -72,6 +72,10 @@ def test_limits_hover_click_and_the_line_for_no_data(tmp_path):
             page.evaluate("C.set({kind: 'pie', y: 'km', rows: " + json.dumps(many[:12]) + "})")
             assert page.locator("#c svg path").count() == 6 and "Other (7)" in page.inner_text("#c .rs-chart-legend")
             page.evaluate("C.set({kind: 'histogram', x: 'km', values: Array.from({length: 2765}, (_, i) => i % 97)})")
+            page.evaluate("C.set({values: Array.from({length: 50}, (_, i) => i * 1.8e17)})")
+            ticks = page.evaluate("[...document.querySelectorAll('#c svg text')].map(x => x.textContent).join(' ')")
+            assert "2e18" in ticks and "000000" not in ticks, ticks                                        # a huge number: a short tick
+            page.evaluate("C.set({values: Array.from({length: 2765}, (_, i) => i % 97)})")
             assert "2 765 values" in page.inner_text("#c .rs-chart-hd")
             # the pointer on a bar shows its values; a click gives its row
             page.evaluate("C.set({kind: 'bar', x: 'highway', y: 'km', rows: " + json.dumps(_ROWS) + ", values: null})")
@@ -122,6 +126,10 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         assert page.locator("#rs-dock .rs-dd-chartel svg circle").count() >= 6
         # data.chart(spec), as Ask's draw_chart: a spec that does not fit is an error
         assert page.evaluate("(() => { try { data.chart({kind: 'pie', x: 'nope', y: 'length_m'}); return 'no error'; } catch(e) { return e.message; } })()").startswith("The column")
+        # Kaveh's case: a kind that needs a number X never takes the road ids; the hint says how to use the kind
+        page.click("#rs-dock .rs-dd-kind[data-kind=bar]")
+        page.click("#rs-dock .rs-dd-kind[data-kind=histogram]")
+        assert page.evaluate("data.result().chart.x") == "length_m" and "20 equal ranges" in page.inner_text("#rs-dock .rs-dd-chint")
         page.click("#rs-dock .rs-dd-view button:has-text('Table')")
         assert page.is_visible("#rs-dock .rs-dock-table")
         browser.close()

@@ -80,18 +80,25 @@ export function dataDock(o = {}){
   svgB.type = "button"; svgB.title = "The chart as an SVG file";
   for(const [k, t] of [["bar", "Bar"], ["line", "Line"], ["histogram", "Histogram"], ["scatter", "Scatter"], ["pie", "Pie"]]) kindS.append(Object.assign($("option", "", t), {value: k}));
   const lab = (t, e) => { const l = $("label", "rs-dd-cl"); l.append($("span", "", t), e); return l; };
+  // how to use each kind of chart: under the controls, and in the tooltip of its button
+  const HINT = {bar: "One bar for each value of X (the groups). Y: the count of rows, or the sum of a number column.",
+    line: "X: a number, a date or a time, in its order. Y: the count of rows, or the sum of a number column, for each X.",
+    histogram: "X: a number column. It counts the rows in each of 20 equal ranges of X.",
+    scatter: "X and Y: two number columns. One point for each row.",
+    pie: "One slice for each value of X (the parts). Y: the count of rows, or the sum of a number column. At most 6 slices."};
   // Kind: five icon buttons, the chosen one filled (Kaveh, 2026-11-06: "also design of these parts too"); X and Y: roadstyle's select box
   const ICON = {bar: '<path d="M5 20V11M10 20V5M15 20v-6M20 20V8"/>', line: '<path d="m3 17 5-6 4 3 5-7 4 4"/>', histogram: '<path d="M3 20h18M4 20v-6h4v6M8 20V8h4v12M12 20v-9h4v9M16 20v-4h4v4"/>',
                 scatter: '<circle cx="6" cy="16" r="1.6"/><circle cx="10" cy="10" r="1.6"/><circle cx="15" cy="13" r="1.6"/><circle cx="18" cy="6" r="1.6"/><circle cx="8" cy="5" r="1.6"/>',
                 pie: '<path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>'};
   const kinds = $("span", "rs-dd-kinds"); kinds.setAttribute("role", "radiogroup"); kinds.setAttribute("aria-label", "The kind of chart");
-  for(const o2 of kindS.options){ const b = $("button", "rs-dd-kind"); b.type = "button"; b.dataset.kind = o2.value; b.title = o2.textContent; b.setAttribute("aria-label", o2.textContent); b.setAttribute("role", "radio");
+  for(const o2 of kindS.options){ const b = $("button", "rs-dd-kind"); b.type = "button"; b.dataset.kind = o2.value; b.title = `${o2.textContent}: ${HINT[o2.value]}`; b.setAttribute("aria-label", o2.textContent); b.setAttribute("role", "radio");
     b.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[o2.value]}</svg>`;
     b.onclick = () => { kindS.value = o2.value; change(); }; kinds.append(b); }
   const paintKinds = () => kinds.querySelectorAll("button").forEach((b) => { const on = b.dataset.kind === kindS.value; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
   chartRow.append(kinds, lab("X", xS), lab("Y", yS), $("span", "rs-dd-sp"), svgB);
   rsSelectBoxes(chartRow);
-  chartBox.append(chartRow, chartEl);
+  const hintEl = $("p", "rs-dd-chint");
+  chartBox.append(chartRow, hintEl, chartEl);
   side.append(list, card, hint); side.classList.add("empty");
   split.append(table.el, chartBox, side);
   el.append(q, err, split);
@@ -261,6 +268,13 @@ export function dataDock(o = {}){
   // table) is drawn from all the rows, one mark for each value of X: the count of rows, or the sum of Y (Kaveh, 2026-11-06: a pie of lanes had one
   // slice for each road). The road ids are never a choice of Y or X: a chart of ids says nothing.
   const COUNT = "(count of rows)";
+  // the columns that fit each kind, and one line that says how to use it
+  function fits(kind, r){
+    const m = measures(r), plain = r.columns.filter((col) => col.name !== ID && !ID_NAME.test(col.name) && !NOT_X.test(String(col.type))).map((col) => col.name);
+    const times = r.columns.filter((col) => rs.chart.isTime(col.type)).map((col) => col.name);
+    return kind === "line" ? {xs: [...times, ...m], ys: [COUNT, ...m]} : kind === "histogram" ? {xs: m, ys: []}
+      : kind === "scatter" ? {xs: m, ys: m} : {xs: plain, ys: [COUNT, ...m]};
+  }
   // a number column that is a measure, not an id: not the id column, not a name of an id (osm_id, source, target, ..._ref), and no value of 10^12 or more
   const ID_NAME = /(^|_)(id|ref)$|^(source|target|from_node|to_node)$/i;
   const NOT_X = /GEOMETRY|BLOB|BYTEA|BINARY|^MAP|^STRUCT|^UNION|\[\]|^LIST|JSON/i;      // no chart of geometries, bytes, maps, structs or lists
@@ -269,11 +283,12 @@ export function dataDock(o = {}){
   let chartSeq = 0;
   async function drawChart(){
     const r = res, me = ++chartSeq; if(!r) return;
-    const sp = r.chart || {kind: "bar"}, names = r.columns.filter((c) => c.name !== ID && !NOT_X.test(String(c.type))).map((c) => c.name);
-    const nums = measures(r);
+    const sp = r.chart || {kind: "bar"}, f = fits(sp.kind, r);
     const ys = [].concat(sp.y || []), grouped = ["bar", "line", "pie"].includes(sp.kind);
-    kindS.value = sp.kind; paintKinds(); fill(xS, names, sp.x);
-    fill(yS, grouped ? [COUNT, ...nums] : nums, ys[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
+    kindS.value = sp.kind; paintKinds(); hintEl.textContent = HINT[sp.kind] || "";
+    fill(xS, f.xs, sp.x); fill(yS, f.ys, ys[0], sp.kind === "histogram"); yS.disabled = sp.kind === "histogram";
+    if(!f.xs.length || (sp.kind === "scatter" && f.ys.length < 1)){
+      chartEl.replaceChildren(Object.assign($("p", "rs-chart-none"), {textContent: `This result has no column for a ${sp.kind} chart. ${HINT[sp.kind]}`})); return; }
     let spec = {...sp, columns: r.columns, rows: table.rows(), values: null, onPick: (i) => rowClick(table.rows()[i], r.columns)};
     const xi = r.columns.findIndex((c) => c.name === sp.x);
     const repeats = xi >= 0 && new Set(table.rows().map((x) => String(x[xi]))).size < table.rows().length;
@@ -289,15 +304,15 @@ export function dataDock(o = {}){
     if(sp.kind === "histogram" && r.more){ const v = await allRows(r, CSV_LIMIT); if(me !== chartSeq) return; spec.values = v.map((x) => x[xi]); }
     if(!chartObj) chartObj = rs.chart(chartEl, spec); else chartObj.set(spec);
   }
-  const change = () => { if(!res) return; const k = kindS.value, old = res.chart || {};
-    res.chart = {...old, kind: k, x: xS.value || old.x, y: k === "histogram" ? undefined : (yS.value || [].concat(old.y || [])[0])};
-    if(["bar", "line", "pie"].includes(k) && res.chart.y === res.chart.x) res.chart.y = COUNT;      // the sum of x for each x says nothing: the rows
-    if(k === "histogram" && !rs.chart.isNumber((res.columns.find((c) => c.name === res.chart.x) || {}).type)) res.chart.x = (res.columns.find((c) => rs.chart.isNumber(c.type)) || {}).name;
-    // a kind that needs y and has none (from a histogram): a number column, another than x where there is one
-    if(k !== "histogram" && !res.chart.y){ const n = measures(res);
-      res.chart.y = k === "scatter" ? n.find((x) => x !== res.chart.x) || n[0] : COUNT; }
-    if(k === "scatter" && res.chart.y === COUNT){ const n = measures(res); res.chart.y = n.find((x) => x !== res.chart.x) || n[0]; }
-    drawChart(); };
+  // a new kind, X or Y: X and Y move to a column that fits the kind (Kaveh, 2026-11-06: a histogram of the road ids)
+  const change = () => { if(!res) return; const k = kindS.value, old = res.chart || {}, f = fits(k, res);
+    const pick = (want, list, alt) => list.includes(want) ? want : list.includes(alt) ? alt : list[0];
+    const time = res.columns.find((col) => rs.chart.isTime(col.type));
+    const x = pick(xS.value, f.xs, k === "line" && time ? time.name : old.x);
+    let y = k === "histogram" ? undefined : pick(yS.value, f.ys, [].concat(old.y || [])[0]);
+    if(["bar", "line", "pie"].includes(k) && y === x) y = COUNT;                                     // the sum of x for each x says nothing: the rows
+    if(k === "scatter" && y === x) y = f.ys.find((n) => n !== x) || y;
+    res.chart = {...old, kind: k, x, y}; drawChart(); };
   kindS.onchange = xS.onchange = yS.onchange = change;
   svgB.onclick = () => { const s = chartObj && chartObj.svg(); if(!s) return;
     const copy = s.cloneNode(true), css = getComputedStyle(document.documentElement);
