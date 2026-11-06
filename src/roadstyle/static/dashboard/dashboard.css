@@ -3,6 +3,10 @@
    is 4.6:1 on the light panel's cards (the logo teal is 4.43:1 there). On the dark panel the teal is lighter, of the same hue: 8.5:1 on the panel's background. `--accent-fill` is the colour of a filled control (a selected tab, a primary button, a mode
    on): its text is white in both themes (4.71:1), so the fill does not get lighter in the dark theme. */
 :root{--accent:#0e7c8e;--accent-fill:#0E7F91}
+/* ONE HOVER (docs/design/ask_and_data_dock.md, "One hover for the whole dashboard"): every control reacts under the pointer and on keyboard focus,
+   in one of three looks by its kind. Not filled: the tint `--rs-hover-bg` behind it, its text or icon (and its border, if it has one) in the accent.
+   Filled (a primary button, the open tab): brighter. A link: underlined. A disabled control has no hover. The tint follows the theme's accent. */
+:root{--rs-hover-bg:color-mix(in srgb,var(--accent) 12%,transparent)}
 /* THE CARD STANDARD of the panel (docs/guides/dashboard-panel.md, "Cards: the panel standard"): the three numbers a page may change in one place.
    --rs-card-gap: the space between two cards. --rs-card-pad: the padding inside a card (a closed card is 14 + 16 + 14 = 44px high with the default).
    --rs-panel-bottom: the room under the last card at the end of the panel. */
@@ -21,13 +25,13 @@ html[data-rs-theme=dark]{--bg:#14171c;--ink:#e9ecf1;--mut:#8b93a1;--line:#272b33
 .maplibregl-ctrl.bm-ctrl{position:relative;overflow:visible}
 .maplibregl-ctrl .bm-icon{font:16px/1 system-ui,sans-serif;color:#5b616b;cursor:pointer;
   position:static !important;top:auto !important;right:auto !important;bottom:auto !important;left:auto !important}
-.maplibregl-ctrl .bm-icon:hover{color:#334155}
+.maplibregl-ctrl .bm-icon:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .maplibregl-ctrl .bm-menu{position:absolute !important;top:0 !important;right:36px !important;bottom:auto !important;left:auto !important;
   z-index:3;background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.06);box-shadow:0 4px 16px rgba(0,0,0,.14);
   font:13px system-ui,sans-serif;display:none;overflow:hidden;padding:4px;text-align:left}
 .bm-menu.open{display:block}
 .bm-menu div{padding:6px 12px;cursor:pointer;white-space:nowrap;border-radius:5px}
-.bm-menu div:hover{background:#f2f4f7}
+.bm-menu div:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .bm-menu div.on{font-weight:700;color:var(--accent)}
 /* non-panel: the map's own colour-by + filter cards share one anchored top-left stack, clear of
    the native zoom controls (top-right) and the scale bar (bottom-left). Panel mode docks them. */
@@ -52,7 +56,7 @@ body.rs-panel #map{right:320px}
   font-size:11px;letter-spacing:.6px;text-transform:uppercase}
 .rs-side-x,.rs-side-min{cursor:pointer;color:#999;font:700 16px/1 sans-serif;padding:0 3px}
 .rs-side-min{display:inline-flex;align-items:center}
-.rs-side-x:hover,.rs-side-min:hover{color:#333}
+.rs-side-x:hover,.rs-side-min:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .rs-side-q{padding:9px 14px;border-bottom:1px solid #ececec}
 .rs-side-q input{width:100%;box-sizing:border-box;padding:6px 9px;border:1px solid #ddd;
   border-radius:7px;font:12.5px system-ui,sans-serif;outline:none}
@@ -60,7 +64,7 @@ body.rs-panel #map{right:320px}
 .rs-side-q-res{max-height:200px;overflow:auto}
 .rs-qrow{padding:4px 2px;border-bottom:1px solid #f3f3f3;cursor:pointer;display:flex;
   justify-content:space-between;gap:10px;font-variant-numeric:tabular-nums}
-.rs-qrow:hover{background:#f7f5ff}
+.rs-qrow:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .rs-qrow b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rs-qrow span{color:#8a8a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:58%}
 .rs-qmore{color:#9a9a9a;padding:5px 2px;font-size:12px}
@@ -118,7 +122,7 @@ box-shadow:0 2px 10px rgba(0,0,0,.10);border:1px solid rgba(0,0,0,.06);font:13px
 .rs-tl .ov-ctrl{position:static;max-height:none;overflow:auto;min-height:0}
 .ov-ctrl.collapsed .ov-body{display:none}
 .rs-tl .ov-ctrl .ov-hd{cursor:pointer;user-select:none}
-.ov-ctrl label:hover{color:var(--accent)}
+.ov-ctrl label:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .ov-ctrl .ov-sw{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
 /* text: soft slate, never black - popups, the map's own buttons, the scale and attribution */
 .maplibregl-ctrl-group button{color:#334155}
@@ -203,7 +207,7 @@ html.rs-tb-folded #rs-toolbar>.rs-tb-row{display:none}
 #rs-toolbar.rs-tb-top .rs-tb-fold svg,#rs-toolbar.rs-tb-bottom .rs-tb-fold svg{transform:rotate(-90deg)}
 html.rs-tb-folded #rs-toolbar .rs-tb-fold svg{transform:none}
 #rs-toolbar .maplibregl-ctrl-group button+button{border:0}
-#rs-toolbar button:hover:not(:disabled){background:var(--rs-tb-hover)}
+#rs-toolbar button:is(:hover,:focus-visible):not(:disabled){background:var(--rs-hover-bg);color:var(--accent)}
 .rs-tb-row,.rs-tb-scroll{display:contents}
 /* a bar that is too short for its tools wraps to a second column (a third, and so on), toward the map; the first column is at the edge. No `overflow`: a box opens outside the bar.
    The margins of 64 px (the corner box at the bottom) shrink in a tiny window: the bar is never lower than two tools (86 px) and keeps above the corner box (the `top` rule). */
@@ -244,7 +248,7 @@ html.rs-overlay .rs-side-min{display:inline-flex;align-items:center;justify-cont
 /* the credits in the corner box: a small round button with the italic i; its list opens upward, toward the middle of the window */
 #rs-scalebox .rs-attr-ctrl{pointer-events:auto;position:relative!important;overflow:visible;flex:none;float:none;margin:0;width:22px;height:22px;background:none!important;border:0;box-shadow:none!important;border-radius:0}
 #rs-scalebox .rs-attr-ctrl button{width:22px;height:22px;padding:0;border:0;background:none;color:var(--rs-tb-ink);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-#rs-scalebox .rs-attr-ctrl button:hover{background:var(--rs-tb-hover)}
+#rs-scalebox .rs-attr-ctrl button:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
 #rs-scalebox .rs-attr-ctrl button svg{width:16px;height:16px}
 html:not(.rs-panel-left) #rs-scalebox .rs-attr-ctrl{order:-1}
 #rs-scalebox #rs-attr-box{position:absolute;top:auto;bottom:calc(100% + 8px);left:auto;right:-8px;width:264px}
@@ -266,7 +270,7 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .bm-menu.rs-bm-box .rs-bm-h{padding:2px 4px!important}
 .rs-bm-row{display:flex;align-items:center;gap:8px;padding:4px;border-radius:6px;cursor:pointer;font:12px/1.3 system-ui,sans-serif}
 .rs-bm-row[hidden]{display:none}   /* a row the page cannot use (One-way arrows on a page without arrows) */
-.rs-bm-row:hover{background:var(--rs-tb-hover,rgba(0,0,0,.08))}
+.rs-bm-row:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .rs-bm-sw{box-sizing:border-box;width:32px;height:20px;border-radius:3px;border:1px solid rgba(0,0,0,.2);flex:none}
 .rs-bm-box hr{border:0;border-top:1px solid var(--rs-tb-border,rgba(0,0,0,.12));margin:4px 0;width:100%}
 .rs-bm-row input:disabled+.rs-bm-n{opacity:.45}
@@ -306,10 +310,9 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-rd-row b{font-weight:400;opacity:.65;font-variant-numeric:tabular-nums;font-size:11px}
 .rs-rd-row input{margin:0;accent-color:var(--accent)}
 #rs-toolbar #rs-roads-box button{width:auto;height:auto;min-width:0;border:0;background:none;color:inherit;font:12px/1.3 system-ui,sans-serif;cursor:pointer;padding:0;border-radius:6px}
-#rs-roads-box .rs-rd-row button:hover{text-decoration:underline}
+#rs-toolbar #rs-roads-box button:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}      /* over the box's own `#rs-toolbar #rs-roads-box button` */
 .rs-rd-row.rs-rd-plain{grid-template-columns:18px 1fr}
 #rs-toolbar #rs-roads-box .rs-rd-bar button{padding:4px 12px;border:1px solid var(--rs-tb-border)}
-#rs-roads-box .rs-rd-bar button:hover{background:var(--rs-tb-hover)}
 /* ---- the box of the tool `navigate` (navbox.js): zoom, turn and tilt ---- */
 #rs-nav-box{position:absolute;z-index:9}
 #rs-nav-box[hidden]{display:none}
@@ -322,13 +325,13 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-nb-row input[type=range]{width:100%;margin:0;accent-color:var(--accent)}
 .rs-nb-zoom{display:grid;grid-template-columns:22px 1fr 22px;gap:4px;align-items:center}
 #rs-nav-box button{width:22px;height:22px;padding:0;border:1px solid var(--rs-tb-border);border-radius:6px;background:none;color:inherit;font:600 14px/1 system-ui,sans-serif;cursor:pointer}
-#rs-nav-box button:hover{background:var(--rs-tb-hover)}
+#rs-nav-box button:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
 #rs-nav-box .rs-nb-hint{font-size:11px;opacity:.7;margin-top:8px}
 #rs-nav-box .rs-nb-reset{width:100%;height:auto;padding:5px 8px;margin-top:4px;font:12px system-ui,sans-serif}
 .rs-cb-opts{display:grid;gap:1px}
 .rs-cb-opt{display:block;width:100%;padding:6px 8px;border:0;border-radius:6px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 #rs-toolbar .rs-cb-opt{width:100%;height:auto;padding:5px 10px;border-radius:6px;font:12px/1.3 system-ui,sans-serif;color:var(--rs-tb-ink);text-align:left}
-.rs-cb-opt:hover{background:var(--rs-tb-hover)}
+.rs-cb-opt:is(:hover,:focus-visible),.rs-cb-opt.on:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
 .rs-cb-opt.on{background:var(--rs-tb-on);font-weight:600}
 .rs-cb-lg{display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;padding:0 4px}
 .rs-cb-lg .lg-title{grid-column:1/-1;font-weight:600;margin-bottom:2px}
@@ -380,7 +383,7 @@ html.rs-phone #rs-toolbar.rs-tb-top :is(.bm-menu,#rs-attr-box,#rs-color-box,#rs-
 #rs-attr-box[hidden]{display:none}
 .rs-attr-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:6px;color:inherit;text-decoration:none;font:12px/1.3 system-ui,sans-serif}
 a.rs-attr-row{cursor:pointer}
-a.rs-attr-row:hover{background:var(--rs-tb-hover)}
+a.rs-attr-row:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .rs-attr-out{display:inline-flex;opacity:.55;flex:none}
 a.rs-attr-row:hover .rs-attr-out{opacity:1}
 /* The bar's background and blur are on a layer behind it, not on the bar: a box inside a bar that has a blur cannot blur the map behind the box
@@ -404,7 +407,7 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
   border:0;border-radius:12px;background:var(--card,transparent);color:inherit;font:13px system-ui,sans-serif;text-align:left;cursor:pointer}
 /* a select box on a card has the card's colour: a thin line shows that it is a field (as a text field), not a line of text */
 #sb .sb-sec[data-rs-card] .rs-sel-btn{border:1px solid var(--line);padding:5px 8px}
-.rs-sel-btn:hover:not(:disabled){box-shadow:inset 0 0 0 1px var(--accent)}
+.rs-sel-btn:hover:not(:disabled){background:var(--rs-hover-bg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .rs-sel-btn:focus-visible,.rs-sel-btn[aria-expanded=true]{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-sel-btn:disabled{opacity:.5;cursor:not-allowed}
 .rs-sel-btn svg{flex:none;opacity:.6}
@@ -430,7 +433,7 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 .rs-svw-bar{background:var(--rs-card-bg);color:var(--rs-tb-ink);padding:6px 44px 6px 14px;gap:6px}
 .rs-svw-t{font-weight:600}
 .rs-svw-bar button{border:0;background:none;color:var(--rs-tb-ink);min-width:28px;height:28px;padding:0 8px;border-radius:10px;font:13px/1 system-ui;cursor:pointer}
-.rs-svw-bar button:hover:not(:disabled){background:var(--rs-tb-hover)}
+.rs-svw-bar button:is(:hover,:focus-visible):not(:disabled){background:var(--rs-hover-bg);color:var(--accent)}
 .rs-svw-mode,.rs-svw-prov{display:inline-flex;border:0;border-radius:10px;overflow:hidden;background:var(--rs-tb-hover)}
 .rs-svw-bar .rs-svw-mode button,.rs-svw-bar .rs-svw-prov button{height:24px;font:11px/1 system-ui;padding:0 9px;color:var(--rs-tb-ink);border-radius:0}
 .rs-svw-bar .rs-svw-mode button.on,.rs-svw-bar .rs-svw-prov button.on,.rs-svw-bar button.rs-svw-cov.on{background:var(--accent-fill);color:#fff}
@@ -438,6 +441,8 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 .rs-svw-bar button.rs-svw-cov svg{display:block;flex:none}
 .rs-svw-bar button.rs-g3d-follow,.rs-svw-bar button.rs-g3d-show{border:0;background:var(--rs-tb-hover);color:var(--rs-tb-ink);border-radius:10px;height:24px;padding:0 10px;font:11px/1 system-ui}
 .rs-svw-bar button.rs-g3d-follow.on{background:var(--accent-fill);color:#fff;border-color:var(--accent-fill)}
+.rs-svw-bar button:is(.rs-g3d-follow,.rs-g3d-show):not(.on):is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
+.rs-svw-bar button.rs-g3d-follow.on:is(:hover,:focus-visible){filter:brightness(1.1)}
 .rs-svw-bar a.rs-g3d-src{color:var(--rs-tb-ink);opacity:.6}
 .rs-g3d-warn{color:#d97706}
 .rs-svw-msg{background:var(--rs-card-bg);color:var(--rs-tb-ink)}
@@ -484,7 +489,8 @@ html.rs-panel-left:not(.rs-overlay):not(.rs-phone):has(#sb.hidden) #map{left:0!i
 .rs-set-seg{display:inline-flex;border-radius:10px;background:var(--rs-tb-hover);padding:2px;gap:2px}
 #rs-toolbar .rs-set-seg button,#rs-settings-box button{width:auto;height:auto;min-width:0;padding:4px 9px;border:0;border-radius:8px;background:none;color:inherit;font:11px/1.2 system-ui,sans-serif;cursor:pointer}
 #rs-settings-box .rs-set-seg button.on{background:var(--rs-tb-on)}
-#rs-settings-box button:hover:not(:disabled){background:var(--rs-tb-hover)}
+#rs-settings-box .rs-set-seg button.on:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
+#rs-settings-box button:is(:hover,:focus-visible):not(:disabled){background:var(--rs-hover-bg);color:var(--accent)}
 #rs-settings-box button:disabled{opacity:.4;cursor:not-allowed}
 .rs-set-slide{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;padding:3px 8px}
 .rs-set-slide span{grid-column:1;grid-row:1}
@@ -531,7 +537,7 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 #sb .sb-sec .rs-sec-title{flex:1;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:none;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;text-align:left}
 #sb .sb-sec[data-rs-fold] > .rs-sec-hd{cursor:pointer}
 #sb .sb-sec[data-rs-fold] > .rs-sec-hd:hover{color:var(--accent)}
-#sb .sb-sec .rs-sec-title:hover{border:0;color:inherit}
+#sb .sb-sec .rs-sec-title:hover{border:0;color:inherit;background:none}      /* a card's title row is not a control of its own: the card rules below give its hover */
 #sb .sb-sec .rs-sec-title:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px}
 #sb .sb-sec.folded .rs-sec-hd{margin-bottom:0}
 .sb-sec .rs-sec-hd > svg{flex:none;transition:transform .15s}
@@ -559,7 +565,7 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 #rs-fold-all[hidden]{display:none}
 /* margin-left:auto puts it at the right, beside the hide-panel button: the row is space-between, and with three items it went to the middle */
 #sb #rs-fold-all{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;margin:0 6px 0 auto;background:none;border:1px solid var(--line);border-radius:8px;color:var(--mut);cursor:pointer;flex:none}
-#sb #rs-fold-all:hover{color:var(--accent);border-color:var(--accent)}
+#sb #rs-fold-all:hover{background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
 /* the kit for the HTML that a page adds to the panel: the panel's tokens (--ink, --mut, --line, --card, --accent) change with the theme, so a section that
    uses them follows the light and the dark theme. Plain text, links, tables and rules already do. */
 .sb-sec{color:var(--ink)}
@@ -602,7 +608,9 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
   cursor:pointer;font-size:13px;width:28px;height:28px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
 #sb-hide{margin-left:6px}
 #sb #sb-th,#sb #sb-hide{padding:0}      /* over "#sb button": the icon needs the room */
-#sb-th:hover,#sb-hide:hover{color:var(--accent);border-color:var(--accent)}
+#sb-th:hover{background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
+/* the hide and show buttons have their look with !important (over `#sb button`), so their hover has it too */
+:is(#rs-show-right button,#sb-show,#sb-hide,html.rs-overlay .rs-side-min):is(:hover,:focus-visible){background:color-mix(in srgb,var(--accent) 12%,var(--rs-tb-bg))!important;color:var(--accent)!important;border-color:var(--accent)!important}
 #sb.hidden{display:none}
 #sb-show{position:fixed;top:10px;right:10px;z-index:3;display:none;background:#fff;color:#333;
   border:1px solid #ccc;border-radius:8px;width:32px;height:32px;cursor:pointer;padding:0;
@@ -620,9 +628,10 @@ html #sb[data-theme=dark]{--rs-thumb:40%}
 #rs-help .rs-help-terms dt{font-weight:700;padding-right:10px}
 #rs-help .rs-help-note{margin-top:12px;padding:8px 10px;background:color-mix(in srgb,#38a3dc 14%,transparent);border-radius:8px;font-size:12px}
 #rs-help a{color:inherit;font-weight:600;text-decoration:underline}
-#rs-help .rs-help-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:20px;color:inherit;cursor:pointer}
+#rs-help .rs-help-x{position:absolute;top:8px;right:10px;border:0;background:none;font-size:20px;color:inherit;cursor:pointer;border-radius:6px}
+#rs-help .rs-help-x:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
 :is(#sb,body) .rs-help-btn{width:22px;height:22px;padding:0;border:0;background:none;color:inherit;opacity:.7;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-left:6px;border-radius:50%;cursor:pointer}
-:is(#sb,body) .rs-help-btn:hover{opacity:1;border:0;color:var(--accent)}      /* (the panel's own `#sb button` rules are as specific: the id of the panel is in both) */
+:is(#sb,body) .rs-help-btn:is(:hover,:focus-visible){opacity:1;border:0;background:var(--rs-hover-bg);color:var(--accent)}      /* (the panel's own `#sb button` rules are as specific: the id of the panel is in both) */
 /* the icon keeps its 16px in every box: a card's chart rule (`.sb-sec .rs-sec-box svg`, a chart as wide as the card) is less specific */
 :is(#sb,body) .rs-help-btn svg{width:16px;height:16px;display:block;flex:none}
 /* a phone: the help window is a sheet at the bottom of the screen, as the panel and the other windows are */
@@ -651,7 +660,7 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb .rs-table td{text-align:right;padding:3px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
 #sb .rs-table th:first-child,#sb .rs-table td:first-child{text-align:left}
 #sb .rs-table tbody tr{cursor:pointer}
-#sb .rs-table tbody tr:hover{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+#sb .rs-table tbody tr:hover{background:var(--rs-hover-bg)}
 #sb .rs-table th[data-sort]{color:var(--accent)}
 #sb .rs-table th[data-sort=asc]::after{content:" \25B2";font-size:8px}
 #sb .rs-table th[data-sort=desc]::after{content:" \25BC";font-size:8px}
@@ -659,12 +668,14 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 /* ---- TABS AND THE TWO-WAY SWITCH (tabs.js): the selected one is in --accent-fill / --accent (the dashboard's one accent, above); the rest are the panel's muted ink ---- */
 #sb .rs-tabs{display:flex;flex-wrap:wrap;gap:2px;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line)}
 #sb .rs-tab{padding:7px 9px;border:1px solid transparent;border-radius:8px;background:none;color:var(--mut);font:600 12px system-ui,sans-serif;cursor:pointer;user-select:none}
-#sb .rs-tab:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent);border-color:transparent}
+#sb .rs-tab:hover{background:var(--rs-hover-bg);color:var(--accent);border-color:transparent}
 #sb .rs-tab.on,#sb .rs-tab.on:hover{color:#fff;background:var(--accent-fill);border-color:var(--accent-fill)}
+#sb .rs-tab.on:is(:hover,:focus-visible){filter:brightness(1.1)}
 #sb .rs-seg{display:flex;padding:2px;margin-bottom:12px;border-radius:10px;background:color-mix(in srgb,var(--mut) 25%,transparent)}
 #sb .rs-seg button{flex:1;padding:6px 8px;border:0;border-radius:8px;background:none;color:color-mix(in srgb,var(--ink) 70%,var(--mut));font:600 11.5px system-ui,sans-serif;cursor:pointer}
-#sb .rs-seg button:hover{color:var(--ink);border:0}
+#sb .rs-seg button:hover{background:var(--rs-hover-bg);color:var(--accent);border:0}
 #sb .rs-seg button.on,#sb .rs-seg button.on:hover{background:var(--card);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+#sb .rs-seg button.on:is(:hover,:focus-visible){background:color-mix(in srgb,var(--accent) 12%,var(--card))}
 #sb .rs-tab:focus-visible,#sb .rs-seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 /* THE DAY PICKER (days.js): a label as the card titles have, then a row. The field looks like a form field (a border, the page's background, the
    calendar icon and a "v"), so that a person sees that it opens something; the arrows and "Latest" are soft buttons beside it. */
@@ -673,7 +684,7 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 :is(#sb,body) .rs-day button{height:34px;box-sizing:border-box;margin:0;border-radius:10px;color:var(--ink);font:13px/1 system-ui,sans-serif;cursor:pointer}
 :is(#sb,body) .rs-day :is(.rs-day-step,.rs-day-last){flex:none;padding:0 12px;border:0;background:var(--card)}
 :is(#sb,body) .rs-day .rs-day-step{width:34px;padding:0;font-size:16px}
-:is(#sb,body) .rs-day :is(.rs-day-step,.rs-day-last):hover:not(:disabled){border:0;background:color-mix(in srgb,var(--accent) 14%,var(--card));color:var(--ink)}
+:is(#sb,body) .rs-day :is(.rs-day-step,.rs-day-last):hover:not(:disabled){border:0;background:var(--rs-hover-bg);color:var(--accent)}
 :is(#sb,body) .rs-day button:disabled{opacity:.4;cursor:default}
 :is(#sb,body) .rs-day .rs-day-field{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;
   border:1px solid color-mix(in srgb,var(--ink) 35%,var(--bg));background:var(--bg);font-weight:600;text-align:left;transition:background .12s,box-shadow .12s,border-color .12s}
@@ -697,8 +708,9 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 .rs-day-cal .rs-day-cw{padding:4px 0;font-size:10.5px;font-weight:700;text-align:center;opacity:.7}
 .rs-day-cal .rs-day-cd{height:32px}
 .rs-day-cal .rs-day-cd:not(:disabled){font-weight:600;background:color-mix(in srgb,var(--accent) 14%,transparent)}
-.rs-day-cal .rs-day-cd:not(:disabled):hover{background:color-mix(in srgb,var(--accent) 28%,transparent)}
+.rs-day-cal .rs-day-cd:not(:disabled):hover{background:color-mix(in srgb,var(--accent) 28%,transparent);color:var(--accent)}      /* a day with data has the tint already: a stronger one */
 .rs-day-cal .rs-day-cd.on,.rs-day-cal .rs-day-cd.on:hover{background:var(--accent-fill);color:#fff}
+.rs-day-cal .rs-day-cd.on:hover{filter:brightness(1.1)}
 .rs-day-cal button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 #sb [data-pane][hidden]{display:none}
 
@@ -751,7 +763,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 .rs-dz-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
 .rs-dz-title .dname{font-size:12px;color:var(--mut);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .rs-dz-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
-.rs-dz-back:hover{color:var(--accent);border-color:var(--accent-fill)}
+.rs-dz-back:hover{background:var(--rs-hover-bg);color:var(--accent);border-color:var(--accent)}
 .rs-dz{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 .rs-dz [hidden]{display:none!important}
 #sb .rs-dz .rs-tabs{flex:none;margin:0 15px;padding-bottom:8px;margin-bottom:0}
@@ -818,3 +830,9 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 html.rs-phone .rs-dz-back,html.rs-phone .rs-dz .rs-tab,html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
 /* the preview under a transparent ground: the map container has the color of the base map, the checkerboard goes over that color */
 .rs-checker{background-image:repeating-conic-gradient(#d4d4d4 0 25%,#ffffff 0 50%);background-size:24px 24px}
+/* ONE HOVER, the rest: keyboard focus has a ring as well as the hover look; a link is underlined under the pointer */
+:is(#sb,#rs-toolbar,#rs-help,.rs-help-box,#rs-scalebox,.rs-day-cal,.rs-svw) :is(button,select,summary,a[href]):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+:is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]{text-decoration:none}
+:is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]:is(:hover,:focus-visible){text-decoration:underline}
+:is(#sb,#rs-help,.rs-help-box) summary{border-radius:6px;cursor:pointer}
+:is(#sb,#rs-help,.rs-help-box) summary:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
