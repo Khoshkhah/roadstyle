@@ -220,8 +220,10 @@ export function dataDock(o = {}){
     for(const t of s.tables || []){ const g = t.name.includes(".") ? t.name.split(".")[0] : ""; (groups[g] = groups[g] || []).push(t); }
     list.replaceChildren(...Object.keys(groups).sort((a, b) => (b === "extra") - (a === "extra")).map((g) => {
       const row = $("div", "rs-dd-tgroup"); if(g) row.append($("b", "", g));
-      for(const t of groups[g]){ const b = $("button", "", t.name.split(".").pop()); b.type = "button"; b.title = `${t.rows ?? "?"} rows${t.about ? ": " + t.about : ""}`;
-        b.onclick = () => { if(!ta) line.click(); ta.setRangeText(t.name, ta.selectionStart, ta.selectionEnd, "end"); ta.focus(); }; row.append(b); }
+      // a click shows the rows of the table (Kaveh, 2026-11-06: "by select a table can see each rows"); the line then has its SQL, to change
+      for(const t of groups[g]){ const b = $("button", "", t.name.split(".").pop()); b.type = "button"; b.title = `${t.rows ?? "?"} rows${t.about ? ": " + t.about : ""}. Click to see its rows.`;
+        const name = t.name.split(".").map((p) => /^[A-Za-z_]\w*$/.test(p) ? p : quoteId(p)).join(".");
+        b.onclick = () => { runSql(`SELECT * FROM ${name}`).catch(() => {}); }; row.append(b); }
       return row; }));
   }
   tablesB.onclick = async () => { if(list.hidden){ await drawTables(); list.hidden = false; tablesB.classList.add("on"); } else { list.hidden = true; tablesB.classList.remove("on"); } };

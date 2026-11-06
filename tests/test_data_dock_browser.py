@@ -30,6 +30,7 @@ const CANNED = {
   "SELECT edge_id, length_m FROM big": {columns: [["edge_id", "BIGINT"], ["length_m", "DOUBLE"]],
      rows: Array.from({length: 2765}, (_, i) => [BigInt(i % 6 + 1), (i * 7919) % 2765 + 0.5])},
   "SELECT name FROM edges": {columns: [["name", "VARCHAR"]], rows: [["Street 1"], ["Street 4"]]},
+  "SELECT * FROM main.edges": {columns: [["edge_id", "BIGINT"], ["name", "VARCHAR"]], rows: [[1n, "Street 0"]]},
   "SELECT day FROM days": {columns: [["day", "Date32<DAY>"]], rows: [[1781049600000]]},
 };
 window.queries = []; window.loads = [];
@@ -125,6 +126,11 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.click("#rs-dock tbody tr >> nth=0")
             page.wait_for_timeout(300)
             assert page.evaluate("rs.getState().selection") == "2"
+            # Tables: a click on a table shows its rows
+            page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
+            page.click("#rs-dock .rs-dd-tables button:has-text('edges')")
+            page.wait_for_timeout(300)
+            assert "SELECT * FROM main.edges" in page.evaluate("window.queries.at(-1)")
             # a DATE that comes as milliseconds shows as a day
             page.evaluate("data.run('SELECT day FROM days')")
             page.wait_for_timeout(200)
