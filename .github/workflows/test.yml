@@ -64,8 +64,10 @@ jobs:
           rustup toolchain install 1.99.1 --profile minimal    # the version of the Rust workflow
           (cd rust && cargo +1.99.1 build --locked -p roadstyle-cli)
 
+      # 4 workers (the runner has 4 cores); each test file stays on one worker (loadfile), so the tests of a file that share a server or a page run
+      # in order. The suite took 22 minutes on one worker (Kaveh, 2026-11-06: "25 min is too much")
       - name: Tests (incl. browser)
-        run: pytest -q
+        run: pytest -q -n 4 --dist loadfile
         env:
           ROADSTYLE_BIN: rust/target/debug/roadstyle
 

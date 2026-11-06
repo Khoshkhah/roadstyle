@@ -45,7 +45,7 @@ studio = ["streamlit"]                     # the `roadstyle studio` Streamlit wo
 mcp = ["mcp>=2.2,<3", "osmnx", "playwright"]  # `roadstyle-mcp`: tools for AI agents (+ playwright install chromium)
 all = ["roadstyle[basemaps,duckdb,arrow,studio]"]  # every user-facing extra
 docs = ["mkdocs-material", "mkdocs-redirects"]
-dev = ["roadstyle[all]", "pytest", "ruff", "mypy"]  # everything a user can get + test/lint tools
+dev = ["roadstyle[all]", "pytest", "pytest-xdist", "ruff", "mypy"]  # everything a user can get + test/lint tools
 
 [project.scripts]
 roadstyle = "roadstyle.cli:main"
