@@ -130,6 +130,7 @@ c.set({kind: "pie"});        // the same data, another kind
 | `pie` | a column of labels | one number column of 0 or more | one slice for each row, largest first, at most 6: the rest is "Other" |
 
 - The series have the colours `--rs-chart-1` to `--rs-chart-8`, in this order. Two or more series, and a pie, have a legend.
+- The chart has a title (`title`, else from the kind and the columns: "km by highway") and the number of rows under it. The axis ticks are compact (0, 2.5K, 5K) on hairline grid lines over a darker base line. A bar of one series has its value at its tip, of each bar up to 15 bars, else of the largest only; a single line has a soft wash under it and its last value at its end. A bar is at most 24 px thick. While the pointer is on a mark, the other marks fade.
 - The pointer on a bar, a point or a slice shows its values. A click on it calls `onPick(row)`.
 - A kind that does not fit the columns shows a line in place of the chart, for example "A pie chart needs a text column and one number column of 0 or more."
 - `small: true` draws a copy with no labels and no hover (the card of an Ask answer).
