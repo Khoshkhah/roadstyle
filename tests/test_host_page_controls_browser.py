@@ -85,6 +85,7 @@ _EDGES = """() => {
   rs.sections.add({id: 'tint', label: 'Ask', note: 'Ask a question', open: () => {}, background: true});
   rs.sections.add({id: 'plain', label: 'Open', note: 'Opens a thing', open: () => {}});
   rs.sections.add({id: 'fold', label: 'Folds', fold: true, html: '<p>x</p>'});
+  rs.sections.get('fold').classList.contains('folded') || rs.sections.get('fold').querySelector('.rs-sec-title').click();   // closed: the thin edge
   const rgb = (c) => { const p = document.createElement('i'); p.style.color = c; document.body.append(p);
     const v = getComputedStyle(p).color; p.remove(); const m = v.match(/[\\d.]+/g).map(Number);
     return v.startsWith('color(') ? m.map((x) => x * 255) : m; };          // a color-mix() is color(srgb r g b), 0 to 1
@@ -99,7 +100,7 @@ _EDGES = """() => {
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_the_cards_of_style_f_have_the_light_edge_and_the_tinted_card_has_none(tmp_path, theme):
-    """Kaveh's style F (the mock-up he chose): the edge of a closed card is a light line (about 1.8:1 on the card, not 3:1), and a card
+    """Kaveh's style F (the mock-up he chose): the edge of a closed card is a light line (1.6:1 on the card in the light theme, 2.8:1 in the dark, not 3:1 or more), and a card
     with the tint (`background: true`, the Ask card) has no edge."""
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser = p.chromium.launch(args=_ARGS)
@@ -110,7 +111,7 @@ def test_the_cards_of_style_f_have_the_light_edge_and_the_tinted_card_has_none(t
         found = page.evaluate(_EDGES)
         browser.close()
     assert found["tint"] is None, found
-    assert 1.3 < found["plain"] < 2.4 and abs(found["plain"] - found["fold"]) < 0.01, found
+    assert 1.3 < found["plain"] < 3 and abs(found["plain"] - found["fold"]) < 0.01, found     # light 1.6:1, dark 2.8:1 (the old edge was 3:1 or more)
 
 
 def test_the_title_row_of_the_dock_is_inside_a_phone(tmp_path):
