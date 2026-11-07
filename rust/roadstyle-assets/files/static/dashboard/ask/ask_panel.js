@@ -546,11 +546,6 @@ export function askPanel(o = {}){
   function finish(t, answer, c){
     t.cam = c.cam; t.text = answer; t.hist = [{role: "user", content: t.question}, {role: "assistant", content: answer}];
     t.el.append(answerEl(answer, t));
-    if(c.by){                                                                                       // who answered, and who could not (Auto)
-      const by = $("p", "rs-ask-by", `${c.by.name} · ${c.by.model}`);
-      if(c.tried.length) by.append(` (after ${c.tried.map((x) => `${x.name} · ${x.model}: ${x.why}`).join("; ")})`);
-      t.el.append(by);
-    }
     for(const m of c.maps){ const line = $("div", "rs-ask-map"); line.append($("span", "rs-ask-map-k", "Map"), $("span", "", m.text)); if(!m.move) line.append($("span", "rs-ask-map-to", "in the list of Colour or Focus")); t.el.append(line); }
     // the answer's table: the query with roads that has the most rows (a model often runs the full list, then a count or "LIMIT 2" for the longest); a map
     // tool's roads win over a helper query that the model ran after it
@@ -567,6 +562,13 @@ export function askPanel(o = {}){
     }
     const sqls = c.maps.flatMap((m) => m.sql);
     if(sqls.length){ foot = $("div", "rs-ask-foot"); foot.append(fold("rs-ask-sqls", plural(sqls.length, "map query", "map queries"), ...codes(sqls))); t.el.append(foot); }
+    // the model that answered, short (no "provider/" and no ":free"), at the end of the footer line: "1 query · 20 rows · flint-v1.0"; the tries that
+    // failed before it are not shown (a decision of 2026-11-07: the card names only the model that gave the answer)
+    if(c.by){
+      const m = c.by.model.replace(/^.*\//, "").replace(/:free$/, ""), sum = foot && foot.querySelector("summary");
+      if(sum) sum.append(` · ${m}`);
+      else { foot = $("div", "rs-ask-foot"); foot.append($("span", "rs-ask-by", m)); t.el.append(foot); }
+    }
     t.res = c.chart ? c.chart.res : [...c.maps].reverse().map((m) => m.res).find(Boolean) || best;
     // a chart answer: a small copy of the chart in the card (no labels, no hover); Show puts the chart in the dock again
     if(c.chart && c.chart.spec){ t.chart = true; const box = $("div", "rs-ask-chart"); t.el.insertBefore(box, foot || null);
