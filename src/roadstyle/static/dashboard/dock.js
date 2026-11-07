@@ -136,7 +136,10 @@ export const rsDock = (() => {
   function table({columns = [], rows = [], idColumn = null, more = false, onSort = null, onRow = null} = {}){
     const box = el("div", "rs-dock-table rs-scroll"), t = el("table", "rs-table"), head = el("thead"), tb = el("tbody");
     t.append(head, tb); box.append(t);
-    let cols = columns, data = rows, orig = rows, sort = null, picked = null;
+    let cols = columns, data = rows, orig = rows, sort = null, picked = null, pickedRow = null;
+    // the row that the person picked (onRow) is kept by its values, not by its place: a sort moves it and it stays selected; the host sorts all its rows
+    // (onSort) and gives new row arrays, so the values decide (a BigInt is equal by value)
+    const sameRow = (a, b) => !!a && !!b && a.length === b.length && a.every((v, j) => v === b[j]);
     const isNum = c => NUM.test(String(c.type || "")) && c.name !== idColumn;
     const idAt = () => idColumn ? cols.findIndex(c => c.name === idColumn) : -1;
     // the width of each column (Kaveh, 2026-11-06: "is there any algorithm to make suitable width size for every column?"): measured on a sample of
@@ -176,10 +179,11 @@ export const rsDock = (() => {
     const rowEl = (r, i) => {
       const tr = el("tr"), k = idAt();
       // onRow(row, index, columns): the host's own click (the data dock: a row of names selects its roads); else a row with an id selects its road
-      if(onRow){ tr.className = "rs-dock-id" + (picked === "#" + i ? " on" : ""); tr.onclick = () => { picked = "#" + i; mark(); onRow(r, i, cols); }; }
+      if(onRow){ tr.className = "rs-dock-id" + (sameRow(r, pickedRow) ? " on" : ""); tr.onclick = () => { pickedRow = r; mark(); onRow(r, i, cols); }; }
       else if(k >= 0){ tr.className = "rs-dock-id" + (picked != null && String(r[k]) === picked ? " on" : ""); tr.onclick = () => pick(String(r[k])); }
       r.forEach((v, j) => { const td = el("td", (v == null ? "rs-dock-null " : "") + (isNum(cols[j]) ? "n" : ""), text(v)); const s = text(v); if(s.length * 6.5 > (colW[j] || 320) - 28) td.title = s; tr.append(td); });
       tr.dataset.i = i;
+      if(tr.onclick){ tr.tabIndex = 0; tr.onkeydown = e => { if(e.target === tr && (e.key === "Enter" || e.key === " ")){ e.preventDefault(); tr.click(); } }; }   // the keys do what a click does
       return tr;
     };
     // over WINDOW rows only the rows in view are in the table: a spacer row above and below keeps the height (one height per row)
@@ -197,14 +201,16 @@ export const rsDock = (() => {
       else { const i = cols.findIndex(c => c.name === col), k = sort.dir === "asc" ? 1 : -1; data = [...orig].sort((x, y) => x[i] == null || y[i] == null ? cmpVal(x[i], y[i]) : k * cmpVal(x[i], y[i])); }
       drawHead(); drawBody();
     }
-    const mark = () => tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", "#" + tr.dataset.i === picked));
+    const mark = () => tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", sameRow(data[+tr.dataset.i], pickedRow)));
     function pick(id){
       picked = id; tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", String(data[+tr.dataset.i][idAt()]) === id));
       if(window.rs){ window.rs.select(id); window.rs.focus([id]); }
     }
-    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; picked = null; } if("more" in x) more = x.more; box.scrollTop = 0; colW = widths(); drawHead(); drawBody(); };
+    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; picked = null; pickedRow = null; } if("more" in x) more = x.more; box.scrollTop = 0; colW = widths(); drawHead(); drawBody(); };
     set({});
-    return {el: box, set, rows: () => data, sort: () => sort};
+    // clear(): no row is selected (the host closed its card)
+    const clear = () => { picked = null; pickedRow = null; tb.querySelectorAll("tr.rs-dock-id.on").forEach(tr => tr.classList.remove("on")); };
+    return {el: box, set, rows: () => data, sort: () => sort, clear};
   }
 
   return {add, remove, open, close, isOpen, show, note, height, list: () => [...items.keys()], table, top: dockTop};

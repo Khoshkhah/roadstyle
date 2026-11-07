@@ -1076,6 +1076,8 @@ html.rs-dock-shut .rs-dock-arrow svg{transform:rotate(180deg)}
 #rs-dock .rs-dock-table tbody tr.rs-dock-id:hover td{color:var(--accent)}
 #rs-dock .rs-dock-table thead th:is(:hover,:focus-visible) small{color:var(--accent)}
 #rs-dock .rs-dock-table tr.on{--rs-row:color-mix(in srgb,var(--accent) 24%,transparent)}
+#rs-dock .rs-dock-table tbody tr.on td:first-child{box-shadow:inset 3px 0 var(--accent),inset -1px 0 var(--line)}      /* the selected row: the tint and a bar, as rs-row */
+#rs-dock .rs-dock-table tbody tr.rs-dock-id:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 #rs-dock .rs-dock-table tr.rs-dock-pad td{padding:0;border:0;background:none}
 #rs-dock .rs-dock-null{color:var(--mut);font-style:italic}
 #rs-dock .rs-dock-table th[data-sort] span{color:var(--accent)}

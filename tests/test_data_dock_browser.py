@@ -321,3 +321,65 @@ def test_the_card_shows_an_overlay_item_and_no_popup_shows_while_the_dock_is_ope
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_a_click_on_a_row_tells_the_page_and_the_page_fills_the_card(tmp_path):
+    """Kaveh, 2026-11-07: "each selecting from table must show that item on map also shows its info in card info". A row of a result that is not a
+    road: the event `row` {columns, row, index, rowId} (also with the keys), the row shows as selected (and stays selected when the rows are sorted),
+    `data.card({title, chip, rows, id})` fills the card, and the close button, a new selection, a new result or `data.card(null)` close it. The close
+    button, a new selection and a new result send `cardclose`; the page's own `data.card(null)` does not."""
+    shown = ("data.show({sql: 'SELECT node_id, label, weight FROM nodes', columns: [{name: 'node_id', type: 'BIGINT'}, {name: 'label', type: 'VARCHAR'}, "
+             "{name: 'weight', type: 'DOUBLE'}], rows: [[10n, 'Charlie', 1.5], [11n, 'Alpha', 2.5], [12n, 'Bravo', 3.5]]})")
+    card = "data.card({title: 'Alpha', chip: 'nodes', rows: [['node_id', 11n], ['weight', 2.5], ['empty', null]], id: 11n})"
+    on = "document.querySelector('#rs-dock tbody tr.on td:nth-child(2)') && document.querySelector('#rs-dock tbody tr.on td:nth-child(2)').textContent"
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); data.open()")
+            page.evaluate("window.rowEv = []; window.nClosed = 0; data.addEventListener('row', e => rowEv.push({columns: e.detail.columns.map(c => c.name), "
+                          "row: e.detail.row.map(String), index: e.detail.index, rowId: e.detail.rowId})); data.addEventListener('cardclose', () => nClosed++)")
+            page.evaluate(shown)
+            page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 3")
+            page.click("#rs-dock tbody tr >> nth=1")
+            assert page.evaluate("rowEv") == [{"columns": ["node_id", "label", "weight"], "row": ["11", "Alpha", "2.5"], "index": 1, "rowId": None}]
+            assert page.evaluate(on) == "Alpha" and page.is_hidden("#rs-dock .rs-dd-card")             # the page has not filled the card yet
+            # the page's card: the title, the chip, the rows (no empty value), the id with Copy id
+            page.evaluate(card)
+            assert page.is_visible("#rs-dock .rs-dd-card")
+            text = page.inner_text("#rs-dock .rs-dd-card")
+            assert "Alpha" in text and "nodes" in text and "weight" in text and "2.5" in text and "id 11" in text and "Copy id" in text and "empty" not in text, text
+            # a sort keeps the row selected, at its new place
+            page.click("#rs-dock th:nth-child(2)")
+            assert page.evaluate(on) == "Alpha" and page.evaluate("[...document.querySelectorAll('#rs-dock tbody tr')].findIndex(r => r.classList.contains('on'))") == 0
+            page.click("#rs-dock th:nth-child(2)")
+            assert page.evaluate(on) == "Alpha" and page.evaluate("[...document.querySelectorAll('#rs-dock tbody tr')].findIndex(r => r.classList.contains('on'))") == 2
+            # the keys: Enter on a row does what a click does
+            page.focus("#rs-dock tbody tr >> nth=1")
+            page.keyboard.press("Enter")
+            assert page.evaluate("rowEv.at(-1).row[1]") == "Bravo" and page.evaluate(on) == "Bravo"
+            # the close button closes the card, tells the page and clears the row
+            page.evaluate(card)
+            page.click("#rs-dock .rs-dd-rc-x")
+            assert page.is_hidden("#rs-dock .rs-dd-card") and page.evaluate("nClosed") == 1 and page.evaluate(on) is None
+            # a new selection (a road) takes the card's place and tells the page
+            page.evaluate(card)
+            page.evaluate("rs.select('3')")
+            page.wait_for_timeout(200)
+            assert page.evaluate("nClosed") == 2 and "Street 2" in page.inner_text("#rs-dock .rs-dd-card")
+            # a new result closes it
+            page.evaluate(card)
+            page.evaluate(shown)
+            assert page.evaluate("nClosed") == 3 and page.is_hidden("#rs-dock .rs-dd-card")
+            # the page's own close sends no event
+            page.evaluate(card)
+            page.evaluate("data.card(null)")
+            assert page.is_hidden("#rs-dock .rs-dd-card") and page.evaluate("nClosed") == 3
+            # a bad card is an error; a road row sends `row` with its id
+            assert "rows" in page.evaluate("(() => { try { data.card({title: 'x'}); } catch(e) { return e.message; } })()")
+            page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
+            page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 6")
+            page.click("#rs-dock tbody tr >> nth=0")
+            assert page.evaluate("rowEv.at(-1).rowId") == "1" and page.evaluate("rowEv.at(-1).columns[0]") == "edge_id"
+        finally:
+            browser.close()
+    assert errors == [], errors

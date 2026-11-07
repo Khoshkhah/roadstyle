@@ -95,7 +95,7 @@ export function dataDock(o = {}){
   // the width of an empty side column (a reviewer, 2026-11-06: 300 px with only the hint in it); CSS .rs-dd-chart:not([hidden]) ~ .rs-dd-side.empty
   const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road or an item on the map, or a row in the table, or open the tables (the database button).");
   card.hidden = true;
-  const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
+  const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => { const k = cols.findIndex((c) => c.name === ID); emit("row", {columns: cols, row: r, index: i, rowId: k >= 0 && r[k] != null ? String(r[k]) : null}); rowClick(r, cols); }, onSort: (col, dir) => sortAll(col, dir)});
   const chartBox = $("div", "rs-dd-chart"), chartRow = $("div", "rs-dd-chartrow"), chartEl = $("div", "rs-dd-chartel"); chartBox.hidden = true;
   const kindS = $("select"), xS = $("select"), yS = $("select"), svgB = $("button", "", "SVG");
   svgB.type = "button"; svgB.title = "The chart as an SVG file";
@@ -170,29 +170,49 @@ export function dataDock(o = {}){
     foot.append($("span", "rs-dd-rc-id", `${ID} ${idv}`), copy, zoom);
     card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), foot);
   }
-  // an overlay item (a building, a crossing; Kaveh, 2026-11-07: "click on item should show info into sql panel card info"): the overlay's name, the
-  // item's name when it has one, its fields (the overlay's popup fields when it has them), and its id. The close button deselects it.
-  function drawItem(d){
-    const p = d.properties || {}, hd = $("div", "rs-dd-rc-hd"), x = $("button", "rs-dd-rc-x", "\u2715");
-    x.type = "button"; x.title = "Close the card"; x.setAttribute("aria-label", x.title); x.onclick = () => rs.select(null);
-    hd.append($("b", "rs-dd-rc-name", p.name || d.overlay), x);
-    const chips = $("div", "rs-dd-rc-chips"); chips.append($("span", "rs-dd-rc-chip strong", d.overlay));
+  // the facts card of an item that is not a road: a title, a chip, rows of [name, value] and an id with Copy id. An overlay item (a building, a
+  // crossing; Kaveh, 2026-11-07: "click on item should show info into sql panel card info") and the page's own card (`data.card`) draw it. `onClose` is
+  // what the close button does.
+  function drawFacts({title, chip, rows: kv = [], id: idv = null}, onClose){
+    const hd = $("div", "rs-dd-rc-hd"), x = $("button", "rs-dd-rc-x", "\u2715");
+    x.type = "button"; x.title = "Close the card"; x.setAttribute("aria-label", x.title); x.onclick = onClose;
+    hd.append($("b", "rs-dd-rc-name", title == null ? "" : String(title)), x);
+    const chips = $("div", "rs-dd-rc-chips"); if(chip) chips.append($("span", "rs-dd-rc-chip strong", String(chip)));
     const rows = $("dl", "rs-dd-rc-rows");
-    for(const k of (d.fields && d.fields.length ? d.fields : Object.keys(p))){
-      const v = p[k]; if(k === "name" || DRAWING.test(k) || v == null || v === "" || typeof v === "object") continue;
-      const dt = $("dt", "", k.replace(/_/g, " ")), dd = $("dd", "", val(v)); if(String(v).length > 28) dd.title = String(v); rows.append(dt, dd);
+    for(const [k, v] of kv){
+      if(v == null || v === "" || typeof v === "object") continue;
+      const dt = $("dt", "", String(k).replace(/_/g, " ")), dd = $("dd", "", val(v)); if(String(v).length > 28) dd.title = String(v); rows.append(dt, dd);
     }
-    const foot = $("div", "rs-dd-rc-foot"), idv = String(d.id ?? ""), copy = $("button", "", "Copy id");
+    const foot = $("div", "rs-dd-rc-foot"), copy = $("button", "", "Copy id");
     copy.type = "button";
-    copy.onclick = async () => { try{ await navigator.clipboard.writeText(idv); copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy id"; }, 1200); }catch(e){} };
-    foot.append($("span", "rs-dd-rc-id", `id ${idv}`), copy);
-    card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), foot);
+    const idt = idv == null ? "" : String(idv);
+    copy.onclick = async () => { try{ await navigator.clipboard.writeText(idt); copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy id"; }, 1200); }catch(e){} };
+    if(idt) foot.append($("span", "rs-dd-rc-id", `id ${idt}`), copy);
+    card.replaceChildren(hd, ...(chip ? [chips] : []), ...(rows.childElementCount ? [rows] : []), ...(foot.childElementCount ? [foot] : []));
   }
+  // an overlay item: the overlay's name, the item's name when it has one, its fields (the overlay's popup fields when it has them), and its id. The
+  // close button deselects it.
+  function drawItem(d){
+    const p = d.properties || {};
+    drawFacts({title: p.name || d.overlay, chip: d.overlay, id: d.id,
+      rows: (d.fields && d.fields.length ? d.fields : Object.keys(p)).filter((k) => k !== "name" && !DRAWING.test(k)).map((k) => [k, p[k]])}, () => rs.select(null));
+  }
+  // the page's own card (`data.card({title, chip, rows, id})`, Kaveh, 2026-11-07: "each selecting from table must show that item on map also shows its info
+  // in card info in sql panel"): for a row of a result that is not a road (a node, a building, a wall), which the page draws on the map itself. The close
+  // button, a new selection, a new result and `data.card(null)` close it; the event `cardclose` tells the page (it removes its own selection on the map).
+  let hostCard = false;
+  const closeHostCard = (tell = true) => {
+    if(!hostCard) return;
+    hostCard = false; card.hidden = true; table.clear(); paintSide();
+    if(tell) emit("cardclose", {});
+  };
+  const showCard = () => { list.hidden = true; tablesB.classList.remove("on"); tablesB.setAttribute("aria-expanded", "false"); card.hidden = false; paintSide(); };
   const paintSide = () => { const none = list.hidden && card.hidden; hint.hidden = !none; side.classList.toggle("empty", none); };
   document.addEventListener("rs:select", (e) => { if(o.card === false) return;
+    closeHostCard();
     if(e.detail.overlay) drawItem(e.detail); else drawCard(e.detail.properties || {}, e.detail.id);
-    list.hidden = true; tablesB.classList.remove("on"); tablesB.setAttribute("aria-expanded", "false"); card.hidden = false; paintSide(); });
-  document.addEventListener("rs:deselect", () => { card.hidden = true; paintSide(); });
+    showCard(); });
+  document.addEventListener("rs:deselect", () => { card.hidden = true; paintSide(); closeHostCard(); });
 
   // ---- the SQL line: one line; a click opens it as a text box, Escape folds it ----
   let sql = o.sql || "", res = null, ctl = null, ta = null;
@@ -249,6 +269,7 @@ export function dataDock(o = {}){
 
   // ---- show a result: the table, the note, the light ----
   function show(r, ran){
+    closeHostCard();                // a new result: the page's card of a row of the old one goes, and the page removes its selection
     res = {...r, columns: r.columns, rows: r.rows, more: !!r.more};
     if(!ran){ sql = r.sql || sql; fold(); }
     table.set({columns: res.columns, rows: res.rows, more: res.more});
@@ -541,6 +562,13 @@ export function dataDock(o = {}){
     view: (v) => (v ? setView(v) : view),
     colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
+    // the page's own card for a row that is not a road: {title, chip, rows: [[name, value], ...], id}; null closes it. The event `cardclose` comes when the
+    // person closes it (the close button), or a new selection or a new result takes its place
+    card(spec){
+      if(!spec){ if(hostCard) closeHostCard(false); else{ card.hidden = true; paintSide(); } return; }
+      if(typeof spec !== "object" || !Array.isArray(spec.rows)) throw new Error("data.card: give {title, chip, rows: [[name, value], ...], id}");
+      drawFacts(spec, () => closeHostCard()); hostCard = true; showCard();
+    },
     light: shown,                // true while the table is shown on the map: the map switch is on and the dock is open (the event `light` tells a change)
   });
 }
