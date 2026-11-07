@@ -135,6 +135,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
 
     - The table shows at most `limit` rows, but the download button (⤓) saves all the rows (at most 1 000 000), and a click on a header sorts all the rows.
     - A DATE shows as `2026-06-10`, a TIMESTAMP as `2026-06-10 08:30:00`, and a geometry as `(32 bytes)`.
+    - The column widths are measured once for each result. A sort keeps the columns in place and in the same width.
 
 ### Tables { .rs-part }
 

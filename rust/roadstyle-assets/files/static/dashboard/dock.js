@@ -159,8 +159,9 @@ export const rsDock = (() => {
       return out;
     };
     let colW = [];
+    // the widths are measured once for each result (`set`), not at each draw: a sort changes the order of the rows, so the sample of 200 rows (and the
+    // 90 % rule) gave other widths, and the columns jumped (Kaveh, 2026-11-07: "sort column in sql table change location of columns a little and they jumps")
     const drawHead = () => {
-      colW = widths();
       const tr = el("tr");
       cols.forEach(c => {
         const th = el("th", isNum(c) ? "n" : ""); th.tabIndex = 0; th.title = c.about || c.name;
@@ -201,7 +202,7 @@ export const rsDock = (() => {
       picked = id; tb.querySelectorAll("tr.rs-dock-id").forEach(tr => tr.classList.toggle("on", String(data[+tr.dataset.i][idAt()]) === id));
       if(window.rs){ window.rs.select(id); window.rs.focus([id]); }
     }
-    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; picked = null; } if("more" in x) more = x.more; box.scrollTop = 0; drawHead(); drawBody(); };
+    const set = (x = {}) => { if(x.columns) cols = x.columns; if(x.rows){ data = orig = x.rows; sort = null; picked = null; } if("more" in x) more = x.more; box.scrollTop = 0; colW = widths(); drawHead(); drawBody(); };
     set({});
     return {el: box, set, rows: () => data, sort: () => sort};
   }
