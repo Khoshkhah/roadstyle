@@ -199,3 +199,35 @@ def test_each_column_gets_a_width_that_fits_most_of_its_values(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+
+_WIDE = """() => { const kinds = ['Götgatan', 'Vasagatan', 'Storgatan'], long = 'Professor Dr. Carl-Gustaf Wilhelm von Rosenstein Allé ';
+  window.T = rs.dock.table({idColumn: 'edge_id',
+  columns: [{name: 'osm_id', type: 'BIGINT'}, {name: 'name', type: 'VARCHAR'}, {name: 'highway', type: 'VARCHAR'}, {name: 'length_m', type: 'DOUBLE'}],
+  rows: Array.from({length: 1000}, (_, i) => [BigInt(100000 + i * 7919), i % 10 === 0 ? long + i : kinds[i % 3] + ' ' + (i % 50), ['primary', 'residential', 'service'][i % 3], (i * 37) % 1013 + 0.5])});
+  rs.dock.add({id: 'roads', label: 'Roads', el: T.el, note: '1000 rows'}); }"""
+_HEADS = "[...document.querySelectorAll('#rs-dock th')].map(h => { const r = h.getBoundingClientRect(); return [Math.round(r.left * 10) / 10, Math.round(r.width * 10) / 10]; })"
+
+
+def test_the_columns_keep_their_place_while_the_rows_are_sorted(tmp_path):
+    """Kaveh, 2026-11-07: "sort column in sql table change location of columns a little and they jumps". The widths come from a sample of the rows, so
+    they are measured once for each result, not at each sort: the left edge and the width of each header are the same after a sort, in both
+    directions, by each column, and back to the order of the rows; a new result may measure again."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            page.evaluate(_WIDE)
+            page.evaluate("rs.dock.open()")
+            page.wait_for_selector("#rs-dock th")
+            first = page.evaluate(_HEADS)
+            assert len(first) == 4 and first[1][1] > 200, first                       # the name column is wide: the long names are in the sample
+            for col in (2, 1, 4, 1, 1, 3, 3, 3, 4, 4, 4):                              # rising, falling, the order again, for several columns
+                page.click(f"#rs-dock th:nth-child({col})")
+                page.wait_for_timeout(120)
+                assert page.evaluate(_HEADS) == first, (col, page.evaluate("T.sort()"))
+            # a new result measures again
+            page.evaluate("T.set({columns: [{name: 'a', type: 'VARCHAR'}], rows: [['x'], ['y']]})")
+            assert len(page.evaluate(_HEADS)) == 1
+        finally:
+            browser.close()
+    assert errors == [], errors
