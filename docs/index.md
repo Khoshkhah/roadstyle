@@ -1,6 +1,6 @@
 # roadstyle
 
-<p class="lead">roadstyle makes one HTML file from a road network: a styled map that you can click, that works offline, with Street View and a JavaScript API.</p>
+<p class="lead">roadstyle turns a road network into an interactive map in one HTML file. The map works offline, and you can add Street View, a dashboard and AI to it.</p>
 
 <div class="rs-hero" markdown>
 ![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](img/hero.jpg)
@@ -52,9 +52,17 @@ rs.render_edges(edges).save("roads.html")  # one file with all its data: it open
 
     ---
 
-    Put the map on a website or in another map app, or let an AI agent make maps.
+    Put the map on a website, or open its roads in another map app.
 
     [:octicons-arrow-right-24: On a website or in a map app](guides/website.md)
+
+-   :material-robot-outline:{ .lg .middle } **AI**
+
+    ---
+
+    Ask questions about your data in words, in a dashboard, with a free key of your own. Or let an AI agent make maps for you, with no code.
+
+    [:octicons-arrow-right-24: Ask](guides/ask.md) · [With AI agents](guides/agents.md)
 
 -   :material-image-multiple-outline:{ .lg .middle } **Gallery**
 
