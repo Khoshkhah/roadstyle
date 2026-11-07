@@ -4,6 +4,8 @@
 //   rs.slider(el, {label: "Speed", min: 0, max: 130, step: 10, value: 50, unit: "km/h", onChange})
 //   rs.slider(el, {label: "Hours", min: 0, max: 23, value: [7, 9], format: v => v + ":00"})
 //   rs.number(el, {label: "Lanes", min: 1, max: 8, value: 2})
+//   rs.number(el, {label: "Buffer", min: 0, step: 50, unit: "m", snap: false})   // snap: false keeps a typed 120; the - and + buttons still add and take 50
+//   const n = rs.number(el, {disabled: true}); n.disabled(false)                 // a field that is off: the box and the - and + buttons
 //   rs.colorPick(el, {label: "Fill", value: "#eb6834", palette: ["#eb6834", ...]})
 import {rsPopAt, rsPopClose, rsPopKeys} from "./menu.js";
 import {rsColorBox, rsColorPickers} from "./colorpick.js";
@@ -52,17 +54,21 @@ export function rsNumber(el, opts = {}){
   if(isFinite(min)) inp.min = min; if(isFinite(max)) inp.max = max; inp.step = step;
   inp.setAttribute("aria-label", opts.label || "Number");
   dn.setAttribute("aria-label", "Less"); up.setAttribute("aria-label", "More");
-  let cur = null;
-  const fix = v => { const n = Math.round(Math.max(min, Math.min(max, v)) / step) * step; return +n.toFixed(10); };
+  // snap (default true): a typed value goes to the nearest step. `snap: false` keeps it; the - and + buttons then add and take one step.
+  let cur = null, off = false;
+  const fix = v => { const c = Math.max(min, Math.min(max, v)); return +(opts.snap === false ? c : Math.round(c / step) * step).toFixed(10); };
+  function paint(){ inp.disabled = off; dn.disabled = off || cur <= min; up.disabled = off || cur >= max; el.classList.toggle("rs-num-off", off); }
   function set(v, quiet){
     const n = fix(+v); if(!isFinite(n)){ inp.value = cur; return; }
-    const was = cur; cur = n; inp.value = n; dn.disabled = n <= min; up.disabled = n >= max;
+    const was = cur; cur = n; inp.value = n; paint();
     if(!quiet && n !== was) opts.onChange?.(n);
   }
   [dn, up].forEach(b => b.addEventListener("click", () => { set(cur + step * +b.dataset.d); inp.focus(); }));
   inp.addEventListener("change", () => set(inp.value === "" ? cur : inp.value));
   set(opts.value ?? (isFinite(min) ? min : 0), true);
-  return {value: () => cur, set};
+  const disabled = on => { off = !!on; paint(); };
+  disabled(opts.disabled);
+  return {value: () => cur, set, disabled};
 }
 const _fcHex = /^#[0-9a-f]{6}$/i;
 const _fcChev = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';

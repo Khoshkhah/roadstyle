@@ -23,6 +23,7 @@ _HTML = """<div id="range"></div><div id="week"></div><div id="month"></div><div
 <div class="rs-status warn">3 fixes are not saved.</div>
 <div class="rs-rows" id="rows2"><div class="rs-row" data-v="w1" tabindex="0"><b>Wall 1</b><small>42 m</small><select><option>wall</option><option>door</option></select></div>
 <div class="rs-row" data-v="w2" tabindex="0"><b>Wall 2</b><small>12 m</small><select><option>wall</option></select></div></div>
+<div id="q2"></div><button type="button" id="endb" aria-label="What is here?">?</button><div id="num2"></div><div id="num3"></div><div class="rs-status" id="st"></div>
 <input id="bad" aria-invalid="true" value="0"><p class="rs-field-msg" id="bad-msg">Lanes is 1 or more.</p><p class="rs-field-msg warn" id="warn-msg">A speed in km/h.</p>"""
 _SETUP = """() => { window.got = {}; const $ = id => document.getElementById(id), log = k => v => { (got[k] = got[k] || []).push(v); };
   window.P = {
@@ -163,6 +164,91 @@ def test_the_switch_and_the_search(page):
     page.wait_for_selector(".rs-search-list:not([hidden]) .rs-search-note")
     page.click("#q .rs-search-go")
     assert _got(page, "submit") == ["zz"]
+
+
+def test_the_six_gaps_that_duckosm_studio_found(page):
+    """PR parts-gaps: an end button in the search field, a number field that is off, an empty status line, the step and done mark of a card, the veil of a busy
+    map, and a number field that keeps a typed value."""
+    # 1. rs.search `end`: a button inside the field, after the clear button and before the end button; its click does not submit
+    page.evaluate("""() => { const $ = id => document.getElementById(id);
+      window.E = rs.toggle($('endb'), v => { (got.end = got.end || []).push(v); });
+      P.q2 = rs.search($('q2'), {placeholder: 'Find', button: 'Go', end: $('endb'), onSubmit: v => { (got.submit2 = got.submit2 || []).push(v); }});
+      try { rs.search(document.createElement('div'), {end: 'x'}); } catch(e) { window.endErr = String(e); } }""")
+    kids = page.evaluate("[...document.querySelector('#q2 .rs-search-box').children].map(e => e.id || e.className.split(' ')[0] || e.tagName)")
+    assert kids == ["rs-search-i", "INPUT", "rs-search-x", "endb", "rs-search-go"], kids
+    box, end = page.locator("#q2 .rs-search-box").bounding_box(), page.locator("#endb").bounding_box()
+    assert box["x"] < end["x"] and end["x"] + end["width"] < box["x"] + box["width"] and 24 <= end["height"] <= 40     # inside the field, an icon button
+    page.click("#endb")
+    assert page.get_attribute("#endb", "aria-pressed") == "true" and _got(page, "end") == [True] and _got(page, "submit2") == []
+    assert "end is an element" in page.evaluate("window.endErr")
+    # 2. rs.number `disabled`: the box and both buttons; set() does not turn the buttons on again
+    page.evaluate("""() => { const $ = id => document.getElementById(id);
+      P.num2 = rs.number($('num2'), {label: 'Buffer', min: 0, max: 500, step: 50, value: 100, unit: 'm', disabled: true, onChange: v => { (got.num2 = got.num2 || []).push(v); }});
+      P.num3 = rs.number($('num3'), {label: 'Buffer', min: 0, max: 500, step: 50, value: 100, snap: false, onChange: v => { (got.num3 = got.num3 || []).push(v); }}); }""")
+    assert page.evaluate("[...document.querySelectorAll('#num2 input, #num2 button')].every(e => e.disabled)")
+    page.evaluate("P.num2.set(200, true)")
+    assert page.evaluate("[...document.querySelectorAll('#num2 input, #num2 button')].every(e => e.disabled)") and page.input_value("#num2 input") == "200"
+    page.evaluate("P.num2.disabled(false)")
+    assert page.evaluate("[...document.querySelectorAll('#num2 input, #num2 button')].every(e => !e.disabled)")
+    page.evaluate("P.num2.set(500, true)")
+    assert page.locator("#num2 .rs-num-st[data-d='1']").is_disabled() and page.locator("#num2 .rs-num-st[data-d='-1']").is_enabled()    # the limit still turns a button off
+    page.evaluate("P.num2.disabled(true)")
+    assert page.evaluate("[...document.querySelectorAll('#num2 .rs-num-st')].every(e => e.disabled)")
+    assert float(page.evaluate("getComputedStyle(document.querySelector('#num2 .rs-num-box')).opacity")) < 1     # it looks off
+    # 6. `snap`: the default rounds a typed value to the step; `snap: false` keeps it, and the buttons still add and take one step
+    page.evaluate("P.num2.disabled(false)")
+    page.evaluate("P.num2.set(0, true)")
+    page.fill("#num2 input", "120")
+    page.keyboard.press("Tab")
+    assert page.evaluate("P.num2.value()") == 100 and page.input_value("#num2 input") == "100"       # default: snap
+    page.fill("#num3 input", "120")
+    page.keyboard.press("Tab")
+    assert page.evaluate("P.num3.value()") == 120 and page.input_value("#num3 input") == "120" and _got(page, "num3") == [120]
+    page.click("#num3 .rs-num-st[data-d='1']")
+    assert page.evaluate("P.num3.value()") == 170
+    page.fill("#num3 input", "9999")
+    page.keyboard.press("Tab")
+    assert page.evaluate("P.num3.value()") == 500                                                  # a limit still holds
+    # 3. an empty status line does not show; one with text does
+    assert page.evaluate("getComputedStyle(document.getElementById('st')).display") == "none"
+    page.evaluate("document.getElementById('st').textContent = 'Reading the area.'")
+    assert page.evaluate("getComputedStyle(document.getElementById('st')).display") == "flex"
+    page.evaluate("document.getElementById('st').textContent = ''")
+    assert page.evaluate("getComputedStyle(document.getElementById('st')).display") == "none"
+    # 4. a card with a step: the number before the title, a check mark in place of it after done()
+    page.evaluate("""() => { rs.sections.add({id: 'draw', label: 'Draw the area', step: 3, html: '<p>x</p>'}); rs.sections.add({id: 'plain', label: 'No step', html: '<p>y</p>'});
+      try { rs.sections.add({id: 'nolabel', step: 1, html: 'z'}); } catch(e) { window.stepErr = String(e); } }""")
+    assert "needs a label" in page.evaluate("window.stepErr") and page.evaluate("rs.sections.get('nolabel')") is None
+    badge = "[data-rs-section=draw] > .rs-sec-hd > .rs-sec-n"
+    assert page.inner_text(badge) == "3" and page.get_attribute(badge, "aria-label") == "Step 3"
+    assert page.evaluate(f"document.querySelector('{badge}').nextElementSibling.classList.contains('rs-sec-title')")        # before the title
+    assert page.evaluate(f"getComputedStyle(document.querySelector('{badge}')).fontSize") != "0px"
+    page.evaluate("rs.sections.done('draw', true)")
+    assert page.evaluate("rs.sections.get('draw').dataset.rsDone") == "1" and page.get_attribute(badge, "aria-label") == "Step 3, done"
+    assert page.evaluate(f"getComputedStyle(document.querySelector('{badge}')).fontSize") == "0px"                      # the check mark is drawn in place of the number
+    assert page.evaluate(f"getComputedStyle(document.querySelector('{badge}'), '::after').content") == '""'
+    page.evaluate("rs.sections.done('draw', false)")
+    assert page.evaluate("rs.sections.get('draw').dataset.rsDone") is None and page.get_attribute(badge, "aria-label") == "Step 3"
+    page.evaluate("rs.sections.done('plain')")                                                         # a card with no step gets the mark alone
+    assert page.locator("[data-rs-section=plain] > .rs-sec-hd > .rs-sec-n").count() == 1
+    # 5. rs.mapBusy: a veil over the free part of the map, the pointer goes through it; null takes it away
+    page.evaluate("rs.mapBusy('Reading the roads…')")
+    def veil():
+        return page.evaluate("""() => { const e = document.getElementById('rs-mapbusy'), r = e.getBoundingClientRect(), f = rs.freeArea();
+          return {hidden: e.hidden, text: e.innerText, lo: Math.abs(r.left - f.lo), hi: Math.abs(r.right - f.hi), top: Math.abs(r.top - f.top), bottom: Math.abs(r.bottom - f.bottom),
+                  ring: getComputedStyle(e.querySelector('.rs-mapbusy-pill'), '::before').animationName === 'rs-spin', role: e.getAttribute('role'),
+                  through: document.elementFromPoint((f.lo + f.hi) / 2, (f.top + f.bottom) / 2).closest('#rs-mapbusy') === null}; }""")
+    v = veil()
+    assert not v["hidden"] and v["text"] == "Reading the roads…" and v["ring"] and v["role"] == "status" and v["through"]
+    assert max(v["lo"], v["hi"], v["top"], v["bottom"]) < 1.5, v
+    page.evaluate("rs.mapBusy('Building…')")
+    assert page.inner_text("#rs-mapbusy .rs-mapbusy-t") == "Building…" and page.locator("#rs-mapbusy").count() == 1
+    page.click("#sb-hide")                                                                              # the panel goes: the veil follows
+    page.wait_for_timeout(300)
+    v = veil()
+    assert max(v["lo"], v["hi"], v["top"], v["bottom"]) < 1.5, v
+    page.evaluate("rs.mapBusy(null)")
+    assert veil()["hidden"]
 
 
 def test_the_drop_zone_the_progress_and_the_busy_button(page, tmp_path):

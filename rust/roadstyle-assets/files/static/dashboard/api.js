@@ -13,7 +13,7 @@ import {rsHours} from "./hours.js";
 import {rsSlider, rsNumber, rsColorPick} from "./fields.js";
 import {rsSearch} from "./search.js";
 import {rsDrop} from "./drop.js";
-import {rsToast, rsConfirm, rsProgress, rsBusy} from "./notice.js";
+import {rsToast, rsConfirm, rsProgress, rsBusy, rsMapBusy} from "./notice.js";
 import {rsMenu} from "./menu.js";
 import {rsMore} from "./more.js";
 import {editorFrame} from "./frame.js";
@@ -111,6 +111,7 @@ export function makeApi(extra){
     confirm: rsConfirm,          // the confirm dialog: a promise of true or false (notice.js)
     progress: rsProgress,        // a progress bar (notice.js)
     busy: rsBusy,                // the busy state of a button (notice.js)
+    mapBusy: rsMapBusy,          // a veil with a ring and a line of text over the free part of the map (notice.js)
     menu: rsMenu,                // an action menu, and menu.button: a "⋯" button with its menu (menu.js)
     more: rsMore,                // "show more" of a long list (more.js)
     frame: editorFrame,          // the frame of an editor that uses the whole panel: open, close, tab (frame.js)

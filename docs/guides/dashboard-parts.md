@@ -54,6 +54,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 | Status | [Status colours](#status-colours) | HTML | an error, a warning, a good result |
 | Status | [A field error and a warning](#a-field-error-and-a-warning) | HTML | a value that is wrong or needs a look |
 | Status | [A progress bar and a busy button](#a-progress-bar-and-a-busy-button) | no | a long task |
+| Status | [A busy map](#a-busy-map) | no | a draw or a build that runs on the map |
 | Status | [A toast and a status line](#a-toast-and-a-status-line) | HTML | the result of an action |
 | Status | [A confirm dialog](#a-confirm-dialog) | no | a question before an action, in place of `confirm()` |
 | Status | [A count badge and a "not saved" dot](#a-count-badge-and-a-not-saved-dot) | HTML | a count on a tab or a button, a change that is not saved |
@@ -324,6 +325,12 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 ??? info "Details"
 
     - `done` has a check mark, `on` (the step to do now) has a filled number and an accent edge, `wait` is dimmed and says what it waits for. Put the buttons of a step in its `rs-step-b`.
+    - Cards that are steps: give `rs.sections.add` the option `step`, and the title row of the card starts with a round badge with the number. `rs.sections.done(id, true)` changes the number to a check mark (`rs.sections.done(id, false)` puts it back). A card that has no `step` gets the check mark alone. `step` and `done` are JavaScript only (`rs.sections.add` and `rs.sections.done`); the typed `dashboard=` option has no `step` yet.
+
+    ```js
+    rs.sections.add({id: "draw", label: "Draw the area", step: 3, html: "..."});
+    rs.sections.done("draw", true);
+    ```
 
 ### Show more { .rs-part }
 
@@ -673,11 +680,15 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     ```js
     rs.number(document.getElementById("lanes"), {label: "Lanes", min: 1, max: 8, step: 1, value: 2, onChange: n => apply(n)});
     rs.number(document.getElementById("width"), {label: "Width", min: 0, max: 40, step: 0.5, value: 7.5, unit: "m"});
+    const buffer = rs.number(document.getElementById("buffer"), {label: "Buffer", min: 0, max: 500, step: 50, value: 100, unit: "m", snap: false});
+    buffer.disabled(true);       // the box and both buttons are off; buffer.disabled(false) turns them on
     ```
 
 ??? info "Details"
 
-    - "−", the number, the unit and "+" are one box. "−" or "+" is disabled at the limit. A typed number out of the range becomes the nearest limit. It gives `{value(), set(v, quiet)}`.
+    - "−", the number, the unit and "+" are one box. "−" or "+" is disabled at the limit. A typed number out of the range becomes the nearest limit. It gives `{value(), set(v, quiet)}` and `disabled(on)`.
+    - By default a typed number goes to the nearest `step`: 120 with `step: 50` becomes 100. With `snap: false` the number stays, and "−" and "+" change it by one `step` (120 becomes 170). Use `snap: false` when the person can ask for any value and `step` is only the size of a click.
+    - `disabled: true` (or `disabled(on)` on the handle) switches off the box and both buttons, and dims them. `set()` does not switch the buttons on again while the field is off.
 
 ### An on/off switch { .rs-part }
 
@@ -710,13 +721,15 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     ```js
     const s = rs.search(document.getElementById("place"), {placeholder: "Find a place", button: "Go",
       suggest: q => fetch(url + encodeURIComponent(q)).then(r => r.json()).then(a => a.map(p => ({label: p.name, sub: p.country, value: p}))),
-      onPick: item => fly(item.value), onSubmit: q => find(q), onClear: () => reset()});
+      onPick: item => fly(item.value), onSubmit: q => find(q), onClear: () => reset(),
+      end: hereButton});   // an icon button inside the field, at its right end (for example a rs.toggle)
     ```
 
 ??? info "Details"
 
     - `suggest(text)` gives a list of `{label, sub, value}`, or a promise of one. The list shows at most `max` rows (default 8). While the promise runs, a ring turns in place of the magnifier. A list with no row says "No match for …" (`none` gives your own words).
     - ↓ ↑ walk the list, Enter picks the marked row or calls `onSubmit(text)`, Escape closes the list, and a second Escape clears the text. The end button (`button`) calls `onSubmit` too.
+    - `end` is an element, for example an icon button that `rs.toggle` controls. It goes inside the field, after the clear button and before the end button (`button`), and it has the size of the clear button. Your code keeps its events: its click does not call `onSubmit`.
     - It gives `{value(), set(text), focus(), clear()}`.
 
 ### A file drop zone { .rs-part }
@@ -1221,6 +1234,27 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 
     - `rs.busy(button, true)` and `rs.busy(button, false)` set the state by hand. `<span class="rs-spinner"></span>` is the ring alone.
 
+### A busy map { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=mapbusy" title="A busy map, live" loading="lazy"></iframe>
+
+**Use it for:** a draw or a build that runs on the map.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    rs.mapBusy("Reading the roads…");      // the veil, the ring and the text
+    rs.mapBusy("Building the network…");   // a second call changes the text
+    rs.mapBusy(null);                      // the veil goes
+    ```
+
+??? info "Details"
+
+    - The veil is over the free part of the map (`rs.freeArea()`): the panel, the bar and the dock stay clear. It follows them when they open, close or move. The pointer goes through the veil, so the person can still move the map.
+    - The text is in a pill, with a turning ring before it. A screen reader reads the text as a status.
+
 ### A toast and a status line { .rs-part }
 
 <iframe class="rs-live" src="../../parts/gallery.html?part=toast" title="A toast and a status line, live" loading="lazy"></iframe>
@@ -1245,7 +1279,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 ??? info "Details"
 
     - A toast comes over the middle of the free part of the map, at the bottom. On a phone it comes at the top, because the sheet is at the bottom. It goes after 4 s (`info`, `ok`), 6 s (`warn`) or 8 s (`error`). It stays while the pointer or the focus is on it. A warning and an error are `role="alert"`. `rs.toast` gives `{close()}`.
-    - A status line (`rs-status`, with `ok`, `warn` or `error`) is the same look in a card, and it stays. Each kind has its colour and its icon.
+    - A status line (`rs-status`, with `ok`, `warn` or `error`) is the same look in a card, and it stays. Each kind has its colour and its icon. A status line with no text does not show, so your code can empty it (`line.textContent = ""`) to hide it.
 
 ### A confirm dialog { .rs-part }
 

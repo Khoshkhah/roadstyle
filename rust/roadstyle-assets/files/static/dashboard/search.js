@@ -1,10 +1,11 @@
 // The search field of a page (docs/design/dashboard_parts_2.md): a magnifier, the text, a clear button, an optional button at the end, and a list of
 // suggestions that the arrow keys walk.
-//   const s = rs.search(el, {placeholder: "Find a place", button: "Go",
+//   const s = rs.search(el, {placeholder: "Find a place", button: "Go", end: toggleButton,
 //     suggest: q => fetch(url + q).then(r => r.json()).then(a => a.map(p => ({label: p.name, sub: p.country, value: p}))),
 //     onPick: item => fly(item.value), onSubmit: q => find(q)});
 // `suggest(text)` gives an array (or a promise of one) of {label, sub, value}; the list shows it under the field. Enter picks the marked row, or
-// calls onSubmit(text) when no row is marked; the end button calls onSubmit too. Escape closes the list, a second Escape clears the text.
+// calls onSubmit(text) when no row is marked; the end button calls onSubmit too. `end` is an element (an icon button, for example a rs.toggle) that goes
+// inside the field at its right end, after the clear button and before the end button; the page keeps its events. Escape closes the list, a second Escape clears the text.
 // It returns {value(), set(text), focus(), clear()}.
 import {rsPopAt, rsPopClose} from "./menu.js";
 const _srIcon = '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="7" cy="7" r="4.8"/><path d="m10.6 10.6 3.6 3.6"/></svg>';
@@ -20,6 +21,8 @@ export function rsSearch(el, opts = {}){
   const box = el.querySelector(".rs-search-box"), inp = el.querySelector("input"), x = el.querySelector(".rs-search-x"), go = el.querySelector(".rs-search-go");
   inp.placeholder = opts.placeholder || "Search"; inp.setAttribute("aria-label", opts.label || inp.placeholder);
   if(go) go.textContent = opts.button;
+  if(opts.end instanceof Element){ opts.end.classList.add("rs-search-end"); x.after(opts.end); }
+  else if(opts.end != null) throw new Error("rs.search: end is an element (a button) that goes inside the field");
   const list = document.createElement("div"); list.className = "rs-search-list"; list.id = id; list.hidden = true; list.setAttribute("role", "listbox");
   inp.setAttribute("aria-controls", id);
   document.body.appendChild(list);
