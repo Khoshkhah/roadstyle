@@ -139,5 +139,52 @@ html = rs.render_dashboard(
 ).html
 (OUT / "live.html").write_text(html.replace("</body>", KEEP_IN + "</body>", 1), encoding="utf-8")
 
+# the data dock, live (data-dock.md): DuckDB in the page (duckdb-wasm) holds the roads of sodermalm.parquet as the table `edges`, and the
+# dock (site/live/dashboard/data/data_dock.js, docs/copy_parts.py) runs its SQL there
+DOCK = """<script type="module">
+import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
+import {dataDock} from "../live/dashboard/data/data_dock.js";
+const conn = (async () => {
+  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+  const url = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], {type: "text/javascript"}));
+  const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(url));
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  await db.registerFileURL("roads.parquet", new URL("sodermalm.parquet", location.href).href, duckdb.DuckDBDataProtocol.HTTP, false);
+  const c = await db.connect();
+  await c.query("CREATE TABLE edges AS SELECT * EXCLUDE (geometry) FROM 'roads.parquet'");
+  return c;
+})();
+// a result as the dock takes it: {columns: [{name, type}], rows: [[...]]} (a BIGINT is a BigInt)
+async function query(sql){
+  const t = await (await conn).query(sql), f = t.schema.fields;
+  return {columns: f.map((x) => ({name: x.name, type: String(x.type)})), rows: t.toArray().map((r) => f.map((x) => r[x.name]))};
+}
+window.data = dataDock({query, ready: conn,
+  schema: async () => ({tables: [{name: "main.edges", rows: Number((await query("SELECT count(*) AS n FROM edges")).rows[0][0]),
+    about: "The roads of Södermalm: one row is one direction of a road (edge_id), with its OpenStreetMap tags, length_m, and two made-up columns, aadt and speed_kph."}]}),
+  sql: "SELECT edge_id, name, highway, length_m FROM edges WHERE highway = 'primary' ORDER BY length_m DESC"});
+window.data.open();
+window.data.run();                                   // the first query at once: the table and its roads on the map
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-sql]"); if(b) window.data.run(b.dataset.sql); });
+</script>"""
+EXAMPLES = [
+    ("Primary roads, the longest first", "SELECT edge_id, name, highway, length_m FROM edges WHERE highway = 'primary' ORDER BY length_m DESC"),
+    ("Bridges and tunnels", "SELECT edge_id, name, highway, bridge, tunnel FROM edges WHERE bridge IS NOT NULL OR tunnel = 'yes'"),
+    ("Busy roads (made-up aadt)", "SELECT edge_id, name, aadt, speed_kph FROM edges WHERE aadt > 20000 ORDER BY aadt DESC"),
+    ("Kilometres by road class", "SELECT highway, round(sum(length_m) / 1000, 2) AS km FROM edges GROUP BY highway ORDER BY km DESC"),
+]
+TRY = ("<p>Write one <code>SELECT</code> in the line under the map and press <b>Run</b> (or Ctrl+Enter). The roads of the result light on "
+       "the map. The table is <code>edges</code>. Or click a query:</p><div class=\"rs-opts\">"
+       + "".join(f'<button type="button" class="rs-opt" style="text-align:left;width:100%" data-sql="{q}"><span><b>{t}</b><small>{q}</small></span></button>' for t, q in EXAMPLES)
+       + "</div>")
+html = rs.render_dashboard(
+    g, basemap="ofm_positron", color_options={"Road class": {}}, name="The data dock",
+    dashboard={"panel": {"sections": [
+        {"id": "try", "label": "Try SQL", "html": TRY},
+        {"id": "road", "label": "Selected road", "part": "road_card", "fields": ["name", "highway", "length_m", "aadt", "speed_kph"]},
+    ]}},
+).html
+(OUT / "data_dock.html").write_text(html.replace("</body>", DOCK + "</body>", 1), encoding="utf-8")
+
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")

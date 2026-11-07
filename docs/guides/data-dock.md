@@ -1,6 +1,19 @@
+---
+hide:
+  - toc
+---
+
 # The data dock
 
 The data dock is one SQL line over a wide table of the result, in the [bottom dock](dashboard-layout.md#the-bottom-dock). The roads of the result light on the map, a click on a row selects its road, and **Colour** and **Focus** keep a change of the map until the person turns it off. It is a JavaScript module that the host page imports. Your page runs the SQL on its own data: roadstyle has no database. Each item below has the same form: a box with **Use it for** and **From Python**, the code in tabs, and **Details** that open on a click.
+
+![The data dock under the map: a query of the bridges and the tunnels of Södermalm, its table, and its roads lit on the map](../img/data-dock.png)
+
+**Try it.** The page below is live: DuckDB runs in the page (duckdb-wasm) with the roads of Södermalm as the table `edges`. Write a
+`SELECT` in the line and press **Run**, or click a query in the panel. The roads of the result light on the map, and a click on a row
+selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noopener">Open it on a page of its own</a>.
+
+<iframe src="../../maps/data_dock.html" loading="lazy" title="The data dock, live, with DuckDB in the page" class="rs-demo" style="height:780px"></iframe>
 
 | Group | Item | From Python | Use it for |
 |---|---|---|---|

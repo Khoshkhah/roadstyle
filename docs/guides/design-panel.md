@@ -1,3 +1,8 @@
+---
+hide:
+  - toc
+---
+
 # Edit the design of a map
 
 The design panel lets a person change the style of a map in the page: a ready theme, the colours and widths of the road classes, the street names, the one-way arrows, the layers, the ground and the colours of the base map. Each change shows on the map after 0.5 s. The person can save a design as a theme of their own, download it as a file and load it again.

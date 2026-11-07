@@ -1,3 +1,8 @@
+---
+hide:
+  - toc
+---
+
 # Edit the levels
 
 The level editor says which road is drawn over which road: a bridge over the street under it, a tunnel under it, and the order where two
