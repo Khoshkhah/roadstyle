@@ -109,9 +109,9 @@ of the area's edge, as a dashboard does. `levels edit AREA_DIR` checks that the 
 
 <div class="grid" markdown>
 
-![The level editor on a desktop: Boulevard du Larvotto (red) and Rond-Point du Portier (blue) picked, their cards, and the apply bar with one change waiting](../img/level-editor.png)
+![The level editor on a desktop, tab Stacking: Bretelle Ostende (red) and Boulevard du Larvotto (blue) picked, Rules now, Add a rule, and the apply bar with one change waiting](../img/level-editor.png)
 
-![The level editor on a phone: the bar at the top, the map, and the panel as a bottom sheet](../img/level-editor-phone.png){ width="260" }
+![The level editor on a phone: the bar at the top, the two picked roads on the map, and the panel as a bottom sheet with the tabs and the apply bar](../img/level-editor-phone.png){ width="260" }
 
 </div>
 
