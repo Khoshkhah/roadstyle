@@ -100,7 +100,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20          # Pages copies the site files for more than 5 minutes since the WebAssembly package is in it (2026-11-07)
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
