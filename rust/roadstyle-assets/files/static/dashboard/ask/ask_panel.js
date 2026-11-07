@@ -1,9 +1,10 @@
 // Ask (docs/design/ask_and_data_dock.md, "3. Ask"; docs/guides/ask.md): an AI agent in the side panel. The person asks a question in words; the agent writes
 // SQL, runs it through the data dock, reads the result and answers in a few sentences. Each answer puts its SQL and its table into the data dock, so its roads
-// light on the map. The agent can also colour roads, focus on roads and move the map: these are the data dock's layers. The person's own key of a free
+// light on the map. The agent can also colour roads, focus on roads and move the map: these are the data dock's layers. It reads and changes the map's own layers, base map, 3D view
+// and camera (get_map, set_map), and a host page adds its own tools (the option tools). The person's own key of a free
 // OpenAI-compatible service stays in this browser and goes only to that service. There is no server and no model in the browser.
 //
-//   askPanel({dashboard, data, about, dialect, examples, panel, backLabel, maxSteps, sendRows, providers}) -> EventTarget + {open, close, isOpen, ask, stop,
+//   askPanel({dashboard, data, about, dialect, examples, panel, backLabel, maxSteps, sendRows, providers, tools}) -> EventTarget + {open, close, isOpen, ask, stop,
 //     clear, remove, history}
 //   events: "answer" {question, text, sql, rows}, "error" {question, message}, "back"
 import {editorFrame} from "../frame.js";
@@ -28,18 +29,22 @@ const FINAL = "Answer now in 1 to 3 short sentences with the results that you ha
 const PROMPT = `You answer questions about the data of a map page. The data is in a {dialect} database.
 {about}
 
-Tools (each takes one read-only SELECT or WITH statement):
+Tools (those with sql take one read-only SELECT or WITH statement):
 - run_query(sql): the first rows of the result. The page shows your result as a table and lights its roads.
 - color_roads(groups): colours roads; each group: label, color (#rrggbb), sql that selects {id}.
 - focus_roads(sql, mode): the roads that the sql selects ({id}) stay; the others are faded
   (mode "fade", the default) or hidden (mode "hide": use it when the person says "only").
 - move_map(sql): zooms to the roads that the sql selects ({id}).
+- get_map(): the map's layers (on or off), base maps, 3D view and camera now. Call it before you use a layer name.
+- set_map(overlays, basemap, view3d, roadFill, tunnel, camera): shows or hides a layer, changes the base map, the 3D view or the camera
+  (center [longitude, latitude], zoom, pitch, bearing). Use it when the person asks to show or hide a layer, to change the base map, the
+  3D view or the camera (a place by its coordinates). For roads from a query, use move_map.
 - draw_chart(sql, kind, x, y, title): a chart of the result in the data dock; kind is bar, line, histogram, scatter or pie;
   x is the column of the labels (bar, pie), of the order (line) or of the numbers (histogram, scatter); y is a number column
   (not for a histogram). Use it when the person asks for a chart, a graph, a plot or a diagram, or when a comparison of 3 to
   40 values is clearer as a chart. Aggregate in the SQL (GROUP BY): a chart draws the rows as they are. A pie needs values
   of 0 or more and at most 6 slices. For the distribution of a number (lengths, speeds) use histogram, not bar.
-Use a map tool only when the person asks to see, show, colour, filter or zoom. You cannot change the data.
+Use a map tool only when the person asks to see, show, hide, colour, filter, zoom or change the map. You cannot change the data.
 
 Rules:
 - Use only names from the schema. Do not guess a name: look it up first.
@@ -120,7 +125,7 @@ export function askPanel(o = {}){
     terms: [["Key", "Your own key of an AI service. Google Gemini and Groq give a free key. The key stays in this browser and goes only to that service. Other pages on the same address (for example the same github.io site) can read it: use a key with a spending limit."],
             ["Examples", "Questions to try. After the first question, they are above the question box."],
             ["An answer", "The question, the answer and the SQL (open “1 query”). Show puts its table in the dock again, and its roads light on the map. ✕ removes the card."],
-            ["MAP", "An answer can colour the roads, focus on some roads (the others fade or hide) or move the map. A colour and a focus stay: they are in the lists of Colour ▾ and Focus ▾ in the data dock."],
+            ["MAP", "An answer can colour the roads, focus on some roads (the others fade or hide) or move the map. A colour and a focus stay: they are in the lists of Colour ▾ and Focus ▾ in the data dock. You can also ask to show or hide a map layer, to change the base map, to turn the 3D view on or to move the camera (\"turn off the water\", \"satellite\", \"zoom to Fontvieille\")."],
             ["New", "Starts a new conversation. The map keeps its colours and its focus."]],
     note: "Ask sends your question, the conversation, the names and descriptions of the tables, and the query results (up to 30 rows each) to the AI service. An AI service can be wrong: look at the table and at the SQL."});
   if(helpB) who.after(helpB);                                                                        // the order: provider, ?, Key, New
@@ -275,7 +280,7 @@ export function askPanel(o = {}){
        const ids = await roadsOf(sql), res = await toDock([{sql}], true);
        rs.focus(ids);
        const text = `Zoomed to ${fmt(ids.length)} roads${notAll(ids)}`;
-       c.maps.push({text, sql: [sql], res, move: true});
+       c.maps.push({text, sql: [sql], res, move: true}); c.cam = false;
        return {done: text + "."};
      }},
   ];
@@ -289,7 +294,63 @@ export function askPanel(o = {}){
       c.chart = {res: data.result(), spec: data.drawnChart(), title};
       return {done: `Drew a ${kind} chart of ${y ? y + " by " : ""}${x} (${fmt(r.total ?? r.rows.length)} rows).`};
     }});
-  const SPECS = TOOLS.map((t) => ({type: "function", function: {name: t.name, description: t.description, parameters: {type: "object", properties: t.parameters, required: t.required}}}));
+  // ---- the map's own controls (rs.getState / rs.setState): the layers, the base map, the 3D view, the road fill, the tunnel look and the camera. The camera has
+  // one path: rs.setState jumps to it; move_map flies to roads (rs.focus). In one answer the last mover wins: showTurn does not fly to the table's roads again
+  // after a set_map camera. The page's own state (selection, filter, colours) stays with its tools. ----
+  const r5 = (n) => Math.round(n * 1e5) / 1e5;
+  function mapNow(){
+    const s = rs.getState(), cam = s.camera;
+    return {overlays: Object.entries(s.overlays || {}).map(([label, v]) => ({label, on: v.visible !== false})),
+      basemaps: rs.basemaps ? rs.basemaps() : [], basemap: s.basemap, view3d: !!s.view3d, roadFill: !!s.roadFill, tunnel: s.tunnel,
+      camera: cam && {center: cam.center.map(r5), zoom: Math.round(cam.zoom * 100) / 100, pitch: Math.round(cam.pitch), bearing: Math.round(cam.bearing)}};
+  }
+  const NUM = (d) => ({type: "number", description: d});
+  TOOLS.push({name: "get_map", description: "The map's layers (on or off), base maps, 3D view, road fill, tunnel look and camera now.", parameters: {}, required: [],
+    step: () => "Reading the map", async run(){ return mapNow(); }});
+  TOOLS.push({name: "set_map", description: "Change the map: show or hide layers, change the base map, the 3D view, the road fill, the tunnel look or the camera. Give only what changes.", required: [],
+    parameters: {
+      overlays: {type: "array", description: "Layers to show or hide (labels from get_map).", items: {type: "object", required: ["label", "on"], properties: {label: {type: "string"}, on: {type: "boolean"}}}},
+      basemap: {type: "string", description: "The key or label of a base map from get_map."},
+      view3d: {type: "boolean", description: "The 3D view (tilted camera)."}, roadFill: {type: "boolean", description: "The fill of the roads."},
+      tunnel: {type: "object", description: "The look of tunnels (as in get_map).", properties: {strength: NUM("0 to 100"), toward: {type: "string"}, palette: {type: "string"}, ratio: {type: "array", items: {type: "number"}}}},
+      camera: {type: "object", description: "Give only what changes.", properties: {center: {type: "array", items: {type: "number"}, description: "[longitude, latitude]"},
+        zoom: NUM("0 to 22"), pitch: NUM("0 to 85"), bearing: NUM("degrees")}}},
+    step: () => "Changing the map",
+    async run(a, c){
+      const now = mapNow(), change = {}, done = [], unknown = [];
+      const find = (list, v, f) => list.find((x) => [x.key, x.label].some((y) => y != null && String(y).toLowerCase() === String(v).toLowerCase())) || (unknown.push(`${f} ${JSON.stringify(v)}`), null);
+      if(a.overlays != null){                                                                    // [{label, on}] or {label: on}
+        const list = Array.isArray(a.overlays) ? a.overlays : Object.entries(a.overlays).map(([label, on]) => ({label, on}));
+        for(const {label, on} of list){ const o = find(now.overlays, label, "layer"); if(o){ (change.overlays = change.overlays || {})[o.label] = {visible: !!on}; done.push(`${o.label} ${on ? "on" : "off"}`); } }
+      }
+      if(a.basemap != null){ const b = find(now.basemaps, a.basemap, "base map"); if(b){ change.basemap = b.key; done.push(`base map ${b.label || b.key}`); } }
+      for(const k of ["view3d", "roadFill"]) if(a[k] != null){ change[k] = !!a[k]; done.push(`${k === "view3d" ? "3D view" : "road fill"} ${a[k] ? "on" : "off"}`); }
+      if(a.tunnel && typeof a.tunnel === "object"){ change.tunnel = a.tunnel; done.push("tunnel look"); }
+      const cam = a.camera;
+      if(cam && typeof cam === "object"){
+        const ok = (v, lo, hi) => Number.isFinite(v) && v >= lo && v <= hi, ll = cam.center, bad = [];
+        if(ll != null && !(Array.isArray(ll) && ll.length === 2 && ok(ll[0], -180, 180) && ok(ll[1], -90, 90))) bad.push("center must be [longitude, latitude]");
+        if(cam.zoom != null && !ok(cam.zoom, 0, 22)) bad.push("zoom must be 0 to 22");
+        if(cam.pitch != null && !ok(cam.pitch, 0, 85)) bad.push("pitch must be 0 to 85");
+        if(cam.bearing != null && !Number.isFinite(cam.bearing)) bad.push("bearing must be a number");
+        if(bad.length) throw new Error("The camera is wrong: " + bad.join("; ") + ".");
+        const {center, zoom, pitch, bearing} = cam, to = {center, zoom, pitch, bearing};
+        for(const k in to) if(to[k] == null) delete to[k];
+        if(Object.keys(to).length){ change.camera = to; done.push("camera"); c.cam = true; }
+      }
+      if(done.length) rs.setState(change);
+      const text = done.length ? "Map: " + done.join(", ") : "";
+      if(text) c.maps.push({text, sql: [], res: null, move: true});
+      return {done: done.length ? text + "." : "Nothing changed.", ...(unknown.length ? {not_found: unknown, hint: "Call get_map for the names."} : {}), map: mapNow()};
+    }});
+
+  // the host's own tools, in the same form: a name that is in use is refused
+  for(const t of o.tools || []){
+    if(!t || typeof t.name !== "string" || typeof t.run !== "function") throw new Error("askPanel: a tool of the option tools needs a name and a run function.");
+    if(TOOLS.some((y) => y.name === t.name)) throw new Error(`askPanel: the tool name "${t.name}" is already in use.`);
+    TOOLS.push({parameters: {}, required: [], description: "", step: () => `Running ${t.name}`, ...t});
+  }
+  const SPECS = TOOLS.map((t) => ({type: "function", function: {name: t.name, description: t.description, parameters: {type: "object", properties: t.parameters, ...(t.required && t.required.length ? {required: t.required} : {})}}}));
 
   // ---- one model call: a wait on the free limit (HTTP 429: at most 2 times, each at most 60 s), and one switch to another model that the key can use ----
   async function callModel(messages, signal, final, say){
@@ -390,7 +451,7 @@ export function askPanel(o = {}){
   }
   // the answer: its text, a line for each change of the map, the query that made its table (and the others in its details), Show
   function finish(t, answer, c){
-    t.text = answer; t.hist = [{role: "user", content: t.question}, {role: "assistant", content: answer}];
+    t.cam = c.cam; t.text = answer; t.hist = [{role: "user", content: t.question}, {role: "assistant", content: answer}];
     t.el.append(answerEl(answer, t));
     for(const m of c.maps){ const line = $("div", "rs-ask-map"); line.append($("span", "rs-ask-map-k", "Map"), $("span", "", m.text)); if(!m.move) line.append($("span", "rs-ask-map-to", "in the list of Colour or Focus")); t.el.append(line); }
     // the answer's table: the query with roads that has the most rows (a model often runs the full list, then a count or "LIMIT 2" for the longest); a map
@@ -406,7 +467,8 @@ export function askPanel(o = {}){
       if(c.failed.length) d.append(fold("rs-ask-failed", `${plural(c.failed.length, "failed attempt", "failed attempts")}, fixed by the agent`, ...failedEls(c.failed)));
       foot = $("div", "rs-ask-foot"); foot.append(d); t.el.append(foot);
     }
-    if(c.maps.length){ const sqls = c.maps.flatMap((m) => m.sql); foot = $("div", "rs-ask-foot"); foot.append(fold("rs-ask-sqls", plural(sqls.length, "map query", "map queries"), ...codes(sqls))); t.el.append(foot); }
+    const sqls = c.maps.flatMap((m) => m.sql);
+    if(sqls.length){ foot = $("div", "rs-ask-foot"); foot.append(fold("rs-ask-sqls", plural(sqls.length, "map query", "map queries"), ...codes(sqls))); t.el.append(foot); }
     t.res = c.chart ? c.chart.res : [...c.maps].reverse().map((m) => m.res).find(Boolean) || best;
     // a chart answer: a small copy of the chart in the card (no labels, no hover); Show puts the chart in the dock again
     if(c.chart && c.chart.spec){ t.chart = true; const box = $("div", "rs-ask-chart"); t.el.insertBefore(box, foot || null);
@@ -426,7 +488,7 @@ export function askPanel(o = {}){
     data.show(t.res);
     if(data.view) data.view(t.chart ? "chart" : "table");
     if(!first || !phone()) data.open();
-    if(data.roadsOf) data.roadsOf(t.res).then((ids) => { if(ids.length) rs.focus(ids); }, () => {});
+    if(data.roadsOf && !(first && t.cam)) data.roadsOf(t.res).then((ids) => { if(ids.length) rs.focus(ids); }, () => {});
   }
   // the answer's text: paragraphs, and "- " or "1. " lines as a real list of at most 3 items, with "… N more in the table"
   function answerEl(text, t){

@@ -140,6 +140,7 @@ Push **Run** under a block: a large window opens with the map and the change on 
     - `rsHillshade(on)` and `rsTerrain(on)` switch the hillshade and the 3D terrain of the base-map box. With no argument they tell whether the switch is on.
     - `rsTerrainTunnels(mode)` (`"fade"`, `"hide"` or `"show"`) sets what a tunnel does while the terrain is on.
     - `rs.setOverlay(label, visible)` shows or hides one overlay of the page.
+    - `rs.basemaps()` gives the base maps of the page as `[{key, label}]`.
     - `rsSetBridges`, `rsSetTunnels` and `rsSetClasses` are the single-control forms of `rs.setFilter`.
     - `rsBuildingsOpacity(value)` sets the opacity of the 3D buildings of a vector base map, from 0 to 1 (the *Opacity* slider under the *3D buildings* row of the base-map box). No argument gives the opacity now. The event is `rs:buildingsopacitychange` (`opacity`).
 
