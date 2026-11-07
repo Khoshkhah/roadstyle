@@ -21,7 +21,7 @@ import {rsDock} from "./dock.js";
 import {rsKpi} from "./kpi.js";
 import {rsSvg} from "./svg.js";
 import {rsChart} from "./chart.js";
-import {holdPopup} from "./select.js";
+import {holdPopup, holdHover, holdSelectLook} from "./select.js";
 import {rsLegend} from "./legend.js";
 import {rsColorModes} from "./colorbox.js";
 
@@ -124,6 +124,8 @@ export function makeApi(extra){
     contract: CONTRACT,          // the newest roadstyle:contract that this dashboard reads (core.js)
     select(id){ if(id == null) call("rsDeselect"); else call("rsSelect", row(id)); },
     holdPopup,                   // holdPopup(key, on): no road popup while a part that shows the road's facts is in view (select.js)
+    holdHover,                   // holdHover(key, on): no road hover while a host tool works on other objects; a click still selects (select.js)
+    holdSelectLook,              // holdSelectLook(key, on): rs:select comes, but roadstyle draws no select look; the host draws its own (select.js)
     fade(ids, o){ call("rsFade", ids == null ? null : rows(ids), o); },   // every other road at o.opacity (0.18) of its opacity; null ends it
     highlight(ids, set){ call("rsHighlight", rows(ids) || [], set && typeof set === "object" ? set : undefined); },   // set: {set, color, opacity} (a named set)
     focus(ids){ call("rsFocus", rows(Array.isArray(ids) ? ids : [ids])); },

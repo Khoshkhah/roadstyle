@@ -1389,6 +1389,7 @@ These parts work only on a page with a map. The box below is a small page with t
         - With `idColumn`, a click on a row selects that road and zooms to it.
         - A table of more than 1000 rows draws only the rows in view, so 50 000 rows stay fast.
     - `rs.holdPopup(key, on)` holds the road popup while a part that shows the road's facts is in view (the data dock's road card). The popup comes back when no key holds it. `rs.fade(ids, {opacity})` fades the other roads (`rs.fade(null)` ends it).
+    - `rs.holdHover(key, on)` holds the road hover while a tool of the page works on other objects (the Building tab of duckOSM's fixes editor): no road lights up, and a click still selects the road. `rs.holdSelectLook(key, on)` keeps `rs:select` but draws no select look on a road or an overlay item, so the page draws its own selection. Each hold ends when no key holds it.
 
 ### The data dock and Ask { .rs-part }
 

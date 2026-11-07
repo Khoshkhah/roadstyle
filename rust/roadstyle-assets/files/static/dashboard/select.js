@@ -2,7 +2,7 @@
 import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
 import {map, style, O, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _NO_HOVER, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
-import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick} from "./overlays.js";
+import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick, _lookHolds, _ovSel, _ovState} from "./overlays.js";
 import {_spDotClick} from "./svproviders.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot, useSpot} from "./svspot.js";
 const HIT = 4;
@@ -68,6 +68,20 @@ export function quiet(on){ _quiet = !!on; if(_quiet && _tip) _tip.remove(); }
 // selection, from the map or from the part, has one place for its facts. The tooltip stays. A page with road_popup=False stays so after the hold.
 const _holds = new Set();
 export function holdPopup(key, on){ if(on) _holds.add(key); else _holds.delete(key); }
+// holdHover(key, on): a host tool that works on other objects (duckOSM's fixes editor in its Building tab) holds the road hover while it is
+// on: no road lights up, no road tooltip, no pointer over a road, and a lit road goes off at once. A click still selects the road and sends
+// rs:select. An overlay keeps its own hover (rsSetInteraction).
+const _hoverHolds = new Set();
+export function holdHover(key, on){
+  if(on) _hoverHolds.add(key); else _hoverHolds.delete(key);
+  if(_hoverHolds.size){ clearTimeout(_tipT); setS(_hov,{hover:false}); _hov=null; _cur=null; if(_tip) _tip.remove(); if(_pt && !_raf) _raf=requestAnimationFrame(hoverFrame); }
+}
+// holdSelectLook(key, on): see _lookHolds (overlays.js). The look of the selection now goes off at once; rs:select and rs:deselect stay.
+export function holdSelectLook(key, on){
+  if(on) _lookHolds.add(key); else _lookHolds.delete(key);
+  if(_lookHolds.size){ setS(_sel,{select:false}); if(_sel && _sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false}); _ovState(_ovSel,{select:false}); }
+}
+const _look = st => { if(_lookHolds.size) return; setS(_sel, st); if(_sel && _sel.road!=null) _fs({source:"roads", id:_sel.road}, st); };
 export function rsDeselect(){
   if(_sel){ setS(_sel,{select:false});
     if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false});
@@ -93,8 +107,7 @@ export function rsSelect(id){
   const dids = (props && props.lvl>0) ? _deckIdsForRoad(hi) : [];
   _sel = dids.length ? {s:"decks", key:"e"+hi, ids:dids, road:hi}
                      : {s:"roads", key:"r"+hi, ids:[hi]};
-  setS(_sel,{select:true});
-  if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:true});
+  _look({select:true});
   // best effort for programmatic selection: overlays at the edge's midpoint (when on screen)
   const c = RoadTable.mid(id) || _midOf((_road(id) || {}).geometry);
   let ovs=[]; if(c){ try{ ovs=_ovAt(map.project({lng:c[0], lat:c[1]})); }catch(err){} }
@@ -114,7 +127,7 @@ let _tip = null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
   const ho = _ovUnder && OVERLAYS.find(o=>o.source===_ovUnder.source);
   const ovHit = ho && !ho.under && !ho.base;   // an interactive overlay under the cursor wins over the road, as for a click; an item attached to a road is its road
-  const f = ovHit ? null : pick(_pt); map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
+  const f = ovHit || _hoverHolds.size ? null : pick(_pt); map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
   const h = hitOf(f);
   if(!(h && _cur && h.key === _cur.key)){                                                  // another road, or none: the last one off at once
     setS(_hov,{hover:false}); _hov=null; if(_tip && _tip.isOpen()) _tip.remove(); _cur = h; }
@@ -166,7 +179,7 @@ export function initSelect(){
     const w = srcOf(f)==="roads" && RoadTable.load(f.id); if(w) await w;   // the road's line first (a table without lines)
     clearOvSel();
     if(_sel) setS(_sel,{select:false});
-    _sel = hitOf(f); setS(_sel,{select:true});
+    _sel = hitOf(f); _look({select:true});
     const props = _pickProps(f), io = _selItem(f);
     const item = io ? {overlay:io.label, id:f.item.id, properties:f.item.properties||{}} : undefined;   // the item selected itself
     const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)

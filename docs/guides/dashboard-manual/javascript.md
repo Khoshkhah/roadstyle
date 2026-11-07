@@ -99,6 +99,7 @@ Push **Run** under a block: a large window opens with the map and the change on 
     - The second block lights more than one group of roads, each in its own colour. Each group has a set name. The light is as wide as the road at every zoom.
     - When a road is in two sets, the set that you set last has the road. `rsHighlight` uses the road rows, as `rsQuery` gives them.
     - Each change sends `rs:highlightchange` with `set` and `ids`.
+    - A tool of your page that works on other objects can hold the road hover: `rs.holdHover("my-tool", true)`, and `false` at the end. No road lights up, and a click still selects the road. `rs.holdSelectLook("my-tool", true)` keeps `rs:select` but draws no select look, so your page draws its own selection.
 
 ### Filter and color { .rs-part }
 

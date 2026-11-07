@@ -11,8 +11,11 @@ import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
 export const _ovWin = ov => ov.popup_window!==false && _OV_POPUP;
 export let _ovSel=null, _ovHov=null, _ovUnder=null, _ovT=0;      // {source,id} of the selected / lit (hovered) overlay feature; the one under the mouse now
-function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
+export function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
 export function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
+// holdSelectLook(key, on) (select.js): while a key holds it, a selection sets no `select` state on a road or an overlay item, and rs:select still
+// comes, so a host page draws its own selection (duckOSM's fixes editor)
+export const _lookHolds = new Set();
 // the interactive overlay features at a screen point: [{label, fields, properties}] — one entry
 // per overlay (its topmost hit). Feeds rs:select's `overlays` payload and the popup/panel.
 // A layer's popup fields are not in its tiles: its props file (roadstyle:interaction.base_props, by source) holds them by row, the feature id.
@@ -43,7 +46,7 @@ export function handleOverlayClick(e, tier){                      // info popup 
     if(hits.length){
       const f = hits[0], p = _ovProps(ov, f);
       rsDeselect();                                        // road selection yields to the overlay
-      _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; _ovState(_ovSel,{select:true});
+      _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; if(!_lookHolds.size) _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
       if(!_ovWin(ov)){ /* popup_window=False: selected and lit, nothing shown */ }
       else if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
