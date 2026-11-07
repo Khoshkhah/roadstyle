@@ -137,7 +137,11 @@ export function askPanel(o = {}){
 
   // the empty start: one line about Ask, the key note when there is no key, the examples as chips
   const ex = $("div", "rs-ask-ex"), needKey = $("div", "rs-ask-need");
-  const chips = (onPick) => examples.map((q) => { const c = $("button", "rs-ask-q", q); c.type = "button"; c.onclick = () => { onPick(); ask(q); }; return c; });
+  // examples: strings and groups {title, items}; a group is a small heading above its chips (the keys and the list's own children are the chips and the headings)
+  const chips = (onPick) => examples.flatMap((g) => {
+    const one = (q) => { const c = $("button", "rs-ask-q", q); c.type = "button"; c.onclick = () => { onPick(); ask(q); }; return c; };
+    return g && typeof g === "object" ? (g.items || []).length ? [...(g.title ? [$("p", "rs-ask-grp", g.title)] : []), ...g.items.map(one)] : [] : [one(String(g))];
+  });
   ex.append($("p", "rs-ask-hint", "Ask a question in words. The agent writes the SQL, the table goes to the data dock and the roads light on the map."), needKey, ...chips(() => {}));
   log.append(ex);
 
@@ -153,7 +157,7 @@ export function askPanel(o = {}){
   // keys: ↑ ↓ walk the examples (the focus scrolls the list to the one in view), Escape closes the list
   exBar.addEventListener("keydown", (e) => {
     if(exList.hidden) return;
-    const items = [...exList.children], at = items.indexOf(document.activeElement);
+    const items = [...exList.querySelectorAll("button.rs-ask-q")], at = items.indexOf(document.activeElement);
     if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); exOpen(false); exB.focus(); }
     else if(e.key === "ArrowUp" || e.key === "ArrowDown"){
       e.preventDefault();
@@ -173,7 +177,7 @@ export function askPanel(o = {}){
   sending(false);
   comp.append(box, send);
   frame.bar.append(exBar, comp);
-  const paintStart = () => { const none = !turns.length; ex.hidden = !none; exBar.hidden = none || !examples.length; };
+  const paintStart = () => { const none = !turns.length; ex.hidden = !none; exBar.hidden = none || !exList.querySelector("button"); };
 
   // ---- the provider's name and the key form (in the view: the person gets the key where it is needed) ----
   function paintWho(){

@@ -525,3 +525,38 @@ def test_a_long_examples_list_stays_in_the_free_space_and_scrolls(tmp_path, size
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_examples_in_groups_have_headings_in_both_lists_and_the_keys_skip_them(tmp_path):
+    """Kaveh, 2026-11-07: "maybe we should categorize them in example list too". `examples` takes strings and groups {title, items}: a heading above its
+    chips in the start list and in the drop-up list; the arrow keys walk over the chips only; a flat list has no heading."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open()")
+            assert page.evaluate("document.querySelectorAll('.rs-ask-ex .rs-ask-q').length") == 1 and page.evaluate("document.querySelectorAll('.rs-ask-grp').length") == 0   # a flat list: no heading
+            page.evaluate("""document.querySelector('.rs-ask').remove();                          // the first Ask view of the host goes; a new one has the groups
+                             withOpts({examples: ['Plain one?', {title: 'Changes', items: ['Which objects did I change?', 'When?']}, {title: 'Empty', items: []},
+                                                  {title: 'Colours', items: ['Colour the primary roads red']}]});
+                             ask.open()""")
+            start = page.evaluate("[...document.querySelectorAll('.rs-ask-ex > .rs-ask-grp, .rs-ask-ex > .rs-ask-q')].map(e => e.className.slice(7) + ':' + e.textContent)")
+            assert start == ["q:Plain one?", "grp:Changes", "q:Which objects did I change?", "q:When?", "grp:Colours", "q:Colour the primary roads red"], start
+            page.evaluate("window.script = [say('Done.')]")
+            page.locator(".rs-ask-ex:visible .rs-ask-q").nth(1).click()                              # a chip of a group asks its question
+            page.wait_for_function("window.calls.length === 1 && !document.querySelector('.rs-ask-send').classList.contains('stop')")      # the answer is done
+            assert page.evaluate("window.calls[0].messages.at(-1).content") == "Which objects did I change?"
+            page.click(".rs-ask-exb")
+            drop = page.evaluate("[...document.querySelectorAll('.rs-ask-exlist > *')].map(e => e.className.slice(7) + ':' + e.textContent)")
+            assert drop == start, drop
+            assert page.evaluate("getComputedStyle(document.querySelector('.rs-ask-exlist .rs-ask-grp')).textTransform") == "uppercase"
+            page.focus(".rs-ask-exb")
+            order = []
+            for _ in range(5):
+                page.keyboard.press("ArrowUp")
+                order.append(page.evaluate("document.activeElement.textContent"))
+            assert order == ["Colour the primary roads red", "When?", "Which objects did I change?", "Plain one?", "Plain one?"], order     # the headings are skipped
+            page.keyboard.press("Escape")
+            assert not page.is_visible(".rs-ask-exlist")
+        finally:
+            browser.close()
+    assert errors == [], errors
