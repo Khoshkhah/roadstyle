@@ -25,7 +25,7 @@ part is a roadstyle part. This note gives roadstyle the 20 parts that pages need
 - **The keyboard.** Each part works with the keys (see the table).
 - **Scope.** The rules are `:is(#sb,body) .rs-…`, so a part works in the panel, in an editor frame, in the dock and in a page of its own.
 - **Native first.** A switch is a check box, a slider is the browser's range input, a dialog is the browser's `<dialog>` (it keeps the focus in it,
-  and Escape is Cancel), the "More…" colour is the browser's colour input.
+  and Escape is Cancel), "More…" opens the colour box of `colorpick.js` (PR 67): the dashboard has one colour box, and no browser dialog.
 
 ## The parts
 
@@ -35,7 +35,7 @@ part is a roadstyle part. This note gives roadstyle the 20 parts that pages need
 | 2 | Hour picker | `rs.hours.use(el, {value: 8 \| [7, 9], range, hours, onChange})`, in the look of the day picker (Kaveh chose it on 2026-11-06: not a grid of 24 buttons). One hour: "‹ [08:00 – 09:00 🕒 ▾] ›"; a click on the field opens a list of the hours that scrolls to the chosen one, with a tick at it. A range: "From [07:00 ▾] To [10:00 ▾] 3 h", each field with its list; To is the end of the last hour and is later than From. An hour not in `hours` is dimmed in the list | ↓ opens the list; ↓ ↑ Home End walk it, Enter picks, Escape closes |
 | 3 | Slider | `rs.slider(el, {label, min, max, step, value, unit, format, onInput, onChange})`. `value: [a, b]` gives two handles; the fill is the chosen part, the value is at the right of the label | the browser's: arrows, Home, End |
 | 4 | Number field | `rs.number(el, {label, min, max, step, value, unit, onChange})`: "−", the number, the unit, "+" in one box; a value out of range is set to the nearest limit | arrows (the browser's) |
-| 5 | Colour picker | `rs.colorPick(el, {label, value, palette, onChange})`: a field with the swatch and the hex. Its box: the palette (default: the 8 chart colours), a hex field and "More…" (the system's colour window) | arrows in the palette, Enter in the hex field |
+| 5 | Colour picker | `rs.colorPick(el, {label, value, palette, onChange})`: a field with the swatch and the hex. Its box: the palette (default: the 8 chart colours), a hex field and "More…" (the colour box of `colorpick.js`) | arrows in the palette, Enter in the hex field |
 | 6 | On/off switch | `<label class="rs-switch"><input type="checkbox" role="switch"><span>Show bridges</span></label>`: no JavaScript | Space |
 | 7 | Search field | `rs.search(el, {placeholder, button, suggest(q), onPick(item), onSubmit(q), onClear})`: the magnifier, the text, "×", an optional filled button at the end; `suggest` gives `{label, sub, value}` rows (or a promise of them), and a ring turns while it waits | ↓ ↑ walk the list, Enter picks or submits, Escape closes, a second Escape clears |
 | 8 | File drop zone | `rs.drop(el, {accept, multiple, text, hint, onFiles, onClear})`: a dashed box; a file over it fills it with the accent; after the pick, a row with the name, the size and "×" | Enter or Space opens the file window |

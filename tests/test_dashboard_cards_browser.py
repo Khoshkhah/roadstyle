@@ -1,4 +1,4 @@
-"""The card standard of the panel (docs/guides/dashboard-panel.md, "Cards: the panel standard"): all cards are as wide as each other, the space between
+"""The card standard of the panel (docs/guides/dashboard-parts.md, "Cards"): all cards are as wide as each other, the space between
 two cards is `--rs-card-gap` (12px), a closed card that folds is 44px high, its title row is flat (no border, no fill), and "collapse all" is at the
 left of "hide the panel". Skipped without playwright."""
 import pytest

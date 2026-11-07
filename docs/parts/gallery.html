@@ -75,6 +75,7 @@ import {rsSvg} from "./static/dashboard/svg.js";
 import {rsChart} from "./static/dashboard/chart.js";
 import {editorFrame} from "./static/dashboard/frame.js";
 import {initSelectBox} from "./static/dashboard/selectbox.js";
+import {initColorPick} from "./static/dashboard/colorpick.js";
 import {initTip} from "./static/dashboard/tip.js";
 import {initPanelScroll, initInnerScroll} from "./static/dashboard/panelscroll.js";
 import {rsHours} from "./static/dashboard/hours.js";
@@ -122,7 +123,9 @@ function openFrame(){
     frame = rs.frame({panel: sb, title: "Edit roads", back: "Parts", id: "gl-ed", tabs: [["tags", "Tags"], ["geometry", "Geometry"], ["notes", "Notes"]]});
     const draw = t => {
       frame.body.innerHTML = {
-        tags: '<label>Road class</label><select><option>primary</option><option>secondary</option><option>residential</option></select><label>Name</label><input value="Götgatan">',
+        tags: '<div class="rs-sec-box"><div class="rs-card-title">Götgatan</div><label>Road class</label><select><option>primary</option><option>secondary</option><option>residential</option></select>' +
+          '<label>Name</label><input value="Götgatan"></div><div class="rs-sec-box"><div class="rs-card-title">Head length</div>' +
+          '<p>Start 5.0 m <button type="button" class="rs-link">default</button></p><input type="range" min="0.5" max="40" step="0.1" value="5"></div>',
         geometry: "<p>The body is the one area that scrolls.</p>" + Array.from({length: 24}, (_, i) => `<p class="sb-note">Point ${i + 1}: 18.07, 59.31</p>`).join(""),
         notes: '<label>Note</label><textarea rows="4">The road is closed in July.</textarea>'}[t];
       frame.bar.innerHTML = `<b>Tab: ${t}</b> <button type="button" class="sb-primary">Apply</button>`;
@@ -131,13 +134,17 @@ function openFrame(){
     frame.addEventListener("back", () => frame.close());
     draw("tags");
   }
+  const fresh = !frame.isOpen();
   frame.open(frame.tab() || "tags");
+  if(fresh && !document.querySelector("#gl-ed-tabs .rs-count"))   // a count on a tab: after open(), as the guide says
+    document.getElementById("gl-ed-tab-geometry").insertAdjacentHTML("beforeend", '<span class="rs-count warn">3</span>'),
+    document.getElementById("gl-ed-tab-notes").insertAdjacentHTML("beforeend", '<span class="rs-count">1</span>');
 }
 
 // each part: its id (the anchor), its name, the room that its window or list needs under it in an iframe (px), and the code that adds it
 const PARTS = [
   {id: "tabs", name: "Tabs", make(){
-    rs.sections.add({id: "tabs", html: '<nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets</button><button class="rs-tab" data-tab="c">Hours</button></nav>' +
+    rs.sections.add({id: "tabs", html: '<nav class="rs-tabs"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets<span class="rs-count">12</span></button><button class="rs-tab" data-tab="c">Hours<span class="rs-count warn">2</span></button></nav>' +
       '<div data-pane="a"><p>The pane of the tab Overview.</p></div><div data-pane="b" hidden><p>The pane of the tab Streets.</p></div><div data-pane="c" hidden><p>The pane of the tab Hours.</p></div>' +
       '<p class="gl-out" id="tabs-out">onChange: none yet</p>'});
     rs.tabs.use(document.querySelector('[data-rs-section="tabs"] .rs-tabs'), id => out("tabs-out", `onChange: <b>${id}</b>`));
@@ -183,16 +190,25 @@ const PARTS = [
                  terms: [["Part", "A control that every dashboard page shares."], ["Token", "A theme colour, for example <code>--accent</code>."]], note: "Escape closes the window."});
     document.getElementById("gl-help-link").onclick = e => { e.preventDefault(); rs.help.open({title: "Opened by a link", intro: "The same window, with words of its own."}); };
   }},
-  {id: "hover", name: "Hover box", room: 60, make(){
+  {id: "hover", name: "Hover box", room: 60, always: true, make(){
     rs.sections.add({id: "hover", html: '<div class="gl-target" id="gl-hover">Move the pointer over this box</div>'});
     rs.hover.on(document.getElementById("gl-hover"), ev => `<b>Saturday</b><br>x ${Math.round(ev.offsetX)} px, y ${Math.round(ev.offsetY)} px`);
   }},
-  {id: "tip", name: "Button tip", room: 50, make(){
+  {id: "tip", name: "Button tip", room: 50, always: true, make(){
     rs.sections.add({id: "tip", html: '<div class="gl-row"><button type="button" title="Zoom to the area" aria-label="Zoom to the area"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg></button>' +
       '<button type="button" title="Build the networks of the area">Build →</button></div><p class="gl-out">The icon button shows its tip. The button with a text shows none.</p>'});
   }},
   {id: "buttons", name: "Buttons", make(){
-    rs.sections.add({id: "buttons", html: '<div class="gl-row"><button type="button">Reset</button><button type="button" class="sb-primary">Run</button><button type="button" disabled>Disabled</button></div>'});
+    rs.sections.add({id: "buttons", html: '<div class="gl-row"><button type="button">Reset</button><button type="button" class="sb-primary">Run</button><button type="button" disabled>Disabled</button></div><p>A link button: <button type="button" class="rs-link">clear</button></p>'});
+  }},
+  {id: "color", name: "Colour picker", room: 380, make(){
+    rs.sections.add({id: "color", html: '<div class="gl-row"><label>Road fill</label><input type="color" id="gl-col" value="#b8d986"><label>Casing</label><input type="color" value="#7a8a9a"></div>' +
+      '<p class="gl-out" id="col-out">input / change: none yet</p><div id="gl-colp"></div><p class="gl-out" id="colp-out">onChange: none yet</p>'});
+    const c = document.getElementById("gl-col");
+    c.addEventListener("input", () => out("col-out", `input: <b>${c.value}</b>`));
+    c.addEventListener("change", () => out("col-out", `change: <b>${c.value}</b>`));
+    // the same box from JavaScript, with a palette first: "More…" opens the box above
+    rs.colorPick(document.getElementById("gl-colp"), {label: "Line colour", value: "#eb6834", onChange: v => out("colp-out", `onChange: <b>${v}</b>`)});
   }},
   {id: "inputs", name: "Text box, check box and radio", make(){
     rs.sections.add({id: "inputs", html: '<label>Street</label><input placeholder="Götgatan"><label>Note</label><textarea rows="3" placeholder="A note"></textarea>' +
@@ -215,6 +231,11 @@ const PARTS = [
   {id: "callout", name: "Callout", make(){
     rs.sections.add({id: "callout", html: '<div class="rs-callout" style="--rs-callout:#16a34a"><b>Yes, the promise holds.</b> On 80 % of hours the traffic was inside the range.</div>' +
       '<div class="rs-callout"><b>No colour given:</b> the edge is <code>--accent</code>.</div>'});
+  }},
+  {id: "status", name: "Status colours", make(){
+    rs.sections.add({id: "status", html: '<div class="rs-callout err"><b>Given up.</b> The solver could not keep 2 crossings.</div>' +
+      '<div class="rs-callout warn"><b>Check this.</b> Choose which road is on top.</div><div class="rs-callout ok"><b>Kept.</b> Every crossing is kept.</div>' +
+      '<div class="gl-row"><span class="rs-chip err">given up</span><span class="rs-chip warn">near</span><span class="rs-chip ok">kept</span></div>'});
   }},
   {id: "kv", name: "Rows of fields", make(){
     rs.sections.add({id: "kv", html: '<div class="rs-name">Götgatan</div><div class="rs-kv"><span>highway</span><b>primary</b></div><div class="rs-kv"><span>lanes</span><b>2</b></div><div class="rs-kv"><span>maxspeed</span><b>40 km/h</b></div><div class="rs-kv"><span>edge_id</span><b>8121729169906061189</b></div>'});
@@ -265,10 +286,6 @@ const PARTS = [
     rs.sections.add({id: "number", html: '<div class="gl-row"><div id="gl-num"></div><div id="gl-num2"></div></div>'});
     rs.number(document.getElementById("gl-num"), {label: "Lanes", min: 1, max: 8, value: 2});
     rs.number(document.getElementById("gl-num2"), {label: "Width", min: 0, max: 40, step: 0.5, value: 7.5, unit: "m"});
-  }},
-  {id: "color", name: "Colour picker", room: 170, make(){
-    rs.sections.add({id: "color", html: '<div id="gl-col"></div><p class="gl-out" id="col-out">onChange: none yet</p>'});
-    rs.colorPick(document.getElementById("gl-col"), {label: "Road fill", value: "#eb6834", onChange: c => out("col-out", `onChange: <b>${c}</b>`)});
   }},
   {id: "onoff", name: "On/off switch", make(){
     rs.sections.add({id: "onoff", html: '<label class="rs-switch"><input type="checkbox" role="switch" checked><span>Show bridges</span></label>' +
@@ -368,7 +385,7 @@ const list = one ? PARTS.filter(p => p.id === one) : PARTS;
 if(one && !list.length) document.querySelector(".sb-body").innerHTML = `<p>No part "${esc(one)}".</p>`;
 if(one) document.querySelector(".sb-top h2").textContent = list[0] ? list[0].name : "Dashboard parts";
 for(const p of list){ if(!one) rs.sections.add({id: p.id + "-cap", html: caption(p.id, p.name)}); p.make(); }
-initSelectBox(); initPanelScroll(); initInnerScroll(); initTip();
+initSelectBox(); initColorPick(); initPanelScroll(); initInnerScroll(); initTip();
 
 if(!one && !q.has("phone")){
   document.getElementById("gl-bar").hidden = document.getElementById("gl-about").hidden = false;
@@ -382,17 +399,25 @@ if(!one && !q.has("phone")){
 }
 if(location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
 
-// in an iframe: the frame is as high as the part, and as the room of its window or list under it
+// in an iframe: the frame is as high as the part, and as the room of its window or list under it. The room is there only while the window or list
+// is open (no empty space under a closed calendar), and from a moment before a click or a key, so that it opens below, as on a page. A tip and a
+// hover box (`always`) keep their small room: they come with the pointer.
 if(one && window.frameElement){
-  const room = list[0] && list[0].room || 0, card = sb.querySelector(".sb-card"), body = sb.querySelector(".sb-body");
+  const part = list[0] || {}, card = sb.querySelector(".sb-card"), body = sb.querySelector(".sb-body");
+  const POP = ".rs-sel-list, .rs-day-cal:not([hidden]), #rs-help:not([hidden])";
+  let armed = 0;
+  const opened = () => performance.now() < armed || (frame && frame.isOpen()) || [...document.querySelectorAll(POP)].some(e => e.getClientRects().length);
+  const arm = () => { armed = performance.now() + 700; fit(); setTimeout(fit, 750); };
+  sb.addEventListener("pointerdown", arm, true); sb.addEventListener("keydown", arm, true);
   const fit = () => {
+    const room = part.room && (part.always || opened()) ? part.room : 0;
     const last = body.lastElementChild, cs = getComputedStyle(body);
     const content = last ? last.getBoundingClientRect().bottom - body.getBoundingClientRect().top + body.scrollTop + parseFloat(cs.paddingBottom) : 0;
     const h = sb.querySelector(".sb-top").offsetHeight + (frame && frame.isOpen() ? 420 : content) + (sb.querySelector(".rs-panel-bar")?.offsetHeight || 0) + 2;
     window.frameElement.style.height = (h + room) + "px";
     sb.style.bottom = room + "px";
   };
-  new ResizeObserver(fit).observe(card); new MutationObserver(fit).observe(card, {childList: true, subtree: true, attributes: true});
+  new ResizeObserver(fit).observe(card); new MutationObserver(fit).observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "aria-expanded"]});      // a list or a window outside the card opens and closes too
   fit();
 }
 window.galleryReady = true;

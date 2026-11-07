@@ -145,7 +145,7 @@ rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positr
 | keyword | default | backends | what |
 |---|---|---|---|
 | `street_view` | `"window"` | web | `"window"` = a map button and a floating window that follows the clicked road; `"dock"` (dashboard) = Street View beside the map with a divider, and no panel (see [Docked](../guides/street-view.md#docked-beside-the-map)); `True` = a link in the popup; `False` = none. Needs the page served over http(s) ([guide](../guides/street-view.md)) |
-| `street_view_key` | env `GOOGLE_MAPS_KEY` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses ([Set up a Google key](../guides/google-key.md)) |
+| `street_view_key` | env `GOOGLE_MAPS_KEY` | web | a Google Maps JavaScript API key for the window: its bar offers Linked (a panorama; the map marker walks with the viewer) and Classic (the embed). Written into the page; restrict it to your site's addresses ([Keys and tokens](../guides/google-key.md)) |
 | `mapillary_token` | env `MAPILLARY_TOKEN` | web | a free Mapillary client token (mapillary.com/developer): the Street View window's Mapillary tab and its coverage layer. Without it the tab asks for one; the person can also save one in the settings (Keys), which is used instead of the page's. Panoramax needs no key. Limit the token to your site: it is written into the page |
 | `google_3d` | on with a toolbar, else `False` | web | `True`: a Google 3D button and a floating window with Google's photorealistic 3D view; its camera and the map's move together, and a clicked road is drawn in it. Needs `street_view_key` (an error without it) ([guide](../guides/google-3d.md)) |
 | `google_3d_layers` | `[]` | web | a list of layers for the Google 3D window, each `{id, kind, source, match, scope, max, on, arrows, style}` (typed: a wrong key or `kind` is an error). A layer draws the features of a GeoJSON source of the page; the window's Show menu turns each on or off ([guide](../guides/google-3d.md#your-own-layers)) |
@@ -202,7 +202,7 @@ Returns a `WebMap` (`.save()`).
 | `boundary` | `None` | web | a dashed outline on top: shapely geometry, GeoDataFrame or GeoJSON. It is an input: the caller says where it comes from (a duckOSM `main.boundary`, a city limit, a drawn shape) |
 | `boundary_dim` | `False` | web | `True`: shade the outside of `boundary` (the opacity is in the template's `boundary` options) |
 | `dashboard` | `None` | web | a partial dashboard option, merged over the defaults of the template `dashboard`: `{"toolbar": {"position": "left"}, "panel": {"sections": [...]}}`. A wrong key or value is an error. Every key, default and meaning: [Dashboard options](#dashboard-options). `template="dashboard"` only |
-| `page_script` | `None` | web | JavaScript text that the page runs, the last script of the body, before the page is ready: it sees `rs`. Put the code in `rs.ready(() => ...)`, which runs it when the panel's sections are there (and at once if they are) ([Live data](../guides/live-data.md)) |
+| `page_script` | `None` | web | JavaScript text that the page runs, the last script of the body, before the page is ready: it sees `rs`. Put the code in `rs.ready(() => ...)`, which runs it when the panel's sections are there (and at once if they are) ([Live data](../guides/dashboard-manual/javascript.md#live-data-a-new-day)) |
 | `page_style` | `None` | web | CSS text of the page, the last style of the body |
 | `boundary_limit` | `False` | web | `True`: the camera stays near `boundary` (the center inside its bounds grown by `limit_pad`, and the lowest zoom `zoom_out` levels under the fit) |
 
@@ -213,7 +213,7 @@ change the defaults below.
 
 | function | page | changed defaults | own keywords |
 |---|---|---|---|
-| `render_dashboard` | the map, an empty panel to which the page adds parts (`dashboard={"panel": {"sections": [{"id": "q", "part": "query"}]}}`, [Add to the panel](../guides/dashboard-panel.md)), and the standard toolbox (navigate, base map, roads, colour and legend, settings, credits) | `template="dashboard"`; the map keeps the defaults of a map page; the panel at the left, the toolbox at the right edge, no scale box | `layout="dock"`: the panel docked at the left and no toolbox. The default `"overlay"` floats the panel over a full map ([Dashboard layout](../guides/dashboard-layout.md)) |
+| `render_dashboard` | the map, an empty panel to which the page adds parts (`dashboard={"panel": {"sections": [{"id": "q", "part": "query"}]}}`, [Dashboards](../guides/dashboards.md#the-panel-starts-empty)), and the standard toolbox (navigate, base map, roads, colour and legend, settings, credits) | `template="dashboard"`; the map keeps the defaults of a map page; the panel at the left, the toolbox at the right edge, no scale box | `layout="dock"`: the panel docked at the left and no toolbox. The default `"overlay"` floats the panel over a full map ([Dashboard layout](../guides/dashboard-layout.md)) |
 | `render_street_view` | map + Google Street View of the clicked road | `name="Roads and Street View"`, `road_popup=False`, `street_view=True` | see below |
 
 | `render_street_view` keyword | default | what |
@@ -225,7 +225,7 @@ change the defaults below.
 
 ## Dashboard options
 
-`dashboard=` is a partial option of the template `dashboard`. The call merges it over the defaults of the template, field by field. Give only the keys that you change. A wrong key or value is an error, and so is `template` (use the keyword `template=`). Guides: [Dashboard layout](../guides/dashboard-layout.md) for the frame and the toolbox, [Add to the panel](../guides/dashboard-panel.md) for the panel.
+`dashboard=` is a partial option of the template `dashboard`. The call merges it over the defaults of the template, field by field. Give only the keys that you change. A wrong key or value is an error, and so is `template` (use the keyword `template=`). Guides: [Dashboard layout](../guides/dashboard-layout.md) for the frame and the toolbox, [Dashboards](../guides/dashboards.md#the-panel-starts-empty) for the panel.
 
 ```python
 rs.render_dashboard(edges, dashboard={
@@ -252,23 +252,28 @@ The options are in groups: the frame (`layout`, `scale_box`), `panel`, `toolbar`
 | `look` | `"card"` (`layout="overlay"`), `"frame"` (`layout="dock"`) | `"card"`: a floating card, see-through, over the map. `"frame"`: full height, with a translucent frame and solid cards. Since 0.29.0 the overlay layout has the card look by default |
 | `sections` | `[]` | the sections that the page adds to the empty panel, in order. A section is a mapping with the keys of the next table |
 
-A section (`panel.sections`; the errors are in [Add to the panel](../guides/dashboard-panel.md#the-errors)):
+`panel.help` (none by default): `{"title", "intro", "terms", "note"}`, the "?" in the panel's title and the words of its help window ([A help window](../guides/dashboard-parts.md#a-help-window)).
+
+A section (`panel.sections`; the errors are in [Dashboards](../guides/dashboards.md#the-errors)):
 
 | key | default | meaning |
 |---|---|---|
 | `id` | required | the name of the section. It is not empty and not used twice |
-| `part` | none | a part of roadstyle: `"query"`, `"road_card"` or `"chart"`. A section has `part` or `html`, not both |
+| `part` | none | a part of roadstyle: `"query"`, `"road_card"` or `"chart"`. A section has one of `html`, `part`, `tabs` and `kpis` |
 | `html` | none | the page's own HTML |
 | `text` | none | the start text of the part `query` (none: an empty box) |
 | `fields` | none | the columns that the part `road_card` shows (none: every column) |
-| `chart` | none | the options of the part `chart`: the next table ([Charts](../guides/charts.md)) |
+| `chart` | none | the options of the part `chart`: the next table ([Charts](../guides/dashboard-parts.md#a-chart)) |
 | `label` | none | the title of the section: a section with a `label` is a card, and a section without one is a block of the page's HTML with no box |
 | `after`, `before` | none | the `id` of an earlier section: this section goes after it, or before it. Give one of them |
 | `fold` | `False` | `True`: the card folds; its title is a button, and its row has a chevron. It needs a `label` |
-| `note` | – | one line of state under the card's title (`rs.sections.note` changes it). It needs a `label`. A card that opens something (`open`, a function) is JavaScript only: [A card that opens something](../guides/dashboard-panel.md#a-card-that-opens-something) |
+| `note` | – | one line of state under the card's title (`rs.sections.note` changes it). It needs a `label`. A card that opens something (`open`, a function) is JavaScript only: [A card that opens something](../guides/dashboard-parts.md#a-card-that-opens-something) |
 | `background` | `True` | `False`: the card has no colour behind it (the same padding and title row). It needs a `label` |
+| `tabs` | none | in place of `html`: `[{"id", "label", "html"}, ...]`, a tab row and one pane for each tab ([Tabs](../guides/dashboard-parts.md#tabs)) |
+| `kpis` | none | in place of `html`: `[{"title", "value", "sub", "color"}, ...]`, number tiles; `value` is a text or a number ([Number tiles](../guides/dashboard-parts.md#number-tiles)) |
+| `help` | none | `{"title", "intro", "terms": [[term, meaning], ...], "note"}`: a "?" in the card's title row that opens the help window. It needs a `label` |
 
-A chart card (`chart` of a section with `part: "chart"`; [Charts](../guides/charts.md)):
+A chart card (`chart` of a section with `part: "chart"`; [Charts](../guides/dashboard-parts.md#a-chart)):
 
 | key | default | meaning |
 |---|---|---|
@@ -282,7 +287,7 @@ A chart card (`chart` of a section with `part: "chart"`; [Charts](../guides/char
 | `height` | `220` | the height of the chart in pixels, 80 or more |
 | `follow` | `False` | the map's roads only: `True` draws the chart again for the roads that the map shows now |
 
-The space of the cards is three CSS variables on `:root`: `--rs-card-gap` (12px, between two cards), `--rs-card-pad` (14px, inside a card) and `--rs-panel-bottom` (28px, under the last card). See [Cards: the panel standard](../guides/dashboard-panel.md#cards-the-panel-standard).
+The space of the cards is three CSS variables on `:root`: `--rs-card-gap` (12px, between two cards), `--rs-card-pad` (14px, inside a card) and `--rs-panel-bottom` (28px, under the last card). See [Cards: the panel standard](../guides/dashboard-parts.md#cards-the-panel-standard).
 
 There is no `hide` key and no `phone` option. The page turns to its phone form by itself when the window is 700 px wide or less (a phone, or a narrow desktop window), with the bar at the top. The page data holds these fixed values as `phone.max_width_px` (700) and `phone.toolbar` (top). `dashboard=` cannot change them.
 

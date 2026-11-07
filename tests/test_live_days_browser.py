@@ -1,4 +1,4 @@
-"""Live data for a new day (docs/guides/live-data.md): a day picker in the panel, added with `dashboard={"panel": {"sections": ...}}` and `page_script=`, loads the
+"""Live data for a new day (docs/guides/dashboard-manual/javascript.md, "Live data: a new day"): a day picker in the panel, added with `dashboard={"panel": {"sections": ...}}` and `page_script=`, loads the
 file of a day and gives it to `rs.setData`; the next day replaces the values of the day before. The files are routes of a fake address, so the page can fetch them.
 Skipped without playwright."""
 import json

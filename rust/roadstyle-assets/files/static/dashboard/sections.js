@@ -1,12 +1,15 @@
-// The panel's sections (docs/guides/dashboard-panel.md): the panel starts empty, and the page adds each section, with `rs.sections` or with the
-// typed option `dashboard.panel.sections`. A section holds the page's own HTML (`html` or `el`) or a part of roadstyle (`part`: "query",
-// "road_card", "chart"), at the end of the panel or beside an earlier section. A section with a `label` is a card: the label is its title row, `fold` makes it
+// The panel's sections (docs/guides/dashboards.md): the panel starts empty, and the page adds each section, with `rs.sections` or with the
+// typed option `dashboard.panel.sections`. A section holds the page's own HTML (`html` or `el`), a part of roadstyle (`part`: "query",
+// "road_card", "chart"), tabs (`tabs`) or number tiles (`kpis`), at the end of the panel or beside an earlier section. A section with a `label` is a card: the label is its title row, `fold` makes it
 // fold, `open` makes the card one button that opens something, `note` is one line of state under the title, `background: false` takes its colour away (a card that opens something has none: `background: true` gives it the tint). A section without a label is a block of the page's own, with no box: the card gap above and below.
 import {O, _emit} from "./core.js";
 import {legendRefresh} from "./legend.js";
 import {queryPart} from "./query.js";
 import {roadCardPart} from "./roadcard.js";
 import {chartCardPart} from "./chartcard.js";
+import {rsTabs} from "./tabs.js";
+import {rsKpi} from "./kpi.js";
+import {rsHelp} from "./help.js";
 const _secEls = new Map();
 const _secBody = () => document.querySelector("#sb .sb-body");
 // the parts of roadstyle that a section can hold: each makes its element from the section's options
@@ -131,8 +134,17 @@ export const rsSections = {
     if(spec.html) host.insertAdjacentHTML("beforeend", spec.html);
     if(spec.el) host.appendChild(spec.el);
     if(spec.part) host.appendChild(_SEC_PARTS[spec.part](spec));
+    // tabs and number tiles from Python (`tabs`, `kpis`): the same HTML as a page writes for rs-tabs and rs.kpi
+    if(spec.tabs){
+      const esc = t => String(t).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
+      host.insertAdjacentHTML("beforeend", '<nav class="rs-tabs">' + spec.tabs.map((t, i) => '<button type="button" class="rs-tab' + (i ? "" : " on") + '" data-tab="' + esc(t.id) + '">' + esc(t.label) + "</button>").join("")
+        + "</nav>" + spec.tabs.map((t, i) => '<div data-pane="' + esc(t.id) + '"' + (i ? " hidden" : "") + ">" + t.html + "</div>").join(""));
+      rsTabs.use(host.querySelector(":scope > .rs-tabs"), () => {});
+    }
+    if(spec.kpis) host.insertAdjacentHTML("beforeend", '<div class="rs-kpis">' + spec.kpis.map(k => rsKpi(k.title, k.value, k.sub, k.color)).join("") + "</div>");
     if(spec.after) _secNeed(spec.after).after(w); else if(spec.before) _secNeed(spec.before).before(w); else body.appendChild(w);
     _secEls.set(spec.id, w);
+    if(spec.help){ if(!spec.label) throw new Error("rs.sections.add: '" + spec.id + "' has help and no label: the \"?\" goes in the card's title row"); rsHelp.button(w, spec.help); }
     _fdPaint();
     _emit("rs:sectionchange", {id: spec.id, state: "add"});
     return w;
@@ -166,6 +178,7 @@ export function initSections(){
   const p = O.dashboard && O.dashboard.panel;
   if(!p) return;
   const run = () => {
+    if(p.help) rsHelp.set(p.help);                                  // the "?" in the panel's title (Python: dashboard={"panel": {"help": {...}}})
     for(const s of p.sections || []) rsSections.add(s);
     legendRefresh();
   };

@@ -47,7 +47,7 @@ with st.sidebar:
     overlays, ov_lines = overlay_section()
 
 # render_dashboard injects the bundled panel, which starts empty: as a demo, the studio adds the query box and the road card
-# (docs/guides/dashboard-panel.md), and passes the look/data knobs through.
+# (docs/guides/dashboards.md), and passes the look/data knobs through.
 kw = {"basemap": basemap, "view_3d": view_3d, "basemaps": bms or None,
       "color_options": color_options, "name": title,
       "dashboard": {"panel": {"sections": [{"id": "q", "part": "query", "label": "Query"},

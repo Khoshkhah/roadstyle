@@ -9,6 +9,7 @@ overlay
 colorbox
 navbox
 selectbox
+colorpick
 placement
 panelscroll
 frame

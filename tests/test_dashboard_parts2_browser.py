@@ -131,6 +131,18 @@ def test_the_slider_the_number_and_the_colour(page):
     assert page.evaluate("P.col.value()") == "#eb6834"                  # not a colour: no change
     page.fill(".rs-color-box:not([hidden]) .rs-color-in", "#123456")
     assert _got(page, "col") == ["#eb6834", "#123456"]
+    # "More…" opens the one colour box of colorpick.js at the field (no browser dialog), and its hex field sets the value
+    assert page.locator(".rs-color-box input[type=color]").count() == 0
+    page.click(".rs-color-box:not([hidden]) .rs-color-more")
+    assert page.locator(".rs-color-box:not([hidden])").count() == 0 and page.locator(".rs-cp-box").count() == 1
+    assert page.evaluate("document.querySelector('#col .rs-cp-btn').offsetParent") is None     # its own swatch is not shown
+    box, btn = page.locator(".rs-cp-box").bounding_box(), page.locator("#col .rs-color-btn").bounding_box()
+    assert abs(box["y"] - (btn["y"] + btn["height"] + 6)) < 2 or abs(box["y"] + box["height"] + 6 - btn["y"]) < 2   # at the field, not at 0, 0
+    page.fill(".rs-cp-box .rs-cp-hex", "#2a78d6")
+    assert page.evaluate("P.col.value()") == "#2a78d6" and page.inner_text("#col .rs-color-hex") == "#2a78d6"
+    page.keyboard.press("Escape")                                        # back to the colour before the box opened
+    assert page.locator(".rs-cp-box").count() == 0 and page.evaluate("P.col.value()") == "#123456"
+    assert page.evaluate("document.activeElement.classList.contains('rs-color-btn')")
 
 
 def test_the_switch_and_the_search(page):

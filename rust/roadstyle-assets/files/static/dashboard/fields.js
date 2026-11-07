@@ -6,6 +6,7 @@
 //   rs.number(el, {label: "Lanes", min: 1, max: 8, value: 2})
 //   rs.colorPick(el, {label: "Fill", value: "#eb6834", palette: ["#eb6834", ...]})
 import {rsPopAt, rsPopClose, rsPopKeys} from "./menu.js";
+import {rsColorBox, rsColorPickers} from "./colorpick.js";
 const _fdHead = cls => '<div class="' + cls + '-head"><span class="' + cls + '-l"></span><output class="' + cls + '-v"></output></div>';
 export function rsSlider(el, opts = {}){
   if(!(el instanceof Element)) throw new Error("rs.slider: give the element that the slider goes in");
@@ -63,8 +64,8 @@ export function rsNumber(el, opts = {}){
   set(opts.value ?? (isFinite(min) ? min : 0), true);
   return {value: () => cur, set};
 }
-const _cpHex = /^#[0-9a-f]{6}$/i;
-const _cpChev = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+const _fcHex = /^#[0-9a-f]{6}$/i;
+const _fcChev = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
 export function rsColorPick(el, opts = {}){
   if(!(el instanceof Element)) throw new Error("rs.colorPick: give the element that the picker goes in");
   // the default palette: the chart colours of the theme (the colours that a page shows its data in)
@@ -72,9 +73,14 @@ export function rsColorPick(el, opts = {}){
   const palette = () => opts.palette || [1, 2, 3, 4, 5, 6, 7, 8].map(k => css().getPropertyValue("--rs-chart-" + k).trim()).filter(Boolean);
   el.classList.add("rs-color");
   el.innerHTML = (opts.label ? '<div class="rs-color-l"></div>' : "") +
-    '<button type="button" class="rs-color-btn" aria-haspopup="dialog" aria-expanded="false"><span class="rs-color-sw"></span><span class="rs-color-hex"></span>' + _cpChev + "</button>";
+    '<button type="button" class="rs-color-btn" aria-haspopup="dialog" aria-expanded="false"><span class="rs-color-sw"></span><span class="rs-color-hex"></span>' + _fcChev + "</button>";
   if(opts.label) el.querySelector(".rs-color-l").textContent = opts.label;
   const btn = el.querySelector(".rs-color-btn"), box = document.createElement("div");
+  // "More…" opens the colour box of colorpick.js (the square, the hue bar, the hex field, the colours used last) on a hidden colour input, at this
+  // part's button: one colour box for the whole dashboard, and no browser dialog. Its `input` sets the value while the person drags.
+  const full = document.createElement("input"); full.type = "color"; full.setAttribute("aria-label", (opts.label || "Colour") + ": more colours");
+  el.appendChild(full); rsColorPickers(el); full.closest(".rs-cp").style.display = "none";
+  full.addEventListener("input", () => set(full.value));
   btn.setAttribute("aria-label", opts.label || "Colour");
   box.className = "rs-color-box"; box.hidden = true; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Choose a colour");
   document.body.appendChild(box);
@@ -82,7 +88,7 @@ export function rsColorPick(el, opts = {}){
   function paint(){ el.querySelector(".rs-color-sw").style.background = cur; el.querySelector(".rs-color-hex").textContent = cur; }
   function set(v, quiet){
     v = String(v).trim().toLowerCase(); if(/^#[0-9a-f]{3}$/i.test(v)) v = "#" + [...v.slice(1)].map(c => c + c).join("");
-    if(!_cpHex.test(v)) return false;
+    if(!_fcHex.test(v)) return false;
     const was = cur; cur = v; paint(); if(!quiet && v !== was) opts.onChange?.(v); return true;
   }
   function close(){ box.hidden = true; btn.setAttribute("aria-expanded", "false"); }
@@ -90,12 +96,12 @@ export function rsColorPick(el, opts = {}){
     box.innerHTML = '<div class="rs-color-grid">' + palette().map(c => '<button type="button" class="rs-color-c' + (c.toLowerCase() === cur ? " on" : "") +
       '" data-c="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>').join("") + "</div>" +
       '<div class="rs-color-row"><input type="text" class="rs-color-in" maxlength="7" spellcheck="false" aria-label="Hex colour">' +
-      '<label class="rs-color-more" title="More colours"><input type="color" aria-label="More colours">More…</label></div>';
-    const hex = box.querySelector(".rs-color-in"), more = box.querySelector("input[type=color]");
-    hex.value = cur; more.value = cur;
-    hex.addEventListener("input", () => { hex.classList.toggle("bad", !_cpHex.test(hex.value)); if(_cpHex.test(hex.value)) set(hex.value); });
+      '<button type="button" class="rs-color-more">More…</button></div>';
+    const hex = box.querySelector(".rs-color-in");
+    hex.value = cur;
+    hex.addEventListener("input", () => { hex.classList.toggle("bad", !_fcHex.test(hex.value)); if(_fcHex.test(hex.value)) set(hex.value); });
     hex.addEventListener("keydown", e => { if(e.key === "Enter" && set(hex.value)){ close(); btn.focus(); } });
-    more.addEventListener("input", () => { set(more.value); hex.value = cur; });
+    box.querySelector(".rs-color-more").addEventListener("click", () => { close(); full.value = cur; rsColorBox(full, btn); });
     box.hidden = false; btn.setAttribute("aria-expanded", "true"); rsPopAt(box, btn);
     (box.querySelector(".rs-color-c.on") || box.querySelector(".rs-color-c"))?.focus();
   }

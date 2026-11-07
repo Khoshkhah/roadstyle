@@ -1,4 +1,4 @@
-"""The panel's sections and the legend's rows (docs/guides/dashboard-panel.md): the panel starts empty; the typed options `dashboard.panel.sections`
+"""The panel's sections and the legend's rows (docs/guides/dashboards.md): the panel starts empty; the typed options `dashboard.panel.sections`
 (the page's HTML or a part: "query", "road_card") and `dashboard.legend.rows`, and the run-time calls `rs.sections` and `rs.legend`. The HTML that a
 page adds and the parts follow the light and the dark theme. Skipped without playwright."""
 import pytest
@@ -241,3 +241,27 @@ def test_a_legend_row_has_a_mark_in_the_colour_box_too_and_a_wrong_shape_is_an_e
     circle = next(m for m in got["marks"] if "circle" in m["c"])
     assert circle["w"] == circle["h"] and circle["r"] in ("50%", "5.5px", "5px") and any("line" in m["c"] and m["h"] < 6 for m in got["marks"])
     assert "square, circle or line" in got["bad"]
+
+
+def test_help_tabs_and_number_tiles_come_from_python(tmp_path):
+    """The three Python options of 2026-11-06: `panel.help` (the "?" in the panel's title), a section's `help` (a "?" in its card title), `tabs` (a
+    tab row with panes that switch) and `kpis` (number tiles). They are the same parts that a page script makes with rs.help, rs.tabs and rs.kpi."""
+    path = _page(tmp_path, panel={"help": {"title": "How to read this page", "intro": "What the page shows.", "terms": [["Flow", "cars an hour"]]},
+                                  "sections": [
+        {"id": "t", "label": "Streets", "help": {"title": "About the streets"},
+         "tabs": [{"id": "a", "label": "Overview", "html": "<p id='pa'>A</p>"}, {"id": "b", "label": "Hours", "html": "<p id='pb'>B</p>"}]},
+        {"id": "k", "kpis": [{"title": "Inside", "value": "80.4%", "sub": "promised 80 %", "color": "#15803d"}, {"title": "Hours", "value": 1412}]}]})
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        shown = "() => [getComputedStyle(document.getElementById('pa').parentElement).display !== 'none', !document.getElementById('pb').parentElement.hidden]"
+        m = page.evaluate("""() => ({title: !!document.querySelector('#sb .sb-top .rs-help-btn'), card: !!document.querySelector('[data-rs-section=t] .rs-sec-hd .rs-help-btn'),
+                                     tabs: [...document.querySelectorAll('[data-rs-section=t] .rs-tab')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')),
+                                     tiles: [...document.querySelectorAll('[data-rs-section=k] .rs-kpi-val')].map(v => v.textContent)})""")
+        assert m == {"title": True, "card": True, "tabs": ["Overview*", "Hours"], "tiles": ["80.4%", "1412"]}, m
+        assert page.evaluate(shown) == [True, False]
+        page.click("[data-rs-section=t] .rs-tab[data-tab=b]")
+        assert page.evaluate(shown) == [False, True]                      # the tab shows its own pane
+        page.click("#sb .sb-top .rs-help-btn")
+        assert page.evaluate("document.querySelector('#rs-help .rs-help-ttl').textContent") == "How to read this page"
+        browser.close()
+    assert not errors, errors

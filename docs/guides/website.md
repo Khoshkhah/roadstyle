@@ -25,7 +25,7 @@ rs.render_edges(edges).save("roads.html")
 The map is a snapshot: re-run Python to show new data.
 
 Most custom pages are easier as the default map plus your own panel:
-see [Dashboards & JavaScript](dashboards.md).
+see [Dashboards](dashboards.md).
 
 **See also:** [Every parameter](../reference/parameters.md) · [JavaScript API](../reference/javascript.md)
 

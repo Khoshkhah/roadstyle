@@ -10,8 +10,8 @@ pw = pytest.importorskip("playwright.sync_api")
 
 import roadstyle as rs  # noqa: E402
 
-_PARTS = """<nav class="rs-tabs" id="tb"><button class="rs-tab on" data-tab="a">Overview</button><button class="rs-tab" data-tab="b">Streets</button></nav>
-<div data-pane="a"><div class="rs-callout" style="--rs-callout:#16a34a"><b>Yes.</b> On 80 % of hours the traffic was inside the range.</div>
+_PARTS = """<nav class="rs-tabs" id="tb"><button class="rs-tab on" data-tab="a">Overview<span class="rs-count warn">2</span></button><button class="rs-tab" data-tab="b">Streets<span class="rs-count">12</span><span class="rs-count err">1</span></button></nav>
+<div data-pane="a"><div class="rs-callout err"><b>Given up.</b> A crossing broke.</div><div class="rs-callout warn"><b>Near.</b> Two roads come near.</div><div class="rs-callout ok"><b>Kept.</b> Every crossing is kept.</div><div class="rs-callout" style="--rs-callout:#16a34a"><b>Yes.</b> On 80 % of hours the traffic was inside the range.</div>
 <div class="rs-cap">All counted hours</div><div class="rs-kpis" id="k"></div>
 <div class="rs-sec-box"><h3>By hour</h3><p>How often the range held.</p><svg id="chart" viewBox="0 0 300 80"></svg></div></div>
 <div data-pane="b" hidden><div class="rs-scroll"><table class="rs-table"><thead><tr><th data-sort="desc">Street</th><th>Hours</th></tr></thead>
@@ -19,7 +19,8 @@ _PARTS = """<nav class="rs-tabs" id="tb"><button class="rs-tab on" data-tab="a">
 <div class="rs-seg" id="mode"><button class="on" data-v="all">Every day</button><button data-v="first">First day</button></div>
 <div id="day"></div>
 <p><button>Plain</button> <button class="sb-primary">Primary</button> <input placeholder="A text box"></p>
-<p class="sb-note">Small print</p><a href="#">a link</a> <span class="rs-chip">chip</span> <span class="rs-chip accent">accent</span>
+<p class="sb-note">Small print</p><a href="#">a link</a> <span class="rs-chip">chip</span> <span class="rs-chip accent">accent</span> <span class="rs-chip err">err</span> <span class="rs-chip warn">warn</span> <span class="rs-chip ok">ok</span>
+<p>Heads <button class="rs-link">default</button> <input type="range" min="0" max="10" value="4"> <input type="color" value="#b8d986"></p>
 <div id="p2-range"></div><div id="p2-hour"></div><div id="p2-hours"></div><div id="p2-sl"></div><div id="p2-num"></div><div id="p2-col"></div>
 <label class="rs-switch"><input type="checkbox" role="switch" checked><span>Show bridges</span></label><div id="p2-q"></div><div id="p2-drop"></div><div id="p2-prog"></div>
 <div class="rs-status warn">3 fixes are not saved.</div><div class="rs-status error">Not an OSM file.</div><div class="rs-status ok">Done.</div>

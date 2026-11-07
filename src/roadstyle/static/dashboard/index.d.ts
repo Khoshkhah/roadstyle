@@ -145,13 +145,15 @@ export interface Sections {
   get(id: string): HTMLElement | null;
   /** A section of the page: html, el or a part of roadstyle, at the end of the panel when it has neither after nor before. */
   add(spec: { id: string; html?: string; el?: HTMLElement; part?: "query" | "road_card" | "chart"; text?: string; fields?: string[]; chart?: ChartCard;
+              tabs?: { id: string; label: string; html: string }[]; kpis?: { title: string; value: string | number; sub?: string; color?: string }[];
+              help?: { title: string; intro?: string; terms?: [string, string][]; note?: string };
               label?: string | null; after?: string; before?: string }): HTMLElement;
   remove(id: string): void;
   hide(id: string): void;
   show(id: string): void;
 }
 
-/** The options of a chart card (`part: "chart"`, chartcard.js; docs/guides/charts.md). No `data`: the map's roads. */
+/** The options of a chart card (`part: "chart"`, chartcard.js; docs/guides/dashboard-parts.md, "A chart"). No `data`: the map's roads. */
 export interface ChartCard {
   kind: "bar" | "line" | "histogram" | "scatter" | "pie";
   /** The groups (bar, pie), the order (line), the numbers (histogram, scatter). */
