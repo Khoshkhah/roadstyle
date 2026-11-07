@@ -2,14 +2,27 @@
 
 <p class="lead">roadstyle has one engine, written in Rust. Python is only a thin binding to it.</p>
 
-The Rust engine makes the style of a map, its vector tiles, the drawing levels and the HTML page. It is in the roadstyle wheel
-on PyPI, so `pip install roadstyle` gives it to you. A source install needs a Rust toolchain.
+The Rust engine makes the style of a map, its vector tiles, the drawing levels and the HTML page. It is in the roadstyle wheel on
+PyPI, so `pip install roadstyle` gives it to you. A source install needs a Rust toolchain.
 
 ```python
 rs.render_edges(edges)
 ```
 
-The same engine is also a WebAssembly package for the browser, and a set of Rust crates.
+The same engine is also a WebAssembly package for the browser, a program (`roadstyle`) and a set of Rust crates.
+
+```mermaid
+flowchart LR
+    inp["Roads + look"] --> eng["Rust engine"]
+    eng --> py["Python<br/>render_edges"]
+    eng --> wasm["Browser<br/>WebAssembly"]
+    eng --> cli["Program<br/>roadstyle"]
+    eng --> crates["Rust crates"]
+    py --> out["HTML page, style, tiles"]
+    wasm --> out
+    cli --> out
+    crates --> out
+```
 
 <div class="grid cards" markdown>
 
@@ -51,6 +64,6 @@ The same engine is also a WebAssembly package for the browser, and a set of Rust
 ## What it is good for
 
 - **Large networks.** The page keeps the roads as vector tiles by default (MLT, one rule for every path). On Nacka (22,191 roads) the tiled page is 20 MB, and the page with GeoJSON roads draws 2.4 to 2.6 times the triangles at zoom 11 to 13.
-- **Nightly pages.** The output is the same for the same input: the same style, options and data.
+- **Nightly pages.** The same style, options and data give the same output.
 - **The browser.** A page can make the style and the tiles itself, from a duckOSM file or a GeoParquet file, with no Python.
 

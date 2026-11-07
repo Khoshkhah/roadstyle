@@ -1,18 +1,10 @@
 # How a map is drawn
 
-<p class="lead">About what roadstyle makes, what MapLibre draws, the two forms of road data, and why the page uses one tile zoom.
-This page is the same for the Python engine and the Rust engine.</p>
+<p class="lead">About what roadstyle makes, what MapLibre draws, the two forms of road data, and why the page uses one tile zoom.</p>
 
 ## roadstyle makes the map, MapLibre draws it
 
-roadstyle does not draw pixels. It turns the road edges into a map **for one drawing library**, and that library draws. You
-select the library with the keyword `backend` of `render_edges`:
-
-| `backend` | The library that draws | What `render_edges` gives |
-|---|---|---|
-| `"web"` (the default) | MapLibre GL JS, in the browser | one HTML file |
-
-The rest of this page is about `"web"`, the backend of almost all maps. The Rust engine makes only this backend.
+roadstyle does not draw pixels. It turns the road edges into a map for MapLibre GL JS, and MapLibre draws. This is the `"web"` backend of `render_edges` (the default). The Rust engine makes only this backend.
 
 ```mermaid
 flowchart TB
@@ -35,21 +27,35 @@ The `"web"` backend makes:
 
 | | In the data (tiles or GeoJSON), for each piece | In the style, one time for all pieces |
 |---|---|---|
-| The drawing order | its numbers: `__rs_s` (the sort number), `__rs_cl`, `__rs_fl` (its positions) | the rule: `"line-sort-key": ["get", "__rs_s"]` (simple mode), or one layer for each position (full look) |
+| The drawing order | its rank `r`: one whole number, from the levels | the rule: `"line-sort-key": ["+", ["*", ["get", "r"], 4294967296], ["id"]]` (the rank first, then the road's key) |
 | The casing | the casing pieces, with their kind (`__rs_k`) and their casing color (`__rs_casing`) | the rule: the casing width for each class and zoom, and the color from `__rs_casing` |
 | The color | the fill color of the road (`__rs_fill`) | the rule: `"line-color"` reads `__rs_fill`, or the state of the Colour by menu |
 
-roadstyle computes the values from the levels and the look, when it cuts the roads into pieces. MapLibre joins the two when it
-draws: it reads each piece's values from the data and applies the rules of the style. Thus the style has the same layers for 1,000
-roads or for 100,000 roads (Monaco, simple mode: 7 layers, 91 KB), and only the data grows.
+roadstyle computes the values from the levels and the look, when it cuts the roads into pieces. MapLibre joins the two when it draws: it reads the values of each piece from the data and applies the rules of the style. Thus the style has the same layers for 1,000 roads or for 100,000 roads, and only the data grows.
 
-MapLibre reads the style and the data and draws them with WebGL. It draws a new frame each time that the view or a filter
-changes.
+MapLibre draws with WebGL. It draws a new frame each time that the view or a filter changes.
 
 ## Three choices for the road data
 
-MapLibre draws only from tiles: small squares of the map, one grid for each zoom. Three choices decide who makes these tiles and
-how they get to the browser. Each choice comes after the one before it.
+MapLibre draws only from tiles: small squares of the map, one grid for each zoom. Three choices decide who makes the tiles and how they get to the browser. Each choice comes after the one before it.
+
+```mermaid
+flowchart TB
+    c1{"1. Tiles<br/>or GeoJSON?"}
+    gj["GeoJSON<br/>MapLibre cuts the tiles<br/>in the browser"]
+    c2{"2. How do the tiles<br/>get to the browser?"}
+    a["A. In the HTML file"]
+    b["B. On a server"]
+    c["C. Made in the browser"]
+    c3{"3. XYZ folder<br/>or PMTiles file?"}
+    c1 -->|"GeoJSON"| gj
+    c1 -->|"vector tiles"| c2
+    c2 --> a
+    c2 --> b
+    c2 --> c
+    b --> c3
+```
+
 
 ### Choice 1: GeoJSON or vector tiles
 
@@ -60,12 +66,9 @@ how they get to the browser. Each choice comes after the one before it.
 | Calls | `render_edges(edges)`, `export_style`, `Tiler` | `render_edges(edges, tiles=False)`, `export_inline`, `inlineStyle` |
 | Good for | every network | a small network, or a page with a palette in a view |
 
-With GeoJSON, roadstyle makes no tiles. The page gives MapLibre all the roads, and MapLibre cuts them, and it keeps every vertex. On 22,000
-roads that draws 2.4 to 2.6 times the triangles of the tiles at zoom 11 to 13. `data_maxzoom` and `data_tolerance` control that cut.
-Choices 2 and 3 do not apply.
+With GeoJSON, roadstyle makes no tiles. The page gives MapLibre all the roads. MapLibre cuts them and keeps every vertex. On 22,000 roads, this draws 2.4 to 2.6 times the triangles of the tiles at zoom 11 to 13. `data_maxzoom` and `data_tolerance` control that cut. Choices 2 and 3 do not apply.
 
-After the cut, MapLibre does the same work with both forms: it turns each tile into shapes for the GPU and draws them. The map
-looks the same, and the dashboard works on both.
+After the cut, MapLibre does the same work with both forms. The map looks the same, and the dashboard works on both.
 
 ### Choice 2: how the vector tiles get to the browser
 
@@ -86,13 +89,11 @@ looks the same, and the dashboard works on both.
 | The files | one file for each tile: `tiles/<z>/<x>/<y>.mlt` | one file, `roads.pmtiles`; an index at its start tells where each tile is |
 | How the map gets one tile | one request for that tile's file | one request for a part of the file (an HTTP range request) |
 
-In both forms the map downloads only the tiles of its view. The difference is the number of files on the server.
-[Make tiles and PMTiles](tiles.md) shows the calls.
+In both forms the map downloads only the tiles of its view. The difference is the number of files on the server. [Make tiles and PMTiles](tiles.md) shows the calls.
 
 ## One tile zoom or several
 
-When the map is flat, all tiles on the screen have the same zoom. When the map is tilted, MapLibre loads the near tiles at a
-higher zoom than the far tiles, because the near part of the view is larger on the screen.
+When the map is flat, all tiles on the screen have the same zoom. When the map is tilted, MapLibre loads the near tiles at a higher zoom than the far tiles, because the near part of the view is larger on the screen.
 
 <div style="max-width:640px;margin:1em auto">
 <svg viewBox="0 0 640 220" width="100%" role="img" aria-label="Left: a tilted view with zoom 15 tiles near and zoom 14 tiles far; the road changes width where they meet. Right: one tile zoom; the road has one width." style="display:block;font:13px sans-serif">
@@ -117,11 +118,9 @@ higher zoom than the far tiles, because the near part of the view is larger on t
 </svg>
 </div>
 
-roadstyle bakes a road's width into each tile for the zoom of that tile. Where a near tile (zoom 15) meets a far tile (zoom 14),
-the same road gets two widths, and the map shows a line across all roads at that place.
+roadstyle bakes the width of a road into each tile for the zoom of that tile. Where a near tile (zoom 15) meets a far tile (zoom 14), the same road gets two widths. The map shows a line across all roads at that place.
 
-To stop this, the page makes MapLibre use **one tile zoom on the whole screen**. The page template sets it for each source that
-is not a base map:
+To stop this, the page makes MapLibre use **one tile zoom on the whole screen**. The page template sets it for each source that is not a raster source:
 
 ```js
 source.calculateTileZoom = (z) => z;      // web_template.html, _flatTiles
@@ -133,8 +132,7 @@ The cost:
 - Above 60°, the page loads 2 to 3.6 times as many tiles (66° to 70°).
 - `max_pitch=60` keeps every view in the range where the rule costs nothing. The default is 70.
 
-A page of your own that adds roadstyle's style to its own MapLibre map does not have this rule. Add the same line for each
-roads source, as the tile example of [Use roadstyle in the browser](browser.md#add-roads-that-come-later-as-vector-tiles) does.
+A page of your own that adds the style of roadstyle to its own MapLibre map does not have this rule. Add the same line for each roads source, as the tile example of [Use roadstyle in the browser](browser.md#add-roads-that-come-later-as-vector-tiles) does.
 
 **See also:** [Big networks](../guides/big-networks.md) · [Make tiles and PMTiles](tiles.md) ·
 [Architecture of the Rust version](architecture.md)

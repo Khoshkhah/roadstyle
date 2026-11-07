@@ -14,8 +14,15 @@ Each road gets four whole numbers, its positions in the drawing order. A higher 
 | the main part of the casing | `a1` (`casing_level`) | the casing between the heads |
 | the end head of the casing | `a2` (`casing_end`) | the casing at the end of the road |
 
-The level input (`level_input`) gives the solver the relations of the roads: which roads cross, which meet, and which one is
-wanted on top. The solver reads only these tables, never the lines.
+The level input gives the solver the relations of the roads: which roads cross, which meet, and which one is wanted on top. The solver reads only these relations, never the lines.
+
+```mermaid
+flowchart LR
+    inp["Level input<br/>crossings, meets, wishes"] --> rules["Rules<br/>x_i − x_j ≤ w"]
+    rules --> graph["Graph<br/>node = number, arc = rule"]
+    graph --> flow["Minimum-cost flow<br/>one stage at a time"]
+    flow --> num["Four numbers<br/>for each road"]
+```
 
 ## The rules
 
@@ -23,20 +30,14 @@ wanted on top. The solver reads only these tables, never the lines.
 
 - **H1.** A casing part is never over the fill of its own road: `a ≤ b`.
 - **H2.** Where two roads meet, the head of each one is not over the fill of the other.
-- **The box.** Every number is in a range of `2 × max_level / margin` steps: −20 to 20 with the defaults (inside the solver, 0 to
-  40).
+- **The box.** Every number is in a range of `2 × max_level / margin` steps: −20 to 20 with the defaults (inside the solver, 0 to 40).
 - **Fixed numbers.** A road that is fixed (for example a hand fix of the level editor) keeps its numbers.
 
 **Soft rules** hold when they can. When they conflict, the solver breaks the fewest, in this order of priority:
 
 1. **Stack.** A road that crosses over another road: the crossing part of its casing is at least one step over the fill of the
    lower road. This is a real bridge or tunnel.
-2. **Crossing.** A path (footway, path, cycleway, steps, pedestrian, bridleway, corridor) at a node where a car road goes on (two
-   car road ends or more), of the same band and of a lower priority than the road: the road's head there is at least one step over
-   the path's fill, so the map draws the path under the road and the road keeps its outline (OSM-Carto's look). There is no meet
-   between them. Before 2026-10-25 they were a meet: the road's head went under the path's fill, a notch in the road's outline and a
-   step in its casing. A crossing comes after the stacks, so a bridge over the road outranks it (a footbridge shorter than its two
-   heads can land on such a path).
+2. **Crossing.** A path (footway, path, cycleway, steps, pedestrian, bridleway or corridor) can meet a car road at a node where the car road goes on (two car road ends or more). The path must be in the same band as the road and have a lower priority. Then the head of the road there is at least one step over the fill of the path. The map draws the path under the road, and the road keeps its outline (OSM-Carto's look). A crossing is not a meet. A crossing comes after the stacks, so a bridge over the road outranks it.
 3. **Order wish.** At a place where roads only meet, the fill of one road is over the fill of the other: a roundabout over a
    tunnel, a tunnel over a bridge, a higher class over a lower one.
 4. **Near** (only with `near_rules=True`): a part that only comes near the lower road.
@@ -137,8 +138,7 @@ parts), with a very large weight on the span (the highest number minus the lowes
 The flow does not give the numbers directly. It gives which rules are **tight** (the arcs with flow) and which have room. The
 numbers are the shortest distances in the graph that the flow leaves: each arc with room keeps `x_i ≤ x_j + w`, and each arc
 with flow also keeps `x_j ≤ x_i − w`. The distances satisfy every rule, with equality exactly where the flow runs, and this makes
-them the best numbers. They are whole numbers. Then `compute_levels` moves them so that the most common casing position is 0 (the
-ground).
+them the best numbers. They are whole numbers. Then `compute_levels` moves them so that the most common casing position is 0 (the ground).
 
 ## The flow algorithm
 
@@ -165,7 +165,9 @@ rules are broken, and the cost of the last stage), and the pairs that it did not
 
 ## Examples from the tests
 
-| Test (`roadstyle-levels::solve`) | The rules | The result |
+The tests are in `rust/roadstyle-levels/src/solve.rs`.
+
+| Test | The rules | The result |
 |---|---|---|
 | `a_bridge_over_a_road` | one stack: the bridge's main casing over the road | the casing over the road's fill, the bridge's fill over its casing; nothing broken |
 | `four_bands_in_three_numbers` | four roads that cross at one point, each over all below it, in a box of 3 numbers (0, 1, 2) | one stack pair gives way: the stack stage breaks 1 step |
