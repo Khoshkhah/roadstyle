@@ -176,7 +176,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `move_map(sql)` | The camera moves to the roads. |
     | `draw_chart(sql, kind, x, y, title)` | A chart of the result ([draw_chart](#draw_chart)). |
     | `get_map()` | The map now ([get_map and set_map](#get_map-and-set_map)). |
-    | `set_map(...)` | A change of the map's layers, base map, 3D view or camera. |
+    | `set_map(...)` | A change of the map's layers, base map, theme, 3D view or camera. |
 
     A map tool needs SQL that selects the id column. It uses only the roads that the map draws, at most 100 000. It puts its roads into the dock, with the id, the name, the class and the length of each road (the columns that the main table has). No id goes back to the model: it gets a short text, for example "Focus on 625 roads (the others hidden).".
 
@@ -216,7 +216,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
 ### get_map and set_map { .rs-part }
 
-**Use it for:** words like "turn off the water", "show buildings in 3D", "satellite" and "zoom to Fontvieille". No code in the page.<br>
+**Use it for:** words like "turn off the water", "show buildings in 3D", "satellite", "dark theme" and "zoom to Fontvieille". No code in the page.<br>
 **From Python:** no
 { .rs-facts }
 
@@ -226,8 +226,8 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
     | Tool | What it does |
     |---|---|
-    | `get_map()` | Gives the layers `[{label, on}]`, the base maps `[{key, label}]` and the current one, `view3d`, `roadFill`, `tunnel` and the camera `{center, zoom, pitch, bearing}`. The agent calls it before it uses a name. |
-    | `set_map(overlays, basemap, view3d, roadFill, tunnel, camera)` | Changes what it is given. `overlays` is `[{label, on}]` (a `{label: on}` map is also accepted), `basemap` is a key or a label, `camera` has any of `center` (`[longitude, latitude]`), `zoom`, `pitch` and `bearing`. A label is not case sensitive. It gives back what changed and the new state of the map. |
+    | `get_map()` | Gives the layers `[{label, on}]`, the base maps `[{key, label}]` and the current one, `theme` (`"light"` or `"dark"`), `view3d`, `roadFill`, `tunnel` and the camera `{center, zoom, pitch, bearing}`. The agent calls it before it uses a name. |
+    | `set_map(overlays, basemap, theme, view3d, roadFill, tunnel, camera)` | Changes what it is given. `theme` is `"light"` or `"dark"`: the dashboard's own switch, for the panel, the cards and the road colours. `overlays` is `[{label, on}]` (a `{label: on}` map is also accepted), `basemap` is a key or a label, `camera` has any of `center` (`[longitude, latitude]`), `zoom`, `pitch` and `bearing`. A label is not case sensitive. It gives back what changed and the new state of the map. |
 
     A layer or a base map that does not exist is named in the answer (`not_found`), so the agent can fix the call; the other changes are made. A wrong camera (a zoom over 22, a latitude over 90) is an error for the model. A change shows as one line "MAP" on the card.
 
