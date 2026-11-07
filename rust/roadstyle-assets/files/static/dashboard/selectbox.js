@@ -31,7 +31,8 @@ function _sbEnhance(sel){
     window.removeEventListener("scroll", onScroll, true);
   };
   const away = e => { if(list && !list.contains(e.target) && !btn.contains(e.target)) close(); };
-  const pick = i => { sel.selectedIndex = i; sel.dispatchEvent(new Event("change", {bubbles: true})); sync(); close(); btn.focus(); };
+  // the events of a native select, in its order: `input`, then `change` (the design panel reads `input`)
+  const pick = i => { sel.selectedIndex = i; for(const t of ["input", "change"]) sel.dispatchEvent(new Event(t, {bubbles: true})); sync(); close(); btn.focus(); };
   const mark = (i, scroll = false) => {
     at = i;
     [...list.children].forEach((o, k) => o.classList.toggle("on", k === at));

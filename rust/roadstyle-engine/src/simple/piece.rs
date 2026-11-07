@@ -129,9 +129,10 @@ impl Piece {
         if let Some(dk) = self.draw {
             put(&mut q, Mark::PieceKind, Cell::Int(dk.kind));
             put(&mut q, Mark::Rank, Cell::Int(rank(dk.key)));
-            // a line of a twin pair that is not the casing (fill, shadow, tunnel gap and dashes) is one direction's half of the road
-            // (a pair is two-way: the flag `pair` says it, so the piece has no `__rs_twoway`, one key less in a tile)
-            if d.twin.is_some() && (1..=4).contains(&dk.kind) && read.is_none_or(|r| r[Mark::Pair as usize]) {
+            // a fill of a twin pair is one direction's half of the road (a pair is two-way: the flag `pair` says it, so the piece has no
+            // `__rs_twoway`, one key less in a tile). The shadow, the tunnel gap and the dashes come from the pair's one casing: both
+            // directions share them, as the casing (exprs.rs, pair_casing)
+            if d.twin.is_some() && dk.kind == 1 && read.is_none_or(|r| r[Mark::Pair as usize]) {
                 q.shift_remove(Mark::Twoway.name());
                 put(&mut q, Mark::Pair, Cell::Bool(true));
             }

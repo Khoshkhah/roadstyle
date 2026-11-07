@@ -117,6 +117,30 @@ def test_the_page_draws_the_roads_and_saves_a_design_that_the_next_start_reads(e
     assert not errors, errors
 
 
+def _pick(page, p, text):
+    """Click the select box of the control `p` and its option `text`, as a person does (the box sends the events, not the test)."""
+    page.locator(f'#design-pane .rs-sel:has([data-p="{p}"]) .rs-sel-btn').click()
+    page.locator(".rs-sel-list .rs-sel-opt", has_text=text).first.click()
+
+
+def test_a_click_on_each_tunnel_list_changes_the_map(editor):
+    _, url, _ = editor
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page, errors = _open(b, url, viewport={"width": 1300, "height": 800})
+        page.evaluate("dz.tab('bridges')")
+        state = "map.getGlobalState()"
+        _pick(page, "tunnels.palette", "Blue + cyan")
+        assert page.evaluate(state)["rs_tun_c0"] == "#315b7d" and page.evaluate("dz.get().tunnels.palette") == "Blue + cyan"
+        _pick(page, "tunnels.toward", "Teal")
+        assert page.evaluate(state)["rs_tun_toward"] == page.evaluate("RS_TUNNEL_TOWARDS.Teal")
+        _pick(page, "tunnels.ratio", "2:1")
+        assert page.evaluate(state)["rs_tun_ratio"] == [2, 1]
+        assert page.evaluate("document.getElementById('tn-pal')?.value ?? 'Blue + cyan'") == "Blue + cyan"
+        b.close()
+    assert not errors, errors
+
+
 def test_the_page_fits_a_phone(editor):
     _, url, _ = editor
     with sync_playwright() as p:

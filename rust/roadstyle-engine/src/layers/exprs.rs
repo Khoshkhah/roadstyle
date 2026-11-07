@@ -271,14 +271,20 @@ pub(crate) fn tun_dash() -> Value {
     json!(["interpolate", ["linear"], gs("rs_tun_strength"), 0, gs("rs_tun_c0"), 100, gs("rs_tun_toward")])
 }
 
-/// A casing of a twin pair: the one casing that both directions share.
-fn pair_casing() -> Value {
-    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["==", ["get", Mark::PieceKind.name()], 0]])
+/// The pieces of a twin pair that come from its one casing (casing_parts makes them for the first edge only): the casing, the bridge
+/// shadow, the tunnel gap and the tunnel dashes (`__rs_k` 0, 2, 3, 4). Both directions share them, so they cover the whole road.
+fn shared_kind() -> Value {
+    json!(["match", ["get", Mark::PieceKind.name()], [0, 2, 3, 4], true, false])
 }
 
-/// A line of a twin pair that is not its casing (fill, shadow, tunnel gap or dash): one direction's half of the road.
+/// A casing of a twin pair: a line that both directions share (`shared_kind`).
+fn pair_casing() -> Value {
+    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], shared_kind()])
+}
+
+/// A line of a twin pair that is not shared (the fill, an item): one direction's half of the road.
 pub(super) fn pair_half() -> Value {
-    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["!=", ["get", Mark::PieceKind.name()], 0]])
+    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["!", shared_kind()]])
 }
 
 /// The settings of the metre-width curves (_width_m_expr): width_m_zoom, config bridge_casing_m / bridge_casing_px, render's
