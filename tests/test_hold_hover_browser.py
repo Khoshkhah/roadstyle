@@ -88,3 +88,34 @@ def test_hold_select_look_keeps_rs_select_and_draws_no_selection(tmp_path):
         page.wait_for_timeout(300)
         assert _state(page, 0, "select")                                      # no key: roadstyle draws the selection again
         assert errors == []
+
+
+def test_a_held_hover_leaves_the_cursor_to_the_host(tmp_path):
+    """A host that holds the road hover owns the cursor over its own objects (duckOSM's fixes editor sets "pointer" over a node dot). roadstyle wrote ""
+    at each mouse move and took it away. Now it writes nothing while the hover is held; the pointer over a road goes when the hold begins; and
+    without a hold the cursor is roadstyle's again (pointer over a road, "" over nothing)."""
+    with pw.sync_playwright() as p:
+        page, errors = _page(p, tmp_path)
+        try:
+            cursor = "map.getCanvas().style.cursor"
+            _rest(page, _at(page, 1))
+            assert page.evaluate(cursor) == "pointer"                                  # no hold: over a road
+            page.evaluate("rs.holdHover('tab', true)")
+            assert page.evaluate(cursor) == ""                                          # the road's pointer goes with the hover
+            page.evaluate("map.getCanvas().style.cursor = 'pointer'")                  # the host's own pointer, over its own object
+            xy = _at(page, 2)
+            for dx in (0, 6, -6, 0):                                                    # the mouse moves over a road and over nothing
+                page.mouse.move(xy[0] + dx, xy[1] + 40)
+                page.wait_for_timeout(60)
+            page.mouse.move(xy[0] + 90, xy[1] + 40)
+            page.wait_for_timeout(150)
+            assert page.evaluate(cursor) == "pointer"                                  # still the host's
+            page.evaluate("rs.holdHover('tab', false); map.getCanvas().style.cursor = ''")
+            page.mouse.move(xy[0] + 91, xy[1] + 40)
+            page.wait_for_timeout(150)
+            assert page.evaluate(cursor) == ""                                          # no hold, over nothing: roadstyle's
+            _rest(page, _at(page, 0))
+            assert page.evaluate(cursor) == "pointer"                                  # no hold, over a road
+            assert errors == []
+        finally:
+            page.context.browser.close()
