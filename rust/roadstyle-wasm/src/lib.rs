@@ -144,6 +144,15 @@ mod wasm {
         roadstyle::look::Ramp::new(&c).map(|r| r.stops(n)).map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// buildingHeights(look: Look, rows: string) -> string: the height and the base of each building, by the look's rule of the 3D buildings
+    /// (the same as in the tiles). `rows`: the JSON text of [[height, levels, roof_levels, kind, min_height, min_level], ...] (text or
+    /// null, the columns of features.parquet); the result: the JSON text of [[height, base], ...]. An error is a thrown Error.
+    #[wasm_bindgen(js_name = buildingHeights)]
+    pub fn building_heights(look: &JsLook, rows: &str) -> Result<String, JsError> {
+        let r: Vec<[Option<String>; 6]> = serde_json::from_str(rows).map_err(|e| JsError::new(&format!("rows: {e}")))?;
+        roadstyle::features::building_heights(&look.0, &r).map(|v| serde_json::to_string(&v).unwrap()).map_err(|e| JsError::new(&e.to_string()))
+    }
+
     /// inlineStyle(roads: Uint8Array, look: Look, features?: Uint8Array, planner?: Uint8Array, name?: string) -> string; an error is a thrown Error.
     #[wasm_bindgen(js_name = inlineStyle)]
     pub fn inline_style(parquet: Vec<u8>, look: &JsLook, features: Option<Vec<u8>>, planner: Option<Vec<u8>>, name: Option<String>) -> Result<String, JsError> {

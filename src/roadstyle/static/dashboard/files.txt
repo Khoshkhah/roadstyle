@@ -47,6 +47,7 @@ color
 legend
 overlays
 features
+walls
 tunnel
 views
 arrows
