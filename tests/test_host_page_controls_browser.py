@@ -135,3 +135,63 @@ def test_the_title_row_of_the_dock_is_inside_a_phone(tmp_path):
           return {past, page: document.documentElement.scrollWidth - innerWidth, lastIn: last.right <= innerWidth + 0.5 && last.left >= 0, n: inActs.length}; }""")
         browser.close()
     assert out["past"] == [] and out["page"] <= 0 and out["lastIn"] and out["n"] >= 6, out
+
+
+_PARTS = """() => {
+  const body = document.querySelector('#sb .sb-body');
+  body.insertAdjacentHTML('beforeend', '<button id="t-plain">Plain</button><button id="t-off" disabled>Off</button><button id="t-poff" class="sb-primary" disabled>Save</button>' +
+    '<div class="rs-sec-box" id="t-box"><h3>Box</h3><div class="rs-sec-box" id="t-inner">Inner</div></div><div class="rs-qrow" id="t-row"><b>A road</b><span>12 m</span></div>');
+  const c = (s, ...p) => { const st = getComputedStyle(document.querySelector(s)); return p.map((k) => st.getPropertyValue(k)); };
+  return {plain: c('#t-plain', 'border-top-width', 'border-radius', 'background-color', 'color', 'padding-left'), off: c('#t-off', 'opacity', 'cursor'),
+          poff: c('#t-poff', 'opacity'), box: c('#t-box', 'background-color', 'border-radius'), inner: c('#t-inner', 'box-shadow'),
+          row: c('#t-row span', 'color'), mut: getComputedStyle(document.getElementById('sb')).getPropertyValue('--mut').trim()};
+}"""
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_panel_controls_and_the_box_have_roadstyle_look_on_a_host_page(tmp_path, theme):
+    """A plain and a disabled button, a box (`rs-sec-box`) and a box in a box, and a row of the query list (`rs-qrow`): the same on a host page
+    as on a roadstyle page, from dashboard.css. A disabled button is dimmed, a box in a box has the card's edge, and the row has the theme's colours."""
+    (tmp_path / "rs").mkdir()
+    (tmp_path / "host").mkdir()
+    out = {}
+    with pw.sync_playwright() as p:
+        for name, ctx, ready in [("rs", served(tmp_path / "rs"), "window.map && map.loaded() && window.rsReady && window.hostReady"),
+                                 ("host", host_page(tmp_path / "host"), "window.ready === true && window.hostReady")]:
+            with ctx as url:
+                browser = p.chromium.launch(args=_ARGS)
+                page = browser.new_page(viewport={"width": 1400, "height": 900})
+                page.route("http://rs.test/**", lambda r: r.fulfill(content_type="application/json", body="{}"))
+                page.goto(url)
+                page.wait_for_function(ready, timeout=60_000)
+                page.evaluate(f"rsSetTheme({json.dumps(theme)})")
+                out[name] = page.evaluate(_PARTS)
+                browser.close()
+    rs_, host = out["rs"], out["host"]
+    assert host == rs_, json.dumps({k: [rs_[k], host[k]] for k in rs_ if host[k] != rs_[k]}, indent=1)
+    assert host["plain"][0] == "1px" and host["off"] == ["0.5", "default"] and host["poff"] == ["0.5"], host
+    assert host["box"][1] == "12px" and host["inner"] != ["none"], host
+    assert host["mut"] and host["row"][0] != "rgb(138, 138, 138)", host        # the theme's muted colour, not the old fixed grey
+
+
+def test_set_theme_on_a_page_with_no_map(tmp_path):
+    """rsSetTheme on a page that has no map (an editor of its own) sets the theme and does not throw: before, it called the map's
+    setGlobalStateProperty on null."""
+    shutil.copytree(FILES / "static", tmp_path / "static")
+    (tmp_path / "p.html").write_text('<!doctype html><html><body><script type="module">import {rsSetTheme} from "./static/dashboard/theme.js";'
+                                     'rsSetTheme("dark"); window.done = document.documentElement.dataset.rsTheme;</script></body></html>')
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(tmp_path)))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            browser = p.chromium.launch(args=_ARGS)
+            page = browser.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{srv.server_port}/p.html")
+            page.wait_for_function("window.done !== undefined", timeout=20_000)
+            got = page.evaluate("window.done")
+            browser.close()
+    finally:
+        srv.shutdown()
+    assert errors == [] and got == "dark", (errors, got)
