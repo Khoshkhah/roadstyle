@@ -48,9 +48,11 @@ function _sbEnhance(sel){
     else if(e.key === "Tab") close();
   };
   // put the list at the button; the list closes when the button is no longer seen (out of the window or clipped by its panel)
-  const updatePos = () => {
-    const r = btn.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    if(!hit || !btn.contains(hit)){ close(); return; }
+  // the check is made before the list is in the page: a list with no place yet can cover the button (a long list of long names did) and close itself
+  const seen = () => { const r = btn.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!hit && btn.contains(hit); };
+  const updatePos = (check = true) => {
+    if(check && !seen()){ close(); return; }
+    const r = btn.getBoundingClientRect();
     const room = innerHeight - r.bottom - 12, h = Math.min(list.scrollHeight, 280);
     const up = room < h && r.top > room;                                 // not enough room below: the list opens upward
     // at least as wide as the button and as wide as its longest option, inside the window; its right edge at the button's when it can
@@ -63,6 +65,7 @@ function _sbEnhance(sel){
   const open = () => {
     if(sel.disabled) return;
     if(_sbOpen) _sbOpen.close();
+    if(!seen()) return;
     list = document.createElement("div"); list.className = "rs-sel-list"; list.setAttribute("role", "listbox");
     [...sel.options].forEach((o, i) => {
       const row = document.createElement("div");
@@ -74,7 +77,7 @@ function _sbEnhance(sel){
       list.append(row);
     });
     document.body.append(list);
-    updatePos();
+    updatePos(false);
     btn.setAttribute("aria-expanded", "true"); mark(sel.selectedIndex, true);
     _sbOpen = {close};
     document.addEventListener("pointerdown", away, true);

@@ -922,8 +922,8 @@ itself after 1.6 s.
 
 | Field | localStorage key | What it is |
 |---|---|---|
-| Provider | `rs-settings:ask` → `provider` | A list of the four free services of `providers.json` (Gemini first), with the link "Get a free key from ..." under it |
-| Model | `rs-settings:ask` → `model.<provider>` | A text box with the models of the provider as its list ([The providers](#the-providers)) |
+| Provider | `rs-settings:ask` → `provider` | **Auto** (`"auto"`: each service that has a key, in this order), then the four free services of `providers.json` (Gemini first), with the link "Get a free key from ..." under it. With Auto, the form shows the order and each service's model in place of Model and Key |
+| Model | `rs-settings:ask` → `model.<provider>` | **Auto** (`"auto"`: the key's best models, at most 3, in the order of `rankModels`), then a select box of the key's chat models (`chatModels`), loaded when the form opens with a saved key; a pick takes effect at once ([The providers](#the-providers)). With Auto, a try that fails gives its place to the next at once (`callModel`, `c.tries`); each answer card names the service and the model that answered (`rs-ask-by`) |
 | Key | `rs-key:ask:<provider>` | One key for each provider, because a key works only with its own service: the person can keep keys of two services and switch. Save, Clear. Save asks the provider for its models (`GET {address}/models`) and says "The key works" or the provider's own error |
 
 - A key stays only in this browser (localStorage). It is never in the page file, never in a URL and never in the conversation. It goes only
