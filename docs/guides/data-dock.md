@@ -169,6 +169,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - **On:** the light, the layers and the two buttons come back. A new Colour or Focus layer (from Ask, for example) turns the switch on.
     - A new table changes the light. A table that a colour or a focus already shows has no light. A closed dock lights nothing.
     - `data.light()` is `true` while the switch is on and the dock is open. The event `light` (`detail.on`) comes when that changes: at a click on the switch, and when the dock opens or closes.
+    - `data.showOnMap()` turns the switch on, as a click does, and gives `true` when it was off. Ask calls it before a colour, a focus or a move, because with the switch off the result does not show.
 
 ### A row { .rs-part }
 

@@ -122,6 +122,8 @@ Then click an example question or type your own. The agent writes the SQL, the t
     - **The footer** counts the query that made the table, "1 query · 625 rows", and opens to its SQL. The other queries of the agent and the failed queries that it fixed are inside it. **Show** puts the card's table back into the dock.
     - **The answer's table** is the query with roads (the id column, or a key column of the data dock) that has the most rows, not the last query. When a map tool ran, its roads are the table.
     - **A map change** is one line on the card, for example "MAP Focus on 625 roads (the others hidden)". A colour or a focus is a layer in **Colour ▾** or **Focus ▾** of the data dock. A new question, ✕ of a card and **New** do not remove a layer.
+    - **The map switch:** when the data dock's map switch is off, a colour, a focus or a move of Ask turns it on (off, the result would not show), and the card says "The map switch of the data dock is on again".
+    - **While Ask works,** the step line of the card ("Asking Groq (…)", "Running query 2") has a turning ring before it.
     - **An error** ends the question with a red line on its card, and the question box works again.
     - **A road click** while Ask is open shows no popup. The data dock opens with the road in its card (`rs.holdPopup("ask", …)`).
     - **The question box** is at the bottom. Enter asks, Shift+Enter is a new line. While the agent works, the send button is a stop square. After the first question, **Examples ▴** above the box shows the example chips. The list is as high as the free space above the box at most and scrolls inside. The arrow keys walk the examples (the headings of groups are skipped, and the list scrolls to the one in focus), and Escape closes it.
