@@ -118,7 +118,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
     - **The tool row** under the title does not scroll: the service and its model, "?", **Key** and **New**.
     - **One card for each question.** The question is the bold title. The answer is plain text: bold and `code` show as bold and code, and a list shows at most 3 items with "… 2 more in the table". The view shows no HTML, no images and no links from the model, and it removes long ids from the text.
-    - **Who answered:** a small line under the answer names the service and the model, for example "Groq · openai/gpt-oss-120b". With Auto, it also names the services or models that could not answer and why, for example "(after Google Gemini · gemini-2.5-flash: HTTP 429)".
+    - **Who answered:** a small line under the answer names the service and the model, for example "Groq · openai/gpt-oss-120b". With Auto, it also names the services or models that could not answer and why, for example "(after Google Gemini · gemini-3.8-flash: HTTP 429)".
     - **The footer** counts the query that made the table, "1 query · 625 rows", and opens to its SQL. The other queries of the agent and the failed queries that it fixed are inside it. **Show** puts the card's table back into the dock.
     - **The answer's table** is the query with roads (the id column, or a key column of the data dock) that has the most rows, not the last query. When a map tool ran, its roads are the table.
     - **A map change** is one line on the card, for example "MAP Focus on 625 roads (the others hidden)". A colour or a focus is a layer in **Colour ▾** or **Focus ▾** of the data dock. A new question, ✕ of a card and **New** do not remove a layer.

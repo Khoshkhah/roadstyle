@@ -280,10 +280,10 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
             assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads."
             r = seen[-1]
             assert r["url"] == "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" and "test-key-123" not in r["url"]
-            assert r["auth"] == "Bearer test-key-123" and r["body"]["model"] == "gemini-2.5-flash" and r["body"]["tool_choice"] == "auto"
+            assert r["auth"] == "Bearer test-key-123" and r["body"]["model"] == "gemini-3.8-flash" and r["body"]["tool_choice"] == "auto"
             assert [t["function"]["name"] for t in r["body"]["tools"]] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart", "get_map", "set_map"]
             assert "test-key-123" not in json.dumps(r["body"])
-            assert page.inner_text(".rs-ask-turn:last-child .rs-ask-by") == "Google Gemini · gemini-2.5-flash"            # each card names who answered
+            assert page.inner_text(".rs-ask-turn:last-child .rs-ask-by") == "Google Gemini · gemini-3.8-flash"            # each card names who answered
         finally:
             browser.close()
     assert errors == [], errors
@@ -353,17 +353,17 @@ def test_auto_asks_the_next_service_at_once_and_the_card_names_who_answered(tmp_
             t0 = page.evaluate("performance.now()")
             assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads."
             assert page.evaluate("performance.now()") - t0 < 3000                                        # no wait on the 429
-            assert seen == [("gemini", "gemini-2.5-flash"), ("groq", "openai/gpt-oss-120b")], seen
+            assert seen == [("gemini", "gemini-3.8-flash"), ("groq", "openai/gpt-oss-120b")], seen
             by = page.inner_text(".rs-ask-turn .rs-ask-by")
-            assert by.startswith("Groq · openai/gpt-oss-120b") and "Google Gemini · gemini-2.5-flash: HTTP 429" in by, by
+            assert by.startswith("Groq · openai/gpt-oss-120b") and "Google Gemini · gemini-3.8-flash: HTTP 429" in by, by
             groq_ok["on"] = False
             assert page.evaluate("ask.ask('How many again?')") is None
             line = page.evaluate("[...document.querySelectorAll('.rs-ask-turn')].at(-1).querySelector('.rs-ask-err').innerText")
-            assert "No service could answer" in line and "Google Gemini · gemini-2.5-flash (HTTP 429)" in line and "Groq · openai/gpt-oss-120b (HTTP 503)" in line, line
+            assert "No service could answer" in line and "Google Gemini · gemini-3.8-flash (HTTP 429)" in line and "Groq · openai/gpt-oss-120b (HTTP 503)" in line, line
             page.click(".rs-ask-keyb")
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)")[0] == "auto"
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-order li')].map(l => l.innerText)") == [
-                "Google Gemini · gemini-2.5-flash", "Groq · openai/gpt-oss-120b", "OpenRouter (free models) · no key", "Z.ai (GLM) · no key"]
+                "Google Gemini · gemini-3.8-flash", "Groq · openai/gpt-oss-120b", "OpenRouter (free models) · no key", "Z.ai (GLM) · no key"]
         finally:
             browser.close()
     assert errors == [], errors

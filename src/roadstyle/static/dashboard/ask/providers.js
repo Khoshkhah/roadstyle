@@ -7,7 +7,7 @@
 //   models(p, key, signal) -> the model names of the key;  pickModel(names) -> a model with tool support;  rankModels(names) -> the same order, all
 //   chatModels(names) -> the names without the models that do not chat (the list of the Model box)
 export const PROVIDERS = [
-  {id: "gemini", name: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.5-flash", keys: "https://aistudio.google.com/apikey"},
+  {id: "gemini", name: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-3.8-flash", keys: "https://aistudio.google.com/apikey"},
   {id: "groq", name: "Groq", base: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", keys: "https://console.groq.com/keys"},
   {id: "openrouter", name: "OpenRouter (free models)", base: "https://openrouter.ai/api/v1", model: "openai/gpt-oss-120b:free", keys: "https://openrouter.ai/keys", onlyFree: true},
   // Z.ai's model list names only its paid models, and a paid model with no balance gives HTTP 429 "Insufficient balance". `free` is the list
