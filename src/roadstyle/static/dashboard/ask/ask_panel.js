@@ -8,7 +8,7 @@
 //     clear, remove, history}
 //   events: "answer" {question, text, sql, rows}, "error" {question, message}, "back"
 import {editorFrame} from "../frame.js";
-import {PROVIDERS, BUSY, chat, models, pickModel, chatModels} from "./providers.js";
+import {PROVIDERS, BUSY, chat, models, pickModel, chatModels, rankModels} from "./providers.js";
 import {inner} from "../data/guard.js";
 
 const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
@@ -112,6 +112,12 @@ export function askPanel(o = {}){
   const putSettings = (s) => lsPut("rs-settings:ask", JSON.stringify(s));
   const prov = () => { const s = settings(), p = PROVS.find((x) => x.id === s.provider) || PROVS[0]; return {...p, model: (s.model && s.model[p.id]) || p.model}; };
   const keyOf = (p = prov()) => lsGet("rs-key:ask:" + p.id) || "";
+  // Auto: the provider "auto" asks each service that has a key, in the order of the list; the model "auto" of a service asks its best models
+  // (rankModels). When one cannot answer, Ask asks the next at once (callModel). Each answer card names the service and the model that answered.
+  const AUTO = "auto", AUTO_P = {id: AUTO, name: "Auto"};
+  const isAuto = () => settings().provider === AUTO;
+  const modelOf = (p) => { const s = settings(); return (s.model && s.model[p.id]) || p.model; };          // a model name or "auto"
+  const label = (m) => m === AUTO ? "Auto" : m;
   const setModel = (m) => { const s = settings(), id = prov().id; s.provider = id; s.model = {...s.model, [id]: m}; putSettings(s); paintWho(); };
   const chatOf = (p, req) => p.chat ? p.chat(req) : chat(p, req);                                   // a provider of the page (a test) has its own chat
   const modelsOf = (p, signal) => p.models ? p.models(keyOf(p), signal) : models(p, keyOf(p), signal);
@@ -186,8 +192,9 @@ export function askPanel(o = {}){
 
   // ---- the provider's name and the key form (in the view: the person gets the key where it is needed) ----
   function paintWho(){
-    const p = prov(), k = keyOf(p);
-    who.textContent = k ? `${p.name} · ${p.model}` : `${p.name} · no key`; who.title = who.textContent;
+    const p = prov(), n = PROVS.filter((x) => keyOf(x)).length, k = isAuto() ? n : keyOf(p);
+    who.textContent = isAuto() ? (n ? `Auto · ${plural(n, "service", "services")}` : "Auto · no key") : k ? `${p.name} · ${label(p.model)}` : `${p.name} · no key`;
+    who.title = who.textContent;
     needKey.replaceChildren();
     if(!k){
       const add = $("button", "sb-primary", "Add a key"); add.type = "button"; add.onclick = () => showKey(true);
@@ -201,13 +208,13 @@ export function askPanel(o = {}){
   keyB.onclick = () => showKey(keyBox.hidden);
   function drawKey(){
     const p = prov();
-    const sel = $("select"); for(const x of PROVS){ const op = $("option", "", x.name); op.value = x.id; op.selected = x.id === p.id; sel.append(op); }
+    const sel = $("select"); for(const x of [AUTO_P, ...PROVS]){ const op = $("option", "", x.name); op.value = x.id; op.selected = isAuto() ? x.id === AUTO : x.id === p.id; sel.append(op); }
     // the model: a select box of the models that the key can use. Before the key's list comes (and with no key) it has only the current model.
     // A pick takes effect at once, with no Save.
     const model = $("select");
     const fill = (ids) => {
-      const cur = prov().model, all = ids.includes(cur) ? ids : [cur, ...ids];
-      model.replaceChildren(...all.map((i) => Object.assign($("option", "", i), {value: i})));
+      const cur = prov().model, all = [AUTO, ...(ids.includes(cur) || cur === AUTO ? ids : [cur, ...ids])];
+      model.replaceChildren(...all.map((i) => Object.assign($("option", "", i === AUTO ? "Auto (the best model that answers)" : i), {value: i})));
       model.value = cur;
     };
     fill([]);
@@ -221,20 +228,27 @@ export function askPanel(o = {}){
     const row = (l, el) => { const r = $("label", "rs-ask-krow"); r.append($("span", "", l), el); return r; };
     const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "‹ Back to chat"); back.type = "button"; back.onclick = () => showKey(false);
     hd.append($("b", "", "Your key"), back);
+    sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(); paintWho(); };
+    if(isAuto()){                                                   // Auto: the order of the services; a service of the box changes its key or model
+      const ol = $("ol", "rs-ask-order");
+      for(const x of PROVS) ol.append($("li", "", `${x.name} · ${keyOf(x) ? label(modelOf(x)) : "no key"}`));
+      keyBox.replaceChildren(hd, row("Provider", sel), $("p", "rs-ask-keynote", "Ask asks these services in this order. When one cannot answer, it asks the next. Choose a service to change its key or its model."), ol);
+      return;
+    }
     keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), row("Key", key), btns, note);
     if(keyOf(p)) modelsOf(p).then((ids) => { if(model.isConnected && prov().id === p.id) fill(chatModels(ids)); })
       .catch((e) => { if(model.isConnected) note.textContent = "The saved key did not work: " + sentence(e.message); });
-    sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(); paintWho(); };
     clear.onclick = () => { lsPut("rs-key:ask:" + prov().id, null); drawKey(); paintWho(); };
     save.onclick = async () => {
       const s = settings(); s.provider = sel.value; putSettings(s);
       if(key.value.trim()) lsPut("rs-key:ask:" + sel.value, key.value.trim());
       key.value = ""; paintWho(); note.textContent = "Checking the key…";
       try{
-        const ids = chatModels(await modelsOf(prov())), was = model.value, m = ids.includes(was) ? was : pickModel(ids);
+        const ids = chatModels(await modelsOf(prov())), was = model.value, m = was === AUTO || ids.includes(was) ? was : pickModel(ids);
         if(m) setModel(m);
         fill(ids);
-        note.textContent = `Saved. The key works: ${plural(ids.length, "model", "models")}. Ask uses ${m}${was !== m ? ` (not "${was}": the key cannot use it)` : ""}.`;
+        const uses = m === AUTO ? `Auto (${rankModels(ids)[0] || "no model"} first)` : m;
+        note.textContent = `Saved. The key works: ${plural(ids.length, "model", "models")}. Ask uses ${uses}${was !== m ? ` (not "${was}": the key cannot use it)` : ""}.`;
         setTimeout(() => { if(!keyBox.hidden) showKey(false); }, 1600);                              // back to the chat by itself
       }catch(e){ note.textContent = "Saved, but the key did not work: " + sentence(e.message); }
     };
@@ -387,11 +401,36 @@ export function askPanel(o = {}){
   const SPECS = TOOLS.map((t) => ({type: "function", function: {name: t.name, description: t.description, parameters: {type: "object", properties: t.parameters, ...(t.required && t.required.length ? {required: t.required} : {})}}}));
 
   // ---- one model call: a wait on the free limit (HTTP 429: at most 2 times, each at most 60 s), and one switch to another model that the key can use ----
-  async function callModel(messages, signal, final, say){
+  // With Auto (of the service or of the model): the list of tries, made once for each question (c.tries); a try that fails gives its place to the
+  // next at once, and the one that answered stays for the next steps of the question (c.at). The model lists of the keys are asked once.
+  const lists = new Map();
+  async function triesOf(signal, c){
+    const out = [];
+    for(const p of isAuto() ? PROVS.filter((x) => keyOf(x)) : [prov()]){
+      const m = modelOf(p);
+      if(m !== AUTO){ out.push({p, model: m}); continue; }
+      try{ if(!lists.has(p.id)) lists.set(p.id, rankModels(chatModels(await modelsOf(p, signal)))); }
+      catch(e){ if(signal.aborted) throw e; c.tried.push({name: p.name, model: "Auto", why: e.status ? `HTTP ${e.status}` : "no model list"}); continue; }
+      for(const x of lists.get(p.id).slice(0, 3)) out.push({p, model: x});                              // at most 3 models of one service
+    }
+    return out;
+  }
+  async function callModel(messages, signal, final, say, c){
+    if(isAuto() || modelOf(prov()) === AUTO){
+      if(!c.tries){ c.tries = await triesOf(signal, c); c.at = 0; }
+      for(; c.at < c.tries.length; c.at++){
+        const {p, model} = c.tries[c.at];
+        say(`Asking ${p.name} (${model})`);
+        try{ const msg = await chatOf(p, {key: keyOf(p), model, messages, tools: SPECS, toolChoice: final ? "none" : "auto", signal}); c.by = {name: p.name, model}; return msg; }
+        catch(e){ if(signal.aborted) throw e; c.tried.push({name: p.name, model, why: e.status ? `HTTP ${e.status}` : sentence(e.message)}); }
+      }
+      throw new Error(`No service could answer: ${c.tried.map((x) => `${x.name} · ${x.model} (${x.why})`).join(", ") || "no service with a key"}. Add a key or try again in a minute.`);
+    }
     let waited = 0, switched = false;
     for(;;){
       const p = prov();
-      try{ return await chatOf(p, {key: keyOf(p), model: p.model, messages, tools: SPECS, toolChoice: final ? "none" : "auto", signal}); }
+      say(`Asking ${p.name} (${p.model})`);
+      try{ const msg = await chatOf(p, {key: keyOf(p), model: p.model, messages, tools: SPECS, toolChoice: final ? "none" : "auto", signal}); c.by = {name: p.name, model: p.model}; return msg; }
       catch(e){
         if(signal.aborted) throw e;
         const s = e.wait || parseFloat((String(e.message).match(/try again in ([\d.]+)\s*s/i) || [])[1]) || 20;
@@ -434,11 +473,11 @@ export function askPanel(o = {}){
     hd.append($("p", "q", text), x); t.el.append(hd);
     turns.push(t); log.append(t.el); paintStart(); toEnd();
     const step = $("p", "step"), say = (s) => { step.textContent = s; if(!step.isConnected) t.el.append(step); toEnd(); };
-    const c = {ok: [], failed: [], maps: []}, me = new AbortController();
+    const c = {ok: [], failed: [], maps: [], tried: []}, me = new AbortController();
     ctl = me; cur = t; sending(true);
     try{
       const p = prov();
-      if(!keyOf(p)) throw new Error(`Ask needs your own key. Add a key of ${p.name} with Key.`);
+      if(isAuto() ? !PROVS.some((x) => keyOf(x)) : !keyOf(p)) throw new Error(`Ask needs your own key. Add a key of ${isAuto() ? "a service" : p.name} with Key.`);
       if(!loaded) say("Loading the data…");
       await data.ready();
       const history = turns.filter((y) => y !== t).flatMap((y) => y.hist || []);
@@ -446,9 +485,8 @@ export function askPanel(o = {}){
       let fails = 0, answer = null, n = 0;
       for(; n < MAX && answer == null; n++){
         const last = n === MAX - 1;
-        say(`Asking ${p.name} (${prov().model})`);
         if(last) messages.push({role: "user", content: FINAL});                                    // the last call answers: no more tools
-        const msg = await callModel(messages, me.signal, last, say), calls = (msg && msg.tool_calls) || [];
+        const msg = await callModel(messages, me.signal, last, say, c), calls = (msg && msg.tool_calls) || [];
         if(me.signal.aborted) throw new Error("Stopped.");
         if(!calls.length || last){ if((msg && msg.content || "").trim()) answer = msg.content; break; }
         messages.push({role: "assistant", content: msg.content || "", tool_calls: calls});
@@ -487,6 +525,11 @@ export function askPanel(o = {}){
   function finish(t, answer, c){
     t.cam = c.cam; t.text = answer; t.hist = [{role: "user", content: t.question}, {role: "assistant", content: answer}];
     t.el.append(answerEl(answer, t));
+    if(c.by){                                                                                       // who answered, and who could not (Auto)
+      const by = $("p", "rs-ask-by", `${c.by.name} · ${c.by.model}`);
+      if(c.tried.length) by.append(` (after ${c.tried.map((x) => `${x.name} · ${x.model}: ${x.why}`).join("; ")})`);
+      t.el.append(by);
+    }
     for(const m of c.maps){ const line = $("div", "rs-ask-map"); line.append($("span", "rs-ask-map-k", "Map"), $("span", "", m.text)); if(!m.move) line.append($("span", "rs-ask-map-to", "in the list of Colour or Focus")); t.el.append(line); }
     // the answer's table: the query with roads that has the most rows (a model often runs the full list, then a count or "LIMIT 2" for the longest); a map
     // tool's roads win over a helper query that the model ran after it

@@ -283,6 +283,7 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
             assert r["auth"] == "Bearer test-key-123" and r["body"]["model"] == "gemini-2.5-flash" and r["body"]["tool_choice"] == "auto"
             assert [t["function"]["name"] for t in r["body"]["tools"]] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart", "get_map", "set_map"]
             assert "test-key-123" not in json.dumps(r["body"])
+            assert page.inner_text(".rs-ask-turn:last-child .rs-ask-by") == "Google Gemini · gemini-2.5-flash"            # each card names who answered
         finally:
             browser.close()
     assert errors == [], errors
@@ -311,14 +312,89 @@ def test_the_model_box_lists_the_keys_models_and_a_pick_takes_effect_at_once(tmp
                              localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'groq'})); makeReal(); ask.open()""")
             page.click(".rs-ask-keyb")
             opts = "[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)"
-            page.wait_for_function(opts + f".length === {len(_MODELS) - 1}")
-            assert page.evaluate(opts) == [i for i in _MODELS if i != "whisper-large-v3"]
+            page.wait_for_function(opts + f".length === {len(_MODELS)}")                      # Auto, and the models without the speech model
+            assert page.evaluate(opts) == ["auto"] + [i for i in _MODELS if i != "whisper-large-v3"]
             page.locator(".rs-ask-krow").nth(1).locator(".rs-sel-btn").click()
             page.locator(".rs-sel-list").get_by_text("llama-3.3-70b-versatile").click()
             assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.groq") == "llama-3.3-70b-versatile"
             assert "llama-3.3-70b-versatile" in page.inner_text(".rs-ask-who")
             page.click(".rs-ask-keyhd button")
             assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads." and chats[-1]["model"] == "llama-3.3-70b-versatile"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+_OK = '{"choices": [{"message": {"role": "assistant", "content": "Six roads."}}]}'
+
+
+def test_auto_asks_the_next_service_at_once_and_the_card_names_who_answered(tmp_path):
+    """Provider Auto: the services that have a key, in the order of the list. Gemini's free limit (429) gives the question to Groq at once, with no
+    wait; the card says "Groq · openai/gpt-oss-120b" and that Gemini could not answer. When no service can answer, the red line names each try."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        seen, groq_ok = [], {"on": True}
+
+        def gemini(route):
+            seen.append(("gemini", route.request.post_data_json["model"]))
+            route.fulfill(status=429, content_type="application/json", body='{"error": {"message": "Quota exceeded. Please retry in 50s."}}')
+
+        def groq(route):
+            seen.append(("groq", route.request.post_data_json["model"]))
+            if groq_ok["on"]:
+                return route.fulfill(status=200, content_type="application/json", body=_OK)
+            route.fulfill(status=503, content_type="application/json", body='{"error": {"message": "over capacity"}}')
+        try:
+            page.route("https://generativelanguage.googleapis.com/**", gemini)
+            page.route("https://api.groq.com/**", groq)
+            page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:gemini', 'k1'); localStorage.setItem('rs-key:ask:groq', 'k2');
+                             localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'auto'})); makeReal(); ask.open()""")
+            assert page.inner_text(".rs-ask-who") == "Auto · 2 services"
+            t0 = page.evaluate("performance.now()")
+            assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads."
+            assert page.evaluate("performance.now()") - t0 < 3000                                        # no wait on the 429
+            assert seen == [("gemini", "gemini-2.5-flash"), ("groq", "openai/gpt-oss-120b")], seen
+            by = page.inner_text(".rs-ask-turn .rs-ask-by")
+            assert by.startswith("Groq · openai/gpt-oss-120b") and "Google Gemini · gemini-2.5-flash: HTTP 429" in by, by
+            groq_ok["on"] = False
+            assert page.evaluate("ask.ask('How many again?')") is None
+            line = page.evaluate("[...document.querySelectorAll('.rs-ask-turn')].at(-1).querySelector('.rs-ask-err').innerText")
+            assert "No service could answer" in line and "Google Gemini · gemini-2.5-flash (HTTP 429)" in line and "Groq · openai/gpt-oss-120b (HTTP 503)" in line, line
+            page.click(".rs-ask-keyb")
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)")[0] == "auto"
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-order li')].map(l => l.innerText)") == [
+                "Google Gemini · gemini-2.5-flash", "Groq · openai/gpt-oss-120b", "OpenRouter (free models) · no key", "Z.ai (GLM) · no key"]
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_model_auto_asks_the_next_model_of_the_key(tmp_path):
+    """Model Auto: the key's models in the order of the automatic pick (rankModels). A busy model gives the question to the next model at once."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        seen = []
+
+        def groq(route):
+            if route.request.url.endswith("/models"):
+                return route.fulfill(status=200, content_type="application/json",
+                                     body=json.dumps({"data": [{"id": i} for i in ["allam-2-7b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b", "openai/gpt-oss-120b"]]}))
+            seen.append(route.request.post_data_json["model"])
+            if len(seen) == 1:
+                return route.fulfill(status=503, content_type="application/json", body='{"error": {"message": "over capacity"}}')
+            route.fulfill(status=200, content_type="application/json", body=_OK)
+        try:
+            page.route("https://api.groq.com/**", groq)
+            page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:groq', 'k2');
+                             localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'groq', model: {groq: 'auto'}})); makeReal(); ask.open()""")
+            assert page.inner_text(".rs-ask-who") == "Groq · Auto"
+            assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads."
+            assert seen == ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"], seen
+            assert page.inner_text(".rs-ask-turn .rs-ask-by").startswith("Groq · qwen/qwen3.8-27b (after Groq · openai/gpt-oss-120b: HTTP 503)")
+            page.click(".rs-ask-keyb")
+            opts = "[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)"
+            page.wait_for_function(opts + ".length > 1")
+            assert page.evaluate(opts)[0] == "auto" and page.evaluate("document.querySelectorAll('.rs-ask-krow')[1].querySelector('select').value") == "auto"
         finally:
             browser.close()
     assert errors == [], errors
@@ -348,11 +424,11 @@ def test_zai_uses_its_free_model_and_no_balance_is_not_a_wait(tmp_path):
             page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:zai', 'test-key-123');
                              localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'zai'})); makeReal(); ask.open()""")
             page.click(".rs-ask-keyb")
-            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)") == ["gemini", "groq", "openrouter", "zai"]
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)") == ["auto", "gemini", "groq", "openrouter", "zai"]
             page.click(".rs-ask-btns .sb-primary")
             page.wait_for_function("document.querySelector('.rs-ask-keynote').textContent.startsWith('Saved.')")
             assert "Ask uses glm-4.5-flash" in page.inner_text(".rs-ask-keynote")
-            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)") == ["glm-4.5-flash"]
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)") == ["auto", "glm-4.5-flash"]
             assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.zai") == "glm-4.5-flash"
             t0 = page.evaluate("performance.now()")
             assert page.evaluate("ask.ask('How many?')") is None

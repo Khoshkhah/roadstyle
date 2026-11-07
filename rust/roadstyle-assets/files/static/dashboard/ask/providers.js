@@ -4,7 +4,7 @@
 //
 //   PROVIDERS: [{id, name, base, model, keys, onlyFree, free}]
 //   chat(p, {key, model, messages, tools, toolChoice, signal}) -> the assistant message {content, tool_calls}; an error has `status` and `wait` (seconds)
-//   models(p, key, signal) -> the model names of the key;  pickModel(names) -> a model with tool support
+//   models(p, key, signal) -> the model names of the key;  pickModel(names) -> a model with tool support;  rankModels(names) -> the same order, all
 //   chatModels(names) -> the names without the models that do not chat (the list of the Model box)
 export const PROVIDERS = [
   {id: "gemini", name: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.5-flash", keys: "https://aistudio.google.com/apikey"},
@@ -25,10 +25,12 @@ const PREFER = [/gpt-oss-120b/, /kimi-k2/, /llama-4-maverick/, /qwen3/, /gpt-oss
 const NOT_CHAT = /whisper|guard|tts|embed|image|audio|playai|aqa|imagen|veo|moderation|orpheus|lyria|banana|transcribe|live|translate|robotics|computer-use|deep-research|antigravity/i;
 const SKIP = new RegExp(NOT_CHAT.source + "|compound|allam|learnlm|gemma|lite|preview|exp", "i");
 export const chatModels = (ids) => ids.filter((i) => !NOT_CHAT.test(i));
-export function pickModel(ids){
-  for(const re of PREFER){ const m = ids.filter((i) => re.test(i) && !SKIP.test(i)).sort().reverse()[0]; if(m) return m; }
-  return ids.find((i) => !SKIP.test(i)) || ids[0];
+// the models in the order of the automatic pick: the best match of each PREFER line, then the others that SKIP does not leave out
+export function rankModels(ids){
+  const top = PREFER.map((re) => ids.filter((i) => re.test(i) && !SKIP.test(i)).sort().reverse()[0]).filter(Boolean);
+  return [...new Set([...top, ...ids.filter((i) => !SKIP.test(i))])];
 }
+export function pickModel(ids){ return rankModels(ids)[0] || ids[0]; }
 
 // the provider's own words of an error: {error: {message}}, {error: "..."}, {message}, a list of one of these (Google's OpenAI-compatible
 // address sends [{error: ...}]) or the text
