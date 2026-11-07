@@ -32,7 +32,7 @@ Later the same day, Kaveh also asked for these:
 9. The agent can also change the map: colour roads, filter the map, and move the map ([The map tools](#the-map-tools)). It still
    cannot change the data.
 10. The agent sees all the host's data, not one table ([The schema](#the-schema)). The conversation scrolls by the panel's own protocol
-   (`rs-pbody`). **Key** is a button, and its form has "Back to chat". The question box is one box with a round send button. A page with
+   (`rs-pbody`). **AI** is a button (it was **Key** until 2026-11-07), and its form has "Back to chat". The question box is one box with a round send button. A page with
    Ask has the card look of the panel by default.
 
 ## Problem
@@ -632,7 +632,7 @@ accent edge: with the tint only, Kaveh found that it did not look like a card to
   well aligned.)
 - **Order.** The oldest question is at the top and the newest at the bottom, next to the question box. After each step the panel
   scrolls to the end.
-- The top row has Back, the provider and the model, **Key** and **New** (a new conversation). Key and New are buttons of the same look. Key
+- The top row has Back, the provider and the model, **AI** and **New** (a new conversation). Key and New are buttons of the same look. Key
   is filled while the key form is open ([The keys](#the-keys)). (A teal word "Key" did not look clickable.)
 - An empty conversation shows one line about what Ask does, and the `examples` as chips. A click on a chip asks it.
 - **The examples stay one click away.** After the first question, a small muted button **Examples ▴** is above the question box. It opens
@@ -917,7 +917,7 @@ Not checked yet: that each service gives tool calls in this form with a real key
 ### The keys
 
 The key form is **in the Ask view**, not in roadstyle's Settings box: the person gets the key where the person needs it, and the
-Settings box does not change. **Key** in the top row shows the form in place of the conversation. The form has a title row "Your key"
+Settings box does not change. **AI** in the top row shows the form in place of the conversation. The form has a title row "Your key"
 with **‹ Back to chat**. After a Save that works, the form says "The key works: 12 models. Ask uses …" and goes back to the chat by
 itself after 1.6 s.
 

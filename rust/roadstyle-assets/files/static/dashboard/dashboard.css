@@ -1217,6 +1217,7 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-ask-turn .q{flex:1;min-width:0;margin:0 0 6px;font-weight:600;overflow-wrap:anywhere}
 #sb .rs-ask-x{flex:none;border:0;background:none;color:var(--mut);font-size:12px;padding:2px 6px;border-radius:6px}
 .rs-ask-turn .step,.rs-ask-turn .rs-ask-by{color:var(--mut);font-size:12px;margin:2px 0}
+.rs-ask-key [hidden]{display:none!important}   /* Save key and Clear show only when they can act */
 .rs-ask-order{margin:4px 0 0;padding-left:20px;font-size:13px}
 .rs-ask-turn .a{margin:4px 0 6px;overflow-wrap:anywhere}
 .rs-ask-turn .a p{margin:0 0 6px}

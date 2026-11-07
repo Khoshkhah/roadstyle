@@ -140,18 +140,18 @@ export function askPanel(o = {}){
   const modelsOf = (p, signal) => p.models ? p.models(keyOf(p), signal) : models(p, keyOf(p), signal);
 
   // ---- the view: rs.frame; the head row is the tool row (it does not scroll), the body the conversation, the bar the question box ----
-  const tools = $("div", "rs-ask-top"), who = $("span", "rs-ask-who"), keyB = $("button", "rs-ask-keyb", "Key"), newB = $("button", "rs-ask-new", "New");
+  const tools = $("div", "rs-ask-top"), who = $("span", "rs-ask-who"), keyB = $("button", "rs-ask-keyb", "AI"), newB = $("button", "rs-ask-new", "New");
   keyB.type = newB.type = "button"; keyB.setAttribute("aria-pressed", "false"); keyB.title = "Your key for the AI service"; newB.title = "Start a new conversation";
   tools.append(who, keyB, newB);
   const helpB = o.help !== false && rs.help && rs.help.button(tools, {title: "Ask", button: "About Ask",
     intro: "Ask a question about the roads in words. An AI service writes the SQL, runs it on the data of this page, and answers in a few sentences. The table goes to the data dock, and the roads light on the map.",
-    terms: [["Key", "Your own key of an AI service. Google Gemini and Groq give a free key. The key stays in this browser and goes only to that service. Other pages on the same address (for example the same github.io site) can read it: use a key with a spending limit."],
+    terms: [["AI", "The AI service, its model and your own key of it. Google Gemini and Groq give a free key. The key stays in this browser and goes only to that service. Other pages on the same address (for example the same github.io site) can read it: use a key with a spending limit."],
             ["Examples", "Questions to try. After the first question, they are above the question box."],
             ["An answer", "The question, the answer and the SQL (open “1 query”). Show puts its table in the dock again, and its roads light on the map. ✕ removes the card."],
             ["MAP", "An answer can colour the roads, focus on some roads (the others fade or hide) or move the map. A colour and a focus stay: they are in the lists of Colour ▾ and Focus ▾ in the data dock. You can also ask to show or hide a map layer, to change the base map, to turn the 3D view on or to move the camera (\"turn off the water\", \"satellite\", \"zoom to Fontvieille\")."],
             ["New", "Starts a new conversation. The map keeps its colours and its focus."]],
     note: "Ask sends your question, the conversation, the names and descriptions of the tables, and the query results (up to 30 rows each) to the AI service. An AI service can be wrong: look at the table and at the SQL."});
-  if(helpB) who.after(helpB);                                                                        // the order: provider, ?, Key, New
+  if(helpB) who.after(helpB);                                                                        // the order: provider, ?, AI, New
   // option tab: "Map" -> a tab row under the panel's title, [Map | Ask]; Ask is a tab, not a view with a Back button (the title stays the host's title)
   const tabbed = !!o.tab, hostTitle = panel.querySelector(".sb-top")?.firstElementChild?.textContent || "Ask";
   const frame = editorFrame({panel, title: tabbed ? hostTitle : "Ask", back: tabbed ? null : o.backLabel || "Back", head: tools, id: "ask"});
@@ -227,7 +227,7 @@ export function askPanel(o = {}){
   }
   const showKey = (on) => { keyBox.hidden = !on; log.hidden = on; frame.bar.hidden = on; keyB.classList.toggle("on", on); keyB.setAttribute("aria-pressed", String(on)); if(on) drawKey(); else toEnd(); };
   keyB.onclick = () => showKey(keyBox.hidden);
-  function drawKey(){
+  function drawKey(said){
     const p = prov();
     const sel = $("select"); for(const x of [AUTO_P, ...PROVS]){ const op = $("option", "", x.name); op.value = x.id; op.selected = isAuto() ? x.id === AUTO : x.id === p.id; sel.append(op); }
     // the model: a select box of the models that the key can use. Before the key's list comes (and with no key) it has only the current model.
@@ -239,21 +239,26 @@ export function askPanel(o = {}){
       model.value = cur;
     };
     fill([]);
-    model.onchange = () => setModel(model.value);
+    // Provider and Model are kept at once (no Save): the note says what Ask uses now. Save is only for a new key ("Save key", shown while a key is typed).
+    const now = () => { const q = prov(); return keyOf(q) ? `Ask uses ${q.name} · ${label(q.model)} now.` : `Ask uses ${q.name} now. Paste its key below.`; };
+    model.onchange = () => { setModel(model.value); note.textContent = now(); };
     const key = $("input", "rs-q"); key.type = "password"; key.autocomplete = "off"; key.placeholder = keyOf(p) ? "(a key is saved in this browser)" : "Paste your key";
-    const save = $("button", "sb-primary", "Save"), clear = $("button", "", "Clear"), note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
+    const save = $("button", "sb-primary", "Save key"), clear = $("button", "", "Clear"), note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
     save.type = clear.type = "button"; btns.append(clear, save);
+    const showBtns = () => { save.hidden = !key.value.trim(); clear.hidden = !keyOf(p); btns.hidden = save.hidden && clear.hidden; };
+    key.oninput = showBtns; showBtns();
+    if(said) note.textContent = said;
     const link = $("a", "", (p.paid ? "Get a key from " : "Get a free key from ") + p.name); if(p.keys){ link.href = p.keys; link.target = "_blank"; link.rel = "noopener"; } else link.hidden = true;
     // no notes under the form (Kaveh, 2026-11-06: "I think we should remove this part too"): the "?" of Ask says where the key and the data go; the line
     // here shows only the state of a save
     const row = (l, el) => { const r = $("label", "rs-ask-krow"); r.append($("span", "", l), el); return r; };
     const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "‹ Back to chat"); back.type = "button"; back.onclick = () => showKey(false);
     hd.append($("b", "", "Your key"), back);
-    sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(); paintWho(); };
+    sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(isAuto() ? "Ask uses Auto now." : now()); paintWho(); };
     if(isAuto()){                                                   // Auto: the order of the services; a service of the box changes its key or model
       const ol = $("ol", "rs-ask-order");
       for(const x of PROVS) ol.append($("li", "", `${x.name} · ${keyOf(x) ? label(modelOf(x)) : "no key"}`));
-      keyBox.replaceChildren(hd, row("Provider", sel), $("p", "rs-ask-keynote", "Ask asks these services in this order. When one cannot answer, it asks the next. Choose a service to change its key or its model."), ol);
+      keyBox.replaceChildren(hd, row("Provider", sel), ...(said ? [note] : []), $("p", "rs-ask-keynote", "Ask asks these services in this order. When one cannot answer, it asks the next. Choose a service to change its key or its model."), ol);
       return;
     }
     keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), row("Key", key), btns, note);
@@ -263,7 +268,7 @@ export function askPanel(o = {}){
     save.onclick = async () => {
       const s = settings(); s.provider = sel.value; putSettings(s);
       if(key.value.trim()) lsPut("rs-key:ask:" + sel.value, key.value.trim());
-      key.value = ""; paintWho(); note.textContent = "Checking the key…";
+      key.value = ""; showBtns(); paintWho(); note.textContent = "Checking the key…";
       try{
         const ids = chatModels(await modelsOf(prov())), was = model.value, m = was === AUTO || ids.includes(was) ? was : pickModel(ids);
         if(m) setModel(m);
@@ -498,7 +503,7 @@ export function askPanel(o = {}){
     ctl = me; cur = t; sending(true);
     try{
       const p = prov();
-      if(isAuto() ? !PROVS.some((x) => keyOf(x)) : !keyOf(p)) throw new Error(`Ask needs your own key. Add a key of ${isAuto() ? "a service" : p.name} with Key.`);
+      if(isAuto() ? !PROVS.some((x) => keyOf(x)) : !keyOf(p)) throw new Error(`Ask needs your own key. Add a key of ${isAuto() ? "a service" : p.name} with AI.`);
       if(!loaded) say("Loading the data…");
       await data.ready();
       const history = turns.filter((y) => y !== t).flatMap((y) => y.hist || []);

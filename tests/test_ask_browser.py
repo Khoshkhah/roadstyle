@@ -317,6 +317,12 @@ def test_the_model_box_lists_the_keys_models_and_a_pick_takes_effect_at_once(tmp
             page.locator(".rs-ask-krow").nth(1).locator(".rs-sel-btn").click()
             page.locator(".rs-sel-list").get_by_text("llama-3.3-70b-versatile").click()
             assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.groq") == "llama-3.3-70b-versatile"
+            assert page.inner_text(".rs-ask-keynote") == "Ask uses Groq · llama-3.3-70b-versatile now."              # kept at once, no Save
+            assert page.inner_text(".rs-ask-keyb") == "AI" and not page.is_visible(".rs-ask-btns .sb-primary")      # no Save key without a typed key
+            page.fill(".rs-ask-key input[type=password]", "another-key")
+            assert page.inner_text(".rs-ask-btns .sb-primary") == "Save key"
+            page.fill(".rs-ask-key input[type=password]", "")
+            assert not page.is_visible(".rs-ask-btns .sb-primary")
             assert "llama-3.3-70b-versatile" in page.inner_text(".rs-ask-who")
             page.click(".rs-ask-keyhd button")
             assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads." and chats[-1]["model"] == "llama-3.3-70b-versatile"
@@ -457,6 +463,7 @@ def test_zai_uses_its_free_model_and_no_balance_is_not_a_wait(tmp_path):
                              localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'zai'})); makeReal(); ask.open()""")
             page.click(".rs-ask-keyb")
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)") == ["auto", "gemini", "groq", "openrouter", "zai", "claude"]
+            page.fill(".rs-ask-key input[type=password]", "test-key-123")                           # Save key shows only with a typed key
             page.click(".rs-ask-btns .sb-primary")
             page.wait_for_function("document.querySelector('.rs-ask-keynote').textContent.startsWith('Saved.')")
             assert "Ask uses glm-4.5-flash" in page.inner_text(".rs-ask-keynote")

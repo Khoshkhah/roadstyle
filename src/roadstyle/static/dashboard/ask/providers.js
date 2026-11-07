@@ -47,7 +47,7 @@ const said = (text) => { try{ let b = JSON.parse(text); if(Array.isArray(b)) b =
 export const BUSY = new Set([500, 502, 503, 504]);
 function refused(p, r, text){
   const why = String(said(text)).slice(0, 300), status = r.status === 429 && /insufficient.(balance|quota)/i.test(why) ? 402 : r.status;
-  const e = new Error(BUSY.has(status) ? `${p.name} is busy now (HTTP ${status}): ${why} Try again in a minute, or choose another service under Key.`
+  const e = new Error(BUSY.has(status) ? `${p.name} is busy now (HTTP ${status}): ${why} Try again in a minute, or choose another service under AI.`
     : status === 429 ? `${p.name}'s free limit (HTTP 429): ${why}` : `${p.name} refused the request (HTTP ${r.status}): ${why}`);
   e.status = status; e.wait = Number(r.headers.get("retry-after")) || null;
   return e;
