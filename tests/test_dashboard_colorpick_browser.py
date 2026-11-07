@@ -33,8 +33,10 @@ def test_the_colour_picker_keeps_the_inputs_value_and_events(tmp_path, theme):
         assert page.evaluate("document.querySelectorAll('#sb .rs-cp-btn')[1].disabled")                 # disabled follows the input
         page.click("#sb .rs-cp-btn >> nth=0")
         sv = page.locator(".rs-cp-sv").bounding_box()
-        page.mouse.move(sv["x"] + sv["width"] * .8, sv["y"] + sv["height"] * .3); page.mouse.down()
-        page.mouse.move(sv["x"] + sv["width"] * .9, sv["y"] + sv["height"] * .2, steps=3); page.mouse.up()
+        page.mouse.move(sv["x"] + sv["width"] * .8, sv["y"] + sv["height"] * .3)
+        page.mouse.down()
+        page.mouse.move(sv["x"] + sv["width"] * .9, sv["y"] + sv["height"] * .2, steps=3)
+        page.mouse.up()
         dragged = page.evaluate("document.getElementById('fill').value")
         assert dragged != "#b8d986" and page.evaluate("ev.every(e => e === 'input') && ev.length >= 2")
         found = page.evaluate(_PROBE, [".rs-cp-box", theme == "dark"])
