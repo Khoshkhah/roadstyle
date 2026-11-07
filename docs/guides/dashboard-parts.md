@@ -306,7 +306,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     | A link | underlined |
 
     - A `disabled` button is faded and does not react. Keyboard focus has an accent ring.
-    - The look of a plain `<button>` in the panel comes from the dashboard template. A host page with no template gets it only in an editor frame.
+    - The look of a plain `<button>`, a `<select>` and a `<label>` in the panel is in `dashboard.css`, so a host page with its own panel (`#sb`) and no dashboard template gets it too. A disabled button, also a primary one, is dimmed.
 
 ### A two-way switch { .rs-part }
 

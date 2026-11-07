@@ -5,6 +5,7 @@ import {map} from "./core.js";
 // the style is loaded (before that MapLibre refuses a global state), and again at each change of the theme
 // It answers whether the style is loaded: a change of the map's style (the base map) must wait for it as well ("Style is not done loading").
 const syncStyleTheme = () => {
+  if(!map) return true;          // a page with no map (a host page, an editor): only the page's theme
   const set = () => map.setGlobalStateProperty("rs_theme", document.documentElement.dataset.rsTheme === "dark" ? "dark" : "light");
   try { set(); return true; } catch(e){ if(!/not done loading/.test(e.message)) throw e; map.once("style.load", set); return false; }
 };
