@@ -61,6 +61,15 @@ rs.render_edges(edges).save("roads.html")  # one file with all its data: it open
 
     [:octicons-arrow-right-24: On a website or in a map app](guides/website.md)
 
+-   :material-brush-variant:{ .lg .middle } **Design**
+
+    ---
+
+    Change the look of a map in the page: a ready theme, the colours and widths of the road classes, the names and the base map.
+    You see each change on the map at once.
+
+    [:octicons-arrow-right-24: Edit the design of a map](guides/design-panel.md)
+
 -   :material-robot-outline:{ .lg .middle } **AI**
 
     ---
