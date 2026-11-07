@@ -891,6 +891,7 @@ with a link to the page that gives the key:
 | Groq | `https://api.groq.com/openai/v1` | https://console.groq.com/keys | free tier, no card |
 | OpenRouter | `https://openrouter.ai/api/v1` | https://openrouter.ai/keys | only its free models (names that end in `:free`); the model list shows only these |
 | Z.ai (GLM) | `https://api.z.ai/api/paas/v4` | https://z.ai/manage-apikey/apikey-list | only `glm-4.5-flash` (the provider's `free` list): the model list of Z.ai names only paid models, and a paid model with no balance gives HTTP 429 "Insufficient balance", which Ask shows at once as a refusal (status 402) |
+| Claude (paid) | `https://api.anthropic.com/v1` | https://console.anthropic.com/settings/keys | the one paid service (the person's own credit; added on 2026-11-07). `headers`: `anthropic-dangerous-direct-browser-access` (a call from a browser page) and `anthropic-version` (the model list); `temperature: false` (its new models refuse `temperature`). A workspace key; an organization key needs `anthropic-workspace-id` |
 
 Services that need credits (xAI Grok, OpenAI) are not in the list. Cerebras and Mistral were removed on 2026-11-07: Cerebras gave only a trial credit with a card, and Mistral gave no free key. SiliconFlow was tried on the same day: its start credit ended after a few requests. A free tier has a limit of requests for each minute and each day; one
 question uses 2 to `maxSteps` requests.

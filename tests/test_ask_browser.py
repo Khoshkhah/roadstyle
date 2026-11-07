@@ -363,7 +363,7 @@ def test_auto_asks_the_next_service_at_once_and_the_card_names_who_answered(tmp_
             page.click(".rs-ask-keyb")
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)")[0] == "auto"
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-order li')].map(l => l.innerText)") == [
-                "Google Gemini · gemini-3.8-flash", "Groq · openai/gpt-oss-120b", "OpenRouter (free models) · no key", "Z.ai (GLM) · no key"]
+                "Google Gemini · gemini-3.8-flash", "Groq · openai/gpt-oss-120b", "OpenRouter (free models) · no key", "Z.ai (GLM) · no key", "Claude (paid) · no key"]
         finally:
             browser.close()
     assert errors == [], errors
@@ -400,6 +400,39 @@ def test_model_auto_asks_the_next_model_of_the_key(tmp_path):
     assert errors == [], errors
 
 
+def test_claude_is_a_paid_service_with_its_browser_header(tmp_path):
+    """Claude (paid): its requests carry the key as a Bearer header and the header anthropic-dangerous-direct-browser-access, which Anthropic needs
+    for a call from a browser page. The key form says "Get a key" (not "a free key"), and the card names Claude and its model."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        seen = []
+
+        def claude(route):
+            seen.append({"url": route.request.url, "auth": route.request.headers.get("authorization"),
+                         "browser": route.request.headers.get("anthropic-dangerous-direct-browser-access"),
+                         "version": route.request.headers.get("anthropic-version"), "body": route.request.post_data_json})
+            if route.request.url.endswith("/models"):
+                return route.fulfill(status=200, content_type="application/json", body='{"data": [{"id": "claude-opus-5-5"}, {"id": "claude-sonnet-5-5"}, {"id": "claude-haiku-5-5"}]}')
+            route.fulfill(status=200, content_type="application/json", body=_OK)
+        try:
+            page.route("https://api.anthropic.com/**", claude)
+            page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:claude', 'test-key-123');
+                             localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'claude'})); makeReal(); ask.open()""")
+            assert page.inner_text(".rs-ask-who") == "Claude (paid) · claude-sonnet-5-5"
+            assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads."
+            r = seen[-1]
+            assert r["url"] == "https://api.anthropic.com/v1/chat/completions" and r["auth"] == "Bearer test-key-123" and r["browser"] == "true"
+            assert "temperature" not in r["body"]                                                        # Claude's new models refuse it
+            assert r["body"]["model"] == "claude-sonnet-5-5" and page.inner_text(".rs-ask-turn .rs-ask-by") == "Claude (paid) · claude-sonnet-5-5"
+            page.click(".rs-ask-keyb")
+            assert page.inner_text(".rs-ask-key > a") == "Get a key from Claude (paid)"
+            page.wait_for_function("document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option').length === 4")
+            assert seen[-1]["browser"] == "true" and seen[-1]["version"] == "2023-06-01"                # the model list too
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 _NO_MONEY = '{"error": {"code": "1113", "message": "Insufficient balance or no resource package. Please recharge."}}'
 
 
@@ -424,7 +457,7 @@ def test_zai_uses_its_free_model_and_no_balance_is_not_a_wait(tmp_path):
             page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:zai', 'test-key-123');
                              localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'zai'})); makeReal(); ask.open()""")
             page.click(".rs-ask-keyb")
-            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)") == ["auto", "gemini", "groq", "openrouter", "zai"]
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)") == ["auto", "gemini", "groq", "openrouter", "zai", "claude"]
             page.click(".rs-ask-btns .sb-primary")
             page.wait_for_function("document.querySelector('.rs-ask-keynote').textContent.startsWith('Saved.')")
             assert "Ask uses glm-4.5-flash" in page.inner_text(".rs-ask-keynote")
