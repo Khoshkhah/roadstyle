@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-07
+
 ### Added
 - **Claude in Ask, as a paid service** ([The services and the keys](docs/guides/ask.md#the-services-and-the-keys)): `Claude (paid)`, with the person's own key and credit, the default model `claude-sonnet-5-5`, and the last place in Auto's order. A provider can now send its own `headers` (Claude needs `anthropic-dangerous-direct-browser-access` from a browser page) and leave out `temperature` (`temperature: false`). The key form says "Get a key" for a paid service.
 - **Ask's `examples` take groups** ([Ask](docs/guides/ask.md#the-options)): an item of `examples` is a string or a group `{title, items}`. A group is a small heading (small capitals, muted) above its questions, in the start list and in the **Examples ▴** list. Strings and groups can mix. The arrow keys skip the headings. A flat list of strings works as before. **Ask has general example groups by default** (Know the data, Find and count, Show on the map, Colour and focus, The map and the layers, Charts), with no name of a table or a column, so they fit any data; a host's own `examples` come after them, and `examples: {general: false, groups: [...]}` shows only the host's own. For duckOSM's 30 and more examples (Kaveh, 2026-11-07). Test: `test_ask_browser.py`.
