@@ -19,9 +19,10 @@ export const PROVIDERS = [
 // embeddings or safety
 const PREFER = [/gpt-oss-120b/, /kimi-k2/, /llama-4-maverick/, /qwen3/, /gpt-oss-20b/, /llama-4-scout/,
                 /^gemini-[\d.]+-flash$/, /^gemini-[\d.]+-pro$/, /llama-3\.3-70b/];
-// NOT_CHAT: models that do not chat (speech, images, embeddings, safety); the Model box does not list them. SKIP: also the models that the
+// NOT_CHAT: models that do not chat with tools (speech, music, images, embeddings, safety, live audio, robots, agents of their own; the
+// names of Gemini's and Groq's lists on 2026-11-07); the Model box does not list them. SKIP: also the models that the
 // automatic pick does not take (small, preview or test models), which a person can still pick in the box
-const NOT_CHAT = /whisper|guard|tts|embed|image|audio|playai|aqa|imagen|veo|moderation/i;
+const NOT_CHAT = /whisper|guard|tts|embed|image|audio|playai|aqa|imagen|veo|moderation|orpheus|lyria|banana|transcribe|live|translate|robotics|computer-use|deep-research|antigravity/i;
 const SKIP = new RegExp(NOT_CHAT.source + "|compound|allam|learnlm|gemma|lite|preview|exp", "i");
 export const chatModels = (ids) => ids.filter((i) => !NOT_CHAT.test(i));
 export function pickModel(ids){
