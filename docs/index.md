@@ -1,11 +1,6 @@
 # roadstyle
 
-<p class="lead">Turn a road network into a styled, interactive HTML map that works offline, with Google Street View and a JavaScript API.</p>
-
-<div style="display:flex;gap:12px;align-items:flex-start;justify-content:center;margin:1rem 0">
-<img src="img/gallery/dashboard.jpg" alt="The standard dashboard on a desktop: Monaco on the OpenFreeMap Positron base map, a road selected in the panel at the left, and the toolbox at the right edge" style="width:70%;min-width:0">
-<img src="img/gallery/dashboard_phone.jpg" alt="The dashboard on a phone: the one-row bar at the top, the map, and the panel as a bottom sheet" style="width:23%;min-width:0">
-</div>
+<p class="lead">roadstyle makes one HTML file from a road network: a styled map that you can click, that works offline, with Street View and a JavaScript API.</p>
 
 <div class="rs-hero" markdown>
 ![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](img/hero.jpg)
@@ -22,7 +17,7 @@ import geopandas as gpd
 import roadstyle as rs
 
 edges = gpd.read_file("edges.gpkg")        # road edges with a `highway` column
-rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offline
+rs.render_edges(edges).save("roads.html")  # one file with all its data: it opens offline
 ```
 
 ## What you can do
@@ -33,7 +28,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
     ---
 
-    Style the roads, colour them by your data, bridges and tunnels in the right order, your own layers, big networks.
+    Style the roads, colour them by your data, put bridges and tunnels in the correct order, add your own layers.
 
     [:octicons-arrow-right-24: Style the roads](guides/style.md)
 
@@ -41,7 +36,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
     ---
 
-    Click a road and see it in Google Street View, Panoramax or Mapillary, or in Google's 3D view.
+    Click a road to see it in Google Street View, Panoramax or Mapillary, or in the 3D view of Google.
 
     [:octicons-arrow-right-24: Street View](guides/street-view.md)
 
@@ -73,7 +68,7 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
     ---
 
-    The engine under the Python library: in the browser, tiles and PMTiles, the command line.
+    The engine of the Python library: in the browser, as tiles and PMTiles, and on the command line.
 
     [:octicons-arrow-right-24: Rust engine](rust/index.md)
 
@@ -83,23 +78,23 @@ What changed in each version: [What is new](whats-new.md).
 
 ## When to use roadstyle
 
-- **Instead of geopandas `.explore()`** when the output is a road map you care about: casings,
-  per-class widths, one-way arrows, bridges over tunnels. `.explore()` draws one flat line.
-- **Instead of prettymaps** when you need an interactive web map or colour by data (flow, speed).
-  prettymaps makes static images.
-- **Instead of kepler.gl** for road cartography. kepler.gl is a general exploration GUI; its roads
-  are flat strokes with no labels or arrows.
-- For a quick look at any geometry, those tools are fine; roadstyle is for roads.
+| In place of | Use roadstyle when |
+|---|---|
+| geopandas `.explore()` | you want a road map: outlines, a width for each class, one-way arrows, bridges over tunnels. `.explore()` draws one flat line. |
+| prettymaps | you want a web map that you can click, or colours from your data. prettymaps makes pictures. |
+| kepler.gl | you want a road map with names and arrows. kepler.gl draws roads as flat lines. |
+
+For a quick look at other shapes, those tools are good. roadstyle is for roads.
 
 ## Built on
 
-- **[MapLibre GL JS](https://maplibre.org/)** (BSD-3-Clause) draws every web map: roadstyle writes its style and
-  data, and a copy of MapLibre is inlined in each saved page so it opens offline.
+- **[MapLibre GL JS](https://maplibre.org/)** (BSD-3-Clause) draws each web map. roadstyle writes the style and the
+  data, and each saved page has its own copy of MapLibre, so it opens offline.
 - **[OpenStreetMap](https://www.openstreetmap.org/copyright)** data (© OpenStreetMap contributors, ODbL) and the
   **[openstreetmap-carto](https://github.com/gravitystorm/openstreetmap-carto)** style, whose road classes,
   colours and widths roadstyle follows.
-- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), is the optional Python solver of which road is drawn on top. The default solver is in Rust.
-- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** for the geometry.
+- **[HiGHS](https://highs.dev/)**, through [SciPy](https://scipy.org/), is the optional Python solver of which road is on top. The default solver is in Rust.
+- **[GeoPandas](https://geopandas.org/)** and **[Shapely](https://shapely.readthedocs.io/)** read and change the geometry.
 
 [:material-image-multiple: Gallery](gallery.md) ·
 [:material-book-open-variant: Reference](reference/parameters.md) ·
