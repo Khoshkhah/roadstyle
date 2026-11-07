@@ -97,7 +97,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - `data.roads(sql)` gives the road ids (on the map) that the SQL selects by `idColumn`. It refuses a query of more than 100 000 roads.
     - `data.colour(groups, {sql})` and `data.focus(ids, {sql, mode})` add the same layers as the buttons. `data.layers()` lists them.
     - For [Ask](ask.md): `data.idColumn`, `data.keyOf(result)` (the column that finds the roads of a result, or `null`) and `data.roadsOf(result)` (its roads on the map).
-    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`), `layers` and `light` (`on`, see [The map switch](#the-map-switch)).
+    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`), `layers`, `light` (`on`, see [The map switch](#the-map-switch)), `row` and `cardclose` (see [A row of your own](#a-row-of-your-own)).
 
 ## What the person does { .rs-group }
 
@@ -182,6 +182,32 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - The card leaves out the fields of roadstyle's drawing (`casing_*`, `fill_level` and others).
     - In a result of names, a click selects the roads of that name.
     - A click on an overlay item on the map (a building, a crossing) shows the item in the card: its name, the overlay's name as a chip, its fields (the overlay's popup fields when it has them) and its id with **Copy id**. The close button deselects it. While the dock shows the card, no popup shows, for a road or for an item.
+
+### A row of your own { .rs-part }
+
+**Use it for:** a row of a result that is not a road (a node, a building, a wall), which your page draws on the map itself. The page hears the click, shows the item on the map, and puts the item's facts in the card.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```javascript
+    data.addEventListener("row", async (e) => {                      // a click, or Enter, on a row of the table
+      const {columns, row} = e.detail;                               // the values are in the order of the columns
+      const facts = columns.map((c, i) => [c.name, row[i]]).filter(([k]) => k !== "geom");
+      drawOnMap(await shapeOf(row));                                 // your own drawing: the select look
+      data.card({title: row[1], chip: "buildings", rows: facts, id: row[0]});
+    });
+    data.addEventListener("cardclose", () => clearMyDrawing());      // the person closed the card
+    ```
+
+??? info "Details"
+
+    - The event `row` comes for every row, also a road row: `detail.columns` (the columns of the result), `detail.row` (the values, in the order of the columns), `detail.index` (the row's place in the table now) and `detail.rowId` (the value of the `idColumn` as a string, or `null` when the result has none). Ignore what you do not need.
+    - The row shows as selected: the accent tint and a bar. A sort keeps the same row selected, because the table knows it by its values.
+    - The keys do what a click does: Tab goes to a row, Enter or Space picks it.
+    - `data.card({title, chip, rows, id})` fills the card with the same look as the card of an overlay item: the title, the chip, the rows `[[name, value], ...]` (a `null` or empty value is left out), and the `id` with **Copy id**. `data.card(null)` closes the card.
+    - The event `cardclose` comes when the card goes away without your call: the close button, a new selection (a road, an overlay item), or a new result. It does not come for your own `data.card(null)`. The row stops being selected. Remove your drawing on the map in `cardclose`.
 
 ### Table or chart { .rs-part }
 
