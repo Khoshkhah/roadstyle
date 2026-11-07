@@ -1,6 +1,11 @@
 # roadstyle
 
-<p class="lead">roadstyle turns a road network into an interactive map in one HTML file. The map works offline, and you can add Street View, a dashboard and AI to it.</p>
+<p class="lead">roadstyle draws a road network as an interactive web map, from one Python call.</p>
+
+- **One file.** The map is one HTML file with all its data in it. It opens from disk, offline, or from your website.
+- **Roads that read like a real map.** Each road class has its own colour and width, with outlines, street names and one-way arrows.
+  Bridges, tunnels and junctions are drawn in the correct order.
+- **More than a map.** Add Street View, a dashboard with your own parts, SQL on your data, and questions to an AI in words.
 
 <div class="rs-hero" markdown>
 ![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](img/hero.jpg)
