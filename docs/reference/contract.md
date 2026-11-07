@@ -144,11 +144,11 @@ such `state` block) has no step of its own (`core.js`, `_useState`).
 | `rs_theme` | text | `"light"` | | every colour of a layer: its dark colour (`"dark"`) or its light one, with the casing of the roads, the base map's layers, the names and the arrows | the dashboard's theme switch | `rsSetTheme`; `rs:themechange` ([the dark theme](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/dark_theme.md)) |
 | `rs_ov_<i>` | object: feature id to color | `{}` | colors | the paint of overlay `i` | host page | `rsColor(..., overlay)` |
 | `rs_palette` | text | the start palette | the palettes that the views name | each color that differs between these palettes (`__rs_fill@<palette>` and the paint values) | View menu | `rsSetView`; `rs:viewselect` |
-| `rs_tun_strength` | number | `tunnel_strength` (60) | 0 to 100 (`steps`) | each tunnel color | Tunnels box | `rsSetTunnelStyle`; `rs:tunnelchange` |
-| `rs_tun_toward` | color | `tunnel_toward` (Sand `#d6cfc4`) | `towards`, or any `#rrggbb` | the same | Tunnels box | the same |
+| `rs_tun_strength` | number | profile `tunnels.strength` (60) | 0 to 100 (`steps`) | each tunnel color | Tunnels box | `rsSetTunnelStyle`; `rs:tunnelchange` |
+| `rs_tun_toward` | color | palette `tunnels.toward` (Sand `#d6cfc4`) | `towards`, or any `#rrggbb` | the same | Tunnels box | the same |
 | `rs_tun_two` | bool | the palette has two colors | | the tunnel casing | Tunnels box | the same |
-| `rs_tun_c0`, `rs_tun_c1` | colors | `tunnel_palettes[tunnel_palette]` | the palettes | the tunnel casing dash and gap | Tunnels box | the same |
-| `rs_tun_ratio` | `[dash, gap]` | `tunnel_casing_dash` (`[1, 1]`) | `ratios` | the tunnel casing dash layer | Tunnels box | the same |
+| `rs_tun_c0`, `rs_tun_c1` | colors | palette `tunnels.palettes[tunnels.palette]` | the palettes | the tunnel casing dash and gap | Tunnels box | the same |
+| `rs_tun_ratio` | `[dash, gap]` | profile `tunnels.casing_dash` (`[1, 1]`) | `ratios` | the tunnel casing dash layer | Tunnels box | the same |
 
 With `state: baked` (the export, RustGIS), the engine writes the start values in place of these expressions.
 
@@ -209,7 +209,7 @@ The layers' own expressions read the properties that they name in `["get", name]
 reads a `__rs_*` property that is not declared, and `rust/roadstyle-rs/tests/sources.rs` fails when a layer reads a property whose name is
 not a literal. A change to a module that reads a new property adds the property to `reads.json`.
 
-Both engines write only what is read (R1, 2026-10-24), in the GeoJSON, the GeoParquet files and the tiles:
+The engine writes only what is read, in the GeoJSON, the GeoParquet files and the tiles:
 
 - A piece keeps what the road layer (the layers on `simple`) and `pieces` read (`props::piece_reads`). An item (`__rs_k` 5) also keeps
   its own fields (a picked item's popup fields).
@@ -228,7 +228,7 @@ The positions of a road (its casing numbers at the start, in the middle and at t
 
 The browser's keyword `levels` (`"tags"` or `"solve"`, Rust engine) computes them whatever the input has. Then an input column with one
 of the four names goes to the outputs as `__rs_kept_<name>`, and a warning names it. Computed positions are not written into the
-caller's table: the roads source and the road table give them under the four names, after the road's own columns, as before (2026-10-25).
+caller's table: the roads source and the road table give them under the four names, after the road's own columns.
 The table is not renamed: the column keywords (`highway_col`, `bridge_col`, ...) resolve one time to the roles of the columns
 (`roadstyle_model::Roles`), and a keyword that names a column the roads do not have is an error that gives the nearest column names.
 

@@ -13,8 +13,8 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `render_dashboard(gdf, **kw)` | `WebMap` | the map, a panel and the standard toolbox ([Pages](#pages), [Dashboard options](#dashboard-options)) |
 | `render_street_view(gdf, **kw)` | `WebMap` | map + Google Street View side by side ([Pages](#pages)) |
 | `sidebar_html(name)` | `str` | a bundled sidebar fragment: `"dashboard"`, `"street_view"` |
-| `export_style(gdf, out_dir, *, base_url, format="xyz", basemap=<render_edges'>, **kw)` | path of `style.json` | the roads as a MapLibre style + vector tiles (`"xyz"` folder or `"pmtiles"`) + sprite, for other map apps ([On a website or in a map app](../guides/website.md#a-style-for-other-map-apps)); `basemap=None`: no base map; `kw` go to `render_edges` |
-| `export_look(path=None, *, profile=None, palette=None, edges=None, positions=None)` | the look (dict) | MapLibre layers with no source for a data layer in another app (the GeoLibre plugin's "Style a layer with roadstyle"); one casing and one fill layer per drawing position (`positions`, else those of `edges`, else -10 to 10) |
+| `export_style(gdf, out_dir, *, base_url, format="xyz", **kw)` | path of `style.json` | the roads as a MapLibre style + vector tiles (`"xyz"` folder or `"pmtiles"`) + sprite, for other map apps ([On a website or in a map app](../guides/website.md#a-style-for-other-map-apps)). The style has the roads only: `basemap=`, `views=` and `color_active=` are errors (`export.py`). `kw` go to `render_edges` |
+| `export_look(path=None, *, profile=None, palette=None, edges=None, highway_col="highway", oneway_col="oneway", tunnel_col="tunnel", bridge_col="bridge", id_col="edge_id", positions=None)` | the look (dict) | MapLibre layers with no source, for a data layer in another app (the GeoLibre plugin's "Style a layer with roadstyle"). One casing layer and one fill layer for each drawing position (`positions`, else those of `edges`, else -10 to 10) |
 | `snapshot(map_or_html, out_path, *, center, zoom, pitch, bearing, width=1200, height=800, scale=1, settle=2.5, timeout=40)` | path | a PNG via headless Chromium (needs `playwright`) |
 | **Read your data** | | |
 | `RoadEdges` | | the canonical input: EPSG:4326 lines + a class column |
@@ -26,7 +26,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `from_duckdb(con_or_rel, query=None, *, geometry, class_col, crs=4326, rename)` | `RoadEdges` | from DuckDB; select the geometry as `ST_AsWKB(geom)` |
 | `filter_edges(gdf, include, exclude, highway_col, match_links)` | GeoDataFrame | keep / drop road classes |
 | `highway_types(gdf, highway_col="highway", normalize=True)` | `list` | the classes present |
-| `classify(values, method="natural", k=5, *, breaks=None, pivot=None, palette="viridis", reverse=False, fmt="{:g}")` | `Classes` | discrete colour classes for roads: the cuts, the labels and the colours (`.labels`, `.breaks`, `.colors`, `.option(column)` for `color_options`). `method`: `natural` (Fisher-Jenks), `quantile`, `equal` or `fixed`. A `pivot` is always one of the cuts. [Dashboard parts](../guides/dashboard-parts.md#colour-classes) |
+| `classify(values, method="natural", k=5, *, breaks=None, pivot=None, palette="viridis", reverse=False, fmt="{:g}", missing_label="not counted", missing_color="#e2e8f0")` | `Classes` | discrete colour classes for roads: the cuts, the labels and the colours (`.labels`, `.breaks`, `.colors`, `.option(column)` for `color_options`). `method`: `natural` (Fisher-Jenks), `quantile`, `equal` or `fixed`. A `pivot` is always one of the cuts. `missing_label` and `missing_color` are the legend row and the colour of a road with no value. [Dashboard parts](../guides/dashboard-parts.md#colour-classes) |
 | `natural_breaks(values, k)`, `ramp(palette, k)` | cuts, colours | the cuts of `classify`, and `k` colours along a palette |
 | **Base maps, settings** ([Settings & palettes](settings.md)) | | |
 | `BASEMAPS`, `Basemap`, `get_basemap`, `register_basemap` | | base maps ([below](#basemap)) |
@@ -35,12 +35,16 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `use_settings(*sources)` | | apply settings (path or dict) for the process; no argument drops them |
 | `Overlay` | | an extra layer for the web backend ([below](#overlay)) |
 | **Helpers** | | |
-| `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call (`near_rules=False`: set True to also lift parts that only come near; `head_m` decides once which parts of a stack cross, see [design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/level_input.md)): `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/level_input.md)) |
+| `compute_levels(edges, band_col=None, order="priority", ...)` | edges + 4 columns | the level step in one call (`near_rules=False`: `True` also lifts parts that only come near; `head_m=5.0` decides once which parts of a stack cross; `method="solve"`): `casing_start`, `casing_level`, `casing_end`, `fill_level` ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/level_input.md)) |
 | `level_input(edges, id_col="edge_id", ...)` | `(roads, pairs)` | the solver's input from any edges: one row per road, one row per relation (`meet`, `stack` one row per crossing part of the upper road, `order`; `near` with `near_rules=True`); `head_m` / `heads` (a heads.csv table) decide which parts cross |
-| `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver, from the tables only (a stack: one row per part, `a_end` start / main / end); `edits` switch rows off or add them; `fixed` (`{road: (casing_start, casing_level, casing_end, fill_level)}`) holds those roads' numbers and solves the others (the editor's local re-solve) |
+| `solve_levels(roads, pairs, edits=None, ...)` | roads + 4 columns | the solver, from the tables only (a stack: one row per part, `a_end` start / main / end); `edits` switch rows off or add them; `fixed` (`{road: (casing_start, casing_level, casing_end, fill_level)}`) holds those roads' numbers and solves the others (the editor's local re-solve); `max_positions` limits the number of positions |
 | `level_area.make_area(edges, folder, db=None, ...)` / `level_area.solve_area(folder)` | `(roads, pairs)` / solved roads | an area folder (`roadstyle-levels make` / `solve`); with `db` every solve also writes into that DuckDB file |
 | `render_edges(..., levels_db=file)` | – | reads `visualization.edge_levels` of a duckOSM file for these edges (some of the edges it was solved for; ids int64 or text); an error with level columns of your own |
-| `save_area_levels(con, folder)` / `load_area_levels(con, edges)` | – / edges + 8 columns | an area's result into `visualization.edge_levels` and back (the four numbers and each edge's ends); reading checks the edges |
+| `save_area_levels(con, folder, *, schema="visualization")` / `load_area_levels(con, edges, *, schema="visualization", subset=False)` | – / edges + 8 columns | an area's result into `visualization.edge_levels` and back (the four numbers and each edge's ends); reading checks the edges |
+| `save_levels(con, levels, *, schema="visualization")` / `load_levels(con, edges=None, *, schema="visualization", **expect)` / `restore_area_inputs(con, folder, *, schema="visualization")` | – / levels / – | the four level numbers of each edge into a duckOSM file and back; the area's input files from the file |
+| `auto_ends(roads, pairs, zoom=18.0, ...)` / `casing_parts(roads, head_m=5.0, heads=None)` | tables | the end marks that the solver finds on its own; the casing pieces of each road |
+| `is_directed(edges, driving_col="driving", cycling_col="cycling", highway_col="highway")` | bool column | the `directed_col` value: an edge open to cars or bikes that is not a path class |
+| `export_inline(edges, **kw)` / `export_geojson(edges, out_dir, *, format="geojson", keep=None, **kw)` / `tile_geojson(src_dir, out, *, format="pmtiles", keep=None, base_url="")` | dict / dict / path | the style with its data inside; the style with its data as files; the tiles of those files |
 | `normalize_highway(value)` | `(base, is_link)` | strip OSM `_link` |
 
 A `WebMap` has `.html` (the page as a string), `.save(path)`, and shows inline in a notebook (Jupyter Notebook 7, JupyterLab): the
@@ -86,7 +90,7 @@ ignore it.
 | `find_control` | `False` | web | a "Search roads…" box in the top-left stack (the docked panel has its own); the JS `rsFind(text)` is always defined ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/sensor_matching_requests.md)) |
 | `overlay_control` | `True` | web | `False` hides the *Layers* box of the overlays on a map page, and the one switch of the style's base-map layers on a dashboard; `rsSetOverlay` still works. A page with a bar has no Layers box |
 | `hillshade` | `False` | web | `True`: the *Hillshade* switch of the base-map box starts on (the person's saved choice in the browser wins). The shade is drawn under the roads from the DEM of `data/basemaps.json` `ontop.dem` (Terrain Tiles on AWS, no key) |
-| `terrain` | `False` | web | `True`: the *3D terrain* switch of the base-map box starts on (the person's saved choice wins). The camera is the page's (`pitch=`): a flat camera shows the hillshade of the ground only. With the terrain on, every layer lies on the ground of the DEM: a tunnel is drawn on the hill above it and a bridge on the valley under it, because MapLibre has no height of its own for a line. The roads are flat with the terrain off. |
+| `terrain` | `False` | web | `True`: the *3D terrain* switch of the base-map box starts on (the person's saved choice wins). The camera is the page's (`pitch=`): a flat camera shows the hillshade only. With the terrain on, every layer lies on the ground of the DEM: a tunnel is drawn on the hill above it and a bridge in the valley under it, because MapLibre has no height for a line |
 | `terrain_exaggeration` | `None` | web | the height of the 3D terrain as a multiple of the DEM's: `2.0` doubles every hill, `0.5` halves it. `None`: `ontop.terrain.exaggeration` of `data/basemaps.json` (`1.0`). Read when the terrain switches on |
 | `terrain_tunnels` | `"fade"` | web | what a tunnel does while the 3D terrain is on: `"fade"` draws its fill, gap and dashes at `ontop.terrain.tunnel_fade` of `data/basemaps.json` (`0.25`), `"hide"` does not draw them, `"show"` leaves them. Without it a tunnel lies on the hill above it, because MapLibre has no height for a line, so a per-edge height (a `z` column) cannot be drawn. No effect with the terrain off |
 | `buildings_opacity` | `None` | web | the opacity of the 3D buildings of a vector base map (OpenFreeMap), from 0 to 1. `None`: `ontop.buildings.opacity` of `data/basemaps.json` (`1`, solid: a road behind a building does not show through the roof). The *Opacity* slider of the base-map box and `rsBuildingsOpacity(value)` change it on the page. Another value is an error |
@@ -107,7 +111,7 @@ ignore it.
 | `color_col` | `"color"` | all | the colour column when `color_table` is a DataFrame |
 | `color_options` | `None` | web | `{name: {styler kwargs}}`: a *Colour by* menu that recolours in the browser; the first entry shows on open |
 | `color_active` | `0` | web | the option shown on open (index or name) |
-| `template` | `None` | web | `"map"` (no panel; the default of `render_edges`) or `"dashboard"` (the default of `render_dashboard`). The dashboard sets the panel (empty), the toolbar and the window rules. It sets no keyword of the map: its map has the defaults of `"map"` (since 0.27.0; before, it set `name`, `basemap="blank"`, `road_popup=False` and a `minzoom` table). A future template follows the style of the dashboard. The old `sidebar=` and the names `"classic"` and `"report"` are errors (there is no report page) |
+| `template` | `None` | web | `"map"` (no panel; the default of `render_edges`) or `"dashboard"` (the default of `render_dashboard`). The dashboard sets the panel (empty), the toolbar and the window rules; its map has the defaults of `"map"`. The old `sidebar=` and the names `"classic"` and `"report"` are errors |
 | `layout` | `None` | web | the dashboard's frame: `"overlay"` (default: the map fills the window, the panel floats, a toolbar) or `"dock"` (the panel is docked at the left and takes its own space, no toolbox). `template="dashboard"` only |
 | `views` | `None` | web | `{name: {setting: value}}`: a *View* menu next to *Colour by*; each view sets several things at once, the first shows on open |
 
@@ -137,7 +141,7 @@ rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positr
 | `road_tooltip` | `False` | web | on hover: `True` = every column, a list = those columns. Not on a touch-only device (a phone): a tap is a click |
 | `hover_delay_ms` | `300` | web | a road or an overlay item lights up and shows its tooltip once the mouse rests this long on it (a passing mouse lights nothing); `0`: at once |
 | `data_maxzoom` | `None` | web | the last zoom MapLibre cuts the GeoJSON sources into tiles at; above it, MapLibre enlarges those tiles and does not cut them again. Positions are as exact as the tile grid of that zoom. `None`: MapLibre's own |
-| `data_tolerance` | `None` | web | how far MapLibre simplifies the road geometry in the tiles it cuts. `None`: `0.05`, which keeps every vertex. A road is cut into tiles in the browser, and zoomed out one tile holds a whole district: `1` makes a sweep at zoom 12 about three times faster (687 to 226 ms on a 22,000-road page), and the page looks the same at zoom 14 and above (no pixel differs in a 760 x 560 view) and the same at zoom 12 to within a fraction of a pixel along road edges |
+| `data_tolerance` | `None` | web | how far MapLibre simplifies the road geometry when it cuts tiles in the browser. `None`: `0.05`, which keeps every vertex. A higher value (`1`) makes a sweep at zoom 12 about three times faster, and the picture is the same from zoom 14 |
 | `tooltip` | `None` | web | hover columns. Web: alias of `road_tooltip`, `None` = no tooltip. Folium: `None` = all columns |
 
 ### Street View
@@ -162,12 +166,12 @@ rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positr
 
 | keyword | default | backends | what |
 |---|---|---|---|
-| `tiles` | `True` | web | the roads, the casing pieces and the end caps are embedded PMTiles (MLT, or MVT with `tile_format="mvt"`; the whole archive is one gzip stream). `tiles=False`: the roads are GeoJSON, which MapLibre cuts into tiles in the browser, keeping every vertex: on 22,000 roads (Nacka, 173,000 pieces) that draws 2.4 to 2.6 times the triangles at zoom 11 to 13 (556,000 against 234,000 at zoom 11) and stalls twice as long while panning. A page with a palette in a view needs `tiles=False` (an error says so) |
+| `tiles` | `True` | web | `True`: the roads, the casing pieces and the end caps are embedded PMTiles (MLT, or MVT with `tile_format="mvt"`). `False`: the roads are GeoJSON, which MapLibre cuts into tiles in the browser with every vertex. That draws 2.4 to 2.6 times the triangles at zoom 11 to 13 and pans slower. A page with a palette in a view needs `tiles=False` (an error says so) |
 | `tile_format` | `"mlt"` | web | the format of the embedded tiles (and of the tiles of `export_style`): `"mlt"` (MapLibre Tile, the default for every path: about 60 % of the bytes of MVT after gzip, the same picture) or `"mvt"` (Mapbox Vector Tile, for an app with MapLibre GL JS older than 5.12). With `tiles=False` it has no effect ([Make tiles and PMTiles](../rust/tiles.md#the-tile-format-mlt-or-mvt)) |
-| `live_data` | `False` | web, Rust engine | the metadata `roadstyle:live` (the feature states `rs_c` and `rs_w`, the default ramp, the no-data colour; [contract](contract.md)) and the page's option `live`, which `rs.setData` reads. Every style's road layer reads its colour and its width factor from the feature state on the road's row (since 2026-10-24, audit N8). With the Python engine: a `ValueError` |
-| `keep_let` | `False` | web, Rust engine | `export_style` and `export_inline` only: `True` keeps the `let` of the width table in the style (a smaller style). `False` writes the long form, with each `let` replaced by its value, because an app such as RustGIS cannot read `let` and draws the widths wrong. A page and its tiles keep the `let` in both cases |
+| `live_data` | `False` | web | writes the metadata `roadstyle:live` (the feature states `rs_c` and `rs_w`, the default ramp, the no-data colour; [contract](contract.md)) and the page option `live`, which `rs.setData` reads |
+| `keep_let` | `False` | web | `export_style` and `export_inline` only: `True` keeps the `let` of the width table in the style (a smaller style). `False` writes each `let` as its value, because an app such as RustGIS cannot read `let`. A page and its tiles always keep the `let` |
 | `compress` | `True` | web | gzip the inlined data; `False` = plain JSON |
-| `tunnel_control` | `False` | web | on a map page with tunnels, a *Tunnels* box (a tool for choosing the look; a page with a bar hides it): the colour list (`tunnel_toward`), the tunnel slider (`tunnel_strength`: 0, 25, 50, 55, 60, 65, 70, 75, 100), the casing palette and the dash ratio ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tunnel_look.md)) |
+| `tunnel_control` | `False` | web | on a map page with tunnels, a *Tunnels* box (a tool for choosing the look; a page with a bar hides it): the colour list (`tunnels.toward`), the strength slider (`tunnels.strength`: 0, 25, 50, 55, 60, 65, 70, 75, 100), the casing palette and the dash ratio ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tunnel_look.md)) |
 
 Returns a `WebMap` (`.save()`).
 
@@ -249,7 +253,7 @@ The options are in groups: the frame (`layout`, `scale_box`), `panel`, `toolbar`
 |---|---|---|
 | `side` | `"left"` | `"left"` or `"right"` |
 | `width_px` | `400` | the width of the panel. Fit the content to the panel and do not widen the panel for it |
-| `look` | `"card"` (`layout="overlay"`), `"frame"` (`layout="dock"`) | `"card"`: a floating card, see-through, over the map. `"frame"`: full height, with a translucent frame and solid cards. Since 0.29.0 the overlay layout has the card look by default |
+| `look` | `"card"` (`layout="overlay"`), `"frame"` (`layout="dock"`) | `"card"`: a floating card, see-through, over the map. `"frame"`: full height, with a translucent frame and solid cards. |
 | `sections` | `[]` | the sections that the page adds to the empty panel, in order. A section is a mapping with the keys of the next table |
 
 `panel.help` (none by default): `{"title", "intro", "terms", "note"}`, the "?" in the panel's title and the words of its help window ([A help window](../guides/dashboard-parts.md#a-help-window)).
@@ -378,7 +382,7 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | field | default | what |
 |---|---|---|
 | `data` | required | GeoDataFrame, GeoSeries or GeoJSON (any CRS) |
-| `kind` | auto | `"fill"`, `"line"`, `"circle"`; auto from the geometry |
+| `kind` | auto | `"fill"`, `"line"`, `"circle"` or `"text"`; auto from the geometry (never `"text"`) |
 | `placement` | `"over"` | `"under"` or `"over"` the roads |
 | `color` | `"#6aa9ff"` | paint colour |
 | `opacity` | fill `0.15`, circle `0.85`, line `0.9` | |
@@ -397,6 +401,8 @@ the `overlays` setting. See [Add your own layers](../guides/overlays.md).
 | `width_m` | `None` | a line's width in metres, exact from `min_zoom` on (replaces `width`) |
 | `dash` | `None` | a line's dash pattern in line widths, `[3, 3]` |
 | `min_zoom` / `max_zoom` | `None` | the zooms in which the overlay is drawn |
+| `style` | `None` | the name of a style in the setting `config.overlays.styles` (roadstyle has none). An argument given on the overlay wins over the style |
+| `width_m_col` / `offset_m_col` / `dash_col` | `None` | with `edge_col` and line features: the property with each item's width in metres (else `width_m`), its line offset in metres (+ = right of the direction; null = 0) and its dash pattern in line widths (`[3, 3]` or `"3,3"`; null = `dash`) |
 | `text_col` / `text_size` / `text_color` / `text_halo` | `None` | `kind="text"`: the property with the text, its size (px), colour and halo colour |
 
 ## Basemap
@@ -413,12 +419,12 @@ Built-ins: [Settings & palettes](settings.md#base-maps-api-keys).
 | `is_dark` | `False` | a dark canvas |
 | `satellite` | `False` | apply the satellite colour filter |
 | `bg`, `preview`, `subdomains` | `"#444"`, three greys, `"abc"` | switcher thumbnail, tile subdomains |
+| `style_url`, `group`, `title`, `dark`, `swatch`, `building_3d` | `None`, `""`, `""`, `None`, `""`, `""` | the fields of the base-map box (`data/basemaps.json`): a vector style URL, the group and title of its row, the key of its dark twin, its swatch, the colour of the 3D buildings of a dark vector style |
 | `maxzoom` | `19` | the provider's last zoom level with real tiles; zoomed in further, the map scales that level up instead of showing missing tiles. Built-ins: Esri grey maps 16, the rest 19; xyzservices providers bring their own `max_zoom` |
 
 ## StyleConfig
 
-The values the stylers read. Since 2026-10-19 every style field comes from the [theme](settings.md#profiles-and-palettes) (the field
-names below are the older `config` keys; each maps to a theme key). Change them in a theme, not in code.
+The values the stylers read. Every field comes from the [profile and palette](settings.md#profiles-and-palettes). The field names below are the `config` keys; the last column of a row names the profile or palette key where it is stored. Change a value in a profile or palette, not in code.
 
 | field | default | what |
 |---|---|---|
@@ -426,17 +432,17 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `casing_extra` | `2.0` | reserved (palettes set casing widths) |
 | `link_scale` | `0.6` | `*_link` width relative to the parent (theme `roads.links.width`) |
 | `tunnel_opacity_scale` | `0.45` | tunnel fade |
-| `tunnel_casing_dash` | `[1, 1]` | the tunnel casing's dash and gap, in line widths; a tunnel's casing is its dash layer alone |
-| `tunnel_strength` | `60` | the tunnel look, v2's slider (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward the `tunnel_toward` colour. Opaque, no see-through. The Tunnels box has the steps 0, 25, 50, 55, 60, 65, 70, 75, 100 |
-| `tunnel_toward` / `tunnel_towards` | `Sand` / eight | the colour a tunnel moves toward: a name in `tunnel_towards` (`name: "#rrggbb"`: Slate `#64748b`, Dark `#14181d`, Light `#efede8`, Graphite `#374151`, Navy `#1e293b`, Stone `#78716c`, Sand `#d6cfc4`, Teal `#134e4a`) or any `#rrggbb`; the same for every base map. An unknown name or a bad colour is an error naming the choices |
-| `tunnel_palette` / `tunnel_palettes` | `Graphite + silver` / seven | the tunnel casing: a pattern of two colours as they are (the default `Graphite + silver`), or `One colour` (slate dashes, empty gaps); `name: [dash, gap]` (`Slate + ice`, `Blue + cyan`, `Warm + sand`, `Graphite + silver`, `Indigo + lavender`, `Teal + mint`); an unknown name is an error |
+| `tunnel_casing_dash` | `[1, 1]` | profile `tunnels.casing_dash`: the tunnel casing's dash and gap, in line widths; a tunnel's casing is its dash layer alone |
+| `tunnel_strength` | `60` | profile `tunnels.strength` (0-100): everything on a tunnel (fill, names, arrows, attached items) moves toward the `tunnels.toward` colour. The Tunnels box has the steps 0, 25, 50, 55, 60, 65, 70, 75, 100 (`tunnels.steps`) |
+| `tunnel_toward` / `tunnel_towards` | `Sand` / eight | palette `tunnels.toward` and `tunnels.towards`: the colour a tunnel moves toward. A name in `towards` (`name: "#rrggbb"`: Slate `#64748b`, Dark `#14181d`, Light `#efede8`, Graphite `#374151`, Navy `#1e293b`, Stone `#78716c`, Sand `#d6cfc4`, Teal `#134e4a`) or any `#rrggbb`. An unknown name or a bad colour is an error that names the choices |
+| `tunnel_palette` / `tunnel_palettes` | `Graphite + silver` / seven | palette `tunnels.palette` and `tunnels.palettes`: the tunnel casing. `One colour` is slate dashes with empty gaps. The other names are `[dash, gap]` pairs: `Slate + ice`, `Blue + cyan`, `Warm + sand`, `Graphite + silver`, `Indigo + lavender`, `Teal + mint`. An unknown name is an error |
 | `tunnel_fill_dash` / `tunnel_fill_dash_color` | `[]` (none; e.g. `[1.2, 1.2]`) / `rgba(255,255,255,0.55)` | light dashes along a tunnel's fill, over any road colour (`[]` = none); a dashed class (steps, a dashed path) keeps only its own dashes |
 | `single_line_classes` | footway, path, steps, pedestrian, cycleway, track, bridleway, corridor, platform | a two-way pair (two reverse edges) of these classes is drawn as ONE line at full width, once, not as two lanes (a footway as two thin dashed lines looked wrong); both edges keep their data, a click shows both directions. `[]` = every pair is lanes |
 | `twin_end_caps` | `true` | a two-way road ends like one road: one road-wide round cap under its two lanes at each end, where both lanes have the same colour (`false` = each lane's own round end) |
-| `twin_casing` | `"one"` | a two-way road given as two directed edges: `"one"` = ONE casing around both directions, at the road's full width (a direction's casing + twice its offset), drawn once from the first edge's casing pieces (numbers, heads, caps; the twins must agree reversed, else a warning names the pair), each direction keeping its own fill; the end caps are the casing's own (no `twin_end_caps` blob); a pair's dead end (no other edge has an end point there) is square for the casing and both fills unless a cap column gives it a cap. The bridge shadow and the tunnel dashes follow it. `"each"` = each direction its own casing, half the width, shifted (the look before 2026-10-08) |
+| `twin_casing` | `"one"` | a two-way road given as two directed edges: `"one"` = ONE casing around both directions, at the road's full width (a direction's casing + twice its offset), drawn once from the first edge's casing pieces (numbers, heads, caps; the twins must agree reversed, else a warning names the pair), each direction keeping its own fill; the end caps are the casing's own (no `twin_end_caps` blob); a pair's dead end (no other edge has an end point there) is square for the casing and both fills unless a cap column gives it a cap. The bridge shadow and the tunnel dashes follow it. `"each"` = each direction its own casing, half the width, shifted |
 | `bridge_casing_m` / `bridge_casing_px` | `0.25` / `1.0` | with metre widths (`width_m_col`): a bridge's deck casing is at least this wide each side in metres, whatever `casing_m` is, and never thinner than this many pixels each side at any zoom (metres are sub-pixel zoomed out), so the bridge look shows on lines with no casing |
-| `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#64748b"` (slate) | bridge casing, px wider / colour |
-| `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` (and `bridge_shadow_trim_m` `3`: no shadow over the last 3 m where a bridge comes down) | a soft shadow under a bridge: a line per stretch at the lowest casing number of its edges, straight on through a junction where the numbers agree; none where the bridge comes down (position mode): px of blur, px shifted right and down (lit from the top left) |
+| `bridge_casing_extra` / `bridge_casing_color` | `1.5` / `"#64748b"` (slate) | profile `bridges.casing_extra` (px wider) / palette `bridges.casing_color` |
+| `bridge_shadow` / `bridge_shadow_color` / `bridge_shadow_blur` / `bridge_shadow_offset` / `bridge_shadow_trim_m` | `true` / `rgba(0,0,0,0.25)` / `4` / `[2, 2]` / `3` | profile `bridges.shadow.show`, `blur`, `offset`, `trim_m`; palette `bridges.shadow.color`. A soft shadow under a bridge, at the lowest casing number of its edges. Blur in px; offset in px right and down (light from the top left); no shadow over the last `trim_m` metres where a bridge comes down |
 | `minor_no_casing` | cycleway, footway, living_street, path, pedestrian, service, track | classes drawn without casing |
 | `casing.drop_below_px` | `1.0` (`0` = always a casing) | no casing piece (a bridge's keeps it) at a zoom where the whole casing line is narrower than this many px: the fill alone, and the casing from the first zoom where it is as wide. The tiles leave out those pieces. Nothing is dropped from a road in metres when `casing_min_px` ≥ this value |
 | `minzoom` | motorway 4 … residential 13 … footway 15 | class → hidden below this zoom (unless `minzoom=False`); the tiles leave out a hidden class |
@@ -447,7 +453,7 @@ names below are the older `config` keys; each maps to a theme key). Change them 
 | `bridge_decks` | `base_m 5`, `thickness_m 1`, `ramp_m 40`, `step_m 2.5`, `match_zoom 18`, `opacity 0.7`, `width_scale 0.6`, `flat_below 16`, `casing_px 2` | 3D bridge decks |
 | `overlays` | `color #6aa9ff`, `radius 6`, `width 2`, per-kind opacities, `circle_stroke #ffffff` | `Overlay` defaults |
 | `annotations` | `slot_m 100` | label / arrow spacing along a road, metres |
-| `tiles` | `minzoom 6`, `maxzoom 16`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up: at maxzoom 15 a casing piece stood 4–5 px off its fill at zoom 22. On Nacka, 16 against 18 changes 0.1 to 0.3 % of the pixels at zoom 17 to 20.5 and saves 3.8 MB of the page. The Rust engine gives each zoom the buffer of its widest stroke (half the line width, the gap and the offset, 3 times a live width; `roadstyle_tiles::buffer`); `buffer_px` is the buffer of a zoom where a width cannot be bounded |
+| `tiles` | `minzoom 6`, `maxzoom 16`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up. The engine gives each zoom the buffer of its widest stroke; `buffer_px` is the buffer of a zoom where a width cannot be bounded |
 | `api_key` / `api_keys` | `None` / `{}` | default key / per-provider keys |
 
 **See also:** [JavaScript API](javascript.md) · [Settings & palettes](settings.md) · [Command line](cli.md)

@@ -11,7 +11,7 @@ with the controls hidden. How to use them together: [Dashboards](../guides/dashb
 (`edge_id_col`, as text) in place of rows. The `window.rs*` functions below stay. Its state:
 
 ```js
-{v: 1, selection, highlight, colorBy, colors, filter: {classes, bridges, tunnels, access, ids}, overlays: {label: {visible}},
+{v: 1, selection, highlight, colorBy, colors, filter: {classes, bridges, tunnels, access, ids}, fade, overlays: {label: {visible}},
  roadFill, tunnel, palette, view, basemap, view3d, camera: {center, zoom, pitch, bearing}, streetView: {mode}, google3d, panel}
 ```
 
@@ -21,7 +21,7 @@ with the controls hidden. How to use them together: [Dashboards](../guides/dashb
 | `rs.setState(part)` | applies a part of the state through the controls' functions (a saved view, a URL) |
 | `rs.can(part)` | false for a part that this page cannot apply (an unknown key, a colour option the style does not have) |
 | `rs.link()` | the part that differs from the start, as `#rs=` and base64url JSON; a page opened with it applies it |
-| `rs.on(event, fn)` | `event`: `state` (each change, as the part of the state that changed), or `select`, `deselect`, `filter`, `color`, `overlay`, `tunnel`, `view`, `view3d`, `basemap`, `highlight`, `roadfill`, `streetview`, `google3d` (the `rs:*` event's `detail`); returns the function that removes it |
+| `rs.on(event, fn)` | `event`: `state` (each change, as the part of the state that changed), or `select`, `deselect`, `filter`, `color`, `overlay`, `tunnel`, `view`, `view3d`, `basemap`, `highlight`, `roadfill`, `fade`, `streetview`, `google3d`, `data`, `tool` (the `rs:*` event's `detail`); returns the function that removes it |
 | `rs.select(id)`, `rs.highlight(ids, set?)`, `rs.focus(ids)` | as `rsSelect`, `rsHighlight`, `rsFocus`, with edge ids (`null`: deselect). `rs.highlight(ids, {set, color, opacity})` lights a named set in its own colour, as `rsHighlight` does. `rs.focus` fits the roads above the bottom dock where the dock covers the map |
 | `rs.fade(ids, {opacity})` | every road that is not in `ids` is drawn at `opacity` (default 0.18) of its own opacity, with its arrows and names; `rs.fade(null)` ends it. `fade` in `rs.getState()`, event `rs:fadechange`. The data dock's Focus uses it ([guide](../guides/data-dock.md)) |
 | `rs.holdPopup(key, on)` | a part that shows the facts itself holds the popups while it is in view: a selection (a click on the map, `rs.select`) then has no popup, for a road, a road's item or an overlay item, and the tooltip stays. Each `key` holds once; the popups come back when no key holds it. A page with `road_popup=False` keeps no road popup. The data dock's card uses it ([guide](../guides/data-dock.md)) |
@@ -32,7 +32,7 @@ with the controls hidden. How to use them together: [Dashboards](../guides/dashb
 | `rsSetOverlays(on)`, `rsGetOverlays()` | all the style's base-map layers together (`window.rsSetOverlays`): on is each layer as the style starts it, off hides all; the one switch of the base-map box (its label is `overlays_label`, default "Map layers"). Event `rs:overlayschange`. A page with a bar has no Layers box: the legend box lists the layers with their colours |
 | `rs.setOverlay(label, visible)`, `rs.setTunnelStyle(look)`, `rs.setView(name)`, `rs.setBasemap(key)` | as the controls |
 | `rs.basemaps()` | the page's base maps as `[{key, label}]`, for `rs.setBasemap` (Ask's `get_map` uses it) |
-| `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()` (each tool with its `kind`, `open` and `disabled` state; a tool that the page cannot use is greyed out, and its title says why), and `ready()` (with `toolbar.hold`). `rs.on("tool", fn)` tells of each open, close and press. The built-in tools are `theme`, `navigate`, `street_view`, `google_3d`, `basemap`, `roads`, `buildings`, `legend`, `settings` and `attribution`. The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
+| `rs.tools` | the toolbox: `add({id, title, icon, onClick})`, `bind`, `remove`, `open(id)`, `close(id)`, `list()` (each tool with its `kind`, `open` and `disabled` state; a tool that the page cannot use is greyed out, and its title says why), and `ready()` (with `toolbar.hold`). `rs.on("tool", fn)` tells of each open, close and press. The built-in tools are `theme`, `navigate` (with `navigation: "buttons"`: `zoom_in`, `zoom_out`, `compass`), `street_view`, `google_3d`, `basemap`, `roads`, `buildings`, `legend`, `settings`, `attribution` and `panel_show`. The element of each tool has `data-rs-tool="<id>"`: this attribute stays, and the `title` goes to the tooltip at the first hover |
 | `rs.ready` | `ready(fn)`: runs `fn` now if the page is ready, else on `rs:ready` |
 | `rs.svg` | `svg(parent, tag, attrs, text?)`: one SVG element of a chart; a value that starts with `var(` goes to the style ([guide](../guides/dashboard-parts.md)) |
 | `rs.kpi` | the HTML of one number tile: `kpi(title, value, sub, color?)`, for a `<div class="rs-kpis">` ([guide](../guides/dashboard-parts.md)) |
@@ -90,6 +90,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsColor([[idsA, "#f80"], [idsB, "#08f"]])` | several sets at once, earlier pairs win overlaps (roads only) | `rs:colorchange` |
 | `rsColor(null)` / `rsColor(null, null, layer)` | reset | `rs:colorchange` |
 | `rsColorBase([[idsA, "#f80"], ...])` / `rsColorBase(null)` | recolour groups UNDER those of `rsColor`, for a host that paints its own roads: `rsColor` and `rsColor(null)` leave them | `rs:colorchange` (`base: true`) |
+| `rsFade(ids, {opacity}?)` | as `rs.fade`, with roadstyle's feature ids; `rsFade(null)` ends it | `rs:fadechange` |
 | `rsFind(text)` | the ids of the roads that match the text (a part of a popup field value or of an id; the docked panel's search); always defined, `find_control=True` adds the box | |
 | `rsSetAccess(kind, on)` / `rsGetAccess()` / `RS_ACCESS` | with `access_col`: show / hide the roads of one access kind; `{kind: shown}`; `{kind: count}` | `rs:filterchange` (`access`) |
 | `rsSetModes(list)` / `rsGetModes()` / `RS_MODES` | a duckOSM map: show only the roads that one of these modes (`driving`, `walking`, `cycling`) can use, from the road table's flags; `null` shows all. It combines with the other road filters. `RS_MODES`: `{mode: count}` from `roadstyle:controls.modes` | `rs:filterchange` (`modes`) |
@@ -118,6 +119,10 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsSetView(nameOrIndex)` | apply a `views` entry: each setting it names, through the functions of this table | `rs:viewselect` (and each function's own event) |
 | `rsSetRoadFill(on)` | show / hide the roads' own fill (`road_fill`); the casing stays. Every road piece is in the road layer `roads-simple` (source `simple`) and its dash layer `roads-simple-dash`; this function, `rsColor` and `rsSetColorField` set it too | `rs:roadfillchange` |
 | `rsSetOverlay(labelOrIndex, on)` | show / hide one overlay | `rs:overlaychange` |
+| `rsSetTheme("light" \| "dark")` | switch the page theme (a base map with a dark twin follows it) | `rs:themechange` |
+| `rsOpenSettings()` | open the settings box | |
+| `rsAddTopRow({id, label, get, set, available?})` | add a check box for a layer of the page under "On top" in the base-map box; `get()` tells whether it shows, `set(on)` shows or hides it, `available()` false greys the row | `rs:toprowschange` |
+| `rsLabelsOn()` | whether the map labels are on (one state for the map and the Google 3D window) | `rs:labelschange` |
 | `rsSetView3D(on)` | tilt to `camera.pitch_3d`, or back to flat and north-up | `rs:viewchange` |
 | `rsPanelShow(on)` | panel mode and `side_panel_html`: hide / show the side panel (a host panel's state is kept per page) | |
 | **Street View** | | |
@@ -262,7 +267,7 @@ open("host.html", "w").write(m.html.replace("</body>", panel + "</body>"))
 
 ## The dashboard on another map
 
-The controls and the road interaction of a saved page are ES modules in `roadstyle/static/dashboard/`. A page that makes its own
+The controls and the road interaction of a saved page are ES modules in `rust/roadstyle-assets/files/static/dashboard/` (the wheel has them in `roadstyle/static/dashboard/`). A page that makes its own
 MapLibre map, for example from a style of roadstyle's Rust engine, can add them:
 
 ```js
