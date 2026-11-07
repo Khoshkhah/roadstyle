@@ -1,4 +1,4 @@
-// The help window of a page (docs/guides/dashboard-panel.md): `rs.help.set({title, intro, terms: [[term, text], ...], note})` puts an "i" button in the
+// The help window of a page (docs/guides/dashboard-parts.md): `rs.help.set({title, intro, terms: [[term, text], ...], note})` puts an "i" button in the
 // panel's title and keeps the window that it opens. The page gives the words, roadstyle gives the look (the card token, the blur and the border of the
 // other floating windows), so every page's help window is the same window in both themes. The words are HTML of the page's own (`<b>` and so on).
 // `anchor` (an element) is where the button goes, in place of the panel's title `#sb .sb-top h2`; `get()` gives the words that are set now (a page that

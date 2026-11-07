@@ -114,4 +114,4 @@ click.
 !!! note
     Overlays work on the web backend only (the default).
 
-**See also:** [Every parameter](../reference/parameters.md) · [Colour by your data](colour.md) · [Dashboards & JavaScript](dashboards.md)
+**See also:** [Every parameter](../reference/parameters.md) · [Colour by your data](colour.md) · [Dashboards](dashboards.md)

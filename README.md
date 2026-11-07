@@ -62,7 +62,7 @@
 
 ## What is new in 0.26.3
 
-- **A dashboard manual.** Three pages with maps that run: an [overview](https://khoshkhah.github.io/roadstyle/guides/dashboard-manual/), the Python SDK and the JavaScript API. Each example has a Run button.
+- **A dashboard manual.** Two pages with maps that run: [Dashboards](https://khoshkhah.github.io/roadstyle/guides/dashboards/) for Python and [JavaScript](https://khoshkhah.github.io/roadstyle/guides/dashboard-manual/javascript/). Each JavaScript example has a Run button.
 - **The two directions of a two-way road are two halves of the road at every zoom.** A colour on one direction does not hide the other.
 - **Fewer arrows on a tiled page, and correct arrows on a page with a vector base map.** Monaco, zoom 16.5: 9 arrows, not 85.
 - **Street View:** the coverage shows on any road, and the header of the window keeps the name of the road. `duckosm.page` draws the base map's textures and icons, and `dashboard=False` gives the dashboard without a panel.

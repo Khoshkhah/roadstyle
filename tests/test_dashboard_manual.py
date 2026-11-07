@@ -1,8 +1,10 @@
-"""The dashboard manual (docs/guides/dashboard-manual/): python.md names every option of `dashboard=` and every python block runs, javascript.md names every
-member of `window.rs` and every `rs:` event, and every block marked `javascript` runs without an error in a fresh dashboard page (the same page as
-docs/build_maps.py makes for the testbed). Skipped without playwright."""
+"""The dashboard docs: the reference names every option of `dashboard=` (reference/parameters.md) and every member of `window.rs` and every `rs:` event
+(reference/javascript.md); every python block of guides/dashboards.md runs, and every block marked `javascript` of guides/dashboard-manual/javascript.md
+runs without an error in a fresh dashboard page (the same page as docs/build_maps.py makes for the testbed). The guides are short (2026-11-06): the full
+lists are the reference's. Skipped without playwright."""
 import json
 import re
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -12,9 +14,10 @@ pw = pytest.importorskip("playwright.sync_api")
 import roadstyle as rs  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-DIR = ROOT / "docs" / "guides" / "dashboard-manual"
-PYTHON = (DIR / "python.md").read_text(encoding="utf-8")
-JAVASCRIPT = (DIR / "javascript.md").read_text(encoding="utf-8")
+PYTHON = (ROOT / "docs" / "guides" / "dashboards.md").read_text(encoding="utf-8")                  # the python blocks
+JAVASCRIPT = (ROOT / "docs" / "guides" / "dashboard-manual" / "javascript.md").read_text(encoding="utf-8")     # the javascript blocks
+OPTIONS = (ROOT / "docs" / "reference" / "parameters.md").read_text(encoding="utf-8")              # every option of dashboard=
+JS_REF = (ROOT / "docs" / "reference" / "javascript.md").read_text(encoding="utf-8")               # every member of rs and every event
 _ARGS = ["--use-gl=swiftshader", "--enable-unsafe-swiftshader"]
 # `layers` is a list of the page's own layers, `sections` and `rows` hold the page's HTML: their keys are checked as words in the manual
 _BLOCKS = re.findall(r"```javascript\n(.*?)```", JAVASCRIPT, re.S)
@@ -57,9 +60,10 @@ def test_the_manual_names_every_option_of_the_dashboard(tmp_path):
     keys |= {"style", "kind", "source", "scope", "match", "max", "on", "arrows", "label", "id",                       # a layer of google_3d
              "dash", "fill", "width_m", "width_prop", "radius", "color", "width", "outline", "outline_width",          # its style
              "html", "part", "text", "fields", "after", "before", "fold", "shape",                                   # a section, a legend row
-             "chart", "agg", "scale", "data", "title", "height", "follow"}                                           # a chart card
-    missing = sorted(k for k in keys if k not in PYTHON)
-    assert not missing, f"python.md does not name these options: {missing}"
+             "chart", "agg", "scale", "data", "title", "height", "follow",                                           # a chart card
+             "tabs", "kpis", "help", "intro", "terms", "value", "sub"}                                               # tabs, number tiles, a help window
+    missing = sorted(k for k in keys if k not in OPTIONS)
+    assert not missing, f"reference/parameters.md does not name these options: {missing}"
 
 
 def test_the_manual_names_every_member_of_rs_and_every_event(tmp_path):
@@ -71,12 +75,12 @@ def test_the_manual_names_every_member_of_rs_and_every_event(tmp_path):
         members = page.evaluate("Object.fromEntries(Object.entries(window.rs).map(([k, v]) => [k, v && typeof v === 'object' ? Object.keys(v) : []]))")
         browser.close()
     # `error` is a value, `destroy` and the rest are named by their words
-    missing = [f"rs.{k}" for k in members if f"rs.{k}" not in JAVASCRIPT]
-    missing += [f"rs.{k}.{m}" for k, ms in members.items() for m in ms if not re.search(rf"\b{m}\b", JAVASCRIPT)]
+    missing = [f"rs.{k}" for k in members if f"rs.{k}" not in JS_REF]
+    missing += [f"rs.{k}.{m}" for k, ms in members.items() for m in ms if not re.search(rf"\b{m}\b", JS_REF)]
     src = ROOT / "rust" / "roadstyle-assets" / "files" / "static"
     events = {m for f in src.rglob("*.js") for m in re.findall(r"""["'`](rs:[a-z0-9]+)["'`]""", f.read_text(encoding="utf-8"))}
-    missing += sorted(e for e in events if e not in JAVASCRIPT)
-    assert not missing, f"javascript.md does not name: {missing}"
+    missing += sorted(e for e in events if e not in JS_REF)
+    assert not missing, f"reference/javascript.md does not name: {missing}"
 
 
 @pytest.mark.parametrize("n", range(len(_BLOCKS)))
@@ -99,6 +103,6 @@ def test_every_python_block_of_the_manual_runs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     env = {"edges": _edges()}                       # the blocks run one after another, as docs/build_maps.py runs them
     for block in re.findall(r"```python\n(.*?)```", PYTHON, re.S):
-        exec(block, env)
+        exec(textwrap.dedent(block), env)      # a block in a content tab is indented
     saved = sorted(p.name for p in tmp_path.glob("dashboard*.html"))
-    assert saved == ["dashboard.html", "dashboard_dock.html", "dashboard_left.html"]       # the maps that python.md shows under its blocks
+    assert saved == ["dashboard.html", "dashboard_dock.html", "dashboard_left.html"]       # the maps that dashboards.md shows under its blocks

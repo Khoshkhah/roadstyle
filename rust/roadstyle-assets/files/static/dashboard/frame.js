@@ -9,6 +9,7 @@
 //   events: "back" when the person clicks the back button; "tab" {tab} when the person clicks a tab
 import {initPanelScroll} from "./panelscroll.js";
 import {rsSelectBoxes} from "./selectbox.js";
+import {rsColorPickers} from "./colorpick.js";
 
 const _efEsc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -49,7 +50,7 @@ export function editorFrame({ panel, title, back = null, tabs = [], head: own = 
   // ---- open and close: the host's title, body and "Collapse all" are kept and hidden (the "Collapse all" is for the host's cards) ----
   let hostWas = null;
   const isOpen = () => root.isConnected;
-  const selects = () => { rsSelectBoxes(top); rsSelectBoxes(root); };
+  const selects = () => { rsSelectBoxes(top); rsSelectBoxes(root); rsColorPickers(root); };      // and each colour input: the colour picker
   const watch = new MutationObserver(selects);                             // a select that the editor adds later gets the select box too
   function open(name) {
     if (!isOpen()) {

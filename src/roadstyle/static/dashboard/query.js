@@ -1,4 +1,4 @@
-// The part "query" (docs/guides/dashboard-panel.md): a WHERE clause over the roads' columns, with Run, Filter, Colour and Reset, and the
+// The part "query" (docs/guides/dashboards.md): a WHERE clause over the roads' columns, with Run, Filter, Colour and Reset, and the
 // list of the matching roads (a click on a name selects the road and flies to it). A page adds it with `{id, part: "query", text}`.
 import {_esc} from "../popup.js";
 // let SQL habits work: AND/OR/NOT, True/False, and a single = become their JS equivalents

@@ -13,6 +13,7 @@ import {initNavBox} from "./navbox.js";
 import {initRoadsBox, useRoadsBox} from "./roadsbox.js";
 import {naturalBreaks} from "./breaks.js";
 import {initSelectBox} from "./selectbox.js";
+import {initColorPick} from "./colorpick.js";
 import {initToolbar} from "./toolbar.js";
 import {initSettings} from "./settings.js";
 import {initPlacement} from "./placement.js";
@@ -120,6 +121,7 @@ export function rsDashboard(map, options){
   initNavBox();
   initRoadsBox();
   initSelectBox();
+  initColorPick();
   initPanelScroll();
   initInnerScroll();
   initPlacement();

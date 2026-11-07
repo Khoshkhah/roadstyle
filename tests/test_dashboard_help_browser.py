@@ -145,7 +145,7 @@ def test_cards_and_number_tiles(tmp_path):
         assert page.evaluate("getComputedStyle(document.getElementById('k')).gridTemplateColumns.split(' ').length") == 3
         muted, ink = (page.evaluate("s => getComputedStyle(document.querySelector(s)).color", s) for s in (".rs-sec-box h3 + p", ".rs-sec-box h3"))
         assert muted != ink
-        assert page.evaluate("getComputedStyle(document.querySelector('.rs-callout')).borderLeftWidth") == "4px"
+        assert page.evaluate("[getComputedStyle(document.querySelector('.rs-callout')).borderRadius, getComputedStyle(document.querySelector('.rs-callout'), '::before').content]") == ["10px", '"i"']   # round corners and the round mark (2026-11-06: no bar)
     _run(tmp_path, body)
 
 

@@ -1,4 +1,4 @@
-"""The chart card (`part: "chart"`, docs/guides/charts.md): each kind in the panel from Python, in both themes and at 390 px, with no mark outside its
+"""The chart card (`part: "chart"`, docs/guides/dashboard-parts.md, "A chart"): each kind in the panel from Python, in both themes and at 390 px, with no mark outside its
 card; the roads by class equal a count of the road table; `follow` draws again after a filter of the roads; a click on a bar lights its roads (the
 highlight set "chart") and a second click ends the light; with `data`, a click sends rs:chartpick. Skipped without playwright."""
 import pandas as pd

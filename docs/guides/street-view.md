@@ -45,7 +45,7 @@ rs.render_edges(edges, street_view_key=KEY)  # the window with Linked / Classic 
 ```
 
 A key needs more than the key itself: billing, the Maps JavaScript API and a list of your web
-addresses. See [Set up a Google key](google-key.md).
+addresses. See [Keys and tokens](google-key.md).
 
 With a Google Maps JavaScript API key the window's bar has the same **Linked / Classic** switch as
 the side-by-side page: Linked is a real panorama and the map marker walks with you, Classic is the
@@ -105,7 +105,7 @@ and it also offers people's indoor photos. With `street_view_key=` the panel is 
 view, and only Google's own street imagery is shown. The page's own step buttons still walk along
 the clicked road. A switch in the panel's bar flips between the two: **Linked** (this panorama) and
 **Classic** (the keyless embed); the viewer's choice is remembered in their browser. The key is written into the page, as every browser key is.
-To make the key and limit it to your own addresses, see [Set up a Google key](google-key.md). Google
+To make the key and limit it to your own addresses, see [Keys and tokens](google-key.md). Google
 bills Dynamic Street View per panorama beyond a monthly free allowance. The same key also opens the
 [Google 3D](google-3d.md) window.
 
@@ -121,9 +121,7 @@ way the road runs where the provider says which way the photo looks. If the prov
 | [Panoramax](https://panoramax.fr/) | none | open data (mostly CC-BY-SA), from `api.panoramax.xyz` |
 | [Mapillary](https://www.mapillary.com/) | a free **client token** | crowd-sourced (CC-BY-SA) |
 
-**Mapillary token.** Sign in at [mapillary.com/developer](https://www.mapillary.com/developer), register an application, and copy its
-*client token*. Open **Settings → Keys** on the page, paste it in *Mapillary token*, and click **Save**. The token stays in this browser; it
-is not in the page. Without a token the Mapillary tab says so and asks for nothing. A token that you give with `mapillary_token=` or with the variable `MAPILLARY_TOKEN` **is written into the page**, so everyone who opens the page can read it. Use a token that is limited to your site.
+**Mapillary token.** Mapillary needs a free client token: [Keys and tokens](google-key.md#the-mapillary-token).
 
 **What leaves your browser.** A click on a road sends the place of the road to the provider that you use (Google, Panoramax or Mapillary). The viewers of Panoramax and Mapillary load from the jsDelivr CDN, so these tabs need an internet connection. The rest of the map still works offline.
 
@@ -197,4 +195,4 @@ from Classic only if you have not moved inside the picture since.
 | heading | where the viewer looks | the road's direction there |
 | walking or turning in the picture | updates the spot | not seen |
 
-**See also:** [Every parameter](../reference/parameters.md) · [Command line](../reference/cli.md) · [Dashboards & JavaScript](dashboards.md)
+**See also:** [Every parameter](../reference/parameters.md) · [Command line](../reference/cli.md) · [Dashboards](dashboards.md)

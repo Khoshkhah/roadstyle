@@ -1,4 +1,4 @@
-// Tabs and the two-way switch of a page (docs/guides/dashboard-panel.md). The page writes the buttons, roadstyle gives the look and the behaviour:
+// Tabs and the two-way switch of a page (docs/guides/dashboard-parts.md). The page writes the buttons, roadstyle gives the look and the behaviour:
 //   <nav class="rs-tabs"><button class="rs-tab on" data-tab="a">A</button> ...</nav>  <div data-pane="a">...</div> <div data-pane="b" hidden>...</div>
 //   <div class="rs-seg"><button class="on" data-v="all">All</button><button data-v="one">One</button></div>
 // `rs.tabs.use(nav, onChange)` wires one of them: a click or an arrow key selects, the chosen button has `on` and `aria-selected`, and the panes beside

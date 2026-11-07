@@ -113,5 +113,5 @@ More on osmnx, from choosing the area to failed downloads: [Roads from OpenStree
 - [Style the roads](guides/style.md): palettes, base maps, labels, 3D bridges.
 - [Colour by your data](guides/colour.md): a column becomes colour and a legend.
 - [Google Street View](guides/street-view.md): the window, or a page with Street View beside the map.
-- [Dashboards & JavaScript](guides/dashboards.md): the standard dashboard with its toolbox, and the `rs*` API.
+- [Dashboards](guides/dashboards.md): a map with a toolbox and a panel, from one Python call.
 - [Every parameter](reference/parameters.md) and the [command line](reference/cli.md).
