@@ -264,7 +264,7 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
         groups = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-acts > .rs-dd-view, #rs-dock .rs-dd-acts > .rs-dd-grp')].map(g => g.innerText.replace(/\\s+/g, ' ').trim())")
         assert len(groups) == 2 and groups[1].startswith("On Colour"), groups
         line = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-q > button')].map(b => b.innerText.trim() || b.getAttribute('aria-label'))")
-        assert line[0] == "The tables of the data" and line[-2] == "Run" and line[-1].startswith("Download all the rows"), line      # icons: the tables and the download
+        assert line[0].startswith("Download all the rows") and line[-2] == "Run" and line[-1] == "The tables of the data", line      # icons: the download and the tables
         # a result of a text and a number: a bar chart in the open view
         page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
         page.wait_for_timeout(300)

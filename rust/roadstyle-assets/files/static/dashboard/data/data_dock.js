@@ -50,8 +50,8 @@ export function dataDock(o = {}){
   colourB.innerHTML = 'Colour <span class="rs-dd-count" hidden></span> ▾'; focusB.innerHTML = 'Focus <span class="rs-dd-count" hidden></span> ▾';
   colourB.title = "The colour layers of the map"; focusB.title = "The focus of the map: the other roads fade or hide";
   tablesB.title = "The tables of the data"; tablesB.setAttribute("aria-label", tablesB.title); csvB.title = "Download all the rows of this result as a CSV file"; csvB.setAttribute("aria-label", csvB.title);
-  // two icons at the ends of the SQL line (Kaveh, 2026-11-07): the tables of the data (a database; "Tables" was too near the view button "Table"),
-  // and the download of the rows ("csv should change to just download icon")
+  // two icons at the ends of the SQL line (Kaveh, 2026-11-07): the download of the rows before the line ("csv should change to just download icon"),
+  // and the tables of the data after Run (a database; "Tables" was too near the view button "Table")
   tablesB.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></svg>';
   csvB.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M5 19h14"/></svg>';
   // Table | Chart: two views of the same result (the design's "4. Charts")
@@ -86,7 +86,7 @@ export function dataDock(o = {}){
   acts.append(viewSw, grp("rs-dd-g-map", lightB, colourB, focusB));
   const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
-  q.append(tablesB, line, run, csvB);
+  q.append(csvB, line, run, tablesB);      // the download before the line, the tables after Run (Kaveh, 2026-11-07: "that download button and tables button must be swap place")
   const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
   // the side column beside the table or the chart (Kaveh, 2026-11-06: the list of the tables "in the same place" as the card of a road): one of the
   // two at a time, the last one opened; the table and the chart stay in view
@@ -134,8 +134,8 @@ export function dataDock(o = {}){
   // the help window: one row for each control of the title row, in its order (Kaveh, 2026-11-06: "needs to update")
   if(o.help !== false && rs.help) rs.help.button(acts, {title: "The data dock", intro: "One SQL line over the result. Click the line to edit it. Ctrl+Enter or Run runs it. Click a row to select its road: its card shows beside the table.",
     terms: [["Table | Chart", "The result as a table or as a chart. In the chart, the column at the left sets the kind, X and Y, and SVG saves the chart as a file."],
-            ["\u26c1 The tables", "The tables of the data, with what each one holds. Click a table to show its rows."],
-            ["\u2913 Download", "All the rows of the result as a CSV file (at most 1\u00a0000\u00a0000)."],
+            ["\u2913 Download (before the line)", "All the rows of the result as a CSV file (at most 1\u00a0000\u00a0000)."],
+            ["\u26c1 The tables (after Run)", "The tables of the data, with what each one holds. Click a table to show its rows."],
             ["On | Off", lightT],
             ["Colour ▾", "A layer that colours the roads of the result: one colour for each value of a text column with 2 to 8 values, else one colour. It stays until you remove it."],
             ["Focus ▾", "Keeps the roads of the result: the other roads fade or hide. One focus at a time; None turns it off."]]});

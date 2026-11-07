@@ -121,7 +121,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
 ??? info "Details"
 
     - A click on the line opens it as a text box. **Ctrl+Enter** or **Run** runs it, and **Escape** folds it.
-    - The tables button (a database icon), before the line, shows the tables of the data in the side column. The download button (⤓), after **Run**, saves all the rows of the result as a CSV file.
+    - The download button (⤓), before the line, saves all the rows of the result as a CSV file. The tables button (a database icon), after **Run**, shows the tables of the data in the side column.
     - An error shows under the line, in the database's words.
     - The guard refuses a statement that writes, loads, or reads a file or an address.
 

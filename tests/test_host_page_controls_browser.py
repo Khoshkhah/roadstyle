@@ -133,10 +133,12 @@ def test_the_title_row_of_the_dock_is_inside_a_phone(tmp_path):
           const past = [...hd.children].filter((e) => e.offsetParent && e.getBoundingClientRect().right > innerWidth + 0.5).map((e) => e.className);
           const inActs = [...acts.querySelectorAll('button')].filter((b) => b.offsetParent);
           acts.scrollLeft = acts.scrollWidth; const last = inActs.at(-1).getBoundingClientRect();
-          const qPast = [...document.querySelectorAll('#rs-dock .rs-dd-q > *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length;
-          return {past, page: document.documentElement.scrollWidth - innerWidth, lastIn: last.right <= innerWidth + 0.5 && last.left >= 0, n: inActs.length, qPast}; }""")
+          const qEls = [...document.querySelectorAll('#rs-dock .rs-dd-q > *')], qPast = qEls.filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length;
+          const x = (c) => document.querySelector('#rs-dock .rs-dd-q .' + c).getBoundingClientRect().left;
+          const qOrder = x('rs-dd-ib:not(.rs-dd-tablesb)') < x('rs-dd-line') && x('rs-dd-line') < x('rs-dd-run') && x('rs-dd-run') < x('rs-dd-tablesb');
+          return {past, page: document.documentElement.scrollWidth - innerWidth, lastIn: last.right <= innerWidth + 0.5 && last.left >= 0, n: inActs.length, qPast, qOrder}; }""")
         browser.close()
-    assert out["past"] == [] and out["page"] <= 0 and out["lastIn"] and out["n"] >= 5 and out["qPast"] == 0, out
+    assert out["past"] == [] and out["page"] <= 0 and out["lastIn"] and out["n"] >= 5 and out["qPast"] == 0 and out["qOrder"], out
 
 
 _PARTS = """() => {
