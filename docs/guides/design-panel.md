@@ -27,7 +27,37 @@ document.getElementById("open-design").onclick = () => design.open();
 design.addEventListener("change", (e) => saveSomewhere(e.detail.text));
 ```
 
-The panel has four tabs: **Theme**, **Roads**, **Text** and **Layers**. A host can add its own tabs (see [Host tabs](#host-tabs)).
+The panel has five tabs: **Theme**, **Roads**, **Bridges & tunnels**, **Text** and **Layers**. A host can add its own tabs (see [Host tabs](#host-tabs)).
+
+## The design editor on its own page
+
+The panel also has a page of its own, as the level editor has. The Rust program serves it for one road file:
+
+```bash
+roadstyle design edit roads.parquet
+```
+
+The program prints the address, for example `http://127.0.0.1:8781/design_editor/?roads=roads.parquet&design=roads.design.json`.
+The page is a host of the standard dashboard: the map of the roads, the bar, the panel with the design panel open, both themes and
+the phone sheet. The engine (roadstyle-wasm) reads the file and makes the tiles in a worker, so a new look on the same tiles shows
+without a new map (`LiveMap.setLook`). The page saves each change into the design file beside the roads. At the next start, the page
+draws that design. The files are in `rust/roadstyle-assets/files/static/design_editor/` (`index.html`, `app.js`, `worker.js`). The
+options of the command are in [The roadstyle program](../rust/cli.md#edit-the-design-of-a-map).
+
+The duckOSM Studio page uses the same panel as a part of its page (its card "Edit design"), with no copy of the code.
+
+## Bridges and tunnels
+
+The tab **Bridges & tunnels** has two sections.
+
+| Section | Values | Where they go |
+|---|---|---|
+| Bridges | The casing colour (the line at the two edges of the deck), the casing width (a factor of the theme's width), the shadow on or off, its colour, its opacity and its blur. | The look: `bridges.casing_color`, `bridges.wing_scale`, `bridges.shadow`. A change gives a new look (`setLook`, else `redraw`). |
+| Tunnels | The strength (0 % keeps the road colours, 100 % gives the full tunnel colours), the colour toward, the dash colours and the dash and gap. | The look (`tunnels.strength`, `toward`, `palette`, `casing_dash`) and the map's global state. The panel paints them at once with `rsSetTunnelStyle`, with no new map. |
+
+The tunnel controls are the controls of roadstyle's Tunnels box of the map bar: both show one state. A change in the Tunnels box
+comes back to the design (the event `rs:tunnelchange`). The lists of the colour toward, the dash colours and the dash ratios come
+from the look (`tunnels.towards`, `tunnels.palettes`, `tunnels.ratios`).
 
 ## The options
 
