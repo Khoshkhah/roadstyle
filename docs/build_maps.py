@@ -29,6 +29,17 @@ random.seed(7)
 g["aadt"] = [random.randint(200, 24000) for _ in range(len(g))]
 g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 
+# 0 - the roads of the live editors (docs/copy_parts.py puts them in site/live/area/): the design editor reads this GeoParquet
+g.to_parquet(OUT / "sodermalm.parquet")
+# ... and the level area of the live level editor (the files of `roadstyle levels make` and `solve`), with empty heads.csv and caps.csv
+from roadstyle import level_area  # noqa: E402
+
+AREA = OUT / "levels_area"
+level_area.make_area(g, AREA)
+level_area.solve_area(AREA)
+for name, head in (("heads.csv", "road,start_m,end_m\n"), ("caps.csv", "road,start,end\n")):
+    (AREA / name).write_text(head, encoding="utf-8")
+
 # 1 — a first map: the default web backend (OpenFreeMap Positron base, the settings default)
 rs.render_edges(g, backend="web", name="roadstyle — first map").save(OUT / "first_map.html")
 
@@ -127,6 +138,65 @@ html = rs.render_dashboard(
     name="roadstyle: live map of Södermalm",
 ).html
 (OUT / "live.html").write_text(html.replace("</body>", KEEP_IN + "</body>", 1), encoding="utf-8")
+
+# the data dock, live (data-dock.md): DuckDB in the page (duckdb-wasm) holds the roads of sodermalm.parquet as the table `edges`, and the
+# dock (site/live/dashboard/data/data_dock.js, docs/copy_parts.py) runs its SQL there
+DOCK = """<script type="module">
+import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.33.1-dev57.0/+esm";
+import {dataDock} from "../live/dashboard/data/data_dock.js";
+const conn = (async () => {
+  const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+  const url = URL.createObjectURL(new Blob([`importScripts("${bundle.mainWorker}");`], {type: "text/javascript"}));
+  const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(url));
+  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+  await db.registerFileURL("roads.parquet", new URL("sodermalm.parquet", location.href).href, duckdb.DuckDBDataProtocol.HTTP, false);
+  const c = await db.connect();
+  await c.query("CREATE TABLE edges AS SELECT * EXCLUDE (geometry) FROM 'roads.parquet'");
+  return c;
+})();
+// a result as the dock takes it: {columns: [{name, type}], rows: [[...]]} (a BIGINT is a BigInt)
+async function query(sql){
+  const t = await (await conn).query(sql), f = t.schema.fields;
+  return {columns: f.map((x) => ({name: x.name, type: String(x.type)})), rows: t.toArray().map((r) => f.map((x) => r[x.name]))};
+}
+window.data = dataDock({query, ready: conn,
+  schema: async () => ({tables: [{name: "main.edges", main: true, rows: Number((await query("SELECT count(*) AS n FROM edges")).rows[0][0]),
+    columns: (await query("DESCRIBE edges")).rows.map((r) => ({name: r[0], type: r[1]})),
+    about: "The roads of Södermalm: one row is one direction of a road (edge_id), with its OpenStreetMap tags, length_m, and two made-up columns, aadt and speed_kph."}]}),
+  sql: "SELECT edge_id, name, highway, length_m FROM edges WHERE highway = 'primary' ORDER BY length_m DESC"});
+window.data.open();
+window.data.run();                                   // the first query at once: the table and its roads on the map
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-sql]"); if(b) window.data.run(b.dataset.sql); });
+</script>"""
+EXAMPLES = [
+    ("Primary roads, the longest first", "SELECT edge_id, name, highway, length_m FROM edges WHERE highway = 'primary' ORDER BY length_m DESC"),
+    ("Bridges and tunnels", "SELECT edge_id, name, highway, bridge, tunnel FROM edges WHERE bridge IS NOT NULL OR tunnel = 'yes'"),
+    ("Busy roads (made-up aadt)", "SELECT edge_id, name, aadt, speed_kph FROM edges WHERE aadt > 20000 ORDER BY aadt DESC"),
+    ("Kilometres by road class", "SELECT highway, round(sum(length_m) / 1000, 2) AS km FROM edges GROUP BY highway ORDER BY km DESC"),
+]
+TRY = ("<p>Write one <code>SELECT</code> in the line under the map and press <b>Run</b> (or Ctrl+Enter). The roads of the result light on "
+       "the map. The table is <code>edges</code>. Or click a query:</p><div class=\"rs-opts\">"
+       + "".join(f'<button type="button" class="rs-opt" style="text-align:left;width:100%" data-sql="{q}"><span><b>{t}</b><small>{q}</small></span></button>' for t, q in EXAMPLES)
+       + "</div>")
+html = rs.render_dashboard(
+    g, basemap="ofm_positron", color_options={"Road class": {}}, name="The data dock",
+    dashboard={"panel": {"sections": [
+        {"id": "try", "label": "Try SQL", "html": TRY},
+        {"id": "road", "label": "Selected road", "part": "road_card", "fields": ["name", "highway", "length_m", "aadt", "speed_kph"]},
+    ]}},
+).html
+(OUT / "data_dock.html").write_text(html.replace("</body>", DOCK + "</body>", 1), encoding="utf-8")
+
+# Ask, live (ask.md): the same page with Ask open in the panel. The visitor pastes the key of a free AI service; it stays in the browser
+ASK = DOCK.replace('import {dataDock} from "../live/dashboard/data/data_dock.js";', """import {dataDock} from "../live/dashboard/data/data_dock.js";
+import {askPanel} from "../live/dashboard/ask/ask_panel.js";""").replace("</script>", """window.ask = askPanel({data: window.data, dialect: "DuckDB",
+  about: "The roads of Södermalm in Stockholm, the table edges: one row is one direction of a road. aadt and speed_kph are made-up numbers.",
+  examples: ["Which streets are longer than 300 m?", "How many kilometres of each road class are there?", "Which bridges have the most traffic (aadt)?"]});
+rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the roads", icon: "ask", background: true, open: () => window.ask.open()});
+window.ask.open();
+</script>""")
+html = rs.render_dashboard(g, basemap="ofm_positron", color_options={"Road class": {}}, name="Ask").html
+(OUT / "ask.html").write_text(html.replace("</body>", ASK + "</body>", 1), encoding="utf-8")
 
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")

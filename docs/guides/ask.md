@@ -1,8 +1,22 @@
+---
+hide:
+  - toc
+---
+
 # Ask
 
 Ask is an AI agent in the side panel. The person types a question in words, for example "Which primary roads are longer than 1 km?". The agent writes SQL, runs it through the [data dock](data-dock.md), reads the result and answers in one to three sentences. Each answer puts its SQL and its table into the data dock, so its roads light on the map. The agent can also colour roads, focus on roads and move the map.
 
 The agent uses the person's own key of a free AI service. The browser sends each request directly to that service. There is no model in the browser and no server of roadstyle or of your page. Ask is a JavaScript module that the host page imports. Each item below has the same form: a box with **Use it for** and **From Python**, the code in tabs, and **Details** that open on a click.
+
+![Ask open in the panel: the key box, three example questions and the question line, over the data dock with the roads of Södermalm](../img/ask.png)
+
+**Try it.** The page below is live: Ask and the [data dock](data-dock.md), with DuckDB in the page and the roads of Södermalm. Click
+**Add a key** and paste the key of a free service (Google Gemini or Groq): the key stays in your browser and goes only to that service.
+Then click an example question or type your own. The agent writes the SQL, the table goes to the dock, and the roads light on the map.
+<a href="../../maps/ask.html" target="_blank" rel="noopener">Open it on a page of its own</a>.
+
+<iframe src="../../maps/ask.html" loading="lazy" title="Ask, live, with the data dock and DuckDB in the page" class="rs-demo" style="height:780px"></iframe>
 
 | Group | Item | From Python | Use it for |
 |---|---|---|---|
