@@ -98,11 +98,28 @@ function inline(el, text){
   return el;
 }
 
+// the default examples: only what every page has (a data dock with tables, and a map with roads, layers and a base map); the agent looks up the names
+const GENERAL = [
+  {title: "Know the data", items: ["What tables does this data have, and what is in each one?", "How many rows does each table have?",
+    "Which columns does the main table have, and which have missing values?"]},
+  {title: "Find and count", items: ["Show the first 20 rows of the main table.", "What are the 10 largest values of the most important number column?",
+    "How many rows are there for each value of a column that has few values?"]},
+  {title: "Show on the map", items: ["Show the 100 roads with the largest value of a number column on the map.", "Show the roads of the most common value of a text column on the map."]},
+  {title: "Colour and focus", items: ["Colour the roads by a column that has few values.", "Keep only the roads of the most common value and fade the others."]},
+  {title: "The map and the layers", items: ["Which layers does the map have?", "Hide all the layers except the roads.", "Switch to the satellite base map.",
+    "Turn on the 3D view.", "Zoom to the roads of the last result."]},
+  {title: "Charts", items: ["Draw a bar chart of the number of rows for each value of a column that has few values.", "Draw a histogram of a number column."]},
+];
+
 export function askPanel(o = {}){
   const rs = o.dashboard || window.rs, data = o.data;
   if(!data || typeof data.run !== "function") throw new Error("askPanel: data (the data dock) is necessary.");
-  const panel = o.panel || document.getElementById("sb"), dialect = o.dialect || "SQL", examples = o.examples || [];
+  const panel = o.panel || document.getElementById("sb"), dialect = o.dialect || "SQL";
   const MAX = o.maxSteps || 6, SEND = o.sendRows || 30, PROVS = o.providers || PROVIDERS, ID = data.idColumn || "edge_id";
+  // the examples: the general groups (any data: no name of a table or a column of a project), then the host's own strings and groups;
+  // examples: {general: false, groups: [...]} gives only the host's own
+  const own = Array.isArray(o.examples) ? o.examples : o.examples && Array.isArray(o.examples.groups) ? o.examples.groups : [];
+  const examples = o.examples && o.examples.general === false ? own : [...GENERAL, ...own];
   const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
   const phone = () => document.documentElement.classList.contains("rs-phone");
   let loaded = false; data.ready().then(() => { loaded = true; }, () => {});
@@ -152,7 +169,11 @@ export function askPanel(o = {}){
 
   // the empty start: one line about Ask, the key note when there is no key, the examples as chips
   const ex = $("div", "rs-ask-ex"), needKey = $("div", "rs-ask-need");
-  const chips = (onPick) => examples.map((q) => { const c = $("button", "rs-ask-q", q); c.type = "button"; c.onclick = () => { onPick(); ask(q); }; return c; });
+  // examples: strings and groups {title, items}; a group is a small heading above its chips (the keys and the list's own children are the chips and the headings)
+  const chips = (onPick) => examples.flatMap((g) => {
+    const one = (q) => { const c = $("button", "rs-ask-q", q); c.type = "button"; c.onclick = () => { onPick(); ask(q); }; return c; };
+    return g && typeof g === "object" ? (g.items || []).length ? [...(g.title ? [$("p", "rs-ask-grp", g.title)] : []), ...g.items.map(one)] : [] : [one(String(g))];
+  });
   ex.append($("p", "rs-ask-hint", "Ask a question in words. The agent writes the SQL, the table goes to the data dock and the roads light on the map."), needKey, ...chips(() => {}));
   log.append(ex);
 
@@ -168,7 +189,7 @@ export function askPanel(o = {}){
   // keys: ↑ ↓ walk the examples (the focus scrolls the list to the one in view), Escape closes the list
   exBar.addEventListener("keydown", (e) => {
     if(exList.hidden) return;
-    const items = [...exList.children], at = items.indexOf(document.activeElement);
+    const items = [...exList.querySelectorAll("button.rs-ask-q")], at = items.indexOf(document.activeElement);
     if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); exOpen(false); exB.focus(); }
     else if(e.key === "ArrowUp" || e.key === "ArrowDown"){
       e.preventDefault();
@@ -188,7 +209,7 @@ export function askPanel(o = {}){
   sending(false);
   comp.append(box, send);
   frame.bar.append(exBar, comp);
-  const paintStart = () => { const none = !turns.length; ex.hidden = !none; exBar.hidden = none || !examples.length; };
+  const paintStart = () => { const none = !turns.length; ex.hidden = !none; exBar.hidden = none || !exList.querySelector("button"); };
 
   // ---- the provider's name and the key form (in the view: the person gets the key where it is needed) ----
   function paintWho(){
