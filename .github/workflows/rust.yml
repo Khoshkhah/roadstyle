@@ -134,8 +134,8 @@ jobs:
           (cd rust && cargo fetch --locked)
           (cd rust && cargo clippy --offline -p roadstyle-py -- -D warnings)
 
-      # the binding gives the Rust engine's texts byte for byte (P5's golden test). The whole suite, with the browser tests, runs once, in the
-      # job browser-smoke of the workflow Tests: two runs of it made each pull request wait 25 minutes (Kaveh, 2026-11-06)
+      # the binding gives the Rust engine's texts byte for byte (P5's golden test). The whole suite, with the browser tests, runs in the job
+      # browser-smoke of the workflow Tests, each night and by hand only (2026-11-07: a pull request waited about 20 minutes for it)
       - name: The binding's golden test (docs/design/rust_library.md, P5)
         run: pytest -q tests/test_binding.py
 

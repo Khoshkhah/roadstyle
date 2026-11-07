@@ -4,6 +4,8 @@ on:
   push:
     branches: [main, rust-engine, "design-*"]
   pull_request:
+  schedule:
+    - cron: "47 3 * * *"          # each night: the job browser-smoke
   workflow_dispatch:
 
 # a new push to a branch cancels its older runs (the runners are shared)
@@ -37,8 +39,10 @@ jobs:
       - name: Tests
         run: pytest -q
 
-  # Full suite with playwright installed — runs the browser tests the matrix above skips.
+  # Full suite with playwright installed — runs the browser tests the matrix above skips. Only at night or by hand: a pull request does not
+  # wait for it (about 20 minutes, 2026-11-07)
   browser-smoke:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45          # the full suite with the browser tests needs more than 20 minutes on a runner (20 cancelled every run, 2026-11-02)
     steps:
