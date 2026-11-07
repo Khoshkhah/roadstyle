@@ -61,6 +61,16 @@ fn building_base(min_height: Option<&str>, min_level: Option<&str>, cfg: &Value)
     }
 }
 
+/// The height and the base of each building (`rows`: the height tags of features.parquet: height, levels, roof_levels, kind, min_height,
+/// min_level), by the rule of the 3D buildings of `look` (building_height, building_base). A page that draws its own parts of a building
+/// (the walls of the dashboard's rsSetWalls) gets the same heights as the tiles.
+pub fn building_heights(look: &crate::Look, rows: &[[Option<String>; 6]]) -> Result<Vec<(Value, Value)>, crate::Error> {
+    let b3d = &look.sections.base_map.as_ref()
+        .ok_or_else(|| crate::Error::Look(crate::look::Error::Look("look.json: no base map (buildings_3d)".into())))?.buildings_3d;
+    Ok(rows.iter().map(|[h, lv, rlv, kind, mh, ml]| (building_height(h.as_deref(), lv.as_deref(), rlv.as_deref(), kind.as_deref(), b3d),
+                                                    building_base(mh.as_deref(), ml.as_deref(), b3d))).collect())
+}
+
 /// load_layers: one table for each layer (osm_id, kind, name, bearing, and a building's height and base), in the order of the first row
 /// of each layer; a polygon layer's features largest first. `t`: the rows of features.parquet.
 pub fn feature_tables(t: &FeatureTable, look: &crate::Look) -> Result<Vec<(String, FeatureTable)>, crate::Error> {

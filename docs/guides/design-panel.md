@@ -84,6 +84,20 @@ It is a JavaScript module that the host page imports. It draws into the host's s
     comes back to the design (the event `rs:tunnelchange`). The lists of the colour toward, the dash colours and the dash ratios come
     from the look (`tunnels.towards`, `tunnels.palettes`, `tunnels.ratios`).
 
+### The 3D walls { .rs-part }
+
+**Use it for:** a color for each wall type of the 3D buildings (front, back, side, party wall, courtyard wall) and for the roof, in the Layers tab.<br>
+**From Python:** no: the page gives the walls (`rsSetWalls`)
+{ .rs-facts }
+
+??? info "Details"
+
+    The section **3D walls** of the Layers tab is `design.walls` = `{on, front, back, side, party, court, roof, roof_dark}`. When the page gives the
+    walls of its buildings (`rsSetWalls`, [the JavaScript API](../reference/javascript.md)), each wall of a building shows in the color of its type,
+    and the roof shows in the roof color. A building with no walls keeps its 3D color. The default is off. The default colors are those of the walls in
+    duckOSM's fixes editor: front `#16a34a`, back `#dc2626`, side `#6b7280`, party wall `#7c3aed`, courtyard wall `#0891b2`; the roof is
+    `#a8a29e` (`#57534e` in the dark theme). The walls are not in the look: a change paints the map at once (`rsSetWallStyle`), and draws no new map.
+
 ### The options { .rs-part }
 
 **Use it for:** what `designPanel({...})` takes. `panel`, `look` and `redraw` are necessary.<br>
