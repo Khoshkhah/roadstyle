@@ -1,5 +1,5 @@
 //! The commands of the roadstyle program (main.rs runs `run`): stage 1 (`sources`), stage 2 (`tiles`), a level area (`levels make`,
-//! `levels solve`) and the level editor (`levels edit`, `serve`). The options have the names of the keywords of `render_edges` (`--color-by lanes` is
+//! `levels solve`), the level editor (`levels edit`, `serve`) and the design editor (`design edit`). The options have the names of the keywords of `render_edges` (`--color-by lanes` is
 //! `color_by="lanes"`, `--no-arrows` is `arrows=False`); a value that is JSON (a number, true, a list) is read as JSON.
 
 use crate::Error;
@@ -33,6 +33,11 @@ usage:
   roadstyle levels edit <area folder> [--port 8780] [--page DIR]
       the level editor at http://127.0.0.1:<port>/level_editor/: the page, your area's files, and the saves of your changes
       (edits.csv, heads.csv, caps.csv, levels.csv). `roadstyle serve <area folder>` is the same without the check of the area.
+  roadstyle design edit <roads> [--design FILE] [--port 8781] [--page DIR]
+      the design editor at http://127.0.0.1:<port>/design_editor/: a map of the roads with the design panel (the theme, the colours,
+      the widths, the names, the arrows and the layers). It saves your design in FILE, a file name in the folder of <roads>
+      (default: <roads name>.design.json). <roads>: a .parquet, .geojson or .shp file (the page reads it; a GeoPackage only the
+      native program reads).
   roadstyle snapshot <page.html> <out.png> [--center LON,LAT] [--zoom Z] [--pitch P] [--bearing B] [--width 1200] [--height 800]
                     [--scale 1] [--settle 2.5] [--timeout 40]
       a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot).
@@ -226,6 +231,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
         ("page", [roads, out]) => page_cmd(roads, out, &mut opts),
         ("tiles", [src, out]) => tiles_cmd(src, out, &mut opts),
         ("levels", [sub, rest @ ..]) => levels(sub, rest, opts),
+        ("design", [sub, roads]) if sub == "edit" => design_edit(roads, &mut opts),
         ("serve", [area]) => serve(area, &mut opts),
         ("snapshot", [page, out]) => snapshot(page, out, opts),
         ("help" | "-h", _) => {
@@ -313,6 +319,41 @@ fn serve(area: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Err
     no_more(opts)?;
     println!("level editor: http://127.0.0.1:{port}/level_editor/  ({area}; Ctrl+C to stop)");
     Ok(roadstyle_serve::serve(Path::new(area), page, port)?)
+}
+
+/// `design edit <roads>`: the design editor of a road file, until Ctrl+C. The server gives the page only the roads file (with the .dbf
+/// and .prj of a Shapefile) and the design file, and the page writes only the design file.
+fn design_edit(roads: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Error> {
+    let path = Path::new(roads);
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let ext = path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_default();
+    if !matches!(ext.as_str(), "parquet" | "geoparquet" | "geojson" | "json" | "shp") {
+        return Err(Error::Usage(format!("{roads}: the design editor reads a .parquet, .geojson or .shp file (write a GeoPackage as GeoParquet first)")));
+    }
+    if !path.is_file() {
+        return Err(Error::File(format!("{roads}: no such file")));
+    }
+    let stem = path.file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let design = take(opts, "design").unwrap_or_else(|| format!("{stem}.design.json"));
+    if design.contains(['/', '\\']) || !design.ends_with(".json") {
+        return Err(Error::Usage(format!("--design {design}: a .json file name in the folder of {roads}, with no folder")));
+    }
+    let port: u16 = take(opts, "port").map_or(Ok(8781), |p| p.parse().map_err(|_| Error::Usage("--port needs a number".into())))?;
+    let page = take(opts, "page").map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
+    no_more(opts)?;
+    let mut read = vec![name.clone(), design.clone()];
+    if ext == "shp" {
+        read.extend([format!("{stem}.dbf"), format!("{stem}.prj")]);
+    }
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    println!("design editor: http://127.0.0.1:{port}/design_editor/?roads={}&design={}  ({}; Ctrl+C to stop)", query(&name), query(&design),
+             dir.join(&design).display());
+    Ok(roadstyle_serve::serve_files(dir, page, port, Some(read), vec![design])?)
+}
+
+/// A text as a part of a URL's query: each byte that is not a letter, a digit or one of `-._~` as %XX.
+fn query(text: &str) -> String {
+    text.bytes().map(|b| if b.is_ascii_alphanumeric() || b"-._~".contains(&b) { (b as char).to_string() } else { format!("%{b:02X}") }).collect()
 }
 
 /// An error for an option the command does not take.

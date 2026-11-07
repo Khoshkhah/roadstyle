@@ -4,7 +4,7 @@
 
 !!! note "A key is necessary"
     The Google 3D window needs a Google Maps JavaScript API key. See
-    [Set up a Google key](google-key.md). The page must be served from an address in the key's
+    [Keys and tokens](google-key.md). The page must be served from an address in the key's
     Websites list, not opened from disk.
 
 ```python

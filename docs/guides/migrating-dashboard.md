@@ -10,7 +10,7 @@
 | `template="classic"` | `render_dashboard(..., layout="dock")` |
 | `layout="overlay"` | The default. You can leave it out |
 | `toolbar="right"` | `dashboard={"toolbar": {"position": "right"}}` |
-| `edit=function` | Removed. Add sections with `dashboard={"panel": {"sections": [...]}}` ([Add to the panel](dashboard-panel.md)), and the page's JavaScript with `page_script=` |
+| `edit=function` | Removed. Add sections with `dashboard={"panel": {"sections": [...]}}` ([Dashboards](dashboards.md#the-panel-starts-empty)), and the page's JavaScript with `page_script=` |
 | panel width (a string replace in the HTML) | `dashboard={"panel": {"width_px": 480}}` |
 | `window.rsG3dSelectionStyle = {...}` | `dashboard={"google_3d": {"selection_style": {...}}}` |
 | `window.rsG3dMeshAltitude = 1.5` | `dashboard={"google_3d": {"mesh_altitude_m": 1.5}}` |
@@ -50,7 +50,7 @@ A page that uses the level editor in a dashboard: [Edit the levels in a dashboar
 | 0.26 | 0.27 |
 |---|---|
 | the panel had the query box and the selected road, and `hide` took blocks away | the panel is empty; add `{"id": "q", "part": "query"}` and `{"id": "road", "part": "road_card"}` to `panel.sections` |
-| `dashboard={"panel": {"hide": [...]}}` | an error: leave it out, and add only the parts that you want ([Add to the panel](dashboard-panel.md)) |
+| `dashboard={"panel": {"hide": [...]}}` | an error: leave it out, and add only the parts that you want ([Dashboards](dashboards.md#the-panel-starts-empty)) |
 | the ids `bm`, `co`, `sb-legend`, `q`, `tbl`, `count`, `detail` | gone: the parts have classes (`.rs-q`, `.rs-q-list`, `.rs-road-card`) and are found with `rs.sections.get(id)` |
 | `basemap="blank"`, `road_popup=False`, a `minzoom` table, `name="Roads dashboard"` set by the template | the template sets no map keyword: the map has the defaults of a map page. Give any of them yourself |
-| a click showed the road in the panel only | a click opens the popup; add the road card for the panel, and `road_popup=False` for the card only ([Add to the panel](dashboard-panel.md#a-click-on-a-road-the-popup-the-card-or-both)) |
+| a click showed the road in the panel only | a click opens the popup; add the road card for the panel, and `road_popup=False` for the card only ([A click on a road](dashboards.md#a-click-on-a-road-the-popup-the-card-or-both)) |

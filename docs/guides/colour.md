@@ -86,4 +86,4 @@ Each entry takes the same keywords as a single colouring: `color_by`, `colors`, 
 From your own page, `rsSetColorField("Speed")` switches the colouring and `rsColor(ids, "#hex")`
 paints a set of roads over it: see the [JavaScript API](../reference/javascript.md).
 
-**See also:** [Every parameter](../reference/parameters.md) · [Style the roads](style.md) · [Dashboards & JavaScript](dashboards.md)
+**See also:** [Every parameter](../reference/parameters.md) · [Style the roads](style.md) · [Dashboards](dashboards.md)

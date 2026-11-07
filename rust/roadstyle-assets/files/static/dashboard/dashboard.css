@@ -7,7 +7,7 @@
    in one of three looks by its kind. Not filled: the tint `--rs-hover-bg` behind it, its text or icon (and its border, if it has one) in the accent.
    Filled (a primary button, the open tab): brighter. A link: underlined. A disabled control has no hover. The tint follows the theme's accent. */
 :root{--rs-hover-bg:color-mix(in srgb,var(--accent) 12%,transparent)}
-/* THE CARD STANDARD of the panel (docs/guides/dashboard-panel.md, "Cards: the panel standard"): the three numbers a page may change in one place.
+/* THE CARD STANDARD of the panel (docs/guides/dashboard-parts.md, "Cards"): the three numbers a page may change in one place.
    --rs-card-gap: the space between two cards. --rs-card-pad: the padding inside a card (a closed card is 14 + 16 + 14 = 44px high with the default).
    --rs-panel-bottom: the room under the last card at the end of the panel. */
 :root{--rs-card-gap:12px;--rs-card-pad:14px;--rs-panel-bottom:28px}
@@ -65,12 +65,12 @@ body.rs-panel #map{right:320px}
   border-radius:7px;font:12.5px system-ui,sans-serif;outline:none}
 .rs-side-q input:focus{border-color:#7c4dff}
 .rs-side-q-res{max-height:200px;overflow:auto}
-.rs-qrow{padding:4px 2px;border-bottom:1px solid #f3f3f3;cursor:pointer;display:flex;
+.rs-qrow{padding:4px 2px;border-bottom:1px solid var(--line);cursor:pointer;display:flex;
   justify-content:space-between;gap:10px;font-variant-numeric:tabular-nums}
 .rs-qrow:hover{background:var(--rs-hover-bg);color:var(--accent)}
 .rs-qrow b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rs-qrow span{color:#8a8a8a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:58%}
-.rs-qmore{color:#9a9a9a;padding:5px 2px;font-size:12px}
+.rs-qrow span{color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:58%}
+.rs-qmore{color:var(--mut);padding:5px 2px;font-size:12px}
 /* a slot for host-page controls (filters, toggles) pinned above the record */
 .rs-side-tools{padding:9px 14px;border-bottom:1px solid #ececec;display:none}
 .rs-side-tools:not(:empty){display:block}
@@ -409,12 +409,45 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 #sb .rs-sel-btn,.rs-side .rs-sel-btn,.rs-sel-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:6px 9px;
   border:0;border-radius:12px;background:var(--card,transparent);color:inherit;font:13px system-ui,sans-serif;text-align:left;cursor:pointer}
 /* a select box on a card has the card's colour: a thin line shows that it is a field (as a text field), not a line of text */
-#sb .sb-sec[data-rs-card] .rs-sel-btn{border:1px solid var(--line);padding:5px 8px}
+#sb :is(.sb-sec[data-rs-card],.rs-sec-box) .rs-sel-btn{border:1px solid var(--line);padding:5px 8px}      /* a section's card and a page's card (also in a frame) */
 .rs-sel-btn:hover:not(:disabled){background:var(--rs-hover-bg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .rs-sel-btn:focus-visible,.rs-sel-btn[aria-expanded=true]{outline:0;box-shadow:inset 0 0 0 1px var(--accent),0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-sel-btn:disabled{opacity:.5;cursor:not-allowed}
 .rs-sel-btn svg{flex:none;opacity:.6}
 .rs-sel-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ---- a colour picker (colorpick.js, docs/guides/dashboard-parts.md "A colour picker"): a swatch button, and a box in the look of the select list ---- */
+.rs-cp{position:relative;display:inline-flex}
+.rs-cp-native{display:none!important}
+:is(#sb,.rs-frame,.rs-side,body) .rs-cp-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:28px;padding:3px;border:1px solid var(--line);border-radius:8px;background:var(--card);cursor:pointer}
+:is(#sb,.rs-frame,.rs-side,body) .rs-cp-btn:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);background:var(--rs-hover-bg)}
+.rs-cp-btn[aria-expanded=true]{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.rs-cp-btn:disabled{opacity:.45;cursor:not-allowed}
+.rs-cp-btn .rs-cp-sw{width:100%;height:100%;border-radius:5px}
+.rs-cp-sw{display:block;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--ink) 18%,transparent)}
+.rs-cp-box{position:fixed;z-index:60;box-sizing:border-box;width:236px;padding:10px;border-radius:14px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  box-shadow:0 6px 22px rgba(0,0,0,.3);color:var(--rs-tb-ink);font:12px system-ui,sans-serif;display:flex;flex-direction:column;gap:9px}
+.rs-cp-sv{position:relative;height:132px;border-radius:9px;cursor:crosshair;touch-action:none;outline:none}
+.rs-cp-sv:focus-visible,.rs-cp-hue:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.rs-cp-dot{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.45);pointer-events:none}
+.rs-cp-row{display:flex;align-items:center;gap:8px}
+.rs-cp-hue{position:relative;flex:1;height:12px;border-radius:6px;cursor:pointer;touch-action:none;outline:none;
+  background:linear-gradient(to right,#f00,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00)}
+.rs-cp-hue i{position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.45);pointer-events:none}
+.rs-cp-pair{display:inline-flex;border-radius:7px;overflow:hidden;flex:none}
+.rs-cp-pair .rs-cp-sw{width:20px;height:24px;border-radius:0;padding:0;cursor:default}
+.rs-cp-pair .rs-cp-old{border-radius:7px 0 0 7px;cursor:pointer}
+.rs-cp-pair .rs-cp-new{border-radius:0 7px 7px 0;border-left:0}
+.rs-cp-box .rs-cp-eye{flex:none;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--rs-tb-ink);cursor:pointer}
+.rs-cp-box .rs-cp-eye:is(:hover,:focus-visible){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+.rs-cp-hexl{display:flex;align-items:center;gap:8px;flex:1;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.04em;font-size:10.5px}
+.rs-cp-box .rs-cp-hex{flex:1;min-width:0;box-sizing:border-box;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);
+  font:13px ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:lowercase;outline:none}
+.rs-cp-box .rs-cp-hex:focus{border-color:var(--accent)}
+.rs-cp-recent{display:flex;flex-wrap:wrap;gap:6px;padding-top:2px;border-top:1px solid var(--line)}
+.rs-cp-recent{padding-top:9px}
+.rs-cp-recent .rs-cp-sw{width:22px;height:22px;padding:0;border-radius:6px;cursor:pointer}
+.rs-cp-recent .rs-cp-sw:is(:hover,:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+html.rs-phone .rs-cp-btn{height:44px;width:56px}
 .rs-sel-list{position:fixed;z-index:60;box-sizing:border-box;overflow-y:auto;padding:5px;border-radius:14px;background:var(--rs-card-bg);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
   border:0;box-shadow:0 6px 22px rgba(0,0,0,.3);color:var(--rs-tb-ink);font:13px system-ui,sans-serif}
 .rs-sel-opt{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 11px;border-radius:10px;cursor:pointer}
@@ -424,6 +457,9 @@ html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display
 /* ---- the controls of the panels, in the theme (a dark panel has dark controls) ---- */
 #sb,.rs-side{color-scheme:light}
 #sb[data-theme=dark],html[data-rs-theme=dark] .rs-side{color-scheme:dark}
+/* the page itself declares the dark theme too: a page in a frame (the live parts of the docs, a host's iframe) on a dark site otherwise gets a white
+   backdrop from the browser, which shows at the round corners and beside the panel (the frame's and the page's colour schemes did not match) */
+html[data-rs-theme=dark]{color-scheme:dark}
 :is(#sb,.rs-side) :is(input:not([type]),input[type=text],input[type=search],input[type=number],input[type=url],textarea){
   box-sizing:border-box;padding:7px 11px;border:0;border-radius:12px;background:var(--card,var(--rs-card-bg));color:var(--ink,var(--rs-tb-ink));font:13px system-ui,sans-serif}
 :is(#sb,.rs-side) :is(input,textarea)::placeholder{color:var(--mut,var(--rs-tb-ink));opacity:.6}
@@ -459,6 +495,9 @@ html #sb{padding:0;overflow:hidden}
 html .sb-card{display:flex;flex-direction:column;height:100%;min-height:0;box-sizing:border-box}
 html .sb-top{flex:none;margin:0;padding:14px 15px 10px;position:relative;z-index:1;transition:box-shadow .15s}
 html :is(.sb-top,.rs-phead).scrolled{box-shadow:0 1px 0 var(--line,var(--rs-tb-border)),0 8px 10px -8px rgba(0,0,0,.35)}
+/* the dark theme: a black shadow at 35 % does not show on the dark panel (Kaveh: "the fading part in light theme is much more better than dark theme"). So the title row is
+   a little lighter while the body is scrolled (a raised surface is lighter in a dark theme), with a lighter line and a deeper shadow */
+html[data-rs-theme=dark] :is(.sb-top,.rs-phead).scrolled{background:color-mix(in srgb,var(--ink) 7%,transparent);box-shadow:0 1px 0 color-mix(in srgb,var(--ink) 16%,transparent),0 10px 16px -6px rgba(0,0,0,.95)}
 html .sb-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px calc(var(--rs-panel-bottom) + var(--rs-fold-room,0px))}      /* --rs-fold-room: sections.js, _fdKeep */
 html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display:flex;flex-direction:column;overflow:hidden;padding:0;border-radius:14px}
 /* ---- the side of the panel (placement.js: <html class="rs-panel-left">) ---- */
@@ -528,7 +567,7 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 /* MapLibre turns the whole compass icon with the map: the ring must not turn, so the page cancels it and turns the needle only (tools.js) */
 .maplibregl-ctrl-compass .maplibregl-ctrl-icon{transform:none!important}
 
-/* ---- the panel's sections (sections.js), the standard (docs/guides/dashboard-panel.md, "Cards: the panel standard"): every section is a block as wide
+/* ---- the panel's sections (sections.js), the standard (docs/guides/dashboard-parts.md, "Cards"): every section is a block as wide
    as the cards with --rs-card-gap above and below (the margins of two blocks, and of a card inside a block, collapse to this one number). A section
    without a label is that block only: the page's own HTML, no padding, no background, no title. ---- */
 .sb-sec{display:block;margin:var(--rs-card-gap) 0}
@@ -589,10 +628,14 @@ html:not(.rs-phone).rs-overlay.rs-panel-card #sb .sb-card{border-radius:14px;bac
 .sb-sec table{width:100%;border-collapse:collapse;font-size:12px}
 .sb-sec :is(td,th){padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;color:var(--ink)}
 .sb-sec th{color:var(--mut);font-weight:600}
-/* a card (the standard, docs/guides/dashboard-panel.md): 12px corners, --rs-card-pad inside, --rs-card-gap between two cards (the vertical margins of two cards collapse
+/* a card (the standard, docs/guides/dashboard-parts.md, "Cards"): 12px corners, --rs-card-pad inside, --rs-card-gap between two cards (the vertical margins of two cards collapse
    to this one number). Its title is the first row inside it, `.rs-card-title`: the same row as the title of a card that folds. */
-.sb-sec :is(.rs-sec-box,details){background:var(--card);color:var(--ink);border-radius:12px;padding:var(--rs-card-pad);margin:var(--rs-card-gap) 0}
-.sb-sec .rs-card-title{min-height:16px;margin:0 0 10px;font:600 12px/16px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
+/* a box anywhere in the panel and in an editor frame (frame.js), not only in a section; the first card of a frame's body has no margin above it
+   (the body has its padding). In a card (or in a box) it has the card's colour, so it gets the card's thin edge in its place */
+.sb-card .rs-sec-box,.sb-sec details,.rs-frame .rs-sec-box{background:var(--card);color:var(--ink);border-radius:12px;padding:var(--rs-card-pad);margin:var(--rs-card-gap) 0}
+.rs-frame-body > .rs-sec-box:first-child{margin-top:0}
+:is(.sb-card,.rs-frame) :is([data-rs-card],.rs-sec-box) .rs-sec-box{background:transparent;box-shadow:inset 0 0 0 1px var(--rs-card-edge)}
+:is(.sb-sec,.rs-frame) .rs-card-title{min-height:16px;margin:0 0 10px;font:600 12px/16px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em;color:var(--ink)}
 .sb-sec summary{cursor:pointer;font-weight:600}
 
 /* ---- the scrollbar of the panel is at its outer edge (decided 2026-10-29): a left panel has it at the left, a right panel at the right. A scroll box with
@@ -738,9 +781,10 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 #sb [data-pane][hidden]{display:none}
 
 /* ---- CARDS, NUMBER TILES, A CAPTION AND A CALLOUT in the panel (the box itself is `.rs-sec-box`, above): a card has a title and, right after it, its short muted description ---- */
-.sb-sec .rs-sec-box h3{font-size:12px;font-weight:700;margin:0 0 3px;color:var(--ink)}
-.sb-sec .rs-sec-box h3 + p{color:var(--mut);font-size:11.5px;line-height:1.45;margin:0 0 7px}
-.sb-sec .rs-sec-box svg{width:100%;height:auto;display:block;overflow:hidden}
+:is(.sb-card,.rs-frame) .rs-sec-box h3{font-size:12px;font-weight:700;margin:0 0 3px;color:var(--ink)}
+:is(.sb-card,.rs-frame) .rs-sec-box h3 + p{color:var(--mut);font-size:11.5px;line-height:1.45;margin:0 0 7px}
+/* a chart in a card is as wide as the card; the icon of a button in the card (the arrow of a select box, a "?") keeps its own size */
+:is(.sb-card,.rs-frame) .rs-sec-box svg:not(button *){width:100%;height:auto;display:block;overflow:hidden}
 #sb .rs-kpis{display:grid;grid-template-columns:repeat(var(--rs-kpi-cols,3),1fr);gap:8px;margin:0 0 12px}
 #sb .rs-kpi{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 #sb .rs-kpi-title{font-size:9.5px;font-weight:700;color:var(--mut);text-transform:uppercase}
@@ -750,8 +794,36 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
 html[data-rs-theme=dark] #sb .rs-kpi-val.rs-c{color:color-mix(in srgb,var(--rs-kpi-c) 60%,var(--ink))}
 #sb .rs-kpi-sub{font-size:10px;color:var(--mut)}
 #sb .rs-cap{margin:2px 0 6px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
-/* a callout: the answer in one box, with an edge in a colour of the page (`--rs-callout`, or set `border-left-color` from the code) */
-#sb .rs-callout{margin:0 0 12px;padding:8px 11px;border:1px solid var(--line);border-left:4px solid var(--rs-callout,var(--accent));border-radius:0 8px 8px 0;background:var(--card);font-size:12.5px;line-height:1.5}
+/* a callout: the answer in one box with round corners, a light tint of its colour and a round mark at the start (decided 2026-11-06: the bar at the left was
+   the only part with that look). The colour is `--rs-callout` (the page's), a status colour (err, warn, ok) or `--accent`. The mark is "i", or
+   ✕ ! ✓ for a status, or the page's own `--rs-mark`: a status is not shown by its colour only. */
+#sb .rs-callout{--rs-st:var(--rs-callout,var(--accent));position:relative;margin:0 0 12px;padding:8px 11px 8px 38px;border-radius:10px;
+  background:color-mix(in srgb,var(--rs-st) 11%,var(--card));color:var(--ink);font-size:12.5px;line-height:1.5}
+#sb .rs-callout::before{content:var(--rs-mark,"i");position:absolute;left:11px;top:9px;width:18px;height:18px;border-radius:50%;background:var(--rs-st);
+  color:var(--card);font:700 11px/18px system-ui,sans-serif;text-align:center}
+#sb .rs-callout.err{--rs-mark:"✕"} #sb .rs-callout.warn{--rs-mark:"!"} #sb .rs-callout.ok{--rs-mark:"✓"}
+
+/* ---- STATUS COLOURS: an error, a warning and a good result, each with a light and a dark value that is readable on --card and --bg. A callout, a chip
+   and a count take one with the class err, warn or ok: the callout's tint and mark, the chip's and the count's tint and text. ---- */
+html{--rs-err:#b91c1c;--rs-warn:#b45309;--rs-ok:#15803d}
+html[data-rs-theme=dark],#sb[data-theme=dark]{--rs-err:#fca5a5;--rs-warn:#fbbf24;--rs-ok:#4ade80}
+#sb :is(.rs-callout,.rs-chip,.rs-count).err{--rs-st:var(--rs-err)}
+#sb :is(.rs-callout,.rs-chip,.rs-count).warn{--rs-st:var(--rs-warn)}
+#sb :is(.rs-callout,.rs-chip,.rs-count).ok{--rs-st:var(--rs-ok)}
+#sb :is(.rs-chip,.rs-count):is(.err,.warn,.ok){background:color-mix(in srgb,var(--rs-st) 16%,transparent);color:color-mix(in srgb,var(--rs-st) 80%,var(--ink))}
+/* a count after the words of a tab (`<span class="rs-count">3</span>`): a small pill. In the selected tab it is on the card colour, so it stays readable
+   on the filled tab. A page gives it err, warn or ok only when the count needs attention (a red 0 is noise). */
+#sb .rs-count{display:inline-block;min-width:16px;margin-left:5px;padding:0 5px;border-radius:999px;background:color-mix(in srgb,var(--mut) 20%,transparent);
+  color:var(--ink);font:600 10.5px/16px system-ui,sans-serif;text-align:center;font-variant-numeric:tabular-nums}
+#sb .rs-tab.on .rs-count{background:var(--card);color:var(--ink)}
+#sb .rs-tab.on .rs-count:is(.err,.warn,.ok){background:var(--card);color:color-mix(in srgb,var(--rs-st) 80%,var(--ink))}
+/* a link button (`<button class="rs-link">`): an action in a line of text or a title row ("clear", "default"), in the accent colour and with no box. Its
+   rules start with #sb or .rs-frame to win over the panel's `#sb button` (a host page with a frame has no template). */
+:is(#sb,.rs-frame) button.rs-link{padding:0;border:0;border-radius:0;background:none;color:var(--accent);font:inherit;text-transform:none;letter-spacing:0;cursor:pointer}
+:is(#sb,.rs-frame) button.rs-link:is(:hover,:focus-visible):not(:disabled){border:0;background:none;color:var(--accent);text-decoration:underline}
+:is(#sb,.rs-frame) button.rs-link:disabled{color:var(--mut);cursor:default}
+/* a slider: the accent colour (the rule of the panel's inputs) and, on a phone, a 44 px row for a finger */
+html.rs-phone #sb input[type=range]{min-height:44px}
 
 /* ---- CHART COLOURS: the colours that a page's charts share, with a light and a dark value (use them with `rs.svg`, which takes `var(--x)` in `fill` and `stroke`).
    For text and lines the panel's own tokens do the same: --ink, --mut, --line, --card. ---- */
@@ -841,6 +913,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
    weight, so the part's own rules win. */
 :where(.rs-frame, #rs-dock) button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
 :where(.rs-frame, #rs-dock) button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+:where(#sb, .rs-frame, #rs-dock) button:disabled{opacity:.5;cursor:not-allowed}      /* also the panel's own buttons: no weight, so a part's own disabled look wins */
 :where(.rs-frame, #rs-dock) :is(input:not([type=checkbox],[type=radio],[type=range],[type=color]),textarea){box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
 :where(.rs-frame) :is(input[type=password],input[type=text]){width:100%}
 :where(.rs-frame, #rs-dock) :is(input,textarea):focus{border-color:var(--accent)}
@@ -860,24 +933,20 @@ html.rs-phone .rs-frame-back,html.rs-phone .rs-frame .rs-tab{min-height:44px}
 html.rs-phone #sb .rs-frame-head .rs-tabs{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
 html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
 /* The design panel (design/design_panel.js, docs/guides/design-panel.md): its content in the editor frame. */
-#sb{--rs-dz-soft:color-mix(in srgb,var(--accent) 12%,transparent);--rs-dz-bad:#b91c1c}
-#sb[data-theme=dark],html[data-rs-theme=dark] #sb{--rs-dz-bad:#f87171}
+#sb{--rs-dz-soft:color-mix(in srgb,var(--accent) 12%,transparent)}
 .rs-dz-title .dname{font-size:12px;color:var(--mut);margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .rs-dz-bar .line{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .rs-dz-bar b{font-weight:600}
 .rs-dz-bar .st{margin:2px 0 0;min-height:1.3em;color:var(--mut);line-height:1.3}
 .rs-dz-bar #design-notice{min-height:0;color:var(--ink)}
 .rs-dz-bar #design-notice:empty{display:none}
-.rs-dz .fsec{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 10px;background:var(--card)}
-.rs-dz .fsec h3{margin:0 0 8px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
 .rs-dz .why,.rs-dz .small{font-size:12px;color:var(--mut);line-height:1.4;margin:0 0 8px}
 .rs-dz .small{color:var(--ink)}
 .rs-dz .muted,.rs-dz .col small{color:var(--mut)}
 .rs-dz .row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
 .rs-dz .row button{flex:1 1 0;white-space:nowrap}
 .rs-dz button.sm{height:28px;padding:0 9px;font-size:12px}
-.rs-dz button.danger{border-color:var(--rs-dz-bad);color:var(--rs-dz-bad)}
-.rs-dz .link{border:0;background:none;color:var(--accent);cursor:pointer;padding:0 2px;font:inherit;white-space:nowrap}
+.rs-dz button.danger{border-color:var(--rs-err);color:var(--rs-err)}
 .rs-dz .drow2{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;margin:0 0 6px;font-size:13px}
 .rs-dz .drow2>span:first-child{min-width:0;overflow-wrap:anywhere}
 .rs-dz .drow2.cls,.rs-dz .rhead{grid-template-columns:1fr 52px 52px}
@@ -887,9 +956,11 @@ html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
 .rs-dz .drow2:has(input[type=text]){grid-template-columns:4em 1fr}
 .rs-dz .rhead{display:grid;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:4px}
 .rs-dz .rhead span{text-align:center}
+.rs-dz .rs-cp,.rs-dz .rs-cp-btn{width:100%}      /* a colour of the design panel fills its column */
 .rs-dz input[type=color]{width:100%;min-width:44px;height:30px;padding:1px 2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer}
+/* a colour box of a panel has the hover of a button: the accent border and the tint */
+:is(#sb,.rs-side,.rs-frame,#rs-dock) input[type=color]:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);background:var(--rs-hover-bg);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-dz input[type=number],.rs-dz input[type=text],.rs-dz input[type=search]{height:32px;min-width:0;width:100%;box-sizing:border-box}
-.rs-dz input[type=range]{accent-color:var(--accent-fill)}
 .rs-dz .drow2 .rs-sel,.rs-dz .drow2>select{width:auto;max-width:11em}
 .rs-dz .optrow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);cursor:pointer;margin-bottom:6px}
 .rs-dz .optrow:has(input:checked){border-color:var(--accent-fill);background:var(--rs-dz-soft)}
@@ -920,14 +991,14 @@ html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
 .rs-dz .cols.two input[type=number]{width:56px}
 .rs-dz .fix-group{margin:12px 0 4px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
 .rs-dz .fix-group:first-child{margin-top:0}
-.rs-dz .bad{color:var(--rs-dz-bad)}
+.rs-dz .bad{color:var(--rs-err)}
 html.rs-phone .rs-dz .row button,html.rs-phone .rs-dz .chip{min-height:44px}
 /* the preview under a transparent ground: the map container has the color of the base map, the checkerboard goes over that color */
 .rs-checker{background-image:repeating-conic-gradient(#d4d4d4 0 25%,#ffffff 0 50%);background-size:24px 24px}
 /* ONE HOVER, the rest: keyboard focus has a ring as well as the hover look; a link is underlined under the pointer */
 :is(#sb,#rs-toolbar,#rs-help,.rs-help-box,#rs-scalebox,.rs-day-cal,.rs-svw) :is(button,select,summary,a[href]):focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 :is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]{text-decoration:none}
-:where(#sb) a[href]{color:var(--accent)}      /* a link in the panel has the accent (a page's own link rule is more specific and wins); before, it had the browser's blue */
+.sb-card a[href]{color:var(--accent)}      /* a link in the panel has the accent (a page's own link rule is more specific and wins); before, it had the browser's blue */
 :is(#sb,#rs-help,.rs-help-box,.rs-svw) a[href]:is(:hover,:focus-visible){text-decoration:underline}
 :is(#sb,#rs-help,.rs-help-box) summary{border-radius:6px;cursor:pointer}
 :is(#sb,#rs-help,.rs-help-box) summary:is(:hover,:focus-visible){background:var(--rs-hover-bg);color:var(--accent)}
@@ -1024,8 +1095,6 @@ html.rs-phone.rs-dock-shut #rs-dock-pill{display:block}
 html.rs-phone.rs-dock-shut.rs-sheet-0 #rs-dock-pill{bottom:56px}
 html.rs-phone.rs-dock-shut.rs-sheet-2 #rs-dock-pill{display:none}
 /* ---- THE DATA DOCK (data/data_dock.js, docs/guides/data-dock.md): in the bottom dock, the SQL line over the table and the road card beside it ---- */
-:root{--rs-err:#b91c1c}
-html[data-rs-theme=dark]{--rs-err:#fca5a5}
 #rs-dock .rs-dd{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
 .rs-dd-acts{display:flex;gap:12px;align-items:center}      /* the groups: their edge is the card edge, clear in the dark theme too (Kaveh) */
 /* a group is one joined control, as Table | Chart: one edge round it and a thin line between its buttons; a button that is on (Tables open, Light
@@ -1241,3 +1310,15 @@ html:not(.rs-phone) .rs-dd-chartrow .rs-dd-cl .rs-sel{width:auto;min-width:0}
 #sb .rs-road-card-none{color:var(--mut)}
 #sb .rs-road-card b{color:var(--ink)}
 #sb .rs-road-card-ov{color:var(--mut)}
+/* the panel's own controls: a label, a select box and a plain button. They were in the dashboard template only, so a host page with its own panel
+   (duckOSM Studio, duckosm edit) got the browser's buttons. At the end of the file, where the template's rules were, so each wins as before. */
+#sb label{display:block;margin:11px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.04em}
+#sb select{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
+  border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
+#sb select:focus{border-color:var(--accent)}
+#sb button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;
+  background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
+#sb button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+#sb button:disabled{opacity:.5;cursor:default}
+#sb button.sb-primary:disabled{filter:saturate(.6)}

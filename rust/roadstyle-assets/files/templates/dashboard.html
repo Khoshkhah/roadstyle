@@ -1,4 +1,4 @@
-<!-- roadstyle UI template: the dashboard's panel (it starts empty: the page adds its sections, docs/guides/dashboard-panel.md).
+<!-- roadstyle UI template: the dashboard's panel (it starts empty: the page adds its sections, docs/guides/dashboards.md).
      A plain HTML/CSS/JS fragment injected at the end of any saved roadstyle web map.
      It talks to the map ONLY through the public window.rs* API and rs:* events, so every
      piece is safe to rip out, restyle, or extend. Uses the shared design tokens
@@ -7,14 +7,6 @@
 #map{right:var(--rs-panel-w,400px)}
 body{--rs-side:var(--rs-panel-w,400px)}   /* shift the map's right-anchored controls left of the panel */
 .co-ctrl,.co-lg{display:none}  /* the toolbox has the colour and the legend: no floating copies */
-#sb label{display:block;margin:11px 0 3px;font-weight:600;font-size:11px;color:var(--mut);
-  text-transform:uppercase;letter-spacing:.04em}
-#sb select{width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);
-  border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
-#sb select:focus{border-color:var(--accent)}
-#sb button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;
-  background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
-#sb button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
 </style>
 <div id="sb" data-theme="light">
 <div class="sb-card">

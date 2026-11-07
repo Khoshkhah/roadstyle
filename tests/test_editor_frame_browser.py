@@ -230,3 +230,54 @@ def test_the_frame_has_one_line_under_its_head_when_the_host_was_scrolled(tmp_pa
         page.evaluate("fr.close()")
         assert page.evaluate(top)                                         # the host's body is still scrolled: its line again
         browser.close()
+
+
+_PARTS = """() => {
+  window.fr = rs.frame({panel: document.getElementById('sb'), title: 'Edit levels', back: 'Steps', id: 'pf',
+                        tabs: [['ends', 'Road ends'], ['history', 'History'], ['issues', 'Issues']]});
+  const count = (cls, n) => Object.assign(document.createElement('span'), {className: 'rs-count' + (cls ? ' ' + cls : ''), textContent: n});
+  fr.body.innerHTML = `<div class="rs-sec-box"><div class="rs-card-title">Rue Grimaldi <button class="rs-link" id="pf-link">clear</button></div>
+      <p>secondary · 172 m</p><select id="pf-sel"><option>primary</option></select><input type="range" id="pf-range" min="0" max="10" value="4"></div>
+    <div class="rs-sec-box"><div class="rs-callout warn">Choose which road is on top.</div><div class="rs-callout err">A crossing broke.</div>
+      <span class="rs-chip err">given up</span> <span class="rs-chip warn">near</span> <span class="rs-chip ok">kept</span></div>`;
+  fr.open('ends');
+  document.getElementById('pf-tab-history').append(count('', '3'));
+  document.getElementById('pf-tab-issues').append(count('err', '2'), count('warn', '5'));
+  document.getElementById('pf-tab-ends').append(count('warn', '1'));
+}"""
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_shared_parts_in_a_frame(tmp_path, theme):
+    """The parts that an editor in a frame uses (docs/guides/dashboard-parts.md): a card with the panel's card look, the first one with no space above it;
+    a count in a tab, also in the selected tab; the status colours on a callout and a chip, different for err and warn; a link button with no box, in the
+    accent colour. Every text is readable and nothing is light in the dark theme."""
+    path = tmp_path / "page.html"
+    rs.render_dashboard(_edges(), basemap="blank", name="Parts").save(path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(path.resolve().as_uri())
+        page.wait_for_function("window.map && map.loaded() && window.rsReady", timeout=60_000)
+        page.evaluate(f"rsSetTheme({json.dumps(theme)})")
+        page.evaluate(_PARTS)
+        page.wait_for_timeout(300)
+        m = page.evaluate("""() => {
+          const cs = (q) => getComputedStyle(document.querySelector(q)), card = cs('#pf-body .rs-sec-box'), root = getComputedStyle(fr.root);
+          const link = cs('#pf-link'), call = [...document.querySelectorAll('#pf-body .rs-callout')].map((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e, '::before').content].join());
+          return {card: card.backgroundColor !== 'rgba(0, 0, 0, 0)' && card.backgroundColor !== root.backgroundColor && card.borderRadius === '12px',
+                  first: card.marginTop, title: cs('#pf-body .rs-card-title').textTransform,
+                  link: [link.borderTopWidth, link.backgroundColor, link.color === getComputedStyle(document.getElementById('sb')).getPropertyValue('--accent').trim() || link.color],
+                  edges: call[0] !== call[1], counts: document.querySelectorAll('#pf-tabs .rs-count').length,
+                  arrow: Math.round(document.querySelector('#pf-body .rs-sel svg').getBoundingClientRect().width),
+                  selEdge: cs('#pf-body .rs-sel-btn').borderTopWidth};
+        }""")
+        assert m["card"] and m["first"] == "0px" and m["title"] == "uppercase", m
+        assert m["link"][:2] == ["0px", "rgba(0, 0, 0, 0)"] and m["edges"] and m["counts"] == 4, m
+        assert m["arrow"] <= 20 and m["selEdge"] == "1px", m      # a select box in a card: its arrow keeps its size, and a line shows that it is a field          # the select box's arrow keeps its size: the card's chart rule is not for an icon of a button
+        found = page.evaluate(_PROBE, ["#sb .rs-frame, #sb .rs-frame-title", theme == "dark"])
+        assert not found, found
+        browser.close()
+    assert not errors, errors

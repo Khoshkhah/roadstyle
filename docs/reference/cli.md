@@ -64,7 +64,7 @@ Only the styling, filtering and data-colour flags apply to every format; the web
 
 | page | builds |
 |---|---|
-| `dashboard` | the map, the standard toolbox and an empty panel. `--dashboard` gives the panel its parts ([Add to the panel](../guides/dashboard-panel.md)) |
+| `dashboard` | the map, the standard toolbox and an empty panel. `--dashboard` gives the panel its parts ([Dashboards](../guides/dashboards.md#the-panel-starts-empty)) |
 | `street-view` | the map + Google Street View of the clicked road |
 
 `--page` needs `-f web`. For `street-view` only:

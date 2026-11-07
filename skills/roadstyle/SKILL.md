@@ -77,7 +77,7 @@ m.save("map.html")                        # m.html is the page as a string
   (main roads from zoom 15-16, side streets from 17); one-way arrows on main roads from zoom 15, side streets from 17: check
   with `rs.snapshot(m, "x.png", center=(lon, lat), zoom=17)`. Bridges: slate outline and a shadow; tunnels fade and are dashed. `settings={"config": {"tunnel_toward": "Dark"}}` (a name in `tunnel_towards`, or a `#rrggbb`) picks the colour they fade toward (default Sand; Dark or Light matching the base map keeps each class hue).
 - Ready-made pages: `rs.render_dashboard(edges, ...)` (an empty panel and the toolbox; `layout="dock"` docks the panel with no toolbar, the
-  default `"overlay"` floats it; `boundary_dim=True` / `boundary_limit=True` shade and limit the map to `boundary=`; `hillshade=True` / `terrain=True` (and `terrain_exaggeration=2.0`, `terrain_tunnels="fade"|"hide"|"show"` for the tunnels, default fade; `buildings_opacity=0.6` for the base map's 3D buildings, default 1, script `rsBuildingsOpacity(v)`) start the base-map box's Hillshade and 3D terrain on (a DEM from the Terrain Tiles on AWS, no key; with the terrain on every layer lies on the ground, so a tunnel is not under the hill and a bridge is not above the valley: switch it off for flat roads); there is no report page; `page_script=` / `page_style=` add the page's own JS and CSS (put the JS in `rs.ready(() => ...)`: the event `rs:ready` fires once, before a late listener); live data for a new day: `live_data=True` + `rs.setData(url, ...)` with `edge_id` as TEXT (a number goes in `classes` sets by natural breaks, or in your `breaks`; `rs.naturalBreaks(values, k)` gives the cuts of a whole day, `fields` names the columns that the popup shows, `rs.colorModes.set(names, {active, onChange})` puts a page's own "Colour by" list in the legend box), guide `guides/live-data.md`; `dashboard={...}` changes any typed option (every key and default: `docs/reference/parameters.md`, "Dashboard options"; the panel's sections: `docs/guides/dashboard-panel.md`) and
+  default `"overlay"` floats it; `boundary_dim=True` / `boundary_limit=True` shade and limit the map to `boundary=`; `hillshade=True` / `terrain=True` (and `terrain_exaggeration=2.0`, `terrain_tunnels="fade"|"hide"|"show"` for the tunnels, default fade; `buildings_opacity=0.6` for the base map's 3D buildings, default 1, script `rsBuildingsOpacity(v)`) start the base-map box's Hillshade and 3D terrain on (a DEM from the Terrain Tiles on AWS, no key; with the terrain on every layer lies on the ground, so a tunnel is not under the hill and a bridge is not above the valley: switch it off for flat roads); there is no report page; `page_script=` / `page_style=` add the page's own JS and CSS (put the JS in `rs.ready(() => ...)`: the event `rs:ready` fires once, before a late listener); live data for a new day: `live_data=True` + `rs.setData(url, ...)` with `edge_id` as TEXT (a number goes in `classes` sets by natural breaks, or in your `breaks`; `rs.naturalBreaks(values, k)` gives the cuts of a whole day, `fields` names the columns that the popup shows, `rs.colorModes.set(names, {active, onChange})` puts a page's own "Colour by" list in the legend box), guide `guides/live-data.md`; `dashboard={...}` changes any typed option (every key and default: `docs/reference/parameters.md`, "Dashboard options"; the panel's sections: `docs/guides/dashboards.md`) and
   `rs.render_street_view(edges, ...)` (Google
   Street View beside the map, or under it with `layout="below"`, following the clicked road;
   `panel_width=42`, `resizable=True`)
@@ -125,7 +125,7 @@ rs.render_dashboard(edges, color_options={"Road class": {}}, dashboard={"panel":
 - There is no `theme=` keyword. The page starts light; to start dark: `page_script="rs.ready(() => rsSetTheme('dark'))"`.
 - An overlay's colour is a text, never a MapLibre expression; a colour for each feature is `color_col=`.
 - A click on a road, hover and tooltip are separate switches (`road_popup`, `road_tooltip`, `hover_color`).
-- Docs: `docs/reference/parameters.md` ("Dashboard options": every key), `docs/guides/dashboard-panel.md` (the panel, its parts, the click), `docs/guides/dashboard-layout.md` (the frame and the toolbox), `docs/reference/javascript.md` (`rs.sections`, events).
+- Docs: `docs/reference/parameters.md` ("Dashboard options": every key), `docs/guides/dashboards.md` (the panel, its sections, the click), `docs/guides/dashboard-layout.md` (the frame and the toolbox), `docs/reference/javascript.md` (`rs.sections`, events).
 
 ## A dashboard page: use the shared parts
 
@@ -144,7 +144,7 @@ Use these parts. Never draw a chart with your own SVG code, and never make your 
   that says why. Guide: `docs/guides/dashboard-parts.md`, "A chart".
 - **A chart in a card** (from Python, no JavaScript): `{"id": "km", "label": "km by class", "part": "chart", "chart": {"kind": "bar",
   "x": "highway", "y": "length_m", "agg": "sum", "scale": 0.001}}`. With no `data`, it reads the map's roads; `"data": df` (a DataFrame or
-  a list of dicts) gives the page's own rows. A click on a bar lights its roads, or sends `rs:chartpick` with `data`. Guide: `docs/guides/charts.md`.
+  a list of dicts) gives the page's own rows. A click on a bar lights its roads, or sends `rs:chartpick` with `data`. Guide: `docs/guides/dashboard-parts.md` ("A chart").
 - **The bottom dock: `rs.dock`** is the wide area under the map (a phone: a bottom sheet). `rs.dock.add({id, label, el, note, actions})`,
   `open(id)`, `close()`, `note(id, text)`. `rs.dock.table({columns, rows, idColumn, more, onSort})` is the dock's table: a header with the
   type, exact 64-bit ids, sort, a click on a row selects its road, and 50 000 rows stay fast. Guide: `docs/guides/dashboard-layout.md`,
@@ -163,7 +163,7 @@ Use these parts. Never draw a chart with your own SVG code, and never make your 
 
 ## Dashboard panel standard (use it, do not invent spacing)
 
-Details: `docs/guides/dashboard-panel.md`, "Cards: the panel standard".
+Details: `docs/guides/dashboard-parts.md`, "Cards".
 
 - **A section with a `label` is a card**: the label is its title row. `fold: True` makes it fold, `background: False` takes its colour away (four kinds).
 - A section without a `label` is a block of the page's own HTML with no box (tabs, a row of tiles, several cards). A card inside it is `<div class="rs-sec-box"><div class="rs-card-title">Title</div>...</div>`.

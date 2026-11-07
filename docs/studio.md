@@ -31,4 +31,4 @@ copy it out when you outgrow the knobs.
 - **Popup & hover**: the click popup (curated, chosen columns, side panel, all, off) and a hover tooltip.
 - **Overlays**: zones, points or lines as extra layers.
 
-**See also:** [Dashboards & JavaScript](guides/dashboards.md) · [Every parameter](reference/parameters.md)
+**See also:** [Dashboards](guides/dashboards.md) · [Every parameter](reference/parameters.md)

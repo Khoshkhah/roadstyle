@@ -16,6 +16,11 @@
 //            reads roadstyle's events), so there is one state in two places. The boundary has its own `boundary.show`.
 //   walls    `design.walls` = {on, front, back, side, party, court, roof, roof_dark}: the 3D walls by type (roadstyle's rsSetWallStyle, walls.js), when the
 //            host gives the walls (rsSetWalls). It is not in the look: the panel paints it at once, so a change draws no new map.
+//   bridges  `design.bridges` = {casing, wing, shadow, shadow_color, shadow_opacity, shadow_blur}: the casing colour of a bridge (its deck edges), a factor of the
+//            width of that casing, and its shadow. They are in the look (bridges.casing_color, bridges.wing_scale, bridges.shadow).
+//   tunnels  `design.tunnels` = {strength, toward, palette, ratio}: the tunnel look of roadstyle's Tunnels box (0 to 100 toward a colour, the two dash colours, the
+//            dash and gap). They are in the look (tunnels.*) and in the map's global state: the panel paints them at once with rsSetTunnelStyle, and reads the
+//            event rs:tunnelchange of the Tunnels box, so there is one state in two places.
 //   host     the value of each host tab (`design[tab.key]`, as the tile profile of the duckOSM page): the host gives `make` and `normalize` (`hosts`)
 //
 // The style is written into roadstyle's look (the sections of its version 2) with `applyToLook`. The host gives that look to its map (LiveMap.setLook on the
@@ -79,6 +84,12 @@ const num = (v, d) => (Number.isFinite(+v) && v !== null && v !== "" ? +v : d);
 const clamp = (v, [lo, hi]) => Math.min(hi, Math.max(lo, v));
 const COLOR = /^#[0-9a-f]{6}$/i;
 const hex = (v, d) => (typeof v === "string" && COLOR.test(v) ? v.toLowerCase() : d);
+/** The alpha of a colour that the look holds ("rgba(0,0,0,0.25)" gives 0.25; a colour with no alpha gives 1), or `d` when it is not a colour. */
+export function alphaOf(c, d) {
+  if (typeof c !== "string") return d;
+  const r = /^rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)$/.exec(c);
+  return r ? clamp(+r[1], [0, 1]) : toHex(c) ? 1 : d;
+}
 /** A colour that the look holds (hex, short hex, or rgba) as #rrggbb; the page's colour input takes only this form. */
 export function toHex(c) {
   if (typeof c !== "string") return null;
@@ -93,8 +104,10 @@ export function toHex(c) {
 
 /** The design that a look (a version 2 look, as an object) has now. `hosts` = [{key, make}]: the host tabs, each with its start value. */
 export function defaultsOf(look, hosts = []) {
-  const cls = look.roads.styles.classes, w = look.roads.model.width, areas = look.base_map.style.areas, lc = areas.landcover, b3 = look.base_map.style.buildings_3d;
+  const bm = look.base_map?.style ?? {};                    // a look of roads alone has no base map: its colours are the defaults below, and applyToLook writes none
+  const cls = look.roads.styles.classes, w = look.roads.model.width, areas = bm.areas ?? {}, lc = areas.landcover ?? {}, b3 = bm.buildings_3d;
   const first = (list) => toHex(lc[list.find((k) => lc[k])]) ?? "#e2ebd6";
+  const br = look.bridges ?? {}, tu = look.tunnels ?? {};
   const d = {
     format: FORMAT, version: VERSION, name: "Light", theme: "light",
     roads: {
@@ -108,9 +121,13 @@ export function defaultsOf(look, hosts = []) {
     base: {
       background: toHex(look.background.light) ?? "#e8e6e1", water: toHex(areas.water?.fill) ?? "#9ebdff", green: first(LAND.green), land: first(LAND.built), sand: first(LAND.sand),
       buildings: toHex(areas.buildings?.fill) ?? "#e5e2df", buildingLine: toHex(areas.buildings?.outline) ?? "#cdcac6",
-      railways: toHex(look.base_map.style.lines?.railways?.color) ?? "#bbbbbb", waterways: toHex(look.base_map.style.lines?.waterways?.color) ?? "#a0c8f0",
+      railways: toHex(bm.lines?.railways?.color) ?? "#bbbbbb", waterways: toHex(bm.lines?.waterways?.color) ?? "#a0c8f0",
       m_per_level: num(b3?.m_per_level, 3.66), max_height: num(b3?.max_height, 200), height_opacity: num(b3?.opacity, 0.9),
     },
+    bridges: { casing: toHex(br.casing_color) ?? "#64748b", wing: 1, shadow: br.shadow?.show !== false, shadow_color: toHex(br.shadow?.color) ?? "#000000",
+               shadow_opacity: alphaOf(br.shadow?.color, 0.25), shadow_blur: num(br.shadow?.blur, 4) },
+    tunnels: { strength: num(tu.strength, 60), toward: typeof tu.toward === "string" ? tu.toward : "Sand", palette: typeof tu.palette === "string" ? tu.palette : "One colour",
+               ratio: tu.casing_dash?.length === 2 ? tu.casing_dash.map(Number) : [1, 1] },
     boundary: defaultBoundary(), ground: defaultGround(), visible: defaultVisible(look), walls: defaultWalls(),
     dark: { roads: [...look.dark.line.lightness], casing: [...look.dark.casing.lightness], areas: [...look.dark.area.lightness], labels: [...look.dark.label.lightness], background: toHex(look.background.dark) ?? "#0e1113" },
   };
@@ -142,6 +159,13 @@ export function normalize(d, base, hosts = []) {
     if (Array.isArray(r) && r.length === 2 && r.every((x) => Number.isFinite(+x))) out.dark[k] = [clamp(+r[0], [0, 1]), clamp(+r[1], [0, 1])];
   }
   out.dark.background = hex(d.dark?.background, out.dark.background);
+  const br = d.bridges ?? {}, ob = out.bridges;
+  Object.assign(ob, { casing: hex(br.casing, ob.casing), wing: clamp(num(br.wing, ob.wing), [0.5, 3]), shadow: !!(br.shadow ?? ob.shadow), shadow_color: hex(br.shadow_color, ob.shadow_color),
+    shadow_opacity: clamp(num(br.shadow_opacity, ob.shadow_opacity), [0, 1]), shadow_blur: clamp(num(br.shadow_blur, ob.shadow_blur), [0, 12]) });
+  const tu = d.tunnels ?? {}, ot = out.tunnels, name = (v, dv) => (typeof v === "string" && v.trim() && v.length <= 40 ? v.trim() : dv);
+  const ratio = typeof tu.ratio === "string" ? tu.ratio.split(":").map(Number) : tu.ratio;
+  Object.assign(ot, { strength: clamp(num(tu.strength, ot.strength), [0, 100]), toward: name(tu.toward, ot.toward), palette: name(tu.palette, ot.palette),
+    ratio: Array.isArray(ratio) && ratio.length === 2 && ratio.every((x) => Number.isFinite(+x) && +x > 0 && +x <= 10) ? ratio.map(Number) : ot.ratio });
   const bd = d.boundary ?? {};
   out.boundary = {
     show: bd.show ?? out.boundary.show, color: hex(bd.color, out.boundary.color), width: clamp(num(bd.width, out.boundary.width), [0.5, 8]),
@@ -188,7 +212,7 @@ export function applyToLook(look, d) {
   if (diff(aa.color, base.arrows.color)) ar.color = aa.color;
   if (aa.minzoom !== base.arrows.minzoom) { ar.minor_minzoom = (ao.minor_minzoom ?? 16) + (aa.minzoom - base.arrows.minzoom); ar.minzoom = aa.minzoom; }
   if (aa.size !== 1) { ar.size.base = +(ao.size.base * aa.size).toFixed(3); ar.size.stops = ao.size.stops.map(([z, s]) => [z, +(s * aa.size).toFixed(3)]); }
-  const st = L.base_map.style, lc = st.areas.landcover, bs = d.base, b0 = base.base;
+  const st = L.base_map?.style ?? { areas: {} }, lc = st.areas.landcover ?? {}, bs = d.base, b0 = base.base;
   if (diff(bs.water, b0.water)) for (const k of ["ocean", "water"]) if (st.areas[k]) st.areas[k].fill = bs.water;
   for (const [key, list] of Object.entries(LAND)) {
     const name = key === "built" ? "land" : key;
@@ -197,12 +221,27 @@ export function applyToLook(look, d) {
   if (st.areas.buildings) for (const [k, to] of [["buildings", "fill"], ["buildingLine", "outline"]]) if (diff(bs[k], b0[k])) st.areas.buildings[to] = bs[k];
   if (st.lines?.railways && diff(bs.railways, b0.railways)) st.lines.railways.color = bs.railways;
   if (st.lines?.waterways && diff(bs.waterways, b0.waterways)) st.lines.waterways.color = bs.waterways;
-  for (const o of [st.buildings_3d, L.base_map.buildings_3d, st.areas.buildings_3d].filter(Boolean)) {
+  for (const o of [st.buildings_3d, L.base_map?.buildings_3d, st.areas.buildings_3d].filter(Boolean)) {
     for (const [k, to] of [["m_per_level", "m_per_level"], ["max_height", "max_height"], ["height_opacity", "opacity"]]) if (diff(bs[k], b0[k])) o[to] = bs[k];
   }
   if (diff(bs.background, b0.background)) L.background.light = bs.background;
   if (diff(d.dark.background, base.dark.background)) L.background.dark = d.dark.background;
   for (const [k, to] of [["roads", "line"], ["casing", "casing"], ["areas", "area"], ["labels", "label"]]) if (diff(d.dark[k], base.dark[k])) L.dark[to].lightness = d.dark[k];
+  const bd = d.bridges, b1 = base.bridges, LB = L.bridges;
+  if (LB) {
+    if (diff(bd.casing, b1.casing)) LB.casing_color = bd.casing;
+    if (bd.wing !== b1.wing) LB.wing_scale = +(look.bridges.wing_scale * bd.wing).toFixed(3);
+    if (LB.shadow) {
+      if (bd.shadow !== b1.shadow) LB.shadow.show = bd.shadow;
+      if (diff(bd.shadow_color, b1.shadow_color) || bd.shadow_opacity !== b1.shadow_opacity) LB.shadow.color = withAlpha(bd.shadow_color, bd.shadow_opacity);
+      if (bd.shadow_blur !== b1.shadow_blur) LB.shadow.blur = bd.shadow_blur;
+    }
+  }
+  const td = d.tunnels, t1 = base.tunnels, LT = L.tunnels;
+  if (LT) {
+    for (const k of ["strength", "toward", "palette"]) if (diff(td[k], t1[k])) LT[k] = td[k];
+    if (diff(td.ratio, t1.ratio)) LT.casing_dash = td.ratio;
+  }
   return L;
 }
 

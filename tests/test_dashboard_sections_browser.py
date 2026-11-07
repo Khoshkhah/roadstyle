@@ -1,4 +1,4 @@
-"""The panel's sections and the legend's rows (docs/guides/dashboard-panel.md): the panel starts empty; the typed options `dashboard.panel.sections`
+"""The panel's sections and the legend's rows (docs/guides/dashboards.md): the panel starts empty; the typed options `dashboard.panel.sections`
 (the page's HTML or a part: "query", "road_card") and `dashboard.legend.rows`, and the run-time calls `rs.sections` and `rs.legend`. The HTML that a
 page adds and the parts follow the light and the dark theme. Skipped without playwright."""
 import pytest
@@ -96,16 +96,17 @@ def test_the_run_time_calls_add_move_and_remove(tmp_path):
 
 
 def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
-    """The text, the small print, the link and the box of a page section have a readable colour in each theme (contrast 4.5 or more), and the colours change."""
+    """The text, the small print, the link and the box of a page section have a readable colour in each theme (contrast 4.5 or more), and the colours change.
+    A box in the card has the card's colour, so it has the card's thin edge."""
     probe = """() => { const ctx = document.createElement('canvas').getContext('2d');
         const rgb = c => { ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.clearRect(0, 0, 1, 1); ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3); };   // any CSS color, also color-mix
         const lum = c => { const [r, g, b] = rgb(c).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
         const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + .05) / (y + .05); };
         const sec = document.querySelector('[data-rs-section=notes]'), cs = s => getComputedStyle(sec.querySelector(s));
-        const card = cs('.rs-sec-box').backgroundColor, part = s => getComputedStyle(document.querySelector(s));
+        const card = getComputedStyle(sec).backgroundColor, edge = cs('.rs-sec-box').boxShadow, part = s => getComputedStyle(document.querySelector(s));
         rsSelect(1);
         const rc = part('.rs-road-card'), q = part('.rs-q'), bg = getComputedStyle(document.getElementById('sb')).backgroundColor;
-        return {text: cs('p').color, note: cs('.sb-note').color, link: cs('a').color, card, roadCard: rc.backgroundColor,
+        return {text: cs('p').color, note: cs('.sb-note').color, link: cs('a').color, card, edge, roadCard: rc.backgroundColor,
                 ratios: [cr(cs('p').color, card), cr(cs('.sb-note').color, card), cr(cs('a').color, card), cr(cs('.rs-sec-box').color, card),
                          cr(getComputedStyle(document.querySelector('.rs-road-card .rs-kv b')).color, rc.backgroundColor), cr(q.color, q.backgroundColor)]}; }"""
     with pw.sync_playwright() as p:
@@ -118,6 +119,7 @@ def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
     assert not errors
     assert light["text"] != dark["text"] and light["card"] != dark["card"] and light["link"] != dark["link"] and light["roadCard"] != dark["roadCard"]
     assert min(light["ratios"]) >= 4.5 and min(dark["ratios"]) >= 4.5, (light, dark)
+    assert light["edge"] != "none" and dark["edge"] != "none", (light, dark)
 
 
 @pytest.mark.parametrize("side", ["left", "right"])
@@ -239,3 +241,27 @@ def test_a_legend_row_has_a_mark_in_the_colour_box_too_and_a_wrong_shape_is_an_e
     circle = next(m for m in got["marks"] if "circle" in m["c"])
     assert circle["w"] == circle["h"] and circle["r"] in ("50%", "5.5px", "5px") and any("line" in m["c"] and m["h"] < 6 for m in got["marks"])
     assert "square, circle or line" in got["bad"]
+
+
+def test_help_tabs_and_number_tiles_come_from_python(tmp_path):
+    """The three Python options of 2026-11-06: `panel.help` (the "?" in the panel's title), a section's `help` (a "?" in its card title), `tabs` (a
+    tab row with panes that switch) and `kpis` (number tiles). They are the same parts that a page script makes with rs.help, rs.tabs and rs.kpi."""
+    path = _page(tmp_path, panel={"help": {"title": "How to read this page", "intro": "What the page shows.", "terms": [["Flow", "cars an hour"]]},
+                                  "sections": [
+        {"id": "t", "label": "Streets", "help": {"title": "About the streets"},
+         "tabs": [{"id": "a", "label": "Overview", "html": "<p id='pa'>A</p>"}, {"id": "b", "label": "Hours", "html": "<p id='pb'>B</p>"}]},
+        {"id": "k", "kpis": [{"title": "Inside", "value": "80.4%", "sub": "promised 80 %", "color": "#15803d"}, {"title": "Hours", "value": 1412}]}]})
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        shown = "() => [getComputedStyle(document.getElementById('pa').parentElement).display !== 'none', !document.getElementById('pb').parentElement.hidden]"
+        m = page.evaluate("""() => ({title: !!document.querySelector('#sb .sb-top .rs-help-btn'), card: !!document.querySelector('[data-rs-section=t] .rs-sec-hd .rs-help-btn'),
+                                     tabs: [...document.querySelectorAll('[data-rs-section=t] .rs-tab')].map(b => b.textContent + (b.classList.contains('on') ? '*' : '')),
+                                     tiles: [...document.querySelectorAll('[data-rs-section=k] .rs-kpi-val')].map(v => v.textContent)})""")
+        assert m == {"title": True, "card": True, "tabs": ["Overview*", "Hours"], "tiles": ["80.4%", "1412"]}, m
+        assert page.evaluate(shown) == [True, False]
+        page.click("[data-rs-section=t] .rs-tab[data-tab=b]")
+        assert page.evaluate(shown) == [False, True]                      # the tab shows its own pane
+        page.click("#sb .sb-top .rs-help-btn")
+        assert page.evaluate("document.querySelector('#rs-help .rs-help-ttl').textContent") == "How to read this page"
+        browser.close()
+    assert not errors, errors
