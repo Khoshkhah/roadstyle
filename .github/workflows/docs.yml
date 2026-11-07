@@ -9,7 +9,7 @@ on:
     paths:
       - "docs/**"
       - "src/roadstyle/**"
-      - "rust/roadstyle-assets/files/**"   # the live parts of the docs (docs/copy_parts.py) are these files
+      - "rust/**"                          # the live parts (docs/copy_parts.py) are rust/roadstyle-assets/files; the live editors run the engine
       - "mkdocs.yml"
       - "pyproject.toml"
       - ".github/workflows/docs.yml"
@@ -29,7 +29,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -60,6 +60,27 @@ jobs:
           test -n "$CARTO_API_KEY" || { echo "::error::repo secret CARTO_API_KEY is not set"; exit 1; }
           test -n "$GOOGLE_MAPS_KEY" || { echo "::error::repo secret GOOGLE_MAPS_KEY is not set"; exit 1; }
           python docs/build_maps.py
+
+      # The live editors of the Manual (Edit design, Edit levels: site/live/, docs/copy_parts.py) run the engine in the page: the
+      # WebAssembly package of rust/roadstyle-wasm/build_editor.sh, with the toolchain and the wasm-bindgen program of the Rust CI (rust.yml).
+      - name: Rust toolchain for the WebAssembly package
+        run: |
+          rustup toolchain install "1.99.1" --profile minimal --target wasm32-unknown-unknown
+          rustup default "1.99.1"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: docs-wasm-1.99.1-${{ hashFiles('rust/Cargo.lock') }}
+      - name: Build the WebAssembly package of the live editors
+        working-directory: rust
+        run: |
+          cargo fetch --locked
+          v=$(grep -m1 -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p')
+          curl -sSfL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$v/wasm-bindgen-$v-x86_64-unknown-linux-musl.tar.gz" | tar xz -C "$RUNNER_TEMP"
+          PATH="$RUNNER_TEMP/wasm-bindgen-$v-x86_64-unknown-linux-musl:$PATH" roadstyle-wasm/build_editor.sh
 
       # First run flips the Pages source from the gh-pages branch to GitHub
       # Actions; subsequent runs are a no-op.

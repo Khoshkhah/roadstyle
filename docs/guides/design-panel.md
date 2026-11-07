@@ -4,6 +4,13 @@ The design panel lets a person change the style of a map in the page: a ready th
 
 It is a JavaScript module that the host page imports. It draws into the host's standard panel (`#sb`), as [the level editor](levels.md#edit-the-levels-in-a-dashboard) does. It has five tabs: **Theme**, **Roads**, **Bridges & tunnels**, **Text** and **Layers**. Each item below has the same form: a box with **Use it for** and **From Python**, the code in tabs, and **Details** that open on a click.
 
+![The design editor: the roads of Södermalm on the map and the design panel open at the tab Theme](../img/design-editor.png)
+
+**Try it.** The design editor below is live, on the roads of Södermalm. Pick a theme, change a colour or a width, and the map changes. Your
+changes stay in your browser. <a href="../../live/design_editor/?roads=sodermalm.parquet" target="_blank" rel="noopener">Open it on a page of its own</a>.
+
+<iframe src="../../live/design_editor/?roads=sodermalm.parquet" loading="lazy" title="The design editor, live, on the roads of Södermalm" class="rs-demo" style="height:780px"></iframe>
+
 | Group | Item | From Python | Use it for |
 |---|---|---|---|
 | Use it | [Add the panel to a page](#add-the-panel-to-a-page) | no | the panel in your dashboard |

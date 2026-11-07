@@ -29,6 +29,9 @@ random.seed(7)
 g["aadt"] = [random.randint(200, 24000) for _ in range(len(g))]
 g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 
+# 0 - the roads of the live editors (docs/copy_parts.py puts them in site/live/area/): the design editor reads this GeoParquet
+g.to_parquet(OUT / "sodermalm.parquet")
+
 # 1 — a first map: the default web backend (OpenFreeMap Positron base, the settings default)
 rs.render_edges(g, backend="web", name="roadstyle — first map").save(OUT / "first_map.html")
 

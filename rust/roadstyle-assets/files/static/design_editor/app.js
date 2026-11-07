@@ -13,7 +13,8 @@ const P = "rs-";                                                   // the prefix
 const ml = globalThis.maplibregl;
 const q = new URLSearchParams(location.search), roadsName = q.get("roads"), designName = q.get("design") || "design.json";
 const boot = document.getElementById("dz-boot");
-const area = (name) => "/area/" + encodeURIComponent(name);
+// the area folder beside this page's folder (relative: /area/ under `roadstyle design edit`, live/area/ on the docs site, docs/copy_parts.py)
+const area = (name) => new URL("../area/" + encodeURIComponent(name), location.href).href;
 async function get(name, need = true){
   const r = await fetch(area(name), {cache: "no-store"});
   if(r.ok) return r;
@@ -119,4 +120,5 @@ async function main(){
     }, 500);
   });
   dz.open();
+  if(rs.sheet && rs.sheet() === 2) rs.sheet(1);                    // a phone (or a narrow frame): the sheet at half height, so the map that changes stays in view
 }
