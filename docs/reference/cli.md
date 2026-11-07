@@ -80,13 +80,32 @@ Street View needs the page served over http(s): `python -m http.server`, then op
 
 ## `roadstyle-levels`
 
-The level step with files you can read and edit ([Which road is on top](../guides/levels.md)). The Rust program `roadstyle` has the same commands, with no Python: `roadstyle levels make`, `levels solve` and `levels edit` ([The roadstyle program](../rust/cli.md#make-and-solve-a-level-area)). `levels make --boundary AREA.geojson` also keeps the edge of the area, which the editor draws as a dashed line:
+The level step with files you can read and edit ([Which road is on top](../guides/levels.md)):
 
 ```text
-roadstyle-levels make SOURCE FOLDER [--query SQL] [--band-col COL] [--order priority|class|COL] [--near-rules]   # roads.parquet, pairs.csv (edits.csv once)
-roadstyle-levels solve FOLDER [--auto-ends] [--max-positions N]                                     # levels.csv
-roadstyle-levels edit FOLDER [--port 8780]                                                          # the level editor
+roadstyle-levels make SOURCE FOLDER [--query SQL] [--geometry COL] [--id-col edge_id] [--band-col COL] [--order priority|class|COL]
+                    [--band-dist 10] [--near-rules] [--engine python|rust]     # roads.parquet, pairs.csv (edits.csv once)
+roadstyle-levels solve FOLDER [--auto-ends] [--max-positions N] [--engine python|rust]    # levels.csv
+roadstyle-levels edit FOLDER [--port 8780]                                                # the level editor
 ```
+
+## The Rust program `roadstyle`
+
+The Rust program has no Python. Its options have the names of the `render_edges` keywords: `--color-by lanes` is `color_by="lanes"`, `--no-arrows` is `arrows=False`. A value that is JSON is read as JSON. All commands are in [The roadstyle program](../rust/cli.md).
+
+| command | does |
+|---|---|
+| `roadstyle page ROADS OUT.html [--palette P] [--profile P] [--settings FILE] [--api-key KEY] [--street-view-key KEY]` | the page in one file, as `render_edges` |
+| `roadstyle sources ROADS OUTDIR [--format geojson\|geoparquet] [--keep COL,COL] [--name NAME]` | stage 1: the style and one file for each source |
+| `roadstyle tiles STAGE1DIR OUT [--format pmtiles\|xyz] [--tile-format mlt\|mvt] [--keep COL,COL] [--base-url URL]` | stage 2: the vector tiles |
+| `roadstyle levels make EDGES FOLDER [--id-col C] [--band-col C] [--order O] [--band-dist 10] [--head-m 5] [--near-rules] [--highway-col C] [--layer-col C] [--bridge-col C] [--tunnel-col C] [--junction-col C] [--boundary AREA.geojson]` | a level area's input. `--boundary` keeps the edge of the area, which the editor draws as a dashed line |
+| `roadstyle levels solve FOLDER` / `levels edit FOLDER [--port 8780] [--page DIR]` | solve the area; the level editor (`roadstyle serve FOLDER` is the same without the check of the area) |
+| `roadstyle design edit ROADS [--design FILE] [--port 8781] [--page DIR]` | the design editor |
+| `roadstyle snapshot PAGE.html OUT.png [--center LON,LAT] [--zoom Z] [--pitch P] [--bearing B] [--width 1200] [--height 800] [--scale 1] [--settle 2.5] [--timeout 40]` | a PNG of a saved page |
+
+## `roadstyle-mcp`
+
+Starts the MCP server: three tools for AI agents. Needs `pip install "roadstyle[mcp]"`.
 
 ## `roadstyle studio`
 

@@ -17,7 +17,7 @@ How the parts work together: [How a map is drawn](../rust/drawing.md).
 
 One row for each **directed edge**: its geometry runs the way traffic flows, and a two-way road is two edges with reversed
 geometry. `render_edges` takes a GeoDataFrame, a file path, a GeoJSON mapping, a pyarrow Table or osmnx edges
-([Loading data](../get-started.md#loading-data)). A column of osmnx lists (`name=['Götgatan', 'Ringvägen']`) becomes its first
+([Loading data](../get-started.md#load-your-data)). A column of osmnx lists (`name=['Götgatan', 'Ringvägen']`) becomes its first
 value.
 
 | Column | Type | Needed | Other name with | What it does |
@@ -69,7 +69,20 @@ Where they come from:
 | Table | Columns |
 |---|---|
 | `visualization.edge_levels` | `edge_id` (BIGINT), `casing_start`, `casing_level`, `casing_end`, `fill_level` (BIGINT), `head_start_m`, `head_end_m` (DOUBLE), `cap_start`, `cap_end` (VARCHAR) |
-| `visualization.edge_levels_meta` | `source` (how the levels were made: `area`, `tags` or `solve`), `area`, `n_edges`, `edge_hash` (the SHA-256 of the sorted edge ids, so the levels fit only these edges), `roadstyle_version`, `created` |
+| `visualization.edge_levels_meta` | `source` (how the levels were made: `area`, `tags` or `solve`), `area`, `n_edges`, `edge_hash` (the first 32 hex characters of the SHA-256 of the sorted edge ids, so the levels fit only these edges), `roadstyle_version`, `created` |
+
+### The files of a level area
+
+`roadstyle-levels make` and `roadstyle levels make` write a folder ([Which road is on top](../guides/levels.md)). The three tables that you edit have a column `time` (local time of the change, `YYYY-MM-DD HH:MM`). The readers ignore it.
+
+| File | Columns |
+|---|---|
+| `roads.parquet`, `pairs.csv` | the solver's input: one row for each road, one row for each relation |
+| `edits.csv` | `relation` (`order`, `stack`, `meet`, `crossing`), `a`, `b`, `a_end` (`start`, `main`, `end`), `b_end`, `enabled`, `time` |
+| `heads.csv` | `road`, `start_m`, `end_m` (empty: 5 m), `time` |
+| `caps.csv` | `road`, `start`, `end` (`round`, `square`, `flat`; empty: round), `time` |
+| `levels.csv` | the result: the four numbers and the ends of each edge |
+| `boundary.geojson` | only with `--boundary`: the edge of the area, drawn as a dashed line in the editor |
 
 ## The look
 
@@ -117,7 +130,7 @@ Bundled: `default`, `highsat`. The table shows `default`; the others state only 
 | `arrows` | `8 entries: minzoom, minor_minzoom, main_below, size, ...` |  |
 | `arrows.minzoom` | `15` |  |
 | `arrows.minor_minzoom` | `16` |  |
-| `arrows.main_below` | `16.5` | the page: below this zoom only the main classes (motorway ... tertiary) get arrows (2026-10-19: was 17) |
+| `arrows.main_below` | `16.5` | the page: below this zoom only the main classes (motorway ... tertiary) get arrows |
 | `arrows.size` | `{"base": 1.8, "stops": [[15, 0.5], [18, 0.9], [22, 3.0]], "minor": 0.…` | icon size by zoom; minor classes x minor |
 | `arrows.spacing` | `[[15, 200], [18, 320], [22, 900]]` | px between repeated arrows (tiles=True) |
 | `arrows.icon` | `{"path": "M 0,2 7,2 7,0 12,2.5 7,5 7,3 0,3 z", "view_box": [12, 5], "…` | drawn 4x large: the size ramp scales it up to ~10x |
@@ -224,7 +237,7 @@ are `render_edges`' keywords.
 
 The rendering gives three outputs: **the MapLibre style** (the rules), **the road data** (the pieces of the roads with their
 values) and, with `render_edges`, **the page** that holds both. The examples below come from Monaco (849 drive edges from osmnx,
-simple mode, `view_3d=True`), made with `rs.export_inline(edges)` on 2026-10-23.
+simple mode, `view_3d=True`), made with `rs.export_inline(edges)`.
 
 ### The output of each way
 
@@ -402,7 +415,7 @@ The road data is the features of the four sources above, with their properties. 
 ([Three choices for the road data](../rust/drawing.md#three-choices-for-the-road-data)):
 
 - **GeoJSON** inside the style (`sources.<name>.data`).
-- **Vector tiles** (MLT by default, MVT 2.1 with `tile_format="mvt"`): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer since 2026-10-27: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page; the popup fields of an overlay are in `props/<source>.json` of `export_style`, by row, not in its tiles), zooms
+- **Vector tiles** (MLT by default, MVT 2.1 with `tile_format="mvt"`): one source `roads`, with the tile layers `simple`, `slots`, `decks` and the base map's layers (no `roads` tile layer: a click reads the road's row in `props.json` of `export_style`, or in the road table of a page; the popup fields of an overlay are in `props/<source>.json` of `export_style`, by row, not in its tiles), zooms
   6 to 16 (MapLibre scales the last zoom up) and a buffer of 80 units. A feature's id is its index in its source. A piece of the layer `simple` and a slot have their road's row as their id (all
   pieces of a road share it). A road feature in a tile has only the marks and the keys of `TILE_ROAD_KEYS` (the allow-list of [Tiling](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md#the-keys-of-a-tile-2026-10-29)), and no text value: the one exception is the street name of a name slot. It has no `__rs_*` flag that is false (every reader takes a missing flag as false), and no `lvl` when the level is 0. Below the last zoom, a line is
   simplified to half a tile unit.

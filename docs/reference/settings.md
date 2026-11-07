@@ -9,7 +9,7 @@ bundled default.
 
 | level | where | scope |
 |---|---|---|
-| 1. bundled | `roadstyle/data/defaults.json` in the package | the defaults |
+| 1. bundled | `data/defaults.json` (in roadstyle-assets) | the defaults |
 | 2. user | `$XDG_CONFIG_HOME/roadstyle/roadstyle.json` (else `~/.config/roadstyle/roadstyle.json`) | read at import |
 | 3. project | `./roadstyle.json` in the working directory | read at import |
 | 4. explicit file | the path in `$ROADSTYLE_CONFIG` | read at import |
@@ -17,7 +17,7 @@ bundled default.
 | 6. one call | `rs.render_edges(edges, settings={...})` | this render only |
 
 Files at levels 2-4 are read when `roadstyle` is imported: create them before `import roadstyle`.
-A file that is not valid JSON is skipped.
+A file that cannot be read (not JSON or YAML, not a mapping) is an error that names the file. A settings file can be JSON or YAML (`.yaml`, `.yml`).
 
 ## Profiles and palettes
 
@@ -25,7 +25,7 @@ The look of a map is two files, picked by name (docs/design/style_config.md). Py
 
 | | holds | bundled | pick |
 |---|---|---|---|
-| **palette** | only colors: road classes (fill, casing, opacity), names, arrows, bridges, tunnels, selection, data maps, overlays, boundary, background | `amber` (default), `carto`, `highsat`, `mono` in `roadstyle/data/palettes/` | `palette="carto"` |
+| **palette** | only colors: road classes (fill, casing, opacity), names, arrows, bridges, tunnels, selection, data maps, overlays, boundary, background, access | `amber` (default), `carto`, `highsat`, `mono` in `roadstyle/data/palettes/` | `palette="carto"` |
 | **profile** | everything that is not a color: widths by zoom, class order and minzoom, zoom ranges of names and arrows, sizes, dashes, caps, the tunnel look | `default`, `highsat` in `roadstyle/data/profiles/` | `profile="highsat"` |
 
 Read the bundled files for every key and its comment. `profile="highsat", palette="highsat"` is the high-saturation look with
@@ -48,8 +48,7 @@ rs.render_edges(edges, profile="highsat", palette="highsat")
 rs.use_settings({"palette": "night"})                   # the rest of the process
 ```
 
-An unknown name is an error that lists the names there are. A palette is a file: Python has no palette registry and no palette
-object.
+An unknown name is an error that lists the names there are. A palette is a file: Python has no palette registry.
 
 ## The settings file
 
@@ -68,10 +67,7 @@ Every settings level uses one layout. `profile` and `palette` name the look; `co
 }
 ```
 
-**The older layout** (2026-10-19): a settings file that still gives style values as `palettes`, `selection`, `roads` or as
-style keys of `config` (`labels`, `arrows`, `bridge_*`, `tunnel_*`, `minzoom`, ...) keeps working for one release. roadstyle
-reads each one as its theme key and gives a `DeprecationWarning` that names the new key (`config.bridge_casing_color ->
-theme bridges.casing_color`). A palette entry can also be wrapped as `{"roads": {...}}`.
+**The older layout:** a settings file can still give style values as `palettes`, `selection`, `roads` or as style keys of `config` (`labels`, `arrows`, `bridge_*`, `tunnel_*`, `minzoom`, ...). roadstyle reads each one as its profile or palette key and gives a `DeprecationWarning` that names the new key (`config.bridge_casing_color -> theme bridges.casing_color`). A palette entry can also be wrapped as `{"roads": {...}}`.
 
 ## Palettes
 
@@ -157,10 +153,10 @@ four palettes: `opacity` 1.0.
 
 In every palette:
 
-- `*_link` roads take the parent's colour, 0.6 × the width (`link_scale`).
-- Tunnels: on the web map, v2's tunnel slider (`tunnel_strength`) moves everything on a tunnel toward a chosen colour (`tunnel_toward`, default Sand), opaque; the casing is
-  dashes, one colour or a two-colour palette (`tunnel_palette`) ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tunnel_look.md)). Bridges get a black casing 1.5 px wider.
-- An unknown class draws as `unclassified`.
+- `*_link` roads take the parent's colour and 0.6 × its width (profile `roads.links.width`).
+- Tunnels: the profile key `tunnels.strength` (default 60) moves everything on a tunnel toward the palette colour `tunnels.toward` (default Sand). The casing is dashes: one colour, or a two-colour pattern from `tunnels.palette` ([design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tunnel_look.md)).
+- Bridges: the casing colour is `bridges.casing_color` (slate `#64748b`) and the casing is `bridges.casing_extra` (1.5 px) wider. The shadow is `bridges.shadow` in the profile and the palette.
+- An unknown class draws like `unclassified`.
 
 ## Custom palettes
 

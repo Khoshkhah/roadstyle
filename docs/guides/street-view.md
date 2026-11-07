@@ -1,6 +1,6 @@
 # Street View
 
-<p class="lead">Click a road and see it in Google Street View, Panoramax or Mapillary, looking the way the road runs. Google's Classic view and Panoramax need no API key.</p>
+<p class="lead">Click a road and see it in Google Street View, Panoramax or Mapillary. The view looks the way the road runs. Google's Classic view and Panoramax need no API key.</p>
 
 <div class="grid cards" markdown>
 
@@ -8,7 +8,7 @@
 
     ---
 
-    On every map by default: a Street View button opens a small window over the map. In a dashboard, the button is in the toolbox.
+    On every map by default. A Street View button opens a small window over the map. In a dashboard, the button is in the toolbox.
 
     [:octicons-arrow-right-24: The floating window](#the-floating-window)
 
@@ -16,24 +16,26 @@
 
     ---
 
-    A page with the map and Street View next to each other, beside or below, with a divider you
-    can drag.
+    A page with the map and Street View next to each other. A divider moves between them.
 
     [:octicons-arrow-right-24: Side by side](#side-by-side)
 
 </div>
 
 !!! warning "Serve the page"
-    Street View only loads in a page served over http(s). Opened from disk (`file://`) it stays
-    grey and the page offers a link instead. Serve the folder with `python -m http.server` and
-    open `http://localhost:8000/map.html`.
+    Street View loads only in a page served over http(s). If you open the page from disk (`file://`), Street View stays
+    grey and the page shows a link. Serve the folder with `python -m http.server`. Then open
+    `http://localhost:8000/map.html`.
 
 ## The floating window
 
-Press the **Street View** button (the person; in the toolbox of a dashboard, it is after the navigate button) and click a road. The window
-follows each new click. Drag its title bar to move it and its corner to resize it. It stays inside
-the map, and comes back inside when the map shrinks (a side panel opening, a smaller browser
-window). The page remembers whether it was open, and where.
+![Ringvägen selected on a satellite base map, with the Street View window showing it](../img/gallery/street_view.jpg)
+
+1. Press the **Street View** button. In a dashboard toolbox, it is after the navigate button.
+2. Click a road.
+
+The window follows each new click. Drag its title bar to move it. Drag its corner to change its size.
+The window stays inside the map. The page remembers if the window was open, and where.
 
 <iframe src="../../maps/street_view_window.html" loading="lazy" title="A map with the Street View window open" class="rs-demo"></iframe>
 
@@ -47,23 +49,27 @@ rs.render_edges(edges, street_view_key=KEY)  # the window with Linked / Classic 
 A key needs more than the key itself: billing, the Maps JavaScript API and a list of your web
 addresses. See [Keys and tokens](google-key.md).
 
-With a Google Maps JavaScript API key the window's bar has the same **Linked / Classic** switch as
-the side-by-side page: Linked is a real panorama and the map marker walks with you, Classic is the
-keyless embed.
+With a Google Maps JavaScript API key, the window bar has a **Linked / Classic** switch.
+Linked is a real panorama, and the map marker walks with you. Classic is the keyless embed.
 
 ## Docked beside the map
 
-A dashboard can have Street View as a side of the page, with a divider you drag, and no panel:
+A dashboard can have Street View as one side of the page, with a divider that you drag:
 
 ```python
 rs.render_dashboard(edges, street_view="dock", street_view_key=KEY).save("street_view.html")
 ```
 
-The window takes the right part of the screen (the lower part on a phone) and the map the rest. The bar is at the left, the map's own edge, and its Street View button closes and opens the dock. Drag the divider: the share is 20 to 80 % and the browser remembers it. The page has no panel; `dashboard={"panel": {...}}` gives it one, and `dashboard={"toolbar": {"position": "top"}}` moves the bar. A map with the toolbox and no panel and no Street View dock is `dashboard={"panel": None}`.
+The Street View window takes the right part of the screen (the lower part on a phone). The map takes the rest.
+The toolbox is at the left edge of the map. Its Street View button closes and opens the dock.
+The share of Street View is 20 to 80 %. The browser remembers it.
+
+The dock page has no panel. Use `dashboard={"panel": {...}}` to add one. Use `dashboard={"toolbar": {"position": "top"}}` to move the toolbox.
+A map with the toolbox, no panel and no Street View dock is `dashboard={"panel": None}`.
 
 ## Side by side
 
-A page of its own: the map and Street View share the screen. Click a road and Street View shows it.
+This page is a page of its own. The map and Street View share the screen. Click a road, and Street View shows it.
 
 **Beside the map**
 
@@ -91,81 +97,84 @@ A page of its own: the map and Street View share the screen. Click a road and St
 |---|---|---|---|
 | `layout` | `"beside"` | `"beside"` or `"below"` the map | `--layout below` |
 | `panel_width` | `42` | Street View's share of the width (of the height when below), 20-80 % | `--panel-width 60` |
-| `resizable` | `True` | a divider the viewer can drag; `False` fixes the size | `--no-resize` |
-| `street_view_key` | `None` | a Google **Maps JavaScript API** key (below) | |
+| `resizable` | `True` | a divider that the viewer can drag. `False` fixes the size | `--no-resize` |
+| `street_view_key` | `None` | a Google **Maps JavaScript API** key (below). The default is the variable `GOOGLE_MAPS_KEY` | |
 
-Every `render_edges` keyword also works here. On a phone, Street View sits under the map.
+Every `render_edges` keyword also works here. On a phone, Street View is under the map.
 
-### With a key: the marker walks with you
+??? info "Linked and Classic"
+    Without a key, the panel is Google's keyless embed. It is a closed box. When the viewer walks in it
+    with Google's arrows, the page does not know where the viewer went. The map marker stays behind.
+    The embed also shows photos that people took indoors.
 
-Without a key the panel is Google's keyless embed. It is a closed box: when the viewer walks inside
-it with Google's own arrows, the page never hears where they went, so the map marker stays behind,
-and it also offers people's indoor photos. With `street_view_key=` the panel is a real panorama
-(the Maps JavaScript API): every step and turn moves the marker on the map, which pans to keep it in
-view, and only Google's own street imagery is shown. The page's own step buttons still walk along
-the clicked road. A switch in the panel's bar flips between the two: **Linked** (this panorama) and
-**Classic** (the keyless embed); the viewer's choice is remembered in their browser. The key is written into the page, as every browser key is.
-To make the key and limit it to your own addresses, see [Keys and tokens](google-key.md). Google
-bills Dynamic Street View per panorama beyond a monthly free allowance. The same key also opens the
-[Google 3D](google-3d.md) window.
+    With `street_view_key=`, the panel is a real panorama (the Maps JavaScript API).
+    Each step and turn moves the marker on the map. The map pans to keep the marker in view.
+    Only Google's own street imagery shows. The step buttons of the page still walk along the clicked road.
+
+    A switch in the bar changes between **Linked** (this panorama) and **Classic** (the keyless embed).
+    The browser remembers the choice.
+
+    The key is written into the page, as every browser key is. To make a key and limit it to your own
+    addresses, see [Keys and tokens](google-key.md). Google bills Dynamic Street View for each panorama
+    above a monthly free quantity. The same key also opens the [Google 3D](google-3d.md) window.
 
 ## Panoramax and Mapillary
 
-The window's title bar has a switch: **Google**, **Panoramax** and **Mapillary**. The choice is remembered in this browser. Every road
-you click, and every step with the arrows, shows the photo of the provider that is nearest to the spot (within 30 m, and only if it looks along the road (photos of the opposite way are not shown)), looking the
-way the road runs where the provider says which way the photo looks. If the provider has no photo there, the window says so.
+The window title bar has a switch: **Google**, **Panoramax** and **Mapillary**. The browser remembers the choice.
+For each road that you click, and for each step, the window shows the photo of the provider that is nearest to the spot.
+The photo must be within 30 m and must look along the road (within 45 degrees). The view looks the way the road runs,
+if the provider says which way the photo looks. If the provider has no photo there, the window says so.
 
 | Provider | Key | Photos |
 |---|---|---|
-| Google | none for Classic; a [Google key](google-key.md) for Linked | Google |
+| Google | none for Classic. A [Google key](google-key.md) for Linked | Google |
 | [Panoramax](https://panoramax.fr/) | none | open data (mostly CC-BY-SA), from `api.panoramax.xyz` |
-| [Mapillary](https://www.mapillary.com/) | a free **client token** | crowd-sourced (CC-BY-SA) |
+| [Mapillary](https://www.mapillary.com/) | a free **client token** ([how to get it](google-key.md#the-mapillary-token)) | crowd-sourced (CC-BY-SA) |
 
-**Mapillary token.** Mapillary needs a free client token: [Keys and tokens](google-key.md#the-mapillary-token).
+**Coverage.** If Panoramax or Mapillary is chosen, the **Coverage** button (the map icon after the provider switch)
+draws where that provider has photos. It shows a line for each sequence, and a dot for each photo from zoom 15.
+Mapillary lines start at zoom 6. Coverage shows only inside the page `boundary`, or inside the bounds of the roads if the page has no boundary.
+Coverage goes away when you choose Google or close the window.
 
-**What leaves your browser.** A click on a road sends the place of the road to the provider that you use (Google, Panoramax or Mapillary). The viewers of Panoramax and Mapillary load from the jsDelivr CDN, so these tabs need an internet connection. The rest of the map still works offline.
+**Click a photo.** If Coverage is on, click a dot to open that photo in the window. A ring marks it until the next road or step.
+The map marker goes to the place where the photo was taken. It turns the way the photo looks.
 
-**Coverage.** With Panoramax or Mapillary chosen, the **Coverage** button (the map icon right after the provider switch) draws where that provider has photos: a line for each
-sequence, and a dot for each photo from zoom 15. The dots are white with a ring in the provider's colour, and the lines have a white edge, so they show on any road colour. When a photo is open, a larger ring marks its dot, so you see which photo you look at: on a road with two carriageways it can be a dot on the other carriageway. It goes away when you choose Google or close the window, and comes back with the
-window. Mapillary's lines start at zoom 6. Coverage is drawn only inside the page's `boundary` (cut to its shape), or inside the bounds of the roads when the page has no boundary.
-
-**Click a photo.** With Coverage on, click a dot (a single photo, from zoom 15) to open that photo in the window; a ring marks it until the next road or step. The map marker goes exactly where the photo was taken (it is not snapped to the road) and turns the way the photo looks, whichever way that is; the direction rule above is only for the photo chosen for a road.
-
-**Known limit: photos are not map-matched.** Neither Panoramax nor Mapillary snaps its photos to a road. A photo's position is the
-raw GPS fix (often 5–15 m off) and its direction is the camera heading. The window does not match them to the network either: it only
-checks the distance (30 m) and the heading (within 45° of the road) of each photo. Near parallel roads, junctions or in tunnels, a
-photo can belong to the neighbouring road, and a drive recorded in one direction may be missing for the other.
-
-The Panoramax viewer opens a flat photo whole and has zoom buttons and the wheel (from the whole photo in to 5°), like panoramax.fr; it reads a photo's crop and field of view the way Panoramax does, and a 360° photo turns freely.
-
-The two viewers are embedded (Photo Sphere Viewer for Panoramax, MapillaryJS for Mapillary) and load from jsDelivr when first used, so
-the page needs a network for them. The map marker turns with the view and follows a step to the next photo. The provider's credit is in the attribution box while its window is open.
+??? info "Details for Panoramax and Mapillary"
+    - **Privacy.** A click on a road sends the place of the road to the provider that you use.
+      The viewers of Panoramax and Mapillary (Photo Sphere Viewer and MapillaryJS) load from the jsDelivr CDN
+      when first used. These tabs need an internet connection. The rest of the map works offline.
+    - **Photos are not map-matched.** Neither provider snaps its photos to a road. The position of a photo is the raw GPS fix
+      (often 5-15 m off). Its direction is the camera heading. The window checks only the distance (30 m) and the heading (45 degrees).
+      Near parallel roads, near junctions or in tunnels, a photo can belong to the neighbouring road.
+      A drive that one direction recorded can be missing for the other direction.
+    - **Panoramax viewer.** A flat photo opens whole. It has zoom buttons and the wheel, like panoramax.fr.
+      A 360 degree photo turns freely.
+    - The map marker turns with the view and follows a step to the next photo.
+      The credit of the provider is in the attribution box while its window is open.
 
 ## Where it looks
 
-- Street View stands on the clicked road's centre line, at the point nearest the click, and looks
+- Street View stands on the centre line of the clicked road, at the point nearest the click. It looks
   the way the edge runs.
-- On a two-way road each direction stands 2.5 m to its right, in its own lane, so the two
+- On a two-way road, each direction stands 2.5 m to its right, in its own lane. The two
   directions look opposite ways.
 - A **marker** (a dot and a cone) on the map shows where Street View stands and which way it looks.
 - The **◀ ▶** buttons walk 15 m back or forward along the road.
 
-Google shows the nearest panorama it has. Where it has no car imagery, that can be a photo someone
-uploaded.
+Google shows the nearest panorama that it has. Where it has no car imagery, the panorama can be a photo that a person uploaded.
 
-**Privacy:** nothing is sent to Google until Street View is opened (side by side: until a road is
-clicked). The request carries only the position and the heading.
+**Privacy:** the page sends nothing to Google until Street View is opened. (Side by side: until you click a road.)
+The request has only the position and the heading.
 
-From your own page: `rsSetStreetView(true)` opens the window, `rsStreetViewStep(15)` steps, and
-the `rs:select` event carries the Street View URL. The marker is yours to drive too:
-`rsSetStreetViewMarker(false)` hides it, and `rsSetStreetViewMarkerAt(lng, lat, heading)` puts it
-where your own Street View stands, snapped onto the road in its lane. See the
-[JavaScript API](../reference/javascript.md).
+??? info "Control Street View from your own page"
+    `rsSetStreetView(true)` opens the window. `rsStreetViewStep(15)` steps. The `rs:select` event has the Street View URL.
+    `rsSetStreetViewMarker(false)` hides the marker. `rsSetStreetViewMarkerAt(lng, lat, heading)` puts the marker
+    where your own Street View stands, snapped onto the road in its lane.
+    See the [JavaScript API](../reference/javascript.md).
 
 ## Where the spot is: position and direction
 
-To place something at an exact spot and facing an exact way (a sensor, a sign, a camera), walk
-there in Street View and read the spot back:
+To put a sensor, a sign or a camera at an exact spot, walk there in Street View. Then read the spot:
 
 ```js
 const s = rsGetStreetViewSpot();
@@ -175,24 +184,24 @@ document.addEventListener("rs:streetviewspot", e => console.log(e.detail));   //
 
 | field | what |
 |---|---|
-| `id`, `properties` | the edge the spot is on (`properties.edge_id` etc.) |
+| `id`, `properties` | the edge of the spot (`properties.edge_id` and others) |
 | `m`, `len` | metres along the edge from its start, and its length |
 | `lng`, `lat` | the point: in the lane on a two-way road, else where the panorama stands |
 | `heading` | where the viewer looks, in degrees from north |
-| `roadHeading` | the edge's own direction at that point |
-| `onRoad` | `false` when the viewer walked off every drawn road: then only `lng`, `lat`, `heading` |
-| `source` | `"panorama"` or `"map"`: see below |
+| `roadHeading` | the direction of the edge at that point |
+| `onRoad` | `false` if the viewer walked off every drawn road. Then only `lng`, `lat`, `heading` are set |
+| `source` | `"panorama"` or `"map"` |
 
-**Which version tells you what.** Linked (with `street_view_key=`) reports every step and turn, so
-the spot is always current and `source` is `"panorama"`. Classic, the keyless embed, is Google's page
-in a sealed frame: it cannot tell the map when the viewer walks or turns inside it. There the spot is
-the one set from the map, by a click or the ◀ ▶ steps, and `source` is `"map"`. Take a position
-from Classic only if you have not moved inside the picture since.
+Linked and Classic give different spots:
 
-| | Linked | Classic |
+| | Linked (with `street_view_key=`) | Classic (keyless) |
 |---|---|---|
+| `source` | `"panorama"` | `"map"` |
 | edge, metres along it, point | current | the clicked or stepped spot |
-| heading | where the viewer looks | the road's direction there |
-| walking or turning in the picture | updates the spot | not seen |
+| `heading` | where the viewer looks | the direction of the road there |
+| walking or turning in the picture | updates the spot | the page does not see it |
+
+Classic is Google's page in a sealed frame. It cannot tell the map when the viewer walks or turns.
+If you moved inside the picture, do not take the position from Classic.
 
 **See also:** [Every parameter](../reference/parameters.md) · [Command line](../reference/cli.md) · [Dashboards](dashboards.md)

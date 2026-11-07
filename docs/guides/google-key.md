@@ -9,15 +9,15 @@ Two roadstyle windows use a Google Maps JavaScript API key:
 | [Google Street View](street-view.md) | works: the Classic embed | adds **Linked**: the map marker walks with you |
 | [Google 3D](google-3d.md) | not available | works |
 
-The two windows use the same key and the same settings. A key alone is not sufficient: Google
-also checks the project's billing, the APIs that the key can use, and the web address of the page.
+The two windows use the same key and the same settings. A key is not enough. Google
+also checks the billing of the project, the APIs that the key can use, and the web address of the page.
 
 ## Make the key
 
 Do these steps in the [Google Cloud console](https://console.cloud.google.com/).
 
 1. Select a project, or make a new project.
-2. Open **Billing** and link a billing account to the project. Google requires billing also for the
+2. Open **Billing** and link a billing account to the project. Google needs billing also for the
    free monthly use.
 3. Open **APIs & Services → Library**, find **Maps JavaScript API**, and click **Enable**. This is
    the only API that roadstyle uses.
@@ -26,7 +26,7 @@ Do these steps in the [Google Cloud console](https://console.cloud.google.com/).
 
 ## Limit the key to your addresses
 
-Each page has the key in its HTML, so each person who opens the page can read the key. The
+Each page has the key in its HTML. Each person who opens the page can read the key. The
 **Websites** list stops other sites from using your key.
 
 1. Under **Application restrictions**, select **Websites**.
@@ -48,13 +48,13 @@ Each page has the key in its HTML, so each person who opens the page can read th
 ## Give the key to roadstyle
 
 Set the environment variable `GOOGLE_MAPS_KEY` before you make the pages. Each page that you
-make then has the key:
+make has the key:
 
 ```bash
 export GOOGLE_MAPS_KEY=AIza...
 ```
 
-Or give the key to one page only:
+Or give the key to one page:
 
 ```python
 rs.render_edges(edges, street_view_key=KEY)                   # Street View with Linked
@@ -67,13 +67,13 @@ rs.render_edges(edges, street_view_key=KEY, google_3d=True)   # and the Google 3
 
 ## Costs
 
-Google bills each Street View panorama and each Google 3D view after a free monthly quantity.
+Google bills each Street View panorama and each Google 3D view above a free monthly quantity.
 The two have different prices. See [Google Maps Platform pricing](https://mapsplatform.google.com/pricing/).
-To get an email before the costs become high, open **Billing → Budgets & alerts** and make a budget.
+To get an email before the costs are high, open **Billing → Budgets & alerts** and make a budget.
 
 ## If the key does not work
 
-Open the browser console (F12). Google writes the cause there:
+Open the browser console (F12). Google writes the cause in it:
 
 | Message in the console | Cause | Do this |
 |---|---|---|
@@ -88,7 +88,14 @@ The Google 3D window also shows "Google refused the key on this page" with the a
 
 The Mapillary tab of the [Street View](street-view.md#panoramax-and-mapillary) window needs a free client token. Panoramax needs no key and no token.
 
-Sign in at [mapillary.com/developer](https://www.mapillary.com/developer), register an application, and copy its
-*client token*. Open **Settings → Keys** on the page, paste it in *Mapillary token*, and click **Save**. The token stays in this browser; it
-is not in the page. Without a token the Mapillary tab says so and asks for nothing. A token that you give with `mapillary_token=` or with the variable `MAPILLARY_TOKEN` **is written into the page**, so everyone who opens the page can read it. Use a token that is limited to your site.
+1. Sign in at [mapillary.com/developer](https://www.mapillary.com/developer) and register an application.
+2. Copy its *client token*.
+3. On the page, open **Settings → Keys**, paste the token in *Mapillary token*, and click **Save**.
+4. Click **Reload**.
+
+The token stays in this browser. It is not in the page. Without a token, the Mapillary tab says that it needs one.
+
+If you give a token with `mapillary_token=` or with the variable `MAPILLARY_TOKEN`, the page **has the token in it**. Everyone who opens the page can read it. Use a token that is limited to your site.
+
+The same **Settings → Keys** box also takes the Google key, for a page that has none.
 

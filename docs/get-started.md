@@ -4,19 +4,19 @@
 
 ## Install
 
-Python 3.10 or newer.
+You need Python 3.10 or newer.
 
 ```bash
 pip install roadstyle
-pip install "roadstyle[duckdb,arrow]"   # extras combine; "roadstyle[all]" takes every one
+pip install "roadstyle[duckdb,arrow]"   # extras combine; "roadstyle[all]" gives every extra
 ```
 
-| Extra | Enables |
+| Extra | What it adds |
 |---|---|
-| `duckdb` | `rs.from_duckdb`, edges from a DuckDB query |
-| `arrow` | edges from a pyarrow Table |
-| `basemaps` | any xyzservices tile provider as a base map |
-| `studio` | `roadstyle studio`, the no-code workbench |
+| `duckdb` | `rs.from_duckdb`: edges from a DuckDB query |
+| `arrow` | `rs.from_arrow`: edges from a pyarrow Table |
+| `basemaps` | each tile provider of xyzservices as a base map |
+| `studio` | `roadstyle studio`: maps with no code |
 | `all` | every extra above |
 
 ??? note "Developing roadstyle"
@@ -56,62 +56,74 @@ pip install "roadstyle[duckdb,arrow]"   # extras combine; "roadstyle[all]" takes
     roadstyle sodermalm_edges.gpkg -o first_map.html
     ```
 
-The file is self-contained: it opens from disk with no server. Hover a road to highlight it, click
-it for its attributes, and switch the base map with the base-map button of the map's controls. In a notebook
-the map shows inline (it loads MapLibre from a CDN, so the preview needs the network).
+The file has all its data in it, so it opens from disk with no server. Move the pointer over a road to light it, and click
+a road to see its fields. The button **Base map and layers** in the map's controls changes the base map. In a notebook the map shows in the cell. The
+notebook needs the network, because the map loads MapLibre from a CDN.
 
 !!! note "Street View needs a server"
-    The Street View button works only when the page is served over http(s), for example with
-    `python -m http.server`, not when it is opened as a file.
+    The Street View window works only on a page that a server gives (http or https), for example `python -m http.server`.
+    It does not work in a page that you open as a file.
 
 ## What your data needs
 
-| Column | Needed? | Switches on |
+| Column | Necessary? | What it gives |
 |---|---|---|
-| `geometry` | required | LineString or MultiLineString, any CRS (reprojected for you) |
-| `highway` | required | the road class (OSM values); another name: `highway_col=` |
-| `name` | optional | street labels, the popup title |
-| `oneway` | optional | one-way arrows |
-| `bridge`, `tunnel`, `layer` | optional | grade separation: tunnels under, bridges on top |
-| `edge_id` | optional | an id kept exact even past 2\*\*53 |
-| anything else | optional | shown in the popup, queryable from JavaScript |
+| `geometry` | yes | LineString or MultiLineString, in any CRS (roadstyle changes it to WGS 84) |
+| `highway` | yes | the road class (the OSM values); for another column name, use `highway_col=` |
+| `name` | no | the street names, and the title of the popup |
+| `oneway` | no | the one-way arrows |
+| `bridge`, `tunnel`, `layer` | no | which road is on top: a tunnel under, a bridge over |
+| `edge_id` | no | an id that stays correct also above 2\*\*53 |
+| other columns | no | the popup shows them, and JavaScript can read them |
 
-An edge is **directed**: its geometry runs the way traffic flows. A two-way road is two edges with
-reversed geometry, drawn side by side as two lanes inside one casing (`twin_casing`), so do not merge them. A two-way footway, path, steps or cycleway
-(`single_line_classes`) is drawn as one full-width line instead; a click on it shows both directions.
+An edge has a **direction**: its line goes the way the traffic goes. A two-way road is two edges, one in each direction. Do not
+join them: roadstyle draws them as two lanes in one outline. A two-way footway, path, steps or cycleway is one line.
 
-## Loading data
+## Load your data
 
-`render_edges` takes a GeoDataFrame, a file path, a GeoJSON mapping, a pyarrow Table or osmnx edges.
-For a WKB geometry column or a DuckDB query, use a helper:
+`render_edges` takes a GeoDataFrame, a file path, a GeoJSON mapping, a pyarrow Table or the edges of osmnx.
 
-```python
-rs.render_edges("roads.gpkg")                            # GeoPackage, GeoJSON, Shapefile, ...
+=== "A file"
 
-import osmnx as ox                                       # pip install osmnx
-G = ox.graph_from_place("Tartu, Estonia", network_type="drive", simplify=False)
-G = ox.simplify_graph(G, edge_attrs_differ=["bridge", "tunnel"])   # else a tunnel merged with
-rs.render_edges(ox.graph_to_gdfs(G, nodes=False))                   # its bridge draws as a bridge
+    ```python
+    rs.render_edges("roads.gpkg")          # GeoPackage, GeoJSON, Shapefile, GeoParquet
+    ```
 
-import duckdb                                            # needs the duckdb extra
-con = duckdb.connect("roads.duckdb")
-con.sql("INSTALL spatial; LOAD spatial")
-e = rs.from_duckdb(con, "SELECT highway, name, ST_AsWKB(geom) AS geom FROM edges",
-                   geometry="geom", crs=4326)            # DuckDB has no CRS: say what it is
-rs.render_edges(e).save("roads.html")
+=== "OpenStreetMap"
 
-import pyarrow as pa                                     # needs the arrow extra
-table = pa.table({"highway": edges["highway"].astype(str).tolist(),
-                  "geometry": [g.wkb for g in edges.geometry]})
-rs.render_edges(rs.from_arrow(table, geometry="geometry", crs=edges.crs))
-```
+    ```python
+    import osmnx as ox                     # pip install osmnx
+    G = ox.graph_from_place("Tartu, Estonia", network_type="drive", simplify=False)
+    G = ox.simplify_graph(G, edge_attrs_differ=["bridge", "tunnel"])   # keep a tunnel apart from its bridge
+    rs.render_edges(ox.graph_to_gdfs(G, nodes=False))
+    ```
 
-More on osmnx, from choosing the area to failed downloads: [Roads from OpenStreetMap](guides/osmnx.md).
+    More in [Roads from OpenStreetMap](guides/osmnx.md).
+
+=== "DuckDB"
+
+    ```python
+    import duckdb                          # the extra duckdb
+    con = duckdb.connect("roads.duckdb")
+    con.sql("INSTALL spatial; LOAD spatial")
+    e = rs.from_duckdb(con, "SELECT highway, name, ST_AsWKB(geom) AS geom FROM edges",
+                       geometry="geom", crs=4326)   # DuckDB keeps no CRS: give it
+    rs.render_edges(e).save("roads.html")
+    ```
+
+=== "pyarrow"
+
+    ```python
+    import pyarrow as pa                   # the extra arrow
+    table = pa.table({"highway": edges["highway"].astype(str).tolist(),
+                      "geometry": [g.wkb for g in edges.geometry]})
+    rs.render_edges(rs.from_arrow(table, geometry="geometry", crs=edges.crs))
+    ```
 
 ## Next steps
 
-- [Style the roads](guides/style.md): palettes, base maps, labels, 3D bridges.
-- [Colour by your data](guides/colour.md): a column becomes colour and a legend.
-- [Google Street View](guides/street-view.md): the window, or a page with Street View beside the map.
+- [Style the roads](guides/style.md): palettes, base maps, names, 3D bridges.
+- [Colour by your data](guides/colour.md): the colours and a legend from a column.
+- [Street View](guides/street-view.md): the window, or a page with Street View beside the map.
 - [Dashboards](guides/dashboards.md): a map with a toolbox and a panel, from one Python call.
 - [Every parameter](reference/parameters.md) and the [command line](reference/cli.md).
