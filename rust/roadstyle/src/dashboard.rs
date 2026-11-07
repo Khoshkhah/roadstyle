@@ -277,6 +277,20 @@ pub struct Toolbar {
     /// turns and tilts it) or `buttons` (the buttons zoom in, zoom out, compass and 2D/3D)
     #[serde(default)]
     pub navigation: Navigation,
+    /// the place of the bar along its edge: `start` (the left corner of a bar at the top or the bottom, the top corner of a bar at the left or the right),
+    /// `middle` (the default) or `end` (Kaveh, 2026-11-06: "it can select middle or left or right corner")
+    #[serde(default)]
+    pub align: Align,
+}
+
+/// The place of the bar along its edge.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Align {
+    Start,
+    #[default]
+    Middle,
+    End,
 }
 
 /// The way the map is navigated from the bar.
@@ -539,7 +553,7 @@ impl Template {
             (Template::Map, _) => (Layout::Dock, None, None, free),
             (Template::Dashboard, Layout::Dock) => (Layout::Dock, panel0.clone(), None, free),
             // the panel over the map is the floating card, see-through (Kaveh, 2026-11-06: the look of the chart demo is the default)
-            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone().map(|p| Panel { look: PanelLook::Card, ..p }), Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box }),
+            (Template::Dashboard, Layout::Overlay) => (Layout::Overlay, panel0.clone().map(|p| Panel { look: PanelLook::Card, ..p }), Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box, align: Align::Middle }),
                                                        WindowRules { clamp: true, recenter_map: false, ..free }),
         };
         Dashboard { template: self, layout, panel, toolbar, windows, boundary: BoundaryRules::new(), google_3d: Google3d::new(), legend: LegendOptions::default(),
@@ -702,7 +716,7 @@ mod tests {
         assert_eq!((d.layout, d.panel.as_ref().map(|p| (p.side, p.width_px, p.look)), d.toolbar), (Dock, Some((Edge::Left, 400, PanelLook::Frame)), None));
         assert!(d.panel.as_ref().unwrap().sections.is_empty(), "the panel starts empty");
         let r = Template::Dashboard.dashboard(Overlay);
-        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box })));
+        assert_eq!((r.layout, r.toolbar), (Overlay, Some(Toolbar { position: Edge::Right, settings: true, hold: false, navigation: Navigation::Box, align: Align::Middle })));
         assert!(r.windows.clamp && !r.windows.recenter_map);
         for layout in [Dock, Overlay] {         // the map has no panel, whatever the layout is
             let free = Template::Map.dashboard(layout);
@@ -797,7 +811,7 @@ mod tests {
     fn the_defaults_are_the_json_that_the_page_reads() {
         let v = serde_json::to_value(Template::Dashboard.dashboard(Overlay)).unwrap();
         assert_eq!(v["template"], "dashboard");
-        assert_eq!(v["toolbar"], serde_json::json!({"position": "right", "settings": true, "hold": false, "navigation": "box"}));
+        assert_eq!(v["toolbar"], serde_json::json!({"position": "right", "settings": true, "hold": false, "navigation": "box", "align": "middle"}));
         assert_eq!(v["scale_box"], false);
         assert_eq!(v["credits"][0]["text"].as_str().map(|t| t.contains("OpenStreetMap")), Some(true));        // the dashboard credits its roads
         assert_eq!(serde_json::to_value(Template::Map.dashboard(Overlay)).unwrap()["credits"], serde_json::json!([]));
@@ -818,7 +832,7 @@ mod tests {
     fn a_partial_dashboard_is_merged_over_the_defaults() {
         let base = Template::Dashboard.dashboard(Overlay);
         let d = merge(&base, &serde_json::json!({"toolbar": {"position": "left", "hold": true}, "google_3d": {"selection_style": {"width": 12.0}, "mesh_altitude_m": 2.0}})).unwrap();
-        assert_eq!(d.toolbar, Some(Toolbar { position: Edge::Left, settings: true, hold: true, navigation: Navigation::Box }));
+        assert_eq!(d.toolbar, Some(Toolbar { position: Edge::Left, settings: true, hold: true, navigation: Navigation::Box, align: Align::Middle }));
         assert_eq!((d.google_3d.selection_style.width, d.google_3d.selection_style.color.as_str(), d.google_3d.mesh_altitude_m), (12.0, "#22d3ee", 2.0));
         assert_eq!(merge(&base, &serde_json::json!({"toolbar": null})).unwrap().toolbar, None);
         for (bad, said) in [(serde_json::json!({"toolbar": {"colour": 1}}), "colour"), (serde_json::json!({"template": "map"}), "cannot change the template"),
