@@ -21,7 +21,7 @@ from test_host_page_gaps_browser import HOST  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 FILES = ROOT / "rust/roadstyle-assets/files"
 # the controls to compare: a plain button, a filled one, a chip and a field of Ask, and a button of the data dock
-_CONTROLS = {"New": ".rs-ask-new", "Key": ".rs-ask-keyb", "Back to chat": ".rs-ask-keyhd button", "Save": ".rs-ask-btns .sb-primary",
+_CONTROLS = {"New": ".rs-ask-new", "AI": ".rs-ask-keyb", "Done": ".rs-ask-keyhd button", "Save key": ".rs-ask-btns .sb-primary",
              "Clear": ".rs-ask-btns button:not(.sb-primary)", "key field": ".rs-ask-key input.rs-q", "dock button": "#rs-dock .rs-dd-acts button"}
 _READ = """(sels) => Object.fromEntries(Object.entries(sels).map(([k, s]) => { const e = document.querySelector(s); if(!e) return [k, null];
   const c = getComputedStyle(e); return [k, ["border-top-width", "border-top-style", "border-top-color", "border-radius", "background-color", "color",

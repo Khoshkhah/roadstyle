@@ -141,7 +141,7 @@ export function askPanel(o = {}){
 
   // ---- the view: rs.frame; the head row is the tool row (it does not scroll), the body the conversation, the bar the question box ----
   const tools = $("div", "rs-ask-top"), who = $("span", "rs-ask-who"), keyB = $("button", "rs-ask-keyb", "AI"), newB = $("button", "rs-ask-new", "New");
-  keyB.type = newB.type = "button"; keyB.setAttribute("aria-pressed", "false"); keyB.title = "Your key for the AI service"; newB.title = "Start a new conversation";
+  keyB.type = newB.type = "button"; keyB.setAttribute("aria-pressed", "false"); keyB.title = "The AI service, its model and your key"; newB.title = "Start a new conversation";
   tools.append(who, keyB, newB);
   const helpB = o.help !== false && rs.help && rs.help.button(tools, {title: "Ask", button: "About Ask",
     intro: "Ask a question about the roads in words. An AI service writes the SQL, runs it on the data of this page, and answers in a few sentences. The table goes to the data dock, and the roads light on the map.",
@@ -252,8 +252,8 @@ export function askPanel(o = {}){
     // no notes under the form (Kaveh, 2026-11-06: "I think we should remove this part too"): the "?" of Ask says where the key and the data go; the line
     // here shows only the state of a save
     const row = (l, el) => { const r = $("label", "rs-ask-krow"); r.append($("span", "", l), el); return r; };
-    const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "‹ Back to chat"); back.type = "button"; back.onclick = () => showKey(false);
-    hd.append($("b", "", "Your key"), back);
+    const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "Done"); back.type = "button"; back.onclick = () => showKey(false);
+    hd.append($("b", "", "AI service"), back);              // Done: the service and the model are already kept
     sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(isAuto() ? "Ask uses Auto now." : now()); paintWho(); };
     if(isAuto()){                                                   // Auto: the order of the services; a service of the box changes its key or model
       const ol = $("ol", "rs-ask-order");

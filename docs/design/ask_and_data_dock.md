@@ -32,7 +32,7 @@ Later the same day, Kaveh also asked for these:
 9. The agent can also change the map: colour roads, filter the map, and move the map ([The map tools](#the-map-tools)). It still
    cannot change the data.
 10. The agent sees all the host's data, not one table ([The schema](#the-schema)). The conversation scrolls by the panel's own protocol
-   (`rs-pbody`). **AI** is a button (it was **Key** until 2026-11-07), and its form has "Back to chat". The question box is one box with a round send button. A page with
+   (`rs-pbody`). **AI** is a button (it was **Key** until 2026-11-07), and its form has **Done** (it was "Back to chat" until 2026-11-07). The question box is one box with a round send button. A page with
    Ask has the card look of the panel by default.
 
 ## Problem
@@ -917,8 +917,8 @@ Not checked yet: that each service gives tool calls in this form with a real key
 ### The keys
 
 The key form is **in the Ask view**, not in roadstyle's Settings box: the person gets the key where the person needs it, and the
-Settings box does not change. **AI** in the top row shows the form in place of the conversation. The form has a title row "Your key"
-with **‹ Back to chat**. After a Save that works, the form says "The key works: 12 models. Ask uses …" and goes back to the chat by
+Settings box does not change. **AI** in the top row shows the form in place of the conversation. The form has a title row "AI service"
+with **Done** (the service and the model are kept at once, so Done only closes the form). After a Save that works, the form says "The key works: 12 models. Ask uses …" and goes back to the chat by
 itself after 1.6 s.
 
 | Field | localStorage key | What it is |
