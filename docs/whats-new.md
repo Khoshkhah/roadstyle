@@ -1,11 +1,26 @@
 # What is new
 
-The changes of each version, short. Every change, with the details, is in the [CHANGELOG](https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md). To move a script to a new version, see [Move a dashboard to the new version](guides/migrating-dashboard.md).
+This page lists the changes of each version in short. The [CHANGELOG](https://github.com/Khoshkhah/roadstyle/blob/main/CHANGELOG.md) has every change with its details. To move a script to a new version, see [Move a dashboard to the new version](guides/migrating-dashboard.md).
+
+## What is new in 0.28.0
+
+- **The design panel is a dashboard part.** Any page with a dashboard can hold the panel that edits the look of a map, with the tabs Theme, Roads, Text and Layers. [Edit the design of a map](guides/design-panel.md)
+- **An *Opacity* slider for the 3D buildings** of a vector base map, and the page keyword `buildings_opacity`. The buildings are solid by default, so a road does not show through a roof. The far buildings of a tilted map now show.
+- **`rs.restyle(style)`** gives a map a new look on the same tiles. The event `rs:stylechange` follows each new style.
+- **`export_look` has the colours of the map.** It read the palette and missed the colours of a design and of a link class.
+
+## What is new in 0.27.1
+
+- **A page can add a row to the base-map box** (`rsAddTopRow`), a day picker (`rs.days.use`), and a card that opens something (`rs.sections.add({..., open: fn})`).
+- **Elevation:** the base-map box has a *3D terrain* row next to *Hillshade* (`hillshade=True` and `terrain=True` start them on), and a switch for the one-way arrows. Page keywords: `terrain_tunnels` and `terrain_exaggeration`.
+- **A new look on a live map needs no new tile** when the roads keep their shape: a colour reaches a road piece by its role, and `LiveMap.setLook` keeps the tiles.
+- **The "?" of a card that folds is before the chevron.** The chevron is last.
+- **A select box on a card looks like a field.**
 
 ## What is new in 0.27.0
 
-- **The dashboard's panel starts empty, and a page adds what it needs**: its own HTML, the query box or the road card, with `dashboard={"panel": {"sections": [...]}}` or `rs.sections.add`. The map of a dashboard has the defaults of a map page. This is a breaking change: see [Migrate a dashboard](guides/migrating-dashboard.md).
-- **Cards: one standard for the panel.** A section with a `label` is a card, with or without a background (`background: False`), that folds or not (`fold: True`). Every card has the same width, gap, padding and title row, and the "?" of `rs.help.button` is at the end of the title row.
+- **The dashboard's panel starts empty, and a page adds what it needs**: its own HTML, the query box or the road card, with `dashboard={"panel": {"sections": [...]}}` or `rs.sections.add`. The map of a dashboard has the defaults of a map page. `dashboard={"phone": ...}` is gone: the page turns to its phone form when the window is 700 px wide or less. This is a breaking change: see [Migrate a dashboard](guides/migrating-dashboard.md).
+- **Cards: one standard for the panel.** A section with a `label` is a card, with or without a background (`background: False`), that folds or not (`fold: True`). Every card has the same width, gap, padding and title row, and the "?" of `rs.help.button` is at the end of the title row (before the chevron since 0.27.1).
 - **Every part of the dashboard follows the dark theme, and every scroll area scrolls the same way as the panel.**
 - **Street View:** Coverage is an icon after the provider switch, and the close button stays at the top right.
 
