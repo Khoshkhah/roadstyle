@@ -31,6 +31,14 @@ g["speed_kph"] = [random.choice([30, 40, 50, 60, 70]) for _ in range(len(g))]
 
 # 0 - the roads of the live editors (docs/copy_parts.py puts them in site/live/area/): the design editor reads this GeoParquet
 g.to_parquet(OUT / "sodermalm.parquet")
+# ... and the level area of the live level editor (the files of `roadstyle levels make` and `solve`), with empty heads.csv and caps.csv
+from roadstyle import level_area  # noqa: E402
+
+AREA = OUT / "levels_area"
+level_area.make_area(g, AREA)
+level_area.solve_area(AREA)
+for name, head in (("heads.csv", "road,start_m,end_m\n"), ("caps.csv", "road,start,end\n")):
+    (AREA / name).write_text(head, encoding="utf-8")
 
 # 1 — a first map: the default web backend (OpenFreeMap Positron base, the settings default)
 rs.render_edges(g, backend="web", name="roadstyle — first map").save(OUT / "first_map.html")

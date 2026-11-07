@@ -67,6 +67,7 @@ nav:
       - JavaScript: guides/dashboard-manual/javascript.md
       - Editors and tools:
           - Edit the design of a map: guides/design-panel.md
+          - Edit the levels: guides/level-editor.md
           - The data dock: guides/data-dock.md
           - Ask: guides/ask.md
   - Share:

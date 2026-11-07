@@ -12,7 +12,7 @@ It also makes the live editors (Edit design, Edit levels), laid out as `roadstyl
 
     site/live/             files/static (design_editor/, level_editor/, dashboard/, ...) and host_options.json
     site/live/level_editor/pkg/   the engine: the WebAssembly package of rust/roadstyle-wasm/build_editor.sh (the docs workflow builds it)
-    site/live/area/        the roads of docs/build_maps.py (sodermalm.parquet)
+    site/live/area/        the roads and the level area of docs/build_maps.py (sodermalm.parquet; roads.parquet, pairs.csv, levels.csv, ...)
 
 The pages save nothing on GitHub Pages: a change stays in the visitor's browser. A missing package or roads file is a warning, so the strict
 build (the docs workflow) fails on it.
@@ -50,9 +50,12 @@ def live(out, docs):
         shutil.copytree(pkg, out / "level_editor" / "pkg", dirs_exist_ok=True)
     else:
         log.warning(f"the live editors have no engine: {pkg} has no roadstyle_wasm.js (run rust/roadstyle-wasm/build_editor.sh)")
-    roads = docs / "maps" / "sodermalm.parquet"
     (out / "area").mkdir(exist_ok=True)
-    if roads.exists():
-        shutil.copy(roads, out / "area" / roads.name)
-    else:
-        log.warning(f"the live editors have no roads: {roads} is missing (run docs/build_maps.py)")
+    roads, levels = docs / "maps" / "sodermalm.parquet", docs / "maps" / "levels_area"
+    for src in (roads, levels):
+        if not src.exists():
+            log.warning(f"the live editors have no {src.name}: {src} is missing (run docs/build_maps.py)")
+        elif src.is_dir():
+            shutil.copytree(src, out / "area", dirs_exist_ok=True)
+        else:
+            shutil.copy(src, out / "area" / src.name)
