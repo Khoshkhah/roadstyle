@@ -20,7 +20,7 @@
 import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
-import {initPanelScroll} from "../panelscroll.js";
+import {editorFrame} from "../frame.js";
 import {quiet} from "../select.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
@@ -105,12 +105,13 @@ const DOCS = "https://khoshkhah.github.io/roadstyle/guides/levels/";
 function levelsHelp(c, back){
   const dot = (col, n) => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};vertical-align:middle"></span> road ${n}`;
   const terms = [
-    ["Pick roads", "Click a road to pick it. Click a second road to see what is between the two roads. Click a picked road, or press Esc, to cancel. You can also type an edge id or an edge_ref in the find box."],
+    ["Road ends", "The tab for one road. Click a road to pick it; a click on another road picks that road. Choose the shape of each end (round, square or flat) and use the sliders to change the length of each casing head."],
+    ["Stacking", "The tab for two roads. Click a road, then a second road, to see the rules between them and to add a rule. Click a picked road, or press Esc, to cancel. In both tabs you can also type an edge id or an edge_ref in the find box."],
     ["Order", "Says which road is drawn on top where the two roads meet. Use <b>on top</b> to choose the road."],
     ["Stack", "Says that one road crosses over the other road, for example on a bridge. Choose the road that is on top, and the parts of its casing that cross."],
     ["Meet", "Joins an end of road 1 to an end of road 2. Each end is drawn under the fill of the other road, so the two roads join with no ring."],
     ["On top", "The road that is drawn over the other road. Click its button."],
-    ["Casing parts", "The casing is the outline of a road. It has three parts: the <b>start head</b>, the <b>main</b> part and the <b>end head</b>. Choose one part, some parts or the whole road. Use the sliders to change the length of a head. Round, square or flat is the shape of a road end."],
+    ["Casing parts", "The casing is the outline of a road. It has three parts: the <b>start head</b>, the <b>main</b> part and the <b>end head</b>. Choose one part, some parts or the whole road. The length of a head is set in <b>Road ends</b>."],
     ["Add to the list", "Puts the new rule in the list of waiting changes. Nothing is solved yet. Use <b>switch off</b> to cancel a rule that the input found."],
     ["Discard", "Removes all the waiting changes."],
     ["Apply and solve", "Solves all the waiting changes together, draws again the roads that changed, and saves them. If the solver refuses the changes, nothing is saved."],
@@ -118,7 +119,7 @@ function levelsHelp(c, back){
     ["Issues", "<b>Given up</b>: a stack that the solver could not keep. It is a flaw on the map. <b>Near warnings</b>: a road that comes near the road below it. <b>Order wishes not kept</b>: an order rule that other rules do not let the solver keep."]];
   if(back != null) terms.push([`← ${back}`, "Goes back to the steps of the page. If changes are waiting, the editor asks you to <b>Apply</b>, <b>Discard</b> or <b>Stay</b>."]);
   return {title: "Edit levels", button: "How to use the level editor",
-    intro: `A level says which road is drawn over which road: a road at a higher level is drawn over a road at a lower level. Click a road on the map: it is ${dot(c.select, 1)}. Click a second road: it is ${dot(c.second, 2)}. Each road has its colour on the map and in the panel. The panel then shows the rules between the two roads.`,
+    intro: `A level says which road is drawn over which road: a road at a higher level is drawn over a road at a lower level. The editor has two tabs for changes. <b>Road ends</b> changes one road: the shape and the head length of each end. <b>Stacking</b> changes two roads: which one is drawn over the other. In Stacking, the first road you click is ${dot(c.select, 1)} and the second is ${dot(c.second, 2)}, on the map and in the panel.`,
     terms,
     note: `More in the guide: <a href="${DOCS}#edit-the-levels" target="_blank" rel="noopener">Edit the levels</a> and <a href="${DOCS}#edit-the-levels-in-a-dashboard" target="_blank" rel="noopener">Edit the levels in a dashboard</a>.`};
 }
@@ -604,35 +605,43 @@ window.lvApi = async (path, body) => {
   throw new Error("not found: " + path);
 };
 
-// --- the panel (static/level_editor.html), with its scripts run, in the host's panel: the host's body and title are kept and hidden
+// --- the panel (static/level_editor.html), with its scripts run, in roadstyle's editor frame (../frame.js; docs/guides/dashboard-parts.md, "An editor in
+// the panel"): the frame gives the title line with "← <backLabel>" (none with backLabel null), the dashboard's tab row (with the counts of History and
+// Issues), the one body that scrolls and the bar at the bottom edge; open() keeps the host's title and body and hides them, close() shows them again
 const html = (await (await fetch(new URL("../../level_editor.html", import.meta.url))).text()).replace("__STATS__", JSON.stringify(stats()));
 window.lvColors = [COLORS.select, COLORS.second];
 window.lvHighlight = highlight;                                 // the panel gives the picked roads (static/level_editor.html)
 window.lvDownload = download;                                    // the History tab's button
+const fr = editorFrame({panel, title: "Edit levels", back: backLabel, id: "lv", label: "Level editor",
+  tabs: [["ends", "Road ends"], ["edit", "Stacking"], ["history", "History"], ["given", "Issues"]]});
+fr.root.id = "lv"; fr.root.dataset.mode = "ends";               // the panel's own rules (#lv ...) and its mode (Road ends or Stacking)
+for(const b of fr.root.querySelectorAll("#lv-tabs [data-tab]")) b.dataset.t = b.dataset.tab;      // the attribute of the old tab row: a host's script can still find a tab
+// the counts of History and Issues: hidden while 0 (the panel shows them when it has the numbers)
+fr.root.querySelector("#lv-tab-history").insertAdjacentHTML("beforeend", '<span class="rs-count" id="lv-hist-n" hidden>0</span>');
+fr.root.querySelector("#lv-tab-given").insertAdjacentHTML("beforeend", '<span class="rs-count" id="lv-gu-n" hidden>0</span><span class="rs-count" id="lv-nr-n" hidden>0</span>');
+window.lvFrame = fr;
+fr.open("ends");
+if(window.rs?.sheet && rs.sheet() === 2) rs.sheet(1);         // a phone: the frame opens the sheet at its full height, but you pick the roads on the map: 40 %
 const holder = document.createElement("div");
 holder.innerHTML = html;
-// the panel's nodes, and the listeners that its scripts add to the document and the map as they run (destroy takes them off)
-const nodes = [], heard = [];
+// the panel's parts into the frame (its panes into the body, its apply bar into the bar, the note and the busy cover over the frame), and the listeners
+// that its scripts add to the document and the map as they run (destroy takes them off)
+const heard = [];
 const [docOn, mapOn] = [document.addEventListener, map.on];
 document.addEventListener = function(...a){ heard.push(() => document.removeEventListener(...a)); return docOn.apply(this, a); };
 map.on = function(...a){ heard.push(() => map.off(...a)); return mapOn.apply(this, a); };
-const hostTitle = hostBar.firstElementChild, hostWas = {title: hostTitle.style.display, body: hostBody.style.display, scroll: hostBody.scrollTop};
-hostTitle.style.display = hostBody.style.display = "none";
 try {
   for(const n of [...holder.childNodes]){
-    const node = n.tagName === "SCRIPT" ? Object.assign(document.createElement("script"), {textContent: n.textContent}) : n;
-    nodes.push(node);
-    if(node.classList?.contains("lv-title")) hostBar.prepend(node);   // the top line, before the host's hide button
-    else hostCard.appendChild(node);                              // a script runs here, at once
+    if(n.id === "lv-src"){
+      for(const part of [...n.children]) (part.dataset.pane ? fr.body : part.id === "lv-bar" ? fr.bar : fr.root).appendChild(part);
+    } else if(n.tagName === "SCRIPT") fr.root.appendChild(Object.assign(document.createElement("script"), {textContent: n.textContent}));   // it runs here, at once
+    else if(n.nodeType === 1) fr.root.appendChild(n);            // the panel's <style>: it goes away with the frame
   }
 } finally { [document.addEventListener, map.on] = [docOn, mapOn]; }
-initPanelScroll();                                               // the editor's tabs scroll by the panel's protocol (the class rs-pbody)
-if(backLabel == null) document.getElementById("lv-back").remove();      // a page with no steps to go back to
-else document.getElementById("lv-back").textContent = "← " + backLabel;
-document.getElementById("lv").addEventListener("lv:back", () => events.dispatchEvent(new CustomEvent("back")));
+fr.root.addEventListener("lv:back", () => events.dispatchEvent(new CustomEvent("back")));
 // the help window (rs.help, the dashboard's own): its "?" button is next to the title; destroy() sets the host's own words again, or takes the window away
 const hadHelp = rs.help.get();
-rs.help.set({...levelsHelp(COLORS, backLabel), anchor: document.querySelector(".lv-title .t")});
+rs.help.set({...levelsHelp(COLORS, backLabel), anchor: fr.top.querySelector(".t")});
 
 // a finger's tap on a phone: the wide tap line, when the dashboard picked nothing for this tap (its pick box can be wider than the road layers
 // under the finger, and its pick comes before the map's click); the road table's row of the piece, which has the road
@@ -672,9 +681,8 @@ function destroy(){
   window.rsDeselect?.();
   if(hadHelp) rs.help.set(hadHelp); else rs.help.clear();
   heard.forEach(off => off());
-  nodes.forEach(n => n.remove());
-  [hostTitle.style.display, hostBody.style.display] = [hostWas.title, hostWas.body];     // the host's panel as it was
-  hostBody.scrollTop = hostWas.scroll;
+  fr.close();                                                    // the frame and the panel go; the host's title and body show again
+  delete window.lvFrame;
   for(const id of [...mine.layers, "lv-ends-end", "lv-ends"]) if(map.getLayer(id)) map.removeLayer(id);
   for(const id of [...mine.sources, "lv-ends"]) if(map.getSource(id)) map.removeSource(id);
   mine.images.forEach(id => map.hasImage(id) && map.removeImage(id));

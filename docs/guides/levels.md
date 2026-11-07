@@ -119,13 +119,15 @@ The editor is the standard dashboard. It has the panel, the toolbox and the phon
 
 - **The base-map box.** The map starts on the blank base map, as every dashboard does. The box has the base maps, the switches under *On top* (Hillshade, Labels, One-way arrows, 3D buildings) and the dark twin that follows the theme.
 - **Red and blue picks.** Road 1 is red, and road 2 is blue. The hover has a light color of the road that the next click picks. A long road name ends with "…", so the rows stay inside the panel.
-- **Segmented tabs.** *Edit*, *History* and *Issues* are the dashboard's segmented control. The tabs scroll as the panel does: a thin scrollbar at the outer edge, a line under the header and a fade at the bottom.
+- **The editor frame.** The editor is in the dashboard's [editor frame](dashboard-parts.md#an-editor-in-the-panel): the title line with "← back", the tab row *Road ends*, *Stacking*, *History* and *Issues* (Issues has a red count for the crossings given up and an orange count for the near warnings, only when there are some), one body that scrolls, and the apply bar at the bottom edge while changes wait. Its switches, cards, buttons and warnings are the [dashboard parts](dashboard-parts.md).
 - **The area boundary.** The dashed line of `boundary.geojson`.
 - **The mode box.** When the roads have a `modes` column (driving, walking, cycling, bus, private), the box shows only the roads of the ticked modes.
 
 
-`roadstyle levels edit out/area` (or `roadstyle-levels edit out/area`) opens a local page with the map and a panel. Click a road, or find it by edge id or `edge_ref`. Pick a
-second road to see every pair between the two.
+`roadstyle levels edit out/area` (or `roadstyle-levels edit out/area`) opens a local page with the map and a panel. It has two tabs for changes:
+
+- **Road ends** is for one road. Click a road, or find it by edge id or `edge_ref`. A click on another road picks that road. Set the shape and the head length of each end.
+- **Stacking** is for two roads. Click a road, then a second road, to see every pair between the two and to add a rule.
 
 The editor is in Rust: the solver runs in the page (WebAssembly), and a small Rust server (`roadstyle levels edit out/area`; `roadstyle serve out/area` is the same without the check of the area) gives the page
 the area's files and saves your changes. Monaco solves in 0.1 s in the page. The server answers only on 127.0.0.1, only to its own address (`Host`), and saves only the page's own changes (`Origin`) of at
@@ -141,7 +143,7 @@ dashboard's panel, toolbox and phone form, and `roadstyle serve` gives it the fi
 - **Switch off** a pair that the input found. To replace a found stack, switch off its rows, then add your own parts.
 - **Before you add**, the page tells you if the new rule is already there or makes a loop with other rules (A over B, B over C, C over
   A: no numbers keep them all).
-- **Each end of a road**: its cap (*round*, *square*, *flat*) and its head length. A change of caps or heads needs no solve.
+- **Each end of a road** (the *Road ends* tab): its cap (*round*, *square*, *flat*) and its head length. A change of caps or heads needs no solve.
 - **Apply and solve** solves all waiting changes together and redraws the roads that changed. If the solver refuses them, nothing is
   saved.
 - **Modes**: when the roads have a `modes` column (duckOSM gives it), boxes show only the roads of the ticked modes.

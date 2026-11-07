@@ -231,7 +231,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert stored and len(stored.strip().split("\n")) > roads, "the first solve saved levels.csv in the browser"
             assert page.locator("#lv").count() == 1 and page.locator("#sb .sb-card #lv").count() == 1, "the editor is in the host's panel"
             assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "none", "the host's body is kept, hidden"
-            assert page.locator("#sb .sb-top .lv-back").inner_text() == "← Steps" and page.locator("#sb .sb-top .t").inner_text() == "Edit levels"
+            assert page.locator("#sb .sb-top #lv-back").inner_text() == "← Steps" and page.locator("#sb .sb-top .rs-frame-title .t").inner_text() == "Edit levels"
             assert page.locator("#sb-hide").is_visible(), "the host's hide button stays"
             # the lean road table: only the fields that the page reads (reads.json's table), live data's id and the road that a click picks
             want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road", "modes"}
@@ -277,7 +277,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             # the help window (rs.help of the host's dashboard): the editor's words with the "<- Steps" line, and the ? button next to its title
             assert page.evaluate("window.host.help.get().title") == "Edit levels"
             assert page.evaluate("window.host.help.get().terms.some((t) => t[0] === '\u2190 Steps')")
-            assert page.evaluate("!!document.querySelector('.lv-title #rs-help-btn')")
+            assert page.evaluate("!!document.querySelector('.rs-frame-title #rs-help-btn')")
             # close, open again, close: the same listeners each time, none left; the host's roads, base map and dashboard back
             opened = page.evaluate("counts()")
             back = "JSON.stringify(Object.fromEntries(hostMap.getStyle().layers.filter(l => l.id.startsWith('host-')).map(l => [l.id, l.source])))"
@@ -287,7 +287,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
                 assert page.evaluate("window.host.help.get() === null && !document.getElementById('rs-help-btn') && !document.getElementById('rs-help')"), "the help went"
                 assert page.evaluate(back) == page.evaluate("JSON.stringify(window.hostSources)"), "the host's layers as they were"
                 assert page.evaluate("!document.getElementById('lv') && !hostMap.getLayer('lv-ends') && !hostMap.getSource('host-lv-roads')")
-                assert page.evaluate("window.rs === window.host && !window.lvApi && !document.querySelector('.lv-title')")
+                assert page.evaluate("window.rs === window.host && !window.lvApi && !document.querySelector('.rs-frame-title')")
                 assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "flex", "the host's body as it was"
                 assert page.evaluate("getComputedStyle(document.querySelector('#sb .sb-top h2')).display") != "none", "the host's title as it was"
                 page.evaluate("writeAgain()")                  # the same area written again (newer files): the stored levels still hold
@@ -490,13 +490,14 @@ def test_the_editor_works_in_the_hosts_panel(view):
             def tap(sel):
                 page.locator(sel).tap() if phone else page.locator(sel).click()
             # open: the top line, three tabs, no apply bar; on a phone the panel is the sheet at the bottom
-            assert page.locator("#sb .lv-back").inner_text() == "← Steps" and page.locator("#sb .lv-title .t").inner_text() == "Edit levels"
-            assert page.evaluate("[...document.querySelectorAll('#lv-tabs button')].map(b => b.dataset.t).join()") == "edit,history,given"
+            assert page.locator("#sb #lv-back").inner_text() == "← Steps" and page.locator("#sb .rs-frame-title .t").inner_text() == "Edit levels"
+            assert page.evaluate("[...document.querySelectorAll('#lv-tabs button')].map(b => b.dataset.t).join()") == "ends,edit,history,given"
+            assert page.evaluate("document.getElementById('lv').dataset.mode") == "ends", "the editor opens in Road ends"
             assert page.evaluate("document.getElementById('lv-bar').hidden") and not page.locator("#lv-bar").is_visible()
             assert page.evaluate("!document.querySelector('#lv-toggle, #lv-handle') && !document.body.classList.contains('lv-open')"), "no frame or fold button of its own"
             sb = box("#sb")
             if phone:
-                assert sb["bottom"] == pytest.approx(844, abs=1) and 280 < sb["top"] < 560, sb
+                assert sb["bottom"] == pytest.approx(844, abs=1) and 280 < sb["top"] < 560, sb      # 40 %: the map stays in view, because you pick the roads on it
             else:
                 # the panel's width (the dashboard default, 400 px) and side are the host's; the default card look floats it 8 px from the edges
                 assert sb["left"] == 8 and sb["right"] - sb["left"] == pytest.approx(400, abs=1) and sb["h"] > 870, sb
@@ -518,8 +519,16 @@ def test_the_editor_works_in_the_hosts_panel(view):
             assert page.evaluate("window.solved.length") == n0 and page.inner_text("#lv-wait").endswith(("waiting ▴", "waiting ▾")), "a cap waits for Apply"
             page.evaluate("document.getElementById('lv-discard').click()")
             page.wait_for_function("document.getElementById('lv-bar').hidden", timeout=20000)
-            # two roads and an order wish: the changes wait in the apply bar
+            # Road ends has one road: a second road replaces the first, and the rules and the Add form do not show
             roads = page.evaluate("[window.editor.roads[0], window.editor.roads.at(-1)]")
+            page.evaluate("""r => { for (const x of r) document.dispatchEvent(new CustomEvent('rs:select', {detail: {properties: {road: x}, lvTap: true}})); }""", roads)
+            page.wait_for_timeout(500)
+            assert page.evaluate("document.querySelectorAll('#lv-cards .card').length") == 1, "Road ends: one road"
+            assert not page.locator("#lv-add-sec").is_visible() and not page.locator("#lv-rel-sec").is_visible()
+            # Stacking: two roads, their rules and the Add form; no caps or heads
+            tap("#lv-tabs button[data-t=edit]")
+            assert page.evaluate("document.getElementById('lv').dataset.mode") == "stack"
+            # two roads and an order wish: the changes wait in the apply bar
             def stage(top=0):
                 page.evaluate("document.getElementById('lv-clear').click()")
                 page.evaluate("""r => { for (const x of r) document.dispatchEvent(new CustomEvent('rs:select', {detail: {properties: {road: x}, lvTap: true}})); }""", roads)
@@ -528,14 +537,16 @@ def test_the_editor_works_in_the_hosts_panel(view):
                 page.evaluate("document.getElementById('lv-add').click()")
             stage()
             page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
+            assert not page.locator("#lv-cards .caps").first.is_visible() and not page.locator("#lv-cards .hd").first.is_visible(), "Stacking: no caps or heads"
             assert page.inner_text("#lv-wait").startswith("1 waiting")
-            bar, sb = box("#lv-bar"), box("#sb")
-            assert sb["bottom"] - 16 <= bar["bottom"] <= sb["bottom"], (bar, sb)       # at the bottom edge of the panel (of the sheet)
+            bar, sb, fb = box("#lv-bar"), box("#sb"), box("#lv .rs-frame-bar")
+            assert page.evaluate("document.getElementById('lv-bar').parentElement.classList.contains('rs-frame-bar')")   # the apply bar is in the frame's bar
+            assert sb["bottom"] - 24 <= fb["bottom"] <= sb["bottom"], (fb, sb)       # at the bottom edge of the panel (of the sheet), with the frame's margins
             for sel in ("#lv-apply", "#lv-discard"):
                 assert page.locator(sel).is_visible()
                 if phone:
                     assert box(sel)["h"] >= 44, sel
-            page.evaluate("document.querySelector('#lv .scroll[data-tab=edit]').scrollTop = 400")      # the panel scrolls, the bar stays
+            page.evaluate("document.querySelector('#lv-body').scrollTop = 400")      # the panel scrolls, the bar stays
             assert box("#lv-bar") == bar
             assert page.evaluate("document.getElementById('lv-queue').hidden"), "the list of the waiting changes opens on a tap"
             tap("#lv-wait")
@@ -588,7 +599,7 @@ def test_the_editor_works_in_the_hosts_panel(view):
             page.evaluate("window.colorCalls = []; const o = window.rsColor; window.rsColor = (...a) => { colorCalls.push(a); return o(...a); }")
             page.evaluate("window.editor.destroy()")
             assert page.evaluate("colorCalls.some(a => a[0] === null)"), "destroy clears rsColor"
-            assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "flex" and not page.locator("#sb .lv-title").count()
+            assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "flex" and not page.locator("#sb .rs-frame-title").count()
             assert page.locator("#sb .sb-top h2").is_visible() and (phone or page.locator("#sb-hide").is_visible())
             assert not [e for e in errors if e != "boom"], errors
             b.close()

@@ -4,17 +4,15 @@
    bad, warn) are its own. The look of the panel itself (frame, width, side, phone sheet, hide button) is the host's. */
 #lv{--lv-bg:var(--bg);--lv-card:var(--card);--lv-line:var(--line);--lv-line2:var(--line);--lv-ink:var(--ink);--lv-ink2:var(--ink);--lv-mute:var(--mut);
   --lv-soft:color-mix(in srgb,var(--ink) 9%,transparent);--lv-hover:color-mix(in srgb,var(--ink) 6%,transparent);
-  --lv-r1:#e53935;--lv-r2:#1e63d6;--lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:#e03131;
-  --lv-bad-bg:#ffe3e3;--lv-warn-bg:#fff4e6;--lv-warn-ink:#b35c00;--lv-warn-line:#ffc078;--lv-queue-line:#fde68a}
-#sb[data-theme=dark] #lv{--lv-bad-bg:#4a2326;--lv-warn-bg:#40301b;--lv-warn-ink:#ffc078;--lv-warn-line:#7a5a2a;--lv-queue-line:#7a6a2a}
+  --lv-r1:#e53935;--lv-r2:#1e63d6;--lv-found:#868e96;--lv-saved:#7048e8;--lv-new:#2f9e44;--lv-bad:var(--rs-err);
+  --lv-bad-bg:color-mix(in srgb,var(--rs-err) 14%,transparent);--lv-warn-bg:color-mix(in srgb,var(--rs-warn) 14%,transparent);--lv-warn-ink:var(--rs-warn);
+  --lv-warn-line:color-mix(in srgb,var(--rs-warn) 45%,transparent);--lv-queue-line:color-mix(in srgb,var(--rs-warn) 40%,transparent)}   /* the status colours of the dashboard */
 #lv button{-webkit-tap-highlight-color:transparent}
 #lv [hidden]{display:none!important}                              /* a display rule below must not show a hidden part */
-#lv{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;color:var(--lv-ink);font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
-/* the top line (in the panel's .sb-top, in place of the host's title; the host's hide button stays at its end) */
-.lv-title{display:flex;align-items:center;gap:10px;min-width:0}
-.lv-title .t{font-size:15px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
-.lv-back{flex:none;height:28px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:none;color:var(--mut);font:600 12.5px system-ui;cursor:pointer;white-space:nowrap}
-.lv-back:hover{color:var(--accent);border-color:var(--accent)}
+/* the two edit modes (the tabs Road ends and Stacking): each shows only its own parts */
+#lv[data-mode=ends] .only-stack,#lv[data-mode=stack] .only-ends{display:none!important}
+/* #lv is the root of roadstyle's editor frame (dashboard/frame.js, docs/guides/dashboard-parts.md "An editor in the panel"): the frame gives the title line
+   with "← back", the tab row (the dashboard's tabs, with counts), the one body that scrolls and the bar at the bottom edge */
 #lv .find{position:relative;margin-top:10px}
 #lv .modes{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font:12px system-ui;color:var(--lv-mute)} #lv .modes label{cursor:pointer;display:flex;gap:4px;align-items:center}
 #lv .find input{width:100%}
@@ -24,21 +22,16 @@
 #lv-hits div{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--lv-line)} #lv-hits div:last-child{border-bottom:none}
 #lv-hits div:hover,#lv-hits div.on{background:var(--lv-hover)} #lv-hits b{font-weight:600} #lv-hits small{color:var(--lv-mute)}
 #lv .t{font-size:15px;font-weight:650;letter-spacing:-.01em} #lv .area{color:var(--lv-mute);font-size:12px;margin-top:1px}
-#lv .tabs{flex:none;padding:2px 15px 10px}                       /* the tabs are the dashboard's segmented control (#lv .seg), as the settings box has */
-#lv .tabs .seg button{display:flex;align-items:center;justify-content:center;gap:4px;padding:5px 6px}
-#lv .tabs .cnt{display:inline-block;min-width:16px;padding:0 5px;border-radius:999px;background:var(--lv-soft);font-size:11px;color:var(--lv-ink2)}
-#lv [data-tab][hidden]{display:none}
-#lv .scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px 24px}
+#lv [data-pane][hidden]{display:none}
+#lv [data-pane] > section:first-child{padding-top:0}
 #lv section{padding:12px 0 4px}
 #lv h2{display:flex;align-items:center;justify-content:space-between;margin:0 0 8px;font-size:11.5px;font-weight:650;color:var(--lv-mute);
   text-transform:uppercase;letter-spacing:.06em}
 #lv h3{display:flex;align-items:center;gap:6px;margin:12px 0 6px;font-size:12px;font-weight:600;color:var(--lv-ink2)}
-#lv .link{font:inherit;text-transform:none;letter-spacing:0;background:none;border:none;color:var(--accent);cursor:pointer;padding:0;font-size:12px}
-#lv .link:hover{text-decoration:underline}
 #lv .empty{color:var(--lv-mute);background:var(--lv-card);border:1px dashed var(--lv-line);border-radius:10px;padding:14px;text-align:center;font-size:12.5px}
-#lv .card{position:relative;background:var(--lv-card);border:1px solid var(--lv-line);border-radius:10px;padding:10px 12px 10px 16px;margin-bottom:8px;
-  box-shadow:0 1px 2px rgba(16,24,40,.04)}
-#lv .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:10px 0 0 10px;background:var(--c)}
+#lv .card{position:relative;margin:0 0 8px;padding-left:18px}
+#lv[data-mode=stack] .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:10px 0 0 10px;background:var(--c)}
+#lv[data-mode=ends] .card{padding-left:var(--rs-card-pad,14px)} #lv[data-mode=ends] .card .num{display:none}      /* one road: no road 1 mark */
 #lv .card .nm{font-weight:620;font-size:13.5px;padding-right:22px} #lv .card .sub{color:var(--lv-mute);font-size:12px}
 #lv .card .x{position:absolute;right:8px;top:7px;border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:15px;line-height:1}
 #lv .card .x:hover{color:var(--lv-bad)}
@@ -79,18 +72,13 @@
 #lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}
 #lv .act{flex:none;font:12px system-ui;border:1px solid var(--lv-line);background:var(--lv-card);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--lv-ink2)}
 #lv .act:hover{border-color:var(--lv-bad);color:var(--lv-bad)}
-#lv .seg{display:flex;background:var(--rs-tb-hover);border-radius:10px;padding:2px;gap:2px}
-#lv .seg button{flex:1;border:none;background:none;border-radius:8px;padding:5px 0;font:600 12px/1.2 system-ui;color:var(--lv-mute);cursor:pointer}
-#lv .seg button:hover{color:var(--lv-ink)}
-#lv .seg button.on{background:var(--rs-tb-on);color:var(--lv-ink)}
+#lv .rs-seg{margin:0}                                            /* the dashboard's switch (rs-seg); the editor sets only its space */
 #lv .desc{margin:8px 2px;color:var(--lv-ink2);font-size:12.5px}
-#lv .warn{margin:8px 0;padding:8px 10px;border-radius:8px;background:var(--lv-warn-bg);border:1px solid var(--lv-warn-line);color:var(--lv-warn-ink);font-size:12.5px}
+#lv .rs-callout{margin:8px 0}                                    /* a warning is the dashboard's callout with the status warn */
 #lv .ends{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:8px 0}
 #lv .ends label{display:block;font-size:11px;color:var(--lv-mute);margin-bottom:3px}
 #lv .ends .seg button{padding:3px 0;font-size:12px}
-#lv .go{width:100%;border:none;border-radius:8px;padding:8px 0;background:var(--lv-ink);color:var(--lv-card);font:600 13px system-ui;cursor:pointer;margin-top:4px}
-#lv .go:hover:not(:disabled){background:color-mix(in srgb,var(--lv-ink) 82%,var(--lv-card))} #lv .go:disabled{opacity:.5;cursor:default}
-#lv .go.ghost{background:var(--lv-card);color:var(--lv-ink);border:1px solid var(--lv-line2)} #lv .go.ghost:hover{background:var(--lv-hover)}
+#lv #lv-add{width:100%;margin-top:4px}                          /* the main action of the form: the panel's filled button (sb-primary) */
 /* the busy veil: over the panel only (it is inside #lv; a position:fixed in #sb would be relative to #sb, whose backdrop-filter holds it) */
 #lv-busy{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;
   background:color-mix(in srgb,var(--lv-bg) 60%,transparent);backdrop-filter:blur(1.5px)}
@@ -103,53 +91,52 @@
 #lv-queue .q span{flex:1} #lv-queue .q button{border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:14px} #lv-queue .q button:hover{color:var(--lv-bad)}
 #lv-top-seg button{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px}
 /* the apply bar: fixed at the bottom of the panel (on a phone: of the sheet), only while edits wait; the list of the waiting edits opens above it */
-#lv-bar{flex:none;padding:8px 15px 10px;border-top:1px solid var(--lv-line)}
+#lv-bar{flex:none}
+.rs-frame-bar:has(> #lv-bar[hidden]){display:none}                 /* the frame's bar shows only while changes wait */
 #lv-bar .main{display:flex;align-items:center;gap:8px}
 #lv-bar .main>span,#lv-bar .main>.link{flex:1;min-width:0;text-align:left;font-weight:600;font-size:12.5px}
-#lv-bar .go{width:auto;margin:0;padding:8px 14px;white-space:nowrap}
+#lv-bar .main button{white-space:nowrap}
 #lv-queue{max-height:30vh;overflow:auto;margin-bottom:8px}
 #lv-toast{position:absolute;left:15px;right:15px;bottom:14px;padding:9px 12px;border-radius:8px;font-size:12.5px;color:var(--lv-card);background:var(--lv-ink);
   box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;user-select:text;z-index:4}
 #lv.has-bar #lv-toast{bottom:68px}
 #lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad);pointer-events:auto;cursor:pointer}
 /* the phone (the dashboard's phone form, html.rs-phone: the panel is the bottom sheet): 44 px touch targets */
-html.rs-phone .lv-back,html.rs-phone #lv .tabs button,html.rs-phone #lv .seg button,html.rs-phone #lv .act,html.rs-phone #lv .go,html.rs-phone #lv .row{min-height:44px}
+html.rs-phone #lv .seg button,html.rs-phone #lv .act,html.rs-phone #lv-bar button,html.rs-phone #lv-add,html.rs-phone #lv .row{min-height:44px}
 html.rs-phone #lv .find input{min-height:44px;font-size:16px}                /* 16 px: the phone does not zoom on focus */
 html.rs-phone #lv input[type=range]{height:44px}
 html.rs-phone #lv input[type=range]::-webkit-slider-thumb{width:28px;height:28px}
 html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
 </style>
-<div class="lv-title"><button class="lv-back" id="lv-back" title="Back to the steps"></button><span class="t">Edit levels</span></div>
-<div id="lv">
-  <nav class="tabs rs-phead" id="lv-tabs"><div class="seg"><button data-t="edit" class="on">Edit</button><button data-t="history">History<span class="cnt" id="lv-hist-n">0</span></button><button data-t="given" title="Given up (a real crossing broke) · near warnings">Issues<span class="cnt" id="lv-gu-n" style="background:var(--lv-bad);color:#fff">0</span><span class="cnt" id="lv-nr-n" style="background:var(--lv-warn-bg);color:var(--lv-warn-ink)">0</span></button></div></nav>
-  <div class="scroll rs-pbody" data-head="#lv-tabs" data-tab="edit">
+<div id="lv-src">
+  <div data-pane="edit">
     <section><div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div>
       <div class="modes" id="lv-modes" hidden title="Show only the roads of these modes (display only: every road is still solved)"></div></section>
 
-    <section><h2>Selection <button class="link" id="lv-clear" title="Esc">clear</button></h2><div id="lv-cards"></div></section>
-    <section id="lv-rel-sec" hidden><h2 id="lv-rel-title">In the tables</h2><div id="lv-rel"></div></section>
-    <section id="lv-add-sec" hidden><h2>Add a relation</h2>
-      <div class="seg" id="lv-kind"><button data-k="order" class="on">Order</button><button data-k="stack">Stack</button><button data-k="meet">Meet</button></div>
-      <div class="ends" id="lv-top" style="grid-template-columns:minmax(0,1fr)"><div><label>on top</label><div class="seg" id="lv-top-seg"></div></div></div>
+    <section><h2>Selection <button class="link rs-link" id="lv-clear" title="Esc">clear</button></h2><div id="lv-cards"></div></section>
+    <section id="lv-rel-sec" class="only-stack" hidden><h2 id="lv-rel-title">In the tables</h2><div id="lv-rel"></div></section>
+    <section id="lv-add-sec" class="only-stack" hidden><h2>Add a relation</h2>
+      <div class="seg rs-seg" id="lv-kind"><button data-k="order" class="on">Order</button><button data-k="stack">Stack</button><button data-k="meet">Meet</button></div>
+      <div class="ends" id="lv-top" style="grid-template-columns:minmax(0,1fr)"><div><label>on top</label><div class="seg rs-seg" id="lv-top-seg"></div></div></div>
       <div class="desc" id="lv-desc"></div>
       <div class="ends" id="lv-ends" hidden>
-        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg" data-e="1"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r1)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r1)">■</span></button></div></div>
-        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg" data-e="2"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r2)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r2)">■</span></button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg rs-seg" data-e="1"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r1)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r1)">■</span></button></div></div>
+        <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg rs-seg" data-e="2"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r2)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r2)">■</span></button></div></div>
       </div>
       <div class="ends" id="lv-part" hidden style="grid-template-columns:minmax(0,1fr)">
-        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end">end head <span class="mk">■</span></button></div></div>
+        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg rs-seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end">end head <span class="mk">■</span></button></div></div>
       </div>
-      <button class="go" id="lv-add">Add to the list</button>
+      <button class="sb-primary" id="lv-add">Add to the list</button>
     </section>
-    <section><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span>
-      <button id="lv-newsession" title="Everything already in edits.csv moves to the list below; this list starts empty. Nothing is deleted." style="float:right;border:1px solid var(--lv-line,#ced4da);background:var(--lv-card);color:var(--lv-ink2);border-radius:6px;padding:2px 8px;font-size:11.5px;cursor:pointer;text-transform:none;letter-spacing:0">Start new session</button></h2><div id="lv-new"></div></section>
+    <section class="only-stack"><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span>
+      <button id="lv-newsession" class="rs-link" title="Everything already in edits.csv moves to the list below; this list starts empty. Nothing is deleted.">start a new session</button></h2><div id="lv-new"></div></section>
   </div>
-  <div class="scroll rs-pbody" data-head="#lv-tabs" data-tab="history" hidden>
+  <div data-pane="history" hidden>
     <section><h2>Already in edits.csv <span style="text-transform:none;letter-spacing:0;font-weight:500">before this session</span></h2>
       <div class="desc" style="margin-top:0">Click a row to show its two roads; delete puts it in the list to apply.</div><div id="lv-saved"></div></section>
-    <section><h2>Download</h2><button class="go ghost" id="lv-dl" title="The edits as they are now">Download edits.csv</button></section>
+    <section><h2>Download</h2><button id="lv-dl" title="The edits as they are now">Download edits.csv</button></section>
   </div>
-  <div class="scroll rs-pbody" data-head="#lv-tabs" data-tab="given" hidden>
+  <div data-pane="given" hidden>
     <section><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div></section>
     <section><h2>Given up by the solver <span style="text-transform:none;letter-spacing:0;font-weight:500">a flaw on the map each</span></h2>
       <div class="desc" style="margin-top:0">Crossings (A over B) the solver could not keep, because of the joins around them: the part of A's casing
@@ -163,17 +150,18 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   </div>
   <div id="lv-bar" hidden>
     <div id="lv-queue" hidden></div>
-    <div class="main" id="lv-bar-main"><button class="link" id="lv-wait" title="Show the waiting changes"></button>
-      <button class="go ghost" id="lv-discard">Discard</button><button class="go" id="lv-apply">Apply and solve</button></div>
+    <div class="main" id="lv-bar-main"><button class="link rs-link" id="lv-wait" title="Show the waiting changes"></button>
+      <button id="lv-discard">Discard</button><button class="sb-primary" id="lv-apply">Apply and solve</button></div>
     <div class="main" id="lv-ask" hidden><span id="lv-ask-t"></span>
-      <button class="go ghost" id="lv-ask-stay">Stay</button><button class="go ghost" id="lv-ask-discard">Discard</button><button class="go" id="lv-ask-apply">Apply</button></div>
+      <button id="lv-ask-stay">Stay</button><button id="lv-ask-discard">Discard</button><button class="sb-primary" id="lv-ask-apply">Apply</button></div>
   </div>
   <div id="lv-toast"></div>
   <div id="lv-busy" hidden><div class="box"><div class="spin"></div><span id="lv-busy-t">Solving …</span></div></div>
 </div>
 <script>
 (function(){
-  let STATS = __STATS__; const $ = id => document.getElementById(id), C = window.lvColors || ["#e53935", "#1e63d6"];   // road 1 (the selection's colour) and road 2 (darker)
+  let STATS = __STATS__; const $ = id => document.getElementById(id), C = window.lvColors || ["#e53935", "#1e63d6"];
+  const F = window.lvFrame;                                   // the editor frame (level_editor.js): its tabs, body and bar   // road 1 (the selection's colour) and road 2 (darker)
   for(const [k, c] of [["--lv-r1", C[0]], ["--lv-r2", C[1]]]) document.getElementById("lv").style.setProperty(k, c);
   const sel = [null, null], facts = {};                       // sel: road ids; facts: road id -> what the server knows
   let pairRows = [];                                          // what the two tables have between the two picked roads
@@ -192,9 +180,18 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   const mk = (end, r) => { const k = sel.indexOf(r);           // a road's end as the map marks it (lv-ends): ● start, ■ end, in the picked road's colour
     return end === "start" || end === "end" ? ` <span class="mk"${k >= 0 ? ` style="color:${C[k]}"` : ""}>${end === "start" ? "●" : "■"}</span>` : ""; };
   $("lv-area").textContent = STATS.area + " · " + STATS.roads + " roads";
-  function tab(t){ document.querySelectorAll("#lv-tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
-    document.querySelectorAll("#lv [data-tab]").forEach(d => d.hidden = d.dataset.tab !== t); }
-  document.querySelectorAll("#lv-tabs button").forEach(b => b.onclick = () => tab(b.dataset.t));
+  // the tabs: Road ends ("ends": one road, its caps and heads) and Stacking ("edit": two roads, their rules) share the scroll area
+  // data-pane="edit" and show their own parts (.only-ends, .only-stack); History and Issues have their own
+  let mode = "ends";
+  function tab(t){
+    if(t === "ends" || t === "edit"){
+      const was = mode; mode = t === "ends" ? "ends" : "stack"; $("lv").dataset.mode = mode;
+      if(mode === "ends" && sel[1] != null) sel[1] = null;     // Road ends has one road: road 2 goes
+      if(was !== mode) update();
+    }
+    F.tab(t);                                                 // the frame marks the tab (on, aria-selected)
+    document.querySelectorAll("#lv [data-pane]").forEach(d => d.hidden = d.dataset.pane !== (t === "ends" ? "edit" : t)); }
+  F.addEventListener("tab", e => tab(e.detail.tab));          // a click on a tab of the frame's row
   const showStats = () => { $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
     ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" || k === "near warnings" ? ` style="cursor:pointer" title="Show the list" data-gu="1"` : ""}${k === "given up" ? ` id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
   document.querySelectorAll("#lv-stats [data-gu]").forEach(e => e.onclick = () => tab("given")); };
@@ -235,6 +232,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   function pick(r, byClick){
     if(r == null) return;                                      // a pick with no road (not a road of the area)
     r = String(r);
+    if(mode === "ends"){ sel[0] = sel[0] === r ? null : r; sel[1] = null; return update(byClick ? r : null); }   // one road: a click replaces it
     const k = sel.indexOf(r);
     if(k >= 0) sel[k] = null;                                  // a picked road clicked again: cancelled
     else if(sel[0] == null) sel[0] = r;
@@ -256,7 +254,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   function choose(f){
     if(!f) return;
     Object.assign(facts, {[f.road]: f}); $("lv-find").value = ""; $("lv-hits").hidden = true; hits = [];
-    tab("edit"); if(!sel.includes(String(f.road))) pick(f.road); focus([String(f.road)]);
+    tab(mode === "ends" ? "ends" : "edit"); if(!sel.includes(String(f.road))) pick(f.road); focus([String(f.road)]);
   }
   $("lv-find").oninput = () => { clearTimeout(findT); findT = setTimeout(async () => {
     const q = $("lv-find").value.trim();
@@ -296,9 +294,9 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     const L = f.length_m || 0;
     let [s, e] = f.heads || [5, 5];
     if(L > 0 && s + e > L){ const k = L / (s + e); s = Math.round(s * k * 10) / 10; e = Math.round(e * k * 10) / 10; }   // as drawn: cut in their ratio
-    return `<div class="hd" data-hroad="${esc(r)}" data-len="${L}" title="The metres at each end drawn at the head's own level; the rest is the main part. Start + end cannot be more than the road.">
-      <div class="hd-h"><span>casing heads <button class="link" data-hnomain title="Heads over the whole road: the end head takes what the start head leaves">no main part</button>
-        ${(f.heads_own || []).some(Boolean) ? `<button class="link" data-hauto title="Back to the default lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">default</button>` : ""}</span><span>road ${L} m</span></div>
+    return `<div class="hd only-ends" data-hroad="${esc(r)}" data-len="${L}" title="The metres at each end drawn at the head's own level; the rest is the main part. Start + end cannot be more than the road.">
+      <div class="hd-h"><span>casing heads <button class="link rs-link" data-hnomain title="Heads over the whole road: the end head takes what the start head leaves">no main part</button>
+        ${(f.heads_own || []).some(Boolean) ? `<button class="link rs-link" data-hauto title="Back to the default lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">default</button>` : ""}</span><span>road ${L} m</span></div>
       <div class="hbar"><i class="s"></i><i class="m"></i><i class="e"></i></div>
       ${[["start", "●", s], ["end", "■", e]].map(([n, m, v], k) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.1" data-hend="${n}" value="${v}"><b></b>
         <small style="grid-column:2/4;margin:-3px 0 2px;font-size:10px">${(f.heads_own || [])[k] ? "set by you" : "default"}</small></label>`).join("")}
@@ -316,7 +314,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   const sidewalk = (d, f) => d.modes === "walking" && (f.directions || []).some(o => o !== d && o.lanes != null);
   function card(r, k){
     const f = facts[r] || {road: r}, L = f.levels || ["–", "–", "–", "–"];
-    return `<div class="card" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
+    return `<div class="card rs-sec-box" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
       <div class="nm"><span class="num" style="--c:${C[k]}">${k + 1}</span>${esc(f.name || f.highway || "road")}</div>
       <div class="sub">${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</div>
       <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
@@ -327,10 +325,10 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
         <span>road id</span><span class="wide" style="grid-column:span 3;font-size:11px">${esc(r)}</span>
         ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→■" : "direction ■→●"}</span><span class="wide" style="grid-column:span 3;font-size:11px"
           title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}${d.lanes != null ? " · lanes " + esc(d.lanes) : sidewalk(d, f) ? " · sidewalk" : ""}${d.modes ? " · " + esc(d.modes) : ""}</span>`).join("")}</div>
-      <div class="wd" data-w="${esc(r)}">${widthHtml(f)}</div>
-      ${["start", "end"].map((e, i) => `<div class="caps" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">
+      <div class="wd only-ends" data-w="${esc(r)}">${widthHtml(f)}</div>
+      ${["start", "end"].map((e, i) => `<div class="caps only-ends" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">
         <span style="width:44px">${e} ${i ? "■" : "●"}</span>
-        <div class="seg" data-cap="${esc(r)}" data-end="${e}">${["round", "square", "flat"].map(v =>
+        <div class="seg rs-seg" data-cap="${esc(r)}" data-end="${e}">${["round", "square", "flat"].map(v =>
           `<button data-v="${v}" class="${(((f.caps || [])[i] || (f.caps_auto || [])[i] || "round") === v) ? "on" : ""}">${v}</button>`).join("")}</div></div>`).join("")}
       ${headsHtml(r, f)}
       <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
@@ -380,8 +378,8 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
         Object.assign(facts, j.roads); showRel(j.rows, picked.length); } catch(err){ toast(err.message, true); } }
     else { $("lv-rel-sec").hidden = true; }
     $("lv-cards").innerHTML = picked.length ? sel.map((r, k) => r != null ? card(r, k) : "").join("")
-      + (sel[1] == null ? `<div class="empty">Click a second road to see what is between them</div>` : "")
-      : `<div class="empty">Click a road on the map<br><small>a second one for the pair · click again or ✕ to cancel · Esc clears</small></div>`;
+      + (sel[1] == null && mode === "stack" ? `<div class="empty">Click a second road to see what is between them</div>` : "")
+      : `<div class="empty">Click a road on the map<br><small>${mode === "stack" ? "a second one for the pair · " : ""}click again or ✕ to cancel · Esc clears</small></div>`;
     $("lv-cards").querySelectorAll("[data-cap] button").forEach(b => b.onclick = () => {
       const box = b.closest("[data-cap]"), r = box.dataset.cap, end = box.dataset.end, cap = b.dataset.v;
       const f = facts[r] || {}, k = end === "start" ? 0 : 1;
@@ -418,7 +416,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     const box = $("lv-rel"); box.innerHTML = "";
     const all = n === 2 ? rows.filter(r => r.section === "found" && (r.relation === "stack" || r.relation === "near") && !isOff(r, rows) && !queued(r)) : [];
     if(all.length){                                           // to override a found stack: switch all its rows off, then add your own parts
-      const b = document.createElement("button"); b.className = "go ghost"; b.style.margin = "0 0 8px";
+      const b = document.createElement("button"); b.style.margin = "0 0 8px";
       b.textContent = `Switch off all ${all.length} found stack row${all.length > 1 ? "s" : ""} of this pair (to the list)`;
       b.title = "To override a found stack: switch off every part of it, then add your own parts below";
       b.onclick = () => { all.forEach(offRow); showRel(rows, n); };
@@ -458,16 +456,16 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     $("lv-ends").hidden = kind !== "meet"; $("lv-part").hidden = kind !== "stack";
     document.querySelectorAll("#lv-part .mk").forEach(m => m.style.color = top == null ? "" : C[top]);     // the upper road's colour, as on the map
     $("lv-add").disabled = (kind !== "meet" && top == null) || (kind === "stack" && !parts.size);
-    if(kind !== "meet" && top == null){ $("lv-desc").innerHTML = `<div class="warn">Choose which road is on top.</div>`; return; }
+    if(kind !== "meet" && top == null){ $("lv-desc").innerHTML = `<div class="rs-callout warn">Choose which road is on top.</div>`; return; }
     const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
     $("lv-desc").innerHTML = kind === "order" ? `Where they meet, ${who(a)}'s fill is drawn after ${who(b)}'s (a wish the solver keeps when it can).`
-      : kind === "stack" && !parts.size ? `<div class="warn">Choose at least one part of ${who(a)}'s casing.</div>`
+      : kind === "stack" && !parts.size ? `<div class="rs-callout warn">Choose at least one part of ${who(a)}'s casing.</div>`
       : kind === "stack" ? `${who(a)}'s ${["start", "main", "end"].filter(p => parts.has(p)).map(p => PART[p]).join(" and ")} casing is drawn after ${who(b)}'s fill,
         even where it joins ${who(b)}: one row per part, added to the found ones. ● start ■ end on the map.
         To override a found stack, switch all its rows off above and add your own parts.`
       : `The ${end1} of ${who(a)} joins the ${end2} of ${who(b)}: each road's head there is drawn under the other's fill. ● start ■ end on the map.`;
     const over = kind === "order" ? stacksOver(b, a) : [];
-    if(over.length) $("lv-desc").innerHTML += `<div class="warn">⚠ ${over.map(r => `${r.section === "found" ? "A found" : "Your"} stack (${relText(r)})`).join(", ")}
+    if(over.length) $("lv-desc").innerHTML += `<div class="rs-callout warn">⚠ ${over.map(r => `${r.section === "found" ? "A found" : "Your"} stack (${relText(r)})`).join(", ")}
       keeps ${who(b)}'s casing over ${who(a)}'s fill. A stack outranks an order, so this order would be given up and nothing changes.
       Switch that stack off first (its row above).</div>`;
   }
@@ -518,7 +516,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     $("lv-ask").hidden = !on; $("lv-bar-main").hidden = on;
     if(on) $("lv-ask-t").textContent = `${queue.length} waiting. Leave?`;
   }
-  $("lv-back").onclick = () => queue.length ? ask(true) : leave();
+  if($("lv-back")) $("lv-back").onclick = () => queue.length ? ask(true) : leave();      // a page with no steps has no back button
   $("lv-ask-stay").onclick = () => ask(false);
   $("lv-ask-discard").onclick = () => { queue = []; showQueue(); leave(); };
   $("lv-ask-apply").onclick = async () => { if(await applyQueue()) leave(); else ask(false); };
@@ -573,6 +571,8 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   async function givenUp(){
     const j = await api("/api/given_up"); Object.assign(facts, j.roads);
     $("lv-gu-n").textContent = j.rows.length; $("lv-nr-n").textContent = j.near.length;
+    $("lv-gu-n").classList.toggle("err", j.rows.length > 0); $("lv-nr-n").classList.toggle("warn", j.near.length > 0);
+    $("lv-gu-n").hidden = !j.rows.length; $("lv-nr-n").hidden = !j.near.length;   // a status colour only when there is something (a red 0 is noise)
     const list = (box, rows, cls, none) => {
       if(!rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${none}</div>`; return; }
       box.className = "rows";
@@ -607,6 +607,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   async function lists(){
     const j = await api("/api/edits"); Object.assign(facts, j.roads);
     $("lv-hist-n").textContent = j.rows.filter(r => r.section === "saved").length;
+    $("lv-hist-n").hidden = !+$("lv-hist-n").textContent;
     for(const s of ["new", "saved"]){
       const rows = j.rows.filter(r => r.section === s), box = $("lv-" + s);
       if(rows.length){ box.className = "rows"; box.innerHTML = rows.map(rowHtml).join(""); wire(box, rows); }
@@ -637,6 +638,8 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     }
     update(); lists(); givenUp(); showQueue();
   }
-  if(map.isStyleLoaded()) start(); else map.once("load", start);     // the Rust page loads this after the map's load (its tiles can still load)
+  // the Rust page loads this after the map's load: then the style can still be loading an image (isStyleLoaded false) and "load" does not come again,
+  // so the panel waits for the next "idle", which always comes (before, the panel stayed empty: no lists and no start text)
+  if(map.isStyleLoaded()) start(); else map.once("idle", start);
 })();
 </script>
