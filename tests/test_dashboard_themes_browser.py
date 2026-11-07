@@ -20,7 +20,17 @@ _PARTS = """<nav class="rs-tabs" id="tb"><button class="rs-tab on" data-tab="a">
 <div id="day"></div>
 <p><button>Plain</button> <button class="sb-primary">Primary</button> <input placeholder="A text box"></p>
 <p class="sb-note">Small print</p><a href="#">a link</a> <span class="rs-chip">chip</span> <span class="rs-chip accent">accent</span> <span class="rs-chip err">err</span> <span class="rs-chip warn">warn</span> <span class="rs-chip ok">ok</span>
-<p>Heads <button class="rs-link">default</button> <input type="range" min="0" max="10" value="4"> <input type="color" value="#b8d986"></p>"""
+<p>Heads <button class="rs-link">default</button> <input type="range" min="0" max="10" value="4"> <input type="color" value="#b8d986"></p>
+<div id="p2-range"></div><div id="p2-hour"></div><div id="p2-hours"></div><div id="p2-sl"></div><div id="p2-num"></div><div id="p2-col"></div>
+<label class="rs-switch"><input type="checkbox" role="switch" checked><span>Show bridges</span></label><div id="p2-q"></div><div id="p2-drop"></div><div id="p2-prog"></div>
+<div class="rs-status warn">3 fixes are not saved.</div><div class="rs-status error">Not an OSM file.</div><div class="rs-status ok">Done.</div>
+<p><button>Fixes<span class="rs-badge">12</span></button> <button class="sb-primary">Save<span class="rs-badge">3</span></button> <button class="sb-danger">Delete</button>
+<button class="rs-busy" disabled>Load</button> <span id="p2-menu"></span> <button id="p2-tog" aria-pressed="true">What is here?</button></p>
+<ol class="rs-steps"><li class="rs-step done"><span class="rs-step-n">1</span><div class="rs-step-b"><b>Area</b><p>Monaco</p></div></li>
+<li class="rs-step on"><span class="rs-step-n">2</span><div class="rs-step-b"><b>Build</b><p>The roads.</p></div></li><li class="rs-step wait"><span class="rs-step-n">3</span><div class="rs-step-b"><b>Edit</b><span class="rs-step-note">After step 2</span></div></li></ol>
+<div class="rs-toolrow" id="p2-tools"><button data-v="a" aria-label="Move">M</button><button data-v="b" aria-label="Draw">D</button></div>
+<div class="rs-rows" id="p2-rows"><button class="rs-row on" data-v="1"><b>Wall</b><small>barrier=wall</small><span class="rs-row-v">new</span></button><button class="rs-row" data-v="2"><b>Door</b><small>entrance=yes</small></button></div>
+<div class="rs-empty"><span><b>No fixes yet.</b> Click a road.</span><button type="button">Add a fix</button></div><div id="p2-more"></div>"""
 _SCRIPT = """rs.ready(() => {
   rs.help.set({title: "How to read this page", intro: "What the page shows.", terms: [["Term", "Its meaning."]], note: "A note."});
   document.getElementById("k").innerHTML = rs.kpi("Inside", "80.4%", "promised 80 %", "#15803d") + rs.kpi("Typical miss", "10 %", "on one hour");
@@ -32,6 +42,15 @@ _SCRIPT = """rs.ready(() => {
   rs.tabs.use(document.getElementById("mode"), () => {});
   rs.days.use(document.getElementById("day"), {days: ["2026-10-01", "2026-10-04", "2026-10-05"]});
   rs.legend.add({id: "ev", color: "#ff0066", label: "Events"});
+  const $ = id => document.getElementById(id);
+  rs.days.range($("p2-range"), {min: "2026-09-01", max: "2026-11-06"}); rs.hours.use($("p2-hour"), {value: 8, hours: [6, 7, 8, 10]}); rs.hours.use($("p2-hours"), {value: [7, 9], range: true});
+  rs.slider($("p2-sl"), {label: "Speed", min: 0, max: 130, value: 50, unit: "km/h"}); rs.number($("p2-num"), {label: "Lanes", min: 1, max: 8, value: 2, unit: "lanes"});
+  rs.colorPick($("p2-col"), {label: "Fill"}); rs.search($("p2-q"), {button: "Go", suggest: () => [{label: "Monaco", sub: "Monaco"}, {label: "Monte Carlo", sub: "Monaco"}]}).set("Mo");
+  rs.drop($("p2-drop"), {hint: "Up to 2 GB"}); rs.progress($("p2-prog"), {label: "Build", value: 0.4});
+  $("p2-menu").append(rs.menu.button([{label: "Edit"}, {label: "Export", disabled: true}, "-", {label: "Delete", danger: true}]));
+  rs.toggle($("p2-tog")); rs.tabs.use($("p2-tools")); rs.tabs.use($("p2-rows"));
+  rs.more($("p2-more"), {items: Array.from({length: 30}, (_, i) => i), page: 3, noun: "roads", render: i => '<div class="rs-qrow"><b>Road ' + i + '</b><span>12 m</span></div>'});
+  rs.panel.bar().innerHTML = '<span>3 fixes not saved</span><button class="sb-primary">Build</button>';
 });"""
 _PROBE = r"""([scope, dark]) => {
   const ctx = document.createElement('canvas').getContext('2d'); ctx.canvas.width = ctx.canvas.height = 1;
@@ -62,7 +81,14 @@ _STEPS = [("panel", "rsSelect(rsQuery(p => p.name)[5])", "#sb"), ("panel, tab b"
          ("settings box", "rs.tools.open('settings')", ".rs-settings, #rs-settings-box, .rs-st-box"), ("credits box", "rs.tools.open('attribution')", "#rs-attr-box"),
          ("help window", "document.querySelector('#sb .sb-top button[title*=\"read\"], #sb .rs-help-btn, #sb button[aria-label*=\"elp\"]')?.click()", ".rs-help, .rs-help-win, [role=dialog]"),
          ("popup", "rsSelect(rsQuery(p => p.name)[5])", ".maplibregl-popup"),
-         ("street view window", "rsSetStreetView && rsSetStreetView(true)", ".rs-svw"), ("day calendar", "document.querySelector('.rs-day-field').click()", ".rs-day-cal:not([hidden])"), ("google 3d window", "rs.tools.open('google_3d')", ".rs-g3d")]
+         ("street view window", "rsSetStreetView && rsSetStreetView(true)", ".rs-svw"), ("day calendar", "document.querySelector('.rs-day-field').click()", ".rs-day-cal:not([hidden])"),
+         ("range calendar", "document.querySelector('#p2-range .rs-day-field').click()", ".rs-range-cal:not([hidden])"),
+         ("hour list", "document.querySelector('#p2-hour .rs-hours-field').click()", ".rs-hours-list:not([hidden])"),
+         ("colour picker box", "document.querySelector('#p2-col .rs-color-btn').click()", ".rs-color-box:not([hidden])"),
+         ("action menu", "document.querySelector('#p2-menu .rs-more-btn').click()", ".rs-menu:not(.rs-hours-list):not([hidden])"),
+         ("search list", "document.querySelector('#p2-q input').dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown'}))", ".rs-search-list:not([hidden])"),
+         ("toasts", "['info', 'ok', 'warn', 'error'].forEach(k => rs.toast('A toast of the kind ' + k, {kind: k, ms: 0, action: k === 'ok' ? {label: 'Undo'} : null}))", "#rs-toasts"),
+         ("confirm dialog", "rs.confirm({title: 'Delete 3 fixes?', text: 'You cannot undo this.', ok: 'Delete', danger: true})", ".rs-dialog"), ("google 3d window", "rs.tools.open('google_3d')", ".rs-g3d")]
 
 
 def _edges(n=6):

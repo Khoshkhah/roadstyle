@@ -37,7 +37,8 @@ function _psInner(el){
   new MutationObserver(more).observe(el, {childList: true, subtree: true});            // a table that gets its rows later
 }
 const _PS_AREAS = [".rs-scroll", ".rs-q-list", "#rs-help .rs-help-box", ".rs-sel-list", "#rs-toolbar .bm-menu", "#rs-attr-box", "#rs-color-box", "#rs-nav-box",
-  "#rs-roads-box", "#rs-settings-box", ".rs-side-bd", ".rs-side-ctl", ".rs-side-q-res"].join(", ");
+  "#rs-roads-box", "#rs-settings-box", ".rs-side-bd", ".rs-side-ctl", ".rs-side-q-res",
+  ".rs-menu", ".rs-color-box", ".rs-search-list"].join(", ");      // the boxes of dashboard parts 2: the menu (and the hour list), the colour box, the search list
 export function initInnerScroll(){
   const scan = () => document.querySelectorAll(_PS_AREAS).forEach(el => el.dataset.rsScroll || _psInner(el));
   let queued = false;          // a box or a window that opens later: one scan in the next frame for every change of the page

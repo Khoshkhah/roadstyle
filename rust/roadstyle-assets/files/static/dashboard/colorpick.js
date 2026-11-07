@@ -34,7 +34,7 @@ function _cpEnhance(inp){
   Object.defineProperty(inp, "value", {get(){ return pv.get.call(inp); }, set(v){ pv.set.call(inp, v); sync(); }, configurable: true});
   const pd = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "disabled");
   Object.defineProperty(inp, "disabled", {get(){ return pd.get.call(inp); }, set(v){ pd.set.call(inp, v); sync(); }, configurable: true});
-  let box = null, hsv = null, old = "";
+  let box = null, hsv = null, old = "", at = null;     // `at`: the button that opened the box (the swatch, or a part's own button: rsColorBox)
   const emit = type => inp.dispatchEvent(new Event(type, {bubbles: true}));
   const set = (hex, live = true) => { pv.set.call(inp, hex); sync(); paint(); if(live) emit("input"); };
   function paint(){
@@ -57,16 +57,16 @@ function _cpEnhance(inp){
       _cpRecent.unshift(inp.value); _cpRecent.length = Math.min(_cpRecent.length, 8);
     }
   };
-  const away = e => { if(box && !box.contains(e.target) && !btn.contains(e.target)) close(); };
+  const away = e => { if(box && !box.contains(e.target) && !(at || btn).contains(e.target)) close(); };
   const keys = e => {
     if(!box) return;
-    if(e.key === "Escape"){ e.preventDefault(); set(old); close(false); btn.focus(); }      // Escape: back to the colour before the box opened
-    else if(e.key === "Enter" && !e.target.matches(".rs-cp-hex")){ e.preventDefault(); close(); btn.focus(); }
+    if(e.key === "Escape"){ e.preventDefault(); set(old); close(false); (at || btn).focus(); }      // Escape: back to the colour before the box opened
+    else if(e.key === "Enter" && !e.target.matches(".rs-cp-hex")){ e.preventDefault(); close(); (at || btn).focus(); }
   };
   // the box at the button: below it, or above it when there is no room below; inside the window
   function place(){
     if(!box) return;
-    const r = btn.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+    const r = (at || btn).getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
     const up = innerHeight - r.bottom - 8 < h && r.top > innerHeight - r.bottom;
     box.style.left = _cpClamp(r.left, 8, innerWidth - w - 8) + "px";
     box.style.top = (up ? Math.max(8, r.top - h - 6) : Math.min(innerHeight - h - 8, r.bottom + 6)) + "px";
@@ -107,7 +107,7 @@ function _cpEnhance(inp){
       e.preventDefault(); hsv.h = (hsv.h + d * (e.shiftKey ? 10 : 1) + 360) % 360; set(_cpToHex(hsv));
     });
     hexf.addEventListener("input", () => { let v = hexf.value.trim(); if(!v.startsWith("#")) v = "#" + v; if(_cpHex.test(v)){ hsv = _cpToHsv(v.toLowerCase()); set(v.toLowerCase()); } });
-    hexf.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); close(); btn.focus(); } });
+    hexf.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); close(); (at || btn).focus(); } });
     box.querySelectorAll(".rs-cp-recent button").forEach(b => b.onclick = () => { hsv = _cpToHsv(b.dataset.c); set(b.dataset.c); });
     const eye = box.querySelector(".rs-cp-eye");
     if(eye) eye.onclick = async () => { try { const r = await new window.EyeDropper().open(); hsv = _cpToHsv(r.sRGBHex.slice(0, 7)); set(r.sRGBHex.slice(0, 7).toLowerCase()); } catch(e){ /* the person pressed Escape */ } };
@@ -117,9 +117,12 @@ function _cpEnhance(inp){
     addEventListener("resize", place); window.addEventListener("scroll", place, true);
     sv.focus();
   }
-  btn.onclick = () => box ? close() : open();
+  btn.onclick = () => { if(box) close(); else { at = null; open(); } };
+  inp._rsCpOpen = el => { if(box) close(); at = el; open(); };
   sync();
 }
+// the box of a colour input that this module enhanced, opened at `anchor` (a part's own button): rs.colorPick's "More…" uses it
+export function rsColorBox(inp, anchor){ _cpEnhance(inp); inp._rsCpOpen(anchor); }
 // every colour input in `el` (an editor frame, a section that the page adds)
 export function rsColorPickers(el){ el.querySelectorAll('input[type="color"]').forEach(_cpEnhance); }
 // every colour input of a panel (the dashboard sidebar, the docked panel, a host panel), also one that a section adds later

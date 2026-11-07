@@ -99,6 +99,7 @@ Push **Run** under a block: a large window opens with the map and the change on 
     - The second block lights more than one group of roads, each in its own colour. Each group has a set name. The light is as wide as the road at every zoom.
     - When a road is in two sets, the set that you set last has the road. `rsHighlight` uses the road rows, as `rsQuery` gives them.
     - Each change sends `rs:highlightchange` with `set` and `ids`.
+    - A tool of your page that works on other objects can hold the road hover: `rs.holdHover("my-tool", true)`, and `false` at the end. No road lights up, and a click still selects the road. `rs.holdSelectLook("my-tool", true)` keeps `rs:select` but draws no select look, so your page draws its own selection.
 
 ### Filter and color { .rs-part }
 
@@ -240,7 +241,37 @@ Push **Run** under a block: a large window opens with the map and the change on 
 **From Python:** see each part
 { .rs-facts }
 
-[The help window](../dashboard-parts.md#a-help-window) · [number tiles](../dashboard-parts.md#number-tiles) (`rs.kpi`) · [tabs](../dashboard-parts.md#tabs) (`rs.tabs`) · [the editor frame](../dashboard-parts.md#an-editor-in-the-panel) (`rs.frame`) · [the hover box](../dashboard-parts.md#a-hover-box) (`rs.hover`) · [a chart](../dashboard-parts.md#a-chart) (`rs.chart`) · [a day picker](../dashboard-parts.md#a-day-picker) (`rs.days`) · [the bottom dock](../dashboard-parts.md#the-bottom-dock) (`rs.dock`)
+[The help window](../dashboard-parts.md#a-help-window) · [number tiles](../dashboard-parts.md#number-tiles) (`rs.kpi`) · [tabs](../dashboard-parts.md#tabs) (`rs.tabs`) · [the editor frame](../dashboard-parts.md#an-editor-in-the-panel) (`rs.frame`) · [the hover box](../dashboard-parts.md#a-hover-box) (`rs.hover`) · [a chart](../dashboard-parts.md#a-chart) (`rs.chart`) · [a day picker](../dashboard-parts.md#a-day-picker) (`rs.days`) · [the bottom dock](../dashboard-parts.md#the-bottom-dock) (`rs.dock`) · [the parts for a form, a list and a message](#form-list-and-message-parts)
+
+### Form, list and message parts { .rs-part }
+
+**Use it for:** a period, an hour, a value, a search, a file, a message, a menu and a long list in your panel. Each one has its own code on [Dashboard parts](../dashboard-parts.md).<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```javascript
+    rs.sections.add({id: "period", label: "Period", html: "<div id='per'></div><div id='hr'></div><div id='lst'></div>"});
+    rs.days.range(document.getElementById("per"), {unit: "week", min: "2026-09-01", max: "2026-11-06", onChange: ([from, to]) => console.log(from, to)});
+    rs.hours.use(document.getElementById("hr"), {value: [7, 9], range: true, label: "Rush hours"});
+    rs.more(document.getElementById("lst"), {items: rs.find("Storgatan"), page: 5, noun: "roads", render: id => `<div class="rs-qrow"><b>${id}</b></div>`});
+    rs.sections.button("period", {icon: "<svg viewBox='0 0 16 16'><circle cx='8' cy='8' r='5'/></svg>", title: "Zoom to the period", onClick: () => {}});
+    rs.panel.bar().innerHTML = "<span>3 fixes not saved</span><button type='button' class='sb-primary'>Build</button>";
+    rs.toast("The period is set.", {kind: "ok"});
+    ```
+
+??? info "Details"
+
+    - `rs.days.range(el, {unit, min, max, value, onChange})` is a period: from a day to a day, a week or a month.
+    - `rs.hours.use(el, {value, range, onChange})` is the hour picker: a field that opens a list of the hours.
+    - `rs.slider`, `rs.number` and `rs.colorPick` are a slider, a number field with "−" and "+", and a colour picker.
+    - `rs.search` is a search field with suggestions, `rs.drop` a file drop zone, `rs.progress` a progress bar and `rs.busy(button, promise)` a button that waits.
+    - `rs.toast(text, {kind})` is a message that goes after some seconds, and `await rs.confirm({title, ok, danger})` is the confirm dialog in place of `confirm()`.
+    - `rs.menu(button, items)` and `rs.menu.button(items)` are an action menu.
+    - `rs.toggle(button, onChange)` is a button that stays pressed.
+    - `rs.more(el, {items, page, render})` shows a long list page by page.
+    - `rs.sections.button(id, {icon, title, onClick})` is an icon button in a card's title row, and `rs.panel.bar()` is the fixed bar at the bottom edge of the panel.
 
 ## Data { .rs-group }
 

@@ -18,6 +18,11 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 | Layout | [Tabs](#tabs) | yes | the sections of a page |
 | Layout | [An editor in the panel](#an-editor-in-the-panel) | no | an editor that needs the whole panel |
 | Layout | [A list or a table that scrolls](#a-list-or-a-table-that-scrolls) | HTML | a long list |
+| Layout | [Steps](#steps) | HTML | a task in steps |
+| Layout | [Show more](#show-more) | no | a long list |
+| Layout | [An empty state](#an-empty-state) | HTML | a list with no item |
+| Layout | [An icon button in a title row](#an-icon-button-in-a-title-row) | no | an action of a card, such as "zoom to the area" |
+| Layout | [The panel's fixed bar](#the-panels-fixed-bar) | no | the state and the main button of a page |
 | Inputs | [Buttons](#buttons) | HTML | an action |
 | Inputs | [A two-way switch](#a-two-way-switch) | no | a mode or a setting |
 | Inputs | [A select box](#a-select-box) | HTML | one value of many |
@@ -26,6 +31,17 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 | Inputs | [Option rows](#option-rows) | HTML | settings with a note |
 | Inputs | [A day picker](#a-day-picker) | no | one day of data at a time |
 | Inputs | [The query part](#the-query-part) | yes | a question about the roads |
+| Inputs | [A date range, a week or a month](#a-date-range-a-week-or-a-month) | no | a page with a period of data |
+| Inputs | [An hour picker](#an-hour-picker) | no | the hour of a page |
+| Inputs | [A slider](#a-slider) | no | a number from a range |
+| Inputs | [A number field](#a-number-field) | no | a count, a width |
+| Inputs | [An on/off switch](#an-onoff-switch) | HTML | a setting that has an effect at once |
+| Inputs | [A search field](#a-search-field) | no | a place, a road |
+| Inputs | [A file drop zone](#a-file-drop-zone) | no | an input file |
+| Inputs | [An action menu](#an-action-menu) | no | the actions of an item |
+| Inputs | [A toggle button](#a-toggle-button) | no | a mode that is on or off |
+| Inputs | [A tool row](#a-tool-row) | HTML | the tools of an editor |
+| Inputs | [Rows that a click selects](#rows-that-a-click-selects) | HTML | a change list |
 | Showing data | [Number tiles](#number-tiles) | yes | the few numbers of a page |
 | Showing data | [Rows of fields](#rows-of-fields) | HTML | the fields of one item |
 | Showing data | [List rows](#list-rows) | HTML | a list of results |
@@ -36,6 +52,11 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 | Showing data | [Colour classes](#colour-classes) | yes | classes for a colour menu |
 | Status | [A callout](#a-callout) | HTML | the answer of a page |
 | Status | [Status colours](#status-colours) | HTML | an error, a warning, a good result |
+| Status | [A field error and a warning](#a-field-error-and-a-warning) | HTML | a value that is wrong or needs a look |
+| Status | [A progress bar and a busy button](#a-progress-bar-and-a-busy-button) | no | a long task |
+| Status | [A toast and a status line](#a-toast-and-a-status-line) | HTML | the result of an action |
+| Status | [A confirm dialog](#a-confirm-dialog) | no | a question before an action, in place of `confirm()` |
+| Status | [A count badge and a "not saved" dot](#a-count-badge-and-a-not-saved-dot) | HTML | a count on a tab or a button, a change that is not saved |
 | Help | [A help window](#a-help-window) | yes | "How to read this page" |
 | Help | [A hover box](#a-hover-box) | no | words under the pointer |
 | Help | [A button tip](#a-button-tip) | HTML | the name of an icon button |
@@ -58,6 +79,8 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 | `var(--line)` | thin lines |
 | `var(--accent)`, `var(--accent-fill)` | links; a filled control |
 | `var(--rs-err)`, `var(--rs-warn)`, `var(--rs-ok)` | [status colours](#status-colours) |
+| `var(--rs-unsaved)`, `var(--rs-danger-fill)` | the ["not saved" dot](#a-count-badge-and-a-not-saved-dot); the fill of a red button (`sb-danger`) |
+| `var(--rs-accent-text)` | the accent as text on an accent tint (a pressed button, a selected row) |
 
 ??? info "Details"
 
@@ -280,13 +303,110 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     - The area has a thin scrollbar and a fade at the bottom while there is more below. Its height is `--rs-scroll-h` (default: 520 px or 60 % of the window, the smaller).
     - The header row stays in view, and the numbers line up. `data-sort` on a `th` shows the sort arrow. The table does not sort: your code sorts the rows.
 
+### Steps { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=steps" title="Steps, live" loading="lazy"></iframe>
+
+**Use it for:** a task in steps.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <ol class="rs-steps">
+      <li class="rs-step done"><span class="rs-step-n">1</span><div class="rs-step-b"><b>Choose an area</b><p>Monaco</p></div></li>
+      <li class="rs-step on"><span class="rs-step-n">2</span><div class="rs-step-b"><b>Build the roads</b><p>...</p></div></li>
+      <li class="rs-step wait"><span class="rs-step-n">3</span><div class="rs-step-b"><b>Edit OSM data</b><span class="rs-step-note">After step 2</span></div></li>
+    </ol>
+    ```
+
+??? info "Details"
+
+    - `done` has a check mark, `on` (the step to do now) has a filled number and an accent edge, `wait` is dimmed and says what it waits for. Put the buttons of a step in its `rs-step-b`.
+
+### Show more { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=more" title="Show more, live" loading="lazy"></iframe>
+
+**Use it for:** a long list.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const l = rs.more(document.getElementById("roads"), {items: roads, page: 50, noun: "roads",
+                                                          render: r => `<div class="rs-qrow"><b>${r.name}</b><span>${r.km} km</span></div>`});
+    l.set(otherRoads);           // a new list: the first page again
+    ```
+
+??? info "Details"
+
+    - The list shows its first `page` rows, and a line under it says "50 of 134 roads" with a button "Show 50 more". `render` gives an element or HTML. It gives `{set(items), shown()}`. The list is in memory. A page that loads its rows from a server can use the `rs-more` line with its own button.
+
+### An empty state { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=empty" title="An empty state, live" loading="lazy"></iframe>
+
+**Use it for:** a list with no item.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <div class="rs-empty"><svg>...</svg><span><b>No fixes yet.</b><br>Click a road on the map to fix its tags.</span><button type="button">Add a fix</button></div>
+    ```
+
+??? info "Details"
+
+    - The icon and the button are optional. It works in the panel, in a frame and in a page of its own.
+
+### An icon button in a title row { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=icon-btn" title="An icon button in a title row, live" loading="lazy"></iframe>
+
+**Use it for:** an action of a card, such as "zoom to the area".<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    rs.sections.button("area", {icon: "<svg>...</svg>", title: "Zoom to the area", onClick: () => zoomTo(area)});
+    ```
+
+??? info "Details"
+
+    - The button goes after the card's title, before the "?" and the chevron. A click on it does not fold or open the card. In a card of the page's own HTML, put `<button class="rs-icon-btn" title="..." aria-label="...">` in the `.rs-card-title`.
+
+### The panel's fixed bar { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=panel-bar" title="The panel's fixed bar, live" loading="lazy"></iframe>
+
+**Use it for:** the state and the main button of a page.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const bar = rs.panel.bar();
+    bar.innerHTML = '<span><b>3 fixes</b> not saved</span><button type="button" class="sb-primary">Build</button>';
+    ```
+
+??? info "Details"
+
+    - `rs.panel.bar()` gives the element at the bottom edge of the panel, under the cards and outside the part that scrolls. It has the look of the editor frame's bar. The first text in it takes the free width, and the buttons are at the right. Empty, it does not show. While an [editor frame](#an-editor-in-the-panel) is open, the frame's own bar is there and this bar does not show. On a phone it is at the bottom of the sheet. A second call gives the same element.
+
 ## Inputs { .rs-group }
 
 ### Buttons { .rs-part }
 
 <iframe class="rs-live" src="../../parts/gallery.html?part=buttons" title="Buttons, live" loading="lazy"></iframe>
 
-**Use it for:** an action. `sb-primary` is the one main action of a card. `rs-link` is a small action in a line of text.<br>
+**Use it for:** an action. `sb-primary` is the one main action of a card. `sb-danger` is an action that deletes. `rs-link` is a small action in a line of text.<br>
 **From Python:** HTML
 { .rs-facts }
 
@@ -294,6 +414,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 
     ```html
     <div class="sb-actions"><button type="button" class="sb-primary">Run</button><button type="button">Reset</button></div>
+    <button type="button" class="sb-danger">Delete</button>
     <button type="button" class="rs-link">clear</button>
     ```
 
@@ -306,6 +427,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     | A link | underlined |
 
     - A `disabled` button is faded and does not react. Keyboard focus has an accent ring.
+    - `sb-danger` is red with white text. Use it for an action that deletes, as the OK button of a [confirm dialog](#a-confirm-dialog).
     - The look of a plain `<button>`, a `<select>` and a `<label>` in the panel is in `dashboard.css`, so a host page with its own panel (`#sb`) and no dashboard template gets it too. A disabled button, also a primary one, is dimmed.
 
 ### A two-way switch { .rs-part }
@@ -376,7 +498,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
 
 <iframe class="rs-live" src="../../parts/gallery.html?part=color" title="A colour picker, live" loading="lazy"></iframe>
 
-**Use it for:** a colour that the person chooses. Write a plain `<input type="color">`: roadstyle gives it its look.<br>
+**Use it for:** a colour that the person chooses. Write a plain `<input type="color">`: roadstyle gives it its look. `rs.colorPick` gives a palette first.<br>
 **From Python:** HTML
 { .rs-facts }
 
@@ -391,6 +513,9 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     ```js
     document.getElementById("fill").addEventListener("input", e => preview(e.target.value));   // while the person drags
     document.getElementById("fill").addEventListener("change", e => save(e.target.value));     // when the person is done
+    // a palette first (default: the 8 chart colours), a hex field, and "More…", which opens the same box
+    const line = rs.colorPick(document.getElementById("line"), {label: "Line colour", value: "#eb6834", onChange: v => save(v)});
+    line.value();      // "#eb6834"
     ```
 
 ??? info "Details"
@@ -400,6 +525,7 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     - Escape closes the box and puts back the colour before. A click on the old colour does the same and keeps the box open. Enter or a click outside keeps the new colour.
     - The arrow keys move the dot in the square (with Shift: ten times as far) and the hue on the bar.
     - It comes to each `<input type="color">` in the panel at the start, in a section that `rs.sections.add` adds, and in an [editor frame](#an-editor-in-the-panel).
+    - `rs.colorPick(el, {label, value, palette, onChange})` shows the swatch and the hex in a field. Its box has the palette, a hex field and **More…**. **More…** opens the box above, so the dashboard has one colour box and no browser dialog. A hex that is not a colour has a red edge and changes nothing. `onChange(hex)` comes for each new colour. It gives `{value(), set(hex, quiet)}`.
 
 ### Option rows { .rs-part }
 
@@ -455,6 +581,254 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     ```
 
 `text` is the start text (none: an empty box). More: [Dashboards](dashboards.md#the-panel-starts-empty).
+
+### A date range, a week or a month { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=range" title="A date range, a week and a month, live" loading="lazy"></iframe>
+
+**Use it for:** a page with a period of data.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const r = rs.days.range(document.getElementById("period"), {
+      unit: "day",                          // "day": from a day to a day; "week": Monday to Sunday; "month": one month
+      min: "2026-09-01", max: "2026-11-06", // the first and the last day that can be chosen
+      days: ["2026-10-05", "2026-10-06"],   // optional: only these days can be the first or the last day of a range
+      value: ["2026-10-05", "2026-10-11"],  // the period at the start (default: the last 7 days, the last week or the last month)
+      onChange: ([from, to]) => load(from, to),
+    });
+    r.value();                              // ["2026-10-05", "2026-10-11"]
+    r.set(["2026-10-01", "2026-10-03"], true);   // quiet: does not call onChange
+    r.unit("week");                         // another unit: the week of the last day
+    ```
+
+??? info "Details"
+
+    - Use it on a page that shows a period of data: from one day to another, one week, or one month. It is the day picker's field with a calendar.
+    - **Days.** The first click in the calendar sets the first day, the second click sets the last day. While the pointer moves, the calendar shows the range that a click gives. The field says "5–11 Oct 2026".
+    - **Week.** A click on a day takes its week, Monday to Sunday. The field says "Week 45 · 2–8 Nov 2026" (the ISO week number).
+    - **Month.** The calendar is a grid of 12 months. The field says "November 2026".
+    - "‹" and "›" go to the period before and after: the same number of days, the week, or the month. A period with no day in `min` to `max` is disabled.
+    - `onChange` can give a promise, as in the day picker. To let the person choose the unit, put an `rs-seg` beside the field and call `unit(u)`.
+
+### An hour picker { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=hours" title="An hour picker, live" loading="lazy"></iframe>
+
+**Use it for:** the hour of a page.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const h = rs.hours.use(document.getElementById("hour"), {value: 8, onChange: h => load(h)});   // one hour: 08:00 – 09:00
+    const r = rs.hours.use(document.getElementById("rush"), {value: [7, 9], range: true, label: "Rush hours",
+                                                              hours: [6, 7, 8, 9, 10], onChange: ([a, b]) => load(a, b)});
+    h.value();             // 8
+    r.set([16, 18]);       // the hours 16, 17 and 18: 16:00 to 19:00
+    ```
+
+??? info "Details"
+
+    - The hour picker has the look of the day picker: a field that opens a list of the hours.
+    - **One hour.** "‹ [08:00 – 09:00] ›". The list scrolls to the chosen hour, which has a tick. "‹" and "›" go to the hour before and after.
+    - **A range** (`range: true`). "From [07:00] To [10:00] 3 h". The value `[7, 9]` is the hours 7, 8 and 9, so To is 10:00, the end of the last hour. The list of To shows only hours after From. A From after To moves To with it.
+    - `hours` are the hours that can be chosen (default: all 24). The others are dimmed in the list, and "‹" and "›" skip them.
+    - Keys: ↓ opens the list, ↓ ↑ Home End walk it, Enter picks, Escape closes.
+
+### A slider { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=slider" title="A slider, live" loading="lazy"></iframe>
+
+**Use it for:** a number from a range.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    rs.slider(document.getElementById("speed"), {label: "Speed limit", min: 0, max: 130, step: 10, value: 50, unit: "km/h",
+                                                   onInput: v => preview(v), onChange: v => apply(v)});
+    rs.slider(document.getElementById("flow"), {label: "Flow", min: 0, max: 2000, step: 50, value: [300, 1200], unit: "veh/h"});   // two handles
+    ```
+
+??? info "Details"
+
+    - The value is at the right of the label. `onInput` comes while the handle moves, `onChange` at the release. With `value: [a, b]` the slider has two handles, and they do not cross. `format(v)` gives the text of a value (default: the value and the unit). It is the browser's range input, so the arrow keys, Home and End work. It gives `{value(), set(v, quiet)}`.
+
+### A number field { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=number" title="A number field, live" loading="lazy"></iframe>
+
+**Use it for:** a count, a width.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    rs.number(document.getElementById("lanes"), {label: "Lanes", min: 1, max: 8, step: 1, value: 2, onChange: n => apply(n)});
+    rs.number(document.getElementById("width"), {label: "Width", min: 0, max: 40, step: 0.5, value: 7.5, unit: "m"});
+    ```
+
+??? info "Details"
+
+    - "−", the number, the unit and "+" are one box. "−" or "+" is disabled at the limit. A typed number out of the range becomes the nearest limit. It gives `{value(), set(v, quiet)}`.
+
+### An on/off switch { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=onoff" title="An on/off switch, live" loading="lazy"></iframe>
+
+**Use it for:** a setting that has an effect at once.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <label class="rs-switch"><input type="checkbox" role="switch" checked><span>Show bridges</span></label>
+    ```
+
+??? info "Details"
+
+    - It is a check box, so `checked`, `disabled`, the `change` event and Space work as for a check box. Use it for a setting that has an effect at once. Use a check box in a form that has a **Save** button.
+
+### A search field { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=search" title="A search field, live" loading="lazy"></iframe>
+
+**Use it for:** a place, a road.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const s = rs.search(document.getElementById("place"), {placeholder: "Find a place", button: "Go",
+      suggest: q => fetch(url + encodeURIComponent(q)).then(r => r.json()).then(a => a.map(p => ({label: p.name, sub: p.country, value: p}))),
+      onPick: item => fly(item.value), onSubmit: q => find(q), onClear: () => reset()});
+    ```
+
+??? info "Details"
+
+    - `suggest(text)` gives a list of `{label, sub, value}`, or a promise of one. The list shows at most `max` rows (default 8). While the promise runs, a ring turns in place of the magnifier. A list with no row says "No match for …" (`none` gives your own words).
+    - ↓ ↑ walk the list, Enter picks the marked row or calls `onSubmit(text)`, Escape closes the list, and a second Escape clears the text. The end button (`button`) calls `onSubmit` too.
+    - It gives `{value(), set(text), focus(), clear()}`.
+
+### A file drop zone { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=drop" title="A file drop zone, live" loading="lazy"></iframe>
+
+**Use it for:** an input file.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    rs.drop(document.getElementById("file"), {accept: ".pbf,.osm", text: "Drop an .osm.pbf file here, or <u>choose a file</u>",
+                                              hint: "Up to 2 GB", onFiles: files => load(files[0]), onClear: () => reset()});
+    ```
+
+??? info "Details"
+
+    - A file over the box fills it with the accent. A click, Enter or Space opens the browser's file window. After the pick, a row shows the file's name and size and a "×" that takes it away. `multiple: true` takes more files. It gives `{files(), clear()}`.
+
+### An action menu { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=menu" title="An action menu, live" loading="lazy"></iframe>
+
+**Use it for:** the actions of an item.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const items = [{label: "Edit", onClick: edit}, {label: "Export", disabled: true}, "-", {label: "Delete", danger: true, onClick: remove}];
+    row.append(rs.menu.button(items));                        // a new "⋯" button with the menu
+    const m = rs.menu(document.getElementById("more"), items); // or the menu of your own button
+    ```
+
+??? info "Details"
+
+    - `"-"` is a line between two groups. `icon` is an SVG before the label. ↓ ↑ Home End walk the list, Enter picks, Escape closes and gives the focus back to the button. `rs.menu` gives `{open(), close(), set(items)}`.
+
+### A toggle button { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=toggle" title="A toggle button, live" loading="lazy"></iframe>
+
+**Use it for:** a mode that is on or off.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const t = rs.toggle(document.getElementById("here"), on => setMode(on ? "what-is-here" : null));
+    t.set(false, true);          // quiet: no onChange
+    ```
+
+??? info "Details"
+
+    - The button stays pressed (`aria-pressed`) until the next click: the accent tint, an accent edge and accent text. It gives `{set(on, quiet), value()}`.
+
+### A tool row { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=toolrow" title="A tool row, live" loading="lazy"></iframe>
+
+**Use it for:** the tools of an editor.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <div class="rs-toolrow" id="tools"><button data-v="pan" title="Move the map" aria-label="Move the map"><svg>...</svg></button>
+      <button data-v="pen" title="Draw a road" aria-label="Draw a road"><svg>...</svg></button></div>
+    ```
+
+=== "JavaScript"
+
+    ```js
+    rs.tabs.use(document.getElementById("tools"), tool => setTool(tool));   // one tool is pressed
+    ```
+
+??? info "Details"
+
+    - The pressed tool has the card colour, an accent edge and an accent icon. For tools that are on or off one by one, set `aria-pressed` on each button in place of `rs.tabs.use`.
+
+### Rows that a click selects { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=rows" title="Rows that a click selects, live" loading="lazy"></iframe>
+
+**Use it for:** a change list.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <div class="rs-rows" id="changes">
+      <button class="rs-row" data-v="4182"><b>Wall, way 4182</b><small>barrier=wall · 42 m</small><span class="rs-row-v">new</span></button>
+      <button class="rs-row" data-v="991"><span class="rs-row-i"><svg>...</svg></span><b>Door, node 991</b><small>entrance=yes</small></button>
+    </div>
+    ```
+
+=== "JavaScript"
+
+    ```js
+    const list = rs.tabs.use(document.getElementById("changes"), id => show(id));
+    list.select("991");          // from the code
+    ```
+
+??? info "Details"
+
+    - A list starts with no row selected. A click or ↓ ↑ selects one row, which has the accent tint and an accent bar. A row that holds a control (a select box, a button) is a `<div class="rs-row" data-v="..." tabindex="0">`: the control is at its end, a click in the control does not select the row, and Enter or Space selects it. `rs-row-i` is an icon, `rs-row-v` a value at the end. Use it for a list of items that a click opens (a change list). Use [option rows](#option-rows) for a choice with a check box or a radio button.
 
 ## Showing data { .rs-group }
 
@@ -806,6 +1180,111 @@ Each part has the same form: the live part, a box with **Use it for** and **From
     - A callout gets the mark ✕, ! or ✓, so the status is clear without the colour.
     - For your own status text, use `color: var(--rs-err)`, `var(--rs-warn)` or `var(--rs-ok)`. They have a light and a dark value.
 
+### A field error and a warning { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=field-msg" title="A field error and a warning, live" loading="lazy"></iframe>
+
+**Use it for:** a value that is wrong or needs a look.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <label>Lanes</label><input id="lanes" value="0" aria-invalid="true"><p class="rs-field-msg">Lanes is 1 or more.</p>
+    <label>Max speed</label><input value="fast"><p class="rs-field-msg warn">Give a speed in km/h, for example 50.</p>
+    ```
+
+??? info "Details"
+
+    - `aria-invalid="true"` on a field (also on a `<select>`: its select box) gives it a red edge. `rs-field-msg` is the line under the field, red with an icon; `warn` makes it amber. An empty line does not show, so a page can keep the element and set its text. Check the value while the person types, and disable the main button while a field has an error.
+
+### A progress bar and a busy button { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=progress" title="A progress bar and a busy button, live" loading="lazy"></iframe>
+
+**Use it for:** a long task.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    const p = rs.progress(document.getElementById("build"), {label: "Building the roads"});
+    p.set(0.42);                 // 42 %
+    p.set(0.9, "Roads 9 of 10"); // your own text
+    p.set(null);                 // no known value: a part of the bar moves
+    rs.busy(document.getElementById("load"), fetch(url));   // a ring before the text, no clicks until the promise ends
+    ```
+
+??? info "Details"
+
+    - `rs.busy(button, true)` and `rs.busy(button, false)` set the state by hand. `<span class="rs-spinner"></span>` is the ring alone.
+
+### A toast and a status line { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=toast" title="A toast and a status line, live" loading="lazy"></iframe>
+
+**Use it for:** the result of an action.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <div class="rs-status warn">3 fixes are not saved.</div>
+    ```
+
+=== "JavaScript"
+
+    ```js
+    rs.toast("Saved 12 fixes.", {kind: "ok", action: {label: "Undo", onClick: undo}});
+    rs.toast("The build stopped: no memory.", {kind: "error", ms: 0});      // ms: 0 stays until the person closes it
+    ```
+
+??? info "Details"
+
+    - A toast comes over the middle of the free part of the map, at the bottom. On a phone it comes at the top, because the sheet is at the bottom. It goes after 4 s (`info`, `ok`), 6 s (`warn`) or 8 s (`error`). It stays while the pointer or the focus is on it. A warning and an error are `role="alert"`. `rs.toast` gives `{close()}`.
+    - A status line (`rs-status`, with `ok`, `warn` or `error`) is the same look in a card, and it stays. Each kind has its colour and its icon.
+
+### A confirm dialog { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=confirm" title="A confirm dialog, live" loading="lazy"></iframe>
+
+**Use it for:** a question before an action, in place of `confirm()`.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    if(await rs.confirm({title: "Delete 3 fixes?", text: "You cannot undo this.", ok: "Delete", danger: true})) remove();
+    ```
+
+??? info "Details"
+
+    - Use it in place of the browser's `confirm()`.
+    - The promise gives `true` for the OK button and `false` for Cancel, Escape or a click outside. `danger: true` makes the OK button red (`sb-danger`), and the focus starts on Cancel, so Enter does not delete. It is the browser's `<dialog>`: the focus stays in it. On a phone it is a sheet at the bottom. `cancel` changes the word "Cancel".
+
+### A count badge and a "not saved" dot { .rs-part }
+
+<iframe class="rs-live" src="../../parts/gallery.html?part=badge" title="A count badge and a not saved dot, live" loading="lazy"></iframe>
+
+**Use it for:** a count on a tab or a button, a change that is not saved.<br>
+**From Python:** HTML
+{ .rs-facts }
+
+=== "HTML"
+
+    ```html
+    <button class="rs-tab" data-tab="fixes">Fixes<span class="rs-badge">12</span></button>
+    <button class="rs-tab" data-tab="tags">Tags<span class="rs-unsaved" role="img" aria-label="Not saved" title="Not saved"></span></button>
+    ```
+
+??? info "Details"
+
+    - They go in a tab or a button. On a filled tab or button, the badge is a darker teal with white text.
+
 ## Help and hints { .rs-group }
 
 ### A help window { .rs-part }
@@ -910,6 +1389,7 @@ These parts work only on a page with a map. The box below is a small page with t
         - With `idColumn`, a click on a row selects that road and zooms to it.
         - A table of more than 1000 rows draws only the rows in view, so 50 000 rows stay fast.
     - `rs.holdPopup(key, on)` holds the road popup while a part that shows the road's facts is in view (the data dock's road card). The popup comes back when no key holds it. `rs.fade(ids, {opacity})` fades the other roads (`rs.fade(null)` ends it).
+    - `rs.holdHover(key, on)` holds the road hover while a tool of the page works on other objects (the Building tab of duckOSM's fixes editor): no road lights up, and a click still selects the road. `rs.holdSelectLook(key, on)` keeps `rs:select` but draws no select look on a road or an overlay item, so the page draws its own selection. Each hold ends when no key holds it.
 
 ### The data dock and Ask { .rs-part }
 
@@ -918,13 +1398,3 @@ These parts work only on a page with a map. The box below is a small page with t
 { .rs-facts }
 
 Both need a database of the host, so this page does not show them live: see [The data dock](data-dock.md) and [Ask](ask.md).
-
-## Parts that roadstyle does not have yet { .rs-group }
-
-Until a part comes, make it with the parts above, or ask for it.
-
-| Group | Planned parts |
-|---|---|
-| Layout | numbered steps with a done mark; "Show more" or paging |
-| Inputs | a date range, week or month picker; an hour picker; a slider with its value, and a range slider; a number field with a unit; an on and off toggle; a search field with suggestions; a file drop zone; a menu of actions; a row of icon tools |
-| Status | a progress bar and a busy button; a toast; a confirm dialog; a "not saved" dot on a tab; an empty state |
