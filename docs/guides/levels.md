@@ -126,8 +126,8 @@ The editor is the standard dashboard. It has the panel, the toolbox and the phon
 
 `roadstyle levels edit out/area` (or `roadstyle-levels edit out/area`) opens a local page with the map and a panel. It has two tabs for changes:
 
-- **Road ends** is for one road. Click a road, or find it by edge id or `edge_ref`. A click on another road picks that road. Set the shape and the head length of each end.
-- **Stacking** is for two roads. Click a road, then a second road, to see every pair between the two and to add a rule.
+- **Road ends** is for one road. Click a road, or find it by edge id or `edge_ref`. A click on another road picks that road. The card of its two ends has one row for each end: its shape and the slider of its head length. A change shows at once, with an orange **waiting** mark until you apply it.
+- **Stacking** is for two roads. Click a road, then a second road, Each road is one short line. **Rules now** lists the rules between the two roads (found, earlier or today), with **switch off** or **delete**. **Add a rule** adds an order, a stack or a meet.
 
 The editor is in Rust: the solver runs in the page (WebAssembly), and a small Rust server (`roadstyle levels edit out/area`; `roadstyle serve out/area` is the same without the check of the area) gives the page
 the area's files and saves your changes. Monaco solves in 0.1 s in the page. The server answers only on 127.0.0.1, only to its own address (`Host`), and saves only the page's own changes (`Origin`) of at
@@ -137,17 +137,18 @@ dashboard's panel, toolbox and phone form, and `roadstyle serve` gives it the fi
 
 - **The edge of the area**: `roadstyle levels make edges.parquet out/area --boundary area.geojson` keeps the GeoJSON polygon as
   `out/area/boundary.geojson`, and the editor draws it as a dashed line. An area with no such file has no line.
-- **Help**: the **?** button next to the title opens a window that explains the editor: the two picked roads (red and blue), Order, Stack and Meet, the casing parts, the buttons of the apply bar, History, Issues and **← Steps**. On a phone it is a sheet. It links to this guide.
+- **Help**: the **?** button next to the title opens a window that explains the editor: the two picked roads (red and blue), Order, Stack and Meet, the casing parts, **Switch off**, a conflict, the buttons of the apply bar, History, Issues and **← Steps**. On a phone it is a sheet. It links to this guide.
 - **Add a rule**: *order* (whose fill is on top where they meet), *stack* (one road over the other: pick the parts of its casing) or
   *meet* (join two ends).
-- **Switch off** a pair that the input found. To replace a found stack, switch off its rows, then add your own parts.
+- **Switch off** a pair that the input found. To replace a found stack, switch off its rows (**switch off all** in Rules now), then add your own parts.
 - **Before you add**, the page tells you if the new rule is already there or makes a loop with other rules (A over B, B over C, C over
   A: no numbers keep them all).
 - **Each end of a road** (the *Road ends* tab): its cap (*round*, *square*, *flat*) and its head length. A change of caps or heads needs no solve.
 - **Apply and solve** solves all waiting changes together and redraws the roads that changed. If the solver refuses them, nothing is
   saved.
 - **Modes**: when the roads have a `modes` column (duckOSM gives it), boxes show only the roads of the ticked modes.
-- The **Issues** tab lists the stacks given up, the near warnings and the order wishes not kept.
+- The **Issues** tab has three counts: the stacks given up, the near warnings and the order wishes not kept. Each issue is one short row; a click shows its two roads on the map, and **edit** opens them in Stacking.
+- **A conflict** of a new rule shows in the panel, with **Add anyway** and **Cancel**. The message after an action is green when it works and red when it does not.
 
 Your changes are in three small tables in the area folder. The input step never writes them:
 
@@ -187,7 +188,7 @@ editor.addEventListener("back", () => { editor.destroy(); showSteps(); });
 The calls and the options are in [Use roadstyle in the browser](../rust/browser.md#the-level-editor-in-a-page). This is what the editor does with the panel:
 
 - **The host's panel.** `panel` is the host's `.sb-card`, with `.sb-top` and `.sb-body`. The editor hides the host's body and shows its own tabs:
-  Edit, History and Issues. The top line has the button "← Steps" (`backLabel`) and "Edit levels", before the host's hide button.
+  Road ends, Stacking, History and Issues. The top line has the button "← Steps" (`backLabel`) and "Edit levels", before the host's hide button.
 - **The apply bar.** A bar at the bottom of the panel (on a phone: of the sheet) shows "N waiting", *Discard* and *Apply and solve*. It shows only when
   changes wait. "N waiting" opens the list, and you can take out each change. A cap or a head length goes to the list like the other changes. Apply needs no solve for it: it only draws again.
 - **Back, with changes waiting.** "← Steps" with no change waiting sends the event `"back"` at once. With changes waiting, the bar asks: *Apply*
