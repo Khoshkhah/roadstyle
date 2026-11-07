@@ -4,10 +4,9 @@
 modules. No Python runs.</p>
 
 !!! warning "Experimental"
-    The Rust engine is experimental in 0.25. The functions of the WebAssembly package, the `roadstyle:*` metadata in the style
-    and the `__rs_*` property names can change in the next versions. Use one exact version of the package.
+    The WebAssembly package is experimental. The functions of the package, the `roadstyle:*` metadata in the style and the `__rs_*` property names can change in the next versions. Use one exact version of the package.
 
-duckosm-rust's browser page and the GeoLibre plugin use roadstyle this way. The examples on this page use Monaco.
+The browser page of duckosm-rust and the GeoLibre plugin use roadstyle this way. The examples on this page use Monaco.
 
 ## Get the files
 
@@ -22,9 +21,7 @@ Then put these files in one folder of your site:
 | `level_editor.html` | the level editor's panel (only for the level editor) | `rust/roadstyle-assets/files/static/` |
 | `js/` | `roads_sql.js` and `features_sql.js`, the worker SQL | `rust/roadstyle-wasm/js/` |
 
-`rust/roadstyle-assets/files/` is the one copy of these files (the crate roadstyle-assets). Until duckosm-rust takes the new paths, the dashboard,
-the popup files and `level_editor.html` are also at their old paths in `src/roadstyle/static/`, as a generated copy. Take them from
-`rust/roadstyle-assets/files/static/`. The npm package `roadstyle-dashboard` has the same files.
+`rust/roadstyle-assets/files/` is the one copy of these files (the crate `roadstyle-assets`). Take them from there, not from the generated copy in `src/roadstyle/static/`. The npm package `roadstyle-dashboard` has the same files.
 
 The page must load MapLibre GL JS 5.24 as a script, because the dashboard uses the global `maplibregl`:
 
@@ -46,27 +43,24 @@ Serve the folder over http. A module script does not load from a `file://` addre
 | `look.withArg(key, value)` | a `Look` | the same look with the keyword `key` (`color_by`, `state`, `live_data`, ...) set to `value` (JSON text) |
 | `look.toJson()`, `Look.fromJson(text)` | JSON text, a `Look` | save a look and load it again (version 2; `fromJson` also reads 1 and 0) |
 | `inlineStyle(roads, look, features?, planner?, name?)` | JSON text | the style with the roads in it (as `export_inline`) |
+| `readGeoParquet(bytes)`, `readGeoJson(bytes)`, `readShp(shp, dbf, prj?, name?)` | a `Roads` | the roads of a file, read one time. `roads.page(look, options, given?, features?)` and `roads.sources(look, features?, planner?, name?)` use it |
 | `new Tiler(roads, look, features?, name?, prefix, keep)` | a `Tiler` | the style with vector-tile sources, and the tiles on request |
 | `tiler.style(format?)` | JSON text | the style of the `Tiler`; `format` (`"mvt"` or `"mlt"`) sets the `encoding` of the vector source |
 | `tiler.tile("roads", z, x, y, format?)` | `Uint8Array` | one vector tile in `format` (default: the format of the `Tiler`); empty when no road is in it |
 | `tiler.props("roads", row)` | JSON text | the properties of one road, or `null` |
 | `tiler.archive(bounds, layers)` | `Uint8Array` | a PMTiles archive of all tiles in `[min lon, min lat, max lon, max lat]` |
 | `pageFrom(roads, look, options, given?, features?)` | HTML text | the whole page, as `render_edges` writes it. The page's keys (`sidebar`, `popup_mode`, ...) come from `options`' args; `given` adds your values (`street_view_key`, `api_key`) |
+| `styleSources(roads, look, features?, planner?, name?)` | a `Sources` | stage 1 alone: the style and its sources, for `new LiveMap(...)` ([Change the look of a live map](#change-the-look-of-a-live-map)) |
 | `exportLook(look, cols, positions)` | JSON text | the look for another app's data layer (as `export_look`) |
 | `makeArea(edges, options?)` | an `AreaFiles` | a level area's files in memory ([The level editor in a page](#the-level-editor-in-a-page)) |
 | `new LevelArea(roads, pairs)` | a `LevelArea` | the level editor's solver on an area (`solve`, `solveLocal`, `check`, `draw`, `levelsCsv`) |
 | `memoryBytes()` | number | the size of the module's memory, in bytes |
 
-The tile format: the default is MLT, the same as for every other way to make tiles. Use `"mvt"` for an app that cannot read MLT. The
-worker keeps each tile in each format that was asked for, so an MLT tile costs 1 to 6 ms (Nacka, native), one time for each tile.
-MapLibre needs about the same time to read both formats ([the measurements](tiles.md#measured-results)).
+The tile format is MLT by default, as for every other way to make tiles. Use `"mvt"` for an app that cannot read MLT. An MLT tile costs 1 to 6 ms (Nacka, native), one time for each tile ([the measurements](tiles.md#measured-results)).
 
-A look's JSON (`toJson`) is a format to save and load a look, not an API: its inner fields change between versions. Do not read or
-change its fields. Give your keywords to `resolveLook`, or change a saved look with `withArg`.
+The JSON of a look (`toJson`) is a format to save and load a look, not an API. Its inner fields change between versions. Do not read or change them. Give your keywords to `resolveLook`, or change a saved look with `withArg`.
 
-`roads` is the bytes of a GeoParquet file: the geometry as WKB in EPSG:4326, and the columns of
-[the data contract](../get-started.md#what-your-data-needs). An error is a thrown `Error` with a message that tells what is wrong.
-The engine takes at most 200,000 roads.
+`roads` is the bytes of a GeoParquet file: the geometry as WKB in EPSG:4326, and the columns of [the data contract](../get-started.md#what-your-data-needs). An error is a thrown `Error` with a message that tells what is wrong. The engine takes at most 200,000 roads (`MAX_ROADS`).
 
 ## Draw a style with the roads in it
 
@@ -97,8 +91,7 @@ The page shows the roads colored by `lanes`, the legend, the search box, the pop
 
 - `args` takes the keywords of `render_edges` that change the style, with their Python names: `color_by`, `cmap`, `arrows`,
   `labels`, `view_3d`, `highway_col`, ... ([every parameter](../reference/parameters.md)).
-- `state: "live"` keeps the global state (`rs_co`, `rs_top`, ...) in the expressions, so the controls can change the map.
-  Without it, the engine writes the start values, as `export_style` does.
+- `state: "live"` keeps the global state (`rs_co`, `rs_top`, ...) in the expressions, so the controls can change the map. Without it, the engine writes the start values, as `export_style` does.
 - `rsDashboard` reads its options from the style's metadata (`roadstyle:controls`, `roadstyle:interaction`,
   `roadstyle:color_options`). An option that you give has priority.
 - Call `rsDashboard` immediately after `new maplibregl.Map(...)`, before the map's `load` event.
@@ -258,10 +251,9 @@ the images again and reads the controls again ([the design panel](../guides/desi
 - A style must have a name: a style with none has `"name": null`, which MapLibre's style check refuses. Give `styleSources` the area's name.
 
 
-`pageFrom` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the
-dashboard's options and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same
-`options` text again: a view with another palette resolves its look from it. The page has placeholders for MapLibre, which you
-replace:
+## Write the whole page
+
+`pageFrom` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the options of the dashboard and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same `options` text again, because a view with another palette resolves its look from it. The page has placeholders for MapLibre. Replace them:
 
 ```js
 const options = JSON.stringify({palette: "amber", args: {state: "live", name: "Monaco", basemap: "osm", views: {plain: {road_fill: false}}}});
@@ -270,8 +262,7 @@ const html = pageFrom(roads, resolveLook(options), options)
   .replace("<script>__MAPLIBRE_JS__</script>", '<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>');
 ```
 
-`given` (JSON text) holds what only the host knows: `api_key` (the key of a tile URL that the host gives), `street_view_key`, and
-`resolved_basemaps` (base map entries in the form of `data/basemaps.json`). The warnings of the stages go to `console.warn`.
+`given` (JSON text) holds what only the host knows: `api_key` (the key of a tile URL), `street_view_key`, and `resolved_basemaps` (base map entries in the form of `data/basemaps.json`). The warnings of the stages go to `console.warn`.
 
 ## The level editor in a page
 
@@ -317,25 +308,18 @@ area's (roadstyle's edge_hash of the area's edge ids) and they have a row for ea
 editor saves it at once, with no solve. A rule (an order wish, a stack part, a rule switched off) is solved again around the change
 (`solveLocal`), and the whole area only when the local answer would keep fewer rules.
 
-`levelEditor({map, panel, pkgUrl, store})` runs the engine (the solver, the map's sources and its tiles) in a Web Worker
-(`editor/level_worker.js`, which loads the package from `pkgUrl`), so the page does not stop while it works. It draws the area on `map` (your MapLibre map; without it, a map of its own in `container`)
-and draws the editor into `panel`. Its tiles have the protocol `lv://`, apart from yours. A page has one dashboard (its state
-is the module's): when your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix it was made with. The editor
-then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`, by source and source layer; your base
-map stays, also when it shares a tile source with your roads), draws its roads with your prefix and its own sources (`<prefix>lv-roads`,
-apart from yours) and gives your dashboard its style. The dashboard's theme (`rs_theme`) and the base map's layers (the `overlays` of your style's `roadstyle:controls`, with their switch and their entry in the legend box) stay while the editor draws. Give `look` (the text of your saved look, such as the page's `look.json`) so that the editor's roads have your palette and your sections (also the dark theme); the editor puts its own column names, the state `live` and the colours of its picks over it. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`; when
-the page has one and you do not give it, `levelEditor` throws an error. `editor.destroy()` closes the editor: it takes off its panel parts,
-its listeners, its roads, tiles and images, clears the colour and the glow of the picked roads, and puts your panel, your roads, your road table and your dashboard's style back. Your files stay in
-the store. A store is `{load(name, bytes), save(name, data)}`: `browserStore(key)` keeps the files
-in this browser (in the origin's private file system: pairs.csv of a large area is more than localStorage's 5 MB; a text that an
-older version kept in localStorage moves there when it is read), `httpStore(base)` uses `roadstyle serve`. After each solve the editor sends the event `"solved"` with `levelsCsv`
-(one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the map's
-table, GeoParquet). `editor.roads` is the area's road ids, in their order; `editor.facts(ids)` gives a Promise of what the panel shows of those roads (any edge or road id), by road id. The editor reads a road's facts from the worker only when the panel needs them. The editor has no frame, fold button, side, width or phone layout of its own: it draws into the host's panel (see "The editor in the host's panel").
-Give your page `<meta name="viewport" content="width=device-width">`, so that a phone lays it out at its own width. A tap on a road picks it, and the
-targets are 44 px on a phone. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now (the History tab has links for edits.csv, heads.csv and caps.csv). The panel follows the
-theme of the host's panel (`#sb[data-theme]`). The module needs the files
-of `rust/roadstyle-assets/files/static/` beside it, in the same layout: `dashboard/` with its subfolders, `level_editor.html` (the panel),
-`dashboard.css` and `popup.css`.
+`levelEditor({map, panel, pkgUrl, store})` runs the engine (the solver, the sources of the map and its tiles) in a Web Worker (`editor/level_worker.js`, which loads the package from `pkgUrl`). The page does not stop while the engine works. The editor draws the area on `map` (your MapLibre map; without it, a map of its own in `container`), and its panel into `panel`. Its tiles have the protocol `lv://`, apart from yours.
+
+??? info "The options, the store and the events of the editor"
+    - **A dashboard of yours.** A page has one dashboard (its state is the state of the module). When your map has one, give it as `levelEditor({..., dashboard, prefix})` with the prefix that it was made with. The editor then takes your roads off the map (the layers of the roles in your style's `roadstyle:sources`, by source and source layer; your base map stays). It draws its roads with your prefix and its own sources (`<prefix>lv-roads`), and gives your dashboard its style. The theme of the dashboard (`rs_theme`) and the layers of the base map stay while the editor draws. Without a dashboard of yours, the editor makes one with the prefix `lv-rs-`. When the page has a dashboard and you do not give it, `levelEditor` throws an error.
+    - **`look`.** Give the text of your saved look (such as the `look.json` of the page), so that the roads of the editor have your palette and your sections (also the dark theme). The editor puts its own column names, the state `live` and the colours of its picks over it.
+    - **`editor.destroy()`.** It closes the editor: it takes off its panel parts, listeners, roads, tiles and images, clears the colour and the glow of the picked roads, and puts your panel, roads, road table and dashboard style back. Your files stay in the store.
+    - **The store.** A store is `{load(name, bytes), save(name, data)}`. `browserStore(key)` keeps the files in this browser (in the private file system of the origin; `pairs.csv` of a large area is more than the 5 MB of localStorage). `httpStore(base)` uses `roadstyle serve`.
+    - **The event `"solved"`.** The editor sends it after each solve, with `levelsCsv` (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the table of the map, GeoParquet).
+    - **Other members.** `editor.roads` is the list of the road ids of the area, in their order. `editor.facts(ids)` gives a Promise of what the panel shows of those roads (by road id). `editor.download(name)` downloads `edits.csv`, `heads.csv`, `caps.csv` or `levels.csv` as they are now.
+    - **The phone.** The editor has no frame, fold button, side, width or phone layout of its own: it draws into the panel of the host. Give your page `<meta name="viewport" content="width=device-width">`. A tap on a road picks it, and the targets are 44 px on a phone.
+    - **The theme.** The panel follows the theme of the panel of the host (`#sb[data-theme]`).
+    - **The files.** The module needs the files of `rust/roadstyle-assets/files/static/` beside it, in the same layout: `dashboard/` with its subfolders, `level_editor.html` (the panel), `dashboard.css` and `popup.css`.
 
 ### The editor in the host's panel
 

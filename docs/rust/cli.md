@@ -1,21 +1,31 @@
 # The roadstyle program
 
-`roadstyle` is the Rust engine as one program, with no Python. Each command is one job. The options have the names of roadstyle's
-Python keywords: `--color-by lanes` is `color_by="lanes"`, and `--no-arrows` is `arrows=False`. A value that is JSON (a number,
-`true`, a list) is read as JSON.
+<p class="lead">`roadstyle` is the Rust engine as one program, with no Python. Each command does one job.</p>
 
-Build it from the repository:
+The options have the names of roadstyle's Python keywords: `--color-by lanes` is `color_by="lanes"`, and `--no-arrows` is `arrows=False`. The program reads a value that is JSON (a number, `true`, a list) as JSON.
+
+Build the program from the repository:
 
 ```bash
 cargo build --release --manifest-path rust/Cargo.toml -p roadstyle-cli
 ```
 
-The program is `rust/target/release/roadstyle`. `roadstyle help` lists the commands.
+The program is `rust/target/release/roadstyle`. `roadstyle help` shows the commands.
+
+| Command | What it does |
+|---|---|
+| [`page`](#make-the-page) | the map, as one HTML file |
+| [`sources`](#draw-a-map-in-two-stages), [`tiles`](#draw-a-map-in-two-stages) | stage 1 (style and sources), then stage 2 (vector tiles) |
+| [`levels make`, `levels solve`, `levels edit`](#make-and-solve-a-level-area) | a level area: make it, solve it, edit it |
+| [`serve`](#make-and-solve-a-level-area) | the level editor, with no check of the area |
+| [`design edit`](#edit-the-design-of-a-map) | the design editor |
+| [`snapshot`](#make-a-picture-of-a-page) | a PNG of a saved page |
+
+The roads file is a GeoParquet file (`.parquet`, the line in the column `geometry`), a GeoJSON file (`.geojson`), a Shapefile (`.shp`, with its `.dbf` and `.prj` beside it) or a GeoPackage (`.gpkg`, its first feature table). The program changes the coordinates of a Shapefile or a GeoPackage to longitude and latitude. All commands that read roads use these files.
 
 ## Make the page
 
-`roadstyle page` makes the same page as `render_edges(backend="web")`: the map, its dashboard and MapLibre, in one file that works
-offline. Any other option is a keyword of `render`:
+`roadstyle page` makes the same page as `render_edges(backend="web")`: the map, its dashboard and MapLibre, in one file that works offline. Any other option is a keyword of `render`:
 
 ```bash
 roadstyle page roads.parquet out/map.html --basemap osm --views '{"plain": {"road_fill": false}}'
@@ -24,21 +34,25 @@ roadstyle page roads.parquet out/mvt.html --tile-format mvt
 roadstyle page roads.parquet out/dashboard.html --template dashboard
 ```
 
-A base map that is a tile URL can take a key: `--api-key KEY`, else the environment variable `ROADSTYLE_API_KEY`. Google 3D and the Street View
-window take `--street-view-key KEY`, else `GOOGLE_MAPS_KEY`. The program writes a key into the page only when you give one.
+| Option | What it does |
+|---|---|
+| `--palette P`, `--profile P`, `--settings FILE.json` | the look |
+| `--api-key KEY` | the key of a base map that is a tile URL. Default: the environment variable `ROADSTYLE_API_KEY` |
+| `--street-view-key KEY` | the key for Google 3D and the Street View window. Default: `GOOGLE_MAPS_KEY` |
+
+The program writes a key into the page only when you give one.
 
 ## Draw a map in two stages
 
-Stage 1 makes the style, one file for each source, and the road table. The program reads the roads by the file's extension:
-GeoParquet (`.parquet`, the line in the column `geometry` in longitude and latitude), GeoJSON (`.geojson`), a Shapefile (`.shp`,
-with its `.dbf` and `.prj` beside it) or a GeoPackage (`.gpkg`, its first feature table). It reprojects a Shapefile or a GeoPackage
-in another CRS to longitude and latitude. `page` and `levels make` read the same files.
+Stage 1 makes the style, one file for each source, and the road table.
 
 ```bash
 roadstyle sources roads.parquet out/stage1 --format geoparquet --color-by lanes
 ```
 
-Stage 2 makes the vector tiles from stage 1's files: one PMTiles file, or a folder of XYZ tiles with its `style.json`.
+`--format` is `geojson` or `geoparquet`. `--keep COL,COL` keeps more columns. `--name NAME` sets the map name.
+
+Stage 2 makes the vector tiles from the files of stage 1: one PMTiles file, or a folder of XYZ tiles with its `style.json`.
 
 ```bash
 roadstyle tiles out/stage1 out/roads.pmtiles
@@ -46,7 +60,7 @@ roadstyle tiles out/stage1 out/xyz --format xyz --base-url https://example.org/t
 roadstyle tiles out/stage1 out/roads_mvt.pmtiles --tile-format mvt
 ```
 
-The tiles are MapLibre Tiles (MLT) by default, as in every other path. `--tile-format mvt` writes Mapbox Vector Tiles. One rule cuts the tiles for `page`, `tiles` and the other paths ([Make tiles and PMTiles](tiles.md)).
+`--format` is `pmtiles` (default) or `xyz`. The tiles are MapLibre Tiles (MLT) by default. `--tile-format mvt` makes Mapbox Vector Tiles. One rule cuts the tiles for `page`, `tiles` and all other paths ([Make tiles and PMTiles](tiles.md)).
 
 ## Make and solve a level area
 
@@ -58,12 +72,28 @@ roadstyle levels edit out/area                    # the level editor, http://127
 roadstyle levels edit out/area --port 8790        # another port
 ```
 
-`levels make` takes the options of `roadstyle-levels make`: `--id-col`, `--band-col`, `--order`, `--band-dist`, `--head-m`,
-`--near-rules` and the tag columns (`--highway-col`, `--layer-col`, `--bridge-col`, `--tunnel-col`, `--junction-col`). `--boundary AREA.geojson` copies a GeoJSON polygon, feature or feature collection to `boundary.geojson` in the area folder, and the level editor draws it as the dashed line of the area's edge. It gives the
-same files as Python's `make_area`: Monaco in 0.1 s (Python 2.2 s), Tartu in 0.7 s (Python 13.2 s).
+`levels make` gives the same files as Python's `make_area`. Its options:
 
-`levels edit AREA_DIR` is the level editor from the Rust program, with no Python. It checks that the folder has `roads.parquet`, then serves the editor page (the standard dashboard: one panel, the bar, both themes, the phone sheet) and saves `edits.csv`, `heads.csv`, `caps.csv` and `levels.csv`. `--page DIR` serves another page folder. `levels edit` (and `serve`, the same without the check that the folder has `roads.parquet`) answers only on 127.0.0.1, only to its own address, and saves only the editor page's own changes. Its page files are in the
-program. Build the page's WebAssembly package with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
+| Option | Default | What it does |
+|---|---|---|
+| `--id-col` | `edge_id` | the column with the road id |
+| `--band-col` | none | the column with the band of a road |
+| `--order` | `priority` | `priority`, `class`, `none` or a column name |
+| `--band-dist` | 10 | the distance of a band, in metres |
+| `--head-m` | 5 | the head length, in metres |
+| `--near-rules` | off | also use the near rules ([How the levels are solved](levels-solver.md#the-rules)) |
+| `--highway-col`, `--layer-col`, `--bridge-col`, `--tunnel-col`, `--junction-col` | `highway`, `layer`, `bridge`, `tunnel`, `junction` | the names of the tag columns |
+| `--boundary AREA.geojson` | none | copies a GeoJSON polygon, feature or feature collection to `boundary.geojson`. The editor draws it as the dashed line of the edge of the area |
+
+`levels solve` reads `roads.parquet`, `pairs.csv` and `edits.csv`, and also `heads.csv` and `caps.csv` when they exist. It writes `levels.csv` and `levels_info.json`.
+
+`levels edit AREA_DIR` serves the level editor. It stops with an error when the folder has no `roads.parquet`. The page is the standard dashboard (one panel, the bar, both themes, the phone sheet). The editor saves `edits.csv`, `heads.csv`, `caps.csv` and `levels.csv` in the folder. The three input files have a column `time`, which the readers ignore.
+
+- `--port` sets the port (default 8780).
+- `--page DIR` serves another page folder. The page reads the area files relative to itself, from `../area/`.
+- `serve AREA_DIR` does the same, with no check of the folder.
+
+The server answers only on 127.0.0.1, only to its own address, and saves only the changes of the editor page. The page files are in the program. Build the WebAssembly package of the page with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
 
 The guide [Which road is on top](../guides/levels.md#edit-the-levels) shows the editor.
 
@@ -75,10 +105,19 @@ roadstyle design edit roads.geojson --design night.json   # another design file 
 roadstyle design edit roads.shp --port 8790               # a Shapefile (its .dbf and .prj beside it), another port
 ```
 
-`design edit ROADS` opens the roads on a map with the design panel: the theme, the road colours and widths, bridges and tunnels, the
-street names, the one-way arrows and the layers ([Edit the design of a map](../guides/design-panel.md#the-design-editor-on-its-own-page)).
-The page reads a GeoParquet, GeoJSON or Shapefile file. It does not read a GeoPackage: write it as GeoParquet first. The program prints
-the address. Each change of the design goes into the design file, by default `<roads name>.design.json` in the folder of the roads.
-`--design NAME` gives another file name in that folder. The server answers only on 127.0.0.1, only to its own address. The page can
-read only the roads file (with the `.dbf` and `.prj` of a Shapefile) and the design file, and it can write only the design file.
-It uses the same WebAssembly package as the level editor: build it with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
+`design edit ROADS` shows the roads on a map with the design panel: the theme, the road colours and widths, bridges and tunnels, the street names, the one-way arrows and the layers ([Edit the design of a map](../guides/design-panel.md#the-design-editor-on-its-own-page)). The program prints the address.
+
+- The page reads a GeoParquet, GeoJSON or Shapefile file. It does not read a GeoPackage. Write the GeoPackage as GeoParquet first.
+- Each change goes into the design file. Default: the name of the roads file without its extension, plus `.design.json`, in the folder of the roads.
+- `--design NAME` sets another `.json` file name in that folder. It has no folder part.
+- `--port` sets the port (default 8781). `--page DIR` serves another page folder.
+
+The server answers only on 127.0.0.1, only to its own address. The page can read only the roads file (with the `.dbf` and `.prj` of a Shapefile) and the design file. It can write only the design file. The page uses the same WebAssembly package as the level editor: build it with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
+
+## Make a picture of a page
+
+```bash
+roadstyle snapshot map.html map.png --center 7.42,43.735 --zoom 15 --width 1200 --height 800
+```
+
+`snapshot` makes a PNG of a saved page. Chromium draws the page (the same as Python's `rs.snapshot`). The options are `--center LON,LAT`, `--zoom`, `--pitch`, `--bearing`, `--width` (1200), `--height` (800), `--scale` (1), `--settle` (2.5 seconds) and `--timeout` (40 seconds). A build without the Cargo feature `snapshot` stops with an error.

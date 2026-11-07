@@ -3,15 +3,11 @@
 <p class="lead">About the structure of roadstyle's Rust engine: its crates and their modules, the path of one map from the roads
 to the page, and the JavaScript side.</p>
 
-The tables with sizes, modules, APIs, metadata keys and design gaps come from the code. `docs/gen_architecture.py` reads
-`rust/*/Cargo.toml` and the source trees, and the docs build runs it, so these tables show the code that the site is built from.
-Their texts are the first sentences of the code's own comments. The full design, with the parts that are not built, is in
-[the Rust library plan](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md).
+The tables of sizes, modules, APIs, metadata keys and design gaps come from the code. The docs build runs `docs/gen_architecture.py`. It reads `rust/*/Cargo.toml` and the source trees, so the tables show the code that the site is built from. Their texts are the first sentences of the comments in the code. The full design, with the parts that are not built, is in [the Rust library plan](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md).
 
 ## The big picture: the engine, JavaScript and MapLibre
 
-A roadstyle map has three parts, and each part has one job. The Rust engine makes the data. MapLibre GL JS draws it.
-roadstyle's JavaScript adds the controls and answers the mouse.
+A roadstyle map has three parts, and each part has one job. The Rust engine makes the data. MapLibre GL JS draws it. The JavaScript of roadstyle adds the controls and answers the mouse.
 
 ```mermaid
 flowchart TB
@@ -27,42 +23,38 @@ flowchart TB
     you <-->|"clicks, rs object"| dash
 ```
 
-*Rust gives JSON text and bytes, and never calls JavaScript or MapLibre. MapLibre does not know roadstyle: for MapLibre the
-roads are an ordinary style. The dashboard reads only the style. One call goes back to the engine: on a click, a browser page can
-ask the engine for the properties of one road (`engine.props`).*
+*Rust gives JSON text and bytes. It never calls JavaScript or MapLibre. MapLibre does not know roadstyle: for MapLibre, the roads are an ordinary style. The dashboard reads only the style. One call goes back to the engine: on a click, a browser page can ask the engine for the properties of one road (`engine.props`).*
 
-**1. The Rust engine makes the data.** From the roads and the look, it makes the pieces of the roads with their values (the
-color, the casing, the place in the drawing order), and a MapLibre style with the rules that read these values (the width for each
-zoom, the color, the sort order) and the `roadstyle:*` metadata for the dashboard. The pieces go into the vector tiles, one tile
-at a time on request or all in one PMTiles archive, or into GeoJSON. The engine never draws
-([the rules and the values](drawing.md#the-rules-are-in-the-style-the-values-are-in-the-data)).
+**1. The Rust engine makes the data.** From the roads and the look, it makes:
 
-**2. MapLibre GL JS draws.** MapLibre is the JavaScript map library in the browser. It reads the style and the tiles and draws
-them with WebGL. It moves the camera, zooms and tilts the map. It asks for each tile that it needs.
+- the pieces of the roads, with their values (the color, the casing, the place in the drawing order);
+- a MapLibre style with the rules that read these values (the width for each zoom, the color, the sort order);
+- the `roadstyle:*` metadata for the dashboard.
 
-**3. roadstyle's JavaScript adds the controls.** The dashboard modules (`rust/roadstyle-assets/files/static/dashboard/`) read the metadata and
-add the toolbox (navigate, base map, roads, colour and legend, settings), the search, Street View and the other controls. They change the map only with
-MapLibre's own calls. The `rs` object is the API of the dashboard for a host page.
+The pieces go into vector tiles (one tile at a time on request, or all in one PMTiles archive) or into GeoJSON. The engine never draws ([the rules and the values](drawing.md#the-rules-are-in-the-style-the-values-are-in-the-data)).
+
+**2. MapLibre GL JS draws.** MapLibre is the JavaScript map library in the browser. It reads the style and the tiles and draws them with WebGL. It moves the camera, and it zooms and tilts the map. It asks for each tile that it needs.
+
+**3. The JavaScript of roadstyle adds the controls.** The dashboard modules (`rust/roadstyle-assets/files/static/dashboard/`) read the metadata. They add the toolbox (navigate, base map, roads, colour and legend, settings), the search, Street View and the other controls. They change the map only with MapLibre's own calls. The `rs` object is the API of the dashboard for a host page.
 
 The engine runs in one of two places:
 
 | Case | Where the engine runs | What runs in the browser |
 |---|---|---|
 | Python: `render_edges(...)` | natively, in the Python process, before the page exists | MapLibre and the dashboard; the style is inside the HTML file |
-| The browser: the WebAssembly package | in the page or in a worker. `roadstyle_wasm.js` (made by `wasm-bindgen`) lets JavaScript call `inlineStyle` and `new Tiler` as normal functions | the engine, MapLibre and the dashboard. MapLibre gets each tile from `tiler.tile(z, x, y)` through `maplibregl.addProtocol("rs", ...)` |
+| The browser: the WebAssembly package | in the page or in a worker. `roadstyle_wasm.js` (made by `wasm-bindgen`) lets JavaScript call `inlineStyle` and `new Tiler` as normal functions | the engine, MapLibre and the dashboard. MapLibre gets each tile from `tiler.tile("roads", z, x, y)` through `maplibregl.addProtocol("rs", ...)` |
+| The program: `roadstyle page` | natively, in the program ([The roadstyle program](cli.md)) | MapLibre and the dashboard, as in the Python case |
 
 The Python page and the browser pages use the same MapLibre version (5.24) and the same dashboard files.
 
 ## The crates
 
-The workspace `rust/` has three kinds of crates:
+The workspace `rust/` has four kinds of crates:
 
-- **The core:** `roadstyle-model` (the roads and their properties), `roadstyle-levels` (the drawing order), `roadstyle-engine`
-  (the style) and `roadstyle-tiles` (the vector tiles and PMTiles).
-- **The reader:** `roadstyle-io` reads Arrow batches (`roads_from`, `table_from`) and GeoParquet bytes (`read_roads`, `read_table`, which
-  give their batches to the same decoder).
-- **The front-ends:** the facade `roadstyle` for Rust users (with the page writer), `roadstyle-wasm` for the browser and
-  `roadstyle-py` for Python. `roadstyle-rs` is the old name of the facade.
+- **The core:** `roadstyle-model` (the roads and their properties), `roadstyle-look` (the look), `roadstyle-levels` (the drawing order), `roadstyle-engine` (the style) and `roadstyle-tiles` (the vector tiles and PMTiles). `roadstyle-assets` holds the files that they read.
+- **The reader:** `roadstyle-io` reads Arrow batches (`roads_from`, `table_from`), GeoParquet bytes (`read_roads`, `read_table`), GeoJSON, Shapefile and GeoPackage files.
+- **The front-ends:** the facade `roadstyle` for Rust users (with the page writer), `roadstyle-wasm` for the browser and `roadstyle-py` for Python. `roadstyle-rs` is the old name of the facade.
+- **The programs:** `roadstyle-cli` (the `roadstyle` program), `roadstyle-mcp` (the MCP server), `roadstyle-serve` (the editor server) and `roadstyle-snapshot` (PNG pictures).
 
 Each arrow points from a crate to the crate that uses it:
 
@@ -113,8 +105,7 @@ flowchart TB
 ```
 <!-- /gen:crate-graph -->
 
-`roadstyle-levels` has no dependency on the other crates, so a program that needs only the drawing order (duckosm-rust's level
-step) takes this crate alone.
+`roadstyle-levels` has no dependency on the other crates of the workspace. A program that needs only the drawing order (the level step of duckosm-rust) takes this crate alone.
 
 <!-- gen:crates -->
 | Crate | Job | Lines | Dependencies |
@@ -138,24 +129,18 @@ step) takes this crate alone.
 All crates: 27,029 lines of Rust in `rust/*/src/`.
 <!-- /gen:crates -->
 
-The crates read roadstyle's data (`src/roadstyle/data/`: the palettes, the profiles, the sprite) and the page files
-(`src/roadstyle/static/`) when they are built, so both engines use one copy of these files. All crates have the version 0.0.1
-and are not on crates.io. To read their API documentation, run `cargo doc --no-deps --open` in `rust/`.
+The crates read the data and the page files (the palettes, the profiles, the sprite, the dashboard) from `rust/roadstyle-assets/files/` when they are built, so every front-end uses one copy. All crates have the version of the workspace (`version` in `rust/Cargo.toml`). To read their API documentation, run `cargo doc --no-deps --open` in `rust/`.
 
 ### The interface between the crates and their users
 
-The roads go in as Arrow batches (the geometry as WKB in EPSG:4326). Python gives an Arrow table (any object with
-`__arrow_c_stream__`; the binding reads it through the Arrow C stream interface), and bytes are a `TypeError`. The CLI and the browser
-give the bytes of a GeoParquet file. The look goes in as a typed `Look`
-(`roadstyle-look`): the palette, the profile, the settings and the keywords of `render_edges`, merged one time by `Look::resolve`, or a
-saved look read by `Look::from_json` (version 1, or version 0: the `look.json` of 0.25.0). The style comes out as JSON
-text, with the metadata for the dashboard. Each crate has one error enum (`roadstyle::Error` in the facade, with a kind for each
-crate's error and its own kinds), a thrown `Error` in JavaScript, a `ValueError` in Python. A message names no binding: the Python
-binding adds "use engine='python'" to a part that the Rust engine does not draw (`EngineError::Unsupported`).
+- **The roads** go in as Arrow batches (the geometry as WKB in EPSG:4326). Python gives an Arrow table (any object with `__arrow_c_stream__`). Bytes are a `TypeError`. The program and the browser give the bytes of a GeoParquet file.
+- **The look** goes in as a typed `Look` (`roadstyle-look`). `Look::resolve` merges the palette, the profile, the settings and the keywords of `render_edges` one time. `Look::from_json` reads a saved look (version 2, 1 or 0).
+- **The style** comes out as JSON text, with the metadata for the dashboard.
+- **An error** is an enum for each crate. The facade has `roadstyle::Error`, with a kind for each crate and its own kinds. JavaScript gets a thrown `Error`. Python gets a `ValueError`. A message names no binding.
 
 ## The modules of each crate
 
-The column "Python counterpart" names the module of the Python engine that does the same job. The golden tests compare the two.
+The column "Python counterpart" names the module of the old Python engine that did the same job.
 
 <!-- gen:modules -->
 #### `roadstyle-assets` { #roadstyle-assets }
@@ -383,8 +368,7 @@ Library, in `rust/roadstyle-snapshot/`. Public API: `Camera`, `Shot`, `SnapshotE
 
 ## The three stages and the one call
 
-The engine has three stages. Each stage is one crate, and each stage knows nothing of the next one. The facade `roadstyle` (in
-Python, `render_edges`) is the one call that runs them in order.
+The engine has three stages. Each stage is one crate, and no stage knows the next one. The facade `roadstyle` (in Python, `render_edges`) is the one call that runs them in order.
 
 ```mermaid
 flowchart TB
@@ -405,13 +389,9 @@ flowchart TB
     dash -->|"MapLibre calls"| ml
 ```
 
-*A map uses one of the two forms, never both. With **vector tiles** (ways A, B and C; the default), stage 2 cuts them first, with one
-rule for every way ([Tiling](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md)). With **GeoJSON** (`tiles=False`), stage 1's sources go to MapLibre with all
-the road fields in them, and MapLibre cuts the tiles in the browser.*
+*A map uses one of the two forms, never both. With **vector tiles** (ways A, B and C; the default), stage 2 cuts them first, with one rule for every way ([Tiling](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md)). With **GeoJSON** (`tiles=False`), the sources of stage 1 go to MapLibre with all the road fields in them, and MapLibre cuts the tiles in the browser.*
 
-The road fields (the name, the class, your columns) are a separate, small input for the interaction: the popup, the search and
-the filters. Drawing does not need them. In the tiles they repeat in each tile and at each zoom: on Tartu, the 26 road fields make
-the 9 tiles of one zoom-12 view 17.9 MB in place of 16.2 MB. Thus each tiled way gives the fields in its own way:
+The road fields (the name, the class, your columns) are a separate, small input for the interaction: the popup, the search and the filters. Drawing does not need them. In the tiles, they repeat in each tile and at each zoom. On Tartu, the 26 road fields make the 9 tiles of one zoom-12 view 17.9 MB in place of 16.2 MB. So each tiled way gives the fields in its own way:
 
 | Form | The fields in the drawing data | The fields for the dashboard |
 |---|---|---|
@@ -420,16 +400,10 @@ the 9 tiles of one zoom-12 view 17.9 MB in place of 16.2 MB. Thus each tiled way
 | B. Tiles on a server | none: a road feature has the marks and the allow-listed keys only | the file `props.json` (the road table, by the road's row), for the app's own popup |
 | C. Tiles made in the browser | only the columns of `keep` | one road on request (`engine.props`): the popup works, but `rs.find` and `rs.query` find nothing, because the page does not have all the fields |
 
-**Planned: one road table for every form.** Today GeoJSON and tiles keep the fields in two different ways. In the design phase,
-stage 1 gives two outputs: the drawing sources (the pieces, the slots, the decks), with only the drawing values and the road's
-row, and **one road table** with the fields of each road, keyed by its row. Stage 2 cuts only the drawing sources into tiles. The
-page or the worker gives the dashboard the road table, whole (as the side table does now) or one road at a time (as
-`engine.props` does now). Way B can keep every column in its tiles, as an option of stage 2, for map apps. The row "One road
-table" of [Known design gaps](#known-design-gaps) shows when this is built. A proposal on top of it: keep the data in a DuckDB
-file on a server, and serve the tiles and the roads on request ([the design note](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/duckdb_server.md)).
+??? info "Planned: one road table for every form"
+    Today GeoJSON and tiles keep the fields in two different ways. In the plan, stage 1 gives two outputs: the drawing sources (the pieces, the slots, the decks), with only the drawing values and the row of the road, and **one road table** with the fields of each road, keyed by its row. Stage 2 cuts only the drawing sources into tiles. The page or the worker gives the dashboard the road table, whole (as the side table does now) or one road at a time (as `engine.props` does now). Way B can keep every column in its tiles, as an option of stage 2, for map apps. The row "One road table" of [Known design gaps](#known-design-gaps) shows when this is built. A proposal on top of it: keep the data in a DuckDB file on a server, and serve the tiles and the roads on request ([the design note](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/duckdb_server.md)).
 
-The one call (the facade, `render_edges`) runs the stages in order. Stage 3 puts the style and the data of the selected form into
-one HTML file.
+The one call (the facade, `render_edges`) runs the stages in order. Stage 3 puts the style and the data of the chosen form into one HTML file.
 
 | Stage | Crate | Input → output | Public call today |
 |---|---|---|---|
@@ -438,19 +412,22 @@ one HTML file.
 | 3. The page | `roadstyle::page` | the style, the data and the options of the dashboard → one HTML file | Rust `page::page_html`; the browser `pageFrom`; Python through `render_edges` |
 | The one call | `roadstyle` (facade) | the roads and the look → the output of the way you ask for | Rust `tiled_from_parquet`; Python `render_edges`, `export_style`; the browser `new Tiler` |
 
-Where the inputs come from: the roads are an Arrow table that Python makes (`_engine._arrow`: GeoPandas' `to_arrow`; `duckosm.read`:
-DuckDB's `arrow()`), or GeoParquet bytes that the browser worker writes from a duckOSM file (`writeRoads`). The look comes from `Look::resolve` (the browser: `resolveLook`; Python: `_rust.resolve_look`), and each binding keeps it as a handle. In Python the
-stages run natively; in the browser they run in the page or in a worker, and the page only draws. Then the dashboard reads the
-metadata and adds the controls, and the `rs` object is the API for a host page.
+Where the inputs come from:
 
-**What the design phase adds** (step (f) of the roadstyle-rs session; the last rows of [Known design gaps](#known-design-gaps)):
+- **The roads** are an Arrow table that Python makes (`_engine._arrow`, from GeoPandas' `to_arrow`; `duckosm.read`, from the `arrow()` of DuckDB). They can also be GeoParquet bytes: the program reads a file, and the browser worker writes them from a duckOSM file (`writeRoads`).
+- **The look** comes from `Look::resolve` (the browser: `resolveLook`; Python: `_rust.resolve_look`). Each binding keeps it as a handle.
 
-- **A public call for each stage alone**, in Rust, Python and the browser.
-- **The output of stage 1 as the input of stage 2.** Stage 1 returns its output in memory, as typed values. You can save it as a file,
-  and stage 2 takes it from memory or reads it from a file. The one call passes it in memory, with no file.
-- **Two file formats between stage 1 and stage 2:** GeoJSON, which MapLibre reads directly and people can read, and GeoParquet, a binary format
-  for large areas (much smaller than Tartu's GeoJSON text of about 150 MB) that DuckDB also reads directly.
-- **The road table as its own Parquet file**, next to the pieces, not inside the GeoJSON.
+In Python and in the program, the stages run natively. In the browser, they run in the page or in a worker, and the page only draws. Then the dashboard reads the metadata and adds the controls. The `rs` object is the API for a host page.
+
+The program has one command for each stage: `roadstyle sources` (stage 1), `roadstyle tiles` (stage 2) and `roadstyle page` (the one call). See [The roadstyle program](cli.md).
+
+??? info "Planned: a public call for each stage"
+    The last rows of [Known design gaps](#known-design-gaps) show these parts. They are not built.
+
+    - **A public call for each stage alone**, in Rust, Python and the browser.
+    - **The output of stage 1 as the input of stage 2.** Stage 1 returns its output in memory, as typed values. You can save it as a file, and stage 2 takes it from memory or reads it from a file. The one call passes it in memory, with no file.
+    - **Two file formats between stage 1 and stage 2:** GeoJSON, which MapLibre reads directly, and GeoParquet, a binary format for large areas that DuckDB also reads directly.
+    - **The road table as its own Parquet file**, next to the pieces, not inside the GeoJSON.
 
 The metadata keys between the engine and the dashboard, and the modules that write or read them:
 
@@ -482,10 +459,7 @@ The metadata keys between the engine and the dashboard, and the modules that wri
 
 ## The engine and the dashboard share a contract
 
-The dashboard does not call the engine. It reads the style's metadata, its layers and the road properties, and it changes the
-map only with MapLibre's own calls. Thus every page (the Python page, duckosm-rust's page, the GeoLibre plugin) uses the same
-files. The names are in [the interaction contract](../reference/contract.md), and `tests/test_contract_names.py` checks them
-against the code.
+The dashboard does not call the engine. It reads the metadata of the style, its layers and the road properties. It changes the map only with MapLibre's own calls. So every page (the Python page, the page of duckosm-rust, the GeoLibre plugin) uses the same files. The names are in [the interaction contract](../reference/contract.md), and `tests/test_contract_names.py` checks them against the code.
 
 ```mermaid
 flowchart TB
@@ -507,8 +481,7 @@ flowchart TB
     ctl -.->|"restyle (planned)"| md
 ```
 
-*The dashed arrow is planned, not built. A change that needs new data (a color column that the style does not have, another
-profile) cannot go back to the engine, and `rs.can(...)` returns false for it.*
+*The dashed arrow is planned, not built. A change that needs new data (a color column that the style does not have, another profile) cannot go back to the engine. `rs.can(...)` returns false for it.*
 
 ## The JavaScript side
 
@@ -536,8 +509,7 @@ flowchart TB
     wasm -->|"style, tiles"| idx
 ```
 
-*The dashboard modules are ES modules. The Python page puts them in the page as one plain script (`render_web._DASH_FILES`), so a
-saved page still works offline.*
+*The dashboard modules are ES modules. The page writer (`rust/roadstyle/src/page.rs`) puts them in the page as one plain script, in the order of `static/dashboard/files.txt`. A saved page works offline.*
 
 <!-- gen:js -->
 **The dashboard modules** (`rust/roadstyle-assets/files/static/dashboard/`):
@@ -660,27 +632,22 @@ saved page still works offline.*
 
 How to use these files in a page: [Use roadstyle in the browser](browser.md).
 
-## Python is the reference
+## The golden tests
 
-A Rust output is correct only when it is the same as the Python output: byte for byte for the style and the page, the same
-features when decoded for the tiles. A difference is a bug in the engine, or an item in a list with its cause and a decision
-(the Python engine has been removed). Each module has golden tests from the Python engine.
+Rust is the reference. The golden tests in `rust/roadstyle-rs/tests/` compare the output with golden files (see `make_goldens.py` and `get_goldens.sh` there). A change of the style or of the tiles is a change of behavior: it needs a new golden.
 
 ## What stays in Python
 
 | Part | Why it stays |
 |---|---|
-| The `render_edges` API, its keywords and `WebMap` | Python reads the data, converts it to GeoParquet and calls Rust |
-| The readers (`load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`) and the filters | Python reads every format; the engine reads GeoParquet only |
-| The level areas, the level editor and the level store (`level_area.py`, `level_editor.py`, `levels_store.py`) | A local tool with an HTTP server and files. The engine has the solver with its defaults only |
-| `snapshot`, the CLI, the MCP server, the studio | Tools around a page: they need Python, a browser or the network |
-| mapstyle's part of the look | mapstyle makes its base-map part from its own data |
+| The `render_edges` API, its keywords and `WebMap` | Python reads the data, converts it to Arrow and calls Rust |
+| The readers (`load_edges`, `from_duckdb`, `from_arrow`, `from_geojson`) and the filters | Python reads every format and gives the engine an Arrow table |
+| `level_area.py`, `levels_store.py` and the Python `roadstyle-levels` command | The Python tool of the level step. The Rust program has the same commands ([The roadstyle program](cli.md)) |
+| `snapshot`, the Python CLI, the MCP server, the studio | Python wrappers around a page. The Rust programs `roadstyle-cli`, `roadstyle-mcp` and `roadstyle-snapshot` do the same jobs |
 
 ## Known design gaps
 
-The plan expects a pure core with no I/O, a typed and versioned look, error enums and a typed render model. The table shows each
-item and the state of the code. The script computes these numbers from `rust/*/src/`, so they change when the design changes, and
-an item shows "yes" when the code has it:
+The plan expects a core with no I/O, a typed and versioned look, error enums and a typed render model. The table shows each item and the state of the code. The script computes these numbers from `rust/*/src/`. An item shows "yes" when the code has it:
 
 <!-- gen:gaps -->
 | The plan expects | The code now | Done |
@@ -699,27 +666,26 @@ What each gap means and how the plan closes it: [the architecture](https://githu
 [the typed look](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#the-typed-look), [errors](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#errors) and
 [the render model](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/rust_library.md#the-render-model) in the plan.
 
-The phases of the plan, on 2026-10-23:
+??? info "The phases of the plan (state of 2026-10-23)"
+    ```mermaid
+    flowchart TB
+        P0["P0 the reference:<br/>goldens, CI"]:::done
+        P1["P1 one branch<br/>with all work"]:::done
+        P2["P2 the crate<br/>split"]:::done
+        P3["P3 typed look,<br/>layer roles"]:::part
+        P4["P4 style features,<br/>columnar model"]:::part
+        P5["P5 Python binding,<br/>the wheel"]:::done
+        P6["P6 page, export,<br/>rs object"]:::part
+        P7["P7 Python as a<br/>thin layer, 1.0"]:::open
+        P0 --> P1 --> P2
+        P2 --> P3 & P4 & P5
+        P3 & P4 --> P6
+        P5 & P6 --> P7
+        classDef done fill:#d1fae5,stroke:#059669,color:#064e3b
+        classDef part fill:#fef3c7,stroke:#d97706,color:#78350f
+        classDef open fill:#f1f5f9,stroke:#94a3b8,color:#334155,stroke-dasharray:4 3
+    ```
 
-```mermaid
-flowchart TB
-    P0["P0 the reference:<br/>goldens, CI"]:::done
-    P1["P1 one branch<br/>with all work"]:::done
-    P2["P2 the crate<br/>split"]:::done
-    P3["P3 typed look,<br/>layer roles"]:::part
-    P4["P4 style features,<br/>columnar model"]:::part
-    P5["P5 Python binding,<br/>the wheel"]:::done
-    P6["P6 page, export,<br/>rs object"]:::part
-    P7["P7 Python as a<br/>thin layer, 1.0"]:::open
-    P0 --> P1 --> P2
-    P2 --> P3 & P4 & P5
-    P3 & P4 --> P6
-    P5 & P6 --> P7
-    classDef done fill:#d1fae5,stroke:#059669,color:#064e3b
-    classDef part fill:#fef3c7,stroke:#d97706,color:#78350f
-    classDef open fill:#f1f5f9,stroke:#94a3b8,color:#334155,stroke-dasharray:4 3
-```
-
-*Green: done. Yellow: partly done. Grey, dashed: open.*
+    *Green: done. Yellow: partly done. Grey, dashed: open.*
 
 **See also:** [Build from source](https://github.com/Khoshkhah/roadstyle/blob/main/docs/rust/build.md)
