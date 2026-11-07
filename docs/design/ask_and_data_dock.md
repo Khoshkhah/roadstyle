@@ -530,7 +530,9 @@ checks that an `ORDER BY` in the SQL keeps its order through this wrap in DuckDB
 ### What it does
 
 Ask is a view that takes the whole side panel, as the design panel and the level editor do. A card of the host opens it, and Back shows
-the host's cards again. The person types a question in words, for example "Which primary roads are longer than 1 km?". An
+the host's cards again. With the option `tab: "Map"` (2026-11-07), Ask is a tab
+beside the host's cards: a row `[Map | Ask]` under the panel's title, no Back button, no card. `open()` and `close()` follow the tab.
+The person types a question in words, for example "Which primary roads are longer than 1 km?". An
 agent writes SQL, runs it with the data dock, reads the result, and writes a short answer. Each answer puts its SQL and its table into the
 data dock and lights the roads.
 
@@ -887,14 +889,13 @@ with a link to the page that gives the key:
 |---|---|---|---|
 | Google Gemini (the default) | `https://generativelanguage.googleapis.com/v1beta/openai` | https://aistudio.google.com/apikey | free tier, no card |
 | Groq | `https://api.groq.com/openai/v1` | https://console.groq.com/keys | free tier, no card |
-| Cerebras | `https://api.cerebras.ai/v1` | https://cloud.cerebras.ai | free tier |
-| Mistral | `https://api.mistral.ai/v1` | https://console.mistral.ai/api-keys | free "Experiment" plan (a phone number to sign up) |
 | OpenRouter | `https://openrouter.ai/api/v1` | https://openrouter.ai/keys | only its free models (names that end in `:free`); the model list shows only these |
+| Z.ai (GLM) | `https://api.z.ai/api/paas/v4` | https://z.ai/manage-apikey/apikey-list | only `glm-4.5-flash` (the provider's `free` list): the model list of Z.ai names only paid models, and a paid model with no balance gives HTTP 429 "Insufficient balance", which Ask shows at once as a refusal (status 402) |
 
-Services that need credits (xAI Grok, OpenAI) are not in the list. A free tier has a limit of requests for each minute and each day; one
+Services that need credits (xAI Grok, OpenAI) are not in the list. Cerebras and Mistral were removed on 2026-11-07: Cerebras gave only a trial credit with a card, and Mistral gave no free key. SiliconFlow was tried on the same day: its start credit ended after a few requests. A free tier has a limit of requests for each minute and each day; one
 question uses 2 to `maxSteps` requests.
 
-Checked on 2026-11-05: each of the five addresses accepts a request from a browser page (CORS) from `http://localhost:8852`. The free
+Checked on 2026-11-05: each address accepts a request from a browser page (CORS) from `http://localhost:8852` (Z.ai on 2026-11-07, from `https://khoshkhah.github.io`). The free
 tiers are as the services said on that day; a service can change them, so the guide `ask.md` names the date.
 
 The addresses are in a data file, `ask/providers.json`. **The model is not a fixed name.** The names of the models change often: on
@@ -921,7 +922,7 @@ itself after 1.6 s.
 
 | Field | localStorage key | What it is |
 |---|---|---|
-| Provider | `rs-settings:ask` → `provider` | A list of the five free services of `providers.json` (Gemini first), with the link "Get a free key from ..." under it |
+| Provider | `rs-settings:ask` → `provider` | A list of the four free services of `providers.json` (Gemini first), with the link "Get a free key from ..." under it |
 | Model | `rs-settings:ask` → `model.<provider>` | A text box with the models of the provider as its list ([The providers](#the-providers)) |
 | Key | `rs-key:ask:<provider>` | One key for each provider, because a key works only with its own service: the person can keep keys of two services and switch. Save, Clear. Save asks the provider for its models (`GET {address}/models`) and says "The key works" or the provider's own error |
 

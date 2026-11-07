@@ -289,6 +289,46 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
 
 
 
+_NO_MONEY = '{"error": {"code": "1113", "message": "Insufficient balance or no resource package. Please recharge."}}'
+
+
+def test_zai_uses_its_free_model_and_no_balance_is_not_a_wait(tmp_path):
+    """Z.ai's model list names only paid models: Save keeps the free model glm-4.5-flash. Z.ai answers a paid model with no balance with HTTP 429
+    "Insufficient balance": a wait does not help, so Ask shows the error at once, after one request."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        chats, money = [], {"n": 1}
+
+        def zai(route):
+            req = route.request
+            if req.url.endswith("/models"):
+                return route.fulfill(status=200, content_type="application/json", body='{"data": [{"id": "glm-4.5"}, {"id": "glm-5.3"}, {"id": "glm-5.3-flash"}]}')
+            chats.append(req.post_data_json)
+            if money["n"] > 0:
+                money["n"] -= 1
+                return route.fulfill(status=429, content_type="application/json", body=_NO_MONEY)
+            route.fulfill(status=200, content_type="application/json", body='{"choices": [{"message": {"role": "assistant", "content": "Six roads."}}]}')
+        try:
+            page.route("https://api.z.ai/**", zai)
+            page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:zai', 'test-key-123');
+                             localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'zai'})); makeReal(); ask.open()""")
+            page.click(".rs-ask-keyb")
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow select option')].map(o => o.value)") == ["gemini", "groq", "openrouter", "zai"]
+            page.click(".rs-ask-btns .sb-primary")
+            page.wait_for_function("document.querySelector('.rs-ask-keynote').textContent.startsWith('Saved.')")
+            assert "Ask uses glm-4.5-flash" in page.inner_text(".rs-ask-keynote")
+            assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.zai") == "glm-4.5-flash"
+            t0 = page.evaluate("performance.now()")
+            assert page.evaluate("ask.ask('How many?')") is None
+            assert page.evaluate("performance.now()") - t0 < 3000 and len(chats) == 1                 # no wait, no second request
+            line = page.inner_text(".rs-ask-turn .rs-ask-err")
+            assert "Z.ai (GLM) refused the request (HTTP 429): Insufficient balance" in line and "free limit" not in line, line
+            assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads." and chats[-1]["model"] == "glm-4.5-flash"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 _BUSY = '[{"error": {"code": 503, "message": "The model is overloaded. Please try again later.", "status": "UNAVAILABLE"}}]'
 
 
@@ -333,6 +373,25 @@ def test_the_phone_keeps_the_tool_row_and_the_box_in_view(tmp_path):
             box = page.evaluate("(() => { const r = document.querySelector('.rs-ask-comp').getBoundingClientRect(); return [r.left, r.right, r.bottom]; })()")
             assert box[0] >= 0 and box[1] <= 390 and box[2] <= 844, box
             assert page.evaluate("document.scrollingElement.scrollWidth") <= 390
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_ask_as_a_tab_in_the_panel_has_no_back_button(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("withOpts({tab: 'Map'})")
+            tabs = page.locator(".rs-panel-tabs .rs-tab")
+            assert tabs.all_inner_texts() == ["Map", "Ask"] and page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "map"
+            tabs.nth(1).click()
+            assert page.evaluate("ask.isOpen()") and page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "ask"
+            assert page.locator("#ask-back").count() == 0 and page.locator(".rs-panel-tabs").is_visible()      # the tab row stays, there is no Back
+            tabs.nth(0).click()
+            assert not page.evaluate("ask.isOpen()") and page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "map"
+            page.evaluate("ask.open()")                                                                          # open from code: the tab follows
+            assert page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "ask"
         finally:
             browser.close()
     assert errors == [], errors
