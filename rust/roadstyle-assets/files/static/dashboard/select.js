@@ -64,10 +64,12 @@ export let _ID_KEYS = [];         // the road's id fields: the panel search alwa
 let _roadPopup = true;            // road_popup=False: a click selects and fires rs:select, no popup
 let _quiet = false;              // quiet(true): no popup and no tooltip, also when the style has them (the level editor on a host's roads)
 export function quiet(on){ _quiet = !!on; if(_quiet && _tip) _tip.remove(); }
-// holdPopup(key, on): a part that shows the road's facts itself (the data dock's road card) holds the road popup while it is in view, so a
-// selection, from the map or from the part, has one place for its facts. The tooltip stays. A page with road_popup=False stays so after the hold.
+// holdPopup(key, on): a part that shows the facts itself (the data dock's card) holds the popups while it is in view: of a road, of a road's item and
+// of an overlay item (overlays.js reads _popupHeld). A selection, from the map or from the part, then has one place for its facts. The tooltip stays.
+// A page with road_popup=False stays so after the hold.
 const _holds = new Set();
 export function holdPopup(key, on){ if(on) _holds.add(key); else _holds.delete(key); }
+export const _popupHeld = () => _holds.size > 0;
 // holdHover(key, on): a host tool that works on other objects (duckOSM's fixes editor in its Building tab) holds the road hover while it is
 // on: no road lights up, no road tooltip, no pointer over a road, and a lit road goes off at once. A click still selects the road and sends
 // rs:select. An overlay keeps its own hover (rsSetInteraction).
@@ -83,6 +85,7 @@ export function holdSelectLook(key, on){
 }
 const _look = st => { if(_lookHolds.size) return; setS(_sel, st); if(_sel && _sel.road!=null) _fs({source:"roads", id:_sel.road}, st); };
 export function rsDeselect(){
+  clearOvSel();                     // an overlay item's selection goes too (the data dock's card closes with rs.select(null))
   if(_sel){ setS(_sel,{select:false});
     if(_sel.road!=null) _fs({source:"roads", id:_sel.road},{select:false});
     _sel=null; }
@@ -187,7 +190,7 @@ export function initSelect(){
     _emit("rs:select", {id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
                streetView:_svPick(e.lngLat, f, f.id)});
     const sv = _sv(e.lngLat, f);
-    if(io){ if(io.interactive && _ovWin(io)){             // the item's own popup (its popup fields), the road's Street View below it
+    if(io){ if(io.interactive && _ovWin(io) && !_holds.size){             // the item's own popup (its popup fields), the road's Street View below it
         if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+_esc(io.label)+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));
         else new maplibregl.Popup({closeButton:true, maxWidth:POPUP.maxWidth}).setLngLat(e.lngLat)
           .setHTML('<span style="color:#777">'+_esc(io.label)+'</span><br>'+_rfields(item.properties, io.popup) + sv + _ovSections(ovs)).addTo(map); } }

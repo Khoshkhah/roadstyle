@@ -7,7 +7,7 @@ import {POPUP, _rfields, _esc} from "../popup.js";
 import {map, O, OVERLAYS, RS_PREFIX, _NO_HOVER, _role, _emit} from "./core.js";
 import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
-import {rsDeselect, _rrows, _TIP_DELAY} from "./select.js";
+import {rsDeselect, _rrows, _TIP_DELAY, _popupHeld} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
 export const _ovWin = ov => ov.popup_window!==false && _OV_POPUP;
 export let _ovSel=null, _ovHov=null, _ovUnder=null, _ovT=0;      // {source,id} of the selected / lit (hovered) overlay feature; the one under the mouse now
@@ -48,7 +48,7 @@ export function handleOverlayClick(e, tier){                      // info popup 
       rsDeselect();                                        // road selection yields to the overlay
       _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; if(!_lookHolds.size) _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
-      if(!_ovWin(ov)){ /* popup_window=False: selected and lit, nothing shown */ }
+      if(!_ovWin(ov) || _popupHeld()){ /* popup_window=False, or a part shows the facts (rs.holdPopup): selected and lit, no popup */ }
       else if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
         rsInfoShow('<div class="rs-name">'+_esc(ov.label)+'</div>'+_rrows(p, fields));
       }else{

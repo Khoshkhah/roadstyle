@@ -73,10 +73,10 @@ class _Quiet(http.server.SimpleHTTPRequestHandler):
 
 
 @contextlib.contextmanager
-def served(tmp_path):
+def served(tmp_path, **kw):
     shutil.copytree(DASH, tmp_path / "dashboard")
     page = tmp_path / "page.html"
-    rs.render_dashboard(_edges(), basemap="blank", color_options={"Road class": {}}, name="Data").save(page)
+    rs.render_dashboard(_edges(), basemap="blank", color_options={"Road class": {}}, name="Data", **kw).save(page)
     page.write_text(page.read_text().replace("</body>", _HOST + "</body>"))
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=str(tmp_path)))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -266,6 +266,45 @@ def test_the_road_card_is_the_one_place_for_a_road_while_the_dock_is_open(tmp_pa
             assert page.evaluate("rs.getState().selection") == "3" and page.evaluate(popups) == 0
             page.evaluate("rs.dock.close(); rs.select('4')")
             page.wait_for_timeout(300)
+            assert page.evaluate(popups) == 1                                   # no card in view: the popup again
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_the_card_shows_an_overlay_item_and_no_popup_shows_while_the_dock_is_open(tmp_path):
+    """Kaveh, 2026-11-07: "click on item should show info into sql panel card info", and no popup. While the dock shows the data dock, a click on an
+    overlay item (a building) shows its facts in the card, with no popup; the card's close button deselects it. When the dock closes, the popup is back."""
+    import geopandas as gpd
+    from shapely.geometry import box
+
+    from roadstyle import Overlay
+    houses = gpd.GeoDataFrame({"name": ["Town hall"], "building": ["civic"], "levels": [4]},
+                              geometry=[box(18.0075, 59.3040, 18.0090, 59.3050)], crs=4326)
+    popups = "document.querySelectorAll('.maplibregl-popup').length"
+    with served(tmp_path, overlays=[Overlay(houses, label="buildings", popup=["building", "levels"])]) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); data.open()")
+            page.wait_for_timeout(300)
+            # the house in the free part of the map: right of the panel, above the dock
+            page.evaluate("""(() => { map.jumpTo({center: [18.00825, 59.3045], zoom: 16}); const q = map.project([18.00825, 59.3045]);
+                                      map.panBy([q.x - 800, q.y - 220], {duration: 0}); })()""")
+            page.evaluate("new Promise(ok => { map.once('idle', ok); map.triggerRepaint(); setTimeout(ok, 3000); })")
+            at = page.evaluate("""(() => { const r = map.getCanvas().getBoundingClientRect(), q = map.project([18.00825, 59.3045]);
+                                          return [r.left + q.x, r.top + q.y]; })()""")
+            page.mouse.click(*at)
+            page.wait_for_timeout(400)
+            assert page.evaluate(popups) == 0 and page.is_visible("#rs-dock .rs-dd-card")
+            card = page.inner_text("#rs-dock .rs-dd-card")
+            assert "Town hall" in card and "buildings" in card and "civic" in card and "4" in card, card
+            page.click("#rs-dock .rs-dd-rc-x")
+            page.wait_for_timeout(300)
+            assert page.is_hidden("#rs-dock .rs-dd-card")
+            page.evaluate("rs.dock.close()")
+            page.wait_for_timeout(300)
+            page.mouse.click(*at)
+            page.wait_for_timeout(400)
             assert page.evaluate(popups) == 1                                   # no card in view: the popup again
         finally:
             browser.close()
