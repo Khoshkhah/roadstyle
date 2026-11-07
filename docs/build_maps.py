@@ -160,7 +160,8 @@ async function query(sql){
   return {columns: f.map((x) => ({name: x.name, type: String(x.type)})), rows: t.toArray().map((r) => f.map((x) => r[x.name]))};
 }
 window.data = dataDock({query, ready: conn,
-  schema: async () => ({tables: [{name: "main.edges", rows: Number((await query("SELECT count(*) AS n FROM edges")).rows[0][0]),
+  schema: async () => ({tables: [{name: "main.edges", main: true, rows: Number((await query("SELECT count(*) AS n FROM edges")).rows[0][0]),
+    columns: (await query("DESCRIBE edges")).rows.map((r) => ({name: r[0], type: r[1]})),
     about: "The roads of Södermalm: one row is one direction of a road (edge_id), with its OpenStreetMap tags, length_m, and two made-up columns, aadt and speed_kph."}]}),
   sql: "SELECT edge_id, name, highway, length_m FROM edges WHERE highway = 'primary' ORDER BY length_m DESC"});
 window.data.open();
@@ -185,6 +186,17 @@ html = rs.render_dashboard(
     ]}},
 ).html
 (OUT / "data_dock.html").write_text(html.replace("</body>", DOCK + "</body>", 1), encoding="utf-8")
+
+# Ask, live (ask.md): the same page with Ask open in the panel. The visitor pastes the key of a free AI service; it stays in the browser
+ASK = DOCK.replace('import {dataDock} from "../live/dashboard/data/data_dock.js";', """import {dataDock} from "../live/dashboard/data/data_dock.js";
+import {askPanel} from "../live/dashboard/ask/ask_panel.js";""").replace("</script>", """window.ask = askPanel({data: window.data, dialect: "DuckDB",
+  about: "The roads of Södermalm in Stockholm, the table edges: one row is one direction of a road. aadt and speed_kph are made-up numbers.",
+  examples: ["Which streets are longer than 300 m?", "How many kilometres of each road class are there?", "Which bridges have the most traffic (aadt)?"]});
+rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the roads", icon: "ask", background: true, open: () => window.ask.open()});
+window.ask.open();
+</script>""")
+html = rs.render_dashboard(g, basemap="ofm_positron", color_options={"Road class": {}}, name="Ask").html
+(OUT / "ask.html").write_text(html.replace("</body>", ASK + "</body>", 1), encoding="utf-8")
 
 for f in sorted(OUT.glob("*.html")):
     print(f"wrote {f.relative_to(REPO)} ({f.stat().st_size // 1024} KB)")
