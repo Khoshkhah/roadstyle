@@ -1202,6 +1202,8 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 #sb .rs-ask-top button.rs-ask-keyb.on:is(:hover,:focus-visible){filter:brightness(1.1);background:var(--accent-fill);color:#fff}
 .rs-ask-ex{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:0 0 4px}
 .rs-ask-hint{color:var(--mut);font-size:12px;margin:0 0 4px}
+.rs-ask-grp{margin:6px 0 0;font:600 11px/1.2 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.rs-ask-grp:first-child{margin-top:0}
 .rs-ask-need{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:0 0 6px;font-size:12.5px}
 .rs-ask-need:empty{display:none}
 .rs-ask-need p{margin:0}

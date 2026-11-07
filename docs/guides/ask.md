@@ -52,7 +52,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
       data,
       about: "A road network of Tartu. One row of edges is one direction of a road.",
       dialect: "DuckDB",
-      examples: ["Which streets are longer than 1 km?", "How many one-way roads are there?"],
+      examples: ["Which streets are longer than 1 km?", "How many one-way roads are there?"],   // after the general groups; or [{title: "Roads", items: [...]}, ...]
     });
     ask.addEventListener("answer", (e) => console.log(e.detail));   // {question, text, sql, rows}
     rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data", open: () => ask.open()});
@@ -72,7 +72,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `dashboard` | `window.rs` | The page's dashboard. |
     | `about` | `""` | One paragraph about your data. It goes into the prompt. Put here the facts that the model must know, for example which table the map draws. |
     | `dialect` | `"SQL"` | The name of the database's SQL. With `"DuckDB"`, the prompt also tells the model how to read the comments of the tables and columns. |
-    | `examples` | `[]` | Questions that the empty start shows as buttons, one row each. A click on a question asks it. |
+    | `examples` | the general groups | Questions that the start shows as buttons, one row each. A click on a question asks it. With no `examples`, Ask shows its **general groups** (Know the data, Find and count, Show on the map, Colour and focus, The map and the layers, Charts): they hold no name of a table or a column, so they fit any data, and the agent looks the names up. Your own `examples` come after them. An item is a string or a group `{title, items: [...]}`: a group is a small heading above its questions. Strings and groups can mix; strings before the first group have no heading. Both lists show the groups: the start list and **Examples ▴**. `examples: {general: false, groups: [...]}` shows only yours (`groups: []` shows none). |
     | `panel` | `#sb` | The host's dashboard panel. Ask uses roadstyle's [editor frame](dashboard-parts.md#an-editor-in-the-panel) in it. |
     | `backLabel` | `"Back"` | The text of the back button. |
     | `tab` | none | Ask as a tab. Give the name of the first tab, for example `"Map"`. A tab row `[Map | Ask]` shows under the panel's title. **Map** shows the host's cards, **Ask** shows the conversation. There is no Back button and no Ask card: the page does not call `rs.sections.add` for Ask. |
@@ -124,7 +124,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     - **A map change** is one line on the card, for example "MAP Focus on 625 roads (the others hidden)". A colour or a focus is a layer in **Colour ▾** or **Focus ▾** of the data dock. A new question, ✕ of a card and **New** do not remove a layer.
     - **An error** ends the question with a red line on its card, and the question box works again.
     - **A road click** while Ask is open shows no popup. The data dock opens with the road in its card (`rs.holdPopup("ask", …)`).
-    - **The question box** is at the bottom. Enter asks, Shift+Enter is a new line. While the agent works, the send button is a stop square. After the first question, **Examples ▴** above the box shows the example chips. The list is as high as the free space above the box at most and scrolls inside. The arrow keys walk the examples (the list scrolls to the one in focus), and Escape closes it.
+    - **The question box** is at the bottom. Enter asks, Shift+Enter is a new line. While the agent works, the send button is a stop square. After the first question, **Examples ▴** above the box shows the example chips. The list is as high as the free space above the box at most and scrolls inside. The arrow keys walk the examples (the headings of groups are skipped, and the list scrolls to the one in focus), and Escape closes it.
 
 ### The services and the keys { .rs-part }
 
