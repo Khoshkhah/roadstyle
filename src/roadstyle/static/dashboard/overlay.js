@@ -12,12 +12,12 @@ const OVERLAP = 1;
 // look is 8 px from the edge
 const sideOf = p => { const r = p.getBoundingClientRect(); return r.left + r.width / 2 < innerWidth / 2 ? "left" : "right"; };
 // `edge`: a function that gives the edge of the box now ("right", "left", "top" or "bottom"); only a box on a side follows a panel
-export function followPanels(box, edge){
+export function followPanels(box, edge, align){
   const edgeNow = () => typeof edge === "function" ? edge() : edge;
   const side = () => { const e = edgeNow(); return e === "right" || e === "left" ? e : null; };
   const run = () => {
-    const s = side(), e = edgeNow();
-    box.style.left = box.style.right = box.style.maxWidth = "";
+    const s = side(), e = edgeNow(), a = align ? align() : "middle";
+    box.style.left = box.style.right = box.style.maxWidth = box.style.top = box.style.bottom = box.style.transform = "";
     if(phone() || !root.classList.contains("rs-overlay") || !(s || e === "top" || e === "bottom")) { root.style.removeProperty("--rs-tb-off"); return; }
     if(s === "right") box.style.left = "auto";                  // a box at the right edge: its left is free
     let off = 8, lo = 0, hi = innerWidth;
@@ -28,14 +28,39 @@ export function followPanels(box, edge){
       sideOf(p) === "left" ? lo = Math.max(lo, r.right) : hi = Math.min(hi, r.left);
       if(sideOf(p) === s) off = Math.max(off, (s === "right" ? innerWidth - r.left : r.right) - OVERLAP);
     }
-    // a box along the top or the bottom is centered in the free part of the window (the part that no panel covers), and wraps to more rows when it is too wide for it
-    if(!s){ box.style.left = (lo + hi) / 2 + "px"; box.style.maxWidth = Math.max(44, hi - lo - 16) + "px"; return; }
+    // a bar at a corner (align start or end, the bar's place along its edge) stays clear of the corner box of the scale and the credits and of the dock
+    const sb = document.getElementById("rs-scalebox"), sr = sb && getComputedStyle(sb).display !== "none" ? sb.getBoundingClientRect() : null;
+    const atLeft = r => r.left + r.right < innerWidth;
+    // a box along the top or the bottom is centered in the free part of the window (the part that no panel covers), or at its left or right end, and wraps to
+    // more rows when it is too wide for it
+    if(!s){
+      if(a !== "middle" && e === "bottom" && sr && sr.width) atLeft(sr) ? lo = Math.max(lo, sr.right) : hi = Math.min(hi, sr.left);
+      box.style.maxWidth = Math.max(44, hi - lo - 16) + "px";
+      if(a === "middle"){ box.style.left = (lo + hi) / 2 + "px"; return; }
+      box.style.transform = "none";
+      if(a === "start") box.style.left = lo + 8 + "px"; else { box.style.left = "auto"; box.style.right = innerWidth - hi + 8 + "px"; }
+      return;
+    }
     box.style[s] = off + "px";
+    if(a === "middle") return;
+    box.style.transform = "none";
+    if(a === "start"){ box.style.top = "8px"; return; }
+    let low = innerHeight;
+    const dock = document.getElementById("rs-dock");
+    if(dock && root.classList.contains("rs-dock-has")) low = Math.min(low, dock.getBoundingClientRect().top);
+    if(sr && sr.width && atLeft(sr) === (s === "left")) low = Math.min(low, sr.top);
+    box.style.top = "auto"; box.style.bottom = innerHeight - low + 8 + "px";
   };
   const watch = () => {
     for(const p of document.querySelectorAll("#sb, .rs-side")) new MutationObserver(run).observe(p, {attributes: true, attributeFilter: ["style", "class"]});
     new MutationObserver(run).observe(document.body, {attributes: true, attributeFilter: ["class"]});
-    new MutationObserver(run).observe(root, {attributes: true, attributeFilter: ["class"]});       // the phone form
+    new MutationObserver(run).observe(root, {attributes: true, attributeFilter: ["class", "style"]});   // the phone form; the dock's height (--rs-dock-h)
+    // a bar with a place along its edge follows the box of the scale too, which comes later and moves to its own corner (only the bar: the box itself
+    // writes its style, so it must not watch it)
+    if(align){
+      const sbWatch = new MutationObserver(run), hook = () => { const sb = document.getElementById("rs-scalebox"); if(sb) sbWatch.observe(sb, {attributes: true, attributeFilter: ["style"]}); return !!sb; };
+      if(!hook()){ const wait = new MutationObserver(() => { if(hook()){ wait.disconnect(); run(); } }); wait.observe(document.body, {childList: true}); }
+    }
     run();
   };
   addEventListener("resize", run);

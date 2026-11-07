@@ -12,7 +12,8 @@
       "position": "right",
       "settings": true,
       "hold": false,
-      "navigation": "box"
+      "navigation": "box",
+      "align": "middle"
     },
     "windows": {
       "clamp": true,

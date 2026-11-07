@@ -241,19 +241,19 @@ window of 650 px the bar at the right edge went 32 px into the dock, and on ever
 
 Measured in the mock-up at 1366 × 900, 768, 650 and 560 px: the bar and an open Settings box end above the dock in each case.
 
-**The place of a bar along the top or the bottom** (Kaveh, 2026-11-05: "for top we should have middle, left and right as option"): a new
-option of the toolbox, beside its edge.
+**The place of the bar along its edge** (Kaveh, 2026-11-05: "for top we should have middle, left and right as option"; 2026-11-06: "it
+can select middle or left or right corner"): the option `toolbar.align`, beside its edge.
 
-| | Option | Settings box | Where |
-|---|---|---|---|
-| `left` | `dashboard={"toolbar": {"position": "top", "align": "left"}}` | "Toolbar place": Left | 8 px after the panel's card (or the window's edge) |
-| `middle` (default) | `"align": "middle"` | Middle | in the middle of the free part, as now |
-| `right` | `"align": "right"` | Right | 8 px from the edge on the other side |
+| `align` | Bar at the top or the bottom | Bar at the left or the right |
+|---|---|---|
+| `start` | the left corner: 8 px after the panel's card (or the window's edge) | the top corner: 8 px from the top |
+| `middle` (default) | in the middle of the free part, as before | in the middle of the height, as before |
+| `end` | the right corner: 8 px from the edge on the other side | the bottom corner: 8 px above the dock, or above the box of the scale on that side |
 
-The row "Toolbar place" shows in the Settings box under "Toolbar" only while the bar is at the top or the bottom. The person's choice is
-kept in this browser with the other layout choices (`savePlace("align", v)`). The code is one change in `followPanels` (overlay.js): it
-sets `left` from `lo`, `hi` and the width of the bar in place of the middle only. A page with Ask (duckOSM Studio) starts with the bar at
-the **top right** (Kaveh's choice): the map then has the full height at the right, and the panel has the left.
+The Settings box has the row "Toolbar place" under "Toolbar". Its names follow the edge: Left, Middle, Right, or Top, Middle, Bottom. The
+person's choice is kept in this browser with the other layout choices (`savePlace("align", v)`). The code is in `followPanels`
+(overlay.js): it gets the place as a function, and a bar at the bottom also keeps clear of the box of the scale. A phone has its own
+bar (one row at the top) and does not use `align`.
 
 ### The layout on a phone
 
