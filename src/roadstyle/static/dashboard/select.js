@@ -76,7 +76,9 @@ export const _popupHeld = () => _holds.size > 0;
 const _hoverHolds = new Set();
 export function holdHover(key, on){
   if(on) _hoverHolds.add(key); else _hoverHolds.delete(key);
-  if(_hoverHolds.size){ clearTimeout(_tipT); setS(_hov,{hover:false}); _hov=null; _cur=null; if(_tip) _tip.remove(); if(_pt && !_raf) _raf=requestAnimationFrame(hoverFrame); }
+  if(_hoverHolds.size){ clearTimeout(_tipT); setS(_hov,{hover:false}); _hov=null; _cur=null; if(_tip) _tip.remove();
+    if(on) map.getCanvas().style.cursor = "";                     // the pointer over a road goes with the hover; the host sets its own from now on
+    if(_pt && !_raf) _raf=requestAnimationFrame(hoverFrame); }
 }
 // holdSelectLook(key, on): see _lookHolds (overlays.js). The look of the selection now goes off at once; rs:select and rs:deselect stay.
 export function holdSelectLook(key, on){
@@ -130,7 +132,10 @@ let _tip = null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
   const ho = _ovUnder && OVERLAYS.find(o=>o.source===_ovUnder.source);
   const ovHit = ho && !ho.under && !ho.base;   // an interactive overlay under the cursor wins over the road, as for a click; an item attached to a road is its road
-  const f = ovHit || _hoverHolds.size ? null : pick(_pt); map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
+  const held = _hoverHolds.size > 0, f = ovHit || held ? null : pick(_pt);
+  // a host that holds the road hover owns the cursor over its own objects (duckOSM's fixes editor: a node dot, a door dot): roadstyle writes it only for
+  // an overlay item, never "" over the rest
+  if(!held || ovHit) map.getCanvas().style.cursor = (f || ovHit) ? "pointer" : "";
   const h = hitOf(f);
   if(!(h && _cur && h.key === _cur.key)){                                                  // another road, or none: the last one off at once
     setS(_hov,{hover:false}); _hov=null; if(_tip && _tip.isOpen()) _tip.remove(); _cur = h; }
