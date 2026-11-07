@@ -54,7 +54,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   let mine = UT.readAll(undefined, `${storageKey}.themes`), origin = null, ask = null, armed = null, renaming = null, nameDraft = "", keepDraft = false, mineMsg = "";
   let design = structuredClone(base), tab = "theme", lastKey = null, timer = null, busy = false, again = false, note = "";
   const styleKey = (d) => {                                          // the boundary, the ground, the layers, the opacity and the host values are not in the look: they draw no new map
-    const k = structuredClone({ ...noHost(d), name: 0, theme: 0, boundary: 0, ground: 0, visible: 0, tunnels: 0 });
+    const k = structuredClone({ ...noHost(d), name: 0, theme: 0, boundary: 0, ground: 0, visible: 0, walls: 0, tunnels: 0 });
     delete k.roads.opacity; delete k.labels.halo_opacity; delete k.arrows.opacity;
     return JSON.stringify(k);
   };
@@ -126,7 +126,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     catch (e) { console.warn("design panel: the tunnel look:", e.message); }
     finally { applying = false; }
   }
-  const paintMap = () => { paintGround(); applyVisible(); paintRoads(); paintTunnels(); };
+  const paintMap = () => { paintGround(); applyVisible(); paintRoads(); paintTunnels(); window.rsSetWallStyle?.(painted.walls); };
   const announce = () => { painted = design; boundary?.(design.boundary); paintMap(); };
   const announceSoon = () => { if (styleKey(design) !== lastKey) held = true; else { held = false; announce(); } };
   const paintHeld = () => { if (held) { held = false; announce(); } };
@@ -287,7 +287,10 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     + sec("Buildings and lines", color("Buildings", "base.buildings", design.base.buildings) + color("Building outline", "base.buildingLine", design.base.buildingLine)
       + color("Railways", "base.railways", design.base.railways) + color("Waterways", "base.waterways", design.base.waterways))
     + sec("3D buildings", range("Meters for each floor", "base.m_per_level", design.base.m_per_level, 2, 6, 0.1, " m") + number("Highest building (m)", "base.max_height", design.base.max_height, 10, 500, 10)
-      + range("Opacity", "base.height_opacity", design.base.height_opacity, 0.2, 1, 0.05), "The height of a building is its floors times this value, up to the highest building.");
+      + range("Opacity", "base.height_opacity", design.base.height_opacity, 0.2, 1, 0.05), "The height of a building is its floors times this value, up to the highest building.")
+    + sec("3D walls", check("Walls by type", "walls.on", design.walls.on, window.rsHasWalls?.() ? "Each wall of a building shows in the color of its type, and the roof in the roof color. A building with no wall types keeps its color." : "This map has no wall types. The page must give them (rsSetWalls).")
+      + [["front", "Front"], ["back", "Back"], ["side", "Side"], ["party", "Party wall"], ["court", "Courtyard wall"], ["roof", "Roof"], ["roof_dark", "Roof, dark theme"]].map(([k, n]) => color(n, `walls.${k}`, design.walls[k])).join(""),
+      "The walls show while the 3D buildings show. Tilt the map to see them.");
   const PANES = { theme: paneTheme, roads: paneRoads, bridges: paneBridges, text: paneText, layers: paneLayers };
 
   // ---- draw ----
