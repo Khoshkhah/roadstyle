@@ -846,6 +846,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
    weight, so the part's own rules win. */
 :where(.rs-frame, #rs-dock) button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
 :where(.rs-frame, #rs-dock) button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+:where(.rs-frame, #rs-dock) button:disabled{opacity:.5;cursor:not-allowed}
 :where(.rs-frame, #rs-dock) :is(input:not([type=checkbox],[type=radio],[type=range],[type=color]),textarea){box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
 :where(.rs-frame) :is(input[type=password],input[type=text]){width:100%}
 :where(.rs-frame, #rs-dock) :is(input,textarea):focus{border-color:var(--accent)}
@@ -893,6 +894,8 @@ html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
 .rs-dz .rhead{display:grid;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:4px}
 .rs-dz .rhead span{text-align:center}
 .rs-dz input[type=color]{width:100%;min-width:44px;height:30px;padding:1px 2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer}
+/* a colour box of a panel has the hover of a button: the accent border and the tint */
+:is(#sb,.rs-side,.rs-frame,#rs-dock) input[type=color]:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);background:var(--rs-hover-bg);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-dz input[type=number],.rs-dz input[type=text],.rs-dz input[type=search]{height:32px;min-width:0;width:100%;box-sizing:border-box}
 .rs-dz input[type=range]{accent-color:var(--accent-fill)}
 .rs-dz .drow2 .rs-sel,.rs-dz .drow2>select{width:auto;max-width:11em}

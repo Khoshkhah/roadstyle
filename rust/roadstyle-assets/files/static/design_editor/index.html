@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>Design editor</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<!-- The design editor (docs/guides/design-panel.md, "The design editor on its own page"): a map of one road file with the design panel. The engine
+     (roadstyle-wasm) makes the map's tiles in a worker (worker.js), the map has roadstyle's dashboard, and the panel is dashboard/design/design_panel.js,
+     drawn into the standard dashboard panel below. `roadstyle design edit <roads>` serves this folder and the road file under /area/, and saves the design. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="../dashboard/dashboard.css">
+<link rel="stylesheet" href="../popup.css">
+<style>html,body{margin:0;height:100%}
+#dz-boot{position:absolute;inset:0;display:grid;place-items:center;font:14px system-ui,sans-serif;color:#555;background:#f6f7f9;z-index:9}</style>
+</head><body>
+<div id="dz-boot">Loading the roads …</div>
+<div id="sb" data-theme="light"><div class="sb-card"><div class="sb-top"><h2>Edit design</h2>
+  <button id="sb-hide" title="Hide the panel" aria-label="Hide the panel"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m8.5 9.5 2.5 2.5-2.5 2.5"/></svg></button></div>
+  <div class="sb-body"></div></div></div>
+<button id="sb-show" title="Show the panel" aria-label="Show the panel"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M15 4v16"/><path d="m10.5 9.5-2.5 2.5 2.5 2.5"/></svg></button>
+<script type="module" src="app.js"></script>
+</body></html>

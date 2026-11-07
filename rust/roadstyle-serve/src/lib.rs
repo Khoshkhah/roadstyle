@@ -1,6 +1,6 @@
-//! `roadstyle serve` (the program, roadstyle-cli, and the Python binding call it): the level editor's page files (in the program,
-//! `embedded`, or a folder) and an area folder under `/area/`, on 127.0.0.1 only. The page writes only the area's own files
-//! (`WRITABLE`), with a PUT. A request must name this server in `Host` (no DNS rebinding), a PUT must come from its own page (`Origin`)
+//! `roadstyle serve` (the program, roadstyle-cli, and the Python binding call it): the page files of the level editor and of the design
+//! editor (in the program, `embedded`, or a folder) and an area folder under `/area/`, on 127.0.0.1 only. The page writes only the
+//! area's own files (`WRITABLE` for the level editor, the design file for the design editor), with a PUT. A request must name this server in `Host` (no DNS rebinding), a PUT must come from its own page (`Origin`)
 //! and have a `Content-Length`, a body is at most `MAX_BODY` bytes, and the request line and headers at most `MAX_HEAD` bytes (httparse
 //! parses them).
 
@@ -26,7 +26,7 @@ fn embedded(rel: &str) -> Option<&'static [u8]> {
     if rel == "host_options.json" {                                   // the dashboard's template, for the page's standard panel (level_editor/app.js)
         return roadstyle_assets::get("data/host_options.json");
     }
-    let page = matches!(rel, "level_editor.html" | "popup.css" | "popup.js") || rel.starts_with("level_editor/") || rel.starts_with("dashboard/");
+    let page = matches!(rel, "level_editor.html" | "popup.css" | "popup.js") || ["level_editor/", "design_editor/", "dashboard/"].iter().any(|d| rel.starts_with(d));
     if page { roadstyle_assets::get(&format!("static/{rel}")) } else { None }
 }
 
@@ -47,12 +47,18 @@ pub enum Page {
 /// Serves the editor's `page` files at `/` and `area` at `/area/` on 127.0.0.1:`port`, until the program stops. A PUT of one of
 /// `WRITABLE` to `/area/<name>` writes that file (the edits.csv before it is kept as edits.csv.bak).
 pub fn serve(area: &Path, page: Page, port: u16) -> Result<(), String> {
+    serve_files(area, page, port, None, WRITABLE.iter().map(|w| w.to_string()).collect())
+}
+
+/// As `serve`, with the area files that the page can read (`read`, file names in `area`; None: every file in it) and write (`write`).
+/// The design editor (`roadstyle design edit`) reads only the roads file and the design file, and writes only the design file.
+pub fn serve_files(area: &Path, page: Page, port: u16, read: Option<Vec<String>>, write: Vec<String>) -> Result<(), String> {
     if matches!(page, Page::Embedded) && !has_package() {
         return Err("serve: this build has no WebAssembly package of the editor: run rust/roadstyle-wasm/build_editor.sh, then build again".into());
     }
     let name = std::fs::canonicalize(area).ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
     let site = Arc::new(Site { area: area.to_path_buf(), page, own: [format!("127.0.0.1:{port}"), format!("localhost:{port}")],
-                               name: name.chars().filter(|c| !c.is_control()).collect() });
+                               name: name.chars().filter(|c| !c.is_control()).collect(), read, write });
     let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("serve: 127.0.0.1:{port}: {e}"))?;
     for stream in listener.incoming().flatten() {
         let site = site.clone();
@@ -65,13 +71,15 @@ pub fn serve(area: &Path, page: Page, port: u16) -> Result<(), String> {
     Ok(())
 }
 
-/// What one `serve` call answers with: its area and page files, its own Host names and the area's name (the header X-Area: the editor
-/// shows it).
+/// What one `serve` call answers with: its area and page files, its own Host names, the area's name (the header X-Area: the editor
+/// shows it) and the area files that the page can read (None: every file) and write.
 struct Site {
     area: PathBuf,
     page: Page,
     own: [String; 2],
     name: String,
+    read: Option<Vec<String>>,
+    write: Vec<String>,
 }
 
 /// One request: GET or HEAD of a file, or PUT of a writable area file.
@@ -110,7 +118,8 @@ fn answer(stream: TcpStream, site: &Site) -> Result<(), String> {
     if !header("host").is_some_and(|h| own.iter().any(|o| o == h)) {
         return say(&mut out, "403 Forbidden", "text/plain", b"not this server's Host", 0);
     }
-    let path = target.split(['?', '#']).next().unwrap_or("/").trim_start_matches('/');
+    let decoded = decode(target.split(['?', '#']).next().unwrap_or("/"));
+    let path = decoded.trim_start_matches('/');
     let index = format!("{path}index.html"); // a folder: its index.html
     let rel = if path.is_empty() || path.ends_with('/') { index.as_str() } else { path };
     let Some(area_rel) = rel.strip_prefix("area/") else {
@@ -128,7 +137,8 @@ fn answer(stream: TcpStream, site: &Site) -> Result<(), String> {
             None => say(&mut out, "404 Not Found", "text/plain", b"not found", 0),
         };
     };
-    let Some(file) = inside(area, area_rel) else {
+    let allowed = |names: &[String]| names.iter().any(|n| n == area_rel);
+    let Some(file) = inside(area, area_rel).filter(|_| site.read.as_deref().is_none_or(allowed) || allowed(&site.write)) else {
         return say(&mut out, "404 Not Found", "text/plain", b"not found", 0);
     };
     match method {
@@ -141,7 +151,7 @@ fn answer(stream: TcpStream, site: &Site) -> Result<(), String> {
             }
             Err(_) => say(&mut out, "404 Not Found", "text/plain", b"not found", 0),
         },
-        "PUT" if WRITABLE.contains(&area_rel) => {
+        "PUT" if allowed(&site.write) => {
             // from this server's own page only (a browser sends Origin with a PUT)
             if header("origin").is_some_and(|o| !own.iter().any(|h| o == format!("http://{h}"))) {
                 return say(&mut out, "403 Forbidden", "text/plain", b"not this server's page", 0);
@@ -163,6 +173,19 @@ fn answer(stream: TcpStream, site: &Site) -> Result<(), String> {
         }
         _ => say(&mut out, "405 Method Not Allowed", "text/plain", b"only GET, and PUT of the area's own files", 0),
     }
+}
+
+/// A request's path with each %XX as its byte (a file name with a space: "my%20roads.geojson"). The path then goes through `inside`.
+fn decode(path: &str) -> String {
+    let (b, mut out, mut i) = (path.as_bytes(), Vec::with_capacity(path.len()), 0);
+    while i < b.len() {
+        let hex = b.get(i + 1..i + 3).and_then(|h| std::str::from_utf8(h).ok()).and_then(|h| u8::from_str_radix(h, 16).ok());
+        match (b[i], hex) {
+            (b'%', Some(v)) => { out.push(v); i += 3; }
+            (c, _) => { out.push(c); i += 1; }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// `rel` under `root`, or None for a path with `..`, a root or a drive in it.
@@ -205,7 +228,8 @@ mod tests {
 
     #[test]
     fn the_editor_files_are_in_the_program() {
-        for f in ["level_editor/index.html", "level_editor/app.js", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/editor/level_worker.js", "dashboard/worker/call.js", "dashboard/dashboard.css", "host_options.json", "popup.css", "popup.js"] {
+        for f in ["level_editor/index.html", "level_editor/app.js", "design_editor/index.html", "design_editor/app.js", "design_editor/worker.js",
+                  "dashboard/design/design_panel.js", "dashboard/design/themes.json", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/editor/level_worker.js", "dashboard/worker/call.js", "dashboard/dashboard.css", "host_options.json", "popup.css", "popup.js"] {
             assert!(embedded(f).is_some_and(|b| !b.is_empty()), "{f}");
         }
     }
@@ -251,6 +275,42 @@ mod tests {
         let (_, ask, port) = server("opts");
         let answer = ask(&format!("GET /host_options.json HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n"));
         assert!(answer.starts_with("HTTP/1.1 200") && answer.contains("\"dashboard\""), "{answer}");
+    }
+
+    #[test]
+    fn a_path_is_percent_decoded() {
+        assert_eq!(decode("/area/my%20roads.geojson"), "/area/my roads.geojson");
+        assert_eq!(decode("/a%2"), "/a%2");
+        assert!(inside(Path::new("/srv"), decode("area/..%2Fsecret").trim_start_matches("area/")).is_none());
+    }
+
+    #[test]
+    fn the_design_editor_reads_and_writes_only_its_files() {
+        let area = std::env::temp_dir().join(format!("roadstyle-serve-design-{}", std::process::id()));
+        std::fs::create_dir_all(&area).unwrap();
+        for f in ["roads.geojson", "other.txt", "roads.design.json"] {
+            std::fs::write(area.join(f), "old").unwrap();
+        }
+        let port = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+        let a = area.clone();
+        std::thread::spawn(move || serve_files(&a, Page::Dir(a.clone()), port, Some(vec!["roads.geojson".into()]), vec!["roads.design.json".into()]));
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let ask = |req: String| {
+            let mut s = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            s.write_all(req.as_bytes()).ok();
+            let mut text = String::new();
+            s.read_to_string(&mut text).ok();
+            text
+        };
+        let host = format!("Host: 127.0.0.1:{port}\r\n");
+        assert!(ask(format!("GET /area/roads.geojson HTTP/1.1\r\n{host}\r\n")).starts_with("HTTP/1.1 200"));
+        assert!(ask(format!("GET /area/roads.design.json HTTP/1.1\r\n{host}\r\n")).starts_with("HTTP/1.1 200"));
+        assert!(ask(format!("GET /area/other.txt HTTP/1.1\r\n{host}\r\n")).starts_with("HTTP/1.1 404"));
+        assert!(ask(format!("PUT /area/roads.design.json HTTP/1.1\r\n{host}Content-Length: 3\r\n\r\nnew")).starts_with("HTTP/1.1 200"));
+        assert!(ask(format!("PUT /area/roads.geojson HTTP/1.1\r\n{host}Content-Length: 1\r\n\r\nx")).starts_with("HTTP/1.1 405"));
+        assert!(ask(format!("PUT /area/edits.csv HTTP/1.1\r\n{host}Content-Length: 1\r\n\r\nx")).starts_with("HTTP/1.1 404"));
+        assert_eq!(std::fs::read_to_string(area.join("roads.design.json")).unwrap(), "new");
+        assert_eq!(std::fs::read_to_string(area.join("roads.geojson")).unwrap(), "old");
     }
 
     #[test]
