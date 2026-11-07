@@ -6,8 +6,7 @@ on:
   push:
     branches: [main, rust-engine, "design-*"]
     paths: ["rust/**", "src/roadstyle/**", ".github/workflows/rust.yml"]
-  pull_request:
-    paths: ["rust/**", "src/roadstyle/**", ".github/workflows/rust.yml"]
+  pull_request:                   # every pull request: rust and python are required checks of main (2026-11-07), so they must run on a docs PR too
   schedule:
     - cron: "17 3 * * *"          # each night: the Tartu goldens too
   workflow_dispatch:
