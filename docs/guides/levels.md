@@ -153,9 +153,13 @@ Your changes are in three small tables in the area folder. The input step never 
 
 | file | what |
 |---|---|
-| `edits.csv` | your rules: `relation` (`order`, `stack`, `meet`, and `crossing` to switch off a found crossing), `a`, `b`, `a_end` (a stack's part: `start`, `main`, `end`), `b_end`, `enabled` (`false` switches that found row off) |
-| `heads.csv` | head lengths per road end in metres (`road`, `start_m`, `end_m`; empty: 5 m) |
-| `caps.csv` | cap per road end (`road`, `start`, `end`: `round`, `square`, `flat`; empty: round) |
+| `edits.csv` | your rules: `relation` (`order`, `stack`, `meet`, and `crossing` to switch off a found crossing), `a`, `b`, `a_end` (a stack's part: `start`, `main`, `end`), `b_end`, `enabled` (`false` switches that found row off), `time` (when it was applied) |
+| `heads.csv` | head lengths per road end in metres (`road`, `start_m`, `end_m`; empty: 5 m), `time` (the road's last change) |
+| `caps.csv` | cap per road end (`road`, `start`, `end`: `round`, `square`, `flat`; empty: round), `time` (the road's last change) |
+
+The `time` column is local time, `YYYY-MM-DD HH:MM`. The editor writes it; the readers ignore it. An old row has no time.
+
+**Add rules from files.** In *History*, **Add from files…** takes one or more edits.csv, heads.csv or caps.csv files, for example from another computer. Their rows go to the list of waiting changes, and **Apply and solve** adds them to the area's files. The editor skips a rule that the area has already, a row that names no road of this area, a crossing row and a value that is not right, and its message counts them by their reason. A row with no time gets the time of the Apply.
 
 `levels.csv` is the result: per edge its four numbers and its ends as drawn. An example: Monaco's tables in `examples/levels/monaco/`.
 
@@ -189,7 +193,7 @@ The calls and the options are in [Use roadstyle in the browser](../rust/browser.
 - **Back, with changes waiting.** "← Steps" with no change waiting sends the event `"back"` at once. With changes waiting, the bar asks: *Apply*
   (solves, then sends `"back"`), *Discard* (drops the changes, then sends `"back"`) or *Stay*. The host answers `"back"` with `editor.destroy()`,
   which puts the host's panel back.
-- **The History tab** has the list of your edits, and a button that downloads `edits.csv`.
+- **The History tab** has the cards *Today*, *Earlier* and *Road ends*, the time of each row, **Add from files…** and the downloads of `edits.csv`, `heads.csv` and `caps.csv`.
 - **The picked roads** have the dashboard's own selection glow. The editor's colours tell road 1 from road 2. When the editor closes, it clears the
   colour and the glow.
 - **The toolbox** is the dashboard's. It does not change.

@@ -35,28 +35,6 @@
 #lv .card .nm{font-weight:620;font-size:13.5px;padding-right:22px} #lv .card .sub{color:var(--lv-mute);font-size:12px}
 #lv .card .x{position:absolute;right:8px;top:7px;border:none;background:none;color:var(--lv-mute);cursor:pointer;font-size:15px;line-height:1}
 #lv .card .x:hover{color:var(--lv-bad)}
-#lv .grid{display:grid;grid-template-columns:54px minmax(0,1fr) 50px minmax(0,1fr);gap:2px 10px;margin-top:8px;font-size:12px}
-#lv .grid span:nth-child(odd){color:var(--lv-mute)} #lv .grid span:nth-child(even){font-variant-numeric:tabular-nums} #lv .grid .wide{overflow-wrap:anywhere}
-#lv .wd{margin-top:8px;padding:7px 8px 8px;border:1px solid var(--lv-line);border-radius:8px}
-#lv .wd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
-#lv .wd-row{display:grid;grid-template-columns:1fr 1fr 64px;gap:6px;align-items:stretch}
-#lv .wd-box{background:var(--lv-bg);border-radius:6px;padding:4px 8px;line-height:1.25}
-#lv .wd-box small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em}
-#lv .wd-box b{font-size:14px;font-variant-numeric:tabular-nums} #lv .wd-box b span{font-size:11px;font-weight:500;color:var(--lv-mute)}
-#lv .wd-box em{display:block;font-style:normal;font-size:11px;color:var(--lv-mute);font-variant-numeric:tabular-nums}
-#lv .wd-x{display:flex;flex-direction:column;justify-content:center;gap:3px;font-size:9.5px;color:var(--lv-mute);text-align:center}
-#lv .wd-x div{height:16px;border-radius:3px;background:#8c96a5;display:flex;align-items:center;justify-content:center}
-#lv .wd-x i{display:block;height:100%;background:#f1e7c8}
-#lv .caps{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--lv-mute)} #lv .caps .seg{flex:1}
-#lv .caps .seg button{padding:3px 0;font-size:11.5px;white-space:nowrap}
-#lv .hd{margin-top:8px;padding:7px 8px 6px;border:1px solid var(--lv-line);border-radius:8px}
-#lv .hd-h{display:flex;justify-content:space-between;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
-#lv .hbar{display:flex;height:12px;border-radius:3px;overflow:hidden;margin-bottom:4px;font-size:9px;line-height:12px;color:#fff;text-align:center}
-#lv .hbar i{display:block;font-style:normal;overflow:hidden;white-space:nowrap} #lv .hbar .s,#lv .hbar .e{background:#6b7686} #lv .hbar .m{background:#c3c9d2;color:#3b4252}
-#lv .hd label{display:grid;grid-template-columns:52px 1fr 52px;row-gap:0;align-items:center;gap:6px;font-size:12px;color:var(--lv-mute)}
-#lv .hd input[type=range]{width:100%} #lv .hd label b{text-align:right;color:var(--lv-ink);font-variant-numeric:tabular-nums}
-#lv .lvls{display:flex;gap:4px;margin-top:8px} #lv .lvls div{flex:1;text-align:center;background:var(--lv-bg);border-radius:6px;padding:3px 0}
-#lv .lvls small{display:block;color:var(--lv-mute);font-size:10px;text-transform:uppercase;letter-spacing:.04em} #lv .lvls b{font-size:13px}
 #lv .num{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;
   background:var(--c);vertical-align:1px;margin-right:2px}
 #lv .rows{background:var(--lv-card);border:1px solid var(--lv-line);border-radius:10px;overflow:hidden}
@@ -65,10 +43,6 @@
 #lv .row .what{flex:1;min-width:0} #lv .row .txt{overflow-wrap:anywhere}
 #lv .row .off{text-decoration:line-through;color:var(--lv-mute)}
 #lv .chip{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:1px 6px;background:var(--lv-soft);color:var(--lv-ink2)}
-#lv .gu-parts{display:flex;gap:3px;margin-top:3px;font-size:11px;color:var(--lv-mute);align-items:center;flex-wrap:wrap}
-#lv .gu-parts b{font-weight:600;border-radius:4px;padding:0 5px;background:var(--lv-soft);color:var(--lv-ink2);font-variant-numeric:tabular-nums}
-#lv .gu-parts b.bad{background:var(--lv-bad-bg);color:var(--lv-bad)}
-#lv .gu-parts b.warn{background:var(--lv-warn-bg);color:var(--lv-warn-ink)}
 #lv .tag{font-size:10.5px;font-weight:600;border-radius:999px;padding:0 7px;color:#fff;background:var(--c)}
 #lv .act{flex:none;font:12px system-ui;border:1px solid var(--lv-line);background:var(--lv-card);border-radius:6px;padding:2px 8px;cursor:pointer;color:var(--lv-ink2)}
 #lv .act:hover{border-color:var(--lv-bad);color:var(--lv-bad)}
@@ -97,56 +71,129 @@
 #lv-bar .main>span,#lv-bar .main>.link{flex:1;min-width:0;text-align:left;font-weight:600;font-size:12.5px}
 #lv-bar .main button{white-space:nowrap}
 #lv-queue{max-height:30vh;overflow:auto;margin-bottom:8px}
-#lv-toast{position:absolute;left:15px;right:15px;bottom:14px;padding:9px 12px;border-radius:8px;font-size:12.5px;color:var(--lv-card);background:var(--lv-ink);
-  box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;user-select:text;z-index:4}
-#lv.has-bar #lv-toast{bottom:68px}
-#lv-toast.show{opacity:1;transform:none} #lv-toast.bad{background:var(--lv-bad);pointer-events:auto;cursor:pointer}
+/* the note after an action: a callout of the dashboard (ok: green ✓, err: red ✕ that stays until a click) that floats above the bar */
+#lv #lv-toast{position:absolute;left:15px;right:15px;bottom:14px;margin:0;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--rs-st) 35%,var(--line));
+  box-shadow:0 6px 18px rgba(0,0,0,.14);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none;user-select:text;z-index:4}
+#lv #lv-toast.show{opacity:1;transform:none} #lv #lv-toast.err{pointer-events:auto;cursor:pointer;padding-right:30px}
+#lv #lv-toast.err::after{content:"×";position:absolute;right:10px;top:6px;font-size:16px;color:var(--mut)}
 /* the phone (the dashboard's phone form, html.rs-phone: the panel is the bottom sheet): 44 px touch targets */
 html.rs-phone #lv .seg button,html.rs-phone #lv .act,html.rs-phone #lv-bar button,html.rs-phone #lv-add,html.rs-phone #lv .row{min-height:44px}
 html.rs-phone #lv .find input{min-height:44px;font-size:16px}                /* 16 px: the phone does not zoom on focus */
 html.rs-phone #lv input[type=range]{height:44px}
 html.rs-phone #lv input[type=range]::-webkit-slider-thumb{width:28px;height:28px}
 html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
+/* a picked road (rows of fields: rs-name and rs-kv) and its two ends (a page card) */
+#lv .card .rs-name{display:flex;align-items:center;gap:6px;margin:0 24px 2px 0;font-size:15px}
+#lv .card .sub{color:var(--mut);font-size:12px;margin:0 0 6px}
+#lv details.lv-more{margin-top:4px}
+#lv details.lv-more > summary{cursor:pointer;padding:4px 0;color:var(--accent);font-size:12px;font-weight:600;list-style-position:inside}
+#lv .lv-ends .rs-card-title{display:flex;justify-content:space-between}
+#lv .lv-ends .lv-len{color:var(--mut);font-weight:600;letter-spacing:0;text-transform:none}
+#lv .lv-ends .hbar{display:flex;height:10px;margin:0 0 4px;border-radius:5px;overflow:hidden;font-size:9px;line-height:10px;text-align:center}
+#lv .lv-ends .hbar i{display:block;font-style:normal;overflow:hidden;white-space:nowrap}
+#lv .lv-ends .hbar .s,#lv .lv-ends .hbar .e{background:var(--accent-fill)}
+#lv .lv-ends .hbar .m{background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--ink)}
+#lv .lv-end{padding:10px 0 4px;border-top:1px solid var(--line);margin-top:6px}
+#lv .lv-end-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+#lv .lv-end-h b{flex:none;width:58px;font-size:12.5px}
+#lv .lv-end-h .rs-seg{flex:1}
+#lv .lv-end label{display:grid;grid-template-columns:58px 1fr 52px;align-items:center;gap:10px;font-size:12px;color:var(--mut)}
+#lv .lv-end label input{width:100%}
+#lv .lv-end label b{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+#lv .lv-end-links{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px 14px;padding-top:6px;font-size:12px}
+/* a conflict of a new rule (the Add card): the callout, the rules of the loop as a short list, Add anyway and Cancel */
+#lv #lv-conflict .rs-callout ul{margin:4px 0 6px;padding-left:18px}
+#lv #lv-conflict .rs-callout li{margin:2px 0}
+#lv #lv-conflict .rs-callout hr{border:0;border-top:1px solid var(--line);margin:8px 0}
+#lv .lv-conflict-acts{display:flex;align-items:center;gap:14px;margin-top:8px}
+/* History: two cards, Today (this session) and Earlier (edits.csv from before) */
+#lv .lv-hist .rs-card-title{display:flex;justify-content:space-between;align-items:center}
+#lv .lv-hist .rs-card-title .rs-link{font-size:12px;font-weight:600}
+#lv .lv-note{margin:-4px 0 10px;color:var(--mut);font-size:12px;line-height:1.4}
+#lv .lv-dl{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:4px 2px 0;font-size:12px;color:var(--mut)}
+#lv .lv-dl .rs-link{font-size:12px;font-weight:600}
+#lv .lv-endv{color:var(--mut);font-size:11.5px}
+#lv .lv-time{display:block;color:var(--mut);font-size:11px;margin-top:1px;font-variant-numeric:tabular-nums}
+#lv .lv-dl small{font-size:11.5px} #lv .lv-endv .mk{opacity:.7}
+/* Issues: the tiles, a callout when there is nothing, and one card for each list with short rows */
+#lv .lv-area{color:var(--mut);font-size:12px;margin:0 0 8px}
+#lv #lv-tiles{margin:0 0 10px}
+#lv #lv-tiles [data-go]{cursor:pointer}
+#lv #lv-tiles [data-go]:is(:hover,:focus-visible){border-color:var(--accent)}
+#lv .lv-issue{gap:8px}
+#lv .lv-issue .what{flex:1;min-width:0;font-size:12.5px}
+#lv .lv-issue .what small{color:var(--mut)}
+#lv .lv-issue.on{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+#lv .lv-issue .lv-edit{flex:none;font-size:12px}
+/* Stacking: the two picked roads as short lines, Rules now (one list) and Add a rule (cards of the dashboard) */
+#lv .lv-pick{position:relative;display:flex;align-items:baseline;gap:6px;margin:0 0 6px;padding:8px 30px 8px 12px;border-radius:10px;background:var(--card);
+  border-left:4px solid var(--c);min-width:0}
+#lv .lv-pick .nm{font-weight:620;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
+#lv .lv-pick small{color:var(--mut);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
+#lv .lv-pick .num{align-self:center;flex:none}
+#lv .lv-pick .x{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;color:var(--mut);cursor:pointer;font-size:14px}
+#lv .lv-pick .x:hover{color:var(--lv-bad)}
+#lv .lv-second{padding:10px;margin:0 0 6px}
+#lv .lv-rules .rs-card-title,#lv .lv-addbox .rs-card-title{display:flex;justify-content:space-between;align-items:center}
+#lv .lv-rules .rs-card-title .rs-link{font-size:12px;font-weight:600;letter-spacing:0;text-transform:none}
+#lv .lv-rule{gap:8px;font-size:12.5px}
+#lv .lv-rule .rs-chip{flex:none}
+#lv .lv-rule .act{border:0;background:none;padding:0;font-size:12px;color:var(--accent)}
+#lv .lv-rule .act:hover{color:var(--lv-bad)}
+#lv .lv-addbox label{display:block;font-size:11px;color:var(--mut);margin:10px 0 4px}
+#lv .lv-addbox .ends{margin:0}
+#lv .lv-addbox .desc{margin:10px 0;line-height:1.45}
+#lv #lv-rel-sec,#lv #lv-add-sec{padding-top:2px}
+/* an end with a change in the list: an orange mark until Apply (or Discard) */
+#lv .lv-waitmark{display:none;margin:3px 0 0;width:max-content;padding:0 6px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.03em;vertical-align:1px;
+  color:var(--rs-warn);background:color-mix(in srgb,var(--rs-warn) 14%,transparent)}
+#lv .lv-end.waiting .lv-waitmark{display:block}
+#lv .lv-end.waiting{box-shadow:inset 3px 0 0 var(--rs-warn);padding-left:8px;margin-left:-8px}
 </style>
 <div id="lv-src">
   <div data-pane="edit">
     <section><div class="find"><input id="lv-find" type="search" placeholder="Find a road: edge id or edge_ref" autocomplete="off"><div id="lv-hits" hidden></div></div>
       <div class="modes" id="lv-modes" hidden title="Show only the roads of these modes (display only: every road is still solved)"></div></section>
 
-    <section><h2>Selection <button class="link rs-link" id="lv-clear" title="Esc">clear</button></h2><div id="lv-cards"></div></section>
-    <section id="lv-rel-sec" class="only-stack" hidden><h2 id="lv-rel-title">In the tables</h2><div id="lv-rel"></div></section>
-    <section id="lv-add-sec" class="only-stack" hidden><h2>Add a relation</h2>
+    <section><h2>Selection</h2><div id="lv-cards"></div></section>
+    <section id="lv-rel-sec" class="only-stack" hidden><div class="rs-sec-box lv-rules"><div class="rs-card-title"><span id="lv-rel-title">Rules now</span><span id="lv-offall"></span></div>
+      <div id="lv-rel"></div></div></section>
+    <section id="lv-add-sec" class="only-stack" hidden><div class="rs-sec-box lv-addbox"><div class="rs-card-title">Add a rule</div>
       <div class="seg rs-seg" id="lv-kind"><button data-k="order" class="on">Order</button><button data-k="stack">Stack</button><button data-k="meet">Meet</button></div>
       <div class="ends" id="lv-top" style="grid-template-columns:minmax(0,1fr)"><div><label>on top</label><div class="seg rs-seg" id="lv-top-seg"></div></div></div>
-      <div class="desc" id="lv-desc"></div>
       <div class="ends" id="lv-ends" hidden>
         <div><label><span class="num" style="--c:var(--lv-r1)">1</span> end of road 1</label><div class="seg rs-seg" data-e="1"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r1)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r1)">■</span></button></div></div>
         <div><label><span class="num" style="--c:var(--lv-r2)">2</span> end of road 2</label><div class="seg rs-seg" data-e="2"><button data-v="start" class="on">start <span class="mk" style="color:var(--lv-r2)">●</span></button><button data-v="end">end <span class="mk" style="color:var(--lv-r2)">■</span></button></div></div>
       </div>
       <div class="ends" id="lv-part" hidden style="grid-template-columns:minmax(0,1fr)">
-        <div><label>which parts of the upper road's casing (one row each)</label><div class="seg rs-seg"><button data-v="all" title="All three parts: three rows">whole road</button><button data-v="start">start head <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end">end head <span class="mk">■</span></button></div></div>
+        <div><label>parts of its casing that cross</label><div class="seg rs-seg"><button data-v="all" title="All three parts: three rows">whole</button><button data-v="start" title="start head">start <span class="mk">●</span></button><button data-v="main" class="on">main</button><button data-v="end" title="end head">end <span class="mk">■</span></button></div></div>
       </div>
+      <div class="desc" id="lv-desc"></div>
+      <div id="lv-conflict" hidden role="alert"></div>
       <button class="sb-primary" id="lv-add">Add to the list</button>
-    </section>
-    <section class="only-stack"><h2>Added now <span style="text-transform:none;letter-spacing:0;font-weight:500">this session, in edits.csv</span>
-      <button id="lv-newsession" class="rs-link" title="Everything already in edits.csv moves to the list below; this list starts empty. Nothing is deleted.">start a new session</button></h2><div id="lv-new"></div></section>
+    </div></section>
   </div>
   <div data-pane="history" hidden>
-    <section><h2>Already in edits.csv <span style="text-transform:none;letter-spacing:0;font-weight:500">before this session</span></h2>
-      <div class="desc" style="margin-top:0">Click a row to show its two roads; delete puts it in the list to apply.</div><div id="lv-saved"></div></section>
-    <section><h2>Download</h2><button id="lv-dl" title="The edits as they are now">Download edits.csv</button></section>
+    <div class="rs-sec-box lv-hist"><div class="rs-card-title">Today <button id="lv-newsession" class="rs-link" title="Everything already in edits.csv moves to the list below; this list starts empty. Nothing is deleted.">start a new session</button></div>
+      <p class="lv-note">The rules that you applied since the editor opened. They are in edits.csv.</p><div id="lv-new"></div></div>
+    <div class="rs-sec-box lv-hist"><div class="rs-card-title">Earlier</div>
+      <p class="lv-note">The rules of edits.csv from before. Click a row to show its two roads; delete puts it in the list to apply.</p><div id="lv-saved"></div></div>
+    <div class="rs-sec-box lv-hist"><div class="rs-card-title">Road ends</div>
+      <p class="lv-note">The roads with their own head lengths or end shapes, as they are now, with the time of each road's last change. Reset puts the defaults in the list to apply.</p><div id="lv-endlist"></div></div>
+    <div class="lv-dl"><button class="rs-link" id="lv-import" title="Put the rules, head lengths or end shapes of your files in the list of waiting changes">Add from files…</button>
+      <input type="file" id="lv-import-f" accept=".csv,text/csv" multiple hidden><small>edits.csv, heads.csv or caps.csv</small></div>
+    <div class="lv-dl">Download <button class="rs-link" data-dl="edits.csv">edits.csv</button> <button class="rs-link" data-dl="heads.csv">heads.csv</button> <button class="rs-link" data-dl="caps.csv">caps.csv</button></div>
   </div>
   <div data-pane="given" hidden>
-    <section><div class="area" id="lv-area"></div><div class="stats" id="lv-stats"></div></section>
-    <section><h2>Given up by the solver <span style="text-transform:none;letter-spacing:0;font-weight:500">a flaw on the map each</span></h2>
-      <div class="desc" style="margin-top:0">Crossings (A over B) the solver could not keep, because of the joins around them: the part of A's casing
-        that crosses B and is drawn under B's fill is red. Click one to open the pair, then switch off or add a part, or change a join nearby.</div><div id="lv-given"></div></section>
-    <section><h2>Near: warnings <span style="text-transform:none;letter-spacing:0;font-weight:500">not crossing, kept last</span></h2>
-      <div class="desc" style="margin-top:0">Parts of A that only come near B (they do not cross it), drawn under B's fill: the solver keeps these last, after
-        every crossing and order wish. Worth a look only where the two roads overlap on the map.</div><div id="lv-near"></div></section>
-    <section><h2>Order wishes not kept <span style="text-transform:none;letter-spacing:0;font-weight:500">a stack or another wish won</span></h2>
-      <div class="desc" style="margin-top:0">"A after B" wishes (found or yours) the solver let go: A's fill is not after B's. Two wishes that disagree, or a
-        wish against a stack, end up here.</div><div id="lv-wishes"></div></section>
+    <div class="lv-area" id="lv-area"></div>
+    <div class="rs-kpis" id="lv-tiles"></div>
+    <div id="lv-noissue"></div>
+    <div class="rs-sec-box lv-issues" id="lv-given-card" hidden><div class="rs-card-title">Given up</div>
+      <p class="lv-note">A crossing that the solver could not keep: a flaw on the map.</p><div id="lv-given"></div></div>
+    <div class="rs-sec-box lv-issues" id="lv-near-card" hidden><div class="rs-card-title">Near</div>
+      <p class="lv-note">A road that only comes near the road below it. Look only where the two overlap.</p><div id="lv-near"></div></div>
+    <div class="rs-sec-box lv-issues" id="lv-wishes-card" hidden><div class="rs-card-title">Wishes not kept</div>
+      <p class="lv-note">An order that a stack or another order won.</p><div id="lv-wishes"></div></div>
   </div>
   <div id="lv-bar" hidden>
     <div id="lv-queue" hidden></div>
@@ -170,13 +217,17 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     $("lv-busy").classList.add("solid"); $("lv-busy").hidden = false; $("lv-busy-t").textContent = "Drawing the new map …"; }
   let queue = [];                                             // the changes waiting to be applied
   const PART = {start: "start head", main: "main", end: "end head"}, END = {start: "●", end: "■"};
-  const SRC = {found: ["found", "var(--lv-found)", "found in pairs.csv"], saved: ["saved", "var(--lv-saved)", "already in edits.csv"],
-               new: ["new", "var(--lv-new)", "added now"]};
+  const SRC = {found: ["found", "var(--lv-found)", "found in the map data (pairs.csv)"], saved: ["earlier", "var(--lv-saved)", "in edits.csv from an earlier session"],
+               new: ["today", "var(--lv-new)", "applied in this session"]};
   const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
   const name = r => { const f = facts[r] || {}; return f.name || f.highway || "road " + r; };
   const ref = r => (facts[r] || {}).edge_ref || r;
   const badge = r => { const k = sel.indexOf(r); return k >= 0 ? `<span class="num" style="--c:${C[k]}">${k + 1}</span>` : ""; };
   const who = r => `${badge(r)}${esc(name(r))}`;
+  // the time of a row ("YYYY-MM-DD HH:MM") as "6 Nov 14:32" (with the year when it is not this year); none: ""
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const when = t => { const m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d:\d\d)/.exec(t || ""); if(!m) return "";
+    return `${+m[3]} ${MON[+m[2] - 1]}${+m[1] !== new Date().getFullYear() ? " " + m[1] : ""} ${m[4]}`; };
   const mk = (end, r) => { const k = sel.indexOf(r);           // a road's end as the map marks it (lv-ends): ● start, ■ end, in the picked road's colour
     return end === "start" || end === "end" ? ` <span class="mk"${k >= 0 ? ` style="color:${C[k]}"` : ""}>${end === "start" ? "●" : "■"}</span>` : ""; };
   $("lv-area").textContent = STATS.area + " · " + STATS.roads + " roads";
@@ -192,14 +243,29 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     F.tab(t);                                                 // the frame marks the tab (on, aria-selected)
     document.querySelectorAll("#lv [data-pane]").forEach(d => d.hidden = d.dataset.pane !== (t === "ends" ? "edit" : t)); }
   F.addEventListener("tab", e => tab(e.detail.tab));          // a click on a tab of the frame's row
-  const showStats = () => { $("lv-stats").innerHTML = [["order wishes", STATS.order_pairs], ["not kept", STATS.order_violations || 0], ["stack pairs", STATS.pairs || 0],
-    ["given up", STATS.given_up.length], ["near warnings", STATS.near_warnings || 0]].map(([k, v]) => `<span class="stat"${k === "given up" || k === "near warnings" ? ` style="cursor:pointer" title="Show the list" data-gu="1"` : ""}${k === "given up" ? ` id="lv-gu-stat"` : ""}><b>${v}</b> ${k}</span>`).join("");
-  document.querySelectorAll("#lv-stats [data-gu]").forEach(e => e.onclick = () => tab("given")); };
+  // the tiles of Issues: given up, near and wishes not kept. A null count: not checked (the levels came with the map, with no solve). A click on a tile: its list
+  const showStats = () => {
+    const n = [STATS.given_up.length, STATS.near_warnings, STATS.order_violations], known = n[1] != null;
+    const tile = (go, title, v, sub, color) => (window.rs?.kpi ? rs.kpi(title, v, sub, color) : `<div class="rs-kpi"><div class="rs-kpi-title">${title}</div><div class="rs-kpi-val">${v}</div></div>`)
+      .replace('<div class="rs-kpi"', +v > 0 ? `<div class="rs-kpi" data-go="${go}" role="button" tabindex="0" title="Go to the list"` : '<div class="rs-kpi"');   // only a tile with a list is a button
+    $("lv-tiles").innerHTML = tile("given", "Given up", known ? n[0] : "–", `of ${STATS.pairs || 0} stacks`, n[0] ? "var(--rs-err)" : null)
+      + tile("near", "Near", known ? n[1] : "–", "warnings", n[1] ? "var(--rs-warn)" : null)
+      + tile("wishes", "Wishes not kept", known ? n[2] : "–", `of ${STATS.order_pairs || 0} orders`, n[2] ? "var(--rs-warn)" : null);
+    $("lv-tiles").querySelectorAll("[data-go]").forEach(t => t.onclick = () => { const c = $("lv-" + t.dataset.go + "-card"); if(!c.hidden) c.scrollIntoView({behavior: "smooth", block: "start"}); });
+    $("lv-noissue").innerHTML = !known ? '<div class="rs-callout"><b>Not checked yet.</b> These levels came with the map. Apply a change to check them.</div>'
+      : n.every(x => !x) ? '<div class="rs-callout ok"><b>No issues.</b> Every crossing and every wish is kept.</div>' : "";
+  };
   showStats();
   // an error stays until clicked (select its text to copy it) and goes to the browser console; a note fades after 4 s (2026-10-08)
-  function toast(t, bad){ const e = $("lv-toast"); e.textContent = bad ? t + "  ✕" : t; e.className = "show" + (bad ? " bad" : ""); clearTimeout(e._t);
-    if(bad){ console.error("level editor:", t); e.onclick = () => { if(!String(getSelection())) e.className = ""; }; }
-    else e._t = setTimeout(() => e.className = "", Math.max(4000, 60 * t.length)); }      // time to read it (a loop's rules are long)
+  function toast(t, bad){ const e = $("lv-toast"); e.textContent = t; e.className = "rs-callout show " + (bad ? "err" : "ok"); e.title = bad ? "Click to close" : ""; clearTimeout(e._t);
+    // the place: as wide as the frame's content, above its bar (Apply, Discard) when the bar shows, else at the bottom of the body. Measured from
+    // the box's offset parent (the panel can be wider than the frame), so it never covers the buttons and never sticks out of the panel
+    e.style.display = "block"; const op = (e.offsetParent || document.body).getBoundingClientRect(), bar = F.bar.getBoundingClientRect(), body = F.body.getBoundingClientRect();
+    const ref = bar.height ? bar : body;
+    Object.assign(e.style, {display: "", left: ref.left - op.left + 8 + "px", right: op.right - ref.right + 8 + "px",
+      bottom: op.bottom - (bar.height ? bar.top : body.bottom) + 8 + "px"});
+    if(bad){ console.error("level editor:", t); e.onclick = () => { if(!String(getSelection())) e.className = "rs-callout err"; }; }
+    else e._t = setTimeout(() => e.classList.remove("show"), Math.max(4000, 60 * t.length)); }      // time to read it (a loop's rules are long)
   async function api(path, body){
     if(window.lvApi) return window.lvApi(path, body);           // the Rust page (static/level_editor/): the solver is in the page, no server
     const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
@@ -273,34 +339,29 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     pick(e.detail.properties.road, !e.detail.lvTap);       // a finger's tap (lvTap) made no glow of the dashboard's
   });
   document.addEventListener("keydown", e => { if(e.key === "Escape") setPair(null, null); });
-  $("lv-clear").onclick = () => setPair(null, null);
-  function widthAt(w, z){                                     // the page's width expression: linear between its zoom stops
-    if(!w) return null; const s = w.z;
-    if(z <= s[0]) return w; if(z >= s[s.length - 1]) return {fill: w.fill.slice(-1), casing: w.casing.slice(-1)};
-    const i = s.findIndex((x, j) => z <= s[j + 1]), f = (z - s[i]) / (s[i + 1] - s[i]);
-    return {fill: [w.fill[i] + (w.fill[i + 1] - w.fill[i]) * f], casing: [w.casing[i] + (w.casing[i + 1] - w.casing[i]) * f]};
-  }
-  function widthHtml(f){                                      // the drawn width at the map's zoom: fill, outer (casing included), a cross-section
-    const z = map.getZoom(), w = widthAt(f.width_px, z); if(!w) return `<div class="wd-h"><span>width</span><span>–</span></div>`;
-    const mpp = 40075016.686 * Math.cos(map.getCenter().lat * Math.PI / 180) / (512 * 2 ** z);    // metres per pixel here
-    const box = (k, v) => `<div class="wd-box"><small>${k}</small><b>${v.toFixed(1)}<span> px</span></b><em>≈ ${(v * mpp).toFixed(1)} m</em></div>`;
-    const pct = (100 * w.fill[0] / w.casing[0]).toFixed(1);
-    return `<div class="wd-h"><span>drawn width</span><span>at z${z.toFixed(1)}</span></div>
-      <div class="wd-row">${box(f.two_way ? "fill, each direction" : "fill", w.fill[0])}${box(f.two_way ? "outer, both directions" : "outer", w.casing[0])}
-        <div class="wd-x" title="Cross-section: the fill (${pct} % of the outer width) between its casings"><div><i style="width:${pct}%"></i></div>section</div></div>`;
-  }
-  map.on("zoomend", () => document.querySelectorAll("#lv-cards [data-w]").forEach(el => el.innerHTML = widthHtml(facts[el.dataset.w] || {})));
-  function headsHtml(r, f){                                   // the casing heads: two sliders that guard each other (start + end <= the road)
-    const L = f.length_m || 0;
+  // the two ends of one road (the tab Road ends): a strip of the casing (start head, main part, end head), and for each end its shape and its head length.
+  // The two sliders guard each other: start + end is not more than the road.
+  function endsHtml(r, f){
+    const L = f.length_m || 0, auto = f.heads_auto || [5, 5];
+    const wait = (op, end) => queue.find(q => q.op === op && String(q.road) === String(r) && q.end === end);   // a change of this end in the list (not applied yet)
     let [s, e] = f.heads || [5, 5];
+    const ws = wait("head", "start"), we = wait("head", "end");
+    const had = f.heads || [5, 5];
+    if(ws) s = ws.m ? +ws.m : auto[0]; if(we) e = we.m ? +we.m : auto[1];      // the slider shows the waiting length
+    const moved = {start: s !== had[0], end: e !== had[1]};                     // the heads wait as a pair: the mark only on the end that changed
     if(L > 0 && s + e > L){ const k = L / (s + e); s = Math.round(s * k * 10) / 10; e = Math.round(e * k * 10) / 10; }   // as drawn: cut in their ratio
-    return `<div class="hd only-ends" data-hroad="${esc(r)}" data-len="${L}" title="The metres at each end drawn at the head's own level; the rest is the main part. Start + end cannot be more than the road.">
-      <div class="hd-h"><span>casing heads <button class="link rs-link" data-hnomain title="Heads over the whole road: the end head takes what the start head leaves">no main part</button>
-        ${(f.heads_own || []).some(Boolean) ? `<button class="link rs-link" data-hauto title="Back to the default lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})">default</button>` : ""}</span><span>road ${L} m</span></div>
-      <div class="hbar"><i class="s"></i><i class="m"></i><i class="e"></i></div>
-      ${[["start", "●", s], ["end", "■", e]].map(([n, m, v], k) => `<label><span>${n} ${m}</span><input type="range" min="0.5" step="0.1" data-hend="${n}" value="${v}"><b></b>
-        <small style="grid-column:2/4;margin:-3px 0 2px;font-size:10px">${(f.heads_own || [])[k] ? "set by you" : "default"}</small></label>`).join("")}
-    </div>`;
+    const cap = i => { const w = wait("cap", i ? "end" : "start");             // the switch shows the waiting shape
+      return (w ? w.cap : (f.caps || [])[i]) || (f.caps_auto || [])[i] || "round"; };
+    const row = (end, mark, i, v) => `<div class="lv-end${wait("cap", end) || (wait("head", end) && moved[end]) ? " waiting" : ""}"><div class="lv-end-h caps"><b>${end === "start" ? "Start" : "End"} ${mark}
+        <span class="lv-waitmark" title="Waiting: Apply to save it, Discard to drop it">waiting</span></b>
+        <div class="seg rs-seg" data-cap="${esc(r)}" data-end="${end}">${["round", "square", "flat"].map(x => `<button data-v="${x}" class="${cap(i) === x ? "on" : ""}">${x}</button>`).join("")}</div></div>
+      <label><span>head</span><input type="range" min="0.5" step="0.1" data-hend="${end}" value="${v}" aria-label="${end} head, metres"><b></b></label></div>`;
+    return `<div class="rs-sec-box lv-ends hd only-ends" data-hroad="${esc(r)}" data-len="${L}">
+      <div class="rs-card-title">The two ends <span class="lv-len">road ${L} m</span></div>
+      <div class="hbar" aria-hidden="true"><i class="s"></i><i class="m"></i><i class="e"></i></div>
+      ${row("start", "●", 0, s)}${row("end", "■", 1, e)}
+      <div class="lv-end-links"><button class="link rs-link" data-hnomain>no main part</button>${(f.heads_own || []).some(Boolean)
+        ? `<button class="link rs-link" data-hauto>default lengths (${(f.heads_auto || []).map(v => v + " m").join(" / ")})</button>` : ""}</div></div>`;
   }
   function headsSync(box){
     const L = +box.dataset.len, [a, b] = box.querySelectorAll("input");
@@ -312,39 +373,36 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   }
   // a walking-only direction of a street (its other direction has car lanes) is its sidewalk, not a lane (2026-10-09)
   const sidewalk = (d, f) => d.modes === "walking" && (f.directions || []).some(o => o !== d && o.lanes != null);
+  // a picked road: its name and class, three fields, and "More" (closed: the ids, the directions, the modes and the levels); in Road ends, its two ends under it
   function card(r, k){
     const f = facts[r] || {road: r}, L = f.levels || ["–", "–", "–", "–"];
-    return `<div class="card rs-sec-box" style="--c:${C[k]}"><button class="x" data-k="${k}" title="Cancel this road">✕</button>
-      <div class="nm"><span class="num" style="--c:${C[k]}">${k + 1}</span>${esc(f.name || f.highway || "road")}</div>
+    const kv = (name, v) => `<div class="rs-kv"><span>${name}</span><b>${v}</b></div>`;
+    const dir = d => esc(d.edge) + (d.edge_ref ? " · " + esc(d.edge_ref) : "") + (d.lanes != null ? " · lanes " + esc(d.lanes) : sidewalk(d, f) ? " · sidewalk" : "") + (d.modes ? " · " + esc(d.modes) : "");
+    const more = [["band", f.band ?? "–"], ["priority", f.priority ?? "–"], ["edges", (f.edges ?? "–") + (f.two_way ? " (two-way)" : "")],
+      ...(f.modes ? [["modes", esc(f.modes)]] : []), ...(f.bus_lines ? [["bus lines", esc(f.bus_lines)]] : []), ["road id", esc(r)],
+      ...(f.directions || []).map(d => [d.way === "along" ? "direction ●→■" : "direction ■→●", dir(d)]),
+      ["levels", `start ${L[0]} · casing ${L[1]} · end ${L[2]} · fill ${L[3]}`]];
+    return `<div class="card rs-sec-box" style="--c:${C[k]}"><button class="x" data-k="${k}" aria-label="Cancel this road">✕</button>
+      <div class="rs-name"><span class="num" style="--c:${C[k]}">${k + 1}</span>${esc(f.name || f.highway || "road")}</div>
       <div class="sub">${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</div>
-      <div class="grid"><span>band</span><span>${f.band ?? "–"}</span><span>priority</span><span>${f.priority ?? "–"}</span>
-        <span>length</span><span>${f.length_m != null ? f.length_m + " m" : "–"}</span><span>edges</span><span>${f.edges ?? "–"}${f.two_way ? " (two‑way)" : ""}</span>
-        <span>look</span><span>${esc(f.look || "–")}</span><span>lanes</span><span>${esc(f.lanes ?? "–")}</span>
-        ${f.modes ? `<span>modes</span><span class="wide" style="grid-column:span 3">${esc(f.modes)}</span>` : ""}
-        ${f.bus_lines ? `<span>bus lines</span><span class="wide" style="grid-column:span 3">${esc(f.bus_lines)}</span>` : ""}
-        <span>road id</span><span class="wide" style="grid-column:span 3;font-size:11px">${esc(r)}</span>
-        ${(f.directions || []).map(d => `<span>${d.way === "along" ? "direction ●→■" : "direction ■→●"}</span><span class="wide" style="grid-column:span 3;font-size:11px"
-          title="${d.way === "along" ? "This edge runs from the road's start to its end" : "This edge runs the other way, from the road's end to its start"}">${esc(d.edge)}${d.edge_ref ? " · " + esc(d.edge_ref) : d.way === "against" ? " · <i>edge_ref not in roads.parquet (make the area again)</i>" : ""}${d.lanes != null ? " · lanes " + esc(d.lanes) : sidewalk(d, f) ? " · sidewalk" : ""}${d.modes ? " · " + esc(d.modes) : ""}</span>`).join("")}</div>
-      <div class="wd only-ends" data-w="${esc(r)}">${widthHtml(f)}</div>
-      ${["start", "end"].map((e, i) => `<div class="caps only-ends" title="The shape of this end of the road (caps.csv, drawing only). It starts round; square = flat but as long as round; flat = stops at the end point">
-        <span style="width:44px">${e} ${i ? "■" : "●"}</span>
-        <div class="seg rs-seg" data-cap="${esc(r)}" data-end="${e}">${["round", "square", "flat"].map(v =>
-          `<button data-v="${v}" class="${(((f.caps || [])[i] || (f.caps_auto || [])[i] || "round") === v) ? "on" : ""}">${v}</button>`).join("")}</div></div>`).join("")}
-      ${headsHtml(r, f)}
-      <div class="lvls"><div><small>start</small><b>${L[0]}</b></div><div><small>casing</small><b>${L[1]}</b></div>
-        <div><small>end</small><b>${L[2]}</b></div><div><small>fill</small><b>${L[3]}</b></div></div></div>`;
+      ${kv("length", f.length_m != null ? f.length_m + " m" : "–")}${kv("look", esc(f.look || "–"))}${kv("lanes", esc(f.lanes ?? "–"))}
+      <details class="lv-more"><summary>More</summary>${more.map(([n, v]) => kv(n, v)).join("")}</details></div>${k === 0 ? endsHtml(r, f) : ""}`;
   }
+  // a picked road in Stacking: one short line (its number, name, class and ref, ✕); the full card is in Road ends
+  const pickLine = (r, k) => { const f = facts[r] || {};
+    return `<div class="lv-pick" style="--c:${C[k]}"><span class="num" style="--c:${C[k]}">${k + 1}</span><span class="nm">${esc(f.name || f.highway || "road")}</span>
+      <small>${esc([f.highway, f.edge_ref].filter(Boolean).join(" · "))}</small><button class="x" data-k="${k}" aria-label="Cancel this road">✕</button></div>`; };
   function relText(r){
     if(r.relation === "meet") return `${who(r.ra)} <small>${esc(r.a_end)}${mk(r.a_end, r.ra)}</small> = ${who(r.rb)} <small>${esc(r.b_end)}${mk(r.b_end, r.rb)}</small>`;
     if(r.relation === "stack" || r.relation === "near") return `${who(r.ra)} <small>${esc(PART[r.a_end] || r.a_end)}${mk(r.a_end, r.ra)}</small> over ${who(r.rb)}${r.relation === "near" ? " <small>(near only)</small>" : ""}`;
     return `${who(r.ra)} after ${who(r.rb)}`;
   }
-  function rowHtml(r){
+  function rowHtml(r, src = true){
     const [t, c, title] = SRC[r.section], off = r.enabled === "false";
-    const act = r.section === "found" ? `<button class="act" data-a="off">switch off</button>` : `<button class="act" data-a="del">delete</button>`;
-    return `<div class="row" data-i="${r.section === "found" ? "" : r.index}" data-ra="${esc(r.ra)}" data-rb="${esc(r.rb)}" title="Show on the map">
-      <span class="tag" style="--c:${c}" title="${title}">${t}</span><span class="chip">${esc(r.relation)}</span>
-      <span class="what"><div class="txt${off ? " off" : ""}">${off ? "switch off: " : ""}${relText(r)}</div></span>${act}</div>`;
+    const act = r.section === "found" ? `<button class="act rs-link" data-a="off">switch off</button>` : `<button class="act rs-link" data-a="del">delete</button>`;
+    return `<div class="row lv-rule" data-i="${r.section === "found" ? "" : r.index}" data-ra="${esc(r.ra)}" data-rb="${esc(r.rb)}" title="Show on the map">
+      ${src ? `<span class="rs-chip" style="--rs-st:${c}" title="${title}">${t}</span>` : ""}
+      <span class="what"><div class="txt${off ? " off" : ""}">${off ? "switched off: " : ""}${relText(r)}</div>${when(r.time) ? `<small class="lv-time">${when(r.time)}</small>` : ""}</span>${act}</div>`;
   }
   function wire(box, rows){
     box.querySelectorAll(".row").forEach((el, n) => {
@@ -377,13 +435,19 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     if(picked.length){ try { const j = await api(`/api/relations?a=${encodeURIComponent(picked[0])}` + (picked[1] ? `&b=${encodeURIComponent(picked[1])}` : ""));
         Object.assign(facts, j.roads); showRel(j.rows, picked.length); } catch(err){ toast(err.message, true); } }
     else { $("lv-rel-sec").hidden = true; }
-    $("lv-cards").innerHTML = picked.length ? sel.map((r, k) => r != null ? card(r, k) : "").join("")
-      + (sel[1] == null && mode === "stack" ? `<div class="empty">Click a second road to see what is between them</div>` : "")
+    drawCards();
+    $("lv-add-sec").hidden = sel[1] == null; describe();
+  }
+  // the picked roads' cards (Road ends: with their two ends, as the list of waiting changes has them; Stacking: one short line each)
+  function drawCards(){
+    const picked = sel.filter(r => r != null);
+    $("lv-cards").innerHTML = picked.length ? sel.map((r, k) => r != null ? (mode === "stack" ? pickLine(r, k) : card(r, k)) : "").join("")
+      + (sel[1] == null && mode === "stack" ? `<div class="empty lv-second">Click a second road on the map</div>` : "")
       : `<div class="empty">Click a road on the map<br><small>${mode === "stack" ? "a second one for the pair · " : ""}click again or ✕ to cancel · Esc clears</small></div>`;
     $("lv-cards").querySelectorAll("[data-cap] button").forEach(b => b.onclick = () => {
       const box = b.closest("[data-cap]"), r = box.dataset.cap, end = box.dataset.end, cap = b.dataset.v;
       const f = facts[r] || {}, k = end === "start" ? 0 : 1;
-      if(cap === ((f.caps || [])[k] || (f.caps_auto || [])[k] || "round")) return;           // already this shape
+      if(cap === ((f.caps || [])[k] || (f.caps_auto || [])[k] || "round")) return unstage("cap", r, [end]);     // the applied shape again
       stageAll([{op: "cap", road: r, end: end, cap: cap}]);
     });
     $("lv-cards").querySelectorAll("[data-hroad]").forEach(box => {
@@ -399,38 +463,32 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
         inp.oninput = () => headsSync(box);
         inp.onchange = () => {                                  // both heads go to the list together, so the pair always fits the road
           const r = box.dataset.hroad, [a, b] = box.querySelectorAll("input"), h = (facts[r] || {}).heads || [5, 5];
-          if(+a.value === h[0] && +b.value === h[1]) return;
+          if(+a.value === h[0] && +b.value === h[1]) return unstage("head", r, ["start", "end"]);    // the applied lengths again
           stageAll([{op: "head", road: r, end: "start", m: a.value}, {op: "head", road: r, end: "end", m: b.value}]);
         };
       });
     });
     $("lv-cards").querySelectorAll(".x").forEach(b => b.onclick = () => { sel[+b.dataset.k] = null; if(sel[0] == null){ sel[0] = sel[1]; sel[1] = null; } update(); });
-    $("lv-add-sec").hidden = sel[1] == null; describe();
   }
+  const unstage = (op, r, ends) => { const n = queue.length;        // back to the applied value: its waiting change goes out of the list
+    queue = queue.filter(q => !(q.op === op && String(q.road) === String(r) && ends.includes(q.end))); if(queue.length !== n) showQueue(); };
+  // Rules now: every rule between the two picked roads (one road: every rule of it), one short row each. "switch off all": a found stack of
+  // the pair goes to the list as switch-off rows, to put your own parts in its place
   function showRel(rows, n){
     pairRows = n === 2 ? rows : [];
     $("lv-rel-sec").hidden = false;
-    const cards = $("lv-cards").closest("section");          // two roads: the rules between them first, above the two (tall) road cards; one road: under its card
-    if(n === 2) cards.before($("lv-rel-sec")); else cards.after($("lv-rel-sec"));
-    $("lv-rel-title").textContent = n === 2 ? "Between these two roads" : "Everything about this road";
-    const box = $("lv-rel"); box.innerHTML = "";
+    $("lv-rel-title").textContent = n === 2 ? "Rules now" : "Rules of this road";
+    const off = $("lv-offall"); off.innerHTML = "";
     const all = n === 2 ? rows.filter(r => r.section === "found" && (r.relation === "stack" || r.relation === "near") && !isOff(r, rows) && !queued(r)) : [];
-    if(all.length){                                           // to override a found stack: switch all its rows off, then add your own parts
-      const b = document.createElement("button"); b.style.margin = "0 0 8px";
-      b.textContent = `Switch off all ${all.length} found stack row${all.length > 1 ? "s" : ""} of this pair (to the list)`;
-      b.title = "To override a found stack: switch off every part of it, then add your own parts below";
+    if(all.length){
+      const b = document.createElement("button"); b.className = "rs-link"; b.textContent = all.length > 1 ? `switch off all ${all.length}` : "switch off";
+      b.title = "Switch off the found stack of this pair (to the list), then add your own parts";
       b.onclick = () => { all.forEach(offRow); showRel(rows, n); };
-      box.appendChild(b);
+      off.appendChild(b);
     }
-    for(const s of ["found", "saved", "new"]){
-      const part = rows.filter(r => r.section === s);
-      const h = document.createElement("h3"); h.innerHTML = `<span class="tag" style="--c:${SRC[s][1]}">${SRC[s][0]}</span> ${SRC[s][2]} <small style="color:var(--lv-mute)">${part.length}</small>`;
-      box.appendChild(h);
-      const d = document.createElement("div");
-      if(part.length){ d.className = "rows"; d.innerHTML = part.map(rowHtml).join(""); wire(d, part); }
-      else d.innerHTML = `<div class="empty" style="padding:8px">none</div>`;
-      box.appendChild(d);
-    }
+    const box = $("lv-rel"), list = ["new", "saved", "found"].flatMap(s => rows.filter(r => r.section === s));
+    if(list.length){ box.className = "rows"; box.innerHTML = list.map(r => rowHtml(r)).join(""); wire(box, list); }
+    else { box.className = ""; box.innerHTML = `<div class="empty">No rules${n === 2 ? " between these two roads" : ""}. The solver decides alone.</div>`; }
   }
   // --- adding a relation
   function segs(box, on){ box.querySelectorAll("button").forEach(b => b.onclick = () => {
@@ -448,6 +506,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     return st.filter(r => r.enabled !== "false" && !(r.section === "found" && isOff(r, pairRows)));
   }
   function describe(){
+    if(!$("lv-conflict").hidden) conflictClose();                   // a change of the form: the conflict box goes
     if(sel[1] == null) return;
     if(sel.join() !== pairKey){ pairKey = sel.join(); top = null; }
     $("lv-top").hidden = kind === "meet";
@@ -458,16 +517,13 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     $("lv-add").disabled = (kind !== "meet" && top == null) || (kind === "stack" && !parts.size);
     if(kind !== "meet" && top == null){ $("lv-desc").innerHTML = `<div class="rs-callout warn">Choose which road is on top.</div>`; return; }
     const [a, b] = kind === "meet" ? sel : [sel[top], sel[1 - top]];
-    $("lv-desc").innerHTML = kind === "order" ? `Where they meet, ${who(a)}'s fill is drawn after ${who(b)}'s (a wish the solver keeps when it can).`
+    $("lv-desc").innerHTML = kind === "order" ? `${who(a)} is drawn over ${who(b)} where they meet. The solver keeps this when it can.`
       : kind === "stack" && !parts.size ? `<div class="rs-callout warn">Choose at least one part of ${who(a)}'s casing.</div>`
-      : kind === "stack" ? `${who(a)}'s ${["start", "main", "end"].filter(p => parts.has(p)).map(p => PART[p]).join(" and ")} casing is drawn after ${who(b)}'s fill,
-        even where it joins ${who(b)}: one row per part, added to the found ones. ● start ■ end on the map.
-        To override a found stack, switch all its rows off above and add your own parts.`
-      : `The ${end1} of ${who(a)} joins the ${end2} of ${who(b)}: each road's head there is drawn under the other's fill. ● start ■ end on the map.`;
+      : kind === "stack" ? `${who(a)} crosses over ${who(b)} (${["start", "main", "end"].filter(p => parts.has(p)).map(p => PART[p]).join(", ")}).`
+      : `The ${end1}${mk(end1, a)} of ${who(a)} joins the ${end2}${mk(end2, b)} of ${who(b)}, with no ring.`;
     const over = kind === "order" ? stacksOver(b, a) : [];
-    if(over.length) $("lv-desc").innerHTML += `<div class="rs-callout warn">⚠ ${over.map(r => `${r.section === "found" ? "A found" : "Your"} stack (${relText(r)})`).join(", ")}
-      keeps ${who(b)}'s casing over ${who(a)}'s fill. A stack outranks an order, so this order would be given up and nothing changes.
-      Switch that stack off first (its row above).</div>`;
+    if(over.length) $("lv-desc").innerHTML += `<div class="rs-callout warn">A stack keeps ${who(b)} over ${who(a)}, and a stack wins over an order.
+      Switch that stack off first, in Rules now.</div>`;
   }
   $("lv-add").onclick = async () => {
     if(sel[1] == null) return toast("Pick two roads first", true);
@@ -476,14 +532,25 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
       : [{relation: kind, a, b, a_end: kind === "meet" ? end1 : "", b_end: kind === "meet" ? end2 : "", enabled: "true"}];
     let found;                                                // the guard: does it clash with the rules there are (found, edits.csv, the list)?
     try { found = (await api("/api/check", {rows, ops: queue.map(payload)})).conflicts; } catch(err){ return toast(err.message, true); }
-    if(found.length && !confirm("This conflicts with rules already there:\n\n" + found.map(c => c.why === "duplicate"
-        ? `• ${c.rule}\n   is already in the tables (${c.with[0]}).`
-        : c.why === "not kept"                               // saved already, but in a loop: the rules that keep it from holding
-        ? `• ${c.rule}\n   is already saved, but the solver cannot keep it: it makes a loop with:\n${c.with.map(w => "     – " + w).join("\n")}\n   Switch one of them off to keep it.`
-        : `• ${c.rule}\n   makes a loop with:\n${c.with.map(w => "     – " + w).join("\n")}\n   No levels keep them all: the solver gives one of them up.`).join("\n\n")
-        + "\n\nAdd it anyway?")) return;
+    if(found.length) return conflict(found, rows);             // in the panel: the rules of the conflict, and Add anyway or Cancel
     rows.forEach(body => stage({op: "add", body}));
   };
+  // a conflict of the new rule with the rules there are, in the Add card (a callout of the dashboard), not the browser's box (2026-11-07). A loop or a rule
+  // that is saved but not kept: the warning, the rules of the loop and what the solver does, then Add anyway or Cancel. A duplicate: only OK (nothing to add)
+  function conflict(found, rows){
+    const box = $("lv-conflict"), dup = found.every(c => c.why === "duplicate"), list = w => `<ul>${w.map(x => `<li>${esc(x)}</li>`).join("")}</ul>`;
+    box.innerHTML = `<div class="rs-callout${dup ? "" : " warn"}">` + found.map(c => c.why === "duplicate"
+        ? `<b>Already there.</b> ${esc(c.rule)} is in the tables: ${esc(c.with[0])}.`
+        : c.why === "not kept"
+        ? `<b>Saved, but not kept.</b> ${esc(c.rule)} makes a loop with:${list(c.with)}Switch one of them off to keep it.`
+        : `<b>This makes a loop.</b> ${esc(c.rule)} makes a loop with:${list(c.with)}No levels keep them all: the solver gives one of them up.`).join("<hr>")
+      + `<div class="lv-conflict-acts">${dup ? "" : '<button type="button" id="lv-anyway">Add anyway</button>'}<button type="button" class="rs-link" id="lv-cancel">${dup ? "OK" : "Cancel"}</button></div></div>`;
+    box.hidden = false; $("lv-add").hidden = true;
+    $("lv-cancel").onclick = conflictClose;
+    if(!dup) $("lv-anyway").onclick = () => { conflictClose(); rows.forEach(body => stage({op: "add", body})); };
+    box.scrollIntoView({block: "nearest"});
+  }
+  function conflictClose(){ $("lv-conflict").hidden = true; $("lv-conflict").innerHTML = ""; $("lv-add").hidden = false; }
   // --- the changes wait in a list (kept over a reload of the page) until Apply: then one solve, and the page again with the same view
   const plain = b => `${b.enabled === "false" ? "switch off: " : ""}${name(b.a)} ${b.relation === "meet" ? `(${b.a_end} ${END[b.a_end]}) = ${name(b.b)} (${b.b_end} ${END[b.b_end]})`
     : b.relation === "stack" || b.relation === "near" ? `(${PART[b.a_end] || b.a_end}${END[b.a_end] ? " " + END[b.a_end] : ""}) over ${name(b.b)}${b.relation === "near" ? " (near only)" : ""}` : `after ${name(b.b)}`}`;
@@ -494,7 +561,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
   function stage(q){
     if(q.op === "delete" && queue.some(x => x.op === "delete" && x.index === q.index)) return toast("Already in the list");
     if(q.op === "cap" || q.op === "head") queue = queue.filter(x => !(x.op === q.op && x.road === q.road && x.end === q.end));   // the last choice for an end counts
-    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `cap ${q.end} ${q.end === "start" ? "●" : "■"} ${q.cap} · ${name(q.road)}`
+    q.text = q.op === "delete" ? "delete edit: " + plain(q.row) : q.op === "cap" ? `cap ${q.end} ${q.end === "start" ? "●" : "■"} ${q.cap || "default"} · ${name(q.road)}`
       : q.op === "head" ? `head ${q.end} ${q.end === "start" ? "●" : "■"} ${q.m ? q.m + " m" : "default"} · ${name(q.road)}`
       : `${q.body.relation} · ${plain(q.body)}`;
     queue.push(q); showQueue(); toast("In the list · apply when ready");
@@ -509,6 +576,7 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     $("lv-wait").textContent = `${n} waiting ${$("lv-queue").hidden ? "▴" : "▾"}`;
     $("lv-queue").innerHTML = queue.map((q, i) => `<div class="q"><span>${esc(q.text)}</span><button data-i="${i}" title="Take out of the list">✕</button></div>`).join("");
     $("lv-queue").querySelectorAll("button").forEach(b => b.onclick = () => { queue.splice(+b.dataset.i, 1); showQueue(); });
+    if(mode === "ends" && sel[0] != null) drawCards();              // the ends card shows what waits (and the old values after Discard)
   }
   $("lv-wait").onclick = () => { $("lv-queue").hidden = !$("lv-queue").hidden; showQueue(); };
   $("lv-discard").onclick = () => { queue = []; showQueue(); };
@@ -533,7 +601,8 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     return true;
   }
   $("lv-apply").onclick = applyQueue;
-  $("lv-dl").onclick = async () => { try { await window.lvDownload("edits.csv"); } catch(err){ toast("The download of edits.csv failed: " + err.message, true); } };
+  document.querySelectorAll("#lv [data-dl]").forEach(b => b.onclick = async () => {
+    try { await window.lvDownload(b.dataset.dl); } catch(err){ toast(`The download of ${b.dataset.dl} failed: ` + err.message, true); } });
   // after an apply: the Rust page drew the new map itself, or the server gives the changed roads (in place), or the whole page again
   async function shown(j, said){
     let why = j.reload;
@@ -568,49 +637,75 @@ html.rs-phone #lv input[type=range]::-moz-range-thumb{width:28px;height:28px}
     Object.assign(facts, u.facts); STATS = u.stats; showStats();
     update(); lists(); givenUp();
   }
+  // the lists of Issues: one short row for each pair (a chip, A over B). A click shows the pair on the map and stays here; "edit" opens it in Stacking
   async function givenUp(){
     const j = await api("/api/given_up"); Object.assign(facts, j.roads);
     $("lv-gu-n").textContent = j.rows.length; $("lv-nr-n").textContent = j.near.length;
     $("lv-gu-n").classList.toggle("err", j.rows.length > 0); $("lv-nr-n").classList.toggle("warn", j.near.length > 0);
     $("lv-gu-n").hidden = !j.rows.length; $("lv-nr-n").hidden = !j.near.length;   // a status colour only when there is something (a red 0 is noise)
-    const list = (box, rows, cls, none) => {
-      if(!rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${none}</div>`; return; }
-      box.className = "rows";
-      box.innerHTML = rows.map(r => {
-        const part = (n, i) => `<b class="${r.parts.includes(n) ? cls : ""}" title="${n} casing ${r.levels[i]}">${n}${mk(n, r.a)} ${r.levels[i]}</b>`;
-        return `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(r.a))} <small>${esc(ref(r.a))}</small>
-          over ${esc(name(r.b))} <small>${esc(ref(r.b))}</small>${r.fill_under && cls === "bad" ? ` <span class="tag" style="--c:var(--lv-bad)">fill under too</span>` : ""}</div>
-          <div class="gu-parts">A ${["start", "main", "end"].map(part).join("")} <b>fill ${r.levels[3]}</b> &nbsp;·&nbsp; B fill <b>${r.b_fill}</b></div></span></div>`;
-      }).join("");
-      box.querySelectorAll(".row").forEach((el, n) => el.onclick = () => { tab("edit"); setPair(rows[n].a, rows[n].b, true); });
+    const road = r => `${esc(name(r))} <small>${esc(ref(r))}</small>`;
+    const list = (key, rows, word, chip, cls) => {
+      $("lv-" + key + "-card").hidden = !rows.length;
+      const box = $("lv-" + key); box.className = "rows";
+      box.innerHTML = rows.map(r => `<div class="row lv-issue"><span class="rs-chip ${cls}">${esc(chip(r))}</span>
+        <span class="what">${road(r.a)} ${word} ${road(r.b)}</span><button type="button" class="rs-link lv-edit">edit</button></div>`).join("");
+      box.querySelectorAll(".row").forEach((el, n) => {
+        el.onclick = e => {
+          document.querySelectorAll("#lv .lv-issue.on").forEach(x => x.classList.remove("on")); el.classList.add("on");
+          if(e.target.closest(".lv-edit")) tab("edit");                // edit: the pair in Stacking
+          setPair(rows[n].a, rows[n].b, true);                          // the pair on the map, red and blue, and the camera on it
+        };
+      });
     };
-    list($("lv-given"), j.rows, "bad", "none: every crossing is kept");
-    list($("lv-near"), j.near, "warn", "none");
-    const wb = $("lv-wishes");
-    if(!j.wishes.length){ wb.className = ""; wb.innerHTML = `<div class="empty" style="padding:8px">none: every wish is kept</div>`; }
-    else { wb.className = "rows";
-      wb.innerHTML = j.wishes.map(w => `<div class="row" title="Show on the map"><span class="what"><div class="txt">${esc(name(w.a))} <small>${esc(ref(w.a))}</small>
-        after ${esc(name(w.b))} <small>${esc(ref(w.b))}</small></div><div class="gu-parts">fill <b>${w.fa}</b> &nbsp;·&nbsp; wished over fill <b>${w.fb}</b></div></span></div>`).join("");
-      wb.querySelectorAll(".row").forEach((el, n) => el.onclick = async () => {   // the pair, and why the wish is not kept: the loop it makes (2026-10-09)
-        const w = j.wishes[n], row = {relation: "order", a: w.a, b: w.b, a_end: "", b_end: "", enabled: "true"};
-        let found = []; try { found = (await api("/api/check", {rows: [row]})).conflicts; } catch(err){}
-        const loop = found.find(c => c.why === "not kept");
-        if(loop && !el.querySelector(".why")) el.querySelector(".what").insertAdjacentHTML("beforeend",
-          `<div class="gu-parts why">loop with: ${loop.with.map(esc).join(" · ")}</div>`);
-        tab("edit"); setPair(w.a, w.b, true);
-        if(loop) toast(`Not kept: it makes a loop with ${loop.with.join(" · ")}. Switch one of them off to keep it.`); }); }
+    list("given", j.rows, "over", r => r.parts.length ? r.parts.join(" + ") : "given up", "err");
+    list("near", j.near, "near", () => "near", "warn");
+    list("wishes", j.wishes, "after", () => "order", "warn");
   }
   $("lv-newsession").onclick = async () => {                 // a new list: the edits so far stay in edits.csv, under "already in edits.csv"
     if(queue.length) return toast("Apply or remove the waiting changes first", true);
-    try { await api("/api/new_session", {}); await lists(); toast("New session: earlier edits are under “Already in edits.csv”"); } catch(err){ toast(err.message, true); }
+    try { await api("/api/new_session", {}); await lists(); toast("New session: the edits so far are under Earlier"); } catch(err){ toast(err.message, true); }
+  };
+  // Road ends in History: one row for each road with its own heads or shapes ("–": the default). A click: the road in Road ends; reset: the defaults to the list
+  async function endList(){
+    const j = await api("/api/ends"); Object.assign(facts, j.roads);
+    const box = $("lv-endlist"), v = (a, unit) => a.map(x => x ? x + unit : "–").join(" / ");
+    if(!j.rows.length){ box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">none: every road has the default ends</div>`; return 0; }
+    box.className = "rows";
+    box.innerHTML = j.rows.map(r => `<div class="row lv-rule"><span class="what"><div class="txt">${esc(name(r.road))} <small>${esc(ref(r.road))}</small></div>
+      <small class="lv-endv">${r.heads.some(Boolean) ? "heads " + v(r.heads, " m") : ""}${r.heads.some(Boolean) && r.caps.some(Boolean) ? " · " : ""}${r.caps.some(Boolean) ? "shapes " + v(r.caps, "") : ""} <span class="mk">(start ● / end ■)</span></small>${when(r.time) ? `<small class="lv-time">${when(r.time)}</small>` : ""}</span>
+      <button class="act rs-link" data-a="reset">reset</button></div>`).join("");
+    box.querySelectorAll(".row").forEach((el, n) => {
+      const {road: r, heads, caps} = j.rows[n];
+      el.onclick = ev => { if(ev.target.closest(".act")) return; tab("ends"); setPair(r, null, true); };
+      el.querySelector(".act").onclick = () => stageAll(["start", "end"].flatMap(end => [   // only what the road has of its own
+        ...(heads.some(Boolean) ? [{op: "head", road: r, end, m: ""}] : []), ...(caps.some(Boolean) ? [{op: "cap", road: r, end, cap: ""}] : [])]));
+    });
+    return j.rows.length;
+  }
+  // Add from files: each file's rows go to the list of waiting changes (Apply adds them); the skipped rows are counted by their reason
+  $("lv-import").onclick = () => $("lv-import-f").click();
+  $("lv-import-f").onchange = async () => {
+    const fs = [...$("lv-import-f").files]; $("lv-import-f").value = "";
+    const said = [];
+    let bad = false;
+    for(const f of fs){
+      try {
+        const j = await api("/api/import", {text: await f.text(), ops: queue.map(payload)}); Object.assign(facts, j.roads);
+        j.ops.forEach(o => stage(o.op === "add" ? {op: "add", body: o.body} : o));
+        const sk = j.skipped.reduce((n, [, k]) => n + k, 0);
+        said.push(`${f.name}: ${j.ops.length} to the list` + (sk ? ` · ${sk} skipped (${j.skipped.map(([why, k]) => `${k} ${why}`).join(", ")})` : ""));
+        if(sk) console.warn("level editor: rows skipped from " + f.name, j.skipped);
+      } catch(err){ bad = true; said.push(`${f.name}: ${err.message}`); }
+    }
+    if(said.length) toast(said.join(" · "), bad);
   };
   async function lists(){
     const j = await api("/api/edits"); Object.assign(facts, j.roads);
-    $("lv-hist-n").textContent = j.rows.filter(r => r.section === "saved").length;
+    $("lv-hist-n").textContent = j.rows.length + await endList();   // today, earlier and the roads with their own ends
     $("lv-hist-n").hidden = !+$("lv-hist-n").textContent;
     for(const s of ["new", "saved"]){
       const rows = j.rows.filter(r => r.section === s), box = $("lv-" + s);
-      if(rows.length){ box.className = "rows"; box.innerHTML = rows.map(rowHtml).join(""); wire(box, rows); }
+      if(rows.length){ box.className = "rows"; box.innerHTML = rows.map(r => rowHtml(r, false)).join(""); wire(box, rows); }
       else { box.className = ""; box.innerHTML = `<div class="empty" style="padding:8px">${s === "new" ? "nothing added yet" : "none"}</div>`; }
     }
   }

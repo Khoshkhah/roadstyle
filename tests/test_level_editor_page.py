@@ -5,6 +5,7 @@ second: skipped without them (CI builds no package)."""
 import hashlib
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -233,8 +234,9 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             assert page.evaluate("document.querySelector('#sb .sb-body').style.display") == "none", "the host's body is kept, hidden"
             assert page.locator("#sb .sb-top #lv-back").inner_text() == "← Steps" and page.locator("#sb .sb-top .rs-frame-title .t").inner_text() == "Edit levels"
             assert page.locator("#sb-hide").is_visible(), "the host's hide button stays"
-            # the lean road table: only the fields that the page reads (reads.json's table), live data's id and the road that a click picks
-            want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road", "modes"}
+            # the lean road table: only the fields that the page reads (reads.json's table), live data's id, the road that a click picks
+            # and the two ends of a road for the marks ● start and ■ end
+            want = set(json.loads((STATIC / "dashboard" / "reads.json").read_text())["table"]) | {"edge", "road", "modes", "s_lon", "s_lat", "e_lon", "e_lat"}
             got = page.evaluate("[...new Set(window.RS_SIDE.props.flatMap(Object.keys))]")
             assert "road" in got and set(got) <= want, set(got) - want
             # the first open solved the whole area; levels_info.json keeps the key of its inputs (roadstyle-levels' inputs_key: the SHA-256
@@ -529,12 +531,17 @@ def test_the_editor_works_in_the_hosts_panel(view):
             tap("#lv-tabs button[data-t=edit]")
             assert page.evaluate("document.getElementById('lv').dataset.mode") == "stack"
             # two roads and an order wish: the changes wait in the apply bar
-            def stage(top=0):
-                page.evaluate("document.getElementById('lv-clear').click()")
+            def stage(top=0, kind="order"):
+                page.evaluate("document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))")   # Esc clears the pair (the panel has no clear link)
                 page.evaluate("""r => { for (const x of r) document.dispatchEvent(new CustomEvent('rs:select', {detail: {properties: {road: x}, lvTap: true}})); }""", roads)
-                page.wait_for_function("document.querySelectorAll('#lv-cards .card').length === 2", timeout=20000)
+                page.wait_for_function("document.querySelectorAll('#lv-cards .lv-pick').length === 2", timeout=20000)
+                page.evaluate("k => document.querySelector(`#lv-kind [data-k=\"${k}\"]`).click()", kind)
                 page.evaluate("t => document.querySelector(`#lv-top-seg button[data-v=\"${t}\"]`).click()", top)
                 page.evaluate("document.getElementById('lv-add').click()")
+                # a rule that makes a loop with the rules there are: the panel's conflict box, and Add anyway puts it in the list
+                page.wait_for_function("!document.getElementById('lv-bar').hidden || !document.getElementById('lv-conflict').hidden", timeout=20000)
+                if page.locator("#lv-anyway").count():
+                    page.evaluate("document.getElementById('lv-anyway').click()")
             stage()
             page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
             assert not page.locator("#lv-cards .caps").first.is_visible() and not page.locator("#lv-cards .hd").first.is_visible(), "Stacking: no caps or heads"
@@ -569,8 +576,8 @@ def test_the_editor_works_in_the_hosts_panel(view):
             assert page.evaluate("window.backs") == 0
             tap("#lv-back")
             assert page.evaluate("window.backs") == 1
-            # with changes waiting it asks: Stay stays
-            stage()
+            # with changes waiting it asks: Stay stays (a new rule: the order is in edits.csv now, and a copy is refused)
+            stage(kind="stack")
             page.wait_for_function("!document.getElementById('lv-bar').hidden", timeout=20000)
             tap("#lv-back")
             assert page.locator("#lv-ask").is_visible() and not page.locator("#lv-bar-main").is_visible() and "1 waiting" in page.inner_text("#lv-ask-t")
@@ -589,12 +596,16 @@ def test_the_editor_works_in_the_hosts_panel(view):
             tap("#lv-ask-apply")
             page.wait_for_function(f"window.backs === 3 && window.solved.length === {n + 1}", timeout=60000)
             assert page.evaluate("stored('edits.csv')").count("\n") == before + 2
-            # the edits.csv download is in the History tab
+            # each applied rule has its time (the readers ignore the column)
+            edits = page.evaluate("stored('edits.csv')").strip().split("\n")
+            assert edits[0].endswith(",time") and re.search(r",\d{4}-\d\d-\d\d \d\d:\d\d$", edits[-1]), edits[-1]
+            # the downloads of edits.csv, heads.csv and caps.csv are in the History tab
             tap("#lv-tabs button[data-t=history]")
-            assert page.locator("#lv-dl").is_visible()
-            with page.expect_download() as d:
-                tap("#lv-dl")
-            assert d.value.suggested_filename == "edits.csv"
+            for name in ("edits.csv", "heads.csv", "caps.csv"):
+                assert page.locator(f"#lv [data-dl='{name}']").is_visible()
+                with page.expect_download() as d:
+                    tap(f"#lv [data-dl='{name}']")
+                assert d.value.suggested_filename == name
             # close: the host's panel as it was, and the picked roads' colour cleared
             page.evaluate("window.colorCalls = []; const o = window.rsColor; window.rsColor = (...a) => { colorCalls.push(a); return o(...a); }")
             page.evaluate("window.editor.destroy()")

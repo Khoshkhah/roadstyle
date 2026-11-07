@@ -23,7 +23,11 @@ import {caller} from "../worker/call.js";
 import {editorFrame} from "../frame.js";
 import {quiet} from "../select.js";
 
-const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];
+const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];      // what a rule is (its key)
+const TCOLS = [...COLS, "time"];                                     // edits.csv: and when it was applied (local "YYYY-MM-DD HH:MM"; "" = before times)
+const HCOLS = ["road", "start_m", "end_m", "time"], KCOLS = ["road", "start", "end", "time"];   // heads.csv, caps.csv: time = the road's last change
+const stamp = () => { const d = new Date(), z = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
 const EMPTY = COLS.join(",") + "\n";
 // the keywords of the editor's map (level_editor.Area._render)
 const LOOK = {state: "live", edge_id_col: "edge", directed_col: "directed", driving_col: "driving", road_popup: false,
@@ -105,18 +109,18 @@ const DOCS = "https://khoshkhah.github.io/roadstyle/guides/levels/";
 function levelsHelp(c, back){
   const dot = (col, n) => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};vertical-align:middle"></span> road ${n}`;
   const terms = [
-    ["Road ends", "The tab for one road. Click a road to pick it; a click on another road picks that road. Choose the shape of each end (round, square or flat) and use the sliders to change the length of each casing head."],
-    ["Stacking", "The tab for two roads. Click a road, then a second road, to see the rules between them and to add a rule. Click a picked road, or press Esc, to cancel. In both tabs you can also type an edge id or an edge_ref in the find box."],
-    ["Order", "Says which road is drawn on top where the two roads meet. Use <b>on top</b> to choose the road."],
-    ["Stack", "Says that one road crosses over the other road, for example on a bridge. Choose the road that is on top, and the parts of its casing that cross."],
+    ["Road ends", "The tab for one road. Click a road to pick it. Each end has its own row: choose its shape (<b>round</b>, <b>square</b> or <b>flat</b>) and use the slider to change the length of its casing head. <b>no main part</b> sets the main part to zero: the end head is then the rest of the road. <b>default lengths</b> sets the lengths back. On the map, ● is the start of the road and ■ is the end."],
+    ["Stacking", "The tab for two roads. Click a road, then a second road, to see the rules between them and to add a rule. Click a picked road, its ×, or press Esc to remove it. You can also type an edge id or an edge_ref in the find box."],
+    ["Order", "Says which road is drawn on top where the two roads meet. Use <b>on top</b> to choose the road. The solver keeps an order when it can."],
+    ["Stack", "Says that one road crosses over the other road, for example on a bridge. Choose the road that is on top, and the parts of its casing that cross. A stack always wins over an order."],
     ["Meet", "Joins an end of road 1 to an end of road 2. Each end is drawn under the fill of the other road, so the two roads join with no ring."],
-    ["On top", "The road that is drawn over the other road. Click its button."],
-    ["Casing parts", "The casing is the outline of a road. It has three parts: the <b>start head</b>, the <b>main</b> part and the <b>end head</b>. Choose one part, some parts or the whole road. The length of a head is set in <b>Road ends</b>."],
-    ["Add to the list", "Puts the new rule in the list of waiting changes. Nothing is solved yet. Use <b>switch off</b> to cancel a rule that the input found."],
-    ["Discard", "Removes all the waiting changes."],
-    ["Apply and solve", "Solves all the waiting changes together, draws again the roads that changed, and saves them. If the solver refuses the changes, nothing is saved."],
-    ["History", "Lists the rules of <b>edits.csv</b>. The button at the bottom downloads the file."],
-    ["Issues", "<b>Given up</b>: a stack that the solver could not keep. It is a flaw on the map. <b>Near warnings</b>: a road that comes near the road below it. <b>Order wishes not kept</b>: an order rule that other rules do not let the solver keep."]];
+    ["Casing parts", "The casing is the outline of a road. It has three parts: the <b>start head</b> ●, the <b>main</b> part and the <b>end head</b> ■. Choose one part, some parts or the whole road. Each part is one row. Set the length of a head in <b>Road ends</b>."],
+    ["Switch off", "Stops a rule that the map data found (a <b>found</b> rule), for example a wrong stack. The rule stays in the data, and edits.csv keeps a row that switches it off. To replace a found stack with your own: switch off <b>all</b> its rows, then add your own parts. A stack that you added yourself has <b>delete</b> in place of switch off."],
+    ["Conflict", "When a new rule makes a loop with other rules (A over B over A), a red box shows those rules. <b>Add anyway</b> puts it in the list; the solver then gives up one rule of the loop. <b>Cancel</b> keeps the list as it was. Usually you switch off one of the other rules first."],
+    ["Add to the list", "Puts the new rule in the list of waiting changes at the bottom. Nothing is solved yet. <b>Discard</b> removes all waiting changes."],
+    ["Apply and solve", "Solves all waiting changes together, draws again the roads that changed, and saves them. A green box tells what changed. If the solver refuses the changes, a red box tells why and nothing is saved. Click a red box to close it."],
+    ["History", "The rules in <b>edits.csv</b>. <b>Today</b> holds the changes of this session; <b>start a new session</b> moves them to <b>Earlier</b> (nothing is deleted). <b>Road ends</b> lists the roads with their own head lengths or end shapes (heads.csv and caps.csv); <b>reset</b> sets the defaults again. Each row shows when it was applied. <b>Add from files…</b> puts the rows of your edits.csv, heads.csv or caps.csv in the list of waiting changes: a rule that the area has already and a row of another area are skipped, and a row with no time gets the time of the Apply. The links at the bottom download the three files."],
+    ["Issues", "Three counts: <b>Given up</b> (a stack that the solver could not keep: a flaw on the map), <b>Near</b> (a road that only comes near the road below it) and <b>Wishes not kept</b> (an order that a stack or another order won). Click a count to go to its list. Click a row to see the two roads on the map; <b>edit</b> opens them in Stacking."]];
   if(back != null) terms.push([`← ${back}`, "Goes back to the steps of the page. If changes are waiting, the editor asks you to <b>Apply</b>, <b>Discard</b> or <b>Stay</b>."]);
   return {title: "Edit levels", button: "How to use the level editor",
     intro: `A level says which road is drawn over which road: a road at a higher level is drawn over a road at a lower level. The editor has two tabs for changes. <b>Road ends</b> changes one road: the shape and the head length of each end. <b>Stacking</b> changes two roads: which one is drawn over the other. In Stacking, the first road you click is ${dot(c.select, 1)} and the second is ${dot(c.second, 2)}, on the map and in the panel.`,
@@ -218,7 +222,8 @@ function highlight(groups){
 // picks (the other fields of a road are a large part of the table's text, which the page parses after each answer)
 const reads = await fetch(new URL("../reads.json", import.meta.url));
 if(!reads.ok) throw new Error(`level editor: the dashboard's reads.json (${reads.status})`);
-const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road", "modes"];   // "modes": the panel's mode box
+const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road", "modes", "s_lon", "s_lat", "e_lon", "e_lat"];   // "modes": the panel's mode box;
+// s_lon ... e_lat: the two ends of the road, where the panel draws ● and ■ (a host's table gets them from addFields; before, the editor's own map had none)
 // the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page. With `host` and `levels.edge_hash`, the engine of this
 // area is the one that an earlier open (or prepareEditor) made, when it has the same hash: `destroy()` keeps it for the next open.
 const engKey = store.key ?? "area", token = host && given ? given.edge_hash : undefined;
@@ -444,7 +449,12 @@ function say(r){
     : `${nm(r.a)}'s ${PART[r.a_end] || r.a_end} over ${nm(r.b)}` + (r.relation === "near" ? " (near only)" : "");
   return txt + (r.own ? " · yours" : "enabled" in r ? "" : " · found");
 }
-const editRows = () => csvRows(editsText).map(r => Object.fromEntries(COLS.map(c => [c, r[c] ?? ""])));
+const editRows = () => csvRows(editsText).map(r => Object.fromEntries(TCOLS.map(c => [c, r[c] ?? ""])));
+// the time of each road's own row in heads.csv or caps.csv ({road: time}); the readers ignore the column (they read by name)
+async function timesOf(text){
+  const rs_ = csvRows(text); await need(rs_.map(r => r.road));
+  return Object.fromEntries(rs_.filter(r => roadOf[r.road] != null).map(r => [roadOf[r.road], r.time || ""]));
+}
 async function rows(){
   const e = editRows();
   await need(e.flatMap(r => [r.a, r.b]));
@@ -493,6 +503,37 @@ function rowOf(body){                                             // one edit fr
   for(const c of ["a", "b"]) if(!(row[c] in roadOf)) throw new Error(`edits: ${row[c]} is not an edge of the roads`);
   return row;
 }
+// "Add from files": the rows of an edits.csv, heads.csv or caps.csv (by its header) as changes for the waiting list, checked as the editor checks
+// its own: a rule that the area (or the list) has already, a row that names no road of this area or a value that is not right is skipped and
+// counted by its reason (nothing is dropped in silence). Apply then adds them as any change. A head or cap row names the road (as the editor
+// writes it); a row by an edge against its road is not swapped here.
+async function importRows(text, ops){
+  const rs_ = csvRows(text), head = rs_.length ? Object.keys(rs_[0]) : (text.split(/\r?\n/)[0] || "").split(",").map(h => h.trim());
+  const skip = {}, out = [], no = why => skip[why] = (skip[why] || 0) + 1;
+  if(head.includes("relation")){
+    await need(rs_.flatMap(r => [r.a, r.b]));
+    const key = r => COLS.map(c => String(r[c] ?? "")).join("|"), have = new Set(after(ops).map(key));
+    for(const r of rs_){
+      if(r.relation === "crossing"){ no("a crossing row (the editor adds no crossing rules)"); continue; }
+      let row; try { row = rowOf(r); } catch(err){ no(/not an edge/.test(err.message) ? "not a road of this area" : err.message); continue; }
+      if(have.has(key(row))){ no("already in the area or the list"); continue; }
+      have.add(key(row)); out.push({op: "add", body: {...row, time: r.time || ""}});
+    }
+  } else if(head.includes("road") && (head.includes("start_m") || head.includes("start"))){
+    const kind = head.includes("start_m") ? "head" : "cap";
+    await need(rs_.map(r => r.road));
+    for(const r of rs_){
+      if(roadOf[r.road] == null){ no("not a road of this area"); continue; }
+      for(const end of ["start", "end"]){
+        const v = String(r[kind === "head" ? end + "_m" : end] ?? "").trim();
+        if(v === "") continue;                                        // not set: the area keeps its own
+        if(kind === "head" ? !(+v > 0) : !["round", "square", "flat"].includes(v)){ no(`a ${kind} that is not right (${v})`); continue; }
+        out.push(kind === "head" ? {op: "head", road: r.road, end, m: v} : {op: "cap", road: r.road, end, cap: v});
+      }
+    }
+  } else throw new Error("not an edits.csv, heads.csv or caps.csv: the header has no relation, start_m or start column");
+  return {ops: out, skipped: Object.entries(skip), roads: await roadsOf(out.flatMap(o => o.op === "add" ? [o.body.a, o.body.b] : [o.road]).map(x => roadOf[x]))};
+}
 function after(ops){                                             // edits.csv after the waiting changes: the deletes out, the adds in
   const gone = new Set(ops.filter(o => o.op === "delete").map(o => +o.index));
   return editRows().filter((_, i) => !gone.has(i)).concat(ops.filter(o => o.op === "add").map(o => rowOf(o.body)));
@@ -536,17 +577,23 @@ async function apply(ops){
     if(!e || COLS.some(c => String(e[c] ?? "") !== String(o.row[c] ?? ""))) throw new Error("an edit to delete is not in edits.csv as the page showed it (changed since): reload the page");
   }
   const kept = old.filter((_, i) => !gone.includes(i)), have = new Set(kept.map(r => COLS.map(c => r[c]).join("|")));
-  const added = ops.filter(o => o.op === "add").map(o => rowOf(o.body));
+  const at = stamp();
+  const added = ops.filter(o => o.op === "add").map(o => ({...rowOf(o.body), time: o.body.time || at}));   // a rule from a file keeps its time
   for(const r of added){ const k = COLS.map(c => r[c]).join("|");
     if(have.has(k)) throw new Error(`this rule is already in edits.csv: ${say(r)}: nothing saved`); have.add(k); }
   const newEdits = ops.some(o => o.op === "add" || o.op === "delete") ? kept.concat(added) : null;
-  const headsCsv = toCsv(Object.entries(heads).filter(([, v]) => v.some(Boolean)).sort().map(([road, v]) => ({road, start_m: v[0], end_m: v[1]})), ["road", "start_m", "end_m"]);
-  const capsCsv = toCsv(Object.entries(caps).filter(([, v]) => v.some(Boolean)).sort().map(([road, v]) => ({road, start: v[0], end: v[1]})), ["road", "start", "end"]);
+  // the time of a road's row: now when this apply changed it, else the time it had
+  const [hT, kT] = [await timesOf(headsText), await timesOf(capsText)], touched = op => new Set(ops.filter(o => o.op === op).map(o => roadOf[String(o.road)]));
+  const [hNew, kNew] = [touched("head"), touched("cap")];
+  const headsCsv = toCsv(Object.entries(heads).filter(([, v]) => v.some(Boolean)).sort().map(([road, v]) => ({road, start_m: v[0], end_m: v[1],
+    time: hNew.has(road) && JSON.stringify(v) !== JSON.stringify((own[road] || [["", ""]])[0]) ? at : hT[road] || ""})), HCOLS);
+  const capsCsv = toCsv(Object.entries(caps).filter(([, v]) => v.some(Boolean)).sort().map(([road, v]) => ({road, start: v[0], end: v[1],
+    time: kNew.has(road) && JSON.stringify(v) !== JSON.stringify((own[road] || [, ["", ""]])[1]) ? at : kT[road] || ""})), KCOLS);
   // the roads a change names (level_editor._changed): of the edit rows added or taken out, and those whose heads changed
   const key = r => COLS.map(c => r[c]).join("|"), before = new Set(old.map(key)), now = new Set((newEdits || old).map(key));
   const changed = [...(newEdits || old), ...old].filter(r => before.has(key(r)) !== now.has(key(r))).flatMap(r => [r.a, r.b])
     .concat(Object.keys(heads).filter(r => JSON.stringify((own[r] || [["", ""]])[0]) !== JSON.stringify(heads[r])));
-  const nextEdits = newEdits ? toCsv(newEdits) : editsText;
+  const nextEdits = newEdits ? toCsv(newEdits, TCOLS) : editsText;
   // caps and heads are drawing only (level_editor.py's change, 2026-10-08): only a relation edit is solved, locally (solveLocal)
   let said = headsCsv === headsText ? "not solved again (only caps)" : "not solved again (heads and caps are drawing only)", full = false, next = res;
   if(newEdits){
@@ -595,6 +642,11 @@ window.lvApi = async (path, body) => {
   const u = new URL(path, location.href), q = k => u.searchParams.get(k) || "";
   switch(u.pathname){
     case "/api/edits": { const r = await rows(); return {rows: r, roads: await roadsOf(r.flatMap(x => [x.ra, x.rb]))}; }
+    case "/api/ends": {                                          // the roads with their own head lengths or end shapes (heads.csv, caps.csv): only the values now
+      const own = JSON.parse((await call({type: "ownEnds", heads: headsText, caps: capsText})).ends);
+      const [hT, kT] = [await timesOf(headsText), await timesOf(capsText)];
+      return {rows: Object.entries(own).map(([road, [heads, caps]]) => ({road, heads, caps, time: [hT[road] || "", kT[road] || ""].sort().pop()})), roads: await roadsOf(Object.keys(own))}; }
+    case "/api/import": return importRows(body.text || "", body.ops || []);
     case "/api/given_up": return givenUp();
     case "/api/find": return find(q("q"));
     case "/api/relations": return relations(q("a"), q("b") || null);
