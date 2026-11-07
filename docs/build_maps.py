@@ -191,8 +191,8 @@ html = rs.render_dashboard(
 ASK = DOCK.replace('import {dataDock} from "../live/dashboard/data/data_dock.js";', """import {dataDock} from "../live/dashboard/data/data_dock.js";
 import {askPanel} from "../live/dashboard/ask/ask_panel.js";""").replace("</script>", """window.ask = askPanel({data: window.data, dialect: "DuckDB",
   about: "The roads of Södermalm in Stockholm, the table edges: one row is one direction of a road. aadt and speed_kph are made-up numbers.",
+  tab: "Map",
   examples: ["Which streets are longer than 300 m?", "How many kilometres of each road class are there?", "Which bridges have the most traffic (aadt)?"]});
-rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the roads", icon: "ask", background: true, open: () => window.ask.open()});
 window.ask.open();
 </script>""")
 html = rs.render_dashboard(g, basemap="ofm_positron", color_options={"Road class": {}}, name="Ask").html

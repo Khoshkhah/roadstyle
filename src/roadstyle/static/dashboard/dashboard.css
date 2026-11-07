@@ -921,6 +921,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
 #sb .rs-frame-head{flex:none;margin:0 15px;padding-bottom:8px;border-bottom:1px solid var(--line)}
 #sb .rs-frame-head:empty{display:none}
 #sb .rs-frame-head .rs-tabs{padding:0;margin:0;border:0}
+#sb .rs-panel-tabs{flex:none;padding:0 15px 10px;margin:0}   /* Ask as a tab (askPanel tab:): the row under the panel's title, outside the cards and the frame */
 .rs-frame-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 15px 24px}
 /* the bar's line is inset as the head row's line (Kaveh: the full-width line above Examples, "make it better and shorter"); Ask has no line: its
    question box has its own edge */

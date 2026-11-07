@@ -378,6 +378,25 @@ def test_the_phone_keeps_the_tool_row_and_the_box_in_view(tmp_path):
     assert errors == [], errors
 
 
+def test_ask_as_a_tab_in_the_panel_has_no_back_button(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("withOpts({tab: 'Map'})")
+            tabs = page.locator(".rs-panel-tabs .rs-tab")
+            assert tabs.all_inner_texts() == ["Map", "Ask"] and page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "map"
+            tabs.nth(1).click()
+            assert page.evaluate("ask.isOpen()") and page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "ask"
+            assert page.locator("#ask-back").count() == 0 and page.locator(".rs-panel-tabs").is_visible()      # the tab row stays, there is no Back
+            tabs.nth(0).click()
+            assert not page.evaluate("ask.isOpen()") and page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "map"
+            page.evaluate("ask.open()")                                                                          # open from code: the tab follows
+            assert page.evaluate("document.querySelector('.rs-panel-tabs .on').dataset.tab") == "ask"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_the_ask_view_is_readable_in_the_theme(tmp_path, theme):
     from test_dashboard_themes_browser import _PROBE

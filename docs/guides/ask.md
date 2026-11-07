@@ -75,6 +75,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `examples` | `[]` | Questions that the empty start shows as buttons, one row each. A click on a question asks it. |
     | `panel` | `#sb` | The host's dashboard panel. Ask uses roadstyle's [editor frame](dashboard-parts.md#an-editor-in-the-panel) in it. |
     | `backLabel` | `"Back"` | The text of the back button. |
+    | `tab` | none | Ask as a tab. Give the name of the first tab, for example `"Map"`. A tab row `[Map | Ask]` shows under the panel's title. **Map** shows the host's cards, **Ask** shows the conversation. There is no Back button and no Ask card: the page does not call `rs.sections.add` for Ask. |
     | `maxSteps` | `6` | The most model calls for one question. |
     | `sendRows` | `30` | The most rows of one result that go to the model. |
     | `providers` | the four free services | The list of services. A test gives a fake provider here (see [Tests](#tests)). |

@@ -4,7 +4,7 @@
 // and camera (get_map, set_map), and a host page adds its own tools (the option tools). The person's own key of a free
 // OpenAI-compatible service stays in this browser and goes only to that service. There is no server and no model in the browser.
 //
-//   askPanel({dashboard, data, about, dialect, examples, panel, backLabel, maxSteps, sendRows, providers, tools}) -> EventTarget + {open, close, isOpen, ask, stop,
+//   askPanel({dashboard, data, about, dialect, examples, panel, backLabel, tab, maxSteps, sendRows, providers, tools}) -> EventTarget + {open, close, isOpen, ask, stop,
 //     clear, remove, history}
 //   events: "answer" {question, text, sql, rows}, "error" {question, message}, "back"
 import {editorFrame} from "../frame.js";
@@ -129,7 +129,16 @@ export function askPanel(o = {}){
             ["New", "Starts a new conversation. The map keeps its colours and its focus."]],
     note: "Ask sends your question, the conversation, the names and descriptions of the tables, and the query results (up to 30 rows each) to the AI service. An AI service can be wrong: look at the table and at the SQL."});
   if(helpB) who.after(helpB);                                                                        // the order: provider, ?, Key, New
-  const frame = editorFrame({panel, title: "Ask", back: o.backLabel || "Back", head: tools, id: "ask"});
+  // option tab: "Map" -> a tab row under the panel's title, [Map | Ask]; Ask is a tab, not a view with a Back button (the title stays the host's title)
+  const tabbed = !!o.tab, hostTitle = panel.querySelector(".sb-top")?.firstElementChild?.textContent || "Ask";
+  const frame = editorFrame({panel, title: tabbed ? hostTitle : "Ask", back: tabbed ? null : o.backLabel || "Back", head: tools, id: "ask"});
+  let tabs = null;
+  if(tabbed){
+    const nav = $("nav", "rs-tabs rs-panel-tabs");
+    for(const [id, name] of [["map", o.tab], ["ask", "Ask"]]){ const b = $("button", "rs-tab", name); b.type = "button"; b.dataset.tab = id; nav.append(b); }
+    panel.querySelector(".sb-top").after(nav);
+    tabs = rs.tabs.use(nav, (id) => id === "ask" ? open() : close());
+  }
   frame.root.classList.add("rs-ask");
   const body = frame.body, log = $("div", "rs-ask-log"), keyBox = $("div", "rs-ask-key"); keyBox.hidden = true;
   body.append(keyBox, log);
@@ -533,8 +542,8 @@ export function askPanel(o = {}){
   function clear(){ stop(); turns.splice(0).forEach((t) => t.el.remove()); schemaTxt = null; paintStart(); }
   newB.onclick = clear;
   const note = (s) => { try{ rs.sections && rs.sections.note("ask", s); }catch(e){} };
-  function open(){ frame.open(); paintWho(); toEnd(); note("Open"); }
-  function close(){ frame.close(); exOpen(false); note(turns.length ? plural(turns.length, "question", "questions") : "Ask a question about the data"); }
+  function open(){ frame.open(); if(tabs) tabs.select("ask", true); paintWho(); toEnd(); note("Open"); }
+  function close(){ frame.close(); if(tabs) tabs.select("map", true); exOpen(false); note(turns.length ? plural(turns.length, "question", "questions") : "Ask a question about the data"); }
   frame.addEventListener("back", () => { close(); emit("back"); });
   // a road click while Ask is open: no popup; the data dock opens with the road in its card, where a question can use it (Kaveh, 2026-11-06: "for ask
   // and query part, we should disable popup"). rs:select comes before the popup, so the hold is right for each click, also after a close by the host

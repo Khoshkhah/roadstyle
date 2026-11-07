@@ -530,7 +530,9 @@ checks that an `ORDER BY` in the SQL keeps its order through this wrap in DuckDB
 ### What it does
 
 Ask is a view that takes the whole side panel, as the design panel and the level editor do. A card of the host opens it, and Back shows
-the host's cards again. The person types a question in words, for example "Which primary roads are longer than 1 km?". An
+the host's cards again. With the option `tab: "Map"` (2026-11-07), Ask is a tab
+beside the host's cards: a row `[Map | Ask]` under the panel's title, no Back button, no card. `open()` and `close()` follow the tab.
+The person types a question in words, for example "Which primary roads are longer than 1 km?". An
 agent writes SQL, runs it with the data dock, reads the result, and writes a short answer. Each answer puts its SQL and its table into the
 data dock and lights the roads.
 
