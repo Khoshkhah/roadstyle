@@ -289,17 +289,20 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
 
 
 
+# a long list of long names: before the fix of 2026-11-07, the list covered its own button before it had a place, and closed itself at once
+_MODELS = ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "whisper-large-v3"] + [f"some-provider/a-long-model-name-{i}-instruct:free" for i in range(20)]
+
+
 def test_the_model_box_lists_the_keys_models_and_a_pick_takes_effect_at_once(tmp_path):
     """The Model row is a select box. With a saved key it lists the key's chat models when the form opens (no speech model); a pick is the model
-    of the next request, with no Save."""
+    of the next request, with no Save. The list is long, as OpenRouter's and Gemini's are, and opens."""
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser, page, errors = _open(p, url)
         chats = []
 
         def groq(route):
             if route.request.url.endswith("/models"):
-                return route.fulfill(status=200, content_type="application/json",
-                                     body='{"data": [{"id": "openai/gpt-oss-120b"}, {"id": "llama-3.3-70b-versatile"}, {"id": "whisper-large-v3"}]}')
+                return route.fulfill(status=200, content_type="application/json", body=json.dumps({"data": [{"id": i} for i in _MODELS]}))
             chats.append(route.request.post_data_json)
             route.fulfill(status=200, content_type="application/json", body='{"choices": [{"message": {"role": "assistant", "content": "Six roads."}}]}')
         try:
@@ -308,8 +311,8 @@ def test_the_model_box_lists_the_keys_models_and_a_pick_takes_effect_at_once(tmp
                              localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'groq'})); makeReal(); ask.open()""")
             page.click(".rs-ask-keyb")
             opts = "[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)"
-            page.wait_for_function(opts + ".length === 2")
-            assert page.evaluate(opts) == ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
+            page.wait_for_function(opts + f".length === {len(_MODELS) - 1}")
+            assert page.evaluate(opts) == [i for i in _MODELS if i != "whisper-large-v3"]
             page.locator(".rs-ask-krow").nth(1).locator(".rs-sel-btn").click()
             page.locator(".rs-sel-list").get_by_text("llama-3.3-70b-versatile").click()
             assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.groq") == "llama-3.3-70b-versatile"
