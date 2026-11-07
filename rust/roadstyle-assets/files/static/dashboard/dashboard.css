@@ -841,6 +841,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
    weight, so the part's own rules win. */
 :where(.rs-frame, #rs-dock) button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
 :where(.rs-frame, #rs-dock) button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+:where(.rs-frame, #rs-dock) button:disabled{opacity:.5;cursor:not-allowed}
 :where(.rs-frame, #rs-dock) :is(input:not([type=checkbox],[type=radio],[type=range],[type=color]),textarea){box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
 :where(.rs-frame) :is(input[type=password],input[type=text]){width:100%}
 :where(.rs-frame, #rs-dock) :is(input,textarea):focus{border-color:var(--accent)}

@@ -137,6 +137,13 @@ def test_a_click_on_each_tunnel_list_changes_the_map(editor):
         _pick(page, "tunnels.ratio", "2:1")
         assert page.evaluate(state)["rs_tun_ratio"] == [2, 1]
         assert page.evaluate("document.getElementById('tn-pal')?.value ?? 'Blue + cyan'") == "Blue + cyan"
+        # an open list is as wide as its longest option, inside the window (the base map list: "Checkerboard", "OpenFreeMap ...")
+        page.evaluate("dz.tab('theme')")
+        page.locator(".rs-sel:has(#design-preview) .rs-sel-btn").click()
+        cut = page.evaluate("""() => { const l = document.querySelector('.rs-sel-list'), r = l.getBoundingClientRect();
+          return {cut: [...l.querySelectorAll('.rs-sel-opt span')].filter(s => s.scrollWidth > s.clientWidth + 1).map(s => s.textContent),
+                  inside: r.left >= 0 && r.right <= innerWidth}; }""")
+        assert cut == {"cut": [], "inside": True}, cut
         b.close()
     assert not errors, errors
 

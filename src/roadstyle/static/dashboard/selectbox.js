@@ -53,7 +53,10 @@ function _sbEnhance(sel){
     if(!hit || !btn.contains(hit)){ close(); return; }
     const room = innerHeight - r.bottom - 12, h = Math.min(list.scrollHeight, 280);
     const up = room < h && r.top > room;                                 // not enough room below: the list opens upward
-    Object.assign(list.style, {left: r.left + "px", width: r.width + "px", maxHeight: Math.min(280, (up ? r.top : room) - 4) + "px",
+    // at least as wide as the button and as wide as its longest option, inside the window; its right edge at the button's when it can
+    Object.assign(list.style, {minWidth: r.width + "px", width: "max-content", maxWidth: (innerWidth - 16) + "px"});
+    const w = list.offsetWidth, left = Math.max(8, Math.min(r.right - w, innerWidth - 8 - w));
+    Object.assign(list.style, {left: (w > r.width ? left : r.left) + "px", maxHeight: Math.min(280, (up ? r.top : room) - 4) + "px",
       top: up ? "auto" : (r.bottom + 4) + "px", bottom: up ? (innerHeight - r.top + 4) + "px" : "auto"});
   };
   const onScroll = e => { if(list && !list.contains(e.target)) updatePos(); };   // a scroll inside the list does not move it

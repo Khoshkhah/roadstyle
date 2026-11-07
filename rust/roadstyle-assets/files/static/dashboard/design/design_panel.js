@@ -203,7 +203,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
       + (ask ? `<p class="small" role="alert">A theme named "${esc(ask.name)}" exists. Replace it? <button type="button" class="sm" data-mine-do="replace">Replace</button> <button type="button" class="sm" data-mine-do="keep-old">Cancel</button></p>` : "")
       + `<p class="small" id="mine-msg" role="status">${esc(mineMsg)}</p>`
       + (mine.length ? `<div class="themes" id="mine-list">${mineShown().map(mineCard).join("")}</div>` : '<p class="why">No saved theme yet. Pick a theme, change it, and save it here with a name.</p>')
-      + `<div class="row"><button type="button" id="mine-download" ${mine.length ? "" : "disabled"}>Download all my themes</button><button type="button" id="mine-load">Load themes from a file</button></div><input id="mine-file" type="file" accept=".json,application/json" hidden>`,
+      + `<div class="row"><button type="button" id="mine-download" ${mine.length ? "" : 'disabled title="Save a theme first: there is no theme to download"'}>Download all my themes</button><button type="button" id="mine-load">Load themes from a file</button></div><input id="mine-file" type="file" accept=".json,application/json" hidden>`,
       "Your themes are for all the maps of this page. They stay in this browser: download them to use them on another computer.");
   };
   const panePreview = () => {
