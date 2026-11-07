@@ -1239,7 +1239,6 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-ask-key{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .rs-ask-keyhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .rs-ask-keyhd b{font-size:13px}
-#sb .rs-ask-keyhd button{font-size:12px;padding:3px 10px}
 #sb .rs-ask-krow{margin:0}
 #sb .rs-ask-krow > span{display:block;margin-bottom:3px}
 .rs-ask-key > a{font-size:12px}

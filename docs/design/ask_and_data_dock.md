@@ -917,8 +917,8 @@ Not checked yet: that each service gives tool calls in this form with a real key
 ### The keys
 
 The key form is **in the Ask view**, not in roadstyle's Settings box: the person gets the key where the person needs it, and the
-Settings box does not change. **AI** in the top row shows the form in place of the conversation. The form has a title row "AI service"
-with **Done** (the service and the model are kept at once, so Done only closes the form). After a Save that works, the form says "The key works: 12 models. Ask uses …" and goes back to the chat by
+Settings box does not change. **AI** in the top row shows the form in place of the conversation. The form has a title row "AI service",
+and **Done** is the filled button at the end of the form (the service and the model are kept at once, so Done only closes the form; while a key is typed, **Save key** takes its place). After a Save that works, the form says "The key works: 12 models. Ask uses …" and goes back to the chat by
 itself after 1.6 s.
 
 | Field | localStorage key | What it is |

@@ -243,25 +243,27 @@ export function askPanel(o = {}){
     const now = () => { const q = prov(); return keyOf(q) ? `Ask uses ${q.name} · ${label(q.model)} now.` : `Ask uses ${q.name} now. Paste its key below.`; };
     model.onchange = () => { setModel(model.value); note.textContent = now(); };
     const key = $("input", "rs-q"); key.type = "password"; key.autocomplete = "off"; key.placeholder = keyOf(p) ? "(a key is saved in this browser)" : "Paste your key";
-    const save = $("button", "sb-primary", "Save key"), clear = $("button", "", "Clear"), note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
-    save.type = clear.type = "button"; btns.append(clear, save);
-    const showBtns = () => { save.hidden = !key.value.trim(); clear.hidden = !keyOf(p); btns.hidden = save.hidden && clear.hidden; };
+    // the button row at the end of the form: Clear (only with a saved key), then one filled button: Done, or Save key while a key is typed
+    const save = $("button", "sb-primary rs-ask-save", "Save key"), clear = $("button", "", "Clear"), done = $("button", "sb-primary rs-ask-done", "Done");
+    const note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
+    save.type = clear.type = done.type = "button"; done.onclick = () => showKey(false); btns.append(clear, save, done);
+    const showBtns = () => { save.hidden = !key.value.trim(); done.hidden = !save.hidden; clear.hidden = !keyOf(p); };
     key.oninput = showBtns; showBtns();
     if(said) note.textContent = said;
     const link = $("a", "", (p.paid ? "Get a key from " : "Get a free key from ") + p.name); if(p.keys){ link.href = p.keys; link.target = "_blank"; link.rel = "noopener"; } else link.hidden = true;
     // no notes under the form (Kaveh, 2026-11-06: "I think we should remove this part too"): the "?" of Ask says where the key and the data go; the line
     // here shows only the state of a save
     const row = (l, el) => { const r = $("label", "rs-ask-krow"); r.append($("span", "", l), el); return r; };
-    const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "Done"); back.type = "button"; back.onclick = () => showKey(false);
-    hd.append($("b", "", "AI service"), back);              // Done: the service and the model are already kept
+    const hd = $("div", "rs-ask-keyhd"); hd.append($("b", "", "AI service"));
     sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(isAuto() ? "Ask uses Auto now." : now()); paintWho(); };
     if(isAuto()){                                                   // Auto: the order of the services; a service of the box changes its key or model
       const ol = $("ol", "rs-ask-order");
       for(const x of PROVS) ol.append($("li", "", `${x.name} · ${keyOf(x) ? label(modelOf(x)) : "no key"}`));
-      keyBox.replaceChildren(hd, row("Provider", sel), ...(said ? [note] : []), $("p", "rs-ask-keynote", "Ask asks these services in this order. When one cannot answer, it asks the next. Choose a service to change its key or its model."), ol);
+      clear.hidden = true;
+      keyBox.replaceChildren(hd, row("Provider", sel), ...(said ? [note] : []), $("p", "rs-ask-keynote", "Ask asks these services in this order. When one cannot answer, it asks the next. Choose a service to change its key or its model."), ol, btns);
       return;
     }
-    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), row("Key", key), btns, note);
+    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), row("Key", key), note, btns);
     if(keyOf(p)) modelsOf(p).then((ids) => { if(model.isConnected && prov().id === p.id) fill(chatModels(ids)); })
       .catch((e) => { if(model.isConnected) note.textContent = "The saved key did not work: " + sentence(e.message); });
     clear.onclick = () => { lsPut("rs-key:ask:" + prov().id, null); drawKey(); paintWho(); };
