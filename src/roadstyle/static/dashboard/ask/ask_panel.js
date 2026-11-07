@@ -144,9 +144,23 @@ export function askPanel(o = {}){
   // the question box: one box with the text and a round send button inside; it grows with the text to 6 lines. Above it, after the first question, "Examples ▴".
   const exBar = $("div", "rs-ask-exbar"), exB = $("button", "rs-ask-exb"), exList = $("div", "rs-ask-exlist");
   exB.type = "button"; exB.innerHTML = "Examples " + ICON_UP; exB.setAttribute("aria-expanded", "false"); exList.hidden = true;
-  const exOpen = (on) => { exList.hidden = !on; exB.setAttribute("aria-expanded", String(on)); };
+  const exOpen = (on) => { exList.hidden = !on; exB.setAttribute("aria-expanded", String(on)); if(on) exList.scrollTop = 0; };
   exList.append(...chips(() => exOpen(false)));
   exB.onclick = () => exOpen(exList.hidden);
+  // the list opens upward over the chat: its top is the top of the frame's body at most, and it scrolls inside (the panel's scroll rules)
+  const fitList = () => { exList.style.maxHeight = Math.max(80, frame.body.clientHeight - 8) + "px"; };
+  new ResizeObserver(fitList).observe(frame.body); fitList();
+  // keys: ↑ ↓ walk the examples (the focus scrolls the list to the one in view), Escape closes the list
+  exBar.addEventListener("keydown", (e) => {
+    if(exList.hidden) return;
+    const items = [...exList.children], at = items.indexOf(document.activeElement);
+    if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); exOpen(false); exB.focus(); }
+    else if(e.key === "ArrowUp" || e.key === "ArrowDown"){
+      e.preventDefault();
+      const next = e.key === "ArrowUp" ? (at < 0 ? items.length - 1 : at - 1) : (at < 0 ? -1 : at + 1);
+      if(items[next]) items[next].focus(); else if(e.key === "ArrowDown") exB.focus();
+    }
+  });
   document.addEventListener("click", (e) => { if(!exBar.contains(e.target)) exOpen(false); });
   exBar.append(exList, exB);
   const comp = $("div", "rs-ask-comp"), box = $("textarea"), send = $("button", "rs-ask-send");

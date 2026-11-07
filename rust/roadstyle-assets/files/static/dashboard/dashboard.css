@@ -713,8 +713,8 @@ html.rs-phone #rs-help .rs-help-terms{grid-template-columns:92px 1fr}
    the query part's list, the help window, the panel's own select list, the boxes of the toolbox, the docked read-out. An area inside a box (`rs-scroll`,
    the query's list) also has a fade at its bottom edge while there is more below (data-more), and at its top edge while there is more above (data-above);
    a whole box has none, because the fade would take its border too. An area with a table has no top fade: the table's header row stays at the top. The height of a `rs-scroll` is `--rs-scroll-h` (the page can set it). ---- */
-:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res,.rs-menu,.rs-color-box,.rs-search-list){overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
-:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res,.rs-menu,.rs-color-box,.rs-search-list):is(:hover,.rs-scrolling){scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
+:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res,.rs-menu,.rs-color-box,.rs-search-list,.rs-ask-exlist){overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:transparent transparent}
+:is(.rs-scroll,.rs-q-list,#rs-help .rs-help-box,.rs-sel-list,#rs-toolbar .bm-menu,#rs-attr-box,#rs-color-box,#rs-nav-box,#rs-roads-box,#rs-settings-box,.rs-side-bd,.rs-side-ctl,.rs-side-q-res,.rs-menu,.rs-color-box,.rs-search-list,.rs-ask-exlist):is(:hover,.rs-scrolling){scrollbar-color:color-mix(in srgb,var(--ink) var(--rs-thumb,47%),transparent) transparent}
 .rs-scroll{overflow:auto;max-height:var(--rs-scroll-h,min(520px,60dvh))}
 :is(.rs-scroll,.rs-q-list)[data-more]{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
 :is(.rs-scroll,.rs-q-list)[data-above]:not(:has(th)){-webkit-mask-image:linear-gradient(to bottom,transparent,#000 28px);mask-image:linear-gradient(to bottom,transparent,#000 28px)}
@@ -1245,8 +1245,10 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-ask-exbar{position:relative;display:flex;margin-bottom:6px}
 #sb .rs-ask-exb{border:0;background:none;padding:2px 6px;font:500 12px system-ui,sans-serif;color:var(--mut);display:inline-flex;align-items:center;gap:4px;border-radius:6px}
 .rs-ask-exb[aria-expanded=false] svg{transform:rotate(180deg)}
+/* the list is as high as the free space above the question box at most (ask_panel.js sets max-height from the frame's body) and scrolls inside */
 .rs-ask-exlist{position:absolute;left:0;right:0;bottom:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:10px;
-  background:var(--bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+  box-sizing:border-box;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.rs-ask-exlist > *{flex:none}
 .rs-ask-comp{display:flex;align-items:flex-end;gap:6px;padding:5px 5px 5px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 .rs-ask-comp:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
 #sb .rs-ask-comp textarea{flex:1;min-width:0;border:0!important;background:transparent!important;box-shadow:none!important;outline:none;resize:none;

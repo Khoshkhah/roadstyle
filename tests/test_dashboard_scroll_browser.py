@@ -103,3 +103,13 @@ def test_a_scroll_area_fades_at_the_top_while_there_is_more_above(tmp_path):
         assert got[sel, "start"] == {"above": False, "more": True, "top": False}, got
         assert got[sel, "middle"] == {"above": True, "more": True, "top": True}, got
     assert got["#tbl", "middle"]["above"] and not got["#tbl", "middle"]["top"], got
+
+
+def test_the_asks_example_list_is_in_both_lists_of_scroll_areas():
+    """Ask's "Examples" list scrolls (Kaveh, 2026-11-07): its class is in `_PS_AREAS` and in the same list of dashboard.css. The behaviour with 7 long
+    examples is in test_ask_browser.py."""
+    from pathlib import Path
+    dash = Path(__file__).resolve().parents[1] / "rust/roadstyle-assets/files/static/dashboard"
+    assert '".rs-ask-exlist"' in (dash / "panelscroll.js").read_text()
+    css = (dash / "dashboard.css").read_text()
+    assert css.count(".rs-search-list,.rs-ask-exlist)") == 2
