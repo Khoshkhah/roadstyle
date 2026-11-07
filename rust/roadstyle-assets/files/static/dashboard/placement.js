@@ -17,14 +17,18 @@ export function layoutNow(){
 // into what is left (web_template.html calls `window.rsFreePad`).
 export function freePad(){
   const pad = {top: 30, right: 30, bottom: 30, left: 30};
+  // the padding is in the map's box: a panel or a bar beside the map (layout "dock": the map starts after the panel) covers nothing, and one over the map
+  // counts only from the map's edge (in the window's numbers the docked panel was counted twice: the first view was far to one side and zoomed out)
+  const m = (document.getElementById("map") || document.body).getBoundingClientRect();
   for(const el of document.querySelectorAll("#sb, #rs-toolbar")){
     if(getComputedStyle(el).display === "none" || getComputedStyle(el).visibility === "hidden") continue;
     const r = el.getBoundingClientRect();
     if(!r.width || !r.height) continue;
+    if(r.right <= m.left || r.left >= m.right || r.bottom <= m.top || r.top >= m.bottom) continue;
     const tall = r.height >= r.width, near = (a, b) => a <= b;
-    if(tall) { if(near(r.left, innerWidth - r.right)) pad.left = Math.max(pad.left, r.right + 8); else pad.right = Math.max(pad.right, innerWidth - r.left + 8); }
-    else if(near(r.top, innerHeight - r.bottom)) pad.top = Math.max(pad.top, r.bottom + 8);
-    else pad.bottom = Math.max(pad.bottom, innerHeight - r.top + 8);
+    if(tall) { if(near(r.left - m.left, m.right - r.right)) pad.left = Math.max(pad.left, r.right - m.left + 8); else pad.right = Math.max(pad.right, m.right - r.left + 8); }
+    else if(near(r.top - m.top, m.bottom - r.bottom)) pad.top = Math.max(pad.top, r.bottom - m.top + 8);
+    else pad.bottom = Math.max(pad.bottom, m.bottom - r.top + 8);
   }
   // the bottom dock: the camera fits above it (it covers the map in the card look; in the frame look the map ends at it, and this adds nothing)
   const d = document.getElementById("rs-dock");

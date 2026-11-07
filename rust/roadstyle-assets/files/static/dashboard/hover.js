@@ -1,4 +1,4 @@
-// The hover box of a page (docs/guides/dashboard-panel.md): the words that a page shows near the pointer over its own chart or its own map layer.
+// The hover box of a page (docs/guides/dashboard-parts.md): the words that a page shows near the pointer over its own chart or its own map layer.
 // `rs.hover.show(html, event)` puts the box beside the pointer (it flips to the other side at an edge), `rs.hover.hide()` takes it away, and
 // `rs.hover.on(node, html | fn)` does both for a node: the text, or a function of the event, shows while the pointer moves over it. The box has the look
 // of the popup (the box token, the blur, the border) in both themes, and it never takes the pointer. The text is HTML of the page's own.

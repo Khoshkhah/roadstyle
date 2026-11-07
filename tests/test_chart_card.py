@@ -1,4 +1,4 @@
-"""The chart card from Python (docs/guides/charts.md): render_dashboard with each kind, from the map's roads and from the page's own rows (a DataFrame,
+"""The chart card from Python (docs/guides/dashboard-parts.md, "A chart"): render_dashboard with each kind, from the map's roads and from the page's own rows (a DataFrame,
 a GeoDataFrame, a list of dicts); the rows go into the page with the SQL type names, a 64-bit integer stays exact, and a wrong chart is a ValueError."""
 import datetime as dt
 import json

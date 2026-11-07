@@ -175,3 +175,21 @@ def test_a_wider_panel_in_the_overlay_layout(tmp_path):
         sb, bar = _box(page, "#sb"), _box(page, "#rs-toolbar")
         browser.close()
     assert sb["w"] == 420 and bar["r"] > 1280 - 20               # the panel is at the left, the bar at the right edge, by default
+
+
+@pytest.mark.parametrize("template", ["dashboard", "dock"])
+def test_the_first_view_puts_the_roads_in_the_free_part_of_the_map(tmp_path, template):
+    """The first view fits the roads into the part of the map that no panel and no bar covers (placement.js `freePad`, in the map's box). With the
+    docked panel (layout "dock") the map starts after the panel, so the panel covers nothing: the roads are in the middle of the map. Before
+    2026-11-06 the padding was in the window's numbers, and the docked panel was counted twice: the roads were far to the right and small."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, tmp_path, template, viewport={"width": 1100, "height": 700})
+        m = page.evaluate("""() => { const c = map.getContainer().getBoundingClientRect(), f = rs.freeArea();
+          const a = map.project([18.0, 59.30]), b = map.project([18.011, 59.31]);
+          return {roads: [Math.min(a.x, b.x) + c.left, Math.max(a.x, b.x) + c.left], free: [f.lo, f.hi], width: Math.max(a.x, b.x) - Math.min(a.x, b.x)}; }""")
+        mid = (m["roads"][0] + m["roads"][1]) / 2
+        free_mid = (m["free"][0] + m["free"][1]) / 2
+        assert abs(mid - free_mid) < 0.1 * (m["free"][1] - m["free"][0]), m        # the roads in the middle of the free part
+        assert m["roads"][0] >= m["free"][0] - 1 and m["roads"][1] <= m["free"][1] + 1, m      # and not under the panel or the bar
+        browser.close()
+    assert not errors, errors

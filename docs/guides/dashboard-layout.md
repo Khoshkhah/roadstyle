@@ -1,226 +1,312 @@
-# Dashboard layout
+# Layout and toolbox
 
-A dashboard is a map with a toolbox and a side panel ([Dashboards](dashboards.md)). This page describes the frame and the toolbox: the layouts, the panel frame, each tool, the windows, the dark theme and the phone form. The panel is at the left and the toolbox is at the right edge. The panel is empty, and there is no scale box.
+What each part of the dashboard screen does, and how to change it. Each item has the same form: a picture when there is one, a box with **Use it for** and **From Python**, the code in tabs, and **Details** that open on a click.
 
-```python
-import roadstyle as rs
+| Group | Item | From Python | Use it for |
+|---|---|---|---|
+| Frame | [The layout](#the-layout) | yes | a floating or a docked panel |
+| Frame | [The panel](#the-panel) | yes | the edge, the look and the width of the panel |
+| Toolbox | [The toolbox](#the-toolbox) | yes | the edge of the bar of tools, your own tools |
+| Toolbox | [Navigate](#navigate) | yes | zoom, turn and tilt |
+| Toolbox | [Roads](#roads) | no option | show or hide road classes |
+| Toolbox | [Base map](#base-map) | yes | the base map, and the switches on top of it |
+| Toolbox | [Colour and legend](#colour-and-legend) | yes | the *Colour by* list and the legend |
+| Toolbox | [Settings](#settings) | yes | the place of the bar and the panel, transparency, keys |
+| Toolbox | [Credits](#credits) | yes | the sources of the map and of your data |
+| Screen | [The dark theme](#the-dark-theme) | JavaScript | a dark page |
+| Screen | [The windows](#the-windows) | yes | Street View and Google 3D |
+| Screen | [The bottom dock](#the-bottom-dock) | no | a wide table under the map |
+| Screen | [A phone](#a-phone) | automatic | the page on a phone |
+| Screen | [The area boundary](#the-area-boundary) | yes | an outline, a shade and a camera limit |
 
-rs.render_dashboard(edges, color_options={"Road class": {}}).save("dashboard.html")
-```
+## The frame { .rs-group }
 
-![The dashboard on a desktop: the panel at the left, the toolbox at the right edge, and the roads of Monaco](../img/dashboard-desktop.png)
+### The layout { .rs-part }
 
-## The form
+**Use it for:** the frame of the page. The panel floats over the map, or it has its own space at the left.<br>
+**From Python:** yes, `layout=`
+{ .rs-facts }
 
-There is one template with a panel: `dashboard`. `layout` changes the frame:
+=== "Python"
 
-| Keyword | What you get |
-|---|---|
-| `layout="overlay"` (default) | The map fills the window. The panel floats over it, at the left. The toolbox is a column at the right edge (`dashboard={"toolbar": {"position": "left"}}` moves it); its boxes open to its left |
-| `layout="dock"` | The panel is docked at the left and takes its own space. No toolbox: the tools are the MapLibre buttons |
+    ```python
+    rs.render_dashboard(edges)                    # layout="overlay": the panel floats, the toolbox is at the right edge
+    rs.render_dashboard(edges, layout="dock")     # the panel has its own space at the left, and there is no toolbox
+    ```
 
-`template="map"` is the map only (the default of `render_edges`). The `classic` template and the report page are gone.
+??? info "Details"
 
-`dashboard={...}` changes any option of the template. Every key, with its default, is in [Dashboard options](../reference/parameters.md#dashboard-options).
+    - With `layout="dock"` the tools are the MapLibre buttons on the map.
+    - `template="map"` gives the map only (the default of `render_edges`).
 
-## The panel
+### The panel { .rs-part }
 
-The panel has a frame: the title (the page's `name`), the theme button and the hide button. The sections that the page adds are in [Add to the panel](dashboard-panel.md). The options `side`, `look` and `width_px` set the edge, the look (`"frame"` or `"card"`) and the width. The person can change the edge and the look in the settings.
+**Use it for:** the edge, the look and the width of the panel. Its content is the [sections](dashboards.md#the-panel-starts-empty).<br>
+**From Python:** yes, `dashboard={"panel": {...}}`
+{ .rs-facts }
 
-The title stays, and only the body scrolls. The scrollbar is at the outer edge of the panel: at the left of a left panel, at the right of a right panel. It shows only when you point at the panel or scroll. A soft fade at the bottom edge shows that more content is below. The scrollbar has a contrast of 3:1 or more in both themes. The sections of the page scroll with the rest, and you do not need CSS for it.
+=== "Python"
 
-If you must change the text of the template, build the page and change `m.html`. The panel is `<div id="sb">`, and its sections go in `<div class="sb-body">`. These ids of its frame stay stable: `sb-hide`, `sb-show` and `sb-th`.
+    ```python
+    rs.render_dashboard(edges, dashboard={"panel": {"side": "right", "look": "card", "width_px": 360}})
+    rs.render_dashboard(edges, dashboard={"panel": None})      # no panel: the map and the toolbox
+    ```
 
-## The toolbox
+??? info "Details"
 
-The bar has one button for each tool, in this order: theme, navigate, Street View, Google 3D, base map, roads, 3D buildings,
-colour and legend, settings, credits. The toolbox is fixed. A tool that the page cannot use stays in its place, greyed out, and its
-tooltip says why. For example, Google 3D is grey when `google_3d` is off, and the 3D buildings tool is grey when the base map is not
-a vector map. `rs.tools.list()` gives each tool with its `disabled` state.
+    - The panel has a title (the page's `name`), the theme button and the hide button. Only the body scrolls.
+    - `look` is `"frame"` (the default) or `"card"`. The person can change the edge and the look in [Settings](#settings).
+    - The panel is `<div id="sb">`, and its sections go in `<div class="sb-body">`.
 
-A box opens toward the map. One box is open at a time. A click outside it, or Escape, closes it. A box stays inside the window.
+## The toolbox { .rs-group }
 
-<div class="grid" markdown>
+### The toolbox { .rs-part }
 
-![The roads tool: All and None, and a row for each road class with its colour and number of roads](../img/dashboard-roads-tool.png)
+**Use it for:** the bar of tools at the edge of the map. Each tool opens a box toward the map.<br>
+**From Python:** yes, `dashboard={"toolbar": {...}}`
+{ .rs-facts }
 
-![The navigate box: sliders for the zoom, the turn and the tilt](../img/dashboard-navigate-box.png)
+=== "Python"
 
-</div>
+    ```python
+    rs.render_dashboard(edges, dashboard={"toolbar": {"position": "left"}})     # left, right (default), top or bottom
+    rs.render_dashboard(edges, dashboard={"toolbar": {"position": "top", "align": "end"}})   # the top right corner
+    ```
 
-### The place of the bar along its edge
+=== "JavaScript"
 
-`dashboard={"toolbar": {"position": "top", "align": "end"}}` puts the bar at the top right corner. `align` is `"start"`, `"middle"`
-(the default) or `"end"`. For a bar at the top or the bottom, start is the left and end is the right. For a bar at the left or the
-right, start is the top and end is the bottom. A bar at a corner stays clear of the panel, the dock and the box of the scale. The
-person can change it in the Settings box: the row "Toolbar place" (Left, Middle, Right; or Top, Middle, Bottom).
+    ```js
+    rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => exportRows()});
+    ```
 
-### Navigate
+??? info "Details"
 
-**One button** (the compass needle) replaces the zoom buttons, the compass and the 2D/3D button. A click opens a box with a zoom
-slider (with - and +), a turn slider, a tilt slider and the button *North up, flat*. Ctrl + drag on the map turns and tilts it.
-The needle turns with the map and flattens with the tilt.
+    - The tools, in order: theme, navigate, Street View, Google 3D, base map, roads, 3D buildings, colour and legend, settings, credits.
+    - A tool that the page cannot use is grey, and its tip says why. `rs.tools.list()` gives each tool with its `disabled` state.
+    - One box is open at a time. A click outside it, or Escape, closes it.
+    - `dashboard={"toolbar": {"hold": True}}` keeps the bar hidden until the page calls `rs.tools.ready()` (6 s at most).
+    - `align` is the place of the bar along its edge: `"start"`, `"middle"` (the default) or `"end"`. At the top or the bottom, start is the left; at the left or the right, start is the top. A bar at a corner stays clear of the panel, the dock and the box of the scale.
+    - When the tools do not fit, the bar takes more columns or rows. It never scrolls. A box that is too tall scrolls.
+    - More about your own tools: [JavaScript](dashboard-manual/javascript.md#toolbox).
 
-`dashboard={"toolbar": {"navigation": "buttons"}}` brings the earlier buttons back: +, -, the compass and 2D/3D. Dragging the compass
-turns the map (left and right) and tilts it (up and down). A click on it sets north and the tilt back.
+### Navigate { .rs-part }
 
-### Roads
+![The navigate box: sliders for the zoom, the turn and the tilt](../img/dashboard-navigate-box.png){ width="320" }
 
-The `roads` tool is the road filter. The box has a row for each road class, with a check box, its colour, its name and its number
-of roads. *All* and *None* set every row. A click on a name shows only that class. A page with bridges, tunnels or access kinds
-(`access_col`) has a row for each of them too. The tool uses the same calls as `rsSetClasses`, `rsSetBridges`, `rsSetTunnels` and
-`rsSetAccess`, so a script and the tool use one filter. When a page has no road classes, the tool is grey. A style that comes later
-(`rs.setStyle`) brings its own classes.
+**Use it for:** zoom, turn and tilt the map. One button, the compass needle, opens a box with three sliders.<br>
+**From Python:** yes, `dashboard={"toolbar": {"navigation": ...}}`
+{ .rs-facts }
 
-### Base map
+=== "Python"
 
-The base-map tool lists the base maps that need no key: OpenFreeMap Liberty and Positron, OpenStreetMap, Esri Gray, Esri Streets,
-Esri Satellite and Blank. Under *On top* it has five switches: Hillshade, 3D terrain, Labels, One-way arrows and 3D buildings. Hillshade shades the ground under the roads, and 3D terrain lifts the map to the ground's heights and tilts a flat map; both come from the Terrain Tiles on AWS (no key), and `hillshade=True` and `terrain=True` start them on. With the terrain on, every layer lies on the ground of the DEM: a tunnel is drawn on the hill above it and a bridge on the valley under it, because MapLibre has no height of its own for a line. The roads are flat with the terrain off. `terrain_tunnels=` chooses what a tunnel does meanwhile: `"fade"` (the default), `"hide"` or `"show"`; MapLibre has no height for a line, so a per-edge height (a `z` column) cannot be drawn. One-way arrows is on by default, and the box keeps the choice in this browser. A page without arrows (`arrows=False`) has no One-way arrows switch. A page can offer other base maps with `basemaps=`. One-way arrows is on by default, and the box keeps the choice in this browser. A page without arrows (`arrows=False`) has no One-way arrows switch. A page can add a row of its own with `window.rsAddTopRow({id, label, get, set, available})` (a check box for a layer of the page; `get` says whether it shows, `set(on)` shows or hides it, `available()` greys the row). The event `rs:toprowschange` makes the box read the state again. A page can offer other base maps with `basemaps=`.
+    ```python
+    rs.render_dashboard(edges, dashboard={"toolbar": {"navigation": "buttons"}})   # +, -, compass and 2D/3D in place of the box
+    ```
 
-When the style has base-map layers of its own (the duckOSM layers: land cover, water, buildings and more), the box has one more
-switch for all of them. Its label is *Map layers* (`overlays_label`). The legend box lists the same layers, each with its colour. The
-swatch has a thin border, so that a white colour shows.
+??? info "Details"
 
-The 3D buildings switch tilts a flat map to 55° and zooms in to 15 when the zoom is under 14.5, because the buildings start at that
-zoom. When you switch it off, the map goes flat again if this switch tilted it. A call of `rsBuildings(on)` from a script moves nothing.
-While the 3D buildings are on, an *Opacity* slider under their row sets how solid they are (`buildings_opacity=`, default 1).
+    - Ctrl + drag on the map turns and tilts it. The needle turns with the map.
+    - *North up, flat* in the box sets the map back.
 
-![The base-map box: seven base maps, and Hillshade, Labels and 3D buildings under On top](../img/dashboard-basemap-box.png)
+### Roads { .rs-part }
 
-### Colour and legend
+![The roads tool: All and None, and a row for each road class with its colour and number of roads](../img/dashboard-roads-tool.png){ width="320" }
 
-The box has the *Colour by* list and the legend of the active colour option. Your own rows follow the legend:
+**Use it for:** show or hide road classes, bridges, tunnels and access kinds.<br>
+**From Python:** no option: the tool is there when the page has road classes
+{ .rs-facts }
 
-```python
-rs.render_dashboard(edges, dashboard={"legend": {"rows": [
-    {"color": "#ff0066", "label": "Events"},
-    {"color": "#16a34a", "label": "Sensors", "shape": "circle"},
-]}})
-```
+=== "JavaScript"
 
-`rs.legend.add` adds a row from JavaScript. A row has a color, a label and a shape (`square`, `circle` or `line`). The shape tells the reader what the color is on the map: a line for a road, a circle for a sensor. A page with
-live data lists each set of numbers with its range and its number of roads. `rs.colorModes` gives the box a "Colour by" list of your
-own. The tool is grey when the page has no colour option and no live data.
+    ```js
+    rsSetClasses(["primary", "secondary"]);      // the same filter as the tool
+    rsSetBridges(false);
+    ```
 
-### Settings
+??? info "Details"
 
-The gear button opens the settings. The browser keeps them. They do not go into the page file.
+    - A row has a check box, the colour, the name and the number of roads. *All* and *None* set every row. A click on a name shows only that class.
+    - A page with bridges, tunnels or access kinds (`access_col`) has a row for each of them. `rsSetTunnels` and `rsSetAccess` set them.
 
-- **Layout.** The bar: left, top, right or bottom. The panel: left or right, as a frame (default) or a card. The scale and zoom number can show.
-- **Transparency.** Three sliders: the bar and the panel, the boxes with the popup and the tooltip, and the card behind the text.
-  Every floating part follows one of the three sliders. The bar and the boxes start at 40 %, the card behind the text at 70 %.
-- **Keys.** A Google Maps key (Street View, Google 3D). No base map needs a key. A saved key replaces the key of the page. A page needs no Google key at build time.
+### Base map { .rs-part }
 
-### Credits
+![The base-map box: seven base maps, and Hillshade, Labels and 3D buildings under On top](../img/dashboard-basemap-box.png){ width="320" }
 
-The credits button is in a box in the bottom corner of the map, on the side opposite to the panel. With the bar at the right, the box is at the bottom right, below the end of the bar. The scale and the zoom number are
-in the same box, and the person chooses to show them. The box is always shown. On a phone the credits button is in the bar.
-The credits list starts with the credits of your page. The dashboard has "© OpenStreetMap contributors", the source of its roads.
-`dashboard={"credits": [{"text": "My data", "href": "https://example.org"}]}` adds yours, and `dashboard={"credits": []}` leaves out
-the credits of your page. A base map that lists its sources gives its own rows after yours, and a row that names OpenStreetMap is not
-shown twice. The blank base map lists no source, so the list shows the credit that the style's roads source carries ("Data from
-OpenStreetMap") in place of your page's credit. The base map's credits follow. The list is short: a long list of image sources is left out.
+**Use it for:** the base map, and the switches *On top*: hillshade, 3D terrain, labels, one-way arrows and 3D buildings.<br>
+**From Python:** yes, `basemap=`, `basemaps=`, `hillshade=`, `terrain=`, `arrows=`, `buildings_opacity=`
+{ .rs-facts }
 
-<div class="grid" markdown>
+=== "Python"
 
-![The settings box: layout, three transparency sliders and the keys](../img/dashboard-settings-box.png)
+    ```python
+    rs.render_dashboard(edges, basemap="ofm_liberty", hillshade=True, terrain=True)
+    ```
 
-![The colour and legend box: the colour options and the legend of the road classes](../img/dashboard-legend-box.png)
+=== "JavaScript"
 
-</div>
+    ```js
+    rsBuildings(true);
+    window.rsAddTopRow({id: "sensors", label: "Sensors", get: () => shown, set: (on) => show(on)});   // a switch for your own layer
+    ```
 
-## The dark theme
+??? info "Details"
 
-The theme button sets the light or the dark theme for the whole page: the bar, the panel, the boxes, the popup and the roads. A dark base map (OpenFreeMap Fiord or Dark, Esri
-Dark Gray, Blank dark) sets the dark theme too. The style's own layers (land, parks, water, buildings, paved areas, lines and points of a duckOSM map, the casing of the roads, the names and the arrows) have a dark
-colour in the style, and the global state `rs_theme` picks it. A change of theme needs no new style and no new tile. The dark colour is the light one turned by the `dark` block of the profile.
-The fill of a road keeps its colour. Design: `docs/design/dark_theme.md`.
+    - The base maps with no key: OpenFreeMap Liberty and Positron, OpenStreetMap, Esri Gray, Esri Streets, Esri Satellite and Blank. `basemaps=` offers other ones.
+    - **Hillshade and 3D terrain** come from the Terrain Tiles on AWS (no key). With the 3D terrain on, a tunnel is drawn on the hill above it and a bridge on the valley under it.
+    - `terrain_tunnels=` sets what a tunnel does on the terrain: `"fade"` (the default), `"hide"` or `"show"`. MapLibre has no height for a line, so a per-edge height (a `z` column) cannot be drawn.
+    - **One-way arrows** are on by default. A page with `arrows=False` has no switch.
+    - **3D buildings** tilt a flat map to 55° and zoom in to 15 when the zoom is under 14.5. The *Opacity* slider sets `buildings_opacity` (default 1).
+    - Base-map layers of the style (the duckOSM layers: land cover, water, buildings) get one switch, *Map layers* (`overlays_label`).
+    - `rsAddTopRow`: `get` says whether the layer shows, `set(on)` shows or hides it, `available()` greys the row. The event `rs:toprowschange` reads the state again.
 
-There is no `theme=` keyword. The page starts light. To start dark, use `page_script="rs.ready(() => rsSetTheme('dark'))"`.
+### Colour and legend { .rs-part }
+
+![The colour and legend box: the colour options and the legend of the road classes](../img/dashboard-legend-box.png){ width="320" }
+
+**Use it for:** the *Colour by* list and the legend, with rows of your own.<br>
+**From Python:** yes, `color_options=` and `dashboard={"legend": {...}}`
+{ .rs-facts }
+
+=== "Python"
+
+    ```python
+    rs.render_dashboard(edges, color_options={"Road class": {}, "Speed": {"color_by": "maxspeed_kmh"}},
+                        dashboard={"legend": {"rows": [{"color": "#16a34a", "label": "Sensors", "shape": "circle"}]}})
+    ```
+
+=== "JavaScript"
+
+    ```js
+    rs.legend.add({id: "events", color: "#ff0066", label: "Events"});
+    ```
+
+??? info "Details"
+
+    - A row has a colour, a label and a shape: `square`, `circle` or `line`. The shape tells what the colour is on the map: a line for a road, a circle for a sensor.
+    - A page with live data lists each set of numbers with its range and its number of roads. `rs.colorModes` gives the box a list of your own.
+    - The tool is grey when the page has no colour option and no live data.
+
+### Settings { .rs-part }
+
+![The settings box: layout, three transparency sliders and the keys](../img/dashboard-settings-box.png){ width="320" }
+
+**Use it for:** the person's own choices: the place of the bar and the panel, the transparency and the keys. The browser keeps them.<br>
+**From Python:** yes, `dashboard={"toolbar": {"settings": False}}` removes the tool
+{ .rs-facts }
+
+??? info "Details"
+
+    - **Layout.** The bar: left, top, right or bottom, and its place along that edge (the row *Toolbar place*). The panel: left or right, as a frame or a card. The scale and the zoom number can show.
+    - **Transparency.** Three sliders: the bar and the panel; the boxes with the popup and the tooltip; the card behind the text.
+    - **Keys.** A Google Maps key and a Mapillary token ([Keys and tokens](google-key.md)). A saved key replaces the key of the page.
+    - The settings do not go into the page file.
+
+### Credits { .rs-part }
+
+**Use it for:** the sources of the map and of your data, in a box in the bottom corner.<br>
+**From Python:** yes, `dashboard={"credits": [...]}`
+{ .rs-facts }
+
+=== "Python"
+
+    ```python
+    rs.render_dashboard(edges, dashboard={"credits": [{"text": "My data", "href": "https://example.org"}]})
+    ```
+
+??? info "Details"
+
+    - The dashboard starts with "© OpenStreetMap contributors". `"credits": []` leaves out the credits of your page.
+    - A base map adds its own sources. A row that names OpenStreetMap shows once.
+    - The scale and the zoom number are in the same box. On a phone the credits are a tool of the bar.
+
+## The screen { .rs-group }
+
+### The dark theme { .rs-part }
 
 ![The dashboard in the dark theme on the OpenFreeMap Fiord base map](../img/gallery/dashboard_dark.jpg)
 
-## Add a tool
+**Use it for:** a dark page: the bar, the panel, the boxes, the popup and the roads. The theme button changes it.<br>
+**From Python:** no keyword: start it dark from `page_script`
+{ .rs-facts }
 
-To add a tool of your own, use `rs.tools`:
+=== "Python"
 
-```javascript
-rs.tools.add({id: "export", title: "Export", icon: "&#8681;", onClick: () => save()});
-```
+    ```python
+    rs.render_dashboard(edges, page_script="rs.ready(() => rsSetTheme('dark'))")
+    ```
 
-To hold the bar until your tools are in, use `dashboard={"toolbar": {"hold": True}}` and call `rs.tools.ready()` (the bar shows after 6 s at most).
+=== "JavaScript"
 
-Your own sections: [Add to the panel](dashboard-panel.md). Older script? [Move a dashboard](migrating-dashboard.md).
+    ```js
+    rsSetTheme("dark");      // or "light"; the event rs:themechange follows
+    ```
 
-## The windows
+??? info "Details"
 
-Street View and Google 3D open in the free part of the map and keep their size. The `windows` option sets their rules (keep inside the screen, restore, remember: [Dashboard options](../reference/parameters.md#dashboard-options)). Google 3D has a view switch, **Imagery** or **Map**, and **Follow** is on at the start.
+    - A dark base map (OpenFreeMap Fiord or Dark, Esri Dark Gray, Blank dark) sets the dark theme too.
+    - A theme change needs no new style and no new tile. The fill of a road keeps its colour.
 
-`street_view="dock"` docks Street View beside the map, as a side of the page with a divider that you drag. The window takes the right part of the screen (the lower part on a phone). The Street View button of the bar closes and opens it. A dashboard with `dashboard={"panel": None}` has no panel: the page is the map and the toolbox. See [Street View](street-view.md#docked-beside-the-map).
+### The windows { .rs-part }
 
-## The bottom dock
+**Use it for:** Street View and Google 3D in a window over the free part of the map, or Street View docked beside it.<br>
+**From Python:** yes, `street_view=`, `google_3d=`, `dashboard={"windows": {...}}`
+{ .rs-facts }
 
-The bottom dock is a wide area under the map, for a table, a chart or a list. A page puts its own element in it. A dock with no content is not on the page.
+=== "Python"
 
-```javascript
-const t = rs.dock.table({columns: [{name: "edge_id", type: "BIGINT"}, {name: "name", type: "VARCHAR"}, {name: "length_m", type: "DOUBLE"}],
-                         rows: [[8121729169906061189n, "Riia", 1240.5]], idColumn: "edge_id"});
-rs.dock.add({id: "roads", label: "Roads", el: t.el, note: "1 row"});   // the dock shows, closed: its title row
-rs.dock.open("roads");
-```
+    ```python
+    rs.render_dashboard(edges, street_view="dock")     # Street View beside the map, with a divider to drag
+    rs.render_dashboard(edges, google_3d=True)
+    ```
 
-- **A desktop.** The dock has the left and the right edge of the map. In `layout="overlay"` it goes from edge to edge of the window, with round top corners. The map ends at the top of the dock. With the card look the map goes on under the dock, and the dock is the glass of the panel's card. The panel, the toolbox, its boxes and a bar along the bottom end above the dock, and the camera fits the roads above it. The box with the scale and the credits hides while the dock is open.
-- **The height.** Drag the grip on the top edge of the dock. The height is 120 px to 70 % of the window. A double click on the grip closes the dock or opens it again. A closed dock is its title row (32 px). The browser keeps the height and the open state for each page.
-- **The title row.** With one content, the row shows its label. With two or more, the row shows tabs. After the label: the content's `note` ("12 rows"), its `actions` (an element: buttons of the content), the arrow that closes or opens the dock, and ✕ for a content with `closable: true`.
-- **A phone.** The dock is a bottom sheet of 40 % of the screen. A tap on its grip goes to the full height and back. A drag down closes it. One sheet is open at a time: when the dock opens, the panel's sheet goes down and Street View and Google 3D close, and when one of them opens, the dock closes. A closed dock is a round button with its label and note.
+??? info "Details"
 
-**The dock's table.** `rs.dock.table({columns, rows, idColumn, more, onSort})` gives `{el, set({columns, rows, more}), rows(), sort()}`, a table in the same look on every page:
+    - A window keeps its size and place. The `windows` option sets the rules: keep inside the screen, open again, remember ([Dashboard options](../reference/parameters.md#dashboard-options)).
+    - More: [Street View](street-view.md) and [Google 3D](google-3d.md).
 
-- The box is as wide as its columns and has the height of the dock. Its two scrollbars are always visible. The header row stays at the top, and the first column stays in view when the table scrolls sideways.
-- A header shows the column's name and, under it, its type (`type`). Its tooltip is the column's `about`. A number column is at the right.
-- A 64-bit id (a `BigInt`) shows exactly. `null` shows as a muted "null". A cell is at most 320 px wide; a longer text ends with "…" and the full text is in its tooltip.
-- A click on a header sorts by that column: rising, falling, then the order of the rows again. With `more: true` (the rows are not all the rows) and `onSort(column, dir)`, the host sorts all its rows and gives `{rows}` back.
-- With `idColumn`, a click on a row selects that road and zooms to it.
-- A table of more than 1000 rows draws only the rows in view, so 50 000 rows stay fast.
+### The bottom dock { .rs-part }
 
-The event `rs:dockchange` (`open`, `id`, `height`) comes when the dock opens, closes, changes its content, or changes its height. `tests/test_dashboard_bottom_dock_browser.py` checks the dock on a desktop (the frame and the card look), on a phone, and with 5000 rows.
+**Use it for:** a wide table, a chart or a list under the map. Drag its grip to change the height.<br>
+**From Python:** no: [the bottom dock](dashboard-parts.md#the-bottom-dock) is a JavaScript part
+{ .rs-facts }
 
-## When the window is small
-
-The bar stays in the free part of the window. This is the part that the panel does not cover. When the bar does not fit in one line, it takes more lines. It never scrolls.
-
-- **A bar at the left or right edge** that is too short for its tools takes a second column, and a third column when it must. The first column is at the edge.
-- **A bar at the top or the bottom** is centered between the panel and the edge of the window. When this space is too narrow, the bar takes a second row.
-- **A box** that is too tall for the window is shorter and scrolls, and it keeps its scroll while it fits again.
-- **A box** opens beside the whole bar, toward the map. It never opens over a second column or row, and it never goes under the bar. The credits box, which opens from the bottom corner, moves to the side of a bar that is in its way. A box that opens beside a bar at a side ends above the scale box and the credits button.
-- **Tools that you add** with `rs.tools.add` take the same lines as the built-in tools.
-
-The bar is tested down to a window height of 145 px. At this height, every tool is inside a bar at the left or right edge. A bar along the top and the credits box can overlap at a height of less than 160 px.
-
-## A phone
-
-At 700 px or less, the page turns to its phone form by itself: the bar is at the top and the panel is a bottom sheet. This is true for a narrow desktop window too. There is no `phone` option.
+### A phone { .rs-part }
 
 ![The dashboard on a phone: the bar at the top and the panel as a bottom sheet](../img/dashboard-phone.png){ width="260" }
 
-- **The bar** has the same tools as on a desktop, in **one row**. When the tools do not fit, the row moves sideways under a finger (it has
-  no scrollbar). A soft fade at an edge shows that more tools are there. A box of the bar opens under the row, as a fixed box with
-  the width of the window, so the scrolling row does not clip it.
-- **The fold button** is first in the bar. It hides the bar, and one small button stays. A tap on that button opens the bar again. The page keeps
-  your choice in this browser (`rs-settings:toolbar-folded`).
-- **The sheet** has three heights: closed, 40 % and full. Its grip is a strip of 44 px with an arrow. The arrow goes one height down, and up when the sheet is
-  closed. The grip and its line follow the theme. The sheet uses the height of the visible screen (`dvh`), so the grip of the full sheet stays below the bar and you can lower the sheet.
-- **The first view** fits into the free part of the window: below the bar and above the sheet. On a desktop it fits beside the panel and the
-  bar. A page of your own can ask for these values with `rsFreePad()` and `rs.freeArea()`, and it can set the sheet with `rs.sheet(n)`.
-- **A window** (Street View, Google 3D) is a bottom sheet too. One sheet is open at a time. The bar of a window wraps, and the 3D note has its own row.
-- **A box** of the bar stays inside the screen, also sideways.
+**Use it for:** nothing to do. At 700 px or less the page turns to its phone form by itself: the bar is at the top and the panel is a bottom sheet.<br>
+**From Python:** automatic, there is no `phone` option
+{ .rs-facts }
 
-## The area boundary
+=== "JavaScript"
 
-`boundary=` (GeoJSON or a shapely geometry) is an input of the page: a dashed line shows it. `boundary_dim=True` shades the outside; `boundary_limit=True` keeps the camera near it. The `boundary` option sets the opacity of the shade and the limit ([Dashboard options](../reference/parameters.md#dashboard-options)).
+    ```js
+    rs.sheet(2);              // the sheet: 0 closed, 1 at 40 %, 2 full
+    const f = rs.freeArea();  // the part of the map that the bar and the sheet leave free
+    ```
 
-## Style
+??? info "Details"
 
-The box in the bottom corner (scale, zoom number, credits) has the rounded shape of the bar. A button with a text shows no tooltip box, and a tooltip box never covers its control. On a phone every tool of the one-row bar can be reached: the row scrolls, and the first and the last tool are whole at the ends.
+    - **The bar** is one row. When the tools do not fit, it moves sideways under a finger, with a fade at the edge.
+    - **The fold button**, first in the bar, hides the bar. A small button stays and opens it again. The browser keeps the choice.
+    - **The sheet** has three heights: closed, 40 % and full. Its grip has an arrow that goes one height down.
+    - **The first view** fits between the bar and the sheet. On a desktop it fits beside the panel and the bar.
+    - **A window** (Street View, Google 3D) is a bottom sheet too. One sheet is open at a time.
 
-The accent color and the other tokens are the same in both themes. They are in [Dashboard parts](dashboard-parts.md#the-accent-color-and-the-theme-tokens). The rules for each part: `docs/design/dashboard_templates.md`, 3.4.
+### The area boundary { .rs-part }
+
+**Use it for:** the outline of your area: a dashed line, a shade outside it, and a camera that stays near it.<br>
+**From Python:** yes, `boundary=`, `boundary_dim=`, `boundary_limit=`
+{ .rs-facts }
+
+=== "Python"
+
+    ```python
+    rs.render_dashboard(edges, boundary=area_polygon, boundary_dim=True, boundary_limit=True)
+    ```
+
+??? info "Details"
+
+    - `boundary` is GeoJSON, a shapely geometry or a GeoDataFrame. With no outline of your own, use the outline of the roads: `edges.union_all().convex_hull`.
+    - `boundary_limit=True` keeps the center near the area, and the zoom-out stops 3 levels under the zoom that shows the whole area.
+    - The `boundary` option of `dashboard=` sets the opacity of the shade and the size of the limit ([Dashboard options](../reference/parameters.md#dashboard-options)).

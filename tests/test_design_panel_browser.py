@@ -180,7 +180,7 @@ def test_the_bridges_and_tunnels_tab_writes_the_look_and_the_tunnel_look_is_one_
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser, page, errors = open_page(p, url)
         page.evaluate("dz.open('bridges')")
-        assert page.evaluate("[...document.querySelectorAll('#design-pane h3')].map(h => h.textContent)") == ["Bridges", "Tunnels"]
+        assert page.evaluate("[...document.querySelectorAll('#design-pane .rs-card-title')].map(h => h.textContent)") == ["Bridges", "Tunnels"]
         # a bridge value is in the look: the map is drawn again with it
         _set(page, "bridges.casing", "#112233")
         page.evaluate("dz.flush()")

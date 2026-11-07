@@ -55,7 +55,7 @@ _MAX_SAFE = 2**53       # a larger integer goes into the page as text: JavaScrip
 
 
 def chart_rows(data) -> dict:
-    """The page's own rows of a chart card (``chart.data``, docs/guides/charts.md) as the page reads them: ``{"columns": [{"name", "type"}],
+    """The page's own rows of a chart card (``chart.data``, docs/guides/dashboard-parts.md, "A chart") as the page reads them: ``{"columns": [{"name", "type"}],
     "rows": [[...]]}``, with the SQL type names of the data dock (VARCHAR, DOUBLE, BIGINT, DATE, TIMESTAMP, BOOLEAN). ``data``: a pandas
     DataFrame, a GeoDataFrame (its geometry is left out) or a list of dicts. An integer of 2**53 or more is text, so it stays exact (as the road
     ids); a missing value is ``None``; a date is ``YYYY-MM-DD`` and a time ``YYYY-MM-DD HH:MM:SS``."""
@@ -118,9 +118,9 @@ def _with_chart_rows(dashboard: dict) -> dict:
 def render_dashboard(gdf, *, template="dashboard", **kw):
     """A self-contained **dashboard** page: the styled map (the defaults of a map page), the toolbox (base map, roads, colour and legend,
     settings, the windows) and a side panel that starts empty. The page adds what it needs to the panel: the parts ``query``,
-    ``road_card`` and ``chart``, or its own HTML, with ``dashboard={"panel": {"sections": [...]}}`` (docs/guides/dashboard-panel.md). A chart card
+    ``road_card`` and ``chart``, or its own HTML, with ``dashboard={"panel": {"sections": [...]}}`` (docs/guides/dashboards.md). A chart card
     reads the map's roads, or its own rows: ``"chart": {"kind": "line", "x": "hour", "y": "vehicles", "data": df}`` (a DataFrame or a list of dicts;
-    docs/guides/charts.md).
+    docs/guides/dashboard-parts.md, "A chart").
 
     Populate the *Colour by* list of the toolbox with ``color_options={...}`` (see :func:`render_edges`); any
     other ``render_edges`` keyword passes through. Returns a :class:`WebMap`;

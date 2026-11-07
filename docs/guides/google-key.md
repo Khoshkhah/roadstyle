@@ -1,6 +1,6 @@
-# Set up a Google key
+# Keys and tokens
 
-<p class="lead">Make one Google Maps key for your pages, and let it work only on your own addresses.</p>
+<p class="lead">Make one Google Maps key for your pages and let it work only on your own addresses, and get a Mapillary token. Panoramax needs nothing.</p>
 
 Two roadstyle windows use a Google Maps JavaScript API key:
 
@@ -83,3 +83,12 @@ Open the browser console (F12). Google writes the cause there:
 | `InvalidKeyMapError` | the key is not correct | copy the key again from **Credentials** |
 
 The Google 3D window also shows "Google refused the key on this page" with the address to add.
+
+## The Mapillary token
+
+The Mapillary tab of the [Street View](street-view.md#panoramax-and-mapillary) window needs a free client token. Panoramax needs no key and no token.
+
+Sign in at [mapillary.com/developer](https://www.mapillary.com/developer), register an application, and copy its
+*client token*. Open **Settings → Keys** on the page, paste it in *Mapillary token*, and click **Save**. The token stays in this browser; it
+is not in the page. Without a token the Mapillary tab says so and asks for nothing. A token that you give with `mapillary_token=` or with the variable `MAPILLARY_TOKEN` **is written into the page**, so everyone who opens the page can read it. Use a token that is limited to your site.
+

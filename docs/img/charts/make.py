@@ -1,4 +1,4 @@
-"""Makes the pictures of the guide "Charts" (docs/guides/charts.md): one chart card of each kind, and the panel of the first example, from a dashboard
+"""Makes the pictures of the part "A chart" (docs/guides/dashboard-parts.md): one chart card of each kind, and the panel of the first example, from a dashboard
 of Monaco in Playwright, in the light theme. Run it again after a change of the chart's look:
 
     PROJ_DATA=<the proj folder of the env> python docs/img/charts/make.py

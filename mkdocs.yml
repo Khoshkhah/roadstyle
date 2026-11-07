@@ -48,35 +48,33 @@ extra_javascript:
 nav:
   - Home: index.md
   - Get started: get-started.md
-  - Guides:
-      - guides/index.md
+  - Maps:
       - Style the roads: guides/style.md
       - Colour by your data: guides/colour.md
       - Which road is on top: guides/levels.md
-      - Roads from OpenStreetMap: guides/osmnx.md
       - Add your own layers: guides/overlays.md
-      - Street View: guides/street-view.md
-      - Google 3D: guides/google-3d.md
-      - Set up a Google key: guides/google-key.md
+      - Roads from OpenStreetMap: guides/osmnx.md
       - Big networks: guides/big-networks.md
-      - Dashboards & JavaScript: guides/dashboards.md
-      - Dashboard manual:
-          - guides/dashboard-manual/index.md
-          - Python SDK: guides/dashboard-manual/python.md
-          - JavaScript: guides/dashboard-manual/javascript.md
-      - Dashboard layout: guides/dashboard-layout.md
-      - Add to the panel: guides/dashboard-panel.md
+      - "Studio: maps with no code": studio.md
+  - Street View and 3D:
+      - "Street View: Google, Panoramax, Mapillary": guides/street-view.md
+      - Google 3D: guides/google-3d.md
+      - Keys and tokens: guides/google-key.md
+  - Dashboards:
+      - Dashboards: guides/dashboards.md
+      - Layout and toolbox: guides/dashboard-layout.md
       - Dashboard parts: guides/dashboard-parts.md
-      - Edit the design of a map: guides/design-panel.md
-      - The data dock: guides/data-dock.md
-      - Charts: guides/charts.md
-      - Ask: guides/ask.md
-      - "Live data: a new day": guides/live-data.md
-      - Move a dashboard to the new version: guides/migrating-dashboard.md
+      - JavaScript: guides/dashboard-manual/javascript.md
+      - Editors and tools:
+          - Edit the design of a map: guides/design-panel.md
+          - The data dock: guides/data-dock.md
+          - Ask: guides/ask.md
+  - Share:
       - Put it on a website: guides/website.md
       - AI agents: guides/agents.md
-  - Gallery: gallery.md
-  - Live map: maps/live.html
+  - Gallery:
+      - gallery.md
+      - Live map: maps/live.html
   - Reference:
       - Every parameter: reference/parameters.md
       - JavaScript API: reference/javascript.md
@@ -84,6 +82,8 @@ nav:
       - Inputs and outputs: reference/formats.md
       - Settings & palettes: reference/settings.md
       - Command line: reference/cli.md
+      - What is new: whats-new.md
+      - Move a dashboard to the new version: guides/migrating-dashboard.md
   - Rust engine:
       - rust/index.md
       - "Tutorial: your first map": rust/first-map.md
@@ -95,7 +95,6 @@ nav:
           - Architecture of the Rust version: rust/architecture.md
           - How a map is drawn: rust/drawing.md
           - How the levels are solved: rust/levels-solver.md
-  - Studio: studio.md
 
 # Old pages; keep their URLs working.
 # the design notes, the audits, the proposals and the build of the code stay in the repository, not on the site
@@ -121,6 +120,11 @@ plugins:
         palettes.md: reference/settings.md
         street-view.md: guides/street-view.md
         rust/crates.md: rust/architecture.md
+        guides/dashboard-panel.md: guides/dashboards.md
+        guides/dashboard-manual/index.md: guides/dashboards.md
+        guides/dashboard-manual/python.md: guides/dashboards.md
+        guides/live-data.md: guides/dashboard-manual/javascript.md
+        guides/charts.md: guides/dashboard-parts.md
 
 # docs/rust/architecture.md: its tables of crates, modules and design gaps, made from the code at each build
 hooks:

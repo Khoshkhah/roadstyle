@@ -1,4 +1,4 @@
-// The part "chart" (docs/guides/charts.md): a chart in a card of the panel, with no JavaScript of the page. A page adds it with `{id, part: "chart",
+// The part "chart" (docs/guides/dashboard-parts.md, "A chart"): a chart in a card of the panel, with no JavaScript of the page. A page adds it with `{id, part: "chart",
 // chart: {kind, x, y, agg, scale, data, title, height, follow}}`. With no `data`, the rows are the map's own road table (x and y are road columns);
 // with `data`, they are the page's own rows ({columns, rows}, or a list of objects). A bar, a line or a pie joins the rows of each value of x with
 // `agg` (with no y: the count of rows); a number x with more than 40 values goes in ranges, as in the data dock (rs.chart.ranges). rs.chart draws it.

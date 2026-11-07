@@ -93,20 +93,21 @@ html = rs.render_street_view(g, name="Roads and Street View", layout="below").ht
 # the testbed of the dashboard manual: every `javascript` block of docs/guides/dashboard-manual/javascript.md runs on it.
 # tests/test_dashboard_manual.py runs the same blocks on a small page with the same keywords. The blank base map needs no key.
 rs.render_dashboard(
-    g, basemap="blank", live_data=True, name="Testbed",
+    g, basemap="blank", live_data=True, name="Testbed", boundary=g.union_all().convex_hull, boundary_limit=True,
     color_options={"Road class": {}, "Speed limit": {"color_by": "maxspeed_kmh", "cmap": "plasma", "vmin": 20, "vmax": 60}},
     views={"Normal": {"road_fill": True}, "Casing only": {"road_fill": False}},
 ).save(OUT / "dashboard_testbed.html")
 
-# the maps of docs/guides/dashboard-manual/python.md: every python block that saves a page makes the map under it.
+# the maps of docs/guides/dashboards.md: every python block that saves a page makes the map under it.
 # The blocks run one after another in one namespace (the first one imports roadstyle), with the sample's edges, in docs/maps.
 import os
 import re
-manual = (REPO / "docs" / "guides" / "dashboard-manual" / "python.md").read_text(encoding="utf-8")
+import textwrap
+manual = (REPO / "docs" / "guides" / "dashboards.md").read_text(encoding="utf-8")
 env = {"edges": g}
 os.chdir(OUT)
 for block in re.findall(r"```python\n(.*?)```", manual, re.S):
-    exec(block, env)
+    exec(textwrap.dedent(block), env)      # a block in a content tab is indented
 os.chdir(REPO)
 
 # the live map (README and the docs home link to it): the dashboard (panel and toolbox) on the sample's own columns,

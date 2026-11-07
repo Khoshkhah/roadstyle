@@ -44,7 +44,7 @@ pub enum PanelLook {
     Frame,
 }
 
-/// A part that roadstyle writes into a section of the panel (docs/guides/dashboard-panel.md). The panel has no part of its own: a page adds them.
+/// A part that roadstyle writes into a section of the panel (docs/guides/dashboards.md). The panel has no part of its own: a page adds them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Part {
@@ -52,7 +52,7 @@ pub enum Part {
     Query,
     /// the selected road's fields, on `rs:select`
     RoadCard,
-    /// a chart of the map's roads or of the page's own rows (`chart`; docs/guides/charts.md)
+    /// a chart of the map's roads or of the page's own rows (`chart`; docs/guides/dashboard-parts.md, "A chart")
     Chart,
 }
 
@@ -110,7 +110,7 @@ pub struct ChartData {
     pub rows: Vec<Vec<Value>>,
 }
 
-/// The options of a chart card (`part: "chart"`; docs/guides/charts.md). With no `data`, the chart reads the map's own road table.
+/// The options of a chart card (`part: "chart"`; docs/guides/dashboard-parts.md, "A chart"). With no `data`, the chart reads the map's own road table.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ChartSpec {
@@ -179,6 +179,41 @@ impl ChartSpec {
     }
 }
 
+/// The words of a help window (`rs.help`): a title, a short introduction, terms with their meaning and a note. They are HTML of the page's own.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Help {
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intro: Option<String>,
+    /// [term, meaning] pairs
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub terms: Vec<(String, String)>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// One tab of a section with tabs: its id, the words on the tab and the HTML of its pane.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Tab {
+    pub id: String,
+    pub label: String,
+    pub html: String,
+}
+
+/// One number tile (`rs.kpi`): a small title, a big value (a text or a number), a line under it and the colour of the value. The words are HTML.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Kpi {
+    pub title: String,
+    pub value: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
 /// A section that the page adds to the panel: the page's own HTML (`html`) or a part of roadstyle (`part`), at the end of the panel or beside an
 /// earlier section. A section with a `label` is a card (the label is its title row), with or without a background, that folds or not. The HTML is
 /// the page's own: it is written into the page as it is.
@@ -199,6 +234,15 @@ pub struct Section {
     /// the chart's options (`part: "chart"`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chart: Option<ChartSpec>,
+    /// tabs in place of `html`: each tab shows its own pane (`rs-tabs`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tabs: Option<Vec<Tab>>,
+    /// number tiles in place of `html` (`rs-kpis`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kpis: Option<Vec<Kpi>>,
+    /// a "?" in the card's title row that opens the help window with these words (needs a `label`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub help: Option<Help>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     /// the id of an earlier section: this one goes after it
@@ -232,6 +276,9 @@ pub struct Panel {
     pub look: PanelLook,
     #[serde(default)]
     pub sections: Vec<Section>,
+    /// the "?" in the panel's title: the words of the page's help window ("How to read this page")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub help: Option<Help>,
 }
 
 /// The mark of a legend row: what the page draws in this colour (a road is a line, a sensor a circle).
@@ -546,7 +593,7 @@ impl Template {
     /// The defaults of the template with a layout (`Map` has no panel, so the layout does not change it).
     pub fn dashboard(self, layout: Layout) -> Dashboard {
         // the panel at the left and empty: the page adds its parts (decided 2026-11-02)
-        let panel0 = Some(Panel { side: Edge::Left, width_px: 400, look: PanelLook::Frame, sections: Vec::new() });
+        let panel0 = Some(Panel { side: Edge::Left, width_px: 400, look: PanelLook::Frame, sections: Vec::new(), help: None });
         let free = WindowRules { clamp: false, recenter_map: true, restore_open: true, remember: true };
         let phone = Phone { max_width_px: 700, toolbar: Edge::Top };
         let (layout, panel, toolbar, windows) = match (self, layout) {
@@ -637,7 +684,7 @@ pub fn merge(base: &Dashboard, over: &Value) -> Result<Dashboard, crate::Error> 
     }
     if o.get("panel").and_then(Value::as_object).is_some_and(|p| p.contains_key("hide")) {
         return Err(crate::error::options("dashboard=: panel.hide is gone: the panel is empty now (roadstyle 0.27.0), so there is nothing to hide. \
-            Add what the page needs with panel.sections, for example {\"id\": \"q\", \"part\": \"query\"} (docs/guides/dashboard-panel.md)"));
+            Add what the page needs with panel.sections, for example {\"id\": \"q\", \"part\": \"query\"} (docs/guides/dashboards.md)"));
     }
     let mut v = serde_json::to_value(base).expect("a Dashboard is JSON");
     deep(&mut v, over);
@@ -653,12 +700,31 @@ impl Dashboard {
         let Some(p) = &self.panel else { return Ok(()) };
         let mut known: Vec<&str> = Vec::new();
         let bad = |m: String| Err(crate::error::options(format!("dashboard=: panel.{m}")));
+        if p.help.as_ref().is_some_and(|h| h.title.is_empty()) {
+            return bad("help needs a `title`".into());
+        }
         for s in &p.sections {
             if s.id.is_empty() || known.contains(&s.id.as_str()) {
                 return bad(format!("sections: the id '{}' is empty or used twice", s.id));
             }
-            if s.html.is_some() == s.part.is_some() {
-                return bad(format!("sections: '{}' needs `html` (the page's own) or `part` (\"query\", \"road_card\" or \"chart\"), and not both", s.id));
+            if [s.html.is_some(), s.part.is_some(), s.tabs.is_some(), s.kpis.is_some()].iter().filter(|x| **x).count() != 1 {
+                return bad(format!("sections: '{}' needs one of `html` (the page's own), `part` (\"query\", \"road_card\" or \"chart\"), `tabs` and `kpis`, and not two", s.id));
+            }
+            if let Some(t) = &s.tabs {
+                if t.is_empty() || t.iter().enumerate().any(|(i, a)| a.id.is_empty() || t[..i].iter().any(|b| b.id == a.id)) {
+                    return bad(format!("sections: '{}' has `tabs` that are empty, or a tab id that is empty or used twice", s.id));
+                }
+            }
+            if let Some(k) = &s.kpis {
+                if k.is_empty() || k.iter().any(|x| !(x.value.is_string() || x.value.is_number())) {
+                    return bad(format!("sections: '{}' has `kpis` that are empty, or a `value` that is not a text or a number", s.id));
+                }
+            }
+            if s.help.is_some() && s.label.is_none() {
+                return bad(format!("sections: '{}' has `help` and no `label`: the \"?\" goes in the card's title row", s.id));
+            }
+            if s.help.as_ref().is_some_and(|h| h.title.is_empty()) {
+                return bad(format!("sections: '{}': `help` needs a `title`", s.id));
             }
             if s.text.is_some() && s.part != Some(Part::Query) {
                 return bad(format!("sections: '{}' has `text`, which only the part \"query\" has", s.id));
@@ -781,7 +847,7 @@ mod tests {
         assert!(Template::Dashboard.dashboard(Dock).first_paint().contains(r#"c.add("rs-tpl-dashboard","rs-dock","rs-panel-left","rs-hide-scale")"#));
         // the width of the panel, and a side and a look that are not the default
         let mut wide = Template::Dashboard.dashboard(Overlay);
-        wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card, sections: Vec::new() });
+        wide.panel = Some(Panel { side: Edge::Left, width_px: 420, look: PanelLook::Card, sections: Vec::new(), help: None });
         let w = wide.first_paint();
         assert!(w.contains(r#""rs-panel-left","rs-panel-card""#) && w.contains(r#"setProperty("--rs-panel-w","420px")"#), "{w}");
     }
@@ -853,7 +919,12 @@ mod tests {
         for (bad, said) in [(serde_json::json!([{"id": "a", "html": "", "after": "legend"}]), "not an earlier section"),
                             (serde_json::json!([{"id": "a", "html": ""}, {"id": "b", "html": "", "after": "a", "before": "a"}]), "use one"),
                             (serde_json::json!([{"id": "a", "html": ""}, {"id": "a", "html": ""}]), "used twice"),
-                            (serde_json::json!([{"id": "a"}]), "needs `html`"), (serde_json::json!([{"id": "a", "html": "", "part": "query"}]), "not both"),
+                            (serde_json::json!([{"id": "a"}]), "needs one of `html`"), (serde_json::json!([{"id": "a", "html": "", "part": "query"}]), "not two"),
+                            (serde_json::json!([{"id": "a", "tabs": []}]), "tabs"), (serde_json::json!([{"id": "a", "html": "", "tabs": [{"id": "t", "label": "T", "html": ""}]}]), "not two"),
+                            (serde_json::json!([{"id": "a", "tabs": [{"id": "t", "label": "T", "html": ""}, {"id": "t", "label": "U", "html": ""}]}]), "used twice"),
+                            (serde_json::json!([{"id": "a", "kpis": [{"title": "n", "value": [1]}]}]), "not a text or a number"),
+                            (serde_json::json!([{"id": "a", "html": "", "help": {"title": "h"}}]), "no `label`"),
+                            (serde_json::json!([{"id": "a", "label": "A", "html": "", "help": {"title": ""}}]), "needs a `title`"),
                             (serde_json::json!([{"id": "a", "part": "graph"}]), "unknown variant"),
                             (serde_json::json!([{"id": "a", "part": "road_card", "text": "x"}]), "only the part \"query\""),
                             (serde_json::json!([{"id": "a", "part": "query", "fields": ["x"]}]), "only the part \"road_card\""),
@@ -865,6 +936,19 @@ mod tests {
         assert!(e.contains("phone is not an option") && e.contains("700 px"), "{e}");
         let e = merge(&base, &serde_json::json!({"panel": {"hide": ["query"]}})).unwrap_err().to_string();
         assert!(e.contains("panel.hide is gone") && e.contains("part"), "{e}");
+    }
+
+    #[test]
+    fn help_tabs_and_tiles_come_from_python() {
+        let base = Template::Dashboard.dashboard(Overlay);
+        let ok = merge(&base, &serde_json::json!({"panel": {"help": {"title": "How to read this page", "terms": [["Flow", "cars an hour"]]}, "sections": [
+            {"id": "t", "label": "Streets", "help": {"title": "About"}, "tabs": [{"id": "a", "label": "Overview", "html": "<p>a</p>"}, {"id": "b", "label": "Hours", "html": ""}]},
+            {"id": "k", "kpis": [{"title": "Inside", "value": "80.4%", "sub": "promised 80 %", "color": "#15803d"}, {"title": "Hours", "value": 1412}]}]}})).unwrap();
+        let p = ok.panel.unwrap();
+        assert_eq!(p.help.unwrap().terms, vec![("Flow".to_string(), "cars an hour".to_string())]);
+        assert_eq!((p.sections[0].tabs.as_ref().unwrap().len(), p.sections[1].kpis.as_ref().unwrap()[1].value.clone()), (2, serde_json::json!(1412)));
+        let e = merge(&base, &serde_json::json!({"panel": {"help": {"title": ""}}})).unwrap_err().to_string();
+        assert!(e.contains("help needs a `title`"), "{e}");
     }
 
     #[test]

@@ -109,7 +109,7 @@ rs.render_dashboard(edges, basemap="ofm_positron", color_options={"Class": {}, "
 
 </div>
 
-More in [Dashboards & JavaScript](guides/dashboards.md).
+More in [Dashboards](guides/dashboards.md).
 
 ## Mono palette
 

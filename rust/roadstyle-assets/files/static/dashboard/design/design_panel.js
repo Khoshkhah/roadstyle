@@ -33,7 +33,7 @@ const shown = (v, unit) => (unit === "%" ? `${Math.round(v * 100)}%` : `${+(+v).
 const range = (label, p, v, min, max, step, unit = "") => `<label class="drow2 rng"><span>${label}</span><input type="range" data-unit="${unit}" data-p="${p}" min="${min}" max="${max}" step="${step}" value="${v}"><output>${shown(v, unit)}</output></label>`;
 const number = (label, p, v, min, max, step = 1, extra = "") => `<label class="drow2"><span>${label}</span><input type="number" data-p="${p}" min="${min}" max="${max}" step="${step}" value="${v}" ${extra}></label>`;
 const check = (label, p, v, note2 = "", extra = "") => `<label class="optrow"><input type="checkbox" data-p="${p}" ${v ? "checked" : ""} ${extra}><span class="t"><b>${label}</b>${note2 ? `<small>${note2}</small>` : ""}</span></label>`;
-const sec = (title, body, why = "") => `<section class="fsec"><h3>${title}</h3>${why ? `<p class="why">${why}</p>` : ""}${body}</section>`;
+const sec = (title, body, why = "") => `<section class="rs-sec-box"><div class="rs-card-title">${title}</div>${why ? `<p class="why">${why}</p>` : ""}${body}</section>`;   // the dashboard's card
 export const controls = { color, range, number, check, sec, esc };
 
 export async function designPanel({ panel, dashboard = window.rs, map = window.map, look, setLook = null, redraw, restyle = {}, backLabel = "Steps", storageKey = "roadstyle",
@@ -67,7 +67,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   title.insertAdjacentHTML("beforeend", '<span class="dname" id="design-name"></span>');
   body.classList.add("rs-dz-body"); bar.classList.add("rs-dz-bar");
   body.innerHTML = '<div id="design-pane"></div>';
-  bar.innerHTML = `<div class="line"><b id="design-changes">Style: default</b>${link ? `<button type="button" class="link" id="design-link">${esc(link.label)}</button>` : ""}</div><p class="st" id="design-state" role="status" aria-live="polite"></p><p class="st" id="design-notice" role="status"></p>`;
+  bar.innerHTML = `<div class="line"><b id="design-changes">Style: default</b>${link ? `<button type="button" class="rs-link" id="design-link">${esc(link.label)}</button>` : ""}</div><p class="st" id="design-state" role="status" aria-live="polite"></p><p class="st" id="design-notice" role="status"></p>`;
   const $ = (id) => root.querySelector("#" + id) ?? title.querySelector("#" + id);
   const pane = $("design-pane");
 
