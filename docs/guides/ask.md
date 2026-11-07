@@ -75,9 +75,10 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `examples` | the general groups | Questions that the start shows as buttons, one row each. A click on a question asks it. With no `examples`, Ask shows its **general groups** (Know the data, Find and count, Show on the map, Colour and focus, The map and the layers, Charts): they hold no name of a table or a column, so they fit any data, and the agent looks the names up. Your own `examples` come after them. An item is a string or a group `{title, items: [...]}`: a group is a small heading above its questions. Strings and groups can mix; strings before the first group have no heading. Both lists show the groups: the start list and **Examples ▴**. `examples: {general: false, groups: [...]}` shows only yours (`groups: []` shows none). |
     | `panel` | `#sb` | The host's dashboard panel. Ask uses roadstyle's [editor frame](dashboard-parts.md#an-editor-in-the-panel) in it. |
     | `backLabel` | `"Back"` | The text of the back button. |
+    | `tab` | none | Ask as a tab. Give the name of the first tab, for example `"Map"`. A tab row `[Map | Ask]` shows under the panel's title. **Map** shows the host's cards, **Ask** shows the conversation. There is no Back button and no Ask card: the page does not call `rs.sections.add` for Ask. |
     | `maxSteps` | `6` | The most model calls for one question. |
     | `sendRows` | `30` | The most rows of one result that go to the model. |
-    | `providers` | the five free services | The list of services. A test gives a fake provider here (see [Tests](#tests)). |
+    | `providers` | the four free services | The list of services. A test gives a fake provider here (see [Tests](#tests)). |
     | `tools` | `[]` | The page's own tools, in the form of the built-in ones (see [The host's own tools](#the-hosts-own-tools)). A name that is in use is refused. |
 
     The schema of the data dock (`schema()`) gives the prompt its tables. Give `main: true` and `columns: [{name, type, about}]` on the table that the map draws. The prompt has one line for each schema with the table names and their rows, the columns of the main table, and each table of the schema `extra` with its `about`. A prompt of this form stays small (about 4 000 characters), because a free service allows only some thousand tokens a minute.
@@ -117,6 +118,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
     - **The tool row** under the title does not scroll: the service and its model, "?", **Key** and **New**.
     - **One card for each question.** The question is the bold title. The answer is plain text: bold and `code` show as bold and code, and a list shows at most 3 items with "… 2 more in the table". The view shows no HTML, no images and no links from the model, and it removes long ids from the text.
+    - **Who answered:** a small line under the answer names the service and the model, for example "Groq · openai/gpt-oss-120b". With Auto, it also names the services or models that could not answer and why, for example "(after Google Gemini · gemini-3.8-flash: HTTP 429)".
     - **The footer** counts the query that made the table, "1 query · 625 rows", and opens to its SQL. The other queries of the agent and the failed queries that it fixed are inside it. **Show** puts the card's table back into the dock.
     - **The answer's table** is the query with roads (the id column, or a key column of the data dock) that has the most rows, not the last query. When a map tool ran, its roads are the table.
     - **A map change** is one line on the card, for example "MAP Focus on 625 roads (the others hidden)". A colour or a focus is a layer in **Colour ▾** or **Focus ▾** of the data dock. A new question, ✕ of a card and **New** do not remove a layer.
@@ -126,25 +128,28 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
 ### The services and the keys { .rs-part }
 
-**Use it for:** a free key of one of five services. The key stays only in the person's browser.<br>
+**Use it for:** a free key of one of four services. The key stays only in the person's browser.<br>
 **From Python:** no
 { .rs-facts }
 
 ??? info "Details"
 
-    Ask offers only services with a free key. The table is as the services said on 2026-11-05. A service can change its free tier.
+    Ask offers only services with a free key. The table is as the services said on 2026-11-05 (Z.ai on 2026-11-07). A service can change its free tier.
 
     | Service | Address | Free key from |
     |---|---|---|
     | Google Gemini (the default) | `https://generativelanguage.googleapis.com/v1beta/openai` | <https://aistudio.google.com/apikey> |
     | Groq | `https://api.groq.com/openai/v1` | <https://console.groq.com/keys> |
-    | Cerebras | `https://api.cerebras.ai/v1` | <https://cloud.cerebras.ai> |
-    | Mistral | `https://api.mistral.ai/v1` | <https://console.mistral.ai/api-keys> |
     | OpenRouter (only its `:free` models) | `https://openrouter.ai/api/v1` | <https://openrouter.ai/keys> |
+    | Z.ai (only `glm-4.5-flash`) | `https://api.z.ai/api/paas/v4` | <https://z.ai/manage-apikey/apikey-list> |
 
-    All five use one request: `POST {address}/chat/completions` with the key in the header `Authorization: Bearer <key>`. Each one accepts a request from a browser page.
+    Cerebras and Mistral are not in the list: on 2026-11-07, Cerebras gave only a trial credit with a card, and Mistral gave no free key. Z.ai's model list names only its paid models, so Ask uses only the free model `glm-4.5-flash` there. It answers slowly, in about 25 to 40 s for each question.
 
-    **Key** opens the key form in place of the conversation: the service, the model and the key. **Save** asks the service for its models (`GET {address}/models`) and says "The key works" or the service's own error. When the typed model is not in the list, Ask picks a model with tool support from it. When the service refuses the model during a question (HTTP 404, or HTTP 400 that names the model), Ask picks another model once and sends the request again. On HTTP 429 (the free limit) Ask waits as long as the service says, at most 60 s and at most 2 times, with a count down on the card. A server error (HTTP 500, 502, 503 or 504, for example Gemini's 503 "The model is overloaded") is a service that is busy for a short time: Ask waits 5 s, then 10 s, and sends the request again. When the service is still busy, the red line says "<service> is busy now" with the service's own words, and tells the person to try again in a minute or to choose another service under **Key**.
+    All four use one request: `POST {address}/chat/completions` with the key in the header `Authorization: Bearer <key>`. Each one accepts a request from a browser page.
+
+    **Auto.** The first entry of **Provider** is **Auto**: Ask asks each service that has a key, in the order of the table. The first entry of **Model** is **Auto**: Ask asks the best models of the key (at most 3), in the order of its automatic pick. When a service or a model cannot answer (a free limit, no balance, a busy service, a refused model or key), Ask asks the next one at once and does not wait. The one that answered stays for the next steps of the question. When none can answer, the red line names each try. With **Provider** on Auto, the form shows the order and the model of each service; choose a service to change its key or its model.
+
+    **Key** opens the key form in place of the conversation: the service, the model and the key. **Model** is a select box of the models that the key can use: with a saved key, Ask asks the service for its models (`GET {address}/models`) when the form opens. The box does not list models that do not chat (speech, images, embeddings). A pick takes effect at once, with no **Save**. **Save** keeps a new key, asks the service for its models and says "The key works" or the service's own error. When the selected model is not in the list, Ask picks a model with tool support from it. When the service refuses the model during a question (HTTP 404, or HTTP 400 that names the model), Ask picks another model once and sends the request again. On HTTP 429 (the free limit) Ask waits as long as the service says, at most 60 s and at most 2 times, with a count down on the card. An HTTP 429 that says "insufficient balance" or "insufficient quota" is an account with no money, not a limit: Ask shows the error at once and does not wait. A server error (HTTP 500, 502, 503 or 504, for example Gemini's 503 "The model is overloaded") is a service that is busy for a short time: Ask waits 5 s, then 10 s, and sends the request again. When the service is still busy, the red line says "<service> is busy now" with the service's own words, and tells the person to try again in a minute or to choose another service under **Key**.
 
     - The key stays only in this browser: `localStorage` `rs-key:ask:<service>`, one key for each service. The service and the model are in `rs-settings:ask`. The key is never in the page file, never in a URL and never in the conversation.
     - Other pages on the same address (for example the same github.io site) can read the key. Use a key with a spending limit. **Clear** removes it.
