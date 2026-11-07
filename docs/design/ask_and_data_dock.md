@@ -923,7 +923,7 @@ itself after 1.6 s.
 | Field | localStorage key | What it is |
 |---|---|---|
 | Provider | `rs-settings:ask` → `provider` | A list of the four free services of `providers.json` (Gemini first), with the link "Get a free key from ..." under it |
-| Model | `rs-settings:ask` → `model.<provider>` | A text box with the models of the provider as its list ([The providers](#the-providers)) |
+| Model | `rs-settings:ask` → `model.<provider>` | A select box of the key's chat models (`chatModels`), loaded when the form opens with a saved key; a pick takes effect at once ([The providers](#the-providers)) |
 | Key | `rs-key:ask:<provider>` | One key for each provider, because a key works only with its own service: the person can keep keys of two services and switch. Save, Clear. Save asks the provider for its models (`GET {address}/models`) and says "The key works" or the provider's own error |
 
 - A key stays only in this browser (localStorage). It is never in the page file, never in a URL and never in the conversation. It goes only

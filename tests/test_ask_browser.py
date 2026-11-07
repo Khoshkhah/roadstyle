@@ -289,6 +289,38 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
 
 
 
+def test_the_model_box_lists_the_keys_models_and_a_pick_takes_effect_at_once(tmp_path):
+    """The Model row is a select box. With a saved key it lists the key's chat models when the form opens (no speech model); a pick is the model
+    of the next request, with no Save."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        chats = []
+
+        def groq(route):
+            if route.request.url.endswith("/models"):
+                return route.fulfill(status=200, content_type="application/json",
+                                     body='{"data": [{"id": "openai/gpt-oss-120b"}, {"id": "llama-3.3-70b-versatile"}, {"id": "whisper-large-v3"}]}')
+            chats.append(route.request.post_data_json)
+            route.fulfill(status=200, content_type="application/json", body='{"choices": [{"message": {"role": "assistant", "content": "Six roads."}}]}')
+        try:
+            page.route("https://api.groq.com/**", groq)
+            page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:groq', 'test-key-123');
+                             localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'groq'})); makeReal(); ask.open()""")
+            page.click(".rs-ask-keyb")
+            opts = "[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)"
+            page.wait_for_function(opts + ".length === 2")
+            assert page.evaluate(opts) == ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"]
+            page.locator(".rs-ask-krow").nth(1).locator(".rs-sel-btn").click()
+            page.locator(".rs-sel-list").get_by_text("llama-3.3-70b-versatile").click()
+            assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.groq") == "llama-3.3-70b-versatile"
+            assert "llama-3.3-70b-versatile" in page.inner_text(".rs-ask-who")
+            page.click(".rs-ask-keyhd button")
+            assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads." and chats[-1]["model"] == "llama-3.3-70b-versatile"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 _NO_MONEY = '{"error": {"code": "1113", "message": "Insufficient balance or no resource package. Please recharge."}}'
 
 
@@ -313,10 +345,11 @@ def test_zai_uses_its_free_model_and_no_balance_is_not_a_wait(tmp_path):
             page.evaluate("""releaseLoad(); localStorage.setItem('rs-key:ask:zai', 'test-key-123');
                              localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'zai'})); makeReal(); ask.open()""")
             page.click(".rs-ask-keyb")
-            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow select option')].map(o => o.value)") == ["gemini", "groq", "openrouter", "zai"]
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)") == ["gemini", "groq", "openrouter", "zai"]
             page.click(".rs-ask-btns .sb-primary")
             page.wait_for_function("document.querySelector('.rs-ask-keynote').textContent.startsWith('Saved.')")
             assert "Ask uses glm-4.5-flash" in page.inner_text(".rs-ask-keynote")
+            assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)") == ["glm-4.5-flash"]
             assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.zai") == "glm-4.5-flash"
             t0 = page.evaluate("performance.now()")
             assert page.evaluate("ask.ask('How many?')") is None

@@ -5,6 +5,7 @@
 //   PROVIDERS: [{id, name, base, model, keys, onlyFree, free}]
 //   chat(p, {key, model, messages, tools, toolChoice, signal}) -> the assistant message {content, tool_calls}; an error has `status` and `wait` (seconds)
 //   models(p, key, signal) -> the model names of the key;  pickModel(names) -> a model with tool support
+//   chatModels(names) -> the names without the models that do not chat (the list of the Model box)
 export const PROVIDERS = [
   {id: "gemini", name: "Google Gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.5-flash", keys: "https://aistudio.google.com/apikey"},
   {id: "groq", name: "Groq", base: "https://api.groq.com/openai/v1", model: "openai/gpt-oss-120b", keys: "https://console.groq.com/keys"},
@@ -18,7 +19,11 @@ export const PROVIDERS = [
 // embeddings or safety
 const PREFER = [/gpt-oss-120b/, /kimi-k2/, /llama-4-maverick/, /qwen3/, /gpt-oss-20b/, /llama-4-scout/,
                 /^gemini-[\d.]+-flash$/, /^gemini-[\d.]+-pro$/, /llama-3\.3-70b/];
-const SKIP = /whisper|guard|tts|embed|image|audio|compound|allam|playai|aqa|imagen|veo|learnlm|gemma|lite|preview|exp/i;
+// NOT_CHAT: models that do not chat (speech, images, embeddings, safety); the Model box does not list them. SKIP: also the models that the
+// automatic pick does not take (small, preview or test models), which a person can still pick in the box
+const NOT_CHAT = /whisper|guard|tts|embed|image|audio|playai|aqa|imagen|veo|moderation/i;
+const SKIP = new RegExp(NOT_CHAT.source + "|compound|allam|learnlm|gemma|lite|preview|exp", "i");
+export const chatModels = (ids) => ids.filter((i) => !NOT_CHAT.test(i));
 export function pickModel(ids){
   for(const re of PREFER){ const m = ids.filter((i) => re.test(i) && !SKIP.test(i)).sort().reverse()[0]; if(m) return m; }
   return ids.find((i) => !SKIP.test(i)) || ids[0];

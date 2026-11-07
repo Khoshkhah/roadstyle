@@ -8,7 +8,7 @@
 //     clear, remove, history}
 //   events: "answer" {question, text, sql, rows}, "error" {question, message}, "back"
 import {editorFrame} from "../frame.js";
-import {PROVIDERS, BUSY, chat, models, pickModel} from "./providers.js";
+import {PROVIDERS, BUSY, chat, models, pickModel, chatModels} from "./providers.js";
 import {inner} from "../data/guard.js";
 
 const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
@@ -202,7 +202,16 @@ export function askPanel(o = {}){
   function drawKey(){
     const p = prov();
     const sel = $("select"); for(const x of PROVS){ const op = $("option", "", x.name); op.value = x.id; op.selected = x.id === p.id; sel.append(op); }
-    const model = $("input", "rs-q"), list = $("datalist"); list.id = "rs-ask-models"; model.value = p.model; model.setAttribute("list", list.id); model.spellcheck = false;
+    // the model: a select box of the models that the key can use. Before the key's list comes (and with no key) it has only the current model.
+    // A pick takes effect at once, with no Save.
+    const model = $("select");
+    const fill = (ids) => {
+      const cur = prov().model, all = ids.includes(cur) ? ids : [cur, ...ids];
+      model.replaceChildren(...all.map((i) => Object.assign($("option", "", i), {value: i})));
+      model.value = cur;
+    };
+    fill([]);
+    model.onchange = () => setModel(model.value);
     const key = $("input", "rs-q"); key.type = "password"; key.autocomplete = "off"; key.placeholder = keyOf(p) ? "(a key is saved in this browser)" : "Paste your key";
     const save = $("button", "sb-primary", "Save"), clear = $("button", "", "Clear"), note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
     save.type = clear.type = "button"; btns.append(clear, save);
@@ -212,7 +221,9 @@ export function askPanel(o = {}){
     const row = (l, el) => { const r = $("label", "rs-ask-krow"); r.append($("span", "", l), el); return r; };
     const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "‹ Back to chat"); back.type = "button"; back.onclick = () => showKey(false);
     hd.append($("b", "", "Your key"), back);
-    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), list, row("Key", key), btns, note);
+    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), row("Key", key), btns, note);
+    if(keyOf(p)) modelsOf(p).then((ids) => { if(model.isConnected && prov().id === p.id) fill(chatModels(ids)); })
+      .catch((e) => { if(model.isConnected) note.textContent = "The saved key did not work: " + sentence(e.message); });
     sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(); paintWho(); };
     clear.onclick = () => { lsPut("rs-key:ask:" + prov().id, null); drawKey(); paintWho(); };
     save.onclick = async () => {
@@ -220,10 +231,10 @@ export function askPanel(o = {}){
       if(key.value.trim()) lsPut("rs-key:ask:" + sel.value, key.value.trim());
       key.value = ""; paintWho(); note.textContent = "Checking the key…";
       try{
-        const ids = await modelsOf(prov()), typed = model.value.trim(), m = ids.includes(typed) ? typed : pickModel(ids);
-        list.replaceChildren(...ids.map((i) => Object.assign($("option"), {value: i})));
-        if(m){ setModel(m); model.value = m; }
-        note.textContent = `Saved. The key works: ${plural(ids.length, "model", "models")}. Ask uses ${m}${typed && typed !== m ? ` (not "${typed}": the key cannot use it)` : ""}.`;
+        const ids = chatModels(await modelsOf(prov())), was = model.value, m = ids.includes(was) ? was : pickModel(ids);
+        if(m) setModel(m);
+        fill(ids);
+        note.textContent = `Saved. The key works: ${plural(ids.length, "model", "models")}. Ask uses ${m}${was !== m ? ` (not "${was}": the key cannot use it)` : ""}.`;
         setTimeout(() => { if(!keyBox.hidden) showKey(false); }, 1600);                              // back to the chat by itself
       }catch(e){ note.textContent = "Saved, but the key did not work: " + sentence(e.message); }
     };
