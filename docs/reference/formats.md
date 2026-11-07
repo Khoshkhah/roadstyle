@@ -17,7 +17,7 @@ How the parts work together: [How a map is drawn](../rust/drawing.md).
 
 One row for each **directed edge**: its geometry runs the way traffic flows, and a two-way road is two edges with reversed
 geometry. `render_edges` takes a GeoDataFrame, a file path, a GeoJSON mapping, a pyarrow Table or osmnx edges
-([Loading data](../get-started.md#loading-data)). A column of osmnx lists (`name=['Götgatan', 'Ringvägen']`) becomes its first
+([Loading data](../get-started.md#load-your-data)). A column of osmnx lists (`name=['Götgatan', 'Ringvägen']`) becomes its first
 value.
 
 | Column | Type | Needed | Other name with | What it does |

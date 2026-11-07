@@ -303,7 +303,7 @@ A chart card (`chart` of a section with `part: "chart"`; [Charts](../guides/dash
 | `height` | `220` | the height of the chart in pixels, 80 or more |
 | `follow` | `False` | the map's roads only: `True` draws the chart again for the roads that the map shows now |
 
-The space of the cards is three CSS variables on `:root`: `--rs-card-gap` (12px, between two cards), `--rs-card-pad` (14px, inside a card) and `--rs-panel-bottom` (28px, under the last card). See [Cards: the panel standard](../guides/dashboard-parts.md#cards-the-panel-standard).
+The space of the cards is three CSS variables on `:root`: `--rs-card-gap` (12px, between two cards), `--rs-card-pad` (14px, inside a card) and `--rs-panel-bottom` (28px, under the last card). See [Cards: the panel standard](../guides/dashboard-parts.md#cards).
 
 There is no `hide` key and no `phone` option. The page turns to its phone form by itself when the window is 700 px wide or less (a phone, or a narrow desktop window), with the bar at the top. The page data holds these fixed values as `phone.max_width_px` (700) and `phone.toolbar` (top). `dashboard=` cannot change them.
 

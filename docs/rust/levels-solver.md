@@ -19,8 +19,8 @@ The level input gives the solver the relations of the roads: which roads cross, 
 ```mermaid
 flowchart LR
     inp["Level input<br/>crossings, meets, wishes"] --> rules["Rules<br/>x_i − x_j ≤ w"]
-    rules --> graph["Graph<br/>node = number, arc = rule"]
-    graph --> flow["Minimum-cost flow<br/>one stage at a time"]
+    rules --> net["Graph<br/>node = number, arc = rule"]
+    net --> flow["Minimum-cost flow<br/>one stage at a time"]
     flow --> num["Four numbers<br/>for each road"]
 ```
 

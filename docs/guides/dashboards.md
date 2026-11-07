@@ -186,7 +186,7 @@ Each item below has the same form: a picture or a live page when there is one, a
         - **Number tiles** (`kpis`): a row of big numbers ([Number tiles](dashboard-parts.md#number-tiles)).
         - **The page's own HTML** (`html`). Build it from the [shared parts](dashboard-parts.md) of a dashboard.
     - `help` on a card puts a "?" in its title, and `panel.help` puts one in the panel's title ([A help window](dashboard-parts.md#a-help-window)).
-    - A section with a `label` is a card, and the label is its title ([Cards](dashboard-parts.md#cards-the-panel-standard)). `fold: true` makes the card fold, `note` is one line of state under the title, and `background: false` takes its colour away. `after` or `before` is the id of an earlier section.
+    - A section with a `label` is a card, and the label is its title ([Cards](dashboard-parts.md#cards)). `fold: true` makes the card fold, `note` is one line of state under the title, and `background: false` takes its colour away. `after` or `before` is the id of an earlier section.
 
 ### The errors { .rs-part }
 
