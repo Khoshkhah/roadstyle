@@ -60,7 +60,7 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
     | `sql` | `""` | The start text of the line. |
     | `label` | `"Data"` | The label of the dock. |
     | `limit` | `1000` | The most rows in the table. |
-    | `card` | `true` | The road card beside the table, in place of the popup. While the dock shows the data dock, a road that the person selects (a row, a name, Ask, or a click on the map) shows only in the card: the dock holds the popup (`rs.holdPopup`). When the dock closes, the popup comes back. |
+    | `card` | `true` | The road card beside the table, in place of the popup. While the dock shows the data dock, a road that the person selects (a row, a name, Ask, or a click on the map) or an overlay item that the person clicks shows only in the card: the dock holds every popup (`rs.holdPopup`). When the dock closes, the popups come back. |
     | `guard` | `true` | `false`: the person's own SQL does not go through the read-only guard. |
 
 ### From JavaScript { .rs-part }
@@ -156,6 +156,7 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
     - The side column then shows the road's card: its name, its main facts as chips (class, length, speed limit, one-way, the networks), its other fields in small type with rounded numbers, and its id with **Copy id** and **Zoom**.
     - The card leaves out the fields of roadstyle's drawing (`casing_*`, `fill_level` and others).
     - In a result of names, a click selects the roads of that name.
+    - A click on an overlay item on the map (a building, a crossing) shows the item in the card: its name, the overlay's name as a chip, its fields (the overlay's popup fields when it has them) and its id with **Copy id**. The close button deselects it. While the dock shows the card, no popup shows, for a road or for an item.
 
 ### Table or chart { .rs-part }
 

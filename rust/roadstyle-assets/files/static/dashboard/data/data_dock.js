@@ -76,7 +76,7 @@ export function dataDock(o = {}){
   // the table has a fixed width (Kaveh, 2026-11-06: "I want to fix the length of table and chart part"): on a desktop the side column always keeps
   // its place beside the table, with a hint while it has neither a card nor the list; on a phone it shows only with one of the two. The chart takes
   // the width of an empty side column (a reviewer, 2026-11-06: 300 px with only the hint in it); CSS .rs-dd-chart:not([hidden]) ~ .rs-dd-side.empty
-  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road on the map or in the table, or open Tables.");
+  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road or an item on the map, or a row in the table, or open Tables.");
   card.hidden = true;
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
   const chartBox = $("div", "rs-dd-chart"), chartRow = $("div", "rs-dd-chartrow"), chartEl = $("div", "rs-dd-chartel"); chartBox.hidden = true;
@@ -153,8 +153,27 @@ export function dataDock(o = {}){
     foot.append($("span", "rs-dd-rc-id", `${ID} ${idv}`), copy, zoom);
     card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), foot);
   }
+  // an overlay item (a building, a crossing; Kaveh, 2026-11-07: "click on item should show info into sql panel card info"): the overlay's name, the
+  // item's name when it has one, its fields (the overlay's popup fields when it has them), and its id. The close button deselects it.
+  function drawItem(d){
+    const p = d.properties || {}, hd = $("div", "rs-dd-rc-hd"), x = $("button", "rs-dd-rc-x", "\u2715");
+    x.type = "button"; x.title = "Close the card"; x.setAttribute("aria-label", x.title); x.onclick = () => rs.select(null);
+    hd.append($("b", "rs-dd-rc-name", p.name || d.overlay), x);
+    const chips = $("div", "rs-dd-rc-chips"); chips.append($("span", "rs-dd-rc-chip strong", d.overlay));
+    const rows = $("dl", "rs-dd-rc-rows");
+    for(const k of (d.fields && d.fields.length ? d.fields : Object.keys(p))){
+      const v = p[k]; if(k === "name" || DRAWING.test(k) || v == null || v === "" || typeof v === "object") continue;
+      const dt = $("dt", "", k.replace(/_/g, " ")), dd = $("dd", "", val(v)); if(String(v).length > 28) dd.title = String(v); rows.append(dt, dd);
+    }
+    const foot = $("div", "rs-dd-rc-foot"), idv = String(d.id ?? ""), copy = $("button", "", "Copy id");
+    copy.type = "button";
+    copy.onclick = async () => { try{ await navigator.clipboard.writeText(idv); copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy id"; }, 1200); }catch(e){} };
+    foot.append($("span", "rs-dd-rc-id", `id ${idv}`), copy);
+    card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), foot);
+  }
   const paintSide = () => { const none = list.hidden && card.hidden; hint.hidden = !none; side.classList.toggle("empty", none); };
-  document.addEventListener("rs:select", (e) => { if(o.card === false || e.detail.overlay) return; drawCard(e.detail.properties || {}, e.detail.id);
+  document.addEventListener("rs:select", (e) => { if(o.card === false) return;
+    if(e.detail.overlay) drawItem(e.detail); else drawCard(e.detail.properties || {}, e.detail.id);
     list.hidden = true; tablesB.classList.remove("on"); tablesB.setAttribute("aria-expanded", "false"); card.hidden = false; paintSide(); });
   document.addEventListener("rs:deselect", () => { card.hidden = true; paintSide(); });
 
@@ -254,7 +273,7 @@ export function dataDock(o = {}){
     if(me === lightSeq) rs.highlight(onMap(ids), LIGHT);
   }
   document.addEventListener("rs:dockchange", (e) => { if(e.detail.id === id && !!e.detail.open !== lightWasOpen){ lightWasOpen = !!e.detail.open; light(); }
-    // the road card is the one place for a road's facts while the dock shows it: no popup for a selection from the table, Ask or the map
+    // the card is the one place for the facts while the dock shows it: no popup for a road or an item, from the table, Ask or the map
     if(o.card !== false && rs.holdPopup) rs.holdPopup("data-dock", !!e.detail.open && e.detail.id === id); });
   let lightWasOpen = false;
   async function rowClick(r, cols){
