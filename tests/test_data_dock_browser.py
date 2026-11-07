@@ -120,19 +120,28 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
             page.wait_for_timeout(300)
             assert page.evaluate("window.lights.at(-1)") == 6                                    # the roads of the table light
-            # Light off: the map's own colours, the table stays; on again: the light comes back. A closed dock lights nothing.
+            # the map switch (Kaveh, 2026-11-07): roadstyle's on/off switch at the start of the map group. Off: the map's own colours, the table
+            # stays, Colour and Focus are disabled; on again: the light comes back. A closed dock shows nothing. The event `light` and data.light()
+            # tell the host whether the table is shown on the map now.
+            sw, mb = "#rs-dock .rs-dd-g-map .rs-dd-light input[role=switch]", "#rs-dock .rs-dd-g-map .rs-dd-mb"
+            assert page.inner_text("#rs-dock .rs-dd-light") == "On" and page.is_checked(sw) and page.evaluate("data.light()") is True
+            assert page.evaluate(f"[...document.querySelectorAll('{mb}')].map(b => b.disabled)") == [False, False]
+            page.evaluate("window.shownEv = []; data.addEventListener('light', e => shownEv.push(e.detail.on))")
             page.click("#rs-dock .rs-dd-light")
             page.wait_for_timeout(200)
             assert page.evaluate("window.lights.at(-1)") == 0 and page.is_visible("#rs-dock .rs-dock-table")
+            assert not page.is_checked(sw) and page.evaluate("data.light()") is False and page.inner_text("#rs-dock .rs-dd-light") == "Off"
+            assert page.evaluate(f"[...document.querySelectorAll('{mb}')].map(b => b.disabled)") == [True, True]
             page.click("#rs-dock .rs-dd-light")
             page.wait_for_timeout(200)
             assert page.evaluate("window.lights.at(-1)") == 6
             page.evaluate("rs.dock.close()")
             page.wait_for_timeout(200)
-            assert page.evaluate("window.lights.at(-1)") == 0
+            assert page.evaluate("window.lights.at(-1)") == 0 and page.evaluate("data.light()") is False
             page.evaluate("rs.dock.open()")
             page.wait_for_timeout(200)
             assert page.evaluate("window.lights.at(-1)") == 6
+            assert page.evaluate("shownEv") == [False, True, False, True]                    # each change of what the map shows, once
             # a row click selects its road; the light stays
             page.click("#rs-dock tbody tr >> nth=1")
             page.wait_for_timeout(200)
@@ -167,7 +176,7 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.wait_for_timeout(300)
             assert page.evaluate("rs.getState().selection") == "2"
             # Tables: a click on a table shows its rows
-            page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
+            page.click("#rs-dock .rs-dd-q .rs-dd-tablesb")
             # the list takes the place of the table: a search field, a group for each schema (the page's own "extra" first), a card with the rows
             # the list is in the side column (where the card of a road is), and the table stays in view
             assert page.is_visible("#rs-dock .rs-dd-side .rs-dd-tables") and page.is_visible("#rs-dock .rs-dock-table") and page.is_hidden("#rs-dock .rs-dd-card")
@@ -177,7 +186,7 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             assert page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-tcard')].filter(b => !b.hidden).map(b => b.querySelector('.rs-dd-tc-name').textContent)") == ["sensors"]
             page.keyboard.press("Escape")
             assert page.is_hidden("#rs-dock .rs-dd-tables") and page.is_visible("#rs-dock .rs-dock-table")
-            page.click("#rs-dock .rs-dd-acts button:has-text('Tables')")
+            page.click("#rs-dock .rs-dd-q .rs-dd-tablesb")
             page.click("#rs-dock .rs-dd-tables button:has-text('edges')")
             assert page.is_hidden("#rs-dock .rs-dd-tables")
             page.wait_for_timeout(300)

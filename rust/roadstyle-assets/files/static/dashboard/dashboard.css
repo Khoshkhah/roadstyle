@@ -1103,8 +1103,8 @@ html.rs-phone.rs-dock-shut.rs-sheet-2 #rs-dock-pill{display:none}
 #rs-dock .rs-dd-grp > button + button{border-left:1px solid var(--rs-card-edge)}
 #rs-dock .rs-dd-grp > button.on{background:var(--accent-fill);color:#fff}
 #rs-dock .rs-dd-acts button.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
-#rs-dock .rs-dd-light{display:inline-flex;align-items:center;gap:4px}
-#rs-dock .rs-dd-light.on{background:color-mix(in srgb,#7c4dff 16%,var(--card));border-color:#7c4dff;color:var(--ink)}      /* on: the colour of the light itself */
+#rs-dock .rs-dd-grp label.rs-dd-light{flex:none;margin:0;padding:0 10px;font-size:12px;white-space:nowrap;border-right:1px solid var(--rs-card-edge)}      /* the map switch: the first part of the map group, On or Off */
+#rs-dock .rs-dd-grp label.rs-dd-light span{min-width:2em}      /* On and Off take the same room: Colour and Focus do not move */
 .rs-dd-count{min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:999px;background:var(--accent-fill);color:#fff;font:600 10.5px/16px system-ui,sans-serif;text-align:center;display:inline-block}
 .rs-dd-count[hidden]{display:none}
 .rs-dd-q{display:flex;gap:8px;align-items:flex-start}
@@ -1114,6 +1114,9 @@ html.rs-phone.rs-dock-shut.rs-sheet-2 #rs-dock-pill{display:none}
 .rs-dd-edit-hint{font-size:11px;color:var(--mut);padding-left:4px}
 .rs-dd-ta{flex:1;min-width:0;width:100%;box-sizing:border-box;resize:none;border:1px solid var(--accent)!important;border-radius:8px;padding:6px 10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;outline:2px solid color-mix(in srgb,var(--accent) 25%,transparent)}
 #rs-dock .rs-dd-run{border-radius:8px;padding:6px 16px;white-space:nowrap}
+#rs-dock .rs-dd-qb{flex:none;border-radius:8px;padding:6px 12px;white-space:nowrap}      /* Tables (before the SQL line) and CSV (after Run) */
+#rs-dock .rs-dd-qb.rs-dd-ib{display:inline-flex;align-items:center;padding:6px 9px}      /* the icons: the tables (a database) and the download */
+#rs-dock .rs-dd-qb.on{background:var(--accent-fill);border-color:var(--accent-fill);color:#fff}
 .rs-dd-err{color:var(--rs-err);font-size:12px;white-space:pre-wrap}
 .rs-dd-err:empty{display:none}
 /* the list of the tables: in the place of the table while it is open; a search field, a group for each schema, a card for each table */

@@ -45,38 +45,55 @@ export function dataDock(o = {}){
 
   // ---- the parts: the actions in the dock's title row, the SQL line, the error line, the list of tables, the table and the road card beside it ----
   const el = $("div", "rs-dd"), acts = $("span", "rs-dd-acts");
-  const tablesB = $("button", "", "Tables"), csvB = $("button", "", "CSV"), colourB = $("button", "rs-dd-mb"), focusB = $("button", "rs-dd-mb");
+  const tablesB = $("button", "rs-dd-qb rs-dd-ib rs-dd-tablesb"), csvB = $("button", "rs-dd-qb rs-dd-ib"), colourB = $("button", "rs-dd-mb"), focusB = $("button", "rs-dd-mb");
   for(const b of [tablesB, csvB, colourB, focusB]) b.type = "button";
   colourB.innerHTML = 'Colour <span class="rs-dd-count" hidden></span> ▾'; focusB.innerHTML = 'Focus <span class="rs-dd-count" hidden></span> ▾';
   colourB.title = "The colour layers of the map"; focusB.title = "The focus of the map: the other roads fade or hide";
-  tablesB.title = "The tables of the data"; csvB.title = "All the rows of this result as a CSV file";
+  tablesB.title = "The tables of the data"; tablesB.setAttribute("aria-label", tablesB.title); csvB.title = "Download all the rows of this result as a CSV file"; csvB.setAttribute("aria-label", csvB.title);
+  // two icons at the ends of the SQL line (Kaveh, 2026-11-07): the tables of the data (a database; "Tables" was too near the view button "Table"),
+  // and the download of the rows ("csv should change to just download icon")
+  tablesB.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-13"/><path d="M5 12c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5"/></svg>';
+  csvB.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M5 19h14"/></svg>';
   // Table | Chart: two views of the same result (the design's "4. Charts")
   const viewSw = $("span", "rs-seg rs-dd-view"), tableB = $("button", "on", "Table"), chartB = $("button", "", "Chart");
   tableB.type = chartB.type = "button"; viewSw.append(tableB, chartB);
-  // Light: the roads of the table in purple on the map, on by default; off, the map shows its own colours (Kaveh, 2026-11-06: "there is no easy way to
+  // the light: the roads of the table in purple on the map, on by default; off, the map shows its own colours (Kaveh, 2026-11-06: "there is no easy way to
   // see map with default colors after opening a table"). The browser keeps the choice. A closed dock lights nothing.
   const LIGHT_KEY = "rs-data-light:" + location.pathname;
   let lightOn = (() => { try{ return localStorage.getItem(LIGHT_KEY) !== "0"; }catch(e){ return true; } })();
-  const lightB = $("button", "rs-dd-light"); lightB.type = "button";
-  lightB.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/></svg> Light';
-  const paintLight = () => { lightB.classList.toggle("on", lightOn); lightB.setAttribute("aria-pressed", String(lightOn));
-    lightB.title = lightOn ? "The roads of the table are lit on the map. Click: the map's own colours" : "The map shows its own colours. Click: light the roads of the table"; };
-  lightB.onclick = () => { lightOn = !lightOn; try{ localStorage.setItem(LIGHT_KEY, lightOn ? "1" : "0"); }catch(e){} paintLight(); light(); };
-  paintLight();
-  // three joined controls in the look of Table | Chart (Kaveh chose "connected groups"): what the dock shows, the data (Tables, CSV), and the
-  // map (Light, Colour, Focus)
+  // the map switch (Kaveh, 2026-11-07: "it must change to something for show or unshow the table on map", and "only be on or off for those colour
+  // and focus [buttons]. for off make them disable and on make them enable"): roadstyle's on/off switch at the start of the map group. On, the table is
+  // on the map: its roads are lit, the dock's Colour and Focus layers show, and a host draws its own shapes of the result (the event `light`). Off,
+  // the map shows its own colours: no light, the layers are hidden (they stay in their lists), and Colour and Focus are disabled.
+  const lightB = $("label", "rs-switch rs-dd-light"), lightIn = $("input"), lightS = $("span"), lightT = "The table on the map. On: its roads are lit, " +
+    "the Colour and Focus layers show, and the shapes that the page draws. Off: the map shows its own colours, and Colour and Focus are disabled. " +
+    "A closed dock shows no light.";
+  lightIn.type = "checkbox"; lightIn.setAttribute("role", "switch"); lightIn.setAttribute("aria-label", "The table on the map"); lightB.title = lightT;
+  lightB.append(lightIn, lightS);
+  function setLight(on){
+    lightOn = on; lightIn.checked = on; lightS.textContent = on ? "On" : "Off"; colourB.disabled = focusB.disabled = !on;
+    try{ localStorage.setItem(LIGHT_KEY, on ? "1" : "0"); }catch(e){}
+  }
+  lightIn.onchange = () => { setLight(lightIn.checked); light(); paint(); tellLight(); };
+  setLight(lightOn);
+  // the event `light` {on}: the table is shown on the map now (the switch is on and the dock is open), when that changes; `data.light()` reads it
+  let shownNow = false;
+  const shown = () => lightOn && rs.dock.isOpen();
+  const tellLight = () => { const on = shown(); if(on !== shownNow){ shownNow = on; emit("light", {on}); } };
+  // the title row: what the dock shows (Table | Chart) and the map (the switch, Colour, Focus), in the look of joined groups (Kaveh chose "connected
+  // groups"). Tables and CSV are on the SQL line (Kaveh, 2026-11-07: "they are unrelated to that row"): the data that the SQL reads, and its rows.
   const grp = (cls, ...els) => { const g = $("span", "rs-dd-grp " + cls); g.append(...els); return g; };
-  acts.append(viewSw, grp("rs-dd-g-data", tablesB, csvB), grp("rs-dd-g-map", lightB, colourB, focusB));
+  acts.append(viewSw, grp("rs-dd-g-map", lightB, colourB, focusB));
   const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
-  q.append(line, run);
+  q.append(tablesB, line, run, csvB);
   const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
   // the side column beside the table or the chart (Kaveh, 2026-11-06: the list of the tables "in the same place" as the card of a road): one of the
   // two at a time, the last one opened; the table and the chart stay in view
   // the table has a fixed width (Kaveh, 2026-11-06: "I want to fix the length of table and chart part"): on a desktop the side column always keeps
   // its place beside the table, with a hint while it has neither a card nor the list; on a phone it shows only with one of the two. The chart takes
   // the width of an empty side column (a reviewer, 2026-11-06: 300 px with only the hint in it); CSS .rs-dd-chart:not([hidden]) ~ .rs-dd-side.empty
-  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road or an item on the map, or a row in the table, or open Tables.");
+  const split = $("div", "rs-dd-split"), side = $("div", "rs-dd-side"), card = $("div", "rs-dd-card"), hint = $("p", "rs-dd-side-hint", "Select a road or an item on the map, or a row in the table, or open the tables (the database button).");
   card.hidden = true;
   const table = rs.dock.table({columns: [], rows: [], idColumn: ID, onRow: (r, i, cols) => rowClick(r, cols), onSort: (col, dir) => sortAll(col, dir)});
   const chartBox = $("div", "rs-dd-chart"), chartRow = $("div", "rs-dd-chartrow"), chartEl = $("div", "rs-dd-chartel"); chartBox.hidden = true;
@@ -117,9 +134,9 @@ export function dataDock(o = {}){
   // the help window: one row for each control of the title row, in its order (Kaveh, 2026-11-06: "needs to update")
   if(o.help !== false && rs.help) rs.help.button(acts, {title: "The data dock", intro: "One SQL line over the result. Click the line to edit it. Ctrl+Enter or Run runs it. Click a row to select its road: its card shows beside the table.",
     terms: [["Table | Chart", "The result as a table or as a chart. In the chart, the column at the left sets the kind, X and Y, and SVG saves the chart as a file."],
-            ["Tables", "The tables of the data, with what each one holds. Click a table to show its rows."],
-            ["CSV", "All the rows of the result as a file (at most 1\u00a0000\u00a0000)."],
-            ["Light", "On: the roads of the result are purple on the map. Off: the map shows its own colours. A closed dock lights no roads."],
+            ["\u26c1 The tables", "The tables of the data, with what each one holds. Click a table to show its rows."],
+            ["\u2913 Download", "All the rows of the result as a CSV file (at most 1\u00a0000\u00a0000)."],
+            ["On | Off", lightT],
             ["Colour ▾", "A layer that colours the roads of the result: one colour for each value of a text column with 2 to 8 values, else one colour. It stays until you remove it."],
             ["Focus ▾", "Keeps the roads of the result: the other roads fade or hide. One focus at a time; None turns it off."]]});
 
@@ -273,6 +290,7 @@ export function dataDock(o = {}){
     if(me === lightSeq) rs.highlight(onMap(ids), LIGHT);
   }
   document.addEventListener("rs:dockchange", (e) => { if(e.detail.id === id && !!e.detail.open !== lightWasOpen){ lightWasOpen = !!e.detail.open; light(); }
+    tellLight();
     // the card is the one place for the facts while the dock shows it: no popup for a road or an item, from the table, Ask or the map
     if(o.card !== false && rs.holdPopup) rs.holdPopup("data-dock", !!e.detail.open && e.detail.id === id); });
   let lightWasOpen = false;
@@ -423,15 +441,16 @@ export function dataDock(o = {}){
     const old = layers.find((x) => x.key === l.key);
     if(old){ layers.splice(layers.indexOf(old), 1); if(l.mode) old.mode = l.mode; l = old; } else l.n = ++seq;
     l.on = true;
+    if(!lightOn){ setLight(true); light(); tellLight(); }      // a new layer (a button, Ask) shows: the map switch turns on
     if(l.kind === "focus") layers.forEach((x) => { if(x.kind === "focus" && x !== l) x.on = false; });
     layers.push(l); paint(); return l;
   }
   function paint(){
-    const colours = layers.filter((l) => l.kind === "colour" && l.on).reverse();        // the newest first: where two meet, the newest wins
+    const colours = lightOn ? layers.filter((l) => l.kind === "colour" && l.on).reverse() : [];      // the map switch off: no layer on the map        // the newest first: where two meet, the newest wins
     rs.color(colours.flatMap((l) => l.groups.map((g) => ({color: g.color, ids: g.ids}))));
     legendIds.forEach((x) => rs.legend.remove(x));
     legendIds = colours.flatMap((l) => l.groups).map((g, k) => { const x = "rs-dd-" + k; rs.legend.add({id: x, color: g.color, label: g.label, shape: "line"}); return x; });
-    const f = layers.find((l) => l.kind === "focus" && l.on);
+    const f = lightOn && layers.find((l) => l.kind === "focus" && l.on);
     rs.setFilter({ids: f && f.mode === "hide" ? f.ids : null});
     if(rs.fade) rs.fade(f && f.mode === "fade" ? f.ids : null);
     paintButtons(); drawMenu();
@@ -522,5 +541,6 @@ export function dataDock(o = {}){
     view: (v) => (v ? setView(v) : view),
     colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
+    light: shown,                // true while the table is shown on the map: the map switch is on and the dock is open (the event `light` tells a change)
   });
 }
