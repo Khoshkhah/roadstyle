@@ -106,6 +106,7 @@ def test_an_edit_is_saved_to_edits_csv(editor):
     with sync_playwright() as p:
         b = p.chromium.launch()
         page, errors = _open(b, url, viewport={"width": 1300, "height": 800})
+        page.click("#lv-tabs [data-t=edit]")                         # Stacking: two roads and the rules between them (Road ends has one road)
         for road in (order["a"], order["b"]):
             page.fill("#lv-find", road)
             page.wait_for_timeout(500)

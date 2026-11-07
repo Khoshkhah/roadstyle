@@ -332,7 +332,7 @@ older version kept in localStorage moves there when it is read), `httpStore(base
 (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the map's
 table, GeoParquet). `editor.roads` is the area's road ids, in their order; `editor.facts(ids)` gives a Promise of what the panel shows of those roads (any edge or road id), by road id. The editor reads a road's facts from the worker only when the panel needs them. The editor has no frame, fold button, side, width or phone layout of its own: it draws into the host's panel (see "The editor in the host's panel").
 Give your page `<meta name="viewport" content="width=device-width">`, so that a phone lays it out at its own width. A tap on a road picks it, and the
-targets are 44 px on a phone. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now (the History tab has a button for edits.csv). The panel follows the
+targets are 44 px on a phone. `editor.download(name)` downloads edits.csv, heads.csv, caps.csv or levels.csv as they are now (the History tab has links for edits.csv, heads.csv and caps.csv). The panel follows the
 theme of the host's panel (`#sb[data-theme]`). The module needs the files
 of `rust/roadstyle-assets/files/static/` beside it, in the same layout: `dashboard/` with its subfolders, `level_editor.html` (the panel),
 `dashboard.css` and `popup.css`.
@@ -343,7 +343,7 @@ of `rust/roadstyle-assets/files/static/` beside it, in the same layout: `dashboa
 `.sb-body` (`levelEditor` throws an error when a part is missing). The editor changes only these parts, and `destroy()` puts them back:
 
 - the host's `.sb-body` is hidden (its scroll place is kept), and the host's title in `.sb-top` is hidden. The top line is "← Steps"
-  and "Edit levels" before the host's hide button; under it are the tabs Edit, History and Issues. `backLabel` is the label (default
+  and "Edit levels" before the host's hide button; under it are the tabs Road ends, Stacking, History and Issues. `backLabel` is the label (default
   `"Steps"`); `backLabel: null` has no button (a page with no steps).
 - the apply bar is at the bottom of the panel (on a phone: of the sheet) and shows only when changes wait: "N waiting", Discard and
   Apply and solve. "N waiting" opens the list of the changes, and each can be taken out. The bar stays when the panel scrolls.
