@@ -125,7 +125,7 @@ def test_each_page_has_its_template():
     assert _dashboard(rs.render_edges(_edges(), backend="web").html)["template"] == "map"
     d = _dashboard(rs.render_dashboard(_edges()).html)                      # the default of render_dashboard is the overlay form
     assert (d["template"], d["layout"], d["panel"], d["toolbar"]) == ("dashboard", "overlay", {"side": "left", "width_px": 400, "look": "card", "sections": []},
-                                                                       {"position": "right", "settings": True, "hold": False, "navigation": "box"})
+                                                                       {"position": "right", "settings": True, "hold": False, "navigation": "box", "align": "middle"})
     c = _dashboard(rs.render_dashboard(_edges(), layout="dock").html)
     assert (c["template"], c["layout"], c["panel"]["look"], c["toolbar"]) == ("dashboard", "dock", "frame", None)
 
@@ -164,7 +164,7 @@ def test_the_dashboard_keyword_merges_typed_options():
     import pytest
     d = _dashboard(rs.render_dashboard(_edges(), dashboard={"toolbar": {"position": "left", "hold": True},
                                                             "google_3d": {"selection_style": {"width": 12}}}).html)
-    assert d["toolbar"] == {"position": "left", "settings": True, "hold": True, "navigation": "box"}
+    assert d["toolbar"] == {"position": "left", "settings": True, "hold": True, "navigation": "box", "align": "middle"}
     assert (d["google_3d"]["selection_style"]["width"], d["google_3d"]["selection_style"]["color"]) == (12.0, "#22d3ee")
     for bad, said in [({"toolbar": {"colour": 1}}, "colour"), ({"template": "map"}, "cannot change the template"), ({"windows": {"clamp": "x"}}, "invalid type")]:
         with pytest.raises(ValueError, match=said):
@@ -183,7 +183,7 @@ def test_the_boundary_shade_and_limit_are_the_pages_choice():
 def test_the_dashboard_template_is_the_overlay_form():
     h = rs.render_dashboard(_edges()).html
     d = _dashboard(h)
-    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True, "hold": False, "navigation": "box"})
+    assert (d["layout"], d["toolbar"]) == ("overlay", {"position": "right", "settings": True, "hold": False, "navigation": "box", "align": "middle"})
     assert d["windows"]["clamp"] is True and d["windows"]["recenter_map"] is False
     assert '<div id="sb"' in h
     assert 'c.add("rs-tpl-dashboard","rs-overlay","rs-has-toolbar","rs-tb-right","rs-panel-left","rs-panel-card","rs-hide-scale")' in h   # the first paint has the form
