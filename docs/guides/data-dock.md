@@ -11,7 +11,7 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
 | What the person does | [The line](#the-line) | no | to write and run one SQL statement |
 | What the person does | [The table](#the-table) | no | the result, sorted and exported |
 | What the person does | [Tables](#tables) | no | the list of the tables of your data |
-| What the person does | [The light](#the-light) | no | the roads of the table on the map |
+| What the person does | [The map switch](#the-map-switch) | no | the table on the map, or the map's own colours |
 | What the person does | [A row](#a-row) | no | one road: its card and its place |
 | What the person does | [Table or chart](#table-or-chart) | no | the same result as a chart |
 | What the person does | [Colour and focus](#colour-and-focus) | no | to keep a change of the map |
@@ -52,7 +52,7 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
     | Option | Default | What it is |
     |---|---|---|
     | `query(sql, {signal})` | (necessary) | Runs one statement on your data. It gives `{columns: [{name, type}], rows}` (a value is a string, number, boolean, `BigInt` or `null`), or it throws an `Error` with the database's message. |
-    | `schema()` | (necessary) | `{tables: [{name, rows, about}]}`: the **Tables** list, and Ask's view of the data. |
+    | `schema()` | (necessary) | `{tables: [{name, rows, about}]}`: the list of tables, and Ask's view of the data. |
     | `ready` | ready at once | A promise that ends when your data is loaded. A run waits for it. |
     | `tables`, `load(t)` | none | Your page's own tables, `[{name, url, about}]`. The data dock gives each one to `load` once at the start, and a run waits for them. A table that does not load does not stop the others. |
     | `idColumn` | `"edge_id"` | The column with the road ids. |
@@ -84,19 +84,19 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
     - `data.roads(sql)` gives the road ids (on the map) that the SQL selects by `idColumn`. It refuses a query of more than 100 000 roads.
     - `data.colour(groups, {sql})` and `data.focus(ids, {sql, mode})` add the same layers as the buttons. `data.layers()` lists them.
     - For [Ask](ask.md): `data.idColumn`, `data.keyOf(result)` (the column that finds the roads of a result, or `null`) and `data.roadsOf(result)` (its roads on the map).
-    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`) and `layers`.
+    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`), `layers` and `light` (`on`, see [The map switch](#the-map-switch)).
 
 ## What the person does { .rs-group }
 
 ### The title row { .rs-part }
 
-**Use it for:** the controls of the dock. After the label and the note, there are three joined groups: **Table | Chart**, **Tables | CSV**, and **Light | Colour ▾ | Focus ▾**.<br>
+**Use it for:** the controls of the dock. After the label and the note, there are two joined groups: **Table | Chart** and **On | Colour ▾ | Focus ▾** (the map switch first).<br>
 **From Python:** no
 { .rs-facts }
 
 ??? info "Details"
 
-    - **Table | Chart** is what the dock shows. **Tables | CSV** is the data. **Light | Colour ▾ | Focus ▾** is the map.
+    - **Table | Chart** is what the dock shows. **On | Colour ▾ | Focus ▾** is the map. The tables button and the download button are on [the line](#the-line).
     - **?** opens a help window with one row for each control.
 
 ### The line { .rs-part }
@@ -108,6 +108,7 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
 ??? info "Details"
 
     - A click on the line opens it as a text box. **Ctrl+Enter** or **Run** runs it, and **Escape** folds it.
+    - The tables button (a database icon), before the line, shows the tables of the data in the side column. The download button (⤓), after **Run**, saves all the rows of the result as a CSV file.
     - An error shows under the line, in the database's words.
     - The guard refuses a statement that writes, loads, or reads a file or an address.
 
@@ -119,7 +120,7 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
 
 ??? info "Details"
 
-    - The table shows at most `limit` rows, but **CSV** has all the rows (at most 1 000 000), and a click on a header sorts all the rows.
+    - The table shows at most `limit` rows, but the download button (⤓) saves all the rows (at most 1 000 000), and a click on a header sorts all the rows.
     - A DATE shows as `2026-06-10`, a TIMESTAMP as `2026-06-10 08:30:00`, and a geometry as `(32 bytes)`.
 
 ### Tables { .rs-part }
@@ -134,16 +135,26 @@ The data dock is one SQL line over a wide table of the result, in the [bottom do
     - The list has a search field (by name or description; Enter opens the first table, Escape closes the list), a group for each schema with its number of tables (the page's own `extra` first), and a card for each table with its name, its number of rows and one line of what it holds.
     - A click on a card shows the table's rows and closes the list: the line gets `SELECT * FROM <table>`, which you can change and run again.
 
-### The light { .rs-part }
+### The map switch { .rs-part }
 
-**Use it for:** the roads of the table on the map (the highlight set `dock`, in roadstyle's select purple).<br>
+**Use it for:** the table on the map, or the map's own colours. On, the roads of the table are lit (the highlight set `dock`, in roadstyle's select purple), the dock's Colour and Focus layers show, and a page shows its own shapes of the result.<br>
 **From Python:** no
 { .rs-facts }
 
+=== "JavaScript"
+
+    ```js
+    data.addEventListener("light", e => myLayer.hidden = !e.detail.on);   // the page's own shapes of the result (nodes, buildings)
+    data.light();                                                          // true: the table is shown on the map now
+    ```
+
 ??? info "Details"
 
+    - The map switch is the dashboard's [on/off switch](dashboard-parts.md#an-onoff-switch) at the start of the map group. It shows **On** or **Off**. The browser keeps the choice.
+    - **Off:** the map shows its own colours, and the table stays. The light goes, the Colour and Focus layers are hidden (they stay in their lists), and **Colour ▾** and **Focus ▾** are disabled.
+    - **On:** the light, the layers and the two buttons come back. A new Colour or Focus layer (from Ask, for example) turns the switch on.
     - A new table changes the light. A table that a colour or a focus already shows has no light. A closed dock lights nothing.
-    - **Light** in the title row turns the light off and on: off, the map shows its own colours and the table stays. The browser keeps the choice.
+    - `data.light()` is `true` while the switch is on and the dock is open. The event `light` (`detail.on`) comes when that changes: at a click on the switch, and when the dock opens or closes.
 
 ### A row { .rs-part }
 

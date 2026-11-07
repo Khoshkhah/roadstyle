@@ -259,9 +259,12 @@ def test_the_data_dock_has_table_and_chart(tmp_path):
                   svgIn: q('.rs-dd-cmain').contains(q('.rs-dd-svg')) && r('.rs-dd-svg').top <= r('.rs-dd-chartel').top + 1,
                   scroll: getComputedStyle(q('.rs-dd-chartel')).overflowY}; })()""")
         assert lay == {"title": False, "hint": False, "column": True, "svgIn": True, "scroll": "hidden"}, lay
-        # the title row has three joined groups: Table | Chart, Tables | CSV, Light | Colour | Focus (Kaveh chose "connected groups")
+        # the title row has two joined groups: Table | Chart and On | Colour | Focus (Kaveh chose "connected groups"); Tables and CSV are on the
+        # SQL line, before it and after Run (Kaveh, 2026-11-07)
         groups = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-acts > .rs-dd-view, #rs-dock .rs-dd-acts > .rs-dd-grp')].map(g => g.innerText.replace(/\\s+/g, ' ').trim())")
-        assert len(groups) == 3 and groups[1] == "Tables CSV" and groups[2].startswith("Light Colour"), groups
+        assert len(groups) == 2 and groups[1].startswith("On Colour"), groups
+        line = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-q > button')].map(b => b.innerText.trim() || b.getAttribute('aria-label'))")
+        assert line[0] == "The tables of the data" and line[-2] == "Run" and line[-1].startswith("Download all the rows"), line      # icons: the tables and the download
         # a result of a text and a number: a bar chart in the open view
         page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
         page.wait_for_timeout(300)
