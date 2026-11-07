@@ -48,6 +48,13 @@ A box opens toward the map. One box is open at a time. A click outside it, or Es
 
 </div>
 
+### The place of the bar along its edge
+
+`dashboard={"toolbar": {"position": "top", "align": "end"}}` puts the bar at the top right corner. `align` is `"start"`, `"middle"`
+(the default) or `"end"`. For a bar at the top or the bottom, start is the left and end is the right. For a bar at the left or the
+right, start is the top and end is the bottom. A bar at a corner stays clear of the panel, the dock and the box of the scale. The
+person can change it in the Settings box: the row "Toolbar place" (Left, Middle, Right; or Top, Middle, Bottom).
+
 ### Navigate
 
 **One button** (the compass needle) replaces the zoom buttons, the compass and the 2D/3D button. A click opens a box with a zoom

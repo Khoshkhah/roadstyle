@@ -291,6 +291,7 @@ There is no `hide` key and no `phone` option. The page turns to its phone form b
 | key | default | meaning |
 |---|---|---|
 | `position` | `"right"` | `"right"`, `"left"`, `"top"` or `"bottom"` |
+| `align` | `"middle"` | the place of the bar along its edge: `"start"` (the left corner of a bar at the top or the bottom, the top corner of a bar at the left or the right), `"middle"` or `"end"`. The Settings box has it as "Toolbar place" |
 | `navigation` | `"box"` | `"box"`: one compass-needle button that opens a box with a zoom, a turn and a tilt slider. `"buttons"`: the buttons zoom in, zoom out, compass and 2D/3D |
 | `settings` | `True` | shows the `settings` tool |
 | `hold` | `False` | `True` keeps the bar hidden until your page calls `rs.tools.ready()`, or for 6 s |

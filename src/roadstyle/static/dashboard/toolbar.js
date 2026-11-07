@@ -164,12 +164,17 @@ function keepInside(box){
   new ResizeObserver(fit).observe(box);
   addEventListener("resize", fit);
 }
-let _tbPlace = null, _tbRerun = null, _tbEdge = null, _tbInset = null;
+let _tbPlace = null, _tbRerun = null, _tbEdge = null, _tbInset = null, _tbAlign = null;
 // the edge that the person chose (settings.js); the phone form is the template's
 // the open box (the settings, from where the person chose the edge) closes first: it opened toward the map from the old edge
 export function setToolbarEdge(edge){
   closeBoxes();
   _tbEdge = edge; if(_tbPlace) _tbPlace(); if(_tbInset) _tbInset(); if(_tbRerun) _tbRerun();
+}
+// the bar's place along its edge: "start", "middle" or "end" (settings.js; the template's `toolbar.align`)
+export function setToolbarAlign(align){
+  closeBoxes();
+  _tbAlign = align; if(_tbRerun) _tbRerun();
 }
 export function initToolbar(){
   const d = O.dashboard;
@@ -219,6 +224,6 @@ export function initToolbar(){
   boxRules(bar);
   const fitBox = t => { if(t.kind === "box"){ const box = t.el.querySelector("#rs-attr-box, #rs-color-box, #rs-nav-box, #rs-roads-box, #rs-settings-box, .bm-menu"); if(box) keepInside(box); } };
   toolList().forEach(fitBox); setOnReplace(fitBox);
-  _tbRerun = followPanels(bar, () => bar.dataset.edge);
+  _tbRerun = followPanels(bar, () => bar.dataset.edge, () => _tbAlign || layoutNow().align);
   return true;
 }
