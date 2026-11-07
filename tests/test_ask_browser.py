@@ -150,7 +150,7 @@ def test_the_agent_fixes_its_sql_and_its_answer_goes_to_the_dock(tmp_path):
             assert turn.locator(".a b").inner_text() == "6" and turn.locator(".a code").inner_text() == "Street 5"
             assert page.evaluate("document.querySelector('.rs-ask-log img')") is None and page.evaluate("window.bad") is None
             assert "<img" in turn.locator(".a").inner_text()
-            assert turn.locator(".rs-ask-foot summary").first.inner_text() == "1 query · 6 rows"
+            assert turn.locator(".rs-ask-foot summary").first.inner_text() == "1 query · 6 rows · fake-1"      # and the model that answered
             assert "lenght" not in turn.inner_text() and turn.locator(":scope > .rs-ask-err").count() == 0
             assert turn.locator(".rs-ask-failed summary").text_content() == "1 failed attempt, fixed by the agent"
             assert _send_ready(page) and page.evaluate("window.answers[0].sql") == "SELECT edge_id, name, highway FROM edges"
@@ -164,7 +164,7 @@ def test_the_agent_fixes_its_sql_and_its_answer_goes_to_the_dock(tmp_path):
             second = page.locator(".rs-ask-turn").nth(1)
             assert second.locator(".a li").count() == 3 and "3363728794791538739" not in second.inner_text()
             assert second.locator(".rs-ask-more").inner_text() == "… 2 more in the table"
-            assert second.locator(".rs-ask-foot summary").first.inner_text() == "1 query · 3 rows"
+            assert second.locator(".rs-ask-foot summary").first.inner_text() == "1 query · 3 rows · fake-1"
             assert second.locator(".rs-ask-failed summary").text_content() == "2 more queries of the agent"
             history = page.evaluate("window.calls.at(-4).messages.map(m => m.content)")
             assert "How many roads?" in history                                                   # the earlier turn goes to the model
@@ -283,7 +283,7 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
             assert r["auth"] == "Bearer test-key-123" and r["body"]["model"] == "gemini-3.8-flash" and r["body"]["tool_choice"] == "auto"
             assert [t["function"]["name"] for t in r["body"]["tools"]] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart", "get_map", "set_map"]
             assert "test-key-123" not in json.dumps(r["body"])
-            assert page.inner_text(".rs-ask-turn:last-child .rs-ask-by") == "Google Gemini · gemini-3.8-flash"            # each card names who answered
+            assert page.inner_text(".rs-ask-turn:last-child .rs-ask-by") == "gemini-3.8-flash"            # each card names the model that answered
         finally:
             browser.close()
     assert errors == [], errors
@@ -317,8 +317,16 @@ def test_the_model_box_lists_the_keys_models_and_a_pick_takes_effect_at_once(tmp
             page.locator(".rs-ask-krow").nth(1).locator(".rs-sel-btn").click()
             page.locator(".rs-sel-list").get_by_text("llama-3.3-70b-versatile").click()
             assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.groq") == "llama-3.3-70b-versatile"
+            assert page.inner_text(".rs-ask-keynote") == "Ask uses Groq · llama-3.3-70b-versatile now."              # kept at once, no Save
+            assert page.inner_text(".rs-ask-keyb") == "AI" and not page.is_visible(".rs-ask-btns .rs-ask-save")      # no Save key without a typed key
+            page.fill(".rs-ask-key input[type=password]", "another-key")
+            assert page.inner_text(".rs-ask-btns .rs-ask-save") == "Save key" and not page.is_visible(".rs-ask-done")      # one filled button
+            page.fill(".rs-ask-key input[type=password]", "")
+            assert not page.is_visible(".rs-ask-btns .rs-ask-save")
+            assert page.locator(".rs-ask-btns button:visible").all_inner_texts() == ["Clear", "Done"]           # Done at the end of the form
+            page.click(".rs-ask-done")
+            assert not page.is_visible(".rs-ask-key")                                                         # Done closes the form
             assert "llama-3.3-70b-versatile" in page.inner_text(".rs-ask-who")
-            page.click(".rs-ask-keyhd button")
             assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads." and chats[-1]["model"] == "llama-3.3-70b-versatile"
         finally:
             browser.close()
@@ -354,8 +362,7 @@ def test_auto_asks_the_next_service_at_once_and_the_card_names_who_answered(tmp_
             assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads."
             assert page.evaluate("performance.now()") - t0 < 3000                                        # no wait on the 429
             assert seen == [("gemini", "gemini-3.8-flash"), ("groq", "openai/gpt-oss-120b")], seen
-            by = page.inner_text(".rs-ask-turn .rs-ask-by")
-            assert by.startswith("Groq · openai/gpt-oss-120b") and "Google Gemini · gemini-3.8-flash: HTTP 429" in by, by
+            assert page.inner_text(".rs-ask-turn .rs-ask-by") == "gpt-oss-120b"                        # only the model that answered, short
             groq_ok["on"] = False
             assert page.evaluate("ask.ask('How many again?')") is None
             line = page.evaluate("[...document.querySelectorAll('.rs-ask-turn')].at(-1).querySelector('.rs-ask-err').innerText")
@@ -390,7 +397,7 @@ def test_model_auto_asks_the_next_model_of_the_key(tmp_path):
             assert page.inner_text(".rs-ask-who") == "Groq · Auto"
             assert page.evaluate("ask.ask('How many?')")["text"] == "Six roads."
             assert seen == ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"], seen
-            assert page.inner_text(".rs-ask-turn .rs-ask-by").startswith("Groq · qwen/qwen3.8-27b (after Groq · openai/gpt-oss-120b: HTTP 503)")
+            assert page.inner_text(".rs-ask-turn .rs-ask-by") == "qwen3.8-27b"
             page.click(".rs-ask-keyb")
             opts = "[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)"
             page.wait_for_function(opts + ".length > 1")
@@ -423,7 +430,7 @@ def test_claude_is_a_paid_service_with_its_browser_header(tmp_path):
             r = seen[-1]
             assert r["url"] == "https://api.anthropic.com/v1/chat/completions" and r["auth"] == "Bearer test-key-123" and r["browser"] == "true"
             assert "temperature" not in r["body"]                                                        # Claude's new models refuse it
-            assert r["body"]["model"] == "claude-sonnet-5-5" and page.inner_text(".rs-ask-turn .rs-ask-by") == "Claude (paid) · claude-sonnet-5-5"
+            assert r["body"]["model"] == "claude-sonnet-5-5" and page.inner_text(".rs-ask-turn .rs-ask-by") == "claude-sonnet-5-5"
             page.click(".rs-ask-keyb")
             assert page.inner_text(".rs-ask-key > a") == "Get a key from Claude (paid)"
             page.wait_for_function("document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option').length === 4")
@@ -458,7 +465,8 @@ def test_zai_uses_its_free_model_and_no_balance_is_not_a_wait(tmp_path):
                              localStorage.setItem('rs-settings:ask', JSON.stringify({provider: 'zai'})); makeReal(); ask.open()""")
             page.click(".rs-ask-keyb")
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[0].querySelectorAll('option')].map(o => o.value)") == ["auto", "gemini", "groq", "openrouter", "zai", "claude"]
-            page.click(".rs-ask-btns .sb-primary")
+            page.fill(".rs-ask-key input[type=password]", "test-key-123")                           # Save key shows only with a typed key
+            page.click(".rs-ask-btns .rs-ask-save")
             page.wait_for_function("document.querySelector('.rs-ask-keynote').textContent.startsWith('Saved.')")
             assert "Ask uses glm-4.5-flash" in page.inner_text(".rs-ask-keynote")
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)") == ["auto", "glm-4.5-flash"]

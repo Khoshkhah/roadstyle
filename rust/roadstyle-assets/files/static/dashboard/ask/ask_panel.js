@@ -140,18 +140,18 @@ export function askPanel(o = {}){
   const modelsOf = (p, signal) => p.models ? p.models(keyOf(p), signal) : models(p, keyOf(p), signal);
 
   // ---- the view: rs.frame; the head row is the tool row (it does not scroll), the body the conversation, the bar the question box ----
-  const tools = $("div", "rs-ask-top"), who = $("span", "rs-ask-who"), keyB = $("button", "rs-ask-keyb", "Key"), newB = $("button", "rs-ask-new", "New");
-  keyB.type = newB.type = "button"; keyB.setAttribute("aria-pressed", "false"); keyB.title = "Your key for the AI service"; newB.title = "Start a new conversation";
+  const tools = $("div", "rs-ask-top"), who = $("span", "rs-ask-who"), keyB = $("button", "rs-ask-keyb", "AI"), newB = $("button", "rs-ask-new", "New");
+  keyB.type = newB.type = "button"; keyB.setAttribute("aria-pressed", "false"); keyB.title = "The AI service, its model and your key"; newB.title = "Start a new conversation";
   tools.append(who, keyB, newB);
   const helpB = o.help !== false && rs.help && rs.help.button(tools, {title: "Ask", button: "About Ask",
     intro: "Ask a question about the roads in words. An AI service writes the SQL, runs it on the data of this page, and answers in a few sentences. The table goes to the data dock, and the roads light on the map.",
-    terms: [["Key", "Your own key of an AI service. Google Gemini and Groq give a free key. The key stays in this browser and goes only to that service. Other pages on the same address (for example the same github.io site) can read it: use a key with a spending limit."],
+    terms: [["AI", "The AI service, its model and your own key of it. Google Gemini and Groq give a free key. The key stays in this browser and goes only to that service. Other pages on the same address (for example the same github.io site) can read it: use a key with a spending limit."],
             ["Examples", "Questions to try. After the first question, they are above the question box."],
             ["An answer", "The question, the answer and the SQL (open “1 query”). Show puts its table in the dock again, and its roads light on the map. ✕ removes the card."],
             ["MAP", "An answer can colour the roads, focus on some roads (the others fade or hide) or move the map. A colour and a focus stay: they are in the lists of Colour ▾ and Focus ▾ in the data dock. You can also ask to show or hide a map layer, to change the base map, to turn the 3D view on or to move the camera (\"turn off the water\", \"satellite\", \"zoom to Fontvieille\")."],
             ["New", "Starts a new conversation. The map keeps its colours and its focus."]],
     note: "Ask sends your question, the conversation, the names and descriptions of the tables, and the query results (up to 30 rows each) to the AI service. An AI service can be wrong: look at the table and at the SQL."});
-  if(helpB) who.after(helpB);                                                                        // the order: provider, ?, Key, New
+  if(helpB) who.after(helpB);                                                                        // the order: provider, ?, AI, New
   // option tab: "Map" -> a tab row under the panel's title, [Map | Ask]; Ask is a tab, not a view with a Back button (the title stays the host's title)
   const tabbed = !!o.tab, hostTitle = panel.querySelector(".sb-top")?.firstElementChild?.textContent || "Ask";
   const frame = editorFrame({panel, title: tabbed ? hostTitle : "Ask", back: tabbed ? null : o.backLabel || "Back", head: tools, id: "ask"});
@@ -227,7 +227,7 @@ export function askPanel(o = {}){
   }
   const showKey = (on) => { keyBox.hidden = !on; log.hidden = on; frame.bar.hidden = on; keyB.classList.toggle("on", on); keyB.setAttribute("aria-pressed", String(on)); if(on) drawKey(); else toEnd(); };
   keyB.onclick = () => showKey(keyBox.hidden);
-  function drawKey(){
+  function drawKey(said){
     const p = prov();
     const sel = $("select"); for(const x of [AUTO_P, ...PROVS]){ const op = $("option", "", x.name); op.value = x.id; op.selected = isAuto() ? x.id === AUTO : x.id === p.id; sel.append(op); }
     // the model: a select box of the models that the key can use. Before the key's list comes (and with no key) it has only the current model.
@@ -239,31 +239,38 @@ export function askPanel(o = {}){
       model.value = cur;
     };
     fill([]);
-    model.onchange = () => setModel(model.value);
+    // Provider and Model are kept at once (no Save): the note says what Ask uses now. Save is only for a new key ("Save key", shown while a key is typed).
+    const now = () => { const q = prov(); return keyOf(q) ? `Ask uses ${q.name} · ${label(q.model)} now.` : `Ask uses ${q.name} now. Paste its key below.`; };
+    model.onchange = () => { setModel(model.value); note.textContent = now(); };
     const key = $("input", "rs-q"); key.type = "password"; key.autocomplete = "off"; key.placeholder = keyOf(p) ? "(a key is saved in this browser)" : "Paste your key";
-    const save = $("button", "sb-primary", "Save"), clear = $("button", "", "Clear"), note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
-    save.type = clear.type = "button"; btns.append(clear, save);
+    // the button row at the end of the form: Clear (only with a saved key), then one filled button: Done, or Save key while a key is typed
+    const save = $("button", "sb-primary rs-ask-save", "Save key"), clear = $("button", "", "Clear"), done = $("button", "sb-primary rs-ask-done", "Done");
+    const note = $("p", "rs-ask-keynote"), btns = $("div", "rs-ask-btns");
+    save.type = clear.type = done.type = "button"; done.onclick = () => showKey(false); btns.append(clear, save, done);
+    const showBtns = () => { save.hidden = !key.value.trim(); done.hidden = !save.hidden; clear.hidden = !keyOf(p); };
+    key.oninput = showBtns; showBtns();
+    if(said) note.textContent = said;
     const link = $("a", "", (p.paid ? "Get a key from " : "Get a free key from ") + p.name); if(p.keys){ link.href = p.keys; link.target = "_blank"; link.rel = "noopener"; } else link.hidden = true;
     // no notes under the form (Kaveh, 2026-11-06: "I think we should remove this part too"): the "?" of Ask says where the key and the data go; the line
     // here shows only the state of a save
     const row = (l, el) => { const r = $("label", "rs-ask-krow"); r.append($("span", "", l), el); return r; };
-    const hd = $("div", "rs-ask-keyhd"), back = $("button", "", "‹ Back to chat"); back.type = "button"; back.onclick = () => showKey(false);
-    hd.append($("b", "", "Your key"), back);
-    sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(); paintWho(); };
+    const hd = $("div", "rs-ask-keyhd"); hd.append($("b", "", "AI service"));
+    sel.onchange = () => { const s = settings(); s.provider = sel.value; putSettings(s); drawKey(isAuto() ? "Ask uses Auto now." : now()); paintWho(); };
     if(isAuto()){                                                   // Auto: the order of the services; a service of the box changes its key or model
       const ol = $("ol", "rs-ask-order");
       for(const x of PROVS) ol.append($("li", "", `${x.name} · ${keyOf(x) ? label(modelOf(x)) : "no key"}`));
-      keyBox.replaceChildren(hd, row("Provider", sel), $("p", "rs-ask-keynote", "Ask asks these services in this order. When one cannot answer, it asks the next. Choose a service to change its key or its model."), ol);
+      clear.hidden = true;
+      keyBox.replaceChildren(hd, row("Provider", sel), ...(said ? [note] : []), $("p", "rs-ask-keynote", "Ask asks these services in this order. When one cannot answer, it asks the next. Choose a service to change its key or its model."), ol, btns);
       return;
     }
-    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), row("Key", key), btns, note);
+    keyBox.replaceChildren(hd, row("Provider", sel), link, row("Model", model), row("Key", key), note, btns);
     if(keyOf(p)) modelsOf(p).then((ids) => { if(model.isConnected && prov().id === p.id) fill(chatModels(ids)); })
       .catch((e) => { if(model.isConnected) note.textContent = "The saved key did not work: " + sentence(e.message); });
     clear.onclick = () => { lsPut("rs-key:ask:" + prov().id, null); drawKey(); paintWho(); };
     save.onclick = async () => {
       const s = settings(); s.provider = sel.value; putSettings(s);
       if(key.value.trim()) lsPut("rs-key:ask:" + sel.value, key.value.trim());
-      key.value = ""; paintWho(); note.textContent = "Checking the key…";
+      key.value = ""; showBtns(); paintWho(); note.textContent = "Checking the key…";
       try{
         const ids = chatModels(await modelsOf(prov())), was = model.value, m = was === AUTO || ids.includes(was) ? was : pickModel(ids);
         if(m) setModel(m);
@@ -498,7 +505,7 @@ export function askPanel(o = {}){
     ctl = me; cur = t; sending(true);
     try{
       const p = prov();
-      if(isAuto() ? !PROVS.some((x) => keyOf(x)) : !keyOf(p)) throw new Error(`Ask needs your own key. Add a key of ${isAuto() ? "a service" : p.name} with Key.`);
+      if(isAuto() ? !PROVS.some((x) => keyOf(x)) : !keyOf(p)) throw new Error(`Ask needs your own key. Add a key of ${isAuto() ? "a service" : p.name} with AI.`);
       if(!loaded) say("Loading the data…");
       await data.ready();
       const history = turns.filter((y) => y !== t).flatMap((y) => y.hist || []);
@@ -546,11 +553,6 @@ export function askPanel(o = {}){
   function finish(t, answer, c){
     t.cam = c.cam; t.text = answer; t.hist = [{role: "user", content: t.question}, {role: "assistant", content: answer}];
     t.el.append(answerEl(answer, t));
-    if(c.by){                                                                                       // who answered, and who could not (Auto)
-      const by = $("p", "rs-ask-by", `${c.by.name} · ${c.by.model}`);
-      if(c.tried.length) by.append(` (after ${c.tried.map((x) => `${x.name} · ${x.model}: ${x.why}`).join("; ")})`);
-      t.el.append(by);
-    }
     for(const m of c.maps){ const line = $("div", "rs-ask-map"); line.append($("span", "rs-ask-map-k", "Map"), $("span", "", m.text)); if(!m.move) line.append($("span", "rs-ask-map-to", "in the list of Colour or Focus")); t.el.append(line); }
     // the answer's table: the query with roads that has the most rows (a model often runs the full list, then a count or "LIMIT 2" for the longest); a map
     // tool's roads win over a helper query that the model ran after it
@@ -567,6 +569,13 @@ export function askPanel(o = {}){
     }
     const sqls = c.maps.flatMap((m) => m.sql);
     if(sqls.length){ foot = $("div", "rs-ask-foot"); foot.append(fold("rs-ask-sqls", plural(sqls.length, "map query", "map queries"), ...codes(sqls))); t.el.append(foot); }
+    // the model that answered, short (no "provider/" and no ":free"), at the end of the footer line: "1 query · 20 rows · flint-v1.0"; the tries that
+    // failed before it are not shown (a decision of 2026-11-07: the card names only the model that gave the answer)
+    if(c.by){
+      const m = c.by.model.replace(/^.*\//, "").replace(/:free$/, ""), sum = foot && foot.querySelector("summary");
+      if(sum) sum.append(` · ${m}`);
+      else { foot = $("div", "rs-ask-foot"); foot.append($("span", "rs-ask-by", m)); t.el.append(foot); }
+    }
     t.res = c.chart ? c.chart.res : [...c.maps].reverse().map((m) => m.res).find(Boolean) || best;
     // a chart answer: a small copy of the chart in the card (no labels, no hover); Show puts the chart in the dock again
     if(c.chart && c.chart.spec){ t.chart = true; const box = $("div", "rs-ask-chart"); t.el.insertBefore(box, foot || null);
