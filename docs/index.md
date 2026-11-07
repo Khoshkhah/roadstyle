@@ -1,6 +1,11 @@
 # roadstyle
 
-<p class="lead">roadstyle makes one HTML file from a road network: a styled map that you can click, that works offline, with Street View and a JavaScript API.</p>
+<p class="lead">roadstyle draws a road network as an interactive web map, from one Python call.</p>
+
+- **One file.** The map is one HTML file with all its data in it. It opens from disk, offline, or from your website.
+- **Roads that read like a real map.** Each road class has its own colour and width, with outlines, street names and one-way arrows.
+  Bridges, tunnels and junctions are drawn in the correct order.
+- **More than a map.** Add Street View, a dashboard with your own parts, SQL on your data, and questions to an AI in words.
 
 <div class="rs-hero" markdown>
 ![A roadstyle map of Monaco in 3D: bridges, tunnels and roundabouts drawn in order, Rue de la Colle selected, and the floating Street View window showing it](img/hero.jpg)
@@ -52,9 +57,26 @@ rs.render_edges(edges).save("roads.html")  # one file with all its data: it open
 
     ---
 
-    Put the map on a website or in another map app, or let an AI agent make maps.
+    Put the map on a website, or open its roads in another map app.
 
     [:octicons-arrow-right-24: On a website or in a map app](guides/website.md)
+
+-   :material-brush-variant:{ .lg .middle } **Design**
+
+    ---
+
+    Change the look of a map in the page: a ready theme, the colours and widths of the road classes, the names and the base map.
+    You see each change on the map at once.
+
+    [:octicons-arrow-right-24: Edit the design of a map](guides/design-panel.md)
+
+-   :material-robot-outline:{ .lg .middle } **AI**
+
+    ---
+
+    Ask questions about your data in words, in a dashboard, with a free key of your own. Or let an AI agent make maps for you, with no code.
+
+    [:octicons-arrow-right-24: Ask](guides/ask.md) · [With AI agents](guides/agents.md)
 
 -   :material-image-multiple-outline:{ .lg .middle } **Gallery**
 
