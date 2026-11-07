@@ -98,6 +98,22 @@ export function run(look, data) {
   eq(X.labels.base_size[0][1], look.labels.base_size[0][1] * 2, "label size");
   eq(X.labels.minzoom, 12); eq(X.labels.minor_minzoom, 14); eq(X.arrows.minor_minzoom, 14);
   eq(X.base_map.style.buildings_3d.m_per_level, 5);
+  // bridges and tunnels: in the look (bridges.*, tunnels.*); a value that the design did not change keeps the look's
+  eq(base.bridges, { casing: D.toHex(look.bridges.casing_color), wing: 1, shadow: look.bridges.shadow.show, shadow_color: "#000000", shadow_opacity: D.alphaOf(look.bridges.shadow.color, 1), shadow_blur: look.bridges.shadow.blur });
+  eq(base.tunnels, { strength: look.tunnels.strength, toward: look.tunnels.toward, palette: look.tunnels.palette, ratio: look.tunnels.casing_dash.length === 2 ? look.tunnels.casing_dash : [1, 1] });
+  ok(JSON.stringify(D.applyToLook(look, base)) === JSON.stringify(look), "the default design is the look");
+  const bt = structuredClone(base);
+  Object.assign(bt.bridges, { casing: "#112233", wing: 2, shadow: false, shadow_color: "#ff0000", shadow_opacity: 0.5, shadow_blur: 6 });
+  Object.assign(bt.tunnels, { strength: 80, toward: "Navy", palette: "Blue + cyan", ratio: "2:1" });
+  const BT = D.applyToLook(look, D.normalize(bt, base));
+  eq(BT.bridges.casing_color, "#112233"); eq(BT.bridges.wing_scale, +(look.bridges.wing_scale * 2).toFixed(3)); eq(BT.bridges.shadow.show, false);
+  eq(BT.bridges.shadow.color, "rgba(255,0,0,0.5)"); eq(BT.bridges.shadow.blur, 6);
+  eq([BT.tunnels.strength, BT.tunnels.toward, BT.tunnels.palette, BT.tunnels.casing_dash], [80, "Navy", "Blue + cyan", [2, 1]]);
+  eq(D.normalize({ bridges: { wing: 99, shadow_opacity: -1, casing: "blue" }, tunnels: { strength: 500, ratio: [0, 1] } }, base).bridges.wing, 3);
+  eq(D.normalize({ bridges: { shadow_opacity: -1, casing: "blue" } }, base).bridges.shadow_opacity, 0);
+  eq(D.normalize({ bridges: { casing: "blue" } }, base).bridges.casing, base.bridges.casing);
+  eq(D.normalize({ tunnels: { strength: 500, ratio: [0, 1] } }, base).tunnels, { ...base.tunnels, strength: 100 });
+  eq([D.alphaOf("rgba(0,0,0,0.25)", 9), D.alphaOf("#123456", 9), D.alphaOf("blue", 9)], [0.25, 1, 9]);
   // a design with wrong values is repaired, not thrown away; a host value goes through the host's normalize
   const bad = D.normalize({ name: "  ", roads: { fill: { motorway: "red", trunk: "#ABCDEF" }, width: { major: 99 } }, profile: { zoom: 30 } }, hbase, [host]);
   eq(bad.name, "Light"); eq(bad.roads.fill.motorway, base.roads.fill.motorway); eq(bad.roads.fill.trunk, "#abcdef");

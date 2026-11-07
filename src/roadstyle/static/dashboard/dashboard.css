@@ -817,8 +817,6 @@ html[data-rs-theme=dark],#sb[data-theme=dark]{--rs-err:#fca5a5;--rs-warn:#fbbf24
 :is(#sb,.rs-frame) button.rs-link{padding:0;border:0;border-radius:0;background:none;color:var(--accent);font:inherit;text-transform:none;letter-spacing:0;cursor:pointer}
 :is(#sb,.rs-frame) button.rs-link:is(:hover,:focus-visible):not(:disabled){border:0;background:none;color:var(--accent);text-decoration:underline}
 :is(#sb,.rs-frame) button.rs-link:disabled{color:var(--mut);cursor:default}
-/* a disabled button looks disabled (it has no hover: the hover rules have :not(:disabled)); without this it looked as a plain button that did not react */
-:is(#sb,.rs-frame) button:disabled{opacity:.45;cursor:not-allowed}
 /* a slider: the accent colour (the rule of the panel's inputs) and, on a phone, a 44 px row for a finger */
 html.rs-phone #sb input[type=range]{min-height:44px}
 
@@ -910,6 +908,7 @@ html.rs-phone .rs-svw.rs-svw-dock{top:auto!important;left:0!important;right:0!im
    weight, so the part's own rules win. */
 :where(.rs-frame, #rs-dock) button{padding:5px 11px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
 :where(.rs-frame, #rs-dock) button:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);color:var(--accent);background:var(--rs-hover-bg)}
+:where(#sb, .rs-frame, #rs-dock) button:disabled{opacity:.5;cursor:not-allowed}      /* also the panel's own buttons: no weight, so a part's own disabled look wins */
 :where(.rs-frame, #rs-dock) :is(input:not([type=checkbox],[type=radio],[type=range],[type=color]),textarea){box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font:inherit;outline:none}
 :where(.rs-frame) :is(input[type=password],input[type=text]){width:100%}
 :where(.rs-frame, #rs-dock) :is(input,textarea):focus{border-color:var(--accent)}
@@ -953,6 +952,9 @@ html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
 .rs-dz .rhead{display:grid;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:4px}
 .rs-dz .rhead span{text-align:center}
 .rs-dz .rs-cp,.rs-dz .rs-cp-btn{width:100%}      /* a colour of the design panel fills its column */
+.rs-dz input[type=color]{width:100%;min-width:44px;height:30px;padding:1px 2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer}
+/* a colour box of a panel has the hover of a button: the accent border and the tint */
+:is(#sb,.rs-side,.rs-frame,#rs-dock) input[type=color]:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);background:var(--rs-hover-bg);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-dz input[type=number],.rs-dz input[type=text],.rs-dz input[type=search]{height:32px;min-width:0;width:100%;box-sizing:border-box}
 .rs-dz .drow2 .rs-sel,.rs-dz .drow2>select{width:auto;max-width:11em}
 .rs-dz .optrow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);cursor:pointer;margin-bottom:6px}

@@ -154,8 +154,11 @@ overlapped (the lanes narrow and move apart in the ramp). A direction that has a
 (`rs_top`), so it covered its twin. At zoom 16 a road with one painted direction showed a wide painted line and a thin sliver of the
 other direction. The widths of the two twins were equal: the lines overlapped.
 
-**Rule.** Each line of a twin pair that is not the casing (fill, bridge shadow, tunnel gap, tunnel dashes; `__rs_pair` and `__rs_k` not 0)
-is one half of the road. With the road's width `w`, and `r` the place of the zoom in the ramp (0 before `offset_zoom`, 1 from
+**Rule.** Each fill of a twin pair (`__rs_pair` and `__rs_k` 1) is one half of the road. The lines that come from the pair's one casing
+(the casing, the bridge shadow, the tunnel gap and the tunnel dashes: `__rs_k` 0, 2, 3, 4) are not halves: both directions share them,
+so they cover the whole road (`pair_casing`). Until 2026-11-07 the shadow, the gap and the dashes were halves too. `casing_parts` makes
+them for the first edge of the pair only, so a two-way tunnel had its dashes on one side only, and a bridge had its shadow on one side
+only. With the road's width `w`, and `r` the place of the zoom in the ramp (0 before `offset_zoom`, 1 from
 `offset_zoom + ramp_zooms`):
 
 | | width | offset |

@@ -9,12 +9,12 @@
 //
 // A change of the style draws the map again after 0.5 s of quiet: setLook(text) gives a style for the same tiles (the panel shows it with rs.restyle), else
 // redraw(text, true) draws a new map. The ground, the layers and the opacity are not in the look: the panel paints them at once with roadstyle's own calls, and
-// again after each new style (rs:stylechange). A change that also changes the look (a theme) paints them when the new look shows: one change on the map.
+// again after each new style (rs:stylechange). The tunnel look is in the map's global state: the panel paints it with rsSetTunnelStyle, as the Tunnels box does. A change that also changes the look (a theme) paints them when the new look shows: one change on the map.
 import * as D from "./design.js";
 import * as UT from "./user_themes.js";
 import {editorFrame} from "../frame.js";
 
-const TABS = [["theme", "Theme"], ["roads", "Roads"], ["text", "Text"], ["layers", "Layers"]];
+const TABS = [["theme", "Theme"], ["roads", "Roads"], ["bridges", "Bridges & tunnels"], ["text", "Text"], ["layers", "Layers"]];
 const LABEL = { motorway: "Motorway", trunk: "Trunk", primary: "Primary", secondary: "Secondary", tertiary: "Tertiary", unclassified: "Unclassified", residential: "Residential",
   living_street: "Living street", service: "Service", pedestrian: "Pedestrian", cycleway: "Cycleway", footway: "Footway", path: "Path", track: "Track" };
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -54,7 +54,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   let mine = UT.readAll(undefined, `${storageKey}.themes`), origin = null, ask = null, armed = null, renaming = null, nameDraft = "", keepDraft = false, mineMsg = "";
   let design = structuredClone(base), tab = "theme", lastKey = null, timer = null, busy = false, again = false, note = "";
   const styleKey = (d) => {                                          // the boundary, the ground, the layers, the opacity and the host values are not in the look: they draw no new map
-    const k = structuredClone({ ...noHost(d), name: 0, theme: 0, boundary: 0, ground: 0, visible: 0 });
+    const k = structuredClone({ ...noHost(d), name: 0, theme: 0, boundary: 0, ground: 0, visible: 0, tunnels: 0 });
     delete k.roads.opacity; delete k.labels.halo_opacity; delete k.arrows.opacity;
     return JSON.stringify(k);
   };
@@ -117,7 +117,16 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     if (map.getLayer(P() + "roads-labels") && d.labels.halo_opacity !== 1) map.setPaintProperty(P() + "roads-labels", "text-halo-color", D.withAlpha(d.labels.halo_color, d.labels.halo_opacity));
     if (map.getLayer(P() + "roads-arrows") && d.arrows.opacity !== 0.7) map.setPaintProperty(P() + "roads-arrows", "icon-opacity", d.arrows.opacity);
   }
-  const paintMap = () => { paintGround(); applyVisible(); paintRoads(); };
+  // the tunnel look: the map's global state (roadstyle's tunnel.js), the same call as the Tunnels box. No tunnel layer: rsSetTunnelStyle does nothing.
+  function paintTunnels() {
+    const t = painted.tunnels;
+    if (!window.rsSetTunnelStyle) return;
+    applying = true;
+    try { window.rsSetTunnelStyle({ strength: t.strength, palette: t.palette, ratio: t.ratio, toward: t.toward }); }
+    catch (e) { console.warn("design panel: the tunnel look:", e.message); }
+    finally { applying = false; }
+  }
+  const paintMap = () => { paintGround(); applyVisible(); paintRoads(); paintTunnels(); };
   const announce = () => { painted = design; boundary?.(design.boundary); paintMap(); };
   const announceSoon = () => { if (styleKey(design) !== lastKey) held = true; else { held = false; announce(); } };
   const paintHeld = () => { if (held) { held = false; announce(); } };
@@ -127,6 +136,13 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
   const quiet = () => applying || restyling;
   for (const [ev, key] of [["rs:arrowschange", "arrows"], ["rs:buildings3dchange", "buildings3d"]]) document.addEventListener(ev, (e) => { if (!quiet()) setVisible(key, e.detail.on); });
   document.addEventListener("rs:overlaychange", (e) => { if (!quiet()) setVisible(e.detail.overlay, e.detail.visible); });
+  document.addEventListener("rs:tunnelchange", (e) => {                                   // the Tunnels box: the design follows
+    const d = e.detail, t = design.tunnels;
+    if (quiet() || (t.strength === d.strength && t.palette === d.palette && t.toward === d.toward && JSON.stringify(t.ratio) === JSON.stringify(d.ratio.map(Number)))) return;
+    design.tunnels = { strength: d.strength, palette: d.palette, toward: d.toward, ratio: d.ratio.map(Number) }; design.theme = "custom";
+    painted = { ...painted, tunnels: design.tunnels };
+    save(); paintBar(); if (isOpen() && tab === "bridges") paint();
+  });
   document.addEventListener("rs:filterchange", (e) => {
     const d = e.detail;
     if (quiet()) return;
@@ -187,7 +203,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
       + (ask ? `<p class="small" role="alert">A theme named "${esc(ask.name)}" exists. Replace it? <button type="button" class="sm" data-mine-do="replace">Replace</button> <button type="button" class="sm" data-mine-do="keep-old">Cancel</button></p>` : "")
       + `<p class="small" id="mine-msg" role="status">${esc(mineMsg)}</p>`
       + (mine.length ? `<div class="themes" id="mine-list">${mineShown().map(mineCard).join("")}</div>` : '<p class="why">No saved theme yet. Pick a theme, change it, and save it here with a name.</p>')
-      + `<div class="row"><button type="button" id="mine-download" ${mine.length ? "" : "disabled"}>Download all my themes</button><button type="button" id="mine-load">Load themes from a file</button></div><input id="mine-file" type="file" accept=".json,application/json" hidden>`,
+      + `<div class="row"><button type="button" id="mine-download" ${mine.length ? "" : 'disabled title="Save a theme first: there is no theme to download"'}>Download all my themes</button><button type="button" id="mine-load">Load themes from a file</button></div><input id="mine-file" type="file" accept=".json,application/json" hidden>`,
       "Your themes are for all the maps of this page. They stay in this browser: download them to use them on another computer.");
   };
   const panePreview = () => {
@@ -222,6 +238,23 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     + sec("Dark mode", `<p class="why">The map in the dark theme changes each light color to a dark one. These ranges set how light the dark colors are (0 is black, 1 is white).</p>`
       + [["roads", "Road fill"], ["casing", "Casing"], ["areas", "Areas"], ["labels", "Text"]].map(([k, n]) => `<div class="drow2 two"><span>${n}</span><input type="number" data-p="dark.${k}.0" min="0" max="1" step="0.02" value="${design.dark[k][0]}" aria-label="${n}, darkest"><input type="number" data-p="dark.${k}.1" min="0" max="1" step="0.02" value="${design.dark[k][1]}" aria-label="${n}, lightest"></div>`).join("")
       + color("Dark ground", "dark.background", design.dark.background));
+  // the lists of the Tunnels box come from the look (tunnels.towards, tunnels.palettes, tunnels.ratios); a value of a file that is not in a list is kept as one more choice
+  const choice = (label, p, v, list) => `<label class="drow2"><span>${label}</span><select data-p="${p}">${[...list, ...(list.includes(v) ? [] : [v])].map((x) => `<option value="${esc(x)}" ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></label>`;
+  const paneBridges = () => {
+    const b = design.bridges, t = design.tunnels, tl = look.tunnels ?? {}, none = (k) => (hasLayer(k) === false ? '<p class="small muted">This map has none, so a change does not show here.</p>' : "");
+    const shadowOff = b.shadow ? "" : "disabled";
+    return sec("Bridges", none("bridges") + color("Casing color", "bridges.casing", b.casing) + range("Casing width", "bridges.wing", b.wing, 0.5, 3, 0.05, " ×")
+        + check("Shadow", "bridges.shadow", b.shadow, "A soft shadow beside the bridge, so that it shows above the roads under it.")
+        + color("Shadow color", "bridges.shadow_color", b.shadow_color).replace("<input", `<input ${shadowOff}`)
+        + range("Shadow opacity", "bridges.shadow_opacity", b.shadow_opacity, 0, 1, 0.05, "%").replace("<input", `<input ${shadowOff}`)
+        + range("Shadow blur", "bridges.shadow_blur", b.shadow_blur, 0, 12, 0.5, " px").replace("<input", `<input ${shadowOff}`),
+        "The casing of a bridge is the line at the two edges of its deck. The width is a factor of the casing width of the theme.")
+      + sec("Tunnels", none("tunnels") + range("Strength", "tunnels.strength", t.strength, 0, 100, 5, " %")
+        + choice("Colors toward", "tunnels.toward", t.toward, Object.keys(tl.towards ?? {}))
+        + choice("Dash colors", "tunnels.palette", t.palette, Object.keys(tl.palettes ?? {}))
+        + choice("Dash and gap", "tunnels.ratio", t.ratio.join(":"), (tl.ratios ?? [[1, 1]]).map((r) => r.join(":"))),
+        "0 % keeps the colors of the road. 100 % gives the full tunnel colors. These are the controls of the Tunnels box of the map bar: both show one state.");
+  };
   const paneText = () => sec("Street names", color("Color", "labels.color", design.labels.color) + color("Halo color", "labels.halo_color", design.labels.halo_color)
       + range("Halo width", "labels.halo_width", design.labels.halo_width, 0, 4, 0.25, " px") + range("Halo opacity", "labels.halo_opacity", design.labels.halo_opacity, 0, 1, 0.05, "%") + range("Size", "labels.size", design.labels.size, 0.6, 1.8, 0.05, " ×")
       + number("From zoom", "labels.minzoom", design.labels.minzoom, 8, 20), "Smaller roads show their names two zooms later.")
@@ -255,7 +288,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
       + color("Railways", "base.railways", design.base.railways) + color("Waterways", "base.waterways", design.base.waterways))
     + sec("3D buildings", range("Meters for each floor", "base.m_per_level", design.base.m_per_level, 2, 6, 0.1, " m") + number("Highest building (m)", "base.max_height", design.base.max_height, 10, 500, 10)
       + range("Opacity", "base.height_opacity", design.base.height_opacity, 0.2, 1, 0.05), "The height of a building is its floors times this value, up to the highest building.");
-  const PANES = { theme: paneTheme, roads: paneRoads, text: paneText, layers: paneLayers };
+  const PANES = { theme: paneTheme, roads: paneRoads, bridges: paneBridges, text: paneText, layers: paneLayers };
 
   // ---- draw ----
   // a host tab: the host draws its pane (draw(element, value, put, controls)); put(v) tells the panel of a new value
@@ -348,7 +381,7 @@ export async function designPanel({ panel, dashboard = window.rs, map = window.m
     if (Number.isNaN(v)) return;
     setPath(design, p, v);
     if (el.type === "range") el.parentElement.querySelector("output").textContent = shown(v, el.dataset.unit);
-    if (p === "boundary.show" || p === "ground.transparent") { design.theme = "custom"; return (changed(), paint()); }
+    if (p === "boundary.show" || p === "ground.transparent" || p === "bridges.shadow") { design.theme = "custom"; return (changed(), paint()); }
     if (p !== "name") design.theme = "custom";
     changed();
   });
