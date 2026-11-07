@@ -93,3 +93,14 @@ The functions give back an object with `value()` and `set(v, quiet)` where the p
 - Paging from a server (a page that loads the next rows): `rs.more` takes a list in memory. A page with server paging can use the `.rs-more`
   line and its own button.
 - A choice of the unit by the person (day, week or month in one control): a page puts an `rs-seg` beside the field and calls `unit(u)`.
+
+## The gaps of 2026-11-07
+
+duckOSM Studio used the parts and found six gaps. Each is closed with a small option, and none changes a part that was in use.
+
+1. `rs.search(el, {end: button})`: an element that goes inside `.rs-search-box`, after the clear button and before the end button `button`. It has the look of the clear button.
+2. `rs.number`: the option `disabled` and the handle's `disabled(on)` switch off the input and both buttons. `set()` and the limits use one function, so they do not switch the buttons on again while the field is off.
+3. `.rs-status:empty{display:none}`, as `.rs-field-msg:empty` has.
+4. `rs.sections.add({step: 3})` puts a round badge (`rs-sec-n`) before the title. `rs.sections.done(id, on)` sets `data-rs-done` on the card: the badge shows a check mark in place of the number, as `rs-step.done` does. A card with no `step` gets the mark alone.
+5. `rs.mapBusy(text)` and `rs.mapBusy(null)` (`notice.js`): `#rs-mapbusy` is a fixed veil that the script puts on `rs.freeArea()` (a `ResizeObserver` on the panel, the bar and the side box follows them). The veil is `--bg` at 40 % through `color-mix` (no `rgba`), the pill uses `--rs-pop-bg` and `--rs-pop-ink`, and the pointer goes through it.
+6. `rs.number`: the option `snap`. **The default stays `true`**: a typed value goes to the nearest `step`, as before, so no page that uses the field changes. `snap: false` keeps the typed value and the buttons add or take one `step`. The note says only that a value out of range goes to the nearest limit, and it says nothing of rounding, so the new option is a choice of the page and not a new rule.

@@ -1,7 +1,7 @@
 {
   "page": {
-    "bytes": 3102115,
-    "sha16": "f695f694679f03cf"
+    "bytes": 3107641,
+    "sha16": "041ec1ae8886d679"
   },
   "warnings": [
     "base map 'voyager_nolabels' was removed; 'ofm_positron' is used instead",

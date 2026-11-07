@@ -84,3 +84,26 @@ export function rsBusy(button, on = true){
   go(!!on);
   return on;
 }
+// The veil of a busy map (a draw, a build): a light veil over the free part of the map (rs.freeArea(): the panel, the bar and the dock stay clear),
+// with a ring and the text of the step in a pill. The pointer goes through it (the person can still move the map). The text is read out as a status.
+//   rs.mapBusy("Reading the roads…")      shows the veil, or changes its text
+//   rs.mapBusy(null)                      takes it away (also false and "")
+let _mbEl = null, _mbWatch = null;
+function _mbPlace(){
+  const f = window.rs?.freeArea?.(); if(!_mbEl || !f) return;
+  Object.assign(_mbEl.style, {left: f.lo + "px", top: f.top + "px", width: Math.max(0, f.hi - f.lo) + "px", height: Math.max(0, f.bottom - f.top) + "px"});
+}
+export function rsMapBusy(text){
+  if(!text){ if(_mbEl) _mbEl.hidden = true; _mbWatch?.disconnect(); return; }
+  if(!_mbEl){
+    _mbEl = document.createElement("div"); _mbEl.id = "rs-mapbusy"; _mbEl.setAttribute("role", "status");
+    _mbEl.innerHTML = '<span class="rs-mapbusy-pill"><span class="rs-mapbusy-t"></span></span>';
+    document.body.appendChild(_mbEl);
+    addEventListener("resize", _mbPlace);
+    _mbWatch = new ResizeObserver(_mbPlace);
+  }
+  _mbEl.querySelector(".rs-mapbusy-t").textContent = text;
+  _mbEl.hidden = false; _mbPlace();
+  _mbWatch.disconnect();                                  // the veil follows a panel, a bar or a dock that opens, closes or moves
+  for(const e of [document.getElementById("sb"), document.getElementById("rs-toolbar"), document.querySelector(".rs-side"), document.querySelector(".rs-grip")]) if(e) _mbWatch.observe(e);
+}

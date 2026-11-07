@@ -82,14 +82,14 @@ import {rsHours} from "./static/dashboard/hours.js";
 import {rsSlider, rsNumber, rsColorPick} from "./static/dashboard/fields.js";
 import {rsSearch} from "./static/dashboard/search.js";
 import {rsDrop} from "./static/dashboard/drop.js";
-import {rsToast, rsConfirm, rsProgress, rsBusy} from "./static/dashboard/notice.js";
+import {rsToast, rsConfirm, rsProgress, rsBusy, rsMapBusy} from "./static/dashboard/notice.js";
 import {rsMenu} from "./static/dashboard/menu.js";
 import {rsMore} from "./static/dashboard/more.js";
 
 // the page's `rs`: the same functions as rs.<name> of a dashboard page (api.js), without the map
 const rs = window.rs = {sections: rsSections, help: rsHelp, hover: rsHover, tabs: rsTabs, days: rsDays, kpi: rsKpi, svg: rsSvg, chart: rsChart, frame: editorFrame,
   hours: rsHours, toggle: rsToggle, slider: rsSlider, number: rsNumber, colorPick: rsColorPick, search: rsSearch, drop: rsDrop, toast: rsToast, confirm: rsConfirm,
-  progress: rsProgress, busy: rsBusy, menu: rsMenu, more: rsMore, panel: {bar: rsPanelBar}};
+  progress: rsProgress, busy: rsBusy, mapBusy: rsMapBusy, menu: rsMenu, more: rsMore, panel: {bar: rsPanelBar}};
 const q = new URLSearchParams(location.search), one = q.get("part"), html = document.documentElement, sb = document.getElementById("sb");
 const top = (() => { try { return window.top.innerWidth; } catch(e){ return innerWidth; } })();
 const phone = q.has("phone") || top <= 700;       // the phone look of a dashboard: a screen of 700 px or less (dashboard.phone.max_width_px)
@@ -283,9 +283,11 @@ const PARTS = [
     rs.slider(document.getElementById("gl-sl2"), {label: "Flow", min: 0, max: 2000, step: 50, value: [300, 1200], unit: "veh/h"});
   }},
   {id: "number", name: "Number field", make(){
-    rs.sections.add({id: "number", html: '<div class="gl-row"><div id="gl-num"></div><div id="gl-num2"></div></div>'});
+    rs.sections.add({id: "number", html: '<div class="gl-row"><div id="gl-num"></div><div id="gl-num2"></div></div><div class="gl-row" style="margin-top:12px"><div id="gl-num3"></div><div id="gl-num4"></div></div>'});
     rs.number(document.getElementById("gl-num"), {label: "Lanes", min: 1, max: 8, value: 2});
     rs.number(document.getElementById("gl-num2"), {label: "Width", min: 0, max: 40, step: 0.5, value: 7.5, unit: "m"});
+    rs.number(document.getElementById("gl-num3"), {label: "Buffer, snap: false", min: 0, max: 500, step: 50, value: 100, unit: "m", snap: false});
+    rs.number(document.getElementById("gl-num4"), {label: "Off", min: 0, max: 500, step: 50, value: 100, unit: "m", disabled: true});
   }},
   {id: "onoff", name: "On/off switch", make(){
     rs.sections.add({id: "onoff", html: '<label class="rs-switch"><input type="checkbox" role="switch" checked><span>Show bridges</span></label>' +
@@ -294,7 +296,11 @@ const PARTS = [
   {id: "search", name: "Search field", room: 190, make(){
     rs.sections.add({id: "search", html: '<div id="gl-q"></div><p class="gl-out" id="q-out">Type "mo", then use the arrow keys.</p>'});
     const places = [["Monaco", "Monaco"], ["Monte Carlo", "Monaco"], ["Montpellier", "France"], ["Tartu", "Estonia"], ["Stockholm", "Sweden"]];
-    rs.search(document.getElementById("gl-q"), {placeholder: "Find a place", button: "Go",
+    const here = document.createElement("button");
+    here.type = "button"; here.title = "What is here?"; here.setAttribute("aria-label", "What is here?");
+    here.innerHTML = '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="5.5"/><path d="M8 5.2v3.4M8 10.6v.1"/></svg>';
+    rs.toggle(here, on => out("q-out", `end button: <b>${on ? "on" : "off"}</b>`));
+    rs.search(document.getElementById("gl-q"), {placeholder: "Find a place", button: "Go", end: here,
       suggest: t => new Promise(ok => setTimeout(() => ok(places.filter(p => p[0].toLowerCase().includes(t.toLowerCase())).map(p => ({label: p[0], sub: p[1]}))), 250)),
       onPick: it => out("q-out", `onPick: <b>${esc(it.label)}</b>`), onSubmit: t => out("q-out", `onSubmit: <b>${esc(t)}</b>`)});
   }},
@@ -308,6 +314,10 @@ const PARTS = [
     rs.progress(document.getElementById("gl-wait"), {label: "Reading the file"});
     let v = 0.4; setInterval(() => { v = v >= 1 ? 0 : v + 0.02; bar.set(v); }, 250);
     for(const id of ["gl-busy", "gl-busy2"]) document.getElementById(id).onclick = e => rs.busy(e.currentTarget, new Promise(ok => setTimeout(ok, 2000)));
+  }},
+  {id: "mapbusy", name: "Busy map", make(){
+    rs.sections.add({id: "mapbusy", html: '<div class="gl-row"><button type="button" class="sb-primary" id="gl-mb">Show the veil</button></div><p class="gl-out">The veil goes after 3 s. Here it covers the whole window, because this page has no map.</p>'});
+    document.getElementById("gl-mb").onclick = () => { rs.mapBusy("Reading the roads…"); setTimeout(() => rs.mapBusy("Building the network…"), 1500); setTimeout(() => rs.mapBusy(null), 3000); };
   }},
   {id: "toast", name: "Toast and status line", make(){
     rs.sections.add({id: "toast", html: '<div class="rs-status">Monaco has 1 214 roads.</div><div class="rs-status warn">3 fixes are not saved.</div><div class="rs-status error">The file is not an OSM file.</div><div class="rs-status ok">The build is done.</div>' +
@@ -335,6 +345,12 @@ const PARTS = [
     rs.sections.add({id: "steps", html: '<ol class="rs-steps"><li class="rs-step done"><span class="rs-step-n">1</span><div class="rs-step-b"><b>Choose an area</b><p>Monaco, 2.1 km²</p></div></li>' +
       '<li class="rs-step on"><span class="rs-step-n">2</span><div class="rs-step-b"><b>Build the roads</b><p>The engine makes the road network.</p></div></li>' +
       '<li class="rs-step wait"><span class="rs-step-n">3</span><div class="rs-step-b"><b>Edit OSM data</b><span class="rs-step-note">After step 2</span></div></li></ol>'});
+    // the same marks in the title row of a card: `step`, and rs.sections.done
+    rs.sections.add({id: "steps-card", label: "Draw the area", step: 3, note: "A click on the button sets the done mark",
+      html: '<button type="button" id="gl-done">Done</button>'});
+    rs.sections.add({id: "steps-card2", label: "Build the roads", step: 4, html: "<p>Not done yet.</p>"});
+    rs.sections.done("steps-card", true);
+    document.getElementById("gl-done").onclick = () => rs.sections.done("steps-card2", !rs.sections.get("steps-card2").dataset.rsDone);
   }},
   {id: "toolrow", name: "Tool row", make(){
     const ic = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;

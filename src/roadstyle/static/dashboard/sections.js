@@ -47,6 +47,7 @@ function _cardMake(w, spec){
   const note = document.createElement("p"); note.className = "rs-sec-note"; note.textContent = spec.note || "";
   const body = document.createElement("div"); body.className = "rs-sec-body";
   w.append(hd, note, body);
+  if(spec.step != null) _stBadge(w, spec.step);
   if(spec.fold) _fdMake(w, spec, hd, tt);
   if(spec.open) _opMake(w, spec, hd, tt);
   return body;
@@ -97,6 +98,14 @@ function _opMake(w, spec, hd, tt){
   hd.insertAdjacentHTML("beforeend", spec.icon === "ask" ? _opAsk : spec.icon && spec.icon !== "edit" ? spec.icon : _opIcon);
   w.onclick = e => { if(!tt.disabled && !e.target.closest(".rs-sec-body, .rs-help-btn, .rs-icon-btn")) spec.open(w); };
 }
+// The number of a step before a card's title (`step: 3`), and its done mark (`rs.sections.done`): one round badge, a check mark in place of the number.
+function _stBadge(w, n){
+  let b = w.querySelector(":scope > .rs-sec-hd > .rs-sec-n");
+  if(!b){ b = document.createElement("span"); b.className = "rs-sec-n"; b.setAttribute("role", "img"); w.querySelector(":scope > .rs-sec-hd").prepend(b); }
+  if(n != null){ b.textContent = n; b.dataset.n = n; }
+  const label = b.dataset.n ? "Step " + b.dataset.n : "Step";
+  b.setAttribute("aria-label", w.dataset.rsDone ? label + ", done" : label);
+}
 const _secNeed = id => { const w = _secEls.get(id); if(!w) throw new Error("rs.sections: no section '" + id + "' (rs.sections.list())"); return w; };
 export const rsSections = {
   // the ids of the sections that are in the panel now, in order
@@ -114,7 +123,7 @@ export const rsSections = {
     tt.after(b);
     return b;
   },
-  // a section of the page: {id, html | el | part, label, after | before, fold | open, note, background}; at the end of the panel when it has neither. A part has its
+  // a section of the page: {id, html | el | part, label, step, after | before, fold | open, note, background}; at the end of the panel when it has neither. A part has its
   // options in the section: `text` (query), `fields` (road_card), `chart` (chart)
   add(spec){
     if(!spec || !spec.id) throw new Error("rs.sections.add: a section needs an id");
@@ -124,7 +133,7 @@ export const rsSections = {
     if(!body) throw new Error("rs.sections.add: the page has no panel");
     const w = document.createElement("div"); w.className = "sb-sec"; w.dataset.rsSection = spec.id;
     if(spec.part) w.dataset.rsPart = spec.part;
-    const card = spec.fold ? "fold" : spec.open ? "open" : spec.note != null ? "note" : spec.background === false ? "background: false" : "";
+    const card = spec.fold ? "fold" : spec.open ? "open" : spec.note != null ? "note" : spec.background === false ? "background: false" : spec.step != null ? "step" : "";
     if(!spec.label && card) throw new Error("rs.sections.add: '" + spec.id + "' has " + card + ": it needs a label (its title), because a section is a card only with a label");
     if(spec.open && spec.fold) throw new Error("rs.sections.add: '" + spec.id + "' has fold and open: a card that opens something does not fold");
     if(spec.icon != null && !(spec.icon === "edit" || spec.icon === "ask" || /^\s*<svg[\s>]/.test(spec.icon))) throw new Error("rs.sections.add: '" + spec.id + "' icon must be \"edit\", \"ask\" or an <svg>");
@@ -148,6 +157,12 @@ export const rsSections = {
     _fdPaint();
     _emit("rs:sectionchange", {id: spec.id, state: "add"});
     return w;
+  },
+  // the done mark of a card: the number of its step (`step`) turns into a check mark. A card with no `step` gets the mark alone.
+  done(id, on = true){
+    const w = _secNeed(id);
+    if(!w.querySelector(":scope > .rs-sec-hd")) throw new Error("rs.sections.done: '" + id + "' is not a card (add it with a label)");
+    on ? w.dataset.rsDone = "1" : delete w.dataset.rsDone; _stBadge(w);
   },
   // a section goes away
   remove(id){

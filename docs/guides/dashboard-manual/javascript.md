@@ -265,12 +265,14 @@ Push **Run** under a block: a large window opens with the map and the change on 
 
     - `rs.days.range(el, {unit, min, max, value, onChange})` is a period: from a day to a day, a week or a month.
     - `rs.hours.use(el, {value, range, onChange})` is the hour picker: a field that opens a list of the hours.
-    - `rs.slider`, `rs.number` and `rs.colorPick` are a slider, a number field with "−" and "+", and a colour picker.
-    - `rs.search` is a search field with suggestions, `rs.drop` a file drop zone, `rs.progress` a progress bar and `rs.busy(button, promise)` a button that waits.
+    - `rs.slider`, `rs.number` and `rs.colorPick` are a slider, a number field with "−" and "+", and a colour picker. `rs.number` has `disabled` (and `disabled(on)` on its handle) and `snap: false`, which keeps a typed value.
+    - `rs.search` is a search field with suggestions (`end` puts your icon button inside the field), `rs.drop` a file drop zone, `rs.progress` a progress bar and `rs.busy(button, promise)` a button that waits.
+    - `rs.mapBusy(text)` puts a veil with a ring and your text over the free part of the map, and `rs.mapBusy(null)` takes it away.
     - `rs.toast(text, {kind})` is a message that goes after some seconds, and `await rs.confirm({title, ok, danger})` is the confirm dialog in place of `confirm()`.
     - `rs.menu(button, items)` and `rs.menu.button(items)` are an action menu.
     - `rs.toggle(button, onChange)` is a button that stays pressed.
     - `rs.more(el, {items, page, render})` shows a long list page by page.
+    - `rs.sections.add({..., step: 3})` puts a step number in a card's title row, and `rs.sections.done(id, true)` changes it to a check mark.
     - `rs.sections.button(id, {icon, title, onClick})` is an icon button in a card's title row, and `rs.panel.bar()` is the fixed bar at the bottom edge of the panel.
 
 ## Data { .rs-group }

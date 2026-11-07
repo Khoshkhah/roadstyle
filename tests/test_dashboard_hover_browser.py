@@ -32,7 +32,8 @@ _PARTS2 = """rs.sections.add({id: 'parts2', label: 'Parts 2', html: '<div id="h2
   const $ = id => document.getElementById(id);
   rs.days.range($('h2-range'), {min: '2026-09-01', max: '2026-11-06'}); rs.hours.use($('h2-hour'), {value: 8}); rs.hours.use($('h2-hours'), {value: [7, 9], range: true});
   rs.number($('h2-num'), {label: 'Lanes', min: 1, max: 8, value: 2}); rs.colorPick($('h2-col'), {label: 'Fill'});
-  rs.search($('h2-q'), {button: 'Go'}).set('Mon'); rs.drop($('h2-drop'));
+  const here = document.createElement('button'); here.type = 'button'; here.setAttribute('aria-label', 'What is here?'); here.textContent = '?';
+  rs.search($('h2-q'), {button: 'Go', end: here}).set('Mon'); rs.drop($('h2-drop'));
   rs.tabs.use($('h2-tools')); rs.tabs.use($('h2-rows')); rs.toggle($('h2-tog'));
   rs.more($('h2-more'), {items: Array.from({length: 30}, (_, i) => i), page: 3, render: i => '<div class="rs-qrow"><b>Road ' + i + '</b></div>'});
   $('h2-menu').append(rs.menu.button([{label: 'Edit'}, {label: 'Delete', danger: true}]));
@@ -129,7 +130,7 @@ def test_every_control_has_one_of_the_three_hover_looks(tmp_path, theme):
         finally:
             browser.close()
     assert len(rows) > 30, rows
-    for cls in ("rs-hours-field", "rs-row", "rs-more-btn", "rs-icon-btn", "rs-menu-item", "rs-color-c", "rs-num-st", "rs-search-go", "rs-drop-zone", "rs-more-b", "sb-danger"):
+    for cls in ("rs-hours-field", "rs-row", "rs-more-btn", "rs-icon-btn", "rs-menu-item", "rs-color-c", "rs-num-st", "rs-search-go", "rs-search-end", "rs-drop-zone", "rs-more-b", "sb-danger"):
         assert any(cls in r[0] for r in rows), cls                       # each new part was under the pointer
     assert [r[0] for r in rows if r[1] and r[2]] == [], "a disabled control reacts"
     bad = [r[0] for r in rows if not r[1] and r[2] is None]
