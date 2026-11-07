@@ -2,43 +2,48 @@
 
 <p class="lead">See the roads in Google's photorealistic 3D view, next to the map. The two cameras move together.</p>
 
+![Götgatan at Medborgarplatsen: the street selected on the map, and the same street in the Google 3D window](../img/gallery/google_3d.jpg)
+
 !!! note "A key is necessary"
     The Google 3D window needs a Google Maps JavaScript API key. See
-    [Keys and tokens](google-key.md). The page must be served from an address in the key's
-    Websites list, not opened from disk.
+    [Keys and tokens](google-key.md). Serve the page from an address in the Websites list of the key.
+    Do not open it from disk.
 
 ```python
 rs.render_edges(edges, google_3d=True)                        # the key from GOOGLE_MAPS_KEY
 rs.render_edges(edges, google_3d=True, street_view_key=KEY)   # or this key
 ```
 
-Pages with a toolbar (the template `dashboard`) have Google 3D on by default; `google_3d=False` turns it off. Without a key, `google_3d=True` stops with an error. The exception is the template `dashboard`
-(the default of `render_dashboard`): it has a settings tool, where you type the key, so the page can
-start without one. The Google 3D window then says that it needs a key and has an **Open settings**
-button. The default is `google_3d=False`.
+The default of `google_3d` is on for a page with a toolbar (the template `dashboard`), and off for other pages.
+Use `google_3d=False` to turn it off.
+
+If a page has no toolbar and no key, `google_3d=True` stops with an error.
+The template `dashboard` has a settings tool where you type the key. So the page can start without a key.
+Then the Google 3D window says that it needs a key. It has an **Open settings** button.
 
 ## The window
 
 Press the **Google 3D** button (the cube, in the toolbar). The window opens in the middle of the
-free part of the map: the panel and the toolbar do not cover it. Drag its title bar to move it and
-its corner to change its size. The window keeps the size that you give it. The page remembers if
-the window was open, and where. In the other templates, the center of the map moves to the middle
-of the free part of the map while the window is open, so the window does not cover the clicked road.
-Google's 3D view loads only when the window opens, and the page removes it when you close the window.
+free part of the map. The panel and the toolbar do not cover it.
+Drag its title bar to move it. Drag its corner to change its size.
+The page remembers the size, if the window was open, and where.
+In the other templates, the center of the map moves to the middle of the free part while the window is open.
+So the window does not cover the clicked road.
+Google's 3D view loads when the window opens. The page removes it when you close the window.
 
 The window bar has these controls:
 
 | Control | What it does |
 |---|---|
 | **Imagery** / **Map** | the photographic mesh, or Google's drawn 3D map |
-| **Follow** | on at the start (`google_3d.follow` in the template). The 3D view follows the map |
+| **Following** / **Follow the map** | on at the start (`google_3d.follow` in the template). If it is on, the 3D view follows the map. Click it to follow again |
 | **Show** | the layers of the window (see [Your own layers](#your-own-layers)) |
 
 ## The two cameras move together
 
 The map leads, and the link goes one way. When you move, turn, tilt or zoom the map, the 3D view
-moves to the same camera. When you move the 3D view yourself, only the 3D view moves and **Follow**
-turns off. Press **Follow** to set the 3D view to the map again. A road selection also turns it on.
+moves to the same camera. When you move the 3D view yourself, only the 3D view moves, and Follow
+turns off. Click **Follow the map** to set the 3D view to the map again. A road selection also turns Follow on.
 
 | Map | Google 3D |
 |---|---|
@@ -47,31 +52,31 @@ turns off. Press **Follow** to set the 3D view to the map again. A road selectio
 | pitch (tilt) | tilt |
 | zoom | range: the distance from the camera to the center, in metres |
 
-Google puts its camera above sea level, and the map is on the ground. So the page reads the
-height of the ground under the center from the free
-[Terrain Tiles on AWS](https://registry.opendata.aws/terrain-tiles/) (Mapzen, no key), and gives it to
-Google. Without it, the 3D view on a hill (Monaco: 120 m) was much closer than the map. The window
-bar shows the credit **heights: Mapzen**. If the heights do not load, the bar shows
-**⚠ no ground heights**: then the 3D view can be too close on a hill.
+??? info "Ground heights and limits"
+    Google puts its camera above sea level. The map is on the ground. So the page reads the
+    height of the ground under the center from the free
+    [Terrain Tiles on AWS](https://registry.opendata.aws/terrain-tiles/) (Mapzen, no key) and gives it to Google.
+    The window bar shows the credit **heights: Mapzen**. If the heights do not load, the bar shows
+    **⚠ no ground heights**. Then the 3D view can be too close on a hill.
 
-The map has the last word. When the map stops at its limit (a box set with `map.setMaxBounds(...)`,
-or its maximum tilt), the 3D view gets the map's camera, so the two views stay the same.
+    The map has the last word. If the map stops at its limit (a box from `map.setMaxBounds(...)`,
+    or its maximum tilt), the 3D view gets the camera of the map.
 
-Some differences stay:
+    Some differences stay:
 
-- The tilt stops at 70° in the two views (the map's setting `camera.max_pitch`).
-- The window is smaller than the map, so it shows the same view at a smaller size. If the window has a
-  different shape, it shows less on the sides.
+    - The tilt stops at 70° in the two views (the map setting `camera.max_pitch`).
+    - The window is smaller than the map. It shows the same view at a smaller size.
+      If the window has a different shape, it shows less on the sides.
 
 ## Click a road
 
-When you click a road, the 3D view draws the road in the selection color and the camera flies to
+When you click a road, the 3D view draws the road in the selection color. The camera flies to
 the middle of the road and looks along it. The map follows the camera.
 
 ## Your own layers
 
 A page can add layers to the window. A layer draws the features of a GeoJSON source of the page on
-Google's 3D view: a bus route, a zone, some points. Give the layers in `google_3d_layers`, a list of
+Google's 3D view, for example a bus route, a zone or some points. Give the layers in `google_3d_layers`, a list of
 dictionaries:
 
 ```python
@@ -92,20 +97,23 @@ rs.render_dashboard(edges, google_3d=True, google_3d_layers=[
 | `arrows` | `True`: direction arrows along a `line` |
 | `style` | `color`, `width`, `outline`, `outline_width`, `dash` (`[metres on, metres off]`), `fill`, `width_m`, `width_prop`, `radius` |
 
-The window has a **Show** menu with one check box for each layer (it shows when there are two or
-more layers). The page remembers your choice. A wrong key, a wrong `kind`, a repeated `id` or a
-`selection` layer without `match` stops with an error. The selected road has its own style, the same
-for all layers that draw the selection: `Google3d.selection_style` of the template.
+The window has a **Show** menu with one check box for each layer. It shows when there are two or
+more layers. The page remembers your choice.
+A wrong key, a wrong `kind`, a repeated `id` or a `selection` layer without `match` stops with an error.
 
 ## The selection
 
-The selected road is one solid line (also in a tunnel), `mesh_altitude_m` (1.5 m) above Google's mesh: at 0.5 m the bumps of the mesh cut the
-line into pieces. Its style is the template's `google_3d.selection_style` (cyan, 8 px, a dark outline, white arrows). A selection can have
-points (`sel.points`): the window draws a pin for each. To change an option, use `dashboard=`:
+The selected road is one solid line, also in a tunnel. It lies `mesh_altitude_m` (1.5 m) above Google's mesh.
+The default style of the template is `google_3d.selection_style` (cyan, 8 px, a dark outline, white arrows).
+All layers that draw the selection use this style.
+A selection can have points (`sel.points`). The window draws a pin for each point.
+To change an option, use `dashboard=`:
 
 ```python
 rs.render_dashboard(edges, google_3d=True, dashboard={"google_3d": {"selection_style": {"color": "#ff0066", "width": 10}}})
 ```
+
+All keys are in the [parameters reference](../reference/parameters.md).
 
 ## From JavaScript
 
