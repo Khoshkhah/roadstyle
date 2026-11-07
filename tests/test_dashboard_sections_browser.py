@@ -96,16 +96,17 @@ def test_the_run_time_calls_add_move_and_remove(tmp_path):
 
 
 def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
-    """The text, the small print, the link and the box of a page section have a readable colour in each theme (contrast 4.5 or more), and the colours change."""
+    """The text, the small print, the link and the box of a page section have a readable colour in each theme (contrast 4.5 or more), and the colours change.
+    A box in the card has the card's colour, so it has the card's thin edge."""
     probe = """() => { const ctx = document.createElement('canvas').getContext('2d');
         const rgb = c => { ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.clearRect(0, 0, 1, 1); ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3); };   // any CSS color, also color-mix
         const lum = c => { const [r, g, b] = rgb(c).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
         const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + .05) / (y + .05); };
         const sec = document.querySelector('[data-rs-section=notes]'), cs = s => getComputedStyle(sec.querySelector(s));
-        const card = cs('.rs-sec-box').backgroundColor, part = s => getComputedStyle(document.querySelector(s));
+        const card = getComputedStyle(sec).backgroundColor, edge = cs('.rs-sec-box').boxShadow, part = s => getComputedStyle(document.querySelector(s));
         rsSelect(1);
         const rc = part('.rs-road-card'), q = part('.rs-q'), bg = getComputedStyle(document.getElementById('sb')).backgroundColor;
-        return {text: cs('p').color, note: cs('.sb-note').color, link: cs('a').color, card, roadCard: rc.backgroundColor,
+        return {text: cs('p').color, note: cs('.sb-note').color, link: cs('a').color, card, edge, roadCard: rc.backgroundColor,
                 ratios: [cr(cs('p').color, card), cr(cs('.sb-note').color, card), cr(cs('a').color, card), cr(cs('.rs-sec-box').color, card),
                          cr(getComputedStyle(document.querySelector('.rs-road-card .rs-kv b')).color, rc.backgroundColor), cr(q.color, q.backgroundColor)]}; }"""
     with pw.sync_playwright() as p:
@@ -118,6 +119,7 @@ def test_the_added_html_follows_the_light_and_the_dark_theme(tmp_path):
     assert not errors
     assert light["text"] != dark["text"] and light["card"] != dark["card"] and light["link"] != dark["link"] and light["roadCard"] != dark["roadCard"]
     assert min(light["ratios"]) >= 4.5 and min(dark["ratios"]) >= 4.5, (light, dark)
+    assert light["edge"] != "none" and dark["edge"] != "none", (light, dark)
 
 
 @pytest.mark.parametrize("side", ["left", "right"])
