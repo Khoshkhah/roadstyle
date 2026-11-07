@@ -98,11 +98,28 @@ function inline(el, text){
   return el;
 }
 
+// the default examples: only what every page has (a data dock with tables, and a map with roads, layers and a base map); the agent looks up the names
+const GENERAL = [
+  {title: "Know the data", items: ["What tables does this data have, and what is in each one?", "How many rows does each table have?",
+    "Which columns does the main table have, and which have missing values?"]},
+  {title: "Find and count", items: ["Show the first 20 rows of the main table.", "What are the 10 largest values of the most important number column?",
+    "How many rows are there for each value of a column that has few values?"]},
+  {title: "Show on the map", items: ["Show the 100 roads with the largest value of a number column on the map.", "Show the roads of the most common value of a text column on the map."]},
+  {title: "Colour and focus", items: ["Colour the roads by a column that has few values.", "Keep only the roads of the most common value and fade the others."]},
+  {title: "The map and the layers", items: ["Which layers does the map have?", "Hide all the layers except the roads.", "Switch to the satellite base map.",
+    "Turn on the 3D view.", "Zoom to the roads of the last result."]},
+  {title: "Charts", items: ["Draw a bar chart of the number of rows for each value of a column that has few values.", "Draw a histogram of a number column."]},
+];
+
 export function askPanel(o = {}){
   const rs = o.dashboard || window.rs, data = o.data;
   if(!data || typeof data.run !== "function") throw new Error("askPanel: data (the data dock) is necessary.");
-  const panel = o.panel || document.getElementById("sb"), dialect = o.dialect || "SQL", examples = o.examples || [];
+  const panel = o.panel || document.getElementById("sb"), dialect = o.dialect || "SQL";
   const MAX = o.maxSteps || 6, SEND = o.sendRows || 30, PROVS = o.providers || PROVIDERS, ID = data.idColumn || "edge_id";
+  // the examples: the general groups (any data: no name of a table or a column of a project), then the host's own strings and groups;
+  // examples: {general: false, groups: [...]} gives only the host's own
+  const own = Array.isArray(o.examples) ? o.examples : o.examples && Array.isArray(o.examples.groups) ? o.examples.groups : [];
+  const examples = o.examples && o.examples.general === false ? own : [...GENERAL, ...own];
   const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
   const phone = () => document.documentElement.classList.contains("rs-phone");
   let loaded = false; data.ready().then(() => { loaded = true; }, () => {});

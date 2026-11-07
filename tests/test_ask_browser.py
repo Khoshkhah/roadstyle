@@ -66,7 +66,7 @@ const fake = {id: "fake", name: "Fake AI", model: "fake-1", base: "https://fake.
 window.tool = (name, args) => () => ({content: "", tool_calls: [{id: "c" + window.calls.length, type: "function", function: {name, arguments: JSON.stringify(args)}}]});
 window.say = (text) => () => ({content: text});
 localStorage.setItem("rs-key:ask:fake", "not-a-key");
-const opts = {data, about: "Six test roads.", dialect: "DuckDB", examples: ["How many roads are there?"], providers: [fake]};
+const opts = {data, about: "Six test roads.", dialect: "DuckDB", examples: {general: false, groups: ["How many roads are there?"]}, providers: [fake]};
 window.ask = askPanel(opts);
 window.answers = []; window.errors = [];
 ask.addEventListener("answer", e => answers.push(e.detail));
@@ -489,7 +489,7 @@ def test_a_long_examples_list_stays_in_the_free_space_and_scrolls(tmp_path, size
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser, page, errors = _open(p, url, *size)
         try:
-            page.evaluate("""withOpts({examples: Array.from({length: 7}, (_, i) => 'Question number ' + (i + 1) + ': which streets of this district have more than two lanes, are one-way and are longer than one kilometre?')});
+            page.evaluate("""withOpts({examples: {general: false, groups: Array.from({length: 7}, (_, i) => 'Question number ' + (i + 1) + ': which streets of this district have more than two lanes, are one-way and are longer than one kilometre?')}});
                              releaseLoad(); ask.open()""")
             _ask(page, "Hi", ["say('Hello.')"])
             page.click(".rs-ask-exb")
@@ -536,8 +536,8 @@ def test_examples_in_groups_have_headings_in_both_lists_and_the_keys_skip_them(t
             page.evaluate("releaseLoad(); ask.open()")
             assert page.evaluate("document.querySelectorAll('.rs-ask-ex .rs-ask-q').length") == 1 and page.evaluate("document.querySelectorAll('.rs-ask-grp').length") == 0   # a flat list: no heading
             page.evaluate("""document.querySelector('.rs-ask').remove();                          // the first Ask view of the host goes; a new one has the groups
-                             withOpts({examples: ['Plain one?', {title: 'Changes', items: ['Which objects did I change?', 'When?']}, {title: 'Empty', items: []},
-                                                  {title: 'Colours', items: ['Colour the primary roads red']}]});
+                             withOpts({examples: {general: false, groups: ['Plain one?', {title: 'Changes', items: ['Which objects did I change?', 'When?']}, {title: 'Empty', items: []},
+                                                  {title: 'Colours', items: ['Colour the primary roads red']}]}});
                              ask.open()""")
             start = page.evaluate("[...document.querySelectorAll('.rs-ask-ex > .rs-ask-grp, .rs-ask-ex > .rs-ask-q')].map(e => e.className.slice(7) + ':' + e.textContent)")
             assert start == ["q:Plain one?", "grp:Changes", "q:Which objects did I change?", "q:When?", "grp:Colours", "q:Colour the primary roads red"], start
@@ -557,6 +557,27 @@ def test_examples_in_groups_have_headings_in_both_lists_and_the_keys_skip_them(t
             assert order == ["Colour the primary roads red", "When?", "Which objects did I change?", "Plain one?", "Plain one?"], order     # the headings are skipped
             page.keyboard.press("Escape")
             assert not page.is_visible(".rs-ask-exlist")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_with_no_examples_option_the_general_groups_show_and_the_hosts_own_come_after(tmp_path):
+    """Kaveh, 2026-11-07: the example questions must work for any data. No `examples`: the general groups (no name of a table or a column of a project).
+    A host's own strings and groups come after them; `{general: false, groups}` gives only the host's own."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("ask.open(); document.querySelector('.rs-ask').remove(); withOpts({examples: undefined}); ask.open()")
+            heads = page.evaluate("[...document.querySelectorAll('.rs-ask-ex > .rs-ask-grp')].map(e => e.textContent)")
+            assert heads == ["Know the data", "Find and count", "Show on the map", "Colour and focus", "The map and the layers", "Charts"], heads
+            text = page.evaluate("document.querySelector('.rs-ask-ex').textContent")
+            assert "Switch to the satellite base map." in text and "edge_id" not in text and "length" not in text
+            page.evaluate("document.querySelector('.rs-ask').remove(); withOpts({examples: ['Own question?', {title: 'Mine', items: ['Own two?']}]}); ask.open()")
+            tail = page.evaluate("[...document.querySelectorAll('.rs-ask-ex > .rs-ask-q, .rs-ask-ex > .rs-ask-grp')].map(e => e.textContent).slice(-3)")
+            assert tail == ["Own question?", "Mine", "Own two?"], tail
+            page.evaluate("document.querySelector('.rs-ask').remove(); withOpts({examples: {general: false, groups: []}}); ask.open()")
+            assert page.evaluate("document.querySelectorAll('.rs-ask-ex .rs-ask-q').length") == 0
         finally:
             browser.close()
     assert errors == [], errors

@@ -52,7 +52,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
       data,
       about: "A road network of Tartu. One row of edges is one direction of a road.",
       dialect: "DuckDB",
-      examples: ["Which streets are longer than 1 km?", "How many one-way roads are there?"],   // or groups: [{title: "Roads", items: [...]}, ...]
+      examples: ["Which streets are longer than 1 km?", "How many one-way roads are there?"],   // after the general groups; or [{title: "Roads", items: [...]}, ...]
     });
     ask.addEventListener("answer", (e) => console.log(e.detail));   // {question, text, sql, rows}
     rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data", open: () => ask.open()});
@@ -72,7 +72,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `dashboard` | `window.rs` | The page's dashboard. |
     | `about` | `""` | One paragraph about your data. It goes into the prompt. Put here the facts that the model must know, for example which table the map draws. |
     | `dialect` | `"SQL"` | The name of the database's SQL. With `"DuckDB"`, the prompt also tells the model how to read the comments of the tables and columns. |
-    | `examples` | `[]` | Questions that the empty start shows as buttons, one row each. A click on a question asks it. An item is a string or a group `{title, items: [...]}`: a group is a small heading above its questions. Strings and groups can mix; strings before the first group have no heading. Both lists show the groups: the start list and **Examples ▴**. |
+    | `examples` | the general groups | Questions that the start shows as buttons, one row each. A click on a question asks it. With no `examples`, Ask shows its **general groups** (Know the data, Find and count, Show on the map, Colour and focus, The map and the layers, Charts): they hold no name of a table or a column, so they fit any data, and the agent looks the names up. Your own `examples` come after them. An item is a string or a group `{title, items: [...]}`: a group is a small heading above its questions. Strings and groups can mix; strings before the first group have no heading. Both lists show the groups: the start list and **Examples ▴**. `examples: {general: false, groups: [...]}` shows only yours (`groups: []` shows none). |
     | `panel` | `#sb` | The host's dashboard panel. Ask uses roadstyle's [editor frame](dashboard-parts.md#an-editor-in-the-panel) in it. |
     | `backLabel` | `"Back"` | The text of the back button. |
     | `maxSteps` | `6` | The most model calls for one question. |
