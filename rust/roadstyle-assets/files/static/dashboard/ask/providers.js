@@ -2,7 +2,7 @@
 // them, the OpenAI-compatible chat (Google gives an OpenAI-compatible address for Gemini too). Each address accepts a request from a browser page (CORS),
 // checked on 2026-11-05 (Z.ai on 2026-11-07). The key goes only in the header of a request to the provider's own address, never in a URL.
 //
-//   PROVIDERS: [{id, name, base, model, keys, onlyFree, free}]
+//   PROVIDERS: [{id, name, base, model, keys, onlyFree, free, paid, headers, temperature}]
 //   chat(p, {key, model, messages, tools, toolChoice, signal}) -> the assistant message {content, tool_calls}; an error has `status` and `wait` (seconds)
 //   models(p, key, signal) -> the model names of the key;  pickModel(names) -> a model with tool support;  rankModels(names) -> the same order, all
 //   chatModels(names) -> the names without the models that do not chat (the list of the Model box)
@@ -13,12 +13,17 @@ export const PROVIDERS = [
   // Z.ai's model list names only its paid models, and a paid model with no balance gives HTTP 429 "Insufficient balance". `free` is the list
   // that Ask can use: the free models that answered a request with a new key (2026-11-07)
   {id: "zai", name: "Z.ai (GLM)", base: "https://api.z.ai/api/paas/v4", model: "glm-4.5-flash", keys: "https://z.ai/manage-apikey/apikey-list", free: ["glm-4.5-flash"]},
+  // Claude is the one paid service (the person's own credit; a decision of 2026-11-07). Its OpenAI-compatible address takes the key as a Bearer
+  // header; a call from a browser page needs the header anthropic-dangerous-direct-browser-access, and its model list (/models) needs
+  // anthropic-version (`headers`, sent with each request). Its new models refuse `temperature` (HTTP 400 "deprecated"): `temperature: false`.
+  {id: "claude", name: "Claude (paid)", base: "https://api.anthropic.com/v1", model: "claude-sonnet-5-5", keys: "https://console.anthropic.com/settings/keys",
+   paid: true, temperature: false, headers: {"anthropic-dangerous-direct-browser-access": "true", "anthropic-version": "2023-06-01"}},
 ];
 
 // the names of the models change often, so Ask takes one from the provider's own list: the first match of this list, never a model for speech, images,
 // embeddings or safety
 const PREFER = [/gpt-oss-120b/, /kimi-k2/, /llama-4-maverick/, /qwen3/, /gpt-oss-20b/, /llama-4-scout/,
-                /^gemini-[\d.]+-flash$/, /^gemini-[\d.]+-pro$/, /llama-3\.3-70b/];
+                /^gemini-[\d.]+-flash$/, /^gemini-[\d.]+-pro$/, /llama-3\.3-70b/, /^claude-sonnet/];
 // NOT_CHAT: models that do not chat with tools (speech, music, images, embeddings, safety, live audio, robots, agents of their own; the
 // names of Gemini's and Groq's lists on 2026-11-07); the Model box does not list them. SKIP: also the models that the
 // automatic pick does not take (small, preview or test models), which a person can still pick in the box
@@ -50,15 +55,15 @@ function refused(p, r, text){
 
 export async function chat(p, {key, model, messages, tools, toolChoice = "auto", signal}){
   const r = await fetch(p.base + "/chat/completions", {method: "POST", signal,
-    headers: {"Content-Type": "application/json", "Authorization": "Bearer " + key},
-    body: JSON.stringify({model, messages, tools, tool_choice: toolChoice, temperature: 0})});
+    headers: {"Content-Type": "application/json", "Authorization": "Bearer " + key, ...p.headers},
+    body: JSON.stringify({model, messages, tools, tool_choice: toolChoice, ...(p.temperature === false ? {} : {temperature: 0})})});
   const text = await r.text();
   if(!r.ok) throw refused(p, r, text);
   return JSON.parse(text).choices[0].message;
 }
 
 export async function models(p, key, signal){
-  const r = await fetch(p.base + "/models", {headers: {"Authorization": "Bearer " + key}, signal}), text = await r.text();
+  const r = await fetch(p.base + "/models", {headers: {"Authorization": "Bearer " + key, ...p.headers}, signal}), text = await r.text();
   if(!r.ok) throw refused(p, r, text);
   const ids = (JSON.parse(text).data || []).map((m) => String(m.id).replace(/^models\//, ""));     // Google names a model "models/<name>"
   if(p.free) return p.free;                                                                        // Z.ai: the key works; its list has only paid models

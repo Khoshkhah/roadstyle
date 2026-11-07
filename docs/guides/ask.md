@@ -78,7 +78,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `tab` | none | Ask as a tab. Give the name of the first tab, for example `"Map"`. A tab row `[Map | Ask]` shows under the panel's title. **Map** shows the host's cards, **Ask** shows the conversation. There is no Back button and no Ask card: the page does not call `rs.sections.add` for Ask. |
     | `maxSteps` | `6` | The most model calls for one question. |
     | `sendRows` | `30` | The most rows of one result that go to the model. |
-    | `providers` | the four free services | The list of services. A test gives a fake provider here (see [Tests](#tests)). |
+    | `providers` | the four free services and Claude | The list of services. A test gives a fake provider here (see [Tests](#tests)). |
     | `tools` | `[]` | The page's own tools, in the form of the built-in ones (see [The host's own tools](#the-hosts-own-tools)). A name that is in use is refused. |
 
     The schema of the data dock (`schema()`) gives the prompt its tables. Give `main: true` and `columns: [{name, type, about}]` on the table that the map draws. The prompt has one line for each schema with the table names and their rows, the columns of the main table, and each table of the schema `extra` with its `about`. A prompt of this form stays small (about 4 000 characters), because a free service allows only some thousand tokens a minute.
@@ -128,24 +128,27 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
 ### The services and the keys { .rs-part }
 
-**Use it for:** a free key of one of four services. The key stays only in the person's browser.<br>
+**Use it for:** a free key of one of four services, or a paid key of Claude. The key stays only in the person's browser.<br>
 **From Python:** no
 { .rs-facts }
 
 ??? info "Details"
 
-    Ask offers only services with a free key. The table is as the services said on 2026-11-05 (Z.ai on 2026-11-07). A service can change its free tier.
+    Ask offers four services with a free key, and Claude, which is paid from the person's own credit. The table is as the services said on 2026-11-05 (Z.ai and Claude on 2026-11-07). A service can change its free tier.
 
-    | Service | Address | Free key from |
+    | Service | Address | Key from |
     |---|---|---|
     | Google Gemini (the default) | `https://generativelanguage.googleapis.com/v1beta/openai` | <https://aistudio.google.com/apikey> |
     | Groq | `https://api.groq.com/openai/v1` | <https://console.groq.com/keys> |
     | OpenRouter (only its `:free` models) | `https://openrouter.ai/api/v1` | <https://openrouter.ai/keys> |
     | Z.ai (only `glm-4.5-flash`) | `https://api.z.ai/api/paas/v4` | <https://z.ai/manage-apikey/apikey-list> |
+    | Claude (paid; the default model `claude-sonnet-5-5`) | `https://api.anthropic.com/v1` | <https://console.anthropic.com/settings/keys> |
 
     Cerebras and Mistral are not in the list: on 2026-11-07, Cerebras gave only a trial credit with a card, and Mistral gave no free key. Z.ai's model list names only its paid models, so Ask uses only the free model `glm-4.5-flash` there. It answers slowly, in about 25 to 40 s for each question.
 
-    All four use one request: `POST {address}/chat/completions` with the key in the header `Authorization: Bearer <key>`. Each one accepts a request from a browser page.
+    All five use one request: `POST {address}/chat/completions` with the key in the header `Authorization: Bearer <key>`. Each one accepts a request from a browser page.
+
+    **Claude** is the one paid service. Use a key that belongs to a workspace (it starts with `sk-ant-api03-`): an organization key (`sk-ant-usr-`) needs the header `anthropic-workspace-id`, which Ask does not send. Give its workspace a spending limit, because the key is in the browser. Ask sends two more headers to Claude: `anthropic-dangerous-direct-browser-access` (Anthropic needs it for a call from a browser page) and `anthropic-version` (for the model list). It sends no `temperature`, because Claude's new models refuse it. With **Provider** on Auto, Claude is the last service in the order.
 
     **Auto.** The first entry of **Provider** is **Auto**: Ask asks each service that has a key, in the order of the table. The first entry of **Model** is **Auto**: Ask asks the best models of the key (at most 3), in the order of its automatic pick. When a service or a model cannot answer (a free limit, no balance, a busy service, a refused model or key), Ask asks the next one at once and does not wait. The one that answered stays for the next steps of the question. When none can answer, the red line names each try. With **Provider** on Auto, the form shows the order and the model of each service; choose a service to change its key or its model.
 
