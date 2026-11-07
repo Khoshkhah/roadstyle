@@ -144,6 +144,15 @@ def test_a_click_on_each_tunnel_list_changes_the_map(editor):
           return {cut: [...l.querySelectorAll('.rs-sel-opt span')].filter(s => s.scrollWidth > s.clientWidth + 1).map(s => s.textContent),
                   inside: r.left >= 0 && r.right <= innerWidth}; }""")
         assert cut == {"cut": [], "inside": True}, cut
+        # a colour box has the hover of a button: the accent border
+        page.keyboard.press("Escape")
+        page.evaluate("dz.tab('bridges')")
+        box = page.locator('#design-pane input[type=color][data-p="bridges.casing"]')
+        border = "getComputedStyle(document.querySelector('#design-pane input[type=color][data-p=\"bridges.casing\"]')).borderColor"
+        rest = page.evaluate(border)
+        box.hover()
+        page.wait_for_timeout(200)
+        assert page.evaluate(border) != rest
         b.close()
     assert not errors, errors
 

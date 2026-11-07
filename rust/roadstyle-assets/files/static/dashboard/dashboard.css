@@ -889,6 +889,8 @@ html.rs-phone #sb .rs-frame-head .rs-tab{flex:none}
 .rs-dz .rhead{display:grid;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:4px}
 .rs-dz .rhead span{text-align:center}
 .rs-dz input[type=color]{width:100%;min-width:44px;height:30px;padding:1px 2px;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer}
+/* a colour box of a panel has the hover of a button: the accent border and the tint */
+:is(#sb,.rs-side,.rs-frame,#rs-dock) input[type=color]:is(:hover,:focus-visible):not(:disabled){border-color:var(--accent);background:var(--rs-hover-bg);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
 .rs-dz input[type=number],.rs-dz input[type=text],.rs-dz input[type=search]{height:32px;min-width:0;width:100%;box-sizing:border-box}
 .rs-dz input[type=range]{accent-color:var(--accent-fill)}
 .rs-dz .drow2 .rs-sel,.rs-dz .drow2>select{width:auto;max-width:11em}

@@ -74,7 +74,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "4e96f491bc2ddc6b8ea2accaa2e35c7a5272968d4ae909d486bff275a81f2098");
+    assert_eq!(style_hash(&area), "8eb30e1fae417a670e29d7e27ed36511bc99004b36aab723015c12f269d9ba05");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
@@ -123,7 +123,7 @@ fn tiles_hash(area: &Path) -> String {
 #[test]
 fn monaco_tiles() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(tiles_hash(&area), "96af5453062bc9bc16fc8bc7b54cf7c953011e2ff059553ca17c5a1e034b1fd4");
+    assert_eq!(tiles_hash(&area), "e7fff2791228032680a158769ab66b4d28b415211cfd87fcc88d9ee8abc730c4");
 }
 
 /// The sea of Monaco (a polygon) is cut to the area's boundary (2026-10-25, duckosm::clip_to_boundary): before, it was in the tiles at

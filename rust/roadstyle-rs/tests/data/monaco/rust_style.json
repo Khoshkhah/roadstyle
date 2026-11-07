@@ -15,7 +15,7 @@
       "line",
       "simple",
       "b7cf11813e537461",
-      "8dd0e060628c436a",
+      "87c60ff01d55d815",
       "f61343b045b32d9b"
     ],
     [
@@ -23,7 +23,7 @@
       "line",
       "simple",
       "278bdfc8da6323c3",
-      "291b46d4210b03f8",
+      "4b4c1a5326c3c6d9",
       "f61343b045b32d9b"
     ],
     [
@@ -31,7 +31,7 @@
       "line",
       "roads",
       "3a1b5d6463213abf",
-      "34f13c2eaa0c61e9",
+      "27ebebd2ed23266e",
       "477f326fbc86a340"
     ],
     [
@@ -55,7 +55,7 @@
       "line",
       "roads",
       "62d60bed28084788",
-      "3777699a7af23706",
+      "9e2b6820cceadbe7",
       "477f326fbc86a340"
     ]
   ],
@@ -68,7 +68,7 @@
     "simple": [
       "geojson",
       17830,
-      "bbe1bda4c07d0f38"
+      "632ee328ed241e0f"
     ],
     "slots": [
       "geojson",
@@ -84,7 +84,7 @@
     "roadstyle:controls": "13b74d5d7142a722",
     "roadstyle:generation": "960db97f1bd34c71"
   },
-  "hash": "669704d24c503b09",
+  "hash": "7d460b94283734db",
   "road_table": {
     "rows": 13298,
     "columns": [
@@ -126,7 +126,7 @@
     }
   },
   "text": {
-    "bytes": 17703833,
-    "sha16": "669704d24c503b09"
+    "bytes": 17693109,
+    "sha16": "7d460b94283734db"
   }
 }

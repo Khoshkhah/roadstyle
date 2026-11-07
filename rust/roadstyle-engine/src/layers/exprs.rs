@@ -48,6 +48,8 @@ impl Exprs for Model {
             let two = json!(["to-boolean", ["get", Mark::Twoway.name()]]);
             let m = match self.half_frac(z).filter(|_| pairs) {
                 Some((hf, px, _)) => {
+                    // a shared line of a pair (piece.rs: no `__rs_twoway`) is two-way, as the pair's casing is
+                    let two = json!(["any", two, ["to-boolean", ["get", Mark::Pair.name()]]]);
                     let by = json!(["case", pair_half(), round_to(hf, 3), two, round_to(f, 3), 1]);
                     let wide = json!(["*", m, by]);
                     if px > 0.0 { json!(["+", wide, ["case", pair_half(), round_to(px / 2.0, 3), 0]]) } else { wide }
@@ -271,20 +273,15 @@ pub(crate) fn tun_dash() -> Value {
     json!(["interpolate", ["linear"], gs("rs_tun_strength"), 0, gs("rs_tun_c0"), 100, gs("rs_tun_toward")])
 }
 
-/// The pieces of a twin pair that come from its one casing (casing_parts makes them for the first edge only): the casing, the bridge
-/// shadow, the tunnel gap and the tunnel dashes (`__rs_k` 0, 2, 3, 4). Both directions share them, so they cover the whole road.
-fn shared_kind() -> Value {
-    json!(["match", ["get", Mark::PieceKind.name()], [0, 2, 3, 4], true, false])
-}
-
-/// A casing of a twin pair: a line that both directions share (`shared_kind`).
+/// A line of a twin pair that comes from its one casing (casing_parts makes them for the first edge only): the casing, the bridge
+/// shadow, the tunnel gap and the tunnel dashes (`__rs_k` 0, 2, 3, 4). Both directions share it, so it covers the whole road.
 fn pair_casing() -> Value {
-    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], shared_kind()])
+    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["!=", ["get", Mark::PieceKind.name()], 1]])
 }
 
-/// A line of a twin pair that is not shared (the fill, an item): one direction's half of the road.
+/// The fill of a twin pair (`__rs_k` 1; an item has no `__rs_pair`): one direction's half of the road.
 pub(super) fn pair_half() -> Value {
-    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["!", shared_kind()]])
+    json!(["all", ["to-boolean", ["get", Mark::Pair.name()]], ["==", ["get", Mark::PieceKind.name()], 1]])
 }
 
 /// The settings of the metre-width curves (_width_m_expr): width_m_zoom, config bridge_casing_m / bridge_casing_px, render's

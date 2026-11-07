@@ -16,7 +16,7 @@
         "line",
         "roads",
         "a94a0337c58323bc",
-        "808f58cf85b1393f",
+        "a8916acdbfb74b6e",
         "80a0a620e1edb4a9"
       ],
       [
@@ -24,7 +24,7 @@
         "line",
         "roads",
         "f26422c8d7737e6c",
-        "291b46d4210b03f8",
+        "4b4c1a5326c3c6d9",
         "80a0a620e1edb4a9"
       ],
       [
@@ -61,21 +61,21 @@
       "roadstyle:contract": "d4735e3a265e16ee",
       "roadstyle:arrows": "42d2b70866ba77b8"
     },
-    "hash": "d254fe1523705230"
+    "hash": "ae1e52fd22acc800"
   },
   "tiles": {
     "z12": {
       "simple": {
         "tiles": 1,
         "features": 1689,
-        "hash": "b60936d0ec3c6953"
+        "hash": "2a9ca0877b7d97e9"
       }
     },
     "z14": {
       "simple": {
         "tiles": 5,
         "features": 6858,
-        "hash": "b9666ef7da017784"
+        "hash": "7dd4ecabf86b6bae"
       },
       "slots": {
         "tiles": 4,
@@ -87,7 +87,7 @@
       "simple": {
         "tiles": 9,
         "features": 21361,
-        "hash": "bcea18fef1344167"
+        "hash": "7a644ff3ecdbcd20"
       },
       "slots": {
         "tiles": 8,
