@@ -114,7 +114,7 @@ def test_the_panel_opens_in_the_host_panel_and_draws_a_theme(tmp_path):
         got = page.evaluate("""() => ({body: getComputedStyle(document.querySelector('#sb .sb-body')).display, title: document.querySelector('#sb .sb-top .rs-dz-title .t').textContent,
           tabs: [...document.querySelectorAll('#design-tabs [role=tab]')].map(b => b.textContent), on: document.querySelector('#design-tabs .on').textContent,
           themes: document.querySelectorAll('#ready-list [data-look]').length})""")
-        assert got == {"body": "none", "title": "Edit design", "tabs": ["Theme", "Roads", "Text", "Layers", "Tiles"], "on": "Theme", "themes": got["themes"]}
+        assert got == {"body": "none", "title": "Edit design", "tabs": ["Theme", "Roads", "Bridges & tunnels", "Text", "Layers", "Tiles"], "on": "Theme", "themes": got["themes"]}
         assert got["themes"] >= 13
         # a theme draws a new map (no setLook style): the host gets the look; the host value stays
         page.evaluate("document.querySelector('[data-look=print]').click(); dz.flush()")
@@ -176,6 +176,33 @@ def test_a_new_look_on_the_same_tiles_goes_through_rs_restyle(tmp_path):
     assert not errors, errors
 
 
+def test_the_bridges_and_tunnels_tab_writes_the_look_and_the_tunnel_look_is_one_state_with_the_tunnels_box(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = open_page(p, url)
+        page.evaluate("dz.open('bridges')")
+        assert page.evaluate("[...document.querySelectorAll('#design-pane h3')].map(h => h.textContent)") == ["Bridges", "Tunnels"]
+        # a bridge value is in the look: the map is drawn again with it
+        _set(page, "bridges.casing", "#112233")
+        page.evaluate("dz.flush()")
+        assert json.loads(page.evaluate("window.drawn.at(-1).text"))["bridges"]["casing_color"] == "#112233"
+        # the shadow switch turns its other controls on and off
+        _set(page, "bridges.shadow", False)
+        page.evaluate("dz.flush()")
+        assert page.evaluate("document.querySelector('#design-pane [data-p=\"bridges.shadow_blur\"]').disabled") is True
+        # a tunnel value goes to roadstyle's tunnel look (rsSetTunnelStyle) at once, with no new map
+        page.evaluate("""() => { window.tun = []; window.rsSetTunnelStyle = (o) => window.tun.push(o); }""")
+        n = page.evaluate("window.drawn.length")
+        page.evaluate("""() => { const s = document.querySelector('#design-pane [data-p="tunnels.ratio"]'); s.value = '2:1'; s.dispatchEvent(new Event('input', {bubbles: true})); }""")
+        page.evaluate("dz.flush()")
+        assert page.evaluate("[window.tun.at(-1).ratio, dz.get().tunnels.ratio, window.drawn.length]") == [[2, 1], [2, 1], n]
+        # the Tunnels box: its event comes back to the design
+        page.evaluate("document.dispatchEvent(new CustomEvent('rs:tunnelchange', {detail: {strength: 25, palette: 'One colour', ratio: [1, 1], toward: 'Dark'}}))")
+        assert page.evaluate("[dz.get().tunnels.strength, dz.get().tunnels.toward, dz.get().theme]") == [25, "Dark", "custom"]
+        assert page.evaluate("document.querySelector('#design-pane [data-p=\"tunnels.toward\"]').value") == "Dark"
+        browser.close()
+    assert not errors, errors
+
+
 def test_the_switch_events_of_a_new_style_are_not_the_persons_and_the_host_fold_button_hides(tmp_path):
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser, page, errors = open_page(p, url)
@@ -233,13 +260,14 @@ def test_every_tab_fits_a_phone(tmp_path):
         page.wait_for_function("window.map && map.loaded() && window.rsReady && window.dzReady", timeout=60_000)
         page.evaluate("rs.sheet(2); dz.open('theme'); document.getElementById('mine-name').value = 'Phone theme'; document.getElementById('mine-save').click()")
         page.wait_for_selector("[data-mine=phone-theme]")       # a saved theme: its card has three buttons that must fit
-        for tab in ("theme", "roads", "text", "layers", "tiles"):
+        for tab in ("theme", "roads", "bridges", "text", "layers", "tiles"):
             page.evaluate(f"dz.tab('{tab}')")
             page.wait_for_timeout(300)
             m = page.evaluate("""() => {
               const root = document.querySelector('.rs-dz'), b = root.querySelector('.rs-dz-body'), r = root.getBoundingClientRect();
-              const wide = [...root.querySelectorAll('*')].filter(e => e.offsetParent && e.getBoundingClientRect().right > r.right + 1).map(e => e.id || e.className || e.tagName).slice(0, 4);
+              const wide = [...root.querySelectorAll('*')].filter(e => e.offsetParent && !e.closest('#design-tabs') && e.getBoundingClientRect().right > r.right + 1).map(e => e.id || e.className || e.tagName).slice(0, 4);
               const tabs = document.getElementById('design-tabs').getBoundingClientRect(), bar = root.querySelector('.rs-dz-bar').getBoundingClientRect();
+              // the tab row is one row that scrolls sideways on a phone (frame.js): its tabs can be past the edge
               return {over: b.scrollWidth - b.clientWidth, page: document.documentElement.scrollWidth - innerWidth, wide, tabs: tabs.left >= 0 && tabs.right <= innerWidth,
                       bar: bar.bottom <= innerHeight + 1 && bar.height > 0, phone: document.documentElement.classList.contains('rs-phone')}; }""")
             assert m == {"over": m["over"], "page": m["page"], "wide": [], "tabs": True, "bar": True, "phone": True} and m["over"] <= 1 and m["page"] <= 1, (tab, m)
