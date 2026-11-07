@@ -38,8 +38,8 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 - [JavaScript: window.rs and live data](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/dashboard-manual/javascript.md): rs.setData, natural breaks, the day picker
 - [Move a dashboard to the new version](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/migrating-dashboard.md): each old keyword and the changes from 0.25 to 0.26
 - [Which road is on top](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/levels.md): the level solver, the level editor, the editor in a dashboard
-- [AI agents](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/agents.md): the MCP server (render_place, render_file, snapshot) and the agent skill
-- [Put it on a website](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/website.md): the saved page in an iframe, a style for other map apps
+- [With AI agents](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/agents.md): the MCP server (render_place, render_file, snapshot) and the agent skill
+- [On a website or in a map app](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/guides/website.md): the saved page in an iframe, a style for other map apps
 - [Gallery](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/gallery.md): one screenshot and the code for each look
 
 ## Optional

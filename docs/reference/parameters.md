@@ -13,7 +13,7 @@ Everything in `roadstyle.__all__`, as `import roadstyle as rs; rs.<name>`.
 | `render_dashboard(gdf, **kw)` | `WebMap` | the map, a panel and the standard toolbox ([Pages](#pages), [Dashboard options](#dashboard-options)) |
 | `render_street_view(gdf, **kw)` | `WebMap` | map + Google Street View side by side ([Pages](#pages)) |
 | `sidebar_html(name)` | `str` | a bundled sidebar fragment: `"dashboard"`, `"street_view"` |
-| `export_style(gdf, out_dir, *, base_url, format="xyz", basemap=<render_edges'>, **kw)` | path of `style.json` | the roads as a MapLibre style + vector tiles (`"xyz"` folder or `"pmtiles"`) + sprite, for other map apps ([Put it on a website](../guides/website.md#a-style-for-other-map-apps)); `basemap=None`: no base map; `kw` go to `render_edges` |
+| `export_style(gdf, out_dir, *, base_url, format="xyz", basemap=<render_edges'>, **kw)` | path of `style.json` | the roads as a MapLibre style + vector tiles (`"xyz"` folder or `"pmtiles"`) + sprite, for other map apps ([On a website or in a map app](../guides/website.md#a-style-for-other-map-apps)); `basemap=None`: no base map; `kw` go to `render_edges` |
 | `export_look(path=None, *, profile=None, palette=None, edges=None, positions=None)` | the look (dict) | MapLibre layers with no source for a data layer in another app (the GeoLibre plugin's "Style a layer with roadstyle"); one casing and one fill layer per drawing position (`positions`, else those of `edges`, else -10 to 10) |
 | `snapshot(map_or_html, out_path, *, center, zoom, pitch, bearing, width=1200, height=800, scale=1, settle=2.5, timeout=40)` | path | a PNG via headless Chromium (needs `playwright`) |
 | **Read your data** | | |

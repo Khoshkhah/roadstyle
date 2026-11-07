@@ -1,4 +1,4 @@
-# Put it on a website
+# On a website or in a map app
 
 <p class="lead">Two ways to show a roadstyle map on a web page or in another map app: the saved page in an iframe, or a style that other map apps open by URL.</p>
 

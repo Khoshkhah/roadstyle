@@ -194,4 +194,4 @@ The reasons for each rule, the measurements and the list of the keys of each lay
 protocol](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/tiling.md).
 
 **See also:** [How a map is drawn](drawing.md) · [Big networks](../guides/big-networks.md) ·
-[Put it on a website](../guides/website.md)
+[On a website or in a map app](../guides/website.md)

@@ -1,4 +1,4 @@
-# AI agents
+# With AI agents
 
 roadstyle works with AI agents two ways: as tools any MCP-capable app can call, or as a library an
 agent writes code against.
