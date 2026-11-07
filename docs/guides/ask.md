@@ -5,7 +5,7 @@ hide:
 
 # Ask
 
-Ask is an AI agent in the side panel. The person types a question in words, for example "Which primary roads are longer than 1 km?". The agent writes SQL, runs it through the [data dock](data-dock.md), reads the result and answers in one to three sentences. Each answer puts its SQL and its table into the data dock, so its roads light on the map. The agent can also colour roads, focus on roads and move the map.
+Ask is an AI agent in the side panel. The person types a question in words, for example "Which primary roads are longer than 1 km?". The agent writes SQL, runs it through the [data dock](data-dock.md), reads the result and answers in one to three sentences. Each answer puts its SQL and its table into the data dock, so its roads light on the map. The agent can also colour roads, focus on roads and move the map, and it can show or hide the map's layers, change the base map, turn the 3D view on and move the camera. A host page can add its own tools.
 
 The agent uses the person's own key of a free AI service. The browser sends each request directly to that service. There is no model in the browser and no server of roadstyle or of your page. Ask is a JavaScript module that the host page imports. Each item below has the same form: a box with **Use it for** and **From Python**, the code in tabs, and **Details** that open on a click.
 
@@ -28,6 +28,8 @@ Then click an example question or type your own. The agent writes the SQL, the t
 | The agent | [The agent](#the-agent) | no | its tools and its loop |
 | The agent | [Graph questions](#graph-questions) | no | the diameter and shortest distances in SQL |
 | The agent | [draw_chart](#draw_chart) | no | a chart of a result |
+| The agent | [get_map and set_map](#get_map-and-set_map) | no | the map's layers, base map, 3D view and camera |
+| The agent | [The host's own tools](#the-hosts-own-tools) | no | to give Ask controls that only your page has |
 | Safety and tests | [Safety](#safety) | no | what the worst result is |
 | Safety and tests | [Tests](#tests) | no | a fake provider, with no key |
 
@@ -76,6 +78,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `maxSteps` | `6` | The most model calls for one question. |
     | `sendRows` | `30` | The most rows of one result that go to the model. |
     | `providers` | the five free services | The list of services. A test gives a fake provider here (see [Tests](#tests)). |
+    | `tools` | `[]` | The page's own tools, in the form of the built-in ones (see [The host's own tools](#the-hosts-own-tools)). A name that is in use is refused. |
 
     The schema of the data dock (`schema()`) gives the prompt its tables. Give `main: true` and `columns: [{name, type, about}]` on the table that the map draws. The prompt has one line for each schema with the table names and their rows, the columns of the main table, and each table of the schema `extra` with its `about`. A prompt of this form stays small (about 4 000 characters), because a free service allows only some thousand tokens a minute.
 
@@ -151,7 +154,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
 ### The agent { .rs-part }
 
-**Use it for:** to know what the agent can do. It has four tools. Each one takes one read-only `SELECT` or `WITH` statement, and the data dock's guard checks each one.<br>
+**Use it for:** to know what the agent can do. It has seven tools of its own (and the page's tools, see below). Each one of the first four takes one read-only `SELECT` or `WITH` statement, and the data dock's guard checks each one.<br>
 **From Python:** no
 { .rs-facts }
 
@@ -163,6 +166,9 @@ Then click an example question or type your own. The agent writes the SQL, the t
     | `color_roads(groups)` | 1 to 8 groups `{label, color, sql}`: a colour layer with a legend row for each group. |
     | `focus_roads(sql, mode)` | A focus layer: the other roads fade (`"fade"`) or are hidden (`"hide"`). The camera moves to the roads. |
     | `move_map(sql)` | The camera moves to the roads. |
+    | `draw_chart(sql, kind, x, y, title)` | A chart of the result ([draw_chart](#draw_chart)). |
+    | `get_map()` | The map now ([get_map and set_map](#get_map-and-set_map)). |
+    | `set_map(...)` | A change of the map's layers, base map, 3D view or camera. |
 
     A map tool needs SQL that selects the id column. It uses only the roads that the map draws, at most 100 000. It puts its roads into the dock, with the id, the name, the class and the length of each road (the columns that the main table has). No id goes back to the model: it gets a short text, for example "Focus on 625 roads (the others hidden).".
 
@@ -199,6 +205,51 @@ Then click an example question or type your own. The agent writes the SQL, the t
 ??? info "Details"
 
     `draw_chart(sql, kind, x, y, title)` draws a chart of the result of its SQL in the data dock: `bar`, `line`, `histogram`, `scatter` or `pie` ([A chart](dashboard-parts.md#a-chart)). The dock switches to its **Chart** view, and the answer card shows a small copy of the chart. **Show** on the card puts its table and its chart in the dock again. The prompt tells the model to use it when the person asks for a chart, a graph, a plot or a diagram, and to aggregate in the SQL (`GROUP BY`). A column that is not in the result, or a kind that does not fit the columns, goes back to the model as an error, as a failed query does.
+
+### get_map and set_map { .rs-part }
+
+**Use it for:** words like "turn off the water", "show buildings in 3D", "satellite" and "zoom to Fontvieille". No code in the page.<br>
+**From Python:** no
+{ .rs-facts }
+
+??? info "Details"
+
+    The two tools are over `rs.getState()` and `rs.setState()`. They change only the map's own controls. They do not change the data, and they do not touch the page's own state (the selection, the filter and the colour layers have their own tools).
+
+    | Tool | What it does |
+    |---|---|
+    | `get_map()` | Gives the layers `[{label, on}]`, the base maps `[{key, label}]` and the current one, `view3d`, `roadFill`, `tunnel` and the camera `{center, zoom, pitch, bearing}`. The agent calls it before it uses a name. |
+    | `set_map(overlays, basemap, view3d, roadFill, tunnel, camera)` | Changes what it is given. `overlays` is `[{label, on}]` (a `{label: on}` map is also accepted), `basemap` is a key or a label, `camera` has any of `center` (`[longitude, latitude]`), `zoom`, `pitch` and `bearing`. A label is not case sensitive. It gives back what changed and the new state of the map. |
+
+    A layer or a base map that does not exist is named in the answer (`not_found`), so the agent can fix the call; the other changes are made. A wrong camera (a zoom over 22, a latitude over 90) is an error for the model. A change shows as one line "MAP" on the card.
+
+    The camera has one path. `set_map` jumps to the camera it is given. `move_map` flies to roads (`rs.focus`). The last one in an answer wins: when `set_map` moved the camera, Ask does not fly to the roads of the table again.
+
+### The host's own tools { .rs-part }
+
+**Use it for:** a control that only your page has, for example a layer of shapes, the map switch of the data dock or a row of the table.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```javascript
+    const ask = askPanel({
+      data,
+      tools: [{
+        name: "show_shapes",
+        description: "Show or hide the layer of shapes.",
+        parameters: {on: {type: "boolean"}},            // JSON Schema of each argument
+        required: ["on"],
+        step: (args, c) => "Changing the shapes",       // the line on the card while the tool runs
+        run: async (args, c) => { page.shapes(args.on); return {done: args.on ? "Shapes on." : "Shapes off."}; },
+      }],
+    });
+    ```
+
+??? info "Details"
+
+    A tool has the form of the built-in ones: `{name, description, parameters, required, step(args, c), run(args, c)}`. `run` gives what goes back to the model (an object; at most 2 500 characters). An error that `run` throws goes back to the model as its text, as a failed query does. `c` is the context of the question: `c.maps` takes `{text, sql: [], res: null, move: true}` for a line "MAP" on the card. `name` and `run` are necessary. A name that a tool already has (also a built-in one) makes `askPanel` throw an error: `the tool name "set_map" is already in use`. Describe the tool for the model in `description`: the prompt does not name it.
 
 ## Safety and tests { .rs-group }
 

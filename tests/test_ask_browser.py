@@ -71,6 +71,7 @@ window.ask = askPanel(opts);
 window.answers = []; window.errors = [];
 ask.addEventListener("answer", e => answers.push(e.detail));
 ask.addEventListener("error", e => errors.push(e.detail.message));
+window.withTools = (tools) => { window.ask = askPanel({...opts, tools}); };    // a host with its own tools
 window.makeReal = () => { window.ask = askPanel({...opts, providers: undefined}); };    // the built-in providers (the test routes their address)
 rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data", open: () => window.ask.open()});
 window.lights = [];
@@ -135,7 +136,7 @@ def test_the_agent_fixes_its_sql_and_its_answer_goes_to_the_dock(tmp_path):
             page.evaluate("releaseLoad()")
             page.wait_for_function("window.answers.length === 1")
             calls = page.evaluate("window.calls")
-            assert len(calls) == 3 and calls[0]["tools"] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart"]
+            assert len(calls) == 3 and calls[0]["tools"] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart", "get_map", "set_map"]
             system = calls[0]["messages"][0]["content"]
             assert "Columns of main.edges" in system and "extra.sensors: Traffic sensors" in system and "Six test roads." in system
             tool_msg = calls[1]["messages"][-1]
@@ -279,7 +280,7 @@ def test_a_real_provider_gets_the_key_only_in_its_header(tmp_path):
             r = seen[-1]
             assert r["url"] == "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" and "test-key-123" not in r["url"]
             assert r["auth"] == "Bearer test-key-123" and r["body"]["model"] == "gemini-2.5-flash" and r["body"]["tool_choice"] == "auto"
-            assert [t["function"]["name"] for t in r["body"]["tools"]] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart"]
+            assert [t["function"]["name"] for t in r["body"]["tools"]] == ["run_query", "color_roads", "focus_roads", "move_map", "draw_chart", "get_map", "set_map"]
             assert "test-key-123" not in json.dumps(r["body"])
         finally:
             browser.close()
@@ -428,6 +429,53 @@ def test_a_road_click_while_ask_is_open_opens_the_dock_card_and_no_popup(tmp_pat
             page.mouse.click(x, y)
             page.wait_for_timeout(300)
             assert page.evaluate(popups) == 1
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_get_map_and_set_map_change_the_map_and_a_host_tool_is_added(tmp_path):
+    import geopandas as gpd
+    from shapely.geometry import box
+    water = rs.Overlay(gpd.GeoDataFrame(geometry=[box(18.0, 59.30, 18.005, 59.305)], crs=4326), kind="fill", label="Water", popup=[])
+    with served(tmp_path, overlays=[water]) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("""withTools([{name: 'host_row', description: 'Select row n of the host table.', parameters: {n: {type: 'number'}}, required: ['n'],
+                                          step: (a) => 'Row ' + a.n, run: async (a, c) => { window.hostGot = [a.n, Object.keys(c)]; return {done: 'Row ' + a.n + '.'}; }}]);
+                             releaseLoad(); ask.open()""")
+            bases = page.evaluate("rs.basemaps().map(b => b.key)")
+            other = next(k for k in bases if k != page.evaluate("rs.getState().basemap"))
+
+            def reply(i):
+                return json.loads(page.evaluate(f"window.calls[{i}].messages.at(-1).content"))
+            _ask(page, "Turn off the water, go to 18.01 59.305 in 3D, other base map", [
+                "tool('get_map', {})",
+                f"tool('set_map', {{overlays: {{water: false, Nodes: true}}, basemap: '{other.upper()}', view3d: true, roadFill: false, camera: {{center: [18.01, 59.305], zoom: 15}}}})",
+                "tool('host_row', {n: 4})", "say('Done.')"])
+            tools = page.evaluate("window.calls[0].tools")
+            assert tools[-3:] == ["get_map", "set_map", "host_row"]
+            assert "set_map(" in page.evaluate("window.calls[0].messages[0].content")
+            first = reply(1)                                                                       # get_map: what can change
+            assert first["overlays"] == [{"label": "Water", "on": True}] and {"key": other, "label": first["basemaps"][bases.index(other)]["label"]} in first["basemaps"]
+            assert first["view3d"] is False and first["roadFill"] is True and len(first["camera"]["center"]) == 2
+            second = reply(2)                                                                      # set_map: the new state; the unknown layer is named
+            assert second["done"].startswith("Map: Water off, base map ") and second["done"].endswith(", 3D view on, road fill off, camera.")
+            assert second["not_found"] == ['layer "Nodes"'] and second["map"]["overlays"] == [{"label": "Water", "on": False}]
+            state = page.evaluate("rs.getState()")
+            assert state["overlays"]["Water"]["visible"] is False and state["view3d"] is True and state["roadFill"] is False
+            assert state["basemap"] == other and abs(state["camera"]["center"][0] - 18.01) < 1e-6 and abs(state["camera"]["center"][1] - 59.305) < 1e-6
+            got = page.evaluate("window.hostGot")                                                  # the host tool: its arguments and the context of the question
+            assert got[0] == 4 and {"ok", "failed", "maps"} <= set(got[1])
+            assert reply(3) == {"done": "Row 4."}
+            assert "Map: Water off" in page.locator(".rs-ask-turn").last.locator(".rs-ask-map").first.inner_text()
+            # a wrong camera and an unknown base map go back to the model as the words of the tool
+            _ask(page, "Zoom far", ["tool('set_map', {camera: {zoom: 99}})", "tool('set_map', {basemap: 'nope'})", "say('No.')"])
+            assert "zoom must be 0 to 22" in page.evaluate("window.calls.at(-2).messages.at(-1).content")
+            assert json.loads(page.evaluate("window.calls.at(-1).messages.at(-1).content"))["done"] == "Nothing changed."
+            # a host tool with a name in use is refused
+            msg = page.evaluate("() => { try{ withTools([{name: 'set_map', run: () => 0}]); }catch(e){ return e.message; } }")
+            assert 'the tool name "set_map" is already in use' in msg
         finally:
             browser.close()
     assert errors == [], errors

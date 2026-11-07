@@ -147,6 +147,7 @@ export function makeApi(extra){
     setTunnelStyle(look){ call("rsSetTunnelStyle", look || {}); },
     setView(name){ call("rsSetView", name); },
     setBasemap(key){ call("rsSetBasemap", key); },
+    basemaps(){ return (O.basemaps || []).map(b => ({key: b.key, label: b.label})); },
     getState(){ return JSON.parse(JSON.stringify({...state, camera: camera()})); },
     // a part of the state: a saved view, a URL (#rs=); each key through the function of its control
     setState(change){
