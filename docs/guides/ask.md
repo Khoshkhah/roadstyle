@@ -122,7 +122,7 @@ Then click an example question or type your own. The agent writes the SQL, the t
     - **A map change** is one line on the card, for example "MAP Focus on 625 roads (the others hidden)". A colour or a focus is a layer in **Colour ▾** or **Focus ▾** of the data dock. A new question, ✕ of a card and **New** do not remove a layer.
     - **An error** ends the question with a red line on its card, and the question box works again.
     - **A road click** while Ask is open shows no popup. The data dock opens with the road in its card (`rs.holdPopup("ask", …)`).
-    - **The question box** is at the bottom. Enter asks, Shift+Enter is a new line. While the agent works, the send button is a stop square. After the first question, **Examples ▴** above the box shows the example chips.
+    - **The question box** is at the bottom. Enter asks, Shift+Enter is a new line. While the agent works, the send button is a stop square. After the first question, **Examples ▴** above the box shows the example chips. The list is as high as the free space above the box at most and scrolls inside. The arrow keys walk the examples (the list scrolls to the one in focus), and Escape closes it.
 
 ### The services and the keys { .rs-part }
 

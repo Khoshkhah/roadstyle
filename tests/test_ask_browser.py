@@ -71,7 +71,8 @@ window.ask = askPanel(opts);
 window.answers = []; window.errors = [];
 ask.addEventListener("answer", e => answers.push(e.detail));
 ask.addEventListener("error", e => errors.push(e.detail.message));
-window.withTools = (tools) => { window.ask = askPanel({...opts, tools}); };    // a host with its own tools
+window.withOpts = (extra) => { window.ask = askPanel({...opts, ...extra}); };
+window.withTools = (tools) => withOpts({tools});    // a host with its own tools
 window.makeReal = () => { window.ask = askPanel({...opts, providers: undefined}); };    // the built-in providers (the test routes their address)
 rs.sections.add({id: "ask", label: "Ask", note: "Ask a question about the data", open: () => window.ask.open()});
 window.lights = [];
@@ -476,6 +477,51 @@ def test_get_map_and_set_map_change_the_map_and_a_host_tool_is_added(tmp_path):
             # a host tool with a name in use is refused
             msg = page.evaluate("() => { try{ withTools([{name: 'set_map', run: () => 0}]); }catch(e){ return e.message; } }")
             assert 'the tool name "set_map" is already in use' in msg
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+@pytest.mark.parametrize("size", [(1280, 600), (390, 600)])
+def test_a_long_examples_list_stays_in_the_free_space_and_scrolls(tmp_path, size):
+    """Kaveh, 2026-11-07: "bug in showing examples. it needs scroll too". 7 long examples do not fit above the question box: the list has the free
+    space as its maximum height and scrolls inside (the panel's scroll rules); the keys walk the examples, and Escape closes the list."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url, *size)
+        try:
+            page.evaluate("""withOpts({examples: Array.from({length: 7}, (_, i) => 'Question number ' + (i + 1) + ': which streets of this district have more than two lanes, are one-way and are longer than one kilometre?')});
+                             releaseLoad(); ask.open()""")
+            _ask(page, "Hi", ["say('Hello.')"])
+            page.click(".rs-ask-exb")
+            geo = """() => { const r = (s) => document.querySelector(s).getBoundingClientRect(), l = r('.rs-ask-exlist'), list = document.querySelector('.rs-ask-exlist'),
+                      first = document.querySelector('.rs-ask-exlist > :first-child').getBoundingClientRect(), last = document.querySelector('.rs-ask-exlist > :last-child').getBoundingClientRect();
+                      return {top: l.top, bottom: l.bottom, body: r('#ask-body').top, comp: r('.rs-ask-comp').top, scrolls: list.scrollHeight > list.clientHeight + 2,
+                              st: list.scrollTop, first: [first.top, first.bottom], last: [last.top, last.bottom]}; }"""
+            g = page.evaluate(geo)
+            assert g["scrolls"], g                                                                 # the list is longer than the free space: the test means something
+            assert g["top"] >= g["body"] - 1 and g["bottom"] <= g["comp"], g                       # inside the free space above the question box
+            assert g["first"][0] >= g["top"] and g["first"][1] <= g["bottom"], g                   # the first example is in view
+            rules = page.evaluate("(() => { const e = document.querySelector('.rs-ask-exlist'), cs = getComputedStyle(e); return [cs.overflowY, cs.overscrollBehaviorY, cs.scrollbarWidth, !!e.dataset.rsScroll]; })()")
+            assert rules == ["auto", "contain", "thin", True], rules                               # the panel's scroll rules
+            page.evaluate("document.querySelector('.rs-ask-exlist').scrollTop = 99999")
+            g = page.evaluate(geo)
+            assert g["last"][0] >= g["top"] and g["last"][1] <= g["bottom"], g                     # the last one is reachable
+            # the keys: from the button, Up goes to the last example, and Up again to the first; Down goes back; Escape closes the list
+            page.focus(".rs-ask-exb")
+            inside = """() => { const a = document.activeElement, l = document.querySelector('.rs-ask-exlist').getBoundingClientRect(), r = a.getBoundingClientRect();
+                         return [a.parentElement.classList.contains('rs-ask-exlist') ? [...a.parentElement.children].indexOf(a) : -1, r.top >= l.top - 1 && r.bottom <= l.bottom + 1]; }"""
+            page.keyboard.press("ArrowUp")
+            assert page.evaluate(inside) == [6, True]
+            for _ in range(6):
+                page.keyboard.press("ArrowUp")
+            assert page.evaluate(inside) == [0, True] and page.evaluate("document.querySelector('.rs-ask-exlist').scrollTop") <= 10      # at most the padding of the list
+            page.keyboard.press("ArrowDown")
+            assert page.evaluate(inside) == [1, True]
+            page.keyboard.press("Escape")
+            assert not page.is_visible(".rs-ask-exlist") and page.evaluate("document.activeElement.className") == "rs-ask-exb"
+            assert page.evaluate("document.querySelector('.rs-ask-exb').getAttribute('aria-expanded')") == "false"
+            page.click(".rs-ask-exb")                                                              # it opens at the top again
+            assert page.evaluate("document.querySelector('.rs-ask-exlist').scrollTop") == 0
         finally:
             browser.close()
     assert errors == [], errors
