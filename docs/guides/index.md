@@ -30,7 +30,7 @@
     - [The data dock](data-dock.md): SQL on your database, with the result under the map.
     - [Ask](ask.md): questions about the data to an AI model, with the person's own key.
 
-## Share
+## Use it elsewhere
 
-- [Put it on a website](website.md): the saved page in an iframe, or a style for other map apps.
-- [AI agents](agents.md): let an AI agent make maps with roadstyle.
+- [On a website or in a map app](website.md): the saved page in an iframe, or a style for other map apps.
+- [With AI agents](agents.md): let an AI agent make maps with roadstyle.

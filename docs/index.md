@@ -53,13 +53,13 @@ rs.render_edges(edges).save("roads.html")  # one self-contained file, opens offl
 
     [:octicons-arrow-right-24: Dashboards](guides/dashboards.md)
 
--   :material-web:{ .lg .middle } **Share**
+-   :material-web:{ .lg .middle } **Use it elsewhere**
 
     ---
 
-    Put the saved page on a website, or let an AI agent make maps.
+    Put the map on a website or in another map app, or let an AI agent make maps.
 
-    [:octicons-arrow-right-24: Put it on a website](guides/website.md)
+    [:octicons-arrow-right-24: On a website or in a map app](guides/website.md)
 
 -   :material-image-multiple-outline:{ .lg .middle } **Gallery**
 

@@ -63,4 +63,4 @@ Compute it once with
 `rs.compute_levels`, keep the result with `rs.save_levels` (duckOSM file, schema `visualization`), and draw with the columns.
 The tile archive also carries the casing pieces and the end caps, so it is larger than the road lines alone.
 
-**See also:** [Every parameter](../reference/parameters.md) · [Put it on a website](website.md)
+**See also:** [Every parameter](../reference/parameters.md) · [On a website or in a map app](website.md)

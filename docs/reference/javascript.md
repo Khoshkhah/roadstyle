@@ -282,4 +282,4 @@ lon, lat and end lon, lat); the level editor on a host map reads the table's `en
 and sizes the roads from a table with no new style, and `rs.clearData()` takes it away. The options and the files:
 `docs/design/dashboard_module.md` in the repository.
 
-**See also:** [Dashboards](../guides/dashboards.md) · [Every parameter](parameters.md) · [Put it on a website](../guides/website.md)
+**See also:** [Dashboards](../guides/dashboards.md) · [Every parameter](parameters.md) · [On a website or in a map app](../guides/website.md)

@@ -109,4 +109,4 @@ entry, so the area is downloaded again.
 walks through all of this on Södermalm, with the maps.
 
 AI agents can do the same without code: the MCP server's `render_place` tool downloads and draws a
-place in one call. See [AI agents](agents.md).
+place in one call. See [With AI agents](agents.md).

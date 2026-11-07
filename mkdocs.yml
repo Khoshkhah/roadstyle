@@ -70,9 +70,9 @@ nav:
           - Edit the levels: guides/level-editor.md
           - The data dock: guides/data-dock.md
           - Ask: guides/ask.md
-  - Share:
-      - Put it on a website: guides/website.md
-      - AI agents: guides/agents.md
+  - Use it elsewhere:
+      - On a website or in a map app: guides/website.md
+      - With AI agents: guides/agents.md
   - Gallery:
       - gallery.md
       - Live map: maps/live.html
