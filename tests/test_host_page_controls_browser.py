@@ -119,8 +119,9 @@ def test_the_cards_of_style_f_have_the_light_edge_and_the_tinted_card_has_an_acc
 
 
 def test_the_title_row_of_the_dock_is_inside_a_phone(tmp_path):
-    """390 px: the title row of the data dock (the label, the note, seven actions, the arrow) was wider than the screen. Now the actions are
-    a row of their own that scrolls sideways, and nothing of the title row is past the screen's edge."""
+    """390 px: the title row of the data dock (the label, the note, the actions, the arrow) was wider than the screen. Now the actions are
+    a row of their own that scrolls sideways, and nothing of the title row is past the screen's edge. The SQL line (the tables icon, the line,
+    Run, the download icon; Kaveh, 2026-11-07) is inside the screen too."""
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser = p.chromium.launch(args=_ARGS)
         page = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True).new_page()
@@ -132,9 +133,10 @@ def test_the_title_row_of_the_dock_is_inside_a_phone(tmp_path):
           const past = [...hd.children].filter((e) => e.offsetParent && e.getBoundingClientRect().right > innerWidth + 0.5).map((e) => e.className);
           const inActs = [...acts.querySelectorAll('button')].filter((b) => b.offsetParent);
           acts.scrollLeft = acts.scrollWidth; const last = inActs.at(-1).getBoundingClientRect();
-          return {past, page: document.documentElement.scrollWidth - innerWidth, lastIn: last.right <= innerWidth + 0.5 && last.left >= 0, n: inActs.length}; }""")
+          const qPast = [...document.querySelectorAll('#rs-dock .rs-dd-q > *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length;
+          return {past, page: document.documentElement.scrollWidth - innerWidth, lastIn: last.right <= innerWidth + 0.5 && last.left >= 0, n: inActs.length, qPast}; }""")
         browser.close()
-    assert out["past"] == [] and out["page"] <= 0 and out["lastIn"] and out["n"] >= 6, out
+    assert out["past"] == [] and out["page"] <= 0 and out["lastIn"] and out["n"] >= 5 and out["qPast"] == 0, out
 
 
 _PARTS = """() => {
