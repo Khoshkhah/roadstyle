@@ -350,7 +350,7 @@ def test_web_street_view_window():
     import pytest
     win = render_edges(_edges(), backend="web").html                     # the default
     assert _opt(win, "street_view") == "window" and '_svWindow = O.street_view==="window"' in win
-    assert "window.rsSetStreetView = rsSetStreetView;" in win and "maps/embed?pb=" in win
+    assert "window.rsSetStreetView = rsSetStreetView;" in win and "maps/embed" not in win
     link = render_edges(_edges(), backend="web", street_view=True).html  # the plain link instead
     assert _opt(link, "street_view") is True and "_streetView = !!O.street_view" in link
     assert "__STREET_VIEW__" not in win

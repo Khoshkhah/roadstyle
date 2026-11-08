@@ -50,7 +50,7 @@ A key needs more than the key itself: billing, the Maps JavaScript API and a lis
 addresses. See [Keys and tokens](google-key.md).
 
 With a Google Maps JavaScript API key, the window bar has a **Linked / Classic** switch.
-Linked is a real panorama, and the map marker walks with you. Classic is the keyless embed.
+Linked is a real panorama, and the map marker walks with you. Classic is a link that opens the spot in Google Maps, because Google no longer lets a page frame its keyless embed.
 
 ## Docked beside the map
 
@@ -111,7 +111,7 @@ Every `render_edges` keyword also works here. On a phone, Street View is under t
     Each step and turn moves the marker on the map. The map pans to keep the marker in view.
     Only Google's own street imagery shows. The step buttons of the page still walk along the clicked road.
 
-    A switch in the bar changes between **Linked** (this panorama) and **Classic** (the keyless embed).
+    A switch in the bar changes between **Linked** (this panorama) and **Classic** (a link to Google Maps).
     The browser remembers the choice.
 
     The key is written into the page, as every browser key is. To make a key and limit it to your own
@@ -127,7 +127,7 @@ if the provider says which way the photo looks. If the provider has no photo the
 
 | Provider | Key | Photos |
 |---|---|---|
-| Google | none for Classic. A [Google key](google-key.md) for Linked | Google |
+| Google | none for the Classic link. A [Google key](google-key.md) for Linked | Google |
 | [Panoramax](https://panoramax.fr/) | none | open data (mostly CC-BY-SA), from `api.panoramax.xyz` |
 | [Mapillary](https://www.mapillary.com/) | a free **client token** ([how to get it](google-key.md#the-mapillary-token)) | crowd-sourced (CC-BY-SA) |
 
@@ -201,7 +201,6 @@ Linked and Classic give different spots:
 | `heading` | where the viewer looks | the direction of the road there |
 | walking or turning in the picture | updates the spot | the page does not see it |
 
-Classic is Google's page in a sealed frame. It cannot tell the map when the viewer walks or turns.
-If you moved inside the picture, do not take the position from Classic.
+Classic has no picture in the page: it is a link, and the page cannot see where you look in Google Maps.
 
 **See also:** [Every parameter](../reference/parameters.md) · [Command line](../reference/cli.md) · [Dashboards](dashboards.md)
