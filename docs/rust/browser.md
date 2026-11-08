@@ -406,6 +406,29 @@ the first open, in the background, for example when the page is idle after it dr
 A test keeps the open fast: with `host`, the editor's worker gets no `build`, `draw` or `tile` call at open or at a change
 (`tests/test_level_editor_page.py`).
 
+### The level-edit part: a card and an adapter
+
+A host page does not need the glue around `levelEditor`. `levelEditPart` (`dashboard/editor/level_part.js`) adds a card to the panel that opens the editor on the host's map, and it does the rest: the line of state under the card, the store (`browserStore` with `memoryFallback`), the area (`ensureArea`), the busy veil, the limit `maxRoads` (default 200 000), the redraw of the changed edges, and the write-back at "← Steps". The host gives a data adapter:
+
+```js
+import {levelEditPart} from "./dashboard/editor/level_part.js";
+
+const part = levelEditPart({dashboard: rs, map, pkgUrl, prefix: "rs-", areaName: "monaco", card: {id: "level", label: "Edit levels"},
+  data: {
+    edges: async () => parquetBytes,                       // the roads of the area as GeoParquet (called only when the area is made)
+    storedLevels: async () => ({csv, edge_hash}),          // the levels in your tables, or null
+    saveLevels: async (files, {name}) => { /* write levels.csv, edits.csv, heads.csv, caps.csv (texts) into your tables */ },
+    relevel: async (rows) => ({}),                         // draw the changed edges again in your map worker; {style} when the layers changed
+    roadsStyle: async () => style,                         // the roads of the page, when they are not on the map at the open
+  }});
+part.addEventListener("applied", (e) => refreshSteps(e.detail));       // after saveLevels
+```
+
+- **Optional:** `data.roadCount()` for `maxRoads`; `data.ensureRoads()` when the host draws its own roads (then `roadsStyle` is not used); `data.after(style)` for the host's own layers on a swapped style; `data.useStyle(style)` when the host swaps a style itself; `pkg` (the initialised roadstyle module).
+- **The host also keeps `window.RS_SIDE`**, the road table of its roads.
+- **Events:** `open`, `close`, `applied` (`{files, rules, heads, caps}`), `error` (`{message, fatal}`); `part.dirty`, `part.isOpen()`, `part.open()`, `part.close()`.
+- While the editor is open, `document.body` has `data-rs-editing="levels"`, so a host can style by it.
+
 ### The adapter for a duckOSM file: `duckosmLevelsData`
 
 If your data is a duckOSM file in duckdb-wasm, you do not write the adapter: `roadstyle-wasm/levels_sql.js` gives `edges`, `storedLevels` and `saveLevels` for it. Only `relevel` and `roadsStyle` stay yours, because they use your own map worker.
