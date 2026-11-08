@@ -53,23 +53,37 @@ export function httpStore(base = "/area/"){
 }
 
 /** The store of a page with no server: the area's files in this browser under `key`, in the origin's private file system (the texts
- * too: pairs.csv of a large area is more than localStorage holds), each with the time it was saved (seconds, in localStorage). */
-export function browserStore(key, name = key){
+ * too: pairs.csv of a large area is more than localStorage holds), each with the time it was saved (seconds, in localStorage).
+ * `memoryFallback: true`: a file that the browser cannot keep (no private file system, a full storage) stays in memory for this page, with a
+ * warning in the console, and `store.lostBytes()` gives the size of those files (the page can tell the person: the edits stay only until the
+ * page closes). Without it, a file that cannot be kept is an error of `save`. `lostBytes()` is 0 when every file is kept. */
+export function browserStore(key, name = key, {memoryFallback = false} = {}){
   const at = n => `lv:${key}:${n}`;
   const dir = async () => (await navigator.storage.getDirectory()).getDirectoryHandle("lv-" + key.replace(/[^\w.-]/g, "_"), {create: true});
   const write = async (n, data) => { const w = await (await (await dir()).getFileHandle(n, {create: true})).createWritable(); await w.write(data); await w.close(); };
-  return {key, name,
+  const mem = new Map();                                          // memoryFallback: the files that the browser did not keep
+  let lost = 0;
+  const size = d => typeof d === "string" ? d.length : d.byteLength;
+  const as = (d, bytes) => bytes ? (typeof d === "string" ? new TextEncoder().encode(d) : d) : (typeof d === "string" ? d : new TextDecoder().decode(d));
+  return {key, name, lostBytes: () => lost,
     async load(n, bytes){
+      if(mem.has(n)){ const m = mem.get(n); return {body: as(m.body, bytes), mtime: m.mtime}; }
+      let d;
+      try { d = await dir(); }
+      catch(e){ if(memoryFallback) return null; throw e; }        // no private file system: the browser kept nothing (save puts the file in memory)
       const old = localStorage.getItem(at(n));                    // a text that an older version kept in localStorage: moved once
       if(old != null){ await write(n, old); localStorage.removeItem(at(n)); }
       let f;
-      try { f = await (await (await dir()).getFileHandle(n)).getFile(); }
+      try { f = await (await d.getFileHandle(n)).getFile(); }
       catch(e){ if(e.name === "NotFoundError") return null; throw e; }
       return {body: bytes ? new Uint8Array(await f.arrayBuffer()) : await f.text(), mtime: +(localStorage.getItem(at(n) + "@mtime") || 0)};
     },
     async save(n, data){
-      await write(n, data);
-      localStorage.setItem(at(n) + "@mtime", String(Date.now() / 1000));
+      if(!mem.has(n)){
+        try { await write(n, data); localStorage.setItem(at(n) + "@mtime", String(Date.now() / 1000)); return; }
+        catch(e){ if(!memoryFallback) throw e; console.warn(`level editor: ${n} is not kept in the browser (${e.message}): it stays in memory until the page closes`); lost += size(data); }
+      } else lost += size(data) - size(mem.get(n).body);          // a file that is in memory stays there: its size is the newest one
+      mem.set(n, {body: data, mtime: Date.now() / 1000});
     }};
 }
 
