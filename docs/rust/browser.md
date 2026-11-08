@@ -426,7 +426,9 @@ part.addEventListener("applied", (e) => refreshSteps(e.detail));       // after 
 
 - **Optional:** `data.roadCount()` for `maxRoads`; `data.ensureRoads()` when the host draws its own roads (then `roadsStyle` is not used); `data.after(style)` for the host's own layers on a swapped style; `data.useStyle(style)` when the host swaps a style itself; `pkg` (the initialised roadstyle module).
 - **The host also keeps `window.RS_SIDE`**, the road table of its roads.
-- **Events:** `open`, `close`, `applied` (`{files, rules, heads, caps}`), `error` (`{message, fatal}`); `part.dirty`, `part.isOpen()`, `part.open()`, `part.close()`.
+- **Events:** `opening`, `open`, `close`, `applied` (`{files, rules, heads, caps}`), `error` (`{message, fatal}`); `part.state` is `"closed"`, `"opening"` or `"open"`; `part.dirty`, `part.isOpen()`, `part.open()`, `part.close()`. While it opens, the dashboard's busy veil shows "Opening the level editor…"; a host can show its own reason with `opening` and `part.state`.
+- **The card.** `card` is any option of `rs.sections.add`: `card: {id: "step8", label: "Edit levels", step: 8, before: "step9"}` gives a numbered card in its place.
+- **A fast first open.** `part.prepare()` makes the area and the engine before the first open (it gives a Promise; call it after your first draw). The option `prepare: "idle"` calls it 500 ms after the map is first idle. The open then does not call `data.edges()` again.
 - While the editor is open, `document.body` has `data-rs-editing="levels"`, so a host can style by it.
 
 ### The adapter for a duckOSM file: `duckosmLevelsData`
