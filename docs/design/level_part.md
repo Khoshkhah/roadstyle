@@ -1,6 +1,6 @@
 # The level-edit part
 
-**Status:** a design, 2026-11-08. The plan is agreed: first the part with a general adapter (A), then a ready adapter for duckOSM data (B).
+**Status:** 2026-11-08. The plan is agreed and built: the part with a general adapter (A), then a ready adapter for duckOSM data (B). a to d are on main; e (PR 107) and f (PR 108) are in review.
 
 ## What and why
 
@@ -43,7 +43,7 @@ Optional: `roadCount()` (for `maxRoads`), `after(style)` (Studio: its overview l
 
 **Step B: `duckosmData(connection)`.** Roadstyle already knows the table layout of duckOSM (`roads_sql.js`, `duckosmPlan`). A ready adapter for it gives `edges()`, `storedLevels()` and `saveLevels(files)` from a DuckDB-wasm connection. Then Studio is about 3 to 5 lines: `levelEditPart({dashboard: rs, map, data: {...duckosmData(conn), relevel, roadsStyle}})`. Only `relevel` and `roadsStyle` stay in Studio, because they use Studio's own map worker. The cost: roadstyle then depends on the table names of duckOSM (`driving.edges`, `visualization.edge_levels`), so a change of those names must change roadstyle too. The general adapter (A) stays for hosts with other data.
 
-The page of `roadstyle levels edit` uses the **same part**. Its adapter reads `roads.parquet` and the CSV files with `fetch` and writes with `PUT`: `httpData(base)`. It has no code of its own either.
+The page of `roadstyle levels edit` keeps `levelEditor` directly: it owns its map (not a host map) and has no glue of its own, so it needs no adapter.
 
 ## Events
 
@@ -63,12 +63,12 @@ With A: the adapter (five functions, about 25 lines of DuckDB-wasm calls) and on
 
 | PR | What | Status |
 |---|---|---|
-| a | `browserStore` `memoryFallback`, `lostBytes()` | merged |
-| b | editor `error` event, `dirty`, `exportFiles()`, deselect at the open | built, not pushed |
-| c | `ensureArea` and the stale-area retry | built, not pushed |
-| d | `roadLayers` (show, remove, reload tiles) | next |
-| e | `levelEditPart` and `httpData`; Studio and `roadstyle levels edit` use it | after d |
-| f | `duckosmData(connection)`: the adapter for duckOSM tables (step B) | last |
+| a | `browserStore` `memoryFallback`, `lostBytes()` | merged (PR 103) |
+| b | editor `error` event, `dirty`, `exportFiles()`, deselect at the open | merged (PR 104) |
+| c | `ensureArea` and the stale-area retry | merged (PR 105) |
+| d | `roadLayers` (show, remove, reload tiles) | merged (PR 106) |
+| e | `levelEditPart`; Studio uses it | in review (PR 107) |
+| f | `duckosmLevelsData`: the adapter for duckOSM tables (step B), in `roadstyle-wasm/levels_sql.js` | in review (PR 108) |
 
 ## Which test covers which behaviour
 
@@ -82,10 +82,12 @@ With A: the adapter (five functions, about 25 lines of DuckDB-wasm calls) and on
 | the limit `maxRoads`, the note | `test_level_part_browser.py` (e) |
 | the card, the status line, the layout attribute | `test_level_part_browser.py` (e) |
 | `applied`, `saveLevels(files)`, `relevel` calls | `test_level_part_browser.py` (e), with the Studio-shaped host |
-| the same part in the page of `roadstyle levels edit` | `test_levels_edit_browser.py` (e) |
 | `duckosmData`: the roads, the stored levels and the write-back, on a DuckDB-wasm connection | `test_duckosm_data_browser.py` (f); it runs only when the network gives duckdb-wasm |
+
+## The design panel
+
+The same question for Studio's design panel gives a shorter answer. `designPanel({...})` is already one call with options. What Studio had around it was the style swap (`removeRoads`, `addRoadStyle`, `addImages`): that is `roadLayers` now (d), with `also: ["rs-low-"]` and `after(style)` for its overview layers. What remains is host code by nature: `setLook` and `redraw` call the host's own map worker and its draw, `boundary` paints the host's boundary, `link` is the host's Export card, and the Tiles tab is the host's own tab. A wrapper part would only forward these, so there is **no `designPart`**. The host moves its pin and uses `roadLayers`.
 
 ## Not decided
 
-- The name of the part (`levelEditPart` is the working name).
-- Whether `roadsStyle()` is needed in a host that always has its roads on the map when the card opens.
+- Nothing: `levelEditPart` is the name, and `roadsStyle()` is optional when the host gives `ensureRoads()` or its roads are on the map.
