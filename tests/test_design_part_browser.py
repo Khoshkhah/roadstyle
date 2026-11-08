@@ -25,7 +25,7 @@ _HOST = """<script type="module">
 import {designEditPart} from "./dashboard/design/design_part.js";
 import {roadLayers} from "./dashboard/roadlayers.js";
 const look = await (await fetch("look.json")).json();
-const restore = new URLSearchParams(location.search).get("restore");
+const restore = new URLSearchParams(location.search).get("restore"), numbered = new URLSearchParams(location.search).has("numbered");
 window.saves = []; window.calls = []; window.reason = ""; window.failSave = false; window.closes = 0; window.changes = [];
 rs.sections.add({id: "export", label: "Export", fold: true, html: "<p>files</p>"});
 rs.sections.fold("export", true);
@@ -38,7 +38,7 @@ const data = {look: async () => look,
 const tiles = {id: "tiles", name: "Tiles", key: "profile", keep: "Keep the tile profile", make: () => ({zoom: 14}), normalize: (p) => ({zoom: +p?.zoom || 14}),
   summary: (v) => `Tiles: zoom ${v.zoom}.`, draw: (el, v) => { el.innerHTML = "<p>tiles</p>"; }};
 window.part = await designEditPart({dashboard: rs, map, data, roads: roadLayers({map, dashboard: rs, prefix: "rs-", also: ["rs-low-"]}),
-  card: {id: "design", label: "Edit design"}, link: {label: "Export →", card: "export"}, tabs: [tiles], storageKey: "dp-part-" + Math.random()});
+  card: numbered ? {id: "design", label: "Edit design", step: 9, before: "export"} : {id: "design", label: "Edit design"}, link: {label: "Export →", card: "export"}, tabs: [tiles], storageKey: "dp-part-" + Math.random()});
 part.addEventListener("close", () => window.closes++);
 part.addEventListener("change", (e) => window.changes.push(e.detail.edited));
 window.partReady = true;
@@ -141,5 +141,14 @@ def test_the_saved_design_is_loaded_before_the_first_draw_and_a_host_tab_value_i
         browser, page, errors, warnings = _open(p, url)
         page.evaluate("window.part.panel.setHost('profile', {zoom: 12})")
         assert _note(page).endswith("Tiles: zoom 12.") and page.evaluate("window.part.edited") is False
+        assert not errors, errors
+        browser.close()
+
+
+def test_the_card_takes_the_options_of_sections_add_a_numbered_card_before_another(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors, warnings = _open(p, url + "?numbered")
+        assert page.evaluate("[...document.querySelectorAll('#sb .sb-sec')].map(e => e.dataset.rsSection).filter(x => x === 'design' || x === 'export')") == ["design", "export"]
+        assert page.evaluate("document.querySelector('#sb [data-rs-section=design] .rs-sec-n').textContent") == "9"
         assert not errors, errors
         browser.close()
