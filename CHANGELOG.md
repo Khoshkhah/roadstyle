@@ -16,6 +16,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **Ask's prompt: one kind of thing can be in several layers.** When the person names a kind (water), the agent changes every layer of that kind (ocean, water, waterways). In Monaco, "turn off the water" left the sea, which is the layer `ocean`.
 
 ### Fixed
+- **The 3D layer of an overlay (`ov*-3d`, the 3D buildings) shows the hover and the select colour.** The extrusion covers the flat fill, but it had a fixed colour, so a hovered or selected building in 3D showed only a faint tint. It now has the same hover and select `case` as the flat fill layer. Found by the duckOSM fixes editor ("hover in the buildings tab does not work"). Test: `interaction.rs` (`the_buildings_entry_names_its_3d_layer`).
 - **An editor frame's scrolled head row has no band** (`dashboard.css`): it gets only a shadow under its own line. In the dark theme, the title row's lighter band floated over Ask's answers.
 
 ## [0.29.0] - 2026-11-07
