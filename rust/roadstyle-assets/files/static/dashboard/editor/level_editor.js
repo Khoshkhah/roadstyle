@@ -136,7 +136,8 @@ const sha = async d => [...new Uint8Array(await crypto.subtle.digest("SHA-256", 
   .map(b => b.toString(16).padStart(2, "0")).join("");
 async function startEngine({store, pkgUrl, lookText, boundary}){
   const worker = new Worker(new URL("./level_worker.js", import.meta.url), {type: "module"});
-  const call = caller(worker);
+  const stopHooks = new Set();                                    // the editors that listen for a stop of this worker (levelEditor adds its own)
+  const call = caller(worker, err => stopHooks.forEach(f => f(err)));
   try {
     const init = call({type: "init", pkgUrl: String(new URL(pkgUrl, location.href)), base: lookText,
       look: JSON.stringify({args: {...LOOK, hover_color: SENT.hover, select_color: SENT.select, ...(boundary ? {boundary} : {})}})});
@@ -152,7 +153,7 @@ async function startEngine({store, pkgUrl, lookText, boundary}){
     // pairs.csv's lines: the panel's found rules of a road come from them when it asks (relations); the open does not parse them
     const pairLines = pairsF.body.split(/\r?\n/).filter(l => l.trim());
     // what the page knows of the roads, asked from the worker when the panel needs them: any edge id -> its road id
-    return {worker, call, areaKey, order, pairLines, roadOf: Object.fromEntries(order.map(r => [r, r]))};
+    return {worker, call, areaKey, order, pairLines, roadOf: Object.fromEntries(order.map(r => [r, r])), stopHooks};
   } catch(e){ worker.terminate(); throw e; }
 }
 const SENT = {select: "#fe0a01", hover: "#fe0a02"};                 // (the editor's sentinel colours, see levelEditor)
@@ -239,10 +240,16 @@ if(!eng){
   eng = await startEngine({store, pkgUrl, lookText, boundary: boundaryF ? JSON.parse(boundaryF.body) : null});
 }
 engines.delete(engKey);                                          // in use: destroy() puts it back (host), or ends it
-const {worker, call, areaKey, order, pairLines, roadOf} = eng;
+const {worker, call, areaKey, order, pairLines, roadOf, stopHooks} = eng;
 const flat = (r) => r.levels.flat();
 const hostSide = window.RS_SIDE, hadApi = window.lvApi;          // the host's, for destroy
 const events = new EventTarget();
+// the worker stops (no memory, a file that does not load): the editor sends the event "error" ({message, fatal: true}); close it and open it again
+const onStop = err => events.dispatchEvent(new CustomEvent("error", {detail: {message: err.message, fatal: true}}));
+stopHooks.add(onStop);
+// a road that the page selected and its popups are not the editor's: they go at the open (the editor's picks are its own)
+if(map){ window.rsDeselect?.(); map.getContainer().querySelectorAll(".maplibregl-popup").forEach(p => p.remove()); }
+let dirty = false;                                               // an Apply of the person (a solve, or a head or a cap) happened in this editor: the host's tables are behind
 const get = (n, bytes) => store.load(n, bytes);
 const [editsF, headsF, capsF, levelsF, infoF] = await Promise.all([get("edits.csv"), get("heads.csv"), get("caps.csv"), get("levels.csv"), get("levels_info.json")]);
 const inputsKey = async edits => `${areaKey}:${await sha(edits)}`;
@@ -609,6 +616,7 @@ async function apply(ops){
   await store.save("caps.csv", capsCsv);
   if(newEdits) await store.save("edits.csv", nextEdits);
   [editsText, headsText, capsText, res] = [nextEdits, headsCsv, capsCsv, next];
+  dirty = true;                                                  // before save: a host that hears "solved" finds it set
   await save(res);
   saved -= gone.filter(i => i < saved).length;
   sessionStorage.setItem(SAVED, String(saved));
@@ -725,6 +733,7 @@ async function download(name){
  * on a host map, the host's roads that it took off go back in their places, with the host's road table and dashboard style. Your
  * files stay in the store. A map of its own is removed. */
 function destroy(){
+  stopHooks.delete(onStop);
   if(token !== undefined) engines.set(engKey, {token, ready: Promise.resolve(eng)});     // the engine waits for the next open of this area
   else worker.terminate();
   map.off("click", tap);
@@ -763,5 +772,9 @@ function destroy(){
   if(hadApi) window.lvApi = hadApi; else delete window.lvApi;
   delete window.lvColors; delete window.lvDownload; delete window.lvHighlight;
 }
-return Object.assign(events, {map, roads: order, facts: roadsOf, download, destroy, files: Object.keys(files), answer: () => res});
+// the four files as texts, {"edits.csv", "heads.csv", "caps.csv", "levels.csv"}: for a host that keeps them in its own tables (call it before destroy(), or
+// after an Apply: levels.csv comes from the last Apply when the worker has ended)
+const exportFiles = async () => Object.fromEntries(await Promise.all(Object.keys(files).map(async n => [n, n === "levels.csv" && lastCsv != null ? lastCsv : await files[n]()])));
+Object.defineProperty(events, "dirty", {get: () => dirty, enumerable: true});          // (Object.assign would copy the value, not the getter)
+return Object.assign(events, {map, roads: order, facts: roadsOf, download, destroy, files: Object.keys(files), answer: () => res, exportFiles});
 }

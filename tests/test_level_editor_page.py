@@ -160,7 +160,7 @@ window.replaced = [];
 window.hostLookText = hostLook.toJson();
 window.workerCalls = [];                                         // the types of the messages to any worker (the editor's worker is made inside levelEditor)
 const post = Worker.prototype.postMessage;
-Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string") window.workerCalls.push(m.type); return post.call(this, m, ...r); };
+Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string"){ window.workerCalls.push(m.type); if(m.type === "init" && m.pkgUrl) window.lastWorker = this; } return post.call(this, m, ...r); };
 window.openHosted = async (levels) => {
   window.RS_SIDE = hostSide;
   window.workerCalls.length = 0;
@@ -204,6 +204,54 @@ class _Files(SimpleHTTPRequestHandler):
 
 
 @needs_pkg
+def test_the_editor_sends_an_error_event_when_its_worker_stops_and_not_after_destroy():
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html")
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("window.errs = []; window.editor.addEventListener('error', e => window.errs.push(e.detail))")
+            # the worker stops (an error event on the Worker object, as the browser sends it when the script fails): the editor tells the host
+            page.evaluate("window.lastWorker.dispatchEvent(new ErrorEvent('error', {message: 'out of memory'}))")
+            assert page.evaluate("window.errs") == [{"message": "the worker stopped: out of memory", "fatal": True}]
+            # a destroyed editor is not heard any more
+            page.evaluate("window.editor.destroy()")
+            page.evaluate("window.lastWorker.dispatchEvent(new ErrorEvent('error', {message: 'again'}))")
+            assert len(page.evaluate("window.errs")) == 1
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
+def test_the_open_takes_off_the_pages_selection_and_popups():
+    """A road that the page selected and its popup are not the editor's: the editor calls rsDeselect and removes the popups when it opens."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")       # ?basemap: the test opens the editor
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("""() => { window.deselected = 0; const o = window.rsDeselect; window.rsDeselect = (...a) => { window.deselected++; return o && o(...a); };
+              new maplibregl.Popup().setLngLat([7.42, 43.73]).setHTML("a road").addTo(window.hostMap); }""")
+            assert page.evaluate("document.querySelectorAll('.maplibregl-popup').length") == 1
+            page.evaluate("window.openEditor()")
+            page.wait_for_function("window.editor", timeout=60000)
+            assert page.evaluate("document.querySelectorAll('.maplibregl-popup').length") == 0
+            assert page.evaluate("window.deselected") >= 1
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
 def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dashboard():
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
@@ -242,6 +290,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             # the first open solved the whole area; levels_info.json keeps the key of its inputs (roadstyle-levels' inputs_key: the SHA-256
             # of roads.parquet, pairs.csv and edits.csv), which are the folder form's bytes
             assert page.evaluate("window.editor.answer().resolve.how") == "full"
+            assert page.evaluate("window.editor.dirty") is False, "no Apply yet"
             import pyarrow.parquet as pq
 
             from roadstyle import _engine
@@ -572,6 +621,11 @@ def test_the_editor_works_in_the_hosts_panel(view):
             tap("#lv-apply")
             page.wait_for_function(f"window.solved.length === {n + 1} && document.getElementById('lv-bar').hidden", timeout=60000)
             assert page.evaluate("stored('edits.csv')").count("\n") == before + 1
+            # the editor knows that an Apply happened, and gives its four files as texts (the host writes them into its own tables)
+            assert page.evaluate("window.editor.dirty") is True
+            files = page.evaluate("window.editor.exportFiles()")
+            assert sorted(files) == ["caps.csv", "edits.csv", "heads.csv", "levels.csv"]
+            assert files["edits.csv"] == page.evaluate("stored('edits.csv')") and files["levels.csv"].startswith("edge,casing_start")
             # "← Steps" with no change waiting leaves at once
             assert page.evaluate("window.backs") == 0
             tap("#lv-back")
