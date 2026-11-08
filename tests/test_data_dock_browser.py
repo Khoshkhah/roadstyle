@@ -175,9 +175,9 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.click("#rs-dock tbody tr >> nth=0")
             page.wait_for_timeout(300)
             assert page.evaluate("rs.getState().selection") == "2"
-            # the two icons of the line (Kaveh, 2026-11-07): the download before the line, the tables after Run
-            order = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-q > *')].map(e => e.classList.contains('rs-dd-tablesb') ? 'tables' : e.classList.contains('rs-dd-line') ? 'line' : e.classList.contains('rs-dd-run') ? 'run' : e.classList.contains('rs-dd-ib') ? 'download' : '?')")
-            assert order == ["download", "line", "run", "tables"], order
+            # the icons of the line (Kaveh, 2026-11-07): the download before the line, the tables after Run, then Reset
+            order = page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-q > *')].map(e => e.classList.contains('rs-dd-tablesb') ? 'tables' : e.title === 'Reset the map and the table' ? 'reset' : e.classList.contains('rs-dd-line') ? 'line' : e.classList.contains('rs-dd-run') ? 'run' : e.classList.contains('rs-dd-ib') ? 'download' : '?')")
+            assert order == ["download", "line", "run", "tables", "reset"], order
             # Tables: a click on a table shows its rows
             page.click("#rs-dock .rs-dd-q .rs-dd-tablesb")
             # the list takes the place of the table: a search field, a group for each schema (the page's own "extra" first), a card with the rows

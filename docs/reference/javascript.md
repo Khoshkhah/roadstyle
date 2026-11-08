@@ -172,6 +172,7 @@ All fire on `document` as `CustomEvent`s; read the fields from `e.detail`.
 | `rs:sectionchange` | `rs.sections` adds, removes, hides, shows or folds a section | `id`, `state` (`add`, `remove`, `hide`, `show`, `fold` or `unfold`) |
 | `rs:chartpick` | a click on a mark of a chart card that has `data` ([Charts](../guides/dashboard-parts.md#a-chart)) | `id` (the section), `row` (the values of the mark), `rows` (the indices of the rows of `data` in it) |
 | `rs:dockchange` | the bottom dock opens, closes, changes its content or its height | `open`, `id`, `height` (0 on a phone) |
+| `rs:dockreset` | the person clicks Reset in the data dock (or the host calls `data.reset()`): the colour layers, the focus, the lit roads, the selected road and the table are gone | `id` (the dock's id) |
 | `rs:fadechange` | `rs.fade` fades the other roads, or ends it | `ids` (rows; `null`: no fade) |
 | `rs:helpchange` | the help window opens or closes | `open`, and `title` when it opens |
 | `rs:colormode` | `rs.colorModes` picks a mode | `name`, `index` |
