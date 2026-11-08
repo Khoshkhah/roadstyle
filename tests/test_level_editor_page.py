@@ -328,6 +328,54 @@ def test_ensure_area_makes_the_area_once_for_an_edge_hash_and_the_editor_makes_i
 
 
 @needs_pkg
+def test_the_level_edit_part_card_takes_the_options_of_sections_add_prepares_and_tells_its_state():
+    """`card` is any option of rs.sections.add (a numbered card before another); `prepare()` makes the area before the first open (the open does not call
+    `edges()` again), also with `prepare: "idle"`; `part.state` and the event "opening" tell the open."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")       # ?basemap: the test opens the editor
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("""() => { host.sections.add({id: "next", label: "Next", step: 9, note: ""});
+              window.makePart({options: {card: {id: "level", label: "Edit levels", step: 8, before: "next"}}});
+              window.states = []; for(const t of ["opening", "open", "close"]) window.part.addEventListener(t, () => window.states.push(t)); }""")
+            assert page.evaluate("[...document.querySelectorAll('#sb .sb-sec')].map(e => e.dataset.rsSection).filter(x => x === 'level' || x === 'next')") == ["level", "next"]
+            assert page.evaluate("document.querySelector('#sb [data-rs-section=level] .rs-sec-n').textContent") == "8"
+            assert page.evaluate("window.part.state") == "closed"
+            # prepare(): the area (and the engine) are made before the first open; the open does not call edges() again
+            page.evaluate("window.part.prepare()")
+            assert page.evaluate("window.partCalls.filter(c => c === 'edges').length") == 1
+            page.evaluate("window.part.open()")
+            assert page.evaluate("window.part.state") in ("opening", "open")
+            page.wait_for_function("window.part.state === 'open'", timeout=60000)
+            assert page.evaluate("window.partCalls.filter(c => c === 'edges').length") == 1
+            page.evaluate("window.part.close()")
+            assert page.evaluate("[window.part.state, window.states]") == ["closed", ["opening", "open", "close"]]
+            b.close()
+            # the option prepare: "idle": the part prepares by itself when the map is idle
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("window.makePart({options: {prepare: 'idle', areaName: 'part-idle'}})")
+            page.wait_for_function("window.partCalls.includes('edges')", timeout=60000)
+            page.evaluate("window.part.open()")
+            page.wait_for_function("window.part.state === 'open'", timeout=60000)
+            assert page.evaluate("window.partCalls.filter(c => c === 'edges').length") == 1
+            assert not [e for e in errors if "stop" not in e], errors
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
 def test_the_editor_sends_an_error_event_when_its_worker_stops_and_not_after_destroy():
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))

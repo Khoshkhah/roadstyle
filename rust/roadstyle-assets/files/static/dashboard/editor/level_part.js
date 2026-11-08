@@ -16,19 +16,24 @@
 // Optional: roadCount() (for maxRoads), ensureRoads() (the host draws its roads itself; with it, roadsStyle is not used), after(style) (the host's
 // own layers on a swapped style), useStyle(style) (the host swaps a style itself), pkg (the roadstyle module, initialised).
 // The host also keeps `window.RS_SIDE`, the road table of its roads, as the dashboard reads it (a host that draws roads has it).
-// Events: "open", "close", "applied" {files, rules, heads, caps}, "error" {message, fatal}. `part.dirty` is true after an Apply of the person.
+// Events: "opening" (the open began: the dashboard's busy veil shows "Opening the level editor…" too), "open", "close", "applied" {files, rules, heads, caps}, "error" {message, fatal}.
+// `part.state` is "closed", "opening" or "open"; `part.dirty` is true after an Apply of the person. `part.prepare()` makes the area and the engine before the first open (a
+// Promise; the host calls it after its first draw), or the option `prepare: "idle"` does it 500 ms after the map is first idle: the open then does not call `data.edges()` again.
+// `card` is any option of rs.sections.add (id, label, note, icon, step, before, after, ...): `card: {id: "step8", label: "Edit levels", step: 8, before: "step9"}` is a numbered card.
 import {levelEditor, browserStore, ensureArea} from "./level_editor.js";
 import {roadLayers} from "../roadlayers.js";
 
 const num = (n, d = 0) => Number(n).toLocaleString("en", {maximumFractionDigits: d}).replace(/,/g, " ");
 
 export function levelEditPart({dashboard = globalThis.rs, map, data, pkgUrl, look = null, card = {}, maxRoads = 200000, panel = document.getElementById("sb"),
-                               backLabel = "Steps", prefix = "rs-", before = null, also = [], idCol = "edge_id", areaName = "area", pkg = null}){
+                               backLabel = "Steps", prefix = "rs-", before = null, also = [], idCol = "edge_id", areaName = "area", pkg = null, prepare: prepareMode = null}){
   for(const f of ["edges", "storedLevels", "saveLevels", "relevel"]) if(typeof data?.[f] !== "function") throw new Error(`levelEditPart: data.${f}() is necessary`);
   const events = new EventTarget(), id = card.id ?? "level";
   const roads = roadLayers({map, dashboard, prefix, before, also});
   const store = browserStore("lv-part:" + areaName, areaName, {memoryFallback: true});
-  let editor = null, levels = null, opening = false, applied = false;
+  let editor = null, levels = null, opening = false, applied = false, prepared = null, synth = null;
+  // the edge hash of the area: the host's stored levels have it; with none, one token for this page (the area is made once, not at each open)
+  const hashOf = () => levels?.edge_hash || (synth ??= "part-" + Date.now().toString(36));
   const note = (t) => dashboard.sections.note(id, t + (store.lostBytes() ? ` The browser could not keep the area files (${num(store.lostBytes() / 2 ** 20, 1)} MB): your edits stay only until you close the page; download edits.csv to keep them.` : ""));
   const send = (type, detail) => events.dispatchEvent(new CustomEvent(type, {detail}));
   const roadsOnMap = () => map.getStyle().layers.some(l => l.id.startsWith(prefix));
@@ -66,14 +71,16 @@ export function levelEditPart({dashboard = globalThis.rs, map, data, pkgUrl, loo
     const count = data.roadCount ? await data.roadCount() : 0;
     if(count > maxRoads) return note(`The level editor shows all ${num(count)} roads of the area. A browser page draws at most ${num(maxRoads)}. Use a smaller area.`);
     opening = true;
+    send("opening");                                               // a host can show a reason now; the busy veil of the dashboard shows "Opening the level editor…" too
     dashboard.mapBusy?.("Opening the level editor…");
     try {
       const t0 = performance.now();
+      if(prepared) await prepared.catch(() => {});                 // the area and the engine that prepare() makes
       levels = levels ?? await data.storedLevels();
       if(!roadsOnMap()){ if(data.ensureRoads) await data.ensureRoads(); else await roads.show(await data.roadsStyle()); }
       dashboard.mapBusy?.("Opening the level editor…");            // a draw that ran meanwhile put the veil away
       editor = await levelEditor({map, panel, backLabel, pkgUrl, store, dashboard, prefix, levels: levels ?? undefined, look,
-        host: {edgeIdCol: idCol, replaceRoads}, area: {edges: data.edges, edgeHash: levels?.edge_hash ?? "", idCol, pkg}});
+        host: {edgeIdCol: idCol, replaceRoads}, area: {edges: data.edges, edgeHash: hashOf(), idCol, pkg}});
       const made = `${num(editor.roads.length)} roads` + (editor.areaInfo?.warnings?.length ? `. Warnings: ${editor.areaInfo.warnings.join("; ")}` : "");
       editor.addEventListener("solved", () => note(`${made}. Changed: ← Steps applies the new drawing order.`));
       editor.addEventListener("back", leave);
@@ -87,8 +94,17 @@ export function levelEditPart({dashboard = globalThis.rs, map, data, pkgUrl, loo
       send("error", {message: e.message, fatal: true});
     } finally { opening = false; dashboard.mapBusy?.(null); }
   }
-  dashboard.sections.add({id, label: card.label ?? "Edit levels", note: card.note ?? "", icon: card.icon ?? "edit", open});
+  // the area and the engine, made before the first open: the first open is then as fast as the next ones
+  function prepare(){
+    return prepared ??= (async () => {
+      levels = levels ?? await data.storedLevels();
+      await ensureArea({store, edgeHash: hashOf(), edges: data.edges, pkg, pkgUrl, idCol, look});
+    })().catch((e) => { prepared = null; throw e; });
+  }
+  if(prepareMode === "idle") map.once("idle", () => setTimeout(() => prepare().catch((e) => console.warn("level edit part: prepare failed:", e.message)), 500));
+  dashboard.sections.add({...card, id, label: card.label ?? "Edit levels", note: card.note ?? "", icon: card.icon ?? "edit", open});   // `card`: any option of rs.sections.add (step, before, after, ...)
   Object.defineProperty(events, "editor", {get: () => editor, enumerable: true});          // (Object.assign would copy the values, not the getters)
+  Object.defineProperty(events, "state", {get: () => editor ? "open" : opening ? "opening" : "closed", enumerable: true});
   Object.defineProperty(events, "dirty", {get: () => !!editor?.dirty || applied, enumerable: true});
-  return Object.assign(events, {open, close: closeEditor, isOpen: () => !!editor, roads});
+  return Object.assign(events, {open, close: closeEditor, isOpen: () => !!editor, prepare, roads});
 }

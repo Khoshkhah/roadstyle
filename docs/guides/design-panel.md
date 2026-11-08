@@ -82,7 +82,7 @@ changes stay in your browser. <a href="../../live/design_editor/?roads=sodermalm
 
 ??? info "Details"
 
-    - **The card.** Its line is the name of the design, ` (changed)` when the style differs from the base design, and the lines that `summary(value)` of each host tab gives (for example `Tile profile: Analysis.`). A value of a host tab is not a change of the style.
+    - **The card.** `card` is any option of `rs.sections.add` (`step`, `before`, `after`, ...): `card: {id: "step9", label: "Edit design", step: 9, before: "step10"}` is a numbered card. Its line is the name of the design, ` (changed)` when the style differs from the base design, and the lines that `summary(value)` of each host tab gives (for example `Tile profile: Analysis.`). A value of a host tab is not a change of the style.
     - **The layout.** `open()` and `close()`; "← Steps" closes the panel and gives the map its size. While the panel is open, `document.body` has `data-rs-editing="design"`. The event `"close"` tells the host to give the map the padding of its panel again.
     - **The restore and the save.** At the start the part loads `loadDesign()` with `draw: false` (the host's first draw shows it). After each change, and 800 ms after the last one, it calls `saveDesign(text)`. A failed save is a warning in the console.
     - **The redraw.** If `redrawReason()` gives a text, the panel shows it, and `redraw` only remembers the look. `roads` (a `roadLayers`) gives the panel's `restyle` options (`prefix` and `also`).

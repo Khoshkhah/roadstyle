@@ -35,7 +35,7 @@ export async function designEditPart({dashboard = globalThis.rs, map, data, road
   const close = () => { if (!pan?.isOpen()) return; pan.close(); map.resize(); document.body.removeAttribute("data-rs-editing"); send("close"); };
   let pan = null;
   const open = () => { pan.open(); document.body.setAttribute("data-rs-editing", "design"); };
-  dashboard.sections.add({ id, label: card.label ?? "Edit design", note: card.note ?? "", icon: card.icon ?? "edit", open });
+  dashboard.sections.add({ ...card, id, label: card.label ?? "Edit design", note: card.note ?? "", icon: card.icon ?? "edit", open });   // `card`: any option of rs.sections.add (step, before, after, ...)
   pan = await designPanel({
     panel, dashboard, map, look: await data.look(), backLabel, storageKey, boundary, tabs,
     setLook: (text) => data.setLook(text),
