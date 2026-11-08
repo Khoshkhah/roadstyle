@@ -376,6 +376,63 @@ def test_the_level_edit_part_card_takes_the_options_of_sections_add_prepares_and
 
 
 @needs_pkg
+def test_the_level_edit_part_keeps_one_store_for_each_area_and_reads_the_levels_at_each_open():
+    """`areaName` may be a function: two areas with one part do not share files (the second open does not see the edits of the first, and saveLevels gets the
+    name of the area of that open). The stored levels are read at each open (a new build has other levels); `reset()` forgets the areas."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")       # ?basemap: the test opens the editor
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("""() => { window.areaNow = "A"; window.levelsNow = null; window.savedNames = [];
+              window.makePart({options: {areaName: () => window.areaNow}, data: {storedLevels: async () => { partCalls.push("storedLevels"); return window.levelsNow; },
+                saveLevels: async (files, o) => { window.savedNames.push([o.name, files["edits.csv"]]); }}}); }""")
+            rows = "(await window.part.editor.exportFiles())['edits.csv'].trim().split('\\n').length - 1"
+            # area A: open, add an order rule, leave: saveLevels gets "A" and its edits
+            page.evaluate("window.part.open()")
+            page.wait_for_function("window.part.state === 'open'", timeout=60000)
+            assert page.evaluate(f"(async () => {rows})()") == 0
+            page.evaluate("""window.lvApi('/api/apply', {ops: [{op: 'add', body: {relation: 'order', a: window.part.editor.roads[0], b: window.part.editor.roads[1], a_end: '', b_end: '', enabled: 'true'}}]})""")
+            page.wait_for_function("window.part.dirty", timeout=60000)
+            page.evaluate("document.getElementById('lv-back').click()")
+            page.wait_for_function("window.part.state === 'closed'", timeout=60000)
+            assert page.evaluate("window.savedNames.map(x => x[0])") == ["A"] and page.evaluate("window.savedNames[0][1]").count("order") == 1
+            # area B: its own store, so no rule of A; leaving it saves under "B"
+            page.evaluate("window.areaNow = 'B'; window.part.open()")
+            page.wait_for_function("window.part.state === 'open'", timeout=60000)
+            assert page.evaluate(f"(async () => {rows})()") == 0, "the edits of area A are not in area B"
+            page.evaluate("window.part.close()")
+            # area A again: its edits are still there
+            page.evaluate("window.areaNow = 'A'; window.part.open()")
+            page.wait_for_function("window.part.state === 'open'", timeout=60000)
+            assert page.evaluate(f"(async () => {rows})()") == 1
+            page.evaluate("window.part.close()")
+            # the levels are read at each open: a new build (another edge hash) is the one that the area gets (edges.json of the store has the hash of the open)
+            page.evaluate("window.levelsNow = {csv: 'edge,casing_start,casing_level,casing_end,fill_level\\n', edge_hash: 'H1'}; window.part.open()")
+            page.wait_for_function("window.part.state === 'open'", timeout=60000)
+            h1 = page.evaluate("window.browserStoreFn('lv-part:A').load('edges.json').then(f => JSON.parse(f.body).edge_hash)")
+            page.evaluate("window.part.close(); window.levelsNow = {csv: 'edge,casing_start,casing_level,casing_end,fill_level\\n', edge_hash: 'H2'}; window.part.open()")
+            page.wait_for_function("window.part.state === 'open'", timeout=60000)
+            h2 = page.evaluate("window.browserStoreFn('lv-part:A').load('edges.json').then(f => JSON.parse(f.body).edge_hash)")
+            assert [h1, h2] == ["H1", "H2"], (h1, h2)
+            page.evaluate("window.part.close()")
+            assert page.evaluate("window.partCalls.filter(c => c === 'storedLevels').length") >= 5
+            # reset(): the areas are forgotten (an open editor refuses it)
+            page.evaluate("window.part.reset()")
+            assert page.evaluate("window.part.state") == "closed"
+            assert not [e for e in errors if "stop" not in e], errors
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
 def test_the_editor_sends_an_error_event_when_its_worker_stops_and_not_after_destroy():
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
