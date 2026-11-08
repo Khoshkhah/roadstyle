@@ -7,6 +7,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The level editor tells the host more** ([Use it in the browser](docs/rust/browser.md)): the event `"error"` (`{message, fatal: true}`) when its worker stops; `editor.dirty` (an Apply happened); `editor.exportFiles()` (the four files as texts); and at the open it calls `rsDeselect()` and removes the popups of the map. `caller(worker, onStop)` takes an optional `onStop` for the stop of a worker. duckOSM Studio had this glue of its own. Tests: `test_level_editor_page.py`.
 - **`browserStore(key, name, {memoryFallback: true})` and `store.lostBytes()`** ([Use it in the browser](docs/rust/browser.md)): a file that the browser cannot keep (no private file system, a full storage) stays in memory for the page, with a warning in the console, and `lostBytes()` gives its size. Without the option, `save` is an error as before. duckOSM Studio had this code of its own. Test: `test_level_editor_page.py`.
 - **Ask sets the theme** ([get_map and set_map](docs/guides/ask.md#get_map-and-set_map)): `get_map` reports `theme`, and `set_map` takes `theme: "light"` or `"dark"`. Before, "dark" came only from a dark base map, and "light" could not be done.
 - **`data.showOnMap()`** ([The data dock](docs/guides/data-dock.md)): turns the dock's map switch on and gives `true` when it was off.

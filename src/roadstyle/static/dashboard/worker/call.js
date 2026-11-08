@@ -2,8 +2,9 @@
 // {type, id, ...} goes to the worker, which answers {id, ok: true, ...fields} or {id, ok: false, error}. Bytes go as transferred buffers.
 
 /** The page's side: call(msg, transfer?) -> a Promise of the worker's answer (its fields), or a rejection with its error. When the worker
- * stops (its script or WebAssembly fails to load, no memory), every waiting call is rejected with that error, so that no call waits. */
-export function caller(worker){
+ * stops (its script or WebAssembly fails to load, no memory), every waiting call is rejected with that error, so that no call waits, and
+ * `onStop(error)` (if given) is called once. */
+export function caller(worker, onStop = null){
   let last = 0;
   const pending = new Map();
   worker.onmessage = (e) => {
@@ -16,6 +17,7 @@ export function caller(worker){
     const err = new Error(`the worker stopped: ${(e && e.message) || "it could not load or read a message"}`);
     pending.forEach(p => p.no(err));
     pending.clear();
+    if(onStop) onStop(err);
   };
   worker.onerror = fail;
   worker.onmessageerror = fail;
