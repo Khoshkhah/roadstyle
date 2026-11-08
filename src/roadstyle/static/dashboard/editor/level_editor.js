@@ -103,6 +103,29 @@ export async function areaIsFor(store, edgeHash){
   return !!f && JSON.parse(f.body).edge_hash === edgeHash;
 }
 
+/** The level area of the host's edges is in `store`: made only when the store has another area (`edgeHash` differs) or `force` is true. `edges()` gives the
+ * roads of the area as GeoParquet bytes (the host's own query; it is called only when the area is made), `pkg` is the roadstyle WebAssembly module
+ * (initialised; with none, `pkgUrl` is loaded), `idCol` the column with the edge id. With `edgeHash` and `pkgUrl`, the engine of the area is also made
+ * in the background (`prepareEditor`, unless `prepare` is false), so that the open only draws the panel. Gives `{made, warnings, roadCount, pairCount}` (the last three only
+ * when the area was made). */
+export async function ensureArea({store, edgeHash = "", edges, pkg = null, pkgUrl = null, idCol = "edge_id", look = null, force = false, prepare = true}){
+  if(!force && edgeHash && await areaIsFor(store, edgeHash)){
+    if(prepare && pkgUrl) prepareEditor({store, pkgUrl, look, edgeHash}).catch(() => {});
+    return {made: false, warnings: []};
+  }
+  if(typeof edges !== "function") throw new Error("ensureArea: give edges(), the host's roads of the area as GeoParquet bytes");
+  if(!pkg){
+    if(!pkgUrl) throw new Error("ensureArea: give pkg (the roadstyle WebAssembly module) or pkgUrl");
+    pkg = await import(String(new URL(pkgUrl, location.href))); await pkg.default();
+  }
+  const a = pkg.makeArea(await edges(), JSON.stringify({id_col: idCol}));
+  try {
+    await saveArea(store, a, edgeHash);
+    if(prepare && edgeHash && pkgUrl) prepareEditor({store, pkgUrl, look, edgeHash}).catch(() => {});
+    return {made: true, warnings: [...a.warnings], roadCount: a.roadCount, pairCount: a.pairCount};
+  } finally { a.free(); }
+}
+
 function csvRows(text){                                          // the rows of a CSV text with a header, as objects (pandas' quotes)
   const lines = (text || "").split(/\r?\n/).filter(l => l.trim());
   const split = l => { const out = []; let cur = "", q = false;
@@ -193,7 +216,7 @@ export function prepareEditor({store, pkgUrl, look = null, edgeHash}){
  * sets its own column names, its state `live` and the colours of its picks. */
 export async function levelEditor({map = null, container = document.body, panel, backLabel = "Steps", template = null, basemaps = null, pkgUrl, store,
                                    maplibregl: ml = globalThis.maplibregl, dashboard = null, prefix = dashboard ? null : "lv-rs-",
-                                   levels: given = null, host = null, colors = {}, look: lookText = null}){
+                                   levels: given = null, host = null, colors = {}, look: lookText = null, area = null}){
 // the picked roads and the hover (`colors`: {select, hover, second}): road 1 red, road 2 blue, the hover a lighter red
 const COLORS = {select: "#e53935", hover: "#ff8a80", second: "#1e63d6", hover2: "#82b1ff", ...colors};
 // The dashboard has one select colour and one hover colour for every road; the editor wants road 1 red and road 2 blue, and the hover of the road
@@ -242,7 +265,7 @@ const TABLE = [...(await reads.json()).table, LOOK.edge_id_col, "road", "modes",
 // the engine in a worker (level_worker.js): the solve, the map and its tiles do not stop the page. With `host` and `levels.edge_hash`, the engine of this
 // area is the one that an earlier open (or prepareEditor) made, when it has the same hash: `destroy()` keeps it for the next open.
 const engKey = store.key ?? "area", token = host && given ? given.edge_hash : undefined;
-let eng = null;
+let eng = null, areaInfo = null;
 const kept = engines.get(engKey);
 if(kept && token !== undefined && kept.token === token){
   try { eng = await kept.ready; } catch(e){ eng = null; }
@@ -251,7 +274,16 @@ if(!eng){
   if(kept){ engines.delete(engKey); kept.ready.then(e => e.worker.terminate(), () => {}); }
   // the area's edge: boundary.geojson in the store (roadstyle levels make --boundary) is the dashed line of the editor's own map; a host map has its own
   const boundaryF = map ? null : await store.load("boundary.geojson");
-  eng = await startEngine({store, pkgUrl, lookText, boundary: boundaryF ? JSON.parse(boundaryF.body) : null});
+  // `area` ({edges, edgeHash, idCol, pkg}: see ensureArea): the editor makes the area itself, and makes it once more when the store lost its files
+  // after it was made (the browser cleared its storage); `levelEditor` has the result in `editor.areaInfo`
+  const start = () => startEngine({store, pkgUrl, lookText, boundary: boundaryF ? JSON.parse(boundaryF.body) : null});
+  if(area) areaInfo = await ensureArea({store, pkgUrl, prepare: false, ...area});
+  try { eng = await start(); }
+  catch(e){
+    if(!area || !/make the area first/.test(e.message)) throw e;
+    areaInfo = await ensureArea({store, pkgUrl, prepare: false, ...area, force: true});
+    eng = await start();
+  }
 }
 engines.delete(engKey);                                          // in use: destroy() puts it back (host), or ends it
 const {worker, call, areaKey, order, pairLines, roadOf, stopHooks} = eng;
@@ -789,6 +821,7 @@ function destroy(){
 // the four files as texts, {"edits.csv", "heads.csv", "caps.csv", "levels.csv"}: for a host that keeps them in its own tables (call it before destroy(), or
 // after an Apply: levels.csv comes from the last Apply when the worker has ended)
 const exportFiles = async () => Object.fromEntries(await Promise.all(Object.keys(files).map(async n => [n, n === "levels.csv" && lastCsv != null ? lastCsv : await files[n]()])));
-Object.defineProperty(events, "dirty", {get: () => dirty, enumerable: true});          // (Object.assign would copy the value, not the getter)
+Object.defineProperty(events, "dirty", {get: () => dirty, enumerable: true});
+Object.defineProperty(events, "areaInfo", {get: () => areaInfo, enumerable: true});    // the result of ensureArea of the option `area` (null: none)          // (Object.assign would copy the value, not the getter)
 return Object.assign(events, {map, roads: order, facts: roadsOf, download, destroy, files: Object.keys(files), answer: () => res, exportFiles});
 }
