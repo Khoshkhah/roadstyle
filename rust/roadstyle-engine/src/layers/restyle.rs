@@ -147,11 +147,16 @@ impl Ov<'_> {
         news
     }
 
-    /// The 3D layer of a base-map layer with heights.
-    fn extrude_layer(&self, ex: &Value) -> Value {
+    /// The 3D layer of a base-map layer with heights. Its colour has the hover and select `case` of the flat body layer, as the extrusion
+    /// covers that layer.
+    fn extrude_layer(&self, layers: &[Value], ex: &Value) -> Value {
+        // the flat colour may be a `coalesce` of a colour set by feature id around the `case`: the extrusion takes the `case` only
+        let flat = layers[self.bodies[0]]["paint"].get("fill-color");
+        let case = flat.and_then(Value::as_array).filter(|a| a.first() == Some(&json!("coalesce"))).and_then(|a| a.last()).or(flat);
+        let color = ms_swap(case, ex["color"].clone());
         self.new_layer(json!({"id": ov_3d(self.i), "type": "fill-extrusion", "metadata": {"roadstyle:group": "buildings 3D", "roadstyle:over": true},
                               "layout": {"visibility": "none"},
-                              "paint": {"fill-extrusion-color": ex["color"], "fill-extrusion-height": ["get", "height"],
+                              "paint": {"fill-extrusion-color": color, "fill-extrusion-height": ["get", "height"],
                                         "fill-extrusion-base": ["coalesce", ["get", "base"], 0], "fill-extrusion-opacity": ex["opacity"]}}))
     }
 
@@ -167,7 +172,7 @@ impl Ov<'_> {
         }
         if let Some(ex) = ll.get("extrude").filter(|v| crate::roads::yes(v)) {
             let last = news.last().map(|n| n.1["id"].as_str().unwrap().to_string()).unwrap_or_else(|| layers[*self.lys.last().unwrap()]["id"].as_str().unwrap().to_string());
-            news.push((last, self.extrude_layer(ex)));
+            news.push((last, self.extrude_layer(layers, ex)));
         }
         news
     }

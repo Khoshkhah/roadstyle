@@ -43,5 +43,11 @@ fn the_buildings_entry_names_its_3d_layer() {
     assert_eq!(with.len(), 1, "only the buildings have heights");
     let id = with[0]["extrude"].as_str().unwrap();
     assert_eq!(with[0]["label"], "buildings");
-    assert!(s.layers.iter().any(|l| l["id"] == id && l["type"] == "fill-extrusion"), "{id}: no such 3D layer");
+    let ex = s.layers.iter().find(|l| l["id"] == id && l["type"] == "fill-extrusion").unwrap_or_else(|| panic!("{id}: no such 3D layer"));
+    // the extrusion covers the flat fill: it paints the hover and the select state as the fill does
+    let flat = &s.layers.iter().find(|l| l["id"] == id.replace("-3d", "-fill")).unwrap()["paint"]["fill-color"];
+    let case = if flat[0] == "coalesce" { flat.as_array().unwrap().last().unwrap() } else { flat };
+    let c = &ex["paint"]["fill-extrusion-color"];
+    assert_eq!(&c.as_array().unwrap()[..5], &case.as_array().unwrap()[..5], "{c}");
+    assert_eq!(c[0], "case", "{c}");
 }
