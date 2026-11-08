@@ -279,7 +279,7 @@ export function askPanel(o = {}){
         fill(ids);
         const uses = m === AUTO ? `Auto (${rankModels(ids)[0] || "no model"} first)` : m;
         note.textContent = `Saved. The key works: ${plural(ids.length, "model", "models")}. Ask uses ${uses}${was !== m ? ` (not "${was}": the key cannot use it)` : ""}.`;
-        setTimeout(() => { if(!keyBox.hidden) showKey(false); }, 1600);                              // back to the chat by itself
+        key.placeholder = "(a key is saved in this browser)"; showBtns();                           // the card stays open: only Done closes it
       }catch(e){ note.textContent = "Saved, but the key did not work: " + sentence(e.message); }
     };
   }
