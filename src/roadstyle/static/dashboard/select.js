@@ -130,7 +130,7 @@ export let _TIP_DELAY = 300;   // ms the mouse rests on a road or an overlay ite
 let _tipT = 0, _cur = null;               // _cur: the road under the mouse now
 let _tip = null;
 function hoverFrame(){ _raf=0; if(!_pt) return;
-  const ho = _ovUnder && OVERLAYS.find(o=>o.source===_ovUnder.source);
+  const ho = _ovUnder && _ovUnder.ov;
   const ovHit = ho && !ho.under && !ho.base;   // an interactive overlay under the cursor wins over the road, as for a click; an item attached to a road is its road
   const held = _hoverHolds.size > 0, f = ovHit || held ? null : pick(_pt);
   // a host that holds the road hover owns the cursor over its own objects (duckOSM's fixes editor: a node dot, a door dot): roadstyle writes it only for

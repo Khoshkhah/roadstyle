@@ -10,6 +10,8 @@ import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY, _popupHeld} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
 export const _ovWin = ov => ov.popup_window!==false && _OV_POPUP;
+// The reference is the RENDERED feature's source (f.source): a layer can draw a source of its own name (ov0 -> rs-ov0) or one that many overlays share (Studio:
+// rs-roads and rs-low, a source layer for each overlay). _ovUnder also has the overlay (`ov`).
 export let _ovSel=null, _ovHov=null, _ovUnder=null, _ovT=0;      // {source,sourceLayer,id} of the selected / lit (hovered) overlay feature; the one under the mouse now
 export function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, sourceLayer:ref.sourceLayer, id:ref.id}, st); }
 export function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
@@ -46,7 +48,7 @@ export function handleOverlayClick(e, tier){                      // info popup 
     if(hits.length){
       const f = hits[0], p = _ovProps(ov, f);
       rsDeselect();                                        // road selection yields to the overlay
-      _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, sourceLayer:f.sourceLayer, id:f.id}; if(!_lookHolds.size) _ovState(_ovSel,{select:true});
+      _ovState(_ovSel,{select:false}); _ovSel={source:f.source, sourceLayer:f.sourceLayer, id:f.id}; if(!_lookHolds.size) _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
       if(!_ovWin(ov) || _popupHeld()){ /* popup_window=False, or a part shows the facts (rs.holdPopup): selected and lit, no popup */ }
       else if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
@@ -101,7 +103,7 @@ function _ovBind(id){
   map.on("mousemove", id, e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
     map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)
     const f = e.features && e.features[0]; if(!f) return;
-    const k={source:ov.source, sourceLayer:f.sourceLayer, id:f.id}, same=o=>!!o && o.source===k.source && o.sourceLayer===k.sourceLayer && o.id===k.id;
+    const k={source:f.source, sourceLayer:f.sourceLayer, id:f.id, ov}, same=o=>!!o && o.source===k.source && o.sourceLayer===k.sourceLayer && o.id===k.id;
     _ovUnder=k;
     if(same(_ovHov)){ if(_ovTip && _ovTip.isOpen()) _ovTip.setLngLat(e.lngLat); return; }   // lit: its tooltip follows the mouse
     if(_ovHov){ _ovState(_ovHov,{hover:false}); _ovHov=null; if(_ovTip) _ovTip.remove(); }  // another one: the last off at once
