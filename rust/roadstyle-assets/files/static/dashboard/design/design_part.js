@@ -4,7 +4,7 @@
 //
 //   const part = designEditPart({dashboard: rs, map, data, roads, card: {id: "design", label: "Edit design"}, link: {label: "Export →", card: "export"},
 //                                tabs: [tilesTab], boundary, storageKey: "mypage"});           // gives an EventTarget
-//   part.open(); part.close(); part.isOpen(); part.edited; part.panel           // `panel` is the designPanel (get, setHost, text, base, ...)
+//   part.open(tab?); part.close(); part.isOpen(); part.edited; part.panel           // `panel` is the designPanel (get, setHost, text, base, ...)
 //
 // The adapter `data` (all of it the host's own data or worker):
 //   look()              the look of the map as an object (the page's own look)
@@ -34,8 +34,8 @@ export async function designEditPart({dashboard = globalThis.rs, map, data, road
   const refresh = (p) => { edited = changes(hostless(p.get()), hostless(p.base())).length > 0; note(p.get()); };
   const close = () => { if (!pan?.isOpen()) return; pan.close(); map.resize(); document.body.removeAttribute("data-rs-editing"); send("close"); };
   let pan = null;
-  const open = () => { pan.open(); document.body.setAttribute("data-rs-editing", "design"); };
-  dashboard.sections.add({ ...card, id, label: card.label ?? "Edit design", note: card.note ?? "", icon: card.icon ?? "edit", open });   // `card`: any option of rs.sections.add (step, before, after, ...)
+  const open = (tab) => { pan.open(tab); document.body.setAttribute("data-rs-editing", "design"); };            // `tab`: the tab to show ("tiles", "bridges", ...)
+  dashboard.sections.add({ ...card, id, label: card.label ?? "Edit design", note: card.note ?? "", icon: card.icon ?? "edit", open: () => open() });   // `card`: any option of rs.sections.add (step, before, after, ...)
   pan = await designPanel({
     panel, dashboard, map, look: await data.look(), backLabel, storageKey, boundary, tabs,
     setLook: (text) => data.setLook(text),
