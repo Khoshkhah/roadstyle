@@ -152,3 +152,15 @@ def test_the_card_takes_the_options_of_sections_add_a_numbered_card_before_anoth
         assert page.evaluate("document.querySelector('#sb [data-rs-section=design] .rs-sec-n').textContent") == "9"
         assert not errors, errors
         browser.close()
+
+
+def test_open_takes_the_tab_that_the_host_asks_for_and_keeps_the_layout_attribute(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors, warnings = _open(p, url)
+        page.evaluate("window.part.open('bridges')")                  # a link of the host that opens the panel on a tab
+        assert page.evaluate("[window.part.isOpen(), document.body.dataset.rsEditing, !!document.querySelector('#design-pane [data-p=\"bridges.casing\"]')]") == [True, "design", True]
+        page.evaluate("window.part.close()")
+        page.evaluate("window.part.open('tiles')")                    # the host tab
+        assert page.evaluate("document.querySelector('#design-pane').textContent.includes('tiles')") is True
+        assert not errors, errors
+        browser.close()

@@ -88,7 +88,7 @@ changes stay in your browser. <a href="../../live/design_editor/?roads=sodermalm
     - **The redraw.** If `redrawReason()` gives a text, the panel shows it, and `redraw` only remembers the look. `roads` (a `roadLayers`) gives the panel's `restyle` options (`prefix` and `also`).
     - **The link.** `link: {label, card}` shows a button in the panel. A click closes the panel, unfolds the card `card` and scrolls to it.
     - **Host tabs.** `tabs` are as in [Host tabs](#host-tabs), with one new key: `summary(value)`.
-    - **Members.** `part.open()`, `part.close()`, `part.isOpen()`, `part.edited` and `part.panel` (the `designPanel`: `get`, `setHost`, `text`, `base`, ...). Events: `change` (`{design, text, edited}`) and `close`.
+    - **Members.** `part.open(tab)` (the tab to show, for example `"tiles"`: a link of the host that opens the panel on a tab), `part.close()`, `part.isOpen()`, `part.edited` and `part.panel` (the `designPanel`: `get`, `setHost`, `text`, `base`, ...). Events: `change` (`{design, text, edited}`) and `close`.
 
 ### The design editor on its own page { .rs-part }
 
