@@ -80,6 +80,7 @@ document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] |
 <script type="module">
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
 import {levelEditor, browserStore, saveArea, areaIsFor} from "/dashboard/editor/level_editor.js";
+window.browserStoreFn = browserStore;                               // for the test of the store alone
 import {rsDashboard} from "/dashboard/index.js";
 import {rsFirstPaint} from "/dashboard/template.js";
 await init();
@@ -201,6 +202,53 @@ class _Files(SimpleHTTPRequestHandler):
 
     def log_message(self, *a):
         pass
+
+
+@needs_pkg
+def test_browser_store_keeps_a_file_in_memory_when_the_browser_cannot_and_tells_how_much():
+    """`memoryFallback: true`: with no private file system, save keeps the file in memory (a warning in the console), load gives it as a text or as
+    bytes, and lostBytes() is its size. Without the option, save is an error. A store that works has lostBytes() 0."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page()
+            warnings = []
+            page.on("console", lambda m: warnings.append(m.text) if m.type == "warning" else None)
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?no-dashboard")
+            page.wait_for_function("window.ready", timeout=60000)
+            got = page.evaluate("""async () => {
+              const out = {};
+              const ok = window.browserStoreFn("fb-ok", "ok", {memoryFallback: true});
+              await ok.save("a.csv", "x,y\\n1,2\\n");
+              out.ok = [(await ok.load("a.csv")).body, ok.lostBytes()];
+              Object.defineProperty(navigator.storage, "getDirectory", {value: () => { throw new Error("no private file system"); }, configurable: true});
+              const plain = window.browserStoreFn("fb-plain");
+              try { await plain.save("a.csv", "1"); out.plain = "saved"; } catch(e){ out.plain = e.message; }
+              const s = window.browserStoreFn("fb-mem", "mem", {memoryFallback: true});
+              out.missing = await s.load("none.csv");
+              await s.save("pairs.csv", "a,b\\n1,2\\n");
+              out.text = (await s.load("pairs.csv")).body;
+              out.bytes = Array.from((await s.load("pairs.csv", true)).body);
+              out.lost = s.lostBytes();
+              await s.save("pairs.csv", "a,b\\n1,2\\n3,4\\n");          // the same file again: the newest text, the size of the newest
+              out.again = [(await s.load("pairs.csv")).body, s.lostBytes()];
+              await s.save("roads.parquet", new Uint8Array([1, 2, 3]));
+              out.parquet = [Array.from((await s.load("roads.parquet", true)).body), s.lostBytes()];
+              return out;
+            }""")
+            assert got["ok"] == ["x,y\n1,2\n", 0]
+            assert "no private file system" in got["plain"], got["plain"]
+            assert got["missing"] is None
+            assert got["text"] == "a,b\n1,2\n" and got["bytes"] == list(b"a,b\n1,2\n") and got["lost"] == 8
+            assert got["again"] == ["a,b\n1,2\n3,4\n", 12]
+            assert got["parquet"] == [[1, 2, 3], 15]
+            assert any("pairs.csv is not kept in the browser" in w for w in warnings), warnings
+            b.close()
+    finally:
+        server.shutdown()
 
 
 @needs_pkg
