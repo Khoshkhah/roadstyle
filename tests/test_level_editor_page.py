@@ -73,14 +73,18 @@ PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport"
 <script>
 // the document's listeners by type (the test's count: a listener left after destroy, or one more after each open, shows here)
 window.listening = {};
+// the editor's worker (made inside levelEditor): the test stops it
+const _Worker = window.Worker;
+window.Worker = class extends _Worker { constructor(u, o){ super(u, o); if(String(u).includes("level_worker")) window.lvWorker = this; } };
 const _on = document.addEventListener, _off = document.removeEventListener;
 document.addEventListener = function(t, ...a){ listening[t] = (listening[t] || 0) + 1; return _on.call(this, t, ...a); };
 document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] || 0) - 1; return _off.call(this, t, ...a); };
 </script>
 <script type="module">
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
-import {levelEditor, browserStore, saveArea, areaIsFor} from "/dashboard/editor/level_editor.js";
+import {levelEditor, browserStore, saveArea, areaIsFor, ensureArea} from "/dashboard/editor/level_editor.js";
 window.browserStoreFn = browserStore;                               // for the test of the store alone
+window.ensureAreaFn = ensureArea;
 import {rsDashboard} from "/dashboard/index.js";
 import {rsFirstPaint} from "/dashboard/template.js";
 await init();
@@ -142,6 +146,12 @@ window.openWith = async (key, levels, edgeHash) => {
   window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store: s, dashboard: host, prefix: "host-", levels});
   return [window.editor.answer().resolve, await areaIsFor(s, edgeHash), await areaIsFor(browserStore("other-" + key), edgeHash)];
 };
+// the option `area` (ensureArea inside the editor): a store, the host's edges() and the edge hash
+window.openArea = async (store, area) => {
+  window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-", area});
+  return window.editor.areaInfo;
+};
+window.edgesBytes = edges;
 window.hostSources = Object.fromEntries(map.getStyle().layers.filter(l => l.id.startsWith("host-")).map(l => [l.id, l.source]));
 window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening).filter(e => e[1])));
 window.before = counts();
@@ -161,7 +171,7 @@ window.replaced = [];
 window.hostLookText = hostLook.toJson();
 window.workerCalls = [];                                         // the types of the messages to any worker (the editor's worker is made inside levelEditor)
 const post = Worker.prototype.postMessage;
-Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string") window.workerCalls.push(m.type); return post.call(this, m, ...r); };
+Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string"){ window.workerCalls.push(m.type); } return post.call(this, m, ...r); };
 window.openHosted = async (levels) => {
   window.RS_SIDE = hostSide;
   window.workerCalls.length = 0;
@@ -252,6 +262,103 @@ def test_browser_store_keeps_a_file_in_memory_when_the_browser_cannot_and_tells_
 
 
 @needs_pkg
+def test_ensure_area_makes_the_area_once_for_an_edge_hash_and_the_editor_makes_it_again_after_a_loss():
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")       # ?basemap: the test opens the editor
+            page.wait_for_function("window.ready", timeout=60000)
+            got = page.evaluate("""async () => {
+              const out = {}, store = window.browserStoreFn("ea-1", "ea"), pkgUrl = "/level_editor/pkg/roadstyle_wasm.js";
+              let calls = 0;
+              const edges = async () => { calls++; return window.edgesBytes; };
+              const a = await window.ensureAreaFn({store, edgeHash: "h1", edges, pkgUrl, prepare: false});
+              out.first = [a.made, a.roadCount > 100, a.pairCount > 0, Array.isArray(a.warnings), calls];
+              const b = await window.ensureAreaFn({store, edgeHash: "h1", edges, pkgUrl, prepare: false});
+              out.same = [b.made, calls];                                      // the same hash: not made again, edges() not called
+              const c = await window.ensureAreaFn({store, edgeHash: "h2", edges, pkgUrl, prepare: false});
+              out.other = [c.made, calls];
+              const d = await window.ensureAreaFn({store, edgeHash: "h2", edges, pkgUrl, prepare: false, force: true});
+              out.force = [d.made, calls];
+              try { await window.ensureAreaFn({store, edgeHash: "h3", pkgUrl}); } catch(e){ out.noEdges = e.message; }
+              // the editor makes the area itself, and again once when the store lost its files after it was made
+              const s2 = window.browserStoreFn("ea-2", "ea2");
+              calls = 0;
+              const info = await window.openArea(s2, {edges, edgeHash: "h9"});
+              out.open = [info.made, calls, window.editor.roads.length > 100];
+              window.editor.destroy();
+              const real = s2.load;
+              let lost = true;                                                  // the files are gone: the first loads of the area's roads and pairs give null
+              s2.load = async (n, bytes) => (lost && (n === "roads.parquet" || n === "pairs.csv")) ? null : real(n, bytes);
+              const save = s2.save;
+              s2.save = async (n, d) => { if(n === "roads.parquet") lost = false; return save(n, d); };
+              const again = await window.openArea(s2, {edges, edgeHash: "h9"});
+              out.retry = [again.made, calls, window.editor.roads.length > 100];
+              return out;
+            }""")
+            assert got["first"] == [True, True, True, True, 1], got
+            assert got["same"] == [False, 1] and got["other"] == [True, 2] and got["force"] == [True, 3], got
+            assert "give edges()" in got["noEdges"], got
+            assert got["open"] == [True, 1, True], got
+            assert got["retry"] == [True, 2, True], got
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
+def test_the_editor_sends_an_error_event_when_its_worker_stops_and_not_after_destroy():
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html")
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("window.errs = []; window.editor.addEventListener('error', e => window.errs.push(e.detail))")
+            # the worker stops (an error event on the Worker object, as the browser sends it when the script fails): the editor tells the host
+            page.evaluate("window.lvWorker.dispatchEvent(new ErrorEvent('error', {message: 'out of memory'}))")
+            assert page.evaluate("window.errs") == [{"message": "the worker stopped: out of memory", "fatal": True}]
+            # a destroyed editor is not heard any more
+            page.evaluate("window.editor.destroy()")
+            page.evaluate("window.lvWorker.dispatchEvent(new ErrorEvent('error', {message: 'again'}))")
+            assert len(page.evaluate("window.errs")) == 1
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
+def test_the_open_takes_off_the_pages_selection_and_popups():
+    """A road that the page selected and its popup are not the editor's: the editor calls rsDeselect and removes the popups when it opens."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")       # ?basemap: the test opens the editor
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("""() => { window.deselected = 0; const o = window.rsDeselect; window.rsDeselect = (...a) => { window.deselected++; return o && o(...a); };
+              new maplibregl.Popup().setLngLat([7.42, 43.73]).setHTML("a road").addTo(window.hostMap); }""")
+            assert page.evaluate("document.querySelectorAll('.maplibregl-popup').length") == 1
+            page.evaluate("window.openEditor()")
+            page.wait_for_function("window.editor", timeout=60000)
+            assert page.evaluate("document.querySelectorAll('.maplibregl-popup').length") == 0
+            assert page.evaluate("window.deselected") >= 1
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
 def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dashboard():
     pw = pytest.importorskip("playwright.sync_api")
     server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
@@ -290,6 +397,7 @@ def test_the_editor_module_edits_an_area_kept_in_the_browser_with_the_hosts_dash
             # the first open solved the whole area; levels_info.json keeps the key of its inputs (roadstyle-levels' inputs_key: the SHA-256
             # of roads.parquet, pairs.csv and edits.csv), which are the folder form's bytes
             assert page.evaluate("window.editor.answer().resolve.how") == "full"
+            assert page.evaluate("window.editor.dirty") is False, "no Apply yet"
             import pyarrow.parquet as pq
 
             from roadstyle import _engine
@@ -620,6 +728,11 @@ def test_the_editor_works_in_the_hosts_panel(view):
             tap("#lv-apply")
             page.wait_for_function(f"window.solved.length === {n + 1} && document.getElementById('lv-bar').hidden", timeout=60000)
             assert page.evaluate("stored('edits.csv')").count("\n") == before + 1
+            # the editor knows that an Apply happened, and gives its four files as texts (the host writes them into its own tables)
+            assert page.evaluate("window.editor.dirty") is True
+            files = page.evaluate("window.editor.exportFiles()")
+            assert sorted(files) == ["caps.csv", "edits.csv", "heads.csv", "levels.csv"]
+            assert files["edits.csv"] == page.evaluate("stored('edits.csv')") and files["levels.csv"].startswith("edge,casing_start")
             # "← Steps" with no change waiting leaves at once
             assert page.evaluate("window.backs") == 0
             tap("#lv-back")

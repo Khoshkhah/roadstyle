@@ -251,6 +251,21 @@ the images again and reads the controls again ([the design panel](../guides/desi
 - A style must have a name: a style with none has `"name": null`, which MapLibre's style check refuses. Give `styleSources` the area's name.
 
 
+## Put the roads on your map: `roadLayers`
+
+Each page that draws roads needs the same steps to put a new road style on its map: take the old roads off, add the images, the sources and the layers with the prefix of the page, and tell the dashboard. `roadLayers` does these steps (`dashboard/roadlayers.js`). roadstyle's design editor page uses it, and a host page can use it in place of its own copy.
+
+```js
+import {roadLayers} from "./dashboard/roadlayers.js";
+
+const roads = roadLayers({map, dashboard: rs, prefix: "rs-", before: "area-fill", also: ["rs-low-"]});
+await roads.show(style, {after: (st) => addOverview(st)});   // the old roads go first; `after` is for the page's own layers
+await roads.reloadTiles();                                    // the same style, new tiles (after a relevel); waits for "idle"
+roads.remove();                                               // the roads off the map
+```
+
+`prefix` starts the ids of the layers, the sources and the images of the roads. `before` is the layer that the roads go under. `also` lists more prefixes that `remove` takes off: `"rs-low-"` is the layers `rs-low-...` and the source `rs-low`. A name of the live state that the map has keeps its value. `roads.layers`, `roads.sources` and `roads.images` list what it put on the map.
+
 ## Write the whole page
 
 `pageFrom` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the options of the dashboard and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same `options` text again, because a view with another palette resolves its look from it. The page has placeholders for MapLibre. Replace them:
@@ -315,6 +330,10 @@ editor saves it at once, with no solve. A rule (an order wish, a stack part, a r
     - **`look`.** Give the text of your saved look (such as the `look.json` of the page), so that the roads of the editor have your palette and your sections (also the dark theme). The editor puts its own column names, the state `live` and the colours of its picks over it.
     - **`editor.destroy()`.** It closes the editor: it takes off its panel parts, listeners, roads, tiles and images, clears the colour and the glow of the picked roads, and puts your panel, roads, road table and dashboard style back. Your files stay in the store.
     - **The store.** A store is `{load(name, bytes), save(name, data)}`. `browserStore(key)` keeps the files in this browser (in the private file system of the origin; `pairs.csv` of a large area is more than the 5 MB of localStorage). `browserStore(key, name, {memoryFallback: true})` keeps a file in memory when the browser cannot keep it (no private file system, a full storage), with a warning in the console. `store.lostBytes()` gives the size of those files, so that the page can say that the edits stay only until the page closes. `httpStore(base)` uses `roadstyle serve`.
+    - **The area.** `ensureArea({store, edgeHash, edges, pkg, pkgUrl, idCol})` makes the level area in the store only when the store has another area (`edgeHash` differs). `edges()` is your own query: it gives the roads of the area as GeoParquet bytes, and roadstyle calls it only when it makes the area. It gives `{made, warnings, roadCount, pairCount}`. With `levelEditor({..., area: {edges, edgeHash, idCol}})` the editor does this itself, and it makes the area once more when the browser lost the files after the area was made. `editor.areaInfo` has the result.
+    - **The event `"error"`.** The editor sends it when its worker stops (no memory, a file that does not load), with `{message, fatal: true}`. Close the editor and open it again.
+    - **`editor.dirty` and `editor.exportFiles()`.** `dirty` is `true` after the person applied a change (a solve, a head or a cap): the host's own tables are then behind. `await editor.exportFiles()` gives the four files as texts, `{"edits.csv", "heads.csv", "caps.csv", "levels.csv"}`, so a host that keeps them in its own tables does not read the store by name. Call it before `destroy()`, or after an Apply.
+    - **At the open** the editor calls `rsDeselect()` and removes the popups of the map: a road that the page selected is not the editor's.
     - **The event `"solved"`.** The editor sends it after each solve, with `levelsCsv` (one row for each edge: its four drawing numbers, its head lengths and its caps), `levelsInfo` and `draw()` (a Promise of the table of the map, GeoParquet).
     - **Other members.** `editor.roads` is the list of the road ids of the area, in their order. `editor.facts(ids)` gives a Promise of what the panel shows of those roads (by road id). `editor.download(name)` downloads `edits.csv`, `heads.csv`, `caps.csv` or `levels.csv` as they are now.
     - **The phone.** The editor has no frame, fold button, side, width or phone layout of its own: it draws into the panel of the host. Give your page `<meta name="viewport" content="width=device-width">`. A tap on a road picks it, and the targets are 44 px on a phone.
