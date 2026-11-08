@@ -2,11 +2,12 @@
 // runs the SQL on its own data (`query`) and tells what the data has (`schema`); roadstyle knows no database. The dock shows the result in rs.dock.table,
 // lights the result's roads on the map (the highlight set "dock"), and keeps the lasting map changes of the page as layers in its buttons Colour and Focus.
 //
-//   dataDock({dashboard, query, schema, ready, tables, load, idColumn, keys, roadsBy, sql, label, limit, card, guard}) -> EventTarget + {run, show, sql, result,
+//   dataDock({dashboard, query, schema, ready, tables, load, idColumn, keys, roadsBy, kinds, map, sql, label, limit, card, guard}) -> EventTarget + {run, show, sql, result,
 //     csv, stop, open, close, ready, roads, idColumn, keyOf, roadsOf, colour, focus, layers, remove, reset, lightOff, schema}
 //   events: "run" {sql, columns, rows, more, ms, source}, "error" {sql, message, source}, "layers" {layers}, "reset" (also the document event rs:dockreset)
 import {guard as guardSql, inner} from "./guard.js";
 import {rsSelectBoxes} from "../selectbox.js";
+import {dockKinds} from "./kinds.js";
 
 const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
 const PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4", "#f032e6", "#9a6324"];
@@ -14,7 +15,7 @@ const PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4
 // hover and select, so a clicked row shows among the lit roads (Kaveh, 2026-11-07: "the table on the map has the same colour as the selected item")
 const LIGHT = {set: "dock", opacity: 1}, LIGHT_BLUE = {light: "#2563eb", dark: "#5aa9f8"};
 const lightColour = () => document.documentElement.dataset.rsTheme === "dark" ? LIGHT_BLUE.dark : LIGHT_BLUE.light;
-const MAP_LIMIT = 100000, CSV_LIMIT = 1000000;
+const MAP_LIMIT = 100000, CSV_LIMIT = 1000000, KIND_LIMIT = 20000;      // KIND_LIMIT: the objects of a kind that the map shows (docs/design/dock_kinds.md)
 const quoteId = (c) => '"' + String(c).replace(/"/g, '""') + '"';
 const lit = (v) => typeof v === "string" ? "'" + v.replace(/'/g, "''") + "'" : typeof v === "bigint" ? String(v) : String(v);
 const fmt = (n) => Number(n).toLocaleString("en").replace(/,/g, " ");
@@ -42,6 +43,7 @@ export function dataDock(o = {}){
   if(typeof o.query !== "function" || typeof o.schema !== "function") throw new Error("dataDock: query and schema are necessary.");
   if((o.tables || []).length && typeof o.load !== "function") throw new Error("dataDock: tables need load (the host loads each one).");
   const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
+  const KINDS = Object.entries(o.kinds || {}), kl = KINDS.length ? dockKinds(o.map || window.map) : null;      // the kinds of the host (docs/design/dock_kinds.md)
   // the data is ready when the host's data is loaded and every table of the page too; a table that does not load does not stop the others
   const ready = (async () => { await o.ready; for(const t of o.tables || []) await Promise.resolve(o.load(t)).catch((e) => console.warn(`dataDock: the table ${t.name} did not load: ${e.message}`)); })();
   let loaded = false; ready.then(() => { loaded = true; }, () => {});
@@ -210,6 +212,7 @@ export function dataDock(o = {}){
   const closeHostCard = (tell = true) => {
     if(!hostCard) return;
     hostCard = false; card.hidden = true; table.clear(); paintSide();
+    if(kl) kl.select(null);
     if(tell) emit("cardclose", {});
   };
   const showCard = () => { list.hidden = true; tablesB.classList.remove("on"); tablesB.setAttribute("aria-expanded", "false"); card.hidden = false; paintSide(); };
@@ -280,7 +283,8 @@ export function dataDock(o = {}){
     if(!ran){ sql = r.sql || sql; fold(); }
     table.set({columns: res.columns, rows: res.rows, more: res.more});
     const n = res.more ? (res.total ? `${fmt(res.rows.length)} of ${fmt(res.total)} rows` : `${fmt(res.rows.length)} rows (there are more)`) : `${fmt(res.rows.length)} row${res.rows.length === 1 ? "" : "s"}`;
-    rs.dock.note(id, `${n} · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"}${res.ms != null ? ` · ${res.ms} ms` : ""}`);
+    res.noteText = `${n} · ${res.columns.length} column${res.columns.length === 1 ? "" : "s"}${res.ms != null ? ` · ${res.ms} ms` : ""}`;
+    rs.dock.note(id, res.noteText);
     paintButtons(); light();
     if(res.chart === undefined){ const m = new Set(measures(res));   // the first chart: from the columns, with the ids as text (never a measure)
       res.chart = rs.chart.guess(res.columns.filter((col) => col.name !== ID).map((col) => rs.chart.isNumber(col.type) && !m.has(col.name) ? {...col, type: "VARCHAR"} : col), ID);
@@ -316,6 +320,10 @@ export function dataDock(o = {}){
     const ids = lightOn && rs.dock.isOpen() && r && !r.byLayer && keyOf(r) ? await roadsOf(r).catch(() => []) : [];
     const pick = rs.getState().selection;                                  // the selected road is not in the blue set: a set paints over the select look
     if(me === lightSeq) rs.highlight(onMap(ids).filter((i) => pick == null || String(i) !== String(pick)), {...LIGHT, color: lightColour()});
+    if(kl){      // a result with no roads: the first kind that has objects for it (docs/design/dock_kinds.md)
+      const own = lightOn && rs.dock.isOpen() && r && !r.byLayer && !ids.length ? await kindOf(r) : null;
+      if(me === lightSeq){ kl.draw(own ? own.features : []); if(r) rs.dock.note(id, (r.noteText || "") + (own && own.more ? ` · the map shows the first ${fmt(KIND_LIMIT)}` : "")); }
+    }
   }
   document.addEventListener("rs:select", (e) => { if(!e.detail.overlay) light(); });      // the selected road leaves the set, a road that is not selected any more comes back
   document.addEventListener("rs:deselect", light);
@@ -325,7 +333,46 @@ export function dataDock(o = {}){
     // the card is the one place for the facts while the dock shows it: no popup for a road or an item, from the table, Ask or the map
     if(o.card !== false && rs.holdPopup) rs.holdPopup("data-dock", !!e.detail.open && e.detail.id === id); });
   let lightWasOpen = false;
+  // ---- the kinds of the host: a node, a building (docs/design/dock_kinds.md). A result with no roads belongs to the first kind whose geometryBy gives a row.
+  const kindOf = (r) => (r.__kindP ||= detectKind(r).then((own) => (r.__own = own)));
+  async function detectKind(r){
+    for(const [name, k] of KINDS) for(const col of k.idColumns || []){
+      if(!r.columns.some((c) => c.name === col)) continue;
+      const q = await query(k.geometryBy(inner(r.sql), col), KIND_LIMIT).catch(() => null);
+      if(!q || !q.rows.length) continue;
+      const features = [], facts = new Map();
+      for(const x of q.rows.slice(0, KIND_LIMIT)){
+        let g = x[1]; try{ if(typeof g === "string") g = JSON.parse(g); }catch(e){ continue; }
+        if(!g || !g.type) continue;
+        const key = String(x[0]), f = {}; q.columns.forEach((c, j) => { if(j > 1) f[c.name] = x[j]; });
+        facts.set(key, f); features.push({type: "Feature", properties: {rs_id: key}, geometry: g});
+      }
+      if(features.length) return {name, label: k.label || name, column: col, features, facts, more: q.rows.length > KIND_LIMIT};
+    }
+    return null;
+  }
+  // the card of an object: the title is its name, else "<label> <id>"; the facts are the other columns; a column `tags` is one row for each tag
+  function kindFacts(own, key){
+    const f = own.facts.get(key) || {}, rows = [];
+    for(const [k, v] of Object.entries(f)){
+      if(k === "name" || k === "tags") continue;
+      rows.push([k, v]);
+    }
+    let tags = f.tags; try{ if(typeof tags === "string") tags = JSON.parse(tags); }catch(e){ tags = null; }
+    if(Array.isArray(tags)) tags = Object.fromEntries(tags.map((t) => [t.key, t.value]));
+    if(tags && typeof tags === "object") for(const [k, v] of Object.entries(tags)) rows.push([k, v]);
+    return {title: f.name || `${own.label} ${key}`, chip: own.label, rows, id: key};
+  }
+  // a row of such a result: the object is selected (the select look, the camera) and its facts are in the card
+  function kindPick(own, r, cols){
+    const v = r[cols.findIndex((c) => c.name === own.column)]; if(v == null) return;
+    const key = String(v), f = own.features.find((x) => x.properties.rs_id === key); if(!f) return;
+    rs.select(null);
+    kl.select(f); kl.fit(f, rs.dock.height ? rs.dock.height() : 0);
+    drawFacts(kindFacts(own, key), () => closeHostCard()); hostCard = true; showCard();
+  }
   async function rowClick(r, cols){
+    if(kl && res && res.__own && !cols.some((c) => c.name === ID)){ kindPick(res.__own, r, cols); return; }
     const i = cols.findIndex((c) => c.name === ID);
     if(i >= 0){ const idv = String(r[i]); rs.select(idv); rs.focus([idv]); return; }
     const k = res && keyOf(res); if(!k) return;
