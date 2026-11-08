@@ -142,10 +142,10 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.wait_for_timeout(200)
             assert page.evaluate("window.lights.at(-1)") == 6
             assert page.evaluate("shownEv") == [False, True, False, True]                    # each change of what the map shows, once
-            # a row click selects its road; the light stays
+            # a row click selects its road; the light stays on the other roads (the selected road shows its select purple: it is not in the blue set)
             page.click("#rs-dock tbody tr >> nth=1")
             page.wait_for_timeout(200)
-            assert page.evaluate("rs.getState().selection") == "2" and page.evaluate("window.lights.at(-1)") == 6
+            assert page.evaluate("rs.getState().selection") == "2" and page.evaluate("window.lights.at(-1)") == 5
             assert page.evaluate(w) == w0 and page.is_hidden("#rs-dock .rs-dd-side-hint")
             # the road card beside the table: the name, the class as a chip, the id at its foot; no field of roadstyle's drawing
             card = page.inner_text("#rs-dock .rs-dd-card")
@@ -198,6 +198,47 @@ def test_the_line_the_guard_the_light_and_a_row(tmp_path):
             page.evaluate("data.run('SELECT day FROM days')")
             page.wait_for_timeout(200)
             assert page.inner_text("#rs-dock tbody td") == "2026-06-10"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_the_light_of_the_table_is_blue_and_a_selected_row_stays_purple(tmp_path):
+    """The roads of the table are lit in blue, with no see-through, and in a lighter blue on a dark map; a clicked row has roadstyle's select purple, so the
+    person sees which row is selected among the lit roads (Kaveh, 2026-11-07: "show table items on map has the same color of showing selected item").
+    The selected road leaves the blue set, because a highlight set paints over the select look; it comes back when the selection ends."""
+    import io
+    Image = pytest.importorskip("PIL.Image")
+    state = """[0, 1, 2, 3, 4, 5].map(id => { const l = map.getLayer("roads-simple");
+        const s = map.getFeatureState({source: l.source, sourceLayer: l.sourceLayer, id}); return [s.rs_hl ?? null, s.rs_hlo ?? null, !!s.select]; })"""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); data.open(); data.run('SELECT edge_id, name, highway FROM edges')")
+            page.wait_for_function("window.lights.at(-1) === 6")
+            assert page.evaluate(state) == [["#2563eb", 1, False]] * 6                                 # blue, whole: the legend's colour is the map's
+            page.evaluate("rs.select('2')")
+            page.wait_for_function(f"({state}).some(s => s[2])")
+            picked = [i for i, s in enumerate(page.evaluate(state)) if s[2]]
+            assert len(picked) == 1 and page.evaluate("rs.getState().selection") == "2"
+            page.wait_for_function(f"({state})[{picked[0]}][0] === null")                              # the selected road is not in the set
+            assert [s[0] for s in page.evaluate(state)] == [None if i == picked[0] else "#2563eb" for i in range(6)]
+            # on the map the selected road is purple and a lit neighbour is blue (the road at the middle of the screen, at zoom 17)
+            def pixel(row):
+                page.evaluate(f"(() => {{ const b = window.RS_SIDE.bboxes[{row}]; map.jumpTo({{center: [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], zoom: 17}}); }})()")
+                page.evaluate("new Promise(ok => { map.once('idle', ok); map.triggerRepaint(); })")
+                x, y = page.evaluate("(() => { const r = map.getCanvas().getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()")
+                return Image.open(io.BytesIO(page.screenshot())).convert("RGB").getpixel((int(x), int(y)))
+            sel, other = pixel(picked[0]), pixel((picked[0] + 1) % 6)
+            assert max(abs(a - b) for a, b in zip(other, (37, 99, 235), strict=True)) < 12, other
+            assert sel[0] - other[0] > 60, (sel, other)                                                   # purple has far more red than the blue
+            page.evaluate("rs.select(null)")
+            page.wait_for_function(f"({state})[{picked[0]}][0] === '#2563eb'")                         # the selection ends: the road is lit again
+            page.evaluate("rs.select('2')")
+            page.wait_for_function(f"({state})[{picked[0]}][0] === null")
+            page.evaluate("rsSetTheme('dark')")
+            page.wait_for_function("(() => { const l = map.getLayer('roads-simple'); return map.getFeatureState({source: l.source, sourceLayer: l.sourceLayer, id: %d}).rs_hl === '#5aa9f8'; })()" % ((picked[0] + 1) % 6))
+            assert page.evaluate(state) == [[None if i == picked[0] else "#5aa9f8", 1 if i != picked[0] else None, i == picked[0]] for i in range(6)]
         finally:
             browser.close()
     assert errors == [], errors

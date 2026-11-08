@@ -16,6 +16,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`data.showOnMap()`** ([The data dock](docs/guides/data-dock.md)): turns the dock's map switch on and gives `true` when it was off.
 
 ### Changed
+- **The roads of the data dock's table are lit in blue** (`dashboard/data/data_dock.js`, [The data dock](docs/guides/data-dock.md)). They had the purple of select and hover, so a clicked row could not be seen among them. The light is `#2563eb` on a light map and `#5aa9f8` on a dark map, with no see-through. Hover and select stay purple.
 - **Ask's map tools turn the dock's map switch on** when it is off (a colour, a focus or a move would not show), and the card says so.
 - **A turning ring shows that Ask works**, before the step line of the card.
 - **Ask's prompt: one kind of thing can be in several layers.** When the person names a kind (water), the agent changes every layer of that kind (ocean, water, waterways). In Monaco, "turn off the water" left the sea, which is the layer `ocean`.

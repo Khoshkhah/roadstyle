@@ -10,7 +10,10 @@ import {rsSelectBoxes} from "../selectbox.js";
 
 const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
 const PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4", "#f032e6", "#9a6324"];
-const LIGHT = {set: "dock", color: "#7c4dff", opacity: 0.55};          // the light: roadstyle's select purple on the road's own fill
+// the light: the roads of the table in blue, on the road's own fill, with no see-through (the map has the colour that the legend has). Purple is the colour of
+// hover and select, so a clicked row shows among the lit roads (Kaveh, 2026-11-07: "the table on the map has the same colour as the selected item")
+const LIGHT = {set: "dock", opacity: 1}, LIGHT_BLUE = {light: "#2563eb", dark: "#5aa9f8"};
+const lightColour = () => document.documentElement.dataset.rsTheme === "dark" ? LIGHT_BLUE.dark : LIGHT_BLUE.light;
 const MAP_LIMIT = 100000, CSV_LIMIT = 1000000;
 const quoteId = (c) => '"' + String(c).replace(/"/g, '""') + '"';
 const lit = (v) => typeof v === "string" ? "'" + v.replace(/'/g, "''") + "'" : typeof v === "bigint" ? String(v) : String(v);
@@ -308,8 +311,12 @@ export function dataDock(o = {}){
   async function light(){
     const me = ++lightSeq, r = res;
     const ids = lightOn && rs.dock.isOpen() && r && !r.byLayer && keyOf(r) ? await roadsOf(r).catch(() => []) : [];
-    if(me === lightSeq) rs.highlight(onMap(ids), LIGHT);
+    const pick = rs.getState().selection;                                  // the selected road is not in the blue set: a set paints over the select look
+    if(me === lightSeq) rs.highlight(onMap(ids).filter((i) => pick == null || String(i) !== String(pick)), {...LIGHT, color: lightColour()});
   }
+  document.addEventListener("rs:select", (e) => { if(!e.detail.overlay) light(); });      // the selected road leaves the set, a road that is not selected any more comes back
+  document.addEventListener("rs:deselect", light);
+  document.addEventListener("rs:themechange", light);                       // the blue of the other theme
   document.addEventListener("rs:dockchange", (e) => { if(e.detail.id === id && !!e.detail.open !== lightWasOpen){ lightWasOpen = !!e.detail.open; light(); }
     tellLight();
     // the card is the one place for the facts while the dock shows it: no popup for a road or an item, from the table, Ask or the map

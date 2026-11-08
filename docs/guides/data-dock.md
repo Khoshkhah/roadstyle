@@ -151,7 +151,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
 
 ### The map switch { .rs-part }
 
-**Use it for:** the table on the map, or the map's own colours. On, the roads of the table are lit (the highlight set `dock`, in roadstyle's select purple), the dock's Colour and Focus layers show, and a page shows its own shapes of the result.<br>
+**Use it for:** the table on the map, or the map's own colours. On, the roads of the table are lit (the highlight set `dock`, in blue: `#2563eb` on a light map and `#5aa9f8` on a dark map, with no see-through; a clicked row keeps roadstyle's select purple), the dock's Colour and Focus layers show, and a page shows its own shapes of the result.<br>
 **From Python:** no
 { .rs-facts }
 
