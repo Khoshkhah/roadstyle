@@ -1,6 +1,6 @@
 # Object kinds in the data dock
 
-**Status:** 2026-11-07. Proposal. It waits for Kaveh's sign-off. Nothing is built.
+**Status:** 2026-11-07. Signed off by Kaveh ("Yes, sign off", told to the duckOSM Studio session, with the answers at the end of this page). Nothing is built yet.
 
 ## What and why
 
@@ -82,14 +82,17 @@ A second test on the page of duckOSM Studio (a Monaco build) checks the real `ob
 
 ## Steps
 
+A PR for each step, with the tests on a host like Studio's (vector tiles, a DuckDB-wasm adapter, the dark and the light theme, a panel of 400 px, a phone of 390 px).
+
 1. **a.** The hook, the detection, the light and the card for nodes (a ring on a dot), with the fake host tests.
 2. **b.** Buildings (fill and outline) and the select look.
 3. **c.** The prompt line for Ask, and the guide `data-dock.md`.
 4. **d.** The test on Studio's page with `objectKinds`. Host change in each PR: none for a page with no `kinds`; the pin and `kinds: objectKinds(...)` for Studio.
+5. **e.** Ask's tools for the kinds: `move_map` and a highlight tool take the ids of a kind.
 
-## Questions for Kaveh
+## Answers of Kaveh (2026-11-07)
 
-1. **A click on the map.** Should a click on a lit node or building on the map select its row too (as a click on a road does)? It needs a hit test on the dock's layers. Proposal: yes, in step b.
-2. **Ask's map tools.** Should `move_map` and a new `highlight` tool take the ids of a kind? Proposal: later, when a person asks for it.
-3. **The limit.** 20 000 objects. Proposal: keep it.
-4. **The colour.** The nodes and the buildings use the blue of the road light, and the selected one uses the purple. Proposal: keep it.
+1. **A click on the map: yes.** A click on a lit node or building selects it and opens its card, as a click on a road does (in step b).
+2. **Ask's map tools for the new kinds** (highlight, focus): yes, but in a later PR, not in the first ones (step e).
+3. **The limit of 20 000 objects:** keep it, with a message when the result is cut.
+4. **The colours:** as in this design. Blue for the result (`#2563eb` on a light map, `#5aa9f8` on a dark map, no see-through) and a purple ring for the selected object.
