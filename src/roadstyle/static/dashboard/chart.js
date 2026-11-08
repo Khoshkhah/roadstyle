@@ -46,6 +46,8 @@ export const rsChart = (() => {
     if(s.kind === "histogram") return isN(s.x) ? null : "A histogram needs a number column.";
     if(!ys.length) return `A ${s.kind} chart needs a number column for y.`;
     if(ys.some((y) => !isN(y))) return `A ${s.kind} chart needs number columns for y.`;
+    const empty = ys.find((y) => s.rows.length && !s.rows.some((r) => num(r[by(y)]) != null));         // a number type with text in it (a DECIMAL as a quoted text)
+    if(empty) return `The column "${empty}" has no numbers in its rows.`;
     if(s.kind === "scatter" && !isN(s.x)) return "A scatter chart needs two number columns.";
     if(s.kind === "line" && !isN(s.x) && !TIME.test(String(s.columns[by(s.x)].type))) return "A line chart needs a number, a date or a time column for x.";
     if(s.kind === "pie" && (ys.length > 1 || s.rows.some((r) => (num(r[by(ys[0])]) ?? 0) < 0))) return "A pie chart needs a text column and one number column of 0 or more.";
@@ -83,6 +85,8 @@ export const rsChart = (() => {
       const H = s.small ? Math.max(40, inner) : Math.max(s.kind === "pie" || s.kind === "bar" ? 60 : 100, room());      // (a bar chart has its own minimum)
       // width 100 % and a viewBox: the chart is never wider than its box, also when the box gets narrower before the next draw
       svg = rsSvg(null, "svg", {width: "100%", height: H, viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "xMidYMin meet", role: "img", "aria-label": s.title || `${s.kind} chart of ${ys.join(", ") || s.x}`});
+      // the size and the paint of the drawing are in its style: a host's rule for icons (`#sb svg {width: 18px; fill: none; stroke: currentColor}`) is not for it
+      svg.style.cssText = `width:100%;height:${H}px;fill:initial;stroke:none;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter`;
       el.insertBefore(svg, s.small ? null : foot);
       const kinds = {bar, line, histogram, scatter, pie};
       kinds[s.kind](W, H, ys, legend);
@@ -96,7 +100,7 @@ export const rsChart = (() => {
     let inner = 0;
     // whole pixels: a box of 191.6 px (a scaled screen) with a 192 px drawing scrolls (Kaveh: "why it has scrol in this position?")
     const room = () => Math.floor(inner - [...el.children].reduce((t, c) => t + (c === svg ? 0 : c.getBoundingClientRect().height), 0));
-    const size = (w, h) => { svg.setAttribute("height", h); svg.setAttribute("viewBox", `0 0 ${w} ${h}`); };
+    const size = (w, h) => { svg.setAttribute("height", h); svg.style.height = h + "px"; svg.setAttribute("viewBox", `0 0 ${w} ${h}`); };
     const at = (n) => s.columns.findIndex((c) => c.name === n);
     const tip = (node, i, extra) => { if(s.small) return;
       node.style.cursor = s.onPick ? "pointer" : "default";

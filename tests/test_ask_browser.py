@@ -602,6 +602,29 @@ def test_draw_chart_shows_the_chart_in_the_dock_and_a_copy_in_the_card(tmp_path)
     assert errors == [], errors
 
 
+def test_a_host_rule_for_icons_does_not_shrink_the_chart_in_the_card(tmp_path):
+    """duckOSM Studio has `#sb svg {width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2}` for its icons. The Ask card is in #sb, so its
+    chart was 18 px wide with outlined bars (Kaveh, 2026-11-07). The chart's own svg does not read a host rule for icons: it fills the card's box, and its bars
+    have no outline."""
+    icons = "#sb svg {width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none}"
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.add_style_tag(content=icons)
+            page.evaluate("releaseLoad(); ask.open()")
+            _ask(page, "A bar chart of the road classes", [
+                "tool('draw_chart', {sql: 'SELECT highway, count(*) AS roads FROM edges GROUP BY highway', kind: 'bar', x: 'highway', y: 'roads'})",
+                "say('Three classes.')"])
+            got = page.evaluate("""(() => { const box = document.querySelector('.rs-ask-turn:last-child .rs-ask-chart'), svg = box.querySelector('svg'), r = svg.getBoundingClientRect(),
+                mark = getComputedStyle(svg.querySelector('path'));
+                return {box: box.clientWidth, w: r.width, h: r.height, attr: Number(svg.getAttribute('height')), stroke: mark.stroke, fill: mark.fill}; })()""")
+            assert got["w"] >= got["box"] - 4 and got["h"] == got["attr"], got
+            assert got["stroke"] == "none" and got["fill"] != "none", got
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 def test_the_duckdb_prompt_has_the_graph_rule(tmp_path):
     """Kaveh: "compute diameter of driving network" got "there is no graph function". With dialect DuckDB the prompt has the shortest-path pattern
     (WITH RECURSIVE ... USING KEY) and the sweeps for the diameter: forward from the 4 nodes at the edges of the map, then backward."""
