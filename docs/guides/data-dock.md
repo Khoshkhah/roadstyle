@@ -70,6 +70,8 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     | `tables`, `load(t)` | none | Your page's own tables, `[{name, url, about}]`. The data dock gives each one to `load` once at the start, and a run waits for them. A table that does not load does not stop the others. |
     | `idColumn` | `"edge_id"` | The column with the road ids. |
     | `keys`, `roadsBy(sql, column)` | `["osm_id", "name"]`, none | A result with no `idColumn` finds its roads by the first of `keys` that it has: `roadsBy` gives the SQL of the road ids. |
+    | `kinds` | none | The objects of your data that are not roads: `{node: {label?, idColumns, geometryBy(sql, column)}, building: {...}}` (see [Objects of a kind](#objects-of-a-kind)). |
+    | `map` | `window.map` | The MapLibre map that the objects of a kind are drawn on. |
     | `sql` | `""` | The start text of the line. |
     | `label` | `"Data"` | The label of the dock. |
     | `limit` | `1000` | The most rows in the table. |
@@ -185,6 +187,37 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - The card leaves out the fields of roadstyle's drawing (`casing_*`, `fill_level` and others).
     - In a result of names, a click selects the roads of that name.
     - A click on an overlay item on the map (a building, a crossing) shows the item in the card: its name, the overlay's name as a chip, its fields (the overlay's popup fields when it has them) and its id with **Copy id**. The close button deselects it. While the dock shows the card, no popup shows, for a road or for an item.
+
+### Objects of a kind { .rs-part }
+
+**Use it for:** a result of nodes, buildings or other objects that are not roads. The dock shows them on the map and in the card by itself.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```javascript
+    const data = dataDock({
+      ...,
+      kinds: {
+        node: {
+          label: "Node",                                        // the chip of the card (default: the name of the kind)
+          idColumns: ["node_id", "osm_id"],
+          geometryBy: (sql, column) => `SELECT n.node_id AS id, ST_AsGeoJSON(n.geom) AS geom, n.name, n.tags
+                                        FROM nodes n WHERE n.node_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`,
+        },
+      },
+    });
+    ```
+
+??? info "Details"
+
+    - A kind is `{label?, idColumns, geometryBy(sql, column)}`. `geometryBy` gives one `SELECT` for the result's own `sql`: its first column is `id`, its second column is `geom` (GeoJSON, as text or as an object), and the other columns are the facts of the card.
+    - The dock looks for roads first. A result that has no roads belongs to the first kind (in the order of `kinds`) that has one of its `idColumns` in the result and whose `geometryBy` gives at least one row. So a name such as `osm_id`, which is a node in one table and a building in another, goes to the kind that has the id.
+    - The objects are blue (`#2563eb`, `#5aa9f8` on a dark map): a dot with a ring for a point, an outline for a line, a fill and an outline for an area. The map switch, the theme and **Reset** control them as they control the road light. The most is 20 000 objects: the note of the table then says "the map shows the first 20 000".
+    - A click on a row selects its object: the select purple (a ring for a point, a thick outline for a line or an area), and the camera moves to it (a point: zoom 18). The card has the same look as the card of a road: the title is the `name` column or "label id", the chip is the label, the other columns are rows (a `null` or empty value is left out), a column `tags` (an object, a list of `{key, value}` or JSON text) is one row for each tag, and the id has **Copy id**. The close button of the card removes the selection.
+    - A change of the base map or of the theme can remove the layers of the objects: the dock puts them back.
+    - The design is [Object kinds in the data dock](../design/dock_kinds.md).
 
 ### A row of your own { .rs-part }
 
