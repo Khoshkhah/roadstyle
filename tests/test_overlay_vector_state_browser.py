@@ -40,7 +40,20 @@ _AT = """([tx, ty]) => { const z = 14, n = 2 ** z, x = Math.floor((18.005 + 180)
 _FS = "id => map.getFeatureState({source: 'rs-ov0', sourceLayer: 'buildings', id})"
 
 
-def test_hover_and_select_set_the_state_with_the_source_layer(host):          # noqa: F811
+_CASE = ["case", ["boolean", ["feature-state", "select"], False], "#7c4dff", ["boolean", ["feature-state", "hover"], False], "#b388ff", "#e5e2df"]
+
+
+def _violet(page, xy):
+    """The picture at a point: how much more blue than green it is (a grey building is about 0, a lit one is above 60)."""
+    from io import BytesIO
+
+    from PIL import Image
+    r, g, b = Image.open(BytesIO(page.screenshot(clip={"x": xy[0], "y": xy[1], "width": 1, "height": 1}))).convert("RGB").getpixel((0, 0))
+    return b - g
+
+
+@pytest.mark.parametrize("three_d", [False, True])
+def test_hover_and_select_set_the_state_with_the_source_layer(host, three_d):          # noqa: F811
     base, _ = host
     with pw.sync_playwright() as p:
         browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
@@ -56,16 +69,22 @@ def test_hover_and_select_set_the_state_with_the_source_layer(host):          # 
             "roadstyle:controls": {"overlays": [{"label": "buildings", "source": "ov0", "layers": ["ov0-fill"], "interactive": True, "popup": [],
                                                  "tooltip": None, "color": "#f4f4f4"}]}},
             "layers": [{"id": "roads", "type": "line", "source": "roadsrc", "paint": {"line-width": 2}},
-                       {"id": "ov0-fill", "type": "fill", "source": "ov0", "source-layer": "buildings", "paint": {"fill-color": "#39c"}}]}
+                       {"id": "ov0-fill", "type": "fill", "source": "ov0", "source-layer": "buildings", "paint": {"fill-color": _CASE}}]}
+        if three_d:        # the 3D layer covers the fill: it has the same states (the engine gives it the case of the fill)
+            style["layers"].append({"id": "ov0-3d", "type": "fill-extrusion", "source": "ov0", "source-layer": "buildings",
+                                    "paint": {"fill-extrusion-color": _CASE, "fill-extrusion-height": 20, "fill-extrusion-opacity": 0.9}})
         page.evaluate("s => addStyle(s)", style)
-        a, b = page.evaluate(_AT, [1000, 1500]), None
+        a = page.evaluate(_AT, [1000, 1500])
         page.wait_for_function("map.loaded() && map.queryRenderedFeatures({layers: ['rs-ov0-fill']}).length > 0", timeout=30_000)
-        b = [a[0] + (3000 - 1000) / 4096 * 512 * 2 ** 14 / 2 ** 14 * 1.0, a[1]]       # 512-px tiles at zoom 14: 1 tile unit = 512 / 4096 px
-        b[0] = a[0] + 2000 / 4096 * 512
+        b = [a[0] + 2000 / 4096 * 512, a[1]]                                  # 512-px tiles at zoom 14: 1 tile unit = 512 / 4096 px
+        page.mouse.move(1, 1)
+        page.wait_for_timeout(500)
+        rest = _violet(page, a)
         page.mouse.move(a[0] + 1, a[1])
         page.mouse.move(*a)
         page.wait_for_timeout(900)                                            # past the hover delay
         assert page.evaluate(_FS, 0).get("hover") is True and not page.evaluate(_FS, 8).get("hover"), (page.evaluate(_FS, 0), page.evaluate(_FS, 8))
+        assert _violet(page, a) > rest + 60, (rest, _violet(page, a))        # the building looks lit, in 2D and under the 3D layer
         page.mouse.move(b[0] + 1, b[1])
         page.mouse.move(*b)
         page.wait_for_timeout(900)
