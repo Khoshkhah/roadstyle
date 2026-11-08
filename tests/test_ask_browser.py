@@ -471,6 +471,11 @@ def test_zai_uses_its_free_model_and_no_balance_is_not_a_wait(tmp_path):
             assert "Ask uses glm-4.5-flash" in page.inner_text(".rs-ask-keynote")
             assert page.evaluate("[...document.querySelectorAll('.rs-ask-krow')[1].querySelectorAll('option')].map(o => o.value)") == ["auto", "glm-4.5-flash"]
             assert page.evaluate("JSON.parse(localStorage.getItem('rs-settings:ask')).model.zai") == "glm-4.5-flash"
+            page.wait_for_timeout(2200)                                                              # the card stays open after Save: only Done closes it
+            assert page.is_visible(".rs-ask-key") and page.is_visible(".rs-ask-btns .rs-ask-done") and page.is_visible(".rs-ask-btns button:has-text('Clear')")
+            assert page.get_attribute(".rs-ask-key input[type=password]", "placeholder") == "(a key is saved in this browser)"
+            page.click(".rs-ask-btns .rs-ask-done")
+            assert not page.is_visible(".rs-ask-key")
             t0 = page.evaluate("performance.now()")
             assert page.evaluate("ask.ask('How many?')") is None
             assert page.evaluate("performance.now()") - t0 < 3000 and len(chats) == 1                 # no wait, no second request

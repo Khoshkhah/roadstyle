@@ -220,3 +220,39 @@ def test_coverage_lines_are_cut_at_the_edge_of_the_area():
     assert got["cut"] == [[[0, 5], [5, 5], [10, 5]]] and got["out"] == []
     assert len(got["twice"]) == 2
     assert got["tri"] == [[[0, 2], [8, 2]]] and got["pin"] == [True, False]          # a boundary that is not a rectangle cuts to its own shape
+
+
+def test_google_classic_is_a_link_and_never_a_frame(tmp_path, monkeypatch):
+    # Google answers its keyless embed with 404 and x-frame-options SAMEORIGIN: a frame shows "refused to connect".
+    # A served page (not file://) with no key is Classic.
+    import functools
+    import http.server
+    import threading
+
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)                      # no key: Classic is the only mode
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False).save(tmp_path / "d.html")
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(tmp_path))
+    handler.log_message = lambda *a: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            browser = p.chromium.launch()
+            try:
+                page = browser.new_page(viewport={"width": 1280, "height": 800})
+                page.goto(f"http://127.0.0.1:{srv.server_port}/d.html")
+                page.wait_for_function("window.map && map.loaded()")
+                xy = page.evaluate("(() => { const p = map.project([18.0, 59.305]); const r = map.getCanvas().getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; })()")
+                page.mouse.move(xy[0] - 30, xy[1] - 30)
+                page.mouse.move(*xy, steps=5)
+                page.wait_for_function("map.getCanvas().style.cursor === 'pointer'", timeout=5000)
+                page.mouse.click(*xy)
+                page.evaluate("rsSetStreetView(true)")
+                page.wait_for_selector(".rs-svw-msg a[href*='google.com/maps']")
+                assert page.locator(".rs-svw iframe").is_hidden()
+                assert "google.com/maps/embed" not in page.content()
+                assert "google.com/maps" in page.get_attribute(".rs-svw-msg a[href*='google.com/maps']", "href")
+            finally:
+                browser.close()
+    finally:
+        srv.shutdown()
