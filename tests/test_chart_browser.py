@@ -40,6 +40,23 @@ def _page(p, tmp_path, phone=False):
     return browser, page, errors
 
 
+def test_a_number_column_that_holds_text_gives_a_line_not_a_flat_chart(tmp_path):
+    """A DECIMAL column that a host gives as quoted text ('"919"', duckOSM Studio, Kaveh 2026-11-07) has the number type but no number in its rows: the chart says
+    so in place of a flat line. A column with one number still draws."""
+    with pw.sync_playwright() as p:
+        browser, page, errors = _page(p, tmp_path)
+        try:
+            cols = [{"name": "highway", "type": "VARCHAR"}, {"name": "km", "type": "DECIMAL(38,0)"}]
+            page.evaluate(_DRAW, ["bar", "highway", "km", cols, [["primary", '"919"'], ["secondary", '"50"']], 400])
+            assert page.evaluate(_INSIDE)["none"] == 'The column "km" has no numbers in its rows.'
+            page.evaluate("C.set({rows: [['primary', '\"919\"'], ['secondary', 50]]})")
+            m = page.evaluate(_INSIDE)
+            assert m["none"] is None and m["marks"] == 2, m
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 @pytest.mark.parametrize("theme,phone", [("light", False), ("dark", False), ("light", True)])
 def test_each_kind_draws_inside_its_box(tmp_path, theme, phone):
     with pw.sync_playwright() as p:

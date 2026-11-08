@@ -46,6 +46,8 @@ export const rsChart = (() => {
     if(s.kind === "histogram") return isN(s.x) ? null : "A histogram needs a number column.";
     if(!ys.length) return `A ${s.kind} chart needs a number column for y.`;
     if(ys.some((y) => !isN(y))) return `A ${s.kind} chart needs number columns for y.`;
+    const empty = ys.find((y) => s.rows.length && !s.rows.some((r) => num(r[by(y)]) != null));         // a number type with text in it (a DECIMAL as a quoted text)
+    if(empty) return `The column "${empty}" has no numbers in its rows.`;
     if(s.kind === "scatter" && !isN(s.x)) return "A scatter chart needs two number columns.";
     if(s.kind === "line" && !isN(s.x) && !TIME.test(String(s.columns[by(s.x)].type))) return "A line chart needs a number, a date or a time column for x.";
     if(s.kind === "pie" && (ys.length > 1 || s.rows.some((r) => (num(r[by(ys[0])]) ?? 0) < 0))) return "A pie chart needs a text column and one number column of 0 or more.";
