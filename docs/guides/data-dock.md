@@ -96,8 +96,9 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - `data.sql()`, `data.result()`, `data.csv()` and `data.stop()` give the line, the result, the CSV text, and stop a run.
     - `data.roads(sql)` gives the road ids (on the map) that the SQL selects by `idColumn`. It refuses a query of more than 100 000 roads.
     - `data.colour(groups, {sql})` and `data.focus(ids, {sql, mode})` add the same layers as the buttons. `data.layers()` lists them.
+    - `data.reset()` does what the Reset button does (see [The line](#the-line)).
     - For [Ask](ask.md): `data.idColumn`, `data.keyOf(result)` (the column that finds the roads of a result, or `null`) and `data.roadsOf(result)` (its roads on the map).
-    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`), `layers`, `light` (`on`, see [The map switch](#the-map-switch)), `row` and `cardclose` (see [A row of your own](#a-row-of-your-own)).
+    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`), `layers`, `light` (`on`, see [The map switch](#the-map-switch)), `reset` (also the document event `rs:dockreset`), `row` and `cardclose` (see [A row of your own](#a-row-of-your-own)).
 
 ## What the person does { .rs-group }
 
@@ -122,6 +123,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
 
     - A click on the line opens it as a text box. **Ctrl+Enter** or **Run** runs it, and **Escape** folds it.
     - The download button (⤓), before the line, saves all the rows of the result as a CSV file. The tables button (a database icon), after **Run**, shows the tables of the data in the side column.
+    - The reset button (a circular arrow), after the tables button, has the title "Reset the map and the table". One click gives the map its own colours again and empties the table: the colour layers and the focus go, the lit roads go, the selected road and its card go, and the table has no result. The SQL text stays. The map switch, the camera, the theme and the layers of the page are the person's, and Reset does not change them. The event `reset` (and the document event `rs:dockreset`) tells the host.
     - An error shows under the line, in the database's words.
     - The guard refuses a statement that writes, loads, or reads a file or an address.
 

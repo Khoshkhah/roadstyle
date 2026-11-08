@@ -244,6 +244,36 @@ def test_the_light_of_the_table_is_blue_and_a_selected_row_stays_purple(tmp_path
     assert errors == [], errors
 
 
+def test_reset_gives_the_map_its_colours_and_empties_the_table(tmp_path):
+    """Reset (Kaveh, 2026-11-07): no colour layer, no focus, no lit road, no selected road and no card; the table has no result and no rows; the SQL text stays;
+    the event rs:dockreset and dock.reset() say so. The map switch is the person's and stays on."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); data.open(); window.resets = 0; document.addEventListener('rs:dockreset', () => { window.resets++; })")
+            page.evaluate("data.run('SELECT edge_id, name, highway FROM edges')")
+            page.wait_for_function("window.lights.at(-1) === 6")
+            page.evaluate("data.colour([{label: 'primary', color: '#e6194b', ids: ['1', '3', '6']}], {sql: 'colour'}); data.focus(['1', '3'], {sql: 'focus', mode: 'fade'})")
+            page.click("#rs-dock tbody tr >> nth=1")
+            page.wait_for_function("rs.getState().selection === '2'")
+            assert page.evaluate("data.layers().length") == 2 and page.locator("#rs-dock tbody tr").count() == 6
+            title = page.get_attribute("#rs-dock .rs-dd-q button[title='Reset the map and the table']", "title")
+            assert title == "Reset the map and the table"
+            page.click("#rs-dock .rs-dd-q button[title='Reset the map and the table']")
+            page.wait_for_function("window.resets === 1 && window.lights.at(-1) === 0")
+            assert page.evaluate("data.layers().length") == 0 and page.evaluate("data.result()") is None
+            assert page.locator("#rs-dock tbody tr").count() == 0 and page.evaluate("rs.getState().selection") is None
+            assert page.evaluate("rs.getState().colors.length") == 0 and page.evaluate("data.sql()").startswith("SELECT edge_id")      # the SQL text stays
+            assert page.evaluate("data.light()") is True, "the map switch stays on"
+            page.evaluate("data.run('SELECT * FROM main.edges')")                                                  # the dock works after a reset
+            page.wait_for_function("window.lights.at(-1) === 1 && document.querySelectorAll('#rs-dock tbody tr').length === 1")
+            page.evaluate("data.reset()")
+            page.wait_for_function("window.resets === 2 && window.lights.at(-1) === 0")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 def test_over_the_row_limit_the_count_the_csv_and_the_sort_cover_all_rows(tmp_path):
     with served(tmp_path) as url, pw.sync_playwright() as p:
         browser, page, errors = _open(p, url)
