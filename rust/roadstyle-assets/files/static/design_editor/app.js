@@ -8,6 +8,7 @@ import {rsDashboard} from "../dashboard/index.js";
 import {rsFirstPaint} from "../dashboard/template.js";
 import {designPanel} from "../dashboard/design/design_panel.js";
 import {caller} from "../dashboard/worker/call.js";
+import {roadLayers} from "../dashboard/roadlayers.js";
 
 const P = "rs-";                                                   // the prefix of the roads' layers, sources and images on the map
 const ml = globalThis.maplibregl;
@@ -48,37 +49,16 @@ async function main(){
   const {look} = await call(msg, [msg.bytes, msg.dbf].filter(Boolean));
 
   // the map: a new map is a new generation of dz:// tiles (worker.js); its road table is the dashboard's RS_SIDE
-  let lookText = null, map = null, rs = null, mine = {layers: [], sources: []};
+  let lookText = null, map = null, rs = null;
   async function make(){
     const b = await call({type: "draw", text: lookText});
     window.RS_SIDE = JSON.parse(new TextDecoder().decode(b.table));
     document.dispatchEvent(new CustomEvent("rs:tableready"));
     return JSON.parse(b.style);
   }
-  const image = (id, v) => new Promise((done) => {                 // an <img> reads an SVG icon too (map.loadImage does not)
-    const im = typeof v === "string" ? {url: v} : v, img = new Image();
-    img.onload = () => { if(map.hasImage(id)) map.removeImage(id); map.addImage(id, img, {sdf: !!im.sdf, pixelRatio: im.pixelRatio || 1}); done(); };
-    img.onerror = () => { console.warn(`design editor: the image ${id} could not be read`); done(); };
-    img.src = im.url;
-  });
-  // the roads style on the map in place of the one before (its layers first, then its sources); its images with the prefix P, as the panel's restyle has them
-  async function showRoads(st){
-    for(const id of mine.layers) if(map.getLayer(id)) map.removeLayer(id);
-    for(const id of mine.sources) if(map.getSource(id)) map.removeSource(id);
-    const own = (st.metadata || {})["roadstyle:images"] || {};
-    await Promise.all(Object.entries(own).map(([n, v]) => image(P + n, v)));
-    const have = map.getGlobalState();                             // a value that the map has (the theme, the person's switches) stays
-    for(const [k, v] of Object.entries(st.state || {})) if(!(k in have)) map.setGlobalStateProperty(k, v.default ?? null);
-    for(const [id, src] of Object.entries(st.sources)) map.addSource(P + id, src);
-    for(const l of st.layers){
-      let json = JSON.stringify(l);
-      for(const n of Object.keys(own)) json = json.replaceAll(`"${n}"`, `"${P}${n}"`);
-      const layer = JSON.parse(json);
-      map.addLayer({...layer, id: P + l.id, ...(l.source ? {source: P + l.source} : {})});
-    }
-    mine = {layers: st.layers.map((l) => P + l.id), sources: Object.keys(st.sources).map((id) => P + id)};
-    rs.setStyle(st);
-  }
+  // the roads style on the map in place of the one before (roadLayers: its images with the prefix P, as the panel's restyle has them)
+  let roads = null;
+  const showRoads = (st) => roads.show(st);
 
   const style = await make();
   const bb = window.RS_SIDE.bboxes.filter(Boolean).reduce((a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])], [180, 90, -180, -90]);
@@ -91,6 +71,7 @@ async function main(){
   map.addControl(new ml.NavigationControl({visualizePitch: true}));
   map.addControl(new ml.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
   rs = window.rs = rsDashboard(map, {style: null, prefix: P, tiles: true, basemaps: opts.basemaps, ontop: opts.ontop, dashboard: opts.dashboard});
+  roads = roadLayers({map, dashboard: rs, prefix: P});
   const f = rs.freeArea(), r = map.getContainer().getBoundingClientRect();     // the roads in the part of the map that the panel and the bar leave free
   map.fitBounds([[bb[0], bb[1]], [bb[2], bb[3]]], {duration: 0, padding: {left: f.lo - r.left + 40, right: r.right - f.hi + 40, top: f.top - r.top + 40, bottom: r.bottom - f.bottom + 40}});
   while(!map.isStyleLoaded()) await new Promise((ok) => setTimeout(ok, 50));

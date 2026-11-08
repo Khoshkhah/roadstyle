@@ -21,6 +21,7 @@ import {rsDashboard} from "../index.js";
 import {style as dashboardStyle} from "../core.js";
 import {caller} from "../worker/call.js";
 import {editorFrame} from "../frame.js";
+import {roadLayers} from "../roadlayers.js";
 import {quiet} from "../select.js";
 
 const COLS = ["relation", "a", "b", "a_end", "b_end", "enabled"];      // what a rule is (its key)
@@ -685,8 +686,7 @@ async function apply(ops){
     if(!r) await showRoads(await build());
     else if(r.style) await showRoads(ownSources(JSON.parse(r.style)));  // the layers changed: the style swapped
     else {                                                         // the same style: the tiles are loaded again (the worker cuts again only the pieces of the changed edges)
-      for(const id of mine.sources){ const s = map.getStyle().sources[id]; if(s?.type === "vector") map.getSource(id).setTiles(s.tiles); }
-      await new Promise(ok => { map.once("idle", ok); setTimeout(ok, 30000); });
+      await roadLayers({map, prefix: P}).reloadTiles();             // (roadLayers: the vector sources with the prefix, then until the map is idle)
     }
   }
   if(host) said += ` · drawn in ${((performance.now() - drawStart) / 1000).toFixed(1)} s`;

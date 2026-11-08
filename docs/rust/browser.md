@@ -251,6 +251,21 @@ the images again and reads the controls again ([the design panel](../guides/desi
 - A style must have a name: a style with none has `"name": null`, which MapLibre's style check refuses. Give `styleSources` the area's name.
 
 
+## Put the roads on your map: `roadLayers`
+
+Each page that draws roads needs the same steps to put a new road style on its map: take the old roads off, add the images, the sources and the layers with the prefix of the page, and tell the dashboard. `roadLayers` does these steps (`dashboard/roadlayers.js`). roadstyle's design editor page uses it, and a host page can use it in place of its own copy.
+
+```js
+import {roadLayers} from "./dashboard/roadlayers.js";
+
+const roads = roadLayers({map, dashboard: rs, prefix: "rs-", before: "area-fill", also: ["rs-low-"]});
+await roads.show(style, {after: (st) => addOverview(st)});   // the old roads go first; `after` is for the page's own layers
+await roads.reloadTiles();                                    // the same style, new tiles (after a relevel); waits for "idle"
+roads.remove();                                               // the roads off the map
+```
+
+`prefix` starts the ids of the layers, the sources and the images of the roads. `before` is the layer that the roads go under. `also` lists more prefixes that `remove` takes off: `"rs-low-"` is the layers `rs-low-...` and the source `rs-low`. A name of the live state that the map has keeps its value. `roads.layers`, `roads.sources` and `roads.images` list what it put on the map.
+
 ## Write the whole page
 
 `pageFrom` writes the same page as `render_edges(backend="web")` in one call: stage 1, the arrows or the tiles, the views, the options of the dashboard and the page. `look` is the result of `resolveLook(options)`, with `"state": "live"` in its args. Give the same `options` text again, because a view with another palette resolves its look from it. The page has placeholders for MapLibre. Replace them:
