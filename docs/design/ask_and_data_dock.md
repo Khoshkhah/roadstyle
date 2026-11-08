@@ -108,12 +108,15 @@ section is the rule; the parts below follow it.
 
   | State | Feature state | Look |
   |---|---|---|
-  | Light | the highlight set `dock` (`rsHighlight(ids, {set: "dock", color: "#7c4dff", opacity: 0.55})`, roadstyle #48) | the road's own fill piece in roadstyle's select purple, at the road's width at every zoom |
+  | Light | the highlight set `dock` (`rsHighlight(ids, {set: "dock", color: "#2563eb", opacity: 1})`; `#5aa9f8` on a dark map; roadstyle #48) | the road's own fill piece in blue, at the road's width at every zoom |
   | Select | `select` (as now) | the **fill** in `select_color` (`#7c4dff`), as always |
   | Hover | `hover` (as now) | the fill in `hover_color` (`#b388ff`), as always |
 
   Purple stays roadstyle's colour of everything that marks roads (Kaveh: "we always used purple for roads hover and selected"; a first try
   in the accent teal was refused, also for the light: "I don't like the type of color you are using for roads from the table").
+  **Changed (2026-11-07, Kaveh):** the light is blue, not purple. A clicked row has the same purple as the lit roads, so the person could not see which
+  road was selected ("show table items on map has the same color of showing selected item"). Hover and select stay purple. Kaveh chose blue from three
+  colours (blue, orange, green); the light has no see-through, so the colour on the map is the colour in the legend, and it changes with the theme.
   **Changed (2026-11-05, the handover from the duckOSM Studio session):** the light uses roadstyle's highlight sets (#48, on main), not a new
   feature state `lit`. A set has its own state (`rs_hl`), so select and deselect never touch it, and no change of the road layer's paint is
   needed. A table that a colour or a focus already shows is not lit, so the light does not hide their colours.

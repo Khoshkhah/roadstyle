@@ -3,14 +3,17 @@
 // lights the result's roads on the map (the highlight set "dock"), and keeps the lasting map changes of the page as layers in its buttons Colour and Focus.
 //
 //   dataDock({dashboard, query, schema, ready, tables, load, idColumn, keys, roadsBy, sql, label, limit, card, guard}) -> EventTarget + {run, show, sql, result,
-//     csv, stop, open, close, ready, roads, idColumn, keyOf, roadsOf, colour, focus, layers, remove, lightOff, schema}
-//   events: "run" {sql, columns, rows, more, ms, source}, "error" {sql, message, source}, "layers" {layers}
+//     csv, stop, open, close, ready, roads, idColumn, keyOf, roadsOf, colour, focus, layers, remove, reset, lightOff, schema}
+//   events: "run" {sql, columns, rows, more, ms, source}, "error" {sql, message, source}, "layers" {layers}, "reset" (also the document event rs:dockreset)
 import {guard as guardSql, inner} from "./guard.js";
 import {rsSelectBoxes} from "../selectbox.js";
 
 const $ = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; };
 const PALETTE = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#42d4f4", "#f032e6", "#9a6324"];
-const LIGHT = {set: "dock", color: "#7c4dff", opacity: 0.55};          // the light: roadstyle's select purple on the road's own fill
+// the light: the roads of the table in blue, on the road's own fill, with no see-through (the map has the colour that the legend has). Purple is the colour of
+// hover and select, so a clicked row shows among the lit roads (Kaveh, 2026-11-07: "the table on the map has the same colour as the selected item")
+const LIGHT = {set: "dock", opacity: 1}, LIGHT_BLUE = {light: "#2563eb", dark: "#5aa9f8"};
+const lightColour = () => document.documentElement.dataset.rsTheme === "dark" ? LIGHT_BLUE.dark : LIGHT_BLUE.light;
 const MAP_LIMIT = 100000, CSV_LIMIT = 1000000;
 const quoteId = (c) => '"' + String(c).replace(/"/g, '""') + '"';
 const lit = (v) => typeof v === "string" ? "'" + v.replace(/'/g, "''") + "'" : typeof v === "bigint" ? String(v) : String(v);
@@ -46,7 +49,10 @@ export function dataDock(o = {}){
   // ---- the parts: the actions in the dock's title row, the SQL line, the error line, the list of tables, the table and the road card beside it ----
   const el = $("div", "rs-dd"), acts = $("span", "rs-dd-acts");
   const tablesB = $("button", "rs-dd-qb rs-dd-ib rs-dd-tablesb"), csvB = $("button", "rs-dd-qb rs-dd-ib"), colourB = $("button", "rs-dd-mb"), focusB = $("button", "rs-dd-mb");
-  for(const b of [tablesB, csvB, colourB, focusB]) b.type = "button";
+  const resetB = $("button", "rs-dd-qb rs-dd-ib");
+  for(const b of [tablesB, csvB, colourB, focusB, resetB]) b.type = "button";
+  resetB.title = "Reset the map and the table"; resetB.setAttribute("aria-label", resetB.title);
+  resetB.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
   colourB.innerHTML = 'Colour <span class="rs-dd-count" hidden></span> ▾'; focusB.innerHTML = 'Focus <span class="rs-dd-count" hidden></span> ▾';
   colourB.title = "The colour layers of the map"; focusB.title = "The focus of the map: the other roads fade or hide";
   tablesB.title = "The tables of the data"; tablesB.setAttribute("aria-label", tablesB.title); csvB.title = "Download all the rows of this result as a CSV file"; csvB.setAttribute("aria-label", csvB.title);
@@ -86,7 +92,7 @@ export function dataDock(o = {}){
   acts.append(viewSw, grp("rs-dd-g-map", lightB, colourB, focusB));
   const q = $("div", "rs-dd-q"), line = $("button", "rs-dd-line"), run = $("button", "sb-primary rs-dd-run", "Run");
   line.type = run.type = "button"; line.title = "Click to edit. Ctrl+Enter runs it.";
-  q.append(csvB, line, run, tablesB);      // the download before the line, the tables after Run (Kaveh, 2026-11-07: "that download button and tables button must be swap place")
+  q.append(csvB, line, run, tablesB, resetB);      // the download before the line, the tables after Run (Kaveh, 2026-11-07: "that download button and tables button must be swap place"), then Reset: the line is the part that shrinks on a phone
   const err = $("div", "rs-dd-err"), list = $("div", "rs-dd-tables"); list.hidden = true;
   // the side column beside the table or the chart (Kaveh, 2026-11-06: the list of the tables "in the same place" as the card of a road): one of the
   // two at a time, the last one opened; the table and the chart stay in view
@@ -308,8 +314,12 @@ export function dataDock(o = {}){
   async function light(){
     const me = ++lightSeq, r = res;
     const ids = lightOn && rs.dock.isOpen() && r && !r.byLayer && keyOf(r) ? await roadsOf(r).catch(() => []) : [];
-    if(me === lightSeq) rs.highlight(onMap(ids), LIGHT);
+    const pick = rs.getState().selection;                                  // the selected road is not in the blue set: a set paints over the select look
+    if(me === lightSeq) rs.highlight(onMap(ids).filter((i) => pick == null || String(i) !== String(pick)), {...LIGHT, color: lightColour()});
   }
+  document.addEventListener("rs:select", (e) => { if(!e.detail.overlay) light(); });      // the selected road leaves the set, a road that is not selected any more comes back
+  document.addEventListener("rs:deselect", light);
+  document.addEventListener("rs:themechange", light);                       // the blue of the other theme
   document.addEventListener("rs:dockchange", (e) => { if(e.detail.id === id && !!e.detail.open !== lightWasOpen){ lightWasOpen = !!e.detail.open; light(); }
     tellLight();
     // the card is the one place for the facts while the dock shows it: no popup for a road or an item, from the table, Ask or the map
@@ -477,6 +487,18 @@ export function dataDock(o = {}){
     paintButtons(); drawMenu();
     emit("layers", {layers: layers.map(({kind, label, sql, on, mode, n}) => ({kind, label, sql, on, mode, n}))});
   }
+  // Reset (Kaveh, 2026-11-07: "it needs a reset button for reset map and also make the table empty"): the map has its own colours again (no colour layer, no focus,
+  // no lit road, no selected road, no card) and the table has no result; the SQL text stays. The map switch, the camera, the theme and the layers of the
+  // page are the person's: Reset does not touch them.
+  function reset(){
+    if(ctl) ctl.abort();
+    layers.length = 0; res = null; err.textContent = "";
+    closeHostCard(); rs.select(null);
+    table.set({columns: [], rows: [], more: false}); rs.dock.note(id, "");
+    setView("table"); paint(); light(); tellLight();
+    emit("reset", {}); document.dispatchEvent(new CustomEvent("rs:dockreset", {detail: {id}}));
+  }
+  resetB.onclick = reset;
   const count = (b, n) => { const c = b.querySelector(".rs-dd-count"); c.hidden = !n; c.textContent = n || ""; };
   function paintButtons(){ count(colourB, layers.filter((l) => l.kind === "colour" && l.on).length); count(focusB, layers.some((l) => l.kind === "focus" && l.on) ? 1 : 0); }
   // the dock's own actions on its table (Ask's tools call the same: colour and focus)
@@ -560,7 +582,7 @@ export function dataDock(o = {}){
     // the chart that the dock drew last: its kind, columns and rows (the rows for each value of x when it grouped them), for a copy of it
     drawnChart: () => (chartObj ? chartObj.spec() : null),
     view: (v) => (v ? setView(v) : view),
-    colour, focus, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
+    colour, focus, reset, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
     // the page's own card for a row that is not a road: {title, chip, rows: [[name, value], ...], id}; null closes it. The event `cardclose` comes when the
     // person closes it (the close button), or a new selection or a new result takes its place
