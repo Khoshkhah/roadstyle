@@ -429,6 +429,21 @@ part.addEventListener("applied", (e) => refreshSteps(e.detail));       // after 
 - **Events:** `open`, `close`, `applied` (`{files, rules, heads, caps}`), `error` (`{message, fatal}`); `part.dirty`, `part.isOpen()`, `part.open()`, `part.close()`.
 - While the editor is open, `document.body` has `data-rs-editing="levels"`, so a host can style by it.
 
+### The adapter for a duckOSM file: `duckosmLevelsData`
+
+If your data is a duckOSM file in duckdb-wasm, you do not write the adapter: `roadstyle-wasm/levels_sql.js` gives `edges`, `storedLevels` and `saveLevels` for it. Only `relevel` and `roadsStyle` stay yours, because they use your own map worker.
+
+```js
+import {duckosmLevelsData} from "roadstyle-wasm/levels_sql.js";
+
+const levels = duckosmLevelsData({db, conn, pkg, catalog: "memory",       // the AsyncDuckDB, its connection and the roadstyle module
+  before: () => forgetRoads(),                                            // optional: runs first in saveLevels
+  after: ({tables, toParquet}) => keepForDownload(tables, toParquet)});    // optional: the written tables and a Parquet writer
+levelEditPart({dashboard: rs, map, pkgUrl, data: {...levels, relevel, roadsStyle}});
+```
+
+`edges()` runs duckosmPlan's `level_edges` query and gives GeoParquet bytes. `storedLevels()` reads `visualization.edge_levels` (`null` when the file has none). `saveLevels(files, {name})` writes `levels.csv` into `visualization.edge_levels` (it refuses a file whose number of edges differs from the build), the meta row, and `edits.csv`, `heads.csv`, `caps.csv` into `level_edits`, `level_heads`, `level_caps`.
+
 ## Keep the main thread free
 
 For a large area, run the engine in a Web Worker, as duckosm-rust does: the worker keeps the `Tiler` and answers `tile` and
