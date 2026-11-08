@@ -83,6 +83,7 @@ document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] |
 <script type="module">
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
 import {levelEditor, browserStore, saveArea, areaIsFor, ensureArea} from "/dashboard/editor/level_editor.js";
+import {levelEditPart} from "/dashboard/editor/level_part.js";
 window.browserStoreFn = browserStore;                               // for the test of the store alone
 window.ensureAreaFn = ensureArea;
 import {rsDashboard} from "/dashboard/index.js";
@@ -152,6 +153,22 @@ window.openArea = async (store, area) => {
   return window.editor.areaInfo;
 };
 window.edgesBytes = edges;
+// the level-edit part with a host like duckosm-rust's: the page's roads on the map (prefix "host-"), its dashboard, a data adapter of its own
+window.partCalls = [];
+window.makePart = (opts = {}) => {
+  window.RS_SIDE = hostSide;                                        // the page's road table: the host sets it with its roads (the dashboard reads it)
+  const data = {
+    edges: async () => { partCalls.push("edges"); return edges; },
+    storedLevels: async () => { partCalls.push("storedLevels"); return null; },
+    saveLevels: async (files, o) => { partCalls.push("saveLevels"); window.savedFiles = files; window.savedName = o.name; },
+    relevel: async (rows) => { partCalls.push("relevel:" + rows.length); return {}; },
+    roadsStyle: async () => { throw new Error("the page's roads are on the map: roadsStyle is not used"); },
+    ...(opts.data || {}),
+  };
+  window.part = levelEditPart({dashboard: host, map, data, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", prefix: "host-", areaName: "part-test", card: {id: "level", label: "Edit levels"},
+    ...(opts.options || {})});
+  return window.part;
+};
 window.hostSources = Object.fromEntries(map.getStyle().layers.filter(l => l.id.startsWith("host-")).map(l => [l.id, l.source]));
 window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening).filter(e => e[1])));
 window.before = counts();
@@ -353,6 +370,57 @@ def test_the_open_takes_off_the_pages_selection_and_popups():
             page.wait_for_function("window.editor", timeout=60000)
             assert page.evaluate("document.querySelectorAll('.maplibregl-popup').length") == 0
             assert page.evaluate("window.deselected") >= 1
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
+def test_the_level_edit_part_opens_the_editor_from_its_card_redraws_and_writes_back_through_the_adapter():
+    """The part with a Studio-shaped host: the page's roads (vector tiles, prefix "host-") on the map, its dashboard and an adapter of its own. The card
+    opens the editor, the status line says what happened, a change goes to relevel, and "← Steps" writes the four files through saveLevels."""
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")       # ?basemap: the test opens the editor
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("window.makePart({options: {maxRoads: 5}, data: {roadCount: async () => 100}})")
+            assert page.locator("#sb .sb-sec", has_text="Edit levels").count() == 1, "the card is in the panel"
+            # the limit: a clear line in the card, and no editor
+            page.evaluate("window.part.open()")
+            page.wait_for_function("document.querySelector('#sb .rs-sec-note')?.textContent.includes('shows all 100 roads')", timeout=20000)
+            assert page.evaluate("window.part.isOpen()") is False and page.evaluate("window.partCalls") == []
+            b.close()
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")
+            page.wait_for_function("window.ready", timeout=60000)
+            page.evaluate("window.makePart(); window.part.addEventListener('applied', e => { window.appliedDetail = e.detail; })")
+            # the open: the area is made once (the adapter's edges), the page's roads stay, the line says how many roads and how long it took
+            page.evaluate("window.part.open()")
+            page.wait_for_function("window.part.isOpen()", timeout=60000)
+            assert page.evaluate("window.partCalls.filter(c => c === 'edges').length") == 1
+            assert page.evaluate("document.body.dataset.rsEditing") == "levels" and page.evaluate("window.part.dirty") is False
+            assert "roads, open in" in page.inner_text("#sb .rs-sec-note") or page.evaluate("document.querySelector('#sb .rs-sec-note')?.textContent").find("roads, open in") >= 0
+            # a change of the person goes to the adapter's relevel (the page's worker draws the edges again), and the line says that something changed
+            page.evaluate("window.lvApi('/api/apply', {ops: [{op: 'cap', road: window.part.editor.roads[0], end: 'start', cap: 'flat'}]})")
+            page.wait_for_function("window.part.dirty", timeout=60000)
+            assert page.evaluate("window.partCalls.some(c => c.startsWith('relevel:'))")
+            # "← Steps" writes the four files through the adapter, closes the editor and tells the host
+            page.evaluate("document.getElementById('lv-back').click()")
+            page.wait_for_function("!window.part.isOpen()", timeout=60000)
+            assert sorted(page.evaluate("Object.keys(window.savedFiles)")) == ["caps.csv", "edits.csv", "heads.csv", "levels.csv"]
+            assert page.evaluate("window.savedName") == "part-test" and page.evaluate("window.savedFiles['caps.csv']").count("flat") >= 1
+            assert page.evaluate("window.appliedDetail.caps") >= 1 and page.evaluate("document.body.dataset.rsEditing") is None
+            assert page.evaluate("document.querySelector('#sb .rs-sec-note').textContent").startswith("Applied.")
+            assert not [e for e in errors if "stop" not in e], errors
             b.close()
     finally:
         server.shutdown()
