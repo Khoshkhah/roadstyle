@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
 const SV_COV_ICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>';   // a folded map
