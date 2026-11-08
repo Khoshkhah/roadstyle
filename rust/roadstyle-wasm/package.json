@@ -10,12 +10,13 @@
     ".": {"types": "./index.d.ts", "default": "./index.js"},
     "./roads_sql.js": {"types": "./roads_sql.d.ts", "default": "./js/roads_sql.js"},
     "./features_sql.js": {"types": "./features_sql.d.ts", "default": "./js/features_sql.js"},
+    "./levels_sql.js": {"types": "./levels_sql.d.ts", "default": "./js/levels_sql.js"},
     "./roadstyle_wasm_bg.wasm": "./pkg/roadstyle_wasm_bg.wasm",
     "./package.json": "./package.json"
   },
   "types": "./index.d.ts",
-  "files": ["index.js", "index.d.ts", "roads_sql.d.ts", "features_sql.d.ts", "pkg/roadstyle_wasm.js", "pkg/roadstyle_wasm.d.ts",
-            "pkg/roadstyle_wasm_bg.wasm", "pkg/roadstyle_wasm_bg.wasm.d.ts", "js/roads_sql.js", "js/features_sql.js", "README.md"],
+  "files": ["index.js", "index.d.ts", "roads_sql.d.ts", "features_sql.d.ts", "levels_sql.d.ts", "pkg/roadstyle_wasm.js", "pkg/roadstyle_wasm.d.ts",
+            "pkg/roadstyle_wasm_bg.wasm", "pkg/roadstyle_wasm_bg.wasm.d.ts", "js/roads_sql.js", "js/features_sql.js", "js/levels_sql.js", "README.md"],
   "scripts": {
     "build": "cargo build --profile dist --target wasm32-unknown-unknown --manifest-path ../Cargo.toml -p roadstyle-wasm && wasm-bindgen --target web --out-dir pkg ../target/wasm32-unknown-unknown/dist/roadstyle_wasm.wasm",
     "prepack": "test -f pkg/roadstyle_wasm_bg.wasm || (echo 'roadstyle-wasm: run npm run build first (pkg/ is missing)' >&2; exit 1)"
