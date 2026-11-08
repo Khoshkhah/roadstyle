@@ -497,6 +497,10 @@ html :is(.sb-top,.rs-phead).scrolled{box-shadow:0 1px 0 var(--line,var(--rs-tb-b
 /* the dark theme: a black shadow at 35 % does not show on the dark panel (Kaveh: "the fading part in light theme is much more better than dark theme"). So the title row is
    a little lighter while the body is scrolled (a raised surface is lighter in a dark theme), with a lighter line and a deeper shadow */
 html[data-rs-theme=dark] :is(.sb-top,.rs-phead).scrolled{background:color-mix(in srgb,var(--ink) 7%,transparent);box-shadow:0 1px 0 color-mix(in srgb,var(--ink) 16%,transparent),0 10px 16px -6px rgba(0,0,0,.95)}
+/* an editor frame's head row (rs-frame-head, the tool row of Ask) has side margins and its own line: when its body is scrolled it gets only a shadow
+   under that line, not the lighter band and the second line of the title row above (the band floated over the answers in the dark theme, 2026-11-07) */
+html #sb .rs-frame-head.scrolled{background:none;box-shadow:0 8px 10px -8px rgba(0,0,0,.35)}
+html[data-rs-theme=dark] #sb .rs-frame-head.scrolled{background:none;box-shadow:0 10px 16px -6px rgba(0,0,0,.95)}
 html .sb-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 15px calc(var(--rs-panel-bottom) + var(--rs-fold-room,0px))}      /* --rs-fold-room: sections.js, _fdKeep */
 html.rs-overlay #sb .sb-card,html.rs-phone.rs-tpl-dashboard #sb .sb-card{display:flex;flex-direction:column;overflow:hidden;padding:0;border-radius:14px}
 /* ---- the side of the panel (placement.js: <html class="rs-panel-left">) ---- */
@@ -1217,6 +1221,9 @@ html.rs-phone .rs-dd-q{flex-wrap:wrap}
 .rs-ask-turn .q{flex:1;min-width:0;margin:0 0 6px;font-weight:600;overflow-wrap:anywhere}
 #sb .rs-ask-x{flex:none;border:0;background:none;color:var(--mut);font-size:12px;padding:2px 6px;border-radius:6px}
 .rs-ask-turn .step,.rs-ask-turn .rs-ask-by{color:var(--mut);font-size:12px;margin:2px 0}
+/* the sign that Ask works: a turning ring before the step line ("Asking Groq …") while the question runs */
+.rs-ask-turn .step::before{content:"";display:inline-block;width:9px;height:9px;margin-right:7px;vertical-align:-1px;border:2px solid var(--accent);border-right-color:transparent;border-radius:50%;animation:rs-spin .8s linear infinite}
+@media (prefers-reduced-motion:reduce){.rs-ask-turn .step::before{animation-duration:3s}}
 .rs-ask-key [hidden]{display:none!important}   /* Save key and Clear show only when they can act */
 .rs-ask-order{margin:4px 0 0;padding-left:20px;font-size:13px}
 .rs-ask-turn .a{margin:4px 0 6px;overflow-wrap:anywhere}

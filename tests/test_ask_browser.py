@@ -647,6 +647,46 @@ def test_a_road_click_while_ask_is_open_opens_the_dock_card_and_no_popup(tmp_pat
     assert errors == [], errors
 
 
+def test_a_map_tool_turns_the_map_switch_on_and_a_ring_shows_the_work(tmp_path):
+    """The dock's map switch is off: a focus would not show, so Ask turns the switch on and the card says so. While a question runs, its step line has a
+    turning ring (decisions of 2026-11-07)."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open(); data.open()")
+            page.locator(".rs-dd-light").click()                                                        # the switch off
+            assert page.evaluate("document.querySelector('.rs-dd-light input').checked") is False
+            _ask(page, "Show only the primary roads", ["tool('focus_roads', {sql: \"SELECT edge_id, name FROM edges WHERE highway = 'primary'\", mode: 'hide'})",
+                                                      "say('Three primary roads.')"])
+            assert page.evaluate("document.querySelector('.rs-dd-light input').checked") is True and page.evaluate("data.light()") is True
+            assert "The map switch of the data dock is on again" in page.inner_text(".rs-ask-turn")
+            ring = page.evaluate("(() => { const p = document.createElement('p'); p.className = 'step'; p.textContent = 'Asking'; document.querySelector('.rs-ask-turn').append(p); return getComputedStyle(p, '::before').animationName; })()")
+            assert ring == "rs-spin"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_set_map_changes_the_theme_both_ways(tmp_path):
+    """The theme in get_map and set_map: before 2026-11-07, Ask could make the page dark only by a dark base map, and "light" could not be done."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open()")
+            _ask(page, "Dark theme, please", ["tool('get_map', {})", "tool('set_map', {theme: 'dark'})", "say('Dark.')"])
+            assert json.loads(page.evaluate("window.calls[1].messages.at(-1).content"))["theme"] == "light"            # get_map names it
+            assert page.evaluate("[document.documentElement.dataset.rsTheme, document.querySelector('#sb').dataset.theme]") == ["dark", "dark"]
+            done = json.loads(page.evaluate("window.calls[2].messages.at(-1).content"))
+            assert done["done"] == "Map: theme dark." and done["map"]["theme"] == "dark"
+            _ask(page, "Light theme again", ["tool('set_map', {theme: 'light'})", "say('Light.')"])
+            assert page.evaluate("[document.documentElement.dataset.rsTheme, document.querySelector('#sb').dataset.theme]") == ["light", "light"]
+            _ask(page, "Blue theme", ["tool('set_map', {theme: 'blue'})", "say('No.')"])
+            assert "light" in page.evaluate("window.calls.at(-1).messages.at(-1).content") and page.evaluate("document.documentElement.dataset.rsTheme") == "light"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
 def test_get_map_and_set_map_change_the_map_and_a_host_tool_is_added(tmp_path):
     import geopandas as gpd
     from shapely.geometry import box

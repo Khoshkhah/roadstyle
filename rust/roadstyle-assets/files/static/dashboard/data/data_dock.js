@@ -569,6 +569,8 @@ export function dataDock(o = {}){
       if(typeof spec !== "object" || !Array.isArray(spec.rows)) throw new Error("data.card: give {title, chip, rows: [[name, value], ...], id}");
       drawFacts(spec, () => closeHostCard()); hostCard = true; showCard();
     },
+    // turns the map switch on (Ask, before a colour, a focus or a move: off, the result would not show); true when it was off
+    showOnMap(){ if(lightOn) return false; setLight(true); light(); paint(); tellLight(); return true; },
     light: shown,                // true while the table is shown on the map: the map switch is on and the dock is open (the event `light` tells a change)
   });
 }

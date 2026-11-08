@@ -35,10 +35,12 @@ Tools (those with sql take one read-only SELECT or WITH statement):
 - focus_roads(sql, mode): the roads that the sql selects ({id}) stay; the others are faded
   (mode "fade", the default) or hidden (mode "hide": use it when the person says "only").
 - move_map(sql): zooms to the roads that the sql selects ({id}).
-- get_map(): the map's layers (on or off), base maps, 3D view and camera now. Call it before you use a layer name.
-- set_map(overlays, basemap, view3d, roadFill, tunnel, camera): shows or hides a layer, changes the base map, the 3D view or the camera
-  (center [longitude, latitude], zoom, pitch, bearing). Use it when the person asks to show or hide a layer, to change the base map, the
-  3D view or the camera (a place by its coordinates). For roads from a query, use move_map.
+- get_map(): the map's layers (on or off), base maps, theme, 3D view and camera now. Call it before you use a layer name.
+- set_map(overlays, basemap, theme, view3d, roadFill, tunnel, camera): shows or hides a layer, changes the base map, the theme ("light"
+  or "dark": the page and the map), the 3D view or the camera (center [longitude, latitude], zoom, pitch, bearing). Use it when the
+  person asks to show or hide a layer, to change the base map, the theme, the 3D view or the camera (a place by its coordinates). For
+  roads from a query, use move_map. One kind of thing can be in several layers (ocean, water and waterways are all water): when the person
+  names a kind, change every layer of that kind.
 - draw_chart(sql, kind, x, y, title): a chart of the result in the data dock; kind is bar, line, histogram, scatter or pie;
   x is the column of the labels (bar, pie), of the order (line) or of the numbers (histogram, scatter); y is a number column
   (not for a histogram). Use it when the person asks for a chart, a graph, a plot or a diagram, or when a comparison of 3 to
@@ -321,6 +323,9 @@ export function askPanel(o = {}){
     try{ await data.run(q, {source: "ask"}); if(!lit) data.lightOff(); return data.result(); }
     catch(e){ return null; }                                                                         // the map change stays; the dock keeps its table
   }
+  // a map tool turns the dock's map switch on when it is off (a decision of 2026-11-07: off, the colours, the focus and the light of the result do not
+  // show), and the card says so once
+  const switchOn = (c) => { if(data.showOnMap && data.showOnMap() && !c.switched){ c.switched = true; c.maps.push({text: "The map switch of the data dock is on again", sql: [], res: null, move: true}); } };
   const TOOLS = [
     {name: "run_query", description: "Run one read-only SQL statement and get the first rows.", parameters: {sql: SQL}, required: ["sql"],
      step: (a, c) => `Running query ${c.ok.length + c.failed.length + 1}`,
@@ -333,6 +338,7 @@ export function askPanel(o = {}){
      step: () => "Colouring the roads",
      async run({groups = []}, c){
        if(!Array.isArray(groups) || !groups.length || groups.length > 8) throw new Error("Give 1 to 8 groups.");
+       switchOn(c);
        const gs = [];
        for(const [k, g] of groups.entries()) gs.push({label: String(g.label || "Roads"), color: /^#[0-9a-f]{6}$/i.test(g.color) ? g.color : PALETTE[k], ids: await roadsOf(g.sql), sql: g.sql});
        data.colour(gs.map(({label, color, ids}) => ({label, color, ids})), {sql: gs.map((g) => g.label + ": " + g.sql).join("\n")});
@@ -345,6 +351,7 @@ export function askPanel(o = {}){
      step: () => "Focusing the map",
      async run({sql, mode}, c){
        const ids = await roadsOf(sql), m = mode === "hide" ? "hide" : "fade";
+       switchOn(c);
        data.focus(ids, {sql, mode: m});
        const text = `Focus on ${fmt(ids.length)} roads${notAll(ids)} (the others ${m === "hide" ? "hidden" : "faded"})`;
        c.maps.push({text, sql: [sql], res: await toDock([{sql}], false)});
@@ -353,7 +360,9 @@ export function askPanel(o = {}){
     {name: "move_map", description: "Zoom the map to the roads that the SQL selects.", parameters: {sql: IDSQL}, required: ["sql"],
      step: () => "Moving the map",
      async run({sql}, c){
-       const ids = await roadsOf(sql), res = await toDock([{sql}], true);
+       const ids = await roadsOf(sql);
+       switchOn(c);
+       const res = await toDock([{sql}], true);
        rs.focus(ids);
        const text = `Zoomed to ${fmt(ids.length)} roads${notAll(ids)}`;
        c.maps.push({text, sql: [sql], res, move: true}); c.cam = false;
@@ -377,16 +386,18 @@ export function askPanel(o = {}){
   function mapNow(){
     const s = rs.getState(), cam = s.camera;
     return {overlays: Object.entries(s.overlays || {}).map(([label, v]) => ({label, on: v.visible !== false})),
-      basemaps: rs.basemaps ? rs.basemaps() : [], basemap: s.basemap, view3d: !!s.view3d, roadFill: !!s.roadFill, tunnel: s.tunnel,
+      basemaps: rs.basemaps ? rs.basemaps() : [], basemap: s.basemap,
+      theme: document.documentElement.dataset.rsTheme === "dark" ? "dark" : "light", view3d: !!s.view3d, roadFill: !!s.roadFill, tunnel: s.tunnel,
       camera: cam && {center: cam.center.map(r5), zoom: Math.round(cam.zoom * 100) / 100, pitch: Math.round(cam.pitch), bearing: Math.round(cam.bearing)}};
   }
   const NUM = (d) => ({type: "number", description: d});
-  TOOLS.push({name: "get_map", description: "The map's layers (on or off), base maps, 3D view, road fill, tunnel look and camera now.", parameters: {}, required: [],
+  TOOLS.push({name: "get_map", description: "The map's layers (on or off), base maps, theme, 3D view, road fill, tunnel look and camera now.", parameters: {}, required: [],
     step: () => "Reading the map", async run(){ return mapNow(); }});
-  TOOLS.push({name: "set_map", description: "Change the map: show or hide layers, change the base map, the 3D view, the road fill, the tunnel look or the camera. Give only what changes.", required: [],
+  TOOLS.push({name: "set_map", description: "Change the map: show or hide layers, change the base map, the theme, the 3D view, the road fill, the tunnel look or the camera. Give only what changes.", required: [],
     parameters: {
       overlays: {type: "array", description: "Layers to show or hide (labels from get_map).", items: {type: "object", required: ["label", "on"], properties: {label: {type: "string"}, on: {type: "boolean"}}}},
       basemap: {type: "string", description: "The key or label of a base map from get_map."},
+      theme: {type: "string", enum: ["light", "dark"], description: "The theme of the page and the map: the panel, the cards and the colours of the roads."},
       view3d: {type: "boolean", description: "The 3D view (tilted camera)."}, roadFill: {type: "boolean", description: "The fill of the roads."},
       tunnel: {type: "object", description: "The look of tunnels (as in get_map).", properties: {strength: NUM("0 to 100"), toward: {type: "string"}, palette: {type: "string"}, ratio: {type: "array", items: {type: "number"}}}},
       camera: {type: "object", description: "Give only what changes.", properties: {center: {type: "array", items: {type: "number"}, description: "[longitude, latitude]"},
@@ -398,6 +409,13 @@ export function askPanel(o = {}){
       if(a.overlays != null){                                                                    // [{label, on}] or {label: on}
         const list = Array.isArray(a.overlays) ? a.overlays : Object.entries(a.overlays).map(([label, on]) => ({label, on}));
         for(const {label, on} of list){ const o = find(now.overlays, label, "layer"); if(o){ (change.overlays = change.overlays || {})[o.label] = {visible: !!on}; done.push(`${o.label} ${on ? "on" : "off"}`); } }
+      }
+      // the theme: the dashboard's own switch (rsSetTheme). Before 2026-11-07 Ask had no theme: "dark" came only from a dark base map, and "light" could not
+      // be done. It is set before the other changes, so that a base map that the person names stays (the theme swaps a base map with a dark twin).
+      if(a.theme != null){
+        if(a.theme !== "light" && a.theme !== "dark") throw new Error('The theme must be "light" or "dark".');
+        if(window.rsSetTheme) window.rsSetTheme(a.theme);
+        done.push(`theme ${a.theme}`);
       }
       if(a.basemap != null){ const b = find(now.basemaps, a.basemap, "base map"); if(b){ change.basemap = b.key; done.push(`base map ${b.label || b.key}`); } }
       for(const k of ["view3d", "roadFill"]) if(a[k] != null){ change[k] = !!a[k]; done.push(`${k === "view3d" ? "3D view" : "road fill"} ${a[k] ? "on" : "off"}`); }
@@ -414,7 +432,7 @@ export function askPanel(o = {}){
         for(const k in to) if(to[k] == null) delete to[k];
         if(Object.keys(to).length){ change.camera = to; done.push("camera"); c.cam = true; }
       }
-      if(done.length) rs.setState(change);
+      if(Object.keys(change).length) rs.setState(change);
       const text = done.length ? "Map: " + done.join(", ") : "";
       if(text) c.maps.push({text, sql: [], res: null, move: true});
       return {done: done.length ? text + "." : "Nothing changed.", ...(unknown.length ? {not_found: unknown, hint: "Call get_map for the names."} : {}), map: mapNow()};

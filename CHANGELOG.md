@@ -6,6 +6,18 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Ask sets the theme** ([get_map and set_map](docs/guides/ask.md#get_map-and-set_map)): `get_map` reports `theme`, and `set_map` takes `theme: "light"` or `"dark"`. Before, "dark" came only from a dark base map, and "light" could not be done.
+- **`data.showOnMap()`** ([The data dock](docs/guides/data-dock.md)): turns the dock's map switch on and gives `true` when it was off.
+
+### Changed
+- **Ask's map tools turn the dock's map switch on** when it is off (a colour, a focus or a move would not show), and the card says so.
+- **A turning ring shows that Ask works**, before the step line of the card.
+- **Ask's prompt: one kind of thing can be in several layers.** When the person names a kind (water), the agent changes every layer of that kind (ocean, water, waterways). In Monaco, "turn off the water" left the sea, which is the layer `ocean`.
+
+### Fixed
+- **An editor frame's scrolled head row has no band** (`dashboard.css`): it gets only a shadow under its own line. In the dark theme, the title row's lighter band floated over Ask's answers.
+
 ## [0.29.0] - 2026-11-07
 
 ### Added
