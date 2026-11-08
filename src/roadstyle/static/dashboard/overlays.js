@@ -10,8 +10,8 @@ import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY, _popupHeld} from "./select.js";
 let _OV_POPUP = true;       // overlay_popup=False: no overlay shows a popup (an Overlay's popup_window=False: that one); a click still selects and fires rs:select
 export const _ovWin = ov => ov.popup_window!==false && _OV_POPUP;
-export let _ovSel=null, _ovHov=null, _ovUnder=null, _ovT=0;      // {source,id} of the selected / lit (hovered) overlay feature; the one under the mouse now
-export function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, id:ref.id}, st); }
+export let _ovSel=null, _ovHov=null, _ovUnder=null, _ovT=0;      // {source,sourceLayer,id} of the selected / lit (hovered) overlay feature; the one under the mouse now
+export function _ovState(ref, st){ if(ref) map.setFeatureState({source:ref.source, sourceLayer:ref.sourceLayer, id:ref.id}, st); }
 export function clearOvSel(){ _ovState(_ovSel,{select:false}); _ovSel=null; }
 // holdSelectLook(key, on) (select.js): while a key holds it, a selection sets no `select` state on a road or an overlay item, and rs:select still
 // comes, so a host page draws its own selection (duckOSM's fixes editor)
@@ -46,16 +46,17 @@ export function handleOverlayClick(e, tier){                      // info popup 
     if(hits.length){
       const f = hits[0], p = _ovProps(ov, f);
       rsDeselect();                                        // road selection yields to the overlay
-      _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, id:f.id}; if(!_lookHolds.size) _ovState(_ovSel,{select:true});
+      _ovState(_ovSel,{select:false}); _ovSel={source:ov.source, sourceLayer:f.sourceLayer, id:f.id}; if(!_lookHolds.size) _ovState(_ovSel,{select:true});
       const fields = ov.popup && ov.popup.length ? ov.popup : Object.keys(p);
       if(!_ovWin(ov) || _popupHeld()){ /* popup_window=False, or a part shows the facts (rs.holdPopup): selected and lit, no popup */ }
       else if(_popupMode==="panel"){   // panel mode: dock the read-out like a road's, no floating popup
         rsInfoShow('<div class="rs-name">'+_esc(ov.label)+'</div>'+_rrows(p, fields));
       }else{
         const rows = fields.filter(k=>p[k]!=null && p[k]!=="").map(k=>"<b>"+_esc(k)+"</b>: "+_esc(p[k]));
+        const mine = _ovSel;       // a click on another feature closes this popup after it set its own selection: only a popup of the selection clears it
         new maplibregl.Popup({closeButton:true,maxWidth:POPUP.maxWidth})
           .setLngLat(e.lngLat).setHTML(rows.join("<br>")||"(no data)").addTo(map)
-          .on("close", clearOvSel);
+          .on("close", ()=>{ if(_ovSel===mine) clearOvSel(); });
       }
       // overlay clicks feed dashboards exactly like road clicks: rs:select with the overlay's
       // label + popup fields, so a sidebar shows sensor/zone info without extra wiring
@@ -100,7 +101,7 @@ function _ovBind(id){
   map.on("mousemove", id, e=>{ if(_NO_HOVER.matches) return; const ov=_ovOfLayer(id); if(!ov || !(ov.interactive || _ovTips(ov))) return;
     map.getCanvas().style.cursor = ov.interactive ? "pointer" : "";   // hover -> recolour, once the mouse rests on it (_TIP_DELAY)
     const f = e.features && e.features[0]; if(!f) return;
-    const k={source:ov.source, id:f.id}, same=o=>!!o && o.source===k.source && o.id===k.id;
+    const k={source:ov.source, sourceLayer:f.sourceLayer, id:f.id}, same=o=>!!o && o.source===k.source && o.sourceLayer===k.sourceLayer && o.id===k.id;
     _ovUnder=k;
     if(same(_ovHov)){ if(_ovTip && _ovTip.isOpen()) _ovTip.setLngLat(e.lngLat); return; }   // lit: its tooltip follows the mouse
     if(_ovHov){ _ovState(_ovHov,{hover:false}); _ovHov=null; if(_ovTip) _ovTip.remove(); }  // another one: the last off at once
