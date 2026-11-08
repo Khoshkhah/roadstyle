@@ -82,8 +82,9 @@ document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] |
 </script>
 <script type="module">
 import init, * as pkg from "/level_editor/pkg/roadstyle_wasm.js";
-import {levelEditor, browserStore, saveArea, areaIsFor} from "/dashboard/editor/level_editor.js";
+import {levelEditor, browserStore, saveArea, areaIsFor, ensureArea} from "/dashboard/editor/level_editor.js";
 window.browserStoreFn = browserStore;                               // for the test of the store alone
+window.ensureAreaFn = ensureArea;
 import {rsDashboard} from "/dashboard/index.js";
 import {rsFirstPaint} from "/dashboard/template.js";
 await init();
@@ -145,6 +146,12 @@ window.openWith = async (key, levels, edgeHash) => {
   window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store: s, dashboard: host, prefix: "host-", levels});
   return [window.editor.answer().resolve, await areaIsFor(s, edgeHash), await areaIsFor(browserStore("other-" + key), edgeHash)];
 };
+// the option `area` (ensureArea inside the editor): a store, the host's edges() and the edge hash
+window.openArea = async (store, area) => {
+  window.editor = await levelEditor({map, panel, pkgUrl: "/level_editor/pkg/roadstyle_wasm.js", store, dashboard: host, prefix: "host-", area});
+  return window.editor.areaInfo;
+};
+window.edgesBytes = edges;
 window.hostSources = Object.fromEntries(map.getStyle().layers.filter(l => l.id.startsWith("host-")).map(l => [l.id, l.source]));
 window.counts = () => JSON.stringify(Object.fromEntries(Object.entries(listening).filter(e => e[1])));
 window.before = counts();
@@ -249,6 +256,55 @@ def test_browser_store_keeps_a_file_in_memory_when_the_browser_cannot_and_tells_
             assert got["again"] == ["a,b\n1,2\n3,4\n", 12]
             assert got["parquet"] == [[1, 2, 3], 15]
             assert any("pairs.csv is not kept in the browser" in w for w in warnings), warnings
+            b.close()
+    finally:
+        server.shutdown()
+
+
+@needs_pkg
+def test_ensure_area_makes_the_area_once_for_an_edge_hash_and_the_editor_makes_it_again_after_a_loss():
+    pw = pytest.importorskip("playwright.sync_api")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), partial(_Files, directory=str(STATIC)))
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with pw.sync_playwright() as p:
+            b = p.chromium.launch()
+            page = b.new_page(viewport={"width": 1300, "height": 850})
+            page.goto(f"http://127.0.0.1:{server.server_address[1]}/test.html?basemap")       # ?basemap: the test opens the editor
+            page.wait_for_function("window.ready", timeout=60000)
+            got = page.evaluate("""async () => {
+              const out = {}, store = window.browserStoreFn("ea-1", "ea"), pkgUrl = "/level_editor/pkg/roadstyle_wasm.js";
+              let calls = 0;
+              const edges = async () => { calls++; return window.edgesBytes; };
+              const a = await window.ensureAreaFn({store, edgeHash: "h1", edges, pkgUrl, prepare: false});
+              out.first = [a.made, a.roadCount > 100, a.pairCount > 0, Array.isArray(a.warnings), calls];
+              const b = await window.ensureAreaFn({store, edgeHash: "h1", edges, pkgUrl, prepare: false});
+              out.same = [b.made, calls];                                      // the same hash: not made again, edges() not called
+              const c = await window.ensureAreaFn({store, edgeHash: "h2", edges, pkgUrl, prepare: false});
+              out.other = [c.made, calls];
+              const d = await window.ensureAreaFn({store, edgeHash: "h2", edges, pkgUrl, prepare: false, force: true});
+              out.force = [d.made, calls];
+              try { await window.ensureAreaFn({store, edgeHash: "h3", pkgUrl}); } catch(e){ out.noEdges = e.message; }
+              // the editor makes the area itself, and again once when the store lost its files after it was made
+              const s2 = window.browserStoreFn("ea-2", "ea2");
+              calls = 0;
+              const info = await window.openArea(s2, {edges, edgeHash: "h9"});
+              out.open = [info.made, calls, window.editor.roads.length > 100];
+              window.editor.destroy();
+              const real = s2.load;
+              let lost = true;                                                  // the files are gone: the first loads of the area's roads and pairs give null
+              s2.load = async (n, bytes) => (lost && (n === "roads.parquet" || n === "pairs.csv")) ? null : real(n, bytes);
+              const save = s2.save;
+              s2.save = async (n, d) => { if(n === "roads.parquet") lost = false; return save(n, d); };
+              const again = await window.openArea(s2, {edges, edgeHash: "h9"});
+              out.retry = [again.made, calls, window.editor.roads.length > 100];
+              return out;
+            }""")
+            assert got["first"] == [True, True, True, True, 1], got
+            assert got["same"] == [False, 1] and got["other"] == [True, 2] and got["force"] == [True, 3], got
+            assert "give edges()" in got["noEdges"], got
+            assert got["open"] == [True, 1, True], got
+            assert got["retry"] == [True, 2, True], got
             b.close()
     finally:
         server.shutdown()
