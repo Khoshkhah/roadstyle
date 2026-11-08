@@ -1,6 +1,6 @@
 # The level-edit part
 
-**Status:** a design, 2026-11-08. Not built. It needs a sign-off before the code.
+**Status:** a design, 2026-11-08. The plan is agreed: first the part with a general adapter (A), then a ready adapter for duckOSM data (B).
 
 ## What and why
 
@@ -41,6 +41,8 @@ An object with **five async functions**. All of them read or write the host's da
 
 Optional: `roadCount()` (for `maxRoads`), `after(style)` (Studio: its overview layers and the boundary), `useStyle(style)` (only a host that swaps the style itself).
 
+**Step B: `duckosmData(connection)`.** Roadstyle already knows the table layout of duckOSM (`roads_sql.js`, `duckosmPlan`). A ready adapter for it gives `edges()`, `storedLevels()` and `saveLevels(files)` from a DuckDB-wasm connection. Then Studio is about 3 to 5 lines: `levelEditPart({dashboard: rs, map, data: {...duckosmData(conn), relevel, roadsStyle}})`. Only `relevel` and `roadsStyle` stay in Studio, because they use Studio's own map worker. The cost: roadstyle then depends on the table names of duckOSM (`driving.edges`, `visualization.edge_levels`), so a change of those names must change roadstyle too. The general adapter (A) stays for hosts with other data.
+
 The page of `roadstyle levels edit` uses the **same part**. Its adapter reads `roads.parquet` and the CSV files with `fetch` and writes with `PUT`: `httpData(base)`. It has no code of its own either.
 
 ## Events
@@ -49,7 +51,7 @@ The page of `roadstyle levels edit` uses the **same part**. Its adapter reads `r
 
 ## What the host keeps (Studio)
 
-The adapter (five functions, about 25 lines of DuckDB-wasm calls) and one call (`levelEditPart({dashboard: rs, map, data, card: {id: "level", label: "Edit levels"}, maxRoads: window.mapMaxRoads})`, about 3 lines). **At most 30 lines.** Studio keeps no store, no area, no veil, no limit text, no note, no layout code and no listener for the worker.
+With A: the adapter (five functions, about 25 lines of DuckDB-wasm calls) and one call (`levelEditPart({dashboard: rs, map, data, card: {id: "level", label: "Edit levels"}, maxRoads: window.mapMaxRoads})`, about 3 lines). **At most 30 lines.** With B: **about 5 lines** (the call, `relevel` and `roadsStyle`). Studio keeps no store, no area, no veil, no limit text, no note, no layout code and no listener for the worker.
 
 ## The rules for a host contract
 
@@ -62,10 +64,11 @@ The adapter (five functions, about 25 lines of DuckDB-wasm calls) and one call (
 | PR | What | Status |
 |---|---|---|
 | a | `browserStore` `memoryFallback`, `lostBytes()` | merged |
-| b | editor `error` event, `dirty`, `exportFiles()`, deselect at the open | built, in review |
-| c | `ensureArea` and the stale-area retry | next |
+| b | editor `error` event, `dirty`, `exportFiles()`, deselect at the open | built, not pushed |
+| c | `ensureArea` and the stale-area retry | built, not pushed |
 | d | `roadLayers` (show, remove, reload tiles) | next |
-| e | `levelEditPart` and `httpData`; Studio and `roadstyle levels edit` use it | last |
+| e | `levelEditPart` and `httpData`; Studio and `roadstyle levels edit` use it | after d |
+| f | `duckosmData(connection)`: the adapter for duckOSM tables (step B) | last |
 
 ## Which test covers which behaviour
 
@@ -80,6 +83,7 @@ The adapter (five functions, about 25 lines of DuckDB-wasm calls) and one call (
 | the card, the status line, the layout attribute | `test_level_part_browser.py` (e) |
 | `applied`, `saveLevels(files)`, `relevel` calls | `test_level_part_browser.py` (e), with the Studio-shaped host |
 | the same part in the page of `roadstyle levels edit` | `test_levels_edit_browser.py` (e) |
+| `duckosmData`: the roads, the stored levels and the write-back, on a DuckDB-wasm connection | `test_duckosm_data_browser.py` (f); it runs only when the network gives duckdb-wasm |
 
 ## Not decided
 
