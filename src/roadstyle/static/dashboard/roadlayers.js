@@ -7,7 +7,7 @@
 //   await roads.show(style, {after: (st) => addOverview(st)});    // the style on the map (the old roads go first)
 //   roads.remove();                                               // the roads off the map
 //   await roads.reloadTiles();                                    // the tiles of the vector sources again, when the answer of a relevel has no style
-//   roads.layers, roads.sources, roads.images                     // what it put on the map (ids with the prefix)
+//   roads.layers, roads.sources, roads.images                     // what it put on the map (ids with the prefix); roads.prefix, roads.also: the options
 //
 // `prefix`: the start of the ids of the layers, the sources and the images of the roads. `before`: the id of a layer that the road layers go under (null:
 // on top). `also`: more id prefixes that `remove` takes off (a page's own copies of the road layers, such as duckOSM Studio's "rs-low-").
@@ -57,5 +57,5 @@ export function roadLayers({map, dashboard = globalThis.rs, prefix = "rs-", befo
     for(const [id, s] of Object.entries(map.getStyle().sources)) if(owns(id) && s.type === "vector") map.getSource(id).setTiles(s.tiles);
     if(wait) await _rlIdle(map, timeout);
   }
-  return {show, remove, reloadTiles, get layers(){ return [...mine.layers]; }, get sources(){ return [...mine.sources]; }, get images(){ return [...mine.images]; }};
+  return {show, remove, reloadTiles, prefix, also: [...also], get layers(){ return [...mine.layers]; }, get sources(){ return [...mine.sources]; }, get images(){ return [...mine.images]; }};
 }

@@ -19,6 +19,7 @@ changes stay in your browser. <a href="../../live/design_editor/?roads=sodermalm
 | Group | Item | From Python | Use it for |
 |---|---|---|---|
 | Use it | [Add the panel to a page](#add-the-panel-to-a-page) | no | the panel in your dashboard |
+| Use it | [A card and an adapter: `designEditPart`](#a-card-and-an-adapter-designeditpart) | no | the panel with the card, the save and the redraw done for you |
 | Use it | [The design editor on its own page](#the-design-editor-on-its-own-page) | command line | the design of a road file, with no page of your own |
 | Use it | [Bridges and tunnels](#bridges-and-tunnels) | the look | bridges and tunnels |
 | Use it | [The options](#the-options) | no | what `designPanel` takes |
@@ -53,6 +54,41 @@ changes stay in your browser. <a href="../../live/design_editor/?roads=sodermalm
     document.getElementById("open-design").onclick = () => design.open();
     design.addEventListener("change", (e) => saveSomewhere(e.detail.text));
     ```
+
+### A card and an adapter: `designEditPart` { .rs-part }
+
+**Use it for:** a host page that wants the design editor with the least code. The part adds the card, and it does the layout, the restore, the save, the redraw and the link to another card. The host gives a data adapter.<br>
+**From Python:** no
+{ .rs-facts }
+
+=== "JavaScript"
+
+    ```js
+    import {designEditPart} from "./dashboard/design/design_part.js";
+    import {roadLayers} from "./dashboard/roadlayers.js";
+
+    const part = await designEditPart({dashboard: rs, map, roads: roadLayers({map, dashboard: rs, prefix: "rs-", also: ["rs-low-"]}),
+      card: {id: "design", label: "Edit design"}, link: {label: "Export →", card: "export"}, storageKey: "mypage",
+      data: {
+        look: async () => lookObject,                      // the look of the map
+        loadDesign: async () => savedText,                 // the saved design of the area, or null (it wins over the browser's copy)
+        saveDesign: async (text) => { /* keep it with the area */ },      // 800 ms after the last change
+        setLook: async (text) => style,                    // the same tiles: a style; undefined when new tiles are necessary
+        redraw: async (text, draw) => note,                // remember the look; with `draw`, draw the map again
+        redrawReason: () => "",                            // optional: a text when you cannot redraw now
+      }});
+    part.addEventListener("close", () => padYourMap());
+    ```
+
+??? info "Details"
+
+    - **The card.** `card` is any option of `rs.sections.add` (`step`, `before`, `after`, ...): `card: {id: "step9", label: "Edit design", step: 9, before: "step10"}` is a numbered card. Its line is the name of the design, ` (changed)` when the style differs from the base design, and the lines that `summary(value)` of each host tab gives (for example `Tile profile: Analysis.`). A value of a host tab is not a change of the style.
+    - **The layout.** `open()` and `close()`; "← Steps" closes the panel and gives the map its size. While the panel is open, `document.body` has `data-rs-editing="design"`. The event `"close"` tells the host to give the map the padding of its panel again.
+    - **The restore and the save.** At the start the part loads `loadDesign()` with `draw: false` (the host's first draw shows it). After each change, and 800 ms after the last one, it calls `saveDesign(text)`. A failed save is a warning in the console.
+    - **The redraw.** If `redrawReason()` gives a text, the panel shows it, and `redraw` only remembers the look. `roads` (a `roadLayers`) gives the panel's `restyle` options (`prefix` and `also`).
+    - **The link.** `link: {label, card}` shows a button in the panel. A click closes the panel, unfolds the card `card` and scrolls to it.
+    - **Host tabs.** `tabs` are as in [Host tabs](#host-tabs), with one new key: `summary(value)`.
+    - **Members.** `part.open(tab)` (the tab to show, for example `"tiles"`: a link of the host that opens the panel on a tab), `part.close()`, `part.isOpen()`, `part.edited` and `part.panel` (the `designPanel`: `get`, `setHost`, `text`, `base`, ...). Events: `change` (`{design, text, edited}`) and `close`.
 
 ### The design editor on its own page { .rs-part }
 
