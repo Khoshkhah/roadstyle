@@ -27,17 +27,17 @@ def _square(x0, y0, x1, y1):
 
 
 def _tile():
-    """One source layer, `buildings`, with two squares: ids 0 and 8."""
+    """One source layer, `ov0` (Studio: a source layer for each overlay), with two squares: ids 0 and 8."""
     feats = b"".join(_field(2, 2, _field(1, 0, _var(i)) + _field(3, 0, _var(3)) + _field(4, 2, _square(*box)))
                      for i, box in ((0, (500, 1000, 1500, 2000)), (8, (2500, 1000, 3500, 2000))))
-    return _field(3, 2, _field(15, 0, _var(2)) + _field(1, 2, b"buildings") + feats + _field(5, 0, _var(4096)))
+    return _field(3, 2, _field(15, 0, _var(2)) + _field(1, 2, b"ov0") + feats + _field(5, 0, _var(4096)))
 
 
 _AT = """([tx, ty]) => { const z = 14, n = 2 ** z, x = Math.floor((18.005 + 180) / 360 * n);
   const la = 59.305 * Math.PI / 180, y = Math.floor((1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n);
   const lng = (x + tx / 4096) / n * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + ty / 4096) / n))) * 180 / Math.PI;
   map.jumpTo({center: [lng, lat], zoom: z}); const p = map.project([lng, lat]), r = map.getCanvas().getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; }"""
-_FS = "id => map.getFeatureState({source: 'rs-ov0', sourceLayer: 'buildings', id})"
+_FS = "id => map.getFeatureState({source: 'rs-tiles', sourceLayer: 'ov0', id})"
 
 
 _CASE = ["case", ["boolean", ["feature-state", "select"], False], "#7c4dff", ["boolean", ["feature-state", "hover"], False], "#b388ff", "#e5e2df"]
@@ -64,14 +64,18 @@ def test_hover_and_select_set_the_state_with_the_source_layer(host, three_d):   
                    else r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
         page.goto(base + "/page.html")
         page.wait_for_function("window.ready === true", timeout=60_000)
+        # Studio's layout: the layers of an overlay (its entry names the source `ov0`) draw a source with another name, shared by all the overlays,
+        # a source layer for each; a second source is for the low zooms
         style = {"version": 8, "sources": {"roadsrc": {"type": "geojson", "data": SQUARE},
-                                          "ov0": {"type": "vector", "tiles": ["http://rs.test/v/{z}/{x}/{y}.pbf"], "maxzoom": 14}}, "metadata": {
-            "roadstyle:controls": {"overlays": [{"label": "buildings", "source": "ov0", "layers": ["ov0-fill"], "interactive": True, "popup": [],
-                                                 "tooltip": None, "color": "#f4f4f4"}]}},
+                                          "tiles": {"type": "vector", "tiles": ["http://rs.test/v/{z}/{x}/{y}.pbf"], "maxzoom": 14},
+                                          "low": {"type": "vector", "tiles": ["http://rs.test/l/{z}/{x}/{y}.pbf"], "maxzoom": 8}}, "metadata": {
+            "roadstyle:controls": {"overlays": [{"label": "buildings", "source": "ov0", "layers": ["ov0-fill", "ov0-fill-low"], "interactive": True,
+                                                 "popup": [], "tooltip": None, "color": "#f4f4f4"}]}},
             "layers": [{"id": "roads", "type": "line", "source": "roadsrc", "paint": {"line-width": 2}},
-                       {"id": "ov0-fill", "type": "fill", "source": "ov0", "source-layer": "buildings", "paint": {"fill-color": _CASE}}]}
+                       {"id": "ov0-fill-low", "type": "fill", "source": "low", "source-layer": "ov0", "maxzoom": 10, "paint": {"fill-color": "#39c"}},
+                       {"id": "ov0-fill", "type": "fill", "source": "tiles", "source-layer": "ov0", "minzoom": 10, "paint": {"fill-color": _CASE}}]}
         if three_d:        # the 3D layer covers the fill: it has the same states (the engine gives it the case of the fill)
-            style["layers"].append({"id": "ov0-3d", "type": "fill-extrusion", "source": "ov0", "source-layer": "buildings",
+            style["layers"].append({"id": "ov0-3d", "type": "fill-extrusion", "source": "tiles", "source-layer": "ov0",
                                     "paint": {"fill-extrusion-color": _CASE, "fill-extrusion-height": 20, "fill-extrusion-opacity": 0.9}})
         page.evaluate("s => addStyle(s)", style)
         a = page.evaluate(_AT, [1000, 1500])
