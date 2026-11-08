@@ -73,6 +73,9 @@ PAGE = """<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport"
 <script>
 // the document's listeners by type (the test's count: a listener left after destroy, or one more after each open, shows here)
 window.listening = {};
+// the editor's worker (made inside levelEditor): the test stops it
+const _Worker = window.Worker;
+window.Worker = class extends _Worker { constructor(u, o){ super(u, o); if(String(u).includes("level_worker")) window.lvWorker = this; } };
 const _on = document.addEventListener, _off = document.removeEventListener;
 document.addEventListener = function(t, ...a){ listening[t] = (listening[t] || 0) + 1; return _on.call(this, t, ...a); };
 document.removeEventListener = function(t, ...a){ listening[t] = (listening[t] || 0) - 1; return _off.call(this, t, ...a); };
@@ -161,7 +164,7 @@ window.replaced = [];
 window.hostLookText = hostLook.toJson();
 window.workerCalls = [];                                         // the types of the messages to any worker (the editor's worker is made inside levelEditor)
 const post = Worker.prototype.postMessage;
-Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string"){ window.workerCalls.push(m.type); if(m.type === "init" && m.pkgUrl) window.lastWorker = this; } return post.call(this, m, ...r); };
+Worker.prototype.postMessage = function(m, ...r){ if(m && typeof m.type === "string"){ window.workerCalls.push(m.type); } return post.call(this, m, ...r); };
 window.openHosted = async (levels) => {
   window.RS_SIDE = hostSide;
   window.workerCalls.length = 0;
@@ -264,11 +267,11 @@ def test_the_editor_sends_an_error_event_when_its_worker_stops_and_not_after_des
             page.wait_for_function("window.ready", timeout=60000)
             page.evaluate("window.errs = []; window.editor.addEventListener('error', e => window.errs.push(e.detail))")
             # the worker stops (an error event on the Worker object, as the browser sends it when the script fails): the editor tells the host
-            page.evaluate("window.lastWorker.dispatchEvent(new ErrorEvent('error', {message: 'out of memory'}))")
+            page.evaluate("window.lvWorker.dispatchEvent(new ErrorEvent('error', {message: 'out of memory'}))")
             assert page.evaluate("window.errs") == [{"message": "the worker stopped: out of memory", "fatal": True}]
             # a destroyed editor is not heard any more
             page.evaluate("window.editor.destroy()")
-            page.evaluate("window.lastWorker.dispatchEvent(new ErrorEvent('error', {message: 'again'}))")
+            page.evaluate("window.lvWorker.dispatchEvent(new ErrorEvent('error', {message: 'again'}))")
             assert len(page.evaluate("window.errs")) == 1
             b.close()
     finally:
