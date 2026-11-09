@@ -71,10 +71,12 @@
 </div>
 <script>
 (function () {
-  // Google no longer serves a keyless embed (HTTP 404, x-frame-options SAMEORIGIN), so Classic is a link
-  const link = url => { frame.hidden = true; hideP(); empty.hidden = false;
-    empty.innerHTML = "<b>Google does not allow this page to show Classic Street View.</b>" +
-      '<a href="' + esc(url) + '" target="_blank" rel="noopener">Open this spot in Google Maps &#8599;</a>'; };
+  // Google won't frame the detail.streetView URL, so build its embeddable twin (the form of
+  // Google's own "Share > Embed a map": no key, but not a documented API). With a Maps Embed API
+  // key, the official one is:
+  //   "https://www.google.com/maps/embed/v1/streetview?key=KEY&location=" + lat + "," + lng + "&heading=" + h
+  const embed = (lat, lng, h) =>
+    "https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d" + lat + "!2d" + lng + "!3f" + h + "!4f0!5f1";
   // WITH A MAPS JAVASCRIPT API KEY (street_view_key=) the panel is a real panorama instead of the
   // embed: it reports every step and turn, so the map marker walks and turns with the viewer, and
   // it asks for Google's own street imagery only - the embed also shows people's indoor photos
@@ -168,12 +170,14 @@
     }
     const u = new URL(d.streetView);
     const [lat, lng] = u.searchParams.get("viewpoint").split(",");
-    if (GKEY && mode === "linked") {                     // the panorama; a link if the API fails to load
+    if (GKEY && mode === "linked") {                     // the panorama; the embed if the API fails to load
       frame.hidden = true;
-      panoAt(lat, lng, u.searchParams.get("heading") || 0).catch(() => link(d.streetView));
+      panoAt(lat, lng, u.searchParams.get("heading") || 0).catch(() => {
+        frame.src = embed(lat, lng, u.searchParams.get("heading") || 0); frame.hidden = false; hideP(); empty.hidden = true; });
       return;
     }
-    link(d.streetView);
+    frame.src = embed(lat, lng, u.searchParams.get("heading") || 0);
+    frame.hidden = false; empty.hidden = true; hideP();
   }
 
   // the divider (resizable=False removes it): the panel width follows the pointer, 20%..80% of
