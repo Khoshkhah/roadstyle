@@ -181,15 +181,31 @@ export function dataDock(o = {}){
   // the facts card of an item that is not a road: a title, a chip, rows of [name, value] and an id with Copy id. An overlay item (a building, a
   // crossing; Kaveh, 2026-11-07: "click on item should show info into sql panel card info") and the page's own card (`data.card`) draw it. `onClose` is
   // what the close button does.
-  function drawFacts({title, chip, rows: kv = [], id: idv = null, parts = []}, onClose){
+  function drawFacts({title, chip, rows: kv = [], id: idv = null, parts = [], sections = [], action = null, loading = false, error = null}, onClose){
     const hd = $("div", "rs-dd-rc-hd"), x = $("button", "rs-dd-rc-x", "\u2715");
     x.type = "button"; x.title = "Close the card"; x.setAttribute("aria-label", x.title); x.onclick = onClose;
     hd.append($("b", "rs-dd-rc-name", title == null ? "" : String(title)), x);
     const chips = $("div", "rs-dd-rc-chips"); if(chip) chips.append($("span", "rs-dd-rc-chip strong", String(chip)));
-    const rows = $("dl", "rs-dd-rc-rows");
-    for(const [k, v] of kv){
-      if(v == null || v === "" || typeof v === "object") continue;
-      const dt = $("dt", "", String(k).replace(/_/g, " ")), dd = $("dd", "", val(v)); if(String(v).length > 28) dd.title = String(v); rows.append(dt, dd);
+    const fill = (dl, list) => {      // rows of [name, value]: a null, an empty value and an object are left out
+      for(const [k, v] of list){
+        if(v == null || v === "" || typeof v === "object") continue;
+        const dt = $("dt", "", String(k).replace(/_/g, " ")), dd = $("dd", "", val(v)); if(String(v).length > 28) dd.title = String(v); dl.append(dt, dd);
+      }
+      return dl;
+    };
+    const rows = fill($("dl", "rs-dd-rc-rows"), kv);
+    const secs = sections.map((sec) => {      // a section: a small title and its rows
+      const box = $("div", "rs-dd-rc-sec"), dl = fill($("dl", "rs-dd-rc-rows"), sec.rows || []);
+      if(sec.title) box.append($("b", "rs-dd-rc-sec-t", String(sec.title)));
+      if(dl.childElementCount) box.append(dl);
+      return box;
+    });
+    const note = loading ? $("p", "rs-dd-rc-note", "Loading\u2026") : error ? $("p", "rs-dd-rc-note err", String(error)) : null;
+    let act = null;      // the one action: an optional line and a button
+    if(action){
+      act = $("div", "rs-dd-rc-act"); const b = $("button", "", String(action.label)); b.type = "button"; b.onclick = action.onRun;
+      if(action.note) act.append($("span", "rs-dd-rc-act-t", String(action.note)));
+      act.append(b); if(action.error) act.append($("p", "rs-dd-rc-note err", String(action.error)));
     }
     const foot = $("div", "rs-dd-rc-foot"), copy = $("button", "", "Copy id"), pr = $("div", "rs-dd-rc-parts");      // pr: the parts of the object, a swatch and a role for each
     for(const [role, col] of parts){ const sw = $("i", "rs-dd-sw"), it = $("span", "rs-dd-rc-part"); sw.style.background = col; it.append(sw, role); pr.append(it); }
@@ -197,7 +213,7 @@ export function dataDock(o = {}){
     const idt = idv == null ? "" : String(idv);
     copy.onclick = async () => { try{ await navigator.clipboard.writeText(idt); copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy id"; }, 1200); }catch(e){} };
     if(idt) foot.append($("span", "rs-dd-rc-id", `id ${idt}`), copy);
-    card.replaceChildren(hd, ...(chip ? [chips] : []), ...(parts.length ? [pr] : []), ...(rows.childElementCount ? [rows] : []), ...(foot.childElementCount ? [foot] : []));
+    card.replaceChildren(hd, ...(chip ? [chips] : []), ...(parts.length ? [pr] : []), ...(rows.childElementCount ? [rows] : []), ...secs, ...(note ? [note] : []), ...(act ? [act] : []), ...(foot.childElementCount ? [foot] : []));
   }
   // an overlay item: the overlay's name, the item's name when it has one, its fields (the overlay's popup fields when it has them), and its id. The
   // close button deselects it.
@@ -212,7 +228,7 @@ export function dataDock(o = {}){
   let hostCard = false;
   const closeHostCard = (tell = true) => {
     if(!hostCard) return;
-    hostCard = false; card.hidden = true; table.clear(); paintSide();
+    hostCard = false; cardSeq++; card.hidden = true; table.clear(); paintSide();
     if(kl) kl.select(null);
     if(tell) emit("cardclose", {});
   };
@@ -357,22 +373,26 @@ export function dataDock(o = {}){
     const cs = colsOf(col).map(quoteId), c = cs.join(", "), q = await query(`SELECT ${c} FROM (SELECT ${c}, row_number() OVER () AS rs_n FROM (${inner(sorted(r))}) AS rs_d WHERE ${cs.map((x) => x + " IS NOT NULL").join(" AND ")}) AS rs_e GROUP BY ${c} ORDER BY min(rs_n)`, KIND_LIMIT);
     return {ids: q.rows.map((x) => (Array.isArray(col) ? x.slice(0, cs.length) : x[0]))};
   }
+  // `geom` is one geometry (an object or GeoJSON text), or a list of parts `[{role, geom}]` (a turn: a `from` road, a `via` node, a `to` road). Its features have
+  // `rs_id` (the row) and, for a part with a role, `rs_role`. It gives null when the text or a geometry is not valid; `geom: null` gives no feature.
+  function featuresOf(g, key){
+    const geomOf = (x) => { if(typeof x === "string") try{ x = JSON.parse(x); }catch(err){ return undefined; } return x; };
+    g = geomOf(g); if(g === undefined) return null;
+    const list = Array.isArray(g) ? g.map((x) => ({role: x.role, geom: geomOf(x.geom)})) : g == null ? [] : [{role: null, geom: g}];
+    if(list.some((x) => x.geom === undefined || (x.geom != null && !x.geom.type))) return null;
+    const have = list.filter((x) => x.geom);
+    return {features: have.map((x) => ({type: "Feature", properties: x.role == null ? {rs_id: key} : {rs_id: key, rs_role: String(x.role)}, geometry: x.geom})),
+      roles: [...new Set(have.filter((x) => x.role != null).map((x) => String(x.role)))]};
+  }
   // the entries of a kind -> features and facts. An entry is {id, geom, ...facts}; `geom: null` is a row with no shape (known, not drawn). With `ids`, an entry of an id that was not asked for is dropped.
-  // `geom` is one geometry, or a list of parts `[{role, geom}]` (a turn: a `from` road, a `via` node, a `to` road); every part is a feature of the row, with `rs_role`.
   function kindRows(entries, ids){
     const features = [], facts = new Map(), parts = new Map(), want = ids ? new Set(ids.map(keyOfId)) : null;
-    const geomOf = (g) => { if(typeof g === "string") try{ g = JSON.parse(g); }catch(err){ return undefined; } return g; };
     for(const e of entries){
       const key = keyOfId(e.id); if(want && !want.has(key)) continue;
-      const g = geomOf(e.geom); if(g === undefined) continue;
-      const list = Array.isArray(g) ? g.map((x) => ({role: x.role, geom: geomOf(x.geom)})) : g == null ? [] : [{role: null, geom: g}];
-      if(list.some((x) => x.geom != null && !x.geom.type) || (g != null && !Array.isArray(g) && !g.type)) continue;
+      const got = featuresOf(e.geom, key); if(!got) continue;
       const f = {}; for(const [k, v] of Object.entries(e)) if(k !== "id" && k !== "geom") f[k] = v;
-      facts.set(key, f);
-      for(const x of list) if(x.geom){
-        features.push({type: "Feature", properties: x.role == null ? {rs_id: key} : {rs_id: key, rs_role: String(x.role)}, geometry: x.geom});
-        if(x.role != null) parts.set(key, [...new Set([...(parts.get(key) || []), String(x.role)])]);
-      }
+      facts.set(key, f); features.push(...got.features);
+      if(got.roles.length) parts.set(key, got.roles);
     }
     return {features, facts, parts};
   }
@@ -422,7 +442,7 @@ export function dataDock(o = {}){
     if(!facts.size) return none();
     const total = ids ? ids.length : idsOf(r, best.column, KIND_LIMIT).length, coverage = total ? Math.min(1, facts.size / total) : 1;
     emit("kind", {name: best.name, column: best.column, coverage, candidates});
-    return {name: best.name, label: best.k.label || best.name, column: best.column, features, facts, parts, more: idsMore || !!got.more, exact: !!ids, total, noShape: best.k.noShape, coverage, candidates};
+    return {name: best.name, label: best.k.label || best.name, card: best.k.card, column: best.column, features, facts, parts, more: idsMore || !!got.more, exact: !!ids, total, noShape: best.k.noShape, coverage, candidates};
   }
   // the note of the table for a result of kinds: which kind owns it, how many ids it found, the more and the errors
   function kindNote(r, own){
@@ -447,13 +467,42 @@ export function dataDock(o = {}){
     if(tags && typeof tags === "object") for(const [k, v] of Object.entries(tags)) rows.push([k, v]);
     return {title: f.name || `${own.label} ${key}`, chip: own.label, rows, id: key, parts: (own.parts.get(key) || []).map((role) => [role, kl.colour(role)])};
   }
-  // a row of such a result: the object is selected (the select look, the camera) and its facts are in the card
+  // a row of such a result: the object is selected (the select look, the camera) and its facts are in the card. A kind with `card(info)` sets the card: the title,
+  // the chip, the rows, `sections`, and one `action`; it can be async (the card shows "Loading..." and then the sections).
+  let cardSeq = 0;
   function kindPick(own, r, cols){
     const v = colsOf(own.column).map((n) => r[cols.findIndex((c) => c.name === n)]); if(v.some((y) => y == null)) return;
     const key = keyOfId(v), fs = own.features.filter((x) => x.properties.rs_id === key); if(!fs.length && !own.facts.has(key)) return;
     rs.select(null);
     kl.select(fs); if(fs.length) kl.fit(fs, rs.dock.height ? rs.dock.height() : 0);
-    drawFacts(kindFacts(own, key, !!fs.length), () => closeHostCard()); hostCard = true; showCard();
+    const base = kindFacts(own, key, !!fs.length), mine = ++cardSeq, onClose = () => closeHostCard();
+    const info = {id: key, kind: own.name, label: own.label, row: Object.fromEntries(cols.map((c, i) => [c.name, r[i]])), facts: own.facts.get(key) || {}, parts: own.parts.get(key) || []};
+    const msg = (e) => String((e && e.message) || e);
+    let spec = {};
+    const show = (patch = {}) => {
+      if(mine !== cardSeq) return;
+      spec = {...spec, ...patch};
+      const a = spec.action && spec.action.label ? {label: spec.action.label, note: spec.action.note, error: spec.actionError, onRun: runAction} : null;
+      drawFacts({...base, ...(spec.title != null ? {title: spec.title} : {}), ...(spec.chip != null ? {chip: spec.chip} : {}), ...(spec.rows ? {rows: spec.rows} : {}),
+        sections: spec.sections || [], action: a, loading: !!spec.loading, error: spec.error}, onClose);
+    };
+    async function runAction(){      // the one button: the host's run(info); a geometry that it gives is drawn with the object, in the select look, and the camera shows it
+      emit("cardaction", {kind: own.name, id: key});
+      try{
+        const out = await spec.action.run(info); if(mine !== cardSeq) return;
+        const more = out == null ? null : featuresOf(out, key);
+        if(out != null && !more) throw new Error("the action gave a geometry that is not valid");
+        if(more && more.features.length){ const all = fs.concat(more.features); kl.select(all); kl.fit(all, rs.dock.height ? rs.dock.height() : 0); }
+        show({actionError: null});
+      }catch(e){ console.error(`dataDock: the action of the kind "${own.name}" failed: ${msg(e)}`); show({actionError: msg(e)}); }
+    }
+    hostCard = true; showCard();
+    if(!own.card){ show(); return; }
+    let got; try{ got = own.card(info); }catch(e){ console.error(`dataDock: the card of the kind "${own.name}" failed: ${msg(e)}`); show({error: msg(e)}); return; }
+    if(got && typeof got.then === "function"){
+      show({loading: true});
+      got.then((x) => show({...(x || {}), loading: false}), (e) => { console.error(`dataDock: the card of the kind "${own.name}" failed: ${msg(e)}`); show({loading: false, error: msg(e)}); });
+    }else show(got || {});
   }
   async function rowClick(r, cols){
     if(kl && res && res.__own && !cols.some((c) => c.name === ID)){ kindPick(res.__own, r, cols); return; }
