@@ -70,7 +70,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     | `tables`, `load(t)` | none | Your page's own tables, `[{name, url, about}]`. The data dock gives each one to `load` once at the start, and a run waits for them. A table that does not load does not stop the others. |
     | `idColumn` | `"edge_id"` | The column with the road ids. |
     | `keys`, `roadsBy(sql, column)` | `["osm_id", "name"]`, none | A result with no `idColumn` finds its roads by the first of `keys` that it has: `roadsBy` gives the SQL of the road ids. |
-    | `kinds` | none | The objects of your data that are not roads: `{node: {label?, idColumns, geometryBy(sql, column)}, building: {...}}` (see [Objects of a kind](#objects-of-a-kind)). |
+    | `kinds` | none | The objects of your data that are not roads: `{node: {label?, idColumns, needs?, geometryBy(sql, column)}, building: {...}}` (see [Objects of a kind](#objects-of-a-kind)). |
     | `map` | `window.map` | The MapLibre map that the objects of a kind are drawn on. |
     | `sql` | `""` | The start text of the line. |
     | `label` | `"Data"` | The label of the dock. |
@@ -100,7 +100,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - `data.colour(groups, {sql})` and `data.focus(ids, {sql, mode})` add the same layers as the buttons. `data.layers()` lists them.
     - `data.reset()` does what the Reset button does (see [The line](#the-line)).
     - For [Ask](ask.md): `data.idColumn`, `data.keyOf(result)` (the column that finds the roads of a result, or `null`) and `data.roadsOf(result)` (its roads on the map).
-    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`), `layers`, `light` (`on`, see [The map switch](#the-map-switch)), `reset` (also the document event `rs:dockreset`), `row` and `cardclose` (see [A row of your own](#a-row-of-your-own)).
+    - The events are `run` (`sql`, `columns`, `rows`, `more`, `ms`, `source`), `error` (`sql`, `message`, `source`), `layers`, `light` (`on`, see [The map switch](#the-map-switch)), `reset` (also the document event `rs:dockreset`), `kind` and `kinderror` (see [Objects of a kind](#objects-of-a-kind)), `row` and `cardclose` (see [A row of your own](#a-row-of-your-own)).
 
 ## What the person does { .rs-group }
 
@@ -213,7 +213,9 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
 ??? info "Details"
 
     - A kind is `{label?, idColumns, geometryBy(sql, column)}`. `geometryBy` gives one `SELECT` for the result's own `sql`: its first column is `id`, its second column is `geom` (GeoJSON, as text or as an object), and the other columns are the facts of the card.
-    - The dock looks for roads first. A result that has no roads belongs to the first kind (in the order of `kinds`) that has one of its `idColumns` in the result and whose `geometryBy` gives at least one row. So a name such as `osm_id`, which is a node in one table and a building in another, goes to the kind that has the id.
+    - The dock looks for roads first. A result that has no roads goes to the kind that finds objects for the most of its ids. A candidate is a kind that has one of its `idColumns` in the result, and all the columns of its optional `needs` (for example `needs: ["lane_num"]`). For each candidate (and each id column), the dock asks `geometryBy` for the first 200 distinct ids of the result. The **coverage** is the share of those ids that get an object. The highest coverage owns the result. A tie goes to the earlier kind in `kinds`, then to the earlier column in `idColumns`. A coverage of 0 means that no kind owns the result. So a name such as `osm_id`, which is a node in one table and a way in another, goes to the table that has the ids, and one id that exists in both tables does not decide. A result with one candidate has no probe. Only the owner loads all its objects.
+    - The note of the table says which kind owns the result: "Shown as Building (osm_id)". When some ids have no object, it adds "2 of 3 ids found". To use another kind, select the column under the id name of that kind (`SELECT osm_id AS way_id`). The event `kind` comes once for each result with `detail` `{name, column, coverage, candidates: [{name, column, coverage}]}`; `name` is `null` when no kind owns the result.
+    - A query of a kind that fails is not hidden. The dock writes it to the console (`console.error`), sends the event `kinderror` (`detail` `{kind, column, message}`), and adds "the kind node failed: ..." to the note of the table. The kind then has no objects.
     - The objects are blue (`#2563eb`, `#5aa9f8` on a dark map): a dot with a ring for a point, an outline for a line, a fill and an outline for an area. The map switch, the theme and **Reset** control them as they control the road light. The most is 20 000 objects: the note of the table then says "the map shows the first 20 000".
     - A click on a row selects its object: the select purple (a ring for a point, a thick outline for a line or an area), and the camera moves to it (a point: zoom 18). The card has the same look as the card of a road: the title is the `name` column or "label id", the chip is the label, the other columns are rows (a `null` or empty value is left out), a column `tags` (an object, a list of `{key, value}` or JSON text) is one row for each tag, and the id has **Copy id**. The close button of the card removes the selection.
     - A change of the base map or of the theme can remove the layers of the objects: the dock puts them back.

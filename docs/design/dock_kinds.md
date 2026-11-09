@@ -42,7 +42,7 @@ duckOSM gives this object: `kinds: objectKinds({names, hasTags})` from `web/ask/
 
 1. The dock tries the roads first, with the rules of today.
 2. If the result has no roads, the dock goes through the kinds in the order of `kinds`. A kind is a candidate when the result has one of its `idColumns`.
-3. The dock runs `geometryBy` for the candidate. The first kind that gives at least one row **owns** the result. This solves the name `osm_id`, which is a node in one table and a building in another: the lookup in the wrong table gives no row.
+3. The dock runs `geometryBy` for the candidate. The first kind that gives at least one row **owns** the result. *(Replaced on 2026-11-09 by the coverage rule of [part 2](dock_kinds_table_views.md#weak-id-names): the kind with the most objects for the first ids owns the result.)*
 4. A result of no kind has no map object, as today.
 
 ## What the dock does for a kind

@@ -28,11 +28,18 @@ import {dataDock} from "./dashboard/data/data_dock.js";
 const NODES = [[1n, '{"type":"Point","coordinates":[18.001,59.305]}', "Node A", {highway: "crossing", note: "zebra"}],
                [2n, '{"type":"Point","coordinates":[18.003,59.305]}', null, {}],
                [3n, '{"type":"Point","coordinates":[18.005,59.305]}', "Node C", {}]];
-const BUILDINGS = [[5001n, '{"type":"Polygon","coordinates":[[[18.0015,59.3],[18.0025,59.3],[18.0025,59.301],[18.0015,59.301],[18.0015,59.3]]]}', "House"]];
+const BUILDINGS = [[5001n, '{"type":"Polygon","coordinates":[[[18.0015,59.3],[18.0025,59.3],[18.0025,59.301],[18.0015,59.301],[18.0015,59.3]]]}', "House"],
+                   [5002n, '{"type":"Polygon","coordinates":[[[18.0035,59.3],[18.0045,59.3],[18.0045,59.301],[18.0035,59.301],[18.0035,59.3]]]}', "Shed"]];
+const WAYS = [[1n, '{"type":"LineString","coordinates":[[18.001,59.31],[18.002,59.31]]}', "Way 1"], [2n, '{"type":"LineString","coordinates":[[18.003,59.31],[18.004,59.31]]}', "Way 2"]];
+const LANES = [[5001n, '{"type":"LineString","coordinates":[[18.001,59.32],[18.002,59.32]]}', 1]];
 const COLS = {
   "SELECT node_id, name FROM nodes": {columns: [["node_id", "BIGINT"], ["name", "VARCHAR"]], rows: NODES.map(n => [n[0], n[2]])},
   "SELECT osm_id FROM house_ids": {columns: [["osm_id", "BIGINT"]], rows: [[5001n]]},
   "SELECT edge_id, name FROM edges": {columns: [["edge_id", "BIGINT"], ["name", "VARCHAR"]], rows: [[1n, "Street 0"], [2n, "Street 1"]]},
+  "SELECT osm_id FROM mixed_ids": {columns: [["osm_id", "BIGINT"]], rows: [[1n], [5001n], [5002n]]},      // 1 is a node, 5001 and 5002 are buildings
+  "SELECT osm_id FROM both_ids": {columns: [["osm_id", "BIGINT"]], rows: [[1n], [2n]]},                     // a node and a way each: the full coverage of two kinds
+  "SELECT osm_id, lane_num FROM lane_ids": {columns: [["osm_id", "BIGINT"], ["lane_num", "INTEGER"]], rows: [[5001n, 1]]},
+  "SELECT broken_id FROM broken": {columns: [["broken_id", "BIGINT"]], rows: [[1n]]},
   "SELECT 1 AS one": {columns: [["one", "INTEGER"]], rows: [[1]]},
 };
 const strip = s => s.trim().replace(/;\\s*$/, "");
@@ -46,24 +53,38 @@ function answer(sql){
   if((m = sql.match(/^SELECT b\\.osm_id AS id, b\\.geom, b\\.name FROM buildings b WHERE b\\.osm_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/))) {
     const r = answer(m[2]), i = r.columns.findIndex(c => c.name === m[1]), ids = new Set(r.rows.map(x => x[i]));
     return {columns: ["id", "geom", "name"].map(name => ({name, type: "VARCHAR"})), rows: BUILDINGS.filter(b => ids.has(b[0]))}; }
+  if((m = sql.match(/^SELECT \\* FROM \\(VALUES ([\\s\\S]*)\\) AS rs_p\\("(\\w+)"\\)$/)))      // the probe of the dock: the first ids as a table
+    return {columns: [{name: m[2], type: "BIGINT"}], rows: [...m[1].matchAll(/\\((\\d+)\\)/g)].map(x => [BigInt(x[1])])};
+  if((m = sql.match(/^SELECT w\\.osm_id AS id, w\\.geom, w\\.name FROM ways w WHERE w\\.osm_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/))) {
+    const r = answer(m[2]), i = r.columns.findIndex(c => c.name === m[1]), ids = new Set(r.rows.map(x => x[i]));
+    return {columns: ["id", "geom", "name"].map(name => ({name, type: "VARCHAR"})), rows: WAYS.filter(w => ids.has(w[0]))}; }
+  if((m = sql.match(/^SELECT l\\.osm_id AS id, l\\.geom, l\\.lane_num FROM lanes l WHERE l\\.osm_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/))) {
+    const r = answer(m[2]), i = r.columns.findIndex(c => c.name === m[1]), ids = new Set(r.rows.map(x => x[i]));
+    return {columns: ["id", "geom", "lane_num"].map(name => ({name, type: "VARCHAR"})), rows: LANES.filter(l => ids.has(l[0]))}; }
   if(/FROM rs_roads WHERE/.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: []};      // no road has an osm_id of a node
   const c = COLS[strip(sql)];
   if(!c) throw new Error("Binder Error: unknown SQL");
   return {columns: c.columns.map(([name, type]) => ({name, type})), rows: c.rows};
 }
-window.queries = [];
+window.queries = []; window.events = [];
 window.data = dataDock({
   query: async (sql) => { window.queries.push(sql); return answer(sql); },
   schema: async () => ({tables: [{name: "main.nodes", rows: 3, about: "The nodes."}]}),
   roadsBy: (sql, column) => `SELECT edge_id FROM rs_roads WHERE "${column}" IN (SELECT "${column}" FROM (${sql}) AS rs_k)`,
   kinds: {
+    lane: {label: "Lane", idColumns: ["osm_id"], needs: ["lane_num"],      // a candidate only for a result that also has lane_num
+      geometryBy: (sql, column) => `SELECT l.osm_id AS id, l.geom, l.lane_num FROM lanes l WHERE l.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
     node: {label: "Node", idColumns: ["node_id", "osm_id"],
       geometryBy: (sql, column) => `SELECT n.node_id AS id, n.geom, n.name, n.tags FROM nodes n WHERE n.node_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
     building: {label: "Building", idColumns: ["osm_id"],
       geometryBy: (sql, column) => `SELECT b.osm_id AS id, b.geom, b.name FROM buildings b WHERE b.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+    way: {label: "Way", idColumns: ["osm_id"],
+      geometryBy: (sql, column) => `SELECT w.osm_id AS id, w.geom, w.name FROM ways w WHERE w.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+    broken: {label: "Broken", idColumns: ["broken_id"], geometryBy: () => "SELECT broken"},      // its SQL fails
   },
   sql: "SELECT node_id, name FROM nodes",
 });
+for(const n of ["kind", "kinderror"]) data.addEventListener(n, (e) => window.events.push([n, e.detail]));
 window.hostReady = true;
 </script>"""
 
@@ -199,3 +220,69 @@ def test_the_phone_shows_the_card_of_a_node(tmp_path):
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def _note(page):
+    return page.inner_text("#rs-dock .rs-dock-note")
+
+
+@pytest.mark.parametrize(("theme", "width"), [("light", 1280), ("dark", 1280), ("light", 390)])
+def test_the_kind_with_the_most_objects_owns_a_weak_id_name(tmp_path, theme, width):
+    """osm_id is an id column of the node, the building and the way kind. Ids 1, 5001 and 5002: one node and two buildings. The old rule gave the result to the
+    first kind with one row (the nodes); now the building kind owns it (coverage 2 of 3). The note says which kind owns the result."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url, width=width, height=844 if width < 500 else 800)
+        try:
+            page.evaluate(f"rsSetTheme('{theme}'); data.open(); data.run('SELECT osm_id FROM mixed_ids')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 2")
+            assert sorted(page.evaluate(f"({_DRAWN})('rs-dock-kinds')")) == ["Polygon:5001", "Polygon:5002"]
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dock-note')?.textContent.includes('Shown as Building (osm_id)')")
+            assert "2 of 3 ids found" in _note(page), _note(page)
+            ev = page.evaluate("events.filter(e => e[0] === 'kind').pop()[1]")
+            assert ev["name"] == "building" and ev["column"] == "osm_id" and abs(ev["coverage"] - 2 / 3) < 1e-9
+            assert [(c["name"], round(c["coverage"], 2)) for c in ev["candidates"]] == [("node", 0.33), ("building", 0.67), ("way", 0.33)]   # lane needs lane_num
+            # one probe for each candidate (the ids as a VALUES table), then one full load for the owner
+            qs = page.evaluate("queries")
+            assert sum("VALUES" in q for q in qs) == 3 and sum("LIMIT 20001" in q for q in qs) == 1, qs
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_full_coverage_in_two_kinds_goes_to_the_earlier_kind_and_needs_removes_a_candidate(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            # ids 1 and 2 are a node and a way each: the tie goes to the node kind, which is the earlier of the two
+            page.evaluate("data.open(); data.run('SELECT osm_id FROM both_ids')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 2")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") == ["Point:1", "Point:2"]
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dock-note')?.textContent.includes('Shown as Node (osm_id)')")
+            assert "ids found" not in _note(page)
+            # the lane kind is first in the list, but only a result with lane_num makes it a candidate
+            page.evaluate("data.run('SELECT osm_id, lane_num FROM lane_ids')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.[0] === 'LineString:5001'")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dock-note')?.textContent.includes('Shown as Lane (osm_id)')")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_failing_kind_query_is_reported(tmp_path):
+    """The query of a kind fails: console.error, the event kinderror and a line in the note. The kind has no rows."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        logs = []
+        page.on("console", lambda m: logs.append(m.text) if m.type == "error" else None)
+        try:
+            page.evaluate("data.open(); data.run('SELECT broken_id FROM broken')")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dock-note')?.textContent.includes('the kind broken failed')")
+            assert "unknown SQL" in _note(page)
+            assert page.evaluate("events.filter(e => e[0] === 'kinderror').length") == 1
+            ev = page.evaluate("events.filter(e => e[0] === 'kinderror')[0][1]")
+            assert ev["kind"] == "broken" and ev["column"] == "broken_id" and "unknown SQL" in ev["message"]
+            assert any('the kind "broken" failed' in t for t in logs), logs
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") == []
+        finally:
+            browser.close()
+    assert [e for e in errors if "unknown SQL" not in e] == [], errors
