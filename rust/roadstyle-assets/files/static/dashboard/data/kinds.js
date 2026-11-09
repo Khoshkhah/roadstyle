@@ -7,7 +7,7 @@
 // a part. A feature with `rs_role` is a part of an object (a turn is a `from` road, a `via` node and a `to` road): it has the colour of its role, and the selected object
 // keeps these colours over a select-colour halo. A role that the palette does not name takes the next colour of `role_series`, in the order of first use.
 //
-//   dockKinds(map) -> {draw(features), select(feature | [feature] | null), fit(feature | [feature], bottom), colour(role), recolour(), clear()}
+//   dockKinds(map, {onPick(feature)}) -> {draw(features), select(feature | [feature] | null), fit(feature | [feature], bottom), colour(role), recolour(), clear()}
 const SRC = "rs-dock-kinds", SEL = "rs-dock-kinds-sel";
 const POINT = ["==", ["geometry-type"], "Point"], AREA = ["==", ["geometry-type"], "Polygon"], LINE = ["==", ["geometry-type"], "LineString"];
 const ROLE = ["has", "rs_role"], PLAIN = ["!", ROLE];
@@ -19,7 +19,7 @@ function look(){
   return d;
 }
 
-export function dockKinds(map){
+export function dockKinds(map, {onPick = null} = {}){
   let feats = [], picked = [], series = new Map();       // series: a role the palette does not name -> its colour pair
   const dark = () => document.documentElement.dataset.rsTheme === "dark";
   const pick = (pair) => dark() ? pair.dark : pair.light;
@@ -71,6 +71,15 @@ export function dockKinds(map){
     map.setPaintProperty(SRC + "-dot", "circle-stroke-color", ring()); map.setPaintProperty(SEL + "-dot", "circle-stroke-color", ring());
   }
   document.addEventListener("rs:themechange", recolour);
+  // a click on the map: the object under the point (a box of 6 px, so a thin line is easy to hit), the one on top when objects overlap. onPick(feature) tells the dock.
+  // A click that hits no object does nothing.
+  map.on("click", (e) => {
+    if(!onPick || !feats.length) return;
+    const ls = ["-dot", "-line", "-fill"].map((l) => SRC + l).filter((id) => map.getLayer(id));
+    if(!ls.length) return;
+    const hit = map.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], {layers: ls});
+    if(hit.length) onPick(hit[0]);
+  });
   // the bounds of some features (a feature, or all the parts of an object): a point gives a zoom of 18, an area or a line its box, clear of the dock at the bottom
   function fit(f, bottom = 0){
     const list = [].concat(f), b = new window.maplibregl.LngLatBounds(), add = (c) => (typeof c[0] === "number" ? b.extend(c) : c.forEach(add));
