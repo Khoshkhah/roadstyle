@@ -43,7 +43,7 @@ export function dataDock(o = {}){
   if(typeof o.query !== "function" || typeof o.schema !== "function") throw new Error("dataDock: query and schema are necessary.");
   if((o.tables || []).length && typeof o.load !== "function") throw new Error("dataDock: tables need load (the host loads each one).");
   const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
-  const KINDS = Object.entries(o.kinds || {}), kl = KINDS.length ? dockKinds(o.map || window.map) : null;      // the kinds of the host (docs/design/dock_kinds.md)
+  const KINDS = Object.entries(o.kinds || {}), kl = KINDS.length ? dockKinds(o.map || window.map, {onPick: (f) => mapPick(f)}) : null;      // the kinds of the host (docs/design/dock_kinds.md)
   // the data is ready when the host's data is loaded and every table of the page too; a table that does not load does not stop the others
   const ready = (async () => { await o.ready; for(const t of o.tables || []) await Promise.resolve(o.load(t)).catch((e) => console.warn(`dataDock: the table ${t.name} did not load: ${e.message}`)); })();
   let loaded = false; ready.then(() => { loaded = true; }, () => {});
@@ -481,7 +481,9 @@ export function dataDock(o = {}){
   }
   // the card of an object: the title is its name, else "<label> <id>"; the facts are the other columns; a column `tags` is one row for each tag
   function kindFacts(own, key, shaped = true){      // parts: the roles of the object, with their colours (a swatch for each)
-    const f = own.facts.get(key) || {}, rows = shaped ? [] : [["on the map", own.noShape ? `no: ${own.noShape}` : "no"]];      // a row with no shape (geom: null)
+    const f = own.facts.get(key) || {}, known = own.facts.has(key);
+    // a row with no shape (geom: null), or a row that the kind has no entry for (a row after the cut of 20 000, or an id the kind does not know)
+    const rows = shaped ? [] : [["on the map", !known ? "no object found for this row" : own.noShape ? `no: ${own.noShape}` : "no"]];
     for(const [k, v] of Object.entries(f)){
       if(k === "name" || k === "tags") continue;
       rows.push([k, v]);
@@ -496,11 +498,15 @@ export function dataDock(o = {}){
   let cardSeq = 0;
   function kindPick(own, r, cols){
     const v = colsOf(own.column).map((n) => r[cols.findIndex((c) => c.name === n)]); if(v.some((y) => y == null)) return;
-    const key = keyOfId(v), fs = own.features.filter((x) => x.properties.rs_id === key); if(!fs.length && !own.facts.has(key)) return;
+    kindShow(own, keyOfId(v), Object.fromEntries(cols.map((c, i) => [c.name, r[i]])));
+  }
+  // the object of a key: selected, the camera on it, the card. A row with no object (a row after the cut, an id that the kind does not know) gets the card too, with the reason.
+  function kindShow(own, key, row){
+    const fs = own.features.filter((x) => x.properties.rs_id === key);
     rs.select(null);
     kl.select(fs); if(fs.length) kl.fit(fs, rs.dock.height ? rs.dock.height() : 0);
     const base = kindFacts(own, key, !!fs.length), mine = ++cardSeq, onClose = () => closeHostCard();
-    const info = {id: key, kind: own.name, label: own.label, row: Object.fromEntries(cols.map((c, i) => [c.name, r[i]])), facts: own.facts.get(key) || {}, parts: own.parts.get(key) || []};
+    const info = {id: key, kind: own.name, label: own.label, row, facts: own.facts.get(key) || {}, parts: own.parts.get(key) || []};
     const msg = (e) => String((e && e.message) || e);
     let spec = {};
     const show = (patch = {}) => {
@@ -527,6 +533,15 @@ export function dataDock(o = {}){
       show({loading: true});
       got.then((x) => show({...(x || {}), loading: false}), (e) => { console.error(`dataDock: the card of the kind "${own.name}" failed: ${msg(e)}`); show({loading: false, error: msg(e)}); });
     }else show(got || {});
+  }
+  // a click on an object on the map: its row in the table is marked and scrolled to, and the row's card opens, as a click on the row does. A row that the table does not hold
+  // (the table has the first rows only) has the card too.
+  function mapPick(f){
+    const own = res && res.__own; if(!own) return;
+    const key = f.properties.rs_id, cs = colsOf(own.column);
+    const i = table.choose((row, cols) => keyOfId(cs.map((n) => row[cols.findIndex((c) => c.name === n)])) === key);
+    if(i >= 0){ rowClick(table.rows()[i], res.columns); return; }
+    kindShow(own, key, {});
   }
   async function rowClick(r, cols){
     if(kl && res && res.__own && !cols.some((c) => c.name === ID)){ kindPick(res.__own, r, cols); return; }
