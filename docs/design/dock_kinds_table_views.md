@@ -1,6 +1,6 @@
 # Object kinds, part 2: every table on the map
 
-**Status:** 2026-11-09. Proposed. Waits for sign-off. Nothing in this note is built.
+**Status:** Signed off 2026-11-09. Nothing in this note is built.
 
 [Object kinds in the data dock](dock_kinds.md) is part 1. Its hook `kinds` is built for nodes and areas (commit `60ade739`). This note answers four requests from duckOSM and one question about weak id names. The source of the requests is "Asked of roadstyle" in `duckOSM/docs/design/table_views.md`. The goal of duckOSM: every table of a duckOSM database shows its rows on the map, and a click on a row gives one standard card.
 
@@ -223,10 +223,12 @@ One PR for each step. Each PR runs the browser tests on a host with the shape of
 
 Steps 2 to 5 do not depend on each other except that step 4 uses the parts of step 3 for the returned geometry. duckOSM can start step 3 of its own plan (`web/ask/views.js`) when steps 1 and 2 are on `main`. The tables with turns need step 3, and the cell card needs step 4.
 
-## Open questions
+## Answers (2026-11-09)
 
-1. **Role colours.** The request says the kind gives a colour for each part. This note gives the role name only, and the palette gives the colour, so that both themes work and no hex value is in code. Is this right?
-2. **Errors of a kind query.** Today `detectKind` swallows an error (`.catch(() => null)`). This note reports it in the note of the table and on `kinderror`, and treats the kind as having no rows. Is this right?
+The owner signed off this note on 2026-11-09. Both open questions have the answer **yes**.
+
+1. **Role colours.** The kind names the role. The palette gives the colour, under `dock.roles.<name>`. The host gives no colour.
+2. **Errors of a kind query.** The dock reports an error of a kind query with `console.error` and the event `kinderror`. The dock does not swallow it. The kind then counts as having no rows.
 
 ## Not covered
 
