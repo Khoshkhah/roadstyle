@@ -67,6 +67,8 @@ pub struct PageOptions {
     /// a Mapillary client token for the Street View window (the person can also save one in the settings)
     pub mapillary_token: String,
     pub select_color: Value,
+    /// the colours of the data dock's objects on the map (the look's `dock` section: result, selected, roles, role_series); null when the look has none
+    pub dock: Value,
     pub filter: Value,
     /// the Roads box (render's filter_control; the dashboard shows it when the filter has classes)
     pub filter_control: bool,

@@ -32,6 +32,7 @@ const BUILDINGS = [[5001n, '{"type":"Polygon","coordinates":[[[18.0015,59.3],[18
                    [5002n, '{"type":"Polygon","coordinates":[[[18.0035,59.3],[18.0045,59.3],[18.0045,59.301],[18.0035,59.301],[18.0035,59.3]]]}', "Shed"]];
 const WAYS = [[1n, '{"type":"LineString","coordinates":[[18.001,59.31],[18.002,59.31]]}', "Way 1"], [2n, '{"type":"LineString","coordinates":[[18.003,59.31],[18.004,59.31]]}', "Way 2"]];
 const MANY = Array.from({length: 25000}, (_, i) => BigInt(i + 1));
+const PAIRS = [[3n, JSON.stringify([{role: "from", geom: {type: "LineString", coordinates: [[18.001, 59.33], [18.002, 59.33]]}}, {role: "to", geom: {type: "LineString", coordinates: [[18.002, 59.33], [18.003, 59.331]]}}]), "A pair"]];
 const LANES = [[5001n, '{"type":"LineString","coordinates":[[18.001,59.32],[18.002,59.32]]}', 1]];
 const COLS = {
   "SELECT node_id, name FROM nodes": {columns: [["node_id", "BIGINT"], ["name", "VARCHAR"]], rows: NODES.map(n => [n[0], n[2]])},
@@ -44,6 +45,8 @@ const COLS = {
   "SELECT h3_cell FROM cells_null": {columns: [["h3_cell", "BIGINT"]], rows: [[9n], [5n]]},                                           // 9 has no shape
   "SELECT h3_cell FROM many_cells": {columns: [["h3_cell", "BIGINT"]], rows: MANY.map(i => [i])},
   "SELECT h3_cell FROM slow_cells": {columns: [["h3_cell", "BIGINT"]], rows: [[99999999n]]},
+  "SELECT from_edge, via_node, to_edge FROM turns": {columns: [["from_edge", "BIGINT"], ["via_node", "BIGINT"], ["to_edge", "BIGINT"]], rows: [[1n, 7n, 2n], [1n, 7n, 3n], [4n, 8n, 5n]]},
+  "SELECT pair_id FROM pairs": {columns: [["pair_id", "BIGINT"]], rows: [[3n]]},
   "SELECT bad_id FROM bad": {columns: [["bad_id", "BIGINT"]], rows: [[1n]]},
   "SELECT empty_id FROM empty": {columns: [["empty_id", "BIGINT"]], rows: [[1n]]},
   "SELECT broken_id FROM broken": {columns: [["broken_id", "BIGINT"]], rows: [[1n]]},
@@ -70,6 +73,9 @@ function answer(sql){
     return {columns: ["id", "geom", "lane_num"].map(name => ({name, type: "VARCHAR"})), rows: LANES.filter(l => ids.has(l[0]))}; }
   if((m = sql.match(/^SELECT "h3_cell" FROM \\(SELECT "h3_cell", row_number\\(\\) OVER \\(\\) AS rs_n FROM \\(([\\s\\S]*)\\) AS rs_d WHERE "h3_cell" IS NOT NULL\\) AS rs_e GROUP BY "h3_cell" ORDER BY min\\(rs_n\\)$/)))
     return {columns: [{name: "h3_cell", type: "BIGINT"}], rows: MANY.map(i => [i])};      // the distinct ids of the long result
+  if((m = sql.match(/^SELECT p\\.pair_id AS id, p\\.parts AS geom, p\\.label FROM pairs p WHERE p\\.pair_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/))) {
+    const r = answer(m[2]), i = r.columns.findIndex(c => c.name === m[1]), ids = new Set(r.rows.map(x => x[i]));
+    return {columns: ["id", "geom", "label"].map(name => ({name, type: "VARCHAR"})), rows: PAIRS.filter(x => ids.has(x[0]))}; }
   if(/FROM rs_roads WHERE/.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: []};      // no road has an osm_id of a node
   const c = COLS[strip(sql)];
   if(!c) throw new Error("Binder Error: unknown SQL");
@@ -96,6 +102,18 @@ window.data = dataDock({
         if(ids.includes(99999999n)){ await new Promise((ok) => { signal.addEventListener("abort", () => { window.aborted = true; ok(); }); setTimeout(ok, 5000); }); return []; }
         return ids.map((id) => ({id, geom: id === 9n ? null : square(id), resolution: 8}));
       }},
+    turn: {label: "Turn", idColumns: [["from_edge", "to_edge"]],      // a composite key; the parts of a turn have a role each
+      async geometryOf(ids, {column}) {
+        window.gotIds = ids; window.gotColumn = column;
+        const x = (id) => 18 + Number(id) / 1000;
+        return ids.map(([a, b]) => ({id: [a, b], turn: `${a}-${b}`, geom: [
+          {role: "from", geom: {type: "LineString", coordinates: [[x(a), 59.34], [x(a) + 0.0005, 59.34]]}},
+          {role: "via", geom: {type: "Point", coordinates: [x(a) + 0.0005, 59.34]}},
+          {role: "to", geom: {type: "LineString", coordinates: [[x(a) + 0.0005, 59.34], [x(b), 59.3405]]}},
+          ...(b === 3n ? [{role: "extra", geom: {type: "Point", coordinates: [x(b), 59.3405]}}] : [])]}));
+      }},
+    pair: {label: "Pair", idColumns: ["pair_id"],      // geometryBy: the parts come as JSON text in the second column
+      geometryBy: (sql, column) => `SELECT p.pair_id AS id, p.parts AS geom, p.label FROM pairs p WHERE p.pair_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
     bad: {label: "Bad", idColumns: ["bad_id"], geometryOf: async () => [], geometryBy: () => "SELECT 1"},      // both functions
     empty: {label: "Empty", idColumns: ["empty_id"]},                                                              // neither function
     broken: {label: "Broken", idColumns: ["broken_id"], geometryBy: () => "SELECT broken"},      // its SQL fails
@@ -389,3 +407,83 @@ def test_a_kind_with_both_functions_or_with_neither_is_skipped_and_reported(tmp_
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def _palette(name="amber"):
+    import yaml
+
+    return yaml.safe_load((ROOT / f"rust/roadstyle-assets/files/data/palettes/{name}.yaml").read_text())["dock"]
+
+
+_COLOURS = "(layer) => { const e = map.getPaintProperty(layer, 'line-color'); return Array.isArray(e) ? Object.fromEntries(e.slice(2, -1).reduce((a, v, i, l) => i % 2 ? a : [...a, [v, l[i + 1]]], [])) : e; }"
+
+
+@pytest.mark.parametrize(("theme", "width"), [("light", 1280), ("dark", 1280), ("light", 390)])
+def test_parts_with_roles_have_the_palette_colours_and_a_composite_key_is_a_row(tmp_path, theme, width):
+    """A turn is three parts (a `from` road, a `via` node, a `to` road), one row. Its key is two columns. A role has the colour of the palette in the theme; a role
+    that the palette does not name takes the first colour of `role_series`. The selected row keeps its colours over a halo."""
+    pal = _palette()
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url, width=width, height=844 if width < 500 else 800)
+        try:
+            page.evaluate(f"rsSetTheme('{theme}'); data.open(); data.run('SELECT from_edge, via_node, to_edge FROM turns')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 10")      # 3 rows of 3 parts, and 1 extra part
+            assert [list(map(str, i)) for i in page.evaluate("gotIds")] == [["1", "2"], ["1", "3"], ["4", "5"]]      # two rows with one from_edge are two objects
+            ids = page.evaluate(f"({_DRAWN})('rs-dock-kinds')")
+            assert sorted(set(i.split(":")[1] for i in ids)) == ["1|2", "1|3", "4|5"]
+            got = page.evaluate(f"({_COLOURS})('rs-dock-kinds-line')")
+            want = {r: pal["roles"][r][theme] for r in ("from", "via", "to")} | {"extra": pal["role_series"][0][theme]}
+            assert got == want, (got, want)
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dock-note')?.textContent.includes('Shown as Turn (from_edge + to_edge)')")
+            page.click("#rs-dock tbody tr >> nth=1")                                                    # the turn 1-3: it has the extra part
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length === 4")
+            assert set(i.split(":")[1] for i in page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')")) == {"1|3"}
+            assert page.evaluate("map.getLayer('rs-dock-kinds-sel-halo') !== undefined")                  # the select halo under the colours
+            assert page.evaluate("map.getPaintProperty('rs-dock-kinds-sel-halo', 'line-color')") == pal["selected"]
+            page.wait_for_function("!map.isMoving()")
+            # the camera shows every part of the turn
+            assert page.evaluate("(() => { const b = map.getBounds(); return [[18.001, 59.34], [18.003, 59.3405]].every(c => b.contains(c)); })()")
+            card = page.inner_text("#rs-dock .rs-dd-card")
+            assert "Turn 1|3" in card and all(r in card for r in ("from", "via", "to", "extra")), card
+            assert page.evaluate("document.querySelectorAll('#rs-dock .rs-dd-rc-part .rs-dd-sw').length") == 4
+            assert page.evaluate("document.documentElement.scrollWidth") <= width
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_geometry_by_gives_parts_as_json_text(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("data.open(); data.run('SELECT pair_id FROM pairs')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 2")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") == ["LineString:3", "LineString:3"]
+            pal = _palette()
+            assert page.evaluate(f"({_COLOURS})('rs-dock-kinds-line')") == {"from": pal["roles"]["from"]["light"], "to": pal["roles"]["to"]["light"]}
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_page_without_the_dock_colours_is_an_error_not_a_guess(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("window.RS_DOCK = null; data.open(); data.run()")
+            page.wait_for_function("true")
+            page.wait_for_timeout(1500)
+            assert any("window.RS_DOCK" in e for e in errors), errors
+        finally:
+            browser.close()
+
+
+def test_every_palette_has_the_dock_colours():
+    import yaml
+
+    for f in sorted((ROOT / "rust/roadstyle-assets/files/data/palettes").glob("*.yaml")):
+        d = yaml.safe_load(f.read_text())["dock"]
+        assert {"result", "selected", "roles", "role_series"} <= set(d), f.name
+        assert {"from", "via", "to"} <= set(d["roles"]) and len(d["role_series"]) >= 3, f.name
+        for pair in [d["result"], *d["roles"].values(), *d["role_series"]]:
+            assert set(pair) == {"light", "dark"}, f.name

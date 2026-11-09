@@ -142,7 +142,8 @@ fn random_changes_keep_the_tiles_only_when_they_are_the_same() {
     let a = look_json();
     let mut paths = Vec::new();
     leaves(&a, &mut Vec::new(), &mut paths);
-    paths.retain(|p| p[0] != "schema_version");
+    // the dock colours (the data dock's objects) are out of the pool: they are not in the map, and their leaves would move the seeded choices
+    paths.retain(|p| p[0] != "schema_version" && p[0] != "dock");
     let mut seed: u64 = 20261104;
     let mut next = |n: usize| {
         seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);

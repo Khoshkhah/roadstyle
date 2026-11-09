@@ -98,6 +98,7 @@ export function rsDashboard(map, options){
   if(error){ console.error(error); o.style = null; }
   fromStyle(o, given);
   initCore(map, o);
+  window.RS_DOCK = o.dock || null;      // the look's dock section: the colours of the data dock's objects (data/kinds.js)
   initTemplate();
   initTheme();
   initPanel();

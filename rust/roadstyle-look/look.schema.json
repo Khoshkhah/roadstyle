@@ -51,6 +51,17 @@
     "boundary": {
       "$ref": "#/$defs/BoundaryLook"
     },
+    "dock": {
+      "description": "the objects of the data dock on the map (the colours of its kinds); a look without this section has none",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DockLook"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "background": {
       "$ref": "#/$defs/BackgroundLook"
     },
@@ -2279,6 +2290,54 @@
         "dash",
         "color",
         "opacity"
+      ]
+    },
+    "DockLook": {
+      "description": "The objects of the data dock on the map (docs/design/dock_kinds_table_views.md): the result, the selected object, and the colour of each role\nof a part (`from`, `via`, `to`). A role with no entry takes the next colour of `role_series`.",
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/ThemeColor"
+        },
+        "selected": {
+          "$ref": "#/$defs/Color"
+        },
+        "roles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ThemeColor"
+          }
+        },
+        "role_series": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ThemeColor"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "selected",
+        "roles",
+        "role_series"
+      ]
+    },
+    "ThemeColor": {
+      "description": "A colour for the light theme and one for the dark theme.",
+      "type": "object",
+      "properties": {
+        "light": {
+          "$ref": "#/$defs/Color"
+        },
+        "dark": {
+          "$ref": "#/$defs/Color"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "light",
+        "dark"
       ]
     },
     "BackgroundLook": {

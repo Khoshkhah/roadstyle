@@ -42,6 +42,8 @@ export interface DashboardOptions {
   google_3d?: boolean;
   /** The selection colour (the theme's selection.select). */
   select_color?: string;
+  /** The look's dock section: the colours of the data dock's objects on the map (`window.RS_DOCK`): `{result, selected, roles, role_series}`; a colour is `{light, dark}`. */
+  dock?: { result: { light: string; dark: string }; selected: string; roles: Record<string, { light: string; dark: string }>; role_series: { light: string; dark: string }[] } | null;
   /** The Roads box: {on, col, classes, swatches, palettes, bridges, tunnels, access}. */
   /** The road filter's facts (roadstyle:controls.filter): the classes that rsSetClasses filters by, their colours, the access kinds. minzoom: {class: its first zoom}. */
   filter?: { classes: string[]; /** the class of each number of `__rs_ci` in a tile (the style of a tile has it): the Roads filter hides a class by its place here */ class_key?: string; class_list?: string[]; col?: string; minzoom?: Record<string, number> | null; [k: string]: unknown };

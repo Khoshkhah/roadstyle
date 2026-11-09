@@ -181,7 +181,7 @@ export function dataDock(o = {}){
   // the facts card of an item that is not a road: a title, a chip, rows of [name, value] and an id with Copy id. An overlay item (a building, a
   // crossing; Kaveh, 2026-11-07: "click on item should show info into sql panel card info") and the page's own card (`data.card`) draw it. `onClose` is
   // what the close button does.
-  function drawFacts({title, chip, rows: kv = [], id: idv = null}, onClose){
+  function drawFacts({title, chip, rows: kv = [], id: idv = null, parts = []}, onClose){
     const hd = $("div", "rs-dd-rc-hd"), x = $("button", "rs-dd-rc-x", "\u2715");
     x.type = "button"; x.title = "Close the card"; x.setAttribute("aria-label", x.title); x.onclick = onClose;
     hd.append($("b", "rs-dd-rc-name", title == null ? "" : String(title)), x);
@@ -191,12 +191,13 @@ export function dataDock(o = {}){
       if(v == null || v === "" || typeof v === "object") continue;
       const dt = $("dt", "", String(k).replace(/_/g, " ")), dd = $("dd", "", val(v)); if(String(v).length > 28) dd.title = String(v); rows.append(dt, dd);
     }
-    const foot = $("div", "rs-dd-rc-foot"), copy = $("button", "", "Copy id");
+    const foot = $("div", "rs-dd-rc-foot"), copy = $("button", "", "Copy id"), pr = $("div", "rs-dd-rc-parts");      // pr: the parts of the object, a swatch and a role for each
+    for(const [role, col] of parts){ const sw = $("i", "rs-dd-sw"), it = $("span", "rs-dd-rc-part"); sw.style.background = col; it.append(sw, role); pr.append(it); }
     copy.type = "button";
     const idt = idv == null ? "" : String(idv);
     copy.onclick = async () => { try{ await navigator.clipboard.writeText(idt); copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy id"; }, 1200); }catch(e){} };
     if(idt) foot.append($("span", "rs-dd-rc-id", `id ${idt}`), copy);
-    card.replaceChildren(hd, ...(chip ? [chips] : []), ...(rows.childElementCount ? [rows] : []), ...(foot.childElementCount ? [foot] : []));
+    card.replaceChildren(hd, ...(chip ? [chips] : []), ...(parts.length ? [pr] : []), ...(rows.childElementCount ? [rows] : []), ...(foot.childElementCount ? [foot] : []));
   }
   // an overlay item: the overlay's name, the item's name when it has one, its fields (the overlay's popup fields when it has them), and its id. The
   // close button deselects it.
@@ -339,28 +340,41 @@ export function dataDock(o = {}){
   const kindOf = (r) => (r.__kindP ||= detectKind(r).then((own) => (r.__own = own)));
   const PROBE = 200;
   // the distinct non-null values of a column in the rows of a result (at most `max`), in the order of their first row; a value keeps the type of the adapter
+  // `col` is a column name, or an array of names (a composite key: the ids are arrays of values, and a row with a null in one of them has no id)
+  const colsOf = (col) => [].concat(col), keyOfId = (id) => (Array.isArray(id) ? id.map(String).join("|") : String(id));
   function idsOf(r, col, max){
-    const i = r.columns.findIndex((c) => c.name === col), seen = new Set(), out = [];
-    for(const x of r.rows){ const v = x[i]; if(v == null || seen.has(String(v))) continue; seen.add(String(v)); out.push(v); if(out.length >= max) break; }
+    const at = colsOf(col).map((n) => r.columns.findIndex((c) => c.name === n)), seen = new Set(), out = [];
+    for(const x of r.rows){
+      const v = at.map((i) => x[i]); if(v.some((y) => y == null)) continue;
+      const id = Array.isArray(col) ? v : v[0], key = keyOfId(id); if(seen.has(key)) continue;
+      seen.add(key); out.push(id); if(out.length >= max) break;
+    }
     return out;
   }
   // the ids of a result for geometryOf: at most KIND_LIMIT, in the order of the result. A result that the table holds whole gives them from its rows; a longer one asks the database.
   async function allIds(r, col){
     if(!r.more) return {ids: idsOf(r, col, KIND_LIMIT + 1)};
-    const c = quoteId(col), q = await query(`SELECT ${c} FROM (SELECT ${c}, row_number() OVER () AS rs_n FROM (${inner(sorted(r))}) AS rs_d WHERE ${c} IS NOT NULL) AS rs_e GROUP BY ${c} ORDER BY min(rs_n)`, KIND_LIMIT);
-    return {ids: q.rows.map((x) => x[0])};
+    const cs = colsOf(col).map(quoteId), c = cs.join(", "), q = await query(`SELECT ${c} FROM (SELECT ${c}, row_number() OVER () AS rs_n FROM (${inner(sorted(r))}) AS rs_d WHERE ${cs.map((x) => x + " IS NOT NULL").join(" AND ")}) AS rs_e GROUP BY ${c} ORDER BY min(rs_n)`, KIND_LIMIT);
+    return {ids: q.rows.map((x) => (Array.isArray(col) ? x.slice(0, cs.length) : x[0]))};
   }
   // the entries of a kind -> features and facts. An entry is {id, geom, ...facts}; `geom: null` is a row with no shape (known, not drawn). With `ids`, an entry of an id that was not asked for is dropped.
+  // `geom` is one geometry, or a list of parts `[{role, geom}]` (a turn: a `from` road, a `via` node, a `to` road); every part is a feature of the row, with `rs_role`.
   function kindRows(entries, ids){
-    const features = [], facts = new Map(), want = ids ? new Set(ids.map(String)) : null;
+    const features = [], facts = new Map(), parts = new Map(), want = ids ? new Set(ids.map(keyOfId)) : null;
+    const geomOf = (g) => { if(typeof g === "string") try{ g = JSON.parse(g); }catch(err){ return undefined; } return g; };
     for(const e of entries){
-      const key = String(e.id); if(want && !want.has(key)) continue;
-      let g = e.geom; if(typeof g === "string") try{ g = JSON.parse(g); }catch(err){ continue; }
-      if(g != null && !g.type) continue;
+      const key = keyOfId(e.id); if(want && !want.has(key)) continue;
+      const g = geomOf(e.geom); if(g === undefined) continue;
+      const list = Array.isArray(g) ? g.map((x) => ({role: x.role, geom: geomOf(x.geom)})) : g == null ? [] : [{role: null, geom: g}];
+      if(list.some((x) => x.geom != null && !x.geom.type) || (g != null && !Array.isArray(g) && !g.type)) continue;
       const f = {}; for(const [k, v] of Object.entries(e)) if(k !== "id" && k !== "geom") f[k] = v;
-      facts.set(key, f); if(g) features.push({type: "Feature", properties: {rs_id: key}, geometry: g});
+      facts.set(key, f);
+      for(const x of list) if(x.geom){
+        features.push({type: "Feature", properties: x.role == null ? {rs_id: key} : {rs_id: key, rs_role: String(x.role)}, geometry: x.geom});
+        if(x.role != null) parts.set(key, [...new Set([...(parts.get(key) || []), String(x.role)])]);
+      }
     }
-    return {features, facts};
+    return {features, facts, parts};
   }
   // the entries of a kind for a result: geometryOf gets the ids, geometryBy gets the SQL. `more`: the kind found more than KIND_LIMIT objects.
   async function kindCall(c, sql, ids, signal, limit = KIND_LIMIT){
@@ -380,7 +394,7 @@ export function dataDock(o = {}){
     const cands = [];
     for(const [name, k] of KINDS){
       if(!(k.needs || []).every((n) => r.columns.some((c) => c.name === n))) continue;      // the result lacks a column that the kind needs
-      const columns = (k.idColumns || []).filter((column) => r.columns.some((c) => c.name === column));
+      const columns = (k.idColumns || []).filter((column) => colsOf(column).every((n) => r.columns.some((c) => c.name === n)));      // a composite key needs all its columns
       if(!columns.length) continue;
       if(!k.geometryOf === !k.geometryBy){ kindFail(r, name, columns[0], new Error("a kind needs geometryOf or geometryBy, and not both")); continue; }
       for(const column of columns) cands.push({name, k, column, coverage: null});
@@ -390,7 +404,7 @@ export function dataDock(o = {}){
       const ids = idsOf(r, c.column, PROBE);
       if(!ids.length){ c.coverage = 0; continue; }
       if(cands.length > 1){      // one candidate needs no probe
-        const probe = `SELECT * FROM (VALUES ${ids.map((v) => "(" + lit(v) + ")").join(", ")}) AS rs_p(${quoteId(c.column)})`;
+        const probe = `SELECT * FROM (VALUES ${ids.map((v) => "(" + [].concat(v).map(lit).join(", ") + ")").join(", ")}) AS rs_p(${colsOf(c.column).map(quoteId).join(", ")})`;
         const got = await kindCall(c, probe, ids, ctl.signal, PROBE).catch((e) => kindFail(r, c.name, c.column, e));
         c.coverage = got ? kindRows(got.entries, c.k.geometryOf ? ids : null).facts.size / ids.length : 0;
       }else c.coverage = 1;
@@ -404,17 +418,17 @@ export function dataDock(o = {}){
     catch(e){ kindFail(r, best.name, best.column, e); return none(); }
     const got = await kindCall(best, inner(r.sql), ids, ctl.signal).catch((e) => kindFail(r, best.name, best.column, e));
     if(!got || ctl.signal.aborted) return none();
-    const {features, facts} = kindRows(got.entries, ids);
+    const {features, facts, parts} = kindRows(got.entries, ids);
     if(!facts.size) return none();
     const total = ids ? ids.length : idsOf(r, best.column, KIND_LIMIT).length, coverage = total ? Math.min(1, facts.size / total) : 1;
     emit("kind", {name: best.name, column: best.column, coverage, candidates});
-    return {name: best.name, label: best.k.label || best.name, column: best.column, features, facts, more: idsMore || !!got.more, exact: !!ids, total, noShape: best.k.noShape, coverage, candidates};
+    return {name: best.name, label: best.k.label || best.name, column: best.column, features, facts, parts, more: idsMore || !!got.more, exact: !!ids, total, noShape: best.k.noShape, coverage, candidates};
   }
   // the note of the table for a result of kinds: which kind owns it, how many ids it found, the more and the errors
   function kindNote(r, own){
     const t = [];
     if(own){
-      t.push(`Shown as ${own.label} (${own.column})`);
+      t.push(`Shown as ${own.label} (${colsOf(own.column).join(" + ")})`);
       if(own.coverage < 1) t.push(`${fmt(own.facts.size)} of ${fmt(own.total)} ids found. To use another kind, select the column under the id name of that kind`);
       if(own.more) t.push(own.exact ? `the map shows the first ${fmt(KIND_LIMIT)} ids` : `the map shows ${fmt(KIND_LIMIT)} objects`);
     }
@@ -422,7 +436,7 @@ export function dataDock(o = {}){
     return t.length ? " \u00b7 " + t.join(" \u00b7 ") : "";
   }
   // the card of an object: the title is its name, else "<label> <id>"; the facts are the other columns; a column `tags` is one row for each tag
-  function kindFacts(own, key, shaped = true){
+  function kindFacts(own, key, shaped = true){      // parts: the roles of the object, with their colours (a swatch for each)
     const f = own.facts.get(key) || {}, rows = shaped ? [] : [["on the map", own.noShape ? `no: ${own.noShape}` : "no"]];      // a row with no shape (geom: null)
     for(const [k, v] of Object.entries(f)){
       if(k === "name" || k === "tags") continue;
@@ -431,15 +445,15 @@ export function dataDock(o = {}){
     let tags = f.tags; try{ if(typeof tags === "string") tags = JSON.parse(tags); }catch(e){ tags = null; }
     if(Array.isArray(tags)) tags = Object.fromEntries(tags.map((t) => [t.key, t.value]));
     if(tags && typeof tags === "object") for(const [k, v] of Object.entries(tags)) rows.push([k, v]);
-    return {title: f.name || `${own.label} ${key}`, chip: own.label, rows, id: key};
+    return {title: f.name || `${own.label} ${key}`, chip: own.label, rows, id: key, parts: (own.parts.get(key) || []).map((role) => [role, kl.colour(role)])};
   }
   // a row of such a result: the object is selected (the select look, the camera) and its facts are in the card
   function kindPick(own, r, cols){
-    const v = r[cols.findIndex((c) => c.name === own.column)]; if(v == null) return;
-    const key = String(v), f = own.features.find((x) => x.properties.rs_id === key); if(!f && !own.facts.has(key)) return;
+    const v = colsOf(own.column).map((n) => r[cols.findIndex((c) => c.name === n)]); if(v.some((y) => y == null)) return;
+    const key = keyOfId(v), fs = own.features.filter((x) => x.properties.rs_id === key); if(!fs.length && !own.facts.has(key)) return;
     rs.select(null);
-    kl.select(f || null); if(f) kl.fit(f, rs.dock.height ? rs.dock.height() : 0);
-    drawFacts(kindFacts(own, key, !!f), () => closeHostCard()); hostCard = true; showCard();
+    kl.select(fs); if(fs.length) kl.fit(fs, rs.dock.height ? rs.dock.height() : 0);
+    drawFacts(kindFacts(own, key, !!fs.length), () => closeHostCard()); hostCard = true; showCard();
   }
   async function rowClick(r, cols){
     if(kl && res && res.__own && !cols.some((c) => c.name === ID)){ kindPick(res.__own, r, cols); return; }
