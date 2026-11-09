@@ -1,6 +1,6 @@
 # Object kinds in the data dock
 
-**Status:** 2026-11-07. Signed off by Kaveh ("Yes, sign off", told to the duckOSM Studio session, with the answers at the end of this page). Nothing is built yet.
+**Status:** 2026-11-07. Signed off by Kaveh ("Yes, sign off", told to the duckOSM Studio session, with the answers at the end of this page). Step a (the hook, nodes) and the drawing of lines and areas are built (commit `60ade739`). Part 2, for every table of a duckOSM database, is [Object kinds, part 2](dock_kinds_table_views.md) (proposed 2026-11-09).
 
 ## What and why
 
