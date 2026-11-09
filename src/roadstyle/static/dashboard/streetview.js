@@ -160,12 +160,13 @@ export function initStreetView(){
           "<span>Run <code>python -m http.server</code> in its folder and open it from localhost.</span>"+
           '<a href="'+_esc(last.url)+'" target="_blank" rel="noopener">Open this spot in Google Maps \u2197</a>';
         return; }
-      // Google no longer serves a keyless embed (HTTP 404, x-frame-options SAMEORIGIN), so Classic is a link
+      // Google won't frame last.url; this is its embeddable twin (Google's "Share > Embed a map" form)
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(",");
-      const link=()=>note("<b>Google does not allow this page to show Classic Street View.</b>"+
-        '<a href="'+_esc(last.url)+'" target="_blank" rel="noopener">Open this spot in Google Maps \u2197</a>');
-      if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); link(); }); return; }
-      link();
+      const src="https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d"+vp[0]+"!2d"+vp[1]+
+                "!3f"+(u.searchParams.get("heading")||0)+"!4f0!5f1";
+      const embed=()=>{ if(fr.getAttribute("src")!==src) fr.src=src; fr.hidden=false; msg.hidden=true; hideP(); };
+      if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); embed(); }); return; }
+      embed();
     };
     const steps=[...bar.querySelectorAll("button[data-step]")];
     const ends=(a, z)=>{ steps[0].disabled=!!a; steps[1].disabled=!!z; };

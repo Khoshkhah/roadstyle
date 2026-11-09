@@ -203,7 +203,8 @@ Events on `document`: `rs:select` (`e.detail.properties`, and `e.detail.streetVi
 Street View URL facing the edge's direction, or null; an overlay click sets `e.detail.overlay`,
 a road click doesn't - test that, not `e.detail.layer`, which differs between click and `rsSelect`), `rs:deselect`, `rs:colorchange`,
 `rs:filterchange`, `rs:basemapchange`. `window.map` is the MapLibre map. Every event with its `detail`:
-`docs/reference/javascript.md`. Street View *inside* a custom page: Google blocks the `detail.streetView` URL in iframes, and its keyless `maps/embed` form is dead (404). Show a link to `detail.streetView`, or use `rs.sidebar_html("street_view")`. Add your own panel by
+`docs/reference/javascript.md`. Street View *inside* a custom page: Google blocks the `detail.streetView` URL in iframes; convert it to a
+`google.com/maps/embed?pb=` one as `rs.sidebar_html("street_view")` does. Add your own panel by
 inserting HTML before `</body>` in `m.html` (example and traps: `docs/reference/javascript.md`, "Drive the map from your own page").
 
 ## Traps (each one cost a real bug)
