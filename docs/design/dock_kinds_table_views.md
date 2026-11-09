@@ -174,7 +174,15 @@ Rules:
 - The dock adds the id line and **Copy id** as before.
 - The event `cardaction` (`{ kind, id }`) tells the host that the button was used.
 
-**Default that keeps old hosts working.** A kind with no `card` gets the card of part 1. A road keeps its own card; this note does not change it.
+**Default that keeps old hosts working.** A kind with no `card` gets the card of part 1.
+
+**The row of a road result (added 2026-11-10, part of step 4).** A result with `edge_id` is a road result. A click on its row selected the road, and the card was the road's card. The other columns of the clicked row were lost: `width_m` and `lane_num` of `lane_profile`, `route_id`, `seq` and `bus_lane` of `route_edges`, the level fields of `edge_levels`. Now the card is the road's card and, under it, a section **This row** with the columns of the clicked row:
+
+- All columns of the row are in the section, in the order of the result, with the values as the table shows them: a `BigInt` and a text as they are, `null` as `null`, a number with at most 3 decimals. Only a geometry column (`geometry`, `geom`) is left out, because the map draws it.
+- A column that the road card already shows with the same value is left out: `edge_id` (the id line), `name`, `highway`, `maxspeed_kmh`, and `oneway`, `driving`, `walking`, `cycling` when they are true, and each other column of the card's list with an equal value. The length in the chip is rounded, so `length_m` stays in the section.
+- When no column is left, there is no section. A result of the road's own columns (`edges`) shows no section.
+- The section comes only from a click on a row of the table. A click on the map, a selection by Ask or by the page has no row, so it has no section. A row with an osm key (`osm_id`, `name`, through `roadsBy`) is not changed.
+- Test: a result of `lane_profile` (several rows for one road): the card has `width_m` and `lane_num`, with the second lane of the same road showing its own values; a 64-bit id stays exact; a result of the road's own columns has no section; a click on the map has none.
 
 **Style.** Sections and the action reuse the classes of the card (`rs-dd-rc-*`) and the tokens of both themes. New classes `rs-dd-rc-sec` and `rs-dd-rc-act` go in `dashboard.css`, in `docs/guides/dashboard-parts.md`, in `tests/test_dashboard_themes_browser.py` (contrast, no light surface in the dark theme) and in `tests/test_dashboard_scroll_browser.py` if the card scrolls. No native tooltip and no native select.
 
@@ -232,6 +240,5 @@ The owner signed off this note on 2026-11-09. Both open questions have the answe
 
 ## Not covered
 
-- The card of a road (`drawCard`): the road lane (`lane_profile`) has `edge_id`, so it takes the road path, and its `lane_num` is not in the road card. A change of the road card is a separate design.
 - Ask's tools for kinds (step e of part 1).
 - A button "Fit to all objects" for a large result.
