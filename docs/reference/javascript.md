@@ -208,6 +208,7 @@ Read-only globals for building your own controls.
 | `RS_CLASSES` | the road classes in the filter, in order |
 | `RS_CLASS_COL` | the column `RS_CLASSES` came from |
 | `RS_CLASS_COLORS` | `{class: fill colour}` |
+| `RS_DOCK` | the look's `dock` section: `{result, selected, roles, role_series}`, the colours of the data dock's objects on the map (`{light, dark}` each); the kinds of the dock need it |
 | `RS_COLOR_OPTIONS` | `[{name, prop, legend}]`, the `color_options` entries |
 | `RS_TUNNEL_TOWARDS` | `{name: "#rrggbb"}`, the colours a tunnel can move toward |
 | `RS_TUNNEL_PALETTES` | `{name: [dash, gap] or null}`, the tunnel casing palettes (`null`: one colour) |

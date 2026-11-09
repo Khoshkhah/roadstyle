@@ -62,6 +62,9 @@ pub struct Sections {
     pub data: DataLook,
     pub overlays: OverlayLook,
     pub boundary: BoundaryLook,
+    /// the objects of the data dock on the map (the colours of its kinds); a look without this section has none
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dock: Option<DockLook>,
     pub background: BackgroundLook,
     /// the dark theme of the style's layers (`rs_theme` "dark"): how each light colour is turned dark
     #[serde(default)]
@@ -430,6 +433,27 @@ impl Default for DarkLook {
     }
 }
 
+/// A colour for the light theme and one for the dark theme.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct ThemeColor {
+    pub light: Color,
+    pub dark: Color,
+}
+
+/// The objects of the data dock on the map (docs/design/dock_kinds_table_views.md): the result, the selected object, and the colour of each role
+/// of a part (`from`, `via`, `to`). A role with no entry takes the next colour of `role_series`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DockLook {
+    pub result: ThemeColor,
+    pub selected: Color,
+    pub roles: IndexMap<String, ThemeColor>,
+    pub role_series: Vec<ThemeColor>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -547,8 +571,8 @@ impl LookFile {
 }
 
 /// The theme sections of a look of version 1 that are sections of version 2 as they are.
-const THEME: [&str; 14] = ["roads", "casing", "labels", "arrows", "bridges", "tunnels", "selection", "data", "overlays", "boundary",
-                           "background", "access", "palettes", "active"];
+const THEME: [&str; 15] = ["roads", "casing", "labels", "arrows", "bridges", "tunnels", "selection", "data", "overlays", "boundary",
+                           "dock", "background", "access", "palettes", "active"];
 
 fn bad(what: &str, e: impl std::fmt::Display) -> Error {
     Error::Look(format!("look: {what}: {e}"))

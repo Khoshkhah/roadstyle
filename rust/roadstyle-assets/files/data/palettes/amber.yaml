@@ -26,5 +26,13 @@ selection: {hover: "#b388ff", select: "#7c4dff", casing: "#000000", opacity: 0.8
 data: {nodata: "#cccccc", color_table: "#bbbbbb", live_ramp: ["#3b82f6", "#06b6d4", "#22c55e", "#eab308", "#f97316", "#ef4444", "#be123c"], opacity: 0.9, casing_opacity: 0.75}
 overlays: {color: "#6aa9ff", circle_stroke: "#ffffff", fill_opacity: 0.15, circle_opacity: 0.85, line_opacity: 0.9, outline_opacity: 0.9}
 boundary: {color: "#6a0dad", opacity: 0.9}
+dock:   # the data dock's objects on the map, light and dark (docs/design/dock_kinds_table_views.md): the result, the selected object, and one colour for each role of a part
+  result: {light: "#2563eb", dark: "#5aa9f8"}
+  selected: "#7c4dff"
+  roles:
+    from: {light: "#16a34a", dark: "#4ade80"}
+    via: {light: "#d97706", dark: "#fbbf24"}
+    to: {light: "#e11d48", dark: "#fb7185"}
+  role_series: [{light: "#0d9488", dark: "#2dd4bf"}, {light: "#db2777", dark: "#f472b6"}, {light: "#65a30d", dark: "#a3e635"}, {light: "#9333ea", dark: "#c084fc"}]
 background: {light: "#e8e6e1", dark: "#0e1113"}
 access: {private: "#c8c8c8", bus: "#9db8d9", pedestrian: "#dddde8", delivery: "#e8d2b0"}     # access_col: the fill of a road that no mode may use

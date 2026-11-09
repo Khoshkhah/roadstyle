@@ -100,6 +100,10 @@ fn the_64_looks_of_mapstyle() {
         if let Some(s) = got.pointer_mut("/theme/roads/split").and_then(Value::as_object_mut) {
             s.shift_remove("overlap_px");
         }
+        // added on 2026-11-09: the palette's dock section, the colours of the data dock's objects (docs/design/dock_kinds_table_views.md)
+        if let Some(t) = got.get_mut("theme").and_then(Value::as_object_mut) {
+            t.shift_remove("dock");
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }
