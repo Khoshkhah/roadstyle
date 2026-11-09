@@ -1168,6 +1168,9 @@ html.rs-phone .rs-dd-side.empty{display:none}
 .rs-dd-rc-rows dt{color:var(--mut);white-space:nowrap}
 .rs-dd-rc-rows dd{margin:0;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rs-dd-rc-foot{display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px solid var(--line)}
+.rs-dd-rc-parts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--mut)}      /* the parts of an object (a turn): a swatch of the role's colour and the role */
+.rs-dd-rc-part{display:inline-flex;align-items:center;gap:5px}
+.rs-dd-rc-part .rs-dd-sw{width:14px;height:8px}
 .rs-dd-rc-id{flex:1;min-width:0;color:var(--mut);font:11px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #rs-dock .rs-dd-rc-foot button{padding:2px 8px;font-size:11.5px}
 .rs-dd-card[hidden]{display:none}

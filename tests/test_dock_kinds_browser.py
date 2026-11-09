@@ -76,7 +76,7 @@ function answer(sql){
   if((m = sql.match(/^SELECT p\\.pair_id AS id, p\\.parts AS geom, p\\.label FROM pairs p WHERE p\\.pair_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/))) {
     const r = answer(m[2]), i = r.columns.findIndex(c => c.name === m[1]), ids = new Set(r.rows.map(x => x[i]));
     return {columns: ["id", "geom", "label"].map(name => ({name, type: "VARCHAR"})), rows: PAIRS.filter(x => ids.has(x[0]))}; }
-  if(/FROM rs_roads WHERE.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: []};      // no road has an osm_id of a node
+  if(/FROM rs_roads WHERE/.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: []};      // no road has an osm_id of a node
   const c = COLS[strip(sql)];
   if(!c) throw new Error("Binder Error: unknown SQL");
   return {columns: c.columns.map(([name, type]) => ({name, type})), rows: c.rows};
