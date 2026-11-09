@@ -51,7 +51,7 @@ host gives them to `rsDashboard` itself.
 | `simple` | the id of the one road layer of simple mode (`roads-simple`) |
 | `pitch_3d` | the camera's tilt in 3D |
 | `select_color` | the colour of a selected road (also the Google 3D line) |
-| `dock` | the colours of the data dock's objects on the map: `{result, selected, roles, role_series}` (the palette's `dock` section; a colour is `{light, dark}`) |
+| `dock` | the colours of the data dock's objects on the map: `{result, selected, roles, role_series}` (the palette's `dock` section; a colour is `{light, dark}`). The features of the dock's objects (`data/kinds.js`) have the property `rs_role` (the role of a part, which sets its colour) |
 | `filter` | the road filter (the facts that `rsSetClasses` and the colour box's class legend read): `{col, classes, access, swatches, bridges, tunnels, minzoom}`, and `palettes` with a view's palette. `minzoom`: `{class: zoom}`, the first zoom of each class of `classes` that the class minzoom hides below a zoom; null when the minzoom is off (`minzoom=False`) |
 | `color_active` | the colour option at the start |
 | `overlays` | the Layers box: `[{label, source, layers, hit, visible, color, popup, popup_window, tooltip, under, base, select, interactive}]`; a base-map layer also has `kinds` (`[[kind, count], ...]`, most first) and, with a 3D layer, `extrude` (that layer's id) |
