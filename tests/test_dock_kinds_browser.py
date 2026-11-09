@@ -44,6 +44,7 @@ const COLS = {
   "SELECT h3_cell FROM cells": {columns: [["h3_cell", "BIGINT"]], rows: [[9223372036854775807n], [9223372036854775807n], [5n]]},      // a repeated id and a 64-bit id
   "SELECT h3_cell FROM cells_null": {columns: [["h3_cell", "BIGINT"]], rows: [[9n], [5n]]},                                           // 9 has no shape
   "SELECT h3_cell FROM many_cells": {columns: [["h3_cell", "BIGINT"]], rows: MANY.map(i => [i])},
+  "SELECT h3_cell FROM card_cells": {columns: [["h3_cell", "BIGINT"]], rows: [[5n], [6n], [7n], [8n], [10n]]},
   "SELECT h3_cell FROM slow_cells": {columns: [["h3_cell", "BIGINT"]], rows: [[99999999n]]},
   "SELECT from_edge, via_node, to_edge FROM turns": {columns: [["from_edge", "BIGINT"], ["via_node", "BIGINT"], ["to_edge", "BIGINT"]], rows: [[1n, 7n, 2n], [1n, 7n, 3n], [4n, 8n, 5n]]},
   "SELECT pair_id FROM pairs": {columns: [["pair_id", "BIGINT"]], rows: [[3n]]},
@@ -101,6 +102,17 @@ window.data = dataDock({
         window.gotIds = ids; window.gotColumn = column;
         if(ids.includes(99999999n)){ await new Promise((ok) => { signal.addEventListener("abort", () => { window.aborted = true; ok(); }); setTimeout(ok, 5000); }); return []; }
         return ids.map((id) => ({id, geom: id === 9n ? null : square(id), resolution: 8}));
+      },
+      card(info) {      // the card of the cell 5 is a whole card; 6 is slow; 7 fails; 8 is very slow; 10 has an action that fails; the others have the default card
+        const id = String(info.id);
+        if(id === "5") return {title: "Cell five", chip: "H3 cell \u00b7 res 8", rows: [["resolution", 8], ["empty", null]],
+          sections: [{title: "Inside", rows: [["nodes", 143], ["edges", 12]]}, {title: "Parent", rows: [["cell", "8a2a1072b59ffff"]]}],
+          action: {label: "Show cell", note: "Draws the cell on the map.", run: () => { window.actionRuns = (window.actionRuns || 0) + 1; return square(777n); }}};
+        if(id === "6") return new Promise((ok) => setTimeout(() => ok({sections: [{title: "Inside", rows: [["nodes", 7]]}]}), 600));
+        if(id === "7") return Promise.reject(new Error("the count failed"));
+        if(id === "8") return new Promise((ok) => setTimeout(() => ok({title: "Slow cell eight"}), 2500));
+        if(id === "10") return {action: {label: "Break", run: () => { throw new Error("no cell for this row"); }}};
+        return undefined;
       }},
     turn: {label: "Turn", idColumns: [["from_edge", "to_edge"]],      // a composite key; the parts of a turn have a role each
       async geometryOf(ids, {column}) {
@@ -120,7 +132,7 @@ window.data = dataDock({
   },
   sql: "SELECT node_id, name FROM nodes",
 });
-for(const n of ["kind", "kinderror"]) data.addEventListener(n, (e) => window.events.push([n, e.detail]));
+for(const n of ["kind", "kinderror", "cardaction"]) data.addEventListener(n, (e) => window.events.push([n, e.detail]));
 window.hostReady = true;
 </script>"""
 
@@ -487,3 +499,97 @@ def test_every_palette_has_the_dock_colours():
         assert {"from", "via", "to"} <= set(d["roles"]) and len(d["role_series"]) >= 3, f.name
         for pair in [d["result"], *d["roles"].values(), *d["role_series"]]:
             assert set(pair) == {"light", "dark"}, f.name
+
+
+_CONTRAST = """([sel, dark]) => {
+  const rgb = (c) => c.match(/[\\d.]+/g).map(Number), lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const bg = (el) => { for(let e = el; e; e = e.parentElement){ const c = rgb(getComputedStyle(e).backgroundColor); if(c.length < 4 || c[3] > 0.5) return c.length < 4 || c[3] > 0 ? c : [255, 255, 255]; } return [255, 255, 255]; };
+  const out = [];
+  for(const el of document.querySelectorAll(sel)){
+    const b = bg(el), f = rgb(getComputedStyle(el).color), l1 = lum(f), l2 = lum(b);
+    out.push({text: el.textContent, ratio: (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05), bgLum: l2});
+  }
+  return out;
+}"""
+
+
+@pytest.mark.parametrize(("theme", "width"), [("light", 1280), ("dark", 1280), ("light", 390)])
+def test_a_kind_card_has_sections_and_one_action(tmp_path, theme, width):
+    """The card of a kind (`card(info)`): the title, the chip, the rows, the sections, then one block with a button, then the id. The button calls `run`, which
+    gives a geometry: it is drawn with the object, in the select look, and the camera shows both. The text has a contrast of 4.5 in both themes."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url, width=width, height=844 if width < 500 else 800)
+        try:
+            page.evaluate(f"rsSetTheme('{theme}'); data.open(); data.run('SELECT h3_cell FROM card_cells')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 5")
+            page.click("#rs-dock tbody tr >> nth=0")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'Cell five'")
+            assert page.evaluate("[...document.querySelector('#rs-dock .rs-dd-card').children].map(e => e.className)") == [
+                "rs-dd-rc-hd", "rs-dd-rc-chips", "rs-dd-rc-rows", "rs-dd-rc-sec", "rs-dd-rc-sec", "rs-dd-rc-act", "rs-dd-rc-foot"]
+            card = page.inner_text("#rs-dock .rs-dd-card")
+            assert "H3 cell \u00b7 res 8" in card and "resolution" in card and "empty" not in card, card      # a null row is left out
+            assert page.evaluate("[...document.querySelectorAll('#rs-dock .rs-dd-rc-sec-t')].map(e => e.textContent)") == ["Inside", "Parent"]
+            assert page.inner_text("#rs-dock .rs-dd-rc-act") .startswith("Draws the cell on the map.") and "Show cell" in page.inner_text("#rs-dock .rs-dd-rc-act")
+            for sel in (".rs-dd-rc-sec-t", ".rs-dd-rc-act-t", ".rs-dd-rc-act button", ".rs-dd-rc-rows dt"):
+                for c in page.evaluate(f"({_CONTRAST})(['#rs-dock {sel}', {str(theme == 'dark').lower()}])"):
+                    assert c["ratio"] >= 4.5, (sel, c)
+                    assert theme == "light" or c["bgLum"] < 0.2, (sel, c)                                      # no light surface in the dark theme
+            assert page.evaluate("document.documentElement.scrollWidth") <= width
+            # the button: run once, the cell far away is drawn with the object, the camera shows both
+            page.click("#rs-dock .rs-dd-rc-act button")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length === 2")
+            assert page.evaluate("actionRuns") == 1 and page.evaluate("events.filter(e => e[0] === 'cardaction').map(e => e[1])") == [{"kind": "cell", "id": "5"}]
+            page.wait_for_function("!map.isMoving()")
+            assert page.evaluate("(() => { const b = map.getBounds(); return [[18.0005, 59.3], [18.0777, 59.3]].every(c => b.contains(c)); })()")
+            # the close button removes the object and what the action drew
+            page.click("#rs-dock .rs-dd-rc-x")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length === 0")
+            assert len(page.evaluate(f"({_DRAWN})('rs-dock-kinds')")) == 5
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_an_async_card_loads_and_a_newer_selection_wins(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        logs = []
+        page.on("console", lambda m: logs.append(m.text) if m.type == "error" else None)
+        try:
+            page.evaluate("data.open(); data.run('SELECT h3_cell FROM card_cells')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 5")
+            page.click("#rs-dock tbody tr >> nth=1")                                                         # the cell 6: slow
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-card')?.textContent.includes('Loading')")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-sec-t')?.textContent === 'Inside'")
+            assert "Loading" not in page.inner_text("#rs-dock .rs-dd-card") and "nodes" in page.inner_text("#rs-dock .rs-dd-card")
+            # a rejected promise shows its message, and the console has it
+            page.click("#rs-dock tbody tr >> nth=2")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-note.err')?.textContent === 'the count failed'")
+            assert any("the count failed" in t for t in logs), logs
+            # a slow card (cell 8) and a click on the cell 5 at once: the card of the cell 5 stays when the slow one comes
+            page.click("#rs-dock tbody tr >> nth=3")
+            page.click("#rs-dock tbody tr >> nth=0")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'Cell five'")
+            page.wait_for_timeout(3000)
+            assert page.inner_text("#rs-dock .rs-dd-rc-name") == "Cell five"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_an_action_that_fails_shows_its_message(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        logs = []
+        page.on("console", lambda m: logs.append(m.text) if m.type == "error" else None)
+        try:
+            page.evaluate("data.open(); data.run('SELECT h3_cell FROM card_cells')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 5")
+            page.click("#rs-dock tbody tr >> nth=4")                                                         # the cell 10: the action breaks
+            page.click("#rs-dock .rs-dd-rc-act button")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-act .rs-dd-rc-note.err')?.textContent === 'no cell for this row'")
+            assert any("no cell for this row" in t for t in logs), logs
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == ["Polygon:10"]                        # the object stays selected
+        finally:
+            browser.close()
+    assert errors == [], errors
