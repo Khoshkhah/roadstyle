@@ -45,6 +45,7 @@ const COLS = {
   "SELECT h3_cell FROM cells_null": {columns: [["h3_cell", "BIGINT"]], rows: [[9n], [5n]]},                                           // 9 has no shape
   "SELECT h3_cell FROM many_cells": {columns: [["h3_cell", "BIGINT"]], rows: MANY.map(i => [i])},
   "SELECT h3_cell FROM card_cells": {columns: [["h3_cell", "BIGINT"]], rows: [[5n], [6n], [7n], [8n], [10n]]},
+  "SELECT h3_cell FROM cells_missing": {columns: [["h3_cell", "BIGINT"]], rows: [[5n], [123456n]]},
   "SELECT h3_cell FROM slow_cells": {columns: [["h3_cell", "BIGINT"]], rows: [[99999999n]]},
   "SELECT from_edge, via_node, to_edge FROM turns": {columns: [["from_edge", "BIGINT"], ["via_node", "BIGINT"], ["to_edge", "BIGINT"]], rows: [[1n, 7n, 2n], [1n, 7n, 3n], [4n, 8n, 5n]]},
   "SELECT pair_id FROM pairs": {columns: [["pair_id", "BIGINT"]], rows: [[3n]]},
@@ -83,7 +84,7 @@ function answer(sql){
   return {columns: c.columns.map(([name, type]) => ({name, type})), rows: c.rows};
 }
 window.queries = []; window.events = []; window.gotIds = null; window.gotColumn = null; window.aborted = false;
-const square = (id) => { const x = 18 + Number(BigInt(id) % 1000n) / 10000; return {type: "Polygon", coordinates: [[[x, 59.3], [x + 0.0005, 59.3], [x + 0.0005, 59.3005], [x, 59.3005], [x, 59.3]]]}; };
+const square = (id) => { const x = 18 + Number(BigInt(id) % 1000n) / 10000, y = 59.3 + Number((BigInt(id) / 1000n) % 100n) * 0.001; return {type: "Polygon", coordinates: [[[x, y], [x + 0.00008, y], [x + 0.00008, y + 0.00008], [x, y + 0.00008], [x, y]]]}; };
 window.data = dataDock({
   query: async (sql) => { window.queries.push(sql); return answer(sql); },
   schema: async () => ({tables: [{name: "main.nodes", rows: 3, about: "The nodes."}]}),
@@ -101,7 +102,7 @@ window.data = dataDock({
       async geometryOf(ids, {column, signal}) {
         window.gotIds = ids; window.gotColumn = column;
         if(ids.includes(99999999n)){ await new Promise((ok) => { signal.addEventListener("abort", () => { window.aborted = true; ok(); }); setTimeout(ok, 5000); }); return []; }
-        return ids.map((id) => ({id, geom: id === 9n ? null : square(id), resolution: 8}));
+        return ids.filter((id) => id !== 123456n).map((id) => ({id, geom: id === 9n ? null : square(id), resolution: 8}));      // 123456 has no entry
       },
       card(info) {      // the card of the cell 5 is a whole card; 6 is slow; 7 fails; 8 is very slow; 10 has an action that fails; the others have the default card
         const id = String(info.id);
@@ -590,6 +591,122 @@ def test_an_action_that_fails_shows_its_message(tmp_path):
             page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-act .rs-dd-rc-note.err')?.textContent === 'no cell for this row'")
             assert any("no cell for this row" in t for t in logs), logs
             assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == ["Polygon:10"]                        # the object stays selected
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def _xy(page, lon, lat):
+    page.evaluate("new Promise(ok => { map.once('idle', ok); map.triggerRepaint(); })")
+    return page.evaluate(f"(() => {{ const r = map.getCanvas().getBoundingClientRect(), p = map.project([{lon}, {lat}]); return [r.left + p.x, r.top + p.y]; }})()")
+
+
+@pytest.mark.parametrize(("theme", "width"), [("light", 1280), ("dark", 1280), ("light", 390)])
+def test_a_click_on_an_object_on_the_map_selects_it_and_marks_its_row(tmp_path, theme, width):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url, width=width, height=844 if width < 500 else 800)
+        try:
+            page.evaluate(f"rsSetTheme('{theme}'); data.open(); data.run()")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 3")
+            page.evaluate("map.jumpTo({center: [18.005, 59.305], zoom: 16.5})")                              # on the node C (a phone shows only the middle)
+            x, y = _xy(page, 18.005, 59.305)
+            page.mouse.click(x + 4, y + 3)                                                                # a little beside it: the box of 6 px
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'Node C'")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == ["Point:3"]
+            assert page.evaluate("[...document.querySelectorAll('#rs-dock tbody tr.on')].map(tr => tr.dataset.i)") == ["2"]      # its row is marked
+            # a click on empty map is a click on empty map, as before: the object is deselected and no new card opens
+            page.wait_for_function("!map.isMoving()")
+            empty = page.evaluate("""() => { const r = map.getCanvas().getBoundingClientRect();      // a point of the canvas with nothing on it and no feature under it
+              for(let y = r.top + 40; y < r.bottom - 40; y += 25) for(let x = r.left + 40; x < r.right - 40; x += 25)
+                if(document.elementFromPoint(x, y) === map.getCanvas() && !map.queryRenderedFeatures([[x - r.left - 12, y - r.top - 12], [x - r.left + 12, y - r.top + 12]]).length) return [x, y];
+              return null; }""")
+            assert empty, "no empty point on the map"
+            page.mouse.click(*empty)
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length === 0")
+            assert len(page.evaluate(f"({_DRAWN})('rs-dock-kinds')")) == 3                                  # the lit objects stay
+            assert page.evaluate("document.documentElement.scrollWidth") <= width
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_click_a_few_pixels_from_a_thin_line_selects_the_whole_object(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("data.open(); data.run('SELECT pair_id FROM pairs')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 2")
+            page.evaluate("map.jumpTo({center: [18.002, 59.33], zoom: 17})")
+            x, y = _xy(page, 18.0015, 59.33)                                                              # on the `from` line
+            page.mouse.click(x, y - 5)
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'Pair 3'")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == ["LineString:3", "LineString:3"]   # both parts
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_row_with_no_object_gets_a_card_with_the_reason(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("data.open(); data.run('SELECT h3_cell FROM cells_missing')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 1")
+            assert "1 of 2 ids found" in _note(page), _note(page)
+            page.click("#rs-dock tbody tr >> nth=1")                                                      # the id 123456: the kind has no entry for it
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'H3 cell 123456'")
+            assert "no object found for this row" in page.inner_text("#rs-dock .rs-dd-card")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == []
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_the_table_marks_a_row_far_down_a_long_table(tmp_path):
+    """rs.dock.table(...).choose(match): the row is marked and scrolled to, and a long table draws it."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            out = page.evaluate("""() => {
+              const rows = Array.from({length: 5000}, (_, i) => [BigInt(i + 1), "row " + (i + 1)]);
+              const t = rs.dock.table({columns: [{name: "n", type: "BIGINT"}, {name: "label", type: "VARCHAR"}], rows, onRow: () => {}});
+              t.el.style.cssText = "position:fixed;left:0;top:0;width:400px;height:200px;overflow:auto;z-index:99999";
+              document.body.append(t.el);
+              const i = t.choose((r) => r[0] === 4000n);
+              const on = t.el.querySelector("tr.on"), box = t.el.getBoundingClientRect(), tr = on && on.getBoundingClientRect();
+              const miss = t.choose((r) => r[0] === 99999n);
+              return {i, onI: on && on.dataset.i, visible: !!tr && tr.top >= box.top - 1 && tr.bottom <= box.bottom + 1, scrolled: t.el.scrollTop, miss, left: t.el.querySelectorAll("tr.on").length};
+            }""")
+            assert out["i"] == 3999 and out["onI"] == "3999" and out["visible"] and out["scrolled"] > 100_000, out
+            assert out["miss"] == -1 and out["left"] == 0, out                                              # no row: the mark goes
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_20000_objects_draw_and_one_click_selects_one(tmp_path):
+    """The limit of the map: 20 000 objects (hexagon-sized squares here). The test records the time to draw them and the time from a click on the map to the card."""
+    import time
+
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            t0 = time.time()
+            page.evaluate("data.open(); data.run('SELECT h3_cell FROM many_cells')")
+            page.wait_for_function("map.getSource('rs-dock-kinds') && map.getSource('rs-dock-kinds').serialize().data.features.length === 19999", timeout=90_000)      # id 9 has no shape
+            drawn = time.time() - t0
+            page.evaluate("map.jumpTo({center: [18.02344, 59.30104], zoom: 18})")
+            x, y = _xy(page, 18.02344, 59.30104)                                                          # the middle of the square of the id 1234
+            t1 = time.time()
+            page.mouse.click(x, y)
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'H3 cell 1234'", timeout=30_000)
+            clicked = time.time() - t1
+            print(f"20 000 objects: drawn in {drawn:.1f} s, a click to the card in {clicked:.1f} s")
+            assert drawn < 60 and clicked < 10, (drawn, clicked)
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == ["Polygon:1234"]
+            # Reset removes the objects and the selection
+            page.click("#rs-dock .rs-dd-q button[title='Reset the map and the table']")
+            page.wait_for_function("map.getSource('rs-dock-kinds').serialize().data.features.length === 0 && map.getSource('rs-dock-kinds-sel').serialize().data.features.length === 0")
         finally:
             browser.close()
     assert errors == [], errors

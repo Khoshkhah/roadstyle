@@ -4,7 +4,7 @@
 // sets its height. On a phone (rs-phone) it is a bottom sheet, one sheet at a time (windows.js), and a closed dock is a small round button.
 //
 //   rs.dock.add({id, label, el, note, actions, closable}) | remove(id) | open(id?) | close() | isOpen() | show(id) | note(id, text) | height(px?) | list()
-//   rs.dock.table({columns, rows, idColumn, more, onSort}) -> {el, set({columns, rows, more}), rows()}
+//   rs.dock.table({columns, rows, idColumn, more, onSort}) -> {el, set({columns, rows, more}), rows(), sort(), clear(), choose(match)}
 //   event rs:dockchange {open, id, height}
 import {map} from "./core.js";
 // (one closure: the dashboard's modules join into one script, so the names stay inside)
@@ -210,7 +210,16 @@ export const rsDock = (() => {
     set({});
     // clear(): no row is selected (the host closed its card)
     const clear = () => { picked = null; pickedRow = null; tb.querySelectorAll("tr.rs-dock-id.on").forEach(tr => tr.classList.remove("on")); };
-    return {el: box, set, rows: () => data, sort: () => sort, clear};
+    // choose(match): mark the first row for which match(row, columns) is true, and scroll to it (a long table draws only the rows in view). It gives the index of the row, or -1.
+    const choose = (match) => {
+      const i = data.findIndex((r) => match(r, cols));
+      pickedRow = i < 0 ? null : data[i]; picked = null;
+      if(i >= 0 && data.length > WINDOW){ box.scrollTop = Math.max(0, i * ROW_H - box.clientHeight / 2); drawBody(); }
+      mark();
+      if(i >= 0 && data.length <= WINDOW){ const tr = tb.querySelector(`tr[data-i="${i}"]`); if(tr && tr.scrollIntoView) tr.scrollIntoView({block: "nearest"}); }
+      return i;
+    };
+    return {el: box, set, rows: () => data, sort: () => sort, clear, choose};
   }
 
   return {add, remove, open, close, isOpen, show, note, height, list: () => [...items.keys()], table, top: dockTop};
