@@ -31,6 +31,7 @@ const NODES = [[1n, '{"type":"Point","coordinates":[18.001,59.305]}', "Node A", 
 const BUILDINGS = [[5001n, '{"type":"Polygon","coordinates":[[[18.0015,59.3],[18.0025,59.3],[18.0025,59.301],[18.0015,59.301],[18.0015,59.3]]]}', "House"],
                    [5002n, '{"type":"Polygon","coordinates":[[[18.0035,59.3],[18.0045,59.3],[18.0045,59.301],[18.0035,59.301],[18.0035,59.3]]]}', "Shed"]];
 const WAYS = [[1n, '{"type":"LineString","coordinates":[[18.001,59.31],[18.002,59.31]]}', "Way 1"], [2n, '{"type":"LineString","coordinates":[[18.003,59.31],[18.004,59.31]]}', "Way 2"]];
+const MANY = Array.from({length: 25000}, (_, i) => BigInt(i + 1));
 const LANES = [[5001n, '{"type":"LineString","coordinates":[[18.001,59.32],[18.002,59.32]]}', 1]];
 const COLS = {
   "SELECT node_id, name FROM nodes": {columns: [["node_id", "BIGINT"], ["name", "VARCHAR"]], rows: NODES.map(n => [n[0], n[2]])},
@@ -39,6 +40,12 @@ const COLS = {
   "SELECT osm_id FROM mixed_ids": {columns: [["osm_id", "BIGINT"]], rows: [[1n], [5001n], [5002n]]},      // 1 is a node, 5001 and 5002 are buildings
   "SELECT osm_id FROM both_ids": {columns: [["osm_id", "BIGINT"]], rows: [[1n], [2n]]},                     // a node and a way each: the full coverage of two kinds
   "SELECT osm_id, lane_num FROM lane_ids": {columns: [["osm_id", "BIGINT"], ["lane_num", "INTEGER"]], rows: [[5001n, 1]]},
+  "SELECT h3_cell FROM cells": {columns: [["h3_cell", "BIGINT"]], rows: [[9223372036854775807n], [9223372036854775807n], [5n]]},      // a repeated id and a 64-bit id
+  "SELECT h3_cell FROM cells_null": {columns: [["h3_cell", "BIGINT"]], rows: [[9n], [5n]]},                                           // 9 has no shape
+  "SELECT h3_cell FROM many_cells": {columns: [["h3_cell", "BIGINT"]], rows: MANY.map(i => [i])},
+  "SELECT h3_cell FROM slow_cells": {columns: [["h3_cell", "BIGINT"]], rows: [[99999999n]]},
+  "SELECT bad_id FROM bad": {columns: [["bad_id", "BIGINT"]], rows: [[1n]]},
+  "SELECT empty_id FROM empty": {columns: [["empty_id", "BIGINT"]], rows: [[1n]]},
   "SELECT broken_id FROM broken": {columns: [["broken_id", "BIGINT"]], rows: [[1n]]},
   "SELECT 1 AS one": {columns: [["one", "INTEGER"]], rows: [[1]]},
 };
@@ -61,12 +68,15 @@ function answer(sql){
   if((m = sql.match(/^SELECT l\\.osm_id AS id, l\\.geom, l\\.lane_num FROM lanes l WHERE l\\.osm_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/))) {
     const r = answer(m[2]), i = r.columns.findIndex(c => c.name === m[1]), ids = new Set(r.rows.map(x => x[i]));
     return {columns: ["id", "geom", "lane_num"].map(name => ({name, type: "VARCHAR"})), rows: LANES.filter(l => ids.has(l[0]))}; }
+  if((m = sql.match(/^SELECT "h3_cell" FROM \\(SELECT "h3_cell", row_number\\(\\) OVER \\(\\) AS rs_n FROM \\(([\\s\\S]*)\\) AS rs_d WHERE "h3_cell" IS NOT NULL\\) AS rs_e GROUP BY "h3_cell" ORDER BY min\\(rs_n\\)$/)))
+    return {columns: [{name: "h3_cell", type: "BIGINT"}], rows: MANY.map(i => [i])};      // the distinct ids of the long result
   if(/FROM rs_roads WHERE/.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: []};      // no road has an osm_id of a node
   const c = COLS[strip(sql)];
   if(!c) throw new Error("Binder Error: unknown SQL");
   return {columns: c.columns.map(([name, type]) => ({name, type})), rows: c.rows};
 }
-window.queries = []; window.events = [];
+window.queries = []; window.events = []; window.gotIds = null; window.gotColumn = null; window.aborted = false;
+const square = (id) => { const x = 18 + Number(BigInt(id) % 1000n) / 10000; return {type: "Polygon", coordinates: [[[x, 59.3], [x + 0.0005, 59.3], [x + 0.0005, 59.3005], [x, 59.3005], [x, 59.3]]]}; };
 window.data = dataDock({
   query: async (sql) => { window.queries.push(sql); return answer(sql); },
   schema: async () => ({tables: [{name: "main.nodes", rows: 3, about: "The nodes."}]}),
@@ -80,6 +90,14 @@ window.data = dataDock({
       geometryBy: (sql, column) => `SELECT b.osm_id AS id, b.geom, b.name FROM buildings b WHERE b.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
     way: {label: "Way", idColumns: ["osm_id"],
       geometryBy: (sql, column) => `SELECT w.osm_id AS id, w.geom, w.name FROM ways w WHERE w.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+    cell: {label: "H3 cell", idColumns: ["h3_cell"], noShape: "a test cell with no place",
+      async geometryOf(ids, {column, signal}) {
+        window.gotIds = ids; window.gotColumn = column;
+        if(ids.includes(99999999n)){ await new Promise((ok) => { signal.addEventListener("abort", () => { window.aborted = true; ok(); }); setTimeout(ok, 5000); }); return []; }
+        return ids.map((id) => ({id, geom: id === 9n ? null : square(id), resolution: 8}));
+      }},
+    bad: {label: "Bad", idColumns: ["bad_id"], geometryOf: async () => [], geometryBy: () => "SELECT 1"},      // both functions
+    empty: {label: "Empty", idColumns: ["empty_id"]},                                                              // neither function
     broken: {label: "Broken", idColumns: ["broken_id"], geometryBy: () => "SELECT broken"},      // its SQL fails
   },
   sql: "SELECT node_id, name FROM nodes",
@@ -286,3 +304,88 @@ def test_a_failing_kind_query_is_reported(tmp_path):
         finally:
             browser.close()
     assert [e for e in errors if "unknown SQL" not in e] == [], errors
+
+
+@pytest.mark.parametrize(("theme", "width"), [("light", 1280), ("dark", 1280), ("light", 390)])
+def test_geometry_of_gets_the_distinct_ids_and_keeps_a_64_bit_id(tmp_path, theme, width):
+    """A kind with geometryOf (no SQL): it gets the distinct non-null ids of the id column, as BigInt, and the column. Its entries are drawn like the rows of
+    geometryBy, and a click on a row gives the card."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url, width=width, height=844 if width < 500 else 800)
+        try:
+            page.evaluate(f"rsSetTheme('{theme}'); data.open(); data.run('SELECT h3_cell FROM cells')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 2")
+            assert page.evaluate("gotIds.map(String)") == ["9223372036854775807", "5"]                        # the repeated id once, no digit lost
+            assert page.evaluate("gotIds.every(i => typeof i === 'bigint')") and page.evaluate("gotColumn") == "h3_cell"
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") == ["Polygon:9223372036854775807", "Polygon:5"]
+            assert not any("VALUES" in q for q in page.evaluate("queries"))                                   # one candidate: no probe, and no SQL of the kind
+            page.click("#rs-dock tbody tr >> nth=1")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length === 1")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'H3 cell 9223372036854775807'")
+            assert "resolution" in page.inner_text("#rs-dock .rs-dd-card")
+            assert page.evaluate("map.getPaintProperty('rs-dock-kinds-fill', 'fill-color')") == ("#5aa9f8" if theme == "dark" else "#2563eb")
+            assert page.evaluate("document.documentElement.scrollWidth") <= width
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_an_entry_with_no_shape_is_known_but_not_drawn(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("data.open(); data.run('SELECT h3_cell FROM cells_null')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 1")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") == ["Polygon:5"]
+            assert "ids found" not in _note(page)                                                              # both ids count as found
+            page.click("#rs-dock tbody tr >> nth=0")                                                          # the row of id 9
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'H3 cell 9'")
+            assert "no: a test cell with no place" in page.inner_text("#rs-dock .rs-dd-card")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == []
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_long_result_gives_geometry_of_the_first_20000_ids(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("data.open(); data.run('SELECT h3_cell FROM many_cells')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 19999", timeout=60_000)      # id 9 has no shape in this host
+            assert page.evaluate("gotIds.length") == 20000 and page.evaluate("String(gotIds[0]) + ',' + String(gotIds[19999])") == "1,20000"
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dock-note')?.textContent.includes('the map shows the first 20\\u2009000 ids')")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_new_result_aborts_the_call_of_the_old_one(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("data.open(); data.run('SELECT h3_cell FROM slow_cells')")
+            page.wait_for_function("gotIds && gotIds.length === 1 && String(gotIds[0]) === '99999999'")
+            assert page.evaluate("aborted") is False
+            page.evaluate("data.run('SELECT 1 AS one')")
+            page.wait_for_function("aborted === true")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_kind_with_both_functions_or_with_neither_is_skipped_and_reported(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        logs = []
+        page.on("console", lambda m: logs.append(m.text) if m.type == "error" else None)
+        try:
+            for sql, kind in (("SELECT bad_id FROM bad", "bad"), ("SELECT empty_id FROM empty", "empty")):
+                page.evaluate(f"data.open(); data.run('{sql}')")
+                page.wait_for_function(f"events.some(e => e[0] === 'kinderror' && e[1].kind === '{kind}')")
+                assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") == []
+                assert any(f'the kind "{kind}" failed' in t and "not both" in t for t in logs), logs
+                assert f"the kind {kind} failed" in _note(page)
+        finally:
+            browser.close()
+    assert errors == [], errors
