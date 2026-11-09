@@ -322,7 +322,7 @@ export function dataDock(o = {}){
     if(me === lightSeq) rs.highlight(onMap(ids).filter((i) => pick == null || String(i) !== String(pick)), {...LIGHT, color: lightColour()});
     if(kl){      // a result with no roads: the first kind that has objects for it (docs/design/dock_kinds.md)
       const own = lightOn && rs.dock.isOpen() && r && !r.byLayer && !ids.length ? await kindOf(r) : null;
-      if(me === lightSeq){ kl.draw(own ? own.features : []); if(r) rs.dock.note(id, (r.noteText || "") + (own && own.more ? ` · the map shows the first ${fmt(KIND_LIMIT)}` : "")); }
+      if(me === lightSeq){ kl.draw(own ? own.features : []); if(r) rs.dock.note(id, (r.noteText || "") + kindNote(r, own)); }
     }
   }
   document.addEventListener("rs:select", (e) => { if(!e.detail.overlay) light(); });      // the selected road leaves the set, a road that is not selected any more comes back
@@ -333,23 +333,71 @@ export function dataDock(o = {}){
     // the card is the one place for the facts while the dock shows it: no popup for a road or an item, from the table, Ask or the map
     if(o.card !== false && rs.holdPopup) rs.holdPopup("data-dock", !!e.detail.open && e.detail.id === id); });
   let lightWasOpen = false;
-  // ---- the kinds of the host: a node, a building (docs/design/dock_kinds.md). A result with no roads belongs to the first kind whose geometryBy gives a row.
+  // ---- the kinds of the host: a node, a building (docs/design/dock_kinds.md, dock_kinds_table_views.md). The owner of a result with no roads is the candidate
+  // (a kind and one of its id columns) that finds objects for the most of the first PROBE ids. A tie goes to the earlier kind, then to the earlier column.
   const kindOf = (r) => (r.__kindP ||= detectKind(r).then((own) => (r.__own = own)));
-  async function detectKind(r){
-    for(const [name, k] of KINDS) for(const col of k.idColumns || []){
-      if(!r.columns.some((c) => c.name === col)) continue;
-      const q = await query(k.geometryBy(inner(r.sql), col), KIND_LIMIT).catch(() => null);
-      if(!q || !q.rows.length) continue;
-      const features = [], facts = new Map();
-      for(const x of q.rows.slice(0, KIND_LIMIT)){
-        let g = x[1]; try{ if(typeof g === "string") g = JSON.parse(g); }catch(e){ continue; }
-        if(!g || !g.type) continue;
-        const key = String(x[0]), f = {}; q.columns.forEach((c, j) => { if(j > 1) f[c.name] = x[j]; });
-        facts.set(key, f); features.push({type: "Feature", properties: {rs_id: key}, geometry: g});
-      }
-      if(features.length) return {name, label: k.label || name, column: col, features, facts, more: q.rows.length > KIND_LIMIT};
+  const PROBE = 200;
+  // the distinct non-null values of a column in the rows of a result (at most `max`), in the order of their first row; a value keeps the type of the adapter
+  function idsOf(r, col, max){
+    const i = r.columns.findIndex((c) => c.name === col), seen = new Set(), out = [];
+    for(const x of r.rows){ const v = x[i]; if(v == null || seen.has(String(v))) continue; seen.add(String(v)); out.push(v); if(out.length >= max) break; }
+    return out;
+  }
+  // the rows of a geometry query: id, geom, then the facts
+  function kindRows(q){
+    const features = [], facts = new Map();
+    for(const x of q.rows.slice(0, KIND_LIMIT)){
+      let g = x[1]; try{ if(typeof g === "string") g = JSON.parse(g); }catch(e){ continue; }
+      if(!g || !g.type) continue;
+      const key = String(x[0]), f = {}; q.columns.forEach((c, j) => { if(j > 1) f[c.name] = x[j]; });
+      facts.set(key, f); features.push({type: "Feature", properties: {rs_id: key}, geometry: g});
     }
+    return {features, facts};
+  }
+  // a query of a kind that fails is reported (the console, the event `kinderror`, the note of the table); the kind has no rows then
+  function kindFail(r, name, column, e){
+    const message = String((e && e.message) || e);
+    console.error(`dataDock: the kind "${name}" failed for the column "${column}": ${message}`);
+    r.kindErrors.push({kind: name, column, message}); emit("kinderror", {kind: name, column, message});
     return null;
+  }
+  async function detectKind(r){
+    r.kindErrors = [];
+    const cands = [];
+    for(const [name, k] of KINDS){
+      if(!(k.needs || []).every((n) => r.columns.some((c) => c.name === n))) continue;      // the result lacks a column that the kind needs
+      for(const column of k.idColumns || []) if(r.columns.some((c) => c.name === column)) cands.push({name, k, column, coverage: null});
+    }
+    let best = null;
+    for(const c of cands){
+      const ids = idsOf(r, c.column, PROBE);
+      if(!ids.length){ c.coverage = 0; continue; }
+      if(cands.length > 1){      // one candidate needs no probe
+        const probe = `SELECT * FROM (VALUES ${ids.map((v) => "(" + lit(v) + ")").join(", ")}) AS rs_p(${quoteId(c.column)})`;
+        const q = await query(c.k.geometryBy(probe, c.column), PROBE).catch((e) => kindFail(r, c.name, c.column, e));
+        c.coverage = q ? kindRows(q).facts.size / ids.length : 0;
+      }else c.coverage = 1;
+      if(c.coverage > (best ? best.coverage : 0)) best = c;
+    }
+    const candidates = cands.map((c) => ({name: c.name, column: c.column, coverage: c.coverage}));
+    if(!best){ if(cands.length) emit("kind", {name: null, column: null, coverage: 0, candidates}); return null; }
+    const q = await query(best.k.geometryBy(inner(r.sql), best.column), KIND_LIMIT).catch((e) => kindFail(r, best.name, best.column, e));
+    const {features, facts} = q ? kindRows(q) : {features: []};
+    if(!features.length){ emit("kind", {name: null, column: null, coverage: 0, candidates}); return null; }
+    const all = idsOf(r, best.column, KIND_LIMIT).length, coverage = all ? Math.min(1, facts.size / all) : 1;
+    emit("kind", {name: best.name, column: best.column, coverage, candidates});
+    return {name: best.name, label: best.k.label || best.name, column: best.column, features, facts, more: q.rows.length > KIND_LIMIT, coverage, candidates};
+  }
+  // the note of the table for a result of kinds: which kind owns it, how many ids it found, the more and the errors
+  function kindNote(r, own){
+    const t = [];
+    if(own){
+      t.push(`Shown as ${own.label} (${own.column})`);
+      if(own.coverage < 1) t.push(`${fmt(own.facts.size)} of ${fmt(idsOf(r, own.column, KIND_LIMIT).length)} ids found. To use another kind, select the column under the id name of that kind`);
+      if(own.more) t.push(`the map shows the first ${fmt(KIND_LIMIT)}`);
+    }
+    for(const e of r.kindErrors || []) t.push(`the kind ${e.kind} failed: ${e.message}`);
+    return t.length ? " \u00b7 " + t.join(" \u00b7 ") : "";
   }
   // the card of an object: the title is its name, else "<label> <id>"; the facts are the other columns; a column `tags` is one row for each tag
   function kindFacts(own, key){
