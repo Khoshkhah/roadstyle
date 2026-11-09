@@ -230,6 +230,10 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - A change of the base map or of the theme can remove the layers of the objects: the dock puts them back.
     - The design is [Object kinds in the data dock](../design/dock_kinds.md).
 
+#### The row of a road result
+
+A click on a row of a result with `edge_id` (`lane_profile`, `route_edges`, `edge_levels`) selects the road. The card shows the road and, under it, the section **This row** with the other columns of the clicked row (a lane's `width_m`, a route's `seq`), as the table shows them: a 64-bit id and a text as they are, `null` as `null`, a number with at most 3 decimals. A column that the card already shows with the same value (`edge_id`, `name`, `highway`, ...) is left out, and so is a geometry column. When nothing is left there is no section. A click on the map, or a selection by Ask, shows the road alone.
+
 ### A row of your own { .rs-part }
 
 **Use it for:** a row of a result that is not a road (a node, a building, a wall), which your page draws on the map itself. The page hears the click, shows the item on the map, and puts the item's facts in the card.<br>
