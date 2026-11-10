@@ -162,12 +162,17 @@ struct Chain {
 }
 
 /// A distance in a priority queue (the smallest first).
-#[derive(PartialEq, PartialOrd)]
+#[derive(PartialEq)]
 struct Dist(f64);
 impl Eq for Dist {}
 impl Ord for Dist {
     fn cmp(&self, o: &Self) -> std::cmp::Ordering {
         o.0.total_cmp(&self.0)
+    }
+}
+impl PartialOrd for Dist {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(o))
     }
 }
 
