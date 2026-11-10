@@ -1,8 +1,6 @@
 """The 3D bridge mesh on the terrain: the checks that a fix must not break, in a real browser. The ground is a synthetic Terrarium tile (a steep slope, answered here, no network), so every run has the same hills. Each check is a thing that was wrong once and came back with a later fix:
 no deck piece under the ground, no slab upside down or thicker than it is made, the free end of a deck flush with the ground, the chains that meet at a node
 agreeing on its height, every chain drawn (a chain longer than the screen too), a click on a deck picked on the mesh with the marker on the deck. Skipped without playwright."""
-import json
-import pathlib
 import struct
 import zlib
 

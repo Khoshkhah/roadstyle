@@ -340,7 +340,7 @@ def test_a_deck_never_rises_faster_than_the_grade_and_a_short_bridge_rises_only_
         pieces = sorted(_decks_of(_straight(n)), key=lambda p: p["__rs_s0"])
         base = [(p["__rs_s0"] * n, p["__rs_base"]) for p in pieces] + [(pieces[-1]["__rs_s1"] * n, pieces[-1]["__rs_base"])]
         assert max(b for _, b in base) <= max(1.0, n / 2 / 8 * 1.1) + 0.2 or n >= 100, (n, max(b for _, b in base))
-        for (d0, b0), (d1, b1) in zip(base, base[1:]):
+        for (d0, b0), (d1, b1) in zip(base, base[1:], strict=False):
             assert d1 == d0 or abs(b1 - b0) / (d1 - d0) <= 1.6 / 8 + 0.02, (n, d0, d1, b0, b1)
 
 
