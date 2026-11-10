@@ -157,6 +157,8 @@ def render_edges(
             raise ValueError("a Styler object (style=) is not in the web page: use color_by, colors, cmap, vmin, vmax or width_by")
         _warn_unclassed(as_edges(gdf, class_col=highway_col).gdf, highway_col)
         kwargs = _named_basemaps(kwargs, api_key)
+        if kwargs.get("bridge_heights") is not None:        # {road id: metres} (a dict or a Series): the keys as text, like color_table's
+            kwargs["bridge_heights"] = {str(k): float(v) for k, v in dict(kwargs["bridge_heights"]).items()}
         data = {k: v for k, v in (("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
                                   ("width_by", width_by), ("color_table", color_table)) if v is not None}
         if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}

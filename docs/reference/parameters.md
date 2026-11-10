@@ -164,6 +164,7 @@ rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positr
 | `pitch` / `bearing` | the `camera` setting (`0` / `0`) | web | starting tilt / rotation in degrees |
 | `max_pitch` | the `camera` setting (`70`) | web | the most the map can tilt, in degrees. `60` keeps the view where MapLibre itself uses one tile zoom. Above 60 the page forces one tile zoom on the whole screen (a road has one width everywhere), and that loads 2 to 3.6 times as many tiles |
 | `view_3d` | `False` | web | open tilted to `camera.pitch_3d`, with raised 3D bridge decks |
+| `bridge_heights` | `None` | web | `{road id: metres}` (a dict or a Series; the ids are the values of the edge id column, `edge_id_col`): the full height of the whole group of bridges that the road is in (the bridge roads that touch each other), and the engine makes the ramps for that height. The id of any road of the group names it; two heights for one group, a negative height, and an id that no road has are errors, and the id of a road that is not a 3D bridge gets a warning. Without it, a group is as high as its length gives (`bridge_decks`: `base_m`, `max_m`, `grow_from_m`, `grow_to_m`). Needs `view_3d=True` |
 
 ### Output & scale
 

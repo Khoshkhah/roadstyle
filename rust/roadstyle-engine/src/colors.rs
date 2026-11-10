@@ -183,7 +183,7 @@ use crate::given;
 
 /// The label of a column value (null is "None", a boolean "True" or "False": the labels that legends have always had; integers stay integers).
 /// ponytail: a float is written writes it only without an exponent (no 1e-05 or 1e+16); add it if a categorical column has such floats.
-fn category_text(c: Cell) -> String {
+pub(crate) fn category_text(c: Cell) -> String {
     let v = match c {
         Cell::Null => return "None".into(),
         Cell::Bool(b) => return if b { "True" } else { "False" }.into(),

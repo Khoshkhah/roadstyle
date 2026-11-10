@@ -33,10 +33,14 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
         None => None,
     };
     let (center, zoom) = camera(&feats);
-    let warnings = std::mem::take(&mut feats.warnings);
+    let mut warnings = std::mem::take(&mut feats.warnings);
     let mut roads = roads::roads_source(feats);
     // render's view_3d: the bridges' extruded decks (_bridge_decks); a casing slab names the user's own `highway` column, whatever highway_col is
-    let decks = if look.map.bridges.decks_3d { decks::bridge_decks(&roads.roads, &look.deck, &look.model, "highway") } else { Vec::new() };
+    let own = look.map.bridges.heights.as_ref().map(|h| (h, look.map.columns.edge_id.as_deref().unwrap_or("edge_id")));
+    if own.is_some() && !look.map.bridges.decks_3d {
+        warnings.push("bridge_heights: the page has no 3D bridges (view_3d=False), so the heights do nothing".into());
+    }
+    let decks = if look.map.bridges.decks_3d { decks::bridge_decks(&roads.roads, &look.deck, &look.model, "highway", own, &mut warnings)? } else { Vec::new() };
     simple.roles = Some(simple::Roles { fills: colors.props.clone(), casing: colors.casing_role });
     simple.colours = (!colors.class_only).then(|| crate::colors::ColourTable::of(&roads.roads, look, &colors.props, colors.casing_role)).map(Box::new);
     let half = look_half(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs, images, &colors, planned)?;
