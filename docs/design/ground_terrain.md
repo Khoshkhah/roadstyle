@@ -94,8 +94,9 @@ a `File` (OPFS), a `Blob`, an `ArrayBuffer` or a URL.
 ```
 
 - With `ground`, the DEM source is the terrain file, and the attribution shows
-  "Ground: FABDEM V1-2 (DTM, EGM2008), id 3f2a…" with its license. duckOSM has no `sha256` column yet, so the id is
-  empty until it does.
+  "Ground: FABDEM V1-2 (DTM, EGM2008), id 3f2a…" with its license. The id is the `sha256` of
+  `main.elevation_metadata` (duckOSM PR 68): the SHA-256 of the DEM file, NULL when the build read no whole file
+  (Copernicus, streamed). With NULL, the attribution has no id.
 - Without `ground`, the page uses `ontop.dem` (the AWS tiles), and the attribution shows "Ground: AWS Terrain Tiles".
   This is for an area with no ground grid only.
 - A ground with `product: DSM` shows "Ground: surface model" (the standard, section 1).
