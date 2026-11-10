@@ -899,3 +899,30 @@ def test_reset_puts_back_what_ask_changed_but_not_what_the_person_changed(tmp_pa
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_the_prompt_says_to_answer_the_last_message_and_an_earlier_turn_carries_its_tools_line(tmp_path):
+    """2026-11-10 (Haiku): after a chart, "Turn off the water" ran a query and drew the chart again, and the model said that its first reply was wrong. The history had only
+    the user's text and the answer, so the model could not know what the tools did. Now the prompt has the rule, and the answer of an earlier turn ends with one line of its tools."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open()")
+            _ask(page, "A bar chart of the roads by class", [
+                "tool('run_query', {sql: 'SELECT edge_id, lenght FROM edges'})",                                       # fails: a column that is not there
+                "tool('draw_chart', {sql: 'SELECT highway, count(*) AS roads FROM edges GROUP BY highway', kind: 'bar', x: 'highway', y: 'roads'})",
+                "say('Done.')"])
+            system = page.evaluate("window.calls[0].messages[0].content")
+            assert "Answer only what the LAST message asks" in system and "set_map only: no query and no chart" in system and "[tools: ...]" in system
+            _ask(page, "Turn off the water and the waterways layers", ["tool('set_map', {overlays: {water: false}})", "say('Off.')"])
+            earlier = page.evaluate("window.calls[3].messages.filter(m => m.role === 'assistant').at(0).content")      # call 3 = the first call of the second turn
+            assert earlier.startswith("Done.\n[tools: run_query failed: ") and "lenght" in earlier, earlier
+            assert earlier.endswith("; draw_chart bar by highway: ok]"), earlier
+            # the line is in the history of the next calls, not in the answer that the person reads
+            assert "[tools" not in page.locator(".rs-ask-turn").first.inner_text() and page.evaluate("window.answers[0].text") == "Done."
+            # set_map gives its own words (here the page has no layer, so "Nothing changed.")
+            _ask(page, "Thanks. And the base map?", ["say('Fine.')"])
+            assert "[tools: set_map: " in page.evaluate("window.calls.at(-1).messages.filter(m => m.role === 'assistant').at(1).content")
+        finally:
+            browser.close()
+    assert errors == [], errors

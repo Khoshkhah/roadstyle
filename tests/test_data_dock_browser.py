@@ -496,3 +496,24 @@ def test_a_road_row_of_another_table_shows_its_own_columns_in_the_card(tmp_path)
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_the_guard_lets_a_column_called_use_pass_and_still_refuses_a_use_statement(tmp_path):
+    """lane_profile.use is a real column. A refused word that is a name (after SELECT, a comma, AS, WHERE, BY, a dot, an operator, `(`) passes; the same word as
+    a statement (the start of the text, or after the `)` of a WITH) is refused."""
+    ok = ["SELECT use FROM driving.lane_profile", "SELECT lane_num AS use FROM t", "SELECT a.use, b.set FROM a JOIN b ON a.id = b.id WHERE use = 'x' ORDER BY use",
+          "SELECT count(use) FROM t GROUP BY use", "SELECT edge_id, use, width_m FROM driving.lane_profile WHERE use <> 'bike' AND set IS NULL",
+          "WITH l AS (SELECT use FROM t) SELECT use FROM l"]
+    bad = ["USE other", "use other;", "(USE x)", "SELECT 1; USE x", "SELECT 1; DROP TABLE t", "WITH a AS (SELECT 1) INSERT INTO t SELECT * FROM a",
+           "WITH a AS (SELECT 1) DELETE FROM t", "WITH a AS (SELECT 1) UPDATE t SET x = 1", "WITH a AS (SELECT 1) COPY t TO 'x'", "SET threads = 1", "SELECT 1 FROM t SET x = 1",
+           "WITH a AS (SELECT 1) SET x = 1", "WITH a AS (SELECT 1) USE db"]
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            got = page.evaluate("""async ([ok, bad]) => { const g = (await import("./dashboard/data/guard.js")).guard;
+                                  return [ok.map((s) => g(s).ok), bad.map((s) => g(s).ok)]; }""", [ok, bad])
+            assert got[0] == [True] * len(ok), [s for s, r in zip(ok, got[0], strict=True) if not r]
+            assert got[1] == [False] * len(bad), [s for s, r in zip(bad, got[1], strict=True) if r]
+        finally:
+            browser.close()
+    assert errors == [], errors
