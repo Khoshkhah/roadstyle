@@ -237,3 +237,14 @@ def test_no_road_popup_while_street_view_is_open(tmp_path, steps, popups):
             assert not errors
         finally:
             browser.close()
+
+
+def test_the_google_frame_is_credentialless(tmp_path):
+    # a page with COEP require-corp (duckOSM Studio) blocks a cross-origin frame that has no `credentialless`: "refused to connect"
+    def body(page, asked):
+        assert page.evaluate("document.querySelector('.rs-svw:not(.rs-g3d) iframe').hasAttribute('credentialless')")
+    _run(tmp_path, body)
+
+
+def test_the_street_view_page_frame_is_credentialless():
+    assert 'id="sv-frame" title="Google Street View" hidden allowfullscreen credentialless' in rs.render_street_view(_edges()).html
