@@ -19,10 +19,13 @@ let _elOn = false, _elTilted = false, _elMode = null;
 // the DEM's source once known (null while the ground's header is read), the ground's archive (null: the AWS tiles), the hillshade asked for meanwhile,
 // and the count of grounds (in the tile URLs: a new ground is new tiles)
 let _elSpec = null, _elArchive = null, _elHillWant = null, _elGen = 0, _elReady = Promise.resolve(), _elProto = false;
+// the attribution of a ground: its source, its product and datum ("datum unknown" where duckOSM has no value), its id and license when known
 function _elAttr(g){
-  const name = "Ground: " + (g.source || "unknown");
-  if(g.product === "DSM") return "Ground: surface model (" + (g.source || "unknown") + ")";
-  return name + " (" + [g.product, g.vertical_datum].filter(Boolean).join(", ") + ")" + (g.id ? ", id " + String(g.id).slice(0, 8) : "") + (g.license ? ", " + g.license : "");
+  const known = v => v != null && v !== "" && v !== "unknown";
+  if(g.product === "DSM") return "Ground: surface model (" + (known(g.source) ? g.source : "source unknown") + ")";
+  return "Ground: " + (known(g.source) ? g.source : "source unknown") + " (" + (known(g.product) ? g.product : "product unknown") + ", " +
+    (known(g.vertical_datum) ? g.vertical_datum : "datum unknown") + ")" + (known(g.id) ? ", id " + String(g.id).slice(0, 8) : "") +
+    (known(g.license) ? ", " + g.license : "");
 }
 // a PMTiles source of bytes in memory or of a File or Blob (an OPFS file: each read is one slice of the file on disk)
 const _elBytes = (buf) => ({getKey: () => "ground", getBytes: (o, l) => buf.then(b => ({data: b.slice(o, o + l)}))});

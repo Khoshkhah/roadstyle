@@ -134,6 +134,10 @@ def test_the_page_draws_the_ground_with_no_request_to_aws():
         # the source's fields: MapLibre fills `tiles` when the source has loaded, so after the tiles
         src = page.evaluate("(() => { const s = map.getSource('rs-dem'); return {tiles: s.tiles, maxzoom: s.maxzoom, attr: s.attribution}; })()")
         assert all(g is not None and abs(g - _plane(cc, rr)) <= 0.10 for g, (cc, rr) in zip(got, pts, strict=True)), list(zip(got, pts, strict=True))
+        # a ground whose facts duckOSM does not know ("unknown"): the attribution names each one as unknown, and has no id or license
+        page.evaluate("t => rsGround({source: 'monaco.tif', product: 'unknown', vertical_datum: 'unknown', license: 'unknown', id: null, terrain: t})", ground["terrain"])
+        page.wait_for_function("(() => { const s = map.getSource('rs-dem'); return s && s.attribution && s.attribution.includes('monaco.tif'); })()", timeout=30_000)
+        unknown_attr = page.evaluate("map.getSource('rs-dem').attribution")
         # without the ground, the page goes back to the AWS tiles and says so
         aws_before = len(aws)
         page.evaluate("rsGround(null)")
@@ -145,6 +149,7 @@ def test_the_page_draws_the_ground_with_no_request_to_aws():
         browser.close()
     assert src["tiles"][0].startswith("rsground://") and src["maxzoom"] == 13, src
     assert "Ground: test DTM (DTM, EGM2008), id 01234567" in src["attr"], src
+    assert unknown_attr == "Ground: monaco.tif (product unknown, datum unknown)", unknown_attr
     assert aws_before == 0 and aws and "Ground: AWS Terrain Tiles" in aws_attr, (aws_before, len(aws), aws_attr)
     assert not errors, errors
 
