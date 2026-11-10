@@ -1990,6 +1990,37 @@
         "base_m": {
           "$ref": "#/$defs/Num"
         },
+        "max_m": {
+          "description": "The height of a long group of bridges (from `grow_to_m` of length) and the lengths between which the height grows from `base_m`. A look made\nbefore these keys (2026-11-09) has none: every group is `base_m` high, as it was.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Num"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "grow_from_m": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Num"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "grow_to_m": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Num"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "thickness_m": {
           "$ref": "#/$defs/Num"
         },

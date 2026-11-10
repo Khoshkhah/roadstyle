@@ -39,6 +39,9 @@ function _pickProps(f){ const t=_side();
   return f.properties||{}; }
 function _selItem(f){ if(ITEM_PICK && f && f.item && f.item.layer.id===ROAD_ITEMS.layer) return ITEM_PICK;   // a road item of items=
   const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
+// the row of the road that a 3D deck carries (its first edge; a rendered feature stringifies the list), null: none (a casing slab, or not a deck)
+export function _deckRoad(f){ let e=f && f.properties && f.properties.__rs_edges; if(typeof e==="string") e=JSON.parse(e);
+  return e && e.length && !f.properties.__rs_casing_slab ? e[0] : null; }
 function hitOf(f){ if(!f || f.id==null) return null;
   if(_selItem(f)) return {s:f.item.source, key:"i"+f.item.source+":"+f.item.id, ids:[f.item.id]};
   if(srcOf(f)==="decks"){ let e=f.properties && f.properties.__rs_edges;
@@ -184,7 +187,8 @@ export function initSelect(){
     const f = pick(e.point);
     if(!f){ if(!handleOverlayClick(e, "under")) rsDeselect(); return; }
     clearTimeout(_tipT); if(_tip) _tip.remove();      // the clicked road's facts go to its popup or card: its tooltip closes (it showed through the popup)
-    const w = srcOf(f)==="roads" && RoadTable.load(f.id); if(w) await w;   // the road's line first (a table without lines)
+    const row = srcOf(f)==="roads" ? f.id : _deckRoad(f);   // a deck carries its road's row
+    const w = row!=null && RoadTable.load(row); if(w) await w;   // the road's line first (a table without lines)
     clearOvSel();
     if(_sel) setS(_sel,{select:false});
     _sel = hitOf(f); _look({select:true});

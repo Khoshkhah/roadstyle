@@ -104,6 +104,14 @@ fn the_64_looks_of_mapstyle() {
         if let Some(t) = got.get_mut("theme").and_then(Value::as_object_mut) {
             t.shift_remove("dock");
         }
+        // added on 2026-11-09: a group of bridges is higher when it is longer (bridges.decks max_m, grow_from_m, grow_to_m)
+        for path in ["/config/bridge_decks", "/theme/bridges/decks"] {
+            if let Some(d) = got.pointer_mut(path).and_then(Value::as_object_mut) {
+                for k in ["max_m", "grow_from_m", "grow_to_m"] {
+                    d.shift_remove(k);
+                }
+            }
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }

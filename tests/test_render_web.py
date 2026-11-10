@@ -37,6 +37,14 @@ def _style(html):
     from road_table import roads_of
     style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + len("const style = "))[0]
     style["_roads"] = roads_of(html)
+    # a GeoJSON source of 256 KB or more is in the page as gzipped base64 and starts empty (the page inflates it): the tests read its features
+    blobs = re.search(r'<script id="rs-gz" type="application/json">(.*?)</script>', html, re.S)
+    if blobs:
+        import base64
+        import gzip
+        for sid, blob in json.loads(blobs.group(1)).items():
+            if sid in style["sources"]:
+                style["sources"][sid]["data"] = json.loads(gzip.decompress(base64.b64decode(blob)))
     return style
 
 
@@ -295,7 +303,9 @@ def test_web_bridge_forks_stay_elevated():
     ends = collections.defaultdict(list)
     for f in slices:
         ends[f["properties"]["__rs_base"]].append(f)
-    assert 5.0 in ends                       # plateaus exist
+    full = round(max(f["properties"]["__rs_full"] for f in slices), 2)      # a long group is higher than a short one (the group's length)
+    assert full > 5.0 and full in ends       # plateaus exist, at the group's full height
+    assert len({f["properties"]["__rs_group"] for f in slices}) == 1        # the three roads touch at the fork: one group
     grounded = [f for f in slices if f["properties"]["__rs_base"] < 0.5]
     assert grounded                          # the true ends still ramp to ground
     # no slice adjacent to the fork node is grounded: check min distance of grounded slices to B
@@ -304,6 +314,19 @@ def test_web_bridge_forks_stay_elevated():
         cs = f["geometry"]["coordinates"][0]
         dmin = min(((x - bx) ** 2 + (y - by) ** 2) ** 0.5 for x, y in cs)
         assert dmin > 0.001                  # ~110 m: grounded slices are far from the junction
+
+
+def test_a_longer_bridge_group_is_higher_and_a_short_one_peaks_at_its_full_height():
+    """The full height of a bridge group grows with its length (base_m 5 up to 60 m, max_m 22 from 600 m); on a bridge shorter than two ramps each
+    ramp is half of it, so the lift reaches 1 in the middle (a lift that peaks below 1 has a ridge there)."""
+    def decks(length_m):
+        dx = length_m / (111320 * math.cos(math.radians(59.3)))
+        g = gpd.GeoDataFrame({"highway": ["primary"], "bridge": ["yes"]}, geometry=[LineString([(18.0, 59.3), (18.0 + dx, 59.3)])], crs=4326)
+        return _style(render_edges(g, backend="web", view_3d=True).html)["sources"]["decks"]["data"]["features"]
+    full = {n: max(f["properties"]["__rs_full"] for f in decks(n)) for n in (40, 300, 1500)}
+    assert full[40] == pytest.approx(5.0) and 5.0 < full[300] < 22.0 and full[1500] == pytest.approx(22.0), full
+    lifts = [max(f["properties"]["__rs_lift0"], f["properties"]["__rs_lift1"]) for f in decks(60) if not f["properties"].get("__rs_casing_slab")]
+    assert max(lifts) == 1.0, max(lifts)
 
 
 def test_web_pick_survives_missing_layers():

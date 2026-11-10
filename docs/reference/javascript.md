@@ -113,6 +113,10 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsSetBasemap(keyOrIndex)` | switch the base map (key, label or index into `RS_BASEMAPS`) | `rs:basemapchange` |
 | `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck | `rs:filterchange` |
+| `rsSetBridges3D(on)` | draw the bridges as 3D decks (on) or as flat lines (off); no argument: whether they are 3D. A page with no decks (`view_3d=False`) stays flat | `rs:bridges3dchange` |
+| `rsBridgeGroups()` | the groups of bridge roads that touch each other: `[{group, roads, height, set}]`, the largest first | |
+| `rsSetBridgeHeight(target, metres)` | give the whole group of `target` (a group number, a road row, or a list of them) the full height `metres`; `null` gives the height of the look back. The ramps keep the length that the engine made | `rs:bridgeheightchange` |
+| `rsBridgeHeight(target)` | the full height of the group of `target`, in metres | |
 | `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows | `rs:filterchange` |
 | `rsSetColorField(nameOrIndex)` | switch the active `color_options` entry | `rs:colorchange` |
 | `rsSetTunnelStyle({strength, palette, ratio, toward})` | move the tunnel look: `strength` 0-100, `palette` a name of `RS_TUNNEL_PALETTES`, `ratio` `[dash, gap]`, `toward` a name of `RS_TUNNEL_TOWARDS` or a `#rrggbb` (any may be left out; another `toward` throws) | `rs:tunnelchange` |

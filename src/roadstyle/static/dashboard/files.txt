@@ -49,6 +49,7 @@ basemap
 elevation
 basemapbox
 boundary
+bridgemesh
 filter
 roadsbox
 color

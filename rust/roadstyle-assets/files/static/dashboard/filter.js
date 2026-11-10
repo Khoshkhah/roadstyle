@@ -1,6 +1,7 @@
 // road-class filtering: window.rsSetClasses([...]) shows exactly those classes and hides the
 // rest across every road layer; the collapsible checkbox panel is just UI over it. The class
 // filter composes (AND) with the id filter from rsFilter below.
+import {_bmFilter} from "./bridgemesh.js";
 import {map, O, OVERLAYS, RS_ROLES, RoadTable, _has, _itemOv, _rprops, _sfeats, _src, _role, _lyr, _emit} from "./core.js";
 export let FILTER = {classes:[], class_key:"__rs_ci", class_list:[]};     // a tile: the key that the filter reads and the class of each of its numbers (the style of a tile has them)
 const _fltBase={};
@@ -36,6 +37,7 @@ export function _applyRoadFilters(){
   const multi = {};   // decks / shadows: the ids of the features with at least one edge shown (null = no switch is on)
   ["decks","shadows"].forEach(src=>{ multi[src] = !_bridgesOn ? [] : (hidden.length || q || !_tunnelsOn || _accHid.size)
     ? _sfeats((_src(src)||{}).source).map((f,k)=>(f.properties.__rs_edges||[]).some(edgeOn) ? k : -1).filter(k=>k>=0) : null; });
+  _bmFilter(multi.decks);   // the sloped mesh of the 3D decks shows the same features as their pick layers
   const and = (f,c)=>f?["all",f,c]:c;
   // a pair drawn as one line has the row of one of its edges as the id of its pieces: it shows while either edge shows (the twin is in the road table)
   const qr = q && _has(["id"],[...q, ...[...q].map(i=>(_rprops(i)||{}).__rs_edge2).filter(t=>t!=null)]), qe = qr;   // once per change

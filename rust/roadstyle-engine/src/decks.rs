@@ -126,8 +126,35 @@ struct Span {
     rev: Option<usize>,
 }
 
-/// A chain of bridge roads through nodes of degree 2: its line, its spans, and whether each end is a free end (a ramp there).
+/// The group of each of `n` reps (numbered from 1 in the order of the first rep): the reps that share a node are one group (union-find).
+fn groups_of(n: usize, at: &HashMap<(u64, u64), Vec<usize>>) -> Vec<usize> {
+    fn find(p: &mut [usize], mut i: usize) -> usize {
+        while p[i] != i {
+            p[i] = p[p[i]];
+            i = p[i];
+        }
+        i
+    }
+    let mut parent: Vec<usize> = (0..n).collect();
+    for reps in at.values() {
+        for w in reps.windows(2) {
+            let (a, b) = (find(&mut parent, w[0]), find(&mut parent, w[1]));
+            parent[a.max(b)] = a.min(b);
+        }
+    }
+    let mut number: HashMap<usize, usize> = HashMap::new();
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let root = find(&mut parent, i);
+        let next = number.len() + 1;
+        out.push(*number.entry(root).or_insert(next));
+    }
+    out
+}
+
+/// A chain of bridge roads through nodes of degree 2: its line, its spans, its group, and whether each end is a free end (a ramp there).
 struct Chain {
+    group: usize,
     pts: Vec<P>,
     spans: Vec<Span>,
     ramp_head: bool,
@@ -137,6 +164,10 @@ struct Chain {
 /// The bridge roads: one representative for each two-way pair, and where each node is used.
 struct Bridges<'a> {
     reps: Vec<Rep<'a>>,
+    /// the group of each rep (from 1): reps that touch through a shared node are one group, whatever their level
+    group: Vec<usize>,
+    /// the length in metres of each group (index: group - 1): the sum of its roads, one for each two-way pair
+    group_len: Vec<f64>,
     pair_edges: HashMap<((u64, u64), (u64, u64)), Vec<usize>>,
     at: HashMap<(u64, u64), Vec<usize>>,
 }
@@ -163,7 +194,13 @@ impl<'a> Bridges<'a> {
             at.entry(hk(r.a)).or_default().push(i);
             at.entry(hk(r.z)).or_default().push(i);
         }
-        Bridges { reps, pair_edges, at }
+        let group = groups_of(reps.len(), &at);
+        let mut group_len = vec![0.0; group.iter().copied().max().unwrap_or(0)];
+        for (r, g) in reps.iter().zip(&group) {
+            let kx = 111320.0 * r.c[0][1].to_radians().cos();
+            group_len[g - 1] += r.c.windows(2).map(|w| ((w[1][0] - w[0][0]) * kx).hypot((w[1][1] - w[0][1]) * 111320.0)).sum::<f64>();
+        }
+        Bridges { reps, group, group_len, pair_edges, at }
     }
 
     fn twin_of(&self, fi: usize, a: Node, z: Node) -> Option<usize> {
@@ -206,7 +243,7 @@ impl<'a> Bridges<'a> {
             }
             ends[prepend as usize] = self.at[&hk(nd)].len() == 1;
         }
-        Chain { pts, spans, ramp_head: ends[1], ramp_tail: ends[0] }
+        Chain { group: self.group[start], pts, spans, ramp_head: ends[1], ramp_tail: ends[0] }
     }
 }
 
@@ -220,10 +257,21 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
     for i in 0..used.len() {
         if !used[i] {
             chain_i += 1;
-            feats.extend(chain_features(roads, dk, m, hw, &bridges.walk(i, &mut used), chain_i));
+            let ch = bridges.walk(i, &mut used);
+            let h = deck_height(dk, bridges.group_len[ch.group - 1]);
+            feats.extend(chain_features(roads, dk, m, hw, &ch, chain_i, h));
         }
     }
     feats
+}
+
+/// The full height of a bridge group of `len` metres: `base_m` for a short one, `max_m` for a long one, a line between (a long bridge crosses
+/// something wide, so it stands higher; the ramps then grow with the height, which keeps the grade of `ramp_m` over `base_m`).
+fn deck_height(dk: &DeckLook, len: f64) -> f64 {
+    if dk.grow_to_m <= dk.grow_from_m {
+        return dk.base_m;
+    }
+    dk.base_m + (dk.max_m - dk.base_m).max(0.0) * ((len - dk.grow_from_m) / (dk.grow_to_m - dk.grow_from_m)).clamp(0.0, 1.0)
 }
 
 /// A chain in metres around its first point (lon0, lat0), and the metres of a pixel at the deck look's zoom.
@@ -252,7 +300,7 @@ fn cuts_of(l: f64, (rh, rt): (f64, f64), step: f64, span_ends: impl Iterator<Ite
 }
 
 /// The features of one chain: its deck pieces (cut where the ramps and the roads change) and their casing slabs.
-fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain, chain_i: usize) -> Vec<Value> {
+fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain, chain_i: usize, h: f64) -> Vec<Value> {
     let [lon0, lat0] = ch.pts[0];
     let cos = lat0.to_radians().cos();
     let frame = Frame { lon0, lat0, kx: 111320.0 * cos, mpp: 156543.03392 * cos / 2f64.powf(dk.match_zoom) };
@@ -264,9 +312,13 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
     }
     let l = pts.windows(2).map(|w| len(&w[0], &w[1])).sum::<f64>();
     let bounds: Vec<(f64, Span)> = ch.spans.iter().map(|s| (cum[s.end], *s)).collect();
-    let (ramp, step) = (dk.ramp_m.max(1.0), dk.step_m.max(0.25));
-    let rh = if ch.ramp_head { ramp.min(l) } else { 0.0 };
-    let rt = if ch.ramp_tail { ramp.min(l - rh) } else { 0.0 };
+    let grade = if dk.base_m > 0.0 { dk.ramp_m / dk.base_m } else { 8.0 };       // metres of ramp for a metre of height
+    let (ramp, step) = ((h * grade).max(dk.ramp_m).max(1.0), dk.step_m.max(0.25));
+    // both ends ramped on a short chain: each ramp is half of it, so the two meet at the full height with no slope (a ramp that takes
+    // the room first, or a lift that peaks below the full height, gives a ridge)
+    let ramp = if ch.ramp_head && ch.ramp_tail { ramp.min(l / 2.0) } else { ramp.min(l) };
+    let rh = if ch.ramp_head { ramp } else { 0.0 };
+    let rt = if ch.ramp_tail { ramp } else { 0.0 };
     let mut feats = Vec::new();
     for w in cuts_of(l, (rh, rt), step, bounds.iter().map(|b| b.0)).windows(2) {
         let (d0, d1) = (w[0], w[1]);
@@ -278,10 +330,12 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
         let pprops = roads.road(span.fi);
         let cls = pprops.role(roadstyle_model::Role::Class).and_then(Cell::as_str).unwrap_or("");
         let half = (m.gwidth(m.group_of(cls), dk.match_zoom) * frame.mpp / 2.0).max(2.0) * dk.width_scale;
-        let up = if ch.ramp_head { mid / ramp } else { 1.0 };
-        let dn = if ch.ramp_tail { (l - mid) / ramp } else { 1.0 };
-        let t = up.min(dn).min(1.0);
-        let lift = t * t * (3.0 - 2.0 * t);
+        // the smooth lift (0 on the ground, 1 at the full height) at a distance along the chain: a ramp at each free end
+        let lift_at = |d: f64| {
+            let t = (if ch.ramp_head { d / ramp } else { 1.0 }).min(if ch.ramp_tail { (l - d) / ramp } else { 1.0 }).clamp(0.0, 1.0);
+            t * t * (3.0 - 2.0 * t)
+        };
+        let (lift, ends) = (lift_at(mid), [lift_at(d0), lift_at(d1)]);
         let part = substring(&pts, d0, d1);
         // one ribbon per directed edge: a two-way bridge is two half-width ribbons side by side (the edge with the chain on the right)
         let ribbons: Vec<(Vec<P>, Option<usize>)> = if pprops.get(Mark::Twoway.name()).is_some_and(crate::roads::yes) && span.fwd.is_some() && span.rev.is_some() {
@@ -292,9 +346,16 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
         for (ring, fdir) in ribbons.iter().filter(|r| r.0.len() >= 4) {
             let mut props: Map<String, Value> = match fdir { Some(f) => roads.road(*f).to_map(), None => pprops.to_map() };
             props.shift_remove(Mark::Class.name());          // the class mark is put after the decks are made
-            props.insert(Mark::DeckBase.name().into(), json!(round_to(dk.base_m * lift, 2)));
-            props.insert(Mark::DeckHeight.name().into(), json!(round_to(dk.base_m * lift + dk.thickness_m, 2)));
+            props.insert(Mark::DeckBase.name().into(), json!(round_to(h * lift, 2)));
+            props.insert(Mark::DeckHeight.name().into(), json!(round_to(h * lift + dk.thickness_m, 2)));
             props.insert(Mark::DeckChain.name().into(), json!(chain_i));
+            props.insert(Mark::DeckGroup.name().into(), json!(ch.group));
+            props.insert(Mark::DeckFull.name().into(), json!(h));
+            props.insert(Mark::DeckThick.name().into(), json!(dk.thickness_m));
+            props.insert(Mark::DeckLift0.name().into(), json!(round_to(ends[0], 4)));
+            props.insert(Mark::DeckLift1.name().into(), json!(round_to(ends[1], 4)));
+            props.insert(Mark::DeckS0.name().into(), json!(round_to(d0 / l, 5)));
+            props.insert(Mark::DeckS1.name().into(), json!(round_to(d1 / l, 5)));
             props.insert(Mark::Edges.name().into(), json!(fdir.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>()));
             feats.push(json!({"type": "Feature", "properties": props, "geometry": {"type": "Polygon", "coordinates": [frame.to_lonlat(ring)]}}));
         }
@@ -303,21 +364,31 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
             edges.sort();
             edges.dedup();
             let highway = pprops.get(hw).map_or(Value::Null, Cell::to_value);
-            feats.extend(casing_slabs(dk, &frame, &part, half, lift, (chain_i, &edges, highway)));
+            let mut slabs = casing_slabs(dk, &frame, &part, (half, h, lift), (chain_i, &edges, highway));
+            for f in &mut slabs {
+                f["properties"][Mark::DeckGroup.name()] = json!(ch.group);
+                f["properties"][Mark::DeckFull.name()] = json!(h);
+                f["properties"][Mark::DeckThick.name()] = json!(dk.thickness_m);
+                f["properties"][Mark::DeckLift0.name()] = json!(round_to(ends[0], 4));
+                f["properties"][Mark::DeckLift1.name()] = json!(round_to(ends[1], 4));
+                f["properties"][Mark::DeckS0.name()] = json!(round_to(d0 / l, 5));
+                f["properties"][Mark::DeckS1.name()] = json!(round_to(d1 / l, 5));
+            }
+            feats.extend(slabs);
         }
     }
     feats
 }
 
 /// The casing: a strip along each long side of the deck, up to just under the deck's top (an extrusion has no outline).
-fn casing_slabs(dk: &DeckLook, frame: &Frame, part: &[P], half: f64, lift: f64, (chain_i, edges, highway): (usize, &[usize], Value)) -> Vec<Value> {
+fn casing_slabs(dk: &DeckLook, frame: &Frame, part: &[P], (half, h, lift): (f64, f64, f64), (chain_i, edges, highway): (usize, &[usize], Value)) -> Vec<Value> {
     let cw = dk.casing_px * frame.mpp;
     [1.0, -1.0].into_iter().filter_map(|sgn| {
         let ring = strip(part, sgn * half, sgn * (half + cw));
         (ring.len() >= 4).then(|| json!({"type": "Feature", "properties": {
             "highway": highway, Mark::DeckChain.name(): chain_i, Mark::CasingSlab.name(): 1,
-            Mark::Edges.name(): edges.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>(), Mark::DeckBase.name(): round_to((dk.base_m * lift - 0.5).max(0.0), 2),
-            Mark::DeckHeight.name(): round_to(dk.base_m * lift + dk.thickness_m * 0.35, 2)},
+            Mark::Edges.name(): edges.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>(), Mark::DeckBase.name(): round_to((h * lift - 0.5).max(0.0), 2),
+            Mark::DeckHeight.name(): round_to(h * lift + dk.thickness_m * 0.35, 2)},
             "geometry": {"type": "Polygon", "coordinates": [frame.to_lonlat(&ring)]}}))
     }).collect()
 }
