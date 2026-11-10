@@ -102,4 +102,7 @@ pub struct Bridges {
     /// The full height in metres of a group of bridges (the bridge roads that touch each other), by the value of the edge id column of one of its roads (as text); the
     /// whole group has it, and the engine makes its ramps for it. None: the height that the length of the group gives (`bridges.decks`).
     pub heights: Option<std::collections::BTreeMap<String, f64>>,
+    /// The name of a column of the roads that has the full height in metres of the group of bridges that the road is in (a road with no value gives nothing). The
+    /// whole group has it; two heights in one group are an error, also with `heights`. None: no column.
+    pub height_col: Option<String>,
 }
