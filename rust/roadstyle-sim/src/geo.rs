@@ -55,6 +55,22 @@ impl Line {
         *self.cum.last().unwrap_or(&0.0)
     }
 
+    /// The metres from the start to the point of the line nearest to `p`.
+    pub fn project(&self, p: [f64; 2]) -> f64 {
+        let mut best = (f64::INFINITY, 0.0);
+        for i in 0..self.pts.len().saturating_sub(1) {
+            let (a, b) = (delta_m(p, self.pts[i]), delta_m(p, self.pts[i + 1]));
+            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+            let l2 = dx * dx + dy * dy;
+            let u = if l2 > 0.0 { (-(a[0] * dx + a[1] * dy) / l2).clamp(0.0, 1.0) } else { 0.0 };
+            let d = (a[0] + u * dx).hypot(a[1] + u * dy);
+            if d < best.0 {
+                best = (d, self.cum[i] + u * (self.cum[i + 1] - self.cum[i]));
+            }
+        }
+        best.1
+    }
+
     /// The point and the heading (degrees) at s metres; s is clamped to the line. A line of one point has heading 0.
     pub fn at(&self, s: f64) -> ([f64; 2], f64) {
         let n = self.pts.len();

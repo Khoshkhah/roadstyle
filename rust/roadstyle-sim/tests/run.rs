@@ -149,3 +149,25 @@ fn geo_dist(a: [f64; 2], b: [f64; 2]) -> f64 {
     let m = 6371008.8 * std::f64::consts::PI / 180.0;
     (((b[0] - a[0]) * m * k).powi(2) + ((b[1] - a[1]) * m).powi(2)).sqrt()
 }
+
+/// The tunnel flag follows the page's tunnel edges: a vehicle whose middle is on a lane of such an edge is in a tunnel, the others are
+/// not, and with no tunnel edges no vehicle is.
+#[test]
+fn tunnel_flag_follows_the_tunnel_edges() {
+    let mut run = monaco();
+    let s = &run.samples;
+    // a vehicle's lane at a sample in the middle of its rows (not internal), and that edge as the one tunnel
+    let (v, r) = (0..s.ids.len()).find_map(|v| {
+        let rows = run.rows(v);
+        rows.get(rows.len() / 2).map(|&r| (v, r as usize)).filter(|&(_, r)| !s.lanes[s.lane[r] as usize].starts_with(':'))
+    }).unwrap();
+    let lane = s.lanes[s.lane[r] as usize].clone();
+    let edge = lane.rsplit_once('_').unwrap().0.to_string();
+    let t = s.t[r] + 0.5;
+    assert!(!run.vehicle_at(v, t).unwrap().tunnel, "no tunnel edges: no tunnel");
+    run.set_tunnel_edges(&std::collections::HashSet::from([edge.clone()]));
+    let all = run.at(t);
+    let inside: Vec<_> = all.iter().filter(|st| st.tunnel).collect();
+    assert!(inside.iter().any(|st| st.vehicle == v as u32), "the vehicle on {edge} is in the tunnel at t={t}");
+    assert!(inside.len() < all.len(), "not every vehicle is in the tunnel");
+}

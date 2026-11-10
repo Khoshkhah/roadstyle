@@ -1,0 +1,11 @@
+[package]
+name = "roadstyle-camera"
+description = "The road surface under a vehicle (ground and structure heights, pitch, roll) and, later, the obstacles and the follow camera"
+version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+roadstyle-sim.workspace = true       # geo: lon/lat to metres

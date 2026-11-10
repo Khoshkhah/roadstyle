@@ -38,7 +38,7 @@ cargo build --release --manifest-path ../../rust/Cargo.toml -p roadstyle-cli
 ```
 
 ```bash
-../../rust/target/release/roadstyle page ../../rust/roadstyle-rs/tests/data/monaco/roads.parquet dashboard.html --template dashboard --vehicles '{"wasm": "./pkg/roadstyle_wasm.js", "fcd": "./data/monaco_fcd.parquet", "net": "./data/monaco.net.xml"}' --page-script "$(cat dashboard_script.js)"
+../../rust/target/release/roadstyle page ../../rust/roadstyle-rs/tests/data/monaco/roads.parquet dashboard.html --template dashboard --dashboard '{"panel": null}' --terrain true --vehicles '{"wasm": "./pkg/roadstyle_wasm.js", "fcd": "./data/monaco_fcd.parquet", "net": "./data/monaco.net.xml"}' --page-script "$(cat dashboard_script.js)"
 ```
 
 Open `http://localhost:8000/examples/vehicles/dashboard.html`. Git ignores `dashboard.html`.
