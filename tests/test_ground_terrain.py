@@ -125,8 +125,8 @@ def test_the_page_draws_the_ground_with_no_request_to_aws():
         page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rsTerrain", timeout=60_000)
         page.evaluate("""c => new Promise(ok => { document.addEventListener('rs:terrainchange', ok, {once: true});
                                                  map.jumpTo({center: c, zoom: 15, pitch: 55}); rsTerrain(true); })""", [WEST + 20 * D, NORTH - 20 * D])
-        page.wait_for_function("map.getTerrain() && map.areTilesLoaded()", timeout=30_000)
-        page.wait_for_timeout(500)
+        c = [WEST + 20.5 * D, NORTH - 20.5 * D]
+        page.wait_for_function("c => map.getTerrain() && map.areTilesLoaded() && map.queryTerrainElevation(c) !== null", arg=c, timeout=30_000)
         src = page.evaluate("(() => { const s = map.getSource('rs-dem'); return {tiles: s.tiles, maxzoom: s.maxzoom, attr: s.attribution}; })()")
         # the terrain's height at cell centres: the plane, to 0.10 m (the standard's limit)
         pts = [(cc, rr) for cc in (12, 20, 28) for rr in (12, 20, 26)]
@@ -135,7 +135,10 @@ def test_the_page_draws_the_ground_with_no_request_to_aws():
         # without the ground, the page goes back to the AWS tiles and says so
         aws_before = len(aws)
         page.evaluate("rsGround(null)")
-        page.wait_for_timeout(1500)
+        for _ in range(150):                          # until the map asks AWS for a tile (the test aborts it), at most 15 s
+            if aws:
+                break
+            page.wait_for_timeout(100)
         aws_attr = page.evaluate("map.getSource('rs-dem').attribution")
         browser.close()
     assert src["tiles"][0].startswith("rsground://") and src["maxzoom"] == 13, src
