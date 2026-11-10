@@ -255,7 +255,7 @@ height = ground(p) + structure(p)        (structure = 0 off a structure; negativ
 
 | Host | `ground` | `structure` | Source on the page |
 |---|---|---|---|
-| roadstyle | terrain (ground requests), else 0 | the deck height at `p`, by the rule of the bridge mesh: the deck is level between the ground at the two ends of its chain, the ramps rise from the ground at each free end, the group height wins over the look's `full` height | the features of the source `decks` and their marks (`__rs_lift0`, `__rs_lift1`, `__rs_full`, `__rs_group`, `__rs_s0`, `__rs_s1`, thickness), and `rsBridgeHeight` |
+| roadstyle | the conformed ground of the area's ground reference (its terrain tiles), through ground requests; else the page's terrain with "ground: AWS Terrain Tiles" shown; else 0 | the deck height at `p`, by the rule of the bridge mesh: the deck is level between the ground at the two ends of its chain, the ramps rise from the ground at each free end, the group height wins over the look's `full` height | the features of the source `decks` and their marks (`__rs_lift0`, `__rs_lift1`, `__rs_full`, `__rs_group`, `__rs_s0`, `__rs_s1`, thickness), and `rsBridgeHeight` |
 | urbanstyle | terrain if on, else 0 | level × 6 m (`DECK_M`), or the height of the `bridge.json` mesh at `p` | the level of the lane's edge; the bridge mesh vertices |
 | SimReady | the DEM that its profiles came from | the `graded` elevation profile of the carriageway at the lane's station, minus `ground` | `sim.elevation_profile` rows given to the page |
 | plain MapLibre | terrain if on, else 0 | 0 | — |
@@ -451,7 +451,7 @@ outline, the selected vehicle's outline, the brake light, the indicator, and the
 | A layer added later goes above the vehicle layer | the module moves its layer on every style event; a browser test checks the order after each kind of change |
 | float32 precision | metres from the scene origin (section 7) |
 | The terrain exaggeration differs from the structure heights | one factor for both (section 8) |
-| The DEM of the map and the heights of the road model differ (SimReady uses FABDEM, the map uses Terrarium tiles) | open question 5 |
+| The DEM of the map and the heights of the road model differ (SimReady uses FABDEM, the map uses Terrarium tiles) | the ground reference standard (duckOSM `docs/concepts/ground-reference.md`, 2026-11-09): the map's terrain is the conformed ground of the area; the run report names its ground id |
 | SwiftShader results differ from a real GPU | the speed targets are measured on a real GPU; the occlusion query results are checked on both |
 | Junction-internal lanes are 15 % of the samples (P0) | lane shapes include the internal lanes of `net.xml` |
 | Big runs do not fit in memory | row-group reading and the time window (section 5) |
@@ -464,4 +464,4 @@ To decide one at a time, before or during the phase that needs the answer:
 2. **Inline limit** (P1): is 20 MB the right limit for a run inside the page?
 3. **The default colour** (P1): by class, by type or by speed?
 4. **Live TraCI** (P6): needed soon, or later?
-5. **One ground** (P2): when a page has both SimReady heights and map terrain, which DEM does the page use?
+5. ~~**One ground**~~: decided 2026-11-09 by the ground reference standard (duckOSM `docs/concepts/ground-reference.md`).

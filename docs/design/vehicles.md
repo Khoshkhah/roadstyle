@@ -96,10 +96,10 @@ SUMO FCD (XML / CSV / Parquet)  ->  reader  ->  trajectory table + vehicle types
 | SimReady | the DEM its profiles came from | `graded` height profile; structure groups | the page's building layer |
 | plain MapLibre | terrain DEM, if on | none | the fill-extrusion layers that the page names |
 
-**One ground for all.** The map's terrain and the road model's heights must come from the same DEM and the same vertical
-datum. If they do not, the road (and the vehicle on it) floats above or sinks under the drawn ground. SimReady's Monaco
-profiles use FABDEM (EGM2008); roadstyle's terrain uses the Terrarium tiles of AWS. Open: which DEM a page uses when both
-are present (decide in P2).
+**One ground for all.** Decided 2026-11-09 by the ground reference standard (duckOSM `docs/concepts/ground-reference.md`): an
+area has one bare-earth DEM with a known vertical datum; SimReady makes the road heights and the conformed ground from it; the
+map's terrain for that area is raster tiles of the conformed ground, not the AWS Terrain Tiles; every product names its ground id.
+A page with no ground reference shows which ground it uses.
 
 **JS and WASM.** One call across the boundary for each frame, with flat arrays: JS gives the time, the terrain samples
 and the building features that MapLibre has; Rust gives the vehicle buffer and the camera. The Rust code is behind a Cargo
