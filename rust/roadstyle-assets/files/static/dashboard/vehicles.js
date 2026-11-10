@@ -160,7 +160,9 @@ async function _vhLoad(o){
   _vhScene = scene; _vhOrigin = scene.origin(); _vhColours = cols; _vhIds = scene.ids();
   _vhReport = JSON.parse(scene.report());
   _vhT = _vhReport.t0; _vhDirty = true; _vhPause();
-  if(!map.isStyleLoaded()) await new Promise(r => map.once("load", r));
+  // the style can be busy after "load" (a theme or base map change of the page): wait for an "idle" with the style loaded, not for
+  // "load", which fires once only
+  await new Promise(r => { const ok = () => map.isStyleLoaded() ? r() : map.once("idle", ok); ok(); });
   _vhLayer.id = _vhLayerId();
   if(!map.getLayer(_vhLayer.id)){ map.addLayer(_vhLayer); map.on("styledata", _vhOnTop); }
   _vhOnTop();

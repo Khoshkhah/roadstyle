@@ -28,6 +28,21 @@ The run must come from the same network as the roads of the page: duckOSM's Mona
 
 Git ignores `pkg/` and `data/`.
 
+## The dashboard page (the Rust page writer)
+
+`dashboard.html` is the same run on roadstyle's full dashboard (the panel, the toolbar, the themes), written by the Rust CLI with
+the page script `dashboard_script.js`. Build the CLI, then run this in `examples/vehicles/`:
+
+```bash
+cargo build --release --manifest-path ../../rust/Cargo.toml -p roadstyle-cli
+```
+
+```bash
+../../rust/target/release/roadstyle page ../../rust/roadstyle-rs/tests/data/monaco/roads.parquet dashboard.html --template dashboard --page-script "$(cat dashboard_script.js)"
+```
+
+Open `http://localhost:8000/examples/vehicles/dashboard.html`. Git ignores `dashboard.html`.
+
 ## Open the page
 
 Serve the root of the repository, because the page reads the modules and the data from there:
