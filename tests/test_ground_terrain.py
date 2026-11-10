@@ -125,12 +125,14 @@ def test_the_page_draws_the_ground_with_no_request_to_aws():
         page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rsTerrain", timeout=60_000)
         page.evaluate("""c => new Promise(ok => { document.addEventListener('rs:terrainchange', ok, {once: true});
                                                  map.jumpTo({center: c, zoom: 15, pitch: 55}); rsTerrain(true); })""", [WEST + 20 * D, NORTH - 20 * D])
-        c = [WEST + 20.5 * D, NORTH - 20.5 * D]
-        page.wait_for_function("c => map.getTerrain() && map.areTilesLoaded() && map.queryTerrainElevation(c) !== null", arg=c, timeout=30_000)
-        src = page.evaluate("(() => { const s = map.getSource('rs-dem'); return {tiles: s.tiles, maxzoom: s.maxzoom, attr: s.attribution}; })()")
         # the terrain's height at cell centres: the plane, to 0.10 m (the standard's limit)
         pts = [(cc, rr) for cc in (12, 20, 28) for rr in (12, 20, 26)]
-        got = page.evaluate("pts => pts.map(p => map.queryTerrainElevation(p))", [[WEST + (cc + 0.5) * D, NORTH - (rr + 0.5) * D] for cc, rr in pts])
+        lnglats = [[WEST + (cc + 0.5) * D, NORTH - (rr + 0.5) * D] for cc, rr in pts]
+        # MapLibre gives 0 (not null) where its terrain tile has not come yet: the plane is above 100 m everywhere
+        page.wait_for_function("ps => map.getTerrain() && map.areTilesLoaded() && ps.every(p => map.queryTerrainElevation(p) > 50)", arg=lnglats, timeout=30_000)
+        got = page.evaluate("ps => ps.map(p => map.queryTerrainElevation(p))", lnglats)
+        # the source's fields: MapLibre fills `tiles` when the source has loaded, so after the tiles
+        src = page.evaluate("(() => { const s = map.getSource('rs-dem'); return {tiles: s.tiles, maxzoom: s.maxzoom, attr: s.attribution}; })()")
         assert all(g is not None and abs(g - _plane(cc, rr)) <= 0.10 for g, (cc, rr) in zip(got, pts, strict=True)), list(zip(got, pts, strict=True))
         # without the ground, the page goes back to the AWS tiles and says so
         aws_before = len(aws)
