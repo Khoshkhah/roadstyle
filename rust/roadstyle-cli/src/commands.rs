@@ -22,6 +22,10 @@ usage:
       keyword of render (--no-tiles for GeoJSON roads, --views '{\"plain\": {\"road_fill\": false}}').
   roadstyle tiles <stage 1 dir> <out> [--format pmtiles|xyz] [--tile-format mlt|mvt] [--keep COL,COL] [--base-url URL]
       stage 2: the vector tiles of stage 1's files (tile_geojson): one PMTiles file, or <out>/roads/{z}/{x}/{y} and style.json.
+  roadstyle terrain <elevation_grid.parquet> <out.pmtiles> [--ground FILE.json]
+      the terrain file of an area: Terrarium PNG tiles in one PMTiles archive, made from its ground grid (duckOSM
+      elevation_grid_main.parquet: col, row, lon, lat, z). --ground: the ground's facts (id, source, product, vertical_datum,
+      resolution_m, license) for the file's metadata. The page option `ground` reads the file (docs/design/ground_terrain.md).
   roadstyle levels make <edges> <area folder> [--id-col edge_id] [--band-col C] [--order priority|class|none|C]
                     [--band-dist 10] [--head-m 5] [--near-rules] [--highway-col highway] [--layer-col layer] [--bridge-col bridge]
                     [--tunnel-col tunnel] [--junction-col junction]
@@ -223,6 +227,33 @@ fn tiles_cmd(src: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> 
     Ok(())
 }
 
+/// `terrain <grid> <out>`: the terrain file of a ground grid (roadstyle_tiles::terrain).
+fn terrain_cmd(grid: &str, out: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Error> {
+    let ground = match take(opts, "ground") {
+        Some(f) => serde_json::from_str(&std::fs::read_to_string(&f).map_err(|e| Error::File(format!("{f}: {e}")))?)
+            .map_err(|e| Error::Usage(format!("--ground {f}: not JSON: {e}")))?,
+        None => serde_json::json!({}),
+    };
+    no_more(opts)?;
+    let data = std::fs::read(grid).map_err(|e| Error::File(format!("{grid}: {e}")))?;
+    let rows = roadstyle::read::read_table(data, "").map_err(|e| Error::File(format!("{grid}: {e}")))?;
+    let (mut col, mut row, mut lon, mut lat, mut z) = (vec![], vec![], vec![], vec![], vec![]);
+    for r in &rows {
+        let f = |k: &str| r.cols.get(k).and_then(serde_json::Value::as_f64);
+        let need = |k: &str| f(k).ok_or_else(|| Error::File(format!("{grid}: a row has no number in the column {k}")));
+        col.push(need("col")? as i32);
+        row.push(need("row")? as i32);
+        lon.push(need("lon")?);
+        lat.push(need("lat")?);
+        z.push(f("z").unwrap_or(f64::NAN));
+    }
+    let g = roadstyle::tiles::terrain::Ground::from_cells(&col, &row, &lon, &lat, &z).map_err(|e| Error::Engine(format!("terrain: {e}")))?;
+    let bytes = roadstyle::tiles::terrain::terrain_pmtiles(&g, &ground);
+    std::fs::write(out, &bytes).map_err(|e| Error::File(format!("{out}: {e}")))?;
+    println!("{out} {} bytes, zooms {} to {}", bytes.len(), bytes[100], bytes[101]);
+    Ok(())
+}
+
 pub fn run(args: &[String]) -> Result<(), Error> {
     let (cmd, rest) = args.split_first().ok_or(Error::Usage(USAGE.into()))?;
     let (pos, mut opts) = split(rest);
@@ -230,6 +261,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
         ("sources", [roads, out]) => sources_cmd(roads, out, &mut opts),
         ("page", [roads, out]) => page_cmd(roads, out, &mut opts),
         ("tiles", [src, out]) => tiles_cmd(src, out, &mut opts),
+        ("terrain", [grid, out]) => terrain_cmd(grid, out, &mut opts),
         ("levels", [sub, rest @ ..]) => levels(sub, rest, opts),
         ("design", [sub, roads]) if sub == "edit" => design_edit(roads, &mut opts),
         ("serve", [area]) => serve(area, &mut opts),

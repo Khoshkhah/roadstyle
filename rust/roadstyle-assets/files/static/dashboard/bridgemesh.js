@@ -8,6 +8,7 @@
 // THE TERRAIN: with the 3D terrain on, a deck is level between the ground heights at the two end nodes of its chain (`__rs_enda`, `__rs_endb`; `__rs_s0`, `__rs_s1`:
 // where a piece is along its chain), and its ramps rise from the ground at each free end. The heights come from the terrain's tiles, read here (`_bmDemAt`).
 import {map, O, RS_PREFIX, style, _src, _sfeats, _emit} from "./core.js";
+import {_elDemTile, _elDemMaxZoom} from "./elevation.js";
 
 const _bmId = () => RS_PREFIX + "roads-bridge-mesh";
 const _bmDeck = () => RS_PREFIX + "roads-bridge-decks", _bmCasing = () => RS_PREFIX + "roads-deck-casing";
@@ -49,7 +50,7 @@ function _bmColour(k){
   return [c.r * u * 255, c.g * u * 255, c.b * u * 255, a * op * 255].map(v => Math.max(0, Math.min(255, Math.round(v))));
 }
 
-// THE GROUND HEIGHT comes from the terrain's own tiles (the DEM of O.ontop.dem), read here and not from the map: map.queryTerrainElevation knows only the tiles of
+// THE GROUND HEIGHT comes from the terrain's own tiles (the page's one DEM: the ground's file, else O.ontop.dem; elevation.js _elDemTile), read here and not from the map: map.queryTerrainElevation knows only the tiles of
 // the screen, and a bridge is longer than the screen (the chain that has no height at its far end would not be drawn). The tiles are the ones that the map draws its terrain
 // from (the same source, the same zoom limit), decoded as the map decodes them (Terrarium) and read with the map's own bilinear step, so a deck and the ground agree.
 const _bmDemTiles = new Map();                       // "z/x/y" -> Float32Array(256 * 256) | "loading" | "failed"
@@ -58,13 +59,9 @@ function _bmDemTile(z, x, y){
   const k = z + "/" + x + "/" + y, t = _bmDemTiles.get(k);
   if(t) return t === "loading" || t === "failed" ? null : t;
   _bmDemTiles.set(k, "loading");
-  const url = O.ontop.dem.tiles[0].replace("{z}", z).replace("{x}", x).replace("{y}", y);
-  fetch(url).then(r => { if(!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
-    .then(b => createImageBitmap(b, {colorSpaceConversion: "none"}))
-    .then(img => {
-      const cv = document.createElement("canvas"); cv.width = cv.height = 256;
-      const cx = cv.getContext("2d", {willReadFrequently: true}); cx.drawImage(img, 0, 0);
-      const px = cx.getImageData(0, 0, 256, 256).data, out = new Float32Array(65536);
+  _elDemTile(z, x, y)
+    .then(px => {
+      const out = new Float32Array(65536);
       for(let i = 0; i < 65536; i++) out[i] = px[i * 4] * 256 + px[i * 4 + 1] + px[i * 4 + 2] / 256 - 32768;      // Terrarium
       _bmDemTiles.set(k, out); _bmGeom = true; map.triggerRepaint();
     })
@@ -73,7 +70,7 @@ function _bmDemTile(z, x, y){
       const tries = (_bmDemTries.get(k) || 0) + 1; _bmDemTries.set(k, tries);
       if(tries < 3){ _bmDemTiles.delete(k); setTimeout(() => { _bmGeom = true; map.triggerRepaint(); }, 1500 * tries); return; }
       _bmDemTiles.set(k, "failed");
-      console.warn("roadstyle: a terrain tile did not come (" + url + "): " + e.message + "; the bridges that need it are not drawn on the terrain");
+      console.warn("roadstyle: a terrain tile did not come (" + k + "): " + e.message + "; the bridges that need it are not drawn on the terrain");
     });
   return null;
 }
@@ -81,7 +78,7 @@ function _bmDemTile(z, x, y){
 // map's own (it equals map.queryTerrainElevation over the screen to the last digit): the pixel at its corner, a bilinear mix of four, and at the edge of a tile the
 // pixels of the next tile.
 function _bmDemAt(lng, lat){
-  const z = O.ontop.dem.maxzoom, n = 2 ** z, la = lat * Math.PI / 180;
+  const z = _elDemMaxZoom(), n = 2 ** z, la = lat * Math.PI / 180;
   const xf = (lng + 180) / 360 * n, yf = (1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n;
   const tx = Math.floor(xf), ty = Math.floor(yf), fx = (xf - tx) * 256, fy = (yf - ty) * 256, x0 = Math.floor(fx), y0 = Math.floor(fy), u = fx - x0, v = fy - y0;
   let miss = false;
