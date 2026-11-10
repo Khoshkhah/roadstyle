@@ -43,7 +43,7 @@ export function dataDock(o = {}){
   if(typeof o.query !== "function" || typeof o.schema !== "function") throw new Error("dataDock: query and schema are necessary.");
   if((o.tables || []).length && typeof o.load !== "function") throw new Error("dataDock: tables need load (the host loads each one).");
   const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
-  const KINDS = Object.entries(o.kinds || {}), kl = KINDS.length ? dockKinds(o.map || window.map) : null;      // the kinds of the host (docs/design/dock_kinds.md)
+  const KINDS = Object.entries(o.kinds || {}), kl = KINDS.length ? dockKinds(o.map || window.map, {onPick: (f) => mapPick(f)}) : null;      // the kinds of the host (docs/design/dock_kinds.md)
   // the data is ready when the host's data is loaded and every table of the page too; a table that does not load does not stop the others
   const ready = (async () => { await o.ready; for(const t of o.tables || []) await Promise.resolve(o.load(t)).catch((e) => console.warn(`dataDock: the table ${t.name} did not load: ${e.message}`)); })();
   let loaded = false; ready.then(() => { loaded = true; }, () => {});
@@ -155,7 +155,29 @@ export function dataDock(o = {}){
   const CHIPS = new Set(["name", "highway", "length_m", "maxspeed_kmh", "oneway", "driving", "walking", "cycling", ID]);
   const val = (v) => typeof v === "boolean" ? (v ? "yes" : "no") : typeof v === "number" ? (Number.isInteger(v) ? fmt(v) : fmt(+v.toFixed(Math.abs(v) < 100 ? 1 : 0))) : String(v);
   const metres = (m) => m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)} km` : `${Math.round(m)} m`;
-  function drawCard(p, roadId){
+  // The row that the person clicked in the table (a result with edge_id): the card shows the road and, under it, the section "This row" with the columns of the row (a lane's
+  // width_m, a bus route's seq). A column that the card already shows with the same value is left out. A value is as the table shows it: a BigInt and a text as they are, a number
+  // to 3 decimals at most. A geometry column is drawn on the map, so it is not here.
+  const cellText = (v) => v == null ? "null" : typeof v === "number" && !Number.isInteger(v) ? String(+v.toFixed(3)) : String(v);
+  const SHAPE = /^(geometry|geom)$/;
+  function onCard(p, k, v){      // the road card shows this property with this value (exactly: the length in a chip is rounded, so it is not here)
+    if(p[k] == null || String(p[k]) !== String(v)) return false;
+    if(k === ID || k === "name" || k === "highway" || k === "maxspeed_kmh") return true;
+    if(k === "oneway" || k === "driving" || k === "walking" || k === "cycling") return p[k] === true;
+    if(CHIPS.has(k) || DRAWING.test(k) || typeof p[k] === "object") return false;
+    return p[k] !== "";
+  }
+  function rowSection(p, row){
+    const dl = $("dl", "rs-dd-rc-rows");
+    for(const [k, v] of Object.entries(row)){
+      if(SHAPE.test(k) || onCard(p, k, v)) continue;
+      const dt = $("dt", "", k.replace(/_/g, " ")), dd = $("dd", "", cellText(v)); if(dd.textContent.length > 28) dd.title = dd.textContent; dl.append(dt, dd);
+    }
+    if(!dl.childElementCount) return null;
+    const box = $("div", "rs-dd-rc-sec"); box.append($("b", "rs-dd-rc-sec-t", "This row"), dl);
+    return box;
+  }
+  function drawCard(p, roadId, row = null){
     const hd = $("div", "rs-dd-rc-hd"), x = $("button", "rs-dd-rc-x", "\u2715");
     x.type = "button"; x.title = "Close the card"; x.setAttribute("aria-label", x.title); x.onclick = () => rs.select(null);
     hd.append($("b", "rs-dd-rc-name", p.name || p.ref || "A road with no name"), x);
@@ -176,7 +198,8 @@ export function dataDock(o = {}){
     copy.onclick = async () => { try{ await navigator.clipboard.writeText(idv); copy.textContent = "Copied"; setTimeout(() => { copy.textContent = "Copy id"; }, 1200); }catch(e){} };
     zoom.onclick = () => rs.focus([idv]);
     foot.append($("span", "rs-dd-rc-id", `${ID} ${idv}`), copy, zoom);
-    card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), foot);
+    const sec = row ? rowSection(p, row) : null;
+    card.replaceChildren(hd, chips, ...(rows.childElementCount ? [rows] : []), ...(sec ? [sec] : []), foot);
   }
   // the facts card of an item that is not a road: a title, a chip, rows of [name, value] and an id with Copy id. An overlay item (a building, a
   // crossing; Kaveh, 2026-11-07: "click on item should show info into sql panel card info") and the page's own card (`data.card`) draw it. `onClose` is
@@ -225,7 +248,7 @@ export function dataDock(o = {}){
   // the page's own card (`data.card({title, chip, rows, id})`, Kaveh, 2026-11-07: "each selecting from table must show that item on map also shows its info
   // in card info in sql panel"): for a row of a result that is not a road (a node, a building, a wall), which the page draws on the map itself. The close
   // button, a new selection, a new result and `data.card(null)` close it; the event `cardclose` tells the page (it removes its own selection on the map).
-  let hostCard = false;
+  let hostCard = false, pendingRow = null;
   const closeHostCard = (tell = true) => {
     if(!hostCard) return;
     hostCard = false; cardSeq++; card.hidden = true; table.clear(); paintSide();
@@ -236,7 +259,8 @@ export function dataDock(o = {}){
   const paintSide = () => { const none = list.hidden && card.hidden; hint.hidden = !none; side.classList.toggle("empty", none); };
   document.addEventListener("rs:select", (e) => { if(o.card === false) return;
     closeHostCard();
-    if(e.detail.overlay) drawItem(e.detail); else drawCard(e.detail.properties || {}, e.detail.id);
+    const pr = pendingRow; pendingRow = null;      // the row that a click in the table made this selection with (not a click on the map)
+    if(e.detail.overlay) drawItem(e.detail); else drawCard(e.detail.properties || {}, e.detail.id, pr && String(pr.id) === String((e.detail.properties || {})[ID] ?? e.detail.id) ? pr.row : null);
     showCard(); });
   document.addEventListener("rs:deselect", () => { card.hidden = true; paintSide(); closeHostCard(); });
 
@@ -457,7 +481,9 @@ export function dataDock(o = {}){
   }
   // the card of an object: the title is its name, else "<label> <id>"; the facts are the other columns; a column `tags` is one row for each tag
   function kindFacts(own, key, shaped = true){      // parts: the roles of the object, with their colours (a swatch for each)
-    const f = own.facts.get(key) || {}, rows = shaped ? [] : [["on the map", own.noShape ? `no: ${own.noShape}` : "no"]];      // a row with no shape (geom: null)
+    const f = own.facts.get(key) || {}, known = own.facts.has(key);
+    // a row with no shape (geom: null), or a row that the kind has no entry for (a row after the cut of 20 000, or an id the kind does not know)
+    const rows = shaped ? [] : [["on the map", !known ? "no object found for this row" : own.noShape ? `no: ${own.noShape}` : "no"]];
     for(const [k, v] of Object.entries(f)){
       if(k === "name" || k === "tags") continue;
       rows.push([k, v]);
@@ -472,11 +498,15 @@ export function dataDock(o = {}){
   let cardSeq = 0;
   function kindPick(own, r, cols){
     const v = colsOf(own.column).map((n) => r[cols.findIndex((c) => c.name === n)]); if(v.some((y) => y == null)) return;
-    const key = keyOfId(v), fs = own.features.filter((x) => x.properties.rs_id === key); if(!fs.length && !own.facts.has(key)) return;
+    kindShow(own, keyOfId(v), Object.fromEntries(cols.map((c, i) => [c.name, r[i]])));
+  }
+  // the object of a key: selected, the camera on it, the card. A row with no object (a row after the cut, an id that the kind does not know) gets the card too, with the reason.
+  function kindShow(own, key, row){
+    const fs = own.features.filter((x) => x.properties.rs_id === key);
     rs.select(null);
     kl.select(fs); if(fs.length) kl.fit(fs, rs.dock.height ? rs.dock.height() : 0);
     const base = kindFacts(own, key, !!fs.length), mine = ++cardSeq, onClose = () => closeHostCard();
-    const info = {id: key, kind: own.name, label: own.label, row: Object.fromEntries(cols.map((c, i) => [c.name, r[i]])), facts: own.facts.get(key) || {}, parts: own.parts.get(key) || []};
+    const info = {id: key, kind: own.name, label: own.label, row, facts: own.facts.get(key) || {}, parts: own.parts.get(key) || []};
     const msg = (e) => String((e && e.message) || e);
     let spec = {};
     const show = (patch = {}) => {
@@ -504,10 +534,19 @@ export function dataDock(o = {}){
       got.then((x) => show({...(x || {}), loading: false}), (e) => { console.error(`dataDock: the card of the kind "${own.name}" failed: ${msg(e)}`); show({loading: false, error: msg(e)}); });
     }else show(got || {});
   }
+  // a click on an object on the map: its row in the table is marked and scrolled to, and the row's card opens, as a click on the row does. A row that the table does not hold
+  // (the table has the first rows only) has the card too.
+  function mapPick(f){
+    const own = res && res.__own; if(!own) return;
+    const key = f.properties.rs_id, cs = colsOf(own.column);
+    const i = table.choose((row, cols) => keyOfId(cs.map((n) => row[cols.findIndex((c) => c.name === n)])) === key);
+    if(i >= 0){ rowClick(table.rows()[i], res.columns); return; }
+    kindShow(own, key, {});
+  }
   async function rowClick(r, cols){
     if(kl && res && res.__own && !cols.some((c) => c.name === ID)){ kindPick(res.__own, r, cols); return; }
     const i = cols.findIndex((c) => c.name === ID);
-    if(i >= 0){ const idv = String(r[i]); rs.select(idv); rs.focus([idv]); return; }
+    if(i >= 0){ const idv = String(r[i]); pendingRow = {id: idv, row: Object.fromEntries(cols.map((c, j) => [c.name, r[j]]))}; rs.select(idv); rs.focus([idv]); return; }
     const k = res && keyOf(res); if(!k) return;
     const v = r[cols.findIndex((c) => c.name === k)]; if(v == null) return;
     const q = await query(o.roadsBy(`SELECT ${quoteId(k)} FROM (SELECT ${lit(v)} AS ${quoteId(k)}) AS rs_v`, k), MAP_LIMIT), j = q.columns.findIndex((c) => c.name === ID);
@@ -669,7 +708,8 @@ export function dataDock(o = {}){
   }
   // Reset (Kaveh, 2026-11-07: "it needs a reset button for reset map and also make the table empty"): the map has its own colours again (no colour layer, no focus,
   // no lit road, no selected road, no card) and the table has no result; the SQL text stays. The map switch, the camera, the theme and the layers of the
-  // page are the person's: Reset does not touch them.
+  // page are the person's: Reset does not touch them. One exception, by the event `rs:dockreset`: Ask (ask/ask_panel.js) puts back the layers, the base map, the
+  // theme, the 3D view, the road fill and the tunnel look that its own set_map changed (2026-11-10), but not the camera, and not a key that the person changed after Ask.
   function reset(){
     if(ctl) ctl.abort();
     layers.length = 0; res = null; err.textContent = "";

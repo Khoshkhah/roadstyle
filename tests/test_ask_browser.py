@@ -861,3 +861,68 @@ def test_with_no_examples_option_the_general_groups_show_and_the_hosts_own_come_
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_reset_puts_back_what_ask_changed_but_not_what_the_person_changed(tmp_path):
+    """Ask hides the water and the waterways, goes dark and moves the camera. Reset (the dock's button) shows the layers and brings the light theme back, and leaves the
+    camera. A layer the person had switched off before stays off; a layer that the person switched on after Ask stays on (the person's change)."""
+    import geopandas as gpd
+    from shapely.geometry import LineString, box
+    gdf = lambda g: gpd.GeoDataFrame(geometry=[g], crs=4326)      # noqa: E731
+    overlays = [rs.Overlay(gdf(box(18.0, 59.30, 18.005, 59.305)), kind="fill", label="Water", popup=[]),
+                rs.Overlay(gdf(LineString([(18.0, 59.31), (18.01, 59.31)])), kind="line", label="Waterways", popup=[]),
+                rs.Overlay(gdf(box(18.01, 59.30, 18.015, 59.305)), kind="fill", label="Parks", popup=[]),
+                rs.Overlay(gdf(box(18.02, 59.30, 18.025, 59.305)), kind="fill", label="Rail", popup=[])]
+    on = "(() => Object.fromEntries(Object.entries(rs.getState().overlays).map(([k, v]) => [k, v.visible !== false])))()"
+    with served(tmp_path, overlays=overlays) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open(); rs.setState({overlays: {Parks: {visible: false}}})")                  # the person switched Parks off by hand
+            assert page.evaluate(on) == {"Water": True, "Waterways": True, "Parks": False, "Rail": True}
+            _ask(page, "Turn off the water and the waterways layers, dark, go to 18.01 59.305", [
+                "tool('set_map', {overlays: {water: false, waterways: false}, theme: 'dark', camera: {center: [18.01, 59.305], zoom: 15}})", "say('Done.')"])
+            assert page.evaluate(on) == {"Water": False, "Waterways": False, "Parks": False, "Rail": True}
+            assert page.evaluate("document.documentElement.dataset.rsTheme") == "dark"
+            page.evaluate("rs.setState({overlays: {Waterways: {visible: true}}})")                                          # the person switches Waterways on again
+            before = page.evaluate("rs.getState().camera.center")
+            page.evaluate("data.open()")
+            page.click("#rs-dock .rs-dd-q button[title='Reset the map and the table']")
+            page.wait_for_function("rs.getState().overlays.Water.visible !== false")
+            assert page.evaluate(on) == {"Water": True, "Waterways": True, "Parks": False, "Rail": True}                    # Parks stays off: the person's
+            assert page.evaluate("document.documentElement.dataset.rsTheme") == "light"
+            assert page.evaluate("rs.getState().camera.center") == before                                                    # the camera is the person's
+            # nothing is remembered after a Reset: a second Reset changes nothing
+            page.evaluate("rs.setState({overlays: {Water: {visible: false}}})")
+            page.click("#rs-dock .rs-dd-q button[title='Reset the map and the table']")
+            page.wait_for_timeout(300)
+            assert page.evaluate(on)["Water"] is False
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_the_prompt_says_to_answer_the_last_message_and_an_earlier_turn_carries_its_tools_line(tmp_path):
+    """2026-11-10 (Haiku): after a chart, "Turn off the water" ran a query and drew the chart again, and the model said that its first reply was wrong. The history had only
+    the user's text and the answer, so the model could not know what the tools did. Now the prompt has the rule, and the answer of an earlier turn ends with one line of its tools."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open()")
+            _ask(page, "A bar chart of the roads by class", [
+                "tool('run_query', {sql: 'SELECT edge_id, lenght FROM edges'})",                                       # fails: a column that is not there
+                "tool('draw_chart', {sql: 'SELECT highway, count(*) AS roads FROM edges GROUP BY highway', kind: 'bar', x: 'highway', y: 'roads'})",
+                "say('Done.')"])
+            system = page.evaluate("window.calls[0].messages[0].content")
+            assert "Answer only what the LAST message asks" in system and "set_map only: no query and no chart" in system and "[tools: ...]" in system
+            _ask(page, "Turn off the water and the waterways layers", ["tool('set_map', {overlays: {water: false}})", "say('Off.')"])
+            earlier = page.evaluate("window.calls[3].messages.filter(m => m.role === 'assistant').at(0).content")      # call 3 = the first call of the second turn
+            assert earlier.startswith("Done.\n[tools: run_query failed: ") and "lenght" in earlier, earlier
+            assert earlier.endswith("; draw_chart bar by highway: ok]"), earlier
+            # the line is in the history of the next calls, not in the answer that the person reads
+            assert "[tools" not in page.locator(".rs-ask-turn").first.inner_text() and page.evaluate("window.answers[0].text") == "Done."
+            # set_map gives its own words (here the page has no layer, so "Nothing changed.")
+            _ask(page, "Thanks. And the base map?", ["say('Fine.')"])
+            assert "[tools: set_map: " in page.evaluate("window.calls.at(-1).messages.filter(m => m.role === 'assistant').at(1).content")
+        finally:
+            browser.close()
+    assert errors == [], errors

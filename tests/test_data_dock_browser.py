@@ -29,6 +29,9 @@ const CANNED = {
      rows: [1, 2, 3, 4, 5, 6].map(i => [BigInt(i), "Street " + (i - 1), classes[i - 1]])},
   "SELECT edge_id, length_m FROM big": {columns: [["edge_id", "BIGINT"], ["length_m", "DOUBLE"]],
      rows: Array.from({length: 2765}, (_, i) => [BigInt(i % 6 + 1), (i * 7919) % 2765 + 0.5])},
+  [`SELECT edge_id, lane_num, "use", width_m, source FROM lane_profile`]: {columns: [["edge_id", "BIGINT"], ["lane_num", "INTEGER"], ["use", "VARCHAR"], ["width_m", "DOUBLE"], ["source", "BIGINT"]],
+     rows: [[2n, 1, "driving", 3.2500000001, 9223372036854775807n], [2n, 2, "cycling", 1.5, null], [3n, 1, "driving", 3, 7n]]},
+  "SELECT edge_id, name FROM same_edges": {columns: [["edge_id", "BIGINT"], ["name", "VARCHAR"]], rows: [[2n, "Street 1"]]},
   "SELECT name FROM edges": {columns: [["name", "VARCHAR"]], rows: [["Street 1"], ["Street 4"]]},
   "SELECT * FROM main.edges": {columns: [["edge_id", "BIGINT"], ["name", "VARCHAR"]], rows: [[1n, "Street 0"]]},
   "SELECT day FROM days": {columns: [["day", "Date32<DAY>"]], rows: [[1781049600000]]},
@@ -451,6 +454,66 @@ def test_a_click_on_a_row_tells_the_page_and_the_page_fills_the_card(tmp_path):
             page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 6")
             page.click("#rs-dock tbody tr >> nth=0")
             assert page.evaluate("rowEv.at(-1).rowId") == "1" and page.evaluate("rowEv.at(-1).columns[0]") == "edge_id"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_a_road_row_of_another_table_shows_its_own_columns_in_the_card(tmp_path):
+    """A result with edge_id (lane_profile: several rows for one road): a click on a row selects the road, and the card has the road and the section "This row" with
+    the columns of the clicked row, as the table shows them (a lane's width_m, a 64-bit id). The edge_id and a column that the card already shows are not repeated; a
+    result of the road's own columns has no section; a click on the map has none."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate('''releaseLoad(); data.open(); data.run('SELECT edge_id, lane_num, "use", width_m, source FROM lane_profile')''')
+            page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 3")
+            sec = "#rs-dock .rs-dd-rc-sec"
+            rows = "[...document.querySelectorAll('#rs-dock .rs-dd-rc-sec dt, #rs-dock .rs-dd-rc-sec dd')].map(e => e.textContent)"
+            page.click("#rs-dock tbody tr >> nth=0")
+            page.wait_for_selector(sec)
+            assert page.text_content("#rs-dock .rs-dd-rc-sec-t") == "This row"
+            assert page.evaluate(rows) == ["lane num", "1", "use", "driving", "width m", "3.25", "source", "9223372036854775807"], page.evaluate(rows)
+            assert "Street 1" in page.inner_text("#rs-dock .rs-dd-card") and page.evaluate("rs.getState().selection") == "2"      # the road's card is there too
+            # the second lane of the same road: its own columns, and a null as the table shows it
+            page.click("#rs-dock tbody tr >> nth=1")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-sec dd:nth-of-type(3)')?.textContent === '1.5'")
+            assert page.evaluate(rows) == ["lane num", "2", "use", "cycling", "width m", "1.5", "source", "null"]
+            # the road's own columns, with the values the card shows: no section
+            page.evaluate("data.run('SELECT edge_id, name FROM same_edges')")
+            page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 1")
+            page.click("#rs-dock tbody tr >> nth=0")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'Street 1'")
+            assert page.locator(sec).count() == 0
+            # a click on the map (Ask, the page) selects the road with no row section
+            page.evaluate('''data.run('SELECT edge_id, lane_num, "use", width_m, source FROM lane_profile')''')
+            page.wait_for_function("document.querySelectorAll('#rs-dock tbody tr').length === 3")
+            page.click("#rs-dock tbody tr >> nth=2")
+            page.wait_for_selector(sec)
+            page.evaluate("rs.select('4')")
+            page.wait_for_function("document.querySelector('#rs-dock .rs-dd-rc-name')?.textContent === 'Street 3'")
+            assert page.locator(sec).count() == 0
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_the_guard_lets_a_column_called_use_pass_and_still_refuses_a_use_statement(tmp_path):
+    """lane_profile.use is a real column. A refused word that is a name (after SELECT, a comma, AS, WHERE, BY, a dot, an operator, `(`) passes; the same word as
+    a statement (the start of the text, or after the `)` of a WITH) is refused."""
+    ok = ["SELECT use FROM driving.lane_profile", "SELECT lane_num AS use FROM t", "SELECT a.use, b.set FROM a JOIN b ON a.id = b.id WHERE use = 'x' ORDER BY use",
+          "SELECT count(use) FROM t GROUP BY use", "SELECT edge_id, use, width_m FROM driving.lane_profile WHERE use <> 'bike' AND set IS NULL",
+          "WITH l AS (SELECT use FROM t) SELECT use FROM l"]
+    bad = ["USE other", "use other;", "(USE x)", "SELECT 1; USE x", "SELECT 1; DROP TABLE t", "WITH a AS (SELECT 1) INSERT INTO t SELECT * FROM a",
+           "WITH a AS (SELECT 1) DELETE FROM t", "WITH a AS (SELECT 1) UPDATE t SET x = 1", "WITH a AS (SELECT 1) COPY t TO 'x'", "SET threads = 1", "SELECT 1 FROM t SET x = 1",
+           "WITH a AS (SELECT 1) SET x = 1", "WITH a AS (SELECT 1) USE db"]
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            got = page.evaluate("""async ([ok, bad]) => { const g = (await import("./dashboard/data/guard.js")).guard;
+                                  return [ok.map((s) => g(s).ok), bad.map((s) => g(s).ok)]; }""", [ok, bad])
+            assert got[0] == [True] * len(ok), [s for s, r in zip(ok, got[0], strict=True) if not r]
+            assert got[1] == [False] * len(bad), [s for s, r in zip(bad, got[1], strict=True) if r]
         finally:
             browser.close()
     assert errors == [], errors

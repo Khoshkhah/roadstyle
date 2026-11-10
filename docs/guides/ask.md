@@ -233,6 +233,10 @@ Then click an example question or type your own. The agent writes the SQL, the t
 
     A layer or a base map that does not exist is named in the answer (`not_found`), so the agent can fix the call; the other changes are made. A wrong camera (a zoom over 22, a latitude over 90) is an error for the model. A change shows as one line "MAP" on the card.
 
+    **Only the last message.** The system prompt tells the agent to answer only what the last message asks: a message about the map (layers, base map, theme, 3D view, camera) needs `set_map` only, with no query and no chart; it does not repeat the query or the chart of an earlier question, and it does not comment on earlier answers unless the person asks. The history that the agent gets for an earlier turn is the question, the answer and one line of what the tools did, for example `[tools: run_query failed: ...; draw_chart bar by highway: ok]` or `[tools: set_map: Map: Water off.]`. The line is true, so the agent does not invent a failure of an earlier step; the card shows only the answer.
+
+    **Reset undoes `set_map`.** Ask remembers, for each layer, the base map, the theme, the 3D view, the road fill and the tunnel look that `set_map` changes, the value before the first change since the last Reset. The Reset button of [the data dock](data-dock.md#the-line) (the document event `rs:dockreset`) puts these values back and forgets them. A value comes back only when it is still as Ask left it: a layer that the person switched by hand after Ask, or before Ask, is the person's and stays. The camera is not undone.
+
     The camera has one path. `set_map` jumps to the camera it is given. `move_map` flies to roads (`rs.focus`). The last one in an answer wins: when `set_map` moved the camera, Ask does not fly to the roads of the table again.
 
 ### The host's own tools { .rs-part }
