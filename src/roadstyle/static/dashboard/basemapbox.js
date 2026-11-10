@@ -8,7 +8,7 @@
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson, rsBuildingsOpacity} from "./basemap.js";
-import {_elHillshade, rsTerrain, rsTerrainTunnels, _elTunnels, _elTerrainByPerson} from "./elevation.js";
+import {_elHillshade, rsTerrain, rsTerrainTunnels, rsGround, _elTunnels, _elTerrainByPerson} from "./elevation.js";
 import {rsArrowsOn, rsHasArrows, rsSetArrows, _arApply} from "./arrows.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
@@ -114,6 +114,7 @@ export function buildBox(menu){
   tops.terrain.c.onchange = () => { _bxSet("terrain", tops.terrain.c.checked); _elTerrainByPerson(tops.terrain.c.checked); };
   window.rsHillshade = on => { if(on === undefined) return tops.hillshade.c.checked; tops.hillshade.c.checked = !!on; apply(); return !!on; };
   window.rsTerrain = rsTerrain;
+  window.rsGround = rsGround;
   window.rsTerrainTunnels = rsTerrainTunnels;
   document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };

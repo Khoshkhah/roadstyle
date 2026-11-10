@@ -46,6 +46,11 @@ pub struct PageOptions {
     pub terrain_exaggeration: Option<f64>,
     /// the tunnels while the 3D terrain is on: "show" (as they are), "fade" (drawn at `ontop.terrain.tunnel_fade`), "hide" (not drawn). No height of their own: MapLibre has none for a line
     pub terrain_tunnels: String,
+    /// the area's ground (docs/design/ground_terrain.md): {id, source, product, vertical_datum, resolution_m, license, terrain}, `terrain` the
+    /// URL of its terrain file (a PMTiles archive of Terrarium PNG tiles; a `data:` URL embeds it). The hillshade and the 3D terrain then
+    /// come from that file, not from `ontop.dem`. Null: an area with no ground, drawn with `ontop.dem` (the AWS Terrain Tiles)
+    #[serde(default)]
+    pub ground: Value,
     /// the opacity of the 3D buildings of a vector base map, 0 to 1 (`buildings_opacity=`); `None`: `ontop.buildings.opacity` of data/basemaps.json (1, solid)
     pub buildings_opacity: Option<f64>,
     /// a tiled page (the roads in the embedded PMTiles archive)
@@ -252,9 +257,11 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
                                     ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
+    if p.tiles.is_some() || !page.ground.is_null() {
+        parts = format!("<script>{}</script>", PMTILES_JS.replace("</script>", "<\\/script>"));       // the roads' archive and the ground's terrain file
+    }
     if let Some(pmt) = p.tiles {
-        parts = format!("<script>{}</script>{}", PMTILES_JS.replace("</script>", "<\\/script>"),
-                        TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(pmt, 9))));
+        parts.push_str(&TILES.replace("__RS_PMTILES_B64__", &base64::engine::general_purpose::STANDARD.encode(crate::tiles::pmtiles::gzip_at(pmt, 9))));
     }
     if let Some((side, side_b64)) = p.side {
         let side_b64 = side_b64.map_or_else(|| gzip_b64(&serde_json::to_vec(&JsSafe(side)).expect("a JSON value")), String::from);

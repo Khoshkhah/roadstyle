@@ -1,6 +1,7 @@
 # The map terrain from the area's own ground
 
-Date: 2026-11-10. Status: proposal, not built. It waits for Kaveh's yes.
+Date: 2026-11-10. Status: accepted by Kaveh on 2026-11-10 and built in roadstyle (`roadstyle-tiles/src/terrain.rs`, `elevation.js`).
+The Studio part waits for Studio PR 136 (the DEM step).
 
 ## Summary
 
@@ -19,12 +20,12 @@ tiles. The AWS tiles stay only for an area with no ground.
 
 | Item | Rule |
 |---|---|
-| Input | A ground grid with the columns `col`, `row`, `lon`, `lat`, `z` (NULL on nodata): duckOSM `main.elevation_grid` (the DTM's own pixels). When SimReady's conformed ground exists as a grid with the same columns, it is the input |
+| Input | A ground grid with the columns `col`, `row`, `lon`, `lat`, `z` (NULL on nodata): duckOSM `main.elevation_grid` (the DTM's own pixels). It must be a full rectangle, regular in longitude and latitude: duckOSM reads a DEM in EPSG:4326 only. When SimReady's conformed ground exists as a grid with the same columns, it is the input |
 | Content | Terrarium PNG tiles, 256 px, RGB, height = R·256 + G + B/256 − 32768 (step 1/256 m) |
 | Archive | One PMTiles v3 file, `tile_type` PNG, no tile compression (a PNG is already compressed). The writer is `roadstyle-tiles/src/pmtiles.rs`, which the road tiles use |
 | Metadata | The ground id (`sha256`), `source`, `product`, `vertical_datum`, `resolution_m`, `license`, from `main.elevation_metadata` |
 | Bounds | The grid's box. Only tiles that touch the grid are in the file |
-| Size | Monaco: some tens of tiles. Stockholm county at z13: about 1,100 tiles, about 70 MB (an estimate, not measured) |
+| Size | Monaco (FABDEM, 104 x 126 cells): 105 KB, zooms 8 to 13 (measured). A county is larger: not measured (only Monaco and Tartu are tested) |
 
 ### The last zoom follows the ground's resolution
 
@@ -36,16 +37,18 @@ resolution. A higher zoom adds no information: MapLibre scales the last zoom up.
 | 30 m DEM (1 arc-second: 22 m east–west at Monaco) | z13 (pixel 13.8 m) | z13 (pixel 9.8 m) |
 | 1 m LiDAR DTM | z16 (cap) | z16 (cap) |
 
-The first zoom is 0. Each zoom is made from the grid in the same way (next section), so the check below applies to every
-zoom. The lower zooms are few tiles and small.
+The first zoom is 5 zooms below the last zoom (z8 for a 30 m DEM). Each zoom is made from the grid in the same way (next
+section), so the check below applies to every zoom. Below the first zoom, MapLibre requests no tile, and the map has no
+terrain from this file. A zoom 0 tile covers the world, and the grid's edge values would make a smear over it.
 
 ### How a tile pixel gets its height
 
-A tile pixel has a point (its centre) in longitude and latitude. Its height is the bilinear value of the grid at that point.
-The grid is regular in the DEM's own CRS, not always in longitude and latitude (a national DTM is often in a projected CRS).
-So the engine does not use a projection library. It finds the grid cell from the pixel centres that the grid gives (`lon`,
-`lat` of each `col`, `row`): a global affine first guess, then a local correction in the 2 × 2 cells. This works for any
-CRS of the DEM.
+A tile pixel has a point in longitude and latitude: its north-west corner. MapLibre reads pixel (i, j) of a DEM tile as the
+height at the point (i, j) of the tile, not at the pixel's centre. A first build used the centre: on a plane, every height on
+the map was 0.84 m too high (half a z13 pixel of slope). The pixel's height is the bilinear value of the grid at that point.
+
+A grid in a projected CRS (a national DTM) is not done: duckOSM does not write one now. When it does, the engine must find
+the grid cell from the `lon` and `lat` of the cells, with no projection library.
 
 A pixel outside the grid, or next to nodata only, gets the nearest valid height of the grid. MapLibre needs a value in every
 pixel, and a step down to 0 m at the edge of the area is worse.
@@ -58,9 +61,9 @@ the same bytes:
 
 | Path | Call |
 |---|---|
-| Python binding | `roadstyle.terrain_tiles(db_or_grid, out)` |
-| CLI | `roadstyle terrain <area.duckdb> -o ground.pmtiles` |
-| Browser (`roadstyle-wasm`) | `terrain_pmtiles(col, row, lon, lat, z, meta)` with the columns as typed arrays |
+| Python binding | `roadstyle._rust.terrain_pmtiles(col, row, lon, lat, z, ground)`; `roadstyle.duckosm.ground(db)` reads a duckOSM file and gives the page option, and `duckosm.page` uses it |
+| CLI | `roadstyle terrain <elevation_grid.parquet> <out.pmtiles> [--ground FILE.json]` |
+| Browser (`roadstyle-wasm`) | `terrainPmtiles(col, row, lon, lat, z, ground)` with the columns as typed arrays |
 
 ## How the file reaches the map
 
@@ -70,12 +73,16 @@ view only, so the memory grows with the view and not with the area (`memory_budg
 | Transport | Source of the `raster-dem` | Used by |
 |---|---|---|
 | A file in the browser disk (OPFS) | `pmtiles.FileSource` on the OPFS `File`: the page reads the bytes of one tile at a time | duckOSM Studio |
-| Embedded in the page | The archive in the page, as the embedded road archive (`pmtiles://ground`) | `render_dashboard`, `render_edges` |
-| A URL or a server | `pmtiles://<URL>` (HTTP range requests) | `export_style`, a server |
+| Embedded in the page | A `data:` URL in the option (`roadstyle.duckosm.ground` makes it) | `render_dashboard`, `render_edges`, `duckosm.page` |
+| A URL or a server | The URL of the file (HTTP range requests) | a server |
 
-One function in the dashboard, `rsDemTile(z, x, y)`, reads one DEM tile from the page's ground. `elevation.js` (the hillshade
-and the terrain), `bridgemesh.js` and `google3d.js` use it. Today the last two make the AWS URL from `O.ontop.dem.tiles[0]`
-by themselves. With this change all three read the same ground.
+In each case `elevation.js` reads the archive with pmtiles.js and gives the tiles to MapLibre through its own protocol
+`rsground://`. The page's `pmtiles://` protocol stays for the roads only.
+
+One function in `elevation.js`, `_elDemTile(z, x, y)`, reads one DEM tile from the page's ground. `google3d.js` uses it for its
+ground heights and names the ground in its credit. A host gives a ground after the page starts with `rsGround(ground)`, where
+`terrain` can be a `File` (OPFS), a `Blob`, an `ArrayBuffer` or a URL. `bridgemesh.js` is not on main yet: when it lands, it
+must use `_elDemTile` too.
 
 ## The page option `ground`
 
@@ -83,11 +90,12 @@ by themselves. With this change all three read the same ground.
 
 ```json
 {"id": "<sha256>", "source": "FABDEM V1-2", "product": "DTM", "vertical_datum": "EGM2008",
- "resolution_m": 30, "license": "CC BY-NC-SA 4.0", "terrain": "<URL or pmtiles:// name or OPFS file>"}
+ "resolution_m": 30, "license": "CC BY-NC-SA 4.0", "terrain": "<a URL or a data: URL>"}
 ```
 
 - With `ground`, the DEM source is the terrain file, and the attribution shows
-  "Ground: FABDEM V1-2 (DTM, EGM2008), id 3f2a…" with its license.
+  "Ground: FABDEM V1-2 (DTM, EGM2008), id 3f2a…" with its license. duckOSM has no `sha256` column yet, so the id is
+  empty until it does.
 - Without `ground`, the page uses `ontop.dem` (the AWS tiles), and the attribution shows "Ground: AWS Terrain Tiles".
   This is for an area with no ground grid only.
 - A ground with `product: DSM` shows "Ground: surface model" (the standard, section 1).
@@ -114,7 +122,10 @@ grid is in the DEM's CRS), so MapLibre interpolates a value that was already int
 So this design has two checks:
 
 1. **The file (a test, at most 0.10 m).** For each pixel of each tile: the decoded height minus the grid's bilinear value at
-   the pixel's point. This checks the engine. The expected difference is at most 0.004 m (the PNG step).
+   the pixel's point. This checks the engine. The expected difference is at most 1/512 m (half the Terrarium step).
+   Tests: `terrain.rs` (Rust), `tests/test_ground_terrain.py` (the tiles decoded by the pmtiles package and PIL, not by the
+   engine). On the Monaco FABDEM grid: 62,465 pixels, the largest difference 0.0020 m. In the browser, on a plane, MapLibre's
+   own height (`queryTerrainElevation`) equals the grid to 0.10 m.
 2. **The display (a number in the report, not a test).** The table above, made again on the file: at the grid's points,
    through MapLibre's interpolation.
 
@@ -122,24 +133,26 @@ The standard's wording must change to the check 1 ("at the tile pixels' points")
 
 ## The measurement of the speed
 
-On Monaco, in Chromium (Playwright), with an empty cache, five runs for each:
+Monaco, Chromium (Playwright, software WebGL), a blank base map, a new browser context for each run (an empty cache). The time
+is from "hillshade and terrain on, pitch 60, zoom 15" to the map with all tiles loaded. Seven runs for each:
 
-- the time from `rsTerrain(true)` with a tilted camera (pitch 55) to the map's `idle` event, with all DEM tiles loaded;
-- the AWS tiles against the terrain file, from OPFS and from the embedded archive;
-- the count of requests to `elevation-tiles-prod` (must be 0 with `ground`).
+| DEM | Median | Runs (ms) | Requests to AWS |
+|---|---|---|---|
+| AWS Terrain Tiles | 3,474 ms | 3,496 3,569 3,437 3,474 3,392 3,689 3,293 | 44 to 50 |
+| Terrain file, embedded in the page | 1,757 ms | 1,623 1,873 1,732 1,814 1,714 1,757 1,806 | 0 |
 
-## The steps after the yes
+The terrain file is about two times faster. The Studio path (OPFS) is measured in step 3.
 
-1. roadstyle: `terrain.rs` with the check 1 as a Rust test on the Monaco FABDEM grid; the Python binding and the CLI.
-2. roadstyle: the page option `ground`, `rsDemTile`, `elevation.js`, `bridgemesh.js`, `google3d.js`, the attribution; the
-   browser test with no request to AWS; the speed measurement.
+## The steps
+
+1. Done: roadstyle `terrain.rs` and its tests; the Python binding, `roadstyle.duckosm.ground` and the CLI.
+2. Done: the page option `ground`, `rsGround`, `elevation.js`, `google3d.js` and the attribution; the browser test with no
+   request to AWS; the speed measurement.
 3. duckOSM Studio, after Studio PR 136 ("a DEM file gives `main.elevation_grid`") merges: read `main.elevation_grid` from
    DuckDB in the browser, make the file with `roadstyle-wasm` in the map worker, write it to OPFS, and give roadstyle the
-   option `ground`. Then the phone-viewport check.
+   ground with `rsGround`. Then the phone-viewport check.
 
-## Questions for Kaveh
+## Open item
 
-1. Is this design correct?
-2. The check: is it correct to test the file at the tile pixels (check 1) and to change the standard's wording to that?
-3. The last zoom: the rule above gives z13 for a 30 m DEM. A higher last zoom makes the display difference smaller (the table)
-   but the file larger, with no new information. Is z13 correct?
+The standard's check (duckOSM `docs/concepts/ground-reference.md`, section 5) says "at the grid's points". It must say "at
+the tile pixels' points", as check 1 above. The standard belongs to duckOSM.

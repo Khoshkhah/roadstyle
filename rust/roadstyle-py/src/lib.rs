@@ -597,6 +597,17 @@ fn given_of(look: PyRef<'_, PyLook>, options: &str) -> PyResult<String> {
     Ok(serde_json::Value::Object(roadstyle::page_options::given_of(&look.0, &o.args)).to_string())
 }
 
+/// terrain_pmtiles(col, row, lon, lat, z, ground) -> bytes: the terrain file of a ground grid (docs/design/ground_terrain.md): Terrarium PNG
+/// tiles in one PMTiles archive. The columns of main.elevation_grid (z: NaN on nodata); `ground`: the JSON text of the ground's facts.
+#[pyfunction]
+fn terrain_pmtiles<'py>(py: Python<'py>, col: Vec<i32>, row: Vec<i32>, lon: Vec<f64>, lat: Vec<f64>, z: Vec<f64>, ground: &str) -> PyResult<Bound<'py, PyBytes>> {
+    let meta: serde_json::Value = serde_json::from_str(ground).map_err(|e| PyValueError::new_err(format!("ground: not JSON: {e}")))?;
+    let a = py.detach(|| {
+        roadstyle::tiles::terrain::Ground::from_cells(&col, &row, &lon, &lat, &z).map(|g| roadstyle::tiles::terrain::terrain_pmtiles(&g, &meta))
+    }).map_err(PyValueError::new_err)?;
+    Ok(PyBytes::new(py, &a))
+}
+
 /// asset(name) -> bytes: one of roadstyle's files by its name (roadstyle-assets: "data/cmaps.json", "static/popup.js", ...). Python has no
 /// copy of them (roadstyle/_assets.py).
 #[pyfunction]
@@ -650,6 +661,7 @@ fn ramp_stops(cmap: &str, n: usize) -> PyResult<Vec<String>> {
 fn _rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(take_warnings, m)?)?;
     m.add_function(wrap_pyfunction!(asset, m)?)?;
+    m.add_function(wrap_pyfunction!(terrain_pmtiles, m)?)?;
     m.add_function(wrap_pyfunction!(asset_names, m)?)?;
     m.add_function(wrap_pyfunction!(ramp_stops, m)?)?;
     m.add_function(wrap_pyfunction!(unknown_keywords, m)?)?;

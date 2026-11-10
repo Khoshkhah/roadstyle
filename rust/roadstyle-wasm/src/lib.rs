@@ -131,6 +131,16 @@ mod wasm {
         roadstyle::look::Options::from_value(&o).and_then(|o| roadstyle::Look::resolve(&o)).map(JsLook).map_err(|e| JsError::new(&e.to_string()))
     }
 
+    /// terrainPmtiles(col, row, lon, lat, z, ground: string) -> Uint8Array: the terrain file of a ground grid (docs/design/ground_terrain.md):
+    /// Terrarium PNG tiles in one PMTiles archive. The columns are typed arrays of main.elevation_grid (z: NaN on nodata); `ground`: the
+    /// JSON text of the ground's facts, written in the metadata. An error is a thrown Error.
+    #[wasm_bindgen(js_name = terrainPmtiles)]
+    pub fn terrain_pmtiles(col: &[i32], row: &[i32], lon: &[f64], lat: &[f64], z: &[f64], ground: &str) -> Result<Vec<u8>, JsError> {
+        let meta: serde_json::Value = serde_json::from_str(ground).map_err(|e| JsError::new(&format!("ground: not JSON: {e}")))?;
+        let g = roadstyle::tiles::terrain::Ground::from_cells(col, row, lon, lat, z).map_err(|e| JsError::new(&e))?;
+        Ok(roadstyle::tiles::terrain::terrain_pmtiles(&g, &meta))
+    }
+
     /// rampStops(cmap: string, n: number) -> string[]: `n` colours ("#rrggbb") at even steps along a ramp (render_edges' cmap: a branca
     /// scheme or a matplotlib colormap name, or the JSON text of a list of colours), from the first colour to the last (at least 2), as
     /// roadstyle's ColorRamp.stops: for example a colour for each category of a column. An error is a thrown Error.

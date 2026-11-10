@@ -10,6 +10,7 @@ import {defineTool, GOOGLE3D_ICON} from "./tools.js";
 import {_wPhone} from "./windows.js";
 import {_svKey} from "./streetview.js";
 import {_svLine, _svDist, _svAt} from "./svspot.js";
+import {_elDemTile, _elDemZoom} from "./elevation.js";
 // the selection's default colour is the dashboard's accent (the css variable --accent, dashboard.css): its stroke, and its fill at an opacity
 const _g3Accent = () => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
 const _g3AccentAlpha = a => { const c = _g3Accent(), v = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)); return "rgba(" + v.join(",") + "," + a + ")"; };
@@ -27,6 +28,10 @@ export function initGoogle3D(){
       '<button type="button" class="rs-g3d-follow on" title="Follow the map">Following</button>'+
       '<button type="button" class="rs-svw-x" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
+    // the credit of the heights: the ground's source, else the AWS tiles' (Mapzen)
+    const credit=()=>{ const a=w.querySelector(".rs-g3d-src"), g=O.ground;
+      if(g && g.terrain){ a.textContent="heights: "+(g.source||"the area's ground"); a.title="Ground heights: the area's ground"+(g.source?", "+g.source:""); a.removeAttribute("href"); } };
+    credit(); document.addEventListener("rs:groundchange", credit);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
     let m3=null, lib=null, line=null, btn=null;
@@ -44,19 +49,15 @@ export function initGoogle3D(){
     // key, the bare ground): one zoom-14 tile per area, kept; a pixel's color is its height. Until a tile
     // is in, the last height found holds, and its arrival moves Google to the right height. The sea floor
     // counts as 0 m: the map's water is at sea level.
-    const DEM_Z=14, dem=new Map(), warn=w.querySelector(".rs-g3d-warn");
+    const dem=new Map(), warn=w.querySelector(".rs-g3d-warn");
     let lastGround=0;
     const ground=(lng, lat)=>{
-      const n=2**DEM_Z, x=(lng+180)/360*n, y=(1-Math.log(Math.tan(rad(lat))+1/Math.cos(rad(lat)))/Math.PI)/2*n;
+      const DEM_Z=_elDemZoom(), n=2**DEM_Z, x=(lng+180)/360*n, y=(1-Math.log(Math.tan(rad(lat))+1/Math.cos(rad(lat)))/Math.PI)/2*n;
       const key=DEM_Z+"/"+Math.floor(x)+"/"+Math.floor(y);
       let t=dem.get(key);
       if(!t){ t={px:null}; dem.set(key, t);
-        const img=new Image(); img.crossOrigin="anonymous";
-        img.onload=()=>{ const c=document.createElement("canvas"); c.width=c.height=256;
-          const g=c.getContext("2d", {willReadFrequently:true}); g.drawImage(img, 0, 0);
-          t.px=g.getImageData(0, 0, 256, 256).data; if(m3 && follow) setGoogle(); };
-        img.onerror=()=>{ warn.hidden=false; console.warn("rs google 3d: no ground heights from", img.src); };
-        img.src=O.ontop.dem.tiles[0].replace("{z}/{x}/{y}", key); }       // the page's one DEM (data/basemaps.json `ontop.dem`; elevation.js draws the hillshade and the terrain from it)
+        _elDemTile(DEM_Z, Math.floor(x), Math.floor(y)).then(px=>{ t.px=px; if(m3 && follow) setGoogle(); },       // the page's one DEM (elevation.js: the ground's file, else ontop.dem)
+          e=>{ warn.hidden=false; console.warn("rs google 3d: no ground heights", e); }); }
       if(!t.px) return lastGround;
       const i=(Math.min(255, Math.floor(x%1*256))+Math.min(255, Math.floor(y%1*256))*256)*4;
       return lastGround=Math.max(0, t.px[i]*256+t.px[i+1]+t.px[i+2]/256-32768); };
