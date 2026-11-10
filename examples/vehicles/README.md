@@ -30,15 +30,15 @@ Git ignores `pkg/` and `data/`.
 
 ## The dashboard page (the Rust page writer)
 
-`dashboard.html` is the same run on roadstyle's full dashboard (the panel, the toolbar, the themes), written by the Rust CLI with
-the page script `dashboard_script.js`. Build the CLI, then run this in `examples/vehicles/`:
+`dashboard.html` is the same run on roadstyle's full dashboard (the panel, the toolbar, the themes), written by the Rust CLI. The page loads the
+run itself (the option `vehicles`), with the colours and sizes of the look's `vehicles` section; `dashboard_script.js` adds the play bar. Build the CLI, then run this in `examples/vehicles/`:
 
 ```bash
 cargo build --release --manifest-path ../../rust/Cargo.toml -p roadstyle-cli
 ```
 
 ```bash
-../../rust/target/release/roadstyle page ../../rust/roadstyle-rs/tests/data/monaco/roads.parquet dashboard.html --template dashboard --page-script "$(cat dashboard_script.js)"
+../../rust/target/release/roadstyle page ../../rust/roadstyle-rs/tests/data/monaco/roads.parquet dashboard.html --template dashboard --vehicles '{"wasm": "./pkg/roadstyle_wasm.js", "fcd": "./data/monaco_fcd.parquet", "net": "./data/monaco.net.xml"}' --page-script "$(cat dashboard_script.js)"
 ```
 
 Open `http://localhost:8000/examples/vehicles/dashboard.html`. Git ignores `dashboard.html`.

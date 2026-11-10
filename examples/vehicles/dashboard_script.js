@@ -1,14 +1,7 @@
-// The page script of examples/vehicles/dashboard.html (roadstyle page ... --template dashboard --page-script "$(cat this file)"):
-// it loads the SUMO run into rs.vehicles and adds the example's own play bar (the dashboard parts of phase P5 replace it).
+// The page script of examples/vehicles/dashboard.html: the example's own play bar (the dashboard parts of phase P5 replace it). The page
+// loads the run itself, from its option `vehicles` (roadstyle page ... --vehicles '{"wasm": ..., "fcd": ..., "net": ...}').
 rs.ready(async () => {
-  const report = await rs.vehicles.load({
-    wasm: "./pkg/roadstyle_wasm.js",
-    fcd: "./data/monaco_fcd.parquet",
-    net: "./data/monaco.net.xml",
-    // the profile's values of the specification (section 13) until they are in profiles/default.yaml
-    options: {placement: "lane", teleport_m: 50, lane_change_s: 2, heading_lookahead_m: 2, class_sizes: {passenger: [5, 1.8, 1.5]}},
-    colours: {passenger: "#e63946"},
-  });
+  const report = rs.vehicles.report() || await new Promise((r) => document.addEventListener("rs:vehicleload", (e) => r(e.detail), {once: true}));
   const bar = document.createElement("div");
   bar.style.cssText = "position:absolute;bottom:28px;transform:translateX(-50%);z-index:5;display:flex;gap:8px;" +
     "align-items:center;padding:6px 10px;border-radius:8px;background:var(--card);color:var(--ink);border:1px solid var(--line);font:13px system-ui,sans-serif";

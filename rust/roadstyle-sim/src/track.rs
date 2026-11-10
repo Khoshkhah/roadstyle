@@ -14,6 +14,9 @@ use crate::geo::{dist_m, heading_deg, offset, turn_deg};
 
 /// The lanes kept behind a chain: enough for half the length of a long vehicle over short lanes.
 const BACK_LANES: usize = 8;
+/// The most lanes in a chain between two samples. A vehicle crosses few lanes in one step, but a cluster of short edges has many: on
+/// Monaco, chains of 7 lanes span only 3 to 8 m.
+const MAX_CHAIN: usize = 16;
 use crate::net::{Net, VTypeRow};
 use crate::Error;
 use std::collections::{HashMap, VecDeque};
@@ -183,7 +186,7 @@ impl Run {
         }
     }
 
-    /// The chain of net lanes from lane `a` to a lane of the edge of lane `b`, through the connections (at most 6 lanes).
+    /// The chain of net lanes from lane `a` to a lane of the edge of lane `b`, through the connections (at most MAX_CHAIN lanes).
     fn path(&self, a: u32, b: u32) -> Option<Vec<u32>> {
         let net = self.net.as_ref()?;
         let target = &net.lanes[b as usize].edge;
@@ -195,7 +198,7 @@ impl Run {
         let mut q = VecDeque::from([(a, 1usize)]);
         let mut other = None;
         while let Some((l, depth)) = q.pop_front() {
-            if depth >= 6 {
+            if depth >= MAX_CHAIN {
                 continue;
             }
             for &n in &net.next[l as usize] {
@@ -448,6 +451,22 @@ impl Run {
     pub fn sample_heading(&self, r: usize) -> f64 {
         let (m, _) = self.middle_lonlat(r);
         heading_deg(m, [self.samples.x[r], self.samples.y[r]])
+    }
+
+    /// The pairs of samples with no chain of lanes between them (`Report::path_gaps`): the vehicle's id, the time of the first sample,
+    /// and the two lanes' ids. A report can name them; they are placed by their lon/lat.
+    pub fn gaps(&self) -> Vec<(String, f64, String, String)> {
+        let s = &self.samples;
+        let mut out = Vec::new();
+        for (v, pairs) in self.pairs.iter().enumerate() {
+            for (k, p) in pairs.iter().enumerate() {
+                let (a, b) = (self.rows[v][k] as usize, self.rows[v][k + 1] as usize);
+                if p.kind == Kind::LonLat && self.net_lane(a) != NONE && self.net_lane(b) != NONE && self.opts.placement == Placement::Lane {
+                    out.push((s.ids[v].clone(), s.t[a], s.lanes[s.lane[a] as usize].clone(), s.lanes[s.lane[b] as usize].clone()));
+                }
+            }
+        }
+        out
     }
 
     /// The rows of vehicle `v`, in time order.

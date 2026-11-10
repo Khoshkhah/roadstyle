@@ -185,6 +185,8 @@ rs.snapshot(m, "map.png", zoom=15)        # headless screenshot; then view map.p
 
 ## JavaScript API (in the saved page)
 
+- Vehicles of a SUMO run: `vehicles={"wasm": ..., "fcd": ..., "net": ...}` (URLs: `roadstyle_wasm.js` built with `--features vehicles`, the FCD Parquet with `--fcd-output.geo true`, the run's `net.xml`) loads them at start; `rs.vehicles.play()`, `pause()`, `seek(t)`, `speed(x)`, `report()`. Colours and sizes are the look's `vehicles` section. Example: `examples/vehicles/`.
+
 | call | does |
 |---|---|
 | `rsQuery(p => bool)` | features whose properties match -> **roadstyle feature ids** |

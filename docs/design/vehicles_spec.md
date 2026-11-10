@@ -148,7 +148,8 @@ A vehicle is placed in one of two ways. The page chooses with the option `vehicl
 The clock time `t` is between two samples `a` and `b` of one vehicle (`a.t <= t < b.t`).
 
 1. **Distance along the path.** For lane placement, the path is the chain of lanes from `a.lane` to `b.lane` through
-   the connections of `net.xml` (also the internal lanes), at most 6 lanes. The search takes `b.lane` itself when a
+   the connections of `net.xml` (also the internal lanes), at most 16 lanes (a cluster of short edges has many: on Monaco, chains of 7
+   lanes span 3 to 8 m). The search takes `b.lane` itself when a
    connection reaches it; else the first lane of `b.lane`'s edge, and then a lane change at `b`.
    The distance `s(t)` along that chain is a cubic Hermite curve with the end values `s(a) = 0`, `s(b) = L` and the end
    slopes `a.speed`, `b.speed`. So the vehicle moves at the simulated speed with no jump at a sample.

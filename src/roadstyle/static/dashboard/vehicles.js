@@ -6,15 +6,17 @@
 // mainMatrix x translate(origin) x scale(metre): small numbers, exact in float32.
 // THE ORDER: the layer must be drawn after every 3D layer that can hide a vehicle (the buildings), or the depth test is wrong (P0). A
 // page adds layers later (the 3D switch, a base map change), so the layer goes to the top again on each style change.
+// THE LOOK: the colours (one for each kind, light and dark), the kind and the size of each SUMO vClass and the numbers of a run come
+// from the look's vehicles section (O.vehicle_look: the palette and the profile); a page can give its own in load().
 // P1: flat ground (z 0), boxes, no camera.
-import {map, RS_PREFIX, _emit} from "./core.js";
+import {map, O, RS_PREFIX, _emit} from "./core.js";
 
 const _VH_STRIDE = 16;                 // the numbers of one vehicle in VehicleScene.frame
 const _VH_MAX_CLASSES = 8;             // the colours the shader holds (a class number past it takes colour number % 8)
 const _VH_KEYS = ["placement", "teleport_m", "lane_change_s", "heading_lookahead_m", "class_sizes"];
 const _vhLayerId = () => RS_PREFIX + "vehicles";
 
-let _vhScene = null, _vhOrigin = null, _vhColours = null, _vhReport = null, _vhIds = null;
+let _vhScene = null, _vhOrigin = null, _vhColours = null, _vhReport = null, _vhIds = null, _vhClasses = [], _vhGiven = null;
 let _vhT = 0, _vhSpeed = 1, _vhPlaying = false, _vhWall = null, _vhSentAt = 0, _vhDirty = true;
 let _vhGl = null, _vhProg = null, _vhVao = null, _vhInstBuf = null, _vhN = 0, _vhLoc = {};
 
@@ -137,34 +139,66 @@ function _vhRgba(c, cls){
 
 function _vhPause(){ _vhPlaying = false; _vhWall = null; }
 
+const _vhDark = () => document.documentElement.dataset.rsTheme === "dark";
+
+// the run's options from the look: the profile's numbers and each class's size
+function _vhOptions(look){
+  const sizes = {};
+  for(const [c, v] of Object.entries(look.classes)) sizes[c] = v.size;
+  return {placement: "lane", teleport_m: look.teleport_m, lane_change_s: look.lane_change_s, heading_lookahead_m: look.heading_lookahead_m,
+          class_sizes: sizes};
+}
+
+// the shader's colours, one for each class of the run: the page's (load's colours, by class) or the look's (the class's kind, in the theme)
+function _vhPaint(){
+  const cols = new Float32Array(_VH_MAX_CLASSES * 4), look = O.vehicle_look;
+  _vhClasses.forEach((c, i) => {
+    let col;
+    if(_vhGiven){
+      if(!(c in _vhGiven)) throw new Error(`rs.vehicles.load: colours has no colour for the class ${c}`);
+      col = _vhGiven[c];
+    } else {
+      const cls = look && look.classes[c];
+      if(!cls) throw new Error(`rs.vehicles: the look has no vehicles.classes.${c} (add the class to the profile)`);
+      const tc = look.colours[cls.kind];
+      if(!tc) throw new Error(`rs.vehicles: the look has no vehicles.colours.${cls.kind} (the kind of the class ${c})`);
+      col = _vhDark() ? tc.dark : tc.light;
+    }
+    if(i < _VH_MAX_CLASSES) cols.set(_vhRgba(col, c), i * 4);
+  });
+  _vhColours = cols;
+}
+
 async function _vhBytes(x){ return typeof x === "string" ? new Uint8Array(await (await fetch(x)).arrayBuffer()) : x; }
 async function _vhText(x){ return x == null ? undefined : (/^\s*</.test(x) ? x : await (await fetch(x)).text()); }
 
-// load({wasm, fcd, net, routes, options, colours}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles"; `fcd` the
+// load({wasm, fcd, net, routes, options?, colours?}): `wasm` the URL of roadstyle_wasm.js built with the feature "vehicles"; `fcd` the
 // bytes or the URL of SUMO's FCD Parquet file; `net` the text or the URL of the run's net.xml; `routes` (optional) the text or URL of
-// a file with the <vType> elements; `options` the profile's values (every key of _VH_KEYS); `colours` {class: "#rrggbb"} for every
-// class of the run. Gives the run's report and sends rs:vehicleload.
+// a file with the <vType> elements. `options` (every key of _VH_KEYS) and `colours` ({class: "#rrggbb"}) default to the look's vehicles
+// section. Gives the run's report and sends rs:vehicleload. A page with the option `vehicles` calls it at start (index.js).
 async function _vhLoad(o){
-  for(const k of ["wasm", "fcd", "options", "colours"]) if(o[k] == null) throw new Error(`rs.vehicles.load: ${k} is missing`);
-  for(const k of _VH_KEYS) if(o.options[k] == null) throw new Error(`rs.vehicles.load: options.${k} is missing`);
+  for(const k of ["wasm", "fcd"]) if(o[k] == null) throw new Error(`rs.vehicles.load: ${k} is missing`);
+  if((o.options == null || o.colours == null) && !O.vehicle_look)
+    throw new Error("rs.vehicles.load: no options or colours, and the look has no vehicles section");
+  const options = o.options || _vhOptions(O.vehicle_look);
+  for(const k of _VH_KEYS) if(options[k] == null) throw new Error(`rs.vehicles.load: options.${k} is missing`);
   const mod = await import(new URL(o.wasm, document.baseURI).href);
   await mod.default();
   const [fcd, net, routes] = await Promise.all([_vhBytes(o.fcd), _vhText(o.net), _vhText(o.routes)]);
-  const scene = new mod.VehicleScene(fcd, net, routes, JSON.stringify(o.options));
-  const classes = scene.classes();
-  const cols = new Float32Array(_VH_MAX_CLASSES * 4);
-  classes.forEach((c, i) => {
-    if(!(c in o.colours)) throw new Error(`rs.vehicles.load: colours has no colour for the class ${c}`);
-    if(i < _VH_MAX_CLASSES) cols.set(_vhRgba(o.colours[c], c), i * 4);
-  });
-  _vhScene = scene; _vhOrigin = scene.origin(); _vhColours = cols; _vhIds = scene.ids();
+  const scene = new mod.VehicleScene(fcd, net, routes, JSON.stringify(options));
+  _vhClasses = scene.classes(); _vhGiven = o.colours || null;
+  _vhPaint();
+  _vhScene = scene; _vhOrigin = scene.origin(); _vhIds = scene.ids();
   _vhReport = JSON.parse(scene.report());
   _vhT = _vhReport.t0; _vhDirty = true; _vhPause();
   // the style can be busy after "load" (a theme or base map change of the page): wait for an "idle" with the style loaded, not for
   // "load", which fires once only
   await new Promise(r => { const ok = () => map.isStyleLoaded() ? r() : map.once("idle", ok); ok(); });
   _vhLayer.id = _vhLayerId();
-  if(!map.getLayer(_vhLayer.id)){ map.addLayer(_vhLayer); map.on("styledata", _vhOnTop); }
+  if(!map.getLayer(_vhLayer.id)){
+    map.addLayer(_vhLayer); map.on("styledata", _vhOnTop);
+    document.addEventListener("rs:themechange", () => { if(_vhScene){ _vhPaint(); map.triggerRepaint(); } });
+  }
   _vhOnTop();
   map.triggerRepaint();
   _emit("rs:vehicleload", _vhReport);
