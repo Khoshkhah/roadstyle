@@ -22,7 +22,10 @@
     "__rs_full",
     "__rs_thick",
     "__rs_s0",
-    "__rs_s1"
+    "__rs_s1",
+    "__rs_enda",
+    "__rs_endb",
+    "__rs_line"
   ],
   "slots": [
     "__rs_cc",

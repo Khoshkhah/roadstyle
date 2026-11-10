@@ -5,6 +5,7 @@ import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick, _lookHolds, _ovSel, _ovState} from "./overlays.js";
 import {_spDotClick} from "./svproviders.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot, useSpot} from "./svspot.js";
+import {_bmDrawn, _bmPickAt} from "./bridgemesh.js";
 const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
@@ -23,10 +24,15 @@ export function _roadOf(f){ const e=f.properties.__rs_edge ?? f.id;   // the roa
           get geometry(){ const r=_road(e); return r && r.geometry; }}; }
 // the feature right under the cursor first, the tolerance box only when there is none: a two-way road's two directions lie side by
 // side, and the box reaches both, where the one drawn last would win (a click near the middle selected the other direction)
-export function pick(p){ const ids = PICK_LAYERS.filter(id=>map.getLayer(id)); if(!ids.length) return null;
+export function pick(p){
+  // the 3D bridges are picked on the mesh that is drawn (its pick shapes, the invisible extrusions, stand on the terrain by MapLibre's own rule); the roads under it
+  // are picked as before. A page with no mesh drawn (flat, or below the decks' zoom) picks every layer
+  const mesh = _bmDrawn(), ids = PICK_LAYERS.filter(id=>map.getLayer(id) && !(mesh && _role(map.getLayer(id))==="decks")); if(!ids.length && !mesh) return null;
   if(ITEM_PICK && map.getLayer(ROAD_ITEMS.layer)){       // a picked road item under the cursor wins over its road
     const it = map.queryRenderedFeatures([p.x, p.y], {layers:[ROAD_ITEMS.layer], filter:["to-boolean",["get","__rs_pick"]]});
     if(it.length) return _roadOf(it[0]); }
+  if(mesh){ const d = _bmPickAt(p); if(d) return d; }
+  if(!ids.length) return null;
   const q = RS_LEAN ? {layers:ids, filter:_FILL_PIECE} : {layers:ids};
   let l = map.queryRenderedFeatures([p.x, p.y], q);
   if(!l.length) l = map.queryRenderedFeatures(box(p), q);
@@ -197,7 +203,7 @@ export function initSelect(){
     const ovs = _ovAt(e.point).filter(o=>!io || o.label!==io.label);   // interactive overlays under the click (e.g. the zone)
     // structured click-data for host pages / dashboards (fires in every popup mode, incl. False)
     _emit("rs:select", {id:f.id, layer:f.layer && f.layer.id, properties:props, twin:_twinDetail(props), overlays:ovs, item:item,
-               streetView:_svPick(e.lngLat, f, f.id)});
+               streetView:_svPick(e.lngLat, f, f.id, e.point)});
     const sv = _sv(e.lngLat, f);
     if(io){ if(io.interactive && _ovWin(io) && !_holds.size){             // the item's own popup (its popup fields), the road's Street View below it
         if(_popupMode === "panel") rsInfoShow('<div class="rs-name">'+_esc(io.label)+'</div>'+_rrows(item.properties, io.popup) + sv + _ovSections(ovs));

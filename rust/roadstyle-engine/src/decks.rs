@@ -152,13 +152,58 @@ fn groups_of(n: usize, at: &HashMap<(u64, u64), Vec<usize>>) -> Vec<usize> {
     out
 }
 
-/// A chain of bridge roads through nodes of degree 2: its line, its spans, its group, and whether each end is a free end (a ramp there).
+/// A chain of bridge roads through nodes of degree 2: its line, its spans, its group and its two end nodes (the node's height is the group's, `Bridges::dfree`).
 struct Chain {
     group: usize,
     pts: Vec<P>,
     spans: Vec<Span>,
-    ramp_head: bool,
-    ramp_tail: bool,
+    head: (u64, u64),
+    tail: (u64, u64),
+}
+
+/// A distance in a priority queue (the smallest first).
+#[derive(PartialEq, PartialOrd)]
+struct Dist(f64);
+impl Eq for Dist {}
+impl Ord for Dist {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        o.0.total_cmp(&self.0)
+    }
+}
+
+/// The distance in metres from each node of the bridge roads to the nearest free end (a node that only one road uses), along the roads. A node with no free
+/// end in its group has none. The height of a node comes from it: 0 at a free end, rising at one grade to the group's height, so two chains that meet at a
+/// node have one height there.
+fn free_end_distances(reps: &[Rep], lens: &[f64], at: &HashMap<(u64, u64), Vec<usize>>) -> HashMap<(u64, u64), f64> {
+    let mut best: HashMap<(u64, u64), f64> = HashMap::new();
+    let mut heap = std::collections::BinaryHeap::new();
+    for (nd, v) in at {
+        if v.len() == 1 {
+            best.insert(*nd, 0.0);
+            heap.push((Dist(0.0), *nd));
+        }
+    }
+    while let Some((Dist(d), nd)) = heap.pop() {
+        if best.get(&nd).is_some_and(|&b| d > b) {
+            continue;
+        }
+        for &i in &at[&nd] {
+            let other = if hk(reps[i].a) == nd { hk(reps[i].z) } else { hk(reps[i].a) };
+            let nd2 = d + lens[i];
+            if best.get(&other).is_none_or(|&b| nd2 < b) {
+                best.insert(other, nd2);
+                heap.push((Dist(nd2), other));
+            }
+        }
+    }
+    best
+}
+
+/// The smaller of a and b, rounded where they are within k of each other (at most k / 4 lower), by `weight` (0: the exact minimum). The ramp's apex
+/// (where the two ramps of a short bridge meet) is rounded so it has no ridge; at the ends of a chain the weight is 0, so the height at a node is exactly the node's.
+fn smin(a: f64, b: f64, k: f64, weight: f64) -> f64 {
+    let h = (k - (a - b).abs()).max(0.0) / k;
+    a.min(b) - weight * h * h * k * 0.25
 }
 
 /// The bridge roads: one representative for each two-way pair, and where each node is used.
@@ -168,6 +213,8 @@ struct Bridges<'a> {
     group: Vec<usize>,
     /// the length in metres of each group (index: group - 1): the sum of its roads, one for each two-way pair
     group_len: Vec<f64>,
+    /// the distance in metres from each node to the nearest free end of its group (`free_end_distances`)
+    dfree: HashMap<(u64, u64), f64>,
     pair_edges: HashMap<((u64, u64), (u64, u64)), Vec<usize>>,
     at: HashMap<(u64, u64), Vec<usize>>,
 }
@@ -195,12 +242,16 @@ impl<'a> Bridges<'a> {
             at.entry(hk(r.z)).or_default().push(i);
         }
         let group = groups_of(reps.len(), &at);
-        let mut group_len = vec![0.0; group.iter().copied().max().unwrap_or(0)];
-        for (r, g) in reps.iter().zip(&group) {
+        let lens: Vec<f64> = reps.iter().map(|r| {
             let kx = 111320.0 * r.c[0][1].to_radians().cos();
-            group_len[g - 1] += r.c.windows(2).map(|w| ((w[1][0] - w[0][0]) * kx).hypot((w[1][1] - w[0][1]) * 111320.0)).sum::<f64>();
+            r.c.windows(2).map(|w| ((w[1][0] - w[0][0]) * kx).hypot((w[1][1] - w[0][1]) * 111320.0)).sum::<f64>()
+        }).collect();
+        let mut group_len = vec![0.0; group.iter().copied().max().unwrap_or(0)];
+        for (l, g) in lens.iter().zip(&group) {
+            group_len[g - 1] += l;
         }
-        Bridges { reps, group, group_len, pair_edges, at }
+        let dfree = free_end_distances(&reps, &lens, &at);
+        Bridges { reps, group, group_len, dfree, pair_edges, at }
     }
 
     fn twin_of(&self, fi: usize, a: Node, z: Node) -> Option<usize> {
@@ -213,7 +264,7 @@ impl<'a> Bridges<'a> {
         used[start] = true;
         let mut pts: Vec<P> = r.c.to_vec();
         let mut spans = vec![Span { end: pts.len() - 1, fi: r.fi, fwd: Some(r.fi), rev: self.twin_of(r.fi, r.a, r.z) }];
-        let mut ends = [false, false];
+        let mut nodes = [hk(r.z), hk(r.a)];          // the chain's end nodes: [tail, head]
         for prepend in [false, true] {
             let mut nd = if prepend { r.a } else { r.z };
             loop {
@@ -241,9 +292,9 @@ impl<'a> Bridges<'a> {
                 }
                 nd = if along { far } else { near };
             }
-            ends[prepend as usize] = self.at[&hk(nd)].len() == 1;
+            nodes[prepend as usize] = hk(nd);
         }
-        Chain { group: self.group[start], pts, spans, ramp_head: ends[1], ramp_tail: ends[0] }
+        Chain { group: self.group[start], pts, spans, head: nodes[1], tail: nodes[0] }
     }
 }
 
@@ -259,7 +310,8 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
             chain_i += 1;
             let ch = bridges.walk(i, &mut used);
             let h = deck_height(dk, bridges.group_len[ch.group - 1]);
-            feats.extend(chain_features(roads, dk, m, hw, &ch, chain_i, h));
+            let far = |nd: &(u64, u64)| bridges.dfree.get(nd).copied().unwrap_or(f64::INFINITY);
+            feats.extend(chain_features(roads, dk, m, hw, &ch, chain_i, (h, far(&ch.head), far(&ch.tail))));
         }
     }
     feats
@@ -300,7 +352,7 @@ fn cuts_of(l: f64, (rh, rt): (f64, f64), step: f64, span_ends: impl Iterator<Ite
 }
 
 /// The features of one chain: its deck pieces (cut where the ramps and the roads change) and their casing slabs.
-fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain, chain_i: usize, h: f64) -> Vec<Value> {
+fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain, chain_i: usize, (h, far_head, far_tail): (f64, f64, f64)) -> Vec<Value> {
     let [lon0, lat0] = ch.pts[0];
     let cos = lat0.to_radians().cos();
     let frame = Frame { lon0, lat0, kx: 111320.0 * cos, mpp: 156543.03392 * cos / 2f64.powf(dk.match_zoom) };
@@ -312,13 +364,13 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
     }
     let l = pts.windows(2).map(|w| len(&w[0], &w[1])).sum::<f64>();
     let bounds: Vec<(f64, Span)> = ch.spans.iter().map(|s| (cum[s.end], *s)).collect();
+    // THE HEIGHT OF A NODE: 0 at a free end, rising at one grade (`ramp_m` over `base_m`) with the distance to the nearest free end, up to the group's height `h`.
+    // A chain draws between the heights of its two end nodes, so the chains that meet at a node have one height there, and a short bridge rises only as far
+    // as the grade lets it (no wall on a bridge of a few metres).
     let grade = if dk.base_m > 0.0 { dk.ramp_m / dk.base_m } else { 8.0 };       // metres of ramp for a metre of height
-    let (ramp, step) = ((h * grade).max(dk.ramp_m).max(1.0), dk.step_m.max(0.25));
-    // both ends ramped on a short chain: each ramp is half of it, so the two meet at the full height with no slope (a ramp that takes
-    // the room first, or a lift that peaks below the full height, gives a ridge)
-    let ramp = if ch.ramp_head && ch.ramp_tail { ramp.min(l / 2.0) } else { ramp.min(l) };
-    let rh = if ch.ramp_head { ramp } else { 0.0 };
-    let rt = if ch.ramp_tail { ramp } else { 0.0 };
+    let (full_ramp, step) = ((h * grade).max(1.0), dk.step_m.max(0.25));         // metres that a rise of the full height takes
+    let (la, lb) = ((far_head / full_ramp).min(1.0), (far_tail / full_ramp).min(1.0));
+    let (rh, rt) = ((full_ramp * (1.0 - la)).min(l), (full_ramp * (1.0 - lb)).min(l));
     let mut feats = Vec::new();
     for w in cuts_of(l, (rh, rt), step, bounds.iter().map(|b| b.0)).windows(2) {
         let (d0, d1) = (w[0], w[1]);
@@ -330,9 +382,11 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
         let pprops = roads.road(span.fi);
         let cls = pprops.role(roadstyle_model::Role::Class).and_then(Cell::as_str).unwrap_or("");
         let half = (m.gwidth(m.group_of(cls), dk.match_zoom) * frame.mpp / 2.0).max(2.0) * dk.width_scale;
-        // the smooth lift (0 on the ground, 1 at the full height) at a distance along the chain: a ramp at each free end
+        // the smooth lift (0 on the ground, 1 at the full height) at a distance along the chain: from each end node
+        let edge = (0.15 * l).max(1.0);                    // the rounding fades out over the last 15 % of a chain at each end
         let lift_at = |d: f64| {
-            let t = (if ch.ramp_head { d / ramp } else { 1.0 }).min(if ch.ramp_tail { (l - d) / ramp } else { 1.0 }).clamp(0.0, 1.0);
+            let w = (d / edge).clamp(0.0, 1.0).min(((l - d) / edge).clamp(0.0, 1.0));
+            let t = smin(la + d / full_ramp, lb + (l - d) / full_ramp, 0.4, w * w * (3.0 - 2.0 * w)).clamp(0.0, 1.0);
             t * t * (3.0 - 2.0 * t)
         };
         let (lift, ends) = (lift_at(mid), [lift_at(d0), lift_at(d1)]);
@@ -356,6 +410,15 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
             props.insert(Mark::DeckLift1.name().into(), json!(round_to(ends[1], 4)));
             props.insert(Mark::DeckS0.name().into(), json!(round_to(d0 / l, 5)));
             props.insert(Mark::DeckS1.name().into(), json!(round_to(d1 / l, 5)));
+            // the chain's end nodes (on its first and last piece): the page reads the ground height at them, so chains that meet at a node agree
+            if d0 <= 1e-9 {
+                props.insert(Mark::DeckEndA.name().into(), json!([round_to(ch.pts[0][0], 7), round_to(ch.pts[0][1], 7)]));
+                props.insert(Mark::DeckLine.name().into(), json!(ch.pts.iter().map(|q| [round_to(q[0], 7), round_to(q[1], 7)]).collect::<Vec<_>>()));
+            }
+            if d1 >= l - 1e-9 {
+                let z = ch.pts[ch.pts.len() - 1];
+                props.insert(Mark::DeckEndB.name().into(), json!([round_to(z[0], 7), round_to(z[1], 7)]));
+            }
             props.insert(Mark::Edges.name().into(), json!(fdir.iter().map(|&r| crate::road::key(r).get()).collect::<Vec<_>>()));
             feats.push(json!({"type": "Feature", "properties": props, "geometry": {"type": "Polygon", "coordinates": [frame.to_lonlat(ring)]}}));
         }

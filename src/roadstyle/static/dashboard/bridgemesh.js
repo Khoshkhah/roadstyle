@@ -5,9 +5,8 @@
 // each is the colour of the mesh (its feature state: select, hover, a highlight set, rsColor), read with the layer's own evaluate.
 // THE GROUP HEIGHT: the bridge roads that touch through shared nodes are one group (`__rs_group`, made by the engine). rsSetBridgeHeight gives
 // the whole group one full height in metres (the ramps at its free ends stay); a road's own deck is never set alone.
-// THE TERRAIN: with the 3D terrain on, a deck is level between the ground heights at the two ends of its chain (`__rs_s0`, `__rs_s1`: where a piece is
-// along its chain), and its ramps rise from the ground at each free end. The heights come from the terrain (map.queryTerrainElevation); a tile that has not
-// come yet gives none, and the mesh is made again when the map is idle.
+// THE TERRAIN: with the 3D terrain on, a deck is level between the ground heights at the two end nodes of its chain (`__rs_enda`, `__rs_endb`; `__rs_s0`, `__rs_s1`:
+// where a piece is along its chain), and its ramps rise from the ground at each free end. The heights come from the terrain's tiles, read here (`_bmDemAt`).
 import {map, O, RS_PREFIX, style, _src, _sfeats, _emit} from "./core.js";
 
 const _bmId = () => RS_PREFIX + "roads-bridge-mesh";
@@ -24,10 +23,15 @@ let _bmOrig = new Map();                             // feature id -> [base, hei
 let _bmHeights = new Map();                          // group -> the metres that the person set
 let _bmShown = null;                                 // the ids of the features that the filters show (filter.js); null: all
 let _bmGeom = true, _bmDirty = new Set(), _bmAll = true;
+let _bmLines = new Map();                            // chain -> its centre line {pts, cum (metres), len}
 let _bmEnds = new Map(), _bmMiss = false, _bmRetry = 0;   // chain -> {za, zb} the ground at its two ends (terrain on), a height that was not there yet, the tries
+let _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0};   // what the last build found wrong in its own vertices (`_bmStats`)
+let _bmPosArr = null, _bmBounds = null;               // the vertices (mercator units from the origin) for the pick, and the bounds of each feature
 let _bmGl = null, _bmProg = null, _bmBuf = {}, _bmLoc = {}, _bmOrigin = [0, 0], _bmOp = null, _bmPatched = null;
 
 // the switch "3D bridges" (the state rs_bridges3d; the style's filters of the flat bridge and of the decks read it too)
+// whether the mesh is what is drawn now (then a click and a hover are picked on it, not on the invisible extrusions)
+export const _bmDrawn = () => { const d = map.getLayer(_bmDeck()); return !!d && !!map.getLayer(_bmId()) && map.getZoom() >= (d.minzoom || 0) && _bmOn() && _bmN > 0; };
 const _bmOn = () => { try { return map.getGlobalState().rs_bridges3d !== false; } catch(e){ return true; } };
 const _bmSrc = () => { const s = _src("decks"); return s ? s.source : null; };
 const _bmMerc = (lon, lat) => [(lon + 180) / 360, 0.5 - Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) / (2 * Math.PI)];
@@ -45,28 +49,87 @@ function _bmColour(k){
   return [c.r * u * 255, c.g * u * 255, c.b * u * 255, a * op * 255].map(v => Math.max(0, Math.min(255, Math.round(v))));
 }
 
-// the ground height (metres, as the terrain is drawn) at a point; 0 without terrain. A tile that has not come gives none: 0 now, and the mesh again later
+// THE GROUND HEIGHT comes from the terrain's own tiles (the DEM of O.ontop.dem), read here and not from the map: map.queryTerrainElevation knows only the tiles of
+// the screen, and a bridge is longer than the screen (the chain that has no height at its far end would not be drawn). The tiles are the ones that the map draws its terrain
+// from (the same source, the same zoom limit), decoded as the map decodes them (Terrarium) and read with the map's own bilinear step, so a deck and the ground agree.
+const _bmDemTiles = new Map();                       // "z/x/y" -> Float32Array(256 * 256) | "loading" | "failed"
+const _bmDemTries = new Map();                       // "z/x/y" -> the tries that failed
+function _bmDemTile(z, x, y){
+  const k = z + "/" + x + "/" + y, t = _bmDemTiles.get(k);
+  if(t) return t === "loading" || t === "failed" ? null : t;
+  _bmDemTiles.set(k, "loading");
+  const url = O.ontop.dem.tiles[0].replace("{z}", z).replace("{x}", x).replace("{y}", y);
+  fetch(url).then(r => { if(!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+    .then(b => createImageBitmap(b, {colorSpaceConversion: "none"}))
+    .then(img => {
+      const cv = document.createElement("canvas"); cv.width = cv.height = 256;
+      const cx = cv.getContext("2d", {willReadFrequently: true}); cx.drawImage(img, 0, 0);
+      const px = cx.getImageData(0, 0, 256, 256).data, out = new Float32Array(65536);
+      for(let i = 0; i < 65536; i++) out[i] = px[i * 4] * 256 + px[i * 4 + 1] + px[i * 4 + 2] / 256 - 32768;      // Terrarium
+      _bmDemTiles.set(k, out); _bmGeom = true; map.triggerRepaint();
+    })
+    .catch(e => {
+      // a network error is tried again (3 tries, a little later each); then the tile is given up and said so: the bridges that need it are not drawn on the terrain
+      const tries = (_bmDemTries.get(k) || 0) + 1; _bmDemTries.set(k, tries);
+      if(tries < 3){ _bmDemTiles.delete(k); setTimeout(() => { _bmGeom = true; map.triggerRepaint(); }, 1500 * tries); return; }
+      _bmDemTiles.set(k, "failed");
+      console.warn("roadstyle: a terrain tile did not come (" + url + "): " + e.message + "; the bridges that need it are not drawn on the terrain");
+    });
+  return null;
+}
+// the ground height in metres at a longitude and a latitude (the terrain's exaggeration included); null where a tile that it needs has not come. The step is the
+// map's own (it equals map.queryTerrainElevation over the screen to the last digit): the pixel at its corner, a bilinear mix of four, and at the edge of a tile the
+// pixels of the next tile.
+function _bmDemAt(lng, lat){
+  const z = O.ontop.dem.maxzoom, n = 2 ** z, la = lat * Math.PI / 180;
+  const xf = (lng + 180) / 360 * n, yf = (1 - Math.log(Math.tan(la) + 1 / Math.cos(la)) / Math.PI) / 2 * n;
+  const tx = Math.floor(xf), ty = Math.floor(yf), fx = (xf - tx) * 256, fy = (yf - ty) * 256, x0 = Math.floor(fx), y0 = Math.floor(fy), u = fx - x0, v = fy - y0;
+  let miss = false;
+  const at = (x, y) => {
+    const t = _bmDemTile(z, tx + (x > 255 ? 1 : x < 0 ? -1 : 0), ty + (y > 255 ? 1 : y < 0 ? -1 : 0));
+    if(!t){ miss = true; return 0; }
+    return t[((y + 256) % 256) * 256 + ((x + 256) % 256)];
+  };
+  const e = (at(x0, y0) * (1 - u) + at(x0 + 1, y0) * u) * (1 - v) + (at(x0, y0 + 1) * (1 - u) + at(x0 + 1, y0 + 1) * u) * v;
+  return miss ? null : e * ((map.getTerrain() && map.getTerrain().exaggeration) || 1);
+}
+// the ground height (metres) at a point; 0 without terrain; null where its tile has not come (the mesh is made again when the tile comes: a chain whose end has no
+// height is not drawn, never drawn at 0)
 const _bmElev = c => {
   if(!map.getTerrain()) return 0;
-  const e = map.queryTerrainElevation({lng: c[0], lat: c[1]});
-  if(e == null){ _bmMiss = true; return 0; }
+  const e = _bmDemAt(c[0], c[1]);
+  if(e == null){ _bmMiss = true; return null; }
   return e;
 };
+// a chain's centre line with its distances (metres), and the point of it at a place along it (0 to 1): the ground height is read there, on the centre, so a deck and its
+// casing slabs (which lie to the side) get one height across their width
+function _bmLineOf(pts){
+  const k = Math.cos(pts[0][1] * Math.PI / 180) * 111320, cum = [0];
+  for(let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot((pts[i][0] - pts[i - 1][0]) * k, (pts[i][1] - pts[i - 1][1]) * 111320));
+  return {pts, cum, len: cum[cum.length - 1]};
+}
+function _bmLinePoint(ln, s){
+  const d = Math.max(0, Math.min(1, s)) * ln.len; let i = 1;
+  while(i < ln.pts.length - 1 && ln.cum[i] < d) i++;
+  const t = (d - ln.cum[i - 1]) / ((ln.cum[i] - ln.cum[i - 1]) || 1), a = ln.pts[i - 1], b = ln.pts[i];
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
 // the vertices of every feature: the position (metres from the origin, in mercator units), the shade of its face and, later, its colour
 function _bmBuild(){
   const s = _bmSrc(); _bmFeats = s ? _sfeats(s) : []; _bmRanges = []; _bmIdx = null;
   const pos = [], shade = [], adj = [];     // adj: for each feature, the base and the top of its pick shape over the ground under it (terrain on)
   let o = null;
-  // the ground at the two ends of each chain (the terrain on): the deck is level between them
-  _bmEnds = new Map(); _bmMiss = false;
+  // the ground at the two end nodes of each chain (the terrain on): the deck is level between them. The nodes are the engine's (`__rs_enda`, `__rs_endb`), the same
+  // coordinates for the chains that meet at a node, so they agree on its height
+  _bmEnds = new Map(); _bmLines = new Map(); _bmMiss = false; _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0};
   if(map.getTerrain()){
     const e = new Map();
-    _bmFeats.forEach(f => { const p = f.properties, r = f.geometry && f.geometry.coordinates && f.geometry.coordinates[0];
-      if(p.__rs_casing_slab || !r || r.length < 5 || (r.length - 1) % 2) return;
-      let c = e.get(p.__rs_chain); if(!c) e.set(p.__rs_chain, c = {sa: 2, sb: -1, a: null, b: null});
-      if(p.__rs_s0 < c.sa){ c.sa = p.__rs_s0; c.a = r[0]; }
-      if(p.__rs_s1 > c.sb){ c.sb = p.__rs_s1; c.b = r[(r.length - 1) / 2 - 1]; } });
-    e.forEach((c, k) => _bmEnds.set(k, {za: _bmElev(c.a), zb: _bmElev(c.b)}));
+    _bmFeats.forEach(f => { const p = f.properties; if(p.__rs_casing_slab || !(p.__rs_enda || p.__rs_endb)) return;
+      let c = e.get(p.__rs_chain); if(!c) e.set(p.__rs_chain, c = {a: null, b: null});
+      if(p.__rs_enda) c.a = p.__rs_enda;
+      if(p.__rs_endb) c.b = p.__rs_endb;
+      if(p.__rs_line) _bmLines.set(p.__rs_chain, _bmLineOf(p.__rs_line)); });
+    e.forEach((c, k) => _bmEnds.set(k, {za: c.a ? _bmElev(c.a) : null, zb: c.b ? _bmElev(c.b) : null}));
   }
   const push = (x, y, z, sh) => { pos.push(x, y, z); shade.push(sh); };
   _bmFeats.forEach((f, k) => {
@@ -85,9 +148,29 @@ function _bmBuild(){
     // the slab thins out to nothing on the ground (twice as fast as the lift rises), so the top of a ramp lands flush with the road: no blunt end
     const thin = i => Math.min(1, 2 * L(i));
     const ce = _bmEnds.get(p.__rs_chain);          // the terrain on: the level line between the ground at the two ends of the chain
+    if(map.getTerrain() && (!ce || ce.za == null || ce.zb == null)){ _bmMiss = true; _bmRanges.push([first, first]); return; }    // no height yet: not drawn
     const zg = i => ce ? ce.za + (ce.zb - ce.za) * (p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0)) : 0;
-    const top = i => zg(i) + H * L(i) + (cas ? 0.35 * th : th) * thin(i), bot = i => zg(i) + Math.max(0, H * L(i) + (cas ? -0.5 : 0));
-    if(ce){ const mid = m >> 1, g = _bmElev(A[mid]); adj[k] = [bot(mid) - g, top(mid) - g]; }
+    // THE HEIGHT OF A VERTEX: the ground under it blends into the level line plus the group's height as the lift rises, so a ramp follows the local terrain at its
+    // free end (flush with it) and a hill that bulges above the level line does not bury it; without terrain the ground is 0 and this is H * lift.
+    const G = [];
+    const ln = ce ? _bmLines.get(p.__rs_chain) : null;
+    for(let i = 0; i < m; i++){
+      const sI = p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0), g = !ce ? 0 : ln ? _bmElev(_bmLinePoint(ln, sI)) : null;
+      if(g == null){ _bmMiss = true; _bmRanges.push([first, first]); return; }
+      G.push(g);
+    }
+    const base = i => { const s3 = L(i); return G[i] * (1 - s3) + (zg(i) + H) * s3; };
+    const top = i => base(i) + (cas ? 0.35 * th : th) * thin(i), bot = i => cas ? Math.max(G[i], base(i) - 0.5) : base(i);
+    if(ce){ const mid = m >> 1; adj[k] = [bot(mid) - G[mid], top(mid) - G[mid]]; }
+    // the checks of the mesh (see _bmStats): a slab with its top under its bottom, a slab or a deck much thicker than it is made, a top under the ground
+    for(let i = 0; i < m; i++){
+      const t = top(i), bo = bot(i), thick = t - bo, made = (cas ? 0.35 * th + 0.5 : th) + 0.01;
+      if(thick < -0.01) _bmStat.inverted++;
+      if(thick > made + 0.05) _bmStat.tooThick++;
+      if(t < G[i] - 0.05) _bmStat.underGround++;
+      if(!cas && L(i) < 1e-3) _bmStat.maxEndGap = Math.max(_bmStat.maxEndGap, Math.abs(base(i) - G[i]));      // a deck's free end is flush with the ground
+      _bmStat.rows++;
+    }
     const v = (c, z) => { const q = _bmMerc(c[0], c[1]); return [q[0] - o[0], q[1] - o[1], z * mz]; };
     const quad = (a, b, c, d, sh) => { [a, b, c, a, c, d].forEach(q => push(q[0], q[1], q[2], sh)); };
     for(let i = 0; i < m - 1; i++){
@@ -138,7 +221,7 @@ let _bmPickHash = "";
 
 function _bmUpload(gl){
   if(_bmGeom){
-    const g = _bmBuild();
+    const g = _bmBuild(); _bmPosArr = g.pos; _bmBounds = null;
     gl.bindBuffer(gl.ARRAY_BUFFER, _bmBuf.pos); gl.bufferData(gl.ARRAY_BUFFER, g.pos, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, _bmBuf.shade); gl.bufferData(gl.ARRAY_BUFFER, g.shade, gl.STATIC_DRAW);
     _bmGeom = false; _bmAll = true;
@@ -226,7 +309,11 @@ export function initBridgeMesh(){
   map.on("styledata", () => { _bmEnsure(); });
   map.on("terrain", () => { _bmRetry = 0; _bmGeom = true; map.triggerRepaint(); });
   // a terrain height that was not there yet (its tile): make the mesh again once the map is idle, a few times at most
-  map.on("idle", () => { if(_bmMiss && _bmRetry < 4){ _bmRetry++; _bmGeom = true; map.triggerRepaint(); } });
+  map.on("idle", () => {
+    if(!_bmMiss) return;
+    if(_bmRetry < 30){ _bmRetry++; _bmGeom = true; map.triggerRepaint(); }
+    else if(_bmRetry++ === 30) console.warn("roadstyle: some bridges are not drawn on the terrain: the ground height at their ends did not come (the terrain tiles)");
+  });
   map.on("sourcedata", e => { if(e.sourceId === _bmSrc() && e.sourceDataType !== "metadata"){ _bmGeom = true; } });
 }
 export const useBridgeMesh = () => { _bmOrig.clear(); _bmHeights.clear(); _bmPickHash = ""; _bmGeom = true; _bmAll = true; _bmEnsure(); };
@@ -236,7 +323,7 @@ export const useBridgeMesh = () => { _bmOrig.clear(); _bmHeights.clear(); _bmPic
 let _bmIdx = null;                                   // road row -> its deck features
 export function _bmDeckZ(lng, lat, road){
   const deck = map.getLayer(_bmDeck());
-  if(road == null || !deck || !map.getLayer(_bmId()) || map.getZoom() < (deck.minzoom || 0) || !_bmOn()) return 0;
+  if(road == null || !deck || !map.getLayer(_bmId()) || map.getZoom() < (deck.minzoom || 0) || !_bmOn()) return null;
   _bmLoad();
   if(!_bmIdx){ _bmIdx = new Map(); _bmFeats.forEach(f => { if(f.properties.__rs_casing_slab) return;
     (f.properties.__rs_edges || []).forEach(r => { let a = _bmIdx.get(r); if(!a) _bmIdx.set(r, a = []); a.push(f); }); }); }
@@ -245,19 +332,87 @@ export function _bmDeckZ(lng, lat, road){
     const r = f.geometry.coordinates[0], n = r.length - 1; let cx = 0, cy = 0;
     for(let i = 0; i < n; i++){ cx += r[i][0]; cy += r[i][1]; }
     const d = ((cx / n - lng) * k) ** 2 + (cy / n - lat) ** 2; if(d < bd){ bd = d; best = f.properties; } }
-  if(!best) return 0;
+  if(!best) return null;
   const L = (best.__rs_lift0 + best.__rs_lift1) / 2, ce = _bmEnds.get(best.__rs_chain);
   // the terrain on: the deck's level line there, as a height over the ground under the marker (the marker stands on the terrain)
-  const zg = ce ? ce.za + (ce.zb - ce.za) * (best.__rs_s0 + best.__rs_s1) / 2 - _bmElev([lng, lat]) : 0;
-  return zg + _bmHeight(best) * L + best.__rs_thick * Math.min(1, 2 * L);
+  const here = _bmElev([lng, lat]);
+  if(ce && (ce.za == null || ce.zb == null || here == null)) return null;      // no height yet: not on the deck
+  // the deck's height over the ground under the marker: the ground blends into the level line plus the group's height by the lift (as the mesh does)
+  const level = ce ? ce.za + (ce.zb - ce.za) * (best.__rs_s0 + best.__rs_s1) / 2 : 0, rise = (level + _bmHeight(best) - (ce ? here : 0)) * L;
+  return rise + best.__rs_thick * Math.min(1, 2 * L);
 }
-// where a point at `metres` above the ground is on the screen, as a shift in pixels from the point on the ground
+// where a point at `metres` above sea level is on the screen (CSS px), drawn as the mesh is: with the matrix that the mesh layer gets
+export function _bmProject(lng, lat, metres){
+  const M = map.transform.getProjectionDataForCustomLayer(false).mainMatrix, mc = maplibregl.MercatorCoordinate.fromLngLat([lng, lat]), z = metres * mc.meterInMercatorCoordinateUnits();
+  const cx = M[0] * mc.x + M[4] * mc.y + M[8] * z + M[12], cy = M[1] * mc.x + M[5] * mc.y + M[9] * z + M[13], cw = M[3] * mc.x + M[7] * mc.y + M[11] * z + M[15];
+  const c = map.getCanvas();
+  return [(cx / cw * 0.5 + 0.5) * c.clientWidth, (0.5 - cy / cw * 0.5) * c.clientHeight];
+}
+// where the deck of the road `road` (a row) is on the screen at a point of it; null where the mesh is not drawn (or its ground height has not come)
+export function _bmDeckScreen(lng, lat, road){
+  const z = _bmDeckZ(lng, lat, road), g = _bmElev([lng, lat]);
+  return z == null || g == null ? null : _bmProject(lng, lat, g + z);
+}
+// where a point at `metres` above the ground is on the screen, as a shift in pixels from the point on the ground: the difference of two points drawn with the mesh's own matrix
 export function _bmScreenUp(lng, lat, metres){
-  const tr = map.transform, c = maplibregl.MercatorCoordinate.fromLngLat([lng, lat]);
-  const g = _bmElev([lng, lat]), a = tr.coordinatePoint(c, g), b = tr.coordinatePoint(c, g + metres);      // the elevation is in metres
-  return [b.x - a.x, b.y - a.y];
+  const g = _bmElev([lng, lat]) ?? 0, a = _bmProject(lng, lat, g), b = _bmProject(lng, lat, g + metres);
+  return [b[0] - a[0], b[1] - a[1]];
 }
 const _bmLoad = () => { if(!_bmFeats.length){ const s = _bmSrc(); _bmFeats = s ? _sfeats(s) : []; _bmIdx = null; } };
+// THE PICK ON THE MESH: the deck piece that is under a screen point, the one nearest to the camera. The extrusions that MapLibre draws as pick shapes stand on the terrain by
+// their own rule, a few metres from the mesh, so with the terrain on the pick is made on the mesh's own triangles, projected with the matrix that draws them.
+function _bmMatrix(){
+  const M = map.transform.getProjectionDataForCustomLayer(false).mainMatrix, T = new Float64Array(16);
+  for(let i = 0; i < 16; i++) T[i] = M[i];
+  for(let r = 0; r < 4; r++) T[12 + r] = M[r] * _bmOrigin[0] + M[4 + r] * _bmOrigin[1] + M[12 + r];
+  return T;
+}
+function _bmFeatureBounds(){                          // the centre and the radius of each feature's vertices
+  if(_bmBounds) return _bmBounds;
+  _bmBounds = _bmRanges.map(([a, b]) => {
+    if(b <= a) return null;
+    let x = 0, y = 0, z = 0; for(let v = a; v < b; v++){ x += _bmPosArr[v * 3]; y += _bmPosArr[v * 3 + 1]; z += _bmPosArr[v * 3 + 2]; }
+    const n = b - a; x /= n; y /= n; z /= n; let r = 0;
+    for(let v = a; v < b; v++) r = Math.max(r, Math.hypot(_bmPosArr[v * 3] - x, _bmPosArr[v * 3 + 1] - y, _bmPosArr[v * 3 + 2] - z));
+    return [x, y, z, r];
+  });
+  return _bmBounds;
+}
+function _bmPickPoint(px, py, T, W, H){
+  const bounds = _bmFeatureBounds(), P = _bmPosArr; let best = -1, bw = Infinity;
+  const proj = (x, y, z) => { const cw = T[3] * x + T[7] * y + T[11] * z + T[15]; if(cw <= 0) return null;
+    return [((T[0] * x + T[4] * y + T[8] * z + T[12]) / cw * 0.5 + 0.5) * W, (0.5 - (T[1] * x + T[5] * y + T[9] * z + T[13]) / cw * 0.5) * H, cw]; };
+  for(let k = 0; k < bounds.length; k++){
+    const bd = bounds[k]; if(!bd) continue;
+    const f = _bmFeats[k]; if(!f || f.properties.__rs_casing_slab || (_bmShown && !_bmShown.has(k))) continue;
+    const c = proj(bd[0], bd[1], bd[2]); if(!c) continue;
+    const e = proj(bd[0] + bd[3], bd[1], bd[2]), e2 = proj(bd[0], bd[1] + bd[3], bd[2]), e3 = proj(bd[0], bd[1], bd[2] + bd[3]);
+    const rpx = Math.max(e ? Math.hypot(e[0] - c[0], e[1] - c[1]) : 0, e2 ? Math.hypot(e2[0] - c[0], e2[1] - c[1]) : 0, e3 ? Math.hypot(e3[0] - c[0], e3[1] - c[1]) : 0) * 1.5 + 4;
+    if(Math.hypot(px - c[0], py - c[1]) > rpx) continue;
+    const [a, b] = _bmRanges[k];
+    for(let v = a; v + 2 < b; v += 3){
+      const A = proj(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]), B = proj(P[v * 3 + 3], P[v * 3 + 4], P[v * 3 + 5]), C = proj(P[v * 3 + 6], P[v * 3 + 7], P[v * 3 + 8]);
+      if(!A || !B || !C) continue;
+      const d = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]); if(Math.abs(d) < 1e-9) continue;
+      const u = ((B[1] - C[1]) * (px - C[0]) + (C[0] - B[0]) * (py - C[1])) / d, w = ((C[1] - A[1]) * (px - C[0]) + (A[0] - C[0]) * (py - C[1])) / d, t = 1 - u - w;
+      if(u < 0 || w < 0 || t < 0) continue;
+      const depth = u * A[2] + w * B[2] + t * C[2];
+      if(depth < bw){ bw = depth; best = k; }
+    }
+  }
+  return best;
+}
+// the feature that MapLibre would give for the deck under the screen point `p` ({x, y}), or null: the point first, then a box of 4 px (as the pick of select.js does)
+export function _bmPickAt(p){
+  if(!_bmDrawn() || !_bmPosArr) return null;
+  const c = map.getCanvas(), T = _bmMatrix(), W = c.clientWidth, H = c.clientHeight;
+  let k = _bmPickPoint(p.x, p.y, T, W, H);
+  for(const [dx, dy] of [[4, 0], [-4, 0], [0, 4], [0, -4]]){ if(k >= 0) break; k = _bmPickPoint(p.x + dx, p.y + dy, T, W, H); }
+  if(k < 0) return null;
+  const f = _bmFeats[k];
+  return {type: "Feature", id: k, properties: f.properties, geometry: f.geometry, layer: map.getLayer(_bmDeck()), source: _bmSrc(), state: {}};
+}
+
 // the groups: [{group, roads (the road rows), height (metres), set (the person gave it)}], largest first
 export function rsBridgeGroups(){
   _bmLoad();
@@ -308,4 +463,6 @@ export function rsSetBridges3D(on){
 }
 // whether the page has 3D decks (it was made with view_3d)
 export const _bmHas = () => !!_bmSrc() && !!map.getSource(_bmSrc());
+// what the last build found wrong in its own vertices: {rows, inverted (a slab whose top is under its bottom), tooThick, underGround (a top under the ground), maxEndGap (metres between a free end and the ground)}; for the tests
+export const _bmStats = () => ({..._bmStat});
 export function initBridgeApi(){ window.rsSetBridges3D = rsSetBridges3D; window.rsBridgeGroups = rsBridgeGroups; window.rsSetBridgeHeight = rsSetBridgeHeight; window.rsBridgeHeight = rsBridgeHeight; }

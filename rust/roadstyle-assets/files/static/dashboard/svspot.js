@@ -4,7 +4,7 @@ import {_esc} from "../popup.js";
 import {map, O, RS_PREFIX, RS_LEAN, RS_LEANS, _road, _roadOfPiece, _emit} from "./core.js";
 import {_svWindow} from "./streetview.js";
 import {srcOf, _deckRoad} from "./select.js";
-import {_bmDeckZ, _bmScreenUp} from "./bridgemesh.js";
+import {_bmDeckZ, _bmScreenUp, _bmDeckScreen} from "./bridgemesh.js";
 let _streetView = false;
 let RS_FILL_LAYERS = [];   // the road fill layers (Street View finds a road on them)
 // Street View stands at a spot ON the clicked edge: its own geometry (the road's centre line), the
@@ -53,11 +53,24 @@ function _svUrlOf(p){ return 'https://www.google.com/maps/@?api=1&map_action=pan
   p.lat.toFixed(6)+','+p.lng.toFixed(6)+(p.h==null ? '' : '&heading='+Math.round(p.h)); }
 function _svUrl(ll, f){
   if(!_streetView || !ll) return null;
-  f=_svFeat(f); const m=_svMeasure(f, ll), p=m==null ? null : _svAt(f, m);
+  f=_svFeat(f);
+  // the spot that the pick found (a deck's click is a point of the ground, not of the deck: _svPick took the spot on the deck's road)
+  const m=(_svPos && f && f.id!=null && _svPos.id===f.id) ? _svPos.m : _svMeasure(f, ll), p=m==null ? null : _svAt(f, m);
   return _svUrlOf(p || ll); }
 // a selection: remember the spot (for the marker and the step buttons) and return its URL
-export function _svPick(ll, f, id){
-  f=_svFeat(f); const m=(_streetView && ll) ? _svMeasure(f, ll) : null;
+// a click on a 3D deck: its longitude and latitude are the point of the ground under the cursor, far from the deck. The spot is the point of the road whose deck is
+// nearest to the click on the screen (pt: the click's screen point); null where the deck is not drawn
+function _svMeasureDeck(road, pt){
+  const cs=_svLine(road); if(cs.length<2 || road.id==null || !pt) return null;
+  const len=_svDist(cs)[cs.length-1], step=Math.max(1, len/400); let best=null, bd=Infinity;
+  for(let m=0; m<=len+1e-6; m+=step){
+    const p=_svAt(road, m), s=_bmDeckScreen(p.c[0], p.c[1], road.id); if(!s) return null;
+    const d=Math.hypot(s[0]-pt.x, s[1]-pt.y); if(d<bd){ bd=d; best=m; } }
+  return best; }
+export function _svPick(ll, f, id, pt){
+  const deck=!!f && srcOf(f)==="decks";
+  f=_svFeat(f); let m=null;
+  if(_streetView && ll){ m=deck ? _svMeasureDeck(f, pt) : null; if(m==null) m=_svMeasure(f, ll); }
   _svFree = null; _svLast = null;
   _svPos = m==null ? null : {f:f, m:m, id:f && f.id!=null ? f.id : id}; _svMark();      // the road's row (a deck's pick id is the deck's)
   queueMicrotask(_svSpotEvent);                 // after the rs:select this pick is part of
