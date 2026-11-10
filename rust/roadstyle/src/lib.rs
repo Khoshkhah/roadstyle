@@ -19,6 +19,7 @@ pub mod options;
 pub mod page;
 pub mod page_options;
 pub mod relevel;
+pub mod walls;
 pub use roadstyle_levels as levels;
 pub use roadstyle_tiles as tiles;
 

@@ -669,3 +669,53 @@ def test_the_panel_title_row_folds_and_unfolds_all_the_sections_that_fold_and_ke
             assert not errors, errors
             page.context.close()
         browser.close()
+
+
+def test_the_walls_of_a_function_load_only_when_they_show_and_a_vector_source_is_a_tile_layer(host):
+    """rsSetWalls(function) (walls.js, docs/design/memory_budget.md, "The 3D walls"): the function runs once, only when "Walls by type" is on and the 3D
+    buildings show; its vector source becomes the layer `walls` of tiles; a new style keeps it; a FeatureCollection is a GeoJSON source as before."""
+    base, vec = host
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
+        page = browser.new_page(viewport={"width": 1100, "height": 760})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.route("http://rs.test/**", lambda r: r.fulfill(content_type="image/png", body=PNG) if ".png" in r.request.url else r.fulfill(content_type="application/json", body="{}"))
+        page.goto(base + "/page.html")
+        page.wait_for_function("window.ready === true", timeout=60_000)
+        page.evaluate("(s) => addStyle(s)", _style())
+        page.evaluate("""() => { window.calls = 0; window.tiles = [];
+          maplibregl.addProtocol("wt", async (p) => { tiles.push(p.url); return {data: new ArrayBuffer(0)}; });
+          rsSetWalls(async () => { calls++; return {type: "vector", tiles: ["wt://walls/{z}/{x}/{y}"], minzoom: 14, maxzoom: 16}; }); }""")
+        wall = "() => { const l = map.getLayer('rs-walls'); return l ? [l.source, l.sourceLayer, map.getSource('rs-walls').type, map.getLayoutProperty('rs-walls', 'visibility')] : null; }"
+        calls = "() => window.calls"
+        # off, or on with flat buildings: the function does not run
+        assert page.evaluate(calls) == 0 and page.evaluate(wall) is None and page.evaluate("() => rsHasWalls()")
+        page.evaluate("() => rsSetWallStyle({on: true})")
+        page.evaluate("() => new Promise(r => setTimeout(r, 50))")
+        assert page.evaluate(calls) == 0, "the 3D buildings do not show"
+        page.evaluate("() => rsSetBuildings3D(true)")
+        page.wait_for_function("map.getLayer('rs-walls')")
+        assert page.evaluate(calls) == 1
+        assert page.evaluate(wall) == ["rs-walls", "walls", "vector", "visible"]
+        page.evaluate("() => map.jumpTo({center: [18.005, 59.305], zoom: 15})")
+        page.wait_for_function("window.tiles.length > 0")
+        # off and on again, and a new style: the same walls, the function does not run again
+        page.evaluate("() => { rsSetWallStyle({on: false}); rsSetWallStyle({on: true}); }")
+        page.evaluate("(s) => addStyle(s)", _style())
+        page.wait_for_function("map.getLayer('rs-walls')")
+        assert page.evaluate(calls) == 1 and page.evaluate(wall) == ["rs-walls", "walls", "vector", "visible"]
+        # a function with no walls: none; an older function's late answer is dropped
+        page.evaluate("""() => { rsSetWalls(() => new Promise(r => setTimeout(() => r({type: "vector", tiles: ["wt://old/{z}/{x}/{y}"]}), 200)));
+                                rsSetWalls(async () => null); }""")
+        page.evaluate("() => new Promise(r => setTimeout(r, 400))")
+        assert not page.evaluate("() => rsHasWalls()") and page.evaluate("() => map.getSource('rs-walls')?.type") == "geojson"
+        # a FeatureCollection: a GeoJSON source of strips at once
+        page.evaluate("""() => rsSetWalls({type: "FeatureCollection", features: [{type: "Feature", properties: {type: "front", height: 10, base: 0, azimuth: 90},
+                          geometry: {type: "LineString", coordinates: [[18.005, 59.305], [18.005, 59.3052]]}}]})""")
+        assert page.evaluate(wall)[2] == "geojson" and page.evaluate("() => rsHasWalls()")
+        assert page.evaluate("async () => (await map.getSource('rs-walls').getData()).features[0].properties") == {"t": "front", "b": 0, "h": 10.25}
+        page.evaluate("() => rsSetWalls(null)")
+        assert page.evaluate(wall) is None and not page.evaluate("() => rsHasWalls()")
+        browser.close()
+    assert not errors, errors

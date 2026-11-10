@@ -146,6 +146,17 @@ changes stay in your browser. <a href="../../live/design_editor/?roads=sodermalm
     duckOSM's fixes editor: front `#16a34a`, back `#dc2626`, side `#6b7280`, party wall `#7c3aed`, courtyard wall `#0891b2`; the roof is
     `#a8a29e` (`#57534e` in the dark theme). The walls are not in the look: a change paints the map at once (`rsSetWallStyle`), and draws no new map.
 
+    A large area has many walls (Tartu: 164,482). Give `rsSetWalls` a function, not the walls: the page then loads them only when the person turns on
+    **Walls by type**. A page with a map worker (roadstyle-wasm's `LiveMap`) gives the walls to `LiveMap.setWalls`, and the function returns the
+    vector source that `setWalls` returns. The walls are then tiles, and the map holds only the tiles in view:
+
+    ```js
+    rsSetWalls(async () => {
+      const fc = await loadWalls();                        // the page's walls: a GeoJSON FeatureCollection, or null
+      return fc && JSON.parse(await mapWorker.setWalls(new TextEncoder().encode(JSON.stringify(fc))));
+    });
+    ```
+
 ### The options { .rs-part }
 
 **Use it for:** what `designPanel({...})` takes. `panel`, `look` and `redraw` are necessary.<br>

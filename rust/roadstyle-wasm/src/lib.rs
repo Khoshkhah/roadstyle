@@ -633,7 +633,20 @@ mod wasm {
 
         pub fn tile(&mut self, source: &str, z: u32, x: u32, y: u32, format: Option<String>) -> Result<Vec<u8>, JsError> {
             let f = tile_format(format, self.0.format())?;
-            if source == roadstyle::tiles::SOURCE { self.0.tile_in(f, z, x, y).map_err(|e| JsError::new(&e.to_string())) } else { Ok(Vec::new()) }
+            match source {
+                roadstyle::tiles::SOURCE => self.0.tile_in(f, z, x, y),
+                roadstyle::walls::SOURCE => self.0.walls_tile(f, z, x, y),
+                _ => Ok(Vec::new()),
+            }.map_err(|e| JsError::new(&e.to_string()))
+        }
+
+        /// setWalls(fc): the 3D walls of the page's buildings (`fc`: the GeoJSON text of the dashboard's `rsSetWalls`, as bytes) become
+        /// tiles of this map: `tile("walls", z, x, y)` gives them (roadstyle::walls). The answer is the JSON text of their vector source
+        /// for MapLibre (the tile layer `walls`), which the page gives to `rsSetWalls`. The walls before go.
+        #[wasm_bindgen(js_name = setWalls)]
+        pub fn set_walls(&mut self, fc: Vec<u8>) -> Result<String, JsError> {
+            let (source, _) = self.0.set_walls(&fc).map_err(|e| JsError::new(&e.to_string()))?;
+            Ok(source.to_string())
         }
 
         /// setLook(look, format?): the look `look` with no new tile (docs/design/restyle_without_retile.md, D2 and D3), when the map's tiles
