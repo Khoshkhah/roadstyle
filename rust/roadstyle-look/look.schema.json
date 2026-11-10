@@ -62,6 +62,17 @@
         }
       ]
     },
+    "vehicles": {
+      "description": "the vehicles of a traffic microsimulation run (the colour of each kind, each SUMO vClass, the numbers of a run); a look without this\nsection has none",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VehiclesLook"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "background": {
       "$ref": "#/$defs/BackgroundLook"
     },
@@ -2369,6 +2380,66 @@
       "required": [
         "light",
         "dark"
+      ]
+    },
+    "VehiclesLook": {
+      "description": "The vehicles of a traffic microsimulation run (docs/design/vehicles_spec.md): the colour of each kind (the palette), the kind and the\ndefault size of each SUMO vClass, and the numbers of a run (the profile). A vType's own size wins over its class's.",
+      "type": "object",
+      "properties": {
+        "colours": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/ThemeColor"
+          }
+        },
+        "classes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/VehicleClassLook"
+          }
+        },
+        "teleport_m": {
+          "description": "a jump longer than this between two samples (a SUMO teleport) is not interpolated, m",
+          "$ref": "#/$defs/Num"
+        },
+        "lane_change_s": {
+          "description": "a lane change blends the places on the two lanes over this time, s",
+          "$ref": "#/$defs/Num"
+        },
+        "heading_lookahead_m": {
+          "description": "the heading is the road's direction this far ahead of the vehicle's middle, m",
+          "$ref": "#/$defs/Num"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "colours",
+        "classes",
+        "teleport_m",
+        "lane_change_s",
+        "heading_lookahead_m"
+      ]
+    },
+    "VehicleClassLook": {
+      "description": "One SUMO vClass: its kind (a key of `VehiclesLook::colours`) and its default size [length, width, height] in m.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "size": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "size"
       ]
     },
     "BackgroundLook": {

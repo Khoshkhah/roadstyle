@@ -129,3 +129,28 @@ dark:
   point: {lightness: [0.30, 0.80], saturation: 1.0}      # their points and icons
   casing: {lightness: [0.12, 0.42], saturation: 0.85}    # the casing of the roads
   label: {lightness: [0.92, 0.30], saturation: 1.0}      # the names, the arrows and their halos (white becomes dark, grey becomes light)
+
+vehicles:   # the vehicles of a traffic microsimulation run (docs/design/vehicles_spec.md); the palette's vehicles.colours colour each kind
+  teleport_m: 50              # a jump longer than this between two samples (a SUMO teleport) is not interpolated: the vehicle is hidden between them
+  lane_change_s: 2            # a lane change blends the places on the two lanes over this time, centred on the sample of the change
+  heading_lookahead_m: 2      # the heading is the road's direction this far ahead of the vehicle's middle
+  classes:                    # each SUMO vClass: its kind (a colour of the palette) and its default size [length, width, height] in m, SUMO's (Vehicle_Type_Parameter_Defaults, 2026-11-10); a vType's own size wins; a class that is not here is an error
+    passenger: {kind: car, size: [5, 1.8, 1.5]}
+    taxi: {kind: car, size: [5, 1.8, 1.5]}
+    evehicle: {kind: car, size: [5, 1.8, 1.5]}
+    emergency: {kind: special, size: [6.5, 2.16, 2.86]}
+    delivery: {kind: truck, size: [6.5, 2.16, 2.86]}
+    truck: {kind: truck, size: [7.1, 2.4, 2.4]}
+    trailer: {kind: truck, size: [16.5, 2.55, 4]}
+    bus: {kind: bus, size: [12, 2.5, 3.4]}
+    coach: {kind: bus, size: [14, 2.6, 4]}
+    tram: {kind: rail, size: [22, 2.4, 3.2]}
+    rail_urban: {kind: rail, size: [109.5, 3.0, 3.6]}
+    rail: {kind: rail, size: [135, 2.84, 3.75]}
+    rail_electric: {kind: rail, size: [200, 2.95, 3.89]}
+    rail_fast: {kind: rail, size: [200, 2.95, 3.89]}
+    subway: {kind: rail, size: [98.7, 2.65, 3.4]}
+    motorcycle: {kind: two_wheel, size: [2.2, 0.9, 1.5]}
+    moped: {kind: two_wheel, size: [2.1, 0.8, 1.7]}
+    scooter: {kind: two_wheel, size: [1.2, 0.5, 1.7]}
+    bicycle: {kind: two_wheel, size: [1.6, 0.65, 1.7]}
