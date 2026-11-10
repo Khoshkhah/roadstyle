@@ -138,3 +138,30 @@ def test_a_highlight_is_as_wide_as_the_road(tmp_path):
         finally:
             browser.close()
     assert errors == []
+
+
+def test_a_new_style_forgets_the_highlight_sets(tmp_path):
+    """rs.setStyle (a host's new roads, as after a build in duckOSM Studio): the new sources have no feature state, and their rows can be other roads. The
+    highlight sets of the old style go, so a later rsHighlight of another set does not light the old rows again (Studio: an edited road came back amber
+    when Ask lit its result after a build)."""
+    path = _save(tmp_path)
+    with pw.sync_playwright() as p:
+        browser = p.chromium.launch(args=_ARGS)
+        page = browser.new_page(viewport={"width": 1280, "height": 800})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        try:
+            page.goto(path.resolve().as_uri())
+            page.wait_for_function("window.map && map.loaded() && window.rsReady", timeout=60_000)
+            page.evaluate(f"rsHighlight([0], {{set: 'edit', color: '{_HEX[BLUE]}', opacity: 1}})")
+            assert page.evaluate(_STATE)[0].get("rs_hl") == _HEX[BLUE]
+            # a new style: the map makes all its sources again (no diff), then the page gives the style to the dashboard
+            page.evaluate("""new Promise(ok => { const st = map.getStyle(); map.once('style.load', () => { rs.setStyle(st); ok(); });
+                                                 map.setStyle(st, {diff: false}); })""")
+            page.wait_for_function("map.isStyleLoaded()", timeout=30_000)
+            assert page.evaluate(_STATE)[0].get("rs_hl") is None
+            page.evaluate(f"rsHighlight([1], {{set: 'turn', color: '{_HEX[GREEN]}', opacity: 1}})")
+            assert [s.get("rs_hl") for s in page.evaluate(_STATE)] == [None, _HEX[GREEN], None, None]
+        finally:
+            browser.close()
+    assert errors == []
