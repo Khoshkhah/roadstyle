@@ -59,7 +59,8 @@ This file says what roadstyle builds and how. It does not cover the SimReady glT
 
 Rules:
 
-- The two crates do not depend on the page code (`roadstyle-engine`, `roadstyle-tiles`). `roadstyle-sim` depends on `roadstyle-io` for Parquet only.
+- The two crates do not depend on the page code (`roadstyle-engine`, `roadstyle-tiles`). `roadstyle-sim` depends on `roadstyle-io` for the reprojection only (`Crs::Proj`: the UTM lanes of `net.xml` to lon/lat), and on the workspace's `parquet` and `arrow` crates.
+- `net.xml` and the `<vType>` elements are read with a small tag scanner (SUMO's XML is plain elements with attributes), as SimReady's `netconvert.rs` does: no XML library.
 - A page without vehicles does not load the feature's code: the Rust page writer and `render_web.py` add `vehicles.js`, `vehiclebar.js` and the WASM with the feature only when the page has vehicles.
 - No new JS dependency. No new Rust dependency for Parquet (`roadstyle-io` already has `parquet` and `arrow`, also in WASM).
 
@@ -119,7 +120,7 @@ A run has three tables and one header.
 Rules:
 
 - Ids stay text in the lists; the tables hold indices. A SUMO edge id is a duckOSM `edge_id` (past 2**53), so a JS number must never hold it.
-- A sample with a `lane` that is not in the lane shapes is counted and shown in the status line (section 10.4). It is not dropped silently and not placed by a guess.
+- A sample with a `lane` that is not in the lane shapes is placed by its lon/lat (`x`, `y`), counted (`lanes_unknown`) and shown in the status line (section 10.4). It is not dropped silently. A pair of samples with no chain of lanes between them is placed the same way and counted (`path_gaps`).
 
 ### 4.2 Where the lane shapes come from
 
@@ -134,19 +135,27 @@ A vehicle is placed in one of two ways. The page chooses with the option `vehicl
 
 - **`"lane"`** (default when the samples have `lane` and `pos`): the middle of the vehicle is at station
   `pos - length / 2` on the lane, at `pos_lat` (else 0) to the right. A station before the lane's start continues
-  backward on the vehicle's previous lane. This is correct on curves, where a shift along the heading is not.
+  backward on the vehicle's previous lanes (the run keeps up to 8 lanes behind each pair). This is correct on curves,
+  where a shift along the heading is not.
+  - **Two kinds of distance.** A station (SUMO's `pos`) is measured on SUMO's lane length, and each lane maps it onto
+    its drawn line, as SUMO does. Some lanes have a drawn line much shorter than their SUMO length (on Monaco, a lane with
+    `length="3.99"` and a line of 0.2 m). So the front of the vehicle follows the stations, and the half length back (and
+    the look ahead of the heading) is in drawn metres: the vehicle keeps its size.
 - **`"lonlat"`**: the middle of the vehicle is `length / 2` behind (`x`, `y`) along `angle`.
 
 ### 4.4 Interpolation
 
 The clock time `t` is between two samples `a` and `b` of one vehicle (`a.t <= t < b.t`).
 
-1. **Distance along the path.** For lane placement, the path is the chain of lanes from `a.lane` to `b.lane` (the
-   lanes in between come from the vehicle's earlier and later samples; SUMO moves at most a few lanes in one step).
+1. **Distance along the path.** For lane placement, the path is the chain of lanes from `a.lane` to `b.lane` through
+   the connections of `net.xml` (also the internal lanes), at most 6 lanes. The search takes `b.lane` itself when a
+   connection reaches it; else the first lane of `b.lane`'s edge, and then a lane change at `b`.
    The distance `s(t)` along that chain is a cubic Hermite curve with the end values `s(a) = 0`, `s(b) = L` and the end
    slopes `a.speed`, `b.speed`. So the vehicle moves at the simulated speed with no jump at a sample.
-2. **Lateral offset.** Between two lanes of one edge (a lane change), the lateral offset moves from the old lane to the
-   new one with a smoothstep over `vehicles.lane_change_s` (profile, default 2 s), centred on `b.t`.
+2. **Lane change.** The place is a blend of the place on the old lane and the place on the new lane (the same distance
+   before or after `b`), with a smoothstep weight over `vehicles.lane_change_s` (profile, default 2 s), centred on `b.t`.
+   A blend of real places, not a sideways shift by the lane width: the lanes of a junction's internal edge are not
+   parallel.
 3. **Heading.** The tangent of the path at `s(t) + vehicles.heading_lookahead_m` (default 2 m), not at `s(t)`: the
    vehicle turns into a curve a little before it, as a driver does.
 4. **Height, pitch, roll.** From the road surface (section 8) at the vehicle's middle, front and back and both sides.
@@ -416,7 +425,7 @@ outline, the selected vehicle's outline, the brake light, the indicator, and the
 
 | Level | Test |
 |---|---|
-| Rust, `roadstyle-sim` | the readers on a fixture (Monaco, 60 s, about 30 vehicles, under 200 KB, made from the P0 run): row counts, ids as text, the front bumper to middle shift on a curve, the Hermite interpolation (the speed at each sample is the simulated speed), a lane change, a teleport, a lane not found |
+| Rust, `roadstyle-sim` | the readers on a fixture made by SUMO itself (Monaco, 90 s, 60 vehicles, 2,676 rows: `monaco_fcd.parquet` 118 KB and the edges of the vehicles' routes in `monaco_net.xml` 604 KB): row counts, ids as text, no lane unknown and no pair without a chain; the middle is 2.5 m behind SUMO's front bumper (median error under 0.1 m); no jump at a sample (99 % under 5 cm, all under 0.1 m, lane changes too); the heading near SUMO's angle (median under 3°); a teleport; a class with no size |
 | Rust, `roadstyle-camera` | `visible` on hand-made cases (a prism between, a slab above, a hill between, a corner); the deck rule gives the same height as the bridge mesh at its vertices; the camera rig on a fixed path is the same each run (no randomness) and never puts the eye inside an obstacle |
 | Python | `read_run` report values on the fixture; each keyword lands in `RS_OPTIONS` (`_opt(html, key)`); `vehicle_data="file"` writes the two files |
 | Browser (Playwright) | load, play, seek, follow, mode keys; layer order after the 3D switch and a base map change; the parts in both themes; the host route (`examples/dashboard_rust/`) with vehicles |

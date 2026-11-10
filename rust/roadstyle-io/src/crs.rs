@@ -10,6 +10,8 @@ use proj4rs::Proj;
 pub enum Crs {
     Epsg(u16),
     Wkt(String),
+    /// A proj string, as SUMO's `net.xml` gives it (`<location projParameter>`).
+    Proj(String),
 }
 
 /// The reprojection of one file: None when its CRS is EPSG:4326 (or the same longlat WGS 84).
@@ -37,6 +39,7 @@ impl ToWgs84 {
                 .ok_or_else(|| Error::Crs(format!("{what}: its CRS EPSG:{c} is not known to the reader (crs-definitions)")))?,
             Some(Crs::Wkt(w)) => proj4wkt::wkt_to_projstring(&w)
                 .map_err(|e| Error::Crs(format!("{what}: its CRS cannot be read ({e}): {}", w.chars().take(120).collect::<String>())))?,
+            Some(Crs::Proj(p)) => p,
         };
         if is_wgs84(&proj) {
             return Ok(ToWgs84(None));
@@ -65,6 +68,16 @@ mod tests {
 
     /// pyproj's lon, lat (9 decimals) of the two EPSG:3006 points of the tests
     pub const PYPROJ: [[f64; 2]; 2] = [[18.068599992, 59.329299997], [18.104000008, 59.310700000]];
+
+    #[test]
+    fn sumo_proj_string() {
+        // SUMO's Monaco network: projParameter of <location>; the point is (0, 0) of the network less netOffset, the
+        // corner of convBoundary, which origBoundary gives as about (7.4054, 43.7253)
+        let t = ToWgs84::new(Some(Crs::Proj("+proj=utm +zone=32 +ellps=WGS84 +datum=WGS84 +units=m +no_defs".into())), "x").unwrap();
+        let mut l = [[371582.04, 4842578.64]];
+        t.line(&mut l).unwrap();
+        assert!((l[0][0] - 7.4054).abs() < 0.001 && (l[0][1] - 43.7253).abs() < 0.001, "{:?}", l[0]);
+    }
 
     #[test]
     fn sweref99_tm_to_wgs84_as_pyproj() {
