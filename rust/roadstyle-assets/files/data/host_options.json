@@ -308,7 +308,7 @@
       ],
       "encoding": "terrarium",
       "tile_size": 256,
-      "maxzoom": 15,
+      "maxzoom": 13,
       "attr": "Ground heights: Terrain Tiles on AWS (<a href=\"https://github.com/tilezen/joerd/blob/master/docs/attribution.md\" target=\"_blank\" rel=\"noopener\">Mapzen, SRTM and other sources</a>)"
     },
     "hillshade": {
