@@ -65,6 +65,9 @@ export function useStyle(st){
   RS_LEAN = leans.length ? RS_LEANS[0] : false;
   RS_ROLES = new Set(Object.keys(O.sources || (style.metadata || {})["roadstyle:sources"] || {}));
   _decks = null;
+  // the highlights (the glow and the highlight sets) were on the rows of the old roads: a new style has new sources with no feature state, and its rows
+  // can be other roads. Forget them, so that the next rsHighlight does not light the old rows again (duckosm-studio: an amber edit came back after a build)
+  _hlSets.clear(); _hlNow = new Map(); _qHl = []; _qHlD = []; for(const k in _qHlOv) delete _qHlOv[k];
   _useState();
   _useImages();
 }
