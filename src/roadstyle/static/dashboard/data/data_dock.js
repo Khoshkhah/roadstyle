@@ -708,7 +708,8 @@ export function dataDock(o = {}){
   }
   // Reset (Kaveh, 2026-11-07: "it needs a reset button for reset map and also make the table empty"): the map has its own colours again (no colour layer, no focus,
   // no lit road, no selected road, no card) and the table has no result; the SQL text stays. The map switch, the camera, the theme and the layers of the
-  // page are the person's: Reset does not touch them.
+  // page are the person's: Reset does not touch them. One exception, by the event `rs:dockreset`: Ask (ask/ask_panel.js) puts back the layers, the base map, the
+  // theme, the 3D view, the road fill and the tunnel look that its own set_map changed (2026-11-10), but not the camera, and not a key that the person changed after Ask.
   function reset(){
     if(ctl) ctl.abort();
     layers.length = 0; res = null; err.textContent = "";
