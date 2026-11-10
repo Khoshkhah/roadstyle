@@ -482,7 +482,8 @@ export function dataDock(o = {}){
     if(!r || !r.__kindP){ await loadKinds(); return; }      // no result, or none that looked for a kind (roads own it): the next result reads the kinds
     const old = await r.__kindP; r.__kindP = null;
     const own = await kindOf(r); if(r !== res) return;
-    const same = (a, b) => a === b || (a && b && a.name === b.name && a.column === b.column && a.facts.size === b.facts.size);
+    const same = (a, b) =>      // a composite key is an array of columns: compare the names, not the arrays
+      a === b || (a && b && a.name === b.name && String(colsOf(a.column)) === String(colsOf(b.column)) && a.facts.size === b.facts.size);
     if(same(old, own)){ r.__own = old; r.__kindP = Promise.resolve(old); return; }
     if(hostCard) closeHostCard();      // the selected object belonged to the old owner
     light();

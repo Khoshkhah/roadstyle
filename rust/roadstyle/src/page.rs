@@ -69,6 +69,10 @@ pub struct PageOptions {
     pub select_color: Value,
     /// the colours of the data dock's objects on the map (the look's `dock` section: result, selected, roles, role_series); null when the look has none
     pub dock: Value,
+    /// the look's vehicles section (the colour of each kind, each SUMO vClass, the numbers of a run); null when the look has none
+    pub vehicle_look: Value,
+    /// a traffic microsimulation run that the page loads at start: {wasm, fcd, net, routes} as URLs (dashboard/vehicles.js); null: none
+    pub vehicles: Value,
     pub filter: Value,
     /// the Roads box (render's filter_control; the dashboard shows it when the filter has classes)
     pub filter_control: bool,
