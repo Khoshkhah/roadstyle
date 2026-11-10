@@ -5,10 +5,11 @@ import {O, RoadTable} from "./core.js";
 import {replaceTool, greyTool, getTool, wrap, ROADS_ICON} from "./tools.js";
 import {FILTER, rsSetClasses, rsSetBridges, rsSetTunnels, rsSetAccess} from "./filter.js";
 import {_esc} from "../popup.js";
-import {rsSetBridges3D, _bmHas} from "./bridgemesh.js";
+import {rsSetBridges3D, _bmHas, rsBridgeGroups, rsSetBridgeHeight} from "./bridgemesh.js";
 
 let _rdVis = null;                      // the classes that show now (null: all); kept from the event rs:filterchange
 let _rdBox = null;                      // {box, fill}
+let _rdBridge = null;                   // the group of 3D bridges that is selected (its number, from rsBridgeGroups), or null
 const _rdClasses = () => (FILTER && FILTER.classes) || [];
 // the number of roads of each class: one pass over the road table, at each opening (a new style has a new table)
 function _rdCounts(){
@@ -17,6 +18,24 @@ function _rdCounts(){
   const out = {};
   for(let i = 0; i < n; i++){ const c = (RoadTable.props(i) || {})[col]; if(c != null) out[c] = (out[c] || 0) + 1; }
   return out;
+}
+// THE HEIGHT OF THE SELECTED BRIDGE: when a 3D bridge is selected (a click on its deck, or a road of it selected by a call), the box under the row "3D bridges" has its height in metres.
+// One number for the whole group of bridges that touch each other (rsSetBridgeHeight); Reset gives the height that the group's length gives (or the page's bridge_heights).
+function _rdHeightBlock(){
+  if(_rdBridge == null || !rsSetBridges3D()) return "";
+  const g = rsBridgeGroups().find(x => x.group === _rdBridge);
+  if(!g) return "";
+  const n = g.roads.length;
+  return '<div class="rs-rd-bh"><span>Height</span><input type="number" data-bh min="0" max="500" step="0.5" value="' + (Math.round(g.height * 10) / 10) + '" aria-label="Height of the selected bridge, in metres"><u>m</u>' +
+    '<button type="button" data-bh-reset' + (g.set ? "" : " disabled") + '>Reset</button></div>' +
+    '<div class="rs-rd-bhn">One height for the ' + n + (n === 1 ? " road" : " roads") + ' of this bridge that touch each other.</div>';
+}
+// the group of the bridge that a selection is: a deck (its properties have the group) or a road of a bridge (its row is in a group)
+function _rdGroupOf(d){
+  const p = (d && d.properties) || {};
+  if(p.__rs_group != null) return +p.__rs_group;
+  const g = d && d.id != null && !d.item && p.lvl > 0 ? rsBridgeGroups().find(x => x.roads.includes(d.id)) : null;      // a road with a level of 1 or more: a bridge
+  return g ? g.group : null;
 }
 export function useRoadsBox(){
   if(!(O.dashboard && O.dashboard.toolbar)) return;
@@ -35,13 +54,15 @@ export function useRoadsBox(){
         '<button type="button" data-only="' + _esc(c) + '" title="Show only ' + _esc(c) + '">' + _esc(c) + "</button><b>" + (cnt && cnt[c] != null ? cnt[c].toLocaleString() : "") + "</b></label>").join("") + "</div>" +
       (grade.length || acc.length ? "<hr>" : "") +
       grade.map(r => '<label class="rs-rd-row rs-rd-plain"><input type="checkbox" data-g="' + r[0] + '" checked><span>' + r[1] + "</span></label>" +
-        (r[0] === "bridges" && _bmHas() ? '<label class="rs-rd-row rs-rd-plain"><input type="checkbox" data-b3d' + (rsSetBridges3D() ? " checked" : "") + '><span>3D bridges</span></label>' : "")).join("") +
+        (r[0] === "bridges" && _bmHas() ? '<label class="rs-rd-row rs-rd-plain"><input type="checkbox" data-b3d' + (rsSetBridges3D() ? " checked" : "") + '><span>3D bridges</span></label>' + _rdHeightBlock() : "")).join("") +
       acc.map(a => '<label class="rs-rd-row"><input type="checkbox" data-k="' + _esc(a[0]) + '" checked><i style="background:' + _esc(a[1]) + '"></i><span>' + _esc(a[2]) + "</span><b>" + (a[3] != null ? a[3].toLocaleString() : "") + "</b></label>").join("");
     const checked = () => cls.filter(c => box.querySelector('input[data-c="' + CSS.escape(c) + '"]').checked);
     box.querySelectorAll("input[data-c]").forEach(i => { i.onchange = () => rsSetClasses(checked()); });
     box.querySelectorAll("button[data-only]").forEach(x => { x.onclick = () => rsSetClasses([x.dataset.only]); });
     box.querySelectorAll("button[data-a]").forEach(x => { x.onclick = () => rsSetClasses(x.dataset.a === "all" ? cls : []); });
     box.querySelectorAll("input[data-b3d]").forEach(i => { i.onchange = () => rsSetBridges3D(i.checked); });
+    box.querySelectorAll("input[data-bh]").forEach(i => { i.onchange = () => { const v = parseFloat(i.value); if(v >= 0) rsSetBridgeHeight(_rdBridge, v); else _rdBox.fill(); }; });
+    box.querySelectorAll("button[data-bh-reset]").forEach(x => { x.onclick = () => rsSetBridgeHeight(_rdBridge, null); });
     box.querySelectorAll("input[data-g]").forEach(i => { i.onchange = () => (i.dataset.g === "bridges" ? rsSetBridges : rsSetTunnels)(i.checked); });
     box.querySelectorAll("input[data-k]").forEach(i => { i.onchange = () => rsSetAccess(i.dataset.k, i.checked); });
   };
@@ -57,5 +78,11 @@ export function initRoadsBox(){
     const v = e.detail && e.detail.visible;
     if(Array.isArray(v)){ _rdVis = new Set(v); if(_rdBox && !_rdBox.box.hidden) _rdBox.fill(); }
   });
+  // the selected bridge: its group, for the height box (the box is made again when it is open)
+  const again = () => { if(_rdBox && !_rdBox.box.hidden) _rdBox.fill(); };
+  document.addEventListener("rs:select", e => { const g = _rdGroupOf(e.detail); if(g !== _rdBridge){ _rdBridge = g; again(); } });
+  document.addEventListener("rs:deselect", () => { if(_rdBridge != null){ _rdBridge = null; again(); } });
+  document.addEventListener("rs:bridgeheightchange", again);
+  document.addEventListener("rs:bridges3dchange", again);
   useRoadsBox();
 }
