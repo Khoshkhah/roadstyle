@@ -4,14 +4,15 @@
 //! - A road (a drawn edge, by its edge id) has heights at every `step_m` along its drawn line, linear between them. The profile is built
 //!   the first time a vehicle needs it, from the host's line of the road and the host's ground along that line (today the map's terrain;
 //!   later the road model's or duckOSM's heights, by the same function).
-//! - A lane of SUMO's network belongs to the road of its edge: a distance along the lane is the same fraction of the road's drawn line.
+//! - A lane of SUMO's network belongs to the road of its edge. netconvert cuts a lane back from each junction, so the lane's start and end
+//!   are projected onto the road's drawn line; a distance along the lane is the same fraction of that span (in either direction).
 //! - A junction's internal lane has no drawn road: its height goes linearly from the end of the road coming in to the start of the road
 //!   going out.
 //! - A vehicle has one to three (lane, distance, weight) entries (a lane change blends two lanes); its height is the weighted sum, its
 //!   pitch the slope of its main road over its length, its roll 0 (a road is level across).
 
 use crate::Pose;
-use roadstyle_sim::geo::{dist_m, Line};
+use roadstyle_sim::geo::Line;
 use roadstyle_sim::{Net, NONE};
 use std::collections::HashMap;
 
@@ -23,8 +24,6 @@ pub type GroundAt<'a> = dyn FnMut(f64, f64) -> Option<f64> + 'a;
 struct Profile {
     len: f64,
     z: Vec<f32>,
-    /// the drawn line runs against the SUMO lanes of its edge (some drawn roads are stored in the other direction): read it backwards
-    reversed: bool,
 }
 
 impl Profile {
@@ -47,18 +46,21 @@ impl Profile {
 pub struct RoadHeights {
     step_m: f64,
     profiles: HashMap<String, Profile>,
+    /// for each lane: the metres along its road's drawn line of the lane's start and end (the end first when the line runs against it)
+    spans: HashMap<u32, (f64, f64)>,
     /// the lanes that lead into each lane (the reverse of the network's connections), made at the first junction
     prev: Option<Vec<Vec<u32>>>,
 }
 
 impl RoadHeights {
     pub fn new(step_m: f64) -> RoadHeights {
-        RoadHeights { step_m, profiles: HashMap::new(), prev: None }
+        RoadHeights { step_m, profiles: HashMap::new(), spans: HashMap::new(), prev: None }
     }
 
     /// Forgets every profile: their source changed (the terrain on or off, another exaggeration, new data).
     pub fn clear(&mut self) {
         self.profiles.clear();
+        self.spans.clear();
     }
 
     /// The number of roads with a profile.
@@ -75,28 +77,29 @@ impl RoadHeights {
         self.profiles.iter().map(|(k, p)| p.z.len() * 4 + k.len() + 64).sum()
     }
 
-    /// The height at fraction `frac` of road `edge` in the direction of its SUMO lane `lane`; None while its line or a height along it is
-    /// not known.
-    fn road_z(&mut self, edge: &str, lane: &Line, frac: f64, line_of: &mut LineOf, ground: &mut GroundAt) -> Option<f64> {
-        if !self.profiles.contains_key(edge) {
-            let line = Line::new(line_of(edge)?);
-            // the road's direction against its lane's: the pairing of the two lines' ends that is nearer
-            let (a, b) = (line.pts[0], *line.pts.last().unwrap());
-            let (c, d) = (lane.pts[0], *lane.pts.last().unwrap());
-            let reversed = dist_m(a, d) + dist_m(b, c) < dist_m(a, c) + dist_m(b, d);
-            let len = line.len();
-            let n = (len / self.step_m).ceil().max(1.0) as usize;
-            let mut z = Vec::with_capacity(n + 1);
-            for i in 0..=n {
-                let (p, _) = line.at((i as f64 * self.step_m).min(len));
-                // a height that the host does not know yet: no profile now, asked again next time
-                z.push(ground(p[0], p[1]).filter(|h| h.is_finite())? as f32);
+    /// The height at fraction `frac` of net lane `lane` (a normal lane), on its road's profile; None while the road's line or a height
+    /// along it is not known.
+    fn road_z(&mut self, net: &Net, lane: u32, frac: f64, line_of: &mut LineOf, ground: &mut GroundAt) -> Option<f64> {
+        let l = &net.lanes[lane as usize];
+        let (has_profile, has_span) = (self.profiles.contains_key(&l.edge), self.spans.contains_key(&lane));
+        if !has_profile || !has_span {
+            let line = Line::new(line_of(&l.edge)?);
+            if !has_profile {
+                let len = line.len();
+                let n = (len / self.step_m).ceil().max(1.0) as usize;
+                let mut z = Vec::with_capacity(n + 1);
+                for i in 0..=n {
+                    let (p, _) = line.at((i as f64 * self.step_m).min(len));
+                    // a height that the host does not know yet: no profile now, asked again next time
+                    z.push(ground(p[0], p[1]).filter(|h| h.is_finite())? as f32);
+                }
+                self.profiles.insert(l.edge.clone(), Profile { len, z });
             }
-            self.profiles.insert(edge.to_string(), Profile { len, z, reversed });
+            // ponytail: the nearest point; a road that loops back near the lane's ends can take the wrong pass
+            self.spans.insert(lane, (line.project(l.line.pts[0]), line.project(*l.line.pts.last().unwrap())));
         }
-        let p = &self.profiles[edge];
-        let f = frac.clamp(0.0, 1.0);
-        Some(p.at(self.step_m, if p.reversed { 1.0 - f } else { f } * p.len))
+        let (s0, s1) = self.spans[&lane];
+        Some(self.profiles[&l.edge].at(self.step_m, s0 + (s1 - s0) * frac.clamp(0.0, 1.0)))
     }
 
     /// The normal lanes at the two ends of internal lane `lane`: the lane coming in and the lane going out (through other internal lanes of
@@ -133,17 +136,14 @@ impl RoadHeights {
         let len = l.line.len();
         let frac = if len > 0.0 { along / len } else { 0.0 };
         if !l.internal {
-            let (edge, line) = (l.edge.clone(), l.line.clone());
-            return self.road_z(&edge, &line, frac, line_of, ground);
+            return self.road_z(net, lane, frac, line_of, ground);
         }
         let (i, o) = self.ends(net, lane);
         if i == NONE || o == NONE {
             return None;
         }
-        let (li, lo) = (&net.lanes[i as usize], &net.lanes[o as usize]);
-        let (ie, il, oe, ol) = (li.edge.clone(), li.line.clone(), lo.edge.clone(), lo.line.clone());
-        let z_in = self.road_z(&ie, &il, 1.0, line_of, ground)?;
-        let z_out = self.road_z(&oe, &ol, 0.0, line_of, ground)?;
+        let z_in = self.road_z(net, i, 1.0, line_of, ground)?;
+        let z_out = self.road_z(net, o, 0.0, line_of, ground)?;
         Some(z_in + (z_out - z_in) * frac.clamp(0.0, 1.0))
     }
 
@@ -215,8 +215,8 @@ mod tests {
         let mut ground = |_: f64, _: f64| Some(0.0);
         let lines: HashMap<String, Vec<[f64; 2]>> = n.lanes.iter().map(|l| (l.edge.clone(), l.line.pts.clone())).collect();
         let mut r = RoadHeights::new(5.0);
-        r.profiles.insert("A".into(), Profile { len: 100.0, z: vec![20.0, 20.0], reversed: false });
-        r.profiles.insert("B".into(), Profile { len: 100.0, z: vec![30.0, 30.0], reversed: false });
+        r.profiles.insert("A".into(), Profile { len: 100.0, z: vec![20.0, 20.0] });
+        r.profiles.insert("B".into(), Profile { len: 100.0, z: vec![30.0, 30.0] });
         let mut line_of = |e: &str| lines.get(e).cloned();
         let j = n.by_id[":J_0_0"];
         let len = n.lanes[j as usize].line.len();
@@ -268,5 +268,21 @@ mod tests {
         assert!(r.is_empty(), "no profile is kept while a height is not known");
         let mut no_line = |_: &str| None;
         assert!(r.lane_z(&n, a, 10.0, &mut no_line, &mut |_, _| Some(1.0)).is_none(), "no line: no height");
+    }
+    #[test]
+    fn a_lane_cut_back_from_its_junctions_reads_its_own_part_of_the_road() {
+        let n = net();
+        let o = origin(&n);
+        let mut ground = |lon: f64, lat: f64| Some(5.0 + 0.10 * delta_m(o, [lon, lat])[0]);
+        // road A's drawn line goes 10 m past each end of its lane (to the nodes), as netconvert's lanes stop short of the junctions
+        let mut lines: HashMap<String, Vec<[f64; 2]>> = n.lanes.iter().map(|l| (l.edge.clone(), l.line.pts.clone())).collect();
+        lines.insert("A".into(), vec![offset(o, -10.0, 0.0), offset(o, 110.0, 0.0)]);
+        let mut line_of = |e: &str| lines.get(e).cloned();
+        let mut r = RoadHeights::new(5.0);
+        let a = n.by_id["A_0"];
+        for along in [0.0, 30.0, 100.0] {
+            let z = r.lane_z(&n, a, along, &mut line_of, &mut ground).unwrap();
+            assert!((z - (5.0 + 0.10 * along)).abs() < 0.05, "{along} m along the lane: {z}");
+        }
     }
 }

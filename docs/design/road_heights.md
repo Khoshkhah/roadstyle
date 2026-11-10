@@ -32,11 +32,14 @@ A vehicle's height came from the ground at its lon/lat (P2 step 1: the terrain o
 - **One profile for each drawn road** (a row of the road table, by its `edge_id`): heights at fixed distances along the road's drawn
   line, and linear between them. Each direction of a two-way road is its own row, so it has its own profile (one profile for the pair is
   a later saving, see "Memory").
-- **Direction:** a drawn line can run against the SUMO lanes of its edge (39 of 2,765 roads on Monaco). When the profile is built, the
-  ends of the road's line are compared with the ends of its lane's line, and a road in the other direction is read backwards.
+- **A lane's part of the road:** netconvert cuts each lane back from its junctions, so a lane starts some metres after its drawn line
+  starts. The start and the end of each lane are projected onto the road's drawn line, once; a place along the lane is the same fraction
+  of that span. This also gives the direction: a drawn line can run against the SUMO lanes of its edge (39 of 2,765 roads on Monaco).
+  (Before 2026-11-10 the fraction of the lane was the fraction of the whole line: on a 30 % street, 8 m of error was 2.7 m of height.)
 - **Step:** 5 m on a ground road (the DEM is 30 m data), 2 m on a bridge deck and its ramps (their shape changes quickly).
 - **Built when a vehicle first drives on the road**, and kept. It is made again when its source changes: the terrain on or off, another
-  exaggeration, a deck height set with `rsBridgeHeight`, new data.
+  exaggeration, a new terrain tile (a finer tile after a zoom changes the drawn terrain under the road), a deck height set with
+  `rsBridgeHeight`, new data.
 - **Sources, in this order:**
 
 | Source | When | Heights |
@@ -59,8 +62,8 @@ A vehicle's height came from the ground at its lon/lat (P2 step 1: the terrain o
 ## The vehicle
 
 - **Its road position**, from the lane placement (`roadstyle-sim`): SUMO's edge id is duckOSM's `edge_id`, which is the drawn road's
-  `edge_id`. The distance along the drawn road is the vehicle's station on its SUMO lane, scaled from the lane's SUMO length to the
-  drawn road's length.
+  `edge_id`. The distance along the drawn road is the vehicle's fraction along its SUMO lane, in the lane's span on the drawn line (see
+  "A lane's part of the road").
 - **A lane change:** the position is a blend of the places on the two lanes; the height is the same blend of the two roads' profiles,
   with the same weights. The vehicle state holds one to three entries (road, distance along, weight).
 - **A junction:** SUMO's internal lane has no drawn road. The height goes linearly, along the internal lane, from the end of the road
@@ -90,6 +93,10 @@ a two-way road would halve it. For comparison, the Monaco page's engine holds ab
 - Until roadstyle draws the area's conformed ground (the ground reference standard), the map's terrain is the AWS Terrain Tiles, while
   duckOSM and SimReady use the area's DTM. A profile from the data and the drawn terrain can then differ by up to about a metre.
 - The 3D decks wait for PR #140 (the bridge mesh).
+
+- The map drapes a road on the terrain, so on a street that slopes across, the drawn road is not level across. A vehicle on a lane
+  1.6 m beside the centre line has the centre line's height, and the drawn road under it can be up to about 1.5 m higher (measured on
+  Monaco, 2026-11-10: most vehicles less than 1 m). Open: decide how a vehicle stands on a draped road.
 
 ## What it replaces
 

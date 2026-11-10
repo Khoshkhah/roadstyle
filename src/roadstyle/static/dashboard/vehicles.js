@@ -28,6 +28,7 @@ let _vhLast = null;              // the numbers of the last frame (rs.vehicles.d
 let _vhTunnelsOn = true;          // the Roads box's Tunnels switch (rs:filterchange)
 let _vhScene = null, _vhOrigin = null, _vhColours = null, _vhReport = null, _vhIds = null, _vhClasses = [], _vhGiven = null;
 let _vhT = 0, _vhSpeed = 1, _vhPlaying = false, _vhWall = null, _vhSentAt = 0, _vhDirty = true;
+let _vhGroundNew = false, _vhGroundAt = 0;   // a terrain tile came: the road heights are made again (at most every 500 ms)
 let _vhGl = null, _vhProg = null, _vhVao = null, _vhInstBuf = null, _vhN = 0, _vhLoc = {};
 
 // a unit box: x forward (-0.5..0.5 of the length), y right (-0.5..0.5 of the width), z up (0..1 of the height); 6 faces, outward normals
@@ -123,6 +124,7 @@ const _vhLayer = {
       _vhWall = now; _vhDirty = true;
       if(_vhT >= _vhReport.t1) _vhPause();
     }
+    if(_vhGroundNew && now - _vhGroundAt > 500){ _vhGroundNew = false; _vhGroundAt = now; _vhScene.clearGround(); _vhDirty = true; }
     if(_vhDirty){
       const inst = _vhScene.frame(_vhT);
       _vhN = inst.length / _VH_STRIDE; _vhLast = inst;
@@ -146,7 +148,7 @@ const _vhLayer = {
       gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, _vhN);
       gl.bindVertexArray(null);
     }
-    if(_vhPlaying || _vhDirty) map.triggerRepaint();
+    if(_vhPlaying || _vhDirty || _vhGroundNew) map.triggerRepaint();
   }
 };
 
@@ -255,6 +257,11 @@ async function _vhLoad(o){
     document.addEventListener("rs:themechange", () => { if(_vhScene){ _vhPaint(); map.triggerRepaint(); } });
     // the terrain on, off, or another exaggeration: the heights kept are wrong now
     map.on("terrain", () => { if(_vhScene){ _vhScene.clearGround(); _vhDirty = true; map.triggerRepaint(); } });
+    // a new tile of the terrain (a finer one after a zoom) changes the drawn terrain under the roads: a profile made from the coarser tile
+    // would put the vehicles above or under the road
+    // ponytail: clears every profile; clear only the roads under the new tile if the rebuild shows in the frame time
+    map.on("sourcedata", e => { const tr = map.getTerrain();
+      if(_vhScene && tr && e.sourceId === tr.source && e.tile){ _vhGroundNew = true; map.triggerRepaint(); } });
     // the Roads box's Tunnels switch, and a road table that comes later (a style with its own table)
     document.addEventListener("rs:filterchange", e => { if("tunnels" in e.detail){ _vhTunnelsOn = e.detail.tunnels; map.triggerRepaint(); } });
     document.addEventListener("rs:tableready", _vhTunnels);
