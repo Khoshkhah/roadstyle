@@ -2,8 +2,8 @@
 // runs the SQL on its own data (`query`) and tells what the data has (`schema`); roadstyle knows no database. The dock shows the result in rs.dock.table,
 // lights the result's roads on the map (the highlight set "dock"), and keeps the lasting map changes of the page as layers in its buttons Colour and Focus.
 //
-//   dataDock({dashboard, query, schema, ready, tables, load, idColumn, keys, roadsBy, kinds, map, sql, label, limit, card, guard}) -> EventTarget + {run, show, sql, result,
-//     csv, stop, open, close, ready, roads, idColumn, keyOf, roadsOf, colour, focus, layers, remove, reset, lightOff, schema}
+//   dataDock({dashboard, query, schema, ready, tables, load, idColumn, keys, roadsBy, kinds (object or function), map, sql, label, limit, card, guard}) -> EventTarget + {run, show, sql, result,
+//     csv, stop, open, close, ready, refreshKinds, roads, idColumn, keyOf, roadsOf, colour, focus, layers, remove, reset, lightOff, schema}
 //   events: "run" {sql, columns, rows, more, ms, source}, "error" {sql, message, source}, "layers" {layers}, "reset" (also the document event rs:dockreset)
 import {guard as guardSql, inner} from "./guard.js";
 import {rsSelectBoxes} from "../selectbox.js";
@@ -43,7 +43,13 @@ export function dataDock(o = {}){
   if(typeof o.query !== "function" || typeof o.schema !== "function") throw new Error("dataDock: query and schema are necessary.");
   if((o.tables || []).length && typeof o.load !== "function") throw new Error("dataDock: tables need load (the host loads each one).");
   const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
-  const KINDS = Object.entries(o.kinds || {}), kl = KINDS.length ? dockKinds(o.map || window.map, {onPick: (f) => mapPick(f)}) : null;      // the kinds of the host (docs/design/dock_kinds.md)
+  // the kinds of the host (docs/design/dock_kinds.md). `kinds` is an object, or a function that gives one (sync or async): the dock calls the function at the start, before
+  // each new result picks its kind, and in `data.refreshKinds()` (docs/design/dock_kinds_function.md). An object is read once, as before.
+  const kindsFn = typeof o.kinds === "function";
+  let KINDS = kindsFn ? [] : Object.entries(o.kinds || {});
+  const kl = kindsFn || KINDS.length ? dockKinds(o.map || window.map, {onPick: (f) => mapPick(f)}) : null;
+  const loadKinds = async () => { if(kindsFn) KINDS = Object.entries((await o.kinds()) || {}); };
+  if(kindsFn) loadKinds().catch((e) => console.error(`dataDock: the function \`kinds\` failed: ${(e && e.message) || e}`));
   // the data is ready when the host's data is loaded and every table of the page too; a table that does not load does not stop the others
   const ready = (async () => { await o.ready; for(const t of o.tables || []) await Promise.resolve(o.load(t)).catch((e) => console.warn(`dataDock: the table ${t.name} did not load: ${e.message}`)); })();
   let loaded = false; ready.then(() => { loaded = true; }, () => {});
@@ -435,6 +441,7 @@ export function dataDock(o = {}){
   }
   async function detectKind(r){
     r.kindErrors = []; const ctl = (kindCtl = new AbortController());
+    try{ await loadKinds(); }catch(e){ kindFail(r, "kinds", "", e); return null; }      // the function `kinds` failed: it is reported, and the result has no owner
     const cands = [];
     for(const [name, k] of KINDS){
       if(!(k.needs || []).every((n) => r.columns.some((c) => c.name === n))) continue;      // the result lacks a column that the kind needs
@@ -467,6 +474,18 @@ export function dataDock(o = {}){
     const total = ids ? ids.length : idsOf(r, best.column, KIND_LIMIT).length, coverage = total ? Math.min(1, facts.size / total) : 1;
     emit("kind", {name: best.name, column: best.column, coverage, candidates});
     return {name: best.name, label: best.k.label || best.name, card: best.k.card, column: best.column, features, facts, parts, more: idsMore || !!got.more, exact: !!ids, total, noShape: best.k.noShape, coverage, candidates};
+  }
+  // `data.refreshKinds()`: the host changed its kinds (a table was added). It reads the function `kinds` again and picks the owner of the current result again. If the same kind
+  // and column still own it with the same number of objects, nothing is drawn again and the selected row stays; if another kind owns it now, the result is drawn again.
+  async function refreshKinds(){
+    const r = res; if(!kindsFn) return;      // an object is read once: nothing changes
+    if(!r || !r.__kindP){ await loadKinds(); return; }      // no result, or none that looked for a kind (roads own it): the next result reads the kinds
+    const old = await r.__kindP; r.__kindP = null;
+    const own = await kindOf(r); if(r !== res) return;
+    const same = (a, b) => a === b || (a && b && a.name === b.name && a.column === b.column && a.facts.size === b.facts.size);
+    if(same(old, own)){ r.__own = old; r.__kindP = Promise.resolve(old); return; }
+    if(hostCard) closeHostCard();      // the selected object belonged to the old owner
+    light();
   }
   // the note of the table for a result of kinds: which kind owns it, how many ids it found, the more and the errors
   function kindNote(r, own){
@@ -802,7 +821,7 @@ export function dataDock(o = {}){
     // the chart that the dock drew last: its kind, columns and rows (the rows for each value of x when it grouped them), for a copy of it
     drawnChart: () => (chartObj ? chartObj.spec() : null),
     view: (v) => (v ? setView(v) : view),
-    colour, focus, reset, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
+    refreshKinds, colour, focus, reset, layers: () => layers.slice(), remove: (l) => { const i = layers.indexOf(l); if(i >= 0){ layers.splice(i, 1); paint(); } },
     lightOff(r = res){ if(r){ r.byLayer = true; light(); } },
     // the page's own card for a row that is not a road: {title, chip, rows: [[name, value], ...], id}; null closes it. The event `cardclose` comes when the
     // person closes it (the close button), or a new selection or a new result takes its place
