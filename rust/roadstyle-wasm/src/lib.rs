@@ -728,3 +728,6 @@ mod wasm {
         crate::grow::PEAK.store(crate::grow::LIVE.load(Relaxed), Relaxed);
     }
 }
+
+#[cfg(all(target_arch = "wasm32", feature = "vehicles"))]
+mod vehicles;

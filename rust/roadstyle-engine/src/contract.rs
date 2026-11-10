@@ -160,7 +160,7 @@ pub fn controls(look: &crate::Look, roads: &Roads, info: PageInfo, active: usize
     // the facts of the look and of the roads that a host's dashboard needs; the caller's page keywords (tiles, views, the base maps, ...)
     // are not here: the page gives them (RS_OPTIONS, page_options::page_from), as a host does (rule 5, R3)
     let mut out = json!({"simple": "roads-simple", "pitch_3d": s.camera.pitch_3d,
-        "select_color": select, "dock": s.dock, "filter": filter_panel(look, roads, m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
+        "select_color": select, "dock": s.dock, "vehicle_look": s.vehicles, "filter": filter_panel(look, roads, m), "color_active": active, "overlays": info.overlays, "tunnel": tunnel,
         "fill_layers": [], "road_fill": {"on": mo.roads.fill, "paint": info.fill_paint}, "dashes": info.dashes,
         "items": items, "edge_id_col": mo.columns.edge_id.as_deref().unwrap_or("edge_id"), "arrow_icon": arw.icon, "arrow_color": arw.color,
         "arrow_rules": {"mainBelow": arw.main_below, "main": arw.main, "minLenPx": place["min_len_px"], "minGapPx": place["min_gap_px"],

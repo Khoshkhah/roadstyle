@@ -89,6 +89,8 @@ function answer(sql){
 window.queries = []; window.events = []; window.gotIds = null; window.gotColumn = null; window.aborted = false;
 const square = (id) => { const x = 18 + Number(BigInt(id) % 1000n) / 10000, y = 59.3 + Number((BigInt(id) / 1000n) % 100n) * 0.001; return {type: "Polygon", coordinates: [[[x, y], [x + 0.00008, y], [x + 0.00008, y + 0.00008], [x, y + 0.00008], [x, y]]]}; };
 window.kindCalls = 0; window.lateKinds = {};
+// a host that builds its kinds again gives new arrays of id columns each time, as duckOSM Studio does
+const fresh = (ks) => Object.fromEntries(Object.entries(ks).map(([n, k]) => [n, {...k, idColumns: k.idColumns.map((c) => (Array.isArray(c) ? [...c] : c))}]));
 const HOST_KINDS = {
   lane: {label: "Lane", idColumns: ["osm_id"], needs: ["lane_num"],      // a candidate only for a result that also has lane_num
     geometryBy: (sql, column) => `SELECT l.osm_id AS id, l.geom, l.lane_num FROM lanes l WHERE l.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
@@ -135,7 +137,7 @@ window.data = dataDock({
   query: async (sql) => { window.queries.push(sql); return answer(sql); },
   schema: async () => ({tables: [{name: "main.nodes", rows: 3, about: "The nodes."}]}),
   roadsBy: (sql, column) => `SELECT edge_id FROM rs_roads WHERE "${column}" IN (SELECT "${column}" FROM (${sql}) AS rs_k)`,
-  kinds: location.hash === "#fn" ? async () => { window.kindCalls++; return {...HOST_KINDS, ...window.lateKinds}; } : HOST_KINDS,      // #fn: a function, as a host that adds tables later
+  kinds: location.hash === "#fn" ? async () => { window.kindCalls++; return fresh({...HOST_KINDS, ...window.lateKinds}); } : HOST_KINDS,      // #fn: a function, as a host that adds tables later
   sql: "SELECT node_id, name FROM nodes",
 });
 for(const n of ["kind", "kinderror", "cardaction"]) data.addEventListener(n, (e) => window.events.push([n, e.detail]));
@@ -780,6 +782,32 @@ def test_refresh_kinds_does_not_redraw_or_lose_the_row_if_the_same_kind_still_ow
             assert "Node A" in page.inner_text("#rs-dock .rs-dd-card")
             if hash_:
                 assert page.evaluate("window.kindCalls") >= 2                                                     # it did read the function
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_refresh_kinds_keeps_the_card_when_the_kind_has_a_composite_key(tmp_path):
+    """The kind `turn` has the id columns ["from_edge", "to_edge"]: its column is an array. The same kind still owns the result, so the card stays."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url + "#fn")
+        try:
+            page.evaluate("data.open(); data.run('SELECT from_edge, via_node, to_edge FROM turns')")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length > 0")
+            page.click("#rs-dock tbody tr >> nth=0")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length > 0")
+            sel = page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')")
+            card = page.inner_text("#rs-dock .rs-dd-card")
+            page.evaluate("window.closed = 0; data.addEventListener('cardclose', () => window.closed++)")
+            page.evaluate(_SETDATA)
+            page.evaluate(_SHOP)
+            page.evaluate("data.refreshKinds()")
+            page.wait_for_timeout(500)
+            assert page.evaluate("window.closed") == 0
+            assert page.evaluate("window.sets") == 0
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == sel
+            assert page.inner_text("#rs-dock .rs-dd-card") == card
+            assert page.evaluate("data.result().__own.name") == "turn"
         finally:
             browser.close()
     assert errors == [], errors

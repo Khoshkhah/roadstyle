@@ -44,6 +44,10 @@ export interface DashboardOptions {
   select_color?: string;
   /** The look's dock section: the colours of the data dock's objects on the map (`window.RS_DOCK`): `{result, selected, roles, role_series}`; a colour is `{light, dark}`. */
   dock?: { result: { light: string; dark: string }; selected: string; roles: Record<string, { light: string; dark: string }>; role_series: { light: string; dark: string }[] } | null;
+  /** A traffic microsimulation run that the page loads at start (vehicles.js): URLs of roadstyle_wasm.js (the feature "vehicles"), SUMO's FCD Parquet, the run's net.xml and (optional) a file with its vTypes. */
+  vehicles?: { wasm: string; fcd: string; net?: string; routes?: string } | null;
+  /** The look's vehicles section: the colour of each kind, each SUMO vClass's kind and size, the numbers of a run. */
+  vehicle_look?: { colours: Record<string, { light: string; dark: string }>; classes: Record<string, { kind: string; size: [number, number, number] }>; teleport_m: number; lane_change_s: number; heading_lookahead_m: number } | null;
   /** The Roads box: {on, col, classes, swatches, palettes, bridges, tunnels, access}. */
   /** The road filter's facts (roadstyle:controls.filter): the classes that rsSetClasses filters by, their colours, the access kinds. minzoom: {class: its first zoom}. */
   filter?: { classes: string[]; /** the class of each number of `__rs_ci` in a tile (the style of a tile has it): the Roads filter hides a class by its place here */ class_key?: string; class_list?: string[]; col?: string; minzoom?: Record<string, number> | null; [k: string]: unknown };
@@ -250,6 +254,12 @@ export interface Dashboard {
   frame(options: { panel: HTMLElement; title: string; back?: string | null; tabs?: [string, string][]; head?: HTMLElement; id?: string; label?: string }): EditorFrame;
   /** The cut points of Fisher-Jenks natural breaks that split the numbers in k sets (what rs.setData uses for a number). */
   naturalBreaks(values: number[], k: number): number[];
+  /** A traffic microsimulation run on the map (vehicles.js, docs/design/vehicles_spec.md). */
+  vehicles: {
+    load(run: { wasm: string; fcd: string | Uint8Array; net?: string; routes?: string; options?: Record<string, unknown>; colours?: Record<string, string | number[]> }): Promise<VehicleReport>;
+    play(): void; pause(): void; seek(t: number): void; speed(x?: number): number; time(): number; playing(): boolean; count(): number;
+    ids(): string[]; report(): VehicleReport | null;
+  };
   /** null, or the error of a style whose interaction contract (roadstyle:contract) is newer than this dashboard reads: then the
    *  dashboard adds no road interaction for it. setStyle sets it again. */
   error: string | null;
@@ -309,3 +319,6 @@ export interface Dashboard {
 
 /** Add roadstyle's controls and road interaction to a MapLibre map. Call it right after new maplibregl.Map(...), before "load". */
 export function rsDashboard(map: MapLibreMap, options?: DashboardOptions): Dashboard;
+
+/** The report of a vehicles run (rs.vehicles.report, the event rs:vehicleload). */
+export interface VehicleReport { samples: number; vehicles: number; t0: number; t1: number; empty_rows: number; lanes_unknown: number; path_gaps: number; teleports: number }

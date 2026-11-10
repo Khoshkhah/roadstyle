@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<title>roadstyle vehicles, SUMO on Monaco</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<!-- An example: a SUMO run (duckOSM's Monaco network, random trips, 900 s) played on roadstyle's dashboard, with the vehicles of
+     rs.vehicles (dashboard/vehicles.js, roadstyle-wasm built with the feature "vehicles"). How to build and open it: README.md. -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<link rel="stylesheet" href="../../rust/roadstyle-assets/files/static/dashboard/dashboard.css">
+<link rel="stylesheet" href="../../rust/roadstyle-assets/files/static/popup.css">
+<style>
+html,body{margin:0;height:100%}#map{position:absolute;inset:0}
+/* the example's own play bar (the dashboard parts of phase P5 replace it) */
+#bar{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);z-index:5;display:flex;gap:8px;align-items:center;
+     padding:6px 10px;border-radius:8px;background:var(--card);color:var(--ink);border:1px solid var(--line);font:13px system-ui,sans-serif}
+#bar button{font:inherit;padding:3px 10px;cursor:pointer;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px}
+#bar input{width:260px}
+</style>
+</head><body>
+<div id="map"></div>
+<div id="bar">
+  <button id="play">Play</button>
+  <input id="seek" type="range" min="0" max="1" step="0.5" value="0"/>
+  <span id="clock">0:00</span>
+  <button data-speed="1">1×</button><button data-speed="4">4×</button><button data-speed="16">16×</button>
+  <span id="count"></span>
+</div>
+<script type="module">
+import init, {Look, inlineStyle, styleSources} from "./pkg/roadstyle_wasm.js";
+import {rsDashboard} from "../../rust/roadstyle-assets/files/static/dashboard/index.js";
+
+const DATA = "../../rust/roadstyle-rs/tests/data/";
+const bytes = (u) => fetch(u).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b));
+const [, roads, lookText] = await Promise.all([init(), bytes(DATA + "monaco/roads.parquet"), fetch(DATA + "look.json").then((r) => r.text())]);
+const withArgs = (look, args) => Object.entries(args).reduce((l, [k, v]) => l.withArg(k, JSON.stringify(v)), look);
+const lk = withArgs(Look.fromJson(lookText), {state: "live", levels: {edge_hash: "615c9155ab37a030dbfa80da2f7fcc09", n_edges: 13298}});
+const style = JSON.parse(inlineStyle(roads, lk, undefined, undefined, "Monaco"));
+const road_table = JSON.parse(new TextDecoder().decode(styleSources(roads, lk, undefined, undefined, "Monaco").roadTable()));
+
+const map = new maplibregl.Map({container: "map", style, center: [7.4246, 43.7384], zoom: 16.5, pitch: 55, bearing: -20,
+                                attributionControl: {compact: true}});
+map.addControl(new maplibregl.NavigationControl({visualizePitch: true}));
+map.addControl(new maplibregl.ScaleControl({maxWidth: 120, unit: "metric"}), "bottom-left");
+const rs = rsDashboard(map, {style, road_table, find_control: true});
+window.map = map;
+
+// the run: SUMO's FCD Parquet output and its net.xml. The options are the profile's values of the specification (section 13)
+const report = await rs.vehicles.load({
+  wasm: "./pkg/roadstyle_wasm.js",
+  fcd: "./data/monaco_fcd.parquet",
+  net: "./data/monaco.net.xml",
+  options: {placement: "lane", teleport_m: 50, lane_change_s: 2, heading_lookahead_m: 2, class_sizes: {passenger: [5, 1.8, 1.5]}},
+  colours: {passenger: "#e63946"},
+});
+console.log("run", report);
+
+const $ = (id) => document.getElementById(id);
+const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+$("seek").min = report.t0; $("seek").max = report.t1;
+$("play").onclick = () => { rs.vehicles.playing() ? rs.vehicles.pause() : rs.vehicles.play(); $("play").textContent = rs.vehicles.playing() ? "Pause" : "Play"; };
+$("seek").oninput = (e) => rs.vehicles.seek(+e.target.value);
+document.querySelectorAll("[data-speed]").forEach((b) => b.onclick = () => rs.vehicles.speed(+b.dataset.speed));
+document.addEventListener("rs:vehicletime", (e) => {
+  $("clock").textContent = fmt(e.detail.t); $("seek").value = e.detail.t; $("count").textContent = `${rs.vehicles.count()} vehicles`;
+  if(!rs.vehicles.playing()) $("play").textContent = "Play";
+});
+rs.vehicles.seek(300);   // a time with many vehicles on the network
+</script>
+</body></html>

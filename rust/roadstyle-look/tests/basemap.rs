@@ -112,6 +112,12 @@ fn the_64_looks_of_mapstyle() {
                 }
             }
         }
+        // added on 2026-11-10: the vehicles section of the palette and the profile (docs/design/vehicles_spec.md)
+        for part in ["theme", "config"] {
+            if let Some(t) = got.get_mut(part).and_then(Value::as_object_mut) {
+                t.shift_remove("vehicles");
+            }
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }
