@@ -1,0 +1,15 @@
+[package]
+name = "roadstyle-sim"
+description = "The output of a traffic microsimulation (SUMO first) as one run, and the place of each vehicle at a clock time"
+version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+roadstyle-io.workspace = true       # Crs::Proj: the lanes of net.xml (UTM) to lon/lat
+parquet.workspace = true            # SUMO's FCD output as Parquet (SUMO 1.24 and later)
+arrow-array.workspace = true
+arrow-schema.workspace = true
+bytes.workspace = true

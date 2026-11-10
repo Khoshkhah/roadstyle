@@ -2629,3 +2629,17 @@ def test_bridge_height_col_says_what_is_wrong_and_does_not_choose():
 def test_bridge_height_col_with_a_text_value_is_an_error():
     with pytest.raises(ValueError, match="not a number"):
         _y_bridges(["tall", None, None, None, None], bridge_height_col="h")
+
+
+def test_web_vehicles_option_and_look():
+    """The page option `vehicles` (a run to load at start) goes to RS_OPTIONS as it is, and the look's vehicles section (the palette's
+    colours, the profile's classes and numbers) is `vehicle_look`; every class's kind has a colour in the palette."""
+    run = {"wasm": "./pkg/roadstyle_wasm.js", "fcd": "./data/run.parquet", "net": "./data/run.net.xml"}
+    html = render_edges(_edges(), backend="web", vehicles=run).html
+    assert _opt(html, "vehicles") == run
+    look = _opt(html, "vehicle_look")
+    assert look["classes"]["passenger"] == {"kind": "car", "size": [5, 1.8, 1.5]}
+    assert look["teleport_m"] == 50 and look["lane_change_s"] == 2 and look["heading_lookahead_m"] == 2
+    assert {c["kind"] for c in look["classes"].values()} <= set(look["colours"])
+    assert all(set(c) == {"light", "dark"} for c in look["colours"].values())
+    assert _opt(render_edges(_edges(), backend="web").html, "vehicles") is None

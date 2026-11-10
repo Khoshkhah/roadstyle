@@ -65,6 +65,10 @@ pub struct Sections {
     /// the objects of the data dock on the map (the colours of its kinds); a look without this section has none
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dock: Option<DockLook>,
+    /// the vehicles of a traffic microsimulation run (the colour of each kind, each SUMO vClass, the numbers of a run); a look without this
+    /// section has none
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vehicles: Option<VehiclesLook>,
     pub background: BackgroundLook,
     /// the dark theme of the style's layers (`rs_theme` "dark"): how each light colour is turned dark
     #[serde(default)]
@@ -462,6 +466,31 @@ pub struct DockLook {
     pub role_series: Vec<ThemeColor>,
 }
 
+/// The vehicles of a traffic microsimulation run (docs/design/vehicles_spec.md): the colour of each kind (the palette), the kind and the
+/// default size of each SUMO vClass, and the numbers of a run (the profile). A vType's own size wins over its class's.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct VehiclesLook {
+    pub colours: IndexMap<String, ThemeColor>,
+    pub classes: IndexMap<String, VehicleClassLook>,
+    /// a jump longer than this between two samples (a SUMO teleport) is not interpolated, m
+    pub teleport_m: Num,
+    /// a lane change blends the places on the two lanes over this time, s
+    pub lane_change_s: Num,
+    /// the heading is the road's direction this far ahead of the vehicle's middle, m
+    pub heading_lookahead_m: Num,
+}
+
+/// One SUMO vClass: its kind (a key of `VehiclesLook::colours`) and its default size [length, width, height] in m.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct VehicleClassLook {
+    pub kind: String,
+    pub size: [Num; 3],
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -579,8 +608,8 @@ impl LookFile {
 }
 
 /// The theme sections of a look of version 1 that are sections of version 2 as they are.
-const THEME: [&str; 15] = ["roads", "casing", "labels", "arrows", "bridges", "tunnels", "selection", "data", "overlays", "boundary",
-                           "dock", "background", "access", "palettes", "active"];
+const THEME: [&str; 16] = ["roads", "casing", "labels", "arrows", "bridges", "tunnels", "selection", "data", "overlays", "boundary",
+                           "dock", "vehicles", "background", "access", "palettes", "active"];
 
 fn bad(what: &str, e: impl std::fmt::Display) -> Error {
     Error::Look(format!("look: {what}: {e}"))
