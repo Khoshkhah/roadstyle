@@ -61,6 +61,9 @@ Rules:
   important facts, by street name (for example the longest). The page shows the table and the map.
 - Never write {id} values or a list of the rows in the answer.
 - If the data cannot answer, say so.
+- Answer only what the LAST message asks. A message about the map (layers, base map, theme, 3D view, camera) needs set_map only: no query and no chart.
+  Never repeat the query or the chart of an earlier question, and do not comment on earlier answers unless the person asks. A line [tools: ...] at the
+  end of an earlier answer is the record of the tools that ran then, and it is true: do not write such a line, and do not say that an earlier step failed unless it says so.
 
 The schema "extra" has the page's own data (each table with what it holds, below): read its columns before you use it.
 Schema (schema: table rows, ...):
@@ -542,7 +545,7 @@ export function askPanel(o = {}){
     hd.append($("p", "q", text), x); t.el.append(hd);
     turns.push(t); log.append(t.el); paintStart(); toEnd();
     const step = $("p", "step"), say = (s) => { step.textContent = s; if(!step.isConnected) t.el.append(step); toEnd(); };
-    const c = {ok: [], failed: [], maps: [], tried: []}, me = new AbortController();
+    const c = {ok: [], failed: [], maps: [], tried: [], log: []}, me = new AbortController();
     ctl = me; cur = t; sending(true);
     try{
       const p = prov();
@@ -566,9 +569,11 @@ export function askPanel(o = {}){
           try{
             if(!tool) throw new Error(`There is no tool ${name}.`);
             say(tool.step(args, c)); out = await tool.run(args, c); fails = 0;
+            c.log.push(logLine(name, args, out));
           }catch(err){
             if(me.signal.aborted) throw err;
             fails++; const e = sentence(err.message);
+            c.log.push(logLine(name, args, null, e));
             if(name === "run_query") c.failed.push({sql: String(args.sql || ""), error: e});
             out = {error: e}; say(`Query ${c.ok.length + c.failed.length} failed: ${e} Trying again.`);
             if(fails >= 3) throw new Error("Three queries failed one after the other. Last error: " + e);
@@ -590,9 +595,18 @@ export function askPanel(o = {}){
       return null;
     }finally{ if(ctl === me){ ctl = null; cur = null; sending(false); } toEnd(); }
   }
+  // What the tools of a turn did, for the history that the model gets on the next turn: it sees the user's text and its own answer, and without this line it cannot know
+  // that a chart was drawn, so it may say that an earlier step failed (2026-11-10, Haiku: "I need to correct my first reply"). "draw_chart bar by kind: ok", "run_query failed: <message>".
+  const short = (s, n = 160) => { s = String(s); return s.length > n ? s.slice(0, n - 1) + "\u2026" : s; };
+  function logLine(name, args, out, error){
+    const what = name === "draw_chart" ? ` ${args.kind} by ${args.x}` : "";
+    if(error) return `${name}${what} failed: ${short(error)}`;
+    return `${name}${what}: ${name === "set_map" && out && out.done ? short(out.done) : "ok"}`;
+  }
+  const toolsLine = (c) => c.log.length ? `\n[tools: ${c.log.join("; ")}]` : "";
   // the answer: its text, a line for each change of the map, the query that made its table (and the others in its details), Show
   function finish(t, answer, c){
-    t.cam = c.cam; t.text = answer; t.hist = [{role: "user", content: t.question}, {role: "assistant", content: answer}];
+    t.cam = c.cam; t.text = answer; t.hist = [{role: "user", content: t.question}, {role: "assistant", content: answer + toolsLine(c)}];
     t.el.append(answerEl(answer, t));
     for(const m of c.maps){ const line = $("div", "rs-ask-map"); line.append($("span", "rs-ask-map-k", "Map"), $("span", "", m.text)); if(!m.move) line.append($("span", "rs-ask-map-to", "in the list of Colour or Focus")); t.el.append(line); }
     // the answer's table: the query with roads that has the most rows (a model often runs the full list, then a count or "LIMIT 2" for the longest); a map
