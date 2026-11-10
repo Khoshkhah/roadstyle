@@ -298,16 +298,31 @@ impl<'a> Bridges<'a> {
     }
 }
 
-/// The heights that a caller gives (`bridge_heights`: road id as text -> metres, by the edge id column `key`): for each group of bridges (index: group - 1) the height of
-/// the whole group. The id of any road of the group names it, as a two-way pair's either edge; two heights for one group, a height that is not a number of 0 or more, an id
-/// that no road has, and a missing column are errors; an id of a road that is not a 3D bridge gets a warning (its height does nothing).
-fn own_heights(roads: &Roads, b: &Bridges, heights: &std::collections::BTreeMap<String, f64>, key: &str, warnings: &mut Vec<String>) -> Result<Vec<Option<f64>>, crate::Error> {
+/// The heights that a caller gives: for each group of bridges (index: group - 1) the height of the whole group. Two sources, which are checked as one:
+/// `bridge_heights` (road id as text -> metres, by the edge id column `id_col`; the id of any road of the group names it, as a two-way pair's either edge) and
+/// `bridge_height_col` (a column of the roads: a road with a value gives its group that height; a road with no value gives nothing). Two heights for one group
+/// (from one source or from both), a height that is not a number of 0 or more, an id that no road has, and a missing column are errors. An id of a road that is not a
+/// 3D bridge gets a warning (its height does nothing); so do the roads with a value in the height column that are not 3D bridges (one warning, with their number).
+pub struct Own<'a> {
+    pub heights: Option<&'a std::collections::BTreeMap<String, f64>>,
+    pub id_col: &'a str,
+    pub height_col: Option<&'a str>,
+}
+
+fn own_heights(roads: &Roads, b: &Bridges, o: &Own, warnings: &mut Vec<String>) -> Result<Vec<Option<f64>>, crate::Error> {
     use crate::colors::category_text;
-    if roads.at(0).is_some_and(|f| f.get(key).is_none()) {
+    let key = o.id_col;
+    let bad_height = |what: &str, id: &str, h: f64| crate::error::Error::Options(format!("{what}: the height of {id:?} is {h}; a height is a number of metres, 0 or more"));
+    if o.heights.is_some() && roads.at(0).is_some_and(|f| f.get(key).is_none()) {
         return Err(crate::error::column(key, "bridge_heights names its ids by it, and the roads do not have it"));
     }
-    if let Some((id, h)) = heights.iter().find(|(_, h)| !h.is_finite() || **h < 0.0) {
-        return Err(crate::error::Error::Options(format!("bridge_heights: the height of {id:?} is {h}; a height is a number of metres, 0 or more")));
+    if let Some(c) = o.height_col {
+        if roads.at(0).is_some_and(|f| f.get(c).is_none()) {
+            return Err(crate::error::column(c, "bridge_height_col names it, and the roads do not have it"));
+        }
+    }
+    if let Some((id, h)) = o.heights.into_iter().flatten().find(|(_, h)| !h.is_finite() || **h < 0.0) {
+        return Err(bad_height("bridge_heights", id, *h));
     }
     let mut group_of_edge: HashMap<usize, usize> = HashMap::new();
     for (i, r) in b.reps.iter().enumerate() {
@@ -315,36 +330,66 @@ fn own_heights(roads: &Roads, b: &Bridges, heights: &std::collections::BTreeMap<
             group_of_edge.insert(fi, b.group[i]);
         }
     }
+    let road_id = |fi: usize| roads.get(fi, key).map(category_text).unwrap_or_else(|| format!("row {fi}"));
     let mut own: Vec<Option<(f64, String)>> = vec![None; b.group_len.len()];
-    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut seen: std::collections::HashSet<&String> = std::collections::HashSet::new();
+    let mut off_bridge = 0usize;
     for fi in 0..roads.len() {
-        let id = roads.get(fi, key).map(category_text).unwrap_or_else(|| "None".into());
-        let Some(&h) = heights.get(&id) else { continue };
-        seen.insert(id.clone());
-        let Some(&g) = group_of_edge.get(&fi) else {
-            warnings.push(format!("bridge_heights: the road {id} is not a 3D bridge (a bridge with a level of 1 or more), so its height does nothing"));
-            continue;
-        };
-        match &own[g - 1] {
-            Some((h0, id0)) if (h0 - h).abs() > 1e-9 => {
-                return Err(crate::Error::Data(format!("bridge_heights: the roads {id0} and {id} touch each other (one group of bridges), and they have two heights, {h0} m and {h} m; a group has one height")));
+        // the heights this road gives its group: (the keyword, the height)
+        let mut gives: Vec<(&str, f64)> = Vec::new();
+        if let Some(heights) = o.heights {
+            let id = roads.get(fi, key).map(category_text).unwrap_or_else(|| "None".into());
+            if let Some((k, &h)) = heights.get_key_value(&id) {
+                seen.insert(k);
+                if group_of_edge.contains_key(&fi) {
+                    gives.push(("bridge_heights", h));
+                } else {
+                    warnings.push(format!("bridge_heights: the road {id} is not a 3D bridge (a bridge with a level of 1 or more), so its height does nothing"));
+                }
             }
-            Some(_) => {}
-            None => own[g - 1] = Some((h, id)),
+        }
+        if let Some(c) = o.height_col {
+            let cell = roads.get(fi, c).filter(|v| !v.is_null());
+            if let Some(cell) = cell {
+                let h = cell.as_f64().ok_or_else(|| crate::Error::Data(format!("bridge_height_col: the road {} has {c} {}, and that is not a number", road_id(fi), cell.to_value())))?;
+                if !h.is_finite() || h < 0.0 {
+                    return Err(bad_height("bridge_height_col", &road_id(fi), h));
+                }
+                if group_of_edge.contains_key(&fi) {
+                    gives.push(("bridge_height_col", h));
+                } else {
+                    off_bridge += 1;
+                }
+            }
+        }
+        for (what, h) in gives {
+            let g = group_of_edge[&fi];
+            let id = road_id(fi);
+            match &own[g - 1] {
+                Some((h0, id0)) if (h0 - h).abs() > 1e-9 => {
+                    return Err(crate::Error::Data(format!("{what}: the roads {id0} and {id} touch each other (one group of bridges), and they have two heights, {h0} m and {h} m; a group has one height")));
+                }
+                Some(_) => {}
+                None => own[g - 1] = Some((h, id)),
+            }
         }
     }
-    if let Some(id) = heights.keys().find(|k| !seen.contains(*k)) {
+    if let Some(id) = o.heights.into_iter().flat_map(|h| h.keys()).find(|k| !seen.contains(k)) {
         return Err(crate::Error::Data(format!("bridge_heights: no road has the {key} {id}")));
+    }
+    if off_bridge > 0 {
+        let c = o.height_col.unwrap_or_default();
+        warnings.push(format!("bridge_height_col: {off_bridge} roads that are not 3D bridges (a bridge with a level of 1 or more) have a value in {c}, so those values do nothing"));
     }
     Ok(own.into_iter().map(|o| o.map(|(h, _)| h)).collect())
 }
 
 /// _bridge_decks: the deck features of the roads (the roads source's features, in its order: a feature's index is its id).
-/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`). `own`: the heights that the caller gave (`bridge_heights` and the edge id column).
-pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Option<(&std::collections::BTreeMap<String, f64>, &str)>, warnings: &mut Vec<String>) -> Result<Vec<Value>, crate::Error> {
+/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`). `own`: the heights that the caller gave (`bridge_heights`, `bridge_height_col`).
+pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Option<&Own>, warnings: &mut Vec<String>) -> Result<Vec<Value>, crate::Error> {
     let bridges = Bridges::new(roads);
     let given = match own {
-        Some((heights, key)) => own_heights(roads, &bridges, heights, key, warnings)?,
+        Some(o) => own_heights(roads, &bridges, o, warnings)?,
         None => Vec::new(),
     };
     let mut used = vec![false; bridges.reps.len()];

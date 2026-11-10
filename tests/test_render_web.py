@@ -2555,12 +2555,14 @@ def test_web_hillshade_and_terrain_keywords():
         render_edges(_edges(), backend="web", buildings_opacity=1.5)
 
 
-def _y_bridges(**kw):
+def _y_bridges(heights=None, **kw):
     """Three bridges that meet at a node (one group: A-B, B-C, B-D, each about 28 m, edge ids 1 to 3), a bridge apart from them (id 4) and a road on the ground (id 5)."""
     a, b, c, d = (18.0000, 59.3000), (18.0003, 59.3002), (18.0006, 59.3004), (18.0006, 59.3000)
     lines = [[a, b], [b, c], [b, d], [(18.01, 59.3), (18.0103, 59.3002)], [(18.02, 59.3), (18.0203, 59.3002)]]
     g = gpd.GeoDataFrame({"highway": ["primary"] * 5, "bridge": ["yes"] * 4 + [None], "layer": ["1"] * 4 + [None], "edge_id": [1, 2, 3, 4, 5]},
                          geometry=[LineString(c) for c in lines], crs=4326)
+    if heights is not None:                                   # the column "h": one value for each road
+        g["h"] = heights
     return render_edges(g, backend="web", view_3d=kw.pop("view_3d", True), **kw).html
 
 
@@ -2596,3 +2598,34 @@ def test_bridge_heights_says_what_is_wrong_and_does_not_choose():
         _y_bridges(bridge_heights={5: 10.0})
     with pytest.warns(UserWarning, match="no 3D bridges"):
         _y_bridges(bridge_heights={1: 10.0}, view_3d=False)
+
+
+def test_bridge_height_col_gives_a_whole_group_the_height_of_its_roads():
+    nan = float("nan")
+    got = _full_by_chain_edge(_y_bridges([nan, 14.0, nan, 9.5, nan], bridge_height_col="h"))      # one road of the Y has a value; the other roads of the Y have none
+    assert got[1] == got[2] == got[3] == 14.0 and got[4] == 9.5, got
+    same = _full_by_chain_edge(_y_bridges([14.0, 14.0, 14.0, nan, nan], bridge_height_col="h"))    # the same height on all the roads of the group is no conflict
+    assert same[1] == same[2] == same[3] == 14.0 and same[4] == pytest.approx(5.0), same
+    both = _full_by_chain_edge(_y_bridges([nan, 14.0, nan, nan, nan], bridge_height_col="h", bridge_heights={3: 14.0, 4: 9.5}))   # the two keywords add up
+    assert both[1] == both[3] == 14.0 and both[4] == 9.5, both
+
+
+def test_bridge_height_col_says_what_is_wrong_and_does_not_choose():
+    nan = float("nan")
+    with pytest.raises(ValueError, match="bridge_height_col: the roads 1 and 3 .* two heights"):
+        _y_bridges([10.0, nan, 12.0, nan, nan], bridge_height_col="h")
+    with pytest.raises(ValueError, match="bridge_heights: the roads 1 and 3 .* two heights, 10 m and 12 m"):
+        _y_bridges([10.0, nan, nan, nan, nan], bridge_height_col="h", bridge_heights={3: 12.0})   # the column and the keyword disagree about one group
+    with pytest.raises(ValueError, match="metres, 0 or more"):
+        _y_bridges([-3.0, nan, nan, nan, nan], bridge_height_col="h")
+    with pytest.raises(ValueError, match="column"):
+        _y_bridges(bridge_height_col="h")                                                           # the roads have no column "h"
+    with pytest.warns(UserWarning, match="1 roads that are not 3D bridges"):
+        _y_bridges([nan, nan, nan, nan, 10.0], bridge_height_col="h")
+    with pytest.warns(UserWarning, match="no 3D bridges"):
+        _y_bridges([10.0, nan, nan, nan, nan], bridge_height_col="h", view_3d=False)
+
+
+def test_bridge_height_col_with_a_text_value_is_an_error():
+    with pytest.raises(ValueError, match="not a number"):
+        _y_bridges(["tall", None, None, None, None], bridge_height_col="h")

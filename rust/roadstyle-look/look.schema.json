@@ -270,7 +270,8 @@
           "$ref": "#/$defs/Bridges",
           "default": {
             "decks_3d": false,
-            "heights": null
+            "heights": null,
+            "height_col": null
           }
         },
         "overlays": {
@@ -1092,6 +1093,14 @@
             "type": "number",
             "format": "double"
           },
+          "default": null
+        },
+        "height_col": {
+          "description": "The name of a column of the roads that has the full height in metres of the group of bridges that the road is in (a road with no value gives nothing). The\nwhole group has it; two heights in one group are an error, also with `heights`. None: no column.",
+          "type": [
+            "string",
+            "null"
+          ],
           "default": null
         }
       },
