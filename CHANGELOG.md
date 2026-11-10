@@ -29,6 +29,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 - **`data.showOnMap()`** ([The data dock](docs/guides/data-dock.md)): turns the dock's map switch on and gives `true` when it was off.
 
 ### Changed
+- **No road popup while the Street View window is open** (`dashboard/streetview.js`, [Street View](docs/guides/street-view.md#the-floating-window)). A click on a road selects it and Street View shows it, with no popup over the map; the popup is back when the window closes. The window holds the popups with `rs.holdPopup("street-view", on)`. A page with `street_view=True` (a link in the popup) is as before. Test: `test_no_road_popup_while_street_view_is_open`.
 - **The roads of the data dock's table are lit in blue** (`dashboard/data/data_dock.js`, [The data dock](docs/guides/data-dock.md)). They had the purple of select and hover, so a clicked row could not be seen among them. The light is `#2563eb` on a light map and `#5aa9f8` on a dark map, with no see-through. Hover and select stay purple.
 - **Ask's map tools turn the dock's map switch on** when it is off (a colour, a focus or a move would not show), and the card says so.
 - **A turning ring shows that Ask works**, before the step line of the card.
