@@ -5,6 +5,7 @@ import {O, RoadTable} from "./core.js";
 import {replaceTool, greyTool, getTool, wrap, ROADS_ICON} from "./tools.js";
 import {FILTER, rsSetClasses, rsSetBridges, rsSetTunnels, rsSetAccess} from "./filter.js";
 import {_esc} from "../popup.js";
+import {rsSetBridges3D, _bmHas} from "./bridgemesh.js";
 
 let _rdVis = null;                      // the classes that show now (null: all); kept from the event rs:filterchange
 let _rdBox = null;                      // {box, fill}
@@ -33,12 +34,14 @@ export function useRoadsBox(){
       cls.map(c => '<label class="rs-rd-row"><input type="checkbox" data-c="' + _esc(c) + '"' + (on(c) ? " checked" : "") + '><i style="background:' + _esc(sw[c] || "#888") + '"></i>' +
         '<button type="button" data-only="' + _esc(c) + '" title="Show only ' + _esc(c) + '">' + _esc(c) + "</button><b>" + (cnt && cnt[c] != null ? cnt[c].toLocaleString() : "") + "</b></label>").join("") + "</div>" +
       (grade.length || acc.length ? "<hr>" : "") +
-      grade.map(r => '<label class="rs-rd-row rs-rd-plain"><input type="checkbox" data-g="' + r[0] + '" checked><span>' + r[1] + "</span></label>").join("") +
+      grade.map(r => '<label class="rs-rd-row rs-rd-plain"><input type="checkbox" data-g="' + r[0] + '" checked><span>' + r[1] + "</span></label>" +
+        (r[0] === "bridges" && _bmHas() ? '<label class="rs-rd-row rs-rd-plain"><input type="checkbox" data-b3d' + (rsSetBridges3D() ? " checked" : "") + '><span>3D bridges</span></label>' : "")).join("") +
       acc.map(a => '<label class="rs-rd-row"><input type="checkbox" data-k="' + _esc(a[0]) + '" checked><i style="background:' + _esc(a[1]) + '"></i><span>' + _esc(a[2]) + "</span><b>" + (a[3] != null ? a[3].toLocaleString() : "") + "</b></label>").join("");
     const checked = () => cls.filter(c => box.querySelector('input[data-c="' + CSS.escape(c) + '"]').checked);
     box.querySelectorAll("input[data-c]").forEach(i => { i.onchange = () => rsSetClasses(checked()); });
     box.querySelectorAll("button[data-only]").forEach(x => { x.onclick = () => rsSetClasses([x.dataset.only]); });
     box.querySelectorAll("button[data-a]").forEach(x => { x.onclick = () => rsSetClasses(x.dataset.a === "all" ? cls : []); });
+    box.querySelectorAll("input[data-b3d]").forEach(i => { i.onchange = () => rsSetBridges3D(i.checked); });
     box.querySelectorAll("input[data-g]").forEach(i => { i.onchange = () => (i.dataset.g === "bridges" ? rsSetBridges : rsSetTunnels)(i.checked); });
     box.querySelectorAll("input[data-k]").forEach(i => { i.onchange = () => rsSetAccess(i.dataset.k, i.checked); });
   };

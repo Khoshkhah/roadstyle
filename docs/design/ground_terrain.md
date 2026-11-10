@@ -79,10 +79,10 @@ view only, so the memory grows with the view and not with the area (`memory_budg
 In each case `elevation.js` reads the archive with pmtiles.js and gives the tiles to MapLibre through its own protocol
 `rsground://`. The page's `pmtiles://` protocol stays for the roads only.
 
-One function in `elevation.js`, `_elDemTile(z, x, y)`, reads one DEM tile from the page's ground. `google3d.js` uses it for its
-ground heights and names the ground in its credit. A host gives a ground after the page starts with `rsGround(ground)`, where
-`terrain` can be a `File` (OPFS), a `Blob`, an `ArrayBuffer` or a URL. `bridgemesh.js` is not on main yet: when it lands, it
-must use `_elDemTile` too.
+One function in `elevation.js`, `_elDemTile(z, x, y)`, reads one DEM tile from the page's ground, and `_elDemMaxZoom()` gives
+its last zoom. `google3d.js` uses them for its ground heights and names the ground in its credit. `bridgemesh.js` uses them for
+the ground under the bridge decks. A host gives a ground after the page starts with `rsGround(ground)`, where `terrain` can be
+a `File` (OPFS), a `Blob`, an `ArrayBuffer` or a URL.
 
 ## The page option `ground`
 

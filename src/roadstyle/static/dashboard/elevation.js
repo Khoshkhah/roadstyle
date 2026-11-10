@@ -111,21 +111,26 @@ export function rsGround(ground){
   _emit("rs:groundchange", {ground: O.ground});
   return O.ground;
 }
-// _elDemZoom(): the zoom of the DEM tiles that a reader of single heights takes (google3d.js): 14, or the ground's last zoom
-export const _elDemZoom = () => Math.min(14, _elSpec ? _elSpec.maxzoom : 14);
-// _elDemTile(z, x, y) -> Promise of the tile's RGBA pixels (256 x 256), from the page's one DEM. The Terrarium height of pixel i: R*256 + G + B/256 - 32768
+// _elDemMaxZoom(): the last zoom of the page's one DEM (the ground's file, else ontop.dem): the zoom that the map draws its terrain from
+export const _elDemMaxZoom = () => _elSpec ? _elSpec.maxzoom : O.ontop.dem.maxzoom;
+// _elDemZoom(): the zoom of the DEM tiles that a reader of single heights takes (google3d.js): 14, or the DEM's last zoom
+export const _elDemZoom = () => Math.min(14, _elDemMaxZoom());
+// _elDemTile(z, x, y) -> Promise of the tile's RGBA pixels (256 x 256), from the page's one DEM, decoded as the map decodes them (no colour space
+// conversion). The Terrarium height of pixel i: R*256 + G + B/256 - 32768, at the pixel's north-west corner
 export async function _elDemTile(z, x, y){
   if(!_elSpec && !_elArchive) _elLoad();
   await _elReady;
-  let img;
+  let blob;
   if(_elArchive){
     const r = await _elArchive.getZxy(z, x, y);
     if(!r) throw new Error("rs ground: no tile " + z + "/" + x + "/" + y);
-    img = await createImageBitmap(new Blob([r.data], {type: "image/png"}));
+    blob = new Blob([r.data], {type: "image/png"});
   } else {
-    img = new Image(); img.crossOrigin = "anonymous";
-    await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error("rs: no DEM tile " + img.src)); img.src = _elSpec.tiles[0].replace("{z}", z).replace("{x}", x).replace("{y}", y); });
+    const url = _elSpec.tiles[0].replace("{z}", z).replace("{x}", x).replace("{y}", y), res = await fetch(url);
+    if(!res.ok) throw new Error("HTTP " + res.status + " " + url);
+    blob = await res.blob();
   }
+  const img = await createImageBitmap(blob, {colorSpaceConversion: "none"});
   const c = document.createElement("canvas"); c.width = c.height = 256;
   const g = c.getContext("2d", {willReadFrequently: true}); g.drawImage(img, 0, 0);
   return g.getImageData(0, 0, 256, 256).data;
