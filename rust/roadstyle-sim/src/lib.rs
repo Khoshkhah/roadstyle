@@ -3,7 +3,7 @@
 //! docs/design/vehicles_spec.md, sections 4 and 5.
 
 mod fcd;
-mod geo;
+pub mod geo;
 mod net;
 mod track;
 

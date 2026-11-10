@@ -12,11 +12,12 @@ crate-type = ["cdylib"]
 
 [features]
 # the vehicles of a traffic microsimulation run (VehicleScene, docs/design/vehicles_spec.md): a page with no vehicles does not carry them
-vehicles = ["dep:roadstyle-sim"]
+vehicles = ["dep:roadstyle-sim", "dep:roadstyle-camera"]
 
 [dependencies]
 roadstyle = { path = "../roadstyle" }
 roadstyle-sim = { path = "../roadstyle-sim", optional = true }
+roadstyle-camera = { path = "../roadstyle-camera", optional = true }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

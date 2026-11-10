@@ -52,6 +52,12 @@ pub struct VehicleState {
     /// index into the run's lane ids (the lane of the sample before the clock time); NONE when the file has none
     pub lane: u32,
     pub vtype: u16,
+    /// the vehicle's middle is on a tunnel lane (Run::set_tunnel_edges)
+    pub tunnel: bool,
+    /// the roads under the vehicle's middle: (net lane, drawn metres along its line, weight). One entry on a lane, two or three during a
+    /// lane change, with the weights of the position's blend (their sum is 1). Empty with lon/lat placement. The vehicle's height comes
+    /// from these roads (docs/design/road_heights.md), never from the ground at its lon/lat
+    pub roads: Vec<(u32, f64, f64)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -99,6 +105,8 @@ pub struct Run {
     pairs: Vec<Vec<Pair>>,
     /// samples' lane index -> net lane index (NONE: not in the network)
     lane_net: Vec<u32>,
+    /// net lane -> tunnel (set_tunnel_edges); empty: no lane is a tunnel
+    tunnel: Vec<bool>,
     report: Report,
 }
 
@@ -168,9 +176,48 @@ impl Run {
             rows,
             pairs: Vec::new(),
             lane_net,
+            tunnel: Vec::new(),
         };
         run.pairs = (0..run.rows.len()).map(|v| run.build_pairs(v)).collect();
         Ok(run)
+    }
+
+    /// The tunnels: the edges (SUMO edge ids, which are the page's edge ids) whose roads are below the ground. A lane of such an edge is
+    /// a tunnel lane, and so is an internal lane of a junction whose lanes in and out are tunnel lanes. The page decides which roads are
+    /// tunnels (its roads' level below 0), so a vehicle follows the tunnel's look (fade, hide) with no second rule.
+    pub fn set_tunnel_edges(&mut self, edges: &std::collections::HashSet<String>) {
+        let Some(net) = &self.net else { return };
+        let mut t: Vec<bool> = net.lanes.iter().map(|l| !l.internal && edges.contains(&l.edge)).collect();
+        let mut prev: Vec<Vec<u32>> = vec![Vec::new(); net.lanes.len()];
+        for (i, next) in net.next.iter().enumerate() {
+            for &n in next {
+                prev[n as usize].push(i as u32);
+            }
+        }
+        // an internal lane: a tunnel lane before it and after it (through other internal lanes of the junction, a few at most)
+        let reach = |start: u32, step: &dyn Fn(u32) -> Vec<u32>| {
+            let mut seen = vec![start];
+            let mut i = 0;
+            while i < seen.len() && i < 32 {
+                let l = seen[i];
+                i += 1;
+                for n in step(l) {
+                    if net.lanes[n as usize].internal {
+                        if !seen.contains(&n) { seen.push(n); }
+                    } else if t[n as usize] {
+                        return true;
+                    }
+                }
+            }
+            false
+        };
+        let inner: Vec<bool> = (0..net.lanes.len() as u32).map(|l| {
+            net.lanes[l as usize].internal && reach(l, &|x| prev[x as usize].clone()) && reach(l, &|x| net.next[x as usize].clone())
+        }).collect();
+        for (i, v) in inner.into_iter().enumerate() {
+            if v { t[i] = true; }
+        }
+        self.tunnel = t;
     }
 
     pub fn report(&self) -> &Report {
@@ -287,8 +334,9 @@ impl Run {
     /// Stations use SUMO's lane lengths (a vehicle's `pos` is measured on them) and each lane maps them onto its drawn
     /// line, as SUMO does; `off` (half a vehicle's length back, a look ahead) is in drawn metres, so a vehicle keeps its
     /// size on a lane whose drawn line is shorter than its SUMO length. Before the first lane the walk goes back through
-    /// `back` (the nearest first); past the ends it stays at the end.
-    fn walk(&self, fwd: &[u32], back: &[u32], s: f64, off: f64) -> ([f64; 2], f64) {
+    /// `back` (the nearest first); past the ends it stays at the end. The third value is the net lane under that point, the fourth the
+    /// drawn metres along that lane's line.
+    fn walk(&self, fwd: &[u32], back: &[u32], s: f64, off: f64) -> ([f64; 2], f64, u32, f64) {
         let lanes = &self.net.as_ref().unwrap().lanes;
         // the lanes in driving order: back (farthest first), then fwd; `zero`: the index of fwd[0]
         let order: Vec<u32> = back.iter().rev().chain(fwd.iter()).copied().collect();
@@ -325,20 +373,25 @@ impl Run {
         if target >= 0.0 {
             for &l in &order[zero..] {
                 if target <= drawn(l) || l == *order.last().unwrap() {
-                    return lanes[l as usize].line.at(target);
+                    let x = target.min(drawn(l));
+                    let (p, h) = lanes[l as usize].line.at(x);
+                    return (p, h, l, x);
                 }
                 target -= drawn(l);
             }
         } else {
             for &l in order[..zero].iter().rev() {
                 if -target <= drawn(l) {
-                    return lanes[l as usize].line.at(drawn(l) + target);
+                    let x = drawn(l) + target;
+                    let (p, h) = lanes[l as usize].line.at(x);
+                    return (p, h, l, x);
                 }
                 target += drawn(l);
             }
         }
         let first = order[0];
-        lanes[first as usize].line.at(0.0)
+        let (p, h) = lanes[first as usize].line.at(0.0);
+        (p, h, first, 0.0)
     }
 
     /// The lanes behind the end of a pair's chain (and behind its lane change), the nearest first.
@@ -366,8 +419,10 @@ impl Run {
         let a = rows[k] as usize;
         let len = self.sizes[s.vtype[a] as usize][0] as f64;
         let look = self.opts.heading_lookahead_m;
-        let state = |p: [f64; 2], heading: f64, speed: f64| VehicleState {
+        let tunnel_of = |l: u32| l != NONE && self.tunnel.get(l as usize).copied().unwrap_or(false);
+        let state = |p: [f64; 2], heading: f64, speed: f64, roads: Vec<(u32, f64, f64)>| VehicleState {
             vehicle: v as u32, lon: p[0], lat: p[1], heading, speed, lane: s.lane[a], vtype: s.vtype[a],
+            tunnel: roads.first().is_some_and(|r| tunnel_of(r.0)), roads,
         };
         if k + 1 == rows.len() {
             // t is the last sample's time: the pair before it gives the lanes behind, else lon/lat
@@ -375,13 +430,13 @@ impl Run {
                 Some(pair) if pair.kind == Kind::Lane => {
                     let la = self.net_lane(a);
                     let back = Self::back_of_end(pair);
-                    let (p, _) = self.walk(&[la], &back, s.pos[a] as f64, -len * 0.5);
-                    let (_, h) = self.walk(&[la], &back, s.pos[a] as f64, look - len * 0.5);
-                    state(p, h, s.speed[a] as f64)
+                    let (p, _, under, along) = self.walk(&[la], &back, s.pos[a] as f64, -len * 0.5);
+                    let (_, h, _, _) = self.walk(&[la], &back, s.pos[a] as f64, look - len * 0.5);
+                    state(p, h, s.speed[a] as f64, vec![(under, along, 1.0)])
                 }
                 _ => {
                     let (p, h) = self.middle_lonlat(a);
-                    state(p, h, s.speed[a] as f64)
+                    state(p, h, s.speed[a] as f64, Vec::new())
                 }
             });
         }
@@ -397,7 +452,7 @@ impl Run {
                 let (pa, ha) = self.middle_lonlat(a);
                 let (pb, hb) = self.middle_lonlat(b);
                 let p = [pa[0] + (pb[0] - pa[0]) * u, pa[1] + (pb[1] - pa[1]) * u];
-                Some(state(p, (ha + turn_deg(ha, hb) * u).rem_euclid(360.0), speed))
+                Some(state(p, (ha + turn_deg(ha, hb) * u).rem_euclid(360.0), speed, Vec::new()))
             }
             Kind::Lane => {
                 let net = self.net.as_ref().unwrap();
@@ -406,21 +461,27 @@ impl Run {
                 let before_end: f64 = chain[..chain.len() - 1].iter().map(|&l| net.lanes[l as usize].length).sum();
                 let sb = before_end + s.pos[b] as f64;
                 let d = sa + hermite(u, (sb - sa).max(0.0), s.speed[a] as f64 * h_t, s.speed[b] as f64 * h_t);
-                let (mut p, _) = self.walk(chain, &pair.back, d, -len * 0.5);
-                let (_, mut h) = self.walk(chain, &pair.back, d, look - len * 0.5);
+                let (mut p, _, under, along) = self.walk(chain, &pair.back, d, -len * 0.5);
+                let (_, mut h, _, _) = self.walk(chain, &pair.back, d, look - len * 0.5);
                 // a lane change: a blend of the places on the two lanes, centred on the sample where SUMO changed the lane
                 let half = self.opts.lane_change_s * 0.5;
-                let mut blend = |q: [f64; 2], hq: f64, w: f64| {
+                // the roads under the vehicle, blended with the same weights as its place
+                let mut roads = vec![(under, along, 1.0)];
+                let mut blend = |q: [f64; 2], hq: f64, w: f64, lane: u32, at: f64| {
                     p = [p[0] + (q[0] - p[0]) * w, p[1] + (q[1] - p[1]) * w];
                     h = (h + turn_deg(h, hq) * w).rem_euclid(360.0);
+                    for r in roads.iter_mut() {
+                        r.2 *= 1.0 - w;
+                    }
+                    roads.push((lane, at, w));
                 };
                 if pair.to != NONE && t > tb - half {
                     // before b, toward b's lane: the same distance before b, on b's lane
                     let back = Self::back_of_end(pair);
                     let x = s.pos[b] as f64 - (sb - d);
-                    let (q, _) = self.walk(&[pair.to], &back, x, -len * 0.5);
-                    let (_, hq) = self.walk(&[pair.to], &back, x, look - len * 0.5);
-                    blend(q, hq, smoothstep((t - (tb - half)) / self.opts.lane_change_s));
+                    let (q, _, lq, aq) = self.walk(&[pair.to], &back, x, -len * 0.5);
+                    let (_, hq, _, _) = self.walk(&[pair.to], &back, x, look - len * 0.5);
+                    blend(q, hq, smoothstep((t - (tb - half)) / self.opts.lane_change_s), lq, aq);
                 }
                 if k > 0 && t < ta + half {
                     let before = &self.pairs[v][k - 1];
@@ -428,12 +489,13 @@ impl Run {
                         // after a, from a's former lane: the same distance after a, on that lane
                         let old = *before.chain.last().unwrap();
                         let back = Self::back_of_end(before);
-                        let (q, _) = self.walk(&[old], &back, d, -len * 0.5);
-                        let (_, hq) = self.walk(&[old], &back, d, look - len * 0.5);
-                        blend(q, hq, 1.0 - smoothstep((t - (ta - half)) / self.opts.lane_change_s));
+                        let (q, _, lq, aq) = self.walk(&[old], &back, d, -len * 0.5);
+                        let (_, hq, _, _) = self.walk(&[old], &back, d, look - len * 0.5);
+                        blend(q, hq, 1.0 - smoothstep((t - (ta - half)) / self.opts.lane_change_s), lq, aq);
                     }
                 }
-                Some(state(p, h, speed))
+                roads.retain(|r| r.2 > 1e-9);
+                Some(state(p, h, speed, roads))
             }
         }
     }

@@ -248,6 +248,10 @@ Budget for one `frame` call with 1,000 vehicles: 2 ms on a desktop.
 
 ## 8. The road surface
 
+**Decided on 2026-11-10: [road_heights.md](road_heights.md).** A vehicle's height comes from its road's height profile (made by the
+rule that draws the road: ground, 3D deck, tunnel), never from the ground at its lon/lat. That document replaces the ground sampling below
+for lane placement.
+
 `surface(p)` gives, at a point on a lane: the height (m above sea level), the grade and the cross slope.
 
 ```

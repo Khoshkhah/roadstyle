@@ -5,6 +5,7 @@
 //! metres"): small numbers, exact in float32, that the vehicle layer turns back with one matrix
 //! (`mainMatrix x translate(origin) x scale(metre)`). x is east, y is south (Mercator's direction), z is up.
 
+use roadstyle_camera::{GroundGrid, RoadHeights};
 use roadstyle_sim::{read_fcd_parquet, read_net, read_vtypes, Placement, Run, RunOptions};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -12,14 +13,33 @@ use std::f64::consts::PI;
 use wasm_bindgen::prelude::*;
 
 /// The numbers for each vehicle in `frame`: x, y, z (origin metres), heading (radians, 0 = north, clockwise), pitch,
-/// roll, length, width, height (m), class (index into `classes()`), r, g, b, a (0: the layer colours by class), flags,
+/// roll, length, width, height (m), class (index into `classes()`), r, g, b, a (0: the layer colours by class), flags (1: in a tunnel),
 /// vehicle (index into `ids()`).
 const STRIDE: usize = 16;
+/// The side of a cell of the ground grid, m: the terrain DEM is 30 m data, so 5 m keeps its shape and asks few points.
+const GROUND_CELL_M: f64 = 5.0;
+/// The step of a road's height profile, m (docs/design/road_heights.md: 5 m on a ground road; the decks' 2 m comes with them).
+const ROAD_STEP_M: f64 = 5.0;
 /// MapLibre's earth radius (its Mercator coordinates).
 const EARTH_R: f64 = 6371008.8;
 
 fn mercator(lon: f64, lat: f64) -> [f64; 2] {
     [(lon + 180.0) / 360.0, 0.5 - (PI / 4.0 + lat.to_radians() / 2.0).tan().ln() / (2.0 * PI)]
+}
+
+#[wasm_bindgen]
+extern "C" {
+    /// The host's ground: `height(lon, lat)` gives the drawn terrain's height there (m above sea level, times the exaggeration; 0
+    /// with no terrain), NaN when it is not known yet (a tile that has not come).
+    pub type Ground;
+    #[wasm_bindgen(method)]
+    fn height(this: &Ground, lon: f64, lat: f64) -> f64;
+
+    /// The host's roads: `line(edgeId)` gives the drawn line of the road with that edge id (lon, lat, lon, lat, ...), in the road's
+    /// direction; undefined while the host does not have it yet.
+    pub type Roads;
+    #[wasm_bindgen(method)]
+    fn line(this: &Roads, edge: &str) -> Option<Vec<f64>>;
 }
 
 #[wasm_bindgen]
@@ -30,6 +50,12 @@ pub struct VehicleScene {
     /// the class of each vehicle type, as an index into `classes`
     type_class: Vec<u16>,
     classes: Vec<String>,
+    ground: Option<Ground>,
+    grid: GroundGrid,
+    roads: Option<Roads>,
+    heights: RoadHeights,
+    /// the vehicles that the last frame left out because their ground is not known yet
+    waiting: usize,
 }
 
 fn opt_f64(o: &Value, k: &str) -> Result<f64, JsError> {
@@ -96,7 +122,9 @@ impl VehicleScene {
         let m = mercator(lon, lat);
         let unit = 1.0 / (2.0 * PI * EARTH_R * lat.to_radians().cos());
         let run = Run::new(samples, net, &vtypes, opts).map_err(err)?;
-        Ok(VehicleScene { run, origin: [lon, lat, m[0], m[1], unit], type_class, classes })
+        Ok(VehicleScene { run, origin: [lon, lat, m[0], m[1], unit], type_class, classes, ground: None,
+                          grid: GroundGrid::new([lon, lat], GROUND_CELL_M), roads: None,
+                          heights: RoadHeights::new(ROAD_STEP_M), waiting: 0 })
     }
 
     /// [lon, lat, Mercator x, Mercator y, Mercator size of one metre] of the scene origin.
@@ -122,21 +150,84 @@ impl VehicleScene {
         .to_string()
     }
 
-    /// Every vehicle on the network at clock time `t` (seconds of the run), STRIDE numbers each.
-    pub fn frame(&self, t: f64) -> Vec<f32> {
+    /// setGround(ground): the host's ground (`{height(lon, lat)}`); the vehicles then stand on it and tilt with it. With no ground they
+    /// stand at 0 m.
+    #[wasm_bindgen(js_name = setGround)]
+    pub fn set_ground(&mut self, ground: Ground) {
+        self.ground = Some(ground);
+        self.grid.clear();
+    }
+
+    /// setRoads(roads): the host's drawn roads (`{line(edgeId)}`). A vehicle placed on its lanes then takes its height from its roads'
+    /// height profiles (docs/design/road_heights.md), never from the ground at its lon/lat.
+    #[wasm_bindgen(js_name = setRoads)]
+    pub fn set_roads(&mut self, roads: Roads) {
+        self.roads = Some(roads);
+        self.heights.clear();
+    }
+
+    /// clearGround(): forgets the ground's heights and the roads' profiles (the map's terrain changed: on, off, another exaggeration).
+    #[wasm_bindgen(js_name = clearGround)]
+    pub fn clear_ground(&mut self) {
+        self.grid.clear();
+        self.heights.clear();
+    }
+
+    /// [roads with a profile, the profiles' bytes]: the memory of the road heights (docs/design/road_heights.md, "Memory").
+    #[wasm_bindgen(js_name = roadProfiles)]
+    pub fn road_profiles(&self) -> Vec<f64> {
+        vec![self.heights.len() as f64, self.heights.bytes() as f64]
+    }
+
+    /// setTunnelEdges(ids): the edges whose roads are below the ground (the page's roads with a level below 0); a vehicle on them gets
+    /// the flag "tunnel" in `frame`, and the page draws it with the tunnels' look (fade, hide).
+    #[wasm_bindgen(js_name = setTunnelEdges)]
+    pub fn set_tunnel_edges(&mut self, ids: Vec<String>) {
+        self.run.set_tunnel_edges(&ids.into_iter().collect());
+    }
+
+    /// The vehicles that the last frame left out because their ground is not known yet.
+    pub fn waiting(&self) -> usize {
+        self.waiting
+    }
+
+    /// Every vehicle on the network at clock time `t` (seconds of the run), STRIDE numbers each. A vehicle whose ground is not known
+    /// yet is left out of this frame (and counted in `waiting`), never drawn at a wrong height.
+    pub fn frame(&mut self, t: f64) -> Vec<f32> {
         let states = self.run.at(t);
         let [_, _, ox, oy, unit] = self.origin;
         let mut out = Vec::with_capacity(states.len() * STRIDE);
+        self.waiting = 0;
         for s in states {
-            let m = mercator(s.lon, s.lat);
             let size = self.run.sizes[s.vtype as usize];
+            let pose = match (&self.ground, &self.roads, &self.run.net) {
+                // on its lanes: the height of its roads
+                (Some(g), Some(r), Some(net)) if !s.roads.is_empty() => {
+                    let mut ground = |lon: f64, lat: f64| Some(g.height(lon, lat)).filter(|h| h.is_finite());
+                    let mut line_of = |e: &str| r.line(e).map(|v| v.chunks_exact(2).map(|c| [c[0], c[1]]).collect::<Vec<_>>());
+                    self.heights.pose(net, &s.roads, size[0] as f64, &mut line_of, &mut ground)
+                }
+                // lon/lat placement: no road, the ground at its lon/lat
+                (Some(g), _, _) if s.roads.is_empty() => {
+                    let mut sample = |lon: f64, lat: f64| Some(g.height(lon, lat)).filter(|h| h.is_finite());
+                    self.grid.pose([s.lon, s.lat], s.heading, size[0] as f64, size[1] as f64, &mut sample)
+                }
+                // on its lanes, and the host has not given its roads yet: it waits (never the ground at its lon/lat)
+                (Some(_), _, _) => None,
+                _ => Some(roadstyle_camera::Pose { z: 0.0, pitch: 0.0, roll: 0.0 }),
+            };
+            let Some(pose) = pose else {
+                self.waiting += 1;
+                continue;
+            };
+            let m = mercator(s.lon, s.lat);
             out.extend_from_slice(&[
                 ((m[0] - ox) / unit) as f32,
                 ((m[1] - oy) / unit) as f32,
-                0.0,
+                pose.z as f32,
                 s.heading.to_radians() as f32,
-                0.0,
-                0.0,
+                pose.pitch as f32,
+                pose.roll as f32,
                 size[0],
                 size[1],
                 size[2],
@@ -145,7 +236,7 @@ impl VehicleScene {
                 0.0,
                 0.0,
                 0.0,
-                0.0,
+                if s.tunnel { 1.0 } else { 0.0 },
                 s.vehicle as f32,
             ]);
         }
