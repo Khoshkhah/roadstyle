@@ -959,7 +959,10 @@ The guard is a function of roadstyle (`data/guard.js`), with no DuckDB: `guard(s
 3. The first word must be `SELECT` or `WITH`.
 4. These words are refused anywhere: `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `DROP`, `ALTER`, `TRUNCATE`, `ATTACH`, `DETACH`,
    `COPY`, `EXPORT`, `IMPORT`, `INSTALL`, `LOAD`, `PRAGMA`, `SET`, `RESET`, `CALL`, `CHECKPOINT`, `VACUUM`, `USE`, `BEGIN`, `COMMIT`,
-   `ROLLBACK`.
+   `ROLLBACK`. A refused word that is a name passes (2026-11-10: `lane_profile.use` is a real column): after `SELECT`, `DISTINCT`, a comma, `AS`, `WHERE`,
+   `BY`, `AND`, `OR`, `NOT`, `ON`, `HAVING`, `CASE`, `WHEN`, `THEN`, `ELSE`, a dot or an operator, and, for the words that do not write rows, after `(`
+   (`count(use)`). A statement can only start the text (rule 3 refuses it) or follow the `)` of a `WITH`, so a word there is still refused:
+   `WITH a AS (SELECT 1) DELETE FROM t` and `USE db` fail.
 5. Functions that read files or the network, or that run SQL from a text, are refused: `read_*`, `*_scan`, `glob`, `sniff_csv`,
    `query`, `query_table`, `getenv`. A string literal directly after `FROM` or `JOIN` (DuckDB reads a file name there) is refused, and so
    is a string literal that has `://`.

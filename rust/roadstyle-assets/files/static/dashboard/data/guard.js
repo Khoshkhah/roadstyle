@@ -12,13 +12,28 @@ export function bare(sql){
 }
 export const inner = (sql) => String(sql).trim().replace(/;\s*$/, "");
 
+// A refused word is a name when it follows SELECT, a comma, AS, WHERE, BY, a dot, AND, OR, NOT, ON, HAVING, CASE, WHEN, THEN, ELSE or an operator: a column called `use`
+// (lane_profile.use) is not the USE statement. A statement that writes can only start the text (which must be SELECT or WITH) or follow the `)` of a WITH, so
+// those places are still refused. A word after `(` is a name too (count(use)), except the words that write rows: `WITH a AS (...) DELETE` and the like never have `(` before them.
+const WRITES = new Set("INSERT UPDATE DELETE MERGE CREATE DROP ALTER TRUNCATE COPY".split(" "));
+const NAME_AFTER = /(?:\b(?:SELECT|DISTINCT|AS|WHERE|BY|AND|OR|NOT|ON|HAVING|CASE|WHEN|THEN|ELSE)|[,.=<>+\-*\/%])$/i;
+function word(body, w){
+  const re = new RegExp(`\\b${w}\\b`, "gi");
+  for(let m; (m = re.exec(body));){
+    const before = body.slice(0, m.index).trimEnd();
+    if(NAME_AFTER.test(before) || (!WRITES.has(w) && before.endsWith("("))) continue;
+    return true;
+  }
+  return false;
+}
+
 export function guard(sql, limit = 1000){
   const body = bare(sql).trim().replace(/;\s*$/, "");
   if(!body) return {ok: false, reason: "Write one SELECT or WITH statement."};
   if(body.includes(";")) return {ok: false, reason: "Only one statement is allowed."};
   const first = (body.match(/^\s*\(?\s*(\w+)/) || [])[1] || "";
   if(!/^(SELECT|WITH)$/i.test(first)) return {ok: false, reason: `Only one SELECT or WITH statement is allowed. Found: ${first.toUpperCase() || "nothing"}.`};
-  const bad = REFUSED.find((w) => new RegExp(`\\b${w}\\b`, "i").test(body));
+  const bad = REFUSED.find((w) => word(body, w));
   if(bad) return {ok: false, reason: `Only one SELECT or WITH statement is allowed. Found: ${bad}.`};
   if(/\b(read_\w+|\w+_scan|glob|sniff_csv|query|query_table|getenv)\s*\(/i.test(body)) return {ok: false, reason: "A query cannot read files, addresses or SQL text."};
   if(/\b(FROM|JOIN)\s+'/i.test(body) || /'[^']*:\/\//.test(String(sql))) return {ok: false, reason: "A query cannot read files or addresses."};
