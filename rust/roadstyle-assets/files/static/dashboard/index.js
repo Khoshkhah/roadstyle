@@ -41,6 +41,7 @@ import {initArrows} from "./arrows.js";
 import {initSelect, useSelect} from "./select.js";
 import {makeApi, fromUrl, refreshState} from "./api.js";
 import {setData, clearData} from "./live.js";
+import {vehiclesApi} from "./vehicles.js";
 // an option left out: render's default. The theme's values (select_color, arrow_icon, arrow_color, arrow_rules) have none:
 // they come from the look (roadstyle's profile and palette).
 const RS_DEFAULTS = {
@@ -185,6 +186,7 @@ export function rsDashboard(map, options){
     naturalBreaks: (values, k) => naturalBreaks(values, k),
   });
   rs.error = error;               // null, or the text of the contract error of the style (setStyle sets it again)
+  rs.vehicles = vehiclesApi();    // a traffic microsimulation run on the map (vehicles.js)
   window.rsTools = rsTools;       // the alias of rs.tools
   window.rs = rs;                 // the page's one object (the window.rs* functions stay as they are)
   // `rs:ready`: window.rs is there and the panel's sections are in place (initSections runs at DOMContentLoaded, before this listener); window.rsReady is true

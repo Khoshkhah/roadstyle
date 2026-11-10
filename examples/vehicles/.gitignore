@@ -1,0 +1,3 @@
+# the WebAssembly package (wasm-bindgen output) and the SUMO run: made by the commands of README.md
+pkg/
+data/

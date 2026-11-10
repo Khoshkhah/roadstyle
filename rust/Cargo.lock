@@ -2049,6 +2049,7 @@ name = "roadstyle-wasm"
 version = "0.29.0"
 dependencies = [
  "roadstyle",
+ "roadstyle-sim",
  "serde_json",
  "wasm-bindgen",
 ]
