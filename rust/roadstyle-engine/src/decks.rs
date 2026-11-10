@@ -303,10 +303,55 @@ impl<'a> Bridges<'a> {
     }
 }
 
+/// The heights that a caller gives (`bridge_heights`: road id as text -> metres, by the edge id column `key`): for each group of bridges (index: group - 1) the height of
+/// the whole group. The id of any road of the group names it, as a two-way pair's either edge; two heights for one group, a height that is not a number of 0 or more, an id
+/// that no road has, and a missing column are errors; an id of a road that is not a 3D bridge gets a warning (its height does nothing).
+fn own_heights(roads: &Roads, b: &Bridges, heights: &std::collections::BTreeMap<String, f64>, key: &str, warnings: &mut Vec<String>) -> Result<Vec<Option<f64>>, crate::Error> {
+    use crate::colors::category_text;
+    if roads.at(0).is_some_and(|f| f.get(key).is_none()) {
+        return Err(crate::error::column(key, "bridge_heights names its ids by it, and the roads do not have it"));
+    }
+    if let Some((id, h)) = heights.iter().find(|(_, h)| !h.is_finite() || **h < 0.0) {
+        return Err(crate::error::Error::Options(format!("bridge_heights: the height of {id:?} is {h}; a height is a number of metres, 0 or more")));
+    }
+    let mut group_of_edge: HashMap<usize, usize> = HashMap::new();
+    for (i, r) in b.reps.iter().enumerate() {
+        for &fi in b.pair_edges.get(&self::key(r.a, r.z)).into_iter().flatten() {
+            group_of_edge.insert(fi, b.group[i]);
+        }
+    }
+    let mut own: Vec<Option<(f64, String)>> = vec![None; b.group_len.len()];
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for fi in 0..roads.len() {
+        let id = roads.get(fi, key).map(category_text).unwrap_or_else(|| "None".into());
+        let Some(&h) = heights.get(&id) else { continue };
+        seen.insert(id.clone());
+        let Some(&g) = group_of_edge.get(&fi) else {
+            warnings.push(format!("bridge_heights: the road {id} is not a 3D bridge (a bridge with a level of 1 or more), so its height does nothing"));
+            continue;
+        };
+        match &own[g - 1] {
+            Some((h0, id0)) if (h0 - h).abs() > 1e-9 => {
+                return Err(crate::Error::Data(format!("bridge_heights: the roads {id0} and {id} touch each other (one group of bridges), and they have two heights, {h0} m and {h} m; a group has one height")));
+            }
+            Some(_) => {}
+            None => own[g - 1] = Some((h, id)),
+        }
+    }
+    if let Some(id) = heights.keys().find(|k| !seen.contains(*k)) {
+        return Err(crate::Error::Data(format!("bridge_heights: no road has the {key} {id}")));
+    }
+    Ok(own.into_iter().map(|o| o.map(|(h, _)| h)).collect())
+}
+
 /// _bridge_decks: the deck features of the roads (the roads source's features, in its order: a feature's index is its id).
-/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`).
-pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Value> {
+/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`). `own`: the heights that the caller gave (`bridge_heights` and the edge id column).
+pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Option<(&std::collections::BTreeMap<String, f64>, &str)>, warnings: &mut Vec<String>) -> Result<Vec<Value>, crate::Error> {
     let bridges = Bridges::new(roads);
+    let given = match own {
+        Some((heights, key)) => own_heights(roads, &bridges, heights, key, warnings)?,
+        None => Vec::new(),
+    };
     let mut used = vec![false; bridges.reps.len()];
     let mut feats = Vec::new();
     let mut chain_i = 0;
@@ -314,12 +359,12 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str) -> Vec<Va
         if !used[i] {
             chain_i += 1;
             let ch = bridges.walk(i, &mut used);
-            let h = deck_height(dk, bridges.group_len[ch.group - 1]);
+            let h = given.get(ch.group - 1).copied().flatten().unwrap_or_else(|| deck_height(dk, bridges.group_len[ch.group - 1]));
             let far = |nd: &(u64, u64)| bridges.dfree.get(nd).copied().unwrap_or(f64::INFINITY);
             feats.extend(chain_features(roads, dk, m, hw, &ch, chain_i, (h, far(&ch.head), far(&ch.tail))));
         }
     }
-    feats
+    Ok(feats)
 }
 
 /// The full height of a bridge group of `len` metres: `base_m` for a short one, `max_m` for a long one, a line between (a long bridge crosses

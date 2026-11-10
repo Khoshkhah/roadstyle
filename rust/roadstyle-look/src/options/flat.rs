@@ -76,6 +76,9 @@ pub(super) fn flat(args: &Value) -> Result<Flat, Error> {
     if let Some(t) = get("color_table") {
         put(&mut out, &mut paths, "color.table", json!({"colors": t, "key": get("color_key").cloned().unwrap_or_else(|| json!("edge_id"))}));
     }
+    if let Some(h) = get("bridge_heights") {
+        put(&mut out, &mut paths, "bridges.heights", h.clone());
+    }
     if let Some(o) = get("color_options") {
         let named: Vec<(String, Value)> = match o {
             Value::Object(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -130,7 +133,7 @@ const FLAT: &[(&str, &str)] = &[
 ];
 
 /// The flat keywords of more than one field, or of a value in another form: `from_args` reads them itself.
-const SPECIAL: &[&str] = &["levels", "minzoom", "road_popup", "road_tooltip", "tooltip", "color_table", "color_key", "color_options",
+const SPECIAL: &[&str] = &["levels", "minzoom", "bridge_heights", "road_popup", "road_tooltip", "tooltip", "color_table", "color_key", "color_options",
                            "overlays", "items", "items_popup", "modes", "interaction"];
 
 /// The keys of a colour option (a data styler's keywords): (keyword, the field of `ColorOption`).

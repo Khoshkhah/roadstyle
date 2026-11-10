@@ -99,4 +99,7 @@ pub struct Tunnels {
 pub struct Bridges {
     /// the raised 3D bridge decks, and the page opens tilted
     pub decks_3d: bool,
+    /// The full height in metres of a group of bridges (the bridge roads that touch each other), by the value of the edge id column of one of its roads (as text); the
+    /// whole group has it, and the engine makes its ramps for it. None: the height that the length of the group gives (`bridges.decks`).
+    pub heights: Option<std::collections::BTreeMap<String, f64>>,
 }

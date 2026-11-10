@@ -2555,6 +2555,49 @@ def test_web_hillshade_and_terrain_keywords():
         render_edges(_edges(), backend="web", buildings_opacity=1.5)
 
 
+def _y_bridges(**kw):
+    """Three bridges that meet at a node (one group: A-B, B-C, B-D, each about 28 m, edge ids 1 to 3), a bridge apart from them (id 4) and a road on the ground (id 5)."""
+    a, b, c, d = (18.0000, 59.3000), (18.0003, 59.3002), (18.0006, 59.3004), (18.0006, 59.3000)
+    lines = [[a, b], [b, c], [b, d], [(18.01, 59.3), (18.0103, 59.3002)], [(18.02, 59.3), (18.0203, 59.3002)]]
+    g = gpd.GeoDataFrame({"highway": ["primary"] * 5, "bridge": ["yes"] * 4 + [None], "layer": ["1"] * 4 + [None], "edge_id": [1, 2, 3, 4, 5]},
+                         geometry=[LineString(c) for c in lines], crs=4326)
+    return render_edges(g, backend="web", view_3d=kw.pop("view_3d", True), **kw).html
+
+
+def _full_by_chain_edge(html):
+    pieces = [f["properties"] for f in _style(html)["sources"]["decks"]["data"]["features"] if not f["properties"].get("__rs_casing_slab")]
+    return {p["edge_id"]: round(p["__rs_full"], 6) for p in pieces}
+
+
+def test_bridge_heights_gives_a_whole_group_one_height_by_the_id_of_any_of_its_roads():
+    default = _full_by_chain_edge(_y_bridges())
+    assert default[1] == default[2] == default[3] and default[4] == pytest.approx(5.0)            # the Y is one group, the lone bridge another
+    got = _full_by_chain_edge(_y_bridges(bridge_heights={2: 14.0}))                                # the id of one road of the group
+    assert got[1] == got[2] == got[3] == 14.0 and got[4] == default[4], got
+    both = _full_by_chain_edge(_y_bridges(bridge_heights={1: 14.0, 3: 14.0, 4: 9.5}))              # two roads of one group with the same height is no conflict
+    assert both[1] == both[3] == 14.0 and both[4] == 9.5, both
+
+
+def test_bridge_heights_makes_the_ramps_for_the_height_it_gives():
+    """The ramps are made by the engine for the height: a bridge of 28 m rises only as far as the grade lets it, whatever height is asked, and a tall height makes it longer to rise."""
+    pieces = [f["properties"] for f in _style(_y_bridges(bridge_heights={4: 14.0}))["sources"]["decks"]["data"]["features"] if not f["properties"].get("__rs_casing_slab")]
+    lone = sorted((p for p in pieces if p["edge_id"] == 4), key=lambda p: p["__rs_s0"])
+    assert all(p["__rs_full"] == 14.0 for p in lone) and max(p["__rs_base"] for p in lone) < 14.0 / 2         # 28 m: 14 m would be a grade of 1 in 1 to its middle
+
+
+def test_bridge_heights_says_what_is_wrong_and_does_not_choose():
+    with pytest.raises(ValueError, match="two heights"):
+        _y_bridges(bridge_heights={1: 10.0, 3: 12.0})                                              # two roads of one group
+    with pytest.raises(ValueError, match="no road has the edge_id 99"):
+        _y_bridges(bridge_heights={99: 10.0})
+    with pytest.raises(ValueError, match="metres, 0 or more"):
+        _y_bridges(bridge_heights={1: -3.0})
+    with pytest.warns(UserWarning, match="road 5 is not a 3D bridge"):
+        _y_bridges(bridge_heights={5: 10.0})
+    with pytest.warns(UserWarning, match="no 3D bridges"):
+        _y_bridges(bridge_heights={1: 10.0}, view_3d=False)
+
+
 def test_web_vehicles_option_and_look():
     """The page option `vehicles` (a run to load at start) goes to RS_OPTIONS as it is, and the look's vehicles section (the palette's
     colours, the profile's classes and numbers) is `vehicle_look`; every class's kind has a colour in the palette."""

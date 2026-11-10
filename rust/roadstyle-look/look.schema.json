@@ -280,7 +280,8 @@
         "bridges": {
           "$ref": "#/$defs/Bridges",
           "default": {
-            "decks_3d": false
+            "decks_3d": false,
+            "heights": null
           }
         },
         "overlays": {
@@ -1091,6 +1092,18 @@
           "description": "the raised 3D bridge decks, and the page opens tilted",
           "type": "boolean",
           "default": false
+        },
+        "heights": {
+          "description": "The full height in metres of a group of bridges (the bridge roads that touch each other), by the value of the edge id column of one of its roads (as text); the\nwhole group has it, and the engine makes its ramps for it. None: the height that the length of the group gives (`bridges.decks`).",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "number",
+            "format": "double"
+          },
+          "default": null
         }
       },
       "additionalProperties": false
