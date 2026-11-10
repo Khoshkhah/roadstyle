@@ -78,7 +78,7 @@ the ramps rise smoothly and meet the ground with no step. A map page has a 2D/3D
 and a **3D bridges** switch in the Roads box (off: the flat bridge at every zoom). Below zoom 16 the bridges are flat.
 
 The bridge roads that touch each other are one group. A longer group is higher (5 m up to 60 m of length, 22 m from 600 m; see `bridge_decks`).
-`bridge_heights={road_id: 14}` gives the whole group of that road one height when the page is made, and the engine makes the ramps for it (a tall bridge has long ramps, and a bridge of a few metres rises only as far as the grade lets it). `rsSetBridgeHeight(road, 14)` does the same live in the page, but the ramps keep the length that the engine made. With the 3D terrain on, the mesh is not drawn.
+`bridge_heights={road_id: 14}` gives the whole group of that road one height when the page is made, and the engine makes the ramps for it (a tall bridge has long ramps, and a bridge of a few metres rises only as far as the grade lets it). `rsSetBridgeHeight(road, 14)` does the same live in the page, but the ramps keep the length that the engine made. In a dashboard, the **Height** field of the Roads box (under "3D bridges", while a 3D bridge is selected) calls it. With the 3D terrain on, the mesh is not drawn.
 
 ```python
 rs.render_edges(edges, view_3d=True)                         # command line: --view-3d
