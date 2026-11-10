@@ -185,8 +185,6 @@ marks! {
     /// a chain's end nodes, as [longitude, latitude], on its first and on its last deck piece (the page reads the ground height at them)
     DeckEndA = "__rs_enda" [Decks];
     DeckEndB = "__rs_endb" [Decks];
-    /// a chain's centre line as [longitude, latitude] points, on its first deck piece: the page reads the ground height on it, so a deck and its casing share one height across their width
-    DeckLine = "__rs_line" [Decks];
     /// the drawing positions that the engine solved, under their contract names (duckOSM's columns: an input column of the name is the
     /// level input; the writers give the solved values under it, in this order, after the road's columns)
     CasingStartColumn = "casing_start";

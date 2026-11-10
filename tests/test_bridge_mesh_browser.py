@@ -65,7 +65,8 @@ def test_the_mesh_has_nothing_wrong_in_its_own_vertices_on_flat_ground_and_on_th
     page.wait_for_timeout(500)
     hills = _settled(page)
     assert hills["rows"] > 0 and hills["inverted"] == 0 and hills["tooThick"] == 0 and hills["underGround"] == 0, hills
-    assert hills["maxEndGap"] < 0.05, hills          # the free end of a deck is flush with the ground that the map draws
+    assert hills["maxEndGap"] < 0.05, hills          # the free end of a deck is at the clearance above the ground that the map draws
+    assert hills["minEndClearance"] >= 0.3, hills    # ... and never flush with it: the terrain would hide the start of the ramp (test_the_start_of_a_ramp_is_not_hidden_by_the_terrain)
     assert not [e for e in page.errors if "pageerror" in e or "Error" in e], page.errors
 
 
@@ -105,16 +106,34 @@ def test_a_click_on_a_deck_is_picked_on_the_mesh_and_the_marker_stands_on_the_de
     assert r["marker"] and abs(r["marker"][0] - x) < 25 and abs(r["marker"][1] - y) < 25, (r, x, y)
 
 
-def test_a_deck_and_its_casing_slabs_have_one_height_across_their_width(page):
-    """The ground is read on the chain's centre line: a casing slab lies to the side of its deck, where the ground is metres higher or lower on a hill, and it came off the deck
-    (tall strips beside the road) when each vertex read the ground under itself."""
+def _pixel(png, x, y):
+    import io
+
+    from PIL import Image
+    return Image.open(io.BytesIO(png)).convert("RGB").getpixel((int(round(x)), int(round(y))))
+
+
+def test_the_start_of_a_ramp_is_not_hidden_by_the_terrain(page):
+    """Where the deck is only centimetres above the ground (the start of a ramp, 8 m from a free end), the terrain that the map draws is a mesh a few centimetres from the
+    exact ground, and it hid the deck: the ramp seemed to start with a flat cut. The check is on what is drawn: the pixel of the deck there is not the colour of the ground."""
     page.evaluate("rsTerrain(true)")
     _settled(page)
-    worst = page.evaluate("""()=>{ const top=(k,mz)=>{ const [a,b]=_bmRanges[k]; let m=-1e9; for(let v=a; v<b; v++) m=Math.max(m,_bmPosArr[v*3+2]/mz); return m; };
-        let worst=0, pairs=0;
-        _bmFeats.forEach((f,k)=>{ const p=f.properties; if(!p.__rs_casing_slab) return; const [a,b]=_bmRanges[k]; if(b<=a) return;
-          const j=_bmFeats.findIndex((g,i)=>!g.properties.__rs_casing_slab && g.properties.__rs_chain===p.__rs_chain && g.properties.__rs_s0===p.__rs_s0 && _bmRanges[i][1]>_bmRanges[i][0]); if(j<0) return;
-          const lat=f.geometry.coordinates[0][0][1], mz=maplibregl.MercatorCoordinate.fromLngLat([18,lat]).meterInMercatorCoordinateUnits();
-          worst=Math.max(worst, Math.abs(top(k,mz)-top(j,mz))); pairs++; });
-        return {worst, pairs}; }""")
-    assert worst["pairs"] > 10 and worst["worst"] < 1.0, worst        # the slab's top is within the slab's own thickness of the deck's top
+    spots = page.evaluate("""()=>{ const out=[];
+        _bmFeats.forEach(f=>{ const p=f.properties; if(p.__rs_casing_slab) return;
+          for(const [end,lift,fromStart] of [[p.__rs_enda,p.__rs_lift0,true],[p.__rs_endb,p.__rs_lift1,false]]) if(end && lift<1e-3){
+            // the pieces of this chain (one side), from the free end: the fourth is about 8 m from it
+            const edge=p.__rs_edges[0], ps=_bmFeats.filter(g=>!g.properties.__rs_casing_slab && g.properties.__rs_chain===p.__rs_chain && g.properties.__rs_edges[0]===edge).sort((a,b)=>fromStart? a.properties.__rs_s0-b.properties.__rs_s0 : b.properties.__rs_s0-a.properties.__rs_s0);
+            const q=ps[3]; if(!q) continue;
+            const r=q.geometry.coordinates[0], n=r.length-1; let x=0,y=0; for(let i=0;i<n;i++){x+=r[i][0];y+=r[i][1];}
+            out.push({c:[x/n,y/n], road:edge}); } });
+        return out.slice(0,3); }""")
+    assert spots, "no free end with a ramp"
+    for sp in spots:
+        page.evaluate("(c)=>map.jumpTo({center: c, zoom: 18.6, pitch: 58, bearing: 20})", sp["c"])
+        _settled(page)
+        page.wait_for_timeout(1500)
+        x, y = page.evaluate("(a)=>{ const z=_bmDeckZ(a.c[0],a.c[1],a.road), g=_bmElev(a.c); return _bmProject(a.c[0],a.c[1],g+z); }", sp)
+        png = page.screenshot()
+        bg = _pixel(png, 1150, 780)
+        deck = _pixel(png, x, y)
+        assert sum(abs(a - b) for a, b in zip(deck, bg, strict=True)) > 30, (sp, deck, bg)     # the deck is there, not the ground

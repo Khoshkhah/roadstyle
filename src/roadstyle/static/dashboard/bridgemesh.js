@@ -11,6 +11,7 @@ import {map, O, RS_PREFIX, style, _src, _sfeats, _emit} from "./core.js";
 
 const _bmId = () => RS_PREFIX + "roads-bridge-mesh";
 const _bmDeck = () => RS_PREFIX + "roads-bridge-decks", _bmCasing = () => RS_PREFIX + "roads-deck-casing";
+const _BM_CLEAR = 0.3, _BM_CLEAR_SLOPE = 2.5;       // metres above the terrain where the deck meets it: this, and this for each metre of slope
 const _bmM = 40075016.686;                           // the metres round the equator
 const _bmLight = [-0.4, 0.5, 0.75];                  // the light of the walls (fixed on the map)
 const _BM_VS = "attribute vec3 a_pos; attribute float a_shade; attribute vec4 a_col; uniform mat4 u_m; varying vec4 v_col;" +
@@ -23,9 +24,8 @@ let _bmOrig = new Map();                             // feature id -> [base, hei
 let _bmHeights = new Map();                          // group -> the metres that the person set
 let _bmShown = null;                                 // the ids of the features that the filters show (filter.js); null: all
 let _bmGeom = true, _bmDirty = new Set(), _bmAll = true;
-let _bmLines = new Map();                            // chain -> its centre line {pts, cum (metres), len}
 let _bmEnds = new Map(), _bmMiss = false, _bmRetry = 0;   // chain -> {za, zb} the ground at its two ends (terrain on), a height that was not there yet, the tries
-let _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0};   // what the last build found wrong in its own vertices (`_bmStats`)
+let _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9};   // what the last build found wrong in its own vertices (`_bmStats`)
 let _bmPosArr = null, _bmBounds = null;               // the vertices (mercator units from the origin) for the pick, and the bounds of each feature
 let _bmGl = null, _bmProg = null, _bmBuf = {}, _bmLoc = {}, _bmOrigin = [0, 0], _bmOp = null, _bmPatched = null;
 
@@ -101,18 +101,13 @@ const _bmElev = c => {
   if(e == null){ _bmMiss = true; return null; }
   return e;
 };
-// a chain's centre line with its distances (metres), and the point of it at a place along it (0 to 1): the ground height is read there, on the centre, so a deck and its
-// casing slabs (which lie to the side) get one height across their width
-function _bmLineOf(pts){
-  const k = Math.cos(pts[0][1] * Math.PI / 180) * 111320, cum = [0];
-  for(let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot((pts[i][0] - pts[i - 1][0]) * k, (pts[i][1] - pts[i - 1][1]) * 111320));
-  return {pts, cum, len: cum[cum.length - 1]};
-}
-function _bmLinePoint(ln, s){
-  const d = Math.max(0, Math.min(1, s)) * ln.len; let i = 1;
-  while(i < ln.pts.length - 1 && ln.cum[i] < d) i++;
-  const t = (d - ln.cum[i - 1]) / ((ln.cum[i] - ln.cum[i - 1]) || 1), a = ln.pts[i - 1], b = ln.pts[i];
-  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+// how far above the exact ground a deck stands where it meets the terrain (see the height of a vertex): more on a steep slope, where the terrain mesh differs most from the
+// ground. The slope is read from the same tiles, 4 m to each side; null where a tile has not come
+function _bmClearance(c){
+  const dx = 4 / (111320 * Math.cos(c[1] * Math.PI / 180)), dy = 4 / 111320;
+  const e1 = _bmDemAt(c[0] + dx, c[1]), e2 = _bmDemAt(c[0] - dx, c[1]), e3 = _bmDemAt(c[0], c[1] + dy), e4 = _bmDemAt(c[0], c[1] - dy);
+  if(e1 == null || e2 == null || e3 == null || e4 == null){ _bmMiss = true; return null; }
+  return _BM_CLEAR + _BM_CLEAR_SLOPE * Math.hypot((e1 - e2) / 8, (e3 - e4) / 8);
 }
 // the vertices of every feature: the position (metres from the origin, in mercator units), the shade of its face and, later, its colour
 function _bmBuild(){
@@ -121,14 +116,13 @@ function _bmBuild(){
   let o = null;
   // the ground at the two end nodes of each chain (the terrain on): the deck is level between them. The nodes are the engine's (`__rs_enda`, `__rs_endb`), the same
   // coordinates for the chains that meet at a node, so they agree on its height
-  _bmEnds = new Map(); _bmLines = new Map(); _bmMiss = false; _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0};
+  _bmEnds = new Map(); _bmMiss = false; _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9};
   if(map.getTerrain()){
     const e = new Map();
     _bmFeats.forEach(f => { const p = f.properties; if(p.__rs_casing_slab || !(p.__rs_enda || p.__rs_endb)) return;
       let c = e.get(p.__rs_chain); if(!c) e.set(p.__rs_chain, c = {a: null, b: null});
       if(p.__rs_enda) c.a = p.__rs_enda;
-      if(p.__rs_endb) c.b = p.__rs_endb;
-      if(p.__rs_line) _bmLines.set(p.__rs_chain, _bmLineOf(p.__rs_line)); });
+      if(p.__rs_endb) c.b = p.__rs_endb; });
     e.forEach((c, k) => _bmEnds.set(k, {za: c.a ? _bmElev(c.a) : null, zb: c.b ? _bmElev(c.b) : null}));
   }
   const push = (x, y, z, sh) => { pos.push(x, y, z); shade.push(sh); };
@@ -150,37 +144,39 @@ function _bmBuild(){
     const ce = _bmEnds.get(p.__rs_chain);          // the terrain on: the level line between the ground at the two ends of the chain
     if(map.getTerrain() && (!ce || ce.za == null || ce.zb == null)){ _bmMiss = true; _bmRanges.push([first, first]); return; }    // no height yet: not drawn
     const zg = i => ce ? ce.za + (ce.zb - ce.za) * (p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0)) : 0;
-    // THE HEIGHT OF A VERTEX: the ground under it blends into the level line plus the group's height as the lift rises, so a ramp follows the local terrain at its
-    // free end (flush with it) and a hill that bulges above the level line does not bury it; without terrain the ground is 0 and this is H * lift.
-    const G = [];
-    const ln = ce ? _bmLines.get(p.__rs_chain) : null;
-    for(let i = 0; i < m; i++){
-      const sI = p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0), g = !ce ? 0 : ln ? _bmElev(_bmLinePoint(ln, sI)) : null;
-      if(g == null){ _bmMiss = true; _bmRanges.push([first, first]); return; }
-      G.push(g);
+    // THE HEIGHT OF A VERTEX: the ground under it (on each side of the deck's width: a hill slopes sideways too) blends into the level line plus the group's height as the lift
+    // rises, so near the ground the deck follows the terrain (and is not buried on the uphill side) and from the plateau up it is level across its width; without terrain the
+    // ground is 0 and this is H * lift. A small clearance keeps the start of the ramp above the terrain that the map draws (a mesh, a few centimetres from the exact ground,
+    // more on a steep slope, which would otherwise win the depth test and hide the ramp); it fades out as the deck rises.
+    const GS = [[], []], CL = [[], []];
+    for(const [sd, side] of [[0, A], [1, B]]) for(let i = 0; i < m; i++){
+      const g = ce ? _bmElev(side[i]) : 0, cl = ce ? _bmClearance(side[i]) : 0;
+      if(g == null || cl == null){ _bmMiss = true; _bmRanges.push([first, first]); return; }
+      GS[sd].push(g); CL[sd].push(cl);
     }
-    const base = i => { const s3 = L(i); return G[i] * (1 - s3) + (zg(i) + H) * s3; };
-    const top = i => base(i) + (cas ? 0.35 * th : th) * thin(i), bot = i => cas ? Math.max(G[i], base(i) - 0.5) : base(i);
-    if(ce){ const mid = m >> 1; adj[k] = [bot(mid) - G[mid], top(mid) - G[mid]]; }
+    const base = (i, sd) => { const s3 = L(i); return GS[sd][i] * (1 - s3) + (zg(i) + H) * s3 + CL[sd][i] * (1 - s3); };
+    const top = (i, sd) => base(i, sd) + (cas ? 0.35 * th : th) * thin(i);
+    const bot = (i, sd) => cas ? Math.max(ce ? -1e9 : 0, base(i, sd) - 0.5) : base(i, sd);       // below the ground on the terrain is inside the hill: hidden, not cut
+    if(ce){ const mid = m >> 1, g = (GS[0][mid] + GS[1][mid]) / 2; adj[k] = [(bot(mid, 0) + bot(mid, 1)) / 2 - g, (top(mid, 0) + top(mid, 1)) / 2 - g]; }
     // the checks of the mesh (see _bmStats): a slab with its top under its bottom, a slab or a deck much thicker than it is made, a top under the ground
-    for(let i = 0; i < m; i++){
-      const t = top(i), bo = bot(i), thick = t - bo, made = (cas ? 0.35 * th + 0.5 : th) + 0.01;
+    for(let i = 0; i < m; i++) for(const sd of [0, 1]){
+      const t = top(i, sd), bo = bot(i, sd), thick = t - bo, made = (cas ? 0.35 * th + 0.5 : th) + 0.01;
       if(thick < -0.01) _bmStat.inverted++;
       if(thick > made + 0.05) _bmStat.tooThick++;
-      if(t < G[i] - 0.05) _bmStat.underGround++;
-      if(!cas && L(i) < 1e-3) _bmStat.maxEndGap = Math.max(_bmStat.maxEndGap, Math.abs(base(i) - G[i]));      // a deck's free end is flush with the ground
+      if(t < GS[sd][i] - 0.05) _bmStat.underGround++;
+      if(!cas && L(i) < 1e-3){ _bmStat.maxEndGap = Math.max(_bmStat.maxEndGap, Math.abs(base(i, sd) - GS[sd][i] - CL[sd][i])); _bmStat.minEndClearance = Math.min(_bmStat.minEndClearance, base(i, sd) - GS[sd][i]); }      // a deck's free end is at the clearance above the ground
       _bmStat.rows++;
     }
     const v = (c, z) => { const q = _bmMerc(c[0], c[1]); return [q[0] - o[0], q[1] - o[1], z * mz]; };
     const quad = (a, b, c, d, sh) => { [a, b, c, a, c, d].forEach(q => push(q[0], q[1], q[2], sh)); };
     for(let i = 0; i < m - 1; i++){
-      quad(v(A[i], top(i)), v(A[i + 1], top(i + 1)), v(B[i + 1], top(i + 1)), v(B[i], top(i)), 1);            // the top, sloped
+      quad(v(A[i], top(i, 0)), v(A[i + 1], top(i + 1, 0)), v(B[i + 1], top(i + 1, 1)), v(B[i], top(i, 1)), 1);            // the top, sloped
       // the bottom: not where the slab is thin (its bottom and its top are then in one place, and the card draws one or the other in teeth)
-      if(top(i) - bot(i) > 0.3 || top(i + 1) - bot(i + 1) > 0.3) quad(v(A[i], bot(i)), v(A[i + 1], bot(i + 1)), v(B[i + 1], bot(i + 1)), v(B[i], bot(i)), 0.45);
-      for(const S of [A, B]){                                                                                  // the two walls
+      if(top(i, 0) - bot(i, 0) > 0.3 || top(i + 1, 0) - bot(i + 1, 0) > 0.3) quad(v(A[i], bot(i, 0)), v(A[i + 1], bot(i + 1, 0)), v(B[i + 1], bot(i + 1, 1)), v(B[i], bot(i, 1)), 0.45);
+      for(const [sd, S] of [[0, A], [1, B]]){                                                                                  // the two walls
         const dx = (S[i + 1][0] - S[i][0]) * cos, dy = S[i + 1][1] - S[i][1], d = Math.hypot(dx, dy) || 1;
         const sh = 0.6 + 0.3 * Math.abs((dy / d) * _bmLight[0] - (dx / d) * _bmLight[1]);
-        quad(v(S[i], top(i)), v(S[i + 1], top(i + 1)), v(S[i + 1], bot(i + 1)), v(S[i], bot(i)), sh);
+        quad(v(S[i], top(i, sd)), v(S[i + 1], top(i + 1, sd)), v(S[i + 1], bot(i + 1, sd)), v(S[i], bot(i, sd)), sh);
       }
     }
     _bmRanges.push([first, shade.length]);
@@ -338,7 +334,7 @@ export function _bmDeckZ(lng, lat, road){
   const here = _bmElev([lng, lat]);
   if(ce && (ce.za == null || ce.zb == null || here == null)) return null;      // no height yet: not on the deck
   // the deck's height over the ground under the marker: the ground blends into the level line plus the group's height by the lift (as the mesh does)
-  const level = ce ? ce.za + (ce.zb - ce.za) * (best.__rs_s0 + best.__rs_s1) / 2 : 0, rise = (level + _bmHeight(best) - (ce ? here : 0)) * L;
+  const level = ce ? ce.za + (ce.zb - ce.za) * (best.__rs_s0 + best.__rs_s1) / 2 : 0, rise = (level + _bmHeight(best) - (ce ? here : 0)) * L + (ce ? (_bmClearance([lng, lat]) ?? _BM_CLEAR) * (1 - L) : 0);
   return rise + best.__rs_thick * Math.min(1, 2 * L);
 }
 // where a point at `metres` above sea level is on the screen (CSS px), drawn as the mesh is: with the matrix that the mesh layer gets
@@ -463,6 +459,6 @@ export function rsSetBridges3D(on){
 }
 // whether the page has 3D decks (it was made with view_3d)
 export const _bmHas = () => !!_bmSrc() && !!map.getSource(_bmSrc());
-// what the last build found wrong in its own vertices: {rows, inverted (a slab whose top is under its bottom), tooThick, underGround (a top under the ground), maxEndGap (metres between a free end and the ground)}; for the tests
+// what the last build found wrong in its own vertices: {rows, inverted (a slab whose top is under its bottom), tooThick, underGround (a top under the ground), maxEndGap (metres between a free end and the ground plus the clearance), minEndClearance (the least height of a free end above the ground)}; for the tests
 export const _bmStats = () => ({..._bmStat});
 export function initBridgeApi(){ window.rsSetBridges3D = rsSetBridges3D; window.rsBridgeGroups = rsBridgeGroups; window.rsSetBridgeHeight = rsSetBridgeHeight; window.rsBridgeHeight = rsBridgeHeight; }

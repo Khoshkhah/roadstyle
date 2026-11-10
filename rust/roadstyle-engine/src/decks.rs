@@ -413,7 +413,6 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
             // the chain's end nodes (on its first and last piece): the page reads the ground height at them, so chains that meet at a node agree
             if d0 <= 1e-9 {
                 props.insert(Mark::DeckEndA.name().into(), json!([round_to(ch.pts[0][0], 7), round_to(ch.pts[0][1], 7)]));
-                props.insert(Mark::DeckLine.name().into(), json!(ch.pts.iter().map(|q| [round_to(q[0], 7), round_to(q[1], 7)]).collect::<Vec<_>>()));
             }
             if d1 >= l - 1e-9 {
                 let z = ch.pts[ch.pts.len() - 1];
