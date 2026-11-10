@@ -19,8 +19,8 @@ Do these steps in the [Google Cloud console](https://console.cloud.google.com/).
 1. Select a project, or make a new project.
 2. Open **Billing** and link a billing account to the project. Google needs billing also for the
    free monthly use.
-3. Open **APIs & Services → Library**, find **Maps JavaScript API**, and click **Enable**. This is
-   the only API that roadstyle uses.
+3. Open **APIs & Services → Library**, find **Maps JavaScript API**, and click **Enable**. Do the same for **Maps Embed API** (it is used by Classic). These are
+   the only APIs that roadstyle uses.
 4. Open **APIs & Services → Credentials** and click **Create credentials → API key**.
 5. Click the name of the new key to edit it.
 
@@ -38,7 +38,7 @@ Each page has the key in its HTML. Each person who opens the page can read the k
     | GitHub Pages, repository `maps` of user `name` | `https://name.github.io/maps/*` |
     | your own site | `https://www.example.com/*` |
 
-3. Under **API restrictions**, select **Restrict key** and select **Maps JavaScript API**.
+3. Under **API restrictions**, select **Restrict key** and select **Maps JavaScript API** and **Maps Embed API**.
 4. Click **Save**. Google can need up to 5 minutes before the new settings work.
 
 !!! note "Each port is a different address"

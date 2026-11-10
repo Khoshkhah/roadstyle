@@ -222,15 +222,15 @@ def test_coverage_lines_are_cut_at_the_edge_of_the_area():
     assert got["tri"] == [[[0, 2], [8, 2]]] and got["pin"] == [True, False]          # a boundary that is not a rectangle cuts to its own shape
 
 
-def test_google_classic_is_a_link_and_never_a_frame(tmp_path, monkeypatch):
-    # Google answers its keyless embed with 404 and x-frame-options SAMEORIGIN: a frame shows "refused to connect".
-    # A served page (not file://) with no key is Classic.
+def _served_classic(tmp_path, monkeypatch, key):
+    """A served dashboard (not file://), a road picked, the window open; returns what the window shows. key: the Google key or None."""
     import functools
     import http.server
     import threading
 
-    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)                      # no key: Classic is the only mode
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False).save(tmp_path / "d.html")
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    kw = {"street_view_key": key} if key else {}
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False, **kw).save(tmp_path / "d.html")
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(tmp_path))
     handler.log_message = lambda *a: None
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
@@ -240,6 +240,9 @@ def test_google_classic_is_a_link_and_never_a_frame(tmp_path, monkeypatch):
             browser = p.chromium.launch()
             try:
                 page = browser.new_page(viewport={"width": 1280, "height": 800})
+                page.route("https://www.google.com/**", lambda r: r.fulfill(body="<html></html>", content_type="text/html"))
+                page.route("https://maps.googleapis.com/**", lambda r: r.abort())
+                page.add_init_script("localStorage.setItem('rs-street-view-mode', 'classic')")
                 page.goto(f"http://127.0.0.1:{srv.server_port}/d.html")
                 page.wait_for_function("window.map && map.loaded()")
                 xy = page.evaluate("(() => { const p = map.project([18.0, 59.305]); const r = map.getCanvas().getBoundingClientRect(); return [r.left + p.x, r.top + p.y]; })()")
@@ -248,11 +251,28 @@ def test_google_classic_is_a_link_and_never_a_frame(tmp_path, monkeypatch):
                 page.wait_for_function("map.getCanvas().style.cursor === 'pointer'", timeout=5000)
                 page.mouse.click(*xy)
                 page.evaluate("rsSetStreetView(true)")
-                page.wait_for_selector(".rs-svw-msg a[href*='google.com/maps']")
-                assert page.locator(".rs-svw iframe").is_hidden()
-                assert "google.com/maps/embed" not in page.content()
-                assert "google.com/maps" in page.get_attribute(".rs-svw-msg a[href*='google.com/maps']", "href")
+                if key:
+                    page.wait_for_selector(".rs-svw:not(.rs-g3d) iframe[src]", state="attached")
+                else:
+                    page.wait_for_selector(".rs-svw-msg a[href*='google.com/maps']")
+                return page.evaluate("""(() => { const w = document.querySelector('.rs-svw:not(.rs-g3d)'), f = w.querySelector('iframe'), o = w.querySelector('.rs-svw-open');
+                    return {src: f.getAttribute('src'), frameShown: !f.hidden, credentialless: f.hasAttribute('credentialless'), openShown: !o.hidden, openHref: o.href,
+                            msgLink: !!w.querySelector('.rs-svw-msg a[href*="google.com/maps"]') && !w.querySelector('.rs-svw-msg').hidden}; })()""")
             finally:
                 browser.close()
     finally:
         srv.shutdown()
+
+
+def test_google_classic_without_a_key_is_a_link_and_never_a_frame(tmp_path, monkeypatch):
+    # Google answers its keyless embed with 404 and x-frame-options SAMEORIGIN: a frame shows "refused to connect"
+    r = _served_classic(tmp_path, monkeypatch, None)
+    assert not r["frameShown"] and not r["src"] and r["msgLink"]
+
+
+def test_google_classic_with_a_key_is_the_embed_api_in_a_credentialless_frame(tmp_path, monkeypatch):
+    # the Maps Embed API is made for frames; `credentialless` lets it load on a page with COEP require-corp; the link stays beside it
+    r = _served_classic(tmp_path, monkeypatch, "KEY123")
+    assert r["src"].startswith("https://www.google.com/maps/embed/v1/streetview?key=KEY123&location=59.3")
+    assert "&heading=" in r["src"] and r["frameShown"] and r["credentialless"]
+    assert r["openShown"] and "google.com/maps" in r["openHref"]

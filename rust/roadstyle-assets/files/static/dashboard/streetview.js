@@ -46,15 +46,16 @@ export function initStreetView(){
       '<button type="button" class="rs-svw-cov" title="Coverage on the map: where this provider has photos" aria-label="Coverage on the map" hidden>'+SV_COV_ICON+'</button>'+
       '<span class="rs-svw-mode" hidden><button type="button" data-m="linked" title="The map marker walks and turns with you; Google\'s street photos only">Linked</button>'+
       '<button type="button" data-m="classic" title="Google\'s plain Street View: the marker stays where you clicked">Classic</button></span>'+
+      '<a class="rs-svw-open" target="_blank" rel="noopener" title="Open this spot in Google Maps" hidden>Google Maps \u2197</a>'+
       '<span class="rs-svw-step"><button type="button" data-step="-15" title="Back 15 m along the road">\u25c0</button>'+
       '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button></span>'+
       '<button type="button" class="rs-svw-x" title="Close">\u2715</button></div>'+
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
-      '<iframe title="Google Street View" allowfullscreen hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>';
+      '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
           fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"), flip=w.querySelector(".rs-svw-mode"),
-          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov");
+          openA=w.querySelector(".rs-svw-open"), provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov");
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked or Classic, remembered in this browser (the same choice as the Street View page's)
     const MODE_KEY="rs-street-view-mode";
@@ -150,6 +151,7 @@ export function initStreetView(){
     };
     let last=null, btn=null, ctlRef=null, ahead=false, exact=false;                   // the latest road selection: {name, url}
     const show=()=>{
+      openA.hidden=true;
       if(w.hidden || !last) return;
       ttl.textContent=last.name;
       if(prov!=="google") return showAlt();
@@ -160,12 +162,18 @@ export function initStreetView(){
           "<span>Run <code>python -m http.server</code> in its folder and open it from localhost.</span>"+
           '<a href="'+_esc(last.url)+'" target="_blank" rel="noopener">Open this spot in Google Maps \u2197</a>';
         return; }
-      // Google no longer serves a keyless embed (HTTP 404, x-frame-options SAMEORIGIN), so Classic is a link
-      const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(",");
-      const link=()=>note("<b>Google does not allow this page to show Classic Street View.</b>"+
+      // Classic: Google's Maps Embed API (made for frames) needs the key. No key, or the Linked script failed: a link instead.
+      // `credentialless` (set in the template, before any src) lets the frame load on a page with COEP require-corp; other browsers ignore it.
+      const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=u.searchParams.get("heading")||0;
+      const link=()=>note("<b>Google does not allow this page to show Classic Street View without a key.</b>"+
         '<a href="'+_esc(last.url)+'" target="_blank" rel="noopener">Open this spot in Google Maps \u2197</a>');
-      if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); link(); }); return; }
-      link();
+      const embed=()=>{
+        const src="https://www.google.com/maps/embed/v1/streetview?key="+encodeURIComponent(_svKey)+"&location="+vp[0]+","+vp[1]+"&heading="+h+"&pitch=0&fov=90";
+        if(fr.getAttribute("src")!==src) fr.src=src;
+        fr.hidden=false; msg.hidden=true; hideP(); openA.href=last.url; openA.hidden=false; };   // the link stays: a refused frame has no event
+      if(!_svKey) return link();
+      if(mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], h).catch(e=>{ console.warn("rs street view:", e); link(); }); return; }
+      embed();
     };
     const steps=[...bar.querySelectorAll("button[data-step]")];
     const ends=(a, z)=>{ steps[0].disabled=!!a; steps[1].disabled=!!z; };

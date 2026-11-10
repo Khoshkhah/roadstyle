@@ -66,12 +66,12 @@
     <button type="button" class="sv-step" data-step="-15" title="Back 15 m along the road" disabled>&#9664;</button>
     <button type="button" class="sv-step" data-step="15" title="Forward 15 m along the road" disabled>&#9654;</button></div>
   <div id="sv-empty">Street View opens here, looking the way the clicked road runs.</div>
-  <iframe id="sv-frame" title="Google Street View" hidden allowfullscreen></iframe>
+  <iframe id="sv-frame" title="Google Street View" hidden allowfullscreen credentialless></iframe>
   <div id="sv-pano" hidden></div>
 </div>
 <script>
 (function () {
-  // Google no longer serves a keyless embed (HTTP 404, x-frame-options SAMEORIGIN), so Classic is a link
+  // Google no longer serves a keyless embed (HTTP 404, x-frame-options SAMEORIGIN), so Classic needs the key (Maps Embed API) and is a link without one
   const link = url => { frame.hidden = true; hideP(); empty.hidden = false;
     empty.innerHTML = "<b>Google does not allow this page to show Classic Street View.</b>" +
       '<a href="' + esc(url) + '" target="_blank" rel="noopener">Open this spot in Google Maps &#8599;</a>'; };
@@ -173,7 +173,10 @@
       panoAt(lat, lng, u.searchParams.get("heading") || 0).catch(() => link(d.streetView));
       return;
     }
-    link(d.streetView);
+    if (!GKEY) return link(d.streetView);
+    frame.src = "https://www.google.com/maps/embed/v1/streetview?key=" + encodeURIComponent(GKEY) + "&location=" + lat + "," + lng +
+      "&heading=" + (u.searchParams.get("heading") || 0) + "&pitch=0&fov=90";
+    frame.hidden = false; empty.hidden = true; hideP();
   }
 
   // the divider (resizable=False removes it): the panel width follows the pointer, 20%..80% of
