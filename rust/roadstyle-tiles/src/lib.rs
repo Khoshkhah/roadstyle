@@ -19,6 +19,7 @@ pub mod codes;
 pub mod pmtiles;
 pub mod rules;
 pub mod stage;
+pub mod terrain;
 mod geom;
 mod layer;
 mod mlt;

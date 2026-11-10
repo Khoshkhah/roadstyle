@@ -92,6 +92,35 @@ def read(db, mode: str = "all", *, levels: str = "stored", layers=True, only: bo
     return roads, features, level_kw
 
 
+def ground(db) -> dict | None:
+    """The page option ``ground`` of the duckOSM file ``db`` (docs/design/ground_terrain.md): the ground's facts from
+    ``main.elevation_metadata`` (the row of ``ele``) and ``terrain``, the area's terrain file made by the engine from
+    ``main.elevation_grid`` (Terrarium PNG tiles in one PMTiles archive), embedded as a ``data:`` URL. None when the file has no
+    ground grid: the page then draws the AWS Terrain Tiles and says so."""
+    import base64
+
+    import duckdb
+
+    from ._engine import rust
+
+    con = duckdb.connect(str(db), read_only=True)
+    try:
+        tables = {r[0] for r in con.execute("SELECT table_name FROM duckdb_tables() WHERE schema_name = 'main'").fetchall()}
+        if "elevation_grid" not in tables:
+            return None
+        col, row, lon, lat, z = con.execute("SELECT col, row, lon, lat, coalesce(z, 'NaN'::DOUBLE) FROM main.elevation_grid").fetchnumpy().values()
+        facts = {}
+        if "elevation_metadata" in tables:
+            cur = con.execute("SELECT * FROM main.elevation_metadata WHERE coalesce(ele_column, 'ele') = 'ele' LIMIT 1")
+            names, found = [d[0] for d in cur.description], cur.fetchone()
+            facts = dict(zip(names, found, strict=True)) if found else {}
+    finally:
+        con.close()
+    g = {"id": facts.get("sha256"), **{k: facts.get(k) for k in ("source", "product", "vertical_datum", "resolution_m", "license")}}
+    archive = rust().terrain_pmtiles(col.tolist(), row.tolist(), lon.tolist(), lat.tolist(), z.tolist(), json.dumps(g))
+    return {**g, "terrain": "data:application/vnd.pmtiles;base64," + base64.b64encode(archive).decode()}
+
+
 def look(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google", levels=None, **kwargs):
     """The look of the map of the duckOSM file ``db`` (the Rust engine's ``Look``): the base map's look of ``mode``, ``theme`` and
     ``paths`` (mapstyle's mode_settings and styles), render_map's map options (the name from the file's name, the tooltip, the reader's
@@ -148,6 +177,8 @@ def page(db, mode: str = "all", *, theme: str = "liberty", paths: str = "google"
               "color_options": {"Road class": {}, "Modes": {"color_by": "modes", "colors": colors}}, **kw}
     else:
         kw = {"template": "dashboard", "dashboard": {"panel": None}, **kw}
+    if "ground" not in kw:
+        kw["ground"] = ground(db)                    # the area's own ground when the file has one (the standard "The ground reference")
     o = _options(db, mode, theme, paths, level_kw, kw)
     lk = rust().resolve_look(json.dumps(o))
     # the look's base maps (blank, in the theme's land colour, and the switcher's), where the caller gives none: the keys that Python resolves
