@@ -220,3 +220,20 @@ def test_coverage_lines_are_cut_at_the_edge_of_the_area():
     assert got["cut"] == [[[0, 5], [5, 5], [10, 5]]] and got["out"] == []
     assert len(got["twice"]) == 2
     assert got["tri"] == [[[0, 2], [8, 2]]] and got["pin"] == [True, False]          # a boundary that is not a rectangle cuts to its own shape
+
+
+@pytest.mark.parametrize("steps, popups", [("", 1), ("rsSetStreetView(true)", 0), ("rsSetStreetView(true); rsSetStreetView(false)", 1)])
+def test_no_road_popup_while_street_view_is_open(tmp_path, steps, popups):
+    path = tmp_path / "d.html"
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window").save(path)        # road_popup stays on (the default)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            page.evaluate(steps or "0")
+            page.wait_for_timeout(200)
+            page.evaluate("rsSelect(rsQuery(p => p.name)[5])")
+            page.wait_for_timeout(300)
+            assert page.evaluate("document.querySelectorAll('.maplibregl-popup').length") == popups      # open: the road is selected, with no popup
+            assert not errors
+        finally:
+            browser.close()
