@@ -52,6 +52,7 @@ const COLS = {
   "SELECT bad_id FROM bad": {columns: [["bad_id", "BIGINT"]], rows: [[1n]]},
   "SELECT empty_id FROM empty": {columns: [["empty_id", "BIGINT"]], rows: [[1n]]},
   "SELECT broken_id FROM broken": {columns: [["broken_id", "BIGINT"]], rows: [[1n]]},
+  "SELECT shop_id FROM shops": {columns: [["shop_id", "BIGINT"]], rows: [[41n], [42n]]},
   "SELECT 1 AS one": {columns: [["one", "INTEGER"]], rows: [[1]]},
 };
 const strip = s => s.trim().replace(/;\\s*$/, "");
@@ -78,6 +79,8 @@ function answer(sql){
   if((m = sql.match(/^SELECT p\\.pair_id AS id, p\\.parts AS geom, p\\.label FROM pairs p WHERE p\\.pair_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/))) {
     const r = answer(m[2]), i = r.columns.findIndex(c => c.name === m[1]), ids = new Set(r.rows.map(x => x[i]));
     return {columns: ["id", "geom", "label"].map(name => ({name, type: "VARCHAR"})), rows: PAIRS.filter(x => ids.has(x[0]))}; }
+  if((m = sql.match(/^SELECT s\\.shop_id AS id, s\\.geom FROM shops s WHERE s\\.shop_id IN \\(SELECT "(\\w+)" FROM \\(([\\s\\S]*)\\) AS rs_k\\)$/)))
+    return {columns: ["id", "geom"].map(name => ({name, type: "VARCHAR"})), rows: [[41n, '{"type":"Point","coordinates":[18.011,59.305]}'], [42n, '{"type":"Point","coordinates":[18.012,59.305]}']]};
   if(/FROM rs_roads WHERE/.test(sql)) return {columns: [{name: "edge_id", type: "BIGINT"}], rows: []};      // no road has an osm_id of a node
   const c = COLS[strip(sql)];
   if(!c) throw new Error("Binder Error: unknown SQL");
@@ -85,52 +88,54 @@ function answer(sql){
 }
 window.queries = []; window.events = []; window.gotIds = null; window.gotColumn = null; window.aborted = false;
 const square = (id) => { const x = 18 + Number(BigInt(id) % 1000n) / 10000, y = 59.3 + Number((BigInt(id) / 1000n) % 100n) * 0.001; return {type: "Polygon", coordinates: [[[x, y], [x + 0.00008, y], [x + 0.00008, y + 0.00008], [x, y + 0.00008], [x, y]]]}; };
+window.kindCalls = 0; window.lateKinds = {};
+const HOST_KINDS = {
+  lane: {label: "Lane", idColumns: ["osm_id"], needs: ["lane_num"],      // a candidate only for a result that also has lane_num
+    geometryBy: (sql, column) => `SELECT l.osm_id AS id, l.geom, l.lane_num FROM lanes l WHERE l.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+  node: {label: "Node", idColumns: ["node_id", "osm_id"],
+    geometryBy: (sql, column) => `SELECT n.node_id AS id, n.geom, n.name, n.tags FROM nodes n WHERE n.node_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+  building: {label: "Building", idColumns: ["osm_id"],
+    geometryBy: (sql, column) => `SELECT b.osm_id AS id, b.geom, b.name FROM buildings b WHERE b.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+  way: {label: "Way", idColumns: ["osm_id"],
+    geometryBy: (sql, column) => `SELECT w.osm_id AS id, w.geom, w.name FROM ways w WHERE w.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+  cell: {label: "H3 cell", idColumns: ["h3_cell"], noShape: "a test cell with no place",
+    async geometryOf(ids, {column, signal}) {
+      window.gotIds = ids; window.gotColumn = column;
+      if(ids.includes(99999999n)){ await new Promise((ok) => { signal.addEventListener("abort", () => { window.aborted = true; ok(); }); setTimeout(ok, 5000); }); return []; }
+      return ids.filter((id) => id !== 123456n).map((id) => ({id, geom: id === 9n ? null : square(id), resolution: 8}));      // 123456 has no entry
+    },
+    card(info) {      // the card of the cell 5 is a whole card; 6 is slow; 7 fails; 8 is very slow; 10 has an action that fails; the others have the default card
+      const id = String(info.id);
+      if(id === "5") return {title: "Cell five", chip: "H3 cell \u00b7 res 8", rows: [["resolution", 8], ["empty", null]],
+        sections: [{title: "Inside", rows: [["nodes", 143], ["edges", 12]]}, {title: "Parent", rows: [["cell", "8a2a1072b59ffff"]]}],
+        action: {label: "Show cell", note: "Draws the cell on the map.", run: () => { window.actionRuns = (window.actionRuns || 0) + 1; return square(777n); }}};
+      if(id === "6") return new Promise((ok) => setTimeout(() => ok({sections: [{title: "Inside", rows: [["nodes", 7]]}]}), 600));
+      if(id === "7") return Promise.reject(new Error("the count failed"));
+      if(id === "8") return new Promise((ok) => setTimeout(() => ok({title: "Slow cell eight"}), 2500));
+      if(id === "10") return {action: {label: "Break", run: () => { throw new Error("no cell for this row"); }}};
+      return undefined;
+    }},
+  turn: {label: "Turn", idColumns: [["from_edge", "to_edge"]],      // a composite key; the parts of a turn have a role each
+    async geometryOf(ids, {column}) {
+      window.gotIds = ids; window.gotColumn = column;
+      const x = (id) => 18 + Number(id) / 1000;
+      return ids.map(([a, b]) => ({id: [a, b], turn: `${a}-${b}`, geom: [
+        {role: "from", geom: {type: "LineString", coordinates: [[x(a), 59.34], [x(a) + 0.0005, 59.34]]}},
+        {role: "via", geom: {type: "Point", coordinates: [x(a) + 0.0005, 59.34]}},
+        {role: "to", geom: {type: "LineString", coordinates: [[x(a) + 0.0005, 59.34], [x(b), 59.3405]]}},
+        ...(b === 3n ? [{role: "extra", geom: {type: "Point", coordinates: [x(b), 59.3405]}}] : [])]}));
+    }},
+  pair: {label: "Pair", idColumns: ["pair_id"],      // geometryBy: the parts come as JSON text in the second column
+    geometryBy: (sql, column) => `SELECT p.pair_id AS id, p.parts AS geom, p.label FROM pairs p WHERE p.pair_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
+  bad: {label: "Bad", idColumns: ["bad_id"], geometryOf: async () => [], geometryBy: () => "SELECT 1"},      // both functions
+  empty: {label: "Empty", idColumns: ["empty_id"]},                                                              // neither function
+  broken: {label: "Broken", idColumns: ["broken_id"], geometryBy: () => "SELECT broken"},      // its SQL fails
+};
 window.data = dataDock({
   query: async (sql) => { window.queries.push(sql); return answer(sql); },
   schema: async () => ({tables: [{name: "main.nodes", rows: 3, about: "The nodes."}]}),
   roadsBy: (sql, column) => `SELECT edge_id FROM rs_roads WHERE "${column}" IN (SELECT "${column}" FROM (${sql}) AS rs_k)`,
-  kinds: {
-    lane: {label: "Lane", idColumns: ["osm_id"], needs: ["lane_num"],      // a candidate only for a result that also has lane_num
-      geometryBy: (sql, column) => `SELECT l.osm_id AS id, l.geom, l.lane_num FROM lanes l WHERE l.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
-    node: {label: "Node", idColumns: ["node_id", "osm_id"],
-      geometryBy: (sql, column) => `SELECT n.node_id AS id, n.geom, n.name, n.tags FROM nodes n WHERE n.node_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
-    building: {label: "Building", idColumns: ["osm_id"],
-      geometryBy: (sql, column) => `SELECT b.osm_id AS id, b.geom, b.name FROM buildings b WHERE b.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
-    way: {label: "Way", idColumns: ["osm_id"],
-      geometryBy: (sql, column) => `SELECT w.osm_id AS id, w.geom, w.name FROM ways w WHERE w.osm_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
-    cell: {label: "H3 cell", idColumns: ["h3_cell"], noShape: "a test cell with no place",
-      async geometryOf(ids, {column, signal}) {
-        window.gotIds = ids; window.gotColumn = column;
-        if(ids.includes(99999999n)){ await new Promise((ok) => { signal.addEventListener("abort", () => { window.aborted = true; ok(); }); setTimeout(ok, 5000); }); return []; }
-        return ids.filter((id) => id !== 123456n).map((id) => ({id, geom: id === 9n ? null : square(id), resolution: 8}));      // 123456 has no entry
-      },
-      card(info) {      // the card of the cell 5 is a whole card; 6 is slow; 7 fails; 8 is very slow; 10 has an action that fails; the others have the default card
-        const id = String(info.id);
-        if(id === "5") return {title: "Cell five", chip: "H3 cell \u00b7 res 8", rows: [["resolution", 8], ["empty", null]],
-          sections: [{title: "Inside", rows: [["nodes", 143], ["edges", 12]]}, {title: "Parent", rows: [["cell", "8a2a1072b59ffff"]]}],
-          action: {label: "Show cell", note: "Draws the cell on the map.", run: () => { window.actionRuns = (window.actionRuns || 0) + 1; return square(777n); }}};
-        if(id === "6") return new Promise((ok) => setTimeout(() => ok({sections: [{title: "Inside", rows: [["nodes", 7]]}]}), 600));
-        if(id === "7") return Promise.reject(new Error("the count failed"));
-        if(id === "8") return new Promise((ok) => setTimeout(() => ok({title: "Slow cell eight"}), 2500));
-        if(id === "10") return {action: {label: "Break", run: () => { throw new Error("no cell for this row"); }}};
-        return undefined;
-      }},
-    turn: {label: "Turn", idColumns: [["from_edge", "to_edge"]],      // a composite key; the parts of a turn have a role each
-      async geometryOf(ids, {column}) {
-        window.gotIds = ids; window.gotColumn = column;
-        const x = (id) => 18 + Number(id) / 1000;
-        return ids.map(([a, b]) => ({id: [a, b], turn: `${a}-${b}`, geom: [
-          {role: "from", geom: {type: "LineString", coordinates: [[x(a), 59.34], [x(a) + 0.0005, 59.34]]}},
-          {role: "via", geom: {type: "Point", coordinates: [x(a) + 0.0005, 59.34]}},
-          {role: "to", geom: {type: "LineString", coordinates: [[x(a) + 0.0005, 59.34], [x(b), 59.3405]]}},
-          ...(b === 3n ? [{role: "extra", geom: {type: "Point", coordinates: [x(b), 59.3405]}}] : [])]}));
-      }},
-    pair: {label: "Pair", idColumns: ["pair_id"],      // geometryBy: the parts come as JSON text in the second column
-      geometryBy: (sql, column) => `SELECT p.pair_id AS id, p.parts AS geom, p.label FROM pairs p WHERE p.pair_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`},
-    bad: {label: "Bad", idColumns: ["bad_id"], geometryOf: async () => [], geometryBy: () => "SELECT 1"},      // both functions
-    empty: {label: "Empty", idColumns: ["empty_id"]},                                                              // neither function
-    broken: {label: "Broken", idColumns: ["broken_id"], geometryBy: () => "SELECT broken"},      // its SQL fails
-  },
+  kinds: location.hash === "#fn" ? async () => { window.kindCalls++; return {...HOST_KINDS, ...window.lateKinds}; } : HOST_KINDS,      // #fn: a function, as a host that adds tables later
   sql: "SELECT node_id, name FROM nodes",
 });
 for(const n of ["kind", "kinderror", "cardaction"]) data.addEventListener(n, (e) => window.events.push([n, e.detail]));
@@ -707,6 +712,74 @@ def test_20000_objects_draw_and_one_click_selects_one(tmp_path):
             # Reset removes the objects and the selection
             page.click("#rs-dock .rs-dd-q button[title='Reset the map and the table']")
             page.wait_for_function("map.getSource('rs-dock-kinds').serialize().data.features.length === 0 && map.getSource('rs-dock-kinds-sel').serialize().data.features.length === 0")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+# a kind that the host adds after the page has started (docs/design/dock_kinds_function.md)
+_SHOP = """window.lateKinds = {shop: {label: "Shop", idColumns: ["shop_id"],
+  geometryBy: (sql, column) => `SELECT s.shop_id AS id, s.geom FROM shops s WHERE s.shop_id IN (SELECT "${column}" FROM (${sql}) AS rs_k)`}}"""
+_SETDATA = "window.sets = 0; const src = map.getSource('rs-dock-kinds'); const sd = src.setData.bind(src); src.setData = (d) => { window.sets++; return sd(d); }; null"
+
+
+def test_a_function_gives_the_kinds_and_a_kind_added_later_is_used_for_the_next_result(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url + "#fn")
+        try:
+            page.wait_for_function("window.kindCalls >= 1")                                                      # the function is called at the start
+            page.evaluate("data.open(); data.run('SELECT shop_id FROM shops')")
+            page.wait_for_function("window.kindCalls >= 2")
+            page.wait_for_timeout(300)
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") in (None, [])                                   # no kind has shop_id yet
+            page.evaluate(_SHOP)                                                                                  # a table is added; no reload
+            page.evaluate("data.run('SELECT shop_id FROM shops')")                                                # the next result
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 2")
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds')") == ["Point:41", "Point:42"]
+            assert "Shown as Shop" in _note(page), _note(page)
+            page.click("#rs-dock tbody tr >> nth=0")                                                              # the row has its object and its card
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length === 1")
+            assert "Shop 41" in page.inner_text("#rs-dock .rs-dd-card")
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+def test_refresh_kinds_picks_the_owner_of_the_result_that_is_open(tmp_path):
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url + "#fn")
+        try:
+            page.evaluate("data.open(); data.run('SELECT shop_id FROM shops')")
+            page.wait_for_function("window.kindCalls >= 2")
+            page.wait_for_timeout(300)
+            page.evaluate(_SHOP)
+            page.evaluate("data.refreshKinds()")                                                                  # no new run
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 2")
+            assert page.evaluate("data.result().__own.name") == "shop"
+        finally:
+            browser.close()
+    assert errors == [], errors
+
+
+@pytest.mark.parametrize("hash_", ["#fn", ""])
+def test_refresh_kinds_does_not_redraw_or_lose_the_row_if_the_same_kind_still_owns_the_result(tmp_path, hash_):
+    """An array host (hash_ empty) is unchanged: refreshKinds does nothing."""
+    with served(tmp_path) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url + hash_)
+        try:
+            page.evaluate("data.open(); data.run()")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds')?.length === 3")
+            page.click("#rs-dock tbody tr >> nth=0")
+            page.wait_for_function("(" + _DRAWN + ")('rs-dock-kinds-sel')?.length === 1")
+            page.evaluate(_SETDATA)
+            page.evaluate(_SHOP)                                                                                  # a new kind that does not touch this result
+            page.evaluate("data.refreshKinds()")
+            page.wait_for_timeout(500)
+            assert page.evaluate("window.sets") == 0
+            assert page.evaluate(f"({_DRAWN})('rs-dock-kinds-sel')") == ["Point:1"]
+            assert "Node A" in page.inner_text("#rs-dock .rs-dd-card")
+            if hash_:
+                assert page.evaluate("window.kindCalls") >= 2                                                     # it did read the function
         finally:
             browser.close()
     assert errors == [], errors

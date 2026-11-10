@@ -70,7 +70,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     | `tables`, `load(t)` | none | Your page's own tables, `[{name, url, about}]`. The data dock gives each one to `load` once at the start, and a run waits for them. A table that does not load does not stop the others. |
     | `idColumn` | `"edge_id"` | The column with the road ids. |
     | `keys`, `roadsBy(sql, column)` | `["osm_id", "name"]`, none | A result with no `idColumn` finds its roads by the first of `keys` that it has: `roadsBy` gives the SQL of the road ids. |
-    | `kinds` | none | The objects of your data that are not roads: `{node: {label?, idColumns, needs?, geometryBy(sql, column) | geometryOf(ids, {column, signal}), noShape?, card?(info)}, building: {...}}` (see [Objects of a kind](#objects-of-a-kind)). |
+    | `kinds` | none | The objects of your data that are not roads: an object, or a function that returns one (see [Objects of a kind](#objects-of-a-kind)). The object is `{node: {label?, idColumns, needs?, geometryBy(sql, column) | geometryOf(ids, {column, signal}), noShape?, card?(info)}, building: {...}}` (see [Objects of a kind](#objects-of-a-kind)). |
     | `map` | `window.map` | The MapLibre map that the objects of a kind are drawn on. |
     | `sql` | `""` | The start text of the line. |
     | `label` | `"Data"` | The label of the dock. |
@@ -228,6 +228,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
     - The colours need `window.RS_DOCK` (the look's `dock` section, in the options of the page as `dock`). A page whose options have no `dock` gets an error when it draws a kind, not a guess.
     - A click on a row selects its object: the select purple (a ring for a point, a thick outline for a line or an area), and the camera moves to it (a point: zoom 18). The card has the same look as the card of a road: the title is the `name` column or "label id", the chip is the label, the other columns are rows (a `null` or empty value is left out), a column `tags` (an object, a list of `{key, value}` or JSON text) is one row for each tag, and the id has **Copy id**. The close button of the card removes the selection.
     - A change of the base map or of the theme can remove the layers of the objects: the dock puts them back.
+    - **Kinds that change.** `kinds` can be a function `() => ({node: {...}, ...})`, sync or async. The dock calls it at start and before each new result picks its kind, so a table that the host adds later is used for the next result. After the host adds a table, it calls `await data.refreshKinds()`: the dock reads the function again and picks the owner of the current result again. If the same kind still owns the result, nothing is drawn again and the selected row stays. If another kind owns it now, the card of the old object closes and the result is drawn again. Keep the function cheap: the dock calls it for each result. If it fails, the dock reports it (`console.error`, the event `kinderror` with `kind: "kinds"`) and the result has no owner. An object as `kinds` is read one time, and `refreshKinds()` does nothing then. The design is [Object kinds that change after the page starts](../design/dock_kinds_function.md).
     - The design is [Object kinds in the data dock](../design/dock_kinds.md).
 
 #### The row of a road result
