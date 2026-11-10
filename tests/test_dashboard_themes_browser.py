@@ -81,7 +81,8 @@ _PROBE = r"""([scope, dark]) => {
   return out;
 }"""
 _STEPS = [("panel", "rsSelect(rsQuery(p => p.name)[5])", "#sb"), ("panel, tab b", "document.querySelector('#tb [data-tab=b]').click()", "#sb"), ("toolbar", None, "#rs-toolbar"),
-         ("roads box", "rs.tools.open('roads')", "#rs-roads-box"), ("colour box", "rs.tools.open('legend')", "#rs-color-box"),
+         ("roads box", "rs.tools.open('roads')", "#rs-roads-box"),
+         ("roads box, a 3D bridge selected", "rsSelect(rsQuery(p => p.bridge === 'yes')[0]); rs.tools.open('roads')", "#rs-roads-box"), ("colour box", "rs.tools.open('legend')", "#rs-color-box"),
          ("base map box", "rs.tools.open('basemap')", ".rs-bm-box, .bm-menu"), ("navigate box", "rs.tools.open('navigate')", "#rs-nav-box"),
          ("settings box", "rs.tools.open('settings')", ".rs-settings, #rs-settings-box, .rs-st-box"), ("credits box", "rs.tools.open('attribution')", "#rs-attr-box"),
          ("help window", "document.querySelector('#sb .sb-top button[title*=\"read\"], #sb .rs-help-btn, #sb button[aria-label*=\"elp\"]')?.click()", ".rs-help, .rs-help-win, [role=dialog]"),
@@ -101,14 +102,14 @@ def _edges(n=6):
     import geopandas as gpd
     from shapely.geometry import LineString
     return gpd.GeoDataFrame({"highway": ["primary", "residential"] * (n // 2), "name": [f"Street {i}" for i in range(n)], "maxspeed_kmh": [50, 30] * (n // 2),
-                             "edge_id": list(range(1, n + 1))},
+                             "edge_id": list(range(1, n + 1)), "bridge": ["yes", "yes"] + [None] * (n - 2), "layer": ["1", "1"] + [None] * (n - 2)},
                             geometry=[LineString([(18.0 + i * 1e-3, 59.30), (18.0 + i * 1e-3, 59.31)]) for i in range(n)], crs=4326)
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_every_part_is_readable_in_the_theme(tmp_path, theme):
     path = tmp_path / "themes.html"
-    rs.render_dashboard(_edges(), basemap="blank", name="Themes", color_options={"Road class": {}, "Speed": {"color_by": "maxspeed_kmh"}}, google_3d=True,
+    rs.render_dashboard(_edges(), basemap="blank", view_3d=True, name="Themes", color_options={"Road class": {}, "Speed": {"color_by": "maxspeed_kmh"}}, google_3d=True,
                         street_view="window", road_tooltip=["name"], page_script=_SCRIPT, dashboard={"panel": {"sections": [
                             {"id": "q", "part": "query", "label": "Query", "text": "p.maxspeed_kmh >= 50"},
                             {"id": "road", "part": "road_card", "label": "Selected road"},
@@ -130,6 +131,8 @@ def test_every_part_is_readable_in_the_theme(tmp_path, theme):
             if act:
                 page.evaluate(f"(() => {{ try {{ {act} }} catch(e) {{ return String(e) }} }})()")
                 page.wait_for_timeout(500)
+            if part == "roads box, a 3D bridge selected":
+                assert page.evaluate("!!document.querySelector('#rs-roads-box .rs-rd-bh input')"), "the height block is not in the Roads box"      # the step shows the new part
             if page.evaluate(f"document.querySelectorAll({json.dumps(scope)}).length"):
                 found = page.evaluate(_PROBE, [scope, theme == "dark"])
                 if found:

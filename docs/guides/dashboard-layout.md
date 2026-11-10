@@ -126,7 +126,7 @@ What each part of the dashboard screen does, and how to change it. Each item has
 ??? info "Details"
 
     - A row has a check box, the colour, the name and the number of roads. *All* and *None* set every row. A click on a name shows only that class.
-    - A page with bridges, tunnels or access kinds (`access_col`) has a row for each of them. `rsSetTunnels` and `rsSetAccess` set them. A page with 3D decks (`view_3d=True`) has a **3D bridges** row under Bridges: `rsSetBridges3D` sets it.
+    - A page with bridges, tunnels or access kinds (`access_col`) has a row for each of them. `rsSetTunnels` and `rsSetAccess` set them. A page with 3D decks (`view_3d=True`) has a **3D bridges** row under Bridges: `rsSetBridges3D` sets it. While a 3D bridge is selected (a click on its deck), a **Height** field under that row gives the height of the whole group of bridges that touch each other, in metres: a new number gives the group that height (`rsSetBridgeHeight`), and **Reset** gives back the height that the length of the group gives, or the one of `bridge_heights`. A wrong number (below 0) is not taken.
 
 ### Base map { .rs-part }
 
