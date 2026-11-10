@@ -87,10 +87,35 @@ So no project can load all its data. The window and the tiles are necessary, not
 | Road geometry | `roadstyle-tiles`, the map worker, the embedded PMTiles archive | Tiles. A road feature has only its marks and some keys ([tiling.md](tiling.md)). Safe. |
 | Overlay geometry | The embedded page | GeoJSON sources. The map worker and the server tiles carry all sources, but the embedded archive has only the 3 road layers ([tiling.md](tiling.md), "What is not one yet", item 1). |
 | 3D objects | Fill-extrusion layers of the source `decks`; the mesh of `bridgemesh.js` (branch) | All features of the source at one time. |
+| 3D walls by type | `dashboard/walls.js`; the engine's `walls.rs` | Tiles (2026-11-10). The page gives a function to `rsSetWalls`. It runs only when "Walls by type" is on. The map worker cuts the strips and the roofs into a tile layer `walls` (zoom 14 to 16) and keeps no GeoJSON. A page that gives a FeatureCollection still gets a GeoJSON source ("The 3D walls", below). |
 | Road table, in the page | `RoadTable` in `dashboard/core.js` (`props`, `mids`, `bboxes`, `lines`) | One JavaScript object for each road in `props`, and one array for each road in `mids` and `bboxes`. The engine sends it as JSON text (`roadTable()` in `roadstyle-wasm`), and the page parses all of it. |
 | Road table, in the engine | `LiveTiles` and `Tiler` in `roadstyle-wasm` | The roads in Rust memory. `props(source, id)` already gives the fields of one feature. |
 | Live data | `setData` in `dashboard/live.js` | The rows as objects (an Arrow table becomes objects through `toArray()`), a `Map` from row to joined row, and a `Map` from row to colour. |
 | Live colours | `_applyC` in `dashboard/color.js` | One `setFeatureState` call for each road whose colour changed. |
+
+### The 3D walls (measured 2026-11-10, done)
+
+Before this change, Studio gave all the walls to `rsSetWalls` after each draw, also when "Walls by type" was off (the default). `walls.js`
+kept them as one GeoJSON source, and MapLibre kept every wall in one worker:
+
+| Area | Walls | That worker | The tab |
+|---|---|---|---|
+| Tartu | 164,482 (50 MB of GeoJSON) | 605 MiB | not measured here |
+| Burnaby | 350,670 | 1,353 MiB | 4,180 MiB. With the walls shown at zoom 16, the tab stopped (out of memory). |
+
+A prototype that cut the walls into tiles of zoom 14 to 16 gave the same picture (Monaco: 3,820 against 3,819 features in view), the wall
+worker 72 MiB, and no crash on Burnaby.
+
+Now (two changes):
+
+1. **Nothing until the walls show.** `rsSetWalls` takes a function. `walls.js` calls it once, when "Walls by type" is on and the 3D buildings
+   show. With the walls off, the page has no wall data at all.
+2. **Tiles.** The function gives the vector source of `LiveMap.setWalls` (roadstyle-wasm): the map worker's engine makes the strips
+   (`rust/roadstyle/src/walls.rs`, the rule of `walls.js`) and cuts them with the one tile rule into the layer `walls`, from zoom 14 to the map's last
+   zoom. The worker cuts a tile only when MapLibre asks for it, as it does for the roads. The address is the roads' address with the source
+   `walls`: `<prefix>walls/{z}/{x}/{y}`.
+
+Studio's measurement of the change is in the pull request of Studio's roadstyle pin (Tartu, the tab after the draw with the walls off, before and after).
 
 So the road attributes are in memory two times: in Rust, and as JavaScript objects. A JavaScript object with 20 fields uses much more memory
 than the same values in a column. I did not measure how much.
@@ -209,7 +234,7 @@ Each step has a check. A step starts only when the step before it is done. The t
 | 2 | **Attributes in columns** (part 3). | The tests of the dashboard pass, the popups and the filters show the same values, and the memory of step 0 is lower. |
 | 3 | **Frames** (part 4), with way A and way B behind one function. Measure both. | A synthetic run on Tartu (1 hour at 1 s steps, 3,600 frames) plays at 10 frames each second, and the memory stays flat during the run. |
 | 4 | **The CI budget** (part 6). | The test fails when a change adds an object for each feature, or when the memory grows with the area, the layers or the length of the run. |
-| 5 | **3D pieces by tile** (part 2), after the bridge mesh is on `main`. | The bridges of the urbanstyle Monaco page look the same, and the mesh memory follows the view. |
+| 5 | **3D pieces by tile** (part 2), after the bridge mesh is on `main`. The 3D walls are done (2026-11-10, "The 3D walls" above): the same way for the decks and the piers. | The bridges of the urbanstyle Monaco page look the same, and the mesh memory follows the view. |
 | 6 | **Moving points** (part 5), if roadstyle-sim needs them. | The same budget test with points. |
 | 7 | **OPFS transport** for tiles and Parquet, when a page builds more than the memory holds (Studio above about 200,000 roads). | The same tiles as the worker's tiles, byte for byte. |
 

@@ -48,6 +48,10 @@ pub struct LiveTiles {
     at_node: HashMap<[u64; 2], Vec<u32>>,
     /// each simple source's place of each piece id (the tag of a waiting piece), made when a tile first asks; a redraw clears it
     piece_at: HashMap<String, HashMap<u64, usize>>,
+    /// the tile prefix of the map (`xyz_at`), for the source of the walls
+    prefix: String,
+    /// the 3D walls (walls.rs), cut when the page asks for them (`set_walls`)
+    walls: Option<tiles::Tiles>,
 }
 
 impl LiveTiles {
@@ -77,7 +81,7 @@ impl LiveTiles {
                 at_node.entry(p).or_default().push(i as u32);
             }
         }
-        Ok(LiveTiles { styled: s, tiles, style, look, options, at, keep: keep.to_vec(), rows, at_node, piece_at: HashMap::new() })
+        Ok(LiveTiles { styled: s, tiles, style, look, options, at, keep: keep.to_vec(), rows, at_node, piece_at: HashMap::new(), prefix: prefix.to_string(), walls: None })
     }
 
     /// The tile z/x/y of the tile source (`Tiles::tile`), after its waiting pieces got their properties.
@@ -90,6 +94,22 @@ impl LiveTiles {
     pub fn tile_in(&mut self, format: tiles::TileFormat, z: u32, x: u32, y: u32) -> Result<Vec<u8>, tiles::Error> {
         self.fill(z, x, y);
         self.tiles.tile_in(format, z, x, y)
+    }
+
+    /// The walls of the page's buildings as tiles of this map (walls.rs; `fc`: the GeoJSON text of `rsSetWalls`), in place of the walls
+    /// before. Returns the vector source of the walls for MapLibre (`<prefix>walls/{z}/{x}/{y}`, in the format of the map) and the number
+    /// of walls and roofs.
+    pub fn set_walls(&mut self, fc: &[u8]) -> Result<(Value, usize), crate::Error> {
+        self.walls = None;                // the old walls go before the new ones are made
+        let max_zoom = self.tiles.zooms().1;
+        let (w, n) = crate::walls::wall_tiles(fc, self.format(), max_zoom)?;
+        self.walls = Some(w);
+        Ok((crate::walls::wall_source(&self.prefix, self.format(), max_zoom), n))
+    }
+
+    /// The tile z/x/y of the walls in the format `format` (empty with no walls).
+    pub fn walls_tile(&self, format: tiles::TileFormat, z: u32, x: u32, y: u32) -> Result<Vec<u8>, tiles::Error> {
+        self.walls.as_ref().map_or(Ok(Vec::new()), |w| w.tile_in(format, z, x, y))
     }
 
     /// The format of the tiles (`TileOptions::format`).

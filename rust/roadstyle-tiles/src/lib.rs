@@ -202,6 +202,18 @@ impl Tiles {
         self.put(name, b.layer(whole, min_zoom, self.max_zoom));
     }
 
+    /// A layer of polygons, as `add_lines` adds lines: each feature is its polygons (each polygon its rings, the outer ring first, in
+    /// longitude and latitude) and its properties; its id is its index.
+    pub fn add_polygons<K, V, P>(&mut self, name: &str, feats: impl Iterator<Item = (Vec<Vec<Vec<[f64; 2]>>>, P)>, keep: &HashSet<String>, whole: bool, min_zoom: u32)
+    where K: AsRef<str>, V: TileValue, P: Iterator<Item = (K, V)> {
+        let mut b = self.builder(name);
+        for (i, (polys, props)) in feats.enumerate() {
+            let g = Geom::Polygons(polys.iter().map(|p| p.iter().map(|r| r.iter().filter_map(|c| merc_ll(c[0], c[1])).collect()).collect()).collect());
+            b.push(Some(i as u64), g, props.filter(|(k, _)| kept(k.as_ref(), keep)));
+        }
+        self.put(name, b.layer(whole, min_zoom, self.max_zoom));
+    }
+
     /// The properties that the first-zoom rules of the layer `name` read (rules.rs), for `add_waiting`.
     pub fn rule_keys(&self, name: &str) -> Vec<String> {
         rules::ZoomRules::of(&self.style, name).keys().to_vec()
