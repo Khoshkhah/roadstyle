@@ -29,7 +29,8 @@ A consumer project that does not install it runs with `PYTHONPATH=<this repo>/sr
 - roadstyle's files (the profiles and palettes, the base map's files, `cmaps.json`, `basemaps.json`, the dashboard, the popup, the
   page templates, MapLibre) have one copy: `rust/roadstyle-assets/files/`, the crate roadstyle-assets. A crate takes a file with
   `roadstyle_assets::text!("data/cmaps.json")` (a wrong name does not compile); Python asks `roadstyle._assets.text(name)`, which
-  needs the built extension (`python rust/roadstyle-py/build.py`). Edit the files there. After an edit in `files/static/`, run
+  needs the built extension (`python rust/roadstyle-py/build.py`); in a checkout, the first file read warns when the extension's
+  files differ from `files/` (`roadstyle._assets.stale`). Edit the files there. After an edit in `files/static/`, run
   `python rust/roadstyle-assets/sync_old_paths.py`: it writes the old paths that duckosm-rust copies (until duckosm-rust takes the new paths).
 - `src/roadstyle/render_web.py` — `render(...)`: Python keywords become the `page` dict, which `_page_html` writes as one
   JSON object `RS_OPTIONS` (the placeholder `__RS_OPTIONS__` of `rust/roadstyle-assets/files/static/web_template.html`).
