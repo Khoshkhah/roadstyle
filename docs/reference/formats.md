@@ -203,6 +203,7 @@ Bundled: `amber`, `carto`, `highsat`, `mono`. The table shows `amber`; the other
 | `overlays` | `{"color": "#6aa9ff", "circle_stroke": "#ffffff", "fill_opacity": 0.15…` |  |
 | `boundary` | `{"color": "#6a0dad", "opacity": 0.9}` |  |
 | `dock` | `{"result": {"light": "#2563eb", "dark": "#5aa9f8"}, "selected": "#7c4dff", "roles": {...}, "role_series": [...]}` | the data dock's objects: the result, the selected object, one colour for each role of a part (`from`, `via`, `to`) |
+| `vehicles` | `{"colours": {"car": {"light": "#e63946", "dark": "#ff6b6b"}, ...}, "classes": {"passenger": {"kind": "car", "size": [5, 1.8, 1.5]}, ...}, "teleport_m": 50, "lane_change_s": 2, "heading_lookahead_m": 2}` | the vehicles of a traffic microsimulation run: the colour of each kind (the palette), the kind and the default size of each SUMO vClass, SUMO's defaults (the profile), and the numbers of a run |
 | `background` | `{"light": "#e8e6e1", "dark": "#0e1113"}` |  |
 | `access` | `{"private": "#c8c8c8", "bus": "#9db8d9", "pedestrian": "#dddde8", "de…` | access_col: the fill of a road that no mode may use |
 <!-- /gen:palette -->
@@ -231,7 +232,7 @@ are `render_edges`' keywords.
 | `schema_version` | 2 |
 | `palette`, `settings` | the inputs as given: the palette name, the settings |
 | `map` | the map options (what the caller chooses for one map): `columns`, `levels`, `color`, `width`, `roads`, `interaction`, `labels`, `arrows`, `tunnels`, `bridges`, `overlays`, `items`, `boundary`, `base_map`, `output` |
-| `roads`, `casing`, `labels`, `arrows`, `bridges`, `tunnels`, `selection`, `data`, `overlays`, `boundary`, `dock`, `background`, `access`, `camera`, `tiles`, `page`, `palettes`, `active`, `interaction` | the sections: the profile and the palette merged, with the settings over them, and the tables of the resolution (the class styles, the road model, the slots, the arrow image) |
+| `roads`, `casing`, `labels`, `arrows`, `bridges`, `tunnels`, `selection`, `data`, `overlays`, `boundary`, `dock`, `vehicles`, `background`, `access`, `camera`, `tiles`, `page`, `palettes`, `active`, `interaction` | the sections: the profile and the palette merged, with the settings over them, and the tables of the resolution (the class styles, the road model, the slots, the arrow image) |
 | `base_map` | the base map's part (a duckOSM map's layers, 3D heights, style and images); none with no base map |
 
 ## The outputs

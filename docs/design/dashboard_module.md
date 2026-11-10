@@ -189,6 +189,8 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `dashboard.google_3d.layers` | `google_3d_layers`: `[{id, label, kind, source, match, scope, max, on, arrows, style}]` (`roadstyle::dashboard::Layer3d`) | `[]` | `google3d.js` |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
 | `dock` | `dock` (the theme's `dock` section: `result`, `selected`, `roles`, `role_series`) | (none) | `index.js` (`window.RS_DOCK`), `data/kinds.js` |
+| `vehicle_look` | `vehicles` (the theme's `vehicles` section: `colours`, `classes`, the numbers of a run) | (none) | `vehicles.js` (`O.vehicle_look`) |
+| `vehicles` | (none: a page keyword) | `null` | `index.js` loads the run at start (`rs.vehicles.load`) |
 | `filter` | `filter_control`, `access_col`, `minzoom`: `{on, col, classes, swatches, palettes, bridges, tunnels, access, minzoom}` | `{on: false, classes: []}` | `filter.js`, `views.js` |
 | `filter_control` | `filter_control` | no effect: the Roads box was removed (the option stays so that a call that gives it still works) | none |
 | `legend` | `legend`: the legend box (a page key; the style always has the legend data) | `true` | `legend.js` |

@@ -2495,3 +2495,17 @@ def test_web_hillshade_and_terrain_keywords():
     assert _opt(on, "ontop")["buildings"]["opacity"] == 1
     with pytest.raises(ValueError, match="buildings_opacity must be from 0 to 1"):
         render_edges(_edges(), backend="web", buildings_opacity=1.5)
+
+
+def test_web_vehicles_option_and_look():
+    """The page option `vehicles` (a run to load at start) goes to RS_OPTIONS as it is, and the look's vehicles section (the palette's
+    colours, the profile's classes and numbers) is `vehicle_look`; every class's kind has a colour in the palette."""
+    run = {"wasm": "./pkg/roadstyle_wasm.js", "fcd": "./data/run.parquet", "net": "./data/run.net.xml"}
+    html = render_edges(_edges(), backend="web", vehicles=run).html
+    assert _opt(html, "vehicles") == run
+    look = _opt(html, "vehicle_look")
+    assert look["classes"]["passenger"] == {"kind": "car", "size": [5, 1.8, 1.5]}
+    assert look["teleport_m"] == 50 and look["lane_change_s"] == 2 and look["heading_lookahead_m"] == 2
+    assert {c["kind"] for c in look["classes"].values()} <= set(look["colours"])
+    assert all(set(c) == {"light", "dark"} for c in look["colours"].values())
+    assert _opt(render_edges(_edges(), backend="web").html, "vehicles") is None
