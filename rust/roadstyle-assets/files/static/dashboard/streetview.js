@@ -9,6 +9,7 @@ import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
 import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
+import {holdPopup} from "./select.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
 const SV_COV_ICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>';   // a folded map
 export let _svWindow = false;
@@ -184,6 +185,7 @@ export function initStreetView(){
         // and forget the road: opened again it waits for a road, not the last one (Kaveh, 2026-10-14)
         last=null; fr.hidden=true; msg.hidden=false; msg.textContent="Click a road to see it in Street View."; ttl.textContent="Street View"; }
       w.hidden=!on; if(on && (dock || !_wPhone())) place(); if(!on && dock) w.__rsUnplace(); rsSetStreetViewMarker(!!on); drawCov();
+      holdPopup("street-view", !!on);                                // Street View shows the road: no road popup over it while it is open
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on); show();
       _emit("rs:streetviewchange", {open:!!on});
     };

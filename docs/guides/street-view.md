@@ -34,6 +34,8 @@
 1. Press the **Street View** button. In a dashboard toolbox, it is after the navigate button.
 2. Click a road.
 
+While the window is open, a click on a road selects it and shows no road popup: Street View shows the road. The popup comes back when you close the window.
+
 The window follows each new click. Drag its title bar to move it. Drag its corner to change its size.
 The window stays inside the map. The page remembers if the window was open, and where.
 
