@@ -390,6 +390,28 @@ export function askPanel(o = {}){
       theme: document.documentElement.dataset.rsTheme === "dark" ? "dark" : "light", view3d: !!s.view3d, roadFill: !!s.roadFill, tunnel: s.tunnel,
       camera: cam && {center: cam.center.map(r5), zoom: Math.round(cam.zoom * 100) / 100, pitch: Math.round(cam.pitch), bearing: Math.round(cam.bearing)}};
   }
+  // Reset (the dock's `rs:dockreset`) puts back what set_map changed (2026-11-10: "Turn off the water and the waterways layers", then Reset left them off). For each key that set_map
+  // touched: the value before the first change since the last Reset, and the value that Ask set. Reset puts a key back only when it is still as Ask left it, so a layer that the person
+  // switched by hand since stays as the person left it, and what the person changed before Ask is not remembered. The camera is not undone (the dock's rule: the camera is the person's).
+  let undo = null;
+  function remember(now, a, change){
+    const u = (undo ||= {overlays: {}, tunnel: {}});
+    for(const [label, v] of Object.entries(change.overlays || {})) u.overlays[label] = {prev: label in u.overlays ? u.overlays[label].prev : now.overlays.find((o) => o.label === label).on, set: v.visible};
+    if(a.theme != null) u.theme = {prev: u.theme ? u.theme.prev : now.theme, set: a.theme};
+    for(const k of ["basemap", "view3d", "roadFill"]) if(change[k] != null) u[k] = {prev: u[k] ? u[k].prev : now[k], set: change[k]};
+    for(const [k, v] of Object.entries(change.tunnel || {})) u.tunnel[k] = {prev: k in u.tunnel ? u.tunnel[k].prev : (now.tunnel || {})[k], set: v};
+  }
+  const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+  function undoAsk(){
+    const u = undo; undo = null; if(!u) return;
+    if(u.theme && window.rsSetTheme && mapNow().theme === u.theme.set && u.theme.prev !== u.theme.set) window.rsSetTheme(u.theme.prev);      // first: a theme can swap the base map
+    const cur = mapNow(), back = {};
+    for(const [label, x] of Object.entries(u.overlays)){ const o = cur.overlays.find((y) => y.label === label); if(o && o.on === x.set && o.on !== x.prev) (back.overlays ||= {})[label] = {visible: x.prev}; }
+    for(const k of ["basemap", "view3d", "roadFill"]) if(u[k] && same(cur[k], u[k].set) && !same(cur[k], u[k].prev)) back[k] = u[k].prev;
+    for(const [k, x] of Object.entries(u.tunnel)) if(same((cur.tunnel || {})[k], x.set) && !same(x.prev, x.set) && x.prev !== undefined) (back.tunnel ||= {})[k] = x.prev;
+    if(Object.keys(back).length) rs.setState(back);
+  }
+  document.addEventListener("rs:dockreset", undoAsk);
   const NUM = (d) => ({type: "number", description: d});
   TOOLS.push({name: "get_map", description: "The map's layers (on or off), base maps, theme, 3D view, road fill, tunnel look and camera now.", parameters: {}, required: [],
     step: () => "Reading the map", async run(){ return mapNow(); }});
@@ -432,6 +454,7 @@ export function askPanel(o = {}){
         for(const k in to) if(to[k] == null) delete to[k];
         if(Object.keys(to).length){ change.camera = to; done.push("camera"); c.cam = true; }
       }
+      remember(now, a, change);
       if(Object.keys(change).length) rs.setState(change);
       const text = done.length ? "Map: " + done.join(", ") : "";
       if(text) c.maps.push({text, sql: [], res: null, move: true});

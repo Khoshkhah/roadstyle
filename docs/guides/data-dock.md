@@ -125,7 +125,7 @@ selects its road. <a href="../../maps/data_dock.html" target="_blank" rel="noope
 
     - A click on the line opens it as a text box. **Ctrl+Enter** or **Run** runs it, and **Escape** folds it.
     - The download button (⤓), before the line, saves all the rows of the result as a CSV file. The tables button (a database icon), after **Run**, shows the tables of the data in the side column.
-    - The reset button (a circular arrow), after the tables button, has the title "Reset the map and the table". One click gives the map its own colours again and empties the table: the colour layers and the focus go, the lit roads go, the selected road and its card go, and the table has no result. The SQL text stays. The map switch, the camera, the theme and the layers of the page are the person's, and Reset does not change them. The event `reset` (and the document event `rs:dockreset`) tells the host.
+    - The reset button (a circular arrow), after the tables button, has the title "Reset the map and the table". One click gives the map its own colours again and empties the table: the colour layers and the focus go, the lit roads go, the selected road and its card go, and the table has no result. The SQL text stays. The map switch, the camera, the theme and the layers of the page are the person's, and Reset does not change them. One exception: when the page has [Ask](ask.md#get_map-and-set_map), Reset puts back what Ask's `set_map` changed (see there). The event `reset` (and the document event `rs:dockreset`) tells the host.
     - An error shows under the line, in the database's words.
     - The guard refuses a statement that writes, loads, or reads a file or an address.
 

@@ -861,3 +861,41 @@ def test_with_no_examples_option_the_general_groups_show_and_the_hosts_own_come_
         finally:
             browser.close()
     assert errors == [], errors
+
+
+def test_reset_puts_back_what_ask_changed_but_not_what_the_person_changed(tmp_path):
+    """Ask hides the water and the waterways, goes dark and moves the camera. Reset (the dock's button) shows the layers and brings the light theme back, and leaves the
+    camera. A layer the person had switched off before stays off; a layer that the person switched on after Ask stays on (the person's change)."""
+    import geopandas as gpd
+    from shapely.geometry import LineString, box
+    gdf = lambda g: gpd.GeoDataFrame(geometry=[g], crs=4326)      # noqa: E731
+    overlays = [rs.Overlay(gdf(box(18.0, 59.30, 18.005, 59.305)), kind="fill", label="Water", popup=[]),
+                rs.Overlay(gdf(LineString([(18.0, 59.31), (18.01, 59.31)])), kind="line", label="Waterways", popup=[]),
+                rs.Overlay(gdf(box(18.01, 59.30, 18.015, 59.305)), kind="fill", label="Parks", popup=[]),
+                rs.Overlay(gdf(box(18.02, 59.30, 18.025, 59.305)), kind="fill", label="Rail", popup=[])]
+    on = "(() => Object.fromEntries(Object.entries(rs.getState().overlays).map(([k, v]) => [k, v.visible !== false])))()"
+    with served(tmp_path, overlays=overlays) as url, pw.sync_playwright() as p:
+        browser, page, errors = _open(p, url)
+        try:
+            page.evaluate("releaseLoad(); ask.open(); rs.setState({overlays: {Parks: {visible: false}}})")                  # the person switched Parks off by hand
+            assert page.evaluate(on) == {"Water": True, "Waterways": True, "Parks": False, "Rail": True}
+            _ask(page, "Turn off the water and the waterways layers, dark, go to 18.01 59.305", [
+                "tool('set_map', {overlays: {water: false, waterways: false}, theme: 'dark', camera: {center: [18.01, 59.305], zoom: 15}})", "say('Done.')"])
+            assert page.evaluate(on) == {"Water": False, "Waterways": False, "Parks": False, "Rail": True}
+            assert page.evaluate("document.documentElement.dataset.rsTheme") == "dark"
+            page.evaluate("rs.setState({overlays: {Waterways: {visible: true}}})")                                          # the person switches Waterways on again
+            before = page.evaluate("rs.getState().camera.center")
+            page.evaluate("data.open()")
+            page.click("#rs-dock .rs-dd-q button[title='Reset the map and the table']")
+            page.wait_for_function("rs.getState().overlays.Water.visible !== false")
+            assert page.evaluate(on) == {"Water": True, "Waterways": True, "Parks": False, "Rail": True}                    # Parks stays off: the person's
+            assert page.evaluate("document.documentElement.dataset.rsTheme") == "light"
+            assert page.evaluate("rs.getState().camera.center") == before                                                    # the camera is the person's
+            # nothing is remembered after a Reset: a second Reset changes nothing
+            page.evaluate("rs.setState({overlays: {Water: {visible: false}}})")
+            page.click("#rs-dock .rs-dd-q button[title='Reset the map and the table']")
+            page.wait_for_timeout(300)
+            assert page.evaluate(on)["Water"] is False
+        finally:
+            browser.close()
+    assert errors == [], errors
