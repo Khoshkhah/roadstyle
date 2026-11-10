@@ -159,7 +159,8 @@ fn road_filter(cx: &Ctx, items: &[&Props]) -> Value {
     flt.push(seam_filter());
     // the 3D decks (view_3d): a bridge is the flat line below flat_below and the extruded deck from it up
     if cx.decks {
-        flt.push(json!(["any", ["<", ["zoom"], cx.look.deck.flat_below], ["!", ["to-boolean", ["get", Mark::Bridge.name()]]]]));
+        // the state rs_bridges3d (the Roads box's "3D bridges", rsSetBridges3D): off, a bridge is the flat line at every zoom
+        flt.push(json!(["any", ["<", ["zoom"], cx.look.deck.flat_below], ["!", ["to-boolean", ["get", Mark::Bridge.name()]]], ["!", ["to-boolean", gs("rs_bridges3d")]]]));
     }
     if items.iter().any(|p| p.contains_key(Mark::ItemMinZoom.name())) {      // an item's own minzoom
         flt.push(json!(["any", ["!", ["has", Mark::ItemMinZoom.name()]], [">=", ["zoom"], ["get", Mark::ItemMinZoom.name()]]]));
@@ -503,8 +504,8 @@ fn deck_layers(cx: &Ctx) -> Vec<Value> {
         "minzoom": dk.flat_below, "filter": flt, "paint": {"fill-extrusion-color": color, "fill-extrusion-base": ["get", Mark::DeckBase.name()],
         "fill-extrusion-height": ["get", Mark::DeckHeight.name()], "fill-extrusion-opacity": dk.opacity}});
     vec![
-        deck("roads-deck-casing", json!(["has", Mark::CasingSlab.name()]), json!(s.bridges.casing_color)),
-        deck("roads-bridge-decks", json!(["!", ["has", Mark::CasingSlab.name()]]),
+        deck("roads-deck-casing", json!(["all", ["has", Mark::CasingSlab.name()], ["to-boolean", gs("rs_bridges3d")]]), json!(s.bridges.casing_color)),
+        deck("roads-bridge-decks", json!(["all", ["!", ["has", Mark::CasingSlab.name()]], ["to-boolean", gs("rs_bridges3d")]]),
              cx.hl(json!(["case", cx.s_on, cx.select, cx.h_on, cx.hover, ["coalesce", ["get", Mark::Fill.name()], cx.fb_fill()]]))),
     ]
 }

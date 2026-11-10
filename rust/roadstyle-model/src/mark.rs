@@ -168,9 +168,23 @@ marks! {
     ItemOffsetM = "__rs_iom";
     ItemMinZoom = "__rs_imz";
     /// a deck: its base, its top, its chain
-    DeckBase = "__rs_base";
-    DeckHeight = "__rs_height";
-    DeckChain = "__rs_chain";
+    DeckBase = "__rs_base" [Decks];
+    DeckHeight = "__rs_height" [Decks];
+    DeckChain = "__rs_chain" [Decks];
+    /// a deck's group: the bridge roads that touch through shared nodes (one height for the whole group, the page's `rsSetBridgeHeight`)
+    DeckGroup = "__rs_group" [Decks];
+    /// a deck piece's lift at its start and at its end, from 0 (on the ground) to 1 (the full height): the page draws the sloped deck from them
+    DeckLift0 = "__rs_lift0" [Decks];
+    DeckLift1 = "__rs_lift1" [Decks];
+    /// a deck's full height above the ground in metres (before a group's own height: `rsSetBridgeHeight`) and the thickness of its slab
+    DeckFull = "__rs_full" [Decks];
+    DeckThick = "__rs_thick" [Decks];
+    /// a deck piece's place along its chain at its start and at its end, from 0 to 1 (the page puts a deck on the terrain with it)
+    DeckS0 = "__rs_s0" [Decks];
+    DeckS1 = "__rs_s1" [Decks];
+    /// a chain's end nodes, as [longitude, latitude], on its first and on its last deck piece (the page reads the ground height at them)
+    DeckEndA = "__rs_enda" [Decks];
+    DeckEndB = "__rs_endb" [Decks];
     /// the drawing positions that the engine solved, under their contract names (duckOSM's columns: an input column of the name is the
     /// level input; the writers give the solved values under it, in this order, after the road's columns)
     CasingStartColumn = "casing_start";

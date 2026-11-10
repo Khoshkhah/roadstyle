@@ -73,8 +73,12 @@ On the command line: `--no-labels`, `--no-arrows` and `--no-basemap-switcher`. T
 
 ## Bridges in 3D
 
-`view_3d=True` tilts the camera and draws each bridge as a raised deck, so you can see the roads under it. A map page has a
-2D/3D button. A dashboard has the tilt slider in its `navigate` box. Below zoom 16 the bridges are flat.
+`view_3d=True` tilts the camera and draws each bridge as a raised deck, so you can see the roads under it. The deck is one sloped mesh:
+the ramps rise smoothly and meet the ground with no step. A map page has a 2D/3D button. A dashboard has the tilt slider in its `navigate` box,
+and a **3D bridges** switch in the Roads box (off: the flat bridge at every zoom). Below zoom 16 the bridges are flat.
+
+The bridge roads that touch each other are one group. A longer group is higher (5 m up to 60 m of length, 22 m from 600 m; see `bridge_decks`).
+`rsSetBridgeHeight(road, 14)` gives the whole group of that road one height. With the 3D terrain on, the mesh is not drawn.
 
 ```python
 rs.render_edges(edges, view_3d=True)                         # command line: --view-3d

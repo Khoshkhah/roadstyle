@@ -41,7 +41,7 @@ def _open(browser, html, errors, tile):
 
 
 def test_the_dem_is_one_rule_in_the_config():
-    assert _DEM["encoding"] == "terrarium" and "{z}/{x}/{y}" in _DEM["tiles"][0] and _DEM["maxzoom"] == 15
+    assert _DEM["encoding"] == "terrarium" and "{z}/{x}/{y}" in _DEM["tiles"][0] and _DEM["maxzoom"] == 13     # 13: the tiles that a road is laid on load sooner and agree (CHANGELOG, Fixed)
 
 
 def test_off_by_default_and_the_rows_draw_the_hillshade_under_the_roads_and_the_terrain():

@@ -3,7 +3,8 @@
 import {_esc} from "../popup.js";
 import {map, O, RS_PREFIX, RS_LEAN, RS_LEANS, _road, _roadOfPiece, _emit} from "./core.js";
 import {_svWindow} from "./streetview.js";
-import {srcOf} from "./select.js";
+import {srcOf, _deckRoad} from "./select.js";
+import {_bmDeckZ, _bmScreenUp, _bmDeckScreen} from "./bridgemesh.js";
 let _streetView = false;
 let RS_FILL_LAYERS = [];   // the road fill layers (Street View finds a road on them)
 // Street View stands at a spot ON the clicked edge: its own geometry (the road's centre line), the
@@ -22,6 +23,8 @@ let _svFree = null, _svLast = null;
 export function _svLine(f){ const g=f && f.geometry;
   return !g ? [] : g.type==="LineString" ? g.coordinates : g.type==="MultiLineString" ? [].concat(...g.coordinates) : []; }
 function _svFeat(f){                          // the edge's full geometry (a picked one may be tile-clipped)
+  // a 3D bridge deck is a ribbon: Street View stands on the road that it carries (its first edge, the directed one that the ribbon is)
+  if(f && srcOf(f)==="decks"){ const row=_deckRoad(f), r=row!=null ? _road(row) : null; if(r) return r; }
   return (f && f.id!=null && srcOf(f)==="roads" && _road(f.id)) || f; }
 export function _svDist(cs){ const k=Math.cos(cs[0][1]*Math.PI/180), d=[0];
   for(let i=1;i<cs.length;i++) d.push(d[i-1]+Math.hypot((cs[i][0]-cs[i-1][0])*k*_SV_R, (cs[i][1]-cs[i-1][1])*_SV_R));
@@ -50,13 +53,26 @@ function _svUrlOf(p){ return 'https://www.google.com/maps/@?api=1&map_action=pan
   p.lat.toFixed(6)+','+p.lng.toFixed(6)+(p.h==null ? '' : '&heading='+Math.round(p.h)); }
 function _svUrl(ll, f){
   if(!_streetView || !ll) return null;
-  f=_svFeat(f); const m=_svMeasure(f, ll), p=m==null ? null : _svAt(f, m);
+  f=_svFeat(f);
+  // the spot that the pick found (a deck's click is a point of the ground, not of the deck: _svPick took the spot on the deck's road)
+  const m=(_svPos && f && f.id!=null && _svPos.id===f.id) ? _svPos.m : _svMeasure(f, ll), p=m==null ? null : _svAt(f, m);
   return _svUrlOf(p || ll); }
 // a selection: remember the spot (for the marker and the step buttons) and return its URL
-export function _svPick(ll, f, id){
-  f=_svFeat(f); const m=(_streetView && ll) ? _svMeasure(f, ll) : null;
+// a click on a 3D deck: its longitude and latitude are the point of the ground under the cursor, far from the deck. The spot is the point of the road whose deck is
+// nearest to the click on the screen (pt: the click's screen point); null where the deck is not drawn
+function _svMeasureDeck(road, pt){
+  const cs=_svLine(road); if(cs.length<2 || road.id==null || !pt) return null;
+  const len=_svDist(cs)[cs.length-1], step=Math.max(1, len/400); let best=null, bd=Infinity;
+  for(let m=0; m<=len+1e-6; m+=step){
+    const p=_svAt(road, m), s=_bmDeckScreen(p.c[0], p.c[1], road.id); if(!s) return null;
+    const d=Math.hypot(s[0]-pt.x, s[1]-pt.y); if(d<bd){ bd=d; best=m; } }
+  return best; }
+export function _svPick(ll, f, id, pt){
+  const deck=!!f && srcOf(f)==="decks";
+  f=_svFeat(f); let m=null;
+  if(_streetView && ll){ m=deck ? _svMeasureDeck(f, pt) : null; if(m==null) m=_svMeasure(f, ll); }
   _svFree = null; _svLast = null;
-  _svPos = m==null ? null : {f:f, m:m, id:id}; _svMark();
+  _svPos = m==null ? null : {f:f, m:m, id:f && f.id!=null ? f.id : id}; _svMark();      // the road's row (a deck's pick id is the deck's)
   queueMicrotask(_svSpotEvent);                 // after the rs:select this pick is part of
   return _svUrl(ll, f); }
 // the map marker: a dot where Street View stands and a cone the way it looks. Shown while a
@@ -87,7 +103,9 @@ function _svMarkPlace(){
   const p=_svAt(_svPos.f, _svPos.m); if(!p) return;
   const px=_svLanePx(_svPos.f.properties||{}), a=map.project(p.a), b=map.project(p.b);
   const dx=b.x-a.x, dy=b.y-a.y, n=Math.hypot(dx, dy)||1;   // screen: y down, right of travel = (-dy, dx)
-  _svMk.setLngLat(p.c).setOffset([-dy/n*px, dx/n*px]); }
+  // a marker on a bridge stands on the deck: the 3D mesh's height at the spot, as a shift up the screen
+  const z=_bmDeckZ(p.c[0], p.c[1], _svPos.id), up=z ? _bmScreenUp(p.c[0], p.c[1], z) : [0, 0];
+  _svMk.setLngLat(p.c).setOffset([-dy/n*px+up[0], dx/n*px+up[1]]); }
 function _svMark(){
   const p = !_svMarkOn ? null : _svFree && _svFree.c ? {c:_svFree.c, h:_svFree.h} : _svPos ? _svAt(_svPos.f, _svPos.m) : null;
   if(!p){ if(_svMk){ _svMk.remove(); _svMk=null; } return; }
@@ -187,6 +205,7 @@ export function initSpot(){
   useSpot();
   window.rsSetStreetViewMarkerAt = rsSetStreetViewMarkerAt;
   map.on("move", _svMarkPlace);                   // zoom / rotate / pitch change the drawn offset
+  document.addEventListener("rs:bridgeheightchange", _svMarkPlace);   // a new bridge height lifts the marker with the deck
   window.rsGetStreetViewSpot = rsGetStreetViewSpot;
   window.rsSetStreetViewMarker = rsSetStreetViewMarker; window.rsStreetViewStep = rsStreetViewStep;
 }

@@ -37,6 +37,14 @@ def _style(html):
     from road_table import roads_of
     style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + len("const style = "))[0]
     style["_roads"] = roads_of(html)
+    # a GeoJSON source of 256 KB or more is in the page as gzipped base64 and starts empty (the page inflates it): the tests read its features
+    blobs = re.search(r'<script id="rs-gz" type="application/json">(.*?)</script>', html, re.S)
+    if blobs:
+        import base64
+        import gzip
+        for sid, blob in json.loads(blobs.group(1)).items():
+            if sid in style["sources"]:
+                style["sources"][sid]["data"] = json.loads(gzip.decompress(base64.b64decode(blob)))
     return style
 
 
@@ -295,7 +303,9 @@ def test_web_bridge_forks_stay_elevated():
     ends = collections.defaultdict(list)
     for f in slices:
         ends[f["properties"]["__rs_base"]].append(f)
-    assert 5.0 in ends                       # plateaus exist
+    full = round(max(f["properties"]["__rs_full"] for f in slices), 2)      # a long group is higher than a short one (the group's length)
+    assert full > 5.0 and full in ends       # plateaus exist, at the group's full height
+    assert len({f["properties"]["__rs_group"] for f in slices}) == 1        # the three roads touch at the fork: one group
     grounded = [f for f in slices if f["properties"]["__rs_base"] < 0.5]
     assert grounded                          # the true ends still ramp to ground
     # no slice adjacent to the fork node is grounded: check min distance of grounded slices to B
@@ -306,11 +316,59 @@ def test_web_bridge_forks_stay_elevated():
         assert dmin > 0.001                  # ~110 m: grounded slices are far from the junction
 
 
+def _decks_of(geoms):
+    g = gpd.GeoDataFrame({"highway": ["primary"] * len(geoms), "bridge": ["yes"] * len(geoms)}, geometry=geoms, crs=4326)
+    feats = _style(render_edges(g, backend="web", view_3d=True).html)["sources"]["decks"]["data"]["features"]
+    return [f["properties"] for f in feats if not f["properties"].get("__rs_casing_slab")]
+
+
+def _straight(length_m):
+    dx = length_m / (111320 * math.cos(math.radians(59.3)))
+    return [LineString([(18.0, 59.3), (18.0 + dx, 59.3)])]
+
+
+def test_a_longer_bridge_group_is_higher():
+    """The full height of a bridge group grows with its length: base_m 5 up to 60 m, max_m 22 from 600 m."""
+    full = {n: max(p["__rs_full"] for p in _decks_of(_straight(n))) for n in (40, 300, 1500)}
+    assert full[40] == pytest.approx(5.0) and 5.0 < full[300] < 22.0 and full[1500] == pytest.approx(22.0), full
+
+
+def test_a_deck_never_rises_faster_than_the_grade_and_a_short_bridge_rises_only_as_far_as_it_lets():
+    """The height of a node is 0 at a free end and rises at one grade (ramp_m 40 over base_m 5: 1 in 8) with the distance to it: a bridge of a few
+    metres is not a wall, and the slope of the deck stays under the grade (a smooth ramp reaches 1.5 times it) along any bridge."""
+    for n in (4, 20, 60, 300):
+        pieces = sorted(_decks_of(_straight(n)), key=lambda p: p["__rs_s0"])
+        base = [(p["__rs_s0"] * n, p["__rs_base"]) for p in pieces] + [(pieces[-1]["__rs_s1"] * n, pieces[-1]["__rs_base"])]
+        assert max(b for _, b in base) <= max(1.0, n / 2 / 8 * 1.1) + 0.2 or n >= 100, (n, max(b for _, b in base))
+        for (d0, b0), (d1, b1) in zip(base, base[1:], strict=False):
+            assert d1 == d0 or abs(b1 - b0) / (d1 - d0) <= 1.6 / 8 + 0.02, (n, d0, d1, b0, b1)
+
+
+def test_chains_that_meet_at_a_node_have_one_height_there():
+    """Three short bridges meet at a node and the other ends are free: the node is at the height that its distance to a free end gives, and each of
+    the three chains has that lift at its end there (a chain with its own ramp rule had a step)."""
+    a, b, c, d = (18.0000, 59.3000), (18.0003, 59.3002), (18.0006, 59.3004), (18.0006, 59.3000)
+    pieces = _decks_of([LineString([a, b]), LineString([b, c]), LineString([b, d])])
+    at_b = []
+    for chain in {p["__rs_chain"] for p in pieces}:
+        ps = sorted((p for p in pieces if p["__rs_chain"] == chain), key=lambda p: p["__rs_s0"])
+        first, last = ps[0], ps[-1]
+        assert first.get("__rs_enda") and last.get("__rs_endb"), (first.keys(), last.keys())
+        for end, lift in ((first["__rs_enda"], first["__rs_lift0"]), (last["__rs_endb"], last["__rs_lift1"])):
+            if abs(end[0] - b[0]) < 1e-6 and abs(end[1] - b[1]) < 1e-6:
+                at_b.append(lift)
+    # the node is the road's length from the free end over the ramp of the group's height (5 m up to 60 m of group, 22 m from 600 m; 8 m of ramp for a metre), through the smooth step
+    dist = math.hypot((b[0] - a[0]) * 111320 * math.cos(math.radians(59.3)), (b[1] - a[1]) * 111320)
+    height = 5.0 + 17.0 * min(1.0, max(0.0, (3 * dist - 60.0) / 540.0))
+    x = min(1.0, dist / (8.0 * height))
+    assert len(at_b) == 3 and max(at_b) - min(at_b) < 1e-9 and at_b[0] == pytest.approx(x * x * (3 - 2 * x), abs=0.03), (at_b, x * x * (3 - 2 * x))
+
+
 def test_web_pick_survives_missing_layers():
     """The 3D view removes roads-bridge-fill (decks replace it); the picker must filter its layer
     list to existing layers or every hover/click errors out and nothing is selectable."""
     html = render_edges(_edges(), backend="web", view_3d=True).html
-    assert "PICK_LAYERS.filter(id=>map.getLayer(id))" in html
+    assert "PICK_LAYERS.filter(id=>map.getLayer(id) &&" in html          # only layers that exist (and, with the 3D mesh drawn, not the invisible deck extrusions)
     assert "O.pick.map(id=>RS_PREFIX+id)" in html and _opt(html, "pick") == ["roads-simple"]   # the page gives the pick layers (R7)
 
 
@@ -612,7 +670,7 @@ def test_web_street_view_link():
     assert on.count("streetView:_svPick(") == 2
     # the point goes onto the edge's own geometry (the road centre line), not the raw click on a
     # drawn lane, which can sit nearer an indoor photo than the road's Street View imagery...
-    assert "const m=_svMeasure(f, ll), p=m==null ? null : _svAt(f, m);" in on
+    assert "_svMeasure(f, ll), p=m==null ? null : _svAt(f, m);" in on
     # ...and a two-way edge moves into its own lane, so the two directions stand apart
     assert "const _SV_LANE_M = 2.5" in on and "f.properties.__rs_twoway" in on
     # a map marker shows where Street View stands; the step buttons walk along the edge

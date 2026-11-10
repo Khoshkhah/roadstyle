@@ -306,7 +306,11 @@ impl SlotLook {
 /// The look values of the 3D bridge decks (the section bridges.decks).
 #[derive(Clone, Debug)]
 pub struct DeckLook {
+    /// the height of a short bridge group, and of a long one (`max_m`, from `grow_to_m` metres of group length); between `grow_from_m` and `grow_to_m` it grows in a line
     pub base_m: f64,
+    pub max_m: f64,
+    pub grow_from_m: f64,
+    pub grow_to_m: f64,
     pub thickness_m: f64,
     pub ramp_m: f64,
     pub step_m: f64,
@@ -319,7 +323,7 @@ pub struct DeckLook {
 
 impl DeckLook {
     fn new(d: &sections::Decks) -> DeckLook {
-        DeckLook { base_m: d.base_m.f(), thickness_m: d.thickness_m.f(), ramp_m: d.ramp_m.f(), step_m: d.step_m.f(), match_zoom: d.match_zoom.f(),
+        DeckLook { base_m: d.base_m.f(), max_m: d.max_m.as_ref().map_or(d.base_m.f(), sections::Num::f), grow_from_m: d.grow_from_m.as_ref().map_or(0.0, sections::Num::f), grow_to_m: d.grow_to_m.as_ref().map_or(0.0, sections::Num::f), thickness_m: d.thickness_m.f(), ramp_m: d.ramp_m.f(), step_m: d.step_m.f(), match_zoom: d.match_zoom.f(),
                    width_scale: d.width_scale.f(), casing_px: d.casing_px.f(), flat_below: d.flat_below.f(), opacity: d.opacity.f() }
     }
 }

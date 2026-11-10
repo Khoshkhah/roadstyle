@@ -12,7 +12,19 @@
   ],
   "decks": [
     "__rs_edges",
-    "__rs_casing_slab"
+    "__rs_casing_slab",
+    "__rs_base",
+    "__rs_height",
+    "__rs_chain",
+    "__rs_group",
+    "__rs_lift0",
+    "__rs_lift1",
+    "__rs_full",
+    "__rs_thick",
+    "__rs_s0",
+    "__rs_s1",
+    "__rs_enda",
+    "__rs_endb"
   ],
   "slots": [
     "__rs_cc",

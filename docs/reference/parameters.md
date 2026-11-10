@@ -463,7 +463,7 @@ The values the stylers read. Every field comes from the [profile and palette](se
 | `labels` | `color #5b5b5b`, no halo | street-name paint; `size`: `[[zoom, px], ...]`, the names' size per zoom for every class (roads in metres) instead of following each class's width |
 | `arrows` | `color #5b5b5b`, `opacity 0.7` | one-way chevron paint |
 | `camera` | `pitch 0`, `bearing 0`, `pitch_3d 55`, `max_pitch 70` | starting camera and 3D tilt |
-| `bridge_decks` | `base_m 5`, `thickness_m 1`, `ramp_m 40`, `step_m 2.5`, `match_zoom 18`, `opacity 0.7`, `width_scale 0.6`, `flat_below 16`, `casing_px 2` | 3D bridge decks |
+| `bridge_decks` | `base_m 5`, `max_m 22`, `grow_from_m 60`, `grow_to_m 600` (a group of bridges is `base_m` high up to `grow_from_m` of length and `max_m` from `grow_to_m`), `thickness_m 1`, `ramp_m 40`, `step_m 2.5`, `match_zoom 18`, `opacity 0.7`, `width_scale 0.6`, `flat_below 16`, `casing_px 2` | 3D bridge decks |
 | `overlays` | `color #6aa9ff`, `radius 6`, `width 2`, per-kind opacities, `circle_stroke #ffffff` | `Overlay` defaults |
 | `annotations` | `slot_m 100` | label / arrow spacing along a road, metres |
 | `tiles` | `minzoom 6`, `maxzoom 16`, `extent 4096`, `buffer_px 80` | the `tiles=True` tileset. The map scales the last zoom's tiles up. The engine gives each zoom the buffer of its widest stroke; `buffer_px` is the buffer of a zoom where a width cannot be bounded |

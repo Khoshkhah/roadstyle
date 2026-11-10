@@ -284,6 +284,14 @@ pub struct Shadow {
 #[serde(deny_unknown_fields)]
 pub struct Decks {
     pub base_m: Num,
+    /// The height of a long group of bridges (from `grow_to_m` of length) and the lengths between which the height grows from `base_m`. A look made
+    /// before these keys (2026-11-09) has none: every group is `base_m` high, as it was.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_m: Option<Num>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grow_from_m: Option<Num>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grow_to_m: Option<Num>,
     pub thickness_m: Num,
     pub ramp_m: Num,
     pub step_m: Num,
