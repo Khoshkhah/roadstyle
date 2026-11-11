@@ -11,15 +11,16 @@ use std::sync::Arc;
 
 include!(concat!(env!("OUT_DIR"), "/pkg.rs"));
 
-/// A page file in the program, by its path under the page: the editor's WebAssembly package (`PKG`, build.rs), or roadstyle-assets'
-/// `static/<path>` for the page's own files (level_editor/, level_editor.html, the dashboard with its editor/ and worker/ modules, the
-/// popup files), and `host_options.json` (the dashboard's template). None for any other path.
 /// Whether this build has the editor's WebAssembly package (rust/roadstyle-wasm/build_editor.sh made it before the build).
 pub fn has_package() -> bool {
     PKG.iter().any(|(n, _)| n.ends_with("_bg.wasm"))
 }
 
-fn embedded(rel: &str) -> Option<&'static [u8]> {
+/// A page file in the program, by its path under the page: the editor's WebAssembly package (`PKG`, build.rs: `level_editor/pkg/<file>`), or
+/// roadstyle-assets' `static/<path>` for the page's own files (level_editor/, level_editor.html, the dashboard with its editor/ and worker/
+/// modules, the popup files), and `host_options.json` (the dashboard's template). None for any other path. A program with a server of its own
+/// (duckOSM's `duckosm studio`, which has the level-edit part) serves the package from here.
+pub fn embedded(rel: &str) -> Option<&'static [u8]> {
     if let Some((_, b)) = PKG.iter().find(|(n, _)| *n == rel) {
         return Some(b);
     }

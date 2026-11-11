@@ -555,6 +555,14 @@ pub fn tiled_of(roads: RoadTable, look: &Look, features: Option<FeatureTable>, n
 /// Stage 2 of styled sources as `tiled_of` makes it: the look's tile keys (`tile_keep`, `tile_layers`, `tile_format`, `data_maxzoom`,
 /// `data_tolerance`) apply. Way D (roadstyle-local) uses it, so its tiles are the tiles of `tiled_of`.
 pub fn tiled_sources(s: &sources::Styled, look: &Look, prefix: &str, keep: &[String]) -> Result<(String, tiles::Tiles), crate::Error> {
+    let o = tile_options_of(s, look, keep)?;
+    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix), sources::SourceMode::inline_of(&look.other))?;
+    Ok((style_text(s, &style), tiled))
+}
+
+/// The tile rules of `tiled_sources` (and of `relevel::LiveTiles`): the look's tile section and columns, and its tile keys (`tile_keep`,
+/// `tile_layers`, `tile_format`).
+pub fn tile_options_of(s: &sources::Styled, look: &Look, keep: &[String]) -> Result<tiles::stage::TileOptions, crate::Error> {
     let mut o = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &serde_json::json!(look.sections.tiles), &columns(look), keep)?;
     // render(tiles=True)'s page (the Python binding): the columns of its road and simple tiles (`tile_keep`; every __rs_* goes too) and
     // the sources in its tiles (`tile_layers`: roads, simple, slots; the page keeps the others inline)
@@ -566,8 +574,6 @@ pub fn tiled_sources(s: &sources::Styled, look: &Look, prefix: &str, keep: &[Str
     if let Some(f) = look.other.get("tile_format").and_then(Value::as_str) {
         o.format = tiles::TileFormat::parse(f)?;
     }
-    // the call's data_maxzoom and data_tolerance for the sources that stay in the style (the look's `other` until the bindings give it)
-    let (style, tiled) = tile_stage(s, &o, &xyz_at(prefix), sources::SourceMode::inline_of(&look.other))?;
-    Ok((style_text(s, &style), tiled))
+    Ok(o)
 }
 

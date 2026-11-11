@@ -169,6 +169,11 @@ and a `.duckdb` file (`database`: it is opened read only, and each of its tables
 The tiles of way D are made by `tiled_sources`, the stage 2 of `tiled_of`, so the look's tile keys (`tile_format`, `tile_layers`,
 `tile_keep`) apply.
 
+**The redraw of way D.** The program holds the map as `relevel::LiveTiles`. `POST /relevel` takes rows of `levels.csv` (the level
+editor's changed roads) and draws these roads again: the answer has the counts and, when the layers changed, the new style. A host
+that saves the levels into the `.duckdb` file calls `Local::reopen_database`, and the queries then read the new tables. A program
+with a server of its own serves the level editor's WebAssembly package with `roadstyle_serve::embedded`.
+
 **Not in the command line yet:** the base-map rows and a `.duckdb` file as the input (only a program that uses the crate gives them).
 The first user of the frames in the page (`rs.setFrames`) is planned.
 

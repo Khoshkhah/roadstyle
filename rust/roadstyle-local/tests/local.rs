@@ -87,6 +87,21 @@ fn way_d_takes_a_duckdb_file_and_gives_the_tiles_of_tiled_of() {
     let _ = std::fs::remove_file(&file);
 }
 
+/// The redraw of way D (`POST /relevel`): a road with new levels is drawn again, so a tile with it changes; an id that no road has is an error.
+#[test]
+fn way_d_draws_a_road_again_with_new_levels() {
+    let local = Local::open(config(None, 0)).unwrap();
+    let id = local.rows("roads", &[0])[0]["edge_id"].clone();
+    let id = id.as_i64().map(|i| i.to_string()).or_else(|| id.as_str().map(String::from)).expect("the road has an edge id");
+    let before: Vec<Vec<u8>> = addresses().iter().map(|&(z, x, y)| local.tile("roads", z, x, y).unwrap()).collect();
+    let r = local.relevel(&json!([{"edge": id, "casing_start": 3, "casing_level": 3, "casing_end": 3, "fill_level": 3}]).to_string()).unwrap();
+    assert!(r["counts"]["edges"].as_u64().unwrap() >= 1, "{r}");
+    assert!(r["style"].is_null() || r["style"]["metadata"]["roadstyle:bounds"].is_array(), "a new style has the bounds");
+    let after: Vec<Vec<u8>> = addresses().iter().map(|&(z, x, y)| local.tile("roads", z, x, y).unwrap()).collect();
+    assert_eq!(before.len(), after.len());
+    assert!(local.relevel(r#"[{"edge": "1", "casing_start": 0, "casing_level": 0, "casing_end": 0, "fill_level": 0}]"#).unwrap_err().contains("no road has the edge id 1"));
+}
+
 /// An answer: the head and the body.
 type Answer = (String, Vec<u8>);
 
