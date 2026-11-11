@@ -1,7 +1,7 @@
 # The bridge profile: input and output (planned)
 
-**Status: Part 2 is built, the rest is planned.** The maker (Part 2) reads a complete profile and makes the 3D deck pieces from it, with the curve `smooth` (the ramps of today): see
-[What works today](#what-works-today). The filler (Part 1, which completes an input that has values missing), interior control points and the curve `design` are planned. The format is fixed, and the sample files are
+**Status: Part 1 and Part 2 are built, with the curve `smooth`.** The filler (Part 1) completes an input that has values missing, and the maker (Part 2) makes the 3D deck pieces from the complete profile: see
+[What works today](#what-works-today). Interior control points, the curve `design` and the design-rule heights are planned. The format is fixed, and the sample files are
 real: scripts make them from the real roads of the Granville Bridge in Vancouver, and tests check them.
 
 ## The idea
@@ -18,7 +18,7 @@ Every value of the input profile is optional: a height, a width, a parameter, ev
 
 ## What works today
 
-The maker is built. You can get the complete profile of a page, change a number, and give it back:
+Both parts are built. You can get the complete profile of a page, change a number, and give it back. You can also give only the numbers you want to set, and the filler adds the rest:
 
 ```python
 import roadstyle as rs
@@ -29,17 +29,22 @@ junction["z_m"] = 9.0                                   # the height of one node
 rs.render_dashboard(edges, view_3d=True, bridge_profile=profile).save("map.html")
 ```
 
-- `bridge_profile=` takes a dictionary or the path of a JSON file.
+- `bridge_profile=` takes a dictionary or the path of a JSON file. `rs.bridge_profile(edges, given)` returns the complete profile of an input `given`.
+- **The input can be incomplete.** Every value is optional, down to `{}`. An empty input gives the profile of today. The filler keeps every value that you give and fills the others with the rules of today: the height of a junction from the length of its group, 0 for a node on the ground, the `top_m` of a chain, the parameters (50 km/h, a grade of 1 in 8, the curve `smooth`). A value that it adds has `source: "rule"` and `method: "derived"` (a junction), or `source: "data"` and `method: "mapped"` (a node on the ground).
+- **Name a node by its position or its id.** An entry with a `lonlat` is for the one node of the roads within 5 m of it. If more than one node is within 5 m, give the `id` of the node. A chain entry needs its `id` (`c1`, `c2`...), which is in the complete profile.
+- **The filler twice is the filler once.** A complete profile goes through the filler with no change, so you can save a filled profile and edit it.
+- **A height without a source gets** `source: "given"` and `method: "chosen"`. If you give a `source` and a `method`, the filler keeps them. If you remove a `z_m`, the filler fills it again, with its `source` and `method`.
+- **A node above the rule's top raises the top of its chains.** A `top_m` that you give is kept, and a node above it is an error.
+- **A warning, not an error:** a chain whose average grade between a height of yours and the other end is above the `design_grade` (the filler never changes your number).
 - With the profile that `rs.bridge_profile(edges)` gives, the page is the same as without it. A page that is given a profile writes the same profile again.
 - **You can change** the `z_m` of a node, the `top_m` of a chain (its full height), and the `width_m` of a chain. A node is higher than the `top_m` of a chain that ends there: that is an error.
-- **Not built, and the maker says so with an error:** interior control points (`points`), and the curve `design`. The filler for an input with values missing is not built, so the profile must be complete. A key that is
-  missing is an error that says "fill it first".
-- The chains are `c1`, `c2`... in the order of the engine, and a profile is for the roads that it was made from. A profile for other roads is an error (the number of chains, the length of a chain, a node that is not
-  where its chain ends).
+- **Not built, and the engine says so with an error:** interior control points (`points`), and the curve `design`.
+- **Not built:** the colored view of what you gave and what the engine added is made by the prototype (`granville_input_profile.py`). The engine does not return the paths of your values yet.
+- The chains are `c1`, `c2`... in the order of the engine, and a profile is for the roads that it was made from. A profile for other roads is an error (a chain or a node that these roads do not have, a chain of another length, a node more than 5 m from the place that the profile gives).
 - **Sample:** [`granville_bridge_profile_today.json`](../samples/bridge-profile/granville_bridge_profile_today.json) is the profile that the engine writes for the roads of the Granville Bridge. It has 13 nodes (8 on the ground
   and 5 junctions, at 22 m, 22 m, 22 m, 22 m and 11.2 m) and 12 chains, all with the full height of 22 m.
 
-The two other profiles on this page (the least input and the complete profile below) show the planned design: the heights are chosen, and the curve is `design`. The maker does not read them yet.
+**The 5 heights of Granville work today.** The filler reads [`granville_input_partial.json`](../samples/bridge-profile/granville_input_partial.json) (the next section), finds the 13 nodes and the 12 chains, keeps the 5 heights and fills the rest, and the maker draws it. The engine warns that chain c3 rises 5.8 m in 96 m, a grade of 0.061, above the design grade of 0.06. The complete profile below and the straight grades of the design are the planned design: the filler fills the 12 `top_m` with 22 m (the rule of today), and the curve is `smooth`, not `design`.
 
 ## The least input: 5 heights
 

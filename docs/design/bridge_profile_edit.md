@@ -1,6 +1,6 @@
 # The bridge profile: roadstyle and urbanstyle, and an input profile
 
-Date: 2026-11-10. Status: proposal. **Part 2, the maker, is built (2026-11-10)** with the curve `smooth`: today's rule writes a complete profile and the maker makes the same pieces from it (`decks.rs`, `bridge_profile.rs`, the keyword `bridge_profile=`, `rs.bridge_profile`). Part 1, the filler, the interior control points and the curve `design` are not built.
+Date: 2026-11-10. Status: proposal. **Part 2, the maker, and Part 1, the filler, are built (2026-11-10)** with the curve `smooth`: the filler (`bridge_fill.rs`) keeps the values of an input and fills the rest with the rules of today, and the maker makes the same pieces as before from the complete profile (`decks.rs`, `bridge_profile.rs`, the keyword `bridge_profile=`, `rs.bridge_profile(edges, given=None)`). The interior control points, the curve `design` and the design rules for the heights are not built.
 This note is about the profile of a group of 3D bridges: how [the engine](../guides/bridge-height.md) makes it, how urbanstyle makes the profile of the same bridge,
 and a proposal for an edit step.
 
@@ -323,8 +323,14 @@ with the heights at its two nodes and its top only. Stage 2 is the profile throu
 
 1. **Documentation first** (this note and [the design note](bridge_height_design.md)). The guide gets new pages when the code exists.
 2. **Part 2, the maker. Built.** It reads a complete input profile and makes the pieces. With the profile that today's rule gives and the curve `smooth`, it makes the same pieces as today (the goldens do not change: a test makes a style from the profile of today and requires identical decks). Two things came from building it: a chain has a `top_m` (the full height that its ramps are made for), and `width_m` is optional (without it each road is drawn at the width of its class, because the roads of one chain can have different widths).
-3. **Part 1, the filler.** It finds the groups, chains and nodes, matches the given nodes, and fills the values. `rs.bridge_profile(edges, given=None)` returns the complete input profile. The keyword `bridge_profile=` (a
-   dictionary or a JSON file) gives the input. Tests: an empty input; the 5 Granville heights; a given value is kept; **Part 1 twice is Part 1 once**; every error of the table; the Granville file has 13 nodes and 12 chains.
+3. **Part 1, the filler. Built.** It finds the groups, chains and nodes, matches the given nodes, and fills the values. `rs.bridge_profile(edges, given=None)` returns the complete input profile. The keyword `bridge_profile=` (a
+   dictionary or a JSON file) gives the input. Tests: an empty input gives the profile of today; the 5 Granville heights; a given value is kept; **Part 1 twice is Part 1 once**; the errors of the table; the Granville file has 13 nodes and 12 chains. What the build decided:
+   - The fill rules are the rules of today (the group height from the length, the node height from the distance to the free end, `top_m` = the group height, 50 km/h, a grade of 1 in 8, the curve `smooth`). A given height does not change the other heights yet: the design rules (step 6) will make the given heights fixed points of the rule.
+   - A node entry is matched by its `id`, or by its `lonlat` within 5 m (the one node; two nodes within 5 m need the `id`: Monaco has such nodes). The group an entry sits in does not matter. A group `name` needs one node in the entry.
+   - A given `z_m` without a `source` gets `source: "given"` and `method: "chosen"`. A removed `z_m` is filled again with its `source` and `method`.
+   - A node above the `top_m` of the rule raises the `top_m` of its chains. A given `top_m` below a node is an error.
+   - The grade warning is on the average grade of a chain (the height difference over `length_m`), only where an end has a height of the person (`source` is not `rule` or `data`). It compares with `design_grade`, which is 1 in 8 until the design rules are built.
+   - The checks "a `ground` node with `z_m` above 0" and "two decks cross" of the table below are not built. The paths of the given values (the colored view) are not returned by the engine: the prototype makes the view.
 4. The page: the landing on fill, the Height box, `rsBridgeGroups()`.
 5. A converter from an urbanstyle profile to a complete input profile, outside the engine. It matches the axes to the chains by the OSM ways (12 of 12 on the Granville Bridge).
 6. The default heights from the design rules (the other note), and the curve `design`.

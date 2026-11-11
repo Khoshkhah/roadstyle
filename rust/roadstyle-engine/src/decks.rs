@@ -421,8 +421,7 @@ pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Opti
     Ok(bridge_decks_and_profile(roads, dk, m, hw, own, warnings)?.0)
 }
 
-/// The deck features and the complete profile that they were made from. Today's rule writes the profile (`today_profile`: the first part of the engine, as a stand-in for the filler that
-/// is not built), and the maker (`make_pieces`: the second part) makes the pieces from it. A page with no profile of its own goes this way, so the pieces are the pieces of the rule.
+/// The deck features and the complete profile that they were made from. Today's rule writes the profile (`today_profile`, the rules of the filler), and the maker (`make_pieces`: the second part) makes the pieces from it. A page with no profile of its own goes this way, so the pieces are the pieces of the rule.
 pub fn bridge_decks_and_profile(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Option<&Own>, warnings: &mut Vec<String>) -> Result<(Vec<Value>, BridgeProfile), crate::Error> {
     let bridges = Bridges::new(roads);
     let given = match own {
@@ -435,11 +434,15 @@ pub fn bridge_decks_and_profile(roads: &Roads, dk: &DeckLook, m: &Model, hw: &st
     Ok((feats, profile))
 }
 
-/// The second part of the engine, the maker: the deck features of the roads from a complete profile (`BridgeProfile::from_value`). It has no rules and no defaults: it reads the heights of
-/// the nodes and the top of each chain, and makes the ramps and the pieces. A profile that does not fit the roads (other chains, other lengths, other nodes) is an error.
-pub fn make_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, profile: &BridgeProfile) -> Result<Vec<Value>, crate::Error> {
+/// The deck features of the roads from an input profile that can be incomplete (`input`, a JSON value; `{}` is the least), and the complete profile that they were made from. The first part,
+/// the filler (`bridge_fill::fill`), keeps what the input gives and fills the rest with the profile of the rules; the second part, the maker (`make_pieces`), makes the pieces from the complete
+/// profile. It has no rules and no defaults: a profile that does not fit the roads (other chains, other lengths, other nodes) is an error.
+pub fn fill_and_make_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, input: &Value, warnings: &mut Vec<String>) -> Result<(Vec<Value>, BridgeProfile), crate::Error> {
     let bridges = Bridges::new(roads);
-    make_pieces(roads, dk, m, hw, &bridges.chains(), profile)
+    let chains = bridges.chains();
+    let profile = crate::bridge_fill::fill(today_profile(&bridges, &chains, dk, &[]), input, warnings)?;
+    let feats = make_pieces(roads, dk, m, hw, &chains, &profile)?;
+    Ok((feats, profile))
 }
 
 /// Today's rule as a complete profile: the height of a group (from its length, or the caller's), a node's height from its distance to the nearest free end (0 at a free end, rising at
@@ -514,7 +517,7 @@ fn make_pieces(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, chains: &[Chai
         let mut z = [0.0; 2];
         for (k, (nid, end)) in [(&cp.from, ch.pts[0]), (&cp.to, ch.pts[ch.pts.len() - 1])].into_iter().enumerate() {
             let Some(n) = nodes.get(nid.as_str()) else { return bad(format!("the chain {id} starts or ends at the node {nid}, which the profile does not have")) };
-            if (n.lonlat[0] - end[0]).abs() > 2e-5 || (n.lonlat[1] - end[1]).abs() > 2e-5 {
+            if bridge_profile::metres_between(n.lonlat, end) > bridge_profile::MATCH_M {
                 return bad(format!("the node {nid} is not where the chain {id} {} in these roads: the profile is not for these roads", if k == 0 { "starts" } else { "ends" }));
             }
             if n.z_m > top + 1e-9 {

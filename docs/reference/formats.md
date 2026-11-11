@@ -86,8 +86,8 @@ Where they come from:
 
 ## The bridge profile (planned)
 
-**Status: Part 2 is built, the rest is planned.** The maker (Part 2) reads a complete profile and makes the 3D deck pieces from it, with the curve `smooth` (the ramps of today). It is the keyword
-`bridge_profile=`, and `rs.bridge_profile(edges)` gives the complete profile of a page. The filler (Part 1, which completes an input that has values missing), the interior control points and the curve `design`
+**Status: Part 1 and Part 2 are built, with the curve `smooth`.** The filler (Part 1) completes an input that has values missing, and the maker (Part 2) makes the 3D deck pieces from the complete profile (the ramps of today). It is the keyword
+`bridge_profile=`, and `rs.bridge_profile(edges, given=None)` gives the complete profile of a page. The interior control points and the curve `design`
 are planned. The format is fixed, the schemas and the sample files are real, and tests check them. For the idea and the examples, read [The bridge profile: input and output](../guides/bridge-profile.md).
 
 A page with 3D bridges (`view_3d=True`) has one **input profile**: the groups of bridges, their nodes and chains, and the height of the nodes. A person edits it. **Part 1** of the engine fills what is missing and writes
@@ -131,14 +131,17 @@ A complete profile is also a valid input profile. Part 1 on a complete profile c
 | `chains[].width_m` | number, above 0 | optional | optional | The width of the deck, in metres. Without it, each road of the chain is drawn at the width of its class |
 | `chains[].width_source` | text | optional | optional | Where the width comes from: `given` or `rule` |
 
-### What is built: the maker
+### What is built: the filler and the maker
 
-The maker (Part 2) reads a **complete** profile. A key that is missing, a key that is not known, and a wrong type are errors that say "fill it first". It also stops, with an error that names the chain or the node, when:
+The filler (Part 1) reads an input profile in which every key is optional. A key that is not known and a wrong type are errors. It matches each node entry to a node of the roads by its `id`, or by its `lonlat` (the one node within 5 m; if more than one node is within 5 m, the `id` is needed). It keeps every value that you give and fills the others with the rules of today (see [the guide](../guides/bridge-profile.md#what-works-today)). The maker (Part 2) reads only the complete result. The filler stops, with an error that names the chain or the node, when:
 
 - the curve is `design`, or a chain has `points` (not built);
-- a chain has no `top_m` (the curve `smooth` makes its ramps for the full height of the chain);
-- a node is higher than the `top_m` of a chain that ends there;
-- the profile is not for the roads: another number of chains, a chain of another length (more than 0.5 m of difference), or a node that is not where its chain starts or ends (more than about 2 m).
+- a node entry has no `id` and no `lonlat`, has a `lonlat` that no node is near, or two entries are for one node;
+- a `z_m` is below 0, a `top_m` or a `width_m` is 0 or less, or a node is higher than the `top_m` of a chain that ends there;
+- the input is not for the roads: a chain or a node that the roads do not have, a `kind`, `chains`, `from` or `to` that differ from the roads, a chain of another length (more than 0.5 m of difference), or an `id` and a `lonlat` more than 5 m apart;
+- a group has a `name` and no node (the engine finds a group by its nodes).
+
+A chain whose average grade between a height of yours and its other end is above the `design_grade` is a warning.
 
 The chains are `c1`, `c2`... in the order of the engine, and a profile of a page is made for the roads of that page. The heights of the two nodes of a chain, with its `top_m`, give the ramps: a node at a
 height `z` has the ramp parameter `t` with `z = top_m × t² (3 − 2t)`. With the profile that today's rule wrote, the maker makes **the same pieces as today**. Two chains that meet at a node have one height there, because a

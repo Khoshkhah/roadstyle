@@ -1,7 +1,7 @@
-//! The bridge profile (docs/guides/bridge-profile.md, docs/reference/formats.md "The bridge profile (planned)"): the input of the engine's second part, the maker (`decks::make_decks`).
+//! The bridge profile (docs/guides/bridge-profile.md, docs/reference/formats.md "The bridge profile"): the input of the engine's second part, the maker (`decks::make_pieces`).
 //! It is a complete input profile: the groups of 3D bridges with their nodes (a height for each), their chains and the parameters. Every key that the maker needs is required here:
-//! a missing one is an error that says "fill the profile first". (The input profile that can be incomplete, and the first part that fills it, are not built yet. Today's rule writes
-//! a complete profile: `decks::bridge_profile`.)
+//! a missing one is an error that says "fill the profile first". The input profile that can be incomplete is read by the first part, the filler (`bridge_fill::fill`), which writes
+//! a complete profile; the rules that it fills with are today's (`decks::today_profile`).
 //!
 //! The first build of the maker has one curve, `smooth`: the smoothstep ramps of today, made for the full height of the chain (`top_m`), from the heights at its two nodes. A chain with
 //! interior control points and the curve `design` (straight grades and vertical curves) are in the format and are not built: they are errors that say so.
@@ -157,6 +157,14 @@ impl BridgeProfile {
         }
         Ok(())
     }
+}
+
+/// How near a position of an input must be to a node of the roads (metres), and how far a node of a profile can be from the end of its chain.
+pub const MATCH_M: f64 = 5.0;
+
+/// The distance in metres between two `[lon, lat]` positions that are near each other.
+pub fn metres_between(a: [f64; 2], b: [f64; 2]) -> f64 {
+    ((a[0] - b[0]) * 111320.0 * a[1].to_radians().cos()).hypot((a[1] - b[1]) * 111320.0)
 }
 
 /// The ramp parameter `t` of the smoothstep `u = t² (3 − 2t)`: the inverse of the smoothstep, `t = 1/2 − sin(asin(1 − 2u) / 3)`. The two ends are exact (0 and 1: no sliver of a piece).

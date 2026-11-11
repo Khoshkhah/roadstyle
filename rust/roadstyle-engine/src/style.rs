@@ -49,8 +49,7 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
                 if own.is_some() {
                     warnings.push("bridge_heights, bridge_height_col: the page has a bridge_profile, so the heights do nothing".into());
                 }
-                let profile = crate::bridge_profile::BridgeProfile::from_value(given)?;
-                (decks::make_decks(&roads.roads, &look.deck, &look.model, "highway", &profile)?, profile)
+                decks::fill_and_make_decks(&roads.roads, &look.deck, &look.model, "highway", given, &mut warnings)?
             }
             None => decks::bridge_decks_and_profile(&roads.roads, &look.deck, &look.model, "highway", own.as_ref(), &mut warnings)?,
         };

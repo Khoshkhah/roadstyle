@@ -1,4 +1,4 @@
-//! The 3D bridge decks in two parts (docs/guides/bridge-profile.md): today's rule writes a complete bridge profile, and the maker makes the decks from a profile.
+//! The 3D bridge decks in two parts (docs/guides/bridge-profile.md): the filler completes an input profile (today's rule fills what is missing), and the maker makes the decks from the complete profile.
 //! The one that matters: the maker, given the profile that today's rule wrote, makes the same decks as today (so a page that has no profile of its own does not change).
 //! The roads are Monaco's bridges (tests/data/monaco_decks).
 
@@ -129,19 +129,93 @@ fn a_person_changes_a_number_and_the_maker_uses_it() {
     assert_eq!(today.len(), wide.len(), "the pieces are the same pieces");
 }
 
+/// An input profile with one entry: the node of the first node of `kind` in the profile `p`, with a height. The entry names the node by its position when no other node is within 5 m
+/// of it (Monaco has nodes that are 2 m apart: for those the id is the only name), and returns the id.
+fn input_with_height(p: &Value, kind: &str, z: f64) -> (Value, String) {
+    let (g, i) = first_node(p, kind);
+    let n = &p["groups"][g]["nodes"][i];
+    let near = p["groups"].as_array().unwrap().iter().flat_map(|g| g["nodes"].as_array().unwrap()).filter(|o| {
+        let d = |k: usize| (o["lonlat"][k].as_f64().unwrap() - n["lonlat"][k].as_f64().unwrap()).abs();
+        d(0) < 1e-4 && d(1) < 1e-4
+    }).count();
+    let entry = if near == 1 { serde_json::json!({"lonlat": n["lonlat"], "z_m": z}) } else { serde_json::json!({"id": n["id"], "z_m": z}) };
+    (serde_json::json!({"groups": [{"nodes": [entry]}]}), n["id"].as_str().unwrap().to_string())
+}
+
+fn node<'a>(p: &'a Value, id: &str) -> &'a Value {
+    p["groups"].as_array().unwrap().iter().flat_map(|g| g["nodes"].as_array().unwrap()).find(|n| n["id"] == id).unwrap()
+}
+
+fn export(input: Value) -> Result<(Value, Value), roadstyle_rs::Error> {
+    let s = style(&[("bridge_profile", input), ("bridge_profile_export", true.into())])?;
+    Ok((s["metadata"]["roadstyle:bridge_profile"].clone(), s))
+}
+
 #[test]
-fn a_profile_that_is_not_complete_or_not_for_these_roads_says_so() {
+fn the_filler_makes_the_profile_of_today_from_an_empty_input_and_changes_nothing_in_a_complete_one() {
+    let today = style(&[("bridge_profile_export", true.into())]).unwrap();
+    let profile = today["metadata"]["roadstyle:bridge_profile"].clone();
+    for empty in [serde_json::json!({}), serde_json::json!({"groups": []}), serde_json::json!({"parameters": {}, "groups": [{"nodes": [], "chains": []}]})] {
+        let (p, s) = export(empty).unwrap();
+        assert_eq!(p, profile, "an empty input fills everything with the rules of today");
+        assert_eq!(decks(&s), decks(&today));
+    }
+    // a complete profile is its own fill (the filler twice is the filler once), and so is a filled one
+    assert_eq!(export(profile.clone()).unwrap().0, profile);
+    let (partial, _) = input_with_height(&profile, "junction", 2.0);
+    let once = export(partial).unwrap().0;
+    assert_eq!(export(once.clone()).unwrap().0, once);
+}
+
+#[test]
+fn a_given_height_is_kept_and_everything_else_is_filled() {
+    let today = profile_of_today();
+    let kind = if today["groups"].as_array().unwrap().iter().any(|g| g["nodes"].as_array().unwrap().iter().any(|n| n["kind"] == "junction")) { "junction" } else { "ground" };
+    let (input, id) = input_with_height(&today, kind, 3.0);
+    let (p, s) = export(input).unwrap();
+    let n = node(&p, &id);
+    assert_eq!((n["z_m"].as_f64().unwrap(), n["source"].as_str().unwrap(), n["method"].as_str().unwrap()), (3.0, "given", "chosen"));
+    // the rest of the profile is the profile of today, except the chains of that node (their top is at least as high as the node)
+    for other in today["groups"].as_array().unwrap().iter().flat_map(|g| g["nodes"].as_array().unwrap()).filter(|o| o["id"] != id.as_str()) {
+        assert_eq!(node(&p, other["id"].as_str().unwrap()), other);
+    }
+    assert_ne!(decks(&s), decks(&style(&[]).unwrap()), "a height of 3 m changes the pieces of its chains");
+    // the source and the method of the person are kept
+    let (g, i) = first_node(&today, kind);
+    let input = serde_json::json!({"groups": [{"nodes": [{"id": today["groups"][g]["nodes"][i]["id"], "z_m": 3.0, "source": "survey", "method": "measured"}]}]});
+    let n = node(&export(input).unwrap().0, &id).clone();
+    assert_eq!((n["source"].as_str().unwrap(), n["method"].as_str().unwrap()), ("survey", "measured"));
+    // a given width and top are kept
+    let p = export(serde_json::json!({"groups": [{"chains": [{"id": "c1", "width_m": 9.0, "top_m": 40.0}]}]})).unwrap().0;
+    let c = &p["groups"][0]["chains"][0];
+    assert_eq!((c["top_m"].as_f64().unwrap(), c["width_m"].as_f64().unwrap(), c["width_source"].as_str().unwrap()), (40.0, 9.0, "given"));
+    // a node above the top of the rule raises the top of its chains
+    let (input, id) = input_with_height(&today, "ground", 50.0);
+    let p = export(input).unwrap().0;
+    for c in p["groups"].as_array().unwrap().iter().flat_map(|g| g["chains"].as_array().unwrap()).filter(|c| c["from"] == id.as_str() || c["to"] == id.as_str()) {
+        assert!(c["top_m"].as_f64().unwrap() >= 50.0);
+    }
+}
+
+#[test]
+fn a_profile_with_a_value_missing_is_filled_and_one_that_is_not_for_these_roads_says_so() {
     let p = profile_of_today();
+    let today = decks(&style(&[]).unwrap());
     let with = |f: &dyn Fn(&mut Value)| { let mut q = p.clone(); f(&mut q); q };
-    // not complete: the maker has no defaults
-    let e = error_of(with(&|q| { q["groups"][0]["nodes"][0].as_object_mut().unwrap().remove("z_m"); }));
-    assert!(e.contains("missing field `z_m`") && e.contains("fill it first"), "{e}");
-    let e = error_of(with(&|q| { q["groups"][0]["chains"][0].as_object_mut().unwrap().remove("points"); }));
-    assert!(e.contains("missing field `points`"), "{e}");
-    let e = error_of(with(&|q| { q["groups"][0]["chains"][0].as_object_mut().unwrap().remove("top_m"); }));
-    assert!(e.contains("no top_m") && e.contains("smooth"), "{e}");
+    // every value is optional: the filler adds what is missing (a height, a top, a chain, a node, the parameters)
+    for q in [
+        with(&|q| { q["groups"][0]["nodes"][0].as_object_mut().unwrap().remove("z_m"); }),
+        with(&|q| { q["groups"][0]["chains"][0].as_object_mut().unwrap().remove("top_m"); }),
+        with(&|q| { q["groups"][0]["chains"].as_array_mut().unwrap().pop(); }),
+        with(&|q| { q.as_object_mut().unwrap().remove("parameters"); }),
+    ] {
+        let (filled, s) = export(q).unwrap();
+        assert_eq!(filled, p);
+        assert_eq!(decks(&s), today);
+    }
     // the format, and what is not built
     assert!(error_of(with(&|q| q["format"] = "other".into())).contains("this engine reads"));
+    assert!(error_of(with(&|q| q["extra"] = 1.into())).contains("unknown field `extra`"));
     assert!(error_of(with(&|q| q["parameters"]["curve"] = "design".into())).contains("not built yet"));
     let e = error_of(with(&|q| q["groups"][0]["chains"][0]["points"] = serde_json::json!([{"s": 5.0, "z_m": 2.0}])));
     assert!(e.contains("interior control points") && e.contains("curve `design`"), "{e}");
@@ -153,21 +227,45 @@ fn a_profile_that_is_not_complete_or_not_for_these_roads_says_so() {
             if n["id"] == from.as_str() { n["z_m"] = (top + 1.0).into(); }
         }
     }));
-    assert!(e.contains("above the top of the chain"), "{e}");
-    // not for these roads: a chain less, a length, a node that is not where the chain ends
-    let e = error_of(with(&|q| { q["groups"][0]["chains"].as_array_mut().unwrap().pop(); }));
-    assert!(e.contains("not for these roads"), "{e}");
+    assert!(e.contains("cannot be above the top"), "{e}");
+    // not for these roads
     let e = error_of(with(&|q| q["groups"][0]["chains"][0]["length_m"] = 999.0.into()));
-    assert!(e.contains("m long in the profile") && e.contains("not for these roads"), "{e}");
+    assert!(e.contains("m long in these roads") && e.contains("not for these roads"), "{e}");
     let e = error_of(with(&|q| {
         let from = q["groups"][0]["chains"][0]["from"].as_str().unwrap().to_string();
         for n in q["groups"][0]["nodes"].as_array_mut().unwrap() {
             if n["id"] == from.as_str() { n["lonlat"][0] = (n["lonlat"][0].as_f64().unwrap() + 0.01).into(); }
         }
     }));
-    assert!(e.contains("is not where the chain") && e.contains("not for these roads"), "{e}");
+    assert!(e.contains("m from the position") && e.contains("not for these roads"), "{e}");
     let e = error_of(with(&|q| { q["groups"][0]["chains"][0]["from"] = "n999".into(); }));
-    assert!(e.contains("n999") && e.contains("does not have"), "{e}");
+    assert!(e.contains("n999") && e.contains("not for these roads"), "{e}");
+    let e = error_of(with(&|q| { q["groups"][0]["chains"][0]["id"] = "c999".into(); }));
+    assert!(e.contains("c999") && e.contains("not for these roads"), "{e}");
+}
+
+#[test]
+fn an_input_that_cannot_be_true_for_these_roads_is_an_error_that_says_what() {
+    let today = profile_of_today();
+    let (g, i) = first_node(&today, "ground");
+    let n = &today["groups"][g]["nodes"][i];
+    let (ll, id) = (n["lonlat"].clone(), n["id"].clone());
+    let nodes = |v: Value| serde_json::json!({"groups": [{"nodes": v}]});
+    let e = error_of(nodes(serde_json::json!([{"lonlat": ll, "z_m": 1.0}, {"id": id, "z_m": 2.0}])));
+    assert!(e.contains("two entries of the input are for the node"), "{e}");
+    assert!(error_of(nodes(serde_json::json!([{"lonlat": [0.0, 0.0], "z_m": 1.0}]))).contains("no node of these roads is within 5 m"));
+    assert!(error_of(nodes(serde_json::json!([{"z_m": 1.0}]))).contains("no id and no lonlat"));
+    assert!(error_of(nodes(serde_json::json!([{"lonlat": ll, "z_m": -1.0}]))).contains("0 or more"));
+    assert!(error_of(nodes(serde_json::json!([{"id": "n999", "z_m": 1.0}]))).contains("n999"));
+    assert!(error_of(nodes(serde_json::json!([{"lonlat": ll, "kind": "junction", "z_m": 1.0}]))).contains("is a Ground in these roads"));
+    assert!(error_of(serde_json::json!({"groups": [{"chains": [{"width_m": 4.0}]}]})).contains("has no id"));
+    assert!(error_of(serde_json::json!({"groups": [{"chains": [{"id": "c1", "width_m": 0.0}]}]})).contains("above 0"));
+    assert!(error_of(serde_json::json!({"groups": [{"chains": [{"id": "c1"}, {"id": "c1"}]}]})).contains("two entries of the input are for the chain c1"));
+    // a given top below a given height
+    let chain = n["chains"][0].clone();
+    let input = serde_json::json!({"groups": [{"nodes": [{"id": id, "z_m": 3.0}], "chains": [{"id": chain, "top_m": 1.0}]}]});
+    assert!(error_of(input).contains("cannot be above the top"));
+    assert!(error_of(serde_json::json!({"groups": [{"name": "x"}]})).contains("has a name and no node"));
 }
 
 #[test]
