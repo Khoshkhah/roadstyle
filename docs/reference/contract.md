@@ -167,7 +167,7 @@ not global state: the dashboard sets them on each road with `setFeatureState`.
 
 ## The feature properties `__rs_*`
 
-67 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
+68 names. None is public for a host page: a host reads the data columns and the API. "Dashboard" marks the names that the dashboard
 reads (the internal contract between the engine and the dashboard of the same version).
 Each one goes into a typed field of the render model, and the engine writes the property only
 when a layer reads it.
@@ -190,6 +190,7 @@ when a layer reads it.
 | `__rs_main`, `__rs_seam`, `__rs_lap`, `__rs_stub` | the main casing piece, a seam, a lap, an end stub | `simple.rs` | engine | internal | the piece generators |
 | `__rs_wm`, `__rs_cm`, `__rs_twm` | the width, the casing and the pair width in metres (over cos of the latitude) | `_mark_width_m` | engine | internal | `RoadDraw.look.width_m` |
 | `__rs_ord`, `__rs_ov`, `__rs_item`, `__rs_ic`, `__rs_iwm`, `__rs_iom`, `__rs_imz`, `__rs_pick` | an attached object's order, its overlay, its row, color, width and offset in metres, minzoom, and "pick it as itself" | `_edge_overlay`, `_item_pieces`, `_road_items` | engine, `select.js` (`__rs_pick`) | dashboard (`__rs_pick`) | `Attachment` |
+| `__rs_bbox` | an overlay's feature in the overlay's rows (a one-file page keeps the rows as a gzip data URL, `roadstyle:interaction.base_props`): its box `[west, south, east, north]` | `rows_file` | `overlays.js` (`rsFocus`) | internal | the page's rows of an overlay |
 | `__rs_arw` | the number of an arrow slot (for the export's thinning) | `_annotation_slots`, `slots.rs` | engine | internal | the slot attachments |
 | `__rs_base`, `__rs_height`, `__rs_casing_slab`, `__rs_chain` | a 3D deck's base and height, its casing slab, its chain | `_bridge_decks` | engine, `select.js` (`__rs_casing_slab`), `bridgemesh.js` (`__rs_base`, `__rs_height`) | dashboard (`__rs_casing_slab`) | the deck generator |
 | `__rs_group`, `__rs_lift0`, `__rs_lift1`, `__rs_s0`, `__rs_s1`, `__rs_enda`, `__rs_endb`, `__rs_full`, `__rs_thick` | a 3D deck's group (the bridge roads that touch through shared nodes, one height for all), its lift at its start and its end (0 on the ground, 1 at the full height), its place along its chain at its start and its end (0 to 1; the mesh uses it to stand level on the terrain), the chain's end nodes as `[longitude, latitude]` on its first and last piece (the ground height is read at them, so chains that meet at a node agree), the full height in metres and the thickness of its slab | `decks.rs` | engine | `bridgemesh.js` (the sloped mesh, `rsSetBridgeHeight`) | the deck generator |
@@ -206,7 +207,7 @@ the file.
 
 - `pieces`: the properties of a feature of the road layer (a road piece or an item); `decks`: of a 3D deck or shadow; `slots`: of a
   name or arrow slot.
-- `table`: the properties of a row of the road table. A row also has the fields of the popup and the tooltip
+- `table`: the properties of a row of the road table, or of a row of an overlay (the overlay's rows of a one-file page: `__rs_bbox`). A row also has the fields of the popup and the tooltip
   (`roadstyle:interaction`; every public field when the popup list is null), the `edge_id_col` and the road's line.
 
 The layers' own expressions read the properties that they name in `["get", name]` and `["has", name]`. The Rust engine collects these

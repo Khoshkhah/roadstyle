@@ -230,6 +230,9 @@ fn host_panel(html: Option<&str>, width: f64, name: &str) -> String {
              <div class=\"rs-side-host\">{html}</div></div>", escape(name))
 }
 
+/// The first view of a page with no roads: the world between the polar caps, [min lon, min lat, max lon, max lat].
+const WORLD: [f64; 4] = [-180.0, -60.0, 180.0, 75.0];
+
 /// the page of `style` (the base map's and the roads' sources and layers) with the dashboard's options `page`.
 pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String {
     let gz = match (&p.gz, p.compress) {
@@ -246,11 +249,18 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
         }
         None => script_json(&style),
     };
-    let [x0, y0, x1, y1] = p.bounds;
+    // A page with no roads yet (a host that adds its data later) has no bounds: its first view is the world, and the banner for a map with
+    // no road features (static/web_template.html) is not for it (`camera.empty`). Without this the center is not a number and the map opens at 0, 0.
+    let empty = !p.bounds.iter().all(|v| v.is_finite());
+    let [x0, y0, x1, y1] = if empty { WORLD } else { p.bounds };
     let Ok(Value::Object(mut opts)) = serde_json::to_value(page) else { unreachable!("PageOptions is a JSON object") };
     let c = &p.cam;
-    opts.insert("camera".into(), serde_json::json!({"center": [(x0 + x1) / 2.0, (y0 + y1) / 2.0], "pitch": c.pitch, "bearing": c.bearing,
-                                                    "max_pitch": c.max_pitch, "bounds": [[x0, y0], [x1, y1]]}));
+    let mut camera = serde_json::json!({"center": [(x0 + x1) / 2.0, (y0 + y1) / 2.0], "pitch": c.pitch, "bearing": c.bearing,
+                                        "max_pitch": c.max_pitch, "bounds": [[x0, y0], [x1, y1]]});
+    if empty {
+        camera["empty"] = Value::Bool(true);
+    }
+    opts.insert("camera".into(), camera);
     // the frame's tokens in one pass (audit R3): a value is not read again, so the host's own text may hold any token
     let first = page.dashboard.first_paint();
     let mut html = fill(&frame().replacen("</head><body>", &format!("</head><body>{first}"), 1), &[("__TITLE__", escape(p.name)), ("__STYLE__", style_json),

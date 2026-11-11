@@ -4,7 +4,7 @@
 // overlays (zone fills) — and a selected road also reports the interactive overlays under the
 // click (rs:select detail.overlays), so a sidebar can show the road AND its zone together.
 import {POPUP, _rfields, _esc} from "../popup.js";
-import {map, O, OVERLAYS, RS_PREFIX, _NO_HOVER, _role, _emit} from "./core.js";
+import {map, O, OVERLAYS, OV_ROWS, RS_PREFIX, _NO_HOVER, _role, _emit} from "./core.js";
 import {getTool} from "./tools.js";
 import {_popupMode, rsInfoShow, _tlHost, _box, _check} from "./panel.js";
 import {rsDeselect, _rrows, _TIP_DELAY, _popupHeld} from "./select.js";
@@ -22,7 +22,12 @@ export const _lookHolds = new Set();
 // per overlay (its topmost hit). Feeds rs:select's `overlays` payload and the popup/panel.
 // A layer's popup fields are not in its tiles: its props file (roadstyle:interaction.base_props, by source) holds them by row, the feature id.
 const _ovRows = {};
-function _ovFetch(ov){ if(ov.props && !_ovRows[ov.props]) fetch(ov.props).then(r=>r.json()).then(j=>{ _ovRows[ov.props] = j; }, ()=>{}); }
+// A page that is one HTML file (way A) holds the file as a `data:application/gzip` URL, which this inflates; any other URL is JSON.
+const _ovJson = r => r.url.startsWith("data:application/gzip") ? new Response(r.body.pipeThrough(new DecompressionStream("gzip"))).json() : r.json();
+// The rows are also the overlay's features for rsQuery, rsGetProps and rsFocus (`OV_ROWS`: the row is the feature's properties, `__rs_bbox` its box).
+function _ovFetch(ov){ if(ov.props && !_ovRows[ov.props]) fetch(ov.props).then(_ovJson).then(j=>{
+  _ovRows[ov.props] = j; OV_ROWS.set(ov.source, j.map((r, i) => ({id: i, properties: r, bbox: r.__rs_bbox}))); },
+  e=>console.error("overlay rows:", e)); }
 const _ovProps = (ov, f) => ({...f.properties, ...(_ovRows[ov.props] || [])[f.id]});
 export function _ovAt(pt){
   const out=[];

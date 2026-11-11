@@ -138,14 +138,25 @@ def test_web_overlays_place_under_and_over_roads():
     ids = [layer["id"] for layer in style["layers"]]
     assert ids.index("ov0-fill") < ids.index("roads-simple")     # zones under the roads
     assert ids.index("ov1-circle") > ids.index("roads-simple")   # POIs on top
-    assert "ov0" in style["sources"] and "ov1" in style["sources"]
+    assert {l["source-layer"] for l in style["layers"] if l["id"].startswith("ov")} == {"ov0", "ov1"}      # the overlays are tile layers of the page's archive
+    assert not [s for s in style["sources"].values() if s["type"] == "geojson"]
     # popup fields + toggle wiring present; overlay props preserved for the popup
     assert "handleOverlayClick" in wm.html and "ov-ctrl" in wm.html
     # placement is baked into the JS meta: click precedence follows the visual stacking
     meta = _opt(wm.html, "overlays")
     assert [m["under"] for m in meta] == [True, False]
-    z = style["sources"]["ov0"]["data"]["features"][0]["properties"]
-    assert z["taz_id"] == "Z0" and z["weight"] == 0.5
+    z = _rows(meta[0])[0]                                      # the popup fields are in the overlay's rows (a gzip data URL), not in the tiles
+    assert z["taz_id"] == "Z0" and z["weight"] == 0.5 and len(z["__rs_bbox"]) == 4
+
+
+def _rows(overlay):
+    """The rows of an overlay of a tiled page: the page option `props` is a `data:application/gzip;base64,` URL of the JSON rows."""
+    import base64
+    import gzip
+
+    head, data = overlay["props"].split(",", 1)
+    assert head == "data:application/gzip;base64"
+    return json.loads(gzip.decompress(base64.b64decode(data)))
 
 
 def test_web_overlay_kind_autodetected():
@@ -1444,7 +1455,7 @@ def test_overlay_metre_width_dash_zoom_range_and_text():
     """width_m is exact in metres from min_zoom (the width doubles with each zoom); dash and the zoom range are on the layer; kind text is a symbol layer along the line that reads text_col."""
     st = _style(render_edges(_edge_world(), backend="web", settings=_STYLES, overlays=[
         Overlay(_line_overlay_data(), style="divider", label="a"), Overlay(_line_overlay_data(), style="dashed", label="b"),
-        Overlay(_line_overlay_data(), style="street_name", label="c")]).html)
+        Overlay(_line_overlay_data(), style="street_name", label="c")], tiles=False).html)    # tiles=False: the test reads the overlay's GeoJSON
     lay = {lyr["id"]: lyr for lyr in st["layers"]}
     w = lay["ov0-line"]["paint"]["line-width"]
     assert w[:3] == ["interpolate", ["exponential", 2], ["zoom"]] and w[3] == 16.0 and w[5] == 22.0 and w[4][1] == ["get", "__rs_wm"]
@@ -2118,7 +2129,7 @@ def test_simple_puts_the_items_of_edges_above_the_road_layer():
     pts = _edge_features([12, 13], order=[0, 0])
     style = _style(render_edges(g, backend="web", overlays=[Overlay(pts, edge_col="edge_id", order_col="order", kind="circle", label="i")]).html)
     ids = [l["id"] for l in style["layers"]]
-    item = next(i for i, l in enumerate(style["layers"]) if l.get("source", "").startswith("ov"))
+    item = next(i for i, l in enumerate(style["layers"]) if l.get("source-layer", "").startswith("ov"))
     assert ids.index("roads-simple") < item and all(ids.index(a) > item for a in ("roads-arrows", "roads-labels") if a in ids)
 
 

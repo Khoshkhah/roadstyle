@@ -5,6 +5,8 @@ export let map = null, style = null, O = {};
 // the prefix of the roads style's source and layer ids in the map: a page that adds the style beside its own adds one ("rs-");
 // the names in the style itself (a layer's source-layer, its metadata) stay without it
 export let RS_PREFIX = "";
+// the prefix of the roads' sources and layers on the map: rsDashboard's option, or the prefix of rs.roadLayers (a page whose roads come later)
+export function setPrefix(p){ RS_PREFIX = p; }
 // tiles=True: the roads are a vector source (the template's no-roads message reads it). The modules do not branch on it: they read the
 // source map (_src) and the road table (RoadTable).
 export let RS_TILED = false;
@@ -43,8 +45,12 @@ export const _ownBuildings = () => OVERLAYS.some(o => o.extrude && o.visible !==
 // true from the map's first `load` event: a style that comes later (rs.setStyle) is added to a loaded map, and no `load` comes again for it
 // (isStyleLoaded is false while the new sources load)
 export let RS_LOADED = false;
+// THE ADAPTER (adapter.js): the object that gives the dashboard the data of its way: `tile`, `rows`, `lines`, `query`, `schema`, `frames`. The page option
+// `adapter` or `rs.setAdapter` sets it; null: a page that has its road table in itself (the embedded page, a host with window.RS_SIDE).
+export let ADAPTER = null;
+export function _setAdapter(a){ ADAPTER = a || null; _ROWS.clear(); _LINES.clear(); _MISS.clear(); }
 export function initCore(m, opts){
-  map = m; O = opts; RS_PREFIX = opts.prefix;
+  map = m; O = opts; RS_PREFIX = opts.prefix; ADAPTER = opts.adapter || null;
   RS_LOADED = map.loaded() && map.isStyleLoaded(); if(!RS_LOADED) map.once("load", ()=>{ RS_LOADED = true; });
   RS_TILED = opts.tiles;
   useStyle(opts.style);
@@ -55,6 +61,7 @@ export function initCore(m, opts){
 // the roads style, at the start or later (rs.setStyle: a page that adds the roads after a build, again for each network). No style yet:
 // no road layers, nothing to pick
 export function useStyle(st){
+  _ROWS.clear(); _LINES.clear(); _MISS.clear();        // the rows and the lines that the adapter gave were the old roads'
   style = st || {layers:[], sources:{}, metadata:{}};
   OVERLAYS = O.overlays;                // the style's own base-map layers (ov<i>): a later style has other ones
   // the layers decide (they are what the map draws); the given map only for a role with no layer: a style made again for tiles can keep the
@@ -138,7 +145,9 @@ export function _itemOv(id){ return OVERLAYS.find(o=>o.base && id in o.base) || 
 export function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojson || !d.updateable) return d.geojson;
   return d._rs || (d._rs={type:"FeatureCollection", features:Array.from(d.updateable.values())}); }
 // the features of an inline source of the roads style that has no table (decks, slots, overlays); src: the source's id in the map
-export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features)||[]; }
+// An overlay in tiles (way A: the embedded archive) has no GeoJSON: its rows (properties and box, `overlays.js`) stand in as features with no geometry.
+export const OV_ROWS = new Map();
+export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features) || OV_ROWS.get(src) || []; }
 // THE ROAD TABLE: each road's fields, midpoint, bbox and line, keyed by the row ({props, mids, bboxes, lines}, as stage 1
 // makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready).
 // A table without lines (the engine's roadTable without lines) can have linesOf(rows): the page's function that gives the lines of
@@ -151,15 +160,41 @@ export let _joined = null, _joinedKeys = [];
 // `fields`: the columns that the popup, the tooltip and the panel show (default: every column of the rows but the key column, which the road has)
 export function _setJoined(m, fields, key){ _joined = m;
   _joinedKeys = !m ? [] : fields ? [...fields] : [...new Set([].concat(...[...m.values()].slice(0, 100).map(r => Object.keys(r))))].filter(k => k !== key); }
+// the rows and the lines that the adapter gave for the roads that the table does not have (a page with no road table: way D, a large area)
+const _ROWS = new Map(), _LINES = new Map(), _MISS = new Set();       // _MISS: the rows that the adapter has not got (asked one time)
+let _pending = null;      // the rows that ask in this turn: one request to the adapter for all of them
+function _askRow(i){
+  if(!_pending){
+    const ids = new Set(), done = Promise.resolve().then(async () => {
+      _pending = null;
+      const list = [...ids], rows = await ADAPTER.rows("roads", list);
+      list.forEach((id, k) => { if(rows[k]) _ROWS.set(id, rows[k]); else _MISS.add(id); });
+    });
+    _pending = {ids, done};
+  }
+  _pending.ids.add(i);
+  return _pending.done;
+}
 export const RoadTable = {
-  has(i){ const t=_table(); return !!t && t.props[i]!=null; },
-  props(i){ const t=_table(), p=(t && t.props[i]) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
+  has(i){ const t=_table(); return (!!t && t.props[i]!=null) || _ROWS.has(i); },
+  props(i){ const t=_table(), p=(t && t.props[i]) || _ROWS.get(i) || {}, j=_joined && _joined.get(i); return j ? {...p, ...j} : p; },
   // the road's own fields, with no joined row (rs.setData reads every road's key: no object for each road)
-  own(i){ const t=_table(); return (t && t.props[i]) || null; },
-  line(i){ const t=_table(); return (t && ((t.lines && t.lines[i]) || (t._lines && t._lines.get(i)))) || null; },
-  // a Promise that the line of row i is loaded (linesOf); null when there is nothing to load
-  load(i){ const t=_table(); if(!t || t.lines || !t.linesOf || i==null || (t._lines && t._lines.has(i))) return null;
-    return Promise.resolve(t.linesOf([i])).then(l=>{ (t._lines || (t._lines=new Map())).set(i, (l && l[0]) || null); }); },
+  own(i){ const t=_table(); return (t && t.props[i]) || _ROWS.get(i) || null; },
+  line(i){ const t=_table(); return (t && ((t.lines && t.lines[i]) || (t._lines && t._lines.get(i)))) || _LINES.get(i) || null; },
+  // a Promise that the row and the line of row i are loaded: the line with the table's `linesOf` or the adapter's `lines`, the row with the adapter's `rows`
+  // (a road that the table does not have); null when there is nothing to load
+  // a Promise that the row of i is loaded (the adapter's `rows`); null when the table has it, or the page has no adapter
+  loadRow(i){ return i!=null && ADAPTER && ADAPTER.rows && !RoadTable.has(i) && !_MISS.has(i) ? _askRow(i) : null; },
+  load(i){
+    if(i==null) return null;
+    const t=_table(), jobs=[], r=RoadTable.loadRow(i);
+    if(r) jobs.push(r);
+    if(!(t && t.lines) && !RoadTable.line(i) && !(t && t._lines && t._lines.has(i))){
+      if(t && t.linesOf) jobs.push(Promise.resolve(t.linesOf([i])).then(l=>{ (t._lines || (t._lines=new Map())).set(i, (l && l[0]) || null); }));
+      else if(ADAPTER && ADAPTER.lines && !_LINES.has(i)) jobs.push(Promise.resolve(ADAPTER.lines([i])).then(l=>{ _LINES.set(i, (l && l[0]) || null); }));
+    }
+    return jobs.length ? Promise.all(jobs) : null;
+  },
   mid(i){ const t=_table(); return (t && t.mids && t.mids[i]) || null; },
   bbox(i){ const t=_table(); return (t && t.bboxes && t.bboxes[i]) || null; },
   rows(){ const t=_table(); return t ? t.props.length : 0; },
@@ -235,10 +270,11 @@ export function rsHighlight(ids, layer){
   if(layer != null && typeof layer === "object") return _hlSet(ids, layer);
   const L=_lyr(layer); if(!L) return;
   if(L.ov){
-    (_qHlOv[L.ov.label]||[]).forEach(i=>map.setFeatureState({source:L.src,id:i},{select:false}));
+    const ref = _src(L.src.slice(RS_PREFIX.length));    // an overlay in tiles is a source layer of the roads' vector source
+    (_qHlOv[L.ov.label]||[]).forEach(i=>map.setFeatureState({...ref,id:i},{select:false}));
     const cur = ids==null ? [] : Array.from(ids);
     _qHlOv[L.ov.label]=cur;
-    cur.forEach(i=>map.setFeatureState({source:L.src,id:i},{select:true}));
+    cur.forEach(i=>map.setFeatureState({...ref,id:i},{select:true}));
     _emit("rs:highlightchange", {overlay:L.ov.label, ids:cur.slice()});
     return;
   }
@@ -265,8 +301,9 @@ export function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set)
   (Array.isArray(ids)?ids:[ids]).forEach(i=>{
     if(!fs){ const b=RoadTable.bbox(i);
       if(b){ _bbExtend([[b[0],b[1]],[b[2],b[3]]], bb); } return; }
-    const g=fs[i] && fs[i].geometry;
+    const g=fs[i] && fs[i].geometry, b=fs[i] && fs[i].bbox;
     if(g && g.coordinates) _bbExtend(g.coordinates, bb);
+    else if(b) _bbExtend([[b[0],b[1]],[b[2],b[3]]], bb);
   });
   // the roads fit above the bottom dock where it covers the map (the card look; dock.js): 80 px and the covered part at the bottom
   const dk=document.getElementById("rs-dock"), mb=map.getContainer().getBoundingClientRect().bottom;

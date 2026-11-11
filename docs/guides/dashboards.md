@@ -160,6 +160,8 @@ Each item below has the same form: a picture or a live page when there is one, a
 **From Python:** yes, `panel.sections`. Keys and defaults: [Dashboard options](../reference/parameters.md#dashboard-options)
 { .rs-facts }
 
+A page can have no roads yet (a host that builds its data after the page opens, and adds the roads with `rs.setStyle`). The page then opens on the world, has no banner "0 road features", and needs no patch of its own for these.
+
 === "Python"
 
     ```python

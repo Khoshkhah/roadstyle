@@ -67,6 +67,7 @@ nav:
       - Layout and toolbox: guides/dashboard-layout.md
       - Dashboard parts: guides/dashboard-parts.md
       - JavaScript: guides/dashboard-manual/javascript.md
+      - How a dashboard holds its data: guides/data-and-memory.md
       - Editors and tools:
           - Edit the design of a map: guides/design-panel.md
           - Edit the levels: guides/level-editor.md

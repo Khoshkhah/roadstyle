@@ -1,6 +1,6 @@
 # Memory: one budget for every dashboard
 
-Date: 2026-11-09, version 2. Status: proposal; step 0 (the measurement, 2026-11-10) and the 3D walls are done. Version 1 covered the
+Date: 2026-11-09, version 2. Status: proposal; step 0 (the measurement, 2026-11-10), the 3D walls and step 1 (every layer as tiles, 2026-11-10) are done. The interface of the four requests (step 2 of the storage plan) is in "Step 2: one interface for the four requests". Version 1 covered the
 roads and the time data. Version 2 adds every layer and the 3D objects, after a look at the data of urbanstyle and SimReady ("What the projects hold" below). "Step 0: the memory of a page" below
 has the first measurement of a tab.
 
@@ -85,7 +85,7 @@ So no project can load all its data. The window and the tiles are necessary, not
 | Part | Where | How it holds the data |
 |---|---|---|
 | Road geometry | `roadstyle-tiles`, the map worker, the embedded PMTiles archive | Tiles. A road feature has only its marks and some keys ([tiling.md](tiling.md)). Safe. |
-| Overlay geometry | The embedded page | GeoJSON sources. The map worker and the server tiles carry all sources, but the embedded archive has only the 3 road layers ([tiling.md](tiling.md), "What is not one yet", item 1). |
+| Overlay geometry | The embedded archive, the map worker, the server tiles | Tiles (2026-11-10, "Step 1" below). The embedded page also has the overlay's rows (properties and box), one object for each feature, until step 2. `decks` and `shadows` stay GeoJSON until step 5. |
 | 3D objects | Fill-extrusion layers of the source `decks`; the mesh of `bridgemesh.js` (branch) | All features of the source at one time. |
 | 3D walls by type | `dashboard/walls.js`; the engine's `walls.rs` | Tiles (2026-11-10). The page gives a function to `rsSetWalls`. It runs only when "Walls by type" is on. The map worker cuts the strips and the roofs into a tile layer `walls` (zoom 14 to 16) and keeps no GeoJSON. A page that gives a FeatureCollection still gets a GeoJSON source ("The 3D walls", below). |
 | Road table, in the page | `RoadTable` in `dashboard/core.js` (`props`, `mids`, `bboxes`, `lines`) | One JavaScript object for each road in `props`, and one array for each road in `mids` and `bboxes`. The engine sends it as JSON text (`roadTable()` in `roadstyle-wasm`), and the page parses all of it. |
@@ -180,6 +180,112 @@ The speed of the disk path:
 
 So step 7 (the OPFS transport) is fast enough for a popup and for tiles. roadstyle's walls are now tiles of the map worker ("The 3D walls"
 above); Studio's tables on the disk are Studio's own work.
+
+### Step 1: every layer in the embedded archive (done 2026-11-10)
+
+The embedded PMTiles archive of a one-file page (way A) had the road layers only. Now it has a tile layer for each source: the base map, the
+boundary and the overlays too (`tiled_page` in `page_options.rs`). The page keeps no GeoJSON for them. Only `decks` and `shadows` stay
+GeoJSON (step 5): the dashboard reads all their features at one time.
+
+The tiles of an overlay have only the keys that the style reads. The dashboard needs more from an overlay: `rsQuery(test, layer)` runs a
+test over each feature, `rsGetProps` reads rows, `rsFocus` needs the box of a feature, and a popup reads its fields. So the page also holds
+the **rows** of each overlay: all its properties and its box (`__rs_bbox`), as JSON, gzip, and a `data:` URL in
+`roadstyle:interaction.base_props` (`rows_file` in `lib.rs`; the page option `overlays[].props`). `overlays.js` reads them when the page
+starts and gives `_sfeats` a feature with no geometry for each row (`OV_ROWS` in `core.js`). The rows are one JavaScript object for each
+feature. Step 2 (columns) changes that.
+
+Measured the same way as step 0: `scripts/measure_page.py` (the private memory of the tab, headless Chromium, a view of 640 × 400, a view of
+zoom 16 with every overlay layer on), roadstyle on `main` against this change, 2026-11-10. The machine ran other builds, so a number can
+differ by a few MiB between runs.
+
+| Page | File | Tab, loaded | Tab, zoom 16, every overlay on |
+|---|---|---|---|
+| urbanstyle, Monaco (`viz/monaco.html`, 35 overlays, about 80,000 features) before | 34.7 MB | 587 MiB | 630 MiB |
+| the same after | 19.1 MB | 416 MiB | 442 MiB |
+| roadstyle, Monaco (`duckosm.page`, 16 base-map layers) before | 5.3 MB | 215 MiB | 334 MiB |
+| the same after | 5.0 MB | 202 MiB | 271 MiB |
+
+The pictures are the same: at zoom 16, 19.8 % of the pixels of the urbanstyle page and 4.5 % of the roadstyle page differ at all (the tile cut
+and MapLibre's GeoJSON cut anti-alias a little differently), 0.09 % and 0.00 % by more than 32 levels of 255. `rsQuery(() => true, label)` gives
+the same number of features for each of the 35 and the 16 overlays, `rsGetProps` the same field names, and `rsFocus` and `rsHighlight` the same camera
+and state. The file is smaller because tiles are smaller than GeoJSON; the 5.4 MB of rows are in it.
+
+What is left in memory: the rows (one object for each feature) and the browser. Step 2 turns the rows into columns, and the rows of a layer
+that is off need not be loaded.
+
+### Step 2: one interface for the four requests (2026-11-11)
+
+A dashboard asks for data in four ways. Today each way has its own host function: the tiles come through a MapLibre protocol
+(`pmtiles://`, `rs://`, `lv://`), a row through `window.RS_SIDE` (`roadTable()`), the lines of a road through `RS_SIDE.linesOf`, a query through
+the `query` and `schema` options of `dataDock`, and a window of frames through nothing (`rs.setData` takes one table). Way D (step 3) needs one
+set of addresses for all of them, so the dashboard must make each request through one interface.
+
+**The interface.** `dashboard/adapter.js`. A page gives the dashboard one **adapter**: an object with these optional functions.
+
+| Request | Adapter function | Answer |
+|---|---|---|
+| A tile | `tile(source, z, x, y)` | `Promise<Uint8Array \| null>`: the bytes of the tile (the tile of the map worker, byte for byte); null: no tile |
+| Some rows | `rows(source, ids)` | `Promise<(object \| null)[]>`: one object of fields for each id; null: no such row |
+| A query | `query(sql, {signal})`, `schema()` | `{columns: [{name, type}], rows}`, and `{tables: [{name, rows, about}]}`: what `dataDock` already asks |
+| A window of frames | `frames(from, to)` | `Promise<{t, values: Float32Array}[]>`: one value for each road row |
+| The lines of some roads | `lines(ids)` | `[[lon, lat], ...]` for each id: what `linesOf` gives |
+| The style of the roads | `style()` | the style, with the tile addresses of the way (`rs.roadLayers().show(style)` puts it on the map) |
+
+The page option `adapter`, or `rs.setAdapter(adapter)`, sets it. `rs.request` makes the four requests as the dashboard makes them
+(`tile`, `rows`, `row`, `query`, `schema`, `frames`, `lines`). A function that the adapter has not got makes `rs.request.<name>` throw an
+error that says so. Nothing takes its place.
+
+**What the dashboard does with it.**
+
+- **Rows.** `RoadTable.load(i)` waits for the line of a road before a selection shows it. It now also waits for the row: when the road table
+  has no row `i` and the adapter has `rows`, the dashboard asks the adapter. All the rows that ask in one turn go in one request. A row that the
+  adapter has not got is asked one time. A selection, a hover tooltip and a popup read the row from the same place as before (`RoadTable.props`).
+  A page with no road table (way D) needs no `window.RS_SIDE`.
+- **Lines.** `RoadTable.load(i)` calls the table's `linesOf`, or else the adapter's `lines`.
+- **Queries.** `dataDock` takes `query` and `schema` from the adapter when the host gives none.
+- **Tiles.** The map reads the tiles through the style. The style of a way has the tile addresses of that way (`pmtiles://roads` in the file, `rs://...`
+  from the map worker, `http://127.0.0.1:<port>/tiles/roads/{z}/{x}/{y}` from the program). `adapter.tile` is the same request for a caller
+  that is not MapLibre (a test; an export).
+- **Frames.** `rs.request.frames(from, to)` is the request. The first user, `rs.setFrames` (step 3 of the plan above), comes with the
+  frame window. This step gives the function and its transport.
+
+**The four adapters.**
+
+| Way | Adapter |
+|---|---|
+| A. One HTML file | None. The page has the road table and the overlays' rows in itself. `rs.request.rows` of a page with no adapter throws. |
+| B. Files on a server | The style points at the PMTiles file. The host gives `rows` and `query` (DuckDB-wasm on the Parquet files at the URL). |
+| C. Made in the browser | The host gives the functions of its map worker and of its DuckDB-wasm (Studio: `roadTable()`, `roadLines`, its `query`). |
+| D. Made by a local program | `rsHttpAdapter(base)`: the program answers the four requests at the addresses below. |
+
+**The addresses of `rsHttpAdapter(base)`** (the program of step 3 answers them; they are in `adapter.js`):
+
+| Request | Address |
+|---|---|
+| the style | `GET /style.json` |
+| a tile | `GET /tiles/<source>/<z>/<x>/<y>` (204: no tile) |
+| rows | `POST /rows/<source>`, body `[id, ...]`, answer `[{...} or null, ...]` |
+| lines | `POST /lines`, body `[id, ...]` |
+| a query | `POST /query`, body `{"sql": "..."}`, answer `{"columns": [{"name", "type"}], "rows": [[...]]}`. A BIGINT is a text, and the adapter makes it a `BigInt` |
+| the schema | `GET /schema` |
+| frames | `GET /frames?from=<i>&to=<j>`: u32 frames, u32 values, then for each frame f64 `t` and one f32 for each value (little endian) |
+
+**How the existing hosts keep working.** Nothing is removed.
+
+- duckOSM Studio gives `window.RS_SIDE` (with `linesOf`), the `query` and `schema` of its DuckDB, and the `rs://` tiles. These work as before: the
+  adapter is `null`, and the table answers first. Studio can move to an adapter when it wants one page for way C and way D.
+- urbanstyle and the duckOSM local pages (`duckosm edit`) give no adapter and use the page's own table.
+- `rs.roadLayers(options)` (the host puts a new roads style on its map) stays. For way D it takes the style of the adapter:
+  `await rs.roadLayers().show(await adapter.style())`. This is the use that duckOSM's build page makes.
+- `rsSetWalls(function)` stays. The function can call `adapter.tile("walls", ...)` itself.
+
+**Not in this step.**
+
+- **The Roads filter and the other loops over all rows** (`RoadTable.rows()`, the mode filter, `rs.setData`) work on the rows that the page
+  has. A page with no road table has none, so they do nothing there. The filters by class read the tile's keys, so they work.
+- **The popup of an overlay in way D.** Its fields come from the tile. A way that wants more gives `rows(<overlay source>, ids)`; the popup does
+  not call it yet.
+- **`rs.setFrames` and the frame window** (plan step 3).
 
 ## The design
 
@@ -287,7 +393,7 @@ Each step has a check. A step starts only when the step before it is done. The t
 | Step | Work | Check |
 |---|---|---|
 | 0 | **Measure.** The memory of the tab, the map worker and the road table, on Monaco and Tartu, with the current code. Count the bytes of `RoadTable` alone and of the overlay sources alone. **Done 2026-11-10** on roadstyle's own pages ("Step 0: the memory of a page"); an urbanstyle page is not measured yet. | The numbers are in this note. They show which part is the largest. |
-| 1 | **Every layer as tiles** (part 1). | The urbanstyle Monaco page looks the same (pixel test), and the overlay GeoJSON is not in memory after the tiles are made. |
+| 1 | **Every layer as tiles** (part 1). **Done 2026-11-10** ("Step 1" above). | The urbanstyle Monaco page looks the same (pixel test), and the overlay GeoJSON is not in memory after the tiles are made. |
 | 2 | **Attributes in columns** (part 3). | The tests of the dashboard pass, the popups and the filters show the same values, and the memory of step 0 is lower. |
 | 3 | **Frames** (part 4), with way A and way B behind one function. Measure both. First read roadstyle PR 149 (the vehicles: `rust/roadstyle-sim`, `vehicles.js`, `roadstyle-camera`), which is open. | A synthetic run on Tartu (1 hour at 1 s steps, 3,600 frames) plays at 10 frames each second, and the memory stays flat during the run. |
 | 4 | **The CI budget** (part 6). | The test fails when a change adds an object for each feature, or when the memory grows with the area, the layers or the length of the run. |

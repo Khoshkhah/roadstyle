@@ -306,7 +306,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),
         select_color: ctl["select_color"].clone(), dock: ctl["dock"].clone(), vehicle_look: ctl["vehicle_look"].clone(), vehicles: k.vehicles.clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
         color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_exaggeration: k.terrain_exaggeration, terrain_tunnels: k.terrain_tunnels.clone(), buildings_opacity: k.buildings_opacity, ground: k.ground.clone(),
-        color_active: ctl["color_active"].clone(), overlays: ctl["overlays"].clone(), overlay_control: k.overlay_control,
+        color_active: ctl["color_active"].clone(), overlays: overlays_with_rows(&ctl["overlays"], &inter["base_props"]), overlay_control: k.overlay_control,
         overlay_popup: k.overlay_popup, tunnel, fill_layers: ctl["fill_layers"].clone(), pick: ctl["pick"].clone(), road_fill: ctl["road_fill"].clone(),
         views: Value::Array(views), items: ctl["items"].clone(), road_popup: inter["popup"].clone(), road_tooltip: inter["tooltip"].clone(),
         // the page's hover_delay_ms, else the look's (roadstyle:interaction)
@@ -631,8 +631,25 @@ fn palette_swatches(style: &mut Value, rows: &[crate::sources::TableRow], pals: 
     flt["palettes"] = Value::Object(out);
 }
 
+/// The overlays of the page with the rows of each one that has some (`props`: the URL of its rows, from `tiled_page`'s `base_props`).
+fn overlays_with_rows(overlays: &Value, rows: &Value) -> Value {
+    let mut out = overlays.clone();
+    for o in out.as_array_mut().into_iter().flatten() {
+        if let Some(url) = o["source"].as_str().and_then(|s| rows.get(s)) {
+            o["props"] = url.clone();
+        }
+    }
+    out
+}
+
+/// The sources that a tiled page keeps as GeoJSON: the dashboard reads all the features of the 3D bridge decks and their shadows at one time
+/// (`filter.js`, `_deckIdsForRoad`), so they cannot be tiles before step 5 of docs/design/memory_budget.md (3D pieces by tile).
+const WHOLE_SOURCES: [&str; 2] = ["decks", "shadows"];
+
 /// _engine._tiled_page: the tiled page's style and its PMTiles archive, from stage 2 of the same stage 1 (no second build). The style
-/// has one vector source `roads` (the embedded archive) with the layers `simple` and `slots`; the other sources stay inline.
+/// has one vector source `roads` (the embedded archive) with a tile layer for each source (the roads, the base map, the boundary and the
+/// overlays), as the map worker and the server tiles have; only `WHOLE_SOURCES` stay inline. An overlay's tiles have only the keys that the
+/// style reads: all its rows (its properties and its box, `crate::rows_file`) go into the style as a gzip data URL (`roadstyle:interaction.base_props`), which the page reads by row.
 fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value, Option<Vec<u8>>), crate::Error> {
     let c = &look.map.columns;
     let hw = Some(c.class.as_str()).filter(|h| !h.is_empty()).unwrap_or("highway");
@@ -642,7 +659,7 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     let keep = [Some(hw), Some(col(&c.filter).unwrap_or(hw)), Some(roadstyle_model::mark::Mark::Twoway.name()), Some(roadstyle_model::mark::Mark::Edge.name()), Some("lvl"), col(&c.width_m)];
     let mut o = TileOptions::new(&s.layers, &s.metadata, &s.saved[TILES], &s.saved[COLUMNS], &[])?;
     o.exact = Some(keep.into_iter().flatten().map(String::from).collect());
-    o.only = Some(["roads", "simple", "slots"].map(String::from).to_vec());
+    o.only = Some(s.shown().map(|(k, _)| k.to_string()).filter(|k| !WHOLE_SOURCES.contains(&k.as_str())).collect());
     if let Some(f) = a.get("tile_format").and_then(Value::as_str) {        // the one default is MLT (docs/design/tiling.md)
         o.format = crate::tiles::TileFormat::parse(f)?;
     }
@@ -650,6 +667,15 @@ fn tiled_page(s: &Styled, look: &Look, a: &Map<String, Value>) -> Result<(Value,
     thin_arrows(&mut style, look);
     // the page gzips the whole archive (page.rs), so its tiles are not gzipped one by one
     let archive = t.archive_in(t.bounds().ok_or(crate::tiles::Error::Empty)?, &t.layer_names(), true)?;
+    // the rows of each overlay (all its properties and its box): the tiles have only the keys that the style reads
+    let urls: Map<String, Value> = s.shown().filter(|(k, _)| o.wants(k) && !["simple", "slots"].contains(k)).filter_map(|(k, src)| {
+        use base64::Engine;
+        let gz = crate::tiles::pmtiles::gzip_at(crate::rows_file(src)?.as_bytes(), 9);
+        Some((k.to_string(), format!("data:application/gzip;base64,{}", base64::engine::general_purpose::STANDARD.encode(gz)).into()))
+    }).collect();
+    if !urls.is_empty() {
+        style["metadata"]["roadstyle:interaction"]["base_props"] = Value::Object(urls);
+    }
     Ok((style, Some(archive)))
 }
 
@@ -714,6 +740,26 @@ mod tests {
         assert!(o["ontop"]["hillshade"].is_object());
         // a form that is not the dashboard is an error here, as for a page
         assert!(host_options(&look, json!({"template": "map"}).as_object().unwrap()).is_err());
+    }
+
+    /// A host that adds its roads later (duckOSM Studio, `duckosm studio`) has a page with no roads: its first view is the world (not a center
+    /// that is not a number, which MapLibre opens at 0, 0), and the page knows that it is empty, so the banner for a map with no road features is not for it.
+    /// A page with roads has the box of the roads and no `empty`.
+    #[test]
+    fn a_page_with_no_roads_opens_on_the_world_and_says_that_it_is_empty() {
+        let o = Options::from_value(&json!({"args": {"template": "dashboard", "state": "live", "tiles": false}})).unwrap();
+        let look = Look::resolve(&o).unwrap();
+        let given = given_of(&look, &o.args);
+        let camera = |html: &str| -> Value {
+            let at = html.find("const RS_OPTIONS = ").expect("the page has its options") + "const RS_OPTIONS = ".len();
+            let mut it = serde_json::Deserializer::from_str(&html[at..]).into_iter::<Value>();
+            it.next().unwrap().unwrap()["camera"].clone()
+        };
+        let page = page_from(RoadTable::empty(), None, &look, &o, &given).unwrap();
+        let c = camera(&page.html);
+        assert_eq!(c["empty"], true);
+        assert_eq!(c["bounds"], json!([[-180.0, -60.0], [180.0, 75.0]]));
+        assert!(c["center"][0].is_number() && c["center"][1].is_number(), "{c}");
     }
 
     /// A removed base map (the CARTO maps, OpenFreeMap Bright) becomes `ofm_positron` with one warning, in the active key, the list and the views;

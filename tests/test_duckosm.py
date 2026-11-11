@@ -270,7 +270,7 @@ def test_a_building_tag_of_two_digits_gives_its_height(tmp_path):
     con.close()
     _, features, _ = duckosm.read(db, "driving", levels="tags", layers=["buildings"])
     assert features.column("levels").to_pylist() == ["25"]
-    html = duckosm.page(db, "driving", levels="tags", layers=["buildings"]).html
+    html = duckosm.page(db, "driving", levels="tags", layers=["buildings"], tiles=False).html       # tiles=False: the height is in the page's GeoJSON
     assert '"height":91.5' in html.replace(" ", ""), "the building's height in the page's base map"
 
 
