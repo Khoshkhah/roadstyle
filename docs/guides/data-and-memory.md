@@ -156,6 +156,22 @@ who makes the data, and when:
 
 Use way B to show finished data to many persons. Use way D to build or edit a large area on one computer.
 
+### Later: way D on a shared server
+
+**An idea, not planned yet.** The program of way D can also run on a shared server, for many persons at one time. It is then a GIS server
+for roadstyle, like GeoServer or QGIS Server: it makes the tiles and answers the queries when a map asks, and it lets persons edit the data.
+
+| | Way D (one computer) | Way D on a shared server |
+|---|---|---|
+| Persons | One, on the same computer (127.0.0.1) | Many, from other computers |
+| Read and write | Yes | Yes |
+| Who can write | The person on the computer | Only the persons who have the right: the server must have sign-in and rights |
+| Two persons edit the same feature | Cannot occur | The server must find the conflict and keep both edits safe |
+| Other GIS apps (QGIS, ArcGIS) | Not necessary | Can use it when the server also gives the standard addresses: OGC API Tiles and OGC API Features (or WMTS and WFS-T) |
+
+The engine, the file formats, the dashboard and the four requests stay the same as in way D. The shared server adds only the sign-in,
+the rights, the conflict check and the standard addresses.
+
 ## One code for the four ways
 
 The four ways are different only in the **transport**: how the bytes go from the data to the map. All other code is written one time,
