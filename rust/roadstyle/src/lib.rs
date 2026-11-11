@@ -169,7 +169,7 @@ pub fn rows_file(src: Source<'_>) -> Option<String> {
         let mut b = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
         extend(&f["geometry"]["coordinates"], &mut b);
         if b[0] <= b[2] {
-            p.insert(roadstyle_model::mark::BBOX.into(), json!(b));
+            p.insert(roadstyle_model::mark::Mark::OverlayBox.name().into(), json!(b));
         }
         Value::Object(p)
     };
