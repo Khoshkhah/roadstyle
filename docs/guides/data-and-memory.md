@@ -13,6 +13,37 @@ To obey this rule, roadstyle cuts each type of data in one of two ways:
 - **By place:** the data is cut into tiles. The map loads the tiles in view and frees the tiles that go out of view.
 - **By time:** the values of a run are cut into frames. The page keeps a window of frames around the frame that it shows.
 
+## Memory and storage in the browser
+
+A page can keep its data in three places. They are different in speed, in size, and in how long the data stays.
+
+| Place | What it is | Speed | Size | How long the data stays |
+|---|---|---|---|---|
+| **Memory** of the tab | The working memory of the page: its JavaScript objects, its workers (the map worker, DuckDB-wasm) and their WebAssembly memory | The fastest | Limited. A WebAssembly module can use at most 4 GB. When a tab uses too much memory, the browser stops the tab. | Until the tab closes or reloads |
+| **Browser disk** (OPFS) | The Origin Private File System: files on the computer's disk that only pages of the same site can open. The person does not see them in a folder. | Fast. A page reads only the part of a file that it needs (`File.slice`, or a sync access handle in a worker). | A part of the free disk space. The browser sets the quota; `navigator.storage.estimate()` gives the use and the quota. | After a reload and a restart, until the page removes the files. The browser can clear them when the disk is full, unless the page asks for persistent storage (`navigator.storage.persist()`). |
+| **Disk of the computer** | Normal files, for example the `.duckdb` file of an area | Fast | The size of the disk | Until the person removes them |
+
+A page in the browser cannot open a normal file on the computer by its path. It can read a file that the person chooses, or files from a
+URL. Only a program on the computer (way D) uses the disk of the computer directly.
+
+**The browser disk is not a second memory.** A file on the browser disk uses no memory until the page reads a part of it. So a page that
+keeps a large table as a file, and reads only the rows of a query, uses little memory.
+
+**Some browsers cannot write to the browser disk:** some Safari versions and private windows. A page must then keep its data in memory, as
+before, so it can show a smaller area only.
+
+### Each way and the three places
+
+| Way | Memory | Browser disk (OPFS) | Disk of the computer |
+|---|---|---|---|
+| A. One HTML file | The whole file, and all the data in it | Not used | The person keeps the HTML file |
+| B. Files on a server | The tiles and the rows in view | Not used. The browser keeps the files it read in its HTTP cache. | Not used |
+| C. Made in the browser | The engine, the tiles in view, and the tables with the home `memory` | The Parquet files of the tables (a table with the home `disk` is read from its file), and the terrain file | Not used |
+| D. Made by a local program | The tiles and the rows in view | Not used | The program reads the input files there |
+
+duckOSM Studio is an example of way C. Each tab has its own folder on the browser disk. A new build removes the files of the build before
+it, and the folders of the tabs that closed, so the browser disk keeps the tables of one area for each open tab.
+
 ## The four ways to run a dashboard
 
 | Way | Where the data is | Use it for | How to make it |
