@@ -415,32 +415,20 @@ fn own_heights(roads: &Roads, b: &Bridges, o: &Own, warnings: &mut Vec<String>) 
     Ok(own.into_iter().map(|o| o.map(|(h, _)| h)).collect())
 }
 
-/// _bridge_decks: the deck features of the roads (the roads source's features, in its order: a feature's index is its id).
-/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`). `own`: the heights that the caller gave (`bridge_heights`, `bridge_height_col`).
-pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Option<&Own>, warnings: &mut Vec<String>) -> Result<Vec<Value>, crate::Error> {
-    Ok(bridge_decks_and_profile(roads, dk, m, hw, own, warnings)?.0)
-}
-
-/// The deck features and the complete profile that they were made from. Today's rule writes the profile (`today_profile`, the rules of the filler), and the maker (`make_pieces`: the second part) makes the pieces from it. A page with no profile of its own goes this way, so the pieces are the pieces of the rule.
-pub fn bridge_decks_and_profile(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Option<&Own>, warnings: &mut Vec<String>) -> Result<(Vec<Value>, BridgeProfile), crate::Error> {
+/// The deck features of the roads, and the complete profile that they were made from, in two parts. The first part, the filler (`bridge_fill::fill`), reads the input profile `input` (a JSON value
+/// in which every key is optional; None is the same as `{}`, the least), keeps what it gives and fills the rest with the rules (`today_profile`). The second part, the maker (`make_pieces`),
+/// makes the pieces from the complete profile. It has no rules and no defaults: a profile that does not fit the roads (other chains, other lengths, other nodes) is an error.
+/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`). `own`: the heights of whole groups that the caller gave (`bridge_heights`, `bridge_height_col`);
+/// they are the rule's group heights, and an input profile has its own heights, so the caller gives one of the two.
+pub fn bridge_decks_and_profile(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, input: Option<&Value>, own: Option<&Own>, warnings: &mut Vec<String>) -> Result<(Vec<Value>, BridgeProfile), crate::Error> {
     let bridges = Bridges::new(roads);
     let given = match own {
         Some(o) => own_heights(roads, &bridges, o, warnings)?,
         None => Vec::new(),
     };
     let chains = bridges.chains();
-    let profile = today_profile(&bridges, &chains, dk, &given);
-    let feats = make_pieces(roads, dk, m, hw, &chains, &profile)?;
-    Ok((feats, profile))
-}
-
-/// The deck features of the roads from an input profile that can be incomplete (`input`, a JSON value; `{}` is the least), and the complete profile that they were made from. The first part,
-/// the filler (`bridge_fill::fill`), keeps what the input gives and fills the rest with the profile of the rules; the second part, the maker (`make_pieces`), makes the pieces from the complete
-/// profile. It has no rules and no defaults: a profile that does not fit the roads (other chains, other lengths, other nodes) is an error.
-pub fn fill_and_make_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, input: &Value, warnings: &mut Vec<String>) -> Result<(Vec<Value>, BridgeProfile), crate::Error> {
-    let bridges = Bridges::new(roads);
-    let chains = bridges.chains();
-    let profile = crate::bridge_fill::fill(today_profile(&bridges, &chains, dk, &[]), input, warnings)?;
+    let empty = json!({});
+    let profile = crate::bridge_fill::fill(today_profile(&bridges, &chains, dk, &given), input.unwrap_or(&empty), warnings)?;
     let feats = make_pieces(roads, dk, m, hw, &chains, &profile)?;
     Ok((feats, profile))
 }

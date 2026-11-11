@@ -42,17 +42,13 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     if own.is_some() && !br.decks_3d {
         warnings.push("bridge_heights, bridge_height_col: the page has no 3D bridges (view_3d=False), so the heights do nothing".into());
     }
-    // the 3D decks are made in two parts: today's rule writes a complete profile (or the caller gives one: `bridge_profile`), and the maker makes the pieces from it
+    // the 3D decks are made in two parts: the filler completes the input profile (`bridge_profile`; no keyword is the empty input), and the maker makes the pieces from the complete profile
     let (decks, profile) = if br.decks_3d {
-        let (decks, profile) = match &br.profile {
-            Some(given) => {
-                if own.is_some() {
-                    warnings.push("bridge_heights, bridge_height_col: the page has a bridge_profile, so the heights do nothing".into());
-                }
-                decks::fill_and_make_decks(&roads.roads, &look.deck, &look.model, "highway", given, &mut warnings)?
-            }
-            None => decks::bridge_decks_and_profile(&roads.roads, &look.deck, &look.model, "highway", own.as_ref(), &mut warnings)?,
-        };
+        if br.profile.is_some() && own.is_some() {
+            warnings.push("bridge_heights, bridge_height_col: the page has a bridge_profile, so the heights do nothing".into());
+        }
+        let own = own.filter(|_| br.profile.is_none());
+        let (decks, profile) = decks::bridge_decks_and_profile(&roads.roads, &look.deck, &look.model, "highway", br.profile.as_ref(), own.as_ref(), &mut warnings)?;
         (decks, br.profile_export.then(|| profile.to_value()))
     } else {
         if br.profile.is_some() {
