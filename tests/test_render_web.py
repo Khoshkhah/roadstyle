@@ -2850,3 +2850,29 @@ def test_the_design_rules_of_the_bridge_height_note_are_calculated_not_typed():
         today_x, today_z = mod.smoothstep_profile(ell, 5 + 17 * min(max((ell - 60) / 540, 0), 1))
         assert abs(mod.np.gradient(today_z, today_x)).max() * 100 == pytest.approx(18.7, abs=0.4), ell    # today's engine: 1.5 / 8
     assert 5 + 17 * (300 - 60) / 540 == pytest.approx(12.6, abs=0.05) and 5 + 17 * (200 - 60) / 540 == pytest.approx(9.4, abs=0.05)   # today's heights in the note
+
+
+def test_the_granville_nodes_and_the_five_heights_of_the_design_note():
+    """docs/design/bridge_height_design.md, "How many heights a profile needs" (docs/img/bridge-height/granville_nodes.py): the Granville group has 13 nodes, 8 free ends on the ground and 5 junctions; the
+    distance of each junction to the ground and the highest height that a grade allows; the example of the 5 heights, in which no chain is steeper than the grade."""
+    import importlib.util
+    import sys
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_granville_nodes", here / "granville_nodes.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        rows, at, _ = mod.junctions()
+        height, chain_rows = mod.example_profile()
+    finally:
+        sys.path.remove(str(here))
+    assert len(at) == 13 and sum(1 for v in at.values() if len(v) == 1) == 8 and len(rows) == 5          # 13 nodes: 8 on the ground, 5 junctions
+    assert sum(len(v) for v in at.values()) == 24                                                            # 12 chains have 24 ends
+    assert [r[2] for r in rows] == [[1, 5, 6, 8], [1, 4, 9], [3, 9, 10], [2, 4, 7], [10, 11, 12]]
+    assert [r[3] for r in rows] == pytest.approx([184, 363, 185, 228, 89], abs=2)                           # the distances to the ground
+    assert [round(0.06 * r[3], 1) for r in rows] == pytest.approx([11.0, 21.8, 11.1, 13.7, 5.3], abs=0.1)  # the highest heights at 6 %
+    assert [round(0.05 * r[3], 1) for r in rows] == pytest.approx([9.2, 18.2, 9.2, 11.4, 4.4], abs=0.1)
+    assert [round(0.08 * r[3], 1) for r in rows] == pytest.approx([14.7, 29.1, 14.8, 18.2, 7.1], abs=0.1)
+    assert [round(r[4], 1) for r in rows] == [22.0, 22.0, 22.0, 22.0, 11.2]                                  # the heights of today's engine
+    assert max(r[4] for r in chain_rows) <= 6.0 + 1e-6 and [round(r[4], 1) for r in chain_rows][:6] == [2.0, 3.4, 3.0, 2.6, 3.9, 4.0]

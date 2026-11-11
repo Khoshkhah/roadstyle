@@ -169,6 +169,72 @@ The engine says what is wrong and does not choose:
 | A level deck (a flat top with no grade) | Warning for a bridge longer than 76 m: the deck has no drainage. The least grade is 0.5 % (rule 6) |
 | A sag curve whose low point is on the bridge | Warning (rule 7) |
 
+## How many heights a profile needs
+
+A profile is fixed by the heights at its **nodes**.
+
+- A node on the ground (a free end) has height 0. The data gives it. There is nothing to give.
+- Every other node (a junction, where chains meet) needs **one height**.
+- Between two nodes, a chain is a straight grade from the height at one end to the height at the other, with a vertical curve at each change of grade.
+- One more height is needed for each high point or low point that the deck must have between its two nodes, above or below the straight grade (for example, the flat top of a bridge over a road).
+  This is one number, the top `P`.
+
+| Bridge | Nodes | On the ground | Heights to give |
+|---|---|---|---|
+| A bridge over a road (one chain) | 2 | 2 | 1: the top `P` |
+| The Granville Bridge (12 chains) | 13 | 8 | **5**: one for each junction. The other 8 node heights are 0. One more height for each chain that needs a high point between its nodes |
+
+The grade limit sets how high a junction can be. From a ground end, a deck can rise at most `g` metres for each metre of distance. So the highest height at a junction is `g × (the shortest distance along the
+chains to a ground end)`. A chain between two junctions can differ in height by at most `g × its length`. If the given heights keep this rule, no chain is steeper than `g`.
+
+### The Granville Bridge: the nodes
+
+`docs/img/bridge-height/granville_nodes.py` finds the nodes of the 12 chains and calculates these distances from the real chain lengths. It uses no measured heights.
+
+![The 13 nodes of the Granville Bridge: 8 on the ground, 5 junctions](../img/bridge-height/granville_nodes.png)
+
+| Junction | Chains that meet | Distance to the nearest ground end | Highest height at 5 % | at 6 % | at 8 % | Height of today's engine |
+|---|---|---|---|---|---|---|
+| J1 | 1, 5, 6, 8 | 184 m | 9.2 m | 11.0 m | 14.7 m | 22.0 m |
+| J2 | 1, 4, 9 | 363 m | 18.2 m | 21.8 m | 29.1 m | 22.0 m |
+| J3 | 3, 9, 10 | 185 m | 9.2 m | 11.1 m | 14.8 m | 22.0 m |
+| J4 | 2, 4, 7 | 228 m | 11.4 m | 13.7 m | 18.2 m | 22.0 m |
+| J5 | 10, 11, 12 | 89 m | 4.4 m | 5.3 m | 7.1 m | 11.2 m |
+
+Today's engine gives J1 and J3 a height of 22 m. They are 184 m and 185 m from the ground, so this is a grade of 12 %. With a design grade of 5 %, J1 and J3 can be 9.2 m high. With 8 %, they can be 14.7 m.
+The engine gives these heights with its rule (a ramp of 8 m for 1 m of height), and it does not look at the grade of the road class.
+
+### The Granville Bridge: a profile from 5 heights
+
+This is an **example**. Each junction has the highest height that a grade of 6 % allows (and not more than 22 m). The heights are J1 11.0 m, J2 21.8 m, J3 11.1 m, J4 13.7 m and J5 5.3 m. Each chain is a straight grade
+between the heights of its two nodes.
+
+![The 12 chains of the Granville Bridge from 5 junction heights](../img/bridge-height/granville_from_5_heights.png)
+
+| Chain | Length | Height at the first end | Height at the last end | Slope |
+|---|---|---|---|---|
+| 1 | 550 m | 21.8 m | 11.0 m | 2.0 % |
+| 2 | 404 m | 13.7 m | 0.0 m | 3.4 % |
+| 3 | 367 m | 0.0 m | 11.1 m | 3.0 % |
+| 4 | 312 m | 21.8 m | 13.7 m | 2.6 % |
+| 5 | 286 m | 11.0 m | 0.0 m | 3.9 % |
+| 6 | 276 m | 0.0 m | 11.0 m | 4.0 % |
+| 7 | 228 m | 13.7 m | 0.0 m | 6.0 % |
+| 8 | 184 m | 11.0 m | 0.0 m | 6.0 % |
+| 9 | 179 m | 11.1 m | 21.8 m | 6.0 % |
+| 10 | 96 m | 5.3 m | 11.1 m | 6.0 % |
+| 11 | 89 m | 5.3 m | 0.0 m | 6.0 % |
+| 12 | 89 m | 0.0 m | 5.3 m | 6.0 % |
+
+What this example is, and what it is not:
+
+- **It is not data.** The 5 heights are a choice. A designer chooses each junction height from what that junction must clear. The rules ask the user for it (see "The data that the engine needs").
+- **No chain is steeper than 6 %.** This follows from the rule above. The chains next to the ground are at exactly 6 %.
+- **The vertical curves are not drawn.** They round the change of grade at the nodes. They are part of the profile (step 3).
+- **No chain has a high point in the middle.** The main span (chain 1) is a straight grade of 2 %. If it must be higher in the middle, it needs one more height.
+- **The number of heights is small.** The profile of the whole bridge is 5 numbers, plus one for each high point. The measured profile of urbanstyle for the same bridge has 82 grade points on its 12 axes. That is a fit of
+  measurements and not the least number that a design needs.
+
 ## What the rules give, and what the engine gives today
 
 `docs/img/bridge-height/design_rules.py` is a prototype in Python. It is not the engine. The figure shows a bridge over a road of 20 m (`P` = 5.8 m), a design speed of 50 km/h and a design grade of 5 %,
