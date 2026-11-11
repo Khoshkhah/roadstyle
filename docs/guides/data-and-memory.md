@@ -85,6 +85,52 @@ who makes the data, and when:
 
 Use way B to show finished data to many persons. Use way D to build or edit a large area on one computer.
 
+## One code for the four ways
+
+The four ways are different only in the **transport**: how the bytes go from the data to the map. All other code is written one time,
+and the four ways use it. This keeps the four ways equal: a change or a fix in one place is in all four ways.
+
+### The parts of a dashboard
+
+| Part | What it does | The one code | What changes from way to way |
+|---|---|---|---|
+| **Engine** | Cuts the tiles with the one tile rule, makes the look, the 3D walls, the terrain tiles and the levels | The Rust crates (`roadstyle`, `roadstyle-tiles`) | Only how it is compiled: the Python binding (A), a native program (B: makes the files; D: answers the page), WebAssembly (C) |
+| **File formats** | Hold the data | PMTiles with MLT tiles; Parquet | Nothing |
+| **Dashboard** | The map, the panel, the toolbox, the popups, the filters, the colours, the editors | `static/dashboard/` | Nothing |
+| **Four requests** | What the dashboard asks for: a tile, one row, a query, a window of frames | One interface in the dashboard | Nothing for the dashboard. Each way gives one adapter. |
+| **Transport** (the adapter) | Moves the bytes of each request | One small adapter for each way | Everything that is different is here, and only here |
+
+### The four requests and the four adapters
+
+| Request | A. One HTML file | B. Files on a server | C. Made in the browser | D. Made by a local program |
+|---|---|---|---|---|
+| **A tile** of a source at `z/x/y` | From the PMTiles archive in the file | A range request to the PMTiles file | The map worker cuts it | A request to the program |
+| **One row** of a source (for a popup) | From the table in the page | DuckDB-wasm reads it from the Parquet file at the URL | The engine (`props`), or the host's DuckDB-wasm | A request to the program |
+| **A query** (the data dock, Ask) | The host's DuckDB-wasm | DuckDB-wasm on the Parquet files at the URL | DuckDB-wasm on the Parquet files in memory or on the browser disk | DuckDB in the program |
+| **A window of frames** | The host gives them | DuckDB-wasm on the Parquet file at the URL | DuckDB-wasm on the browser disk, or a running simulation | The program |
+
+### The rules that keep one code
+
+1. **The engine has each function one time, in Rust.** The WebAssembly module and the native program call the same function. An address
+   of the program in way D only calls that function. It has no logic of its own.
+2. **The dashboard never asks which way it runs in.** It makes the four requests, and the adapter answers them.
+3. **The files of way B come from the same engine** (`roadstyle tiles`, `Tiler.archive`). They are the same tiles that ways C and D make
+   on request.
+4. **A transport moves bytes, and never changes them.** The same request gives the same bytes in the four ways. A test can compare them.
+5. **A new type of data is added one time.** It is a new source in the engine and a new name in the requests, not new code for each way.
+6. **A host gives roadstyle functions, not data.** For example, `rsSetWalls` takes a function that gives the walls when they first show.
+   The host decides the transport inside the function, and roadstyle does not change.
+
+### What is one code today
+
+| Part | Today |
+|---|---|
+| Engine | One code. The Python binding, the native program and the WebAssembly module call the same Rust crates. |
+| Tiles | One code: one tile rule and one format for all ways. In way A, only the road layers are tiles; the other layers are GeoJSON. |
+| Dashboard | One code for all pages. |
+| Four requests | Not one interface yet. The tiles come through MapLibre (a tile address for each source). The rows, the queries and the frames come through functions that the host gives (for example `rsSetWalls`, and the data dock's functions). |
+| Adapter of way D | Planned |
+
 ## The types of data
 
 | Type of data | How it is cut | A. One HTML file | B. Files on a server | C. Made in the browser | D. Made by a local program (planned) |
