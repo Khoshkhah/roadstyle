@@ -716,6 +716,26 @@ mod tests {
         assert!(host_options(&look, json!({"template": "map"}).as_object().unwrap()).is_err());
     }
 
+    /// A host that adds its roads later (duckOSM Studio, `duckosm studio`) has a page with no roads: its first view is the world (not a center
+    /// that is not a number, which MapLibre opens at 0, 0), and the page knows that it is empty, so the banner for a map with no road features is not for it.
+    /// A page with roads has the box of the roads and no `empty`.
+    #[test]
+    fn a_page_with_no_roads_opens_on_the_world_and_says_that_it_is_empty() {
+        let o = Options::from_value(&json!({"args": {"template": "dashboard", "state": "live", "tiles": false}})).unwrap();
+        let look = Look::resolve(&o).unwrap();
+        let given = given_of(&look, &o.args);
+        let camera = |html: &str| -> Value {
+            let at = html.find("const RS_OPTIONS = ").expect("the page has its options") + "const RS_OPTIONS = ".len();
+            let mut it = serde_json::Deserializer::from_str(&html[at..]).into_iter::<Value>();
+            it.next().unwrap().unwrap()["camera"].clone()
+        };
+        let page = page_from(RoadTable::empty(), None, &look, &o, &given).unwrap();
+        let c = camera(&page.html);
+        assert_eq!(c["empty"], true);
+        assert_eq!(c["bounds"], json!([[-180.0, -60.0], [180.0, 75.0]]));
+        assert!(c["center"][0].is_number() && c["center"][1].is_number(), "{c}");
+    }
+
     /// A removed base map (the CARTO maps, OpenFreeMap Bright) becomes `ofm_positron` with one warning, in the active key, the list and the views;
     /// the fallback is in the list one time.
     #[test]
