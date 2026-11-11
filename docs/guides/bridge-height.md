@@ -280,6 +280,7 @@ Four things change a profile today.
 | `rsSetBridges3D(false)` | In the open page | The bridges are flat lines |
 
 The engine does not read a `height` or `maxheight` tag to find H. The height is a rule for the picture and not a measurement. Two bridges of the same length get the same H.
+A proposal for an input that gives a chain its own height line is in `docs/design/bridge_profile_edit.md`. It is not built.
 
 A step that edits the pieces between the engine and the page must keep these rules, or the mesh shows a step or a gap:
 

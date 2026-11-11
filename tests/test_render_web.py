@@ -2758,3 +2758,33 @@ def test_the_granville_bridge_example_is_the_engines():
     assert engine_top[:10] == pytest.approx([22.0] * 10, abs=0.05) and engine_top[10:] == pytest.approx([11.2, 11.2], abs=0.1)
     assert max(z for _, z in lidar[0]["samples"]) == pytest.approx(39.3, abs=0.05)                         # axis a1, the main span
     assert sorted({round(max(z for _, z in a["samples"]), 1) for a in lidar}) == [11.6, 11.7, 18.2, 22.7, 27.0, 27.1, 39.3]
+
+
+def test_the_prototype_numbers_of_the_bridge_profile_proposal_are_pinned():
+    """docs/design/bridge_profile_edit.md, "What the prototype shows on the Granville Bridge" (docs/img/bridge-height/granville_proposed.py): for each of the 12 chains, the largest error against the
+    LiDAR stations of the profile of today, of stage 1 (the heights at the ends and the top) and of stage 2 (the grade points). The proposal says that stage 1 is not enough and a height line is.
+    The example of the proposal (chain 1: its road id, its 9 points and 9 curves) is in the data too."""
+    import importlib.util
+    import sys
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_granville_proposed", here / "granville_proposed.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        rows = mod.compute()
+    finally:
+        sys.path.remove(str(here))
+    today = [17.3, 11.3, 10.9, 10.2, 8.9, 9.7, 11.8, 9.5, 5.0, 4.8, 3.0, 3.0]
+    one = [10.0, 2.5, 7.0, 9.8, 9.5, 8.9, 6.3, 5.7, 4.9, 3.4, 0.9, 0.9]
+    assert [r["errors"][0] for r in rows] == pytest.approx(today, abs=0.06)
+    assert [r["errors"][1] for r in rows] == pytest.approx(one, abs=0.06)
+    assert max(r["errors"][2] for r in rows) < 0.35 and min(r["errors"][1] for r in rows[:6]) > 2.4        # stage 2: 0.3 m at most. Stage 1 leaves up to 10 m on the long chains
+    assert rows[4]["errors"][1] > rows[4]["errors"][0]                                                    # chain 5: stage 1 is a little worse than today
+    first = rows[0]["inputs"]
+    assert first == pytest.approx((27.0, 22.7, 39.3), abs=0.1)
+    edges = gpd.read_parquet(here / "granville_bridge_edges.parquet")
+    chain1 = {f["properties"]["osm_id"] for f in mod.chains_of(edges)[0]["pieces"]}
+    assert chain1 == {1419040127, 1419040128} and 8043974233675410214 in set(edges[edges.osm_id.isin(chain1)].edge_id)       # the road id of the example
+    a1 = json.loads((here / "granville_lidar_samples.json").read_text())["axes"][0]
+    assert a1["points"][:3] == [[0.0, 27.02], [160.0, 31.06], [220.0, 33.66]] and len(a1["points"]) == len(a1["curves"]) == 9 and a1["curves"] == [0.0, 54.0, 54.0, 27.0, 18.0, 18.0, 27.0, 54.0, 0.0]
