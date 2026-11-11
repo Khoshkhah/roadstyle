@@ -1,6 +1,6 @@
 # Memory: one budget for every dashboard
 
-Date: 2026-11-09, version 2. Status: proposal; step 0 (the measurement, 2026-11-10) and the 3D walls are done. Version 1 covered the
+Date: 2026-11-09, version 2. Status: proposal; step 0 (the measurement, 2026-11-10), the 3D walls and step 1 (every layer as tiles, 2026-11-10) are done. Version 1 covered the
 roads and the time data. Version 2 adds every layer and the 3D objects, after a look at the data of urbanstyle and SimReady ("What the projects hold" below). "Step 0: the memory of a page" below
 has the first measurement of a tab.
 
@@ -85,7 +85,7 @@ So no project can load all its data. The window and the tiles are necessary, not
 | Part | Where | How it holds the data |
 |---|---|---|
 | Road geometry | `roadstyle-tiles`, the map worker, the embedded PMTiles archive | Tiles. A road feature has only its marks and some keys ([tiling.md](tiling.md)). Safe. |
-| Overlay geometry | The embedded page | GeoJSON sources. The map worker and the server tiles carry all sources, but the embedded archive has only the 3 road layers ([tiling.md](tiling.md), "What is not one yet", item 1). |
+| Overlay geometry | The embedded archive, the map worker, the server tiles | Tiles (2026-11-10, "Step 1" below). The embedded page also has the overlay's rows (properties and box), one object for each feature, until step 2. `decks` and `shadows` stay GeoJSON until step 5. |
 | 3D objects | Fill-extrusion layers of the source `decks`; the mesh of `bridgemesh.js` (branch) | All features of the source at one time. |
 | 3D walls by type | `dashboard/walls.js`; the engine's `walls.rs` | Tiles (2026-11-10). The page gives a function to `rsSetWalls`. It runs only when "Walls by type" is on. The map worker cuts the strips and the roofs into a tile layer `walls` (zoom 14 to 16) and keeps no GeoJSON. A page that gives a FeatureCollection still gets a GeoJSON source ("The 3D walls", below). |
 | Road table, in the page | `RoadTable` in `dashboard/core.js` (`props`, `mids`, `bboxes`, `lines`) | One JavaScript object for each road in `props`, and one array for each road in `mids` and `bboxes`. The engine sends it as JSON text (`roadTable()` in `roadstyle-wasm`), and the page parses all of it. |
@@ -180,6 +180,38 @@ The speed of the disk path:
 
 So step 7 (the OPFS transport) is fast enough for a popup and for tiles. roadstyle's walls are now tiles of the map worker ("The 3D walls"
 above); Studio's tables on the disk are Studio's own work.
+
+### Step 1: every layer in the embedded archive (done 2026-11-10)
+
+The embedded PMTiles archive of a one-file page (way A) had the road layers only. Now it has a tile layer for each source: the base map, the
+boundary and the overlays too (`tiled_page` in `page_options.rs`). The page keeps no GeoJSON for them. Only `decks` and `shadows` stay
+GeoJSON (step 5): the dashboard reads all their features at one time.
+
+The tiles of an overlay have only the keys that the style reads. The dashboard needs more from an overlay: `rsQuery(test, layer)` runs a
+test over each feature, `rsGetProps` reads rows, `rsFocus` needs the box of a feature, and a popup reads its fields. So the page also holds
+the **rows** of each overlay: all its properties and its box (`__rs_bbox`), as JSON, gzip, and a `data:` URL in
+`roadstyle:interaction.base_props` (`rows_file` in `lib.rs`; the page option `overlays[].props`). `overlays.js` reads them when the page
+starts and gives `_sfeats` a feature with no geometry for each row (`OV_ROWS` in `core.js`). The rows are one JavaScript object for each
+feature. Step 2 (columns) changes that.
+
+Measured the same way as step 0: `scripts/measure_page.py` (the private memory of the tab, headless Chromium, a view of 640 × 400, a view of
+zoom 16 with every overlay layer on), roadstyle on `main` against this change, 2026-11-10. The machine ran other builds, so a number can
+differ by a few MiB between runs.
+
+| Page | File | Tab, loaded | Tab, zoom 16, every overlay on |
+|---|---|---|---|
+| urbanstyle, Monaco (`viz/monaco.html`, 35 overlays, about 80,000 features) before | 34.7 MB | 587 MiB | 630 MiB |
+| the same after | 19.1 MB | 416 MiB | 442 MiB |
+| roadstyle, Monaco (`duckosm.page`, 16 base-map layers) before | 5.3 MB | 215 MiB | 334 MiB |
+| the same after | 5.0 MB | 202 MiB | 271 MiB |
+
+The pictures are the same: at zoom 16, 19.8 % of the pixels of the urbanstyle page and 4.5 % of the roadstyle page differ at all (the tile cut
+and MapLibre's GeoJSON cut anti-alias a little differently), 0.09 % and 0.00 % by more than 32 levels of 255. `rsQuery(() => true, label)` gives
+the same number of features for each of the 35 and the 16 overlays, `rsGetProps` the same field names, and `rsFocus` and `rsHighlight` the same camera
+and state. The file is smaller because tiles are smaller than GeoJSON; the 5.4 MB of rows are in it.
+
+What is left in memory: the rows (one object for each feature) and the browser. Step 2 turns the rows into columns, and the rows of a layer
+that is off need not be loaded.
 
 ## The design
 
@@ -287,7 +319,7 @@ Each step has a check. A step starts only when the step before it is done. The t
 | Step | Work | Check |
 |---|---|---|
 | 0 | **Measure.** The memory of the tab, the map worker and the road table, on Monaco and Tartu, with the current code. Count the bytes of `RoadTable` alone and of the overlay sources alone. **Done 2026-11-10** on roadstyle's own pages ("Step 0: the memory of a page"); an urbanstyle page is not measured yet. | The numbers are in this note. They show which part is the largest. |
-| 1 | **Every layer as tiles** (part 1). | The urbanstyle Monaco page looks the same (pixel test), and the overlay GeoJSON is not in memory after the tiles are made. |
+| 1 | **Every layer as tiles** (part 1). **Done 2026-11-10** ("Step 1" above). | The urbanstyle Monaco page looks the same (pixel test), and the overlay GeoJSON is not in memory after the tiles are made. |
 | 2 | **Attributes in columns** (part 3). | The tests of the dashboard pass, the popups and the filters show the same values, and the memory of step 0 is lower. |
 | 3 | **Frames** (part 4), with way A and way B behind one function. Measure both. First read roadstyle PR 149 (the vehicles: `rust/roadstyle-sim`, `vehicles.js`, `roadstyle-camera`), which is open. | A synthetic run on Tartu (1 hour at 1 s steps, 3,600 frames) plays at 10 frames each second, and the memory stays flat during the run. |
 | 4 | **The CI budget** (part 6). | The test fails when a change adds an object for each feature, or when the memory grows with the area, the layers or the length of the run. |
