@@ -5,11 +5,13 @@ import {map, OVERLAYS, _emit} from "./core.js";
 import {_ovCbs} from "./overlays.js";
 import {getTool, greyTool, replaceTool, BUILDINGS_ICON} from "./tools.js";
 import {_check} from "./panel.js";
+import {_ownOpacity} from "./basemap.js";
 let _b3d = [], _b3dOn = false;     // the overlays with a 3D layer (ov.extrude), the switch
 // a 3D layer shows while the switch is on and its overlay (the buildings) is shown
 function _show3d(){
   _b3d.forEach(ov => { if(map.getLayer(ov.extrude))
     map.setLayoutProperty(ov.extrude, "visibility", _b3dOn && ov.visible !== false ? "visible" : "none"); });
+  _ownOpacity();
 }
 export function rsSetBuildings3D(on){
   _b3dOn = !!on; _show3d();
