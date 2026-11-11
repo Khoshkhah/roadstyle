@@ -1,6 +1,6 @@
 # Memory: one budget for every dashboard
 
-Date: 2026-11-09, version 2. Status: proposal; step 0 (the measurement, 2026-11-10), the 3D walls and step 1 (every layer as tiles, 2026-11-10) are done. Version 1 covered the
+Date: 2026-11-09, version 2. Status: proposal; step 0 (the measurement, 2026-11-10), the 3D walls and step 1 (every layer as tiles, 2026-11-10) are done. The interface of the four requests (step 2 of the storage plan) is in "Step 2: one interface for the four requests". Version 1 covered the
 roads and the time data. Version 2 adds every layer and the 3D objects, after a look at the data of urbanstyle and SimReady ("What the projects hold" below). "Step 0: the memory of a page" below
 has the first measurement of a tab.
 
@@ -212,6 +212,80 @@ and state. The file is smaller because tiles are smaller than GeoJSON; the 5.4 M
 
 What is left in memory: the rows (one object for each feature) and the browser. Step 2 turns the rows into columns, and the rows of a layer
 that is off need not be loaded.
+
+### Step 2: one interface for the four requests (2026-11-11)
+
+A dashboard asks for data in four ways. Today each way has its own host function: the tiles come through a MapLibre protocol
+(`pmtiles://`, `rs://`, `lv://`), a row through `window.RS_SIDE` (`roadTable()`), the lines of a road through `RS_SIDE.linesOf`, a query through
+the `query` and `schema` options of `dataDock`, and a window of frames through nothing (`rs.setData` takes one table). Way D (step 3) needs one
+set of addresses for all of them, so the dashboard must make each request through one interface.
+
+**The interface.** `dashboard/adapter.js`. A page gives the dashboard one **adapter**: an object with these optional functions.
+
+| Request | Adapter function | Answer |
+|---|---|---|
+| A tile | `tile(source, z, x, y)` | `Promise<Uint8Array \| null>`: the bytes of the tile (the tile of the map worker, byte for byte); null: no tile |
+| Some rows | `rows(source, ids)` | `Promise<(object \| null)[]>`: one object of fields for each id; null: no such row |
+| A query | `query(sql, {signal})`, `schema()` | `{columns: [{name, type}], rows}`, and `{tables: [{name, rows, about}]}`: what `dataDock` already asks |
+| A window of frames | `frames(from, to)` | `Promise<{t, values: Float32Array}[]>`: one value for each road row |
+| The lines of some roads | `lines(ids)` | `[[lon, lat], ...]` for each id: what `linesOf` gives |
+| The style of the roads | `style()` | the style, with the tile addresses of the way (`rs.roadLayers().show(style)` puts it on the map) |
+
+The page option `adapter`, or `rs.setAdapter(adapter)`, sets it. `rs.request` makes the four requests as the dashboard makes them
+(`tile`, `rows`, `row`, `query`, `schema`, `frames`, `lines`). A function that the adapter has not got makes `rs.request.<name>` throw an
+error that says so. Nothing takes its place.
+
+**What the dashboard does with it.**
+
+- **Rows.** `RoadTable.load(i)` waits for the line of a road before a selection shows it. It now also waits for the row: when the road table
+  has no row `i` and the adapter has `rows`, the dashboard asks the adapter. All the rows that ask in one turn go in one request. A row that the
+  adapter has not got is asked one time. A selection, a hover tooltip and a popup read the row from the same place as before (`RoadTable.props`).
+  A page with no road table (way D) needs no `window.RS_SIDE`.
+- **Lines.** `RoadTable.load(i)` calls the table's `linesOf`, or else the adapter's `lines`.
+- **Queries.** `dataDock` takes `query` and `schema` from the adapter when the host gives none.
+- **Tiles.** The map reads the tiles through the style. The style of a way has the tile addresses of that way (`pmtiles://roads` in the file, `rs://...`
+  from the map worker, `http://127.0.0.1:<port>/tiles/roads/{z}/{x}/{y}` from the program). `adapter.tile` is the same request for a caller
+  that is not MapLibre (a test; an export).
+- **Frames.** `rs.request.frames(from, to)` is the request. The first user, `rs.setFrames` (step 3 of the plan above), comes with the
+  frame window. This step gives the function and its transport.
+
+**The four adapters.**
+
+| Way | Adapter |
+|---|---|
+| A. One HTML file | None. The page has the road table and the overlays' rows in itself. `rs.request.rows` of a page with no adapter throws. |
+| B. Files on a server | The style points at the PMTiles file. The host gives `rows` and `query` (DuckDB-wasm on the Parquet files at the URL). |
+| C. Made in the browser | The host gives the functions of its map worker and of its DuckDB-wasm (Studio: `roadTable()`, `roadLines`, its `query`). |
+| D. Made by a local program | `rsHttpAdapter(base)`: the program answers the four requests at the addresses below. |
+
+**The addresses of `rsHttpAdapter(base)`** (the program of step 3 answers them; they are in `adapter.js`):
+
+| Request | Address |
+|---|---|
+| the style | `GET /style.json` |
+| a tile | `GET /tiles/<source>/<z>/<x>/<y>` (204: no tile) |
+| rows | `POST /rows/<source>`, body `[id, ...]`, answer `[{...} or null, ...]` |
+| lines | `POST /lines`, body `[id, ...]` |
+| a query | `POST /query`, body `{"sql": "..."}`, answer `{"columns": [{"name", "type"}], "rows": [[...]]}`. A BIGINT is a text, and the adapter makes it a `BigInt` |
+| the schema | `GET /schema` |
+| frames | `GET /frames?from=<i>&to=<j>`: u32 frames, u32 values, then for each frame f64 `t` and one f32 for each value (little endian) |
+
+**How the existing hosts keep working.** Nothing is removed.
+
+- duckOSM Studio gives `window.RS_SIDE` (with `linesOf`), the `query` and `schema` of its DuckDB, and the `rs://` tiles. These work as before: the
+  adapter is `null`, and the table answers first. Studio can move to an adapter when it wants one page for way C and way D.
+- urbanstyle and the duckOSM local pages (`duckosm edit`) give no adapter and use the page's own table.
+- `rs.roadLayers(options)` (the host puts a new roads style on its map) stays. For way D it takes the style of the adapter:
+  `await rs.roadLayers().show(await adapter.style())`. This is the use that duckOSM's build page makes.
+- `rsSetWalls(function)` stays. The function can call `adapter.tile("walls", ...)` itself.
+
+**Not in this step.**
+
+- **The Roads filter and the other loops over all rows** (`RoadTable.rows()`, the mode filter, `rs.setData`) work on the rows that the page
+  has. A page with no road table has none, so they do nothing there. The filters by class read the tile's keys, so they work.
+- **The popup of an overlay in way D.** Its fields come from the tile. A way that wants more gives `rows(<overlay source>, ids)`; the popup does
+  not call it yet.
+- **`rs.setFrames` and the frame window** (plan step 3).
 
 ## The design
 

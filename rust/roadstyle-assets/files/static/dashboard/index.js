@@ -2,6 +2,7 @@
 // to a MapLibre map (docs/design/dashboard_module.md). The options have the names of render_web.render's keywords; the values are
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
 import {initCore, useStyle, _contractError, _emit} from "./core.js";
+import {requestsOf, setAdapter, httpAdapter} from "./adapter.js";
 import {initGeneration, useGeneration} from "./generation.js";
 import {initTemplate, setSheet, getSheet} from "./template.js";
 import {initWindows, freeArea} from "./windows.js";
@@ -48,6 +49,7 @@ import {vehiclesApi} from "./vehicles.js";
 const RS_DEFAULTS = {
   style: null,                 // the roads style (the layer ids, the base map layer, the metadata); null: it comes later (rs.setStyle)
   prefix: "",                  // the prefix of the roads style's source and layer ids in the map ("rs-": the page added them so)
+  adapter: null,               // the adapter of the page (adapter.js): {tile, rows, lines, query, schema, frames, style}, each optional; null: the page has its own road table
   road_table: null,            // the road table {props, mids, bboxes, lines} by row (stage 1); null: window.RS_SIDE, else none
   vehicles: null,              // a traffic microsimulation run to load at start: {wasm, fcd, net, routes} as URLs (vehicles.js); null: none
   vehicle_look: null,          // the look's vehicles section: the colour of each kind, each SUMO vClass, the numbers of a run (vehicles.js)
@@ -191,6 +193,9 @@ export function rsDashboard(map, options){
     naturalBreaks: (values, k) => naturalBreaks(values, k),
   });
   rs.error = error;               // null, or the text of the contract error of the style (setStyle sets it again)
+  rs.request = requestsOf();      // the four requests (adapter.js): tile, rows (row), query (schema), frames, lines
+  rs.setAdapter = setAdapter;     // the adapter of the page, later (null: none)
+  window.rsHttpAdapter = httpAdapter;     // the adapter of way D (a one-file page cannot import the module)
   rs.vehicles = vehiclesApi();    // a traffic microsimulation run on the map (vehicles.js)
   // a page with the option `vehicles` ({wasm, fcd, net, routes}: URLs) loads its run at start; a failure is reported, never hidden
   if(o.vehicles) rs.vehicles.load(o.vehicles).catch(e => console.error("rs.vehicles: the run of the option vehicles did not load:", e));
