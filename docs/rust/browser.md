@@ -157,8 +157,9 @@ Use this form when the map has its own base map and the roads come later or chan
 the roads style's sources and layers with a prefix, and gives the dashboard the new style each time.
 
 ```js
-import init, {resolveLook, Tiler} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, styleSources, Tiler} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "./dashboard/index.js";
+import {engineAdapter} from "./dashboard/ways.js";
 
 await init();
 const roads = new Uint8Array(await (await fetch("monaco_roads.parquet")).arrayBuffer());
@@ -171,13 +172,13 @@ maplibregl.addProtocol("rs", async ({url}) => {
   const [g, source, z, x, y] = url.slice("rs://".length).split("/");
   return {data: +g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array()};
 });
-// the dashboard before the roads: no style yet; one road's properties come from the engine
-const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, simple: "roads-simple",
-                             engine: {props: async (row) => JSON.parse(tiler.props("roads", row))}});
+// the dashboard before the roads: no style yet; a road's fields and line come from the engine (the adapter of way C, set in showRoads)
+const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, simple: "roads-simple"});
 
 async function showRoads(args) {
   const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live", ...args}}));
   tiler = new Tiler(roads, look, undefined, "Monaco", `rs://${++gen}/`, ["name", "highway", "lanes"]);
+  rs.setAdapter(engineAdapter({tiler, sources: styleSources(roads, look)}));      // the rows and the lines of these roads
   const style = JSON.parse(tiler.style());
   for (const l of map.getStyle().layers) if (l.id.startsWith("rs-")) map.removeLayer(l.id);
   for (const id of Object.keys(map.getStyle().sources)) if (id.startsWith("rs-")) map.removeSource(id);

@@ -1,8 +1,8 @@
-// The page of `roadstyle local` (way D): the standard dashboard with the adapter of way D (dashboard/adapter.js, rsHttpAdapter). The program that serves
+// The page of `roadstyle local` (way D): the standard dashboard with the adapter of way D (dashboard/ways.js, rsHttpAdapter). The program that serves
 // this page answers the four requests at addresses on its own origin: the style and the tiles of the roads, the rows and the lines of a road, and the
 // queries of the data dock. The page keeps no road table.
 import {rsDashboard} from "../dashboard/index.js";
-import {httpAdapter} from "../dashboard/adapter.js";
+import {httpAdapter} from "../dashboard/ways.js";
 import {rsFirstPaint} from "../dashboard/template.js";
 import {dataDock} from "../dashboard/data/data_dock.js";
 

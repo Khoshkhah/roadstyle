@@ -60,3 +60,26 @@ if(!same){
     process.exit(1);
   }
 }
+
+// The adapter of way C (dashboard/ways.js, engineAdapter): the dashboard's four requests over the engine in the page give the engine's own answers:
+// the style with the Tiler's tile addresses, the Tiler's tile, the fields of a road (Sources.roadTable) and the line of a road (Sources.roadLines).
+{
+  const {engineAdapter} = await import(new URL("../roadstyle-assets/files/static/dashboard/ways.js", import.meta.url).href);
+  const tiler = new pkg.Tiler(readFileSync(new URL("roads.parquet", data)), look, undefined, "Monaco", "rs://1/", ["name", "highway"]);
+  const a = engineAdapter({tiler, sources: s});
+  const n = 2 ** 15, lon = 7.4243, lat = 43.7384;
+  const [x, y] = [Math.floor((lon + 180) / 360 * n), Math.floor((1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n)];
+  const style = await a.style(), tile = await a.tile("roads", 15, x, y), none = await a.tile("roads", 15, 0, 0);
+  const rows = await a.rows("roads", [0, 1]), lines = await a.lines([0, 1]);
+  const got = {tiles: style.sources.roads.tiles[0], tile: text(tile), none, row: Object.keys(rows[0]).sort(), line: lines[0].length >= 2 && lines[0][0].length === 2};
+  console.log(JSON.stringify(got));
+  const same = got.tiles.startsWith("rs://1/roads/") && Buffer.compare(Buffer.from(tile), Buffer.from(tiler.tile("roads", 15, x, y))) === 0 && none === null
+    && JSON.stringify(rows[1]) === JSON.stringify(JSON.parse(new TextDecoder().decode(s.roadTable(undefined, false))).props[1]) && got.row.includes("highway") && got.line === true;
+  if(!same){
+    console.error("the adapter of way C does not give the engine's answers");
+    process.exit(1);
+  }
+  let refused = false;
+  try { engineAdapter({}); } catch { refused = true; }
+  if(!refused){ console.error("engineAdapter with no Tiler is not an error"); process.exit(1); }
+}

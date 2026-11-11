@@ -9,6 +9,8 @@
 //! | `POST /lines` `[id, ...]` | the line of each road | the engine (`write_road_lines`) |
 //! | `POST /query` `{"sql"}`, `GET /schema` | a result, the tables | DuckDB on the Parquet files and the tables of a `.duckdb` file |
 //! | `GET /frames?from=&to=` | a window of frames | DuckDB on the file of the run |
+//! | `GET /road_table`, `GET /road_ends` | the whole road table (JSON: props, mids, bboxes), and the two ends of each road (f64 LE) | the engine (`write_road_table`, `road_ends`) |
+//! | `POST /walls` (GeoJSON of `rsSetWalls`) | `{"source", "walls"}`: the 3D walls as tiles of this map (`GET /tiles/walls/...`) | the engine (`LiveTiles::set_walls`) |
 //! | `POST /relevel` `[levels.csv rows]` | `{"counts", "style"}`: the changed roads are drawn again (the style when its layers changed) | the engine (`relevel::LiveTiles`) |
 //!
 //! The server (roadstyle-serve) moves bytes and the functions here call the engine or DuckDB: this crate has no rule of its own for a tile, a
@@ -111,12 +113,36 @@ impl Local {
 
     /// One tile of a source: the bytes of the tile, empty for no tile.
     pub fn tile(&self, source: &str, z: u32, x: u32, y: u32) -> Result<Vec<u8>, String> {
-        if source != roadstyle::tiles::SOURCE {
-            return Ok(Vec::new());
-        }
         let mut map = self.map.lock().map_err(|e| e.to_string())?;
         let format = map.format();
-        map.tile_in(format, z, x, y).map_err(|e| e.to_string())
+        match source {
+            roadstyle::tiles::SOURCE => map.tile_in(format, z, x, y).map_err(|e| e.to_string()),
+            "walls" => map.walls_tile(format, z, x, y).map_err(|e| e.to_string()),
+            _ => Ok(Vec::new()),
+        }
+    }
+
+    /// The whole road table as the page loads it (JSON text: props, mids, bboxes; no lines): a part that needs every row (the level editor,
+    /// `levelEditPart`) asks for it while it is open.
+    pub fn road_table(&self) -> Result<Vec<u8>, String> {
+        let map = self.map.lock().map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        roadstyle::write_road_table(map.sources(), None, false, &mut out).map_err(|e| e.to_string())?;
+        Ok(out)
+    }
+
+    /// The two ends of each road, 4 numbers for each row (start lon, lat, end lon, lat; NaN: no line), as f64 little endian.
+    pub fn road_ends(&self) -> Result<Vec<u8>, String> {
+        let map = self.map.lock().map_err(|e| e.to_string())?;
+        Ok(roadstyle::road_ends(map.sources()).iter().flat_map(|v| v.to_le_bytes()).collect())
+    }
+
+    /// The 3D walls of the page's buildings (`fc`: the GeoJSON text of `rsSetWalls`) as tiles of this map, in place of the walls before:
+    /// `{"source": the vector source of the walls (tiles at /tiles/walls/...), "walls": the number of walls and roofs}`.
+    pub fn set_walls(&self, fc: &[u8]) -> Result<Value, String> {
+        let mut map = self.map.lock().map_err(|e| e.to_string())?;
+        let (source, n) = map.set_walls(fc).map_err(|e| e.to_string())?;
+        Ok(json!({"source": source, "walls": n}))
     }
 
     /// Read the `.duckdb` file again, after another connection wrote it (a host that saves the levels): a new table gets its view too.
@@ -357,6 +383,9 @@ impl Api for Local {
         let done = |x: Result<Response, Response>| Some(x.unwrap_or_else(|e| e));
         match (r.method, p.as_slice()) {
             ("GET", ["style.json"]) => Some(Response { status: 200, kind: "application/json", body: self.style().into_bytes() }),
+            ("GET", ["road_table"]) => done(self.road_table().map(|body| Response { status: 200, kind: "application/json", body }).map_err(|e| fail(500, &e))),
+            ("GET", ["road_ends"]) => done(self.road_ends().map(|body| Response { status: 200, kind: "application/octet-stream", body }).map_err(|e| fail(500, &e))),
+            ("POST", ["walls"]) => done(self.set_walls(r.body).map(|v| json_response(&v)).map_err(|e| fail(400, &e))),
             ("POST", ["relevel"]) => done(self.relevel(&String::from_utf8_lossy(r.body)).map(|v| json_response(&v)).map_err(|e| fail(400, &e))),
             ("GET", ["tiles", source, z, x, y]) => {
                 let n = |s: &str| s.parse::<u32>().map_err(|_| fail(400, "a tile address has numbers: /tiles/<source>/<z>/<x>/<y>"));

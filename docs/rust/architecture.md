@@ -23,7 +23,7 @@ flowchart TB
     you <-->|"clicks, rs object"| dash
 ```
 
-*Rust gives JSON text and bytes. It never calls JavaScript or MapLibre. MapLibre does not know roadstyle: for MapLibre, the roads are an ordinary style. The dashboard reads only the style. One call goes back to the engine: on a click, a browser page can ask the engine for the properties of one road (`engine.props`).*
+*Rust gives JSON text and bytes. It never calls JavaScript or MapLibre. MapLibre does not know roadstyle: for MapLibre, the roads are an ordinary style. The dashboard reads only the style. One call goes back to the engine: on a click, a browser page can ask the engine for the fields of one road (the page's adapter, `rsEngineAdapter`).*
 
 **1. The Rust engine makes the data.** From the roads and the look, it makes:
 

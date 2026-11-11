@@ -4,6 +4,7 @@ playwright."""
 import functools
 import http.server
 import json
+import math
 import shutil
 import struct
 import threading
@@ -158,4 +159,53 @@ def test_the_http_adapter_speaks_the_addresses_of_way_d(tmp_path):
         finally:
             browser.close()
     assert ("POST", "/rows/roads") in seen and ("POST", "/query") in seen and ("GET", "/frames?from=0&to=2") in seen
+    assert errors == []
+
+
+def test_the_files_adapter_reads_the_files_of_way_b(tmp_path):
+    """Way B (ways.js, filesAdapter): the files of export_style(format="pmtiles") at a URL. A page with no road table reads the style, a tile from
+    roads.pmtiles (range requests) and the rows of the roads from props.json, which it reads one time."""
+    folder = tmp_path / "b"
+    rs.export_style(_edges(), folder, base_url="http://files.test/b", format="pmtiles")
+    props = json.loads((folder / "props.json").read_text())
+    seen = []
+
+    def route(r):
+        name = r.request.url.split("/b/", 1)[1].split("?")[0]
+        f = folder / name
+        seen.append(name)
+        cors = {"Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "Content-Range, ETag"}
+        if not f.is_file():
+            return r.fulfill(status=404, headers=cors)
+        body, ask = f.read_bytes(), r.request.headers.get("range")
+        if ask:                                                      # a range request of the PMTiles library
+            a, b = (int(v) for v in ask.split("=", 1)[1].split("-"))
+            b = min(b, len(body) - 1)
+            return r.fulfill(status=206, headers={**cors, "Content-Range": f"bytes {a}-{b}/{len(body)}"}, body=body[a:b + 1])
+        return r.fulfill(headers=cors, body=body)
+
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, _page(tmp_path))
+        try:
+            page.route("http://files.test/**", route)
+            if not page.evaluate("!!window.pmtiles"):
+                page.add_script_tag(path=str(ROOT / "rust/roadstyle-assets/files/vendor/pmtiles.js"))
+            page.evaluate("""() => { window.ways = rsFilesAdapter("http://files.test/b");
+              window.RS_SIDE = null; if (O) O.road_table = null;          // a page with no road table
+              rs.setAdapter(ways); }""")
+            assert page.evaluate("ways.style().then(s => s.sources.roads.url)") == "pmtiles://http://files.test/b/roads.pmtiles"
+            assert page.evaluate("ways.rows('roads', [0, 1])") == props[:2]
+            page.evaluate("RoadTable.load(2)")
+            assert page.evaluate("RoadTable.props(2)") == props[2], "the dashboard's rows come from props.json"
+            assert seen.count("props.json") == 1, seen
+            # a tile of the roads: the archive's centre tile has bytes, a tile far away has none
+            centre = page.evaluate("new pmtiles.PMTiles('http://files.test/b/roads.pmtiles').getHeader().then(h => [h.centerZoom, h.centerLon, h.centerLat])")
+            z, lon, lat = centre
+            n = 2 ** z
+            x, y = int((lon + 180) / 360 * n), int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * n)
+            assert page.evaluate(f"ways.tile('roads', {z}, {x}, {y}).then(t => t ? t.length : 0)") > 0
+            assert page.evaluate(f"ways.tile('roads', {z}, 0, 0)") is None
+            assert "the adapter has no query" in page.evaluate("(async () => { try { await rs.request.query('x'); } catch (e) { return e.message; } })()")
+        finally:
+            browser.close()
     assert errors == []
