@@ -85,7 +85,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | function | does | fires |
 |---|---|---|
 | **Query and act on id sets** | | |
-| `rsQuery(p => bool, layer?)` | the ids of the features whose properties match | |
+| `rsQuery(p => bool, layer?)` | the ids of the features whose properties match. An overlay in tiles (a one-file page) reads its rows, which hold all its properties; a page of the map worker has no rows for it and gets an empty list | |
 | `rsGetProps(ids, layer?)` | the rows behind the ids, internal fields removed | |
 | `rsFilter(ids, layer?)` | show only these features; `null` resets. On roads it combines with the class, bridge and tunnel filters and hides every piece and every attached item (`Overlay(edge_col=...)`) of the other roads; on an overlay attached to edges it combines with its roads' filters and keeps each layer's position and order | `rs:filterchange` |
 | `rsColor(ids, "#hex", layer?)` | paint the set one colour over the base colours, and draw it on top of the other roads on its level | `rs:colorchange` |
