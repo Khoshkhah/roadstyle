@@ -48,7 +48,12 @@ export function httpAdapter(base, {fetch: get = globalThis.fetch.bind(globalThis
   const ok = async r => { if(!r.ok) throw new Error(`${r.url}: ${r.status} ${(await r.text()).slice(0, 300)}`); return r; };
   const post = async (path, body, opt = {}) => (await ok(await get(url(path), {method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify(body), ...opt}))).json();
   return {
-    style: async () => (await ok(await get(url("/style.json")))).json(),
+    // the program's tile addresses are relative ("/tiles/roads/{z}/{x}/{y}"): the base goes before them (MapLibre needs an address with its origin)
+    style: async () => {
+      const st = await (await ok(await get(url("/style.json")))).json();
+      for(const s of Object.values(st.sources || {})) if(s.tiles) s.tiles = s.tiles.map(t => t.startsWith("/") ? url(t) : t);
+      return st;
+    },
     tile: async (source, z, x, y) => {
       const r = await get(url(`/tiles/${source}/${z}/${x}/${y}`));
       if(r.status === 204) return null;
