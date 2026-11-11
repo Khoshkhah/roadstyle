@@ -13,6 +13,9 @@
 //! The server (roadstyle-serve) moves bytes and the functions here call the engine or DuckDB: this crate has no rule of its own for a tile, a
 //! row or a line (rule 1 of the guide). The page files come from roadstyle-assets (`local/`, the dashboard).
 
+// with no DuckDB (the feature `duckdb` off) the program has no queries, schema or frames: the files are not read
+#![cfg_attr(not(feature = "duckdb"), allow(dead_code, unused_imports))]
+
 use roadstyle::sources::Styled;
 use roadstyle::tiles::Tiles;
 use roadstyle_serve::{Api, Page, Request, Response};
@@ -42,6 +45,7 @@ pub struct Local {
     style: String,
     tiles: Tiles,
     rows: Vec<Value>,
+    #[cfg(feature = "duckdb")]
     db: Mutex<duckdb::Connection>,
     frames: Option<PathBuf>,
 }
@@ -72,34 +76,42 @@ impl Local {
         let mut style: Value = serde_json::from_str(&style).map_err(|e| e.to_string())?;
         style["metadata"]["roadstyle:bounds"] = json!(bounds);
         let style = style.to_string();
-        let db = duckdb::Connection::open_in_memory().map_err(|e| e.to_string())?;
-        let view = |db: &duckdb::Connection, name: &str, file: &Path| -> Result<(), String> {
-            let sql = format!("CREATE VIEW {} AS SELECT * FROM read_parquet({})", ident(name), text(&file.display().to_string()));
-            db.execute_batch(&sql).map_err(|e| format!("{}: {e}", file.display()))
-        };
-        if let Some(f) = &c.database {
-            // the file's tables as views in `main`: the queries and the schema name them as the tables of a Parquet file
-            db.execute_batch(&format!("ATTACH {} AS file (READ_ONLY)", text(&f.display().to_string()))).map_err(|e| format!("{}: {e}", f.display()))?;
-            let names: Vec<String> = {
-                let mut stmt = db.prepare("SELECT table_name FROM information_schema.tables WHERE table_catalog = 'file' AND table_schema = 'main' ORDER BY 1")
-                    .map_err(|e| e.to_string())?;
-                let r = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
-                r
+        #[cfg(feature = "duckdb")]
+        let db = {
+            let db = duckdb::Connection::open_in_memory().map_err(|e| e.to_string())?;
+            let view = |db: &duckdb::Connection, name: &str, file: &Path| -> Result<(), String> {
+                let sql = format!("CREATE VIEW {} AS SELECT * FROM read_parquet({})", ident(name), text(&file.display().to_string()));
+                db.execute_batch(&sql).map_err(|e| format!("{}: {e}", file.display()))
             };
-            for n in names {
-                db.execute_batch(&format!("CREATE VIEW {0} AS SELECT * FROM file.main.{0}", ident(&n))).map_err(|e| format!("{}: {n}: {e}", f.display()))?;
+            if let Some(f) = &c.database {
+                // the file's tables as views in `main`: the queries and the schema name them as the tables of a Parquet file
+                db.execute_batch(&format!("ATTACH {} AS file (READ_ONLY)", text(&f.display().to_string()))).map_err(|e| format!("{}: {e}", f.display()))?;
+                let names: Vec<String> = {
+                    let mut stmt = db.prepare("SELECT table_name FROM information_schema.tables WHERE table_catalog = 'file' AND table_schema = 'main' ORDER BY 1")
+                        .map_err(|e| e.to_string())?;
+                    let r = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
+                    r
+                };
+                for n in names {
+                    db.execute_batch(&format!("CREATE VIEW {0} AS SELECT * FROM file.main.{0}", ident(&n))).map_err(|e| format!("{}: {n}: {e}", f.display()))?;
+                }
             }
+            if let Some(f) = &c.roads_file {
+                view(&db, "roads", f)?;
+            }
+            for (name, file) in &c.tables {
+                view(&db, name, file)?;
+            }
+            if let Some(f) = &c.frames {
+                view(&db, "frames", f)?;           // the run's file is also a table, so the data dock can read it
+            }
+            db
+        };
+        #[cfg(not(feature = "duckdb"))]
+        if c.database.is_some() || c.roads_file.is_some() || !c.tables.is_empty() || c.frames.is_some() {
+            return Err(NO_DB.into());
         }
-        if let Some(f) = &c.roads_file {
-            view(&db, "roads", f)?;
-        }
-        for (name, file) in &c.tables {
-            view(&db, name, file)?;
-        }
-        if let Some(f) = &c.frames {
-            view(&db, "frames", f)?;           // the run's file is also a table, so the data dock can read it
-        }
-        Ok(Local { styled, style, tiles, rows, db: Mutex::new(db), frames: c.frames, })
+        Ok(Local { styled, style, tiles, rows, #[cfg(feature = "duckdb")] db: Mutex::new(db), frames: c.frames })
     }
 
     /// The number of roads (the length of a frame).
@@ -133,6 +145,12 @@ impl Local {
     }
 
     /// A query: `{"columns": [{"name", "type"}], "rows": [[...]]}`. A 64-bit integer is a text (JSON numbers keep 53 bits); a date or a time is its text.
+    #[cfg(not(feature = "duckdb"))]
+    pub fn query(&self, _sql: &str) -> Result<Value, String> {
+        Err(NO_DB.into())
+    }
+
+    #[cfg(feature = "duckdb")]
     pub fn query(&self, sql: &str) -> Result<Value, String> {
         let db = self.db.lock().map_err(|e| e.to_string())?;
         let mut stmt = db.prepare(sql).map_err(|e| e.to_string())?;
@@ -160,6 +178,12 @@ impl Local {
     }
 
     /// The tables and the views of DuckDB: `{"tables": [{"name": "main.roads", "rows": n}]}`.
+    #[cfg(not(feature = "duckdb"))]
+    pub fn schema(&self) -> Result<Value, String> {
+        Err(NO_DB.into())
+    }
+
+    #[cfg(feature = "duckdb")]
     pub fn schema(&self) -> Result<Value, String> {
         let db = self.db.lock().map_err(|e| e.to_string())?;
         let names: Vec<String> = {
@@ -178,6 +202,12 @@ impl Local {
 
     /// The frames `from` up to `to` of the run: u32 frames, u32 values (one for each road), then for each frame f64 `t` and one f32 for each road, NaN
     /// where the file has no value. The file has the columns `frame` (from 0), `t`, `row` (the road's row) and `value`.
+    #[cfg(not(feature = "duckdb"))]
+    pub fn frames(&self, _from: u32, _to: u32) -> Result<Vec<u8>, String> {
+        Err(NO_DB.into())
+    }
+
+    #[cfg(feature = "duckdb")]
     pub fn frames(&self, from: u32, to: u32) -> Result<Vec<u8>, String> {
         let Some(_) = &self.frames else { return Err("this program has no run: give --frames FILE.parquet".into()) };
         let n = self.roads();
@@ -209,6 +239,10 @@ impl Local {
     }
 }
 
+/// The answer of a query, the schema or the frames in a build with no DuckDB.
+#[cfg(not(feature = "duckdb"))]
+const NO_DB: &str = "this build of roadstyle-local has no DuckDB (the feature `duckdb`): no queries, schema, frames or files";
+
 /// A SQL identifier, and a SQL text, quoted.
 fn ident(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
@@ -219,6 +253,7 @@ fn text(s: &str) -> String {
 }
 
 /// One cell as JSON, and its DuckDB type's name ("" for NULL).
+#[cfg(feature = "duckdb")]
 fn cell(v: duckdb::types::Value) -> (Value, &'static str) {
     use duckdb::types::Value as V;
     match v {
