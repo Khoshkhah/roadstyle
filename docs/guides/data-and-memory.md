@@ -163,8 +163,14 @@ the program has no rule of its own for a tile, a row or a line. A test keeps the
 hash of three tiles of Monaco. The native tests (`roadstyle-local`) and the WebAssembly package in Node (way C,
 `cross_language.mjs`) both check the same file.
 
-**Not in the program yet:** the layers other than the roads (the base map, the boundary, the overlays), the 3D walls and bridge
-decks, the ground, and a `.duckdb` file of duckOSM as the input. The first user of the frames in the page (`rs.setFrames`) is planned.
+**A program that uses the crate** (for example `duckosm studio`) can give `roadstyle_local::Config` more than the command line gives:
+the base-map rows (`features`: the buildings, the water and the other layers of the look go in the tiles, as `tiled_of` puts them),
+and a `.duckdb` file (`database`: it is opened read only, and each of its tables is a table of the queries and the schema, in its own schema, for example `driving.edges`).
+The tiles of way D are made by `tiled_sources`, the stage 2 of `tiled_of`, so the look's tile keys (`tile_format`, `tile_layers`,
+`tile_keep`) apply.
+
+**Not in the command line yet:** the base-map rows and a `.duckdb` file as the input (only a program that uses the crate gives them).
+The first user of the frames in the page (`rs.setFrames`) is planned.
 
 **Way B and way D.** For the page they are the same: it asks the same addresses, and it gets the same tiles and rows. The difference is
 who makes the data, and when:

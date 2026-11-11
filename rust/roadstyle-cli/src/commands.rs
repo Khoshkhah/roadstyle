@@ -366,7 +366,7 @@ fn local_cmd(path: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(),
     }
     let name = take(opts, "name").unwrap_or_else(|| Path::new(path).file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
     let look = roadstyle::Look::resolve(&look_options(opts, |_| {})?)?;
-    let config = roadstyle_local::Config { roads: self::roads(path)?, roads_file: Some(PathBuf::from(path)), name, look, tables, frames, port };
+    let config = roadstyle_local::Config { roads: self::roads(path)?, features: None, database: None, roads_file: Some(PathBuf::from(path)), name, look, tables, frames, port };
     Ok(roadstyle_local::serve(config, page)?)
 }
 
