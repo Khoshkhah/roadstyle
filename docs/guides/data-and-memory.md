@@ -94,6 +94,21 @@ roadstyle tiles out/stage1 out/roads.pmtiles                     # stage 2: the 
 
 Put the folder on a web server at `base_url`. The server must answer HTTP range requests (most file hosts and cloud storage do). A map
 opens `style.json` by its URL and reads each tile in view from `roads.pmtiles`. To show a change, make the files again.
+
+The folder also has `props.json`: the fields of each road, in the order of the rows (a tile's feature id is its row). A dashboard reads
+the folder with the adapter of way B, `rsFilesAdapter(base)` (`dashboard/ways.js`):
+
+```js
+import {filesAdapter} from "./dashboard/ways.js";
+
+maplibregl.addProtocol("pmtiles", new pmtiles.Protocol().tile);          // the PMTiles library (vendor/pmtiles.js)
+const adapter = filesAdapter("https://example.org/monaco");               // style.json, roads.pmtiles, props.json
+rs.setAdapter(adapter);                                                    // rs: the page's dashboard (rsDashboard)
+await rs.roadLayers({prefix: "rs-"}).show(await adapter.style());
+```
+
+A click on a road reads its row from `props.json`. The page reads the file one time, at the first click. The data dock needs a database:
+give the adapter `query` and `schema` (for example DuckDB-wasm on Parquet files at the URL), else the dock says that the page has none.
 More: [Make tiles and PMTiles](../rust/tiles.md#b-put-the-tiles-on-a-server), [The roadstyle program](../rust/cli.md).
 
 ### Make way C: made in the browser
@@ -101,8 +116,9 @@ More: [Make tiles and PMTiles](../rust/tiles.md#b-put-the-tiles-on-a-server), [T
 The page loads the WebAssembly engine (roadstyle-wasm) and its input file. The engine makes each tile when MapLibre asks for it:
 
 ```js
-import init, {resolveLook, Tiler} from "./pkg/roadstyle_wasm.js";
+import init, {resolveLook, styleSources, Tiler} from "./pkg/roadstyle_wasm.js";
 import {rsDashboard} from "./dashboard/index.js";
+import {engineAdapter} from "./dashboard/ways.js";
 import {roadLayers} from "./dashboard/roadlayers.js";
 
 await init();
@@ -114,16 +130,21 @@ maplibregl.addProtocol("rs", async ({url}) => {
   const [g, source, z, x, y] = url.slice("rs://".length).split("/");
   return {data: +g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array()};
 });
-const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true,
-                             engine: {props: async (row) => JSON.parse(tiler.props("roads", row))}});
-
 const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live"}}));
 tiler = new Tiler(roads, look, undefined, "Area", `rs://${++gen}/`, ["name", "highway"]);
-await roadLayers({map, dashboard: rs, prefix: "rs-"}).show(JSON.parse(tiler.style()));   // the roads over the base map
+const sources = styleSources(roads, look);                  // the road table: the fields and the line of each road
+const adapter = engineAdapter({tiler, sources});            // the adapter of way C (dashboard/ways.js)
+const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true, adapter});
+await roadLayers({map, dashboard: rs, prefix: "rs-"}).show(await adapter.style());       // the roads over the base map
 ```
 
+A click on a road reads its fields from the road table of `sources` (`roadTable`, read one time), and its line from `roadLines`. The data
+dock needs a database: give the adapter `query` and `schema` (for example DuckDB-wasm on the Parquet files of the page).
+
 A page that builds large areas runs the engine in a worker (the map worker), and keeps its tables on the browser disk
-([Tables](#tables-in-memory-or-on-the-disk)). The engine takes at most 200,000 roads. duckOSM Studio is a full example.
+([Tables](#tables-in-memory-or-on-the-disk)). Its adapter gives the same functions, and each one asks the worker. The engine takes at most
+200,000 roads. duckOSM Studio is a full example: it gives the dashboard its road table and its DuckDB-wasm with the host functions of
+before (`window.RS_SIDE`, the data dock's `query` and `schema`), which work with no adapter.
 More: [Use roadstyle in the browser](../rust/browser.md).
 
 ### Way D: the engine out of the browser
@@ -138,12 +159,13 @@ roadstyle local roads.parquet --table sensors=sensors.parquet --frames run.parqu
 
 | Request | Address | Made by |
 |---|---|---|
-| The style of the roads | `GET /style.json` | the engine (`tiles_of_sources`) |
-| A tile | `GET /tiles/roads/<z>/<x>/<y>` | the engine (`Tiles::tile_in`): the tile of the map worker, byte for byte |
+| The style of the roads | `GET /style.json` | the engine (`relevel::LiveTiles`, with the tile rules of `tiled_sources`) |
+| A tile | `GET /tiles/roads/<z>/<x>/<y>` | the engine (`LiveTiles::tile_in`): the tile of the map worker, byte for byte |
 | Rows | `POST /rows/roads`, a list of row numbers | the engine (the road table) |
 | The lines of roads | `POST /lines`, a list of row numbers | the engine (`write_road_lines`) |
 | A query, the tables | `POST /query`, `GET /schema` | DuckDB on the Parquet files: the roads file is the table `roads`; `--table NAME=FILE` adds more |
 | A window of frames | `GET /frames?from=<i>&to=<j>` | DuckDB on the file of a run (`--frames`: the columns `frame`, `t`, `row`, `value`) |
+| A redraw with new levels | `POST /relevel`, rows of `levels.csv` | the engine (`LiveTiles::relevel`); see "The redraw of way D" below |
 
 The page at `/local/` is the standard dashboard. It uses the adapter `rsHttpAdapter(location.origin)`
 ([the adapter](../reference/javascript.md)) and keeps no road table: a click on a road asks the program for its row, and a query of the
@@ -155,7 +177,7 @@ limits, because the engine runs as a program on the computer:
 - The program reads the input files on the disk and keeps them there.
 - The page asks the program for each tile, one row for a popup, a query of the data dock, or a window of frames, at addresses on
   127.0.0.1.
-- The page and the dashboard are the same as in way B. Only the addresses change, so the dashboard does not know which way it uses.
+- The page and the dashboard are the same as in ways B and C. Only the adapter changes, so the dashboard does not know which way it uses.
 
 The server is the small Rust server of `roadstyle levels edit` and `roadstyle design edit` (roadstyle-serve), with one more thing: a
 program can give it addresses of its own. The server only moves bytes. The functions behind the addresses call the engine or DuckDB, so
@@ -177,15 +199,15 @@ with a server of its own serves the level editor's WebAssembly package with `roa
 **Not in the command line yet:** the base-map rows and a `.duckdb` file as the input (only a program that uses the crate gives them).
 The first user of the frames in the page (`rs.setFrames`) is planned.
 
-**Way B and way D.** For the page they are the same: it asks the same addresses, and it gets the same tiles and rows. The difference is
-who makes the data, and when:
+**Way B and way D.** For the page they are the same: the same dashboard makes the same requests, and it gets the same tiles and rows.
+Only the adapter is different (`rsFilesAdapter` reads files, `rsHttpAdapter` asks a program). The difference is who makes the data, and when:
 
 | | B. Files on a server | D. Made by a local program |
 |---|---|---|
 | When the data is made | Before the page opens: you make the PMTiles and Parquet files one time | When the page asks for it, tile by tile |
 | What answers the page | A file host. It runs no code. | A Rust program that runs while the page is open |
 | A change (an edit, a new look, new values) | Make the files again | Shows at once: the program makes the new tiles |
-| A query of the data dock | DuckDB-wasm in the browser reads parts of the Parquet files | DuckDB in the program queries the files, and the page gets only the result |
+| A query of the data dock | The host's DuckDB-wasm in the browser reads parts of the Parquet files (the adapter's `query`) | DuckDB in the program queries the files, and the page gets only the result |
 | Who can open the page | Each person who has the URL, from any computer | Only the person on that computer (127.0.0.1) |
 | Disk space | All the tiles of all zooms | Only the input files |
 
@@ -227,8 +249,9 @@ and the four ways use it. This keeps the four ways equal: a change or a fix in o
 | Request | A. One HTML file | B. Files on a server | C. Made in the browser | D. Made by a local program |
 |---|---|---|---|---|
 | **A tile** of a source at `z/x/y` | From the PMTiles archive in the file | A range request to the PMTiles file | The map worker cuts it | A request to the program |
-| **One row** of a source (for a popup) | From the table in the page | DuckDB-wasm reads it from the Parquet file at the URL | The engine (`props`), or the host's DuckDB-wasm | A request to the program |
-| **A query** (the data dock, Ask) | The host's DuckDB-wasm | DuckDB-wasm on the Parquet files at the URL | DuckDB-wasm on the Parquet files in memory or on the browser disk | DuckDB in the program |
+| **One row** of a source (for a popup) | From the table in the page | From `props.json` at the URL, read one time | From the engine's road table (`Sources.roadTable`) | A request to the program |
+| **A query** (the data dock, Ask) | The host's DuckDB-wasm | The host's DuckDB-wasm on the Parquet files at the URL | The host's DuckDB-wasm on the Parquet files in memory or on the browser disk | DuckDB in the program |
+| **The adapter** (`dashboard/ways.js`) | None | `rsFilesAdapter(base)` | `rsEngineAdapter({tiler, sources})` | `rsHttpAdapter(base)` |
 | **A window of frames** | The host gives them | DuckDB-wasm on the Parquet file at the URL | DuckDB-wasm on the browser disk, or a running simulation | The program |
 
 ### The rules that keep one code
@@ -251,17 +274,17 @@ and the four ways use it. This keeps the four ways equal: a change or a fix in o
 | Tiles | One code: one tile rule and one format for all ways. In way A, every layer is a tile layer of the archive in the file, except the 3D bridge decks (GeoJSON until they are tiles). |
 | Dashboard | One code for all pages. |
 | Four requests | One interface: the **adapter** (`dashboard/adapter.js`, [the design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/memory_budget.md)). A page gives it one object with `tile`, `rows`, `query` and `frames` (and `lines`, `schema`, `style`); the dashboard asks the four requests through `rs.request`. Each way gives its own adapter. A page that has its road table in itself needs none, and the host functions of before (`window.RS_SIDE`, the data dock's `query` and `schema`) work as before. The first user of `frames` (`rs.setFrames`) is not built yet. |
-| Adapter of way D | One code. `rsHttpAdapter(base)` in the browser, and `roadstyle local` (the crate `roadstyle-local`) as the program that answers it. |
+| Adapters | One module, `dashboard/ways.js`, with no import: `rsFilesAdapter` (B: tested in a browser on the files of `export_style`), `rsEngineAdapter` (C: tested in Node with the WebAssembly package, `cross_language.mjs`) and `rsHttpAdapter` (D: `roadstyle local`, the crate `roadstyle-local`, answers it). Way A needs none. A way with no program (B, C) takes the data dock's `query` and `schema` from the host. |
 
 ## The types of data
 
 | Type of data | How it is cut | A. One HTML file | B. Files on a server | C. Made in the browser | D. Made by a local program |
 |---|---|---|---|---|---|
 | [Road lines](#road-lines-and-other-layers) | Tiles | Tiles in the file | Tiles from the PMTiles file | The map worker makes a tile when the map asks for it | The program makes a tile when the map asks for it (built) |
-| [Other layers](#road-lines-and-other-layers) (water, land, buildings, boundary) | Tiles | Tiles in the file (the rows of an overlay are also in the page) | Tiles | Tiles from the map worker | Planned: the program reads roads only |
+| [Other layers](#road-lines-and-other-layers) (water, land, buildings, boundary) | Tiles | Tiles in the file (the rows of an overlay are also in the page) | Tiles | Tiles from the map worker | Tiles from the program (built: a program that uses the crate gives the rows, as `duckosm studio` does; the command line reads roads only) |
 | [3D objects](#3d-objects) (walls, bridge decks, piers) | Pieces by tile | All objects at one time (planned: by tile) | Planned: by tile | Walls: tiles from the map worker. Decks: all at one time (planned: by tile). | Planned: pieces by tile from the program |
 | [The ground](#the-ground) | Tiles of one terrain file | The terrain file at a URL | Tiles from the terrain file | A terrain file on the browser disk | Planned: the terrain file on the disk, by tile from the program |
-| [Tables](#tables-in-memory-or-on-the-disk) (road fields, popups, queries) | Rows, read by query | The road table in the page | The host reads Parquet at a URL | The host keeps each table in memory or on the browser disk | The program queries the Parquet files on the disk with DuckDB (built) |
+| [Tables](#tables-in-memory-or-on-the-disk) (road fields, popups, queries) | Rows, read by query | The road table in the page | The rows from `props.json`; the queries by the host (Parquet at a URL) | The engine's road table; the queries by the host (in memory or on the browser disk) | The program queries the Parquet files and a `.duckdb` file on the disk with DuckDB (built) |
 | [Values in time](#values-in-time) | Frames | One table of values at a time | One table of values at a time | One table of values at a time (planned: a window of frames) | The program gives the frames of the window (built; the page does not use them yet) |
 | [Moving points](#moving-points) (vehicles) | Frames | Planned | Planned | Planned | Planned |
 

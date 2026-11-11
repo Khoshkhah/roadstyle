@@ -254,8 +254,8 @@ error that says so. Nothing takes its place.
 | Way | Adapter |
 |---|---|
 | A. One HTML file | None. The page has the road table and the overlays' rows in itself. `rs.request.rows` of a page with no adapter throws. |
-| B. Files on a server | The style points at the PMTiles file. The host gives `rows` and `query` (DuckDB-wasm on the Parquet files at the URL). |
-| C. Made in the browser | The host gives the functions of its map worker and of its DuckDB-wasm (Studio: `roadTable()`, `roadLines`, its `query`). |
+| B. Files on a server | `rsFilesAdapter(base)` (`dashboard/ways.js`, 2026-11-11): the style, a tile of the PMTiles file, and the rows from `props.json`. The host gives `query` and `schema` (DuckDB-wasm on the Parquet files at the URL). |
+| C. Made in the browser | `rsEngineAdapter({tiler, sources})` (`dashboard/ways.js`, 2026-11-11): the style and the tiles of the Tiler, the rows and the lines of the road table. The host gives `query` and `schema`. A page with a map worker gives the same functions over its worker (Studio still uses the host functions of before). |
 | D. Made by a local program | `rsHttpAdapter(base)`: the program answers the four requests at the addresses below. |
 
 **The addresses of `rsHttpAdapter(base)`** (the program of step 3 answers them; they are in `adapter.js`):
@@ -439,7 +439,9 @@ The order puts the largest measured part first. Step 0 can change the order.
    `index.html`, which sets `window.RS_SIDE` from `roadTable()`.
 3. **3D pieces:** OGC 3D Tiles files (a standard that other viewers read), or roadstyle's own pieces in the vector tiles (one protocol with the
    2D tiles)?
-4. **The optional DuckDB helper:** do you want roadstyle to ship it, or does each host write its own two functions?
+4. **The optional DuckDB helper:** do you want roadstyle to ship it, or does each host write its own two functions? *Answered 2026-11-11
+   (Kaveh: "make possible for using all these versions"): roadstyle ships the adapters of ways B, C and D (`dashboard/ways.js`); the queries
+   stay the host's, because roadstyle has no DuckDB of its own in the page.*
 
 ## Not in this note
 

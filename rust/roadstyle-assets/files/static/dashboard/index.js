@@ -2,7 +2,8 @@
 // to a MapLibre map (docs/design/dashboard_module.md). The options have the names of render_web.render's keywords; the values are
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
 import {initCore, useStyle, _contractError, _emit, setPrefix} from "./core.js";
-import {requestsOf, setAdapter, httpAdapter} from "./adapter.js";
+import {requestsOf, setAdapter} from "./adapter.js";
+import {httpAdapter, filesAdapter, engineAdapter} from "./ways.js";
 import {initGeneration, useGeneration} from "./generation.js";
 import {initTemplate, setSheet, getSheet} from "./template.js";
 import {initWindows, freeArea} from "./windows.js";
@@ -206,7 +207,9 @@ export function rsDashboard(map, options){
   rs.error = error;               // null, or the text of the contract error of the style (setStyle sets it again)
   rs.request = requestsOf();      // the four requests (adapter.js): tile, rows (row), query (schema), frames, lines
   rs.setAdapter = setAdapter;     // the adapter of the page, later (null: none)
-  window.rsHttpAdapter = httpAdapter;     // the adapter of way D (a one-file page cannot import the module)
+  window.rsHttpAdapter = httpAdapter;     // the adapters of ways D, B and C (ways.js; a one-file page cannot import the module)
+  window.rsFilesAdapter = filesAdapter;
+  window.rsEngineAdapter = engineAdapter;
   rs.vehicles = vehiclesApi();    // a traffic microsimulation run on the map (vehicles.js)
   // a page with the option `vehicles` ({wasm, fcd, net, routes}: URLs) loads its run at start; a failure is reported, never hidden
   if(o.vehicles) rs.vehicles.load(o.vehicles).catch(e => console.error("rs.vehicles: the run of the option vehicles did not load:", e));

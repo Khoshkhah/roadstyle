@@ -339,7 +339,8 @@ export function rsDashboard(map: MapLibreMap, options?: DashboardOptions): Dashb
 /** The report of a vehicles run (rs.vehicles.report, the event rs:vehicleload). */
 export interface VehicleReport { samples: number; vehicles: number; t0: number; t1: number; empty_rows: number; lanes_unknown: number; path_gaps: number; teleports: number }
 
-/** What a way gives the dashboard (adapter.js). Way D: `rsHttpAdapter(base)`. */
+/** What a way gives the dashboard (adapter.js). The adapters of the ways are in ways.js: way B `rsFilesAdapter(base, {pmtiles, query, schema})`,
+ * way C `rsEngineAdapter({tiler, sources, format, query, schema})`, way D `rsHttpAdapter(base)`. Way A needs none. */
 export interface Adapter {
   tile?(source: string, z: number, x: number, y: number): Promise<Uint8Array | null>;
   rows?(source: string, ids: number[]): Promise<(Record<string, unknown> | null)[]>;
