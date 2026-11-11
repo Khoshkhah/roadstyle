@@ -89,12 +89,17 @@ export function buildBox(menu){
   topRow("hillshade", "Hillshade").checked = keep("hillshade", O.hillshade);
   topRow("terrain", "3D terrain").checked = keep("terrain", O.terrain);
   // what a tunnel does on the terrain (elevation.js, terrain_tunnels=): show it, fade it or hide it; a row under the switch, shown only while the terrain is on
-  const tunRow = _bxEl("label", "rs-set-slide rs-bm-opacity rs-bm-tunnels"), tunSel = _bxEl("select");
-  tunSel.id = "rs-top-terrain-tunnels";
-  for(const [v, t] of [["show", "Show"], ["fade", "Fade"], ["hide", "Hide"]]){ const o = _bxEl("option", "", t); o.value = v; tunSel.appendChild(o); }
-  tunSel.value = rsTerrainTunnels();
-  tunSel.onchange = () => rsTerrainTunnels(tunSel.value);
-  tunRow.append(_bxEl("span", "", "Tunnels"), tunSel); menu.appendChild(tunRow);
+  // the dashboard's segmented control (rs-seg), as the panel's: one button for each mode, the mode now marked
+  const tunRow = _bxEl("div", "rs-bm-opacity rs-bm-tunnels"), tunSeg = _bxEl("div", "rs-seg");
+  tunSeg.id = "rs-top-terrain-tunnels"; tunSeg.setAttribute("role", "radiogroup"); tunSeg.setAttribute("aria-label", "Tunnels on the terrain");
+  const tunMark = () => tunSeg.querySelectorAll("button").forEach(b => { const on = b.dataset.mode === rsTerrainTunnels(); b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
+  for(const [v, t] of [["show", "Show"], ["fade", "Fade"], ["hide", "Hide"]]){
+    const b = _bxEl("button", "", t); b.type = "button"; b.dataset.mode = v; b.setAttribute("role", "radio");
+    b.onclick = () => { rsTerrainTunnels(v); tunMark(); };
+    tunSeg.appendChild(b);
+  }
+  tunMark();
+  tunRow.append(_bxEl("span", "", "Tunnels"), tunSeg); menu.appendChild(tunRow);
   topRow("labels", "Labels");
   topRow("arrows", "One-way arrows").checked = rsArrowsOn();       // on, unless the person turned them off in this browser (arrows.js keeps the state)
   topRow("buildings", "3D buildings");
