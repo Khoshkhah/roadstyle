@@ -128,7 +128,8 @@ export function buildBox(menu){
   window.rsTerrainTunnels = rsTerrainTunnels;
   window.rsTunnelsOpacity = rsTunnelsOpacity;
   document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; tunRow.hidden = !e.detail.on; });
-  document.addEventListener("rs:buildings3dchange", () => { opRow.hidden = !(tops.buildings.c.checked || (_ownBuildings() && window.rsGetBuildings3D && window.rsGetBuildings3D())); });
+  // the area's own 3D buildings on or off: the row, and the opacity they have now (their style's until the person moves the slider)
+  document.addEventListener("rs:buildings3dchange", () => { opRow.hidden = !(tops.buildings.c.checked || (_ownBuildings() && window.rsGetBuildings3D && window.rsGetBuildings3D())); opShow(rsBuildingsOpacity()); });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
   tops.arrows.c.onchange = () => rsSetArrows(tops.arrows.c.checked);
   document.addEventListener("rs:arrowschange", e => { tops.arrows.c.checked = e.detail.on; });
