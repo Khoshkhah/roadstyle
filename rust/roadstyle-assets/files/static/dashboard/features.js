@@ -1,7 +1,7 @@
 // The base map's layers (mapstyle's page scripts, docs/design/mapstyle_page_scripts.md): the 3D buildings and each layer's clicks,
 // tooltip and popup. Each comes from the layer's entry in roadstyle:controls.overlays (audit R7; a page's layers have no metadata):
 // its 3D layer (extrude: the layer id), its start switches (interactive, tooltip, popup_window).
-import {map, OVERLAYS, _emit} from "./core.js";
+import {map, OVERLAYS, RS_PREFIX, _emit} from "./core.js";
 import {_ovCbs} from "./overlays.js";
 import {getTool, greyTool, replaceTool, BUILDINGS_ICON} from "./tools.js";
 import {_check} from "./panel.js";
@@ -11,7 +11,16 @@ let _b3d = [], _b3dOn = false;     // the overlays with a 3D layer (ov.extrude),
 function _show3d(){
   _b3d.forEach(ov => { if(map.getLayer(ov.extrude))
     map.setLayoutProperty(ov.extrude, "visibility", _b3dOn && ov.visible !== false ? "visible" : "none"); });
+  if(_b3dOn) _over3d();
   _ownOpacity();
+}
+// the 3D buildings over the names of the streets: a text layer draws over every layer under it, so a building that stands in front of a street
+// name must be above that name's layer. The 3D layers go just above the last text layer of the roads (the selection's layers stay above them).
+function _over3d(){
+  const ls = map.getStyle().layers, lastText = ls.map(l => l.type === "symbol" && l.id.startsWith(RS_PREFIX)).lastIndexOf(true);
+  if(lastText < 0) return;
+  const next = ls.slice(lastText + 1).find(l => !_b3d.some(ov => ov.extrude === l.id));
+  for(const ov of _b3d) if(map.getLayer(ov.extrude) && ls.findIndex(l => l.id === ov.extrude) < lastText) map.moveLayer(ov.extrude, next ? next.id : undefined);
 }
 export function rsSetBuildings3D(on){
   _b3dOn = !!on; _show3d();

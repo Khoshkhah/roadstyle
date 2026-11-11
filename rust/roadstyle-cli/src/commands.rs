@@ -42,6 +42,12 @@ usage:
       the widths, the names, the arrows and the layers). It saves your design in FILE, a file name in the folder of <roads>
       (default: <roads name>.design.json). <roads>: a .parquet, .geojson or .shp file (the page reads it; a GeoPackage only the
       native program reads).
+  roadstyle local <roads.parquet> [--table NAME=FILE.parquet]... [--frames FILE.parquet] [--port 8830] [--page DIR]
+                  [--palette P] [--profile P] [--settings FILE.json] [--<keyword> VALUE] [--no-<keyword>]
+      way D (docs/guides/data-and-memory.md): the engine as a program on 127.0.0.1. The page at http://127.0.0.1:<port>/local/ is the standard
+      dashboard; the program makes the tiles, the rows and the lines of the roads and runs the queries (DuckDB) when the page asks, so
+      the page keeps only what is in view. --table: more Parquet files for the queries (the roads file is the table `roads`). --frames: the
+      Parquet file of a run (columns frame, t, row, value), the window of frames of the page.
   roadstyle snapshot <page.html> <out.png> [--center LON,LAT] [--zoom Z] [--pitch P] [--bearing B] [--width 1200] [--height 800]
                     [--scale 1] [--settle 2.5] [--timeout 40]
       a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot).
@@ -265,6 +271,7 @@ pub fn run(args: &[String]) -> Result<(), Error> {
         ("levels", [sub, rest @ ..]) => levels(sub, rest, opts),
         ("design", [sub, roads]) if sub == "edit" => design_edit(roads, &mut opts),
         ("serve", [area]) => serve(area, &mut opts),
+        ("local", [roads]) => local_cmd(roads, &mut opts),
         ("snapshot", [page, out]) => snapshot(page, out, opts),
         ("help" | "-h", _) => {
             println!("{USAGE}");
@@ -342,6 +349,25 @@ fn levels(sub: &str, pos: &[String], mut opts: Vec<(String, Option<String>)>) ->
         }
         _ => Err(Error::Usage(USAGE.into())),
     }
+}
+
+/// `local <roads>`: way D, until Ctrl+C. The roads are a .parquet file (DuckDB reads it as the table `roads`).
+fn local_cmd(path: &str, opts: &mut Vec<(String, Option<String>)>) -> Result<(), Error> {
+    if !matches!(Path::new(path).extension().and_then(|e| e.to_str()), Some("parquet" | "geoparquet")) {
+        return Err(Error::Usage(format!("{path}: roadstyle local reads a GeoParquet file (.parquet)")));
+    }
+    let port: u16 = take(opts, "port").map_or(Ok(8830), |p| p.parse().map_err(|_| Error::Usage("--port needs a number".into())))?;
+    let page = take(opts, "page").map_or(roadstyle_serve::Page::Embedded, |p| roadstyle_serve::Page::Dir(p.into()));
+    let frames = take(opts, "frames").map(PathBuf::from);
+    let mut tables = Vec::new();
+    while let Some(t) = take(opts, "table") {
+        let (name, file) = t.split_once('=').ok_or_else(|| Error::Usage(format!("--table {t}: NAME=FILE.parquet")))?;
+        tables.push((name.to_string(), PathBuf::from(file)));
+    }
+    let name = take(opts, "name").unwrap_or_else(|| Path::new(path).file_stem().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+    let look = roadstyle::Look::resolve(&look_options(opts, |_| {})?)?;
+    let config = roadstyle_local::Config { roads: self::roads(path)?, features: None, database: None, roads_file: Some(PathBuf::from(path)), name, look, tables, frames, port };
+    Ok(roadstyle_local::serve(config, page)?)
 }
 
 /// `serve` and `levels edit`: the level editor of an area folder, until Ctrl+C.
