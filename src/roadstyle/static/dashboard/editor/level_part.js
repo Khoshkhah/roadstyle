@@ -15,7 +15,8 @@
 //   roadsStyle()          the style of the page's roads; used when the page's roads are not on the map at the open (see `ensureRoads`)
 // Optional: roadCount() (for maxRoads), ensureRoads() (the host draws its roads itself; with it, roadsStyle is not used), after(style) (the host's
 // own layers on a swapped style), useStyle(style) (the host swaps a style itself), pkg (the roadstyle module, initialised).
-// The host also keeps `window.RS_SIDE`, the road table of its roads, as the dashboard reads it (a host that draws roads has it).
+// The host also keeps `window.RS_SIDE`, the road table of its roads, as the dashboard reads it (a host that draws roads has it). A page that keeps no road
+// table (way D) needs none: the part lends the editor the table of the page's adapter (`table`, `lines`, `ends`) while it is open.
 // Events: "opening" (the open began: the dashboard's busy veil shows "Opening the level editor…" too), "open", "close", "applied" {files, rules, heads, caps}, "error" {message, fatal}.
 // `part.state` is "closed", "opening" or "open"; `part.dirty` is true after an Apply of the person. `part.prepare()` makes the area and the engine before the first open (a
 // Promise; the host calls it after its first draw), or the option `prepare: "idle"` does it 500 ms after the map is first idle: the open then does not call `data.edges()` again.
@@ -54,9 +55,27 @@ export function levelEditPart({dashboard = globalThis.rs, map, data, pkgUrl, loo
     if(r?.style) await (data.useStyle ? data.useStyle(r.style) : roads.show(r.style, {after: data.after}));
     else await roads.reloadTiles();
   }
+  // a page that keeps no road table (way D): the editor needs every row (its panel finds a road's rows and ends), so the part lends it the table of the
+  // page's adapter while it is open (rs.request.table, its lines and ends), and gives the page its own back at the close
+  let lent = null;
+  async function lendTable(){
+    if(window.RS_SIDE?.props?.length || !dashboard.request) return;
+    let t;
+    try { t = await dashboard.request.table(); } catch { return; }      // no table in the adapter: the editor says that the host has none
+    t.linesOf = (ids) => dashboard.request.lines(ids);
+    t.endsOf = () => dashboard.request.ends();
+    lent = {before: window.RS_SIDE};
+    window.RS_SIDE = t;
+  }
+  function giveBack(){
+    if(!lent) return;
+    window.RS_SIDE = lent.before;
+    lent = null;
+  }
   function closeEditor(){
     if(!editor) return;
     editor.destroy();
+    giveBack();
     editor = null;
     document.body.removeAttribute("data-rs-editing");
     map.resize();
@@ -90,6 +109,7 @@ export function levelEditPart({dashboard = globalThis.rs, map, data, pkgUrl, loo
       else a.levels = await data.storedLevels();                   // the levels of the tables now (a new build or another area has other levels)
       editArea = a;
       if(!roadsOnMap()){ if(data.ensureRoads) await data.ensureRoads(); else await roads.show(await data.roadsStyle()); }
+      await lendTable();
       dashboard.mapBusy?.("Opening the level editor…");            // a draw that ran meanwhile put the veil away
       editor = await levelEditor({map, panel, backLabel, pkgUrl, store: a.store, dashboard, prefix, levels: a.levels ?? undefined, look,
         host: {edgeIdCol: idCol, replaceRoads}, area: {edges: data.edges, edgeHash: hashOf(a), idCol, pkg}});
@@ -102,6 +122,7 @@ export function levelEditPart({dashboard = globalThis.rs, map, data, pkgUrl, loo
       send("open");
     } catch(e){
       closeEditor();
+      giveBack();
       note("The level editor failed: " + e.message);
       send("error", {message: e.message, fatal: true});
     } finally { opening = false; dashboard.mapBusy?.(null); }

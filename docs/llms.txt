@@ -21,7 +21,7 @@ Edges are directed: a two-way road is two edges with reversed geometry. JS calls
 - [Overview](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/index.md): the one engine, written in Rust; Python is a thin binding
 - [Make tiles and PMTiles](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/tiles.md): MLT tiles to zoom 16, the three ways to get tiles to the browser, the tile keys and the tile budget
 - [Tiling: one algorithm and one protocol](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/design/tiling.md): the one rule for every tile path
-- [Use roadstyle in the browser](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/browser.md): the WebAssembly package (resolveLook, inlineStyle, Tiler, pageFrom), the worker SQL, rsDashboard with style: null, prefix, tiles, engine.props, the level editor in a page
+- [Use roadstyle in the browser](https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/rust/browser.md): the WebAssembly package (resolveLook, inlineStyle, Tiler, pageFrom), the worker SQL, rsDashboard with style: null, prefix, tiles, the adapter of way C (engineAdapter), the level editor in a page
 
 ## Guides
 
