@@ -65,8 +65,11 @@ fn a_tile_of_way_d_is_the_tile_of_the_engine_and_the_golden_of_the_wasm_package(
     assert_eq!(Value::Object(got), want, "way_d_tiles.json: run ROADSTYLE_BLESS=1 cargo test -p roadstyle-local");
 }
 
-/// A server on a free port (a page folder with no file), and `ask(request)` for its answer: the head and the body.
-fn server(frames: Option<PathBuf>) -> (Arc<Local>, impl Fn(&str, &str, &str) -> (String, Vec<u8>)) {
+/// An answer: the head and the body.
+type Answer = (String, Vec<u8>);
+
+/// A server on a free port (a page folder with no file), and `ask(method, path, body)` for its answer.
+fn server(frames: Option<PathBuf>) -> (Arc<Local>, impl Fn(&str, &str, &str) -> Answer) {
     let port = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
     let local = Arc::new(Local::open(config(frames, port)).unwrap());
     let dir = std::env::temp_dir().join(format!("roadstyle-local-{port}"));
