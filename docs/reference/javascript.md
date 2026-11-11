@@ -120,7 +120,7 @@ rs.setState({colorBy: "speed", filter: {bridges: false}});
 | `rsSetClasses(list)` | show exactly these road classes | `rs:filterchange` |
 | `rsSetBridges(on)` | show / hide every bridge and its 3D deck | `rs:filterchange` |
 | `rsSetBridges3D(on)` | draw the bridges as 3D decks (on) or as flat lines (off); no argument: whether they are 3D. A page with no decks (`view_3d=False`) stays flat | `rs:bridges3dchange` |
-| `rsBridgeGroups()` | the groups of bridge roads that touch each other: `[{group, roads, height, set}]`, the largest first | |
+| `rsBridgeGroups()` | the groups of bridge roads that touch each other: `[{group, roads, height, set, chains, nodes}]`, the largest first. `chains` and `nodes` are the values of the [bridge profile](formats.md#the-bridge-profile-planned) that the page was made from (the chains of the group, and the nodes at their ends, each with `z_m`, `source` and `method`). They are `[]` when the page has no profile. `height` is the height now: for a group with `set`, the deck is at `height`, and the nodes keep the `z_m` of the profile | |
 | `rsSetBridgeHeight(target, metres)` | give the whole group of `target` (a group number, a road row, or a list of them) the full height `metres`; `null` gives the height of the look back. The ramps keep the length that the engine made | `rs:bridgeheightchange` |
 | `rsBridgeHeight(target)` | the full height of the group of `target`, in metres | |
 | `rsSetTunnels(on)` | show / hide every tunnel, with its street names and arrows | `rs:filterchange` |

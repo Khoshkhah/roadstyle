@@ -90,3 +90,29 @@ def test_a_wrong_number_is_not_taken_and_the_block_goes_with_the_selection_and_w
     page.evaluate("rsDeselect()")
     assert _box(page)["has"] is False
     assert not page.errors, page.errors
+
+
+def _nodes_of_the_box(page):
+    return page.evaluate("""()=>[...document.querySelectorAll('#rs-roads-box .rs-rd-bhnodes span')].map(s=>({id:s.dataset.node, text:s.textContent}))""")
+
+
+def test_the_groups_have_the_chains_and_nodes_of_the_profile_and_the_box_lists_the_nodes(page):
+    group = _click_the_deck_of_the_y(page)
+    g = page.evaluate("(g)=>rsBridgeGroups().find(x=>x.group===g)", group)
+    assert len(g["chains"]) >= 1 and len(g["nodes"]) >= 2, g
+    ends = {i for c in g["chains"] for i in (c["from"], c["to"])}
+    assert ends == {n["id"] for n in g["nodes"]}, g                    # the nodes of a group are the ends of its chains
+    assert all(n["source"] and n["method"] for n in g["nodes"]), g
+    _box(page)
+    shown = _nodes_of_the_box(page)
+    assert [s["id"] for s in shown] == [n["id"] for n in g["nodes"]], shown
+    top = max(n["z_m"] for n in g["nodes"])
+    page.fill("#rs-roads-box input[data-bh]", str(top * 2))             # the group gets twice the height: the nodes show twice their height
+    page.press("#rs-roads-box input[data-bh]", "Enter")
+    page.wait_for_timeout(500)
+    _box(page)
+    doubled = _nodes_of_the_box(page)
+    assert f"{round(top * 2, 1):g} m" in " ".join(s["text"] for s in doubled), doubled
+    page.click("#rs-roads-box button[data-bh-reset]")
+    page.evaluate("rsDeselect()")
+    assert page.errors == []

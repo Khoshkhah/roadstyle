@@ -173,6 +173,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `prefix` | (none: the Python page adds the style as it is) | `""` | `core.js`, and each file that names a source or a layer |
 | `road_table` | (none: the tiled page sets `window.RS_SIDE`) | `null` | `core.js` (`RoadTable`) |
 | `adapter` | (none: a JavaScript option of `rsDashboard`; `rs.setAdapter` sets it later) | `null` | `core.js` (`ADAPTER`, `RoadTable.load`), `adapter.js` (`rs.request`, `rsHttpAdapter`), `data/data_dock.js` |
+| `bridge_profile` | the engine, with 3D bridges: the complete bridge profile (`groups`, `parameters`) | the metadata `roadstyle:bridge_profile`, else `null` | `bridgemesh.js` (`rsBridgeGroups`), `roadsbox.js` |
 | `live` | `live_data=True` (the Rust engine): `{color, width, types, ramp, nodata}` | the metadata `roadstyle:live`, else `null` | `live.js` |
 | `basemaps` | `basemaps` | `[]` | `basemap.js` |
 | `basemap_switcher` | `basemap_switcher` | `true` | `basemap.js` |

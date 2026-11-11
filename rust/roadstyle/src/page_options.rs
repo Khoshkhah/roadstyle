@@ -300,7 +300,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let google_3d = k.google_3d.unwrap_or(dashboard.toolbar.is_some());
     let opts = PageOptions {
         dashboard, basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
-        sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(),
+        sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(), bridge_profile: meta["roadstyle:bridge_profile"].clone(),
         popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
         street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d,
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),

@@ -49,7 +49,7 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
         }
         let own = own.filter(|_| br.profile.is_none());
         let (decks, profile) = decks::bridge_decks_and_profile(&roads.roads, &look.deck, &look.model, "highway", br.profile.as_ref(), own.as_ref(), &mut warnings)?;
-        (decks, br.profile_export.then(|| profile.to_value()))
+        (decks, Some(profile.to_value()))
     } else {
         if br.profile.is_some() {
             warnings.push("bridge_profile: the page has no 3D bridges (view_3d=False), so the profile does nothing".into());

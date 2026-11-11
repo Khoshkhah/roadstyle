@@ -56,6 +56,7 @@ const RS_DEFAULTS = {
   vehicle_look: null,          // the look's vehicles section: the colour of each kind, each SUMO vClass, the numbers of a run (vehicles.js)
   sources: null,               // role -> {source, layer} (roadstyle:sources); null: the style's metadata, else its layers
   arrows: undefined,           // "points" | "line" | "line-center" | null (roadstyle:arrows); undefined: the metadata, else the style
+  bridge_profile: null,        // the complete bridge profile of the 3D decks (roadstyle:bridge_profile), or null: rsBridgeGroups lists its chains and nodes
   live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)
   dashboard: null,             // the template's typed options (roadstyle::dashboard::Dashboard): layout, panel, toolbar, windows, phone; null: none
   basemaps: [], ontop: {}, basemap_switcher: true, hillshade: false, terrain: false, terrain_exaggeration: null, buildings_opacity: null, terrain_tunnels: "fade",
@@ -92,6 +93,7 @@ function fromStyle(o, given){
   if(!given.has("road_tooltip")) o.road_tooltip = it.tooltip || false;                   // false | true | [fields]
   if(!given.has("hover_delay_ms")) o.hover_delay_ms = it.hover_delay_ms != null ? it.hover_delay_ms : 300;
   if(!given.has("color_options")) o.color_options = meta["roadstyle:color_options"] || [];
+  if(!given.has("bridge_profile")) o.bridge_profile = meta["roadstyle:bridge_profile"] || null;
   if(!given.has("live")) o.live = meta["roadstyle:live"] || null;
   if(!given.has("images")) o.images = meta["roadstyle:images"] || null;
 }

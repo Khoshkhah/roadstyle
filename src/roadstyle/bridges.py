@@ -35,11 +35,10 @@ def bridge_profile(edges, given=None, **kwargs) -> dict:
     from ._engine import export_inline
 
     kwargs.pop("view_3d", None)
-    kwargs.pop("bridge_profile_export", None)
     if given is not None:
         if kwargs.get("bridge_profile") is not None:
             raise TypeError("give the input profile once: as given or as bridge_profile=, not both")
         kwargs["bridge_profile"] = given
     if kwargs.get("bridge_profile") is not None:
         kwargs["bridge_profile"] = read_bridge_profile(kwargs["bridge_profile"])
-    return export_inline(edges, view_3d=True, bridge_profile_export=True, **kwargs)["metadata"]["roadstyle:bridge_profile"]
+    return export_inline(edges, view_3d=True, **kwargs)["metadata"]["roadstyle:bridge_profile"]
