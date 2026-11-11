@@ -15,6 +15,7 @@ import {map, O, _emit} from "./core.js";
 
 const _elHill = "rs-top-hillshade", _elTerrain = "rs-dem";
 const _elModes = ["show", "fade", "hide"];
+let _elTunOp = null;                 // the opacity of the tunnels that the person set (rsTunnelsOpacity), else the mode's
 let _elOn = false, _elTilted = false, _elMode = null;
 // the DEM's source once known (null while the ground's header is read), the ground's archive (null: the AWS tiles), the hillshade asked for meanwhile,
 // and the count of grounds (in the tile URLs: a new ground is new tiles)
@@ -140,14 +141,23 @@ export async function _elDemTile(z, x, y){
 }
 // the state of the tunnels' pieces: 1 with the terrain off or "show", the fade, or 0 for "hide". Again after rs.setStyle (the state starts at 1 with a new style)
 export function _elTunnels(){
-  const mode = _elMode || O.terrain_tunnels, f = {show: 1, fade: O.ontop.terrain.tunnel_fade, hide: 0};
-  map.setGlobalStateProperty("rs_terrain_tunnel", _elOn ? f[mode] : 1);
+  map.setGlobalStateProperty("rs_terrain_tunnel", _elOn ? rsTunnelsOpacity() : 1);
+}
+// rsTunnelsOpacity(value): the opacity of the tunnels while the 3D terrain is on, 0 (hidden) to 1 (shown); no argument: the opacity now (the person's,
+// else the mode's: show 1, fade `ontop.terrain.tunnel_fade`, hide 0)
+export function rsTunnelsOpacity(value){
+  if(value === undefined){ const mode = _elMode || O.terrain_tunnels; return _elTunOp ?? {show: 1, fade: O.ontop.terrain.tunnel_fade, hide: 0}[mode]; }
+  if(typeof value !== "number" || !(value >= 0 && value <= 1)) throw new Error("rsTunnelsOpacity: value must be a number from 0 to 1, got " + JSON.stringify(value));
+  _elTunOp = value; _elTunnels();
+  _emit("rs:tunnelsopacitychange", {opacity: value});
+  return value;
 }
 // rsTerrainTunnels(mode): "show", "fade" or "hide"; no argument: the mode now
 export function rsTerrainTunnels(mode){
   if(mode === undefined) return _elMode || O.terrain_tunnels;
   if(!_elModes.includes(mode)) throw new Error("rsTerrainTunnels: mode must be " + _elModes.join(", ") + ", got " + JSON.stringify(mode));
-  _elMode = mode; _elTunnels();
+  _elMode = mode; _elTunOp = null; _elTunnels();
+  _emit("rs:tunnelsopacitychange", {opacity: rsTunnelsOpacity()});
   return mode;
 }
 // A person's switch of the terrain (the box's row): on, the map is tilted if it is flat, so that the switch shows something; off, it is flattened again

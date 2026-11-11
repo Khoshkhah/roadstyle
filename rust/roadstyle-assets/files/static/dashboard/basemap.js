@@ -11,7 +11,9 @@ let BASEMAPS = [];
 // its far tiles at a lower zoom, and where the 3D buildings stop the flat ones show. window.rsBuildings(on) hides or shows the buildings in both modes.
 // window.rsBuildingsOpacity(value) sets the opacity of the 3D buildings (buildings_opacity=, else `ontop.buildings.opacity` of data/basemaps.json).
 let vec = null, buildingsOn = true, glyphs0 = null, sprite0 = null, bOpacity = null;
-const opacityNow = ()=>bOpacity ?? O.buildings_opacity ?? (O.ontop && O.ontop.buildings || {}).opacity ?? 1;
+// the opacity now: the person's, else the page's, else the area's own 3D buildings' (their style's paint, while they are on the map), else the base map's
+const ownNow = ()=>{ const ov = OVERLAYS.find(o=>o.extrude && map.getLayer(o.extrude)); const v = ov && map.getPaintProperty(ov.extrude, "fill-extrusion-opacity"); return typeof v === "number" ? v : null; };
+const opacityNow = ()=>bOpacity ?? O.buildings_opacity ?? ownNow() ?? (O.ontop && O.ontop.buildings || {}).opacity ?? 1;
 // the area's own 3D buildings (the overlays' 3D layers, features.js) take the opacity too, once the person or the page set one (else their style's)
 export function _ownOpacity(){
   const v = bOpacity ?? O.buildings_opacity;
