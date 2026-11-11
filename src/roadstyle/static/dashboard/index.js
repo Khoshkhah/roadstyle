@@ -29,6 +29,7 @@ import {initStreetView} from "./streetview.js";
 import {initGoogle3D} from "./google3d.js";
 import {initBasemap} from "./basemap.js";
 import {useTops} from "./basemapbox.js";
+import {roadLayers} from "./roadlayers.js";
 import {initFilter, useFilter} from "./filter.js";
 import {initFind} from "./find.js";
 import {initColor, useColor} from "./color.js";
@@ -143,6 +144,8 @@ export function rsDashboard(map, options){
   initToolbar() || mountColumn();  // every control module has defined its tool: the bar or the column shows them (tools.js)
   initOverlay();
   const rs = makeApi({
+    // roadLayers (roadlayers.js) on this map and this dashboard: a host page that puts a new roads style on its map (a server's tiled style, a LiveMap's)
+    roadLayers(opts = {}){ return roadLayers({map, dashboard: rs, ...opts}); },
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection and the hover go: they were the old roads'.
     setStyle(style, more){

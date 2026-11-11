@@ -283,6 +283,8 @@ export interface Dashboard {
   /** A new look on the same tiles (LiveMap.setLook's style): the road layers (and their copies with the prefixes `also`) take its paint, layout and filter.
    *  false: the new style has other layers (draw a new map). */
   restyle(style: StyleSpecification, options?: { also?: string[]; imagePrefix?: string }): Promise<boolean>;
+  /** roadLayers (dashboard/roadlayers.js) on this map and this dashboard: show(style) puts a new roads style on the map, reloadTiles(), remove(). */
+  roadLayers(options?: { prefix?: string; before?: string | null; also?: string[] }): { show(style: StyleSpecification, options?: { after?: (style: StyleSpecification) => void }): Promise<void>; reloadTiles(): Promise<void>; remove(): void; layers: string[]; sources: string[]; images: string[] };
   /** The prefix of the roads style's ids on the map. */
   readonly prefix: string;
   /** The phone's bottom sheet: its height (0 closed, 1 40 %, 2 full; null where the page has no sheet), or set it. */
