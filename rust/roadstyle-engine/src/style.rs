@@ -42,10 +42,26 @@ pub(crate) fn style_parts(table: RoadTable, roles: Roles, solved: Option<Vec<[i1
     if own.is_some() && !br.decks_3d {
         warnings.push("bridge_heights, bridge_height_col: the page has no 3D bridges (view_3d=False), so the heights do nothing".into());
     }
-    let decks = if look.map.bridges.decks_3d { decks::bridge_decks(&roads.roads, &look.deck, &look.model, "highway", own.as_ref(), &mut warnings)? } else { Vec::new() };
+    // the 3D decks are made in two parts: the filler completes the input profile (`bridge_profile`; no keyword is the empty input), and the maker makes the pieces from the complete profile
+    let (decks, profile) = if br.decks_3d {
+        if br.profile.is_some() && own.is_some() {
+            warnings.push("bridge_heights, bridge_height_col: the page has a bridge_profile, so the heights do nothing".into());
+        }
+        let own = own.filter(|_| br.profile.is_none());
+        let (decks, profile) = decks::bridge_decks_and_profile(&roads.roads, &look.deck, &look.model, "highway", br.profile.as_ref(), own.as_ref(), &mut warnings)?;
+        (decks, br.profile_export.then(|| profile.to_value()))
+    } else {
+        if br.profile.is_some() {
+            warnings.push("bridge_profile: the page has no 3D bridges (view_3d=False), so the profile does nothing".into());
+        }
+        (Vec::new(), None)
+    };
     simple.roles = Some(simple::Roles { fills: colors.props.clone(), casing: colors.casing_role });
     simple.colours = (!colors.class_only).then(|| crate::colors::ColourTable::of(&roads.roads, look, &colors.props, colors.casing_role)).map(Box::new);
-    let half = look_half(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs, images, &colors, planned)?;
+    let mut half = look_half(look, &roads.roads, &simple, source_features(&slots), !decks.is_empty(), &mut ovs, images, &colors, planned)?;
+    if let Some(profile) = profile {
+        half.metadata["roadstyle:bridge_profile"] = profile;
+    }
     // after the road layers: they attached the features of a layer on the streets and set its groups
     let look_inputs = crate::LookInputs { colors, layers: ovs.iter().filter(|o| o.user.is_none()).map(|o| overlays::LayerFacts {
         name: o.name.clone(), kinds: o.kinds.clone(), height: !o.l["extrude"].is_null(), edge: o.edge, edge_groups: o.edge_groups.clone() }).collect() };

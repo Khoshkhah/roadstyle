@@ -16,6 +16,7 @@ from .basemaps import (
     register_basemap,
     set_api_key,
 )
+from .bridges import bridge_profile
 from .classify import Classes, classify, natural_breaks, ramp
 from .config import StyleConfig
 from .edges import (
@@ -115,7 +116,7 @@ __all__ = [
     "restore_area_inputs",
     "save_area_levels",
     "save_levels",
-    "render_edges", "render_dashboard", "render_street_view", "sidebar_html",
+    "render_edges", "render_dashboard", "render_street_view", "sidebar_html", "bridge_profile",
     "filter_edges", "highway_types", "use_settings", "snapshot",
     "normalize_highway",
     "BASEMAPS", "Basemap", "get_basemap", "set_api_key", "get_api_key",

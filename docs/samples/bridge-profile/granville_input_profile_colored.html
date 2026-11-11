@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The complete input profile of the Granville Bridge</title>
+<style>
+:root { --bg: #ffffff; --fg: #1f2937; --given: #1d4ed8; --added: #c2410c; --line: #d1d5db; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg: #111827; --fg: #e5e7eb; --given: #93c5fd; --added: #fdba74; --line: #374151; } }
+body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+h1 { font-size: 1.1rem; margin: 0 0 .4rem; }
+.rs-bp-key { display: inline-block; margin: .2rem 0 .8rem; }
+pre.rs-bp { margin: 0; padding: 12px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+.given { color: var(--given); font-weight: 700; }
+.added { color: var(--added); }
+</style></head><body>
+<h1>The complete input profile of the Granville Bridge</h1>
+<p>Bold blue: what you gave in the input (profile 1). Orange: what the engine added (profile 2). Point at a bold blue value to see its tooltip.</p>
+<span class="rs-bp-key"><span class="given">Given in your input (profile 1)</span> &nbsp; <span class="added">Added by the engine (profile 2)</span></span>
+<pre class="rs-bp"><code>{
+ <span class="added">"format": "roadstyle.bridge_profile/1"</span>,
+ "parameters": {<span class="given" title="given in your input">"design_speed_kmh": 50</span>, <span class="given" title="given in your input">"design_grade": 0.06</span>},
+ "groups": [
+  {
+   <span class="added">"name": "Granville Bridge"</span>,
+   "nodes": [
+    {<span class="added">"id": "n1"</span>, <span class="added">"lonlat": [-123.12952, 49.27624]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c6"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>},
+    {<span class="added">"id": "n2"</span>, <span class="added">"lonlat": [-123.1292, 49.27515]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c8"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>},
+    {<span class="added">"id": "n3"</span>, <span class="added">"lonlat": [-123.12744, 49.27507]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c5"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>},
+    {<span class="added">"id": "n4"</span>, <span class="given" title="given in your input">"lonlat": [-123.13097, 49.27397]</span>, <span class="added">"kind": "junction"</span>, <span class="added">"chains": ["c1", "c5", "c6", "c8"]</span>, <span class="given" title="given in your input">"z_m": 11.0</span>, <span class="given" title="given in your input">"source": "example"</span>, <span class="given" title="given in your input">"method": "chosen"</span>},
+    {<span class="added">"id": "n5"</span>, <span class="given" title="given in your input">"lonlat": [-123.1363, 49.27045]</span>, <span class="added">"kind": "junction"</span>, <span class="added">"chains": ["c1", "c4", "c9"]</span>, <span class="given" title="given in your input">"z_m": 21.8</span>, <span class="given" title="given in your input">"source": "example"</span>, <span class="given" title="given in your input">"method": "chosen"</span>},
+    {<span class="added">"id": "n6"</span>, <span class="given" title="given in your input">"lonlat": [-123.13785, 49.26922]</span>, <span class="added">"kind": "junction"</span>, <span class="added">"chains": ["c3", "c9", "c10"]</span>, <span class="given" title="given in your input">"z_m": 11.1</span>, <span class="given" title="given in your input">"source": "example"</span>, <span class="given" title="given in your input">"method": "chosen"</span>},
+    {<span class="added">"id": "n7"</span>, <span class="given" title="given in your input">"lonlat": [-123.13945, 49.26856]</span>, <span class="added">"kind": "junction"</span>, <span class="added">"chains": ["c2", "c4", "c7"]</span>, <span class="given" title="given in your input">"z_m": 13.7</span>, <span class="given" title="given in your input">"source": "example"</span>, <span class="given" title="given in your input">"method": "chosen"</span>},
+    {<span class="added">"id": "n8"</span>, <span class="given" title="given in your input">"lonlat": [-123.13834, 49.26843]</span>, <span class="added">"kind": "junction"</span>, <span class="added">"chains": ["c10", "c11", "c12"]</span>, <span class="given" title="given in your input">"z_m": 5.3</span>, <span class="given" title="given in your input">"source": "example"</span>, <span class="given" title="given in your input">"method": "chosen"</span>},
+    {<span class="added">"id": "n9"</span>, <span class="added">"lonlat": [-123.14242, 49.26811]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c7"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>},
+    {<span class="added">"id": "n10"</span>, <span class="added">"lonlat": [-123.13848, 49.26764]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c11"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>},
+    {<span class="added">"id": "n11"</span>, <span class="added">"lonlat": [-123.13835, 49.26764]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c12"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>},
+    {<span class="added">"id": "n12"</span>, <span class="added">"lonlat": [-123.13592, 49.26645]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c3"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>},
+    {<span class="added">"id": "n13"</span>, <span class="added">"lonlat": [-123.14096, 49.26513]</span>, <span class="added">"kind": "ground"</span>, <span class="added">"chains": ["c2"]</span>, <span class="added">"z_m": 0.0</span>, <span class="added">"source": "data"</span>, <span class="added">"method": "mapped"</span>}
+   ],
+   "chains": [
+    {<span class="added">"id": "c1"</span>, <span class="added">"osm_ways": [1419040127, 1419040128]</span>, <span class="added">"length_m": 550.4</span>, <span class="added">"from": "n5"</span>, <span class="added">"to": "n4"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 5.2</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c2"</span>, <span class="added">"osm_ways": [35354210]</span>, <span class="added">"length_m": 404.2</span>, <span class="added">"from": "n7"</span>, <span class="added">"to": "n13"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 3.0</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c3"</span>, <span class="added">"osm_ways": [37226820, 304881410, 1419040130, 1419040131]</span>, <span class="added">"length_m": 367.1</span>, <span class="added">"from": "n12"</span>, <span class="added">"to": "n6"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 3.1</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c4"</span>, <span class="added">"osm_ways": [992936499, 1419040134, 1419040135, 1419040136]</span>, <span class="added">"length_m": 311.8</span>, <span class="added">"from": "n5"</span>, <span class="added">"to": "n7"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 3.0</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c5"</span>, <span class="added">"osm_ways": [24530078, 341691672]</span>, <span class="added">"length_m": 286.4</span>, <span class="added">"from": "n4"</span>, <span class="added">"to": "n3"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 5.2</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c6"</span>, <span class="added">"osm_ways": [26440580, 341691648, 1419312044]</span>, <span class="added">"length_m": 276.5</span>, <span class="added">"from": "n1"</span>, <span class="added">"to": "n4"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 5.1</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c7"</span>, <span class="added">"osm_ways": [35354235]</span>, <span class="added">"length_m": 228.0</span>, <span class="added">"from": "n7"</span>, <span class="added">"to": "n9"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 2.9</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c8"</span>, <span class="added">"osm_ways": [1316244490, 1316244492]</span>, <span class="added">"length_m": 183.9</span>, <span class="added">"from": "n4"</span>, <span class="added">"to": "n2"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 4.0</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c9"</span>, <span class="added">"osm_ways": [1419040129, 1419040137]</span>, <span class="added">"length_m": 178.6</span>, <span class="added">"from": "n6"</span>, <span class="added">"to": "n5"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 5.1</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c10"</span>, <span class="added">"osm_ways": [1419040132, 1419040133, 1419040138]</span>, <span class="added">"length_m": 95.8</span>, <span class="added">"from": "n8"</span>, <span class="added">"to": "n6"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 5.1</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c11"</span>, <span class="added">"osm_ways": [336795552]</span>, <span class="added">"length_m": 89.1</span>, <span class="added">"from": "n8"</span>, <span class="added">"to": "n10"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 5.2</span>, <span class="added">"width_source": "rule"</span>},
+    {<span class="added">"id": "c12"</span>, <span class="added">"osm_ways": [256879265, 1285848467]</span>, <span class="added">"length_m": 88.9</span>, <span class="added">"from": "n11"</span>, <span class="added">"to": "n8"</span>, <span class="added">"points": []</span>, <span class="added">"width_m": 5.1</span>, <span class="added">"width_source": "rule"</span>}
+   ]
+  }
+ ]
+}</code></pre>
+</body></html>

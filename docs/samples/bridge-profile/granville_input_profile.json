@@ -1,0 +1,38 @@
+{
+ "format": "roadstyle.bridge_profile/1",
+ "parameters": {"design_speed_kmh": 50, "design_grade": 0.06},
+ "groups": [
+  {
+   "name": "Granville Bridge",
+   "nodes": [
+    {"id": "n1", "lonlat": [-123.12952, 49.27624], "kind": "ground", "chains": ["c6"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n2", "lonlat": [-123.1292, 49.27515], "kind": "ground", "chains": ["c8"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n3", "lonlat": [-123.12744, 49.27507], "kind": "ground", "chains": ["c5"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n4", "lonlat": [-123.13097, 49.27397], "kind": "junction", "chains": ["c1", "c5", "c6", "c8"], "z_m": 11.0, "source": "example", "method": "chosen"},
+    {"id": "n5", "lonlat": [-123.1363, 49.27045], "kind": "junction", "chains": ["c1", "c4", "c9"], "z_m": 21.8, "source": "example", "method": "chosen"},
+    {"id": "n6", "lonlat": [-123.13785, 49.26922], "kind": "junction", "chains": ["c3", "c9", "c10"], "z_m": 11.1, "source": "example", "method": "chosen"},
+    {"id": "n7", "lonlat": [-123.13945, 49.26856], "kind": "junction", "chains": ["c2", "c4", "c7"], "z_m": 13.7, "source": "example", "method": "chosen"},
+    {"id": "n8", "lonlat": [-123.13834, 49.26843], "kind": "junction", "chains": ["c10", "c11", "c12"], "z_m": 5.3, "source": "example", "method": "chosen"},
+    {"id": "n9", "lonlat": [-123.14242, 49.26811], "kind": "ground", "chains": ["c7"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n10", "lonlat": [-123.13848, 49.26764], "kind": "ground", "chains": ["c11"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n11", "lonlat": [-123.13835, 49.26764], "kind": "ground", "chains": ["c12"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n12", "lonlat": [-123.13592, 49.26645], "kind": "ground", "chains": ["c3"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n13", "lonlat": [-123.14096, 49.26513], "kind": "ground", "chains": ["c2"], "z_m": 0.0, "source": "data", "method": "mapped"}
+   ],
+   "chains": [
+    {"id": "c1", "osm_ways": [1419040127, 1419040128], "length_m": 550.4, "from": "n5", "to": "n4", "points": [], "width_m": 5.2, "width_source": "rule"},
+    {"id": "c2", "osm_ways": [35354210], "length_m": 404.2, "from": "n7", "to": "n13", "points": [], "width_m": 3.0, "width_source": "rule"},
+    {"id": "c3", "osm_ways": [37226820, 304881410, 1419040130, 1419040131], "length_m": 367.1, "from": "n12", "to": "n6", "points": [], "width_m": 3.1, "width_source": "rule"},
+    {"id": "c4", "osm_ways": [992936499, 1419040134, 1419040135, 1419040136], "length_m": 311.8, "from": "n5", "to": "n7", "points": [], "width_m": 3.0, "width_source": "rule"},
+    {"id": "c5", "osm_ways": [24530078, 341691672], "length_m": 286.4, "from": "n4", "to": "n3", "points": [], "width_m": 5.2, "width_source": "rule"},
+    {"id": "c6", "osm_ways": [26440580, 341691648, 1419312044], "length_m": 276.5, "from": "n1", "to": "n4", "points": [], "width_m": 5.1, "width_source": "rule"},
+    {"id": "c7", "osm_ways": [35354235], "length_m": 228.0, "from": "n7", "to": "n9", "points": [], "width_m": 2.9, "width_source": "rule"},
+    {"id": "c8", "osm_ways": [1316244490, 1316244492], "length_m": 183.9, "from": "n4", "to": "n2", "points": [], "width_m": 4.0, "width_source": "rule"},
+    {"id": "c9", "osm_ways": [1419040129, 1419040137], "length_m": 178.6, "from": "n6", "to": "n5", "points": [], "width_m": 5.1, "width_source": "rule"},
+    {"id": "c10", "osm_ways": [1419040132, 1419040133, 1419040138], "length_m": 95.8, "from": "n8", "to": "n6", "points": [], "width_m": 5.1, "width_source": "rule"},
+    {"id": "c11", "osm_ways": [336795552], "length_m": 89.1, "from": "n8", "to": "n10", "points": [], "width_m": 5.2, "width_source": "rule"},
+    {"id": "c12", "osm_ways": [256879265, 1285848467], "length_m": 88.9, "from": "n11", "to": "n8", "points": [], "width_m": 5.1, "width_source": "rule"}
+   ]
+  }
+ ]
+}

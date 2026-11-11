@@ -3,6 +3,7 @@
 //! other vertices than GEOS gives, but it covers the same ground (tests/test_engine_parity.py compares them by shape).
 
 use roadstyle_model::mark::Mark;
+use crate::bridge_profile::{self, BridgeProfile, Curve, Kind};
 use crate::layers::{round_to, Model};
 use crate::road::Roads;
 use roadstyle_model::Cell;
@@ -204,11 +205,14 @@ fn free_end_distances(reps: &[Rep], lens: &[f64], at: &HashMap<(u64, u64), Vec<u
     best
 }
 
-/// The smaller of a and b, rounded where they are within k of each other (at most k / 4 lower), by `weight` (0: the exact minimum). The ramp's apex
-/// (where the two ramps of a short bridge meet) is rounded so it has no ridge; at the ends of a chain the weight is 0, so the height at a node is exactly the node's.
-fn smin(a: f64, b: f64, k: f64, weight: f64) -> f64 {
+/// The smaller of a and b, rounded where they are within k of each other (at most k / 4 lower). k = 0: the exact minimum. The ramp's apex (where the two ramps of a short bridge
+/// meet) is rounded so it has no ridge.
+fn smin(a: f64, b: f64, k: f64) -> f64 {
+    if k <= 0.0 {
+        return a.min(b);
+    }
     let h = (k - (a - b).abs()).max(0.0) / k;
-    a.min(b) - weight * h * h * k * 0.25
+    a.min(b) - h * h * k * 0.25
 }
 
 /// The bridge roads: one representative for each two-way pair, and where each node is used.
@@ -301,6 +305,28 @@ impl<'a> Bridges<'a> {
         }
         Chain { group: self.group[start], pts, spans, head: nodes[1], tail: nodes[0] }
     }
+
+    /// The chains of the bridge roads, in the order of their first road: `__rs_chain` of a chain is its place + 1.
+    fn chains(&self) -> Vec<Chain> {
+        let mut used = vec![false; self.reps.len()];
+        let mut out = Vec::new();
+        for i in 0..used.len() {
+            if !used[i] {
+                out.push(self.walk(i, &mut used));
+            }
+        }
+        out
+    }
+
+    /// The position of each node, by its key.
+    fn positions(&self) -> HashMap<(u64, u64), Node> {
+        let mut at = HashMap::new();
+        for r in &self.reps {
+            at.insert(hk(r.a), r.a);
+            at.insert(hk(r.z), r.z);
+        }
+        at
+    }
 }
 
 /// The heights that a caller gives: for each group of bridges (index: group - 1) the height of the whole group. Two sources, which are checked as one:
@@ -389,25 +415,106 @@ fn own_heights(roads: &Roads, b: &Bridges, o: &Own, warnings: &mut Vec<String>) 
     Ok(own.into_iter().map(|o| o.map(|(h, _)| h)).collect())
 }
 
-/// _bridge_decks: the deck features of the roads (the roads source's features, in its order: a feature's index is its id).
-/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`). `own`: the heights that the caller gave (`bridge_heights`, `bridge_height_col`).
-pub fn bridge_decks(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, own: Option<&Own>, warnings: &mut Vec<String>) -> Result<Vec<Value>, crate::Error> {
+/// The deck features of the roads, and the complete profile that they were made from, in two parts. The first part, the filler (`bridge_fill::fill`), reads the input profile `input` (a JSON value
+/// in which every key is optional; None is the same as `{}`, the least), keeps what it gives and fills the rest with the rules (`today_profile`). The second part, the maker (`make_pieces`),
+/// makes the pieces from the complete profile. It has no rules and no defaults: a profile that does not fit the roads (other chains, other lengths, other nodes) is an error.
+/// `hw`: the property that has the user's `highway` column (a casing slab's `highway`). `own`: the heights of whole groups that the caller gave (`bridge_heights`, `bridge_height_col`);
+/// they are the rule's group heights, and an input profile has its own heights, so the caller gives one of the two.
+pub fn bridge_decks_and_profile(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, input: Option<&Value>, own: Option<&Own>, warnings: &mut Vec<String>) -> Result<(Vec<Value>, BridgeProfile), crate::Error> {
     let bridges = Bridges::new(roads);
     let given = match own {
         Some(o) => own_heights(roads, &bridges, o, warnings)?,
         None => Vec::new(),
     };
-    let mut used = vec![false; bridges.reps.len()];
+    let chains = bridges.chains();
+    let empty = json!({});
+    let profile = crate::bridge_fill::fill(today_profile(&bridges, &chains, dk, &given), input.unwrap_or(&empty), warnings)?;
+    let feats = make_pieces(roads, dk, m, hw, &chains, &profile)?;
+    Ok((feats, profile))
+}
+
+/// Today's rule as a complete profile: the height of a group (from its length, or the caller's), a node's height from its distance to the nearest free end (0 at a free end, rising at
+/// the grade to the group's height), a chain with the top that is its group's height. The nodes are named n1, n2... from the north to the south, the chains c1, c2... in the order of the engine.
+fn today_profile(b: &Bridges, chains: &[Chain], dk: &DeckLook, given: &[Option<f64>]) -> BridgeProfile {
+    let grade = if dk.base_m > 0.0 { dk.ramp_m / dk.base_m } else { 8.0 };       // metres of ramp for a metre of height
+    let top = |g: usize| given.get(g - 1).copied().flatten().unwrap_or_else(|| deck_height(dk, b.group_len[g - 1]));
+    let at = b.positions();
+    // the nodes of the chains, from the north to the south (then from the west to the east)
+    let mut keys: Vec<(u64, u64)> = chains.iter().flat_map(|c| [c.head, c.tail]).collect();
+    keys.sort_by(|x, y| at[y].1.total_cmp(&at[x].1).then(at[x].0.total_cmp(&at[y].0)));
+    keys.dedup();
+    let id_of: HashMap<(u64, u64), String> = keys.iter().enumerate().map(|(i, k)| (*k, format!("n{}", i + 1))).collect();
+    let group_of_node: HashMap<(u64, u64), usize> = chains.iter().flat_map(|c| [(c.head, c.group), (c.tail, c.group)]).collect();
+    let mut groups: Vec<bridge_profile::Group> = (1..=b.group_len.len()).map(|g| bridge_profile::Group { name: format!("group {g}"), nodes: Vec::new(), chains: Vec::new() }).collect();
+    for k in &keys {
+        let g = group_of_node[k];
+        let (h, far) = (top(g), b.dfree.get(k).copied().unwrap_or(f64::INFINITY));
+        let t = (far / (h * grade).max(1.0)).min(1.0);
+        let ground = b.at.get(k).is_some_and(|v| v.len() == 1);
+        let ids: Vec<String> = chains.iter().enumerate().filter(|(_, c)| c.head == *k || c.tail == *k).map(|(i, _)| format!("c{}", i + 1)).collect();
+        groups[g - 1].nodes.push(bridge_profile::Node {
+            id: id_of[k].clone(), lonlat: [at[k].0, at[k].1], kind: if ground { Kind::Ground } else { Kind::Junction }, chains: ids,
+            z_m: h * t * t * (3.0 - 2.0 * t), source: if ground { "data" } else { "rule" }.into(), method: if ground { "mapped" } else { "derived" }.into() });
+    }
+    for (i, c) in chains.iter().enumerate() {
+        groups[c.group - 1].chains.push(bridge_profile::Chain {
+            id: format!("c{}", i + 1), osm_ways: Vec::new(), length_m: chain_length(c), from: id_of[&c.head].clone(), to: id_of[&c.tail].clone(), points: Vec::new(),
+            top_m: Some(top(c.group)), width_m: None, width_source: None });
+    }
+    BridgeProfile { format: bridge_profile::FORMAT.into(), parameters: bridge_profile::Parameters { design_speed_kmh: 50.0, design_grade: 1.0 / grade, curve: Some(Curve::Smooth) }, groups }
+}
+
+/// The length of a chain in metres: its line in the metres around its first point (the same frame as `chain_features`).
+fn chain_length(ch: &Chain) -> f64 {
+    let [lon0, lat0] = ch.pts[0];
+    let kx = 111320.0 * lat0.to_radians().cos();
+    let pts: Vec<P> = ch.pts.iter().map(|&[x, y]| [(x - lon0) * kx, (y - lat0) * 111320.0]).collect();
+    pts.windows(2).map(|w| len(&w[0], &w[1])).sum::<f64>()
+}
+
+/// The pieces of every chain, from the profile. The heights of the two nodes of a chain, with its top, give the ramps (`chain_features`).
+fn make_pieces(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, chains: &[Chain], profile: &BridgeProfile) -> Result<Vec<Value>, crate::Error> {
+    let bad = |s: String| Err(crate::Error::Data(format!("bridge_profile: {s}")));
+    if profile.parameters.curve.unwrap_or(Curve::Smooth) != Curve::Smooth {
+        return bad("the curve `design` (straight grades and vertical curves) is not built yet: use `smooth`".into());
+    }
+    let mut nodes: HashMap<&str, &bridge_profile::Node> = HashMap::new();
+    let mut by_id: HashMap<&str, (usize, &bridge_profile::Chain)> = HashMap::new();
+    for (gi, g) in profile.groups.iter().enumerate() {
+        nodes.extend(g.nodes.iter().map(|n| (n.id.as_str(), n)));
+        by_id.extend(g.chains.iter().map(|c| (c.id.as_str(), (gi, c))));
+    }
+    if by_id.len() != chains.len() {
+        return bad(format!("the profile has {} chains and these roads have {}: the profile is not for these roads", by_id.len(), chains.len()));
+    }
     let mut feats = Vec::new();
-    let mut chain_i = 0;
-    for i in 0..used.len() {
-        if !used[i] {
-            chain_i += 1;
-            let ch = bridges.walk(i, &mut used);
-            let h = given.get(ch.group - 1).copied().flatten().unwrap_or_else(|| deck_height(dk, bridges.group_len[ch.group - 1]));
-            let far = |nd: &(u64, u64)| bridges.dfree.get(nd).copied().unwrap_or(f64::INFINITY);
-            feats.extend(chain_features(roads, dk, m, hw, &ch, chain_i, (h, far(&ch.head), far(&ch.tail))));
+    for (i, ch) in chains.iter().enumerate() {
+        let (chain_i, id) = (i + 1, format!("c{}", i + 1));
+        let Some(&(gi, cp)) = by_id.get(id.as_str()) else { return bad(format!("the profile has no chain {id}: the profile is not for these roads")) };
+        if gi + 1 != ch.group {
+            return bad(format!("the chain {id} is in group {} in the profile and in group {} in these roads", gi + 1, ch.group));
         }
+        let l = chain_length(ch);
+        if (cp.length_m - l).abs() > 0.5 {
+            return bad(format!("the chain {id} is {:.1} m long in the profile and {l:.1} m in these roads: the profile is not for these roads", cp.length_m));
+        }
+        if !cp.points.is_empty() {
+            return bad(format!("the chain {id} has interior control points; they need the curve `design`, which is not built yet"));
+        }
+        let Some(top) = cp.top_m else { return bad(format!("the chain {id} has no top_m: the curve `smooth` makes its ramps for the full height of the chain, and needs it")) };
+        let mut z = [0.0; 2];
+        for (k, (nid, end)) in [(&cp.from, ch.pts[0]), (&cp.to, ch.pts[ch.pts.len() - 1])].into_iter().enumerate() {
+            let Some(n) = nodes.get(nid.as_str()) else { return bad(format!("the chain {id} starts or ends at the node {nid}, which the profile does not have")) };
+            if bridge_profile::metres_between(n.lonlat, end) > bridge_profile::MATCH_M {
+                return bad(format!("the node {nid} is not where the chain {id} {} in these roads: the profile is not for these roads", if k == 0 { "starts" } else { "ends" }));
+            }
+            if n.z_m > top + 1e-9 {
+                return bad(format!("the node {nid} is {} m high, above the top of the chain {id} ({top} m)", n.z_m));
+            }
+            z[k] = n.z_m;
+        }
+        let (la, lb) = (bridge_profile::smoothstep_inverse(z[0] / top), bridge_profile::smoothstep_inverse(z[1] / top));
+        feats.extend(chain_features(roads, dk, m, hw, ch, chain_i, (top, la, lb, cp.width_m)));
     }
     Ok(feats)
 }
@@ -446,8 +553,10 @@ fn cuts_of(l: f64, (rh, rt): (f64, f64), step: f64, span_ends: impl Iterator<Ite
     cuts
 }
 
-/// The features of one chain: its deck pieces (cut where the ramps and the roads change) and their casing slabs.
-fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain, chain_i: usize, (h, far_head, far_tail): (f64, f64, f64)) -> Vec<Value> {
+/// The features of one chain: its deck pieces (cut where the ramps and the roads change) and their casing slabs. `h`: the full height of the chain; `la`, `lb`: the ramp
+/// parameter at its head and its tail node (0: on the ground, 1: at the full height), from the heights of the two nodes of the profile; `width`: the width of the deck, or None for
+/// the width of each road's class.
+fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain, chain_i: usize, (h, la, lb, width): (f64, f64, f64, Option<f64>)) -> Vec<Value> {
     let [lon0, lat0] = ch.pts[0];
     let cos = lat0.to_radians().cos();
     let frame = Frame { lon0, lat0, kx: 111320.0 * cos, mpp: 156543.03392 * cos / 2f64.powf(dk.match_zoom) };
@@ -464,8 +573,17 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
     // as the grade lets it (no wall on a bridge of a few metres).
     let grade = if dk.base_m > 0.0 { dk.ramp_m / dk.base_m } else { 8.0 };       // metres of ramp for a metre of height
     let (full_ramp, step) = ((h * grade).max(1.0), dk.step_m.max(0.25));         // metres that a rise of the full height takes
-    let (la, lb) = ((far_head / full_ramp).min(1.0), (far_tail / full_ramp).min(1.0));
     let (rh, rt) = ((full_ramp * (1.0 - la)).min(l), (full_ramp * (1.0 - lb)).min(l));
+    // THE ROUNDING of the apex: where the ramp from the head end and the ramp from the tail end give the same lift (`cross`, metres from the head end), the deck has a crest, and the crest is
+    // rounded (`smin`) over a width that must lie inside the chain. So the width is the smaller of 0.4 and what fits between the crossing and the nearer end. Where the two ramps cross at
+    // an end of the chain (a node whose lift is what the ramp gives) or outside it, the deck has no crest and the width is 0: the exact minimum, and the lift at a node is exact.
+    let cross = (l + full_ramp * (lb - la)) / 2.0;
+    let round_k = (2.0 * cross.min(l - cross) / full_ramp).clamp(0.0, 0.4);
+    // the smooth lift (0 on the ground, 1 at the full height) at a distance along the chain: from each end node
+    let lift_at = |d: f64| {
+        let t = smin(la + d / full_ramp, lb + (l - d) / full_ramp, round_k).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
     let mut feats = Vec::new();
     for w in cuts_of(l, (rh, rt), step, bounds.iter().map(|b| b.0)).windows(2) {
         let (d0, d1) = (w[0], w[1]);
@@ -476,14 +594,8 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
         let span = bounds.iter().find(|b| mid <= b.0 + 1e-6).unwrap_or(&bounds[bounds.len() - 1]).1;
         let pprops = roads.road(span.fi);
         let cls = pprops.role(roadstyle_model::Role::Class).and_then(Cell::as_str).unwrap_or("");
-        let half = (m.gwidth(m.group_of(cls), dk.match_zoom) * frame.mpp / 2.0).max(2.0) * dk.width_scale;
-        // the smooth lift (0 on the ground, 1 at the full height) at a distance along the chain: from each end node
-        let edge = (0.15 * l).max(1.0);                    // the rounding fades out over the last 15 % of a chain at each end
-        let lift_at = |d: f64| {
-            let w = (d / edge).clamp(0.0, 1.0).min(((l - d) / edge).clamp(0.0, 1.0));
-            let t = smin(la + d / full_ramp, lb + (l - d) / full_ramp, 0.4, w * w * (3.0 - 2.0 * w)).clamp(0.0, 1.0);
-            t * t * (3.0 - 2.0 * t)
-        };
+        // half the width of the deck: the profile's width for the chain, else the width of the road's class
+        let half = width.map_or_else(|| (m.gwidth(m.group_of(cls), dk.match_zoom) * frame.mpp / 2.0).max(2.0) * dk.width_scale, |w| w / 2.0);
         let (lift, ends) = (lift_at(mid), [lift_at(d0), lift_at(d1)]);
         let part = substring(&pts, d0, d1);
         // one ribbon per directed edge: a two-way bridge is two half-width ribbons side by side (the edge with the chain on the right)

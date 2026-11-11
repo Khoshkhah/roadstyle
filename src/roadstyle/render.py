@@ -159,6 +159,9 @@ def render_edges(
         kwargs = _named_basemaps(kwargs, api_key)
         if kwargs.get("bridge_heights") is not None:        # {road id: metres} (a dict or a Series): the keys as text, like color_table's
             kwargs["bridge_heights"] = {str(k): float(v) for k, v in dict(kwargs["bridge_heights"]).items()}
+        if kwargs.get("bridge_profile") is not None:        # a complete bridge profile: a dictionary, or the path of a JSON file
+            from .bridges import read_bridge_profile
+            kwargs["bridge_profile"] = read_bridge_profile(kwargs["bridge_profile"])
         data = {k: v for k, v in (("color_by", color_by), ("colors", colors), ("cmap", cmap), ("vmin", vmin), ("vmax", vmax),
                                   ("width_by", width_by), ("color_table", color_table)) if v is not None}
         if color_table is not None:         # a mapping, a Series or a DataFrame: {edge id as text: colour}

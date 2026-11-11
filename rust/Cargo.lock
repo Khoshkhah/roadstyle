@@ -2298,6 +2298,7 @@ dependencies = [
  "roadstyle-look",
  "roadstyle-model",
  "rstar",
+ "serde",
  "serde_json",
 ]
 

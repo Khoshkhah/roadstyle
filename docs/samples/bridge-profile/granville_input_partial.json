@@ -1,0 +1,14 @@
+{
+ "parameters": {"design_speed_kmh": 50, "design_grade": 0.06},
+ "groups": [
+  {
+   "nodes": [
+    {"lonlat": [-123.13097, 49.27397], "z_m": 11.0, "source": "example", "method": "chosen"},
+    {"lonlat": [-123.1363, 49.27045], "z_m": 21.8, "source": "example", "method": "chosen"},
+    {"lonlat": [-123.13785, 49.26922], "z_m": 11.1, "source": "example", "method": "chosen"},
+    {"lonlat": [-123.13945, 49.26856], "z_m": 13.7, "source": "example", "method": "chosen"},
+    {"lonlat": [-123.13834, 49.26843], "z_m": 5.3, "source": "example", "method": "chosen"}
+   ]
+  }
+ ]
+}

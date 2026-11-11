@@ -1,0 +1,190 @@
+"""The 3D bridge decks in two parts (docs/guides/bridge-profile.md, docs/reference/formats.md): today's rule writes a complete bridge profile (`rs.bridge_profile`), and the maker makes the decks
+from a profile (`bridge_profile=`). The maker, given the profile that today's rule wrote, makes the same decks as today."""
+import base64
+import gzip
+import json
+import re
+import warnings
+
+import geopandas as gpd
+import pytest
+from shapely.geometry import LineString
+
+import roadstyle as rs
+
+
+def _roads():
+    """Three bridges that meet at a node (A-B, B-C, B-D: one group, 3 chains), a bridge apart from them (one group, one chain) and a road on the ground."""
+    a, b, c, d = (18.0000, 59.3000), (18.0003, 59.3002), (18.0006, 59.3004), (18.0006, 59.3000)
+    lines = [[a, b], [b, c], [b, d], [(18.01, 59.3), (18.0103, 59.3002)], [(18.02, 59.3), (18.0203, 59.3002)]]
+    return gpd.GeoDataFrame({"highway": ["primary"] * 5, "bridge": ["yes"] * 4 + [None], "layer": ["1"] * 4 + [None], "edge_id": [1, 2, 3, 4, 5]},
+                            geometry=[LineString(x) for x in lines], crs=4326)
+
+
+def _decks(html):
+    """The features of the source `decks` of a page."""
+    style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + len("const style = "))[0]
+    blobs = re.search(r'<script id="rs-gz" type="application/json">(.*?)</script>', html, re.S)
+    if blobs and "decks" in json.loads(blobs.group(1)):
+        return json.loads(gzip.decompress(base64.b64decode(json.loads(blobs.group(1))["decks"])))["features"]
+    return style["sources"]["decks"]["data"]["features"]
+
+
+def _page(**kw):
+    return rs.render_edges(_roads(), backend="web", view_3d=True, **kw).html
+
+
+def test_the_profile_of_a_page_is_complete_and_has_the_nodes_and_chains_of_its_bridges():
+    p = rs.bridge_profile(_roads())
+    assert p["format"] == "roadstyle.bridge_profile/1" and p["parameters"]["curve"] == "smooth"
+    assert [len(g["chains"]) for g in p["groups"]] == [3, 1]                                                 # the Y is one group of 3 chains, the lone bridge another
+    nodes = [n for g in p["groups"] for n in g["nodes"]]
+    assert sorted(n["kind"] for n in nodes) == ["ground"] * 5 + ["junction"]                                 # 5 ends on the ground, one junction (the node of the Y)
+    junction = next(n for n in nodes if n["kind"] == "junction")
+    assert len(junction["chains"]) == 3 and (junction["source"], junction["method"]) == ("rule", "derived")
+    assert all(n["z_m"] == 0 and (n["source"], n["method"]) == ("data", "mapped") for n in nodes if n["kind"] == "ground")
+    assert [c["id"] for g in p["groups"] for c in g["chains"]] == ["c1", "c2", "c3", "c4"]
+    assert all(c["points"] == [] and c["top_m"] >= 5.0 for g in p["groups"] for c in g["chains"])
+
+
+def test_the_maker_makes_the_decks_of_today_from_the_profile_of_today(tmp_path):
+    today = _decks(_page())
+    profile = rs.bridge_profile(_roads())
+    assert today and _decks(_page(bridge_profile=profile)) == today                                          # from a dictionary
+    path = tmp_path / "profile.json"
+    path.write_text(json.dumps(profile))
+    assert _decks(_page(bridge_profile=path)) == today and _decks(_page(bridge_profile=str(path))) == today    # from a file
+    assert rs.bridge_profile(_roads(), bridge_profile=profile) == profile                                    # the profile that a page is given is the profile that it writes
+
+
+def test_a_person_changes_a_number_and_the_page_changes():
+    today = _decks(_page())
+    profile = rs.bridge_profile(_roads())
+    junction = next(n for g in profile["groups"] for n in g["nodes"] if n["kind"] == "junction")
+    junction["z_m"] = junction["z_m"] / 2
+    junction["source"], junction["method"] = "given", "chosen"
+    changed = _decks(_page(bridge_profile=profile))
+    assert changed != today                                                                                  # other ramps: other pieces, and other heights
+    assert max(f["properties"]["__rs_base"] for f in changed) < max(f["properties"]["__rs_base"] for f in today)
+    wide = rs.bridge_profile(_roads())
+    wide["groups"][1]["chains"][0]["width_m"] = 9.0                                                          # the width of one chain
+    assert _decks(_page(bridge_profile=wide)) != today
+
+
+def test_an_empty_input_gives_the_profile_of_today_and_a_complete_profile_gives_itself():
+    today = rs.bridge_profile(_roads())
+    for empty in ({}, {"groups": []}, {"parameters": {}, "groups": [{"nodes": [], "chains": []}]}):
+        assert rs.bridge_profile(_roads(), empty) == today                                                    # Part 1 of nothing: every value is filled by the rules
+    assert rs.bridge_profile(_roads(), today) == today                                                        # Part 1 of a complete profile: no change
+    junction = next(n for g in today["groups"] for n in g["nodes"] if n["kind"] == "junction")
+    once = rs.bridge_profile(_roads(), {"groups": [{"nodes": [{"lonlat": junction["lonlat"], "z_m": 4.0}]}]})
+    assert rs.bridge_profile(_roads(), once) == once                                                          # Part 1 twice is Part 1 once
+
+
+def test_a_given_height_is_kept_by_position_or_by_id_and_the_rest_is_filled():
+    today = rs.bridge_profile(_roads())
+    junction = next(n for g in today["groups"] for n in g["nodes"] if n["kind"] == "junction")
+    by_position = rs.bridge_profile(_roads(), {"groups": [{"nodes": [{"lonlat": [junction["lonlat"][0] + 2e-5, junction["lonlat"][1]], "z_m": 4.0}]}]})   # 1.5 m away
+    by_id = rs.bridge_profile(_roads(), {"groups": [{"nodes": [{"id": junction["id"], "z_m": 4.0}]}]})
+    node = next(n for g in by_id["groups"] for n in g["nodes"] if n["id"] == junction["id"])
+    assert (node["z_m"], node["source"], node["method"]) == (4.0, "given", "chosen")                         # kept, and marked as the person's
+    assert [g["chains"] for g in by_id["groups"]] == [g["chains"] for g in today["groups"]]                  # the chains: the rules'
+    assert [n["z_m"] for g in by_position["groups"] for n in g["nodes"]] == [n["z_m"] for g in by_id["groups"] for n in g["nodes"]]
+    assert _decks(_page(bridge_profile=by_id)) == _decks(_page(bridge_profile={"groups": [{"nodes": [{"id": junction["id"], "z_m": 4.0}]}]}))   # the page fills it too
+    assert _decks(_page(bridge_profile=by_id)) != _decks(_page())
+    own = rs.bridge_profile(_roads(), {"groups": [{"nodes": [{"id": junction["id"], "z_m": 4.0, "source": "survey", "method": "measured"}]}]})
+    node = next(n for g in own["groups"] for n in g["nodes"] if n["id"] == junction["id"])
+    assert (node["source"], node["method"]) == ("survey", "measured")                                         # the person's words are kept
+    wide = rs.bridge_profile(_roads(), {"parameters": {"design_speed_kmh": 30}, "groups": [{"name": "Y", "nodes": [{"id": junction["id"]}], "chains": [{"id": "c4", "width_m": 9.0}]}]})
+    assert wide["parameters"]["design_speed_kmh"] == 30 and wide["parameters"]["design_grade"] == today["parameters"]["design_grade"]
+    assert wide["groups"][0]["name"] == "Y" and wide["groups"][1]["chains"][0]["width_m"] == 9.0 and wide["groups"][1]["chains"][0]["width_source"] == "given"
+
+
+def test_a_profile_with_values_missing_is_filled_and_one_that_is_not_for_these_roads_is_an_error_that_says_what():
+    profile = rs.bridge_profile(_roads())
+
+    def changed(change):
+        p = json.loads(json.dumps(profile))
+        change(p)
+        return p
+
+    for p in (changed(lambda p: p["groups"][0]["nodes"][0].pop("z_m")), changed(lambda p: p["groups"][0]["chains"][0].pop("top_m")), changed(lambda p: p["groups"][0]["chains"].pop()),
+              changed(lambda p: p.pop("parameters")), changed(lambda p: p["groups"].pop())):
+        assert rs.bridge_profile(_roads(), p) == profile                                                      # every value is optional: the rules fill it again
+        assert _decks(_page(bridge_profile=p)) == _decks(_page())
+
+    def error(p, exc=ValueError):
+        with pytest.raises(exc) as e:
+            _page(bridge_profile=p)
+        return str(e.value)
+
+    assert "not built yet" in error(changed(lambda p: p["parameters"].update(curve="design")))
+    assert "interior control points" in error(changed(lambda p: p["groups"][0]["chains"][0].update(points=[{"s": 5.0, "z_m": 2.0}])))
+    assert "unknown field `extra`" in error(changed(lambda p: p.update(extra=1)))
+    assert "this engine reads" in error(changed(lambda p: p.update(format="other")))
+    assert "not for these roads" in error(changed(lambda p: p["groups"][0]["chains"][0].update(id="c99")))
+    assert "not for these roads" in error({"groups": [{"nodes": [{"lonlat": [0.0, 0.0], "z_m": 3.0}]}]})
+    n1 = next(n for g in profile["groups"] for n in g["nodes"] if n["id"] == "n1")
+    assert "cannot be above the top" in error({"groups": [{"nodes": [{"id": "n1", "z_m": 3.0}], "chains": [{"id": n1["chains"][0], "top_m": 1.0}]}]})
+    with pytest.raises(TypeError, match="dictionary or the path"):
+        _page(bridge_profile=42)
+    with pytest.raises(TypeError, match="once"):
+        rs.bridge_profile(_roads(), {}, bridge_profile={})
+
+
+def test_a_grade_above_the_design_grade_between_a_given_height_and_the_other_end_is_a_warning():
+    junction = next(n for g in rs.bridge_profile(_roads())["groups"] for n in g["nodes"] if n["kind"] == "junction")
+    given = {"parameters": {"design_grade": 0.01}, "groups": [{"nodes": [{"id": junction["id"], "z_m": 4.0}]}]}
+    with pytest.warns(UserWarning, match=r"the chain c\d rises .* the design grade is 0.01"):
+        _page(bridge_profile=given)
+    with warnings.catch_warnings():                                                                           # a profile that the engine wrote has no heights of the person: no warning
+        warnings.simplefilter("error")
+        _page(bridge_profile={**rs.bridge_profile(_roads()), "parameters": {"design_speed_kmh": 50, "design_grade": 0.01}})
+
+
+def test_a_profile_on_a_page_with_no_3d_bridges_does_nothing_and_says_so():
+    profile = rs.bridge_profile(_roads())
+    with pytest.warns(UserWarning, match="no 3D bridges"):
+        html = rs.render_edges(_roads(), backend="web", view_3d=False, bridge_profile=profile).html
+    style = json.JSONDecoder().raw_decode(html, html.index("const style = ") + len("const style = "))[0]
+    assert "decks" not in style["sources"]
+
+
+def test_the_granville_sample_is_the_profile_that_the_engine_writes_and_the_maker_reads_it_again():
+    """docs/samples/bridge-profile/granville_bridge_profile_today.json (docs/img/bridge-height/granville_engine_profile.py) is real output of the engine for the roads of the Granville Bridge, and the maker
+    makes the same decks from it as today. The heights are the ones that the guide gives for today's engine: 22 m at four junctions and 11.2 m at the fifth."""
+    from pathlib import Path
+    samples = Path(__file__).resolve().parents[1] / "docs" / "samples" / "bridge-profile"
+    edges = gpd.read_parquet(samples / "granville_bridge_edges.parquet")
+    saved = json.loads((samples / "granville_bridge_profile_today.json").read_text())
+    assert rs.bridge_profile(edges) == saved                                                                 # the file is what the engine writes
+    group = saved["groups"][0]
+    assert (len(saved["groups"]), len(group["nodes"]), len(group["chains"])) == (1, 13, 12)
+    assert sorted(n["kind"] for n in group["nodes"]) == ["ground"] * 8 + ["junction"] * 5
+    assert sorted(round(n["z_m"], 1) for n in group["nodes"] if n["kind"] == "junction") == [11.2, 22.0, 22.0, 22.0, 22.0]
+    assert {c["top_m"] for c in group["chains"]} == {22.0}
+    today = _decks(rs.render_edges(edges, backend="web", view_3d=True).html)
+    assert today and _decks(rs.render_edges(edges, backend="web", view_3d=True, bridge_profile=samples / "granville_bridge_profile_today.json").html) == today
+
+
+def test_the_filler_completes_the_five_heights_of_the_granville_example():
+    """docs/samples/bridge-profile/granville_input_partial.json: 5 junction heights, each named by its position. The engine finds the 13 nodes and 12 chains, keeps the 5 heights, and fills the rest."""
+    from pathlib import Path
+    samples = Path(__file__).resolve().parents[1] / "docs" / "samples" / "bridge-profile"
+    edges = gpd.read_parquet(samples / "granville_bridge_edges.parquet")
+    given = json.loads((samples / "granville_input_partial.json").read_text())
+    with pytest.warns(UserWarning, match=r"the chain c3 rises 5.8 m in 96 m .* the design grade is 0.06"):     # 5.3 m and 11.1 m are 96 m apart: 0.061
+        filled = rs.bridge_profile(edges, given)
+    group = filled["groups"][0]
+    assert (len(filled["groups"]), len(group["nodes"]), len(group["chains"])) == (1, 13, 12)
+    assert filled["parameters"] == {"design_speed_kmh": 50.0, "design_grade": 0.06, "curve": "smooth"}          # the two given parameters, and the curve of the rules
+    junctions = {n["id"]: (n["z_m"], n["source"], n["method"]) for n in group["nodes"] if n["kind"] == "junction"}
+    assert sorted(junctions.values()) == sorted((e["z_m"], "example", "chosen") for e in given["groups"][0]["nodes"])
+    assert all(n["z_m"] == 0 and n["source"] == "data" for n in group["nodes"] if n["kind"] == "ground") and sum(n["kind"] == "ground" for n in group["nodes"]) == 8
+    assert {c["top_m"] for c in group["chains"]} == {22.0}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        assert rs.bridge_profile(edges, filled) == filled                                                       # the filler twice is the filler once
+        page = _decks(rs.render_edges(edges, backend="web", view_3d=True, bridge_profile=given).html)
+        assert page and page != _decks(rs.render_edges(edges, backend="web", view_3d=True).html)                 # the 5 heights change the pieces
+        assert page == _decks(rs.render_edges(edges, backend="web", view_3d=True, bridge_profile=filled).html)   # the input and the filled profile make one page

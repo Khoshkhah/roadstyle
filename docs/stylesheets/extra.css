@@ -78,3 +78,11 @@ html.rs-tb-open #rs-tb-win { visibility: visible; }
 #rs-tb-win iframe.rs-testbed { display: block; width: 100%; height: 100%; border: 0; }
 #rs-tb-win .rs-tb-out { margin: 0; max-height: 22%; overflow: auto; padding: 8px 14px; font-size: .72rem; white-space: pre-wrap; border-top: 3px solid var(--md-accent-fg-color); }
 #rs-tb-win .rs-tb-out.error { border-top-color: #dc2626; }
+
+/* the bridge profile (guides/bridge-profile.md): the values that a person gave (profile 1) and the values that the engine added (profile 2) */
+:root { --rs-bp-given: #1d4ed8; --rs-bp-added: #c2410c; }
+[data-md-color-scheme="slate"] { --rs-bp-given: #93c5fd; --rs-bp-added: #fdba74; }
+.md-typeset pre.rs-bp .given { color: var(--rs-bp-given); font-weight: 700; }
+.md-typeset pre.rs-bp .added { color: var(--rs-bp-added); }
+.md-typeset .rs-bp-key .given { color: var(--rs-bp-given); font-weight: 700; }
+.md-typeset .rs-bp-key .added { color: var(--rs-bp-added); }

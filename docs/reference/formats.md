@@ -84,6 +84,92 @@ Where they come from:
 | `levels.csv` | the result: the four numbers and the ends of each edge |
 | `boundary.geojson` | only with `--boundary`: the edge of the area, drawn as a dashed line in the editor |
 
+## The bridge profile (planned)
+
+**Status: Part 1 and Part 2 are built, with the curve `smooth`.** The filler (Part 1) completes an input that has values missing, and the maker (Part 2) makes the 3D deck pieces from the complete profile (the ramps of today). It is the keyword
+`bridge_profile=`, and `rs.bridge_profile(edges, given=None)` gives the complete profile of a page. The interior control points and the curve `design`
+are planned. The format is fixed, the schemas and the sample files are real, and tests check them. For the idea and the examples, read [The bridge profile: input and output](../guides/bridge-profile.md).
+
+A page with 3D bridges (`view_3d=True`) has one **input profile**: the groups of bridges, their nodes and chains, and the height of the nodes. A person edits it. **Part 1** of the engine fills what is missing and writes
+the complete profile. **Part 2** makes the deck pieces from the complete profile. Both are JSON files.
+
+| File | Schema | Sample |
+|---|---|---|
+| The input profile: every value is optional. An empty profile is valid | [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | [`granville_input_partial.json`](../samples/bridge-profile/granville_input_partial.json) |
+| The complete input profile: what Part 1 writes and Part 2 reads | [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | [`granville_input_profile.json`](../samples/bridge-profile/granville_input_profile.json) |
+
+A complete profile is also a valid input profile. Part 1 on a complete profile changes nothing.
+
+### The keys
+
+"Input" is whether the key is optional in the input profile, and "complete" is whether it is required in the complete profile.
+
+| Key | Type | Input | Complete | Meaning and rules |
+|---|---|---|---|---|
+| `format` | `"roadstyle.bridge_profile/1"` | optional | required | The version of the format |
+| `parameters.design_speed_kmh` | number, above 0, at most 200 | optional | required | The design speed. Default 50. It sets the length of the vertical curves |
+| `parameters.design_grade` | number, above 0, at most 0.3 | optional | required | The design grade, as a fraction (0.05 is 5 %). Default 0.05 |
+| `parameters.curve` | `"smooth"` or `"design"` | optional | optional | `smooth`: the curve of today (built). `design`: straight grades and vertical curves (not built: an error). Default `smooth` |
+| `groups` | list of groups | optional | required, one or more | One group is the bridge roads that touch each other |
+| `groups[].name` | text | optional | required | The name of the group |
+| `groups[].nodes` | list of nodes | optional | required | The ends of the chains |
+| `groups[].chains` | list of chains | optional | required | A chain is a line of bridge roads between two nodes |
+| `nodes[].id` | text `n1`, `n2`... | optional | required | The id of the node in a complete profile |
+| `nodes[].lonlat` | `[longitude, latitude]` | optional | required | The position. In an input profile it names the node: the node of the group within 5 m. A node needs a `lonlat` or an `id` |
+| `nodes[].kind` | `"ground"` or `"junction"` | optional | required | `ground`: one chain ends here, and the height is 0. `junction`: chains meet here |
+| `nodes[].chains` | list of chain ids | optional | required | The chains that meet at the node |
+| `nodes[].z_m` | number, 0 or more | optional | required | The height of the node above the ground, in metres |
+| `nodes[].source`, `.method` | text, and `mapped`, `measured`, `derived` or `chosen` | optional | required | Where the value comes from, and how it was found |
+| `chains[].id` | text `c1`, `c2`... | optional | required | The id of the chain. A chain needs `osm_ways` or an `id` |
+| `chains[].osm_ways` | list of integers | optional | optional | The OSM ways of the chain, when the roads have them. In an input profile they name the chain |
+| `chains[].length_m` | number, above 0 | optional | required | The length of the chain |
+| `chains[].from`, `.to` | node ids | optional | required | The node at the first end and at the last end of the chain |
+| `chains[].points` | list of points | optional | required (can be empty) | Interior control points, in order of `s`. **Not built:** the maker stops with an error if a chain has one (it needs the curve `design`) |
+| `chains[].top_m` | number, above 0 | optional | optional | The full height of the chain: the height that its ramps are made for. The maker needs it for the curve `smooth`. It is the `__rs_full` of the pieces |
+| `points[].s` | number, 0 or more | required | required | Metres from the first end of the chain. Inside the chain |
+| `points[].z_m` | number, 0 or more | required | required | The height of the deck at that place |
+| `chains[].width_m` | number, above 0 | optional | optional | The width of the deck, in metres. Without it, each road of the chain is drawn at the width of its class |
+| `chains[].width_source` | text | optional | optional | Where the width comes from: `given` or `rule` |
+
+### What is built: the filler and the maker
+
+The filler (Part 1) reads an input profile in which every key is optional. A key that is not known and a wrong type are errors. It matches each node entry to a node of the roads by its `id`, or by its `lonlat` (the one node within 5 m; if more than one node is within 5 m, the `id` is needed). It keeps every value that you give and fills the others with the rules of today (see [the guide](../guides/bridge-profile.md#what-works-today)). The maker (Part 2) reads only the complete result. The filler stops, with an error that names the chain or the node, when:
+
+- the curve is `design`, or a chain has `points` (not built);
+- a node entry has no `id` and no `lonlat`, has a `lonlat` that no node is near, or two entries are for one node;
+- a `z_m` is below 0, a `top_m` or a `width_m` is 0 or less, or a node is higher than the `top_m` of a chain that ends there;
+- the input is not for the roads: a chain or a node that the roads do not have, a `kind`, `chains`, `from` or `to` that differ from the roads, a chain of another length (more than 0.5 m of difference), or an `id` and a `lonlat` more than 5 m apart;
+- a group has a `name` and no node (the engine finds a group by its nodes).
+
+A chain whose average grade between a height of yours and its other end is above the `design_grade` is a warning.
+
+The chains are `c1`, `c2`... in the order of the engine, and a profile of a page is made for the roads of that page. The heights of the two nodes of a chain, with its `top_m`, give the ramps: a node at a
+height `z` has the ramp parameter `t` with `z = top_m × t² (3 − 2t)`. With the profile that today's rule wrote, the maker makes **the same pieces as today**. Two chains that meet at a node have one height there, because a
+node has one `z_m`.
+
+### What the schema cannot check
+
+The schema checks the form. These rules need the roads, and the engine checks them (Part 1 or Part 2, see [the guide page](../guides/bridge-profile.md#what-the-engine-checks)):
+
+- A given node is within 5 m of exactly one node of the group. Two entries for one node are an error.
+- A given chain is one chain of the group.
+- The `s` of the points of a chain increase, and they are inside the chain.
+- The grade between two given heights is not above the design grade. The vertical curves do not overlap.
+- The `chains` of a node and the `from` and `to` of the chains agree. A node where one chain ends is `ground`.
+
+### What Part 1 fills
+
+| Missing | Filled with | `source`, `method` |
+|---|---|---|
+| The groups, chains and nodes | The roads | `data`, `mapped` |
+| `z_m` of a `ground` node | 0 | `data`, `mapped` |
+| `z_m` of a `junction` | The rule (the height that today's rule gives, until the design rules are built) | `rule`, `derived` |
+| `top_m` of a chain | The height of its group (from its length) | |
+| `width_m` | Not filled: without it, each road is drawn at the width of its class and the look | |
+| `parameters` | 50 km/h and 0.05 | |
+
+A value that the person gave is never changed. A person's value that has no `source` gets `given` and `chosen`.
+
 ## The look
 
 The look is the set of choices of a map. It has four parts, merged in this order: the profile, the palette, the settings, and the

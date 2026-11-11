@@ -2654,3 +2654,434 @@ def test_web_vehicles_option_and_look():
     assert {c["kind"] for c in look["classes"].values()} <= set(look["colours"])
     assert all(set(c) == {"light", "dark"} for c in look["colours"].values())
     assert _opt(render_edges(_edges(), backend="web").html, "vehicles") is None
+
+
+def _bridge_source_features(length_m, **kw):
+    """All the features of the source `decks` of one straight bridge of `length_m` metres (a deck piece, then its two casing slabs), in the order of the source."""
+    import math
+    dlon = length_m / (111320 * math.cos(math.radians(43.74)))
+    g = gpd.GeoDataFrame({"highway": ["primary"], "bridge": ["yes"], "layer": ["1"], "edge_id": [1]}, geometry=[LineString([(7.42, 43.74), (7.42 + dlon, 43.74)])], crs=4326)
+    return _style(render_edges(g, backend="web", view_3d=True, **kw).html)["sources"]["decks"]["data"]["features"]
+
+
+def _straight_bridge(length_m, **kw):
+    """The deck pieces of one straight bridge (no casing slabs): their properties, in order along it, with the settings of `kw`."""
+    pieces = [f["properties"] for f in _bridge_source_features(length_m, **kw) if not f["properties"].get("__rs_casing_slab")]
+    return sorted(pieces, key=lambda p: p["__rs_s0"])
+
+
+def _flat_part_starts(length_m, **kw):
+    """The metres along a straight bridge where its deck reaches the group height (a piece's start lift is 1)."""
+    return min(p["__rs_s0"] for p in _straight_bridge(length_m, **kw) if p["__rs_lift0"] >= 0.999) * length_m
+
+
+def _lift_of_the_page(x, ell, ramp, lift_head=0.0, lift_tail=0.0):
+    """The lift at the distance x along a chain of ell metres, by the formulas of docs/guides/bridge-height.md (step 5): a and b, where they cross, the width k of the rounding there,
+    the smooth minimum, the smoothstep."""
+    def clamp(v, lo, hi):
+        return max(lo, min(hi, v))
+
+    a, b = lift_head + x / ramp, lift_tail + (ell - x) / ramp
+    cross = (ell + ramp * (lift_tail - lift_head)) / 2
+    k = clamp(2 * min(cross, ell - cross) / ramp, 0, 0.4)
+    if k > 0:
+        h = max(k - abs(a - b), 0) / k
+        t = min(a, b) - h * h * k / 4
+    else:
+        t = min(a, b)
+    t = clamp(t, 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def test_the_numbers_of_the_bridge_height_page_are_the_engines():
+    """docs/guides/bridge-height.md: the group heights of its table, the ramp of 8 m for each metre of height, the hump of a bridge of 40 m, the effect of ramp_m, the formulas of
+    step 5 (the lift of every piece of four bridges), the worked example, the example profile and the rules of an edit step. A change of a rule fails here, and the page and
+    docs/img/bridge-height/make.py are changed with it."""
+    for length, height in ((60, 5.0), (120, 6.89), (330, 13.5), (600, 22.0), (800, 22.0)):
+        assert _straight_bridge(length)[0]["__rs_full"] == pytest.approx(height, abs=0.02), length
+    short = _straight_bridge(40)
+    assert max(p["__rs_base"] for p in short) == pytest.approx(1.76, abs=0.03)                          # "its deck rises only 1.8 m at the middle"
+    assert {round(p["__rs_height"] - p["__rs_base"], 6) for p in short} == {1.0}                          # __rs_height = __rs_base + thickness_m
+    names = {"__rs_group", "__rs_chain", "__rs_full", "__rs_lift0", "__rs_lift1", "__rs_s0", "__rs_s1", "__rs_thick", "__rs_edges", "__rs_base", "__rs_height"}
+    assert names <= set(short[0]) and "__rs_enda" in short[0] and "__rs_endb" in short[-1]                # the table of the page
+    assert not any("__rs_enda" in p or "__rs_endb" in p for p in short[1:-1]) and "__rs_endb" not in short[0] and "__rs_enda" not in short[-1]
+    assert _flat_part_starts(800) == pytest.approx(176, abs=3)                                           # 22 m x 8 m = 176 m of ramp (a piece is 2.5 m long)
+    assert _flat_part_starts(800, settings={"config": {"bridge_decks": {"ramp_m": 80}}}) == pytest.approx(352, abs=3)    # the example of the page: 22 m x 16 m
+    # step 5: the engine's lift of every piece (its start, its end and its base at the middle) is the page's formula
+    for length in (40, 120, 330, 800):
+        pieces = _straight_bridge(length)
+        full = pieces[0]["__rs_full"]
+        ramp = max(full * 8, 1.0)
+        assert {p["__rs_full"] for p in pieces} == {full}, length                                           # one height for the group
+        for p in pieces:
+            x0, x1 = p["__rs_s0"] * length, p["__rs_s1"] * length
+            assert p["__rs_lift0"] == pytest.approx(_lift_of_the_page(x0, length, ramp), abs=3e-4), (length, x0)
+            assert p["__rs_lift1"] == pytest.approx(_lift_of_the_page(x1, length, ramp), abs=3e-4), (length, x1)
+            assert p["__rs_base"] == pytest.approx(full * _lift_of_the_page((x0 + x1) / 2, length, ramp), abs=0.02), (length, x0)
+        # the rules of an edit step: no gap, no step, the lift is 0 at a free end
+        assert pieces[0]["__rs_s0"] == 0 and pieces[-1]["__rs_s1"] == 1 and pieces[0]["__rs_lift0"] == 0 and pieces[-1]["__rs_lift1"] == 0
+        for p, q in zip(pieces, pieces[1:], strict=False):
+            assert p["__rs_s1"] == q["__rs_s0"] and p["__rs_lift1"] == q["__rs_lift0"], (length, p["__rs_s1"])
+    # the worked example (a bridge of 120 m, x = 10 m) and the table of the page
+    full, ramp = 5 + 17 * 60 / 540, (5 + 17 * 60 / 540) * 8
+    assert (full, ramp, 10 / ramp, 110 / ramp) == pytest.approx((6.889, 55.11, 0.1815, 1.996), abs=0.002)
+    assert _lift_of_the_page(10, 120, ramp) == pytest.approx(0.0868, abs=0.0001) and full * 0.0868 == pytest.approx(0.60, abs=0.01)
+    pieces = _straight_bridge(120)
+    assert len(pieces) == 47
+    for n, (s0, s1, l0, l1) in {1: (0, 0.02083, 0, 0.006), 4: (0.0625, 0.08333, 0.0505, 0.0868), 5: (0.08333, 0.10417, 0.0868, 0.131), 24: (0.45926, 0.54074, 0.9972, 0.9972),
+                                46: (0.95833, 0.97917, 0.0232, 0.006), 47: (0.97917, 1, 0.006, 0)}.items():
+        p = pieces[n - 1]
+        assert (p["__rs_s0"], p["__rs_s1"]) == pytest.approx((s0, s1), abs=1e-5) and (p["__rs_lift0"], p["__rs_lift1"]) == pytest.approx((l0, l1), abs=1e-4), n
+    # the example profile: the first piece, with its polygon, and the order of the source (a deck piece, then its two casing slabs)
+    feats = _bridge_source_features(120)
+    first = feats[0]
+    assert [bool(f["properties"].get("__rs_casing_slab")) for f in feats[:6]] == [False, True, True, False, True, True]
+    assert first["geometry"]["coordinates"] == [[[7.42, 43.740022], [7.420031, 43.740022], [7.420031, 43.739978], [7.42, 43.739978], [7.42, 43.740022]]]
+    p = first["properties"]
+    assert (p["__rs_group"], p["__rs_chain"], p["__rs_thick"], p["__rs_base"], p["__rs_height"], p["__rs_edges"], p["__rs_enda"]) == (1, 1, 1.0, 0.01, 1.01, [0], [7.42, 43.74])
+    assert p["__rs_full"] == pytest.approx(6.8889, abs=1e-4)
+    slab = feats[1]["properties"]
+    assert slab["__rs_casing_slab"] == 1 and all(slab[k] == p[k] for k in ("__rs_group", "__rs_chain", "__rs_full", "__rs_lift0", "__rs_lift1", "__rs_s0", "__rs_s1"))   # a slab has the lifts and places of its piece
+
+
+def test_the_granville_bridge_example_is_the_engines():
+    """docs/guides/bridge-height.md, "A real example: the Granville Bridge": the 12 chains of the bridge group of docs/img/bridge-height/granville_bridge_edges.parquet, their
+    lengths, their lifts at the two ends and the pieces, from the same functions as the figures (docs/img/bridge-height/granville.py). The comparison of docs/design/bridge_profile_edit.md
+    (the highest deck of each chain, and the LiDAR heights of granville_lidar_samples.json) is pinned here too."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import importlib.util
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    spec = importlib.util.spec_from_file_location("bridge_height_granville", here / "granville.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    chains = mod.chains_of(gpd.read_parquet(here.parents[1] / "samples" / "bridge-profile" / "granville_bridge_edges.parquet"))
+    full = chains[0]["pieces"][0]["properties"]["__rs_full"]
+    assert len(chains) == 12 and full == pytest.approx(22.0)                                    # one group of 12 chains, at the largest height
+    assert sum(c["length"] for c in chains) == pytest.approx(3061, abs=5) and sum(len(c["pieces"]) for c in chains) == 624
+    want = [(550, 1.00, 1.00, 2), (404, 1.00, 0.00, 72), (367, 0.00, 1.00, 74), (312, 1.00, 1.00, 4), (286, 1.00, 0.00, 73), (276, 0.00, 1.00, 74),
+            (228, 1.00, 0.00, 73), (184, 1.00, 0.00, 72), (179, 1.00, 1.00, 2), (96, 0.51, 1.00, 36), (89, 0.51, 0.00, 71), (89, 0.00, 0.51, 71)]
+    for n, (c, (length, first, last, pieces)) in enumerate(zip(chains, want, strict=True), 1):
+        p0, p1 = c["pieces"][0]["properties"], c["pieces"][-1]["properties"]
+        assert c["length"] == pytest.approx(length, abs=1.5), n
+        assert (p0["__rs_lift0"], p1["__rs_lift1"]) == pytest.approx((first, last), abs=0.01), n
+        assert len(c["pieces"]) == pieces, n
+    ends = [p for c in chains for p in (c["pieces"][0]["properties"]["__rs_lift0"], c["pieces"][-1]["properties"]["__rs_lift1"])]
+    assert sum(1 for e in ends if e == 0) == 8 and sum(1 for e in ends if abs(e - 0.51) < 0.01) == 3        # eight free ends; three chains meet at the node of lift 0.51
+    assert 89 / (full * 8) == pytest.approx(0.51, abs=0.01) and full * 0.51 == pytest.approx(11.2, abs=0.1)             # the numbers of the page: 89 / 176 = 0.51, 0.51 x 22 = 11.2
+    # the comparison with the LiDAR: the same 12 ways, the highest deck of the engine, and of the measurement
+    lidar = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_lidar_samples.json").read_text())["axes"]
+    engine_top = [max(full * max(f["properties"]["__rs_lift0"], f["properties"]["__rs_lift1"]) for f in c["pieces"]) for c in chains]
+    assert engine_top[:10] == pytest.approx([22.0] * 10, abs=0.05) and engine_top[10:] == pytest.approx([11.2, 11.2], abs=0.1)
+    assert max(z for _, z in lidar[0]["samples"]) == pytest.approx(39.3, abs=0.05)                         # axis a1, the main span
+    assert sorted({round(max(z for _, z in a["samples"]), 1) for a in lidar}) == [11.6, 11.7, 18.2, 22.7, 27.0, 27.1, 39.3]
+
+
+def test_the_prototype_numbers_of_the_bridge_profile_proposal_are_pinned():
+    """docs/design/bridge_profile_edit.md, "What the prototype shows on the Granville Bridge" (docs/img/bridge-height/granville_proposed.py): for each of the 12 chains, the largest error against the
+    LiDAR stations of the profile of today, of stage 1 (the heights at the ends and the top) and of stage 2 (the grade points). The proposal says that stage 1 is not enough and a height line is.
+    The example of the proposal (chain 1: its road id, its 9 points and 9 curves) is in the data too."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import importlib.util
+    import sys
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_granville_proposed", here / "granville_proposed.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        rows = mod.compute()
+    finally:
+        sys.path.remove(str(here))
+    today = [17.3, 11.3, 10.9, 10.2, 8.9, 9.7, 11.8, 9.5, 5.0, 4.9, 3.0, 3.0]
+    one = [10.0, 2.5, 7.0, 9.8, 9.5, 8.9, 6.3, 5.7, 4.9, 3.4, 0.9, 0.9]
+    assert [r["errors"][0] for r in rows] == pytest.approx(today, abs=0.06)
+    assert [r["errors"][1] for r in rows] == pytest.approx(one, abs=0.06)
+    assert max(r["errors"][2] for r in rows) < 0.35 and min(r["errors"][1] for r in rows[:6]) > 2.4        # stage 2: 0.3 m at most. Stage 1 leaves up to 10 m on the long chains
+    assert rows[4]["errors"][1] > rows[4]["errors"][0]                                                    # chain 5: stage 1 is a little worse than today
+    first = rows[0]["inputs"]
+    assert first == pytest.approx((27.0, 22.7, 39.3), abs=0.1)
+    edges = gpd.read_parquet(here.parents[1] / "samples" / "bridge-profile" / "granville_bridge_edges.parquet")
+    chain1 = {f["properties"]["osm_id"] for f in mod.chains_of(edges)[0]["pieces"]}
+    assert chain1 == {1419040127, 1419040128} and 8043974233675410214 in set(edges[edges.osm_id.isin(chain1)].edge_id)       # the road id of the example
+    a1 = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_lidar_samples.json").read_text())["axes"][0]
+    assert a1["points"][:3] == [[0.0, 27.02], [160.0, 31.06], [220.0, 33.66]] and len(a1["points"]) == len(a1["curves"]) == 9 and a1["curves"] == [0.0, 54.0, 54.0, 27.0, 18.0, 18.0, 27.0, 54.0, 0.0]
+
+
+def test_a_ramp_never_dips_and_is_never_steeper_than_its_curve_allows():
+    """The rounding of the curve (step 5 of docs/guides/bridge-height.md) is only at a crest, where the two ramps cross inside the chain. Where they cross at an end of the chain
+    (a node whose lift is what the ramp gives, chains 11 and 12 of the Granville Bridge) there is no crest, and the lift must not dip. The steepest part of a ramp is 1.5 times the average
+    slope, 1.5 / 8 = 18.75 %: the middle of the smoothstep. No piece is steeper."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import importlib.util
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    spec = importlib.util.spec_from_file_location("bridge_height_granville_slope", here / "granville.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    chains = mod.chains_of(gpd.read_parquet(here.parents[1] / "samples" / "bridge-profile" / "granville_bridge_edges.parquet"))
+    full = chains[0]["pieces"][0]["properties"]["__rs_full"]
+    for n, c in enumerate(chains, 1):
+        lifts = [c["pieces"][0]["properties"]["__rs_lift0"]] + [f["properties"]["__rs_lift1"] for f in c["pieces"]]
+        ups = [b - a for a, b in zip(lifts, lifts[1:], strict=False)]
+        assert not (any(u > 1e-6 for u in ups) and any(u < -1e-6 for u in ups)), f"chain {n} goes up and down"     # a chain is not a hump here: no dip and climb again
+        for f in c["pieces"]:
+            p = f["properties"]
+            dx = (p["__rs_s1"] - p["__rs_s0"]) * c["length"]
+            if dx > 1:
+                assert abs(full * (p["__rs_lift1"] - p["__rs_lift0"])) / dx <= 1.5 / 8 + 0.004, (n, p["__rs_s0"])
+    for length in (200, 330, 800):
+        pieces = _straight_bridge(length)
+        for p in pieces:
+            dx = (p["__rs_s1"] - p["__rs_s0"]) * length
+            if dx > 1:
+                assert abs(p["__rs_full"] * (p["__rs_lift1"] - p["__rs_lift0"])) / dx <= 1.5 / 8 + 0.004, (length, p["__rs_s0"])
+
+
+def test_the_design_rules_of_the_bridge_height_note_are_calculated_not_typed():
+    """docs/design/bridge_height_design.md (docs/img/bridge-height/design_rules.py): the formulas of the stopping sight distance and of K give the values of the TxDOT table (K = 247 ft per percent at
+    70 mph, and 473 for a crest and 260 for a sag at 85 mph), the K table of the note, a ramp that is never steeper than its design grade, the length that a clearance needs, and the figures that the
+    note gives for today's engine."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import importlib.util
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    spec = importlib.util.spec_from_file_location("bridge_height_design_rules", here / "design_rules.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    ft = 3.28084                                                                                          # feet in a metre: K in feet per percent is K in metres per percent x this
+    mph = 1.609344
+    assert [round(k * ft) for k in mod.k_values(70 * mph)] == pytest.approx([247, 181], abs=2)            # 70 mph: crest 247 (the worked example in the search results)
+    assert [round(k * ft) for k in mod.k_values(85 * mph)] == pytest.approx([473, 260], abs=2)            # 85 mph: crest 473, sag 260 (the TxDOT table)
+    table = {30: (31, 1.5, 4.2), 40: (46, 3.2, 7.5), 50: (63, 6.1, 11.7), 60: (83, 10.4, 16.7), 70: (104, 16.5, 22.4), 80: (128, 25.0, 28.9), 100: (183, 50.9, 44.1)}
+    for v, (s, kc, ks) in table.items():
+        assert (mod.stopping_sight_distance(v), *mod.k_values(v)) == pytest.approx((s, kc, ks), abs=0.6 if v > 40 else 0.15), v
+    for h, row in ((5.8, (145, 116, 97, 72)), (10, (250, 200, 167, 125)), (20, (500, 400, 333, 250))):
+        assert [round(h / g) for g in (0.04, 0.05, 0.06, 0.08)] == list(row)                              # the ramp table: P / g
+    top = 5.0 + max(0.8, 20 / 25)
+    assert top == pytest.approx(5.8)
+    assert mod.minimum_length(top, 0.05, 50) == pytest.approx(321, abs=3)                                 # the shortest chain that reaches 5.8 m at 5 % and 50 km/h
+    for ell, height, grade, apex in ((300.0, 5.8, 0.05, 5.28), (200.0, 5.8, 0.05, 2.78), (1200.0, 19.8, 0.04, 19.8)):
+        xs, z, high, _ = mod.design_profile(ell, height, grade, 50)
+        assert high == pytest.approx(apex, abs=0.03), ell
+        assert abs(mod.np.gradient(z, xs)).max() * 100 <= grade * 100 + 0.05, ell                         # never steeper than the design grade
+        today_x, today_z = mod.smoothstep_profile(ell, 5 + 17 * min(max((ell - 60) / 540, 0), 1))
+        assert abs(mod.np.gradient(today_z, today_x)).max() * 100 == pytest.approx(18.7, abs=0.4), ell    # today's engine: 1.5 / 8
+    assert 5 + 17 * (300 - 60) / 540 == pytest.approx(12.6, abs=0.05) and 5 + 17 * (200 - 60) / 540 == pytest.approx(9.4, abs=0.05)   # today's heights in the note
+
+
+def test_the_granville_nodes_and_the_five_heights_of_the_design_note():
+    """docs/design/bridge_height_design.md, "How many heights a profile needs" (docs/img/bridge-height/granville_nodes.py): the Granville group has 13 nodes, 8 free ends on the ground and 5 junctions; the
+    distance of each junction to the ground and the highest height that a grade allows; the example of the 5 heights, in which no chain is steeper than the grade."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import importlib.util
+    import sys
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_granville_nodes", here / "granville_nodes.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        rows, at, _ = mod.junctions()
+        height, chain_rows = mod.example_profile()
+    finally:
+        sys.path.remove(str(here))
+    assert len(at) == 13 and sum(1 for v in at.values() if len(v) == 1) == 8 and len(rows) == 5          # 13 nodes: 8 on the ground, 5 junctions
+    assert sum(len(v) for v in at.values()) == 24                                                            # 12 chains have 24 ends
+    assert [r[2] for r in rows] == [[1, 5, 6, 8], [1, 4, 9], [3, 9, 10], [2, 4, 7], [10, 11, 12]]
+    assert [r[3] for r in rows] == pytest.approx([184, 363, 185, 228, 89], abs=2)                           # the distances to the ground
+    assert [round(0.06 * r[3], 1) for r in rows] == pytest.approx([11.0, 21.8, 11.1, 13.7, 5.3], abs=0.1)  # the highest heights at 6 %
+    assert [round(0.05 * r[3], 1) for r in rows] == pytest.approx([9.2, 18.2, 9.2, 11.4, 4.4], abs=0.1)
+    assert [round(0.08 * r[3], 1) for r in rows] == pytest.approx([14.7, 29.1, 14.8, 18.2, 7.1], abs=0.1)
+    assert [round(r[4], 1) for r in rows] == [22.0, 22.0, 22.0, 22.0, 11.2]                                  # the heights of today's engine
+    assert max(r[4] for r in chain_rows) <= 6.0 + 1e-6 and [round(r[4], 1) for r in chain_rows][:6] == [2.0, 3.4, 3.0, 2.6, 3.9, 4.0]
+
+
+def test_the_granville_input_profile_of_the_design_note_is_the_engines_nodes_and_chains():
+    """docs/design/bridge_profile_edit.md, "An example: the Granville Bridge" (docs/img/bridge-height/granville_input_profile.py and .json): the file has the 13 nodes (8 on the ground, 5 junctions) and
+    the 12 chains of the group that the engine finds, the example heights of the 5 junctions, and no chain has an interior control point. The file is the one that the script makes."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import importlib.util
+    import sys
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_granville_input", here / "granville_input_profile.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        made = mod.input_profile()
+    finally:
+        sys.path.remove(str(here))
+    saved = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_input_profile.json").read_text())
+    assert made == saved                                                                                  # the file is what the script makes
+    group = saved["groups"][0]
+    assert saved["format"] == "roadstyle.bridge_profile/1" and saved["parameters"] == {"design_speed_kmh": 50, "design_grade": 0.06}
+    assert len(group["nodes"]) == 13 and len(group["chains"]) == 12
+    ground = [n for n in group["nodes"] if n["kind"] == "ground"]
+    junction = [n for n in group["nodes"] if n["kind"] == "junction"]
+    assert len(ground) == 8 and len(junction) == 5 and all(n["z_m"] == 0 for n in ground)               # the ground is 0, from the data: nothing to give
+    assert sorted(n["z_m"] for n in junction) == [5.3, 11.0, 11.1, 13.7, 21.8]                           # the 5 heights of the example
+    assert all(c["points"] == [] for c in group["chains"])
+    ids = {n["id"] for n in group["nodes"]}
+    assert all(c["from"] in ids and c["to"] in ids for c in group["chains"])
+    assert sum(len(n["chains"]) for n in group["nodes"]) == 24                                            # each of the 12 chains has two ends
+
+
+def test_the_two_parts_of_the_engine_fill_and_make_on_the_granville_bridge():
+    """docs/design/bridge_profile_edit.md, "The proposal: the engine has two parts" (docs/img/bridge-height/granville_input_profile.py, a prototype): Part 1 (`fill`) turns the least input (5 junction heights)
+    into the complete input profile and keeps every value that is given; filling twice is filling once; a missing value is filled and marked as derived; wrong input is an error. Part 2 (`make`) has no
+    defaults: it makes the height along each chain of a complete profile, and a missing value is an error."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import copy
+    import importlib.util
+    import sys
+
+    import numpy as np
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_two_parts", here / "granville_input_profile.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        partial, filled = mod.partial_input(), mod.fill(mod.partial_input())
+        saved_partial = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_input_partial.json").read_text())
+        saved_filled = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_input_profile.json").read_text())
+        empty = mod.fill({})
+        dropped = copy.deepcopy(partial)
+        removed = dropped["groups"][0]["nodes"].pop(0)                                                       # J1: its height is not given
+        j1 = mod.fill(dropped)
+        changed = copy.deepcopy(partial)
+        changed["groups"][0]["nodes"][1]["z_m"] = 15.0
+        kept = mod.fill(changed)
+        with_point = mod.fill({**partial, "groups": [{**partial["groups"][0], "chains": [{"osm_ways": [1419040127, 1419040128], "points": [{"s": 275.0, "z_m": 25.0}]}]}]})
+        errors = []
+        for bad in ({"groups": [{"nodes": [{"lonlat": [-123.0, 49.0], "z_m": 5.0}]}]},                      # a node that is not one node of the group
+                    {"groups": [{"nodes": [{**partial["groups"][0]["nodes"][0]}, {**partial["groups"][0]["nodes"][0]}]}]},      # two entries for one node
+                    {"groups": [{"nodes": [{**partial["groups"][0]["nodes"][0], "z_m": -1.0}]}]}):          # a height below 0
+            try:
+                mod.fill(bad)
+            except ValueError as e:
+                errors.append(str(e))
+        heights = mod.make(filled)
+        incomplete = copy.deepcopy(filled)
+        incomplete["groups"][0]["nodes"][4]["z_m"] = None
+        no_width = copy.deepcopy(filled)
+        no_width["groups"][0]["chains"][0]["width_m"] = None
+        make_errors = []
+        for bad in (incomplete, no_width):
+            try:
+                mod.make(bad)
+            except ValueError as e:
+                make_errors.append(str(e))
+        pointed = mod.make(with_point)["c1"]
+    finally:
+        sys.path.remove(str(here))
+    assert [len(partial["groups"][0]["nodes"]), len(filled["groups"][0]["nodes"]), len(filled["groups"][0]["chains"])] == [5, 13, 12]
+    assert partial == saved_partial and filled == saved_filled                                              # the files are what the prototype makes
+    assert mod.fill(filled) == filled                                                                       # Part 1 twice is Part 1 once
+    by_pos = {tuple(n["lonlat"]): n for n in filled["groups"][0]["nodes"]}
+    for n in partial["groups"][0]["nodes"]:                                                                  # every given value is kept, with its own source
+        assert by_pos[tuple(n["lonlat"])]["z_m"] == n["z_m"] and by_pos[tuple(n["lonlat"])]["source"] == "example"
+    assert all(n["z_m"] == 0 and (n["source"], n["method"]) == ("data", "mapped") for n in filled["groups"][0]["nodes"] if n["kind"] == "ground")
+    assert [(n["z_m"], n["source"], n["method"]) for n in empty["groups"][0]["nodes"] if n["kind"] == "junction"] == [(z, "rule", "derived") for z in (9.2, 18.2, 9.2, 11.4, 4.4)]  # an empty input: all filled by the rule, at the default grade of 5 %
+    assert empty["parameters"] == {"design_speed_kmh": 50, "design_grade": 0.05} and all(c["width_source"] == "rule" for c in empty["groups"][0]["chains"])
+    j1_node = {tuple(n["lonlat"]): n for n in j1["groups"][0]["nodes"]}[tuple(removed["lonlat"])]
+    assert (j1_node["z_m"], j1_node["source"], j1_node["method"]) == (11.0, "rule", "derived")             # a missing height is filled, and marked
+    assert {tuple(n["lonlat"]): n["z_m"] for n in kept["groups"][0]["nodes"]}[tuple(partial["groups"][0]["nodes"][1]["lonlat"])] == 15.0     # a given height is not changed by the rule
+    assert len(errors) == 3 and "must be one" in errors[0] and "two entries" in errors[1] and "below 0" in errors[2]
+    assert len(make_errors) == 2 and all("fill the profile first" in m for m in make_errors)               # Part 2 has no defaults
+    assert set(heights) == {f"c{n}" for n in range(1, 13)}
+    for chain in filled["groups"][0]["chains"]:                                                              # the height at the two ends of a chain is the height of its nodes
+        xs, z = heights[chain["id"]]
+        zs = {n["id"]: n["z_m"] for n in filled["groups"][0]["nodes"]}
+        assert (z[0], z[-1]) == pytest.approx((zs[chain["from"]], zs[chain["to"]]), abs=0.05)
+        assert abs(np.gradient(z, xs)).max() * 100 <= 6.0 + 0.1                                          # no chain is steeper than the design grade
+    xs, z = pointed
+    assert 24.4 <= float(np.interp(275.0, xs, z)) <= 25.0                                               # an interior point: the deck goes through it, rounded by its curve
+
+
+def test_the_guide_page_of_the_bridge_profile_shows_the_sample_files_and_links_them():
+    """docs/guides/bridge-profile.md shows the least input and the colored complete profile of docs/samples/bridge-profile/ in full (so the page and the files cannot differ), links every sample file, gives
+    their sizes, and is in the menu. The colored block is the one that the prototype makes: 22 values from the input (bold blue) and 169 added by the engine (orange), and the text without the tags is the JSON file.
+    The stylesheet has both colors for the light and the dark scheme."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
+    import html
+    import importlib.util
+    import re
+    import sys
+    root = Path(__file__).resolve().parents[1]
+    samples = root / "docs" / "samples" / "bridge-profile"
+    page = (root / "docs" / "guides" / "bridge-profile.md").read_text()
+    sys.path.insert(0, str(root / "docs" / "img" / "bridge-height"))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_colored", root / "docs" / "img" / "bridge-height" / "granville_input_profile.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        partial, filled = mod.partial_input(), mod.input_profile()
+        block, view = mod.dump_html(filled, partial), mod.view_html(filled, partial)
+    finally:
+        sys.path.remove(str(root / "docs" / "img" / "bridge-height"))
+    assert (samples / "granville_input_partial.json").read_text().rstrip("\n") in page                    # the least input is on the page as it is
+    for name in ("granville_input_partial.json", "granville_input_profile.json"):
+        json.loads((samples / name).read_text())                                                        # valid JSON
+    assert block in page and block in view and (samples / "granville_input_profile_colored.html").read_text() == view     # the page, the view and the file are one block
+    assert html.unescape(re.sub(r"<[^>]+>", "", block)).replace("<pre class=\"rs-bp\"><code>", "") == (samples / "granville_input_profile.json").read_text().rstrip("\n")   # without the tags: the JSON file
+    assert (block.count('class="given"'), block.count('class="added"')) == (22, 169) and 'title="given in your input"' in block
+    assert "&quot;" not in block and "<span" in mod.LEGEND and mod.LEGEND in page
+    css = (root / "docs" / "stylesheets" / "extra.css").read_text()
+    assert "--rs-bp-given" in css and "--rs-bp-added" in css and css.count('[data-md-color-scheme="slate"] { --rs-bp-given') == 1      # both colors, light and dark
+    files = sorted(p.name for p in samples.iterdir())
+    assert files == ["bridge_profile_complete.schema.json", "bridge_profile_input.schema.json", "granville_bridge_edges.parquet", "granville_bridge_profile_today.json", "granville_input_partial.json",
+                     "granville_input_profile.json", "granville_input_profile_colored.html", "granville_lidar_samples.json"]
+    for name in files:
+        assert f"](../samples/bridge-profile/{name})" in page, name                                      # every sample file has a link
+        assert f"{(samples / name).stat().st_size / 1024:.1f} KB" in page, name                         # and its size
+    assert "guides/bridge-profile.md" in (root / "mkdocs.yml").read_text()                              # the page is in the menu
+    assert "bridge-profile.md" in (root / "docs" / "guides" / "bridge-height.md").read_text()          # and the guide of the heights points to it
+
+
+def test_the_bridge_profile_schemas_check_the_samples_and_agree_with_the_reference():
+    """docs/samples/bridge-profile/*.schema.json (docs/img/bridge-height/bridge_profile_schema.py) are the format of docs/reference/formats.md, "The bridge profile (planned)": the files are what the script makes,
+    they are valid schemas, the least input is valid as an input and not as a complete profile, the complete profile is valid as both, an empty input is valid, a wrong input is rejected, and every key of the schema
+    is in the reference."""
+    import importlib.util
+    import sys
+
+    import jsonschema
+    root = Path(__file__).resolve().parents[1]
+    here = root / "docs" / "img" / "bridge-height"
+    samples = root / "docs" / "samples" / "bridge-profile"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_profile_schema", here / "bridge_profile_schema.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    finally:
+        sys.path.remove(str(here))
+    inp, com = (json.loads((samples / f"bridge_profile_{n}.schema.json").read_text()) for n in ("input", "complete"))
+    assert inp == mod.schema(False) and com == mod.schema(True)                                           # the files are what the script makes
+    for schema in (inp, com):
+        jsonschema.Draft202012Validator.check_schema(schema)
+    vi, vc = jsonschema.Draft202012Validator(inp), jsonschema.Draft202012Validator(com)
+    partial = json.loads((samples / "granville_input_partial.json").read_text())
+    full = json.loads((samples / "granville_input_profile.json").read_text())
+    assert vi.is_valid(partial) and not vc.is_valid(partial)                                              # the least input: an input, not a complete profile
+    assert vi.is_valid(full) and vc.is_valid(full)                                                        # a complete profile is also an input
+    assert vi.is_valid({}) and not vc.is_valid({})                                                        # an empty input is valid
+    node = {"lonlat": [-123.1, 49.2], "z_m": 5.0}
+    for bad in ({"groups": [{"nodes": [{**node, "z_m": -1}]}]},                                          # a height below 0
+                {"groups": [{"nodes": [{**node, "lonlat": [-123.1, 49.2, 5]}]}]},                         # a position with three numbers
+                {"groups": [{"nodes": [{**node, "kind": "bridge"}]}]},                                    # an unknown kind
+                {"groups": [{"nodes": [{**node, "method": "guess"}]}]},                                   # an unknown method
+                {"groups": [{"nodes": [{"z_m": 5.0}]}]},                                                  # a node with no lonlat and no id
+                {"groups": [{"chains": [{"osm_ways": [1], "points": [{"z_m": 3.0}]}]}]},                  # a point with no s
+                {"parameters": {"curve": "round"}}, {"parameters": {"design_grade": 0}}, {"extra": 1}):    # an unknown curve, a grade of 0, an unknown key
+        assert not vi.is_valid(bad), bad
+    broken = json.loads(json.dumps(full))
+    broken["groups"][0]["nodes"][0].pop("z_m")
+    assert vi.is_valid(broken) and not vc.is_valid(broken)                                                # Part 2 needs every height
+    section = (root / "docs" / "reference" / "formats.md").read_text()
+    section = section[section.index("## The bridge profile (planned)"):section.index("## The look")]
+    names = {k for d in inp["$defs"].values() if d.get("type") == "object" for k in d["properties"]} | set(inp["properties"])
+    assert names >= {"format", "parameters", "groups", "design_speed_kmh", "design_grade", "curve", "z_m", "lonlat", "osm_ways", "points", "width_m", "width_source", "s"}
+    assert [n for n in sorted(names) if f"`{n}`" not in section and f".{n}`" not in section and f"[].{n}`" not in section and f"`.{n}`" not in section] == []      # every key is in the reference
+    assert "bridge_profile_input.schema.json" in section and "bridge_profile_complete.schema.json" in section
+    for key, default in (("design_speed_kmh", 50), ("design_grade", 0.05)):
+        assert f"Default {default}" in section, key                                                       # the defaults of the reference

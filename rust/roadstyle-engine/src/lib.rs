@@ -4,6 +4,8 @@
 // Numeric code: index loops over parallel arrays and tuple types read as they are.
 #![allow(clippy::needless_range_loop, clippy::type_complexity)]
 
+pub mod bridge_fill;
+pub mod bridge_profile;
 pub mod colors;
 pub mod dark;
 pub mod contract;
