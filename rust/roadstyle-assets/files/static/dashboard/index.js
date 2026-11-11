@@ -145,8 +145,15 @@ export function rsDashboard(map, options){
   initOverlay();
   const rs = makeApi({
     // roadLayers (roadlayers.js) on this map and this dashboard: a host page that puts a new roads style on its map (a server's tiled style, a LiveMap's)
-    // the dashboard reads the roads with the prefix of their layers: a page made with no prefix (page_from) takes the prefix of roadLayers ("rs-" by default)
-    roadLayers(opts = {}){ const prefix = opts.prefix ?? "rs-"; setPrefix(prefix); return roadLayers({map, dashboard: rs, ...opts, prefix}); },
+    // the dashboard reads the roads with the prefix of their layers: a page made with no prefix (page_from) takes the prefix of roadLayers ("rs-" by default).
+    // The controls of a style that it shows are the roads' own: they take the place of the page's first options (a page made with no roads gave empty ones)
+    roadLayers(opts = {}){
+      const prefix = opts.prefix ?? "rs-";
+      setPrefix(prefix); o.prefix = prefix;
+      const r = roadLayers({map, dashboard: rs, ...opts, prefix}), show = r.show;
+      r.show = (style, more) => { for(const k of Object.keys((style?.metadata || {})["roadstyle:controls"] || {})) given.delete(k); return show(style, more); };
+      return r;
+    },
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection and the hover go: they were the old roads'.
     setStyle(style, more){
