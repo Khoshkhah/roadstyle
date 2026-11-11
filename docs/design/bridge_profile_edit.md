@@ -1,4 +1,4 @@
-# The bridge profile: roadstyle and urbanstyle, and an edit step
+# The bridge profile: roadstyle and urbanstyle, and an input profile
 
 Date: 2026-11-10. Status: proposal. Nothing is built. The documentation comes first: this note is the spec, and the code waits for approval.
 This note is about the profile of a group of 3D bridges: how [the engine](../guides/bridge-height.md) makes it, how urbanstyle makes the profile of the same bridge,
@@ -11,10 +11,12 @@ and a proposal for an edit step.
   file for each bridge, with a height line `[s, z]` in metres for each axis and a `source` and a `method` for each value.
 - On the Granville Bridge, the engine finds the same 12 chains as urbanstyle finds axes, with the same OSM ways. The heights are different. The engine gives all 12 chains the same top
   (22 m). The LiDAR gives 39 m on the main span and 11.6 m to 27 m on the ramps.
-- **A second note gives the rules for the heights themselves:** [The height of a bridge from the design rules](bridge_height_design.md) (clearance, design grade, vertical curves). Its profile is a list of
-  points of vertical intersection with curve lengths. This is the same form as the `points` and `curves` of the input below. The design rules make the list, and a user can edit it.
-- **The proposal keeps the current approach and adds an optional input in front of it.** With no input, the output is the same as today. The input is a **height line for a chain**
-  (`points` and `curves`, as in urbanstyle's `heights` section). A prototype on the Granville Bridge shows that heights alone are not enough: the shape of the line is the limit.
+- **A second note gives the rules for the heights themselves:** [The height of a bridge from the design rules](bridge_height_design.md) (clearance, design grade, vertical curves).
+- **The proposal: the 3D bridge has an input profile and an output profile, and a person edits only the input profile.** The engine writes the input profile for the roads: the group, its chains and nodes,
+  and a default height `z` at each node. A person changes the numbers. The engine reads the file again and makes the output profile (the deck pieces). The output is never edited. With no change, the output is
+  the same as today.
+- **The input profile is small.** The Granville Bridge has 13 nodes. 8 are on the ground (height 0, from the data), so a person gives **5 heights**, one for each junction. A chain between two nodes is a straight
+  grade with vertical curves. A chain that needs a crest or a sag between its nodes needs one more control point for each. A prototype shows why: node heights alone leave up to 10 m of error on the long chains.
 
 ## How roadstyle makes the profile
 
@@ -131,110 +133,90 @@ What the comparison shows:
 - **The ends are not the same.** Five LiDAR axes are 18 m to 62 m longer (chains 2, 5, 6, 7 and 8), because urbanstyle continues each landing on fill. The engine stops at the OSM bridge way.
 - **The grade is not the same.** The engine rises 1 m in 8 m. The rule of urbanstyle rises 1 m in 20 m. The LiDAR ramps are steeper at the start and flatter later: on chain 3, the deck rises 10 m in the first 100 m.
 
-## Where an edit step can go
+## The proposal: edit only the input profile
 
-The engine makes the profile in five steps (see the guide). An edit can enter at four places.
-
-| | Where | What the user gives | Risk |
-|---|---|---|---|
-| A | The engine, before it cuts a chain into pieces | The height of a node (`deck_m`), the top of a chain (`top_m`), or a height line for a chain (`points`, `curves`) | The engine keeps all rules by itself. The engine needs a way to name a chain |
-| B | The engine, as a file | A profile file in the format of urbanstyle (`urbanstyle.bridge/1`), matched to the chains by the OSM ways | A converter from `[s, z]` to lifts |
-| C | The page, after the engine | `rsSetBridgeHeight` for one chain, or a new call for a height line | The page keeps the lifts of the pieces. It cannot change the ramp |
-| D | The pieces, between the engine and the page | A program that changes `__rs_lift0`, `__rs_lift1`, `__rs_base` and `__rs_height` | The program must keep the six rules of the guide. A mistake shows as a step or a gap |
-
-The proposal below is place A, with the file form of place B as a converter.
-
-## The proposal
-
-### What does not change
-
-- The groups, the chains and the free ends (steps 1 and 2 of the guide).
-- The rule for the height of a group and the rule for the lift at a node (steps 3 and 4), for every chain that has no input.
-- The profile format: the same deck pieces with the same properties. The page does not change, except for the points in "The page".
-- A page made with no input has the same pieces as today. A test keeps this (the goldens do not change).
-
-### The input: a height line for a chain
-
-The height line of a chain is `z(x)`: the height of the deck above the ground at the distance `x` metres from the first end of the chain. It is the same idea as the `vertical` of an axis in urbanstyle.
-
-```python
-rs.render_dashboard(edges, view_3d=True, bridge_profile={
-    "8043974233675410214": {                       # the id of one road of the chain (chain 1, the main span), as bridge_heights does
-        "points": [[0, 27.02], [160, 31.06], [220, 33.66], [310, 38.77], [340, 39.27], [360, 38.63], [390, 36.62], [490, 27.41], [550.46, 22.72]],   # [x, z]
-        "curves": [0, 54, 54, 27, 18, 18, 27, 54, 0],      # the length of the vertical curve at each point (optional; 0 is a corner)
-        "source": "City of Vancouver LiDAR 2022", "method": "measured",     # optional: kept in the table
-    },
-})
-```
-
-| Key | Meaning |
-|---|---|
-| The key of the dictionary | The id of one road of the chain. Any road of the chain names it |
-| `points` | `[x, z]` pairs in order of `x`. The first `x` is 0 and the last `x` is the length of the chain. `z` is in metres, 0 or more |
-| `curves` | The length of the vertical curve at each point, in metres. 0 gives a corner. The default is all 0 |
-| `from` | Optional. `[longitude, latitude]` of the end where `x` is 0. The engine takes the end of the chain that is within 5 m of it. Without `from`, `x` is 0 at the first end that the table shows |
-| `source`, `method` | Optional text. `method` is `measured`, `derived` or `chosen`. They go in the table and in the Height box |
-
-The same dictionary can be a JSON file: `bridge_profile="profile.json"`. The look option is `bridges.profile`, as `bridges.heights` is for `bridge_heights`.
-
-**The table.** To write the input, the user needs to know the chains. `rs.bridge_table(edges)` returns one row for each chain: the chain number, the group, the ids of its roads, its length, the
-longitude and latitude of its first and its last end, the group height H, the lift at each end, and the `source` and `method` of its height line, when it has one. The table of the Granville Bridge
-in the guide is this table.
-
-### The changed formulas
-
-**A chain with a height line.** The height `z(x)` is the straight line through the points. At an inside point `i` with a curve length `c > 0`, the line is rounded. Let `g1` and `g2` be the slopes
-before and after the point. For `x` from `s_i − c/2` to `s_i + c/2`, with `u = x − (s_i − c/2)`:
+The 3D bridge has an **input profile** and an **output profile**. A person edits the input profile and nobody edits the output profile.
 
 ```text
-z(x) = (z_i − g1 × c/2) + g1 × u + (g2 − g1) ÷ (2c) × u²
+roads  ->  the engine writes the input profile (the nodes, with a height for each, from the rules)
+                |
+                |   a person changes the numbers
+                v
+         the input profile  ->  the engine (the rules, the vertical curves, the checks)  ->  the output profile (the deck pieces)  ->  the page draws it
 ```
 
-The chain's own top is `P = max z`, and the lift is `lift(x) = z(x) ÷ P`. The deck pieces of the chain have `__rs_full = P`. The underside is `P × lift(x) = z(x)`, so the picture shows the line.
-(On terrain, the formula of step 6 is the same, with H = P.)
+- The **input profile** is small: the group (its chains and nodes), the height `z` of each control point, and a few parameters. The engine can write it for any page, with a default `z` from the rules at each
+  node, so that a person edits only numbers.
+- The **output profile** is the list of deck pieces of [the guide](../guides/bridge-height.md). It is made from the input profile. It is never edited. If the input profile has no change, the output is the output of the rules.
+- This is also the design of urbanstyle: a profile file, and a model that reads only the file.
 
-**A chain with no height line.** The formulas of step 5 do not change. Two inputs change.
+### What is in the input profile
 
-- The height at an end node is the height that a height line gives there, when a chain with a line meets this node. Without a line, it is `H × (the node lift)`, as today.
-- The chain's top is `P = max(H, the height at its first end, the height at its last end)`, in place of H. Then `lift_head = z_head ÷ P`, `lift_tail = z_tail ÷ P` and `R = P × g`.
+| Part | Content | Edited by a person? |
+|---|---|---|
+| `parameters` | The design speed and the design grade. The engine needs them for the vertical curves and the checks | Yes |
+| The group | A name, its chains and its nodes. They come from the roads | No. The engine writes them |
+| A node | An id, its position (longitude and latitude), its kind (`ground` or `junction`), the chains that meet there, and its height `z_m`. A `ground` node is 0. A `junction` has the height that the rules give, until a person changes it | **The `z_m` of a junction: yes** |
+| A chain | An id, the OSM ways, its length, its two end nodes (`from`, `to`), the interior control points (`points`), and optionally its width | `points` and the width: yes |
+| An interior control point | `s` (metres from the `from` end) and `z_m`. For a high point or a low point between two nodes | Yes |
+| `source`, `method` | Where a height comes from. `method` is `mapped`, `measured`, `derived` or `chosen`. Optional | Yes |
 
-If no chain at the node has a line, P = H, and the result is the same as today.
+The width is not needed for a height. The engine takes it from the road class and the lanes, and a chain can override it. The geometry of a chain is the geometry of the roads. It is not in the file.
 
-**The pieces.** A chain with a height line is cut every `line_step_m` along the whole chain (10 m by default, a new key of `bridge_decks`) and at each point. The main span of the Granville Bridge (550 m) has
-2 pieces today and about 55 pieces then.
+### An example: the Granville Bridge
 
-### The rules, errors and warnings
+`docs/img/bridge-height/granville_input_profile.json` is the input profile of the Granville Bridge group (5 KB, made by `granville_input_profile.py`). It has 13 nodes and 12 chains. This is a node on the ground, a junction, and a chain:
 
-The six rules of the guide still hold, with two changes: the end lifts of two chains at a node agree in **metres** (`z`) and not in lift, and the height at a free end is 0 unless the line says
-otherwise. The engine says what is wrong and does not choose:
+```json
+{"id": "n1", "lonlat": [-123.12952, 49.27624], "kind": "ground", "chains": ["c6"], "z_m": 0.0, "source": "data", "method": "mapped"}
+{"id": "n4", "lonlat": [-123.13097, 49.27397], "kind": "junction", "chains": ["c1", "c5", "c6", "c8"], "z_m": 11.0, "source": "example", "method": "chosen"}
+{"id": "c1", "osm_ways": [1419040127, 1419040128], "length_m": 550.4, "from": "n5", "to": "n4", "points": []}
+```
+
+The 8 nodes on the ground are 0 and come from the data. The 5 junction heights are the example of [the design note](bridge_height_design.md): each is the highest height that a grade of 6 % allows. They are the
+only 5 numbers that a person must give. `points` is empty for every chain: each chain is a straight grade between its two nodes, with vertical curves.
+
+### What the engine does with it
+
+1. It reads the nodes and chains. A node has one height. For this reason, two chains that meet at a node cannot have two heights (the problem of the first proposal is gone).
+2. For each chain, it makes the profile through the height at its first node, its interior control points, and the height at its last node: a straight grade between two points, and a parabolic vertical curve
+   of length `L = max(K × A, 0.6 V)` at each change of grade (the rules of [the design note](bridge_height_design.md), step 3).
+3. It cuts the chain into deck pieces. The pieces carry the same properties as today (`__rs_lift0`, `__rs_lift1`, `__rs_s0`, `__rs_s1`, `__rs_full`). With a different `__rs_full` for each chain, the lift of a piece
+   is `z ÷ __rs_full`, with `__rs_full` the highest `z` of the chain.
+4. It runs the checks and reports them.
+
+**With no input profile**, the engine writes the default input profile with the rules that it has. Until the rules of the design note are built, the default `z` of a junction is the height that today's rule gives. The output
+is then the output of today.
+
+### How many control points
+
+| | Count |
+|---|---|
+| Nodes on the ground | 8. Height 0 from the data. Nothing to give |
+| Junctions | 5. One height for each |
+| Interior control points | 0 or more. One for each high point or low point that a chain needs between its nodes |
+
+The Granville Bridge needs 5 heights and no more, if each chain can be a straight grade. A chain that needs a crest (for example the main span, 550 m) needs one point more for the crest.
+
+### Checks
+
+The engine says what is wrong and does not change a number of the person.
 
 | Case | Result |
 |---|---|
-| Two heights at one node: the end `z` of two chains differ by more than 0.1 m | Error. It names the node (longitude and latitude), the two chains and the two heights |
-| The `points` are not in order of `x`, `x` is outside 0 to the length of the chain, or a `z` is below 0 | Error |
-| The first `x` is not 0 or the last `x` is not the length of the chain (within 1 m) | Error |
-| Two curves overlap: `c_i ÷ 2 + c_(i+1) ÷ 2` is more than the distance between the points | Error |
-| All `z` are 0 | Error |
-| Two entries for roads of one chain | Error |
-| An id that no road has | Error |
-| An id of a road that is not a 3D bridge | Warning |
-| `view_3d` is false | Warning, as for `bridge_heights` |
-| A line and `bridge_heights` for the same group | The line is for a chain and `bridge_heights` is for the group. The group H is used by the chains with no line |
+| The grade between two control points is above the design grade | Warning. Above the maximum grade of the road class: error |
+| The `s` of a point is outside the chain, or the points of a chain are not in order of `s` | Error |
+| A node id or a chain id that the roads do not have | Error |
+| A `z_m` below 0 | Error |
+| A `ground` node with `z_m` above 0 | Allowed: a landing on fill. The page closes the end of the deck down to the ground |
+| Two curves overlap (a short chain with a high design speed) | Warning. The curves are shortened and the message says so |
+| A sag curve whose low point is on the bridge, or a flat top with no grade on a long bridge | Warning |
+| Two decks cross and the upper deck is not high enough above the lower one | Warning (later: it needs the crossings from the level solver) |
 
-A free end with `z > 0` is a landing on fill (the OSM bridge way ends in the air). The engine allows it. The page must close the end of the deck down to the ground: see "The page".
+### What the prototype shows: node heights alone are not enough
 
-### The page
-
-- The page reads the same pieces. It does not change for a height line.
-- A deck end with `lift > 0` is blunt today (a wall as high as the deck is thick). For a landing on fill, the page draws the sides down to the ground, as urbanstyle does.
-- The Height box shows the top `P` of a chain with a line, with its `source` and `method`, and does not let the user change it (`rsSetBridgeHeight` on a group with lines gives an error that names the chains).
-  This is an open decision (see below).
-- `rsBridgeGroups()` lists the chains with `source` and `method`.
-
-### What the prototype shows on the Granville Bridge
-
-`docs/img/bridge-height/granville_proposed.py` is a prototype in Python of the changed formulas. It is not the engine. For each chain, the input of stage 1 is the LiDAR height at the two ends and the
-highest LiDAR height. The input of stage 2 is the grade points of the LiDAR fit. The table shows the largest difference to the LiDAR stations of the chain.
+`docs/img/bridge-height/granville_proposed.py` is a prototype in Python. It is not the engine. It compares three profiles against the LiDAR stations of each chain. Stage 1 is the profile of the chain
+with the heights at its two nodes and its top only. Stage 2 is the profile through the grade points of the LiDAR fit, which are control points between the nodes. This is the evidence for interior control points.
 
 ![The engine today, the stage 1 profile, the stage 2 profile and the LiDAR](../img/bridge-height/granville_proposed.png)
 
@@ -260,32 +242,40 @@ highest LiDAR height. The input of stage 2 is the grade points of the LiDAR fit.
 - **Some free ends are above the ground.** The engine has a free end (lift 0) at the last end of chains 2 and 8. The LiDAR height there is 4.4 m and 8.3 m, because the OSM bridge way ends before
   the bridge does, and the deck goes on to the street on fill. Only a height line (or a node height) can say this.
 
+### The page
+
+- The page reads the same pieces. It does not change for an input profile.
+- A deck end with `lift > 0` is blunt today. For a landing on fill, the page draws the sides down to the ground, as urbanstyle does.
+- The Height box shows the `z_m` of the selected node or chain, with its `source` and `method`, and can change it in the open page (a change of the input profile, not of the output).
+- `rsBridgeGroups()` lists the chains and the nodes.
+
 ### The order of the work
 
-1. **Documentation first** (this note). The guide gets the new pages only when the code exists.
-2. The engine: the look option, the table, the formulas, the errors. Tests: a line of two points; the rounded corner; the continuity of the pieces; two heights at a node; a rule chain that meets
-   a line chain; a free end with `z > 0`; every error of the table; **no input gives the same pieces as today**; the Granville Bridge with the LiDAR points (largest error 0.5 m).
+1. **Documentation first** (this note and [the design note](bridge_height_design.md)). The guide gets new pages when the code exists.
+2. The engine: the input profile (read, write, default), the profile through the control points, the checks. `rs.bridge_profile(edges)` writes the input profile. The keyword `bridge_profile=` (a dictionary or a JSON file)
+   reads it. Tests: a straight grade between two nodes; the rounded corner; the continuity of the pieces; one height at a node; an interior point; every check of the table; **no input gives the same pieces as today**;
+   the Granville file gives its 12 chains and 13 nodes.
 3. The page: the landing on fill, the Height box, `rsBridgeGroups()`.
-4. A converter from an urbanstyle profile to this input, outside the engine: it matches the axes to the chains by the OSM ways (12 of 12 on the Granville Bridge).
-5. The guide: a how-to page "Give a bridge its own height line", the row in "Every parameter", and a change of "What can change a profile".
+4. A converter from an urbanstyle profile to this input profile, outside the engine. It matches the axes to the chains by the OSM ways (12 of 12 on the Granville Bridge).
+5. The default `z` of a junction from the design rules (the other note).
 
 ### Decisions that are open
 
 Each decision has the recommendation of this note.
 
-1. **Input.** A height line for a chain. Recommended, because stage 1 is not enough. A height for a node or for the middle of a chain is not an input. It is derived from the lines.
-2. **Name of a chain.** The id of one road of the chain, with `from` for the direction. The table shows the ends.
-3. **The Height box on a chain with a line.** Show the top and the `source`. Do not change it. The other choice is to scale the line; this hides the measurement.
-4. **The landing on fill.** The page draws the sides down to the ground.
-5. **`line_step_m`.** 10 m, as the stations of urbanstyle.
-6. **The tolerance at a node.** 0.1 m.
+1. **Edit only the input profile.** Yes. The output profile is never edited.
+2. **Control points.** The heights of the nodes, and interior points `(s, z)`. A height line with curves is not an input: the curves are calculated.
+3. **Naming a node.** By its id in the input profile that the engine writes, and its position. The engine writes the file so that a person does not need to find the nodes.
+4. **A new keyword.** `bridge_profile=` replaces `bridge_heights` and `bridge_height_col` in the end. The two stay while the engine has no input profile.
+5. **The Height box in the open page.** It changes the input profile, then the output is made again. The ramps are then new too (today they keep the first length).
+6. **The landing on fill.** The page draws the sides down to the ground.
 7. **The urbanstyle converter.** Yes, outside the engine.
 8. **Where the file is kept.** "One rule for every path" says the page, the tiles and the editor must read the same data. A profile that belongs to the area could be kept with the area, in duckOSM. This is for later.
-9. **The landing of the engine.** The engine stops at the OSM bridge way. urbanstyle continues the landing on fill to the next junction (150 m at most). A height line with `z > 0` at the end says what urbanstyle does, with no change to the rule.
 
 ### Regenerate the figures and the tables
 
 ```bash
-python docs/img/bridge-height/granville_vs_lidar.py     # the comparison, and its table
-python docs/img/bridge-height/granville_proposed.py     # the prototype, and its table
+python docs/img/bridge-height/granville_vs_lidar.py       # the comparison, and its table
+python docs/img/bridge-height/granville_proposed.py       # the prototype, and its table
+python docs/img/bridge-height/granville_input_profile.py  # the input profile of the Granville Bridge
 ```

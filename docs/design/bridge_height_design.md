@@ -11,7 +11,7 @@ design rules give. It uses no measured data of one bridge.
   times sharper than the curves of design practice at 50 km/h. A bridge over a road needs 5.8 m, and the engine gives a bridge of 300 m a height of 12.6 m.
 - The proposal is to find the height of each chain from its **clearance**, the length of its **ramps** from a **design grade**, and the **vertical curves** from a **design speed**. The result is a list of
   points of vertical intersection (PVI) with curve lengths. This is the standard form of a vertical alignment in road design, and it is also the form of the `points` and `curves` in the proposal of
-  [the edit step](bridge_profile_edit.md).
+  [the input profile](bridge_profile_edit.md).
 - Each rule below says where it comes from and how well I could verify it. Some values (the maximum grade of each road class) I could not verify. The note says so, and they are settings.
 
 ## The design rules
@@ -277,7 +277,7 @@ Each one has the recommendation of this note.
 4. **The depth of the structure.** `max(0.8 m, w ÷ 25)`, the value of a steel plate girder. A setting.
 5. **A level top.** A top with no grade has no drainage. Recommended: a top has a grade of 0.5 % or a crest. This changes the flat top of every long bridge.
 6. **The unknown obstacle.** The assumed top of 5.8 m, with a warning.
-7. **The format.** The profile of a chain is a list of PVI with curve lengths. A user can give the same list as an input (the proposal of [the edit step](bridge_profile_edit.md)).
+7. **The format.** The input is a profile that a person edits: the nodes, their heights, and interior control points. The engine writes it and reads it back, and the curves are calculated from the design speed (the proposal of [the input profile](bridge_profile_edit.md)).
 
 ## The order of the work
 

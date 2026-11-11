@@ -2876,3 +2876,32 @@ def test_the_granville_nodes_and_the_five_heights_of_the_design_note():
     assert [round(0.08 * r[3], 1) for r in rows] == pytest.approx([14.7, 29.1, 14.8, 18.2, 7.1], abs=0.1)
     assert [round(r[4], 1) for r in rows] == [22.0, 22.0, 22.0, 22.0, 11.2]                                  # the heights of today's engine
     assert max(r[4] for r in chain_rows) <= 6.0 + 1e-6 and [round(r[4], 1) for r in chain_rows][:6] == [2.0, 3.4, 3.0, 2.6, 3.9, 4.0]
+
+
+def test_the_granville_input_profile_of_the_design_note_is_the_engines_nodes_and_chains():
+    """docs/design/bridge_profile_edit.md, "An example: the Granville Bridge" (docs/img/bridge-height/granville_input_profile.py and .json): the file has the 13 nodes (8 on the ground, 5 junctions) and
+    the 12 chains of the group that the engine finds, the example heights of the 5 junctions, and no chain has an interior control point. The file is the one that the script makes."""
+    import importlib.util
+    import sys
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_granville_input", here / "granville_input_profile.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        made = mod.input_profile()
+    finally:
+        sys.path.remove(str(here))
+    saved = json.loads((here / "granville_input_profile.json").read_text())
+    assert made == saved                                                                                  # the file is what the script makes
+    group = saved["groups"][0]
+    assert saved["format"] == "roadstyle.bridge_profile/1" and saved["parameters"] == {"design_speed_kmh": 50, "design_grade": 0.06}
+    assert len(group["nodes"]) == 13 and len(group["chains"]) == 12
+    ground = [n for n in group["nodes"] if n["kind"] == "ground"]
+    junction = [n for n in group["nodes"] if n["kind"] == "junction"]
+    assert len(ground) == 8 and len(junction) == 5 and all(n["z_m"] == 0 for n in ground)               # the ground is 0, from the data: nothing to give
+    assert sorted(n["z_m"] for n in junction) == [5.3, 11.0, 11.1, 13.7, 21.8]                           # the 5 heights of the example
+    assert all(c["points"] == [] for c in group["chains"])
+    ids = {n["id"] for n in group["nodes"]}
+    assert all(c["from"] in ids and c["to"] in ids for c in group["chains"])
+    assert sum(len(n["chains"]) for n in group["nodes"]) == 24                                            # each of the 12 chains has two ends
