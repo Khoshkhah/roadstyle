@@ -1,7 +1,8 @@
 # The bridge profile: input and output (planned)
 
-**Status: planned, not built.** The engine does not read an input profile yet. The format on this page is fixed, and the sample files are real: scripts make them from the real roads of the Granville Bridge in
-Vancouver, and tests check them. Today you can set the height of a group of bridges with `bridge_heights` or `bridge_height_col` (see [How the height of a 3D bridge is calculated](bridge-height.md)).
+**Status: Part 2 is built, the rest is planned.** The maker (Part 2) reads a complete profile and makes the 3D deck pieces from it, with the curve `smooth` (the ramps of today): see
+[What works today](#what-works-today). The filler (Part 1, which completes an input that has values missing), interior control points and the curve `design` are planned. The format is fixed, and the sample files are
+real: scripts make them from the real roads of the Granville Bridge in Vancouver, and tests check them.
 
 ## The idea
 
@@ -14,6 +15,31 @@ The engine has two parts:
 2. **Part 2, the maker.** It reads a complete input profile. It has no rules and no defaults: if a value is missing, it stops. It makes the height along each chain and the deck pieces.
 
 Every value of the input profile is optional: a height, a width, a parameter, even the list of nodes. The least input is an empty profile. If you run Part 1 on a complete profile, nothing changes.
+
+## What works today
+
+The maker is built. You can get the complete profile of a page, change a number, and give it back:
+
+```python
+import roadstyle as rs
+
+profile = rs.bridge_profile(edges)                      # the complete profile that the engine writes for these roads
+junction = next(n for g in profile["groups"] for n in g["nodes"] if n["kind"] == "junction")
+junction["z_m"] = 9.0                                   # the height of one node, in metres
+rs.render_dashboard(edges, view_3d=True, bridge_profile=profile).save("map.html")
+```
+
+- `bridge_profile=` takes a dictionary or the path of a JSON file.
+- With the profile that `rs.bridge_profile(edges)` gives, the page is the same as without it. A page that is given a profile writes the same profile again.
+- **You can change** the `z_m` of a node, the `top_m` of a chain (its full height), and the `width_m` of a chain. A node is higher than the `top_m` of a chain that ends there: that is an error.
+- **Not built, and the maker says so with an error:** interior control points (`points`), and the curve `design`. The filler for an input with values missing is not built, so the profile must be complete. A key that is
+  missing is an error that says "fill it first".
+- The chains are `c1`, `c2`... in the order of the engine, and a profile is for the roads that it was made from. A profile for other roads is an error (the number of chains, the length of a chain, a node that is not
+  where its chain ends).
+- **Sample:** [`granville_bridge_profile_today.json`](../samples/bridge-profile/granville_bridge_profile_today.json) is the profile that the engine writes for the roads of the Granville Bridge. It has 13 nodes (8 on the ground
+  and 5 junctions, at 22 m, 22 m, 22 m, 22 m and 11.2 m) and 12 chains, all with the full height of 22 m.
+
+The two other profiles on this page (the least input and the complete profile below) show the planned design: the heights are chosen, and the curve is `design`. The maker does not read them yet.
 
 ## The least input: 5 heights
 
@@ -132,15 +158,16 @@ All files are in `docs/samples/bridge-profile/` and are published with this site
 
 | File | What it is | Size |
 |---|---|---|
+| [`granville_bridge_profile_today.json`](../samples/bridge-profile/granville_bridge_profile_today.json) | The complete profile that the engine writes today for the same roads (`rs.bridge_profile`). The maker reads it and makes the same pieces | 3.3 KB |
 | [`granville_input_partial.json`](../samples/bridge-profile/granville_input_partial.json) | The least input: 5 junction heights | 0.6 KB |
 | [`granville_input_profile.json`](../samples/bridge-profile/granville_input_profile.json) | The complete input profile that Part 1 makes from it | 3.9 KB |
 | [`granville_input_profile_colored.html`](../samples/bridge-profile/granville_input_profile_colored.html) | The same complete profile in one HTML page, with the values of the input and the values that the engine added in two colors. Open it in a browser | 10.9 KB |
-| [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 4.6 KB |
-| [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 4.8 KB |
+| [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 4.9 KB |
+| [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 5.0 KB |
 | [`granville_bridge_edges.parquet`](../samples/bridge-profile/granville_bridge_edges.parquet) | The roads of the example: the 41 edges (27 OpenStreetMap ways) of the Granville Bridge and its ramps, from duckOSM's Vancouver database. OpenStreetMap data, ODbL | 16.6 KB |
 | [`granville_lidar_samples.json`](../samples/bridge-profile/granville_lidar_samples.json) | The deck heights that the City of Vancouver LiDAR 2022 gives on the 12 axes of the same bridge, from urbanstyle's profile (Open Government Licence - Vancouver). It is for comparison only. The profile above does not use it | 7.7 KB |
 
-The scripts that make them are in `docs/img/bridge-height/`. A prototype of the two parts, in Python, is `granville_input_profile.py` (`fill` is Part 1 and `make` is Part 2). It is not the engine.
+The scripts that make them are in `docs/img/bridge-height/`. A prototype of the two parts, in Python, is `granville_input_profile.py` (`fill` is Part 1 and `make` is the planned design). It is not the engine. The engine's maker is in `rust/roadstyle-engine/src/decks.rs`.
 
 ```bash
 python docs/img/bridge-height/granville_input_profile.py   # writes the two profiles

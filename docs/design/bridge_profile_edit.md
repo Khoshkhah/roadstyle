@@ -1,6 +1,6 @@
 # The bridge profile: roadstyle and urbanstyle, and an input profile
 
-Date: 2026-11-10. Status: proposal. Nothing is built. The documentation comes first: this note is the spec, and the code waits for approval.
+Date: 2026-11-10. Status: proposal. **Part 2, the maker, is built (2026-11-10)** with the curve `smooth`: today's rule writes a complete profile and the maker makes the same pieces from it (`decks.rs`, `bridge_profile.rs`, the keyword `bridge_profile=`, `rs.bridge_profile`). Part 1, the filler, the interior control points and the curve `design` are not built.
 This note is about the profile of a group of 3D bridges: how [the engine](../guides/bridge-height.md) makes it, how urbanstyle makes the profile of the same bridge,
 and a proposal for an edit step.
 
@@ -322,7 +322,7 @@ with the heights at its two nodes and its top only. Stage 2 is the profile throu
 ### The order of the work
 
 1. **Documentation first** (this note and [the design note](bridge_height_design.md)). The guide gets new pages when the code exists.
-2. **Part 2, the maker.** It reads a complete input profile and makes the pieces. With the profile that today's rule gives and the curve `smooth`, it makes the same pieces as today (the goldens do not change).
+2. **Part 2, the maker. Built.** It reads a complete input profile and makes the pieces. With the profile that today's rule gives and the curve `smooth`, it makes the same pieces as today (the goldens do not change: a test makes a style from the profile of today and requires identical decks). Two things came from building it: a chain has a `top_m` (the full height that its ramps are made for), and `width_m` is optional (without it each road is drawn at the width of its class, because the roads of one chain can have different widths).
 3. **Part 1, the filler.** It finds the groups, chains and nodes, matches the given nodes, and fills the values. `rs.bridge_profile(edges, given=None)` returns the complete input profile. The keyword `bridge_profile=` (a
    dictionary or a JSON file) gives the input. Tests: an empty input; the 5 Granville heights; a given value is kept; **Part 1 twice is Part 1 once**; every error of the table; the Granville file has 13 nodes and 12 chains.
 4. The page: the landing on fill, the Height box, `rsBridgeGroups()`.

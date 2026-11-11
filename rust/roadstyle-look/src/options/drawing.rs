@@ -105,4 +105,9 @@ pub struct Bridges {
     /// The name of a column of the roads that has the full height in metres of the group of bridges that the road is in (a road with no value gives nothing). The
     /// whole group has it; two heights in one group are an error, also with `heights`. None: no column.
     pub height_col: Option<String>,
+    /// A complete bridge profile (docs/reference/formats.md, "The bridge profile (planned)"): the engine's maker makes the decks from it, in place of today's rule. `bridge_heights` and
+    /// `bridge_height_col` do nothing then. None: today's rule.
+    pub profile: Option<serde_json::Value>,
+    /// Write the complete profile of the page (the one that was given, or the one that today's rule gives) into the metadata of the style, under `roadstyle:bridge_profile`.
+    pub profile_export: bool,
 }

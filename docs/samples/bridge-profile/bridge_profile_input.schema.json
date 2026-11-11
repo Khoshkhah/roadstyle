@@ -164,8 +164,7 @@
      "items": {
       "type": "integer"
      },
-     "minItems": 1,
-     "description": "The OSM ways of the chain. In a partial input they name the chain"
+     "description": "The OSM ways of the chain, when the roads have them. In a partial input they name the chain"
     },
     "length_m": {
      "type": "number",
@@ -186,12 +185,17 @@
      "items": {
       "$ref": "#/$defs/point"
      },
-     "description": "Interior control points, in order of s"
+     "description": "Interior control points, in order of s (the curve design: not built)"
+    },
+    "top_m": {
+     "type": "number",
+     "exclusiveMinimum": 0,
+     "description": "The full height of the chain: the height that its ramps are made for (the curve smooth). The page's __rs_full"
     },
     "width_m": {
      "type": "number",
      "exclusiveMinimum": 0,
-     "description": "The width of the deck, in metres"
+     "description": "The width of the deck, in metres. Without it, each road is drawn at the width of its class"
     },
     "width_source": {
      "type": "string"

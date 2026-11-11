@@ -1,0 +1,38 @@
+{
+ "format": "roadstyle.bridge_profile/1",
+ "parameters": {"design_speed_kmh": 50.0, "design_grade": 0.125, "curve": "smooth"},
+ "groups": [
+  {
+   "name": "group 1",
+   "nodes": [
+    {"id": "n1", "lonlat": [-123.129519, 49.276238], "kind": "ground", "chains": ["c6"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n2", "lonlat": [-123.129196, 49.275151], "kind": "ground", "chains": ["c4"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n3", "lonlat": [-123.127443, 49.275071], "kind": "ground", "chains": ["c10"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n4", "lonlat": [-123.13097, 49.273972], "kind": "junction", "chains": ["c1", "c4", "c6", "c10"], "z_m": 22.0, "source": "rule", "method": "derived"},
+    {"id": "n5", "lonlat": [-123.136295, 49.270454], "kind": "junction", "chains": ["c1", "c7", "c8"], "z_m": 22.0, "source": "rule", "method": "derived"},
+    {"id": "n6", "lonlat": [-123.137852, 49.269223], "kind": "junction", "chains": ["c2", "c3", "c7"], "z_m": 22.0, "source": "rule", "method": "derived"},
+    {"id": "n7", "lonlat": [-123.139446, 49.268559], "kind": "junction", "chains": ["c5", "c8", "c12"], "z_m": 22.0, "source": "rule", "method": "derived"},
+    {"id": "n8", "lonlat": [-123.138341, 49.268434], "kind": "junction", "chains": ["c3", "c9", "c11"], "z_m": 11.184039303012181, "source": "rule", "method": "derived"},
+    {"id": "n9", "lonlat": [-123.142415, 49.268107], "kind": "ground", "chains": ["c5"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n10", "lonlat": [-123.138476, 49.267641], "kind": "ground", "chains": ["c9"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n11", "lonlat": [-123.138348, 49.267638], "kind": "ground", "chains": ["c11"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n12", "lonlat": [-123.135924, 49.266447], "kind": "ground", "chains": ["c2"], "z_m": 0.0, "source": "data", "method": "mapped"},
+    {"id": "n13", "lonlat": [-123.14096, 49.265127], "kind": "ground", "chains": ["c12"], "z_m": 0.0, "source": "data", "method": "mapped"}
+   ],
+   "chains": [
+    {"id": "c1", "length_m": 550.4247518941102, "from": "n5", "to": "n4", "points": [], "top_m": 22.0},
+    {"id": "c2", "length_m": 367.8160948986167, "from": "n12", "to": "n6", "points": [], "top_m": 22.0},
+    {"id": "c3", "length_m": 95.77135718363304, "from": "n8", "to": "n6", "points": [], "top_m": 22.0},
+    {"id": "c4", "length_m": 184.03066340183983, "from": "n4", "to": "n2", "points": [], "top_m": 22.0},
+    {"id": "c5", "length_m": 228.61089791733644, "from": "n7", "to": "n9", "points": [], "top_m": 22.0},
+    {"id": "c6", "length_m": 277.688716531536, "from": "n1", "to": "n4", "points": [], "top_m": 22.0},
+    {"id": "c7", "length_m": 178.5366339318271, "from": "n6", "to": "n5", "points": [], "top_m": 22.0},
+    {"id": "c8", "length_m": 312.24441093873673, "from": "n5", "to": "n7", "points": [], "top_m": 22.0},
+    {"id": "c9", "length_m": 89.94509796359418, "from": "n8", "to": "n10", "points": [], "top_m": 22.0},
+    {"id": "c10", "length_m": 287.76928477131526, "from": "n4", "to": "n3", "points": [], "top_m": 22.0},
+    {"id": "c11", "length_m": 88.98158920157493, "from": "n11", "to": "n8", "points": [], "top_m": 22.0},
+    {"id": "c12", "length_m": 404.31921329131774, "from": "n7", "to": "n13", "points": [], "top_m": 22.0}
+   ]
+  }
+ ]
+}

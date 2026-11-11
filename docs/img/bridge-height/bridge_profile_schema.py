@@ -34,12 +34,13 @@ def _defs(complete):
             "chains": {"type": "array", "items": {"type": "string", "pattern": "^c[0-9]+$"}, "description": "The chains that meet at the node"},
             "z_m": {"type": "number", "minimum": 0, "description": "The height of the node above the ground, in metres"}, **mark}
     chain = {"id": {"type": "string", "pattern": "^c[0-9]+$"},
-             "osm_ways": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "description": "The OSM ways of the chain. In a partial input they name the chain"},
+             "osm_ways": {"type": "array", "items": {"type": "integer"}, "description": "The OSM ways of the chain, when the roads have them. In a partial input they name the chain"},
              "length_m": {"type": "number", "exclusiveMinimum": 0},
              "from": {"type": "string", "pattern": "^n[0-9]+$", "description": "The node at the first end of the chain"},
              "to": {"type": "string", "pattern": "^n[0-9]+$", "description": "The node at the last end of the chain"},
-             "points": {"type": "array", "items": {"$ref": "#/$defs/point"}, "description": "Interior control points, in order of s"},
-             "width_m": {"type": "number", "exclusiveMinimum": 0, "description": "The width of the deck, in metres"},
+             "points": {"type": "array", "items": {"$ref": "#/$defs/point"}, "description": "Interior control points, in order of s (the curve design: not built)"},
+             "top_m": {"type": "number", "exclusiveMinimum": 0, "description": "The full height of the chain: the height that its ramps are made for (the curve smooth). The page's __rs_full"},
+             "width_m": {"type": "number", "exclusiveMinimum": 0, "description": "The width of the deck, in metres. Without it, each road is drawn at the width of its class"},
              "width_source": {"type": "string"}}
     return {
         "lonlat": {"type": "array", "prefixItems": [{"type": "number", "minimum": -180, "maximum": 180}, {"type": "number", "minimum": -90, "maximum": 90}], "items": False, "minItems": 2},
@@ -49,7 +50,7 @@ def _defs(complete):
                            "curve": {"enum": ["smooth", "design"], "description": "smooth: the curve of today. design: straight grades and vertical curves"}},
                           required=("design_speed_kmh", "design_grade") if complete else ()),
         "node": obj(node, required=("id", "lonlat", "kind", "chains", "z_m", "source", "method") if complete else (), any_of=None if complete else [{"required": ["lonlat"]}, {"required": ["id"]}]),
-        "chain": obj(chain, required=("id", "osm_ways", "length_m", "from", "to", "points", "width_m", "width_source") if complete else (), any_of=None if complete else [{"required": ["osm_ways"]}, {"required": ["id"]}]),
+        "chain": obj(chain, required=("id", "length_m", "from", "to", "points") if complete else (), any_of=None if complete else [{"required": ["osm_ways"]}, {"required": ["id"]}]),
         "group": obj({"name": {"type": "string"}, "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}}, "chains": {"type": "array", "items": {"$ref": "#/$defs/chain"}}},
                      required=("name", "nodes", "chains") if complete else ()),
     }

@@ -3009,8 +3009,8 @@ def test_the_guide_page_of_the_bridge_profile_shows_the_sample_files_and_links_t
     css = (root / "docs" / "stylesheets" / "extra.css").read_text()
     assert "--rs-bp-given" in css and "--rs-bp-added" in css and css.count('[data-md-color-scheme="slate"] { --rs-bp-given') == 1      # both colors, light and dark
     files = sorted(p.name for p in samples.iterdir())
-    assert files == ["bridge_profile_complete.schema.json", "bridge_profile_input.schema.json", "granville_bridge_edges.parquet", "granville_input_partial.json", "granville_input_profile.json",
-                     "granville_input_profile_colored.html", "granville_lidar_samples.json"]
+    assert files == ["bridge_profile_complete.schema.json", "bridge_profile_input.schema.json", "granville_bridge_edges.parquet", "granville_bridge_profile_today.json", "granville_input_partial.json",
+                     "granville_input_profile.json", "granville_input_profile_colored.html", "granville_lidar_samples.json"]
     for name in files:
         assert f"](../samples/bridge-profile/{name})" in page, name                                      # every sample file has a link
         assert f"{(samples / name).stat().st_size / 1024:.1f} KB" in page, name                         # and its size
