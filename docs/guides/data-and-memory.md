@@ -48,16 +48,87 @@ it, and the folders of the tabs that closed, so the browser disk keeps the table
 
 | Way | Where the data is | Use it for | How to make it |
 |---|---|---|---|
-| **A. One HTML file** | In the file | A small area. A file to send, or to open from the disk. | `rs.render_edges(...)`, `rs.render_dashboard(...)` |
-| **B. Files on a server** | In files at a URL. The browser reads only the parts that it needs (HTTP range requests). | A large area. A website or another map app. | `rs.export_style(...)` with a PMTiles file |
-| **C. Made in the browser** | The page makes the data from its input files. It keeps the result in memory or on the browser disk (OPFS). | A page that builds its maps itself, for example duckOSM Studio. | roadstyle-wasm: `new LiveMap(...)`, `new Tiler(...)` |
-| **D. Made by a local program** (planned) | A Rust program on the computer reads the input files on the disk and makes the tiles and the rows when the page asks for them. The browser only draws. | An area that is too large for the browser. A tool on one computer, for example `duckosm studio`. | A program that serves the same addresses as way B on 127.0.0.1 |
+| **A. One HTML file** | In the file | A small area. A file to send, or to open from the disk. | [Make way A](#make-way-a-one-html-file) |
+| **B. Files on a server** | In files at a URL. The browser reads only the parts that it needs (HTTP range requests). | A large area. A website or another map app. | [Make way B](#make-way-b-files-on-a-server) |
+| **C. Made in the browser** | The page makes the data from its input files. It keeps the result in memory or on the browser disk (OPFS). | A page that builds its maps itself, for example duckOSM Studio. | [Make way C](#make-way-c-made-in-the-browser) |
+| **D. Made by a local program** (planned) | A Rust program on the computer reads the input files on the disk and makes the tiles and the rows when the page asks for them. The browser only draws. | An area that is too large for the browser. A tool on one computer, for example `duckosm studio`. | [Way D](#way-d-the-engine-out-of-the-browser) (planned) |
 
 The file formats are the same in the four ways: PMTiles for the tiles, and Parquet for the tables. Only the transport changes. A static file
 host is enough for way B, and no running server is necessary. Way D is way C with the engine out of the browser: the same engine runs as a
 program, and the data stays on the disk of the computer, not on the browser disk. [Make tiles and PMTiles](../rust/tiles.md) tells how to make the files.
 
+### Make way A: one HTML file
+
+Give the roads to Python, and save one file. The roads go into the file as tiles.
+
+```python
+import roadstyle as rs
+
+rs.render_edges(edges).save("map.html")                 # a map
+rs.render_dashboard(edges, ...).save("dashboard.html")  # a dashboard: the map, the panel and the toolbox
+```
+
+Or, with the roadstyle program, from a GeoParquet file of roads:
+
+```bash
+roadstyle page roads.parquet out/map.html
+```
+
+Open the file from the disk, or send it. It needs no server. The whole file goes into the memory of the tab, so use it for a small area.
+More: [Dashboards](dashboards.md), [Make tiles and PMTiles](../rust/tiles.md#a-put-the-tiles-in-one-html-file).
+
+### Make way B: files on a server
+
+Make the files one time, and put them on a file host:
+
+```python
+rs.export_style(edges, "monaco_pm", base_url="https://example.org/monaco", format="pmtiles")
+```
+
+Or, with the roadstyle program, in two stages:
+
+```bash
+roadstyle sources roads.parquet out/stage1 --format geoparquet   # stage 1: the style and its sources
+roadstyle tiles out/stage1 out/roads.pmtiles                     # stage 2: the tiles, as one PMTiles file
+```
+
+Put the folder on a web server at `base_url`. The server must answer HTTP range requests (most file hosts and cloud storage do). A map
+opens `style.json` by its URL and reads each tile in view from `roads.pmtiles`. To show a change, make the files again.
+More: [Make tiles and PMTiles](../rust/tiles.md#b-put-the-tiles-on-a-server), [The roadstyle program](../rust/cli.md).
+
+### Make way C: made in the browser
+
+The page loads the WebAssembly engine (roadstyle-wasm) and its input file. The engine makes each tile when MapLibre asks for it:
+
+```js
+import init, {resolveLook, Tiler} from "./pkg/roadstyle_wasm.js";
+import {rsDashboard} from "./dashboard/index.js";
+import {roadLayers} from "./dashboard/roadlayers.js";
+
+await init();
+const roads = new Uint8Array(await (await fetch("roads.parquet")).arrayBuffer());   // or a File from the browser disk
+const map = new maplibregl.Map({container: "map", style: "https://tiles.openfreemap.org/styles/positron"});
+
+let tiler = null, gen = 0;                                  // the tile address: rs://<generation>/<source>/<z>/<x>/<y>
+maplibregl.addProtocol("rs", async ({url}) => {
+  const [g, source, z, x, y] = url.slice("rs://".length).split("/");
+  return {data: +g === gen ? tiler.tile(source, +z, +x, +y) : new Uint8Array()};
+});
+const rs = rsDashboard(map, {style: null, prefix: "rs-", tiles: true,
+                             engine: {props: async (row) => JSON.parse(tiler.props("roads", row))}});
+
+const look = resolveLook(JSON.stringify({palette: "amber", args: {state: "live"}}));
+tiler = new Tiler(roads, look, undefined, "Area", `rs://${++gen}/`, ["name", "highway"]);
+await roadLayers({map, dashboard: rs, prefix: "rs-"}).show(JSON.parse(tiler.style()));   // the roads over the base map
+```
+
+A page that builds large areas runs the engine in a worker (the map worker), and keeps its tables on the browser disk
+([Tables](#tables-in-memory-or-on-the-disk)). The engine takes at most 200,000 roads. duckOSM Studio is a full example.
+More: [Use roadstyle in the browser](../rust/browser.md).
+
 ### Way D: the engine out of the browser
+
+**Planned.** There is no command for way D yet.
 
 A browser tab has limits: its memory (a WebAssembly module can use at most 4 GB) and the space of the browser disk. Way D has no such
 limits, because the engine runs as a program on the computer:
