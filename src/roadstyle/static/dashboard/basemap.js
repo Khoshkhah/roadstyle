@@ -1,7 +1,7 @@
 // base-layer switching: window.rsSetBasemap(key|index) is the API (swaps the raster source's
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
-import {map, O, _emit, _ownBuildings} from "./core.js";
+import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {defineTool, BUILDINGS_ICON, LAYERS_ICON} from "./tools.js";
 import {buildBox} from "./basemapbox.js";
 let BASEMAPS = [];
@@ -12,6 +12,12 @@ let BASEMAPS = [];
 // window.rsBuildingsOpacity(value) sets the opacity of the 3D buildings (buildings_opacity=, else `ontop.buildings.opacity` of data/basemaps.json).
 let vec = null, buildingsOn = true, glyphs0 = null, sprite0 = null, bOpacity = null;
 const opacityNow = ()=>bOpacity ?? O.buildings_opacity ?? (O.ontop && O.ontop.buildings || {}).opacity ?? 1;
+// the area's own 3D buildings (the overlays' 3D layers, features.js) take the opacity too, once the person or the page set one (else their style's)
+export function _ownOpacity(){
+  const v = bOpacity ?? O.buildings_opacity;
+  if(v == null) return;
+  for(const ov of OVERLAYS) if(ov.extrude && map.getLayer(ov.extrude)) map.setPaintProperty(ov.extrude, "fill-extrusion-opacity", v);
+}
 // The layer that follows the base map layer in the map: the vector style's layers and a rebuilt raster layer go before it, so they stay under the roads. The map is
 // asked, not the roads style: a host page adds the roads' layers with its prefix, and its own layers `bg` and `basemap` have none.
 const afterBase = ()=>{ const ls = map.getStyle().layers, i = ls.findIndex(l=>l.id === "basemap"); return (ls.slice(i + 1).find(l=>!l.id.startsWith("vbm-")) || {}).id; };
@@ -85,6 +91,7 @@ export function rsBuildingsOpacity(value){
   if(typeof value !== "number" || !(value >= 0 && value <= 1)) throw new Error("rsBuildingsOpacity: value must be a number from 0 to 1, got " + JSON.stringify(value));
   bOpacity = value;
   if(vec) for(const l of vec.layers) if(l.type === "fill-extrusion") map.setPaintProperty("vbm-"+l.id, "fill-extrusion-opacity", value);
+  _ownOpacity();
   _emit("rs:buildingsopacitychange", {opacity:value});
   return value;
 }

@@ -32,7 +32,7 @@ fn looks() -> Vec<(String, Look, Option<Options>)> {
     for (choice, idx) in g["choices"].as_object().unwrap() {
         let [mode, theme, paths]: [&str; 3] = choice.split('|').collect::<Vec<_>>().try_into().unwrap();
         let args = g["parts"]["args"][idx["args"].as_u64().unwrap() as usize].clone();
-        let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into(), place: None }), args,
+        let o = Options { base_map: Some(BaseMap { mode: mode.into(), theme: theme.into(), paths: paths.into(), place: None, buildings_min_zoom: None }), args,
                           ..Default::default() };
         out.push((choice.clone(), Look::resolve(&o).unwrap(), Some(o)));
     }

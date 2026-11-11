@@ -73,7 +73,8 @@ export function buildBox(menu){
     tops.buildings.c.disabled = !vec || own; tops.buildings.c.checked = vec && !own && rsBuildings();
     tops.buildings.lab.classList.toggle("rs-bm-off", !vec || own);
     tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
-    opRow.hidden = !tops.buildings.c.checked;
+    opRow.hidden = !(tops.buildings.c.checked || (own && window.rsGetBuildings3D && window.rsGetBuildings3D()));      // the slider: the vector style's buildings, or the area's own in 3D
+    tunRow.hidden = !tops.terrain.c.checked;
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
     _elHillshade(tops.hillshade.c.checked, firstRoad()); rsTerrain(tops.terrain.c.checked); _elTunnels();
@@ -87,6 +88,13 @@ export function buildBox(menu){
   const keep = (id, start) => { const v = _bxGet(id); return v == null ? !!start : v === "1"; };       // the person's saved choice, else the page's start (hillshade=, terrain=)
   topRow("hillshade", "Hillshade").checked = keep("hillshade", O.hillshade);
   topRow("terrain", "3D terrain").checked = keep("terrain", O.terrain);
+  // what a tunnel does on the terrain (elevation.js, terrain_tunnels=): show it, fade it or hide it; a row under the switch, shown only while the terrain is on
+  const tunRow = _bxEl("label", "rs-set-slide rs-bm-opacity rs-bm-tunnels"), tunSel = _bxEl("select");
+  tunSel.id = "rs-top-terrain-tunnels";
+  for(const [v, t] of [["show", "Show"], ["fade", "Fade"], ["hide", "Hide"]]){ const o = _bxEl("option", "", t); o.value = v; tunSel.appendChild(o); }
+  tunSel.value = rsTerrainTunnels();
+  tunSel.onchange = () => rsTerrainTunnels(tunSel.value);
+  tunRow.append(_bxEl("span", "", "Tunnels"), tunSel); menu.appendChild(tunRow);
   topRow("labels", "Labels");
   topRow("arrows", "One-way arrows").checked = rsArrowsOn();       // on, unless the person turned them off in this browser (arrows.js keeps the state)
   topRow("buildings", "3D buildings");
@@ -116,7 +124,8 @@ export function buildBox(menu){
   window.rsTerrain = rsTerrain;
   window.rsGround = rsGround;
   window.rsTerrainTunnels = rsTerrainTunnels;
-  document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; });
+  document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; tunRow.hidden = !e.detail.on; });
+  document.addEventListener("rs:buildings3dchange", () => { opRow.hidden = !(tops.buildings.c.checked || (_ownBuildings() && window.rsGetBuildings3D && window.rsGetBuildings3D())); });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
   tops.arrows.c.onchange = () => rsSetArrows(tops.arrows.c.checked);
   document.addEventListener("rs:arrowschange", e => { tops.arrows.c.checked = e.detail.on; });
