@@ -4,7 +4,7 @@ one straight bridge of four lengths, as the Rust engine makes it with the defaul
     python docs/img/bridge-height/make.py
 
 Each deck piece has its start and end lift (`__rs_lift0`, `__rs_lift1`) and its place along the bridge (`__rs_s0`, `__rs_s1`); the underside of the deck
-is the group height `__rs_full` times the lift, and the top is `thickness_m` above it."""
+is the group height `__rs_full` times the lift. The page makes the deck thin out to nothing at the ground: the top is `thickness_m` x min(1, 2 x lift) above the underside."""
 import json
 import math
 import warnings
@@ -42,11 +42,12 @@ def main():
     for ax, length in zip(axes, LENGTHS):
         pieces = deck_pieces(length)
         full, thick = pieces[0]["__rs_full"], pieces[0]["__rs_thick"]
-        xs, under = [], []
+        xs, under, top = [], [], []
         for p in pieces:
-            xs += [p["__rs_s0"] * length, p["__rs_s1"] * length]
-            under += [full * p["__rs_lift0"], full * p["__rs_lift1"]]
-        top = [u + thick for u in under]
+            for s, lift in ((p["__rs_s0"], p["__rs_lift0"]), (p["__rs_s1"], p["__rs_lift1"])):
+                xs.append(s * length)
+                under.append(full * lift)
+                top.append(full * lift + thick * min(1.0, 2.0 * lift))
         ax.fill_between(xs, under, top, color="#f28c28", linewidth=0)
         ax.plot(xs, top, color="#9a4f00", linewidth=1.2)
         ax.axhline(0, color="#64748b", linewidth=1.5)

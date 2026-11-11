@@ -2645,13 +2645,17 @@ def test_web_vehicles_option_and_look():
     assert _opt(render_edges(_edges(), backend="web").html, "vehicles") is None
 
 
-def _straight_bridge(length_m, **kw):
-    """The deck pieces of one straight bridge of `length_m` metres (no casing slabs), in order along it, with the settings of `kw`."""
+def _bridge_source_features(length_m, **kw):
+    """All the features of the source `decks` of one straight bridge of `length_m` metres (a deck piece, then its two casing slabs), in the order of the source."""
     import math
     dlon = length_m / (111320 * math.cos(math.radians(43.74)))
     g = gpd.GeoDataFrame({"highway": ["primary"], "bridge": ["yes"], "layer": ["1"], "edge_id": [1]}, geometry=[LineString([(7.42, 43.74), (7.42 + dlon, 43.74)])], crs=4326)
-    html = render_edges(g, backend="web", view_3d=True, **kw).html
-    pieces = [f["properties"] for f in _style(html)["sources"]["decks"]["data"]["features"] if not f["properties"].get("__rs_casing_slab")]
+    return _style(render_edges(g, backend="web", view_3d=True, **kw).html)["sources"]["decks"]["data"]["features"]
+
+
+def _straight_bridge(length_m, **kw):
+    """The deck pieces of one straight bridge (no casing slabs): their properties, in order along it, with the settings of `kw`."""
+    pieces = [f["properties"] for f in _bridge_source_features(length_m, **kw) if not f["properties"].get("__rs_casing_slab")]
     return sorted(pieces, key=lambda p: p["__rs_s0"])
 
 
@@ -2660,15 +2664,66 @@ def _flat_part_starts(length_m, **kw):
     return min(p["__rs_s0"] for p in _straight_bridge(length_m, **kw) if p["__rs_lift0"] >= 0.999) * length_m
 
 
+def _lift_of_the_page(x, ell, ramp, lift_head=0.0, lift_tail=0.0, k=0.4):
+    """The lift at the distance x along a chain of ell metres, by the formulas of docs/guides/bridge-height.md (step 5): a and b, the smooth minimum with the weight w, the smoothstep."""
+    def clamp(v, lo, hi):
+        return max(lo, min(hi, v))
+
+    a, b = lift_head + x / ramp, lift_tail + (ell - x) / ramp
+    e = max(0.15 * ell, 1.0)
+    v = min(clamp(x / e, 0, 1), clamp((ell - x) / e, 0, 1))
+    w = v * v * (3 - 2 * v)
+    h = max(k - abs(a - b), 0) / k
+    t = clamp(min(a, b) - w * h * h * k / 4, 0, 1)
+    return t * t * (3 - 2 * t)
+
+
 def test_the_numbers_of_the_bridge_height_page_are_the_engines():
-    """docs/guides/bridge-height.md: the group heights of its table, the ramp of 8 m for each metre of height, the hump of a bridge of 40 m, the 1 m of the deck and the
-    effect of ramp_m. A change of a rule fails here, and the page and docs/img/bridge-height/make.py are changed with it."""
+    """docs/guides/bridge-height.md: the group heights of its table, the ramp of 8 m for each metre of height, the hump of a bridge of 40 m, the effect of ramp_m, the formulas of
+    step 5 (the lift of every piece of four bridges), the worked example, the example profile and the rules of an edit step. A change of a rule fails here, and the page and
+    docs/img/bridge-height/make.py are changed with it."""
     for length, height in ((60, 5.0), (120, 6.89), (330, 13.5), (600, 22.0), (800, 22.0)):
         assert _straight_bridge(length)[0]["__rs_full"] == pytest.approx(height, abs=0.02), length
     short = _straight_bridge(40)
-    names = {"__rs_group", "__rs_chain", "__rs_full", "__rs_lift0", "__rs_lift1", "__rs_s0", "__rs_s1", "__rs_thick", "__rs_edges", "__rs_base", "__rs_height"}
-    assert names <= set(short[0]) and "__rs_enda" in short[0] and "__rs_endb" in short[-1]                # the profile's properties of the page's table
     assert max(p["__rs_base"] for p in short) == pytest.approx(1.76, abs=0.03)                          # "its deck rises only 1.8 m at the middle"
-    assert {round(p["__rs_height"] - p["__rs_base"], 6) for p in short} == {1.0}                          # the deck is 1 m thick
+    assert {round(p["__rs_height"] - p["__rs_base"], 6) for p in short} == {1.0}                          # __rs_height = __rs_base + thickness_m
+    names = {"__rs_group", "__rs_chain", "__rs_full", "__rs_lift0", "__rs_lift1", "__rs_s0", "__rs_s1", "__rs_thick", "__rs_edges", "__rs_base", "__rs_height"}
+    assert names <= set(short[0]) and "__rs_enda" in short[0] and "__rs_endb" in short[-1]                # the table of the page
+    assert not any("__rs_enda" in p or "__rs_endb" in p for p in short[1:-1]) and "__rs_endb" not in short[0] and "__rs_enda" not in short[-1]
     assert _flat_part_starts(800) == pytest.approx(176, abs=3)                                           # 22 m x 8 m = 176 m of ramp (a piece is 2.5 m long)
     assert _flat_part_starts(800, settings={"config": {"bridge_decks": {"ramp_m": 80}}}) == pytest.approx(352, abs=3)    # the example of the page: 22 m x 16 m
+    # step 5: the engine's lift of every piece (its start, its end and its base at the middle) is the page's formula
+    for length in (40, 120, 330, 800):
+        pieces = _straight_bridge(length)
+        full = pieces[0]["__rs_full"]
+        ramp = max(full * 8, 1.0)
+        assert {p["__rs_full"] for p in pieces} == {full}, length                                           # one height for the group
+        for p in pieces:
+            x0, x1 = p["__rs_s0"] * length, p["__rs_s1"] * length
+            assert p["__rs_lift0"] == pytest.approx(_lift_of_the_page(x0, length, ramp), abs=3e-4), (length, x0)
+            assert p["__rs_lift1"] == pytest.approx(_lift_of_the_page(x1, length, ramp), abs=3e-4), (length, x1)
+            assert p["__rs_base"] == pytest.approx(full * _lift_of_the_page((x0 + x1) / 2, length, ramp), abs=0.02), (length, x0)
+        # the rules of an edit step: no gap, no step, the lift is 0 at a free end
+        assert pieces[0]["__rs_s0"] == 0 and pieces[-1]["__rs_s1"] == 1 and pieces[0]["__rs_lift0"] == 0 and pieces[-1]["__rs_lift1"] == 0
+        for p, q in zip(pieces, pieces[1:], strict=False):
+            assert p["__rs_s1"] == q["__rs_s0"] and p["__rs_lift1"] == q["__rs_lift0"], (length, p["__rs_s1"])
+    # the worked example (a bridge of 120 m, x = 10 m) and the table of the page
+    full, ramp = 5 + 17 * 60 / 540, (5 + 17 * 60 / 540) * 8
+    assert (full, ramp, 10 / ramp, 110 / ramp) == pytest.approx((6.889, 55.11, 0.1815, 1.996), abs=0.002)
+    assert _lift_of_the_page(10, 120, ramp) == pytest.approx(0.0868, abs=0.0001) and full * 0.0868 == pytest.approx(0.60, abs=0.01)
+    pieces = _straight_bridge(120)
+    assert len(pieces) == 47
+    for n, (s0, s1, l0, l1) in {1: (0, 0.02083, 0, 0.006), 4: (0.0625, 0.08333, 0.0505, 0.0868), 5: (0.08333, 0.10417, 0.0868, 0.131), 24: (0.45926, 0.54074, 0.9972, 0.9972),
+                                46: (0.95833, 0.97917, 0.0232, 0.006), 47: (0.97917, 1, 0.006, 0)}.items():
+        p = pieces[n - 1]
+        assert (p["__rs_s0"], p["__rs_s1"]) == pytest.approx((s0, s1), abs=1e-5) and (p["__rs_lift0"], p["__rs_lift1"]) == pytest.approx((l0, l1), abs=1e-4), n
+    # the example profile: the first piece, with its polygon, and the order of the source (a deck piece, then its two casing slabs)
+    feats = _bridge_source_features(120)
+    first = feats[0]
+    assert [bool(f["properties"].get("__rs_casing_slab")) for f in feats[:6]] == [False, True, True, False, True, True]
+    assert first["geometry"]["coordinates"] == [[[7.42, 43.740022], [7.420031, 43.740022], [7.420031, 43.739978], [7.42, 43.739978], [7.42, 43.740022]]]
+    p = first["properties"]
+    assert (p["__rs_group"], p["__rs_chain"], p["__rs_thick"], p["__rs_base"], p["__rs_height"], p["__rs_edges"], p["__rs_enda"]) == (1, 1, 1.0, 0.01, 1.01, [0], [7.42, 43.74])
+    assert p["__rs_full"] == pytest.approx(6.8889, abs=1e-4)
+    slab = feats[1]["properties"]
+    assert slab["__rs_casing_slab"] == 1 and all(slab[k] == p[k] for k in ("__rs_group", "__rs_chain", "__rs_full", "__rs_lift0", "__rs_lift1", "__rs_s0", "__rs_s1"))   # a slab has the lifts and places of its piece
