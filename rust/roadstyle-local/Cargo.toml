@@ -1,0 +1,18 @@
+[package]
+name = "roadstyle-local"
+version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "roadstyle local: way D, the engine as a program on 127.0.0.1 (the tiles from the engine, the rows and the queries from the files on the disk with DuckDB)"
+
+[dependencies]
+roadstyle.workspace = true
+roadstyle-serve.workspace = true
+serde_json.workspace = true
+duckdb = { version = "=1.10506.1", features = ["bundled", "parquet"] }   # the version of duckOSM (offline from the same cache); the queries of the data dock
+
+[dev-dependencies]
+flate2 = "1"                  # the golden options of Monaco are gzipped
+sha2.workspace = true

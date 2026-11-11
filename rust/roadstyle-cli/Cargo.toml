@@ -12,6 +12,7 @@ roadstyle = { workspace = true, features = ["gpkg"] }   # the native program rea
 serde_json.workspace = true
 roadstyle-snapshot = { workspace = true, optional = true }
 roadstyle-serve.workspace = true
+roadstyle-local.workspace = true      # way D: `roadstyle local` (bundled DuckDB)
 
 [features]
 # `roadstyle snapshot` (Chromium through headless_chrome)
