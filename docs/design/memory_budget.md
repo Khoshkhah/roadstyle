@@ -161,6 +161,26 @@ What this shows:
 
 The order of the plan does not change.
 
+### Studio's prototype (measured 2026-11-10, not merged)
+
+Studio's branch `claude/proto-wall-tiles` tried the walls as tiles on the browser disk (OPFS) and Studio's tables on the disk, in headless
+Chromium. It is a Studio page, so DuckDB-wasm and Studio's tables are in the tab too. The numbers show what a large host holds beside roadstyle:
+
+| Area | The tab | Parts |
+|---|---|---|
+| Monaco | 801 to 871 MiB | |
+| Tartu | 2,225 MiB | the walls' worker 605 MiB, the map worker 192 MiB, DuckDB 206 MiB, the road table 23 MiB |
+| Burnaby, before | 4,180 MiB | the walls' worker 1,353 MiB; the tab stopped with the walls on |
+| Burnaby, the prototype | 2,193 MiB | DuckDB 50 MiB, the walls' worker 72 MiB |
+
+The speed of the disk path:
+
+- A popup's query on a Parquet file on the disk: 20 ms on Monaco; on Burnaby 52 ms mean, 11 ms median.
+- A wall tile: 0.25 ms from the memory cache, about 1.2 ms from OPFS, 2.9 to 4.4 ms mean to make it.
+
+So step 7 (the OPFS transport) is fast enough for a popup and for tiles. roadstyle's walls are now tiles of the map worker ("The 3D walls"
+above); Studio's tables on the disk are Studio's own work.
+
 ## The design
 
 ### Where the data lives
@@ -269,7 +289,7 @@ Each step has a check. A step starts only when the step before it is done. The t
 | 0 | **Measure.** The memory of the tab, the map worker and the road table, on Monaco and Tartu, with the current code. Count the bytes of `RoadTable` alone and of the overlay sources alone. **Done 2026-11-10** on roadstyle's own pages ("Step 0: the memory of a page"); an urbanstyle page is not measured yet. | The numbers are in this note. They show which part is the largest. |
 | 1 | **Every layer as tiles** (part 1). | The urbanstyle Monaco page looks the same (pixel test), and the overlay GeoJSON is not in memory after the tiles are made. |
 | 2 | **Attributes in columns** (part 3). | The tests of the dashboard pass, the popups and the filters show the same values, and the memory of step 0 is lower. |
-| 3 | **Frames** (part 4), with way A and way B behind one function. Measure both. | A synthetic run on Tartu (1 hour at 1 s steps, 3,600 frames) plays at 10 frames each second, and the memory stays flat during the run. |
+| 3 | **Frames** (part 4), with way A and way B behind one function. Measure both. First read roadstyle PR 149 (the vehicles: `rust/roadstyle-sim`, `vehicles.js`, `roadstyle-camera`), which is open. | A synthetic run on Tartu (1 hour at 1 s steps, 3,600 frames) plays at 10 frames each second, and the memory stays flat during the run. |
 | 4 | **The CI budget** (part 6). | The test fails when a change adds an object for each feature, or when the memory grows with the area, the layers or the length of the run. |
 | 5 | **3D pieces by tile** (part 2), after the bridge mesh is on `main`. The 3D walls are done (2026-11-10, "The 3D walls" above): the same way for the decks and the piers. | The bridges of the urbanstyle Monaco page look the same, and the mesh memory follows the view. |
 | 6 | **Moving points** (part 5), if roadstyle-sim needs them. | The same budget test with points. |
