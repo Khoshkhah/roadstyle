@@ -676,22 +676,7 @@ mod wasm {
         }
 
         pub fn relevel(&mut self, rows: &str) -> Result<String, JsError> {
-            let err = |m: String| JsError::new(&format!("relevel: {m}"));
-            let rows: Vec<serde_json::Value> = serde_json::from_str(rows).map_err(|e| err(e.to_string()))?;
-            let text = |v: &serde_json::Value| v.as_str().map(str::trim).filter(|t| !t.is_empty()).map(String::from)
-                .or_else(|| v.as_f64().map(|n| n.to_string()));
-            let num = |r: &serde_json::Value, k: &str| -> Result<Option<f64>, JsError> {
-                text(&r[k]).map(|t| t.parse::<f64>().map_err(|_| err(format!("{k} is not a number: {t}")))).transpose()
-            };
-            let int = |r: &serde_json::Value, k: &str| -> Result<i64, JsError> {
-                num(r, k)?.filter(|n| n.fract() == 0.0).map(|n| n as i64).ok_or_else(|| err(format!("{k} is not a whole number")))
-            };
-            let rows = rows.iter().map(|r| Ok(roadstyle::relevel::LevelRow {
-                edge_id: text(&r["edge"]).and_then(|t| t.parse().ok()).ok_or_else(|| err(format!("an edge id: {}", r["edge"])))?,
-                levels: [int(r, "casing_start")?, int(r, "casing_level")?, int(r, "casing_end")?, int(r, "fill_level")?],
-                heads: [num(r, "head_start_m")?, num(r, "head_end_m")?],
-                caps: [text(&r["cap_start"]), text(&r["cap_end"])],
-            })).collect::<Result<Vec<_>, JsError>>()?;
+            let rows = roadstyle::relevel::LevelRow::of_json(rows).map_err(|e| JsError::new(&e))?;
             let done = self.0.relevel(&rows).map_err(|e| JsError::new(&e.to_string()))?;
             Ok(serde_json::to_string(&done).expect("JSON of counts"))
         }

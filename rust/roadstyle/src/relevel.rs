@@ -23,6 +23,30 @@ pub struct LevelRow {
     pub caps: [Option<String>; 2],
 }
 
+impl LevelRow {
+    /// The rows of a JSON list of levels.csv rows (`edge`, `casing_start`, `casing_level`, `casing_end`, `fill_level`, `head_start_m`,
+    /// `head_end_m`, `cap_start`, `cap_end`): a number may be a text, and an empty text is null. The page's redraw sends them (the
+    /// WebAssembly map worker, and way D's `POST /relevel`).
+    pub fn of_json(text: &str) -> Result<Vec<LevelRow>, String> {
+        let err = |m: String| format!("relevel: {m}");
+        let rows: Vec<Value> = serde_json::from_str(text).map_err(|e| err(e.to_string()))?;
+        let text = |v: &Value| v.as_str().map(str::trim).filter(|t| !t.is_empty()).map(String::from).or_else(|| v.as_f64().map(|n| n.to_string()));
+        let num = |r: &Value, k: &str| -> Result<Option<f64>, String> {
+            text(&r[k]).map(|t| t.parse::<f64>().map_err(|_| err(format!("{k} is not a number: {t}")))).transpose()
+        };
+        let int = |r: &Value, k: &str| -> Result<i64, String> {
+            num(r, k)?.filter(|n| n.fract() == 0.0).map(|n| n as i64).ok_or_else(|| err(format!("{k} is not a whole number")))
+        };
+        rows.iter().map(|r| Ok(LevelRow {
+            // a 64-bit id as a text keeps its digits (a JSON number has 53 bits)
+            edge_id: r["edge"].as_i64().or_else(|| r["edge"].as_str()?.trim().parse().ok()).ok_or_else(|| err(format!("an edge id: {}", r["edge"])))?,
+            levels: [int(r, "casing_start")?, int(r, "casing_level")?, int(r, "casing_end")?, int(r, "fill_level")?],
+            heads: [num(r, "head_start_m")?, num(r, "head_end_m")?],
+            caps: [text(&r["cap_start"]), text(&r["cap_end"])],
+        })).collect()
+    }
+}
+
 /// What a redraw changed: the edges whose pieces changed, the pieces that went, the other sources made again, and whether the
 /// style's layers changed (then the page must set the new style: `LiveTiles::style`).
 #[derive(Debug, Default, serde::Serialize)]
@@ -63,18 +87,21 @@ impl LiveTiles {
     /// `new`, with the tiles cut with these buffers (one for each zoom) in place of the ones that the style gives: the tiles of another map that
     /// kept its tiles through `set_look` (docs/design/restyle_without_retile.md, the guard test). None: the style's.
     pub fn with_buffers(s: sources::Styled, look: Look, prefix: &str, keep: &[String], buffers: Option<Vec<f64>>) -> Result<LiveTiles, crate::Error> {
-        let mut options = tiles::stage::TileOptions::new(&s.layers, &s.metadata, &s.saved[tiles::stage::TILES], &s.saved[tiles::stage::COLUMNS], keep)?;
+        // the rules of `tiled_sources` (the look's tile keys apply), so a map that redraws has the tiles of one that does not
+        let mut options = crate::tile_options_of(&s, &look, keep)?;
         options.wait = true;
         if let Some(b) = buffers {
             options.buffers = b;
         }
         // tiles_of_sources's stage 2, with the pieces that wait
         let at = crate::xyz_at(prefix);
-        let (style, tiles) = crate::tile_stage(&s, &options, &at, sources::SourceMode::INLINE)?;
+        let (style, tiles) = crate::tile_stage(&s, &options, &at, sources::SourceMode::inline_of(&look.other))?;
         let style = crate::style_text(&s, &style);
         let r = &s.roads.roads;
-        let id = r.roles.col(Role::EdgeId).ok_or_else(|| crate::error::edits("redraw: the roads have no edge id column"))?;
-        let rows = (0..r.table.len()).filter_map(|i| r.table.cell(id, i).as_i64().or_else(|| r.table.cell(id, i).as_str()?.parse().ok()).map(|e| (e, i))).collect();
+        // roads with no edge id column make a map that does not redraw (`relevel` says so): way D serves any road file
+        let rows = r.roles.col(Role::EdgeId).map(|id| (0..r.table.len())
+            .filter_map(|i| r.table.cell(id, i).as_i64().or_else(|| r.table.cell(id, i).as_str()?.parse().ok()).map(|e| (e, i))).collect())
+            .unwrap_or_default();
         let mut at_node: HashMap<[u64; 2], Vec<u32>> = HashMap::new();
         for i in 0..r.table.len() {
             for p in ends(r.table.line(i)) {
@@ -204,6 +231,12 @@ impl LiveTiles {
 
     /// Give the edges of `rows` their new levels, heads and caps, and change the tiles where the drawing changed.
     pub fn relevel(&mut self, rows: &[LevelRow]) -> Result<Redrawn, crate::Error> {
+        if self.styled.roads.roads.roles.col(Role::EdgeId).is_none() {
+            return Err(crate::error::edits("redraw: the roads have no edge id column"));
+        }
+        if let Some(x) = rows.iter().find(|x| !self.rows.contains_key(&x.edge_id)) {
+            return Err(crate::error::edits(format!("redraw: no road has the edge id {}", x.edge_id)));
+        }
         let fills = self.fills_change(rows);
         self.set_rows(rows)?;
         // the ring: the changed edges and the edges at their end nodes (a road's caps and joins come from the roads at its nodes)
