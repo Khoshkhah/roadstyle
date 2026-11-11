@@ -71,6 +71,20 @@ duckOSM's local pages (`duckosm edit`, `duckosm studio`) and roadstyle's editors
 already have a small Rust server on 127.0.0.1. Today it gives the page its files, and the engine runs in the browser (way C). In way D,
 the same server also gives the tiles and the rows.
 
+**Way B and way D.** For the page they are the same: it asks the same addresses, and it gets the same tiles and rows. The difference is
+who makes the data, and when:
+
+| | B. Files on a server | D. Made by a local program |
+|---|---|---|
+| When the data is made | Before the page opens: you make the PMTiles and Parquet files one time | When the page asks for it, tile by tile |
+| What answers the page | A file host. It runs no code. | A Rust program that runs while the page is open |
+| A change (an edit, a new look, new values) | Make the files again | Shows at once: the program makes the new tiles |
+| A query of the data dock | DuckDB-wasm in the browser reads parts of the Parquet files | DuckDB in the program queries the files, and the page gets only the result |
+| Who can open the page | Each person who has the URL, from any computer | Only the person on that computer (127.0.0.1) |
+| Disk space | All the tiles of all zooms | Only the input files |
+
+Use way B to show finished data to many persons. Use way D to build or edit a large area on one computer.
+
 ## The types of data
 
 | Type of data | How it is cut | A. One HTML file | B. Files on a server | C. Made in the browser | D. Made by a local program (planned) |
