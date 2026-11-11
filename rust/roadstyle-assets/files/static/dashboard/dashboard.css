@@ -883,7 +883,7 @@ html.rs-phone .rs-chart[data-more]{-webkit-mask-image:linear-gradient(to bottom,
    pointer (or the key focus) gives the hover tint and the accent edge; a checked row has the accent tint and the accent edge (ONE HOVER above). */
 :is(#sb,.rs-side) .rs-opts{display:grid;gap:6px}
 :is(#sb,.rs-side) .rs-opts.rs-opts-row{grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
-:is(#sb,.rs-side) .rs-opt{display:flex;align-items:flex-start;gap:10px;margin:0;padding:9px 10px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--rs-card-edge);color:var(--ink);font:13px/1.35 system-ui,sans-serif;cursor:pointer}
+:is(#sb,.rs-side) .rs-opt{display:flex;align-items:flex-start;gap:10px;margin:0;padding:9px 10px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--rs-card-edge);color:var(--ink);font:13px/1.35 system-ui,sans-serif;text-transform:none;letter-spacing:0;cursor:pointer}   /* an option row is a <label>: not the small capitals of `#sb label` */
 :is(#sb,.rs-side) .rs-opts-row .rs-opt{align-items:center;justify-content:center;gap:7px;padding:9px 6px;font-weight:500}
 :is(#sb,.rs-side) .rs-opt[hidden]{display:none}
 :is(#sb,.rs-side) .rs-opt>input{flex:none;margin:2px 0 0}

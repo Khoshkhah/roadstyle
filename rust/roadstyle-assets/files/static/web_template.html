@@ -31,8 +31,8 @@ map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bott
 rsDashboard(map, {...RS_OPTIONS, style: style});
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
 // on the map itself (frontends like notebook webviews surface no console). Amber banner reports
-// the inflate state so a screenshot alone pinpoints the failing stage.
-map.on("load", function(){ var tries=0; (function check(){ setTimeout(function(){
+// the inflate state so a screenshot alone pinpoints the failing stage. A page that has no roads yet (`camera.empty`: a host that adds its data later) has no banner.
+map.on("load", function(){ var tries=0; if(cam.empty) return; (function check(){ setTimeout(function(){
   try{
     var s = _src("simple") || _src("roads"), n;   // the role that draws the roads: simple, or roads in the full look
     if(!s) n = 0;
