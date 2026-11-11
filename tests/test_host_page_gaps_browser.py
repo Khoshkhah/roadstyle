@@ -164,6 +164,11 @@ def test_a_later_style_brings_its_base_map_layers_a_raster_map_goes_under_the_ro
         page.wait_for_function("map.getStyle().sprite === 'http://rs.test/vsprite'")
         page.evaluate("() => rsSetBasemap('osm')")
         page.wait_for_function("map.getStyle().sprite === 'http://rs.test/own'")
+        # a vector style that comes after a later choice is not merged (a phone: the page chose the blank map before the first style came)
+        page.evaluate("""() => { const f = window.fetch; window.fetch = (u, o) => String(u).endsWith('/vec.json') ? new Promise(r => setTimeout(r, 800)).then(() => f(u, o)) : f(u, o); }""")
+        page.evaluate("() => { rsSetBasemap('vec'); rsSetBasemap('osm'); }")
+        page.wait_for_timeout(1500)
+        assert page.evaluate("() => [map.getStyle().sprite, map.getLayoutProperty('basemap', 'visibility')]") == ["http://rs.test/own", "visible"]
         # gap 6: whoever asks, the dark theme gets the dark twin
         page.evaluate("() => rsSetTheme('dark')")
         page.evaluate("() => rsSetBasemap('blank')")

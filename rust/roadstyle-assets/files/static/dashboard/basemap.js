@@ -69,8 +69,12 @@ const flatWithoutHeight = s=>{
     if(Array.isArray(e) && e[0] === "get" && e.length === 2) l.paint[k] = ["coalesce", e, 0];
   }
 };
-const mergeVector = async b=>{
+// asked: the number of the last rsSetBasemap. A vector style that comes after a later choice is not merged (a phone: the page asks for the blank map
+// before the first style has come, and the late style must not come back over it).
+let asked = 0;
+const mergeVector = async (b, n)=>{
   const s = await (await fetch(b.style_url)).json();
+  if(n !== asked) return;
   flatWithoutHeight(s);
   addExtrusion(s, b);
   clearVector();
@@ -122,8 +126,9 @@ export function rsSetBasemap(keyOrIdx){
   const twin = BASEMAPS[idx] && BASEMAPS[idx].dark && document.documentElement.dataset.rsTheme === "dark" ? BASEMAPS.findIndex(b=>b.key === BASEMAPS[idx].dark) : -1;
   if(twin >= 0) idx = twin;
   const b = BASEMAPS[idx]; if(!b) return;
+  const n = ++asked;
   if(!b.style_url) clearVector();
-  if(b.style_url){ mergeVector(b); }
+  if(b.style_url){ mergeVector(b, n); }
   else if(b.tiles.length && map.getLayer("basemap")){
     // rebuild the source, not setTiles: a raster source's maxzoom (past it the last level is
     // scaled up) and its attribution are fixed when it is created. Same ids, same place in the
