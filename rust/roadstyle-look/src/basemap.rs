@@ -46,7 +46,9 @@ const PATTERNS: [(&str, &[u8]); 7] = [
 pub const LOOKS: [&str; 4] = ["all", "driving", "walking", "cycling"];
 
 /// One choice of a base map's look: the travel mode that stands out, the theme (the whole map's colours) and the path style (how
-/// walking and cycling paths look); `place`: the map's place (render_map: the database's file name), for the map's name.
+/// walking and cycling paths look); `place`: the map's place (render_map: the database's file name), for the map's name;
+/// `buildings_min_zoom`: the first zoom of the buildings (default: the theme's; liberty: 14). A lower zoom gives the tiles of that zoom the buildings too, so
+/// they are larger (Tartu at zoom 12: the buildings are about 455 KB of a 3 MB tile).
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct BaseMap {
@@ -54,11 +56,12 @@ pub struct BaseMap {
     pub theme: String,
     pub paths: String,
     pub place: Option<String>,
+    pub buildings_min_zoom: Option<f64>,
 }
 
 impl Default for BaseMap {
     fn default() -> BaseMap {
-        BaseMap { mode: "all".into(), theme: "liberty".into(), paths: "google".into(), place: None }
+        BaseMap { mode: "all".into(), theme: "liberty".into(), paths: "google".into(), place: None, buildings_min_zoom: None }
     }
 }
 
@@ -342,7 +345,10 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
     })?;
     let modes = style(MODES);
     let spec = modes.get(&b.mode).filter(|s| !s.is_null()).cloned().unwrap_or_else(|| json!({}));
-    let (themed, th, tr) = load_theme(&b.theme)?;
+    let (mut themed, th, tr) = load_theme(&b.theme)?;
+    if let Some(z) = b.buildings_min_zoom.filter(|z| (0.0..=22.0).contains(z)) {
+        themed["features"]["areas"]["buildings"]["min_zoom"] = json!(z);
+    }
     let color = |v: &Value| recolor(v, tr.0, tr.1);
     let palette = base_palette(&themed, &th, &color, st, &spec, &modes)?;
     let mut roads = spec.get("roads").and_then(Value::as_object).cloned().unwrap_or_default();
@@ -379,6 +385,16 @@ pub fn base_map(b: &BaseMap) -> Result<BaseMapLook, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The buildings' first zoom: the theme's by default (liberty: 14), the option's when it is given, and the other areas stay as they are.
+    #[test]
+    fn buildings_min_zoom() {
+        let zoom = |b: &BaseMap| base_map(b).unwrap().features["style"]["areas"].clone();
+        let (plain, given) = (zoom(&BaseMap::default()), zoom(&BaseMap { buildings_min_zoom: Some(12.0), ..BaseMap::default() }));
+        assert_eq!(plain["buildings"]["min_zoom"], json!(14));
+        assert_eq!(given["buildings"]["min_zoom"], json!(12.0));
+        assert_eq!(plain["parking"], given["parking"]);
+    }
 
     #[test]
     fn colours_as_python_makes_them() {
