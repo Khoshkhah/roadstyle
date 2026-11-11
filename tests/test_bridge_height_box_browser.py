@@ -128,7 +128,7 @@ def _mesh_vertices(browser, profile):
     pg.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
     pg.evaluate("map.jumpTo({center: [18.002, 59.301], zoom: 17.2, pitch: 55, bearing: 20})")
     pg.wait_for_function("_bmStats().rows > 0", timeout=30_000)
-    n = pg.evaluate("_bmStats().landings")
+    n = pg.evaluate("[_bmStats().landings, _bmStats().filled > 0]")
     ctx.close()
     return n
 
@@ -141,6 +141,6 @@ def test_a_free_end_that_has_a_height_gets_a_face_down_to_the_ground_and_a_junct
     ground = next(n for n in profile["groups"][0]["nodes"] if n["kind"] == "ground")
     junction = next(n for n in profile["groups"][0]["nodes"] if n["kind"] == "junction")
     landed = _mesh_vertices(browser, {"groups": [{"nodes": [{"id": ground["id"], "z_m": 4.0}]}]})
-    assert (base, landed) == (0, 1), (base, landed)                               # one free end with a height: one face
+    assert (base, landed) == ([0, False], [1, True]), (base, landed)                     # one free end with a height: one face, and the walls of its ramp go down
     raised = _mesh_vertices(browser, {"groups": [{"nodes": [{"id": junction["id"], "z_m": junction["z_m"] + 1.0}]}]})
-    assert raised == 0, raised                                         # a junction goes on with the next deck: no face
+    assert raised == [0, False], raised                                         # a junction goes on with the next deck: no face

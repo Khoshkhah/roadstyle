@@ -137,3 +137,25 @@ def test_the_start_of_a_ramp_is_not_hidden_by_the_terrain(page):
         bg = _pixel(png, 1150, 780)
         deck = _pixel(png, x, y)
         assert sum(abs(a - b) for a, b in zip(deck, bg, strict=True)) > 30, (sp, deck, bg)     # the deck is there, not the ground
+
+
+def test_a_landing_on_fill_has_a_face_and_walls_down_to_the_ground_on_flat_ground_and_on_the_terrain(page):
+    """A free end that has a height above 0 (a deck that goes on to a street on fill): one end face, and the walls of its ramp go down to the ground; on the terrain too, where the ground is
+    the hill. Nothing is under the ground, upside down or thicker than it is made."""
+    ground = next(n for g in rs.bridge_profile(_edges())["groups"] for n in g["nodes"] if n["kind"] == "ground" and abs(n["lonlat"][0] - _A[0]) < 1e-4 and abs(n["lonlat"][1] - _A[1]) < 1e-4)
+    html = rs.render_dashboard(_edges(), view_3d=True, basemap="blank", bridge_profile={"groups": [{"nodes": [{"id": ground["id"], "z_m": 4.0}]}]}).html
+    ctx = page.context.browser.new_context(viewport={"width": 1200, "height": 800})
+    pg = ctx.new_page()
+    pg.route("**/elevation-tiles-prod/**", lambda r: r.fulfill(content_type="image/png", body=_tile(), headers={"access-control-allow-origin": "*"}))
+    pg.route("http://rs.test/p.html", lambda r: r.fulfill(content_type="text/html", body=html))
+    pg.goto("http://rs.test/p.html")
+    pg.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=60_000)
+    pg.evaluate("map.jumpTo({center: [18.002, 59.301], zoom: 17.2, pitch: 55, bearing: 20})")
+    for terrain in (False, True):
+        if terrain:
+            pg.evaluate("rsTerrain(true)")
+            pg.wait_for_timeout(500)
+        st = _settled(pg)
+        assert st["landings"] == 1 and st["filled"] > 0, (terrain, st)
+        assert st["inverted"] == 0 and st["tooThick"] == 0 and st["underGround"] == 0, (terrain, st)
+    ctx.close()
