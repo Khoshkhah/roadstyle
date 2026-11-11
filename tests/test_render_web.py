@@ -2748,6 +2748,7 @@ def test_the_granville_bridge_example_is_the_engines():
     """docs/guides/bridge-height.md, "A real example: the Granville Bridge": the 12 chains of the bridge group of docs/img/bridge-height/granville_bridge_edges.parquet, their
     lengths, their lifts at the two ends and the pieces, from the same functions as the figures (docs/img/bridge-height/granville.py). The comparison of docs/design/bridge_profile_edit.md
     (the highest deck of each chain, and the LiDAR heights of granville_lidar_samples.json) is pinned here too."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import importlib.util
     here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
     spec = importlib.util.spec_from_file_location("bridge_height_granville", here / "granville.py")
@@ -2779,6 +2780,7 @@ def test_the_prototype_numbers_of_the_bridge_profile_proposal_are_pinned():
     """docs/design/bridge_profile_edit.md, "What the prototype shows on the Granville Bridge" (docs/img/bridge-height/granville_proposed.py): for each of the 12 chains, the largest error against the
     LiDAR stations of the profile of today, of stage 1 (the heights at the ends and the top) and of stage 2 (the grade points). The proposal says that stage 1 is not enough and a height line is.
     The example of the proposal (chain 1: its road id, its 9 points and 9 curves) is in the data too."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import importlib.util
     import sys
     here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
@@ -2809,6 +2811,7 @@ def test_a_ramp_never_dips_and_is_never_steeper_than_its_curve_allows():
     """The rounding of the curve (step 5 of docs/guides/bridge-height.md) is only at a crest, where the two ramps cross inside the chain. Where they cross at an end of the chain
     (a node whose lift is what the ramp gives, chains 11 and 12 of the Granville Bridge) there is no crest, and the lift must not dip. The steepest part of a ramp is 1.5 times the average
     slope, 1.5 / 8 = 18.75 %: the middle of the smoothstep. No piece is steeper."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import importlib.util
     here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
     spec = importlib.util.spec_from_file_location("bridge_height_granville_slope", here / "granville.py")
@@ -2837,6 +2840,7 @@ def test_the_design_rules_of_the_bridge_height_note_are_calculated_not_typed():
     """docs/design/bridge_height_design.md (docs/img/bridge-height/design_rules.py): the formulas of the stopping sight distance and of K give the values of the TxDOT table (K = 247 ft per percent at
     70 mph, and 473 for a crest and 260 for a sag at 85 mph), the K table of the note, a ramp that is never steeper than its design grade, the length that a clearance needs, and the figures that the
     note gives for today's engine."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import importlib.util
     here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
     spec = importlib.util.spec_from_file_location("bridge_height_design_rules", here / "design_rules.py")
@@ -2866,6 +2870,7 @@ def test_the_design_rules_of_the_bridge_height_note_are_calculated_not_typed():
 def test_the_granville_nodes_and_the_five_heights_of_the_design_note():
     """docs/design/bridge_height_design.md, "How many heights a profile needs" (docs/img/bridge-height/granville_nodes.py): the Granville group has 13 nodes, 8 free ends on the ground and 5 junctions; the
     distance of each junction to the ground and the highest height that a grade allows; the example of the 5 heights, in which no chain is steeper than the grade."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import importlib.util
     import sys
     here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
@@ -2892,6 +2897,7 @@ def test_the_granville_nodes_and_the_five_heights_of_the_design_note():
 def test_the_granville_input_profile_of_the_design_note_is_the_engines_nodes_and_chains():
     """docs/design/bridge_profile_edit.md, "An example: the Granville Bridge" (docs/img/bridge-height/granville_input_profile.py and .json): the file has the 13 nodes (8 on the ground, 5 junctions) and
     the 12 chains of the group that the engine finds, the example heights of the 5 junctions, and no chain has an interior control point. The file is the one that the script makes."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import importlib.util
     import sys
     here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
@@ -2922,6 +2928,7 @@ def test_the_two_parts_of_the_engine_fill_and_make_on_the_granville_bridge():
     """docs/design/bridge_profile_edit.md, "The proposal: the engine has two parts" (docs/img/bridge-height/granville_input_profile.py, a prototype): Part 1 (`fill`) turns the least input (5 junction heights)
     into the complete input profile and keeps every value that is given; filling twice is filling once; a missing value is filled and marked as derived; wrong input is an error. Part 2 (`make`) has no
     defaults: it makes the height along each chain of a complete profile, and a missing value is an error."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import copy
     import importlib.util
     import sys
@@ -2994,6 +3001,7 @@ def test_the_guide_page_of_the_bridge_profile_shows_the_sample_files_and_links_t
     """docs/guides/bridge-profile.md shows the least input and the colored complete profile of docs/samples/bridge-profile/ in full (so the page and the files cannot differ), links every sample file, gives
     their sizes, and is in the menu. The colored block is the one that the prototype makes: 22 values from the input (bold blue) and 169 added by the engine (orange), and the text without the tags is the JSON file.
     The stylesheet has both colors for the light and the dark scheme."""
+    pytest.importorskip("matplotlib")   # the figures of docs/img/bridge-height are made with it; CI has none
     import html
     import importlib.util
     import re
