@@ -40,7 +40,10 @@ const idsKey = (ids) => { let h = 0; for(const s of [...ids].sort()) for(let i =
 
 export function dataDock(o = {}){
   const rs = o.dashboard || window.rs, ID = o.idColumn || "edge_id", KEYS = o.keys || ["osm_id", "name"], LIMIT = o.limit || 1000;
-  if(typeof o.query !== "function" || typeof o.schema !== "function") throw new Error("dataDock: query and schema are necessary.");
+  // `query` and `schema` of the page's adapter (rs.request, adapter.js) when the host gives none
+  if(typeof o.query !== "function" && rs.request) o = {...o, query: (sql, opt) => rs.request.query(sql, opt)};
+  if(typeof o.schema !== "function" && rs.request) o = {...o, schema: () => rs.request.schema()};
+  if(typeof o.query !== "function" || typeof o.schema !== "function") throw new Error("dataDock: query and schema are necessary (the host gives them, or the page's adapter).");
   if((o.tables || []).length && typeof o.load !== "function") throw new Error("dataDock: tables need load (the host loads each one).");
   const events = new EventTarget(), emit = (name, detail) => events.dispatchEvent(new CustomEvent(name, {detail}));
   // the kinds of the host (docs/design/dock_kinds.md). `kinds` is an object, or a function that gives one (sync or async): the dock calls the function at the start, before

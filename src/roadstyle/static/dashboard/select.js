@@ -1,6 +1,6 @@
 // hover + click-to-select + info popup (feature-state, tolerance box, throttled to one query/frame)
 import {POPUP, _rpairs, _rfields, _esc} from "../popup.js";
-import {map, style, O, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _NO_HOVER, _role, _itemOv, _side, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
+import {map, style, O, ADAPTER, RS_PREFIX, RS_LEAN, RS_LEANS, OVERLAYS, _NO_HOVER, _role, _itemOv, _rprops, RoadTable, _road, _roadOfPiece, _FILL_PIECE, _fs, _deckIdsForRoad, _joinedKeys, _emit} from "./core.js";
 import {_popupMode, rsInfoShow, rsInfoClear} from "./panel.js";
 import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick, _lookHolds, _ovSel, _ovState} from "./overlays.js";
 import {_spDotClick} from "./svproviders.js";
@@ -40,8 +40,8 @@ export function pick(p){
 export function srcOf(f){ return f && f.layer && _role(f.layer)==="decks" ? "decks" : "roads"; }
 // full properties of a picked feature: tiles carry only the style props, so road hits read the
 // road table's row behind the feature id; decks keep the feature's own properties
-function _pickProps(f){ const t=_side();
-  if(t && srcOf(f)==="roads" && f.id!=null && t.props[f.id]) return RoadTable.props(f.id);
+function _pickProps(f){
+  if(srcOf(f)==="roads" && f.id!=null && RoadTable.has(f.id)) return RoadTable.props(f.id);
   return f.properties||{}; }
 function _selItem(f){ if(ITEM_PICK && f && f.item && f.item.layer.id===ROAD_ITEMS.layer) return ITEM_PICK;   // a road item of items=
   const o = f && f.item && _itemOv(f.item.layer.id); return o && o.select==="item" ? o : null; }   // its overlay
@@ -111,9 +111,10 @@ function _midOf(g){                         // the middle of the length (a middl
   const t=(h-d[i])/((d[i+1]-d[i])||1);
   return [cs[i][0]+t*(cs[i+1][0]-cs[i][0]), cs[i][1]+t*(cs[i+1][1]-cs[i][1])]; }
 export function rsSelect(id){
+  if(!RoadTable.has(id) && !(ADAPTER && ADAPTER.rows)) return;
+  const w = RoadTable.load(id); if(w) return w.then(()=>rsSelect(id));   // its row (an adapter) and its line first (a table without lines)
   const props = RoadTable.has(id) ? RoadTable.props(id) : null;
   if(props==null) return;
-  const w = RoadTable.load(id); if(w) return w.then(()=>rsSelect(id));   // its line first (a table without lines)
   clearOvSel();
   if(_sel) setS(_sel,{select:false});
   // a bridge: glow the deck chain (shown above flat_below) AND the flat line (shown below it)
@@ -153,7 +154,9 @@ function hoverFrame(){ _raf=0; if(!_pt) return;
   const p = _pt;
   _tipT = setTimeout(()=>{ if(_pt !== p) return;                                          // the mouse rested on it: light it up
     _hov=h; setS(_hov,{hover:true});
-    if(_tip && !_quiet) _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); }, _TIP_DELAY);
+    const tip = () => { if(_hov === h && _tip && !_quiet) _tip.setLngLat(map.unproject(p)).setHTML(_both(_pickProps(f), false, _ttipOnly)).addTo(map); };
+    const w = srcOf(f) === "roads" && RoadTable.loadRow(f.id);     // a page with an adapter reads the road's row when the mouse rests on it
+    w ? w.then(tip) : tip(); }, _TIP_DELAY);
 }
 let _sel=null;
 // what the style decides: the layers a road is picked on, the popup and tooltip fields, the hover delay. Again for a new style

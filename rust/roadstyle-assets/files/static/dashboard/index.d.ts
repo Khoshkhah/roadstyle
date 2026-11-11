@@ -12,6 +12,8 @@ export interface DashboardOptions {
   /** The road table of stage 1, by row: each road's fields, midpoint, bbox, heading and line (styleSources(...).roadTable()). null:
    *  window.RS_SIDE (every page of roadstyle has it). */
   road_table?: RoadTableData | null;
+  /** The adapter of the page (adapter.js): the data of its way. Each function is optional. null: the page has its own road table. */
+  adapter?: Adapter | null;
   /** The roads are a vector source (tiles). Simple mode and its road layer come from the style. */
   tiles?: boolean;
   /** The generation of the tiles (the PMTiles metadata `generation`, a tile server's answer). None: the `?g=` of the style's tile URLs. A style of another
@@ -252,6 +254,18 @@ export interface Dashboard {
   /** The frame of an editor in the panel. Events: "back" (the back button), "tab" ({tab}: a click on a tab). */
   dock: Dock;
   frame(options: { panel: HTMLElement; title: string; back?: string | null; tabs?: [string, string][]; head?: HTMLElement; id?: string; label?: string }): EditorFrame;
+  /** The four requests, as the dashboard makes them (adapter.js): each one calls the page's adapter and throws an Error when the page has none, or the adapter lacks it. */
+  request: {
+    tile(source: string, z: number, x: number, y: number): Promise<Uint8Array | null>;
+    rows(source: string, ids: number[]): Promise<(Record<string, unknown> | null)[]>;
+    row(source: string, id: number): Promise<Record<string, unknown> | null>;
+    query(sql: string, options?: { signal?: AbortSignal }): Promise<{ columns: { name: string; type: string }[]; rows: unknown[][] }>;
+    schema(): Promise<{ tables: { name: string; rows?: number; about?: string }[] }>;
+    frames(from: number, to: number): Promise<{ t: number; values: Float32Array }[]>;
+    lines(ids: number[]): Promise<([number, number][] | null)[]>;
+  };
+  /** The adapter of the page, later (null: none). */
+  setAdapter(adapter: Adapter | null): void;
   /** The cut points of Fisher-Jenks natural breaks that split the numbers in k sets (what rs.setData uses for a number). */
   naturalBreaks(values: number[], k: number): number[];
   /** A traffic microsimulation run on the map (vehicles.js, docs/design/vehicles_spec.md). */
@@ -324,3 +338,14 @@ export function rsDashboard(map: MapLibreMap, options?: DashboardOptions): Dashb
 
 /** The report of a vehicles run (rs.vehicles.report, the event rs:vehicleload). */
 export interface VehicleReport { samples: number; vehicles: number; t0: number; t1: number; empty_rows: number; lanes_unknown: number; path_gaps: number; teleports: number }
+
+/** What a way gives the dashboard (adapter.js). Way D: `rsHttpAdapter(base)`. */
+export interface Adapter {
+  tile?(source: string, z: number, x: number, y: number): Promise<Uint8Array | null>;
+  rows?(source: string, ids: number[]): Promise<(Record<string, unknown> | null)[]>;
+  lines?(ids: number[]): Promise<([number, number][] | null)[]>;
+  query?(sql: string, options?: { signal?: AbortSignal }): Promise<{ columns: { name: string; type: string }[]; rows: unknown[][] }>;
+  schema?(): Promise<{ tables: { name: string; rows?: number; about?: string }[] }>;
+  frames?(from: number, to: number): Promise<{ t: number; values: Float32Array }[]>;
+  style?(): Promise<StyleSpecification>;
+}

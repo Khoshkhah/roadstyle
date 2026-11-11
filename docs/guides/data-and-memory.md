@@ -215,8 +215,8 @@ and the four ways use it. This keeps the four ways equal: a change or a fix in o
 | Engine | One code. The Python binding, the native program and the WebAssembly module call the same Rust crates. |
 | Tiles | One code: one tile rule and one format for all ways. In way A, every layer is a tile layer of the archive in the file, except the 3D bridge decks (GeoJSON until they are tiles). |
 | Dashboard | One code for all pages. |
-| Four requests | Not one interface yet. The tiles come through MapLibre (a tile address for each source). The rows, the queries and the frames come through functions that the host gives (for example `rsSetWalls`, and the data dock's functions). |
-| Adapter of way D | Planned |
+| Four requests | One interface: the **adapter** (`dashboard/adapter.js`, [the design](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/memory_budget.md)). A page gives it one object with `tile`, `rows`, `query` and `frames` (and `lines`, `schema`, `style`); the dashboard asks the four requests through `rs.request`. Each way gives its own adapter. A page that has its road table in itself needs none, and the host functions of before (`window.RS_SIDE`, the data dock's `query` and `schema`) work as before. The first user of `frames` (`rs.setFrames`) is not built yet. |
+| Adapter of way D | `rsHttpAdapter(base)`: the browser side is built. The program that answers it is next (step 3). |
 
 ## The types of data
 
