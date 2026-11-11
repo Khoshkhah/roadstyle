@@ -53,6 +53,15 @@ it, and the folders of the tabs that closed, so the browser disk keeps the table
 | **C. Made in the browser** | The page makes the data from its input files. It keeps the result in memory or on the browser disk (OPFS). | A page that builds its maps itself, for example duckOSM Studio. | [Make way C](#make-way-c-made-in-the-browser) |
 | **D. Made by a local program** | A Rust program on the computer reads the input files on the disk and makes the tiles and the rows when the page asks for them. The browser only draws. | An area that is too large for the browser. A tool on one computer, for example `duckosm studio`. | [Way D](#way-d-the-engine-out-of-the-browser) |
 
+**duckOSM's online and offline versions.** duckOSM makes its data in two of these ways:
+
+| Version | Way | Program | Where the tables are | Its limit |
+|---|---|---|---|---|
+| Online | C | duckOSM Studio, a web page | Today in the memory of the tab. Planned (duckOSM's stage 3): Parquet files on the browser disk (OPFS), which DuckDB-Wasm reads in place (`registerFileHandle`) | The memory of the tab, then the space of the browser disk |
+| Offline | D | `duckosm-rust` and `duckosm studio`, on the computer | In a `.duckdb` file on the disk; the program's DuckDB loads the PBF file (`read_osm`) | DuckDB's `memory_limit` and the disk (the load step of France, a 5.1 GB file, is measured in it) |
+
+The two versions use the same engine and the same dashboard. Only the transport changes ([duckOSM's design note of the load step](https://github.com/Khoshkhah/duckOSM/blob/main/docs/design/streaming_load.md)).
+
 The file formats are the same in the four ways: PMTiles for the tiles, and Parquet for the tables. Only the transport changes. A static file
 host is enough for way B, and no running server is necessary. Way D is way C with the engine out of the browser: the same engine runs as a
 program, and the data stays on the disk of the computer, not on the browser disk. [Make tiles and PMTiles](../rust/tiles.md) tells how to make the files.
