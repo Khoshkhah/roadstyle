@@ -213,7 +213,7 @@ and the four ways use it. This keeps the four ways equal: a change or a fix in o
 | Part | Today |
 |---|---|
 | Engine | One code. The Python binding, the native program and the WebAssembly module call the same Rust crates. |
-| Tiles | One code: one tile rule and one format for all ways. In way A, only the road layers are tiles; the other layers are GeoJSON. |
+| Tiles | One code: one tile rule and one format for all ways. In way A, every layer is a tile layer of the archive in the file, except the 3D bridge decks (GeoJSON until they are tiles). |
 | Dashboard | One code for all pages. |
 | Four requests | Not one interface yet. The tiles come through MapLibre (a tile address for each source). The rows, the queries and the frames come through functions that the host gives (for example `rsSetWalls`, and the data dock's functions). |
 | Adapter of way D | Planned |
@@ -223,7 +223,7 @@ and the four ways use it. This keeps the four ways equal: a change or a fix in o
 | Type of data | How it is cut | A. One HTML file | B. Files on a server | C. Made in the browser | D. Made by a local program (planned) |
 |---|---|---|---|---|---|
 | [Road lines](#road-lines-and-other-layers) | Tiles | Tiles in the file | Tiles from the PMTiles file | The map worker makes a tile when the map asks for it | The program makes a tile when the map asks for it |
-| [Other layers](#road-lines-and-other-layers) (water, land, buildings, boundary) | Tiles | GeoJSON in the file (planned: tiles) | Tiles | Tiles from the map worker | Tiles from the program |
+| [Other layers](#road-lines-and-other-layers) (water, land, buildings, boundary) | Tiles | Tiles in the file (the rows of an overlay are also in the page) | Tiles | Tiles from the map worker | Tiles from the program |
 | [3D objects](#3d-objects) (walls, bridge decks, piers) | Pieces by tile | All objects at one time (planned: by tile) | Planned: by tile | Walls: tiles from the map worker. Decks: all at one time (planned: by tile). | Pieces by tile from the program |
 | [The ground](#the-ground) | Tiles of one terrain file | The terrain file at a URL | Tiles from the terrain file | A terrain file on the browser disk | The terrain file on the disk, by tile from the program |
 | [Tables](#tables-in-memory-or-on-the-disk) (road fields, popups, queries) | Rows, read by query | The road table in the page | The host reads Parquet at a URL | The host keeps each table in memory or on the browser disk | The program queries the Parquet files on the disk with DuckDB |
@@ -255,7 +255,7 @@ All ways give the same tiles ([Big networks](big-networks.md)):
 - **C:** the map worker keeps the roads and cuts a tile only when the map asks for it.
 - **D:** the local program does the same as the map worker, outside the browser.
 
-The other layers follow the same rule. In way A, they are GeoJSON in the file today. Then the whole layer stays in memory.
+The other layers follow the same rule. In way A, they are tile layers of the archive in the file. The tiles have only the keys that the style reads, so the page also keeps the rows of each overlay (all its properties and its box) for `rsQuery`, `rsGetProps`, `rsFocus` and the popups. The 3D bridge decks stay GeoJSON until they are cut into pieces by tile.
 
 ## 3D objects
 

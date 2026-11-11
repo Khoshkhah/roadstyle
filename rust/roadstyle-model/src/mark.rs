@@ -185,6 +185,8 @@ marks! {
     /// a chain's end nodes, as [longitude, latitude], on its first and on its last deck piece (the page reads the ground height at them)
     DeckEndA = "__rs_enda" [Decks];
     DeckEndB = "__rs_endb" [Decks];
+    /// an overlay's feature in the overlay's rows (a one-file page): its box [west, south, east, north], which the page's `rsFocus` fits the camera to
+    OverlayBox = "__rs_bbox" [Table];
     /// the drawing positions that the engine solved, under their contract names (duckOSM's columns: an input column of the name is the
     /// level input; the writers give the solved values under it, in this order, after the road's columns)
     CasingStartColumn = "casing_start";

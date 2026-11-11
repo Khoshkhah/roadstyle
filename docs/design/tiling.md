@@ -158,8 +158,11 @@ the gain of moving them is mostly the tags of two keys (about 2 of 10 on a piece
 
 ## What is not one yet
 
-1. The embedded archive has 3 tile layers (`roads`, `simple`, `slots`). The other sources of the page (the base map, the boundary, the overlays) stay GeoJSON in the page.
-   The worker and the server tiles carry all the sources. Rule: all sources are tile layers. Not done.
+1. **Done (2026-11-10).** The embedded archive has a tile layer for each source of the page: the roads, the base map, the boundary and the overlays, as the worker and the
+   server tiles have. The page keeps no GeoJSON for them. Two sources stay GeoJSON: `decks` and `shadows` (the 3D bridge decks), because the dashboard reads all their features
+   at one time (`WHOLE_SOURCES` in `page_options.rs`). They become tiles in step 5 of [memory_budget.md](memory_budget.md). An overlay's tiles have only the keys that the style reads;
+   the page keeps the rows of the overlay (all its properties and its box) as one gzip data URL in `roadstyle:interaction.base_props`, and the dashboard answers `rsQuery`, `rsGetProps`,
+   `rsFocus` and the popup from these rows.
 2. The full look (`export_style`) has a layer `roads` (one feature for each road with 21 columns) that the page's look does not have
    (tile_contract.md, rule 10).
 3. The keys of the embedded page include the class, the filter column, `__rs_twoway`, the edge, `lvl` and the width, because the page filters read them from the feature. The road

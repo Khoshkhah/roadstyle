@@ -43,6 +43,7 @@
     "__rs_access",
     "__rs_twoway",
     "__rs_dup",
+    "__rs_bbox",
     "name",
     "highway",
     "bridge",
