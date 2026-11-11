@@ -37,12 +37,12 @@ const _bmOn = () => { try { return map.getGlobalState().rs_bridges3d !== false; 
 const _bmSrc = () => { const s = _src("decks"); return s ? s.source : null; };
 const _bmMerc = (lon, lat) => [(lon + 180) / 360, 0.5 - Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) / (2 * Math.PI)];
 
-// the landed ends of the chains, from the bridge profile: a Set of "<chain number>:0" (the start) and "<chain number>:1" (the end) for each chain end at a `ground` node that has a height
-// above 0 (a deck that goes on to a street on fill). The chain id of the profile is c<N>.
+// the landed ends of the chains, from the bridge profile: a Map "<chain number>:0" (the start) or "<chain number>:1" (the end) -> the height z_m of the end, for each chain end at a `ground`
+// node that has a height above 0 (a deck that goes on to a street on fill). The chain id of the profile is c<N>.
 function _bmLanded(){
-  const out = new Set(), prof = O.bridge_profile;
-  ((prof && prof.groups) || []).forEach(g => { const up = new Map(g.nodes.map(n => [n.id, n.kind === "ground" && n.z_m > 0]));
-    g.chains.forEach(c => { const n = c.id.slice(1); if(up.get(c.from)) out.add(n + ":0"); if(up.get(c.to)) out.add(n + ":1"); }); });
+  const out = new Map(), prof = O.bridge_profile;
+  ((prof && prof.groups) || []).forEach(g => { const z = new Map(g.nodes.map(n => [n.id, n.kind === "ground" && n.z_m > 0 ? n.z_m : 0]));
+    g.chains.forEach(c => { const n = c.id.slice(1); if(z.get(c.from)) out.set(n + ":0", z.get(c.from)); if(z.get(c.to)) out.set(n + ":1", z.get(c.to)); }); });
   return out;
 }
 // the decks' full height in metres: the group's own when it was set, else the look's (`__rs_full`)
@@ -131,6 +131,7 @@ function _bmBuild(){
     e.forEach((c, k) => _bmEnds.set(k, {za: c.a ? _bmElev(c.a) : null, zb: c.b ? _bmElev(c.b) : null}));
   }
   const push = (x, y, z, sh) => { pos.push(x, y, z); shade.push(sh); };
+  const landed = _bmLanded();                    // the landed ends of the chains (once for the whole build)
   _bmFeats.forEach((f, k) => {
     const p = f.properties, ring = f.geometry && f.geometry.coordinates && f.geometry.coordinates[0], first = shade.length;
     adj[k] = null;
@@ -173,11 +174,12 @@ function _bmBuild(){
       _bmStat.rows++;
     }
     const v = (c, z) => { const q = _bmMerc(c[0], c[1]); return [q[0] - o[0], q[1] - o[1], z * mz]; };
-    const landed = _bmLanded(), lan0 = landed.has(p.__rs_chain + ":0"), lan1 = landed.has(p.__rs_chain + ":1");
-    // THE FILL: on the ramp of a landed end (the lift is under 1, in the half of the chain that the end is in) the walls go down to the ground: an earth ramp, not a deck in the air
+    const z0 = landed.get(p.__rs_chain + ":0"), z1 = landed.get(p.__rs_chain + ":1");
+    // THE FILL: at a landed end the walls go down to the ground while the underside of the deck is lower than the height of the end (the fill is the street that goes on to the bridge);
+    // from there the wall's bottom rises to the deck's underside over the same height again, so the fill ends in a slope and not in a cliff. The end is the one that the vertex is nearest to.
     const sAt = i => p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0);
-    const fill = i => (lan0 || lan1) && L(i) < 0.999 && ((lan0 && sAt(i) < 0.5) || (lan1 && sAt(i) >= 0.5));
-    const wallBot = (i, sd) => { if(!fill(i)) return bot(i, sd); _bmStat.filled++; return Math.min(bot(i, sd), GS[sd][i]); };
+    const wallBot = (i, sd) => { const ze = sAt(i) < 0.5 ? z0 : z1, b0 = bot(i, sd); if(!ze) return b0;
+      const t = Math.min(1, Math.max(0, (b0 - GS[sd][i] - ze) / ze)); if(t < 1) _bmStat.filled++; return GS[sd][i] + (b0 - GS[sd][i]) * t; };
     const quad = (a, b, c, d, sh) => { [a, b, c, a, c, d].forEach(q => push(q[0], q[1], q[2], sh)); };
     for(let i = 0; i < m - 1; i++){
       quad(v(A[i], top(i, 0)), v(A[i + 1], top(i + 1, 0)), v(B[i + 1], top(i + 1, 1)), v(B[i], top(i, 1)), 1);            // the top, sloped
