@@ -1,7 +1,7 @@
 # The map terrain from the area's own ground
 
-Date: 2026-11-10. Status: accepted by Kaveh on 2026-11-10 and built in roadstyle (`roadstyle-tiles/src/terrain.rs`, `elevation.js`).
-The Studio part waits for Studio PR 136 (the DEM step).
+Date: 2026-11-10. Status: accepted by Kaveh on 2026-11-10 and built: roadstyle PRs 145, 146 and 147 (`roadstyle-tiles/src/terrain.rs`,
+`elevation.js`), duckOSM Studio PR 137.
 
 ## Summary
 
@@ -130,7 +130,7 @@ So this design has two checks:
 2. **The display (a number in the report, not a test).** The table above, made again on the file: at the grid's points,
    through MapLibre's interpolation.
 
-The standard's wording must change to the check 1 ("at the tile pixels' points"). The standard belongs to duckOSM.
+The standard now checks at the tile pixels' points, as check 1 (duckOSM PR 70, 2026-11-10).
 
 ## The measurement of the speed
 
@@ -142,18 +142,22 @@ is from "hillshade and terrain on, pitch 60, zoom 15" to the map with all tiles 
 | AWS Terrain Tiles | 3,474 ms | 3,496 3,569 3,437 3,474 3,392 3,689 3,293 | 44 to 50 |
 | Terrain file, embedded in the page | 1,757 ms | 1,623 1,873 1,732 1,814 1,714 1,757 1,806 | 0 |
 
-The terrain file is about two times faster. The Studio path (OPFS) is measured in step 3.
+The terrain file is about two times faster.
+
+duckOSM Studio, Monaco, the file in OPFS, seven runs with the HTTP cache cleared before each:
+
+| DEM | Terrain and hillshade loaded (median) | Whole map loaded (median) | Requests to AWS |
+|---|---|---|---|
+| AWS Terrain Tiles | 5,950 ms | 8,556 ms | 72 |
+| Terrain file in OPFS | 4,435 ms | 7,725 ms | 0 |
+
+In Studio the roads and the base map load at the same time, so the gain is smaller than on the blank page.
 
 ## The steps
 
 1. Done: roadstyle `terrain.rs` and its tests; the Python binding, `roadstyle.duckosm.ground` and the CLI.
 2. Done: the page option `ground`, `rsGround`, `elevation.js`, `google3d.js` and the attribution; the browser test with no
    request to AWS; the speed measurement.
-3. duckOSM Studio, after Studio PR 136 ("a DEM file gives `main.elevation_grid`") merges: read `main.elevation_grid` from
-   DuckDB in the browser, make the file with `roadstyle-wasm` in the map worker, write it to OPFS, and give roadstyle the
-   ground with `rsGround`. Then the phone-viewport check.
-
-## Open item
-
-The standard's check (duckOSM `docs/concepts/ground-reference.md`, section 5) says "at the grid's points". It must say "at
-the tile pixels' points", as check 1 above. The standard belongs to duckOSM.
+3. Done (duckOSM Studio PR 137): after a build or a restore with `main.elevation_grid`, the page makes the file with
+   `terrainPmtiles` on its own thread (some ms for Monaco), writes it to OPFS (`ground.pmtiles`) and calls `rsGround`. Test:
+   `ground_e2e.py` (no request to AWS; the file's z13 tiles equal the grid to 0.0020 m). The phone-viewport check passed.
