@@ -2742,7 +2742,7 @@ def test_the_granville_bridge_example_is_the_engines():
     spec = importlib.util.spec_from_file_location("bridge_height_granville", here / "granville.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    chains = mod.chains_of(gpd.read_parquet(here / "granville_bridge_edges.parquet"))
+    chains = mod.chains_of(gpd.read_parquet(here.parents[1] / "samples" / "bridge-profile" / "granville_bridge_edges.parquet"))
     full = chains[0]["pieces"][0]["properties"]["__rs_full"]
     assert len(chains) == 12 and full == pytest.approx(22.0)                                    # one group of 12 chains, at the largest height
     assert sum(c["length"] for c in chains) == pytest.approx(3061, abs=5) and sum(len(c["pieces"]) for c in chains) == 624
@@ -2757,7 +2757,7 @@ def test_the_granville_bridge_example_is_the_engines():
     assert sum(1 for e in ends if e == 0) == 8 and sum(1 for e in ends if abs(e - 0.51) < 0.01) == 3        # eight free ends; three chains meet at the node of lift 0.51
     assert 89 / (full * 8) == pytest.approx(0.51, abs=0.01) and full * 0.51 == pytest.approx(11.2, abs=0.1)             # the numbers of the page: 89 / 176 = 0.51, 0.51 x 22 = 11.2
     # the comparison with the LiDAR: the same 12 ways, the highest deck of the engine, and of the measurement
-    lidar = json.loads((here / "granville_lidar_samples.json").read_text())["axes"]
+    lidar = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_lidar_samples.json").read_text())["axes"]
     engine_top = [max(full * max(f["properties"]["__rs_lift0"], f["properties"]["__rs_lift1"]) for f in c["pieces"]) for c in chains]
     assert engine_top[:10] == pytest.approx([22.0] * 10, abs=0.05) and engine_top[10:] == pytest.approx([11.2, 11.2], abs=0.1)
     assert max(z for _, z in lidar[0]["samples"]) == pytest.approx(39.3, abs=0.05)                         # axis a1, the main span
@@ -2787,10 +2787,10 @@ def test_the_prototype_numbers_of_the_bridge_profile_proposal_are_pinned():
     assert rows[4]["errors"][1] > rows[4]["errors"][0]                                                    # chain 5: stage 1 is a little worse than today
     first = rows[0]["inputs"]
     assert first == pytest.approx((27.0, 22.7, 39.3), abs=0.1)
-    edges = gpd.read_parquet(here / "granville_bridge_edges.parquet")
+    edges = gpd.read_parquet(here.parents[1] / "samples" / "bridge-profile" / "granville_bridge_edges.parquet")
     chain1 = {f["properties"]["osm_id"] for f in mod.chains_of(edges)[0]["pieces"]}
     assert chain1 == {1419040127, 1419040128} and 8043974233675410214 in set(edges[edges.osm_id.isin(chain1)].edge_id)       # the road id of the example
-    a1 = json.loads((here / "granville_lidar_samples.json").read_text())["axes"][0]
+    a1 = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_lidar_samples.json").read_text())["axes"][0]
     assert a1["points"][:3] == [[0.0, 27.02], [160.0, 31.06], [220.0, 33.66]] and len(a1["points"]) == len(a1["curves"]) == 9 and a1["curves"] == [0.0, 54.0, 54.0, 27.0, 18.0, 18.0, 27.0, 54.0, 0.0]
 
 
@@ -2803,7 +2803,7 @@ def test_a_ramp_never_dips_and_is_never_steeper_than_its_curve_allows():
     spec = importlib.util.spec_from_file_location("bridge_height_granville_slope", here / "granville.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    chains = mod.chains_of(gpd.read_parquet(here / "granville_bridge_edges.parquet"))
+    chains = mod.chains_of(gpd.read_parquet(here.parents[1] / "samples" / "bridge-profile" / "granville_bridge_edges.parquet"))
     full = chains[0]["pieces"][0]["properties"]["__rs_full"]
     for n, c in enumerate(chains, 1):
         lifts = [c["pieces"][0]["properties"]["__rs_lift0"]] + [f["properties"]["__rs_lift1"] for f in c["pieces"]]
@@ -2892,7 +2892,7 @@ def test_the_granville_input_profile_of_the_design_note_is_the_engines_nodes_and
         made = mod.input_profile()
     finally:
         sys.path.remove(str(here))
-    saved = json.loads((here / "granville_input_profile.json").read_text())
+    saved = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_input_profile.json").read_text())
     assert made == saved                                                                                  # the file is what the script makes
     group = saved["groups"][0]
     assert saved["format"] == "roadstyle.bridge_profile/1" and saved["parameters"] == {"design_speed_kmh": 50, "design_grade": 0.06}
@@ -2923,8 +2923,8 @@ def test_the_two_parts_of_the_engine_fill_and_make_on_the_granville_bridge():
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         partial, filled = mod.partial_input(), mod.fill(mod.partial_input())
-        saved_partial = json.loads((here / "granville_input_partial.json").read_text())
-        saved_filled = json.loads((here / "granville_input_profile.json").read_text())
+        saved_partial = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_input_partial.json").read_text())
+        saved_filled = json.loads((here.parents[1] / "samples" / "bridge-profile" / "granville_input_profile.json").read_text())
         empty = mod.fill({})
         dropped = copy.deepcopy(partial)
         removed = dropped["groups"][0]["nodes"].pop(0)                                                       # J1: its height is not given
@@ -2977,3 +2977,41 @@ def test_the_two_parts_of_the_engine_fill_and_make_on_the_granville_bridge():
         assert abs(np.gradient(z, xs)).max() * 100 <= 6.0 + 0.1                                          # no chain is steeper than the design grade
     xs, z = pointed
     assert 24.4 <= float(np.interp(275.0, xs, z)) <= 25.0                                               # an interior point: the deck goes through it, rounded by its curve
+
+
+def test_the_guide_page_of_the_bridge_profile_shows_the_sample_files_and_links_them():
+    """docs/guides/bridge-profile.md shows the least input and the colored complete profile of docs/samples/bridge-profile/ in full (so the page and the files cannot differ), links every sample file, gives
+    their sizes, and is in the menu. The colored block is the one that the prototype makes: 22 values from the input (bold blue) and 169 added by the engine (orange), and the text without the tags is the JSON file.
+    The stylesheet has both colors for the light and the dark scheme."""
+    import html
+    import importlib.util
+    import re
+    import sys
+    root = Path(__file__).resolve().parents[1]
+    samples = root / "docs" / "samples" / "bridge-profile"
+    page = (root / "docs" / "guides" / "bridge-profile.md").read_text()
+    sys.path.insert(0, str(root / "docs" / "img" / "bridge-height"))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_colored", root / "docs" / "img" / "bridge-height" / "granville_input_profile.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        partial, filled = mod.partial_input(), mod.input_profile()
+        block, view = mod.dump_html(filled, partial), mod.view_html(filled, partial)
+    finally:
+        sys.path.remove(str(root / "docs" / "img" / "bridge-height"))
+    assert (samples / "granville_input_partial.json").read_text().rstrip("\n") in page                    # the least input is on the page as it is
+    for name in ("granville_input_partial.json", "granville_input_profile.json"):
+        json.loads((samples / name).read_text())                                                        # valid JSON
+    assert block in page and block in view and (samples / "granville_input_profile_colored.html").read_text() == view     # the page, the view and the file are one block
+    assert html.unescape(re.sub(r"<[^>]+>", "", block)).replace("<pre class=\"rs-bp\"><code>", "") == (samples / "granville_input_profile.json").read_text().rstrip("\n")   # without the tags: the JSON file
+    assert (block.count('class="given"'), block.count('class="added"')) == (22, 169) and 'title="given in your input"' in block
+    assert "&quot;" not in block and "<span" in mod.LEGEND and mod.LEGEND in page
+    css = (root / "docs" / "stylesheets" / "extra.css").read_text()
+    assert "--rs-bp-given" in css and "--rs-bp-added" in css and css.count('[data-md-color-scheme="slate"] { --rs-bp-given') == 1      # both colors, light and dark
+    files = sorted(p.name for p in samples.iterdir())
+    assert files == ["granville_bridge_edges.parquet", "granville_input_partial.json", "granville_input_profile.json", "granville_input_profile_colored.html", "granville_lidar_samples.json"]
+    for name in files:
+        assert f"](../samples/bridge-profile/{name})" in page, name                                      # every sample file has a link
+        assert f"{(samples / name).stat().st_size / 1024:.1f} KB" in page, name                         # and its size
+    assert "guides/bridge-profile.md" in (root / "mkdocs.yml").read_text()                              # the page is in the menu
+    assert "bridge-profile.md" in (root / "docs" / "guides" / "bridge-height.md").read_text()          # and the guide of the heights points to it

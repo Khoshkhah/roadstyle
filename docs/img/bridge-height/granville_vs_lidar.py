@@ -1,5 +1,5 @@
 """Makes granville_vs_lidar.png and prints the table of docs/design/bridge_profile_edit.md: the profile that the engine makes for each chain of the Granville Bridge
-next to the heights that the City of Vancouver LiDAR 2022 gives for the same road (granville_lidar_samples.json, from urbanstyle's profile of the bridge). A chain is
+next to the heights that the City of Vancouver LiDAR 2022 gives for the same road (docs/samples/bridge-profile/granville_lidar_samples.json, from urbanstyle's profile of the bridge). A chain is
 the axis of urbanstyle's profile that has the same OSM ways. Run it again after a change of the height rules:
 
     python docs/img/bridge-height/granville_vs_lidar.py"""
@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from granville import chains_of
 
 HERE = Path(__file__).resolve().parent
+SAMPLES = HERE.parents[1] / "samples" / "bridge-profile"
 
 
 def matched(chains, lidar):
@@ -27,8 +28,8 @@ def matched(chains, lidar):
 
 
 def main():
-    chains = chains_of(gpd.read_parquet(HERE / "granville_bridge_edges.parquet"))
-    lidar = json.loads((HERE / "granville_lidar_samples.json").read_text())
+    chains = chains_of(gpd.read_parquet(SAMPLES / "granville_bridge_edges.parquet"))
+    lidar = json.loads((SAMPLES / "granville_lidar_samples.json").read_text())
     full = chains[0]["pieces"][0]["properties"]["__rs_full"]
     print(f"H of the engine: {full:.1f} m\n| Chain | Axis of the LiDAR file | Length (engine, LiDAR) | Highest deck, engine | Highest deck, LiDAR |\n|---|---|---|---|---|")
     fig, axes = plt.subplots(3, 4, figsize=(12.5, 7.6), sharey=True)

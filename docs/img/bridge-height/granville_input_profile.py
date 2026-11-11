@@ -5,15 +5,17 @@
     Part 2, `make`: reads a complete input profile and makes the height along each chain: a straight grade between the control points, with a vertical curve at each interior point. It has no rules and no
     defaults. A value that is missing is an error.
 
-It writes granville_input_partial.json (the 5 junction heights, found by their position: the least input) and granville_input_profile.json (the complete profile). Run it again after a change:
+It writes docs/samples/bridge-profile/granville_input_profile_colored.html (the complete profile with the values of the input and the values that the engine added in two colors), docs/samples/bridge-profile/granville_input_partial.json (the 5 junction heights, found by their position: the least input) and granville_input_profile.json (the complete profile), in the same folder. Run it again after a change:
 
     python docs/img/bridge-height/granville_input_profile.py"""
+import html
 import json
 import math
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+SAMPLES = HERE.parents[1] / "samples" / "bridge-profile"
 sys.path.insert(0, str(HERE))
 from design_rules import curve_length, vertical_profile  # noqa: E402
 from granville import KX, KY  # noqa: E402
@@ -102,6 +104,77 @@ def make(filled):
     return out
 
 
+def given_paths(given, filled):
+    """The values of the complete profile `filled` that come from the input `given`, as paths (tuples of keys and indexes). Every other value was added by the engine."""
+    paths = {("parameters", k) for k in (given.get("parameters") or {})}
+    group = (given.get("groups") or [{}])[0]
+    for entry in group.get("nodes", []):
+        lon, lat = entry["lonlat"]
+        for i, node in enumerate(filled["groups"][0]["nodes"]):
+            if math.hypot((node["lonlat"][0] - lon) * KX, (node["lonlat"][1] - lat) * KY) <= MATCH_M:
+                paths |= {("groups", 0, "nodes", i, k) for k in entry if k in node}
+    given_chains = {frozenset(c["osm_ways"]): c for c in group.get("chains", []) if "osm_ways" in c}
+    for i, chain in enumerate(filled["groups"][0]["chains"]):
+        entry = given_chains.get(frozenset(chain["osm_ways"]), {})
+        paths |= {("groups", 0, "chains", i, k) for k in entry if k in chain and k != "osm_ways"}
+    return paths
+
+
+def dump_html(filled, given):
+    """The complete profile as the HTML of a `pre` block: each value in the span of its class, `given` (in the input: profile 1) or `added` (by the engine: profile 2). The text without the tags is the
+    JSON of `dump`."""
+    marked = given_paths(given, filled)
+
+    def span(path, key, value):
+        text = html.escape(json.dumps(key) + ": " + json.dumps(value, separators=(", ", ": ")), quote=False)
+        return f'<span class="given" title="given in your input">{text}</span>' if path in marked else f'<span class="added">{text}</span>'
+
+    def line(prefix, path, item):
+        return prefix + "{" + ", ".join(span(path + (k,), k, v) for k, v in item.items()) + "}"
+
+    rows = []
+    for key, value in filled.items():
+        if key == "parameters":
+            rows.append(f' {json.dumps(key)}: ' + "{" + ", ".join(span((key, k), k, v) for k, v in value.items()) + "}")
+        elif key != "groups":
+            rows.append(" " + span((key,), key, value))
+        else:
+            group = []
+            for gkey, gvalue in value[0].items():
+                if gkey in ("nodes", "chains"):
+                    group.append(f'   "{gkey}": [\n' + ",\n".join(line("    ", ("groups", 0, gkey, i), item) for i, item in enumerate(gvalue)) + "\n   ]")
+                else:
+                    group.append("   " + span(("groups", 0, gkey), gkey, gvalue))
+            rows.append(' "groups": [\n  {\n' + ",\n".join(group) + "\n  }\n ]")
+    return '<pre class="rs-bp"><code>{\n' + ",\n".join(rows) + "\n}</code></pre>"
+
+
+LEGEND = '<span class="rs-bp-key"><span class="given">Given in your input (profile 1)</span> &nbsp; <span class="added">Added by the engine (profile 2)</span></span>'
+
+
+def view_html(filled, given):
+    """A page of its own with the colored profile, for a person who updates the input file: what they gave, and what the engine added."""
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The complete input profile of the Granville Bridge</title>
+<style>
+:root {{ --bg: #ffffff; --fg: #1f2937; --given: #1d4ed8; --added: #c2410c; --line: #d1d5db; color-scheme: light dark; }}
+@media (prefers-color-scheme: dark) {{ :root {{ --bg: #111827; --fg: #e5e7eb; --given: #93c5fd; --added: #fdba74; --line: #374151; }} }}
+body {{ margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }}
+h1 {{ font-size: 1.1rem; margin: 0 0 .4rem; }}
+.rs-bp-key {{ display: inline-block; margin: .2rem 0 .8rem; }}
+pre.rs-bp {{ margin: 0; padding: 12px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }}
+.given {{ color: var(--given); font-weight: 700; }}
+.added {{ color: var(--added); }}
+</style></head><body>
+<h1>The complete input profile of the Granville Bridge</h1>
+<p>Bold blue: what you gave in the input (profile 1). Orange: what the engine added (profile 2). Point at a bold blue value to see its tooltip.</p>
+{LEGEND}
+{dump_html(filled, given)}
+</body></html>
+"""
+
+
 def input_profile():
     """The complete input profile of the group, from the least input."""
     return fill(partial_input())
@@ -129,8 +202,11 @@ def dump(profile):
 
 def main():
     partial, filled = partial_input(), input_profile()
-    (HERE / "granville_input_partial.json").write_text(dump(partial))
-    (HERE / "granville_input_profile.json").write_text(dump(filled))
+    (SAMPLES / "granville_input_partial.json").write_text(dump(partial))
+    (SAMPLES / "granville_input_profile.json").write_text(dump(filled))
+    (SAMPLES / "granville_input_profile_colored.html").write_text(view_html(filled, partial))
+    paths = given_paths(partial, filled)
+    print(f"values from the input: {len(paths)}")
     g = filled["groups"][0]
     print(f"input: {len(partial['groups'][0]['nodes'])} nodes. filled: {len(g['nodes'])} nodes ({sum(1 for n in g['nodes'] if n['kind'] == 'ground')} ground, "
           f"{sum(1 for n in g['nodes'] if n['kind'] == 'junction')} junction), {len(g['chains'])} chains")

@@ -232,7 +232,7 @@ The casing is a thin slab along each long side of the deck. The extrusion layers
 ## A real example: the Granville Bridge
 
 The Granville Bridge in Vancouver has a main span and many ramps. This is a real group with more than one chain. The data is 41 road edges (27 OpenStreetMap ways) from the
-Vancouver database of duckOSM, in `docs/img/bridge-height/granville_bridge_edges.parquet`. The engine makes one group of them, with 12 chains, 624 deck pieces and
+Vancouver database of duckOSM, in `docs/samples/bridge-profile/granville_bridge_edges.parquet`. The engine makes one group of them, with 12 chains, 624 deck pieces and
 H = 22 m. The group is 3061 m long, so H is the largest value, `max_m`. A full ramp is 22 m × 8 = 176 m.
 
 ![The 12 chains of the Granville Bridge on the map](../img/bridge-height/granville_plan.png)
@@ -282,8 +282,8 @@ Four things change a profile today.
 | `rsSetBridges3D(false)` | In the open page | The bridges are flat lines |
 
 The engine does not read a `height` or `maxheight` tag to find H. The height is a rule for the picture and not a measurement. Two bridges of the same length get the same H.
-A proposal for an input profile (the nodes of a group of bridges with a height for each, which a person edits) is in `docs/design/bridge_profile_edit.md`. A proposal for heights from the design rules (clearance, grade, vertical curves)
-is in `docs/design/bridge_height_design.md`. Neither is built.
+A planned input profile (the nodes of a group of bridges, with a height for each, which a person edits) is on [The bridge profile: input and output](bridge-profile.md), with sample files.
+A proposal for heights from the design rules (clearance, grade, vertical curves) is in `docs/design/bridge_height_design.md`. Neither is built.
 
 A step that edits the pieces between the engine and the page must keep these rules, or the mesh shows a step or a gap:
 

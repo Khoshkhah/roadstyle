@@ -1,5 +1,5 @@
 """The prototype of the proposed edit step (docs/design/bridge_profile_edit.md), on the Granville Bridge: what the engine's profile would be with measured heights as input,
-for each chain, next to the profile that the engine makes today and the LiDAR heights (granville_lidar_samples.json). It is a prototype in Python of the changed formulas of step 5
+for each chain, next to the profile that the engine makes today and the LiDAR heights (docs/samples/bridge-profile/granville_lidar_samples.json). It is a prototype in Python of the changed formulas of step 5
 and of the height line of stage 2. It is not the engine. Run it again after a change of the proposal:
 
     python docs/img/bridge-height/granville_proposed.py
@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
+SAMPLES = HERE.parents[1] / "samples" / "bridge-profile"
 sys.path.insert(0, str(HERE))
 from granville import chains_of  # noqa: E402
 from granville_vs_lidar import matched  # noqa: E402
@@ -57,8 +58,8 @@ def stage2(x, points):
 def compute():
     """For each chain (numbered from the longest): its stage 1 input (the heights at its two ends and its top), the largest error of the profile of today, of stage 1 and of stage 2
     against the LiDAR stations of the chain, and the four lines of the figure."""
-    chains = chains_of(gpd.read_parquet(HERE / "granville_bridge_edges.parquet"))
-    lidar = json.loads((HERE / "granville_lidar_samples.json").read_text())
+    chains = chains_of(gpd.read_parquet(SAMPLES / "granville_bridge_edges.parquet"))
+    lidar = json.loads((SAMPLES / "granville_lidar_samples.json").read_text())
     full = chains[0]["pieces"][0]["properties"]["__rs_full"]
     rows = []
     for c, axis, _ in matched(chains, lidar):

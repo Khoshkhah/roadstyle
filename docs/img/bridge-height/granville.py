@@ -1,4 +1,4 @@
-"""Makes the pictures and the table of "A real example: the Granville Bridge" (docs/guides/bridge-height.md) from granville_bridge_edges.parquet, the 41 edges of
+"""Makes the pictures and the table of "A real example: the Granville Bridge" (docs/guides/bridge-height.md) from docs/samples/bridge-profile/granville_bridge_edges.parquet, the 41 edges of
 the Granville Bridge and its ramps in Vancouver (OpenStreetMap data, ODbL, through duckOSM's `driving.edges` of vancouver_city.duckdb: the edges of the bridge group,
 27 OSM ways). Run it again after a change of the height rules:
 
@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import roadstyle as rs
 
 HERE = Path(__file__).resolve().parent
+SAMPLES = HERE.parents[1] / "samples" / "bridge-profile"
 KX = 111320 * math.cos(math.radians(49.27))        # metres of a degree of longitude at Vancouver
 KY = 111320.0
 
@@ -85,7 +86,7 @@ def centre_line(chain):
 
 
 def main():
-    edges = gpd.read_parquet(HERE / "granville_bridge_edges.parquet")
+    edges = gpd.read_parquet(SAMPLES / "granville_bridge_edges.parquet")
     chains = chains_of(edges)
     full = chains[0]["pieces"][0]["properties"]["__rs_full"]
     total = sum(c["length"] for c in chains)

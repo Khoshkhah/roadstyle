@@ -15,6 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = Path(__file__).resolve().parent
+SAMPLES = HERE.parents[1] / "samples" / "bridge-profile"
 sys.path.insert(0, str(HERE))
 from granville import KX, KY, centre_line, chains_of  # noqa: E402
 
@@ -23,7 +24,7 @@ GRADES = (0.05, 0.06, 0.08)
 
 def graph():
     """The nodes of the chains and the chains between them: ({node: [(chain, end, lift)]}, {chain: (node_first, node_last, length)}, the chains)."""
-    chains = chains_of(gpd.read_parquet(HERE / "granville_bridge_edges.parquet"))
+    chains = chains_of(gpd.read_parquet(SAMPLES / "granville_bridge_edges.parquet"))
     at, ends = collections.defaultdict(list), {}
     for n, c in enumerate(chains, 1):
         first, last = c["pieces"][0]["properties"], c["pieces"][-1]["properties"]

@@ -189,7 +189,7 @@ The geometry of a chain is the geometry of the roads. It is not in the file. The
 
 ### An example: the Granville Bridge
 
-The least useful input for the Granville Bridge is **5 junction heights**, each with the position of its node (`docs/img/bridge-height/granville_input_partial.json`, 14 lines):
+The least useful input for the Granville Bridge is **5 junction heights**, each with the position of its node (`docs/samples/bridge-profile/granville_input_partial.json`, 14 lines):
 
 ```json
 {
@@ -208,7 +208,7 @@ The least useful input for the Granville Bridge is **5 junction heights**, each 
 }
 ```
 
-Part 1 turns it into the complete input profile (`granville_input_profile.json`, 38 lines, made by `granville_input_profile.py`). It finds the 13 nodes and the 12 chains, adds the 8 nodes on the ground (height 0, from
+Part 1 turns it into the complete input profile (`docs/samples/bridge-profile/granville_input_profile.json`, 38 lines, made by `granville_input_profile.py`). It finds the 13 nodes and the 12 chains, adds the 8 nodes on the ground (height 0, from
 the data), keeps the 5 given heights as they are, and fills the width of each chain. This is a junction, a node on the ground and a chain of the complete profile:
 
 ```json
@@ -233,6 +233,20 @@ J1 in the input, Part 1 fills 11.0 m and marks it `derived`. The real rule is in
 | `parameters` | 50 km/h and 5 % (the defaults of [the design note](bridge_height_design.md)) |
 
 A given height is fixed. If the given heights break the grade limit (two junctions too far apart in height for the length of the chain between them), Part 1 reports it. It does not change a given number.
+
+### What is yours and what is added
+
+A person who updates the input file must see which values are theirs and which values the engine added. Part 1 knows this exactly, so it says it:
+
+- Part 1 returns the complete profile and the **paths of the given values** (profile 1). Every other value of the complete profile was added by the engine (profile 2).
+- A node that the person gave: its `lonlat`, `z_m`, `source` and `method` are given. Its `id`, `kind` and `chains` are added. A node that the person did not give is added in full. A chain is added, except the
+  `points` and the `width_m` that the person gave. A parameter is given if the input has it.
+- A colored view shows both: **bold blue** for a given value, **orange** for an added value. It is HTML, with the tooltip "given in your input" on the given values, and it follows the light and dark scheme.
+  The color is never the only sign: a given value is also bold.
+- A value that the person copies from the orange into the input becomes given: it is blue the next time, and Part 1 never changes it. A value that the person leaves out is filled again.
+
+The prototype has `given_paths(given, filled)`, `dump_html(filled, given)` and `view_html(filled, given)`. On the Granville example, 22 values are given (the 2 parameters, and `lonlat`, `z_m`, `source` and
+`method` of 5 nodes) and 169 are added. `granville_input_profile_colored.html` is the view, and [the guide page](../guides/bridge-profile.md) shows the same block.
 
 ### Where this is in the code today
 
