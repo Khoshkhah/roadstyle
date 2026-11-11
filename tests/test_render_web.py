@@ -2962,8 +2962,8 @@ def test_the_two_parts_of_the_engine_fill_and_make_on_the_granville_bridge():
     for n in partial["groups"][0]["nodes"]:                                                                  # every given value is kept, with its own source
         assert by_pos[tuple(n["lonlat"])]["z_m"] == n["z_m"] and by_pos[tuple(n["lonlat"])]["source"] == "example"
     assert all(n["z_m"] == 0 and (n["source"], n["method"]) == ("data", "mapped") for n in filled["groups"][0]["nodes"] if n["kind"] == "ground")
-    assert [(n["z_m"], n["source"], n["method"]) for n in empty["groups"][0]["nodes"] if n["kind"] == "junction"] == [(z, "rule", "derived") for z in (11.0, 21.8, 11.1, 13.7, 5.3)]  # an empty input: all filled by the rule
-    assert empty["parameters"] == {"design_speed_kmh": 50, "design_grade": 0.06} and all(c["width_source"] == "rule" for c in empty["groups"][0]["chains"])
+    assert [(n["z_m"], n["source"], n["method"]) for n in empty["groups"][0]["nodes"] if n["kind"] == "junction"] == [(z, "rule", "derived") for z in (9.2, 18.2, 9.2, 11.4, 4.4)]  # an empty input: all filled by the rule, at the default grade of 5 %
+    assert empty["parameters"] == {"design_speed_kmh": 50, "design_grade": 0.05} and all(c["width_source"] == "rule" for c in empty["groups"][0]["chains"])
     j1_node = {tuple(n["lonlat"]): n for n in j1["groups"][0]["nodes"]}[tuple(removed["lonlat"])]
     assert (j1_node["z_m"], j1_node["source"], j1_node["method"]) == (11.0, "rule", "derived")             # a missing height is filled, and marked
     assert {tuple(n["lonlat"]): n["z_m"] for n in kept["groups"][0]["nodes"]}[tuple(partial["groups"][0]["nodes"][1]["lonlat"])] == 15.0     # a given height is not changed by the rule
@@ -3009,9 +3009,60 @@ def test_the_guide_page_of_the_bridge_profile_shows_the_sample_files_and_links_t
     css = (root / "docs" / "stylesheets" / "extra.css").read_text()
     assert "--rs-bp-given" in css and "--rs-bp-added" in css and css.count('[data-md-color-scheme="slate"] { --rs-bp-given') == 1      # both colors, light and dark
     files = sorted(p.name for p in samples.iterdir())
-    assert files == ["granville_bridge_edges.parquet", "granville_input_partial.json", "granville_input_profile.json", "granville_input_profile_colored.html", "granville_lidar_samples.json"]
+    assert files == ["bridge_profile_complete.schema.json", "bridge_profile_input.schema.json", "granville_bridge_edges.parquet", "granville_input_partial.json", "granville_input_profile.json",
+                     "granville_input_profile_colored.html", "granville_lidar_samples.json"]
     for name in files:
         assert f"](../samples/bridge-profile/{name})" in page, name                                      # every sample file has a link
         assert f"{(samples / name).stat().st_size / 1024:.1f} KB" in page, name                         # and its size
     assert "guides/bridge-profile.md" in (root / "mkdocs.yml").read_text()                              # the page is in the menu
     assert "bridge-profile.md" in (root / "docs" / "guides" / "bridge-height.md").read_text()          # and the guide of the heights points to it
+
+
+def test_the_bridge_profile_schemas_check_the_samples_and_agree_with_the_reference():
+    """docs/samples/bridge-profile/*.schema.json (docs/img/bridge-height/bridge_profile_schema.py) are the format of docs/reference/formats.md, "The bridge profile (planned)": the files are what the script makes,
+    they are valid schemas, the least input is valid as an input and not as a complete profile, the complete profile is valid as both, an empty input is valid, a wrong input is rejected, and every key of the schema
+    is in the reference."""
+    import importlib.util
+    import sys
+
+    import jsonschema
+    root = Path(__file__).resolve().parents[1]
+    here = root / "docs" / "img" / "bridge-height"
+    samples = root / "docs" / "samples" / "bridge-profile"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_profile_schema", here / "bridge_profile_schema.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    finally:
+        sys.path.remove(str(here))
+    inp, com = (json.loads((samples / f"bridge_profile_{n}.schema.json").read_text()) for n in ("input", "complete"))
+    assert inp == mod.schema(False) and com == mod.schema(True)                                           # the files are what the script makes
+    for schema in (inp, com):
+        jsonschema.Draft202012Validator.check_schema(schema)
+    vi, vc = jsonschema.Draft202012Validator(inp), jsonschema.Draft202012Validator(com)
+    partial = json.loads((samples / "granville_input_partial.json").read_text())
+    full = json.loads((samples / "granville_input_profile.json").read_text())
+    assert vi.is_valid(partial) and not vc.is_valid(partial)                                              # the least input: an input, not a complete profile
+    assert vi.is_valid(full) and vc.is_valid(full)                                                        # a complete profile is also an input
+    assert vi.is_valid({}) and not vc.is_valid({})                                                        # an empty input is valid
+    node = {"lonlat": [-123.1, 49.2], "z_m": 5.0}
+    for bad in ({"groups": [{"nodes": [{**node, "z_m": -1}]}]},                                          # a height below 0
+                {"groups": [{"nodes": [{**node, "lonlat": [-123.1, 49.2, 5]}]}]},                         # a position with three numbers
+                {"groups": [{"nodes": [{**node, "kind": "bridge"}]}]},                                    # an unknown kind
+                {"groups": [{"nodes": [{**node, "method": "guess"}]}]},                                   # an unknown method
+                {"groups": [{"nodes": [{"z_m": 5.0}]}]},                                                  # a node with no lonlat and no id
+                {"groups": [{"chains": [{"osm_ways": [1], "points": [{"z_m": 3.0}]}]}]},                  # a point with no s
+                {"parameters": {"curve": "round"}}, {"parameters": {"design_grade": 0}}, {"extra": 1}):    # an unknown curve, a grade of 0, an unknown key
+        assert not vi.is_valid(bad), bad
+    broken = json.loads(json.dumps(full))
+    broken["groups"][0]["nodes"][0].pop("z_m")
+    assert vi.is_valid(broken) and not vc.is_valid(broken)                                                # Part 2 needs every height
+    section = (root / "docs" / "reference" / "formats.md").read_text()
+    section = section[section.index("## The bridge profile (planned)"):section.index("## The look")]
+    names = {k for d in inp["$defs"].values() if d.get("type") == "object" for k in d["properties"]} | set(inp["properties"])
+    assert names >= {"format", "parameters", "groups", "design_speed_kmh", "design_grade", "curve", "z_m", "lonlat", "osm_ways", "points", "width_m", "width_source", "s"}
+    assert [n for n in sorted(names) if f"`{n}`" not in section and f".{n}`" not in section and f"[].{n}`" not in section and f"`.{n}`" not in section] == []      # every key is in the reference
+    assert "bridge_profile_input.schema.json" in section and "bridge_profile_complete.schema.json" in section
+    for key, default in (("design_speed_kmh", 50), ("design_grade", 0.05)):
+        assert f"Default {default}" in section, key                                                       # the defaults of the reference

@@ -135,6 +135,8 @@ All files are in `docs/samples/bridge-profile/` and are published with this site
 | [`granville_input_partial.json`](../samples/bridge-profile/granville_input_partial.json) | The least input: 5 junction heights | 0.6 KB |
 | [`granville_input_profile.json`](../samples/bridge-profile/granville_input_profile.json) | The complete input profile that Part 1 makes from it | 3.9 KB |
 | [`granville_input_profile_colored.html`](../samples/bridge-profile/granville_input_profile_colored.html) | The same complete profile in one HTML page, with the values of the input and the values that the engine added in two colors. Open it in a browser | 10.9 KB |
+| [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 4.6 KB |
+| [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 4.8 KB |
 | [`granville_bridge_edges.parquet`](../samples/bridge-profile/granville_bridge_edges.parquet) | The roads of the example: the 41 edges (27 OpenStreetMap ways) of the Granville Bridge and its ramps, from duckOSM's Vancouver database. OpenStreetMap data, ODbL | 16.6 KB |
 | [`granville_lidar_samples.json`](../samples/bridge-profile/granville_lidar_samples.json) | The deck heights that the City of Vancouver LiDAR 2022 gives on the 12 axes of the same bridge, from urbanstyle's profile (Open Government Licence - Vancouver). It is for comparison only. The profile above does not use it | 7.7 KB |
 
@@ -145,6 +147,8 @@ python docs/img/bridge-height/granville_input_profile.py   # writes the two prof
 ```
 
 ## Read more
+
+The exact format, key by key, is in [Inputs and outputs](../reference/formats.md#the-bridge-profile-planned). The two JSON Schemas check the form of both files.
 
 The design notes are in the repository, in `docs/design/`: `bridge_profile_edit.md` (the two parts, the checks, the comparison with urbanstyle) and `bridge_height_design.md` (the design rules for the heights: clearance,
 grade and vertical curves, with their sources).

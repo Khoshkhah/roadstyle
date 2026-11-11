@@ -1,0 +1,235 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://khoshkhah.github.io/roadstyle/samples/bridge-profile/bridge_profile_input.schema.json",
+ "title": "The input profile of a group of 3D bridges: every value is optional (planned)",
+ "type": "object",
+ "additionalProperties": false,
+ "properties": {
+  "format": {
+   "const": "roadstyle.bridge_profile/1"
+  },
+  "parameters": {
+   "$ref": "#/$defs/parameters"
+  },
+  "groups": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/group"
+   }
+  }
+ },
+ "$defs": {
+  "lonlat": {
+   "type": "array",
+   "prefixItems": [
+    {
+     "type": "number",
+     "minimum": -180,
+     "maximum": 180
+    },
+    {
+     "type": "number",
+     "minimum": -90,
+     "maximum": 90
+    }
+   ],
+   "items": false,
+   "minItems": 2
+  },
+  "point": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "s": {
+     "type": "number",
+     "minimum": 0,
+     "description": "Metres from the first end of the chain"
+    },
+    "z_m": {
+     "type": "number",
+     "minimum": 0
+    },
+    "source": {
+     "type": "string",
+     "description": "Where the value comes from: data, rule, given, example, a survey..."
+    },
+    "method": {
+     "enum": [
+      "mapped",
+      "measured",
+      "derived",
+      "chosen"
+     ],
+     "description": "How it was found"
+    }
+   },
+   "required": [
+    "s",
+    "z_m"
+   ]
+  },
+  "parameters": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "design_speed_kmh": {
+     "type": "number",
+     "exclusiveMinimum": 0,
+     "maximum": 200
+    },
+    "design_grade": {
+     "type": "number",
+     "exclusiveMinimum": 0,
+     "maximum": 0.3
+    },
+    "curve": {
+     "enum": [
+      "smooth",
+      "design"
+     ],
+     "description": "smooth: the curve of today. design: straight grades and vertical curves"
+    }
+   }
+  },
+  "node": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^n[0-9]+$",
+     "description": "The id of the node in a complete profile"
+    },
+    "lonlat": {
+     "$ref": "#/$defs/lonlat",
+     "description": "The position of the node. In a partial input it names the node: the node of the group within 5 m"
+    },
+    "kind": {
+     "enum": [
+      "ground",
+      "junction"
+     ],
+     "description": "ground: one chain ends here, height 0. junction: chains meet here"
+    },
+    "chains": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "pattern": "^c[0-9]+$"
+     },
+     "description": "The chains that meet at the node"
+    },
+    "z_m": {
+     "type": "number",
+     "minimum": 0,
+     "description": "The height of the node above the ground, in metres"
+    },
+    "source": {
+     "type": "string",
+     "description": "Where the value comes from: data, rule, given, example, a survey..."
+    },
+    "method": {
+     "enum": [
+      "mapped",
+      "measured",
+      "derived",
+      "chosen"
+     ],
+     "description": "How it was found"
+    }
+   },
+   "anyOf": [
+    {
+     "required": [
+      "lonlat"
+     ]
+    },
+    {
+     "required": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "chain": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "type": "string",
+     "pattern": "^c[0-9]+$"
+    },
+    "osm_ways": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     },
+     "minItems": 1,
+     "description": "The OSM ways of the chain. In a partial input they name the chain"
+    },
+    "length_m": {
+     "type": "number",
+     "exclusiveMinimum": 0
+    },
+    "from": {
+     "type": "string",
+     "pattern": "^n[0-9]+$",
+     "description": "The node at the first end of the chain"
+    },
+    "to": {
+     "type": "string",
+     "pattern": "^n[0-9]+$",
+     "description": "The node at the last end of the chain"
+    },
+    "points": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/point"
+     },
+     "description": "Interior control points, in order of s"
+    },
+    "width_m": {
+     "type": "number",
+     "exclusiveMinimum": 0,
+     "description": "The width of the deck, in metres"
+    },
+    "width_source": {
+     "type": "string"
+    }
+   },
+   "anyOf": [
+    {
+     "required": [
+      "osm_ways"
+     ]
+    },
+    {
+     "required": [
+      "id"
+     ]
+    }
+   ]
+  },
+  "group": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "nodes": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/node"
+     }
+    },
+    "chains": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/chain"
+     }
+    }
+   }
+  }
+ }
+}

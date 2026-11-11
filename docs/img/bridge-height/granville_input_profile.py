@@ -21,7 +21,8 @@ from design_rules import curve_length, vertical_profile  # noqa: E402
 from granville import KX, KY  # noqa: E402
 from granville_nodes import distance_to_ground, example_profile, graph  # noqa: E402
 
-DEFAULTS = {"design_speed_kmh": 50, "design_grade": 0.06}
+DEFAULTS = {"design_speed_kmh": 50, "design_grade": 0.05}        # what Part 1 fills when the input has no parameters
+EXAMPLE_GRADE = 0.06            # the grade of the example: the 5 junction heights are the highest that it allows
 CAP_M = 22.0                    # the stand-in rule: not above the height that the engine gives today
 MATCH_M = 5.0                   # a given node is the node of the group within this distance
 
@@ -29,9 +30,9 @@ MATCH_M = 5.0                   # a given node is the node of the group within t
 def partial_input():
     """The least input that a person gives: the 5 junction heights, each with the position of its node. Everything else is filled."""
     at, _, _ = graph()
-    height, _ = example_profile(DEFAULTS["design_grade"])
+    height, _ = example_profile(EXAMPLE_GRADE)
     junctions = sorted((k for k, v in at.items() if len(v) > 1), key=lambda k: -k[1])
-    return {"parameters": dict(DEFAULTS),
+    return {"parameters": {**DEFAULTS, "design_grade": EXAMPLE_GRADE},
             "groups": [{"nodes": [{"lonlat": list(k), "z_m": round(height[k], 1), "source": "example", "method": "chosen"} for k in junctions]}]}
 
 
