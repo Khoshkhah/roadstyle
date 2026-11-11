@@ -2905,3 +2905,75 @@ def test_the_granville_input_profile_of_the_design_note_is_the_engines_nodes_and
     ids = {n["id"] for n in group["nodes"]}
     assert all(c["from"] in ids and c["to"] in ids for c in group["chains"])
     assert sum(len(n["chains"]) for n in group["nodes"]) == 24                                            # each of the 12 chains has two ends
+
+
+def test_the_two_parts_of_the_engine_fill_and_make_on_the_granville_bridge():
+    """docs/design/bridge_profile_edit.md, "The proposal: the engine has two parts" (docs/img/bridge-height/granville_input_profile.py, a prototype): Part 1 (`fill`) turns the least input (5 junction heights)
+    into the complete input profile and keeps every value that is given; filling twice is filling once; a missing value is filled and marked as derived; wrong input is an error. Part 2 (`make`) has no
+    defaults: it makes the height along each chain of a complete profile, and a missing value is an error."""
+    import copy
+    import importlib.util
+    import sys
+
+    import numpy as np
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    sys.path.insert(0, str(here))
+    try:
+        spec = importlib.util.spec_from_file_location("bridge_height_two_parts", here / "granville_input_profile.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        partial, filled = mod.partial_input(), mod.fill(mod.partial_input())
+        saved_partial = json.loads((here / "granville_input_partial.json").read_text())
+        saved_filled = json.loads((here / "granville_input_profile.json").read_text())
+        empty = mod.fill({})
+        dropped = copy.deepcopy(partial)
+        removed = dropped["groups"][0]["nodes"].pop(0)                                                       # J1: its height is not given
+        j1 = mod.fill(dropped)
+        changed = copy.deepcopy(partial)
+        changed["groups"][0]["nodes"][1]["z_m"] = 15.0
+        kept = mod.fill(changed)
+        with_point = mod.fill({**partial, "groups": [{**partial["groups"][0], "chains": [{"osm_ways": [1419040127, 1419040128], "points": [{"s": 275.0, "z_m": 25.0}]}]}]})
+        errors = []
+        for bad in ({"groups": [{"nodes": [{"lonlat": [-123.0, 49.0], "z_m": 5.0}]}]},                      # a node that is not one node of the group
+                    {"groups": [{"nodes": [{**partial["groups"][0]["nodes"][0]}, {**partial["groups"][0]["nodes"][0]}]}]},      # two entries for one node
+                    {"groups": [{"nodes": [{**partial["groups"][0]["nodes"][0], "z_m": -1.0}]}]}):          # a height below 0
+            try:
+                mod.fill(bad)
+            except ValueError as e:
+                errors.append(str(e))
+        heights = mod.make(filled)
+        incomplete = copy.deepcopy(filled)
+        incomplete["groups"][0]["nodes"][4]["z_m"] = None
+        no_width = copy.deepcopy(filled)
+        no_width["groups"][0]["chains"][0]["width_m"] = None
+        make_errors = []
+        for bad in (incomplete, no_width):
+            try:
+                mod.make(bad)
+            except ValueError as e:
+                make_errors.append(str(e))
+        pointed = mod.make(with_point)["c1"]
+    finally:
+        sys.path.remove(str(here))
+    assert [len(partial["groups"][0]["nodes"]), len(filled["groups"][0]["nodes"]), len(filled["groups"][0]["chains"])] == [5, 13, 12]
+    assert partial == saved_partial and filled == saved_filled                                              # the files are what the prototype makes
+    assert mod.fill(filled) == filled                                                                       # Part 1 twice is Part 1 once
+    by_pos = {tuple(n["lonlat"]): n for n in filled["groups"][0]["nodes"]}
+    for n in partial["groups"][0]["nodes"]:                                                                  # every given value is kept, with its own source
+        assert by_pos[tuple(n["lonlat"])]["z_m"] == n["z_m"] and by_pos[tuple(n["lonlat"])]["source"] == "example"
+    assert all(n["z_m"] == 0 and (n["source"], n["method"]) == ("data", "mapped") for n in filled["groups"][0]["nodes"] if n["kind"] == "ground")
+    assert [(n["z_m"], n["source"], n["method"]) for n in empty["groups"][0]["nodes"] if n["kind"] == "junction"] == [(z, "rule", "derived") for z in (11.0, 21.8, 11.1, 13.7, 5.3)]  # an empty input: all filled by the rule
+    assert empty["parameters"] == {"design_speed_kmh": 50, "design_grade": 0.06} and all(c["width_source"] == "rule" for c in empty["groups"][0]["chains"])
+    j1_node = {tuple(n["lonlat"]): n for n in j1["groups"][0]["nodes"]}[tuple(removed["lonlat"])]
+    assert (j1_node["z_m"], j1_node["source"], j1_node["method"]) == (11.0, "rule", "derived")             # a missing height is filled, and marked
+    assert {tuple(n["lonlat"]): n["z_m"] for n in kept["groups"][0]["nodes"]}[tuple(partial["groups"][0]["nodes"][1]["lonlat"])] == 15.0     # a given height is not changed by the rule
+    assert len(errors) == 3 and "must be one" in errors[0] and "two entries" in errors[1] and "below 0" in errors[2]
+    assert len(make_errors) == 2 and all("fill the profile first" in m for m in make_errors)               # Part 2 has no defaults
+    assert set(heights) == {f"c{n}" for n in range(1, 13)}
+    for chain in filled["groups"][0]["chains"]:                                                              # the height at the two ends of a chain is the height of its nodes
+        xs, z = heights[chain["id"]]
+        zs = {n["id"]: n["z_m"] for n in filled["groups"][0]["nodes"]}
+        assert (z[0], z[-1]) == pytest.approx((zs[chain["from"]], zs[chain["to"]]), abs=0.05)
+        assert abs(np.gradient(z, xs)).max() * 100 <= 6.0 + 0.1                                          # no chain is steeper than the design grade
+    xs, z = pointed
+    assert 24.4 <= float(np.interp(275.0, xs, z)) <= 25.0                                               # an interior point: the deck goes through it, rounded by its curve

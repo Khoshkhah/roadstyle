@@ -51,14 +51,23 @@ def chains_of(edges):
     """The chains of the bridge group: for each chain (numbered from the longest) its pieces in order along it (one ribbon for each place), its length in metres and
     the roads on it."""
     by = collections.defaultdict(dict)
+    ribbons = collections.defaultdict(lambda: collections.defaultdict(list))
     for f in deck_pieces(edges):
         p = f["properties"]
         by[p["__rs_chain"]].setdefault((p["__rs_s0"], p["__rs_s1"]), f)
+        ribbons[p["__rs_chain"]][(p["__rs_s0"], p["__rs_s1"])].append(f)
     out = []
-    for pieces in by.values():
+    for chain, pieces in by.items():
         ordered = [f for _, f in sorted(pieces.items())]
         length = sum(math.hypot((a[0] - b[0]) * KX, (a[1] - b[1]) * KY) for f in ordered for a, b in zip(side(f["geometry"]["coordinates"][0])[1:], side(f["geometry"]["coordinates"][0]), strict=False))
-        out.append({"pieces": ordered, "length": length,
+        first = min(ribbons[chain])                                    # the width of the deck: the ribbons of its first piece (two ribbons for a two-way road) side by side
+        width = 0.0
+        for f in ribbons[chain][first]:
+            ring = f["geometry"]["coordinates"][0]
+            m = (len(ring) - 1) // 2
+            a, b = ring[0], ring[2 * m - 1]
+            width += math.hypot((a[0] - b[0]) * KX, (a[1] - b[1]) * KY)
+        out.append({"pieces": ordered, "length": length, "width": width,
                     "roads": collections.Counter(f["properties"].get("name") or "no name" for f in ordered)})
     out.sort(key=lambda c: -c["length"])
     return out
