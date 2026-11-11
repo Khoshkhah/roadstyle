@@ -28,7 +28,7 @@ fn look() -> roadstyle::Look {
 
 fn config(frames: Option<PathBuf>, port: u16) -> Config {
     let roads = roadstyle::read::read_roads(std::fs::read(data("roads.parquet")).unwrap(), "geometry").unwrap();
-    Config { roads, roads_file: Some(data("roads.parquet")), name: "Monaco".into(), look: look(), tables: Vec::new(), frames, port }
+    Config { roads, features: None, database: None, roads_file: Some(data("roads.parquet")), name: "Monaco".into(), look: look(), tables: Vec::new(), frames, port }
 }
 
 /// The three tiles of cross_language.mjs: the point (7.4243, 43.7384) at zoom 12, 14 and 15.
@@ -63,6 +63,27 @@ fn a_tile_of_way_d_is_the_tile_of_the_engine_and_the_golden_of_the_wasm_package(
     }
     let want: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(Value::Object(got), want, "way_d_tiles.json: run ROADSTYLE_BLESS=1 cargo test -p roadstyle-local");
+}
+
+/// The area's own data (the local page of duckOSM): the tiles are the tiles of `tiled_of` (the look's tile keys apply; the base-map rows go
+/// through the same call), and the tables of a `.duckdb` file are tables of the queries (a BIGINT keeps its digits) and of the schema, each one time.
+#[test]
+fn way_d_takes_a_duckdb_file_and_gives_the_tiles_of_tiled_of() {
+    let file = std::env::temp_dir().join(format!("roadstyle-local-{}.duckdb", std::process::id()));
+    let _ = std::fs::remove_file(&file);
+    duckdb::Connection::open(&file).unwrap().execute_batch("CREATE TABLE edges AS SELECT 9007199254740993::BIGINT AS edge_id").unwrap();
+    let mut c = config(None, 0);
+    c.database = Some(file.clone());
+    let local = Local::open(c).unwrap();
+    let roads = roadstyle::read::read_roads(std::fs::read(data("roads.parquet")).unwrap(), "geometry").unwrap();
+    let (_, tiler, _) = roadstyle::tiled_of(roads, &look(), None, Some("Monaco".into()), "rs://", &[]).unwrap();
+    for (z, x, y) in addresses() {
+        assert_eq!(local.tile("roads", z, x, y).unwrap(), tiler.tile_in(tiler.format, z, x, y).unwrap(), "z{z}/{x}/{y}: the tile of tiled_of");
+    }
+    assert_eq!(local.query("SELECT edge_id FROM edges").unwrap()["rows"], json!([["9007199254740993"]]));
+    let names: Vec<Value> = local.schema().unwrap()["tables"].as_array().unwrap().iter().map(|t| t["name"].clone()).collect();
+    assert_eq!(names, vec![json!("main.edges"), json!("main.roads")]);
+    let _ = std::fs::remove_file(&file);
 }
 
 /// An answer: the head and the body.

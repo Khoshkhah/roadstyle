@@ -3,11 +3,11 @@
 //!
 //! | address | answer | made by |
 //! |---|---|---|
-//! | `GET /style.json` | the roads' style, with the tile addresses of this program | the engine (`tiles_of_sources`) |
+//! | `GET /style.json` | the roads' style, with the tile addresses of this program | the engine (`tiled_sources`) |
 //! | `GET /tiles/<source>/<z>/<x>/<y>` | one tile (204: none) | the engine (`Tiles::tile_in`): the bytes of the map worker's tile |
 //! | `POST /rows/<source>` `[id, ...]` | the fields of each road | the engine (the road table, `write_road_table`) |
 //! | `POST /lines` `[id, ...]` | the line of each road | the engine (`write_road_lines`) |
-//! | `POST /query` `{"sql"}`, `GET /schema` | a result, the tables | DuckDB on the Parquet files |
+//! | `POST /query` `{"sql"}`, `GET /schema` | a result, the tables | DuckDB on the Parquet files and the tables of a `.duckdb` file |
 //! | `GET /frames?from=&to=` | a window of frames | DuckDB on the file of the run |
 //!
 //! The server (roadstyle-serve) moves bytes and the functions here call the engine or DuckDB: this crate has no rule of its own for a tile, a
@@ -20,10 +20,14 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-/// What the program is given: the roads (read by the caller), their file (the table `roads` of the queries; none for another format), more Parquet
-/// files as tables (`name`, file), the Parquet file of a run (frames), the look and the port.
+/// What the program is given: the roads (read by the caller), the base-map rows (buildings, water, ...: read by the caller; their sources go in the
+/// tiles as the look says), the roads' file (the table `roads` of the queries; none for another format), a `.duckdb` file (each of its tables in
+/// `main` is a table of the queries; it is opened read only), more Parquet files as tables (`name`, file), the Parquet file of a run (frames),
+/// the look and the port.
 pub struct Config {
     pub roads: roadstyle::RoadTable,
+    pub features: Option<roadstyle::FeatureTable>,
+    pub database: Option<PathBuf>,
     pub roads_file: Option<PathBuf>,
     pub name: String,
     pub look: roadstyle::Look,
@@ -54,9 +58,9 @@ pub fn serve(c: Config, page: Page) -> Result<(), String> {
 impl Local {
     /// Stage 1 and stage 2 of the roads (the tiles are cut when a tile is asked), the road table, and the views of DuckDB over the files.
     pub fn open(c: Config) -> Result<Local, String> {
-        let styled = roadstyle::sources_of(c.roads, &c.look, None, None, Some(c.name.clone())).map_err(|e| e.to_string())?;
+        let styled = roadstyle::sources_of(c.roads, &c.look, c.features, None, Some(c.name.clone())).map_err(|e| e.to_string())?;
         // the style's tile addresses are relative: the page puts its own origin before them (adapter.js)
-        let (style, tiles) = roadstyle::tiles_of_sources(&styled, "/tiles/", &[]).map_err(|e| e.to_string())?;
+        let (style, tiles) = roadstyle::tiled_sources(&styled, &c.look, "/tiles/", &[]).map_err(|e| e.to_string())?;
         let mut table = Vec::new();
         roadstyle::write_road_table(&styled, None, false, &mut table).map_err(|e| e.to_string())?;
         let table: Value = serde_json::from_slice(&table).map_err(|e| e.to_string())?;
@@ -73,6 +77,19 @@ impl Local {
             let sql = format!("CREATE VIEW {} AS SELECT * FROM read_parquet({})", ident(name), text(&file.display().to_string()));
             db.execute_batch(&sql).map_err(|e| format!("{}: {e}", file.display()))
         };
+        if let Some(f) = &c.database {
+            // the file's tables as views in `main`: the queries and the schema name them as the tables of a Parquet file
+            db.execute_batch(&format!("ATTACH {} AS file (READ_ONLY)", text(&f.display().to_string()))).map_err(|e| format!("{}: {e}", f.display()))?;
+            let names: Vec<String> = {
+                let mut stmt = db.prepare("SELECT table_name FROM information_schema.tables WHERE table_catalog = 'file' AND table_schema = 'main' ORDER BY 1")
+                    .map_err(|e| e.to_string())?;
+                let r = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
+                r
+            };
+            for n in names {
+                db.execute_batch(&format!("CREATE VIEW {0} AS SELECT * FROM file.main.{0}", ident(&n))).map_err(|e| format!("{}: {n}: {e}", f.display()))?;
+            }
+        }
         if let Some(f) = &c.roads_file {
             view(&db, "roads", f)?;
         }
@@ -146,7 +163,7 @@ impl Local {
     pub fn schema(&self) -> Result<Value, String> {
         let db = self.db.lock().map_err(|e| e.to_string())?;
         let names: Vec<String> = {
-            let mut stmt = db.prepare("SELECT table_schema || '.' || table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY 1")
+            let mut stmt = db.prepare("SELECT table_schema || '.' || table_name FROM information_schema.tables WHERE table_catalog = current_database() AND table_schema = 'main' ORDER BY 1")
                 .map_err(|e| e.to_string())?;
             let r = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
             r
