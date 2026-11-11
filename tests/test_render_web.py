@@ -2643,3 +2643,32 @@ def test_web_vehicles_option_and_look():
     assert {c["kind"] for c in look["classes"].values()} <= set(look["colours"])
     assert all(set(c) == {"light", "dark"} for c in look["colours"].values())
     assert _opt(render_edges(_edges(), backend="web").html, "vehicles") is None
+
+
+def _straight_bridge(length_m, **kw):
+    """The deck pieces of one straight bridge of `length_m` metres (no casing slabs), in order along it, with the settings of `kw`."""
+    import math
+    dlon = length_m / (111320 * math.cos(math.radians(43.74)))
+    g = gpd.GeoDataFrame({"highway": ["primary"], "bridge": ["yes"], "layer": ["1"], "edge_id": [1]}, geometry=[LineString([(7.42, 43.74), (7.42 + dlon, 43.74)])], crs=4326)
+    html = render_edges(g, backend="web", view_3d=True, **kw).html
+    pieces = [f["properties"] for f in _style(html)["sources"]["decks"]["data"]["features"] if not f["properties"].get("__rs_casing_slab")]
+    return sorted(pieces, key=lambda p: p["__rs_s0"])
+
+
+def _flat_part_starts(length_m, **kw):
+    """The metres along a straight bridge where its deck reaches the group height (a piece's start lift is 1)."""
+    return min(p["__rs_s0"] for p in _straight_bridge(length_m, **kw) if p["__rs_lift0"] >= 0.999) * length_m
+
+
+def test_the_numbers_of_the_bridge_height_page_are_the_engines():
+    """docs/guides/bridge-height.md: the group heights of its table, the ramp of 8 m for each metre of height, the hump of a bridge of 40 m, the 1 m of the deck and the
+    effect of ramp_m. A change of a rule fails here, and the page and docs/img/bridge-height/make.py are changed with it."""
+    for length, height in ((60, 5.0), (120, 6.89), (330, 13.5), (600, 22.0), (800, 22.0)):
+        assert _straight_bridge(length)[0]["__rs_full"] == pytest.approx(height, abs=0.02), length
+    short = _straight_bridge(40)
+    names = {"__rs_group", "__rs_chain", "__rs_full", "__rs_lift0", "__rs_lift1", "__rs_s0", "__rs_s1", "__rs_thick", "__rs_edges", "__rs_base", "__rs_height"}
+    assert names <= set(short[0]) and "__rs_enda" in short[0] and "__rs_endb" in short[-1]                # the profile's properties of the page's table
+    assert max(p["__rs_base"] for p in short) == pytest.approx(1.76, abs=0.03)                          # "its deck rises only 1.8 m at the middle"
+    assert {round(p["__rs_height"] - p["__rs_base"], 6) for p in short} == {1.0}                          # the deck is 1 m thick
+    assert _flat_part_starts(800) == pytest.approx(176, abs=3)                                           # 22 m x 8 m = 176 m of ramp (a piece is 2.5 m long)
+    assert _flat_part_starts(800, settings={"config": {"bridge_decks": {"ramp_m": 80}}}) == pytest.approx(352, abs=3)    # the example of the page: 22 m x 16 m
