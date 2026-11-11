@@ -210,6 +210,9 @@ pub const PREFIX: &str = "__rs_";
 /// The prefix of a user column that has a mark's name (it is kept aside as `__rs_kept_<name>` until Roles: R6 part 3).
 pub const KEPT: &str = "__rs_kept_";
 
+/// The box of an overlay's feature in the overlay's rows ([west, south, east, north]): the page's `rsFocus` fits the camera to it (`overlays.js`).
+pub const BBOX: &str = "__rs_bbox";
+
 impl Mark {
     /// The mark of a property name (None: not a mark; a colour option's fill: `option_of_fill`).
     pub fn of(name: &str) -> Option<Mark> {

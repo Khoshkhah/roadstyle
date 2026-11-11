@@ -138,7 +138,9 @@ export function _itemOv(id){ return OVERLAYS.find(o=>o.base && id in o.base) || 
 export function _sdata(s){ const d=s && s._data; if(!d) return null; if(d.geojson || !d.updateable) return d.geojson;
   return d._rs || (d._rs={type:"FeatureCollection", features:Array.from(d.updateable.values())}); }
 // the features of an inline source of the roads style that has no table (decks, slots, overlays); src: the source's id in the map
-export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features)||[]; }
+// An overlay in tiles (way A: the embedded archive) has no GeoJSON: its rows (properties and box, `overlays.js`) stand in as features with no geometry.
+export const OV_ROWS = new Map();
+export function _sfeats(src){ const g=_sdata(src && map.getSource(src)); return (g && g.features) || OV_ROWS.get(src) || []; }
 // THE ROAD TABLE: each road's fields, midpoint, bbox and line, keyed by the row ({props, mids, bboxes, lines}, as stage 1
 // makes it). The page gives it (options.road_table, or window.RS_SIDE: the page loads it after the style and then sends rs:tableready).
 // A table without lines (the engine's roadTable without lines) can have linesOf(rows): the page's function that gives the lines of
@@ -235,10 +237,11 @@ export function rsHighlight(ids, layer){
   if(layer != null && typeof layer === "object") return _hlSet(ids, layer);
   const L=_lyr(layer); if(!L) return;
   if(L.ov){
-    (_qHlOv[L.ov.label]||[]).forEach(i=>map.setFeatureState({source:L.src,id:i},{select:false}));
+    const ref = _src(L.src.slice(RS_PREFIX.length));    // an overlay in tiles is a source layer of the roads' vector source
+    (_qHlOv[L.ov.label]||[]).forEach(i=>map.setFeatureState({...ref,id:i},{select:false}));
     const cur = ids==null ? [] : Array.from(ids);
     _qHlOv[L.ov.label]=cur;
-    cur.forEach(i=>map.setFeatureState({source:L.src,id:i},{select:true}));
+    cur.forEach(i=>map.setFeatureState({...ref,id:i},{select:true}));
     _emit("rs:highlightchange", {overlay:L.ov.label, ids:cur.slice()});
     return;
   }
@@ -265,8 +268,9 @@ export function rsFocus(ids, opt, layer){ // fly the camera to an id (or id set)
   (Array.isArray(ids)?ids:[ids]).forEach(i=>{
     if(!fs){ const b=RoadTable.bbox(i);
       if(b){ _bbExtend([[b[0],b[1]],[b[2],b[3]]], bb); } return; }
-    const g=fs[i] && fs[i].geometry;
+    const g=fs[i] && fs[i].geometry, b=fs[i] && fs[i].bbox;
     if(g && g.coordinates) _bbExtend(g.coordinates, bb);
+    else if(b) _bbExtend([[b[0],b[1]],[b[2],b[3]]], bb);
   });
   // the roads fit above the bottom dock where it covers the map (the card look; dock.js): 80 px and the covered part at the bottom
   const dk=document.getElementById("rs-dock"), mb=map.getContainer().getBoundingClientRect().bottom;
