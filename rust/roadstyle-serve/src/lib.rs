@@ -26,7 +26,7 @@ fn embedded(rel: &str) -> Option<&'static [u8]> {
     if rel == "host_options.json" {                                   // the dashboard's template, for the page's standard panel (level_editor/app.js)
         return roadstyle_assets::get("data/host_options.json");
     }
-    let page = matches!(rel, "level_editor.html" | "popup.css" | "popup.js") || ["level_editor/", "design_editor/", "dashboard/"].iter().any(|d| rel.starts_with(d));
+    let page = matches!(rel, "level_editor.html" | "popup.css" | "popup.js") || ["level_editor/", "design_editor/", "local/", "dashboard/"].iter().any(|d| rel.starts_with(d));
     if page { roadstyle_assets::get(&format!("static/{rel}")) } else { None }
 }
 
@@ -36,6 +36,28 @@ pub const WRITABLE: [&str; 5] = ["edits.csv", "heads.csv", "caps.csv", "levels.c
 /// The largest body of a PUT (levels.csv of Tartu, 65,000 edges, is about 4 MB), and of a request's line and headers.
 pub const MAX_BODY: usize = 16 << 20;
 const MAX_HEAD: usize = 64 << 10;
+
+/// A request that a program's `Api` answers: the method, the path (decoded, with no query), the query text (after `?`) and the body of a POST.
+pub struct Request<'a> {
+    pub method: &'a str,
+    pub path: &'a str,
+    pub query: &'a str,
+    pub body: &'a [u8],
+}
+
+/// An answer of an `Api`: the status number (200, 204, 400, 404, 500), the content type and the body.
+pub struct Response {
+    pub status: u16,
+    pub kind: &'static str,
+    pub body: Vec<u8>,
+}
+
+/// The addresses that a program answers beside the page files (way D, roadstyle-local: the tiles, the rows, the queries). `answer` gives None for an address
+/// that is not the program's: the server then looks for a page file or an area file. The request has passed the Host check; a POST has also passed the Origin
+/// check and has a `Content-Length` of at most `MAX_BODY` bytes.
+pub trait Api: Send + Sync {
+    fn answer(&self, request: &Request) -> Option<Response>;
+}
 
 /// The editor's page files: the ones in the program, or a folder (`--page`, while you change them).
 #[derive(Clone)]
@@ -53,12 +75,18 @@ pub fn serve(area: &Path, page: Page, port: u16) -> Result<(), String> {
 /// As `serve`, with the area files that the page can read (`read`, file names in `area`; None: every file in it) and write (`write`).
 /// The design editor (`roadstyle design edit`) reads only the roads file and the design file, and writes only the design file.
 pub fn serve_files(area: &Path, page: Page, port: u16, read: Option<Vec<String>>, write: Vec<String>) -> Result<(), String> {
-    if matches!(page, Page::Embedded) && !has_package() {
+    serve_with(area, page, port, read, write, None)
+}
+
+/// As `serve_files`, with the addresses of a program (`api`: it answers first, a path that it does not answer goes to the files).
+pub fn serve_with(area: &Path, page: Page, port: u16, read: Option<Vec<String>>, write: Vec<String>, api: Option<Arc<dyn Api>>) -> Result<(), String> {
+    // the level editor's page needs its WebAssembly package; a program with its own addresses (way D) does not
+    if matches!(page, Page::Embedded) && api.is_none() && !has_package() {
         return Err("serve: this build has no WebAssembly package of the editor: run rust/roadstyle-wasm/build_editor.sh, then build again".into());
     }
     let name = std::fs::canonicalize(area).ok().and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned())).unwrap_or_default();
     let site = Arc::new(Site { area: area.to_path_buf(), page, own: [format!("127.0.0.1:{port}"), format!("localhost:{port}")],
-                               name: name.chars().filter(|c| !c.is_control()).collect(), read, write });
+                               name: name.chars().filter(|c| !c.is_control()).collect(), read, write, api });
     let listener = TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("serve: 127.0.0.1:{port}: {e}"))?;
     for stream in listener.incoming().flatten() {
         let site = site.clone();
@@ -80,6 +108,7 @@ struct Site {
     name: String,
     read: Option<Vec<String>>,
     write: Vec<String>,
+    api: Option<Arc<dyn Api>>,
 }
 
 /// One request: GET or HEAD of a file, or PUT of a writable area file.
@@ -120,6 +149,28 @@ fn answer(stream: TcpStream, site: &Site) -> Result<(), String> {
     }
     let decoded = decode(target.split(['?', '#']).next().unwrap_or("/"));
     let path = decoded.trim_start_matches('/');
+    if let Some(api) = &site.api {
+        let query = target.split('#').next().unwrap_or("").split_once('?').map_or("", |(_, q)| q);
+        let mut body = Vec::new();
+        if method == "POST" {
+            // from this server's own page only (a browser sends Origin with a POST), and with a Content-Length
+            if header("origin").is_some_and(|o| !own.iter().any(|h| o == format!("http://{h}"))) {
+                return say(&mut out, "403 Forbidden", "text/plain", b"not this server's page", 0);
+            }
+            let Some(length) = header("content-length").and_then(|v| v.parse::<usize>().ok()) else {
+                return say(&mut out, "411 Length Required", "text/plain", b"a POST needs a Content-Length", 0);
+            };
+            if length > MAX_BODY {
+                return say(&mut out, "413 Content Too Large", "text/plain", b"more than 16 MB", 0);
+            }
+            body = vec![0u8; length];
+            reader.read_exact(&mut body).map_err(|e| e.to_string())?;
+        }
+        if let Some(r) = api.answer(&Request { method, path: &decoded, query, body: &body }) {
+            let status = match r.status { 200 => "200 OK", 204 => "204 No Content", 400 => "400 Bad Request", 404 => "404 Not Found", _ => "500 Internal Server Error" };
+            return say(&mut out, status, r.kind, &r.body, 0);
+        }
+    }
     let index = format!("{path}index.html"); // a folder: its index.html
     let rel = if path.is_empty() || path.ends_with('/') { index.as_str() } else { path };
     let Some(area_rel) = rel.strip_prefix("area/") else {
@@ -228,7 +279,7 @@ mod tests {
 
     #[test]
     fn the_editor_files_are_in_the_program() {
-        for f in ["level_editor/index.html", "level_editor/app.js", "design_editor/index.html", "design_editor/app.js", "design_editor/worker.js",
+        for f in ["local/index.html", "local/app.js", "level_editor/index.html", "level_editor/app.js", "design_editor/index.html", "design_editor/app.js", "design_editor/worker.js",
                   "dashboard/design/design_panel.js", "dashboard/design/themes.json", "level_editor.html", "dashboard/index.js", "dashboard/editor/level_editor.js", "dashboard/editor/level_worker.js", "dashboard/worker/call.js", "dashboard/dashboard.css", "host_options.json", "popup.css", "popup.js"] {
             assert!(embedded(f).is_some_and(|b| !b.is_empty()), "{f}");
         }

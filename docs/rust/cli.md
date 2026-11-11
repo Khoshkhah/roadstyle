@@ -19,6 +19,7 @@ The program is `rust/target/release/roadstyle`. `roadstyle help` shows the comma
 | [`levels make`, `levels solve`, `levels edit`](#make-and-solve-a-level-area) | a level area: make it, solve it, edit it |
 | [`serve`](#make-and-solve-a-level-area) | the level editor, with no check of the area |
 | [`design edit`](#edit-the-design-of-a-map) | the design editor |
+| [`local`](#run-the-engine-as-a-local-program-way-d) | way D: the roads, the rows and the queries from a program on 127.0.0.1 |
 | [`snapshot`](#make-a-picture-of-a-page) | a PNG of a saved page |
 
 The roads file is a GeoParquet file (`.parquet`, the line in the column `geometry`), a GeoJSON file (`.geojson`), a Shapefile (`.shp`, with its `.dbf` and `.prj` beside it) or a GeoPackage (`.gpkg`, its first feature table). The program changes the coordinates of a Shapefile or a GeoPackage to longitude and latitude. All commands that read roads use these files.
@@ -113,6 +114,24 @@ roadstyle design edit roads.shp --port 8790               # a Shapefile (its .db
 - `--port` sets the port (default 8781). `--page DIR` serves another page folder.
 
 The server answers only on 127.0.0.1, only to its own address. The page can read only the roads file (with the `.dbf` and `.prj` of a Shapefile) and the design file. It can write only the design file. The page uses the same WebAssembly package as the level editor: build it with `rust/roadstyle-wasm/build_editor.sh` before you build the program.
+
+## Run the engine as a local program (way D)
+
+```bash
+roadstyle local roads.parquet                                   # http://127.0.0.1:8830/local/
+roadstyle local roads.parquet --table sensors=sensors.parquet   # one more table for the queries
+roadstyle local roads.parquet --frames run.parquet --port 8840  # a run: the columns frame, t, row, value
+```
+
+`local ROADS` shows the roads in the standard dashboard. The program makes the tiles, the rows and the lines of the roads and runs the queries of
+the data dock (DuckDB) when the page asks, so the page keeps only what is in view ([the four ways](../guides/data-and-memory.md#way-d-the-engine-out-of-the-browser)).
+
+- The roads file is a GeoParquet file. DuckDB reads it as the table `roads`.
+- `--table NAME=FILE.parquet` adds a Parquet file as the table `NAME`. It can be given more than once.
+- `--frames FILE.parquet` gives the file of a run: one row for each value, with the columns `frame` (from 0), `t` (seconds), `row` (the road's row) and `value`. The file is also the table `frames`.
+- `--port` sets the port (default 8830). `--page DIR` serves another page folder. The options of the look (`--palette`, `--profile`, `--settings`, `--<keyword>`) are as for `page`.
+
+The server answers only on 127.0.0.1, only to its own address.
 
 ## Make a picture of a page
 

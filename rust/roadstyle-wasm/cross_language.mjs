@@ -43,3 +43,20 @@ if(!same){
     process.exit(1);
   }
 }
+
+// Way C and way D give the same tile bytes: the wasm Tiler's tile of three addresses has the size and hash that `roadstyle local` (roadstyle-local, the native
+// program) gives for them. The file is made by rust/roadstyle-local/tests/local.rs (ROADSTYLE_BLESS=1), which checks the program against it.
+{
+  const tiler = new pkg.Tiler(readFileSync(new URL("roads.parquet", data)), look, undefined, undefined, "rs://", []);
+  const want = JSON.parse(readFileSync(new URL("way_d_tiles.json", data), "utf8"));
+  const got = {};
+  for(const key of Object.keys(want)){
+    const [z, x, y] = key.split("/").map(Number);
+    got[key] = text(tiler.tile("roads", z, x, y));
+  }
+  console.log(JSON.stringify(got));
+  if(JSON.stringify(got) !== JSON.stringify(want)){
+    console.error(`the wasm Tiler's tiles differ from way D's: want ${JSON.stringify(want)}`);
+    process.exit(1);
+  }
+}
