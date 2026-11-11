@@ -28,13 +28,17 @@ def clamp(v, lo, hi):
     return max(lo, min(hi, v))
 
 
-def lift_of(x, ell, ramp, lift_head, lift_tail, k=0.4):
+def lift_of(x, ell, ramp, lift_head, lift_tail):
     """Step 5 of the guide: the lift at the distance x along a chain, with the node lifts of its two ends and its full ramp."""
     a, b = lift_head + x / ramp, lift_tail + (ell - x) / ramp
-    e = max(0.15 * ell, 1.0)
-    v = min(clamp(x / e, 0, 1), clamp((ell - x) / e, 0, 1))
-    h = max(k - abs(a - b), 0) / k
-    t = clamp(min(a, b) - v * v * (3 - 2 * v) * h * h * k / 4, 0, 1)
+    cross = (ell + ramp * (lift_tail - lift_head)) / 2
+    k = clamp(2 * min(cross, ell - cross) / ramp, 0, 0.4)
+    if k > 0:
+        h = max(k - abs(a - b), 0) / k
+        t = min(a, b) - h * h * k / 4
+    else:
+        t = min(a, b)
+    t = clamp(t, 0, 1)
     return t * t * (3 - 2 * t)
 
 

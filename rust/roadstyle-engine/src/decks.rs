@@ -204,11 +204,14 @@ fn free_end_distances(reps: &[Rep], lens: &[f64], at: &HashMap<(u64, u64), Vec<u
     best
 }
 
-/// The smaller of a and b, rounded where they are within k of each other (at most k / 4 lower), by `weight` (0: the exact minimum). The ramp's apex
-/// (where the two ramps of a short bridge meet) is rounded so it has no ridge; at the ends of a chain the weight is 0, so the height at a node is exactly the node's.
-fn smin(a: f64, b: f64, k: f64, weight: f64) -> f64 {
+/// The smaller of a and b, rounded where they are within k of each other (at most k / 4 lower). k = 0: the exact minimum. The ramp's apex (where the two ramps of a short bridge
+/// meet) is rounded so it has no ridge.
+fn smin(a: f64, b: f64, k: f64) -> f64 {
+    if k <= 0.0 {
+        return a.min(b);
+    }
     let h = (k - (a - b).abs()).max(0.0) / k;
-    a.min(b) - weight * h * h * k * 0.25
+    a.min(b) - h * h * k * 0.25
 }
 
 /// The bridge roads: one representative for each two-way pair, and where each node is used.
@@ -466,6 +469,16 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
     let (full_ramp, step) = ((h * grade).max(1.0), dk.step_m.max(0.25));         // metres that a rise of the full height takes
     let (la, lb) = ((far_head / full_ramp).min(1.0), (far_tail / full_ramp).min(1.0));
     let (rh, rt) = ((full_ramp * (1.0 - la)).min(l), (full_ramp * (1.0 - lb)).min(l));
+    // THE ROUNDING of the apex: where the ramp from the head end and the ramp from the tail end give the same lift (`cross`, metres from the head end), the deck has a crest, and the crest is
+    // rounded (`smin`) over a width that must lie inside the chain. So the width is the smaller of 0.4 and what fits between the crossing and the nearer end. Where the two ramps cross at
+    // an end of the chain (a node whose lift is what the ramp gives) or outside it, the deck has no crest and the width is 0: the exact minimum, and the lift at a node is exact.
+    let cross = (l + full_ramp * (lb - la)) / 2.0;
+    let round_k = (2.0 * cross.min(l - cross) / full_ramp).clamp(0.0, 0.4);
+    // the smooth lift (0 on the ground, 1 at the full height) at a distance along the chain: from each end node
+    let lift_at = |d: f64| {
+        let t = smin(la + d / full_ramp, lb + (l - d) / full_ramp, round_k).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    };
     let mut feats = Vec::new();
     for w in cuts_of(l, (rh, rt), step, bounds.iter().map(|b| b.0)).windows(2) {
         let (d0, d1) = (w[0], w[1]);
@@ -477,13 +490,6 @@ fn chain_features(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, ch: &Chain,
         let pprops = roads.road(span.fi);
         let cls = pprops.role(roadstyle_model::Role::Class).and_then(Cell::as_str).unwrap_or("");
         let half = (m.gwidth(m.group_of(cls), dk.match_zoom) * frame.mpp / 2.0).max(2.0) * dk.width_scale;
-        // the smooth lift (0 on the ground, 1 at the full height) at a distance along the chain: from each end node
-        let edge = (0.15 * l).max(1.0);                    // the rounding fades out over the last 15 % of a chain at each end
-        let lift_at = |d: f64| {
-            let w = (d / edge).clamp(0.0, 1.0).min(((l - d) / edge).clamp(0.0, 1.0));
-            let t = smin(la + d / full_ramp, lb + (l - d) / full_ramp, 0.4, w * w * (3.0 - 2.0 * w)).clamp(0.0, 1.0);
-            t * t * (3.0 - 2.0 * t)
-        };
         let (lift, ends) = (lift_at(mid), [lift_at(d0), lift_at(d1)]);
         let part = substring(&pts, d0, d1);
         // one ribbon per directed edge: a two-way bridge is two half-width ribbons side by side (the edge with the chain on the right)

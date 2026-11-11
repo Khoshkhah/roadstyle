@@ -11,6 +11,8 @@ and a proposal for an edit step.
   file for each bridge, with a height line `[s, z]` in metres for each axis and a `source` and a `method` for each value.
 - On the Granville Bridge, the engine finds the same 12 chains as urbanstyle finds axes, with the same OSM ways. The heights are different. The engine gives all 12 chains the same top
   (22 m). The LiDAR gives 39 m on the main span and 11.6 m to 27 m on the ramps.
+- **A second note gives the rules for the heights themselves:** [The height of a bridge from the design rules](bridge_height_design.md) (clearance, design grade, vertical curves). Its profile is a list of
+  points of vertical intersection with curve lengths. This is the same form as the `points` and `curves` of the input below. The design rules make the list, and a user can edit it.
 - **The proposal keeps the current approach and adds an optional input in front of it.** With no input, the output is the same as today. The input is a **height line for a chain**
   (`points` and `curves`, as in urbanstyle's `heights` section). A prototype on the Granville Bridge shows that heights alone are not enough: the shape of the line is the limit.
 
@@ -247,7 +249,7 @@ highest LiDAR height. The input of stage 2 is the grade points of the LiDAR fit.
 | 7 | 11.7 m, 0.2 m, 11.7 m | 11.8 m | 6.3 m | 0.3 m |
 | 8 | 22.7 m, 8.3 m, 22.7 m | 9.5 m | 5.7 m | 0.2 m |
 | 9 | 18.2 m, 27.0 m, 27.0 m | 5.0 m | 4.9 m | 0.1 m |
-| 10 | 11.6 m, 18.2 m, 18.2 m | 4.8 m | 3.4 m | 0.0 m |
+| 10 | 11.6 m, 18.2 m, 18.2 m | 4.9 m | 3.4 m | 0.0 m |
 | 11 | 11.6 m, 0.1 m, 11.6 m | 3.0 m | 0.9 m | 0.2 m |
 | 12 | 0.0 m, 11.6 m, 11.6 m | 3.0 m | 0.9 m | 0.2 m |
 

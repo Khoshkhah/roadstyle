@@ -2664,17 +2664,21 @@ def _flat_part_starts(length_m, **kw):
     return min(p["__rs_s0"] for p in _straight_bridge(length_m, **kw) if p["__rs_lift0"] >= 0.999) * length_m
 
 
-def _lift_of_the_page(x, ell, ramp, lift_head=0.0, lift_tail=0.0, k=0.4):
-    """The lift at the distance x along a chain of ell metres, by the formulas of docs/guides/bridge-height.md (step 5): a and b, the smooth minimum with the weight w, the smoothstep."""
+def _lift_of_the_page(x, ell, ramp, lift_head=0.0, lift_tail=0.0):
+    """The lift at the distance x along a chain of ell metres, by the formulas of docs/guides/bridge-height.md (step 5): a and b, where they cross, the width k of the rounding there,
+    the smooth minimum, the smoothstep."""
     def clamp(v, lo, hi):
         return max(lo, min(hi, v))
 
     a, b = lift_head + x / ramp, lift_tail + (ell - x) / ramp
-    e = max(0.15 * ell, 1.0)
-    v = min(clamp(x / e, 0, 1), clamp((ell - x) / e, 0, 1))
-    w = v * v * (3 - 2 * v)
-    h = max(k - abs(a - b), 0) / k
-    t = clamp(min(a, b) - w * h * h * k / 4, 0, 1)
+    cross = (ell + ramp * (lift_tail - lift_head)) / 2
+    k = clamp(2 * min(cross, ell - cross) / ramp, 0, 0.4)
+    if k > 0:
+        h = max(k - abs(a - b), 0) / k
+        t = min(a, b) - h * h * k / 4
+    else:
+        t = min(a, b)
+    t = clamp(t, 0, 1)
     return t * t * (3 - 2 * t)
 
 
@@ -2775,7 +2779,7 @@ def test_the_prototype_numbers_of_the_bridge_profile_proposal_are_pinned():
         rows = mod.compute()
     finally:
         sys.path.remove(str(here))
-    today = [17.3, 11.3, 10.9, 10.2, 8.9, 9.7, 11.8, 9.5, 5.0, 4.8, 3.0, 3.0]
+    today = [17.3, 11.3, 10.9, 10.2, 8.9, 9.7, 11.8, 9.5, 5.0, 4.9, 3.0, 3.0]
     one = [10.0, 2.5, 7.0, 9.8, 9.5, 8.9, 6.3, 5.7, 4.9, 3.4, 0.9, 0.9]
     assert [r["errors"][0] for r in rows] == pytest.approx(today, abs=0.06)
     assert [r["errors"][1] for r in rows] == pytest.approx(one, abs=0.06)
@@ -2788,3 +2792,61 @@ def test_the_prototype_numbers_of_the_bridge_profile_proposal_are_pinned():
     assert chain1 == {1419040127, 1419040128} and 8043974233675410214 in set(edges[edges.osm_id.isin(chain1)].edge_id)       # the road id of the example
     a1 = json.loads((here / "granville_lidar_samples.json").read_text())["axes"][0]
     assert a1["points"][:3] == [[0.0, 27.02], [160.0, 31.06], [220.0, 33.66]] and len(a1["points"]) == len(a1["curves"]) == 9 and a1["curves"] == [0.0, 54.0, 54.0, 27.0, 18.0, 18.0, 27.0, 54.0, 0.0]
+
+
+def test_a_ramp_never_dips_and_is_never_steeper_than_its_curve_allows():
+    """The rounding of the curve (step 5 of docs/guides/bridge-height.md) is only at a crest, where the two ramps cross inside the chain. Where they cross at an end of the chain
+    (a node whose lift is what the ramp gives, chains 11 and 12 of the Granville Bridge) there is no crest, and the lift must not dip. The steepest part of a ramp is 1.5 times the average
+    slope, 1.5 / 8 = 18.75 %: the middle of the smoothstep. No piece is steeper."""
+    import importlib.util
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    spec = importlib.util.spec_from_file_location("bridge_height_granville_slope", here / "granville.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    chains = mod.chains_of(gpd.read_parquet(here / "granville_bridge_edges.parquet"))
+    full = chains[0]["pieces"][0]["properties"]["__rs_full"]
+    for n, c in enumerate(chains, 1):
+        lifts = [c["pieces"][0]["properties"]["__rs_lift0"]] + [f["properties"]["__rs_lift1"] for f in c["pieces"]]
+        ups = [b - a for a, b in zip(lifts, lifts[1:], strict=False)]
+        assert not (any(u > 1e-6 for u in ups) and any(u < -1e-6 for u in ups)), f"chain {n} goes up and down"     # a chain is not a hump here: no dip and climb again
+        for f in c["pieces"]:
+            p = f["properties"]
+            dx = (p["__rs_s1"] - p["__rs_s0"]) * c["length"]
+            if dx > 1:
+                assert abs(full * (p["__rs_lift1"] - p["__rs_lift0"])) / dx <= 1.5 / 8 + 0.004, (n, p["__rs_s0"])
+    for length in (200, 330, 800):
+        pieces = _straight_bridge(length)
+        for p in pieces:
+            dx = (p["__rs_s1"] - p["__rs_s0"]) * length
+            if dx > 1:
+                assert abs(p["__rs_full"] * (p["__rs_lift1"] - p["__rs_lift0"])) / dx <= 1.5 / 8 + 0.004, (length, p["__rs_s0"])
+
+
+def test_the_design_rules_of_the_bridge_height_note_are_calculated_not_typed():
+    """docs/design/bridge_height_design.md (docs/img/bridge-height/design_rules.py): the formulas of the stopping sight distance and of K give the values of the TxDOT table (K = 247 ft per percent at
+    70 mph, and 473 for a crest and 260 for a sag at 85 mph), the K table of the note, a ramp that is never steeper than its design grade, the length that a clearance needs, and the figures that the
+    note gives for today's engine."""
+    import importlib.util
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    spec = importlib.util.spec_from_file_location("bridge_height_design_rules", here / "design_rules.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    ft = 3.28084                                                                                          # feet in a metre: K in feet per percent is K in metres per percent x this
+    mph = 1.609344
+    assert [round(k * ft) for k in mod.k_values(70 * mph)] == pytest.approx([247, 181], abs=2)            # 70 mph: crest 247 (the worked example in the search results)
+    assert [round(k * ft) for k in mod.k_values(85 * mph)] == pytest.approx([473, 260], abs=2)            # 85 mph: crest 473, sag 260 (the TxDOT table)
+    table = {30: (31, 1.5, 4.2), 40: (46, 3.2, 7.5), 50: (63, 6.1, 11.7), 60: (83, 10.4, 16.7), 70: (104, 16.5, 22.4), 80: (128, 25.0, 28.9), 100: (183, 50.9, 44.1)}
+    for v, (s, kc, ks) in table.items():
+        assert (mod.stopping_sight_distance(v), *mod.k_values(v)) == pytest.approx((s, kc, ks), abs=0.6 if v > 40 else 0.15), v
+    for h, row in ((5.8, (145, 116, 97, 72)), (10, (250, 200, 167, 125)), (20, (500, 400, 333, 250))):
+        assert [round(h / g) for g in (0.04, 0.05, 0.06, 0.08)] == list(row)                              # the ramp table: P / g
+    top = 5.0 + max(0.8, 20 / 25)
+    assert top == pytest.approx(5.8)
+    assert mod.minimum_length(top, 0.05, 50) == pytest.approx(321, abs=3)                                 # the shortest chain that reaches 5.8 m at 5 % and 50 km/h
+    for ell, height, grade, apex in ((300.0, 5.8, 0.05, 5.28), (200.0, 5.8, 0.05, 2.78), (1200.0, 19.8, 0.04, 19.8)):
+        xs, z, high, _ = mod.design_profile(ell, height, grade, 50)
+        assert high == pytest.approx(apex, abs=0.03), ell
+        assert abs(mod.np.gradient(z, xs)).max() * 100 <= grade * 100 + 0.05, ell                         # never steeper than the design grade
+        today_x, today_z = mod.smoothstep_profile(ell, 5 + 17 * min(max((ell - 60) / 540, 0), 1))
+        assert abs(mod.np.gradient(today_z, today_x)).max() * 100 == pytest.approx(18.7, abs=0.4), ell    # today's engine: 1.5 / 8
+    assert 5 + 17 * (300 - 60) / 540 == pytest.approx(12.6, abs=0.05) and 5 + 17 * (200 - 60) / 540 == pytest.approx(9.4, abs=0.05)   # today's heights in the note

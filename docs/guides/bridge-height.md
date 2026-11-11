@@ -156,12 +156,10 @@ Inside a chain, the engine finds the lift at each distance x along the chain. Le
 a = lift_head + x ÷ R                  from the head end
 b = lift_tail + (ℓ − x) ÷ R            from the tail end
 
-k = 0.4
-e = max( 0.15 × ℓ, 1 )
-v = min( clamp(x ÷ e, 0, 1), clamp((ℓ − x) ÷ e, 0, 1) )
-w = v × v × (3 − 2v)                   the weight: 0 at the ends, 1 inside
-h = max( k − |a − b|, 0 ) ÷ k
-t = min(a, b) − w × h × h × k ÷ 4      smooth minimum
+cross = (ℓ + R × (lift_tail − lift_head)) ÷ 2     where a and b are equal (metres from the head end)
+k = clamp( 2 × min(cross, ℓ − cross) ÷ R, 0, 0.4 )     the width of the rounding
+h = max( k − |a − b|, 0 ) ÷ k                    (h = 0 when k = 0)
+t = min(a, b) − h × h × k ÷ 4                    smooth minimum
 t = clamp(t, 0, 1)
 
 lift(x) = t × t × (3 − 2t)
@@ -171,9 +169,12 @@ The steps in words:
 
 1. Each end gives a lift that rises with the distance from that end (`a` and `b`).
 2. The smaller of the two values is the lift. The deck rises from each end and stops at 1.
-3. Where `a` and `b` are within `k` of each other, the smooth minimum rounds the place where they meet. It lowers the value by up to `k ÷ 4`, which is 0.1.
-   A short bridge gets a round top and no ridge. The weight `w` is 0 at the two ends of the chain, so the lift at a node is exact.
-4. The last line, t × t × (3 − 2t), gives each ramp a soft start on the ground and a soft end at the flat part.
+3. Where `a` and `b` cross inside the chain, the deck has a crest. The smooth minimum rounds the crest over a width `k`. `k` is at most 0.4 and never wider than the distance from the crossing to
+   the nearer end allows. It lowers the value by up to `k ÷ 4`, which is 0.1. A short bridge gets a round top and no ridge.
+4. Where `a` and `b` cross at an end of the chain, or outside the chain, there is no crest. `k` is 0 and the lift is the exact minimum. For this reason the lift at a node is always exact,
+   and a ramp that starts at a node has no dip.
+5. The last line, t × t × (3 − 2t), gives each ramp a soft start on the ground and a soft end at the flat part. The curve is steepest in the middle of a ramp: 1.5 times the average
+   slope, which is 1.5 ÷ 8 = 18.75 % with the default look.
 
 The underside and the top of the deck, without terrain:
 
@@ -280,7 +281,8 @@ Four things change a profile today.
 | `rsSetBridges3D(false)` | In the open page | The bridges are flat lines |
 
 The engine does not read a `height` or `maxheight` tag to find H. The height is a rule for the picture and not a measurement. Two bridges of the same length get the same H.
-A proposal for an input that gives a chain its own height line is in `docs/design/bridge_profile_edit.md`. It is not built.
+A proposal for an input that gives a chain its own height line is in `docs/design/bridge_profile_edit.md`. A proposal for heights from the design rules (clearance, grade, vertical curves)
+is in `docs/design/bridge_height_design.md`. Neither is built.
 
 A step that edits the pieces between the engine and the page must keep these rules, or the mesh shows a step or a gap:
 
