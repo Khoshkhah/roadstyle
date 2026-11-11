@@ -150,6 +150,39 @@ fn props_file(tiled: &mut tiles::Tiles, o: &tiles::stage::TileOptions, k: &str, 
     tiled.props_files.push((k.to_string(), String::from_utf8(text).expect("JSON text is UTF-8")));
 }
 
+/// The rows of an overlay for a page that is one HTML file (way A): for each feature, in the order of its tiles' feature id, all its
+/// properties and its box `__rs_bbox` ([west, south, east, north], when it has a geometry), as JSON. The tiles have only the keys that the
+/// style reads; the dashboard answers `rsQuery`, `rsGetProps`, `rsFocus` and the popups from these rows (`overlays.js`).
+pub fn rows_file(src: Source<'_>) -> Option<String> {
+    fn extend(c: &Value, b: &mut [f64; 4]) {
+        match c.as_array() {
+            Some(a) if a.first().is_some_and(Value::is_number) => {
+                let (x, y) = (a[0].as_f64().unwrap_or(0.0), a.get(1).and_then(Value::as_f64).unwrap_or(0.0));
+                *b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+            }
+            Some(a) => a.iter().for_each(|c| extend(c, b)),
+            None => {}
+        }
+    }
+    let row = |f: Value| {
+        let mut p = f["properties"].as_object().cloned().unwrap_or_default();
+        let mut b = [f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY];
+        extend(&f["geometry"]["coordinates"], &mut b);
+        if b[0] <= b[2] {
+            p.insert("__rs_bbox".into(), json!(b));
+        }
+        Value::Object(p)
+    };
+    let rows: Vec<Value> = match src {
+        Source::Json(v) => v["data"]["features"].as_array()?.iter().map(|f| row(f.clone())).collect(),
+        Source::Features(f) => (0..f.table.len()).map(|r| row(f.table.to_geojson(r))).collect(),
+        _ => return None,
+    };
+    let mut text = Vec::new();
+    serde_json::to_writer(&mut text, &roadstyle_model::table::JsSafe(&Value::Array(rows))).expect("a Vec takes every byte");
+    String::from_utf8(text).ok()
+}
+
 /// rule for a source other than the roads, the pieces and the slots: lines are clipped to each tile; points and polygons go
 /// whole into every tile their box touches, from the first zoom (its extra layers). A polygon at a tile's edge whose clipped part has
 /// no area was left out of that tile before (the sea at Monaco's west edge, 2026-10-24).
