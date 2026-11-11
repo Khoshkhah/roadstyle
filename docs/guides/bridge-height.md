@@ -227,6 +227,47 @@ If a terrain tile has not arrived, the page does not draw the chains that need i
 
 The casing is a thin slab along each long side of the deck. The extrusion layers of the decks stay in the map with opacity 0. A click or a hover finds the bridge on them. The Street View marker stands on the deck.
 
+## A real example: the Granville Bridge
+
+The Granville Bridge in Vancouver has a main span and many ramps. This is a real group with more than one chain. The data is 41 road edges (27 OpenStreetMap ways) from the
+Vancouver database of duckOSM, in `docs/img/bridge-height/granville_bridge_edges.parquet`. The engine makes one group of them, with 12 chains, 624 deck pieces and
+H = 22 m. The group is 3061 m long, so H is the largest value, `max_m`. A full ramp is 22 m × 8 = 176 m.
+
+![The 12 chains of the Granville Bridge on the map](../img/bridge-height/granville_plan.png)
+
+The figure shows the chains on the map. The numbers are the chain numbers of the table, from the longest chain to the shortest one. Each chain has a first end and a last end, in
+the order of its points.
+
+| Chain | Roads | Length | Lift at the first end | Lift at the last end | Deck pieces |
+|---|---|---|---|---|---|
+| 1 | Granville Bridge | 550 m | 1.00 | 1.00 | 2 |
+| 2 | Granville Bridge | 404 m | 1.00 | 0.00 | 72 |
+| 3 | Granville Bridge | 367 m | 0.00 | 1.00 | 74 |
+| 4 | Granville Bridge | 312 m | 1.00 | 1.00 | 4 |
+| 5 | Granville Bridge, Seymour Street | 286 m | 1.00 | 0.00 | 73 |
+| 6 | Granville Bridge, Howe Street | 276 m | 0.00 | 1.00 | 74 |
+| 7 | Granville Bridge | 228 m | 1.00 | 0.00 | 73 |
+| 8 | Granville Bridge | 184 m | 1.00 | 0.00 | 72 |
+| 9 | Granville Bridge | 179 m | 1.00 | 1.00 | 2 |
+| 10 | Granville Bridge | 96 m | 0.51 | 1.00 | 36 |
+| 11 | Granville Bridge | 89 m | 0.51 | 0.00 | 71 |
+| 12 | Granville Bridge | 89 m | 0.00 | 0.51 | 71 |
+
+![The profile of each chain of the Granville Bridge](../img/bridge-height/granville.png)
+
+The figure shows the profile of each chain. The dashed line is H. What the example shows:
+
+- **Eight chain ends are free ends.** Their lift is 0.00. The ramp rises from the ground there, along the full ramp of 176 m (chains 2, 3, 5, 6, 7, 8, 11 and 12).
+- **A node far from a free end has lift 1.00.** A chain with lift 1.00 at both ends is flat. Chains 1, 4 and 9 each have only 2 deck pieces, one for each road.
+- **A node that is near a free end has a lift between 0 and 1.** Chains 10, 11 and 12 meet at one node. It is 89 m from the nearest free end, so its lift is 89 ÷ 176 = 0.51. All
+  three chains have 0.51 at that node, so there is no step.
+- **A short chain does not reach H.** Chains 11 and 12 are 89 m long. Their decks reach only 0.51 × 22 = 11.2 m.
+- **All chains of the group have the same H.** Chain 1, the main span, and chain 7, a low ramp, both reach 22 m. The City of Vancouver LiDAR 2022 measures other heights on the same
+  bridge: 39 m on the main span, and 11.6 m to 27 m on the ramps. The engine does not read measured heights. For the comparison, read
+  `docs/design/bridge_profile_edit.md`.
+
+Make the figures and the table again with `python docs/img/bridge-height/granville.py`.
+
 ## What can change a profile
 
 Four things change a profile today.

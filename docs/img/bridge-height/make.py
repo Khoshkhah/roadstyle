@@ -39,7 +39,7 @@ def deck_pieces(length_m):
 
 def main():
     fig, axes = plt.subplots(1, len(LENGTHS), figsize=(12.5, 3.6), sharey=True)
-    for ax, length in zip(axes, LENGTHS):
+    for ax, length in zip(axes, LENGTHS, strict=True):
         pieces = deck_pieces(length)
         full, thick = pieces[0]["__rs_full"], pieces[0]["__rs_thick"]
         xs, under, top = [], [], []

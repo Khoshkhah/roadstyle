@@ -2727,3 +2727,34 @@ def test_the_numbers_of_the_bridge_height_page_are_the_engines():
     assert p["__rs_full"] == pytest.approx(6.8889, abs=1e-4)
     slab = feats[1]["properties"]
     assert slab["__rs_casing_slab"] == 1 and all(slab[k] == p[k] for k in ("__rs_group", "__rs_chain", "__rs_full", "__rs_lift0", "__rs_lift1", "__rs_s0", "__rs_s1"))   # a slab has the lifts and places of its piece
+
+
+def test_the_granville_bridge_example_is_the_engines():
+    """docs/guides/bridge-height.md, "A real example: the Granville Bridge": the 12 chains of the bridge group of docs/img/bridge-height/granville_bridge_edges.parquet, their
+    lengths, their lifts at the two ends and the pieces, from the same functions as the figures (docs/img/bridge-height/granville.py). The comparison of docs/design/bridge_profile_edit.md
+    (the highest deck of each chain, and the LiDAR heights of granville_lidar_samples.json) is pinned here too."""
+    import importlib.util
+    here = Path(__file__).resolve().parents[1] / "docs" / "img" / "bridge-height"
+    spec = importlib.util.spec_from_file_location("bridge_height_granville", here / "granville.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    chains = mod.chains_of(gpd.read_parquet(here / "granville_bridge_edges.parquet"))
+    full = chains[0]["pieces"][0]["properties"]["__rs_full"]
+    assert len(chains) == 12 and full == pytest.approx(22.0)                                    # one group of 12 chains, at the largest height
+    assert sum(c["length"] for c in chains) == pytest.approx(3061, abs=5) and sum(len(c["pieces"]) for c in chains) == 624
+    want = [(550, 1.00, 1.00, 2), (404, 1.00, 0.00, 72), (367, 0.00, 1.00, 74), (312, 1.00, 1.00, 4), (286, 1.00, 0.00, 73), (276, 0.00, 1.00, 74),
+            (228, 1.00, 0.00, 73), (184, 1.00, 0.00, 72), (179, 1.00, 1.00, 2), (96, 0.51, 1.00, 36), (89, 0.51, 0.00, 71), (89, 0.00, 0.51, 71)]
+    for n, (c, (length, first, last, pieces)) in enumerate(zip(chains, want, strict=True), 1):
+        p0, p1 = c["pieces"][0]["properties"], c["pieces"][-1]["properties"]
+        assert c["length"] == pytest.approx(length, abs=1.5), n
+        assert (p0["__rs_lift0"], p1["__rs_lift1"]) == pytest.approx((first, last), abs=0.01), n
+        assert len(c["pieces"]) == pieces, n
+    ends = [p for c in chains for p in (c["pieces"][0]["properties"]["__rs_lift0"], c["pieces"][-1]["properties"]["__rs_lift1"])]
+    assert sum(1 for e in ends if e == 0) == 8 and sum(1 for e in ends if abs(e - 0.51) < 0.01) == 3        # eight free ends; three chains meet at the node of lift 0.51
+    assert 89 / (full * 8) == pytest.approx(0.51, abs=0.01) and full * 0.51 == pytest.approx(11.2, abs=0.1)             # the numbers of the page: 89 / 176 = 0.51, 0.51 x 22 = 11.2
+    # the comparison with the LiDAR: the same 12 ways, the highest deck of the engine, and of the measurement
+    lidar = json.loads((here / "granville_lidar_samples.json").read_text())["axes"]
+    engine_top = [max(full * max(f["properties"]["__rs_lift0"], f["properties"]["__rs_lift1"]) for f in c["pieces"]) for c in chains]
+    assert engine_top[:10] == pytest.approx([22.0] * 10, abs=0.05) and engine_top[10:] == pytest.approx([11.2, 11.2], abs=0.1)
+    assert max(z for _, z in lidar[0]["samples"]) == pytest.approx(39.3, abs=0.05)                         # axis a1, the main span
+    assert sorted({round(max(z for _, z in a["samples"]), 1) for a in lidar}) == [11.6, 11.7, 18.2, 22.7, 27.0, 27.1, 39.3]
