@@ -91,7 +91,7 @@ bridges:
   casing_m: 0.25   # metre widths: at least this wide each side
   casing_px: 1.0   # and never thinner than this each side
   shadow: {show: true, blur: 4.0, offset: [2, 2], trim_m: 3.0, width_scale: 1.6}
-  decks: {base_m: 5.0, max_m: 22.0, grow_from_m: 60.0, grow_to_m: 600.0, thickness_m: 1.0, ramp_m: 40.0, step_m: 2.5, match_zoom: 18.0, width_scale: 0.6, flat_below: 16.0, casing_px: 2.0}   # view_3d: the extruded decks
+  decks: {base_m: 5.0, max_m: 22.0, grow_from_m: 60.0, grow_to_m: 600.0, thickness_m: 1.0, ramp_m: 40.0, step_m: 2.5, match_zoom: 18.0, width_scale: 0.6, flat_below: 15.0, casing_px: 2.0}   # view_3d: the extruded decks
 
 tunnels:
   opacity_scale: 0.45   # folium / lonboard: a tunnel fades to this

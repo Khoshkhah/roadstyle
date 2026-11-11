@@ -6,6 +6,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **The 3D bridge decks show from zoom 15** (`bridge_decks.flat_below`; it was 16). Below zoom 15 a bridge is still its flat line.
+
 ### Added
 
 - **A page with 3D bridges has its bridge profile, and the Height box lists the nodes.** The style writes the profile under `roadstyle:bridge_profile` every time (the keyword `bridge_profile_export` is gone: `rs.bridge_profile(edges)` does not need it), and the page gets it as the option `bridge_profile`. `rsBridgeGroups()` returns the `chains` and the `nodes` of each group. The Height box of a selected bridge lists its nodes with the height and the `source` of each. A group that you set to a new height shows the nodes at the same ratio.
