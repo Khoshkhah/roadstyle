@@ -8,7 +8,7 @@
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
 import {rsBuildings, rsBuildingsByPerson, rsBuildingsOpacity} from "./basemap.js";
-import {_elHillshade, rsTerrain, rsTerrainTunnels, rsGround, _elTunnels, _elTerrainByPerson} from "./elevation.js";
+import {_elHillshade, rsTerrain, rsTerrainTunnels, rsTunnelsOpacity, rsGround, _elTunnels, _elTerrainByPerson} from "./elevation.js";
 import {rsArrowsOn, rsHasArrows, rsSetArrows, _arApply} from "./arrows.js";
 
 const _bxEl = (tag, cls, txt) => { const e = document.createElement(tag); if(cls) e.className = cls; if(txt) e.textContent = txt; return e; };
@@ -89,17 +89,14 @@ export function buildBox(menu){
   topRow("hillshade", "Hillshade").checked = keep("hillshade", O.hillshade);
   topRow("terrain", "3D terrain").checked = keep("terrain", O.terrain);
   // what a tunnel does on the terrain (elevation.js, terrain_tunnels=): show it, fade it or hide it; a row under the switch, shown only while the terrain is on
-  // the dashboard's segmented control (rs-seg), as the panel's: one button for each mode, the mode now marked
-  const tunRow = _bxEl("div", "rs-bm-opacity rs-bm-tunnels"), tunSeg = _bxEl("div", "rs-seg");
-  tunSeg.id = "rs-top-terrain-tunnels"; tunSeg.setAttribute("role", "radiogroup"); tunSeg.setAttribute("aria-label", "Tunnels on the terrain");
-  const tunMark = () => tunSeg.querySelectorAll("button").forEach(b => { const on = b.dataset.mode === rsTerrainTunnels(); b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on)); });
-  for(const [v, t] of [["show", "Show"], ["fade", "Fade"], ["hide", "Hide"]]){
-    const b = _bxEl("button", "", t); b.type = "button"; b.dataset.mode = v; b.setAttribute("role", "radio");
-    b.onclick = () => { rsTerrainTunnels(v); tunMark(); };
-    tunSeg.appendChild(b);
-  }
-  tunMark();
-  tunRow.append(_bxEl("span", "", "Tunnels"), tunSeg); menu.appendChild(tunRow);
+  // the opacity of the tunnels on the terrain: a slider as the buildings' Opacity, 0 (hidden) to 1 (shown)
+  const tunRow = _bxEl("label", "rs-set-slide rs-bm-opacity rs-bm-tunnels"), tunIn = _bxEl("input"), tunVal = _bxEl("b");
+  tunIn.type = "range"; tunIn.min = "0"; tunIn.max = "1"; tunIn.step = "0.05"; tunIn.id = "rs-top-terrain-tunnels";
+  const tunShow = v => { tunIn.value = v; tunVal.textContent = (+v).toFixed(2); };
+  tunShow(rsTunnelsOpacity());
+  tunIn.oninput = () => rsTunnelsOpacity(+tunIn.value);
+  document.addEventListener("rs:tunnelsopacitychange", e => tunShow(e.detail.opacity));
+  tunRow.append(_bxEl("span", "", "Tunnels"), tunIn, tunVal); menu.appendChild(tunRow);
   topRow("labels", "Labels");
   topRow("arrows", "One-way arrows").checked = rsArrowsOn();       // on, unless the person turned them off in this browser (arrows.js keeps the state)
   topRow("buildings", "3D buildings");
@@ -129,6 +126,7 @@ export function buildBox(menu){
   window.rsTerrain = rsTerrain;
   window.rsGround = rsGround;
   window.rsTerrainTunnels = rsTerrainTunnels;
+  window.rsTunnelsOpacity = rsTunnelsOpacity;
   document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; tunRow.hidden = !e.detail.on; });
   document.addEventListener("rs:buildings3dchange", () => { opRow.hidden = !(tops.buildings.c.checked || (_ownBuildings() && window.rsGetBuildings3D && window.rsGetBuildings3D())); });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
