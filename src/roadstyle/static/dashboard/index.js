@@ -1,7 +1,7 @@
 // roadstyle's map dashboard, the entry: rsDashboard(map, options) adds the map controls and the road interaction of roadstyle's page
 // to a MapLibre map (docs/design/dashboard_module.md). The options have the names of render_web.render's keywords; the values are
 // those the page reads (render_web.py makes them). Call it right after `new maplibregl.Map(...)`, before the map's "load" event.
-import {initCore, useStyle, _contractError, _emit} from "./core.js";
+import {initCore, useStyle, _contractError, _emit, setPrefix} from "./core.js";
 import {requestsOf, setAdapter, httpAdapter} from "./adapter.js";
 import {initGeneration, useGeneration} from "./generation.js";
 import {initTemplate, setSheet, getSheet} from "./template.js";
@@ -145,7 +145,8 @@ export function rsDashboard(map, options){
   initOverlay();
   const rs = makeApi({
     // roadLayers (roadlayers.js) on this map and this dashboard: a host page that puts a new roads style on its map (a server's tiled style, a LiveMap's)
-    roadLayers(opts = {}){ return roadLayers({map, dashboard: rs, ...opts}); },
+    // the dashboard reads the roads with the prefix of their layers: a page made with no prefix (page_from) takes the prefix of roadLayers ("rs-" by default)
+    roadLayers(opts = {}){ const prefix = opts.prefix ?? "rs-"; setPrefix(prefix); return roadLayers({map, dashboard: rs, ...opts, prefix}); },
     // a new roads style: the page added its sources and layers to the map first (with the prefix). The controls stay; they read the
     // new style, its metadata and its layers. The selection and the hover go: they were the old roads'.
     setStyle(style, more){

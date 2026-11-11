@@ -5,6 +5,8 @@ export let map = null, style = null, O = {};
 // the prefix of the roads style's source and layer ids in the map: a page that adds the style beside its own adds one ("rs-");
 // the names in the style itself (a layer's source-layer, its metadata) stay without it
 export let RS_PREFIX = "";
+// the prefix of the roads' sources and layers on the map: rsDashboard's option, or the prefix of rs.roadLayers (a page whose roads come later)
+export function setPrefix(p){ RS_PREFIX = p; }
 // tiles=True: the roads are a vector source (the template's no-roads message reads it). The modules do not branch on it: they read the
 // source map (_src) and the road table (RoadTable).
 export let RS_TILED = false;
