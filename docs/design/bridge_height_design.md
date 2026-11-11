@@ -16,18 +16,64 @@ design rules give. It uses no measured data of one bridge.
 
 ## The design rules
 
-| # | Rule | Value | Status | Source |
-|---|---|---|---|---|
-| 1 | Clearance of a bridge over a road | 16 ft (4.9 m) for a freeway and an arterial, 14 ft (4.3 m) for other roads. Add 6 in (0.15 m) for a new surface. So 5.0 m | Found in a state manual | [FDOT bulletin RDB10-10](https://www.fdot.gov/docs/default-source/content-docs/roadway/bulletin/RDB10-10.pdf), [TxDOT: vertical clearance](https://www.txdot.gov/manuals/des/rdw/chapter-4--basic-design-criteria/4-8-vertical-alignment/4-8-6-vertical-clearance.html) |
-| 2 | Clearance over a railway | 23 ft (7.0 m) to 23 ft 6 in (7.2 m) above the top of the rail. The railway can ask for more | Found in three state manuals | [Illinois](https://my.ilga.gov/ftp/JCAR/AdminCode/092/092015000C01600R.html), [NCDOT](https://connect.ncdot.gov/projects/Roadway/Roadway%20Design%20Manual/08-12.%20%20Guide%20for%20Paving%20Shoulders%20Under%20Bridges.pdf.pdf), [TxDOT](https://www.txdot.gov/manuals/rrd/rho/exhibit_a_and_pse_design/exhibit_a_design-i1005859/guidelines_on_projects_with_overpasses-i1006139.html) |
-| 3 | Clearance over navigable water | Set by the authority of the waterway. There is no general value | Not researched | The user gives it |
-| 4 | Depth of the structure | A steel plate girder is about span ÷ 25 deep (slab and girder). A steel box girder is span ÷ 20 to ÷ 25 for a simple span and ÷ 25 to ÷ 35 for a continuous one. A concrete structure: not confirmed | Found in secondary sources | [Mead & Hunt](https://meadhunt.com/?p=63129), [a textbook excerpt](https://ingenieriasismica.utpl.edu.ec/sites/default/files/publicaciones/UCG-ES-00536.pdf), [lecture notes](https://www.scribd.com/document/392377472/Design-of-Box-Girder-Bridges) |
-| 5 | Maximum grade | It depends on the road class, the terrain and the design speed. The maximum value must be used rarely and is not a target. A bridge has no limit of its own. It follows the road | The rule is found. **The numbers of the tables are not**. They are settings | [TxDOT: grades](https://www.txdot.gov/manuals/des/rdw/chapter-4--basic-design-criteria/4-8-vertical-alignment/4-8-1-grades.html), [Kentucky summary of the AASHTO Green Book](https://kp.uky.edu/?p=23524) |
-| 6 | Least grade on a long bridge | At least 0.5 % so that water runs off | Found in one state manual | [Iowa DOT: vertical alignment](https://iowadot.gov/design-manual/chapter-2-alignments/2c-vertical-alignment) |
-| 7 | Low point on a bridge | A sag curve must not put its low point on a bridge | Found in one state manual | Iowa DOT, same page |
-| 8 | A vertical curve | `L = K × A`. `A` is the change of grade in percent. The preferred least length is about 3 × the design speed (in mph and feet), which is 0.6 × V (V in km/h, L in metres). It is not a design control if the sight distance is met | Found | [TxDOT: vertical curves](https://www.txdot.gov/manuals/des/rdw/chapter-4--basic-design-criteria/4-8-vertical-alignment/4-8-2-vertical-curves.html), [LibreTexts: vertical curves](https://eng.libretexts.org/Bookshelves/Civil_Engineering/Fundamentals_of_Transportation/07:_Geometric_Design/7.05:_Vertical_Curves) |
-| 9 | `K` from the stopping sight distance `S` | Crest: `K = S² ÷ 658`. Sag: `K = S² ÷ (120 + 3.5 S)`. `S = 0.278 V t + V² ÷ (254 × a ÷ 9.81)`, with `t` = 2.5 s and `a` = 3.4 m/s² (the AASHTO values) | **Derived, and checked**: the formulas give 247 ft per percent at 70 mph, and 473 (crest) and 260 (sag) at 85 mph. The search results have 247 at 70 mph (a worked example) and 473 and 260 at 85 mph (the TxDOT table). A test keeps this | TxDOT, LibreTexts |
-| 10 | The ends | A deck meets the approach road at its height. The roads that meet at a node have the same height there | Principle | |
+**1. Clearance of a bridge over a road**
+
+- Value: 16 ft (4.9 m) for a freeway and an arterial, 14 ft (4.3 m) for other roads. Add 6 in (0.15 m) for a new surface. So 5.0 m
+- Status: Found in a state manual
+- Source: [FDOT bulletin RDB10-10](https://www.fdot.gov/docs/default-source/content-docs/roadway/bulletin/RDB10-10.pdf), [TxDOT: vertical clearance](https://www.txdot.gov/manuals/des/rdw/chapter-4--basic-design-criteria/4-8-vertical-alignment/4-8-6-vertical-clearance.html)
+
+**2. Clearance over a railway**
+
+- Value: 23 ft (7.0 m) to 23 ft 6 in (7.2 m) above the top of the rail. The railway can ask for more
+- Status: Found in three state manuals
+- Source: [Illinois](https://my.ilga.gov/ftp/JCAR/AdminCode/092/092015000C01600R.html), [NCDOT](https://connect.ncdot.gov/projects/Roadway/Roadway%20Design%20Manual/08-12.%20%20Guide%20for%20Paving%20Shoulders%20Under%20Bridges.pdf.pdf), [TxDOT](https://www.txdot.gov/manuals/rrd/rho/exhibit_a_and_pse_design/exhibit_a_design-i1005859/guidelines_on_projects_with_overpasses-i1006139.html)
+
+**3. Clearance over navigable water**
+
+- Value: Set by the authority of the waterway. There is no general value
+- Status: Not researched
+- Source: The user gives it
+
+**4. Depth of the structure**
+
+- Value: A steel plate girder is about span ÷ 25 deep (slab and girder). A steel box girder is span ÷ 20 to ÷ 25 for a simple span and ÷ 25 to ÷ 35 for a continuous one. A concrete structure: not confirmed
+- Status: Found in secondary sources
+- Source: [Mead & Hunt](https://meadhunt.com/?p=63129), [a textbook excerpt](https://ingenieriasismica.utpl.edu.ec/sites/default/files/publicaciones/UCG-ES-00536.pdf), [lecture notes](https://www.scribd.com/document/392377472/Design-of-Box-Girder-Bridges)
+
+**5. Maximum grade**
+
+- Value: It depends on the road class, the terrain and the design speed. The maximum value must be used rarely and is not a target. A bridge has no limit of its own. It follows the road
+- Status: The rule is found. **The numbers of the tables are not**. They are settings
+- Source: [TxDOT: grades](https://www.txdot.gov/manuals/des/rdw/chapter-4--basic-design-criteria/4-8-vertical-alignment/4-8-1-grades.html), [Kentucky summary of the AASHTO Green Book](https://kp.uky.edu/?p=23524)
+
+**6. Least grade on a long bridge**
+
+- Value: At least 0.5 % so that water runs off
+- Status: Found in one state manual
+- Source: [Iowa DOT: vertical alignment](https://iowadot.gov/design-manual/chapter-2-alignments/2c-vertical-alignment)
+
+**7. Low point on a bridge**
+
+- Value: A sag curve must not put its low point on a bridge
+- Status: Found in one state manual
+- Source: Iowa DOT, same page
+
+**8. A vertical curve**
+
+- Value: `L = K × A`. `A` is the change of grade in percent. The preferred least length is about 3 × the design speed (in mph and feet), which is 0.6 × V (V in km/h, L in metres). It is not a design control if the sight distance is met
+- Status: Found
+- Source: [TxDOT: vertical curves](https://www.txdot.gov/manuals/des/rdw/chapter-4--basic-design-criteria/4-8-vertical-alignment/4-8-2-vertical-curves.html), [LibreTexts: vertical curves](https://eng.libretexts.org/Bookshelves/Civil_Engineering/Fundamentals_of_Transportation/07:_Geometric_Design/7.05:_Vertical_Curves)
+
+**9. `K` from the stopping sight distance `S`**
+
+- Value: Crest: `K = S² ÷ 658`. Sag: `K = S² ÷ (120 + 3.5 S)`. `S = 0.278 V t + V² ÷ (254 × a ÷ 9.81)`, with `t` = 2.5 s and `a` = 3.4 m/s² (the AASHTO values)
+- Status: **Derived, and checked**: the formulas give 247 ft per percent at 70 mph, and 473 (crest) and 260 (sag) at 85 mph. The search results have 247 at 70 mph (a worked example) and 473 and 260 at 85 mph (the TxDOT table). A test keeps this
+- Source: TxDOT, LibreTexts
+
+**10. The ends**
+
+- Value: A deck meets the approach road at its height. The roads that meet at a node have the same height there
+- Status: Principle
 
 What I could not verify: the numbers of the maximum grade for each road class, the clearance over water, and the depth of a concrete structure. The numbers in the maximum-grade tables of the AASHTO Green Book and of the
 Canadian TAC guide (Vancouver uses the BC supplement) must be read from the books by the person who sets the defaults.

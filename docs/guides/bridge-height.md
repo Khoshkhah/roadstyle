@@ -195,8 +195,9 @@ It writes `__rs_base = H × lift(x_middle)` and `__rs_height = __rs_base + thick
 
 ![The profile of a straight bridge for four lengths](../img/bridge-height/profile.png)
 
-The figure shows the profile of one straight bridge for four lengths. The engine made it with the default look. The orange band is the deck. The dashed line is H.
-Make the figure again with `python docs/img/bridge-height/make.py`.
+The figure shows the profile of one straight bridge for four lengths. The engine made it with the default look. In the top row, the orange band is the deck and the dashed line is H.
+The vertical scale is larger than the horizontal scale, by the number under each picture (36 times for the bridge of 800 m), so a ramp looks steeper than it is. The bottom row shows the true slope in
+percent. On every ramp the steepest slope is 18.8 %, which is 1.5 times the average of 12.5 %. Make the figure again with `python docs/img/bridge-height/make.py`.
 
 ## Part 2. The page draws the profile
 

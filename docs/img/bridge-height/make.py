@@ -12,6 +12,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import matplotlib
+import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -38,8 +39,10 @@ def deck_pieces(length_m):
 
 
 def main():
-    fig, axes = plt.subplots(1, len(LENGTHS), figsize=(12.5, 3.6), sharey=True)
-    for ax, length in zip(axes, LENGTHS, strict=True):
+    fig, axes = plt.subplots(2, len(LENGTHS), figsize=(12.5, 6.2), gridspec_kw={"height_ratios": [3, 1.6]})
+    steepest = []
+    for col, length in enumerate(LENGTHS):
+        ax, ax2 = axes[0][col], axes[1][col]
         pieces = deck_pieces(length)
         full, thick = pieces[0]["__rs_full"], pieces[0]["__rs_thick"]
         xs, under, top = [], [], []
@@ -55,14 +58,31 @@ def main():
         peak = max(under)
         ax.set_title(f"{length} m long\ngroup height {full:.1f} m" + ("" if peak > full - 0.05 else f"\nthe deck reaches {peak:.1f} m"), fontsize=10)
         ax.set_xlim(0, length)
-        ax.set_xlabel("metres along the bridge", fontsize=9)
+        ax.set_ylim(-1, 25)
         ax.spines[["top", "right"]].set_visible(False)
         ax.tick_params(labelsize=8)
-    axes[0].set_ylabel("metres above the ground", fontsize=9)
-    axes[0].set_ylim(-1, 25)
+        # the true slope in percent, from the underside of the deck
+        grid = np.arange(0, length + 0.25, 0.5)
+        z = np.interp(grid, xs, under)
+        slope = np.abs(np.gradient(z, grid)) * 100
+        steepest.append(float(slope.max()))
+        ax2.fill_between(grid, slope, color="#64748b", alpha=0.35, linewidth=0)
+        ax2.plot(grid, slope, color="#475569", linewidth=1.0)
+        ax2.set_xlim(0, length)
+        ax2.set_ylim(0, 25)
+        ax2.spines[["top", "right"]].set_visible(False)
+        ax2.tick_params(labelsize=8)
+        ax2.set_xlabel("metres along the bridge", fontsize=9)
+        ax2.text(0.97, 0.9, f"steepest {slope.max():.1f} %", transform=ax2.transAxes, ha="right", va="top", fontsize=8)
+    axes[0][0].set_ylabel("metres above the ground", fontsize=9)
+    axes[1][0].set_ylabel("slope, in percent", fontsize=9)
     fig.tight_layout()
+    for col, length in enumerate(LENGTHS):               # how much larger the vertical scale is than the horizontal scale, in each picture
+        pos = axes[0][col].get_position()
+        exaggeration = (length / (pos.width * 12.5)) / (26 / (pos.height * 6.2))
+        axes[0][col].set_xlabel(f"the vertical scale is {exaggeration:.0f} times larger", fontsize=8, color="#9a4f00")
     fig.savefig(HERE / "profile.png", dpi=130)
-    print("wrote", HERE / "profile.png")
+    print("wrote", HERE / "profile.png", "| steepest slopes:", [round(v, 1) for v in steepest])
 
 
 if __name__ == "__main__":

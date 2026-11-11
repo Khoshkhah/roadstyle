@@ -125,13 +125,16 @@ def main():
         ax.axhline(height, color="#2563eb", linewidth=0.8, linestyle=(0, (1, 2)))
         ax.axhline(0, color="#64748b", linewidth=1.0)
         ax.set_title(f"{ell:.0f} m long, needs {height:.1f} m at {g:.0%}\nreaches {apex:.1f} m, steepest {slope:.1f} %", fontsize=9)
-        ax.set_xlabel("metres along the bridge", fontsize=8)
         ax.tick_params(labelsize=8)
         ax.spines[["top", "right"]].set_visible(False)
         ax.legend(fontsize=7, loc="lower center", bbox_to_anchor=(0.5, -0.42), frameon=False)
         print(f"  {ell:.0f} m (needs {height:.1f} m, grade {g:.0%}): the deck reaches {apex:.2f} m, steepest {slope:.2f} %, curves {[round(c) for c in curves]}; today's engine: {today_slope:.1f} %")
     axes[0].set_ylabel("metres above the ground", fontsize=8)
     fig.tight_layout()
+    for ax, ell in zip(axes, (300.0, 200.0, 1200.0), strict=True):          # how much larger the vertical scale is than the horizontal scale
+        pos, (low, high) = ax.get_position(), ax.get_ylim()
+        exaggeration = (ell / (pos.width * 12.5)) / ((high - low) / (pos.height * 4.4))
+        ax.set_xlabel(f"metres along the bridge (the vertical scale is {exaggeration:.0f} times larger)", fontsize=8)
     fig.savefig(HERE / "design_rules.png", dpi=120)
 
 
