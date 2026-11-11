@@ -287,6 +287,34 @@ error that says so. Nothing takes its place.
   not call it yet.
 - **`rs.setFrames` and the frame window** (plan step 3).
 
+### Step 3: way D, the engine as a local program (2026-11-11)
+
+`roadstyle local ROADS.parquet` ([CLI](../rust/cli.md#run-the-engine-as-a-local-program-way-d), the crate `roadstyle-local`) is the program that answers the
+addresses of `rsHttpAdapter` (step 2). It is built on three parts that exist:
+
+- **The server.** `roadstyle-serve`, the small Rust server of `levels edit` and `design edit`, gets one hook: `Api`, a trait with
+  `answer(&Request) -> Option<Response>`. The server moves bytes (the Host check, the Origin check of a POST, the size limits). An address that
+  the `Api` does not answer goes to the page files. The server has no rule about roads.
+- **The engine.** `Local::open` calls `sources_of` (stage 1) and `tiles_of_sources` (stage 2) once. A tile is `Tiles::tile_in`, a row is a row of
+  `write_road_table`, a line is `write_road_lines`. These are the functions that the WebAssembly package calls in way C (`Tiler.tile`,
+  `Sources.roadTable`, `Sources.roadLines`). The crate has no rule of its own (rule 1 of the guide).
+- **DuckDB.** `duckdb` 1.10506.1, bundled (the version of duckOSM). A view for the roads file (`roads`), for each `--table`, and for the file of a
+  run (`frames`). `POST /query` runs a statement and answers `{columns, rows}`; a 64-bit integer is a text, which `rsHttpAdapter` makes a `BigInt`.
+  `GET /frames` reads the window with one query and gives the binary form of the adapter.
+
+**The page.** `/local/` is the standard dashboard with `rsHttpAdapter(location.origin)` and no road table. The style comes from `/style.json`
+(the tile addresses are relative; the adapter puts its base before them) and has the box of the roads in `metadata["roadstyle:bounds"]`.
+
+**One tile, two ways, one hash.** `rust/roadstyle-rs/tests/data/monaco/way_d_tiles.json` holds the size and the SHA-256 (16 characters) of three
+Monaco tiles (zoom 12, 14 and 15). The native test (`roadstyle-local/tests/local.rs`) checks that the program's tile is the engine's tile (the same bytes as
+`tiled_from_parquet`, which the WebAssembly `Tiler` calls) and that its hash is in the file. `cross_language.mjs` (the wasm package in Node, way C) checks
+the same file. So way C and way D give the same bytes, and a change in one of them shows in the other.
+
+**What is not in the program yet.** It reads roads only: the base map, the boundary and the overlays, the 3D walls and decks, and the ground
+are not tiles of the program. It reads a GeoParquet file, not the `.duckdb` file of an area (duckOSM's build page does that with its own
+route and `rs.roadLayers`, PR 157). The rows of all the roads are in the program's memory (the road table), as in the wasm path; a Parquet
+file read on demand is the next step when an area is too large for that. The page does not use the frames yet (`rs.setFrames`).
+
 ## The design
 
 ### Where the data lives

@@ -93,11 +93,11 @@ jobs:
           cargo fetch --locked
           roadstyle-rs/tests/get_goldens.sh
 
-      - name: The programs (roadstyle-cli, roadstyle-mcp and roadstyle-snapshot are not default members)
+      - name: The programs (roadstyle-cli, roadstyle-mcp, roadstyle-snapshot and roadstyle-local are not default members)
         env:
           CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
           CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS: "true"
-        run: cargo test --offline --release -p roadstyle-cli -p roadstyle-mcp -p roadstyle-snapshot
+        run: cargo test --offline --release -p roadstyle-cli -p roadstyle-mcp -p roadstyle-snapshot -p roadstyle-local
 
 
   rust-wasm:

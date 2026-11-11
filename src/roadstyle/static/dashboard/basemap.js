@@ -11,7 +11,9 @@ let BASEMAPS = [];
 // its far tiles at a lower zoom, and where the 3D buildings stop the flat ones show. window.rsBuildings(on) hides or shows the buildings in both modes.
 // window.rsBuildingsOpacity(value) sets the opacity of the 3D buildings (buildings_opacity=, else `ontop.buildings.opacity` of data/basemaps.json).
 let vec = null, buildingsOn = true, glyphs0 = null, sprite0 = null, bOpacity = null;
-const opacityNow = ()=>bOpacity ?? O.buildings_opacity ?? (O.ontop && O.ontop.buildings || {}).opacity ?? 1;
+// the opacity now: the person's, else the page's, else the area's own 3D buildings' (their style's paint, while they are on the map), else the base map's
+const ownNow = ()=>{ const ov = OVERLAYS.find(o=>o.extrude && map.getLayer(o.extrude)); const v = ov && map.getPaintProperty(ov.extrude, "fill-extrusion-opacity"); return typeof v === "number" ? v : null; };
+const opacityNow = ()=>bOpacity ?? O.buildings_opacity ?? ownNow() ?? (O.ontop && O.ontop.buildings || {}).opacity ?? 1;
 // the area's own 3D buildings (the overlays' 3D layers, features.js) take the opacity too, once the person or the page set one (else their style's)
 export function _ownOpacity(){
   const v = bOpacity ?? O.buildings_opacity;
@@ -67,8 +69,12 @@ const flatWithoutHeight = s=>{
     if(Array.isArray(e) && e[0] === "get" && e.length === 2) l.paint[k] = ["coalesce", e, 0];
   }
 };
-const mergeVector = async b=>{
+// asked: the number of the last rsSetBasemap. A vector style that comes after a later choice is not merged (a phone: the page asks for the blank map
+// before the first style has come, and the late style must not come back over it).
+let asked = 0;
+const mergeVector = async (b, n)=>{
   const s = await (await fetch(b.style_url)).json();
+  if(n !== asked) return;
   flatWithoutHeight(s);
   addExtrusion(s, b);
   clearVector();
@@ -120,8 +126,9 @@ export function rsSetBasemap(keyOrIdx){
   const twin = BASEMAPS[idx] && BASEMAPS[idx].dark && document.documentElement.dataset.rsTheme === "dark" ? BASEMAPS.findIndex(b=>b.key === BASEMAPS[idx].dark) : -1;
   if(twin >= 0) idx = twin;
   const b = BASEMAPS[idx]; if(!b) return;
+  const n = ++asked;
   if(!b.style_url) clearVector();
-  if(b.style_url){ mergeVector(b); }
+  if(b.style_url){ mergeVector(b, n); }
   else if(b.tiles.length && map.getLayer("basemap")){
     // rebuild the source, not setTiles: a raster source's maxzoom (past it the last level is
     // scaled up) and its attribution are fixed when it is created. Same ids, same place in the
