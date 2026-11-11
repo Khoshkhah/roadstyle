@@ -26,7 +26,7 @@ let _bmHeights = new Map();                          // group -> the metres that
 let _bmShown = null;                                 // the ids of the features that the filters show (filter.js); null: all
 let _bmGeom = true, _bmDirty = new Set(), _bmAll = true;
 let _bmEnds = new Map(), _bmMiss = false, _bmRetry = 0;   // chain -> {za, zb} the ground at its two ends (terrain on), a height that was not there yet, the tries
-let _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9};   // what the last build found wrong in its own vertices (`_bmStats`)
+let _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9, landings: 0};   // what the last build found wrong in its own vertices (`_bmStats`)
 let _bmPosArr = null, _bmBounds = null;               // the vertices (mercator units from the origin) for the pick, and the bounds of each feature
 let _bmGl = null, _bmProg = null, _bmBuf = {}, _bmLoc = {}, _bmOrigin = [0, 0], _bmOp = null, _bmPatched = null;
 
@@ -37,6 +37,13 @@ const _bmOn = () => { try { return map.getGlobalState().rs_bridges3d !== false; 
 const _bmSrc = () => { const s = _src("decks"); return s ? s.source : null; };
 const _bmMerc = (lon, lat) => [(lon + 180) / 360, 0.5 - Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) / (2 * Math.PI)];
 
+// the free ends of the chains, from the bridge profile: a Set of "<chain number>:0" (the start) and "<chain number>:1" (the end) for each chain end at a `ground` node. The chain id of the profile is c<N>.
+function _bmFreeEnds(){
+  const out = new Set(), prof = O.bridge_profile;
+  ((prof && prof.groups) || []).forEach(g => { const kind = new Map(g.nodes.map(n => [n.id, n.kind]));
+    g.chains.forEach(c => { const n = c.id.slice(1); if(kind.get(c.from) === "ground") out.add(n + ":0"); if(kind.get(c.to) === "ground") out.add(n + ":1"); }); });
+  return out;
+}
 // the decks' full height in metres: the group's own when it was set, else the look's (`__rs_full`)
 function _bmHeight(p){ const h = _bmHeights.get(p.__rs_group); return h == null ? p.__rs_full : h; }
 
@@ -113,7 +120,7 @@ function _bmBuild(){
   let o = null;
   // the ground at the two end nodes of each chain (the terrain on): the deck is level between them. The nodes are the engine's (`__rs_enda`, `__rs_endb`), the same
   // coordinates for the chains that meet at a node, so they agree on its height
-  _bmEnds = new Map(); _bmMiss = false; _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9};
+  _bmEnds = new Map(); _bmMiss = false; _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9, landings: 0};
   if(map.getTerrain()){
     const e = new Map();
     _bmFeats.forEach(f => { const p = f.properties; if(p.__rs_casing_slab || !(p.__rs_enda || p.__rs_endb)) return;
@@ -175,6 +182,12 @@ function _bmBuild(){
         const sh = 0.6 + 0.3 * Math.abs((dy / d) * _bmLight[0] - (dx / d) * _bmLight[1]);
         quad(v(S[i], top(i, sd)), v(S[i + 1], top(i + 1, sd)), v(S[i + 1], bot(i + 1, sd)), v(S[i], bot(i, sd)), sh);
       }
+    }
+    // A LANDING ON FILL: a free end of a chain (a `ground` node of the bridge profile) that the profile gave a height above 0 is a deck that goes on to a street on fill. Its end is closed
+    // with a face down to the ground. (A junction is not a free end: the next deck goes on there.) With no profile, a free end is on the ground and has no face.
+    if(!cas){
+      for(const [end, i, up] of [[0, 0, p.__rs_lift0 > 0.01 && p.__rs_s0 < 1e-6], [1, m - 1, p.__rs_lift1 > 0.01 && p.__rs_s1 > 1 - 1e-6]])
+        if(up && _bmFreeEnds().has(p.__rs_chain + ":" + end)){ quad(v(A[i], top(i, 0)), v(B[i], top(i, 1)), v(B[i], GS[1][i]), v(A[i], GS[0][i]), 0.7); _bmStat.landings++; }
     }
     _bmRanges.push([first, shade.length]);
   });
