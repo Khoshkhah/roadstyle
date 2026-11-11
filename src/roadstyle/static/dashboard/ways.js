@@ -14,6 +14,7 @@
 //   POST base/lines            [id, ...]          [[[lon, lat], ...] | null, ...]
 //   POST base/query            {sql}              {columns: [{name, type}], rows: [[...]]}: a BIGINT value is a text, and this adapter makes it a BigInt
 //   GET  base/schema                              {tables: [{name, rows, about}]}
+//   GET  base/road_table, base/road_ends          the whole road table ({props, mids, bboxes}), and the ends of each road (f64: start lon, lat, end lon, lat)
 //   GET  base/frames?from=<i>&to=<j>              the frames from i up to j: u32 frames, u32 values, then for each frame f64 t and f32 for each value (little endian)
 // An error status is an Error with the text of the answer.
 const BIG = /^(U?BIGINT|HUGEINT|UHUGEINT)$/i;
@@ -41,6 +42,9 @@ export function httpAdapter(base, {fetch: get = globalThis.fetch.bind(globalThis
       return {columns: r.columns, rows: r.rows.map(row => row.map((v, k) => big[k] && v !== null ? BigInt(v) : v))};
     },
     schema: async () => (await ok(await get(url("/schema")))).json(),
+    // the whole road table ({props, mids, bboxes}) and the ends of each road (4 numbers for each row): for a part that needs every row (the level editor)
+    table: async () => (await ok(await get(url("/road_table")))).json(),
+    ends: async () => new Float64Array(await (await ok(await get(url("/road_ends")))).arrayBuffer()),
     frames: async (from, to) => {
       const buf = await (await ok(await get(url(`/frames?from=${from}&to=${to}`)))).arrayBuffer(), v = new DataView(buf);
       const n = v.getUint32(0, true), len = v.getUint32(4, true), out = [];
@@ -103,7 +107,10 @@ export function engineAdapter({tiler, sources = null, format = undefined, query 
       return ids.map(i => table[i] ?? null);
     },
   };
-  if(sources) out.lines = async ids => JSON.parse(new TextDecoder().decode(sources.roadLines(Uint32Array.from(ids))));
+  if(sources){
+    out.lines = async ids => JSON.parse(new TextDecoder().decode(sources.roadLines(Uint32Array.from(ids))));
+    out.table = async () => JSON.parse(new TextDecoder().decode(sources.roadTable(undefined, false)));
+  }
   if(query) out.query = query;
   if(schema) out.schema = schema;
   return out;

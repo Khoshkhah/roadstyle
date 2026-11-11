@@ -3,6 +3,8 @@
 //   rows    the fields of some roads (a popup)       adapter.rows(source, ids)       -> Promise<(object | null)[]>, one for each id
 //   query   a SQL query (the data dock, Ask)         adapter.query(sql, {signal})    -> Promise<{columns: [{name, type}], rows}>
 //   frames  a window of frames of a run              adapter.frames(from, to)        -> Promise<{t, values: Float32Array}[]>
+// Also `table()` (the whole road table, {props, mids, bboxes}) and `ends()` (Float64Array, 4 numbers for each row): a part that needs every row, the
+// level editor (levelEditPart), asks for them on a page that keeps no road table.
 // The adapter also has `lines(ids)` (the line of each road, [[lon, lat], ...]), `schema()` (the tables, as the data dock asks) and `style()` (the
 // roads' style, with the tile addresses of the way). Every function is optional. A page uses what it needs. A function that the adapter has not got
 // makes `rs.request.<name>` throw an error that says so: nothing replaces it.
@@ -29,6 +31,8 @@ export function requestsOf(){
     schema: () => need("schema")(),
     frames: (from, to) => need("frames")(from, to),
     lines: ids => need("lines")(ids),
+    table: () => need("table")(),
+    ends: () => need("ends")(),
   };
 }
 // `rs.setAdapter(adapter)`: the adapter of the page (null: none). The rows and lines of the old adapter go.

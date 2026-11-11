@@ -166,6 +166,8 @@ roadstyle local roads.parquet --table sensors=sensors.parquet --frames run.parqu
 | A query, the tables | `POST /query`, `GET /schema` | DuckDB on the Parquet files: the roads file is the table `roads`; `--table NAME=FILE` adds more |
 | A window of frames | `GET /frames?from=<i>&to=<j>` | DuckDB on the file of a run (`--frames`: the columns `frame`, `t`, `row`, `value`) |
 | A redraw with new levels | `POST /relevel`, rows of `levels.csv` | the engine (`LiveTiles::relevel`); see "The redraw of way D" below |
+| The whole road table, the ends of the roads | `GET /road_table`, `GET /road_ends` | the engine (`write_road_table`, `road_ends`): the level editor (`levelEditPart`) borrows them while it is open, on a page that keeps no road table |
+| The 3D walls | `POST /walls` (the GeoJSON of `rsSetWalls`), then `GET /tiles/walls/<z>/<x>/<y>` | the engine (`LiveTiles::set_walls`): the walls as tiles of the map, as the map worker of way C cuts them |
 
 The page at `/local/` is the standard dashboard. It uses the adapter `rsHttpAdapter(location.origin)`
 ([the adapter](../reference/javascript.md)) and keeps no road table: a click on a road asks the program for its row, and a query of the
@@ -282,7 +284,7 @@ and the four ways use it. This keeps the four ways equal: a change or a fix in o
 |---|---|---|---|---|---|
 | [Road lines](#road-lines-and-other-layers) | Tiles | Tiles in the file | Tiles from the PMTiles file | The map worker makes a tile when the map asks for it | The program makes a tile when the map asks for it (built) |
 | [Other layers](#road-lines-and-other-layers) (water, land, buildings, boundary) | Tiles | Tiles in the file (the rows of an overlay are also in the page) | Tiles | Tiles from the map worker | Tiles from the program (built: a program that uses the crate gives the rows, as `duckosm studio` does; the command line reads roads only) |
-| [3D objects](#3d-objects) (walls, bridge decks, piers) | Pieces by tile | All objects at one time (planned: by tile) | Planned: by tile | Walls: tiles from the map worker. Decks: all at one time (planned: by tile). | Planned: pieces by tile from the program |
+| [3D objects](#3d-objects) (walls, bridge decks, piers) | Pieces by tile | All objects at one time (planned: by tile) | Planned: by tile | Walls: tiles from the map worker. Decks: all at one time (planned: by tile). | Walls: tiles from the program (`POST /walls`, built). Decks: planned |
 | [The ground](#the-ground) | Tiles of one terrain file | The terrain file at a URL | Tiles from the terrain file | A terrain file on the browser disk | Planned: the terrain file on the disk, by tile from the program |
 | [Tables](#tables-in-memory-or-on-the-disk) (road fields, popups, queries) | Rows, read by query | The road table in the page | The rows from `props.json`; the queries by the host (Parquet at a URL) | The engine's road table; the queries by the host (in memory or on the browser disk) | The program queries the Parquet files and a `.duckdb` file on the disk with DuckDB (built) |
 | [Values in time](#values-in-time) | Frames | One table of values at a time | One table of values at a time | One table of values at a time (planned: a window of frames) | The program gives the frames of the window (built; the page does not use them yet) |
