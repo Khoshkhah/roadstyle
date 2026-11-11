@@ -27,7 +27,14 @@ const map = new maplibregl.Map({container:"map", style:style, center:cam.center,
 function _flatTiles(){ Object.keys(style.sources).forEach(id=>{ const s=map.getSource(id); if(s && s.type!=="raster") s.calculateTileZoom=z=>z; }); }
 map.on("styledata", _flatTiles);
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}));    // dragging the compass turns the map and, up or down, changes its tilt; a click sets north and the tilt back. The icon does not lean: the page cancels MapLibre's transform (dashboard.css)
-map.addControl(new maplibregl.ScaleControl({maxWidth:120, unit:"metric"}), "bottom-left");
+// The scale bar. MapLibre's control measures itself on every "move" with map.unproject. With the 3D terrain on, each unproject reads pixels back
+// from the GPU (the terrain's coordinates framebuffer), so every frame of a pan waited for the GPU (2026-11-11: 99% of a pan's time in Burnaby).
+// With the terrain on, the bar is measured when the move ends; with it off, on every move as before.
+const _scale = new maplibregl.ScaleControl({maxWidth:120, unit:"metric"});
+map.addControl(_scale, "bottom-left");
+map.off("move", _scale._onMove);
+map.on("move", ()=>{ if(!map.getTerrain()) _scale._onMove(); });
+map.on("moveend", ()=>{ if(map.getTerrain()) _scale._onMove(); });
 rsDashboard(map, {...RS_OPTIONS, style: style});
 // Self-diagnosis: a map with zero road features is a broken page, not an empty area — say WHY
 // on the map itself (frontends like notebook webviews surface no console). Amber banner reports

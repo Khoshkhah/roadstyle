@@ -183,7 +183,8 @@ export function initSelect(){
   initSpot();
   window.rsDeselect = rsDeselect;
   window.rsSelect = rsSelect;
-  map.on("mousemove", e=>{ if(_NO_HOVER.matches) return; _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
+  // no hover pick while the map moves (a drag): with the 3D terrain on, each pick reads pixels back from the GPU and stalls the frame
+  map.on("mousemove", e=>{ if(_NO_HOVER.matches || map.isMoving()) return; _pt=e.point; if(!_raf) _raf=requestAnimationFrame(hoverFrame); });
   map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; _cur=null; clearTimeout(_tipT); if(_tip) _tip.remove(); });
   map.on("click", async e=>{
     if(_spDotClick(e)) return;       // a photo's dot of the Street View coverage opens that photo
