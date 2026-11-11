@@ -1,7 +1,7 @@
 # How a dashboard holds its data
 
 <p class="lead">A dashboard shows several types of data: road lines, other map layers, 3D objects, the ground, tables, and values that
-change with time. This page tells how each type gets into the browser, in each of the three ways to run a dashboard.</p>
+change with time. This page tells how each type gets into the browser, in each of the four ways to run a dashboard.</p>
 
 ## The rule
 
@@ -13,28 +13,44 @@ To obey this rule, roadstyle cuts each type of data in one of two ways:
 - **By place:** the data is cut into tiles. The map loads the tiles in view and frees the tiles that go out of view.
 - **By time:** the values of a run are cut into frames. The page keeps a window of frames around the frame that it shows.
 
-## The three ways to run a dashboard
+## The four ways to run a dashboard
 
 | Way | Where the data is | Use it for | How to make it |
 |---|---|---|---|
 | **A. One HTML file** | In the file | A small area. A file to send, or to open from the disk. | `rs.render_edges(...)`, `rs.render_dashboard(...)` |
 | **B. Files on a server** | In files at a URL. The browser reads only the parts that it needs (HTTP range requests). | A large area. A website or another map app. | `rs.export_style(...)` with a PMTiles file |
 | **C. Made in the browser** | The page makes the data from its input files. It keeps the result in memory or on the browser disk (OPFS). | A page that builds its maps itself, for example duckOSM Studio. | roadstyle-wasm: `new LiveMap(...)`, `new Tiler(...)` |
+| **D. Made by a local program** (planned) | A Rust program on the computer reads the input files on the disk and makes the tiles and the rows when the page asks for them. The browser only draws. | An area that is too large for the browser. A tool on one computer, for example `duckosm studio`. | A program that serves the same addresses as way B on 127.0.0.1 |
 
-The file formats are the same in the three ways: PMTiles for the tiles, and Parquet for the tables. Only the transport changes. A static file
-host is enough for way B, and no running server is necessary. [Make tiles and PMTiles](../rust/tiles.md) tells how to make the files.
+The file formats are the same in the four ways: PMTiles for the tiles, and Parquet for the tables. Only the transport changes. A static file
+host is enough for way B, and no running server is necessary. Way D is way C with the engine out of the browser: the same engine runs as a
+program, and the data stays on the disk of the computer, not on the browser disk. [Make tiles and PMTiles](../rust/tiles.md) tells how to make the files.
+
+### Way D: the engine out of the browser
+
+A browser tab has limits: its memory (a WebAssembly module can use at most 4 GB) and the space of the browser disk. Way D has no such
+limits, because the engine runs as a program on the computer:
+
+- The program reads the input files on the disk (for example the `.duckdb` file of an area) and keeps them there.
+- The page asks the program for each tile, one row for a popup, a query of the data dock, or a window of frames, at addresses on
+  127.0.0.1.
+- The page and the dashboard are the same as in way B. Only the addresses change, so the dashboard does not know which way it uses.
+
+duckOSM's local pages (`duckosm edit`, `duckosm studio`) and roadstyle's editors (`roadstyle levels edit`, `roadstyle design edit`)
+already have a small Rust server on 127.0.0.1. Today it gives the page its files, and the engine runs in the browser (way C). In way D,
+the same server also gives the tiles and the rows.
 
 ## The types of data
 
-| Type of data | How it is cut | A. One HTML file | B. Files on a server | C. Made in the browser |
-|---|---|---|---|---|
-| [Road lines](#road-lines-and-other-layers) | Tiles | Tiles in the file | Tiles from the PMTiles file | The map worker makes a tile when the map asks for it |
-| [Other layers](#road-lines-and-other-layers) (water, land, buildings, boundary) | Tiles | GeoJSON in the file (planned: tiles) | Tiles | Tiles from the map worker |
-| [3D objects](#3d-objects) (walls, bridge decks, piers) | Pieces by tile | All objects at one time (planned: by tile) | Planned: by tile | Walls: tiles from the map worker. Decks: all at one time (planned: by tile). |
-| [The ground](#the-ground) | Tiles of one terrain file | The terrain file at a URL | Tiles from the terrain file | A terrain file on the browser disk |
-| [Tables](#tables-in-memory-or-on-the-disk) (road fields, popups, queries) | Rows, read by query | The road table in the page | The host reads Parquet at a URL | The host keeps each table in memory or on the browser disk |
-| [Values in time](#values-in-time) | Frames | One table of values at a time | One table of values at a time | One table of values at a time (planned: a window of frames) |
-| [Moving points](#moving-points) (vehicles) | Frames | Planned | Planned | Planned |
+| Type of data | How it is cut | A. One HTML file | B. Files on a server | C. Made in the browser | D. Made by a local program (planned) |
+|---|---|---|---|---|---|
+| [Road lines](#road-lines-and-other-layers) | Tiles | Tiles in the file | Tiles from the PMTiles file | The map worker makes a tile when the map asks for it | The program makes a tile when the map asks for it |
+| [Other layers](#road-lines-and-other-layers) (water, land, buildings, boundary) | Tiles | GeoJSON in the file (planned: tiles) | Tiles | Tiles from the map worker | Tiles from the program |
+| [3D objects](#3d-objects) (walls, bridge decks, piers) | Pieces by tile | All objects at one time (planned: by tile) | Planned: by tile | Walls: tiles from the map worker. Decks: all at one time (planned: by tile). | Pieces by tile from the program |
+| [The ground](#the-ground) | Tiles of one terrain file | The terrain file at a URL | Tiles from the terrain file | A terrain file on the browser disk | The terrain file on the disk, by tile from the program |
+| [Tables](#tables-in-memory-or-on-the-disk) (road fields, popups, queries) | Rows, read by query | The road table in the page | The host reads Parquet at a URL | The host keeps each table in memory or on the browser disk | The program queries the Parquet files on the disk with DuckDB |
+| [Values in time](#values-in-time) | Frames | One table of values at a time | One table of values at a time | One table of values at a time (planned: a window of frames) | The program gives the frames of the window |
+| [Moving points](#moving-points) (vehicles) | Frames | Planned | Planned | Planned | Planned |
 
 "Planned" means that the design is in the repository ([memory_budget.md](https://github.com/Khoshkhah/roadstyle/blob/main/docs/design/memory_budget.md)),
 but the code is not on `main`.
@@ -54,11 +70,12 @@ Each source loads its tiles when the map asks for them. A source that is hidden 
 ## Road lines and other layers
 
 A road line in a tile has its geometry, its id, and only the keys that the style reads. Its other fields are in the [tables](#tables-in-memory-or-on-the-disk).
-The three ways give the same tiles ([Big networks](big-networks.md)):
+All ways give the same tiles ([Big networks](big-networks.md)):
 
 - **A:** the tiles are in the HTML file.
 - **B:** the browser reads each tile from the PMTiles file with a range request.
 - **C:** the map worker keeps the roads and cuts a tile only when the map asks for it.
+- **D:** the local program does the same as the map worker, outside the browser.
 
 The other layers follow the same rule. In way A, they are GeoJSON in the file today. Then the whole layer stays in memory.
 
@@ -102,7 +119,7 @@ A table can move between the two homes, because the Parquet file stays on the di
 duckOSM Studio is an example. Its address sets the rule: `?tables=memory`, `?tables=disk` or `?tables=auto` (the default). With `auto`,
 a file larger than 256 KiB goes to the disk.
 
-In way B, the host reads the Parquet files at a URL. DuckDB-wasm reads only the row groups that a query needs. In way A, the page has
+In way D, the program queries the Parquet files on the disk with DuckDB, and the page gets only the result. In way B, the host reads the Parquet files at a URL. DuckDB-wasm reads only the row groups that a query needs. In way A, the page has
 its road table in memory.
 
 ## Values in time
