@@ -66,12 +66,12 @@ fn a_tile_of_way_d_is_the_tile_of_the_engine_and_the_golden_of_the_wasm_package(
 }
 
 /// The area's own data (the local page of duckOSM): the tiles are the tiles of `tiled_of` (the look's tile keys apply; the base-map rows go
-/// through the same call), and the tables of a `.duckdb` file are tables of the queries (a BIGINT keeps its digits) and of the schema, each one time.
+/// through the same call), and the tables of a `.duckdb` file are tables of the queries in their own schemas (a BIGINT keeps its digits) and of the schema, each one time.
 #[test]
 fn way_d_takes_a_duckdb_file_and_gives_the_tiles_of_tiled_of() {
     let file = std::env::temp_dir().join(format!("roadstyle-local-{}.duckdb", std::process::id()));
     let _ = std::fs::remove_file(&file);
-    duckdb::Connection::open(&file).unwrap().execute_batch("CREATE TABLE edges AS SELECT 9007199254740993::BIGINT AS edge_id").unwrap();
+    duckdb::Connection::open(&file).unwrap().execute_batch("CREATE TABLE edges AS SELECT 9007199254740993::BIGINT AS edge_id; CREATE SCHEMA driving; CREATE TABLE driving.edges AS SELECT 1 AS n").unwrap();
     let mut c = config(None, 0);
     c.database = Some(file.clone());
     let local = Local::open(c).unwrap();
@@ -82,7 +82,8 @@ fn way_d_takes_a_duckdb_file_and_gives_the_tiles_of_tiled_of() {
     }
     assert_eq!(local.query("SELECT edge_id FROM edges").unwrap()["rows"], json!([["9007199254740993"]]));
     let names: Vec<Value> = local.schema().unwrap()["tables"].as_array().unwrap().iter().map(|t| t["name"].clone()).collect();
-    assert_eq!(names, vec![json!("main.edges"), json!("main.roads")]);
+    assert_eq!(local.query("SELECT n FROM driving.edges").unwrap()["rows"], json!([[1]]));
+    assert_eq!(names, vec![json!("main.edges"), json!("main.roads"), json!("driving.edges")]);
     let _ = std::fs::remove_file(&file);
 }
 

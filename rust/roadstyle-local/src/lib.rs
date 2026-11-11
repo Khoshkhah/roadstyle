@@ -24,8 +24,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 /// What the program is given: the roads (read by the caller), the base-map rows (buildings, water, ...: read by the caller; their sources go in the
-/// tiles as the look says), the roads' file (the table `roads` of the queries; none for another format), a `.duckdb` file (each of its tables in
-/// `main` is a table of the queries; it is opened read only), more Parquet files as tables (`name`, file), the Parquet file of a run (frames),
+/// tiles as the look says), the roads' file (the table `roads` of the queries; none for another format), a `.duckdb` file (each of its tables is a table of the queries, in
+/// its own schema; it is opened read only), more Parquet files as tables (`name`, file), the Parquet file of a run (frames),
 /// the look and the port.
 pub struct Config {
     pub roads: roadstyle::RoadTable,
@@ -84,16 +84,19 @@ impl Local {
                 db.execute_batch(&sql).map_err(|e| format!("{}: {e}", file.display()))
             };
             if let Some(f) = &c.database {
-                // the file's tables as views in `main`: the queries and the schema name them as the tables of a Parquet file
+                // the file's tables as views with the same schema and name (`main.edges`, `driving.edges`): the queries name them as in the file
                 db.execute_batch(&format!("ATTACH {} AS file (READ_ONLY)", text(&f.display().to_string()))).map_err(|e| format!("{}: {e}", f.display()))?;
-                let names: Vec<String> = {
-                    let mut stmt = db.prepare("SELECT table_name FROM information_schema.tables WHERE table_catalog = 'file' AND table_schema = 'main' ORDER BY 1")
+                let names: Vec<(String, String)> = {
+                    let mut stmt = db.prepare("SELECT table_schema, table_name FROM information_schema.tables WHERE table_catalog = 'file' ORDER BY 1, 2")
                         .map_err(|e| e.to_string())?;
-                    let r = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
+                    let r = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))).map_err(|e| e.to_string())?
+                        .collect::<Result<_, _>>().map_err(|e| e.to_string())?;
                     r
                 };
-                for n in names {
-                    db.execute_batch(&format!("CREATE VIEW {0} AS SELECT * FROM file.main.{0}", ident(&n))).map_err(|e| format!("{}: {n}: {e}", f.display()))?;
+                for (schema, n) in names {
+                    let (s, t) = (ident(&schema), ident(&n));
+                    db.execute_batch(&format!("CREATE SCHEMA IF NOT EXISTS {s}; CREATE VIEW {s}.{t} AS SELECT * FROM file.{s}.{t}"))
+                        .map_err(|e| format!("{}: {schema}.{n}: {e}", f.display()))?;
                 }
             }
             if let Some(f) = &c.roads_file {
@@ -177,7 +180,7 @@ impl Local {
         Ok(json!({"columns": columns, "rows": data}))
     }
 
-    /// The tables and the views of DuckDB: `{"tables": [{"name": "main.roads", "rows": n}]}`.
+    /// The tables and the views of DuckDB, `main` first: `{"tables": [{"name": "main.roads", "rows": n}]}`.
     #[cfg(not(feature = "duckdb"))]
     pub fn schema(&self) -> Result<Value, String> {
         Err(NO_DB.into())
@@ -187,7 +190,7 @@ impl Local {
     pub fn schema(&self) -> Result<Value, String> {
         let db = self.db.lock().map_err(|e| e.to_string())?;
         let names: Vec<String> = {
-            let mut stmt = db.prepare("SELECT table_schema || '.' || table_name FROM information_schema.tables WHERE table_catalog = current_database() AND table_schema = 'main' ORDER BY 1")
+            let mut stmt = db.prepare("SELECT table_schema || '.' || table_name FROM information_schema.tables WHERE table_catalog = current_database() ORDER BY table_schema <> 'main', 1")
                 .map_err(|e| e.to_string())?;
             let r = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?.collect::<Result<_, _>>().map_err(|e| e.to_string())?;
             r
