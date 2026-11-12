@@ -93,7 +93,7 @@ def test_a_wrong_number_is_not_taken_and_the_block_goes_with_the_selection_and_w
 
 
 def _nodes_of_the_box(page):
-    return page.evaluate("""()=>[...document.querySelectorAll('#rs-roads-box .rs-rd-bhnodes span')].map(s=>({id:s.dataset.node, text:s.textContent}))""")
+    return page.evaluate("""()=>[...document.querySelectorAll('#rs-roads-box .rs-rd-bn')].map(s=>({id:s.dataset.node, text:s.querySelector('input').value + ' m ' + s.querySelector('em').textContent}))""")
 
 
 def test_the_groups_have_the_chains_and_nodes_of_the_profile_and_the_box_lists_the_nodes(page):

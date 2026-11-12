@@ -322,6 +322,8 @@ html.rs-overlay ::-webkit-scrollbar-button{display:none}
 .rs-rd-bh u{text-decoration:none;opacity:.65}
 #rs-toolbar #rs-roads-box .rs-rd-bh button{padding:3px 8px;border:1px solid var(--rs-tb-border)}
 #rs-toolbar #rs-roads-box .rs-rd-bh button:disabled{opacity:.45;cursor:default;background:none;color:inherit}
+.rs-rd-bn em{font-style:normal;font-size:11px;opacity:.65}
+.rs-rd-bnbar{margin:6px 2px 4px 20px}
 .rs-rd-bhn{margin:2px 2px 4px 20px;font:11px/1.3 system-ui,sans-serif;opacity:.65}
 #rs-toolbar #rs-roads-box .rs-rd-bar button{padding:4px 12px;border:1px solid var(--rs-tb-border)}
 /* ---- the box of the tool `navigate` (navbox.js): zoom, turn and tilt ---- */

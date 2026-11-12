@@ -1,7 +1,8 @@
-# The bridge profile: input and output (planned)
+# The bridge profile: input and output
 
-**Status: Part 1 and Part 2 are built, with the curve `smooth`.** The filler (Part 1) completes an input that has values missing, and the maker (Part 2) makes the 3D deck pieces from the complete profile: see
-[What works today](#what-works-today). Interior control points, the curve `design` and the design-rule heights are planned. The format is fixed, and the sample files are
+**Status: built.** The filler (Part 1) completes an input that has values missing, and the maker (Part 2) makes the 3D deck pieces from the complete profile: see
+[What works today](#what-works-today). There are two curves (`smooth` and `design`), two rules for a missing height (`length` and `design`: see [The design rules](#the-design-rules-and-the-curve-design)),
+and the open page can change the height of a node ([Change a node in the open page](#change-a-node-in-the-open-page)). The sample files are
 real: scripts make them from the real roads of the Granville Bridge in Vancouver, and tests check them.
 
 ## The idea
@@ -38,7 +39,7 @@ rs.render_dashboard(edges, view_3d=True, bridge_profile=profile).save("map.html"
 - **A warning, not an error:** a chain whose average grade between a height of yours and the other end is above the `design_grade` (the filler never changes your number).
 - With the profile that `rs.bridge_profile(edges)` gives, the page is the same as without it. A page that is given a profile writes the same profile again.
 - **You can change** the `z_m` of a node, the `top_m` of a chain (its full height), and the `width_m` of a chain. A node is higher than the `top_m` of a chain that ends there: that is an error.
-- **Not built, and the engine says so with an error:** interior control points (`points`), and the curve `design`.
+- **Interior control points** (`points`) need the curve `design`. With the curve `smooth`, a chain that has them is an error that says so.
 - **Not built:** the colored view of what you gave and what the engine added is made by the prototype (`granville_input_profile.py`). The engine does not return the paths of your values yet.
 - The chains are `c1`, `c2`... in the order of the engine, and a profile is for the roads that it was made from. A profile for other roads is an error (a chain or a node that these roads do not have, a chain of another length, a node more than 5 m from the place that the profile gives).
 - **Sample:** [`granville_bridge_profile_today.json`](../samples/bridge-profile/granville_bridge_profile_today.json) is the profile that the engine writes for the roads of the Granville Bridge. It has 13 nodes (8 on the ground
@@ -150,12 +151,49 @@ input to set it yourself. After that it is blue, because it is yours now. A valu
 | The parameters | 50 km/h and 5 % |
 | `source` and `method` | `given` and `chosen` for your values, `rule` and `derived` for the filled values |
 
+## The design rules and the curve design
+
+The default is today's rule: the height of a group from its length, and smooth ramps. Two parameters change it. Both are in `parameters` of the input profile, and the default of both is the rule of today, so no page changes unless you ask.
+
+- `"curve": "design"` draws each chain as straight grades between its two nodes and its interior points, with a parabolic vertical curve of the length `curve_m` at each interior point. A chain with no interior points is one straight grade.
+- `"height_rule": "design"` finds the heights that you did not give with the design rules ([the design note](../design/bridge_height_design.md)). It also sets the curve to `design`, the design grade to 0.05 and the design speed to 50 km/h, unless you give them.
+
+```python
+rs.render_dashboard(edges, view_3d=True, bridge_profile={"parameters": {"height_rule": "design"}}).save("map.html")
+```
+
+What the rule `design` does, in order:
+
+1. A node on the ground is a fixed point at 0 m. A node that has a `z_m` in your input is a fixed point at your height.
+2. The height of every other node is the highest height that the grade allows: the smallest `z_fixed + grade × distance` over the fixed points, along the chains. It is not above the top `P` of the chains that meet there.
+3. `P` is the clearance of a bridge over a road (5.0 m) plus the depth of the structure, `max(0.8 m, span ÷ 25)`. The engine knows no obstacle, so the span is the length of the chain, at most 100 m: `P` is 6.1 m to 9.0 m. If a bridge crosses something that needs more, give the heights of its nodes.
+4. A chain with no `points` in your input gets them: from each node the deck rises at the grade to its top and comes down at the same grade. A top longer than 76 m is a crest with a grade of at least 0.5 % on each side, so water runs off.
+5. Each interior point gets a curve: `max(K × A, 0.6 V)` metres, with `A` the change of grade in percent, `K` for a crest or a sag from the stopping sight distance, and `V` the design speed in km/h. At 50 km/h a 5 % crest has 30 m of curve and a 5 % sag 58 m. A curve is shortened (with a warning) where two curves would overlap.
+6. `top_m` of a chain is its highest point.
+
+On the Granville Bridge with no input, the rule gives junctions at 9.0 m, 9.0 m, 9.0 m, 9.0 m and 4.4 m (the last is 89 m from the ground: 5 % of 89 m). The real bridge is 22 m to 39 m high, because it crosses a street, a railway and False Creek.
+The rule does not know that. The heights of your own five junctions are fixed points, and the rule fills everything else around them.
+
+**Warnings** (the page still draws): a chain between two ground ends that is too short to reach its top; a curve that was shortened; a level top of more than 76 m that you gave; a low point on a bridge; two decks that cross with less than 5 m between them (found from the lines of the chains, with the curve `design` only);
+a node on the ground that you raised (the deck ends in the air there, and the page draws no landing).
+
+## Change a node in the open page
+
+In the open page, select a 3D bridge (a click on its deck). The Height box lists its nodes, each with a number. Type a new height and press Enter: the chains that meet at that node are drawn again from the profile. **Reset nodes** gives the profile's heights back.
+**Copy profile** puts the profile with your heights on the clipboard. Give it to `bridge_profile=` to get the exact pieces.
+
+The page evaluates the same curves as the engine (a browser test requires the same heights), but it cannot run the engine's rules. So a new node height changes the chains that meet at that node and nothing else: the interior points and the curve lengths stay as they were,
+and the other nodes do not move to keep the grade. Check the grade yourself, or give the profile back to the engine. The same calls are in JavaScript: `rsSetBridgeNode(id, metres)` and `rsBridgeProfile()` ([JavaScript](../reference/javascript.md)).
+
+One height for the whole group (the number above the nodes) and the node heights do not mix: the last one that you gave counts.
+
 ## What the engine checks
 
 The engine says what is wrong. It does not change a number that you gave.
 
-- Part 1: a node that is not within 5 m of exactly one node of the group; two entries for one node; a height below 0; a grade between two given heights that is above the design grade.
-- Part 2: a height or a width that is missing; an interior point outside its chain or out of order; two vertical curves that overlap.
+- Part 1: a node that is not within 5 m of exactly one node of the group; two entries for one node; a height below 0; a grade between two given heights that is above the design grade (a warning); points that are out of order or outside the chain.
+- Part 2: a height or a width that is missing; a point without `curve_m`; an interior point outside its chain or out of order; two vertical curves that overlap; a point above the top of its chain.
+- Warnings: see [the design rules](#the-design-rules-and-the-curve-design).
 
 ## Sample files
 
@@ -167,8 +205,8 @@ All files are in `docs/samples/bridge-profile/` and are published with this site
 | [`granville_input_partial.json`](../samples/bridge-profile/granville_input_partial.json) | The least input: 5 junction heights | 0.6 KB |
 | [`granville_input_profile.json`](../samples/bridge-profile/granville_input_profile.json) | The complete input profile that Part 1 makes from it | 3.9 KB |
 | [`granville_input_profile_colored.html`](../samples/bridge-profile/granville_input_profile_colored.html) | The same complete profile in one HTML page, with the values of the input and the values that the engine added in two colors. Open it in a browser | 10.9 KB |
-| [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 4.9 KB |
-| [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 5.0 KB |
+| [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 5.2 KB |
+| [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 5.4 KB |
 | [`granville_bridge_edges.parquet`](../samples/bridge-profile/granville_bridge_edges.parquet) | The roads of the example: the 41 edges (27 OpenStreetMap ways) of the Granville Bridge and its ramps, from duckOSM's Vancouver database. OpenStreetMap data, ODbL | 16.6 KB |
 | [`granville_lidar_samples.json`](../samples/bridge-profile/granville_lidar_samples.json) | The deck heights that the City of Vancouver LiDAR 2022 gives on the 12 axes of the same bridge, from urbanstyle's profile (Open Government Licence - Vancouver). It is for comparison only. The profile above does not use it | 7.7 KB |
 
@@ -180,7 +218,7 @@ python docs/img/bridge-height/granville_input_profile.py   # writes the two prof
 
 ## Read more
 
-The exact format, key by key, is in [Inputs and outputs](../reference/formats.md#the-bridge-profile-planned). The two JSON Schemas check the form of both files.
+The exact format, key by key, is in [Inputs and outputs](../reference/formats.md#the-bridge-profile). The two JSON Schemas check the form of both files.
 
 The design notes are in the repository, in `docs/design/`: `bridge_profile_edit.md` (the two parts, the checks, the comparison with urbanstyle) and `bridge_height_design.md` (the design rules for the heights: clearance,
 grade and vertical curves, with their sources).

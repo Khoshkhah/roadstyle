@@ -84,11 +84,11 @@ Where they come from:
 | `levels.csv` | the result: the four numbers and the ends of each edge |
 | `boundary.geojson` | only with `--boundary`: the edge of the area, drawn as a dashed line in the editor |
 
-## The bridge profile (planned)
+## The bridge profile
 
-**Status: Part 1 and Part 2 are built, with the curve `smooth`.** The filler (Part 1) completes an input that has values missing, and the maker (Part 2) makes the 3D deck pieces from the complete profile (the ramps of today). It is the keyword
-`bridge_profile=`, and `rs.bridge_profile(edges, given=None)` gives the complete profile of a page. The interior control points and the curve `design`
-are planned. The format is fixed, the schemas and the sample files are real, and tests check them. For the idea and the examples, read [The bridge profile: input and output](../guides/bridge-profile.md).
+**Status: built.** The filler (Part 1) completes an input that has values missing, and the maker (Part 2) makes the 3D deck pieces from the complete profile. It is the keyword
+`bridge_profile=`, and `rs.bridge_profile(edges, given=None)` gives the complete profile of a page. There are two curves (`smooth`, the ramps of today, and `design`, straight grades with vertical curves and
+interior control points) and two rules for a missing height (`length`, today's, and `design`, the design rules). The schemas and the sample files are real, and tests check them. For the idea and the examples, read [The bridge profile: input and output](../guides/bridge-profile.md).
 
 A page with 3D bridges (`view_3d=True`) has one **input profile**: the groups of bridges, their nodes and chains, and the height of the nodes. A person edits it. **Part 1** of the engine fills what is missing and writes
 the complete profile. **Part 2** makes the deck pieces from the complete profile. Both are JSON files.
@@ -108,8 +108,9 @@ A complete profile is also a valid input profile. Part 1 on a complete profile c
 |---|---|---|---|---|
 | `format` | `"roadstyle.bridge_profile/1"` | optional | required | The version of the format |
 | `parameters.design_speed_kmh` | number, above 0, at most 200 | optional | required | The design speed. Default 50. It sets the length of the vertical curves |
-| `parameters.design_grade` | number, above 0, at most 0.3 | optional | required | The design grade, as a fraction (0.05 is 5 %). Default 0.05 |
-| `parameters.curve` | `"smooth"` or `"design"` | optional | optional | `smooth`: the curve of today (built). `design`: straight grades and vertical curves (not built: an error). Default `smooth` |
+| `parameters.design_grade` | number, above 0, at most 0.3 | optional | required | The design grade, as a fraction (0.05 is 5 %). Default 0.05 with the rule `design`; the rule `length` fills 0.125 (the grade of the look, 1 in 8) |
+| `parameters.curve` | `"smooth"` or `"design"` | optional | optional | `smooth`: the ramps of today. `design`: straight grades between the nodes and the interior points, with a vertical curve of `curve_m` at each interior point. Default `smooth`; `design` when `height_rule` is `design` |
+| `parameters.height_rule` | `"length"` or `"design"` | optional | optional | How the filler finds a height that you did not give. `length`: today's rule (the height of the group from its length). `design`: the design rules ([the design note](../design/bridge_height_design.md)). The maker does not read it. Default `length` |
 | `groups` | list of groups | optional | required, one or more | One group is the bridge roads that touch each other |
 | `groups[].name` | text | optional | required | The name of the group |
 | `groups[].nodes` | list of nodes | optional | required | The ends of the chains |
@@ -124,10 +125,11 @@ A complete profile is also a valid input profile. Part 1 on a complete profile c
 | `chains[].osm_ways` | list of integers | optional | optional | The OSM ways of the chain, when the roads have them. In an input profile they name the chain |
 | `chains[].length_m` | number, above 0 | optional | required | The length of the chain |
 | `chains[].from`, `.to` | node ids | optional | required | The node at the first end and at the last end of the chain |
-| `chains[].points` | list of points | optional | required (can be empty) | Interior control points, in order of `s`. **Not built:** the maker stops with an error if a chain has one (it needs the curve `design`) |
+| `chains[].points` | list of points | optional | required (can be empty) | Interior control points, in order of `s`. They need the curve `design`: the maker stops with an error if a chain has one and the curve is `smooth`. A chain whose input has `points` (even an empty list) keeps them; the filler makes points only for a chain whose input has none, with the rule `design` |
 | `chains[].top_m` | number, above 0 | optional | optional | The full height of the chain: the height that its ramps are made for. The maker needs it for the curve `smooth`. It is the `__rs_full` of the pieces |
 | `points[].s` | number, 0 or more | required | required | Metres from the first end of the chain. Inside the chain |
 | `points[].z_m` | number, 0 or more | required | required | The height of the deck at that place |
+| `points[].curve_m` | number, 0 or more | optional | required | The length of the vertical curve around the point, in metres (0: none). The filler writes it from the design speed (`L = max(K × A, 0.6 V)`, [the design note](../design/bridge_height_design.md#3-the-vertical-curves)) and shortens it where two curves would overlap; a length that you give is kept |
 | `chains[].width_m` | number, above 0 | optional | optional | The width of the deck, in metres. Without it, each road of the chain is drawn at the width of its class |
 | `chains[].width_source` | text | optional | optional | Where the width comes from: `given` or `rule` |
 
@@ -135,7 +137,7 @@ A complete profile is also a valid input profile. Part 1 on a complete profile c
 
 The filler (Part 1) reads an input profile in which every key is optional. A key that is not known and a wrong type are errors. It matches each node entry to a node of the roads by its `id`, or by its `lonlat` (the one node within 5 m; if more than one node is within 5 m, the `id` is needed). It keeps every value that you give and fills the others with the rules of today (see [the guide](../guides/bridge-profile.md#what-works-today)). The maker (Part 2) reads only the complete result. The filler stops, with an error that names the chain or the node, when:
 
-- the curve is `design`, or a chain has `points` (not built);
+- a chain has `points` and the curve is `smooth`; the points are not in order of `s`, or one is not inside the chain; two curves overlap (a curve of yours; a curve that the filler made is shortened, with a warning);
 - a node entry has no `id` and no `lonlat`, has a `lonlat` that no node is near, or two entries are for one node;
 - a `z_m` is below 0, a `top_m` or a `width_m` is 0 or less, or a node is higher than the `top_m` of a chain that ends there;
 - the input is not for the roads: a chain or a node that the roads do not have, a `kind`, `chains`, `from` or `to` that differ from the roads, a chain of another length (more than 0.5 m of difference), or an `id` and a `lonlat` more than 5 m apart;
@@ -163,10 +165,12 @@ The schema checks the form. These rules need the roads, and the engine checks th
 |---|---|---|
 | The groups, chains and nodes | The roads | `data`, `mapped` |
 | `z_m` of a `ground` node | 0 | `data`, `mapped` |
-| `z_m` of a `junction` | The rule (the height that today's rule gives, until the design rules are built) | `rule`, `derived` |
-| `top_m` of a chain | The height of its group (from its length) | |
+| `z_m` of a `junction` | The rule. `length`: the height that today's rule gives. `design`: the highest height that the design grade allows from the ground and from every height you gave, and not above the top `P` that the clearance needs | `rule`, `derived` |
+| `points` of a chain (the rule `design`) | From each node the deck rises at the design grade to the top of the chain and comes down at the same grade. A top longer than 76 m has a grade of at least 0.5 % (a crest) | `rule`, `derived` |
+| `curve_m` of a point (the curve `design`) | `max(K × A, 0.6 V)`, shortened to fit | |
+| `top_m` of a chain | `smooth`: the height of its group (from its length), or its highest node. `design`: its highest point or node | |
 | `width_m` | Not filled: without it, each road is drawn at the width of its class and the look | |
-| `parameters` | 50 km/h and 0.05 | |
+| `parameters` | 50 km/h, and the grade and the curve of the rule | |
 
 A value that the person gave is never changed. A person's value that has no `source` gets `given` and `chosen`.
 

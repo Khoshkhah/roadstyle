@@ -118,7 +118,6 @@ def test_a_profile_with_values_missing_is_filled_and_one_that_is_not_for_these_r
             _page(bridge_profile=p)
         return str(e.value)
 
-    assert "not built yet" in error(changed(lambda p: p["parameters"].update(curve="design")))
     assert "interior control points" in error(changed(lambda p: p["groups"][0]["chains"][0].update(points=[{"s": 5.0, "z_m": 2.0}])))
     assert "unknown field `extra`" in error(changed(lambda p: p.update(extra=1)))
     assert "this engine reads" in error(changed(lambda p: p.update(format="other")))
@@ -188,3 +187,83 @@ def test_the_filler_completes_the_five_heights_of_the_granville_example():
         page = _decks(rs.render_edges(edges, backend="web", view_3d=True, bridge_profile=given).html)
         assert page and page != _decks(rs.render_edges(edges, backend="web", view_3d=True).html)                 # the 5 heights change the pieces
         assert page == _decks(rs.render_edges(edges, backend="web", view_3d=True, bridge_profile=filled).html)   # the input and the filled profile make one page
+
+
+# ---- the design rules and the curve `design` (docs/design/bridge_height_design.md) ----
+
+def _long_roads():
+    """A bridge of 1 km on its own, and a Y of three bridges of 700 m to 900 m."""
+    a, b, c, d = (18.000, 59.3000), (18.010, 59.3075), (18.020, 59.3125), (18.020, 59.3025)
+    lines = [[a, b], [b, c], [b, d], [(18.05, 59.3), (18.0640, 59.3)]]
+    return gpd.GeoDataFrame({"highway": ["primary"] * 4, "bridge": ["yes"] * 4, "layer": ["1"] * 4, "edge_id": [1, 2, 3, 4]}, geometry=[LineString(x) for x in lines], crs=4326)
+
+
+def test_the_design_rule_gives_a_top_ramps_at_the_design_grade_and_a_crest_for_drainage():
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        p = rs.bridge_profile(_long_roads(), bridge_profile={"parameters": {"height_rule": "design"}})
+    assert (p["parameters"]["curve"], p["parameters"]["design_grade"], p["parameters"]["height_rule"]) == ("design", 0.05, "design")
+    assert not [str(x.message) for x in w if "level top" in str(x.message)], "the rule makes no level top"
+    lone = p["groups"][-1]["chains"][0]
+    assert lone["top_m"] == pytest.approx(9.0, abs=0.5), lone                                                  # the clearance 5 m and the depth 4 m
+    assert [q["s"] for q in lone["points"]] == sorted(q["s"] for q in lone["points"]) and len(lone["points"]) == 3, lone["points"]   # the foot of the crest, the middle, the other foot
+    first, mid, last = lone["points"]
+    assert first["z_m"] == pytest.approx(last["z_m"]) and mid["z_m"] > first["z_m"], "a crest in the middle of the top"
+    assert (mid["z_m"] - first["z_m"]) / (mid["s"] - first["s"]) == pytest.approx(0.005, abs=1e-4), "0.5 % each side"
+    assert first["s"] == pytest.approx((first["z_m"]) / 0.05, abs=1.0), "the ramp is 5 %"
+    assert all(q["curve_m"] >= 30 for q in lone["points"]), "every curve is at least 0.6 V = 30 m"
+
+
+def test_the_curve_design_makes_pieces_whose_slope_is_never_above_the_design_grade_and_the_page_gets_the_profile():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        html = rs.render_edges(_long_roads(), backend="web", view_3d=True, bridge_profile={"parameters": {"height_rule": "design"}}).html
+    feats = [f["properties"] for f in _decks(html) if "__rs_casing_slab" not in f["properties"]]
+    length = {c["id"]: c["length_m"] for g in rs.bridge_profile(_long_roads(), bridge_profile={"parameters": {"height_rule": "design"}})["groups"] for c in g["chains"]}
+    assert feats
+    for q in feats:
+        l = length[f"c{q['__rs_chain']}"]
+        ds = (q["__rs_s1"] - q["__rs_s0"]) * l
+        assert abs(q["__rs_lift1"] - q["__rs_lift0"]) * q["__rs_full"] / ds <= 0.05 + 0.002, q
+
+
+def test_a_given_height_is_a_fixed_point_of_the_design_rule_and_the_filler_twice_is_the_filler_once():
+    first = rs.bridge_profile(_long_roads(), bridge_profile={"parameters": {"height_rule": "design"}})
+    junction = next(n for g in first["groups"] for n in g["nodes"] if n["kind"] == "junction")
+    given = {"parameters": {"height_rule": "design"}, "groups": [{"nodes": [{"id": junction["id"], "z_m": 4.0}]}]}
+    second = rs.bridge_profile(_long_roads(), bridge_profile=given)
+    node = next(n for g in second["groups"] for n in g["nodes"] if n["id"] == junction["id"])
+    assert (node["z_m"], node["source"]) == (4.0, "given") and junction["z_m"] > 4.0
+    assert rs.bridge_profile(_long_roads(), bridge_profile=second) == second                                    # the filler twice is the filler once
+
+
+def test_the_filler_and_the_maker_warn_of_what_they_see():
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        p = rs.bridge_profile(_long_roads(), bridge_profile={"parameters": {"height_rule": "design"}})
+        # a chain of the person with a level top of 800 m, and a ground end that the person raised
+        chain = p["groups"][0]["chains"][0]
+        ground = next(n for n in p["groups"][0]["nodes"] if n["kind"] == "ground")
+        edit = {"parameters": {"height_rule": "design"}, "groups": [{"nodes": [{"id": ground["id"], "z_m": 4.0}],
+                "chains": [{"id": chain["id"], "points": [{"s": 100.0, "z_m": 9.0, "curve_m": 30.0}, {"s": chain["length_m"] - 100.0, "z_m": 9.0, "curve_m": 30.0}]}]}]}
+        rs.render_edges(_long_roads(), backend="web", view_3d=True, bridge_profile=edit)
+    text = " | ".join(str(x.message) for x in w)
+    assert "free end of its bridge" in text and f"the node {ground['id']}" in text, text                       # a ground end above 0: the deck ends in the air
+    assert f"the chain {chain['id']} has a level top" in text, text                                             # a flat top of the person
+
+
+def test_the_design_rule_on_the_granville_bridge_has_no_level_top_and_no_grade_above_5_percent():
+    edges = gpd.read_parquet("docs/samples/bridge-profile/granville_bridge_edges.parquet")
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        p = rs.bridge_profile(edges, bridge_profile={"parameters": {"height_rule": "design"}})
+        rs.render_edges(edges, backend="web", view_3d=True, bridge_profile=p)
+    assert not [str(x.message) for x in w if "level top" in str(x.message) or "low point" in str(x.message) or "cross" in str(x.message)], [str(x.message) for x in w]
+    junctions = sorted(n["z_m"] for g in p["groups"] for n in g["nodes"] if n["kind"] == "junction")
+    assert junctions == pytest.approx([4.4, 9.0, 9.0, 9.0, 9.0], abs=0.1), junctions            # 5 % from the ground, and not above the top that the clearance needs
+    for g in p["groups"]:
+        z = {n["id"]: n["z_m"] for n in g["nodes"]}
+        for c in g["chains"]:
+            pts = [(0.0, z[c["from"]])] + [(q["s"], q["z_m"]) for q in c["points"]] + [(c["length_m"], z[c["to"]])]
+            assert all(abs(b[1] - a[1]) / (b[0] - a[0]) <= 0.05 + 1e-9 for a, b in zip(pts, pts[1:], strict=False)), (c["id"], pts)
+            assert all(abs(b[1] - a[1]) / (b[0] - a[0]) >= 0.005 - 1e-9 or b[0] - a[0] < 76 for a, b in zip(pts, pts[1:], strict=False)), (c["id"], pts)     # every straight run drains
