@@ -32,26 +32,27 @@ def _defs(complete):
             "lonlat": {"$ref": "#/$defs/lonlat", "description": "The position of the node. In a partial input it names the node: the node of the group within 5 m"},
             "kind": {"enum": ["ground", "junction"], "description": "ground: one chain ends here, height 0. junction: chains meet here"},
             "chains": {"type": "array", "items": {"type": "string", "pattern": "^c[0-9]+$"}, "description": "The chains that meet at the node"},
-            "z_m": {"type": "number", "minimum": 0, "description": "The height of the node above the ground, in metres"}, **mark}
+            "z_m": {"type": "number", "description": "The height of the node above the ground, in metres, 0 or more (with z_reference elevation: its elevation in the datum of the ground, any number)"}, **mark}
     chain = {"id": {"type": "string", "pattern": "^c[0-9]+$"},
              "osm_ways": {"type": "array", "items": {"type": "integer"}, "description": "The OSM ways of the chain, when the roads have them. In a partial input they name the chain"},
              "length_m": {"type": "number", "exclusiveMinimum": 0},
              "from": {"type": "string", "pattern": "^n[0-9]+$", "description": "The node at the first end of the chain"},
              "to": {"type": "string", "pattern": "^n[0-9]+$", "description": "The node at the last end of the chain"},
              "points": {"type": "array", "items": {"$ref": "#/$defs/point"}, "description": "Interior control points, in order of s (the curve design)"},
-             "top_m": {"type": "number", "exclusiveMinimum": 0, "description": "The full height of the chain: the height that its ramps are made for (the curve smooth). The page's __rs_full"},
+             "top_m": {"type": "number", "description": "The full height of the chain: the height that its ramps are made for (the curve smooth). The page's __rs_full. Above 0 (with z_reference elevation: the highest elevation of the chain)"},
              "width_m": {"type": "number", "exclusiveMinimum": 0, "description": "The width of the deck, in metres. Without it, each road is drawn at the width of its class"},
              "width_source": {"type": "string"}}
     return {
         "lonlat": {"type": "array", "prefixItems": [{"type": "number", "minimum": -180, "maximum": 180}, {"type": "number", "minimum": -90, "maximum": 90}], "items": False, "minItems": 2},
         "point": obj({"s": {"type": "number", "minimum": 0, "description": "Metres from the first end of the chain"},
-                      "z_m": {"type": "number", "minimum": 0},
+                      "z_m": {"type": "number", "description": "The height of the point above the ground, 0 or more (with z_reference elevation: its elevation)"},
                       "curve_m": {"type": "number", "minimum": 0, "description": "The length of the vertical curve around the point, in metres (0: none). The filler writes it; the maker needs it"}, **mark}, required=("s", "z_m")),
         "ground": obj({"id": {"type": "string", "description": "The ground id: the SHA-256 of the elevation file (duckOSM main.elevation_metadata.sha256)"},
                        "source": {"type": "string"}, "product": {"type": "string", "description": "DTM or DSM"}, "vertical_datum": {"type": "string"}}),
         "parameters": obj({"design_speed_kmh": {"type": "number", "exclusiveMinimum": 0, "maximum": 200}, "design_grade": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.3},
                            "curve": {"enum": ["smooth", "design"], "description": "smooth: the curve of today. design: straight grades and vertical curves"},
-                           "height_rule": {"enum": ["length", "design"], "description": "How the filler finds a height that was not given. length: today's rule. design: the design rules"}},
+                           "height_rule": {"enum": ["length", "design"], "description": "How the filler finds a height that was not given. length: today's rule. design: the design rules"},
+                           "z_reference": {"enum": ["ground", "elevation"], "description": "What z_m is. ground: metres above the ground of the page (the default; a free end is 0). elevation: the elevation in the vertical datum of the profile's ground (every node needs one)"}},
                           required=("design_speed_kmh", "design_grade") if complete else ()),
         "node": obj(node, required=("id", "lonlat", "kind", "chains", "z_m", "source", "method") if complete else (), any_of=None if complete else [{"required": ["lonlat"]}, {"required": ["id"]}]),
         "chain": obj(chain, required=("id", "length_m", "from", "to", "points") if complete else (), any_of=None if complete else [{"required": ["osm_ways"]}, {"required": ["id"]}]),
@@ -70,6 +71,13 @@ def schema(complete):
            "type": "object", "additionalProperties": False, "properties": props, "$defs": _defs(complete)}
     if complete:
         out["required"] = ["format", "parameters", "groups"]
+    # what depends on z_reference: heights above the ground are 0 or more; an elevation is any number, needs the curve design and the ground that it is in
+    is_elevation = {"required": ["parameters"], "properties": {"parameters": {"required": ["z_reference"], "properties": {"z_reference": {"const": "elevation"}}}}}
+    out["if"] = is_elevation
+    out["then"] = {"required": ["ground"], "properties": {"ground": {"required": ["id"]}, "parameters": {"properties": {"curve": {"const": "design"}}}}}
+    out["else"] = {"properties": {"groups": {"items": {"properties": {
+        "nodes": {"items": {"properties": {"z_m": {"minimum": 0}}}},
+        "chains": {"items": {"properties": {"top_m": {"exclusiveMinimum": 0}, "points": {"items": {"properties": {"z_m": {"minimum": 0}}}}}}}}}}}}
     return out
 
 

@@ -462,7 +462,7 @@ fn today_profile(b: &Bridges, chains: &[Chain], dk: &DeckLook, given: &[Option<f
             id: format!("c{}", i + 1), osm_ways: Vec::new(), length_m: chain_length(c), from: id_of[&c.head].clone(), to: id_of[&c.tail].clone(), points: Vec::new(),
             top_m: Some(top(c.group)), width_m: None, width_source: None });
     }
-    BridgeProfile { format: bridge_profile::FORMAT.into(), ground: None, parameters: bridge_profile::Parameters { design_speed_kmh: 50.0, design_grade: 1.0 / grade, curve: Some(Curve::Smooth), height_rule: None }, groups }
+    BridgeProfile { format: bridge_profile::FORMAT.into(), ground: None, parameters: bridge_profile::Parameters { design_speed_kmh: 50.0, design_grade: 1.0 / grade, curve: Some(Curve::Smooth), height_rule: None, z_reference: None }, groups }
 }
 
 /// The length of a chain in metres: its line in the metres around its first point (the same frame as `chain_features`).
@@ -479,6 +479,17 @@ fn chain_length(ch: &Chain) -> f64 {
 fn make_pieces(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, chains: &[Chain], profile: &BridgeProfile, warnings: &mut Vec<String>) -> Result<Vec<Value>, crate::Error> {
     let bad = |s: String| Err(crate::Error::Data(format!("bridge_profile: {s}")));
     let design = profile.parameters.curve.unwrap_or(Curve::Smooth) == Curve::Design;
+    // z_reference "elevation": the heights are elevations. The marks of a piece (its lift, its full height) are fractions of a height above 0, so every height is moved down by the lowest one (0 or less) for
+    // the marks: one shift for the whole profile, so the clearance between two decks is the same. The page draws an elevation profile from the profile itself, not from these marks.
+    let elevation = profile.parameters.is_elevation();
+    if elevation && !design {
+        return bad("z_reference is \"elevation\", which needs the curve \"design\"".into());
+    }
+    let shift = if elevation {
+        profile.groups.iter().flat_map(|g| g.nodes.iter().map(|n| n.z_m).chain(g.chains.iter().flat_map(|c| c.points.iter().map(|q| q.z_m)))).fold(0.0, f64::min)
+    } else {
+        0.0
+    };
     let mut nodes: HashMap<&str, &bridge_profile::Node> = HashMap::new();
     let mut by_id: HashMap<&str, (usize, &bridge_profile::Chain)> = HashMap::new();
     for (gi, g) in profile.groups.iter().enumerate() {
@@ -505,6 +516,7 @@ fn make_pieces(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, chains: &[Chai
             return bad(format!("the chain {id} has interior control points; they need the curve `design`: set parameters.curve to \"design\""));
         }
         let Some(top) = cp.top_m else { return bad(format!("the chain {id} has no top_m: the profile needs it (the full height of the chain, which the lift is a fraction of)")) };
+        let top = if elevation { (top - shift).max(bridge_profile::MIN_TOP_M) } else { top };
         let mut z = [0.0; 2];
         for (k, (nid, end)) in [(&cp.from, ch.pts[0]), (&cp.to, ch.pts[ch.pts.len() - 1])].into_iter().enumerate() {
             let Some(n) = nodes.get(nid.as_str()) else { return bad(format!("the chain {id} starts or ends at the node {nid}, which the profile does not have")) };
@@ -514,18 +526,18 @@ fn make_pieces(roads: &Roads, dk: &DeckLook, m: &Model, hw: &str, chains: &[Chai
             if n.z_m > top + 1e-9 {
                 return bad(format!("the node {nid} is {} m high, above the top of the chain {id} ({top} m)", n.z_m));
             }
-            z[k] = n.z_m;
+            z[k] = n.z_m - shift;
         }
         let shape = if design {
             let mut p = vec![Pvi { s: 0.0, z: z[0], curve_m: 0.0 }];
             for q in &cp.points {
                 let Some(c) = q.curve_m else { return bad(format!("the point at {} m of the chain {id} has no curve_m: fill the profile first (the filler writes the length of the curve)", q.s)) };
-                p.push(Pvi { s: q.s, z: q.z_m, curve_m: c });
+                p.push(Pvi { s: q.s, z: q.z_m - shift, curve_m: c });
             }
             p.push(Pvi { s: l, z: z[1], curve_m: 0.0 });
             // the profile's length is within 0.5 m of the roads' (checked above): the points keep their place on the chain, scaled to the roads' length
             let edge = cp.length_m;
-            if let Err(e) = bridge_curve::check(&p.iter().enumerate().map(|(k, q)| if k + 1 == p.len() { Pvi { s: edge, ..*q } } else { *q }).collect::<Vec<_>>(), edge) {
+            if let Err(e) = bridge_curve::check(&p.iter().enumerate().map(|(k, q)| if k + 1 == p.len() { Pvi { s: edge, ..*q } } else { *q }).collect::<Vec<_>>(), edge, 0.0) {
                 return bad(format!("the chain {id}: {e}"));
             }
             if let Some(q) = p.iter().find(|q| q.z > top + 1e-9) {

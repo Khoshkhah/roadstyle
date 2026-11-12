@@ -210,7 +210,7 @@ rs.render_dashboard(edges, view_3d=True, bridge_profile=given).save("map.html")
 ## The ground
 
 `z_m` is metres above **the ground of the area**: duckOSM's reference ground (`main.elevation_metadata`, the DTM), which a page with the option `ground` draws as its terrain. A free end of a bridge is on that ground, so its `z_m` is 0 even on a hill.
-The absolute height of a point is the ground there plus `z_m`. The profile stores no elevation of the ground: a second copy of the ground would not agree with the one that the page draws.
+The absolute height of a point is the ground there plus `z_m`; with the 3D terrain on, the page adds `z_m` to the straight line between the ground at the two ends of the chain (see [Heights as elevations](#heights-as-elevations) for a profile whose heights are elevations). The profile stores no elevation of the ground: a second copy of the ground would not agree with the one that the page draws.
 
 The profile can name its ground, as every product of an area does (the standard [The ground reference](https://github.com/Khoshkhah/duckOSM/blob/main/docs/concepts/ground-reference.md)):
 
@@ -222,6 +222,29 @@ The profile can name its ground, as every product of an area does (the standard 
 - A profile and a page whose ground **ids** differ are an error that names both ids.
 - A profile that names a ground, on a page with no ground, is a warning: the heights are above a ground that the page does not draw.
 - `rs.bridge_profile(edges)` writes a ground only if you give one.
+
+## Heights as elevations
+
+By default `z_m` is a height above the ground. With the 3D terrain on, the page does not add `z_m` to the ground at each point of the deck. It draws the deck level between the ground at the two end nodes of its chain, and adds `z_m` to that line. On a hillside the line differs from the real road by metres, so a profile of real road heights, subtracted from the wrong line, gives a deck that floats over the hill and drops at its free end.
+
+If you have each height as an elevation in the datum of the area's ground (for example the graded road heights of SimReady), give them as they are. Set `parameters.z_reference` to `"elevation"`:
+
+```python
+given = {
+    "parameters": {"z_reference": "elevation"},
+    "ground": {"id": "<sha256 of the elevation file>", "vertical_datum": "EGM2008"},
+    "groups": [{"nodes": [{"lonlat": [7.42980, 43.74355], "z_m": 83.2, "source": "simready", "method": "measured"},   # one entry for every node
+                          {"lonlat": [7.42992, 43.74056], "z_m": 62.0, "source": "simready", "method": "measured"}]}],
+}
+rs.render_dashboard(edges, view_3d=True, ground=ground, bridge_profile=given).save("map.html")      # `ground` is the same ground
+```
+
+- `z_m` of a node, and `z_m` of a point, is the elevation in metres in the vertical datum of the `ground` of the profile. The page draws the deck at that elevation, over the page's own ground. There is no level line and no ramp from the ground.
+- Every node needs its `z_m`, a free end too. The profile must name its ground (`ground.id`), and the page must have the same `ground`. A page with no ground, or with another ground id, is an error. An elevation is never drawn over another terrain, such as the AWS Terrain Tiles.
+- The curve is `design`: the shape of a chain is straight grades between its nodes and its interior `points`, with a vertical curve at each point. You cannot use the curve `smooth` or the rule `height_rule: "design"`, because both start from the ground.
+- **A free end must be on the ground.** The page compares the elevation of each free end with the ground at its position. If they differ by more than 1 m, the page does not draw the bridges of that group. It shows the message in a toast, and `rsBridgeProblems()` returns it. Fix the elevation, or fix the roads (a bridge that ends too early in the OSM data). The page does not change your number.
+- The page needs the 3D terrain on. With the terrain off, the bridges of an elevation profile are not drawn, and the page says so.
+- A node edit in the open page (`rsSetBridgeNode`) takes an elevation, any number. The group has no height of its own: `rsSetBridgeHeight` is an error.
 
 ## What the engine checks
 

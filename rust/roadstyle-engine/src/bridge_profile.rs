@@ -53,6 +53,26 @@ pub struct Parameters {
     /// how the filler found the heights that the person did not give: `length` (today's rule, from the length of the group) when it is not there, or `design` (the design rules). The maker does not read it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height_rule: Option<Rule>,
+    /// what `z_m` is: `ground` (metres above the ground of the page, the rule of the first build) when it is not there, or `elevation` (the height above the vertical datum of the profile's ground)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub z_reference: Option<ZReference>,
+}
+
+/// What the heights of a profile are measured from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ZReference {
+    /// metres above the ground: the end of a bridge is on the ground, so its height is 0
+    Ground,
+    /// the elevation in the vertical datum of the ground that the profile names (`ground.id`): the deck is drawn at this elevation, and the page checks that each free end is on the ground there
+    Elevation,
+}
+
+impl Parameters {
+    /// Whether `z_m` is an elevation.
+    pub fn is_elevation(&self) -> bool {
+        self.z_reference == Some(ZReference::Elevation)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,16 +186,23 @@ impl BridgeProfile {
         if !(p.design_grade.is_finite() && p.design_grade > 0.0 && p.design_grade <= 0.3) {
             return bad(format!("design_grade is {}; it is a number above 0 and at most 0.3", p.design_grade));
         }
+        let elev = p.is_elevation();
+        if elev && p.curve != Some(Curve::Design) {
+            return bad("z_reference is \"elevation\", which needs the curve \"design\": the curve \"smooth\" makes ramps from the ground".into());
+        }
+        if elev && self.ground.as_ref().and_then(|g| g.id.as_ref()).is_none() {
+            return bad(crate::bridge_fill::elevation_needs_ground());
+        }
         let mut ids = std::collections::HashSet::new();
         for g in &self.groups {
             for n in &g.nodes {
                 if !ids.insert(n.id.as_str()) {
                     return bad(format!("two nodes have the id {:?}", n.id));
                 }
-                if !(n.z_m.is_finite() && n.z_m >= 0.0) {
+                if !(n.z_m.is_finite() && (elev || n.z_m >= 0.0)) {
                     return bad(format!("the node {} has z_m {}; a height is a number of metres, 0 or more", n.id, n.z_m));
                 }
-                if n.kind == Kind::Ground && n.z_m != 0.0 {
+                if !elev && n.kind == Kind::Ground && n.z_m != 0.0 {
                     return bad(crate::bridge_fill::ground_end(&n.id, n.z_m));
                 }
                 if !(n.lonlat[0].is_finite() && n.lonlat[1].is_finite()) {
@@ -187,7 +214,7 @@ impl BridgeProfile {
                     return bad(format!("two chains have the id {:?}", c.id));
                 }
                 for (what, v) in [("length_m", Some(c.length_m)), ("top_m", c.top_m), ("width_m", c.width_m)] {
-                    if v.is_some_and(|v| !(v.is_finite() && v > 0.0)) {
+                    if v.is_some_and(|v| !(v.is_finite() && (v > 0.0 || (elev && what == "top_m")))) {
                         return bad(format!("the chain {} has {what} {}; it is a number of metres above 0", c.id, v.unwrap_or(f64::NAN)));
                     }
                 }
@@ -196,6 +223,9 @@ impl BridgeProfile {
         Ok(())
     }
 }
+
+/// The least top of a chain that stays at the ground: the maker divides by it.
+pub const MIN_TOP_M: f64 = 0.1;
 
 /// How near a position of an input must be to a node of the roads (metres), and how far a node of a profile can be from the end of its chain.
 pub const MATCH_M: f64 = 5.0;

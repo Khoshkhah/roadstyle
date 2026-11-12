@@ -113,24 +113,25 @@ A complete profile is also a valid input profile. Part 1 on a complete profile c
 | `parameters.design_grade` | number, above 0, at most 0.3 | optional | required | The design grade, as a fraction (0.05 is 5 %). Default 0.05 with the rule `design`; the rule `length` fills 0.125 (the grade of the look, 1 in 8) |
 | `parameters.curve` | `"smooth"` or `"design"` | optional | optional | `smooth`: the ramps of today. `design`: straight grades between the nodes and the interior points, with a vertical curve of `curve_m` at each interior point. Default `smooth`; `design` when `height_rule` is `design` |
 | `parameters.height_rule` | `"length"` or `"design"` | optional | optional | How the filler finds a height that you did not give. `length`: today's rule (the height of the group from its length). `design`: the design rules ([the design note](../design/bridge_height_design.md)). The maker does not read it. Default `length` |
+| `parameters.z_reference` | `"ground"` or `"elevation"` | optional | optional | What `z_m` is. `ground` (the default): metres above the ground of the page, and a free end is 0. `elevation`: the elevation in the vertical datum of the profile's ground (`ground.vertical_datum`). The deck is drawn at its elevation, over the page's ground. It needs the curve `design`, the `ground.id` of the profile, an elevation for every node (a free end too), and a page with the same `ground`. It cannot be used with `height_rule: "design"`. See [Heights as elevations](../guides/bridge-profile.md#heights-as-elevations) |
 | `groups` | list of groups | optional | required, one or more | One group is the bridge roads that touch each other |
 | `groups[].name` | text | optional | required | The name of the group |
 | `groups[].nodes` | list of nodes | optional | required | The ends of the chains |
 | `groups[].chains` | list of chains | optional | required | A chain is a line of bridge roads between two nodes |
 | `nodes[].id` | text `n1`, `n2`... | optional | required | The id of the node in a complete profile |
 | `nodes[].lonlat` | `[longitude, latitude]` | optional | required | The position. In an input profile it names the node: the node of the group within 5 m. A node needs a `lonlat` or an `id` |
-| `nodes[].kind` | `"ground"` or `"junction"` | optional | required | `ground`: one chain ends here, and the height is 0 (the end of a bridge is on the ground: a `z_m` above 0 is an error). `junction`: chains meet here |
+| `nodes[].kind` | `"ground"` or `"junction"` | optional | required | `ground`: one chain ends here, and the height is 0 (the end of a bridge is on the ground: a `z_m` above 0 is an error; with `z_reference: "elevation"` the page checks that the elevation is the ground's, within 1 m). `junction`: chains meet here |
 | `nodes[].chains` | list of chain ids | optional | required | The chains that meet at the node |
-| `nodes[].z_m` | number, 0 or more | optional | required | The height of the node above the ground, in metres |
+| `nodes[].z_m` | number, 0 or more (any number with `z_reference: "elevation"`) | optional | required | The height of the node above the ground, in metres. With `z_reference: "elevation"`: its elevation in the datum of the ground |
 | `nodes[].source`, `.method` | text, and `mapped`, `measured`, `derived` or `chosen` | optional | required | Where the value comes from, and how it was found |
 | `chains[].id` | text `c1`, `c2`... | optional | required | The id of the chain. A chain needs `osm_ways` or an `id` |
 | `chains[].osm_ways` | list of integers | optional | optional | The OSM ways of the chain, when the roads have them. In an input profile they name the chain |
 | `chains[].length_m` | number, above 0 | optional | required | The length of the chain |
 | `chains[].from`, `.to` | node ids | optional | required | The node at the first end and at the last end of the chain |
 | `chains[].points` | list of points | optional | required (can be empty) | Interior control points, in order of `s`. They need the curve `design`: the maker stops with an error if a chain has one and the curve is `smooth`. A chain whose input has `points` (even an empty list) keeps them; the filler makes points only for a chain whose input has none, with the rule `design` |
-| `chains[].top_m` | number, above 0 | optional | optional | The full height of the chain: the height that its ramps are made for. The maker needs it for the curve `smooth`. It is the `__rs_full` of the pieces |
+| `chains[].top_m` | number, above 0 (any number with `z_reference: "elevation"`) | optional | optional | The full height of the chain: the height that its ramps are made for. The maker needs it for the curve `smooth`. It is the `__rs_full` of the pieces |
 | `points[].s` | number, 0 or more | required | required | Metres from the first end of the chain. Inside the chain |
-| `points[].z_m` | number, 0 or more | required | required | The height of the deck at that place |
+| `points[].z_m` | number, 0 or more (any number with `z_reference: "elevation"`) | required | required | The height of the deck at that place |
 | `points[].curve_m` | number, 0 or more | optional | required | The length of the vertical curve around the point, in metres (0: none). The filler writes it from the design speed (`L = max(K × A, 0.6 V)`, [the design note](../design/bridge_height_design.md#3-the-vertical-curves)) and shortens it where two curves would overlap; a length that you give is kept |
 | `chains[].width_m` | number, above 0 | optional | optional | The width of the deck, in metres. Without it, each road of the chain is drawn at the width of its class |
 | `chains[].width_source` | text | optional | optional | Where the width comes from: `given` or `rule` |

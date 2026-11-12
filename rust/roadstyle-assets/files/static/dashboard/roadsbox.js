@@ -26,6 +26,7 @@ function _rdHeightBlock(){
   const g = rsBridgeGroups().find(x => x.group === _rdBridge);
   if(!g) return "";
   const n = g.roads.length;
+  if(g.zReference === "elevation") return '<div class="rs-rd-bhn">The heights of this page are elevations, in metres above the datum of the ground. Each end of a bridge road has its own.</div>' + _rdNodes(g);
   return '<div class="rs-rd-bh"><span>Height</span><input type="number" data-bh min="0" max="500" step="0.5" value="' + (Math.round(g.height * 10) / 10) + '" aria-label="Height of the selected bridge, in metres"><u>m</u>' +
     '<button type="button" data-bh-reset' + (g.set ? "" : " disabled") + '>Reset</button></div>' +
     '<div class="rs-rd-bhn">One height for the ' + n + (n === 1 ? " road" : " roads") + ' of this bridge that touch each other.</div>' + _rdNodes(g);
@@ -36,9 +37,10 @@ function _rdHeightBlock(){
 function _rdNodes(g){
   if(!g.nodes.length) return "";
   const top = id => { const c = g.chains.find(c => c.from === id || c.to === id); return c && c.top_m ? c.top_m : null; };
-  const z = nd => Math.round(nd.z_m * (g.set && top(nd.id) ? g.height / top(nd.id) : 1) * 10) / 10;
-  const rows = g.nodes.map(nd => '<div class="rs-rd-bh rs-rd-bn" data-node="' + _esc(nd.id) + '"><span>' + _esc(nd.id) + '</span><input type="number" data-bn="' + _esc(nd.id) + '" min="0" max="500" step="0.5" value="' + z(nd) + '"' + (nd.kind === "ground" ? " disabled" : "") +
-    ' aria-label="Height of the node ' + _esc(nd.id) + ', in metres' + (nd.kind === "ground" ? " (a free end is on the ground)" : "") + '"><u>m</u><em>' + _esc(nd.source) + "</em></div>").join("");
+  const elev = g.zReference === "elevation", fixed = nd => !elev && nd.kind === "ground";             // an elevation profile: a free end has an elevation too (the ground there)
+  const z = nd => Math.round(nd.z_m * (!elev && g.set && top(nd.id) ? g.height / top(nd.id) : 1) * 10) / 10;
+  const rows = g.nodes.map(nd => '<div class="rs-rd-bh rs-rd-bn" data-node="' + _esc(nd.id) + '"><span>' + _esc(nd.id) + '</span><input type="number" data-bn="' + _esc(nd.id) + '"' + (elev ? "" : ' min="0" max="500"') + ' step="0.5" value="' + z(nd) + '"' + (fixed(nd) ? " disabled" : "") +
+    ' aria-label="' + (elev ? "Elevation" : "Height") + ' of the node ' + _esc(nd.id) + ', in metres' + (fixed(nd) ? " (a free end is on the ground)" : "") + '"><u>m</u><em>' + _esc(nd.source) + "</em></div>").join("");
   return '<div class="rs-rd-bhn">Nodes: the height at each end of a bridge road. Change one and the roads that meet there are drawn again.</div>' + rows +
     '<div class="rs-rd-bar rs-rd-bnbar"><button type="button" data-bn-reset' + (g.nodesSet.length ? "" : " disabled") + '>Reset nodes</button><button type="button" data-bn-copy>Copy profile</button></div>';
 }
@@ -82,7 +84,7 @@ export function useRoadsBox(){
     box.querySelectorAll("input[data-b3d]").forEach(i => { i.onchange = () => rsSetBridges3D(i.checked); });
     box.querySelectorAll("input[data-bh]").forEach(i => { i.onchange = () => { const v = parseFloat(i.value); if(v >= 0) rsSetBridgeHeight(_rdBridge, v); else _rdBox.fill(); }; });
     box.querySelectorAll("button[data-bh-reset]").forEach(x => { x.onclick = () => rsSetBridgeHeight(_rdBridge, null); });
-    box.querySelectorAll("input[data-bn]").forEach(i => { i.onchange = () => { const v = parseFloat(i.value); if(v >= 0) rsSetBridgeNode(i.dataset.bn, v); else _rdBox.fill(); }; });
+    box.querySelectorAll("input[data-bn]").forEach(i => { i.onchange = () => { const v = parseFloat(i.value); const g = rsBridgeGroups().find(y => y.group === _rdBridge); if(g && g.zReference === "elevation" ? Number.isFinite(v) : v >= 0) rsSetBridgeNode(i.dataset.bn, v); else _rdBox.fill(); }; });
     box.querySelectorAll("button[data-bn-reset]").forEach(x => { x.onclick = () => { const g = rsBridgeGroups().find(y => y.group === _rdBridge); if(g) g.nodesSet.forEach(id => rsSetBridgeNode(id, null)); }; });
     box.querySelectorAll("button[data-bn-copy]").forEach(x => { x.onclick = () => _rdCopyProfile(x); });
     box.querySelectorAll("input[data-g]").forEach(i => { i.onchange = () => (i.dataset.g === "bridges" ? rsSetBridges : rsSetTunnels)(i.checked); });
