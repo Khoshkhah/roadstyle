@@ -6,6 +6,7 @@ import {_ovUnder, _ovWin, clearOvSel, _ovAt, _ovSections, handleOverlayClick, _l
 import {_spDotClick} from "./svproviders.js";
 import {_svLine, _svDist, _svPick, _sv, initSpot, useSpot} from "./svspot.js";
 import {_bmDrawn, _bmPickAt} from "./bridgemesh.js";
+import {_s3Click} from "./scene3d.js";
 const HIT = 4;
 function box(p){ return [[p.x-HIT,p.y-HIT],[p.x+HIT,p.y+HIT]]; }
 // query only layers that EXIST: the 3D view swaps roads-bridge-fill for the deck extrusions,
@@ -188,6 +189,7 @@ export function initSelect(){
   map.on("mouseout", ()=>{ _pt=null; if(_raf){cancelAnimationFrame(_raf);_raf=0;} setS(_hov,{hover:false}); _hov=null; _cur=null; clearTimeout(_tipT); if(_tip) _tip.remove(); });
   map.on("click", async e=>{
     if(_spDotClick(e)) return;       // a photo's dot of the Street View coverage opens that photo
+    if(_s3Click(e, rsDeselect)) return;     // a click on the 3D road tiles (scene3d.js) is theirs: their own event and popup
     // visual stacking decides the click: an "over" overlay (POIs, in front of the roads) wins;
     // then the roads; an "under" overlay (zone fills) only when the click missed every road —
     // so a road inside a zone stays selectable and still feeds rs:select (the popup, the road card).

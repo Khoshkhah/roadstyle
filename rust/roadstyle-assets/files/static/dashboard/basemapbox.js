@@ -23,7 +23,7 @@ const _bxSwatch = b => {
 // the box's layers again after rs.setStyle (index.js): a new roads style brings its arrow layers back as visible
 let _bxApply = null;
 export function useTops(){ if(_bxApply) _bxApply(); }
-// A PAGE'S OWN ROW under "On top": window.rsAddTopRow({id, label, get, set, available}) adds a check box for a layer of the page (get: whether it shows, set(on): the page shows or hides it,
+// A PAGE'S OWN ROW under "On top": window.rsAddTopRow({id, label, get, set, available, unavailable}) adds a check box for a layer of the page (get: whether it shows, set(on): the page shows or hides it,
 // available(): false greys the row). The row can be added before or after the box is built. The event rs:toprowschange tells the box that the page changed its state.
 const _hostPending = [];
 let _hostAdd = null;
@@ -109,7 +109,7 @@ export function buildBox(menu){
   document.addEventListener("rs:buildingsopacitychange", e => opShow(e.detail.opacity));
   opRow.append(_bxEl("span", "", "Opacity"), opIn, opVal); menu.appendChild(opRow);
   const hostRows = new Map();                        // the rows of the page: id -> {c, lab, spec}
-  const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); });
+  const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); lab.title = !on && spec.unavailable ? spec.unavailable() : ""; });
   _hostAdd = spec => { if(hostRows.has(spec.id)) return; const c = topRow("host-" + spec.id, spec.label); hostRows.set(spec.id, {c, lab: tops["host-" + spec.id].lab, spec}); c.onchange = () => { spec.set(c.checked); syncHost(); }; syncHost(); };
   document.addEventListener("rs:toprowschange", syncHost);
   _hostPending.splice(0).forEach(_hostAdd);

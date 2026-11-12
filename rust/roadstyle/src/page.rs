@@ -51,6 +51,9 @@ pub struct PageOptions {
     /// come from that file, not from `ontop.dem`. Null: an area with no ground, drawn with `ontop.dem` (the AWS Terrain Tiles)
     #[serde(default)]
     pub ground: Value,
+    /// the 3D road tiles (docs/design/scene_3d_tiles.md): {url, zoom, kinds, crs, origin, vertical_datum, ground_id, on, popup, min_zoom, max_tiles, cache_mb} (scene3d.rs), or null
+    #[serde(default)]
+    pub scene_3d: Value,
     /// the opacity of the 3D buildings of a vector base map, 0 to 1 (`buildings_opacity=`); `None`: `ontop.buildings.opacity` of data/basemaps.json (1, solid)
     pub buildings_opacity: Option<f64>,
     /// a tiled page (the roads in the embedded PMTiles archive)
@@ -269,7 +272,7 @@ pub fn page_html(mut style: Value, page: &PageOptions, p: &PageParts) -> String 
                                     ("__RS_OPTIONS__", script_json(&Value::Object(opts))),
                                     ("__HOST_PANEL_HTML__", host_panel(p.side_panel_html, p.host_panel_width, p.name))]);
     let mut parts = String::new();
-    if p.tiles.is_some() || !page.ground.is_null() {
+    if p.tiles.is_some() || !page.ground.is_null() || !page.scene_3d.is_null() {
         parts = format!("<script>{}</script>", PMTILES_JS.replace("</script>", "<\\/script>"));       // the roads' archive and the ground's terrain file
     }
     if let Some(pmt) = p.tiles {

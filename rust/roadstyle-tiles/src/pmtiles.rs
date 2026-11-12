@@ -185,8 +185,61 @@ impl Writer {
     }
 }
 
+/// What a PMTiles v3 file says about itself: the zooms, the tile type and compression of its header, and its metadata (JSON).
+#[derive(Debug)]
+pub struct Info {
+    pub min_zoom: u8,
+    pub max_zoom: u8,
+    pub tile_type: u8,
+    /// the header's tile compression: 1 none, 2 gzip
+    pub tile_compression: u8,
+    pub metadata: serde_json::Value,
+}
+
+/// `read_info`: the header (127 bytes) and the metadata of the archive at `path`; the tiles are not read.
+pub fn read_info(path: &std::path::Path) -> Result<Info, String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let shown = path.display();
+    let mut f = std::fs::File::open(path).map_err(|e| format!("{shown}: {e}"))?;
+    let mut h = [0u8; 127];
+    f.read_exact(&mut h).map_err(|e| format!("{shown}: no PMTiles header ({e})"))?;
+    if &h[..7] != b"PMTiles" || h[7] != 3 {
+        return Err(format!("{shown} is not a PMTiles v3 archive"));
+    }
+    let at = |o: usize| u64::from_le_bytes(h[o..o + 8].try_into().expect("8 bytes"));
+    let (off, len) = (at(24), at(32));
+    let mut raw = vec![0u8; len as usize];
+    f.seek(SeekFrom::Start(off)).and_then(|_| f.read_exact(&mut raw)).map_err(|e| format!("{shown}: the metadata is not in the file ({e})"))?;
+    let text = match h[97] {
+        1 => raw,
+        2 => {
+            let mut out = Vec::new();
+            flate2::read::GzDecoder::new(&raw[..]).read_to_end(&mut out).map_err(|e| format!("{shown}: the metadata is not gzip ({e})"))?;
+            out
+        }
+        c => return Err(format!("{shown}: internal compression {c} is not supported (1 none, 2 gzip)")),
+    };
+    let metadata = if text.is_empty() { serde_json::Value::Null } else { serde_json::from_slice(&text).map_err(|e| format!("{shown}: the metadata is not JSON ({e})"))? };
+    Ok(Info { min_zoom: h[100], max_zoom: h[101], tile_type: h[99], tile_compression: h[98], metadata })
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn read_info_gives_the_header_and_the_metadata_of_a_written_archive() {
+        let mut w = super::Writer::default();
+        w.write_tile(super::tile_id(16, 34000, 23000), &super::gzip(b"tile"));
+        let place = super::Place { min_lon_e7: 0, min_lat_e7: 0, max_lon_e7: 1, max_lat_e7: 1, center_zoom: 16, center_lon_e7: 0, center_lat_e7: 0 };
+        let bytes = w.finish(0, &place, r#"{"format": "glb", "zoom": 16}"#).unwrap();
+        let path = std::env::temp_dir().join(format!("rs_info_{}.pmtiles", std::process::id()));
+        std::fs::write(&path, bytes).unwrap();
+        let info = super::read_info(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!((info.min_zoom, info.max_zoom, info.tile_type, info.tile_compression), (16, 16, 0, 2));
+        assert_eq!(info.metadata["format"], "glb");
+        assert!(super::read_info(std::path::Path::new("/no/such/file")).is_err());
+    }
+
     #[test]
     fn tile_ids_are_the_pmtiles_ones() {
         // zxy_to_tileid of the pmtiles package

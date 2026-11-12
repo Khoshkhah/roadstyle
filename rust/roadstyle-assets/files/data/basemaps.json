@@ -295,6 +295,12 @@
   "buildings": {
    "opacity": 1
   },
+  "scene_3d": {
+   "lift_m": 0.6,
+   "light": [-0.4, 0.5, 0.75],
+   "ambient": 0.8,
+   "dim": {"light": 1.0, "dark": 0.6}
+  },
   "labels": {
    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
    "opacity": 1,

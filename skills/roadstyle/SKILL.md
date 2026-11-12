@@ -98,6 +98,7 @@ m.save("map.html")                        # m.html is the page as a string
   The map is the judge: where it cannot follow (`map.setMaxBounds`, max pitch) the 3D view goes back to it. The
   ground height under the center comes from the free Terrain Tiles on AWS (no key; the bar credits "heights: Mapzen",
   and shows "⚠ no ground heights" if they fail), so hills match too. Online only, like Street View.
+- `scene_3d=path` draws 3D road tiles: a PMTiles archive of GLB files (SimReady's `<area>.page.pmtiles`) in the map, with a row of the base-map box for the scene and for each part, and a click that gives the primitive's `extras` (`rs:scene3dselect`). It needs `ground=` with the archive's ground id (an error that names both ids otherwise) and the 3D terrain on (`terrain=True`). JS: `rsScene3d(on)`, `rsScene3dKind(kind, on)`, `rsScene3dStatus()`, `rsScene3dProblems()`. Guide: `/guides/scene-3d/`.
 - Colours, widths, casing and camera defaults are settings, not keywords:
   `rs.render_edges(..., settings={"config": {"labels": {"color": "#888"}}})`.
 - Unsure of a keyword? `help(rs.render_edges)` or the parameters page. Don't guess: an unknown

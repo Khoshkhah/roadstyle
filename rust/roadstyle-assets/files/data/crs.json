@@ -1,0 +1,17 @@
+{
+  "_about": "The map projections that the 3D road tiles (scene_3d, dashboard/scene3d.js) can come in: the project CRS of a GLB archive, by EPSG code. A new code of a known family is one row. The page reads the parameters that scene3d.rs writes into its option; the formulas are in scene3d.js (tmerc, lcc, webmerc).",
+  "ellipsoids": {
+    "WGS84": {"a": 6378137.0, "inv_f": 298.257223563},
+    "GRS80": {"a": 6378137.0, "inv_f": 298.257222101}
+  },
+  "utm": [
+    {"first": 32601, "last": 32660, "zone_base": 32600, "ellipsoid": "WGS84", "south": false, "name": "WGS 84 / UTM north"},
+    {"first": 32701, "last": 32760, "zone_base": 32700, "ellipsoid": "WGS84", "south": true, "name": "WGS 84 / UTM south"},
+    {"first": 25828, "last": 25838, "zone_base": 25800, "ellipsoid": "GRS80", "south": false, "name": "ETRS89 / UTM"}
+  ],
+  "codes": {
+    "3006": {"family": "tmerc", "ellipsoid": "GRS80", "lon0": 15.0, "k0": 0.9996, "fe": 500000.0, "fn": 0.0, "name": "SWEREF99 TM"},
+    "3301": {"family": "lcc", "ellipsoid": "GRS80", "lat0": 57.517553930555556, "lon0": 24.0, "lat1": 59.333333333333336, "lat2": 58.0, "fe": 500000.0, "fn": 6375000.0, "name": "Estonian Coordinate System of 1997"},
+    "3857": {"family": "webmerc", "ellipsoid": "WGS84", "name": "WGS 84 / Pseudo-Mercator"}
+  }
+}
