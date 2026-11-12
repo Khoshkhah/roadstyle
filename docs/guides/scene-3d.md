@@ -1,6 +1,6 @@
-# 3D road tiles (GLB)
+# 3D scene (GLB tiles)
 
-<p class="lead">Draw real 3D roads on the map: lanes, junctions, kerbs, markings, bridge decks and buildings, each at its own height. The tiles come from a GLB archive that SimReady writes for an area.</p>
+<p class="lead">Draw a real 3D scene on the map: lanes, junctions, kerbs, markings, bridge decks and buildings, each at its own height. The tiles come from a GLB archive that SimReady writes for an area.</p>
 
 ![Monaco with the 3D scene: road ribbons at their real height, and the buildings as blocks](../img/scene-3d/scene-3d.jpg)
 
@@ -225,6 +225,6 @@ A row of the base-map box that is grey is not an error. Its tooltip names the re
 
 ## See also
 
-- [3D road tiles: the design](../design/scene_3d_tiles.md): the choices, the projection table and the measurements.
+- [3D scene: the design](../design/scene_3d_tiles.md): the choices, the projection table and the measurements.
 - [Google 3D](google-3d.md) and [How the height of a 3D bridge is calculated](bridge-height.md): the other 3D views of the page.
 - [JavaScript](../reference/javascript.md): every call and event of the page.
