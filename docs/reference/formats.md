@@ -107,6 +107,8 @@ A complete profile is also a valid input profile. Part 1 on a complete profile c
 | Key | Type | Input | Complete | Meaning and rules |
 |---|---|---|---|---|
 | `format` | `"roadstyle.bridge_profile/1"` | optional | required | The version of the format |
+| `ground` | object | optional | optional | The ground that the heights are above: `z_m` is metres above the ground of the area (duckOSM's reference ground). Not there: not said. A page with a ground (the page option `ground`) writes its facts here when the profile has none |
+| `ground.id`, `ground.source`, `ground.product`, `ground.vertical_datum` | text | optional | optional | The facts of the ground, as the page option `ground` has them: the ground id (the SHA-256 of the elevation file, duckOSM `main.elevation_metadata.sha256`), the source, `DTM` or `DSM`, and the vertical datum. A profile and a page whose ground ids differ do not belong together: an error that names both ids |
 | `parameters.design_speed_kmh` | number, above 0, at most 200 | optional | required | The design speed. Default 50. It sets the length of the vertical curves |
 | `parameters.design_grade` | number, above 0, at most 0.3 | optional | required | The design grade, as a fraction (0.05 is 5 %). Default 0.05 with the rule `design`; the rule `length` fills 0.125 (the grade of the look, 1 in 8) |
 | `parameters.curve` | `"smooth"` or `"design"` | optional | optional | `smooth`: the ramps of today. `design`: straight grades between the nodes and the interior points, with a vertical curve of `curve_m` at each interior point. Default `smooth`; `design` when `height_rule` is `design` |

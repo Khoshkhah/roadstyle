@@ -11,6 +11,9 @@
   "parameters": {
    "$ref": "#/$defs/parameters"
   },
+  "ground": {
+   "$ref": "#/$defs/ground"
+  },
   "groups": {
    "type": "array",
    "items": {
@@ -72,6 +75,26 @@
     "s",
     "z_m"
    ]
+  },
+  "ground": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "id": {
+     "type": "string",
+     "description": "The ground id: the SHA-256 of the elevation file (duckOSM main.elevation_metadata.sha256)"
+    },
+    "source": {
+     "type": "string"
+    },
+    "product": {
+     "type": "string",
+     "description": "DTM or DSM"
+    },
+    "vertical_datum": {
+     "type": "string"
+    }
+   }
   },
   "parameters": {
    "type": "object",

@@ -256,3 +256,35 @@ def test_the_end_of_a_bridge_is_on_the_ground_and_the_filler_and_the_maker_warn_
     text = " | ".join(str(x.message) for x in w)
     assert f"the chain {chain['id']} has a level top" in text, text                                             # a flat top of the person
     assert f"the chain {chain['id']} goes from 0.0 m to 40.0 m" in text and "the design grade is 0.125" in text, text      # a straight grade that is too steep
+
+
+# ---- the ground of the profile (the standard "The ground reference", docs/design/ground_terrain.md) ----
+
+_GROUND = {"id": "a" * 64, "source": "FABDEM V1-2", "product": "DTM", "vertical_datum": "EGM2008", "resolution_m": 30, "license": "CC BY-NC-SA 4.0", "terrain": "https://example.test/t.pmtiles"}
+
+
+def _page_profile(html):
+    at = html.index("const RS_OPTIONS = ") + len("const RS_OPTIONS = ")
+    return json.JSONDecoder().raw_decode(html, at)[0]["bridge_profile"]
+
+
+def test_a_page_with_a_ground_writes_it_into_the_profile_and_two_different_grounds_are_an_error():
+    html = rs.render_edges(_roads(), backend="web", view_3d=True, ground=_GROUND).html
+    assert _page_profile(html)["ground"] == {"id": "a" * 64, "source": "FABDEM V1-2", "product": "DTM", "vertical_datum": "EGM2008"}      # the facts, not the file or the license
+    same = rs.render_edges(_roads(), backend="web", view_3d=True, ground=_GROUND, bridge_profile={"ground": {"id": "a" * 64}}).html
+    assert _page_profile(same)["ground"] == {"id": "a" * 64}                                                                          # the profile's own ground is kept
+    with pytest.raises(ValueError, match=r"ground b{64}, and the page draws the ground a{64}: two products of one area"):
+        rs.render_edges(_roads(), backend="web", view_3d=True, ground=_GROUND, bridge_profile={"ground": {"id": "b" * 64}})
+    # a profile with a ground and no id (a source, a product) is not compared; a page with no ground says nothing in the profile
+    assert "ground" not in _page_profile(rs.render_edges(_roads(), backend="web", view_3d=True).html)
+    with pytest.warns(UserWarning, match="the page has no ground"):
+        rs.render_edges(_roads(), backend="web", view_3d=True, bridge_profile={"ground": {"id": "b" * 64}})
+
+
+def test_the_ground_of_an_input_is_kept_in_the_complete_profile_and_the_filler_twice_is_the_filler_once():
+    p = rs.bridge_profile(_roads(), {"ground": {"id": "c" * 64, "product": "DTM"}})
+    assert p["ground"] == {"id": "c" * 64, "product": "DTM"}
+    assert rs.bridge_profile(_roads(), p) == p
+    assert "ground" not in rs.bridge_profile(_roads())                                                      # not said: not written
+    with pytest.raises(ValueError, match="unknown field"):
+        rs.bridge_profile(_roads(), {"ground": {"file": "x.tif"}})

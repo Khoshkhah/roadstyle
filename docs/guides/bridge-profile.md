@@ -176,7 +176,7 @@ The rule does not know that. The heights of your own five junctions are fixed po
 
 **Warnings** (the page still draws): a chain between two ground ends that is too short to reach its top; a curve that was shortened; a level top of more than 76 m that you gave; a low point on a bridge; two decks that cross with less than 5 m between them (found from the lines of the chains, with the curve `design` only); a straight grade steeper than the design grade (with the curve `design`).
 
-**The end of a bridge is on the ground.** A node where one chain ends (`kind: "ground"`) has the height 0. A `z_m` above 0 there is an error, because a deck that ends in the air is a wrong height: the page draws no landing, and the engine does not guess one. Fix the height, or fix the roads (a bridge that ends too early in the OSM data).
+**The end of a bridge is on the ground** (the ground of the area, see [The ground](#the-ground)). A node where one chain ends (`kind: "ground"`) has the height 0. A `z_m` above 0 there is an error, because a deck that ends in the air is a wrong height: the page draws no landing, and the engine does not guess one. Fix the height, or fix the roads (a bridge that ends too early in the OSM data).
 
 ## Change a node in the open page
 
@@ -207,6 +207,22 @@ rs.render_dashboard(edges, view_3d=True, bridge_profile=given).save("map.html")
 
 [`granville_urbanstyle_axes.json`](../samples/bridge-profile/granville_urbanstyle_axes.json) is the file for the Granville Bridge, reduced to the keys that the converter reads.
 
+## The ground
+
+`z_m` is metres above **the ground of the area**: duckOSM's reference ground (`main.elevation_metadata`, the DTM), which a page with the option `ground` draws as its terrain. A free end of a bridge is on that ground, so its `z_m` is 0 even on a hill.
+The absolute height of a point is the ground there plus `z_m`. The profile stores no elevation of the ground: a second copy of the ground would not agree with the one that the page draws.
+
+The profile can name its ground, as every product of an area does (the standard [The ground reference](https://github.com/Khoshkhah/duckOSM/blob/main/docs/concepts/ground-reference.md)):
+
+```json
+{"ground": {"id": "<sha256 of the elevation file>", "source": "FABDEM V1-2", "product": "DTM", "vertical_datum": "EGM2008"}}
+```
+
+- A page with a ground (`ground=`, which `rs.duckosm.page` fills from the duckOSM file) writes the facts of that ground into the profile when the profile has none. A profile that you save from the page (`rsBridgeProfile()`) names its ground.
+- A profile and a page whose ground **ids** differ are an error that names both ids.
+- A profile that names a ground, on a page with no ground, is a warning: the heights are above a ground that the page does not draw.
+- `rs.bridge_profile(edges)` writes a ground only if you give one.
+
 ## What the engine checks
 
 The engine says what is wrong. It does not change a number that you gave.
@@ -225,8 +241,8 @@ All files are in `docs/samples/bridge-profile/` and are published with this site
 | [`granville_input_partial.json`](../samples/bridge-profile/granville_input_partial.json) | The least input: 5 junction heights | 0.6 KB |
 | [`granville_input_profile.json`](../samples/bridge-profile/granville_input_profile.json) | The complete input profile that Part 1 makes from it | 3.9 KB |
 | [`granville_input_profile_colored.html`](../samples/bridge-profile/granville_input_profile_colored.html) | The same complete profile in one HTML page, with the values of the input and the values that the engine added in two colors. Open it in a browser | 10.9 KB |
-| [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 5.2 KB |
-| [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 5.4 KB |
+| [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 5.7 KB |
+| [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 5.9 KB |
 | [`granville_bridge_edges.parquet`](../samples/bridge-profile/granville_bridge_edges.parquet) | The roads of the example: the 41 edges (27 OpenStreetMap ways) of the Granville Bridge and its ramps, from duckOSM's Vancouver database. OpenStreetMap data, ODbL | 16.6 KB |
 | [`granville_urbanstyle_axes.json`](../samples/bridge-profile/granville_urbanstyle_axes.json) | The 12 axes of urbanstyle's measured profile of the Granville Bridge (`urbanstyle.bridge/1`), reduced to the OSM ways, the line, the length and the vertical profile. The input of `rs.bridge_profile_from_urbanstyle`. City of Vancouver LiDAR 2022 (Open Government Licence - Vancouver) | 11.5 KB |
 | [`granville_lidar_samples.json`](../samples/bridge-profile/granville_lidar_samples.json) | The deck heights that the City of Vancouver LiDAR 2022 gives on the 12 axes of the same bridge, from urbanstyle's profile (Open Government Licence - Vancouver). It is for comparison only. The profile above does not use it | 7.7 KB |

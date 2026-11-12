@@ -3080,7 +3080,7 @@ def test_the_bridge_profile_schemas_check_the_samples_and_agree_with_the_referen
     section = (root / "docs" / "reference" / "formats.md").read_text()
     section = section[section.index("## The bridge profile"):section.index("## The look")]
     names = {k for d in inp["$defs"].values() if d.get("type") == "object" for k in d["properties"]} | set(inp["properties"])
-    assert names >= {"format", "parameters", "groups", "design_speed_kmh", "design_grade", "curve", "z_m", "lonlat", "osm_ways", "points", "width_m", "width_source", "s", "height_rule", "curve_m"}
+    assert names >= {"format", "parameters", "groups", "design_speed_kmh", "design_grade", "curve", "z_m", "lonlat", "osm_ways", "points", "width_m", "width_source", "s", "height_rule", "curve_m", "ground", "vertical_datum"}
     assert [n for n in sorted(names) if f"`{n}`" not in section and f".{n}`" not in section and f"[].{n}`" not in section and f"`.{n}`" not in section] == []      # every key is in the reference
     assert "bridge_profile_input.schema.json" in section and "bridge_profile_complete.schema.json" in section
     for key, default in (("design_speed_kmh", 50), ("design_grade", 0.05)):
