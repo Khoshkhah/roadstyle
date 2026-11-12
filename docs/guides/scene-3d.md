@@ -34,7 +34,7 @@ open page, `rsGround(other)` makes the layer say so (`rsScene3dProblems()`) and 
 
 With the 3D terrain off the layer draws nothing: the rows are grey and say why. It never draws the roads flat. The layer lifts the whole
 scene by `ontop.scene_3d.lift_m` (0.6 m): the terrain that the map draws is a mesh that is lower than the exact ground in places, and a road at its exact height is
-covered by it. Measured on Monaco (3D terrain on): with no lift 0.3 to 6 % of the road pixels show, with 0.3 m 87 to 100 %, with 0.6 m 93 to 100 %. The surface normals of a GLB are noisy, so the lift does not follow the slope: it is one number.
+covered by it. Measured on Monaco (3D terrain on): with no lift 0.3 to 6 % of the road pixels show, with 0.3 m 91 to 100 %, with 0.6 m 92 to 100 %. The count does not grow above 0.3 m, so the lift does not follow the slope: it is one number.
 
 ## The switches
 

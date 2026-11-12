@@ -5,7 +5,7 @@
 // A vertex of a tile is (east - origin.x, height, -(north - origin.y)) in metres of the archive's CRS (the GLB's root `extras.simready`). Each vertex is converted
 // to Web Mercator on the CPU, once, when its tile is read (the inverse of the CRS: `_s3Inv`; the parameters are rows of data/crs.json). The height is metres above the datum of the
 // ground, drawn as height x the terrain's exaggeration, so the layer needs the 3D terrain, and the terrain's mesh is lower than the exact ground in places: the whole scene is lifted by
-// `ontop.scene_3d.lift_m`. Measured on Monaco: with no lift only 0.3 to 6 % of the road pixels are visible, with 0.6 m 93 to 100 %. A lift that follows the slope (the surface normals of the GLB give a noisy slope) made the road edges ragged, so the lift is one number.
+// `ontop.scene_3d.lift_m`. Measured on Monaco: with no lift only 0.3 to 6 % of the road pixels are visible, with 0.6 m 93 to 100 %. The GLB's normals are smooth (the first slope test read them with a wrong stride and was void). With the right stride a measurement saturates at 0.3 m (see docs/design/scene_3d_tiles.md), so the lift stays one number.
 //
 // THE TILES: the tiles that the view touches and one ring around them (a primitive is in the tile of the centre of its box, so it can reach a few metres into the next one), the
 // nearest `max_tiles` of them, from `min_zoom` on. They are read one at a time as they come, kept in a cache with a byte budget (`cache_mb`) and drawn while they are in it.
@@ -285,12 +285,12 @@ const _s3Layer = {
     gl.useProgram(_s3Prog);
     gl.uniform1f(_s3Loc.u_lift, cfg.lift_m); gl.uniform3f(_s3Loc.u_light, L[0] / ln, L[1] / ln, L[2] / ln); gl.uniform1f(_s3Loc.u_amb, cfg.ambient); gl.uniform1f(_s3Loc.u_dim, dim);
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
-    const attr = (loc, buf, size, ty, norm) => { gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, ty, norm, 0, 0); };
+    const attr = (loc, buf, size, ty, norm, stride) => { gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, ty, norm, stride || 0, 0); };
     _s3Tiles.forEach(t => {
       if(t.state !== "ok") return;
       t.used = ++_s3Clock; if(!t.gpu) _s3Upload(gl, t);
       gl.uniformMatrix4fv(_s3Loc.u_m, false, new Float32Array(_s3Matrix(M, t))); gl.uniform1f(_s3Loc.u_zs, _s3Zs(t)); gl.uniform4f(_s3Loc.u_hl, 0, 0, 0, 0);
-      attr(_s3Loc.pos, t.gpu.pos, 3, gl.FLOAT, false); attr(_s3Loc.nrm, t.gpu.nrm, 3, gl.BYTE, true); attr(_s3Loc.col, t.gpu.col, 4, gl.UNSIGNED_BYTE, true);
+      attr(_s3Loc.pos, t.gpu.pos, 3, gl.FLOAT, false); attr(_s3Loc.nrm, t.gpu.nrm, 3, gl.BYTE, true, 4); attr(_s3Loc.col, t.gpu.col, 4, gl.UNSIGNED_BYTE, true);       // the normal is 4 bytes for a vertex (x, y, z, pad): stride 4
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.gpu.idx);
       for(const k in t.ranges){ const [s, c] = t.ranges[k]; if(c && _s3Kinds.get(k)) gl.drawElements(gl.TRIANGLES, c, gl.UNSIGNED_INT, s * 4); }
       if(_s3Sel && _s3Sel.tile === t){            // the picked primitive again, in the select colour, a little nearer

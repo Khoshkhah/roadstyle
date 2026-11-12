@@ -305,6 +305,25 @@ def test_the_scene_shows_against_the_map_in_both_themes(tmp_path, theme):
     assert errors == []
 
 
+def test_a_flat_road_is_one_colour_all_over(tmp_path):
+    """Every normal of the quad points up, so the light is the same on all of it. A wrong stride of the normal buffer gave stripes and fans."""
+    html, f = _scene(tmp_path)
+    c = _centre(f["code"], f["quads"]["roads"][0])
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, html, f["path"])
+        try:
+            _goto(page, *c)
+            from PIL import Image
+            x, y = page.evaluate("c => { const p = map.project(c); return [p.x, p.y]; }", c)
+            im = Image.open(io.BytesIO(page.screenshot())).convert("RGB")
+            px = [im.getpixel((int(x) + dx, int(y) + dy)) for dx in (-14, -7, 0, 7, 14) for dy in (-14, -7, 0, 7, 14)]
+            spread = max(max(q[i] for q in px) - min(q[i] for q in px) for i in range(3))
+            assert spread <= 2, (spread, px)
+        finally:
+            browser.close()
+    assert errors == []
+
+
 def test_a_ground_that_is_not_the_archives_is_an_error_in_the_page_too(tmp_path):
     """A host that gives another ground later (rsGround) gets the error in the page, and no triangle is drawn."""
     html, f = _scene(tmp_path)
