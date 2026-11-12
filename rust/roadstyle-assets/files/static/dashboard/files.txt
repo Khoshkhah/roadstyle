@@ -52,6 +52,7 @@ elevation
 basemapbox
 boundary
 bridgemesh
+scene3d
 filter
 roadsbox
 color

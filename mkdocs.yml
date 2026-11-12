@@ -61,6 +61,7 @@ nav:
       - How the height of a 3D bridge is calculated: guides/bridge-height.md
       - The bridge profile, input and output (planned): guides/bridge-profile.md
       - Google 3D: guides/google-3d.md
+      - 3D road tiles (GLB): guides/scene-3d.md
       - Keys and tokens: guides/google-key.md
   - Dashboards:
       - Dashboards: guides/dashboards.md

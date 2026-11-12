@@ -40,6 +40,7 @@ import {initFeatures, useFeatures} from "./features.js";
 import {initWalls} from "./walls.js";
 import {initTunnel} from "./tunnel.js";
 import {initBridgeMesh, useBridgeMesh, initBridgeApi} from "./bridgemesh.js";
+import {initScene3D} from "./scene3d.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
 import {initSelect, useSelect} from "./select.js";
@@ -60,7 +61,7 @@ const RS_DEFAULTS = {
   bridge_profile: null,        // the complete bridge profile of the 3D decks (roadstyle:bridge_profile), or null: rsBridgeGroups lists its chains and nodes
   live: null,                  // the live data (R22): {color: "rs_c", width: "rs_w", types, ramp, nodata}, or null (the page has none)
   dashboard: null,             // the template's typed options (roadstyle::dashboard::Dashboard): layout, panel, toolbar, windows, phone; null: none
-  basemaps: [], ontop: {}, basemap_switcher: true, hillshade: false, terrain: false, terrain_exaggeration: null, buildings_opacity: null, terrain_tunnels: "fade",
+  basemaps: [], ontop: {}, basemap_switcher: true, hillshade: false, terrain: false, terrain_exaggeration: null, buildings_opacity: null, terrain_tunnels: "fade", scene_3d: null,
   tiles: false,                // the roads are a vector source (the template's no-roads message); simple mode comes from the style
   tiles_generation: null,      // the generation of the tiles (the PMTiles metadata, a tile server's answer), else the ?g= of the style's tile URLs
   popup_mode: "popup", find_control: false, zoom_readout: true, pitch_3d: 55,
@@ -129,6 +130,7 @@ export function rsDashboard(map, options){
   initTunnel();
   initBridgeApi();
   initBridgeMesh();
+  initScene3D();
   initViews();
   initArrows();
   initSelect();
