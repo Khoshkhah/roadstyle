@@ -1,5 +1,5 @@
 // The base-map box (docs/design/dashboard_templates.md, 3.3): the heading "Base map", one radio row with a swatch for each map, a divider, and
-// "On top": Hillshade, 3D terrain (elevation.js), Labels, One-way arrows and 3D buildings (with its Opacity slider below it while it is on). A map with a dark twin is one row that follows the page's theme. The order on the map: the base
+// "On top": Hillshade, 3D terrain (elevation.js), Labels, One-way arrows, and the 3D buildings' Opacity slider while they are on (their switch is the toolbar's buildings button: buildingstool.js). A map with a dark twin is one row that follows the page's theme. The order on the map: the base
 // map, the hillshade, the labels, the roads, the page's own layers, the buildings, the selection. The URLs of the layers on top are
 // data/basemaps.json `ontop` (O.ontop).
 //
@@ -7,7 +7,7 @@
 // labels only from a base map that can show them: the style's own labels (a vector style), or Esri's label tiles (Esri Gray, Esri Satellite).
 // Blank, OpenStreetMap and Esri Streets get no label layer from the page. The choice is kept for each base map.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
-import {rsBuildings, rsBuildingsByPerson, rsBuildingsOpacity} from "./basemap.js";
+import {rsBuildings, rsBuildingsOpacity} from "./basemap.js";
 import {_elHillshade, rsTerrain, rsTerrainTunnels, rsTunnelsOpacity, rsGround, _elTunnels, _elTerrainByPerson} from "./elevation.js";
 import {rsArrowsOn, rsHasArrows, rsSetArrows, _arApply} from "./arrows.js";
 
@@ -70,10 +70,7 @@ export function buildBox(menu){
     const vec = vector(), kind = labelKind(), on = wantOf();
     tops.labels.c.checked = on;                       // the switches show the state of the map that is on
     const own = _ownBuildings();                       // the area's own buildings are shown: they have their own switch, and the vector style's are not drawn
-    tops.buildings.c.disabled = !vec || own; tops.buildings.c.checked = vec && !own && rsBuildings();
-    tops.buildings.lab.classList.toggle("rs-bm-off", !vec || own);
-    tops.buildings.lab.title = own ? "The area's own buildings are shown (the Layers rows)" : "";
-    opRow.hidden = !(tops.buildings.c.checked || (own && window.rsGetBuildings3D && window.rsGetBuildings3D()));      // the slider: the vector style's buildings, or the area's own in 3D
+    opRow.hidden = !((vec && !own && rsBuildings()) || (own && window.rsGetBuildings3D && window.rsGetBuildings3D()));      // the slider: the vector style's buildings, or the area's own in 3D
     tunRow.hidden = !tops.terrain.c.checked;
     if(lastOn !== on){ lastOn = on; _emit("rs:labelschange", {on}); }
     if(!map.isStyleLoaded()){ map.once("idle", apply); return; }       // the layers wait for the style: "idle" calls this again
@@ -99,15 +96,14 @@ export function buildBox(menu){
   tunRow.append(_bxEl("span", "", "Tunnels"), tunIn, tunVal); menu.appendChild(tunRow);
   topRow("labels", "Labels");
   topRow("arrows", "One-way arrows").checked = rsArrowsOn();       // on, unless the person turned them off in this browser (arrows.js keeps the state)
-  topRow("buildings", "3D buildings");
-  // the opacity of the 3D buildings: a slider row under the switch, shown only while the switch is on
+  // the opacity of the 3D buildings: a slider row, shown only while 3D buildings are on (the switch is the toolbar's buildings button: buildingstool.js)
   const opRow = _bxEl("label", "rs-set-slide rs-bm-opacity"), opIn = _bxEl("input"), opVal = _bxEl("b");
   opIn.type = "range"; opIn.min = "0"; opIn.max = "1"; opIn.step = "0.05"; opIn.id = "rs-top-buildings-opacity";
   const opShow = v => { opIn.value = v; opVal.textContent = (+v).toFixed(2); };
   opShow(rsBuildingsOpacity());
   opIn.oninput = () => rsBuildingsOpacity(+opIn.value);
   document.addEventListener("rs:buildingsopacitychange", e => opShow(e.detail.opacity));
-  opRow.append(_bxEl("span", "", "Opacity"), opIn, opVal); menu.appendChild(opRow);
+  opRow.append(_bxEl("span", "", "3D buildings opacity"), opIn, opVal); menu.appendChild(opRow);
   const hostRows = new Map();                        // the rows of the page: id -> {c, lab, spec}
   const syncHost = () => hostRows.forEach(({c, lab, spec}) => { const on = spec.available ? !!spec.available() : true; c.checked = !!spec.get(); c.disabled = !on; lab.classList.toggle("rs-bm-off", !on); lab.title = !on && spec.unavailable ? spec.unavailable() : ""; });
   _hostAdd = spec => { if(hostRows.has(spec.id)) return; const c = topRow("host-" + spec.id, spec.label); hostRows.set(spec.id, {c, lab: tops["host-" + spec.id].lab, spec}); c.onchange = () => { spec.set(c.checked); syncHost(); }; syncHost(); };
@@ -129,11 +125,10 @@ export function buildBox(menu){
   window.rsTunnelsOpacity = rsTunnelsOpacity;
   document.addEventListener("rs:terrainchange", e => { tops.terrain.c.checked = e.detail.on; tunRow.hidden = !e.detail.on; });
   // the area's own 3D buildings on or off: the row, and the opacity they have now (their style's until the person moves the slider)
-  document.addEventListener("rs:buildings3dchange", () => { opRow.hidden = !(tops.buildings.c.checked || (_ownBuildings() && window.rsGetBuildings3D && window.rsGetBuildings3D())); opShow(rsBuildingsOpacity()); });
+  document.addEventListener("rs:buildings3dchange", () => { opRow.hidden = !((vector() && !_ownBuildings() && rsBuildings()) || (_ownBuildings() && window.rsGetBuildings3D && window.rsGetBuildings3D())); opShow(rsBuildingsOpacity()); });
   tops.labels.c.onchange = () => { _bxSet("labels2:" + baseKey(), tops.labels.c.checked); apply(); };
   tops.arrows.c.onchange = () => rsSetArrows(tops.arrows.c.checked);
   document.addEventListener("rs:arrowschange", e => { tops.arrows.c.checked = e.detail.on; });
-  tops.buildings.c.onchange = () => rsBuildingsByPerson(tops.buildings.c.checked);
   const mark = () => rows.forEach(([b, r]) => { r.checked = b.key === current || b.dark === current; });
   // a map with a twin shows the swatch of the twin of the current theme
   const swatches = () => rows.forEach(([b, , sw]) => { const tw = b.dark && byKey(b.dark); sw.style.background = _bxSwatch(isDark() && tw ? tw : b); });

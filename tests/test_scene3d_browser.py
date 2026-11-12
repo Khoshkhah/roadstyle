@@ -109,7 +109,7 @@ def _edges(lon, lat):
     return gpd.GeoDataFrame({"highway": ["primary"], "name": ["A street"], "edge_id": [1]}, geometry=[LineString([(lon, lat), (lon + 1e-3, lat)])], crs=4326)
 
 
-def _scene(tmp_path, code="EPSG:32632", ground=None, with_ground=True, **kw):
+def _scene(tmp_path, code="EPSG:32632", ground=None, with_ground=True, buildings=False, **kw):
     """The place of `code` with a road tile (the tile of the origin + 10 m) and a deck tile (the next tile to the east). Returns (html, facts)."""
     o = PLACES[code]
     lon, lat = _to_lonlat(code, o[0] + 10, o[1] + 10)
@@ -123,7 +123,9 @@ def _scene(tmp_path, code="EPSG:32632", ground=None, with_ground=True, **kw):
     road = {"quad": _quad(o[0], o[1], 5.0), "extras": {"lane_id": "4064037692617345284", "role": "through", "use": ["auto", "bus"]}, "color": [0.9, 0.2, 0.2]}
     deck = {"quad": _quad(eb, nb, 20.0), "extras": {"structure_id": "S9", "role": "deck"}, "color": [0.2, 0.2, 0.9]}
     path = tmp_path / "scene.pmtiles"
-    _archive(path, {(tx, ty): _glb({"roads": [road]}, code, o), (tx + 1, ty): _glb({"structures": [deck]}, code, o)}, code, o)
+    house = {"quad": _quad(o[0] + 40, o[1] + 40, 12.0), "extras": {"building_id": "B1"}, "color": [0.8, 0.8, 0.7]}
+    kinds = ("roads", "kerbs", "markings", "structures") + (("buildings",) if buildings else ())
+    _archive(path, {(tx, ty): _glb({"roads": [road], **({"buildings": [house]} if buildings else {})}, code, o), (tx + 1, ty): _glb({"structures": [deck]}, code, o)}, code, o, kinds=kinds)
     g = ground if ground is not None else (_ground(lon, lat) if with_ground else None)
     html = rs.render_dashboard(_edges(lon, lat), basemap="blank", ground=g, scene_3d={"tiles": str(path), "url": "http://rs.test/scene.pmtiles"}, minzoom=False, **kw).html
     return html, dict(path=path, lon=lon, lat=lat, road=road, deck=deck, origin=o, code=code, quads={"roads": (o, 5.0), "structures": ((eb, nb), 20.0)})
@@ -283,6 +285,42 @@ def test_the_rows_are_in_the_base_map_box_and_the_scene_needs_the_terrain(tmp_pa
             page.wait_for_function("!!map.getTerrain()", timeout=60_000)
             page.wait_for_timeout(500)
             assert not any(page.evaluate("[...document.querySelectorAll('.rs-bm-box label.rs-bm-row input')].filter(i => i.parentElement.textContent.includes('3D k')).map(i => i.disabled)"))
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_the_toolbar_button_switches_the_scenes_buildings_and_no_row_repeats_it(tmp_path):
+    """One button for the 3D buildings of every source: the part `buildings` of the scene has no row in the base-map box, and the toolbar's button
+    (the same one that works for OpenFreeMap's buildings and the area's own) is on while they show and switches them."""
+    html, f = _scene(tmp_path, buildings=True)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, html, f["path"])
+        try:
+            page.wait_for_function("rsScene3dStatus().drawn", timeout=60_000)
+            names = page.evaluate("[...document.querySelectorAll('.rs-bm-box label.rs-bm-row')].map(l => l.textContent.trim()).filter(t => t.startsWith('3D '))")
+            assert "3D buildings" not in names and "3D roads" in names, names
+            btn = "document.getElementById('rs-b3d-btn')"
+            page.wait_for_function(f"!{btn}.disabled", timeout=10_000)
+            assert page.evaluate(f"{btn}.classList.contains('rs-on')") is True
+            page.evaluate(f"{btn}.click()")
+            page.wait_for_function(f"!{btn}.classList.contains('rs-on')", timeout=10_000)
+            assert page.evaluate("[rsScene3dKind('buildings'), rsScene3dKind('roads')]") == [False, True]
+            page.evaluate(f"{btn}.click()")
+            page.wait_for_function(f"{btn}.classList.contains('rs-on')", timeout=10_000)
+            assert page.evaluate("rsScene3dKind('buildings')") is True
+        finally:
+            browser.close()
+    assert errors == []
+
+
+def test_the_toolbar_button_is_grey_when_the_page_has_no_buildings_at_all(tmp_path):
+    html, f = _scene(tmp_path)                       # a scene with no part `buildings`, a blank base map
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, html, f["path"])
+        try:
+            assert page.evaluate("document.getElementById('rs-b3d-btn').disabled") is True
+            assert "3D scene with buildings" in page.evaluate("document.getElementById('rs-b3d-btn').title")
         finally:
             browser.close()
     assert errors == []

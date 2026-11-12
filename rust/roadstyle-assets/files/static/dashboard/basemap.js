@@ -2,7 +2,7 @@
 // tiles; the road layers stay put); the dropdown is just UI over it and stays in sync.
 // A tile-less entry (blank) hides the raster layer and shows the plain background colour.
 import {map, O, OVERLAYS, _emit, _ownBuildings} from "./core.js";
-import {defineTool, BUILDINGS_ICON, LAYERS_ICON} from "./tools.js";
+import {defineTool, LAYERS_ICON} from "./tools.js";
 import {buildBox} from "./basemapbox.js";
 let BASEMAPS = [];
 // A VECTOR STYLE as a base map (Basemap.style_url, e.g. OpenFreeMap): its sources and layers are merged into the page's map with the prefix
@@ -101,6 +101,9 @@ export function rsBuildingsOpacity(value){
   _emit("rs:buildingsopacitychange", {opacity:value});
   return value;
 }
+// what buildingstool.js asks: a vector style is merged (its buildings exist), and the page has a vector style among its base maps
+export const _bmHasVector = () => !!vec;
+export const _bmHasVectorStyle = () => BASEMAPS.some(b => b.style_url);
 export function rsBuildings(on){
   if(on === undefined) return buildingsOn;
   buildingsOn = !!on; paintBuildings();
@@ -150,24 +153,13 @@ export function initBasemap(){
   window.rsBuildings = rsBuildings;
   window.rsBuildingsOpacity = rsBuildingsOpacity;
   map.on("pitchend", paintBuildings);
-  for(const ev of ["rs:overlaychange", "rs:overlayschange"]) document.addEventListener(ev, paintBuildings);        // the page's own buildings on or off
+  for(const ev of ["rs:overlaychange", "rs:overlayschange", "rs:scene3dchange", "rs:scene3dstatus"]) document.addEventListener(ev, paintBuildings);        // the page's own buildings on or off (an overlay, or the 3D scene)
   window.RS_BASEMAPS = BASEMAPS;
   if(BASEMAPS[0]) map.getContainer().style.backgroundColor = BASEMAPS[0].bg;
   // a page that starts on a vector style (basemap="ofm_liberty") merges it as soon as the style is in, as a click on its row would
   if(BASEMAPS[0] && BASEMAPS[0].style_url){ let done = false; const go = ()=>{ if(done || !map.isStyleLoaded()) return; done = true; rsSetBasemap(0); };
     if(map.isStyleLoaded()) go(); else { map.on("load", go); map.on("styledata", go); } }
-  // the tool `buildings` of a page with a vector base map: the buildings of the vector style (features.js defines it again for a page with
-  // buildings of its own, which then win); greyed on a raster base map
-  if(BASEMAPS.some(b=>b.style_url)){
-    const d=document.createElement("div"), bt=document.createElement("button");
-    d.className="maplibregl-ctrl maplibregl-ctrl-group"; bt.type="button"; bt.id="rs-b3d-btn"; bt.innerHTML=BUILDINGS_ICON; d.appendChild(bt);
-    const sync=()=>{ bt.disabled=!vec; bt.classList.toggle("rs-on", !!vec && buildingsOn);
-                     bt.title=vec ? "Buildings in 3D" : "3D buildings need a vector base map (OpenFreeMap)"; };
-    bt.onclick=()=>rsBuildingsByPerson(!buildingsOn);
-    for(const ev of ["rs:buildingschange", "rs:basemapready", "rs:basemapchange"]) document.addEventListener(ev, ()=>setTimeout(sync, 0));
-    sync();
-    defineTool("buildings", "toggle", d, {title: bt.title, isOpen: ()=>!!vec && buildingsOn});
-  }
+  // the tool `buildings` is buildingstool.js's: one button for the buildings of every source (this base map's, the area's own, the 3D scene's)
   if(O.basemap_switcher && BASEMAPS.length > 1){
     const menu=document.createElement("div"); menu.className="bm-menu";
     BASEMAPS.forEach((b,i)=>{ const o=document.createElement("div"); o.textContent=b.label;

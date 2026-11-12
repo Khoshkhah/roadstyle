@@ -8,6 +8,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Changed
 
+- **One 3D buildings button for every source.** The toolbox's buildings button now switches the buildings of a vector base map (OpenFreeMap), the buildings of the area (a map layer with a 3D layer) and the part `buildings` of a 3D scene (`scene_3d`). It is on while any source shows its buildings, and grey, with the reason in its title, when the page has none. The base-map box has no *3D buildings* row any more, the Layers box has no *Buildings 3D* row, and the scene has no *3D buildings* row: the button is the one switch. The *Opacity* slider of the box is now *3D buildings opacity*. The scene's buildings win over the base map's, as the area's own buildings do. The calls `rsBuildings`, `rsSetBuildings3D` and `rsScene3dKind("buildings", on)` are as before.
 - **The 3D bridge decks show from zoom 15** (`bridge_decks.flat_below`; it was 16). Below zoom 15 a bridge is still its flat line.
 
 ### Fixed

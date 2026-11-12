@@ -22,7 +22,7 @@ _LIBERTY = {"version": 8, "sources": _SRC, "layers": [
      "paint": {"fill-extrusion-color": "#ccc", "fill-extrusion-height": ["get", "render_height"], "fill-extrusion-opacity": 0.8}}]}
 _POSITRON = {"version": 8, "sources": _SRC, "layers": [
     {"id": "building", "type": "fill", "source": "openmaptiles", "source-layer": "building", "minzoom": 12, "paint": {"fill-color": "#eee"}}]}
-_STATE = """() => { const l = map.getStyle().layers.find(x => x.type === 'fill-extrusion'), row = document.querySelector('.rs-bm-opacity');
+_STATE = """() => { const l = map.getStyle().layers.find(x => x.type === 'fill-extrusion'), row = document.querySelector('.rs-bm-opacity:not(.rs-bm-tunnels)');
   return {opacity: map.getPaintProperty(l.id, 'fill-extrusion-opacity'), minzoom: l.minzoom, api: rsBuildingsOpacity(),
           slider: +document.getElementById('rs-top-buildings-opacity').value, shown: !row.hidden && row.offsetParent !== null}; }"""
 
@@ -74,7 +74,7 @@ def test_the_slider_shows_with_the_3d_buildings_and_the_api_and_the_slider_agree
         page.evaluate("rsBuildingsOpacity(0.7)")
         s = page.evaluate(_STATE)
         assert (s["opacity"], s["slider"]) == (0.7, 0.7) and page.evaluate("_ev") == [0.4, 0.7], s
-        assert page.evaluate("document.querySelector('.rs-bm-opacity b').textContent") == "0.70"
+        assert page.evaluate("document.querySelector('.rs-bm-opacity:not(.rs-bm-tunnels) b').textContent") == "0.70"
         with pytest.raises(pw.Error, match="from 0 to 1"):
             page.evaluate("rsBuildingsOpacity(2)")
         browser.close()
@@ -102,9 +102,9 @@ def test_the_slider_fits_a_phone():
         browser = p.chromium.launch(args=_ARGS)
         page = _open(browser, rs.render_dashboard(_edges(), basemap="ofm_positron").html, errors, _POSITRON,
                      viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
-        page.evaluate("document.querySelector('.rs-bm-opacity').scrollIntoView()")
+        page.evaluate("document.querySelector('.rs-bm-opacity:not(.rs-bm-tunnels)').scrollIntoView()")
         r = page.evaluate("""() => { const s = document.getElementById('rs-top-buildings-opacity').getBoundingClientRect(),
-                                     b = document.querySelector('.rs-bm-box').getBoundingClientRect(), v = document.querySelector('.rs-bm-opacity b').getBoundingClientRect();
+                                     b = document.querySelector('.rs-bm-box').getBoundingClientRect(), v = document.querySelector('.rs-bm-opacity:not(.rs-bm-tunnels) b').getBoundingClientRect();
                                      return {s: [s.left, s.right, s.width, s.height], box: [b.left, b.right], v: [v.left, v.right], w: innerWidth}; }""")
         assert r["box"][0] <= r["s"][0] and r["s"][1] <= r["box"][1] <= r["w"], r       # the slider is inside the box, the box inside the phone
         assert r["s"][2] >= 120 and r["box"][0] <= r["v"][0] and r["v"][1] <= r["box"][1], r
