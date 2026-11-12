@@ -214,7 +214,6 @@ fn a_profile_with_a_value_missing_is_filled_and_one_that_is_not_for_these_roads_
     // the format, and what is not built
     assert!(error_of(with(&|q| q["format"] = "other".into())).contains("this engine reads"));
     assert!(error_of(with(&|q| q["extra"] = 1.into())).contains("unknown field `extra`"));
-    assert!(error_of(with(&|q| q["parameters"]["curve"] = "design".into())).contains("not built yet"));
     let e = error_of(with(&|q| q["groups"][0]["chains"][0]["points"] = serde_json::json!([{"s": 5.0, "z_m": 2.0}])));
     assert!(e.contains("interior control points") && e.contains("curve `design`"), "{e}");
     // a node above the top of its chain
@@ -274,4 +273,120 @@ fn a_profile_on_a_page_with_no_3d_bridges_makes_no_decks_and_heights_give_way_to
     // bridge_heights names ids that Monaco's roads do not have; with a profile they are not read, and the page is made from the profile
     let both = style(&[("bridge_profile", p), ("bridge_heights", serde_json::json!({"no such road": 14.0}))]).unwrap();
     assert_eq!(decks(&both), decks(&style(&[]).unwrap()));
+}
+
+// ---- the curve `design` and the design rules (docs/design/bridge_height_design.md) ----
+
+fn design_input(extra: Value) -> Value {
+    let mut v = serde_json::json!({"parameters": {"height_rule": "design"}});
+    if let Some(o) = extra.as_object() {
+        for (k, x) in o {
+            v[k] = x.clone();
+        }
+    }
+    v
+}
+
+/// The deck pieces (not the casing slabs) of each chain: `(s0, s1, z0, z1)` in metres along the chain and above the ground, from the lifts that the page draws.
+fn pieces_of(s: &Value, p: &Value) -> std::collections::BTreeMap<u64, Vec<(f64, f64, f64, f64)>> {
+    let length: std::collections::HashMap<String, f64> = p["groups"].as_array().unwrap().iter().flat_map(|g| g["chains"].as_array().unwrap()).map(|c| (c["id"].as_str().unwrap().to_string(), c["length_m"].as_f64().unwrap())).collect();
+    let mut out: std::collections::BTreeMap<u64, Vec<(f64, f64, f64, f64)>> = Default::default();
+    for f in decks(s) {
+        let q = &f["properties"];
+        if q.get("__rs_casing_slab").is_some() {
+            continue;
+        }
+        let (n, full, l) = (q["__rs_chain"].as_u64().unwrap(), q["__rs_full"].as_f64().unwrap(), length[&format!("c{}", q["__rs_chain"])]);
+        out.entry(n).or_default().push((q["__rs_s0"].as_f64().unwrap() * l, q["__rs_s1"].as_f64().unwrap() * l, q["__rs_lift0"].as_f64().unwrap() * full, q["__rs_lift1"].as_f64().unwrap() * full));
+    }
+    out
+}
+
+#[test]
+fn the_design_rules_make_a_profile_that_never_rises_faster_than_the_design_grade() {
+    let (p, s) = export(design_input(serde_json::json!({}))).unwrap();
+    assert_eq!((p["parameters"]["curve"].as_str(), p["parameters"]["height_rule"].as_str(), p["parameters"]["design_grade"].as_f64()), (Some("design"), Some("design"), Some(0.05)));
+    let g = 0.05;
+    let mut points = 0;
+    for grp in p["groups"].as_array().unwrap() {
+        let z: std::collections::HashMap<&str, f64> = grp["nodes"].as_array().unwrap().iter().map(|n| (n["id"].as_str().unwrap(), n["z_m"].as_f64().unwrap())).collect();
+        for c in grp["chains"].as_array().unwrap() {
+            let (l, top) = (c["length_m"].as_f64().unwrap(), c["top_m"].as_f64().unwrap());
+            let (z0, z1) = (z[c["from"].as_str().unwrap()], z[c["to"].as_str().unwrap()]);
+            assert!((z0 - z1).abs() <= g * l + 1e-6, "{}: the two nodes differ by more than the grade allows", c["id"]);
+            let pts = c["points"].as_array().unwrap();
+            points += pts.len();
+            for q in pts {
+                assert!(q["curve_m"].as_f64().unwrap() >= 0.0 && q["z_m"].as_f64().unwrap() <= top + 1e-9, "every point has the length of its curve, and none is above the top");
+            }
+            assert!(pts.windows(2).all(|w| w[0]["s"].as_f64() < w[1]["s"].as_f64()));
+        }
+    }
+    assert!(points > 0, "Monaco has a chain that is long enough for a top");
+    // the pieces: no piece is steeper than the grade (the lifts are rounded to 4 decimals: 0.002 of slack)
+    for (n, v) in pieces_of(&s, &p) {
+        for (s0, s1, z0, z1) in v {
+            assert!(s1 > s0 && (z1 - z0).abs() / (s1 - s0) <= g + 0.002, "chain {n}: the piece from {s0} m to {s1} m rises {} m", z1 - z0);
+        }
+    }
+}
+
+#[test]
+fn the_design_profile_is_its_own_fill_and_a_given_height_is_a_fixed_point_of_the_rule() {
+    let (p, s) = export(design_input(serde_json::json!({}))).unwrap();
+    let (again, s2) = export(p.clone()).unwrap();
+    assert_eq!(again, p, "the filler twice is the filler once");
+    assert_eq!(decks(&s2), decks(&s), "and the maker makes the same decks");
+    // a height of the person (a junction at 5 cm, where the rule gave more) is kept, and the nodes next to it follow the grade from it
+    let (g, i) = first_node(&p, "junction");
+    let id = p["groups"][g]["nodes"][i]["id"].as_str().unwrap().to_string();
+    let rule_z = p["groups"][g]["nodes"][i]["z_m"].as_f64().unwrap();
+    let (input, _) = input_with_height(&p, "junction", 0.05);
+    let q = export(design_input(input)).unwrap().0;
+    let n = node(&q, &id);
+    assert_eq!((n["z_m"].as_f64().unwrap(), n["source"].as_str().unwrap()), (0.05, "given"));
+    assert!(rule_z > 0.05, "the rule gave a higher junction ({rule_z} m)");
+    for c in q["groups"].as_array().unwrap().iter().flat_map(|g| g["chains"].as_array().unwrap()).filter(|c| c["from"] == id.as_str() || c["to"] == id.as_str()) {
+        let other = if c["from"] == id.as_str() { c["to"].as_str().unwrap() } else { c["from"].as_str().unwrap() };
+        assert!((node(&q, other)["z_m"].as_f64().unwrap() - 0.05).abs() <= 0.05 * c["length_m"].as_f64().unwrap() + 1e-6);
+    }
+}
+
+#[test]
+fn points_and_curves_given_by_a_person_are_kept_and_the_wrong_ones_say_what() {
+    let (p, _) = export(design_input(serde_json::json!({}))).unwrap();
+    // a chain with points: the first chain that has two
+    let (c_id, pts) = p["groups"].as_array().unwrap().iter().flat_map(|g| g["chains"].as_array().unwrap()).find(|c| !c["points"].as_array().unwrap().is_empty()).map(|c| (c["id"].as_str().unwrap().to_string(), c["points"].clone())).expect("a chain with points");
+    let l = p["groups"].as_array().unwrap().iter().flat_map(|g| g["chains"].as_array().unwrap()).find(|c| c["id"] == c_id.as_str()).unwrap()["length_m"].as_f64().unwrap();
+    let entry = |points: Value| serde_json::json!({"groups": [{"chains": [{"id": c_id, "points": points}]}]});
+    // one point of the person, with its own curve, and no top: the rule gives the length of the curves of the points that have none
+    let one = serde_json::json!([{"s": l * 0.4, "z_m": 3.0, "curve_m": 4.0}, {"s": l * 0.7, "z_m": 4.0}]);
+    let q = export(design_input(entry(one))).unwrap().0;
+    let c = q["groups"].as_array().unwrap().iter().flat_map(|g| g["chains"].as_array().unwrap()).find(|c| c["id"] == c_id.as_str()).unwrap().clone();
+    assert_eq!(c["points"][0]["curve_m"].as_f64(), Some(4.0), "a curve that the person gave is kept");
+    assert!(c["points"][1]["curve_m"].as_f64().unwrap() >= 30.0 - 1e-9 || c["points"][1]["curve_m"].as_f64().unwrap() > 0.0, "a curve that is missing is written");
+    assert!(c["top_m"].as_f64().unwrap() >= 4.0);
+    // a chain with points of the person keeps them when the filler goes over the profile again
+    assert_eq!(export(q.clone()).unwrap().0, q);
+    // errors
+    let e = export(design_input(entry(serde_json::json!([{"s": 50.0, "z_m": 3.0}, {"s": 40.0, "z_m": 3.0}])))).unwrap_err().to_string();
+    assert!(e.contains("not in order of s"), "{e}");
+    let e = export(design_input(entry(serde_json::json!([{"s": l + 5.0, "z_m": 3.0}])))).unwrap_err().to_string();
+    assert!(e.contains("not in order of s") || e.contains("end at the length"), "{e}");
+    let e = export(design_input(entry(serde_json::json!([{"s": l / 2.0, "z_m": 3.0, "curve_m": l * 2.0}])))).unwrap_err().to_string();
+    assert!(e.contains("overlap"), "{e}");
+    // the maker has no rule: a profile whose point has no curve_m is an error that says to fill it
+    let mut raw = p.clone();
+    for g in raw["groups"].as_array_mut().unwrap() {
+        for c in g["chains"].as_array_mut().unwrap() {
+            for q in c["points"].as_array_mut().unwrap() {
+                q.as_object_mut().unwrap().remove("curve_m");
+            }
+        }
+    }
+    // (the filler goes first, so the profile is complete again: the same fill)
+    assert_eq!(export(raw).unwrap().0["groups"], p["groups"], "the filler writes the missing curves back");
+    // points with the curve smooth
+    let e = export(serde_json::json!({"parameters": {"curve": "smooth"}, "groups": [{"chains": [{"id": c_id, "points": pts}]}]})).unwrap_err().to_string();
+    assert!(e.contains("curve `design`"), "{e}");
 }

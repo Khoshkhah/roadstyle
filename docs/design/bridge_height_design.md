@@ -1,6 +1,6 @@
 # The height of a bridge from the design rules
 
-Date: 2026-11-10. Status: proposal. Nothing is built. The documentation comes first. This note replaces the heights that the engine guesses from the length of a bridge with the heights that bridge
+Date: 2026-11-10. Status: built as an option (2026-11-11): `parameters.height_rule: "design"` in the [bridge profile](bridge_profile_edit.md). The default is still the length rule, so no page changes unless the profile asks. The documentation came first. This note replaces the heights that the engine guesses from the length of a bridge with the heights that bridge
 design rules give. It uses no measured data of one bridge.
 
 ## Summary
@@ -292,3 +292,18 @@ Each one has the recommendation of this note.
 ```bash
 python docs/img/bridge-height/design_rules.py     # the tables, the example and the figure
 ```
+
+## What was built (2026-11-11)
+
+The rules of this note are in `bridge_fill.rs` (the heights, the points, the curve lengths), `bridge_curve.rs` (K, the curve length, the height along a chain) and `decks.rs` (the maker and its warnings). The guide
+[The bridge profile](../guides/bridge-profile.md#the-design-rules-and-the-curve-design) says how to use them. What the build decided, for each open decision above:
+
+1. **Retire the length rule?** Not yet. `height_rule: "design"` is an option; the length rule is the default. Retiring it changes every bridge in every page, and the design rules cannot replace it before the engine knows what a bridge crosses.
+2. **Speed and grade.** 50 km/h and 5 % for every road. There is no table for each road class: the tables of the maximum grade were not read from a standard.
+3. **Obstacles.** None are read. The engine assumes a top: clearance 5.0 m plus the depth `max(0.8 m, span ÷ 25)`, with the span the length of the chain and at most 100 m (6.1 m to 9.0 m). Give the heights of your nodes where a bridge crosses something that needs more. The crossings of the level solver, a railway and water are not used.
+4. **Depth of the structure.** `max(0.8 m, span ÷ 25)`, constants in `bridge_fill.rs`.
+5. **A level top.** The rule gives a top longer than 76 m a crest with a grade of 0.5 % on each side. A level top that a person gives is a warning.
+6. **The unknown obstacle.** The assumed top, with no warning for each chain; the warning is for a chain between two ground ends that is too short to reach it.
+7. **The format.** The nodes, their heights, interior points with `curve_m`, and the parameters. The engine writes the curve lengths into the profile, so the maker and the page need no rule.
+
+Not built: the maximum grade of a road class (an error above it), the clearance over a railway and over water, and the crossings from the level solver (the warning for two decks that cross uses the lines of the chains).

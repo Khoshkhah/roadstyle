@@ -1,6 +1,6 @@
 # The bridge profile: roadstyle and urbanstyle, and an input profile
 
-Date: 2026-11-10. Status: proposal. **Part 2, the maker, and Part 1, the filler, are built (2026-11-10)** with the curve `smooth`: the filler (`bridge_fill.rs`) keeps the values of an input and fills the rest with the rules of today, and the maker makes the same pieces as before from the complete profile (`decks.rs`, `bridge_profile.rs`, the keyword `bridge_profile=`, `rs.bridge_profile(edges, given=None)`). The interior control points, the curve `design` and the design rules for the heights are not built.
+Date: 2026-11-10. Status: built (2026-11-11), except the urbanstyle converter (step 5). Part 2, the maker, and Part 1, the filler, are built (`bridge_fill.rs`, `decks.rs`, `bridge_profile.rs`, `bridge_curve.rs`, the keyword `bridge_profile=`, `rs.bridge_profile(edges, given=None)`). Both curves are built: `smooth` (the default, the ramps of today) and `design` (straight grades with vertical curves and interior control points). Both rules for a missing height are built: `length` (the default, today's rule) and `design` (the design rules of [the other note](bridge_height_design.md)). The open page changes the height of a node (step 4c). The defaults did not change, so no page changes unless the profile asks for it.
 This note is about the profile of a group of 3D bridges: how [the engine](../guides/bridge-height.md) makes it, how urbanstyle makes the profile of the same bridge,
 and a proposal for an edit step.
 
@@ -276,12 +276,12 @@ Each part checks what it can see. The engine says what is wrong and does not cha
 | 1 | A given node is not within 5 m of exactly one node of the group, or two entries are for one node | Error |
 | 1 | A `z_m` below 0 | Error |
 | 1 | The grade between two given heights is above the design grade | Warning. Above the maximum grade of the road class: error |
-| 1 | A `ground` node with `z_m` above 0 | Allowed: a landing on fill. The page closes the end of the deck down to the ground |
+| 1 | A `ground` node with `z_m` above 0 | Allowed, with a warning: the deck ends in the air there. The page draws no landing (a landing on fill was built in November 2026 and not wanted) |
 | 2 | A height or a width is missing | Error: fill the profile first |
 | 2 | The `s` of a point is outside the chain, or the points are not in order of `s` | Error |
 | 2 | Two curves overlap (a short chain with a high design speed) | Warning. The curves are shortened and the message says so |
 | 2 | A sag curve whose low point is on the bridge, or a flat top with no grade on a long bridge | Warning |
-| 1 | Two decks cross and the upper deck is not high enough above the lower one | Warning (later: it needs the crossings from the level solver) |
+| 2 | Two decks cross and the upper deck is not 5 m above the lower one | Warning, with the curve `design` only. The crossings come from the lines of the chains, not from the level solver |
 
 ### What the prototype shows: node heights alone are not enough
 
@@ -315,8 +315,8 @@ with the heights at its two nodes and its top only. Stage 2 is the profile throu
 ### The page
 
 - The page reads the same pieces. It does not change for an input profile.
-- A deck end with `lift > 0` is blunt today. For a landing on fill, the page draws the sides down to the ground, as urbanstyle does.
-- The Height box shows the `z_m` of the selected node or chain, with its `source` and `method`, and can change it in the open page. A change is a change of the input profile, and Part 2 makes the output again.
+- A deck end with `lift > 0` is blunt, and stays blunt: the page draws no landing on fill (decided 2026-11-11, after a trial).
+- The Height box shows the `z_m` of each node of the selected bridge, with its `source`, and changes it in the open page (built). A change is a change of the input profile. The page has no maker: it evaluates the profile in JavaScript as the maker does (a browser test requires the same heights) and cuts the pieces of the changed chains into steps of 2.5 m. `rsBridgeProfile()` gives the profile with the new heights, and the engine makes the exact pieces from it.
 - `rsBridgeGroups()` lists the chains and the nodes.
 
 ### The order of the work
@@ -331,9 +331,9 @@ with the heights at its two nodes and its top only. Stage 2 is the profile throu
    - A node above the `top_m` of the rule raises the `top_m` of its chains. A given `top_m` below a node is an error.
    - The grade warning is on the average grade of a chain (the height difference over `length_m`), only where an end has a height of the person (`source` is not `rule` or `data`). It compares with `design_grade`, which is 1 in 8 until the design rules are built.
    - The checks "a `ground` node with `z_m` above 0" and "two decks cross" of the table below are not built. The paths of the given values (the colored view) are not returned by the engine: the prototype makes the view.
-4. The page. **4a, built:** the page has the profile (the option `bridge_profile`), `rsBridgeGroups()` returns the `chains` and `nodes`, and the Height box lists the nodes with their height and `source`. **Not built:** 4b the landing on fill; 4c a change of the height of a node or a chain in the open page (the page has no maker: the box sets the height of a whole group in JavaScript, as before).
+4. The page. **4a, built:** the page has the profile (the option `bridge_profile`), `rsBridgeGroups()` returns the `chains` and `nodes`, and the Height box lists the nodes with their height and `source`. **4b, not built, and not wanted:** the landing on fill. **4c, built:** a number for each node in the Height box, `rsSetBridgeNode(id, metres)`, `rsBridgeProfile()`. A new node height changes the chains that meet at the node and nothing else: the interior points and the curve lengths stay, and the other nodes do not move. The group height and the node heights give way to the last one given.
 5. A converter from an urbanstyle profile to a complete input profile, outside the engine. It matches the axes to the chains by the OSM ways (12 of 12 on the Granville Bridge).
-6. The default heights from the design rules (the other note), and the curve `design`.
+6. **The design rules and the curve `design`. Built.** `parameters.height_rule: "design"` fills the junction heights with the design rules and sets the curve to `design`, the grade to 0.05 and the speed to 50 km/h; `parameters.curve: "design"` alone draws straight grades and vertical curves. They are options and not the default: the default heights are the heights of today, because the design rules need the obstacles under a bridge, and the engine does not know them (it assumes a top of 6.1 m to 9.0 m). The note [The height of a bridge from the design rules](bridge_height_design.md) says what was built.
 
 ### Decisions that are open
 
@@ -343,7 +343,7 @@ Each decision has the recommendation of this note.
 2. **Control points.** The heights of the nodes, and interior points `(s, z)`. A height line with curves is not an input: the curves are calculated.
 3. **Naming a node.** By its position in a partial input, and by its id in a complete profile. The engine writes the complete profile, so a person does not need to find the nodes.
 4. **A new keyword.** `bridge_profile=` replaces `bridge_heights` and `bridge_height_col` in the end. The two stay while the engine has no input profile.
-5. **The curve.** `smooth` first, then `design`. The change of the default to `design` changes the look of every bridge.
+5. **The curve.** `smooth` first, then `design`. Decided 2026-11-11: `design` is an option and `smooth` stays the default, because the change of the default changes the look of every bridge.
 6. **The Height box in the open page.** It changes the input profile, and the output is made again. The ramps are then new too (today they keep the first length).
 7. **The landing on fill.** The page draws the sides down to the ground.
 8. **The urbanstyle converter.** Yes, outside the engine.

@@ -1,4 +1,4 @@
-"""The two JSON Schemas of the bridge profile (docs/reference/formats.md, "The bridge profile (planned)"). One source makes both files in docs/samples/bridge-profile/:
+"""The two JSON Schemas of the bridge profile (docs/reference/formats.md, "The bridge profile"). One source makes both files in docs/samples/bridge-profile/:
 
     bridge_profile_input.schema.json      the input profile: every value is optional (an empty profile is valid)
     bridge_profile_complete.schema.json   the complete input profile that Part 1 writes and Part 2 reads: every value that Part 2 needs is required
@@ -38,16 +38,18 @@ def _defs(complete):
              "length_m": {"type": "number", "exclusiveMinimum": 0},
              "from": {"type": "string", "pattern": "^n[0-9]+$", "description": "The node at the first end of the chain"},
              "to": {"type": "string", "pattern": "^n[0-9]+$", "description": "The node at the last end of the chain"},
-             "points": {"type": "array", "items": {"$ref": "#/$defs/point"}, "description": "Interior control points, in order of s (the curve design: not built)"},
+             "points": {"type": "array", "items": {"$ref": "#/$defs/point"}, "description": "Interior control points, in order of s (the curve design)"},
              "top_m": {"type": "number", "exclusiveMinimum": 0, "description": "The full height of the chain: the height that its ramps are made for (the curve smooth). The page's __rs_full"},
              "width_m": {"type": "number", "exclusiveMinimum": 0, "description": "The width of the deck, in metres. Without it, each road is drawn at the width of its class"},
              "width_source": {"type": "string"}}
     return {
         "lonlat": {"type": "array", "prefixItems": [{"type": "number", "minimum": -180, "maximum": 180}, {"type": "number", "minimum": -90, "maximum": 90}], "items": False, "minItems": 2},
         "point": obj({"s": {"type": "number", "minimum": 0, "description": "Metres from the first end of the chain"},
-                      "z_m": {"type": "number", "minimum": 0}, **mark}, required=("s", "z_m")),
+                      "z_m": {"type": "number", "minimum": 0},
+                      "curve_m": {"type": "number", "minimum": 0, "description": "The length of the vertical curve around the point, in metres (0: none). The filler writes it; the maker needs it"}, **mark}, required=("s", "z_m")),
         "parameters": obj({"design_speed_kmh": {"type": "number", "exclusiveMinimum": 0, "maximum": 200}, "design_grade": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.3},
-                           "curve": {"enum": ["smooth", "design"], "description": "smooth: the curve of today. design: straight grades and vertical curves"}},
+                           "curve": {"enum": ["smooth", "design"], "description": "smooth: the curve of today. design: straight grades and vertical curves"},
+                           "height_rule": {"enum": ["length", "design"], "description": "How the filler finds a height that was not given. length: today's rule. design: the design rules"}},
                           required=("design_speed_kmh", "design_grade") if complete else ()),
         "node": obj(node, required=("id", "lonlat", "kind", "chains", "z_m", "source", "method") if complete else (), any_of=None if complete else [{"required": ["lonlat"]}, {"required": ["id"]}]),
         "chain": obj(chain, required=("id", "length_m", "from", "to", "points") if complete else (), any_of=None if complete else [{"required": ["osm_ways"]}, {"required": ["id"]}]),
@@ -61,8 +63,8 @@ def schema(complete):
     name = "bridge_profile_complete" if complete else "bridge_profile_input"
     props = {"format": {"const": FORMAT}, "parameters": {"$ref": "#/$defs/parameters"}, "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}, **({"minItems": 1} if complete else {})}}
     out = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": f"{SITE}{name}.schema.json",
-           "title": ("The complete input profile of a group of 3D bridges: what Part 1 writes and Part 2 reads (planned)" if complete
-                     else "The input profile of a group of 3D bridges: every value is optional (planned)"),
+           "title": ("The complete input profile of a group of 3D bridges: what Part 1 writes and Part 2 reads " if complete
+                     else "The input profile of a group of 3D bridges: every value is optional"),
            "type": "object", "additionalProperties": False, "properties": props, "$defs": _defs(complete)}
     if complete:
         out["required"] = ["format", "parameters", "groups"]

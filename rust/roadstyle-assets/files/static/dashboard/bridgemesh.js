@@ -5,6 +5,9 @@
 // each is the colour of the mesh (its feature state: select, hover, a highlight set, rsColor), read with the layer's own evaluate.
 // THE GROUP HEIGHT: the bridge roads that touch through shared nodes are one group (`__rs_group`, made by the engine). rsSetBridgeHeight gives
 // the whole group one full height in metres (the ramps at its free ends stay); a road's own deck is never set alone.
+// THE NODE HEIGHTS: rsSetBridgeNode(id, metres) gives one node of the bridge profile (O.bridge_profile) another height. The chains that meet at the node are then drawn from the profile with that
+// height: this file evaluates the profile as the engine's maker does (`_bmSmoothZ`, `_bmDesignZ`; a browser test requires that the two agree), and the pieces of those chains are cut into
+// steps of 2.5 m on the way to the mesh, so a new ramp has its shape and not the old cuts. rsBridgeProfile() gives the profile with the new heights, to give to `bridge_profile=` for the exact pieces.
 // THE TERRAIN: with the 3D terrain on, a deck is level between the ground heights at the two end nodes of its chain (`__rs_enda`, `__rs_endb`; `__rs_s0`, `__rs_s1`:
 // where a piece is along its chain), and its ramps rise from the ground at each free end. The heights come from the terrain's tiles, read here (`_bmDemAt`).
 import {map, O, RS_PREFIX, style, _src, _sfeats, _emit} from "./core.js";
@@ -12,6 +15,7 @@ import {_elDemTile, _elDemMaxZoom} from "./elevation.js";
 
 const _bmId = () => RS_PREFIX + "roads-bridge-mesh";
 const _bmDeck = () => RS_PREFIX + "roads-bridge-decks", _bmCasing = () => RS_PREFIX + "roads-deck-casing";
+const _BM_STEP = 2.5;                                 // metres between the vertices of a piece of an edited chain
 const _BM_CLEAR = 0.3, _BM_CLEAR_SLOPE = 2.5;       // metres above the terrain where the deck meets it: this, and this for each metre of slope
 const _bmM = 40075016.686;                           // the metres round the equator
 const _bmLight = [-0.4, 0.5, 0.75];                  // the light of the walls (fixed on the map)
@@ -39,6 +43,59 @@ const _bmMerc = (lon, lat) => [(lon + 180) / 360, 0.5 - Math.log(Math.tan(Math.P
 
 // the decks' full height in metres: the group's own when it was set, else the look's (`__rs_full`)
 function _bmHeight(p){ const h = _bmHeights.get(p.__rs_group); return h == null ? p.__rs_full : h; }
+
+// THE EDITED CHAINS: a chain with a node whose height the person set is drawn from the profile, not from the lifts of its pieces.
+let _bmNodeZ = new Map();                            // node id -> the metres that the person set
+let _bmEditMemo = null;                              // chain number -> {full, lift(s)} for the chains with an edited node (made when needed; null: out of date)
+// the vertical curve of the maker, `bridge_curve::z_at`: points [{s, z, c}] from the head end to the tail end, a straight grade between them, a parabola of length c around each interior point
+function _bmDesignZ(p, d){
+  const n = p.length;
+  for(let i = 1; i < n - 1; i++){
+    const l = p[i].c, start = p[i].s - l / 2;
+    if(l > 0 && d > start && d < p[i].s + l / 2){
+      const g1 = (p[i].z - p[i - 1].z) / (p[i].s - p[i - 1].s), g2 = (p[i + 1].z - p[i].z) / (p[i + 1].s - p[i].s), u = d - start;
+      return p[i].z - g1 * l / 2 + g1 * u + (g2 - g1) / (2 * l) * u * u;
+    }
+  }
+  let i = 0; for(let k = n - 2; k >= 0; k--) if(p[k].s <= d){ i = k; break; }
+  return p[i].z + (p[i + 1].z - p[i].z) / (p[i + 1].s - p[i].s) * (d - p[i].s);
+}
+// the smooth ramps of the maker (`decks::lift_fn`): z0, z1 the heights of the two nodes, top the full height of the chain, grade the metres of ramp for a metre of height (1 / design_grade), l the length
+function _bmSmoothZ(z0, z1, top, grade, l){
+  const inv = u => u <= 1e-12 ? 0 : u >= 1 - 1e-12 ? 1 : 0.5 - Math.sin(Math.asin(1 - 2 * u) / 3), full = Math.max(top * grade, 1), la = inv(z0 / top), lb = inv(z1 / top);
+  const cross = (l + full * (lb - la)) / 2, k = Math.max(0, Math.min(0.4, 2 * Math.min(cross, l - cross) / full));
+  const smin = (a, b) => k <= 0 ? Math.min(a, b) : Math.min(a, b) - Math.pow(Math.max(k - Math.abs(a - b), 0) / k, 2) * k * 0.25;
+  return d => { const t = Math.max(0, Math.min(1, smin(la + d / full, lb + (l - d) / full))); return top * t * t * (3 - 2 * t); };
+}
+// the height in metres along a chain of the profile, with the node heights `zf` and `zt` (the edited ones in place of the profile's): {full, z(d)}, d the metres from the head end
+function _bmChainFn(cp, zf, zt){
+  const prof = O.bridge_profile, par = prof.parameters, l = cp.length_m;
+  if(par.curve === "design"){
+    const pts = [{s: 0, z: zf, c: 0}, ...cp.points.map(q => ({s: q.s, z: q.z_m, c: q.curve_m || 0})), {s: l, z: zt, c: 0}];
+    return {full: Math.max(...pts.map(q => q.z), 0.1), z: d => _bmDesignZ(pts, Math.max(0, Math.min(l, d)))};
+  }
+  const top = Math.max(cp.top_m || 0, zf, zt);
+  return {full: top, z: _bmSmoothZ(zf, zt, top, 1 / par.design_grade, l)};
+}
+function _bmEdits(){
+  if(_bmEditMemo) return _bmEditMemo;
+  _bmEditMemo = new Map();
+  const prof = O.bridge_profile;
+  if(!_bmNodeZ.size || !prof) return _bmEditMemo;
+  const nodes = new Map(); prof.groups.forEach(g => g.nodes.forEach(n => nodes.set(n.id, n)));
+  const zOf = id => _bmNodeZ.has(id) ? _bmNodeZ.get(id) : nodes.get(id).z_m;
+  prof.groups.forEach(g => g.chains.forEach(cp => {
+    if(!_bmNodeZ.has(cp.from) && !_bmNodeZ.has(cp.to)) return;
+    const f = _bmChainFn(cp, zOf(cp.from), zOf(cp.to)), l = cp.length_m;
+    _bmEditMemo.set(+cp.id.slice(1), {full: f.full, length: l, z: f.z, lift: s => f.z(s * l) / f.full});
+  }));
+  return _bmEditMemo;
+}
+// what a piece is drawn with: its full height, and, when its chain has an edited node, the lift along the chain (s: 0 to 1) and the length of the chain
+function _bmPiece(p){
+  const e = _bmEdits().get(p.__rs_chain);
+  return e ? {full: e.full, lift: e.lift, length: e.length} : {full: _bmHeight(p), lift: null, length: 0};
+}
 
 // the colour (bytes) of feature k: the paint expression of its layer, with its properties and its feature state
 function _bmColour(k){
@@ -127,15 +184,28 @@ function _bmBuild(){
     const p = f.properties, ring = f.geometry && f.geometry.coordinates && f.geometry.coordinates[0], first = shade.length;
     adj[k] = null;
     if(!ring || ring.length < 5 || (ring.length - 1) % 2){ _bmRanges.push([first, first]); return; }
-    const m = (ring.length - 1) / 2, H = _bmHeight(p), th = p.__rs_thick, cas = !!p.__rs_casing_slab;
-    const A = [], B = [];
+    const pi = _bmPiece(p), H = pi.full, th = p.__rs_thick, cas = !!p.__rs_casing_slab;
+    let m = (ring.length - 1) / 2, A = [], B = [];
     for(let i = 0; i < m; i++){ A.push(ring[i]); B.push(ring[2 * m - 1 - i]); }
     if(!o) o = _bmMerc(A[0][0], A[0][1]);
     const cos = Math.cos(A[0][1] * Math.PI / 180), mz = 1 / (_bmM * cos);
     // the distance along the side A fixes where each vertex is between the lift at the start and at the end
-    const cum = [0];
+    let cum = [0];
     for(let i = 1; i < m; i++) cum.push(cum[i - 1] + Math.hypot((A[i][0] - A[i - 1][0]) * cos, A[i][1] - A[i - 1][1]));
-    const L = i => p.__rs_lift0 + (p.__rs_lift1 - p.__rs_lift0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0);
+    if(pi.lift){
+      // a chain with an edited node: the piece is cut into steps of _BM_STEP metres (the sides get the points between their vertices), because its lift is not the line between the lifts of its ends
+      const A2 = [A[0]], B2 = [B[0]], c2 = [0];
+      for(let i = 1; i < m; i++){
+        const n = Math.max(1, Math.ceil((cum[i] - cum[i - 1]) * 111320 / _BM_STEP));
+        for(let k = 1; k <= n; k++){
+          const t = k / n, mix = (u, v) => [u[0] + (v[0] - u[0]) * t, u[1] + (v[1] - u[1]) * t];
+          A2.push(mix(A[i - 1], A[i])); B2.push(mix(B[i - 1], B[i])); c2.push(cum[i - 1] + (cum[i] - cum[i - 1]) * t);
+        }
+      }
+      A = A2; B = B2; cum = c2; m = A.length;
+    }
+    const along = i => cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0;
+    const L = i => pi.lift ? pi.lift(p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * along(i)) : p.__rs_lift0 + (p.__rs_lift1 - p.__rs_lift0) * along(i);
     // the slab thins out to nothing on the ground (twice as fast as the lift rises), so the top of a ramp lands flush with the road: no blunt end
     const thin = i => Math.min(1, 2 * L(i));
     const ce = _bmEnds.get(p.__rs_chain);          // the terrain on: the level line between the ground at the two ends of the chain
@@ -202,8 +272,10 @@ function _bmSyncPickers(adj){
   if(!src || !src.setData || !_bmFeats.length) return;
   const vals = _bmFeats.map((f, k) => {
     const p = f.properties; if(!_bmOrig.has(k)) _bmOrig.set(k, [p.__rs_base, p.__rs_height]);
-    const [b0, h0] = _bmOrig.get(k), r = p.__rs_full ? _bmHeight(p) / p.__rs_full : 1, a = adj && adj[k];
-    return a ? [Math.max(0, a[0]), Math.max(a[0] + 0.1, a[1])] : [b0 * r, h0 + b0 * (r - 1)];
+    const [b0, h0] = _bmOrig.get(k), pi = _bmPiece(p), r = p.__rs_full ? pi.full / p.__rs_full : 1, a = adj && adj[k];
+    if(a) return [Math.max(0, a[0]), Math.max(a[0] + 0.1, a[1])];
+    if(pi.lift){ const z = pi.lift((p.__rs_s0 + p.__rs_s1) / 2) * pi.full; return [z, z + h0 - b0]; }      // an edited chain: the deck at the middle of the piece
+    return [b0 * r, h0 + b0 * (r - 1)];
   });
   const h = vals.map(v => Math.round(v[0] * 2) + "," + Math.round(v[1] * 2)).join(";");
   if(h === _bmPickHash) return;
@@ -309,7 +381,7 @@ export function initBridgeMesh(){
   });
   map.on("sourcedata", e => { if(e.sourceId === _bmSrc() && e.sourceDataType !== "metadata"){ _bmGeom = true; } });
 }
-export const useBridgeMesh = () => { _bmOrig.clear(); _bmHeights.clear(); _bmPickHash = ""; _bmGeom = true; _bmAll = true; _bmEnsure(); };
+export const useBridgeMesh = () => { _bmOrig.clear(); _bmHeights.clear(); _bmNodeZ.clear(); _bmEditMemo = null; _bmPickHash = ""; _bmGeom = true; _bmAll = true; _bmEnsure(); };
 
 // THE STREET VIEW MARKER on a bridge: the height (metres) of the deck top at a point of the bridge road `road` (its row), where the marker stands;
 // 0 where the mesh is not drawn (flat below flat_below, the 3D terrain) or the road has no deck
@@ -326,12 +398,12 @@ export function _bmDeckZ(lng, lat, road){
     for(let i = 0; i < n; i++){ cx += r[i][0]; cy += r[i][1]; }
     const d = ((cx / n - lng) * k) ** 2 + (cy / n - lat) ** 2; if(d < bd){ bd = d; best = f.properties; } }
   if(!best) return null;
-  const L = (best.__rs_lift0 + best.__rs_lift1) / 2, ce = _bmEnds.get(best.__rs_chain);
+  const pi = _bmPiece(best), L = pi.lift ? pi.lift((best.__rs_s0 + best.__rs_s1) / 2) : (best.__rs_lift0 + best.__rs_lift1) / 2, ce = _bmEnds.get(best.__rs_chain);
   // the terrain on: the deck's level line there, as a height over the ground under the marker (the marker stands on the terrain)
   const here = _bmElev([lng, lat]);
   if(ce && (ce.za == null || ce.zb == null || here == null)) return null;      // no height yet: not on the deck
   // the deck's height over the ground under the marker: the ground blends into the level line plus the group's height by the lift (as the mesh does)
-  const level = ce ? ce.za + (ce.zb - ce.za) * (best.__rs_s0 + best.__rs_s1) / 2 : 0, rise = (level + _bmHeight(best) - (ce ? here : 0)) * L + (ce ? (_bmClearance([lng, lat]) ?? _BM_CLEAR) * (1 - L) : 0);
+  const level = ce ? ce.za + (ce.zb - ce.za) * (best.__rs_s0 + best.__rs_s1) / 2 : 0, rise = (level + pi.full - (ce ? here : 0)) * L + (ce ? (_bmClearance([lng, lat]) ?? _BM_CLEAR) * (1 - L) : 0);
   return rise + best.__rs_thick * Math.min(1, 2 * L);
 }
 // where a point at `metres` above sea level is on the screen (CSS px), drawn as the mesh is: with the matrix that the mesh layer gets
@@ -416,12 +488,14 @@ export function rsBridgeGroups(){
     let e = g.get(p.__rs_group); if(!e) g.set(p.__rs_group, e = {group: p.__rs_group, roads: new Set(), chains: new Set(), height: p.__rs_full, set: false});
     e.chains.add("c" + p.__rs_chain);       // the chain id of the profile is c<N>, N = the engine's chain number
     (p.__rs_edges || []).forEach(r => e.roads.add(r)); });
-  const prof = O.bridge_profile, pc = new Map(), pn = new Map();
-  ((prof && prof.groups) || []).forEach(x => { x.chains.forEach(c => pc.set(c.id, c)); x.nodes.forEach(n => pn.set(n.id, n)); });
+  const prof = O.bridge_profile, pc = new Map(), pn = new Map(), ed = _bmEdits();
+  ((prof && prof.groups) || []).forEach(x => { x.chains.forEach(c => pc.set(c.id, c)); x.nodes.forEach(n => pn.set(n.id, _bmNodeZ.has(n.id) ? {...n, z_m: _bmNodeZ.get(n.id), source: "page", method: "chosen"} : n)); });
   return [...g.values()].map(e => {
     const chains = [...e.chains].filter(id => pc.has(id)).map(id => pc.get(id)), ends = new Set(chains.flatMap(c => [c.from, c.to]));
-    return {group: e.group, roads: [...e.roads], height: _bmHeights.has(e.group) ? _bmHeights.get(e.group) : e.height, set: _bmHeights.has(e.group),
-      chains, nodes: [...ends].filter(id => pn.has(id)).map(id => pn.get(id))}; })
+    // the height now: the group's own when it was set; else, with edited nodes, the highest of the edited chains; else the engine's
+    const edited = chains.map(c => ed.get(+c.id.slice(1))).filter(Boolean), nodeSet = edited.length > 0;
+    return {group: e.group, roads: [...e.roads], height: _bmHeights.has(e.group) ? _bmHeights.get(e.group) : nodeSet ? Math.max(e.height, ...edited.map(x => x.full)) : e.height, set: _bmHeights.has(e.group),
+      chains, nodes: [...ends].filter(id => pn.has(id)).map(id => pn.get(id)), nodesSet: [...ends].filter(id => _bmNodeZ.has(id))}; })
     .sort((a, b) => b.roads.length - a.roads.length);
 }
 // the group of a target: a group number from rsBridgeGroups, or a road row of a bridge
@@ -441,11 +515,43 @@ export function rsSetBridgeHeight(target, metres){
     const g = _bmGroupOf(t);
     if(g == null) throw new Error("rsSetBridgeHeight: " + JSON.stringify(t) + " is not a bridge group or the row of a bridge road");
     if(metres == null) _bmHeights.delete(g); else _bmHeights.set(g, +metres);
+    // one height for the whole group, or the heights of its nodes: the last one that the person gave
+    const gr = rsBridgeGroups().find(x => x.group === g);
+    if(gr && metres != null) gr.nodesSet.forEach(id => _bmNodeZ.delete(id));
     done.push(g);
   }
+  _bmEditMemo = null;
   _bmGeom = true; map.triggerRepaint();
   _emit("rs:bridgeheightchange", {groups: done.map(g => ({group: g, height: _bmHeights.has(g) ? _bmHeights.get(g) : null}))});
   return done;
+}
+// rsSetBridgeNode(id, metres): the node `id` of the bridge profile (rsBridgeGroups()[].nodes[].id) gets this height, in metres above the ground, 0 or more; null gives the profile's height back.
+// The chains that meet at the node are drawn from the profile with the new height. The group's own height (rsSetBridgeHeight) is then given up: the last one that the person gave counts.
+// A page whose style has no bridge profile (made before the profile, or without 3D bridges) throws.
+export function rsSetBridgeNode(id, metres){
+  const prof = O.bridge_profile;
+  if(!prof || !prof.groups) throw new Error("rsSetBridgeNode: this page has no bridge profile (it has no 3D bridges, or it was made by an older roadstyle)");
+  const node = prof.groups.flatMap(g => g.nodes).find(n => n.id === id);
+  if(!node) throw new Error("rsSetBridgeNode: the profile has no node " + JSON.stringify(id));
+  if(metres != null && !(metres >= 0)) throw new Error("rsSetBridgeNode: metres must be a number of 0 or more, or null, got " + JSON.stringify(metres));
+  const gr = rsBridgeGroups().find(x => x.nodes.some(n => n.id === id));
+  if(metres == null || +metres === node.z_m) _bmNodeZ.delete(id); else { _bmNodeZ.set(id, +metres); if(gr) _bmHeights.delete(gr.group); }
+  _bmEditMemo = null; _bmGeom = true; map.triggerRepaint();
+  _emit("rs:bridgeheightchange", {nodes: [{id, z_m: _bmNodeZ.has(id) ? _bmNodeZ.get(id) : null}]});
+  return id;
+}
+// rsBridgeProfile(): the bridge profile of the page with the heights that the person set (the node's `source` is "page", its `method` "chosen"; the top of a chain is raised to its highest node). Give it to
+// `bridge_profile=` and the engine makes the pieces of these heights. null where the page has no profile.
+export function rsBridgeProfile(){
+  const prof = O.bridge_profile;
+  if(!prof || !prof.groups) return null;
+  const out = JSON.parse(JSON.stringify(prof)), z = new Map();
+  out.groups.forEach(g => g.nodes.forEach(n => { if(_bmNodeZ.has(n.id)){ n.z_m = _bmNodeZ.get(n.id); n.source = "page"; n.method = "chosen"; } z.set(n.id, n.z_m); }));
+  out.groups.forEach(g => g.chains.forEach(c => {
+    if(!_bmNodeZ.has(c.from) && !_bmNodeZ.has(c.to)) return;
+    c.top_m = _bmChainFn(c, z.get(c.from), z.get(c.to)).full;
+  }));
+  return out;
 }
 export function rsBridgeHeight(target){
   const g = _bmGroupOf(target); if(g == null) return null;
@@ -466,4 +572,4 @@ export function rsSetBridges3D(on){
 export const _bmHas = () => !!_bmSrc() && !!map.getSource(_bmSrc());
 // what the last build found wrong in its own vertices: {rows, inverted (a slab whose top is under its bottom), tooThick, underGround (a top under the ground), maxEndGap (metres between a free end and the ground plus the clearance), minEndClearance (the least height of a free end above the ground)}; for the tests
 export const _bmStats = () => ({..._bmStat});
-export function initBridgeApi(){ window.rsSetBridges3D = rsSetBridges3D; window.rsBridgeGroups = rsBridgeGroups; window.rsSetBridgeHeight = rsSetBridgeHeight; window.rsBridgeHeight = rsBridgeHeight; }
+export function initBridgeApi(){ window.rsSetBridges3D = rsSetBridges3D; window.rsBridgeGroups = rsBridgeGroups; window.rsSetBridgeHeight = rsSetBridgeHeight; window.rsBridgeHeight = rsBridgeHeight; window.rsSetBridgeNode = rsSetBridgeNode; window.rsBridgeProfile = rsBridgeProfile; }

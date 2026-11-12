@@ -1,7 +1,7 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "https://khoshkhah.github.io/roadstyle/samples/bridge-profile/bridge_profile_complete.schema.json",
- "title": "The complete input profile of a group of 3D bridges: what Part 1 writes and Part 2 reads (planned)",
+ "title": "The complete input profile of a group of 3D bridges: what Part 1 writes and Part 2 reads ",
  "type": "object",
  "additionalProperties": false,
  "properties": {
@@ -50,6 +50,11 @@
      "type": "number",
      "minimum": 0
     },
+    "curve_m": {
+     "type": "number",
+     "minimum": 0,
+     "description": "The length of the vertical curve around the point, in metres (0: none). The filler writes it; the maker needs it"
+    },
     "source": {
      "type": "string",
      "description": "Where the value comes from: data, rule, given, example, a survey..."
@@ -89,6 +94,13 @@
       "design"
      ],
      "description": "smooth: the curve of today. design: straight grades and vertical curves"
+    },
+    "height_rule": {
+     "enum": [
+      "length",
+      "design"
+     ],
+     "description": "How the filler finds a height that was not given. length: today's rule. design: the design rules"
     }
    },
    "required": [
@@ -187,7 +199,7 @@
      "items": {
       "$ref": "#/$defs/point"
      },
-     "description": "Interior control points, in order of s (the curve design: not built)"
+     "description": "Interior control points, in order of s (the curve design)"
     },
     "top_m": {
      "type": "number",

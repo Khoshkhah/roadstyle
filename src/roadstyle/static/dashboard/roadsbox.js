@@ -5,7 +5,7 @@ import {O, RoadTable} from "./core.js";
 import {replaceTool, greyTool, getTool, wrap, ROADS_ICON} from "./tools.js";
 import {FILTER, rsSetClasses, rsSetBridges, rsSetTunnels, rsSetAccess} from "./filter.js";
 import {_esc} from "../popup.js";
-import {rsSetBridges3D, _bmHas, rsBridgeGroups, rsSetBridgeHeight} from "./bridgemesh.js";
+import {rsSetBridges3D, _bmHas, rsBridgeGroups, rsSetBridgeHeight, rsSetBridgeNode, rsBridgeProfile} from "./bridgemesh.js";
 
 let _rdVis = null;                      // the classes that show now (null: all); kept from the event rs:filterchange
 let _rdBox = null;                      // {box, fill}
@@ -30,13 +30,24 @@ function _rdHeightBlock(){
     '<button type="button" data-bh-reset' + (g.set ? "" : " disabled") + '>Reset</button></div>' +
     '<div class="rs-rd-bhn">One height for the ' + n + (n === 1 ? " road" : " roads") + ' of this bridge that touch each other.</div>' + _rdNodes(g);
 }
-// the nodes of the group, from the bridge profile: the height of each in metres and where it comes from (`given`: a person; `rule`, `data`: the engine). A group that the person set is
-// drawn at its height, so each node shows the profile's height times (height now / the top of its chain).
+// the nodes of the group, from the bridge profile: a row for each with its height in metres (a number to change: rsSetBridgeNode) and where the height comes from (`given`: a person;
+// `rule`, `data`: the engine; `page`: set in this page). A group that the person set is drawn at its height, so each node shows the profile's height times (height now / the top of its chain).
+// Reset nodes gives the profile's heights back. Copy profile puts the profile with these heights on the clipboard, to give to `bridge_profile=` for the exact pieces.
 function _rdNodes(g){
   if(!g.nodes.length) return "";
   const top = id => { const c = g.chains.find(c => c.from === id || c.to === id); return c && c.top_m ? c.top_m : null; };
   const z = nd => Math.round(nd.z_m * (g.set && top(nd.id) ? g.height / top(nd.id) : 1) * 10) / 10;
-  return '<div class="rs-rd-bhn rs-rd-bhnodes">' + g.nodes.map(nd => '<span data-node="' + _esc(nd.id) + '">' + _esc(nd.id) + " " + z(nd) + " m " + _esc(nd.source) + "</span>").join(" · ") + "</div>";
+  const rows = g.nodes.map(nd => '<div class="rs-rd-bh rs-rd-bn" data-node="' + _esc(nd.id) + '"><span>' + _esc(nd.id) + '</span><input type="number" data-bn="' + _esc(nd.id) + '" min="0" max="500" step="0.5" value="' + z(nd) +
+    '" aria-label="Height of the node ' + _esc(nd.id) + ', in metres"><u>m</u><em>' + _esc(nd.source) + "</em></div>").join("");
+  return '<div class="rs-rd-bhn">Nodes: the height at each end of a bridge road. Change one and the roads that meet there are drawn again.</div>' + rows +
+    '<div class="rs-rd-bar rs-rd-bnbar"><button type="button" data-bn-reset' + (g.nodesSet.length ? "" : " disabled") + '>Reset nodes</button><button type="button" data-bn-copy>Copy profile</button></div>';
+}
+// Copy profile: the profile with the heights of this page on the clipboard. A browser that does not allow it (a page that is not on https or localhost) says so on the button.
+function _rdCopyProfile(btn){
+  const text = JSON.stringify(rsBridgeProfile(), null, 1);
+  const done = ok => { btn.textContent = ok ? "Copied" : "Not copied: use rsBridgeProfile()"; setTimeout(() => { btn.textContent = "Copy profile"; }, 2500); };
+  if(!navigator.clipboard) return done(false);
+  navigator.clipboard.writeText(text).then(() => done(true), () => done(false));
 }
 // the group of the bridge that a selection is: a deck (its properties have the group) or a road of a bridge (its row is in a group)
 function _rdGroupOf(d){
@@ -71,6 +82,9 @@ export function useRoadsBox(){
     box.querySelectorAll("input[data-b3d]").forEach(i => { i.onchange = () => rsSetBridges3D(i.checked); });
     box.querySelectorAll("input[data-bh]").forEach(i => { i.onchange = () => { const v = parseFloat(i.value); if(v >= 0) rsSetBridgeHeight(_rdBridge, v); else _rdBox.fill(); }; });
     box.querySelectorAll("button[data-bh-reset]").forEach(x => { x.onclick = () => rsSetBridgeHeight(_rdBridge, null); });
+    box.querySelectorAll("input[data-bn]").forEach(i => { i.onchange = () => { const v = parseFloat(i.value); if(v >= 0) rsSetBridgeNode(i.dataset.bn, v); else _rdBox.fill(); }; });
+    box.querySelectorAll("button[data-bn-reset]").forEach(x => { x.onclick = () => { const g = rsBridgeGroups().find(y => y.group === _rdBridge); if(g) g.nodesSet.forEach(id => rsSetBridgeNode(id, null)); }; });
+    box.querySelectorAll("button[data-bn-copy]").forEach(x => { x.onclick = () => _rdCopyProfile(x); });
     box.querySelectorAll("input[data-g]").forEach(i => { i.onchange = () => (i.dataset.g === "bridges" ? rsSetBridges : rsSetTunnels)(i.checked); });
     box.querySelectorAll("input[data-k]").forEach(i => { i.onchange = () => rsSetAccess(i.dataset.k, i.checked); });
   };

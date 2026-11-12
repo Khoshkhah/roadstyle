@@ -3038,7 +3038,7 @@ def test_the_guide_page_of_the_bridge_profile_shows_the_sample_files_and_links_t
 
 
 def test_the_bridge_profile_schemas_check_the_samples_and_agree_with_the_reference():
-    """docs/samples/bridge-profile/*.schema.json (docs/img/bridge-height/bridge_profile_schema.py) are the format of docs/reference/formats.md, "The bridge profile (planned)": the files are what the script makes,
+    """docs/samples/bridge-profile/*.schema.json (docs/img/bridge-height/bridge_profile_schema.py) are the format of docs/reference/formats.md, "The bridge profile": the files are what the script makes,
     they are valid schemas, the least input is valid as an input and not as a complete profile, the complete profile is valid as both, an empty input is valid, a wrong input is rejected, and every key of the schema
     is in the reference."""
     import importlib.util
@@ -3078,9 +3078,9 @@ def test_the_bridge_profile_schemas_check_the_samples_and_agree_with_the_referen
     broken["groups"][0]["nodes"][0].pop("z_m")
     assert vi.is_valid(broken) and not vc.is_valid(broken)                                                # Part 2 needs every height
     section = (root / "docs" / "reference" / "formats.md").read_text()
-    section = section[section.index("## The bridge profile (planned)"):section.index("## The look")]
+    section = section[section.index("## The bridge profile"):section.index("## The look")]
     names = {k for d in inp["$defs"].values() if d.get("type") == "object" for k in d["properties"]} | set(inp["properties"])
-    assert names >= {"format", "parameters", "groups", "design_speed_kmh", "design_grade", "curve", "z_m", "lonlat", "osm_ways", "points", "width_m", "width_source", "s"}
+    assert names >= {"format", "parameters", "groups", "design_speed_kmh", "design_grade", "curve", "z_m", "lonlat", "osm_ways", "points", "width_m", "width_source", "s", "height_rule", "curve_m"}
     assert [n for n in sorted(names) if f"`{n}`" not in section and f".{n}`" not in section and f"[].{n}`" not in section and f"`.{n}`" not in section] == []      # every key is in the reference
     assert "bridge_profile_input.schema.json" in section and "bridge_profile_complete.schema.json" in section
     for key, default in (("design_speed_kmh", 50), ("design_grade", 0.05)):

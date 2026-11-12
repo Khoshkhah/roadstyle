@@ -3,8 +3,9 @@
 //! a missing one is an error that says "fill the profile first". The input profile that can be incomplete is read by the first part, the filler (`bridge_fill::fill`), which writes
 //! a complete profile; the rules that it fills with are today's (`decks::today_profile`).
 //!
-//! The first build of the maker has one curve, `smooth`: the smoothstep ramps of today, made for the full height of the chain (`top_m`), from the heights at its two nodes. A chain with
-//! interior control points and the curve `design` (straight grades and vertical curves) are in the format and are not built: they are errors that say so.
+//! The maker has two curves. `smooth`: the smoothstep ramps of today, made for the full height of the chain (`top_m`), from the heights at its two nodes. `design`: straight grades between
+//! the two nodes and the interior control points of the chain, with a vertical curve of the length `curve_m` at each interior point (`bridge_curve`). The curve `smooth` has no interior
+//! points: a chain that has them is an error that says to use `design`.
 
 use crate::Error;
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,7 @@ pub struct BridgeProfile {
     pub groups: Vec<Group>,
 }
 
-/// The design speed and the design grade (for the curve `design`), and the curve.
+/// The design speed and the design grade, the curve, and the rule that the filler heights follow.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Parameters {
@@ -31,12 +32,25 @@ pub struct Parameters {
     /// `smooth` (today's ramps) when it is not there
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub curve: Option<Curve>,
+    /// how the filler found the heights that the person did not give: `length` (today's rule, from the length of the group) when it is not there, or `design` (the design rules). The maker does not read it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height_rule: Option<Rule>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Curve {
     Smooth,
+    Design,
+}
+
+/// The rule that the filler finds a missing height with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Rule {
+    /// the height of a group from its length, a node's height from its distance to the free end (the rule of the first build)
+    Length,
+    /// the design rules (docs/design/bridge_height_design.md): the design grade from the ground, the top from the clearance
     Design,
 }
 
@@ -81,7 +95,7 @@ pub struct Chain {
     pub length_m: f64,
     pub from: String,
     pub to: String,
-    /// interior control points (the curve `design`): not built
+    /// interior control points, in order of `s` (the curve `design`); none with the curve `smooth`
     pub points: Vec<Point>,
     /// the full height of the chain: the height that its ramps are made for (the curve `smooth`). `__rs_full`
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -98,6 +112,9 @@ pub struct Chain {
 pub struct Point {
     pub s: f64,
     pub z_m: f64,
+    /// the length of the vertical curve around the point, in metres (0: none). The maker needs it; the filler writes it from the design speed
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub curve_m: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
