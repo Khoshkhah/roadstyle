@@ -12,6 +12,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Fixed
 
+- **`rs.bridge_profile_from_urbanstyle` stops at a free end that is above the ground.** An axis that is more than 0.5 m high at a free end of the OSM bridge was set to 0 with a warning. The deck then dropped to the ground in a few metres (a grade of 43 % to 84 % on four chains of the Granville Bridge). Now the converter raises a `ValueError` that names every such node, its axis and its height, and the cause (the OSM bridge is shorter than the real one). An end that is 0.5 m or less high is on the ground and gets 0.
+
 - **The end of a 3D bridge is on the ground.** A free end (a node with `kind: "ground"`) with a `z_m` above 0 is an error in `bridge_profile=` (it was a warning that said the deck ends in the air), the page cannot set it (`rsSetBridgeNode` throws, the number in the Height box is fixed), and `rs.bridge_profile_from_urbanstyle` gives a free end the height 0 and warns when the axis is more than 0.5 m high there. With the curve `design`, a straight grade steeper than the design grade is a warning.
 
 ### Added
