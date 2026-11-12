@@ -227,6 +227,8 @@ struct Bridges<'a> {
     dfree: HashMap<(u64, u64), f64>,
     pair_edges: HashMap<((u64, u64), (u64, u64)), Vec<usize>>,
     at: HashMap<(u64, u64), Vec<usize>>,
+    /// the nodes where a road of level below 0 (a tunnel) starts or ends: a free end of a bridge at one of them is a portal
+    tunnel_ends: std::collections::HashSet<(u64, u64)>,
 }
 
 impl<'a> Bridges<'a> {
@@ -261,7 +263,16 @@ impl<'a> Bridges<'a> {
             group_len[g - 1] += l;
         }
         let dfree = free_end_distances(&reps, &lens, &at);
-        Bridges { reps, group, group_len, dfree, pair_edges, at }
+        let mut tunnel_ends = std::collections::HashSet::new();
+        for (fi, p) in roads.iter().enumerate() {
+            if p.get("lvl").and_then(Cell::as_f64).unwrap_or(0.0) < 0.0 {
+                for n in roads.topo().ends[fi].into_iter().flatten() {
+                    let q = roads.topo().points[n as usize];
+                    tunnel_ends.insert(hk((q[0], q[1])));
+                }
+            }
+        }
+        Bridges { reps, group, group_len, dfree, pair_edges, at, tunnel_ends }
     }
 
     fn twin_of(&self, fi: usize, a: Node, z: Node) -> Option<usize> {
@@ -454,7 +465,7 @@ fn today_profile(b: &Bridges, chains: &[Chain], dk: &DeckLook, given: &[Option<f
         let ground = b.at.get(k).is_some_and(|v| v.len() == 1);
         let ids: Vec<String> = chains.iter().enumerate().filter(|(_, c)| c.head == *k || c.tail == *k).map(|(i, _)| format!("c{}", i + 1)).collect();
         groups[g - 1].nodes.push(bridge_profile::Node {
-            id: id_of[k].clone(), lonlat: [at[k].0, at[k].1], kind: if ground { Kind::Ground } else { Kind::Junction }, chains: ids,
+            id: id_of[k].clone(), lonlat: [at[k].0, at[k].1], kind: if ground { Kind::Ground } else { Kind::Junction }, portal: ground && b.tunnel_ends.contains(k), chains: ids,
             z_m: h * t * t * (3.0 - 2.0 * t), source: if ground { "data" } else { "rule" }.into(), method: if ground { "mapped" } else { "derived" }.into() });
     }
     for (i, c) in chains.iter().enumerate() {

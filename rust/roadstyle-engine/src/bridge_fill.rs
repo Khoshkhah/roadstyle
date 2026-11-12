@@ -51,6 +51,7 @@ struct InNode {
     id: Option<String>,
     lonlat: Option<[f64; 2]>,
     kind: Option<Kind>,
+    portal: Option<bool>,
     chains: Option<Vec<String>>,
     z_m: Option<f64>,
     source: Option<String>,
@@ -157,6 +158,9 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
             let node = &mut found.groups[g].nodes[i];
             if n.kind.is_some_and(|k| k != node.kind) {
                 return bad(format!("the node {id} is a {:?} in these roads, and the input says {:?}: the input is not for these roads", node.kind, n.kind.unwrap()));
+            }
+            if n.portal.is_some_and(|p| p != node.portal) {
+                return bad(format!("the node {id} is {} portal in these roads (a free end of a bridge where a road of level below 0 starts), and the input says portal {}: the input is not for these roads", if node.portal { "a" } else { "not a" }, n.portal.unwrap()));
             }
             if n.chains.as_ref().is_some_and(|c| c.iter().collect::<std::collections::BTreeSet<_>>() != node.chains.iter().collect()) {
                 return bad(format!("the node {id} has the chains {:?} in these roads, and the input says {:?}: the input is not for these roads", node.chains, n.chains.as_ref().unwrap()));

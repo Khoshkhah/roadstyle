@@ -27,9 +27,13 @@ def _ground_z(name):
     return _plane(*_CELL[name])
 
 
-def _edges():
+def _edges(tunnel_at_a=False):
+    """The Y of bridges; with `tunnel_at_a` a road of level -1 starts at the free end A: the deck goes into a tunnel there (a portal)."""
     lines = [[_at("A"), _at("B")], [_at("B"), _at("C")], [_at("B"), _at("D")]]
-    return gpd.GeoDataFrame({"highway": ["primary"] * 3, "bridge": ["yes"] * 3, "layer": ["1"] * 3, "edge_id": [1, 2, 3]}, crs=4326, geometry=[LineString(c) for c in lines])
+    n = 3 + tunnel_at_a
+    return gpd.GeoDataFrame({"highway": ["primary"] * n, "bridge": ["yes"] * 3 + [None] * tunnel_at_a, "tunnel": [None] * 3 + ["yes"] * tunnel_at_a,
+                             "layer": ["1"] * 3 + ["-1"] * tunnel_at_a, "edge_id": list(range(1, n + 1))}, crs=4326,
+                            geometry=[LineString(c) for c in lines + ([[(WEST + 3.5 * D, NORTH - 12.5 * D), _at("A")]] if tunnel_at_a else [])])
 
 
 def _given(heights):
@@ -53,8 +57,8 @@ def pw_run():
         yield p
 
 
-def _open(p, given, errors):
-    html = rs.render_dashboard(_edges(), view_3d=True, basemap="blank", ground=_ground_option(), bridge_profile=given).html
+def _open(p, given, errors, tunnel_at_a=False):
+    html = rs.render_dashboard(_edges(tunnel_at_a), view_3d=True, basemap="blank", ground=_ground_option(), bridge_profile=given).html
     pg = p.chromium.launch(args=_ARGS).new_context(viewport={"width": 1300, "height": 800}).new_page()
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.route("http://rs.test/p.html", lambda r: r.fulfill(content_type="text/html", body=html))
@@ -126,4 +130,20 @@ def test_an_elevation_has_no_group_height_and_any_number_is_an_elevation(pw_run)
     prof = pg.evaluate("rsBridgeProfile()")
     assert prof["parameters"]["z_reference"] == "elevation" and prof["ground"]["id"] == FACTS["id"]
     assert any(n["z_m"] == -4.5 and n["source"] == "page" for g in prof["groups"] for n in g["nodes"])
+    pg.context.browser.close()
+
+
+def test_a_free_end_where_the_deck_goes_into_a_tunnel_is_a_portal_and_is_not_checked_against_the_ground(pw_run):
+    """The deck at the free end A is 20 m above the ground, as at a tunnel portal on a hill: with a tunnel road that starts at A, the page draws it and has no problem; the same roads with no tunnel
+    have the problem (test_a_free_end_that_is_not_on_the_ground...)."""
+    high = {**_ON_GROUND, "A": _ground_z("A") + 20.0}
+    errors = []
+    pg = _open(pw_run, _given(high), errors, tunnel_at_a=True)
+    pg.wait_for_function("_bmStats().rows > 0", timeout=40_000)
+    assert pg.evaluate("rsBridgeProblems()") == []
+    nodes = pg.evaluate("rsBridgeGroups().flatMap(g => g.nodes)")
+    assert [n["id"] for n in nodes if n.get("portal")] and all(n["kind"] == "ground" for n in nodes if n.get("portal")), nodes
+    drawn = pg.evaluate("_bmFeats.filter((f, k) => !f.properties.__rs_casing_slab && _bmRanges[k][1] > _bmRanges[k][0]).length")
+    assert drawn > 0
+    assert not [e for e in errors if "pageerror" in e], errors
     pg.context.browser.close()

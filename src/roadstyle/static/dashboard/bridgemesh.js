@@ -13,7 +13,8 @@
 // THE ELEVATION PROFILE (parameters.z_reference "elevation"): the node heights and the points of a chain are elevations in the vertical datum of the profile's ground, and a deck is drawn at its
 // elevation (the terrain's exaggeration included), over the same ground (the terrain from the page's `ground`). There is no level line between the ground at the two ends, and no lift: the
 // deck's height is the profile's, in every chain, so the engine's marks of a piece (its lift) are not read. A free end must be on the ground: where the profile's elevation and the terrain
-// differ by more than `_BM_END_TOL` metres, the bridges of that group are not drawn and the page says so (rsBridgeProblems(), a toast).
+// differ by more than `_BM_END_TOL` metres, the bridges of that group are not drawn and the page says so (rsBridgeProblems(), a toast). A free end that is a portal (`portal: true`: the deck goes straight
+// into a tunnel, so the ground is above the deck) is not checked: the deck ends at its own elevation.
 import {map, O, RS_PREFIX, style, _src, _sfeats, _emit} from "./core.js";
 import {rsToast} from "./notice.js";
 import {_elDemTile, _elDemMaxZoom} from "./elevation.js";
@@ -209,7 +210,7 @@ function _bmBuild(){
     else {
       const ex = map.getTerrain().exaggeration || 1;
       O.bridge_profile.groups.forEach(gr => gr.nodes.forEach(n => {
-        if(n.kind !== "ground") return;
+        if(n.kind !== "ground" || n.portal) return;
         const z = _bmNodeZ.has(n.id) ? _bmNodeZ.get(n.id) : n.z_m, g = _bmElev(n.lonlat);
         if(g == null || Math.abs(z - g / ex) <= _BM_END_TOL) return;       // not there yet (its tile): the mesh is made again when it comes; or on the ground
         _bmProblems.push({node: n.id, z_m: z, ground_m: g / ex, chains: n.chains.slice(), message: "the free end " + n.id + " is at " + z.toFixed(1) + " m and the ground there is " + (g / ex).toFixed(1) +

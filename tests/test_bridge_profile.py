@@ -290,6 +290,21 @@ def test_the_ground_of_an_input_is_kept_in_the_complete_profile_and_the_filler_t
         rs.bridge_profile(_roads(), {"ground": {"file": "x.tif"}})
 
 
+def test_a_free_end_where_a_tunnel_starts_is_a_portal_and_no_other_node_says_so():
+    a, b, c, d = (18.0000, 59.3000), (18.0003, 59.3002), (18.0006, 59.3004), (17.9994, 59.2998)
+    roads = gpd.GeoDataFrame({"highway": ["primary"] * 3, "bridge": ["yes", "yes", None], "tunnel": [None, None, "yes"], "layer": ["1", "1", "-1"], "edge_id": [1, 2, 3]},
+                             geometry=[LineString(x) for x in ([a, b], [b, c], [d, a])], crs=4326)
+    p = rs.bridge_profile(roads)
+    nodes = {tuple(n["lonlat"]): n for g in p["groups"] for n in g["nodes"]}
+    assert nodes[a]["portal"] is True and nodes[a]["kind"] == "ground", nodes[a]          # the bridge goes into the tunnel at a
+    assert "portal" not in nodes[c]                                                      # the other end of the bridge is a free end that is not a portal
+    assert rs.bridge_profile(roads, p) == p                                              # the filler twice is the filler once
+    wrong = {"groups": [{"nodes": [{"id": nodes[c]["id"], "portal": True}]}]}
+    with pytest.raises(ValueError, match=r"not a portal in these roads.*the input says portal true"):
+        rs.bridge_profile(roads, wrong)
+    assert all("portal" not in n for g in rs.bridge_profile(_roads())["groups"] for n in g["nodes"])      # no tunnel in these roads
+
+
 def _elevation_input(base=100.0, ground_id="a" * 64):
     """Every node of the Y and of the lone bridge at `base` metres plus the height that today's rule gives it: an input with z_reference "elevation"."""
     nodes = [{"id": n["id"], "z_m": base + n["z_m"], "source": "test", "method": "measured"} for g in rs.bridge_profile(_roads())["groups"] for n in g["nodes"]]

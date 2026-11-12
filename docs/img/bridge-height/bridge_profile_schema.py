@@ -31,6 +31,7 @@ def _defs(complete):
     node = {"id": {"type": "string", "pattern": "^n[0-9]+$", "description": "The id of the node in a complete profile"},
             "lonlat": {"$ref": "#/$defs/lonlat", "description": "The position of the node. In a partial input it names the node: the node of the group within 5 m"},
             "kind": {"enum": ["ground", "junction"], "description": "ground: one chain ends here, height 0. junction: chains meet here"},
+            "portal": {"type": "boolean", "description": "A free end where the deck goes straight into a tunnel (a road of level below 0 starts at the node). The engine writes it; with z_reference elevation the page does not check the ground there"},
             "chains": {"type": "array", "items": {"type": "string", "pattern": "^c[0-9]+$"}, "description": "The chains that meet at the node"},
             "z_m": {"type": "number", "description": "The height of the node above the ground, in metres, 0 or more (with z_reference elevation: its elevation in the datum of the ground, any number)"}, **mark}
     chain = {"id": {"type": "string", "pattern": "^c[0-9]+$"},
