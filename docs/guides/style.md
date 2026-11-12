@@ -75,7 +75,7 @@ On the command line: `--no-labels`, `--no-arrows` and `--no-basemap-switcher`. T
 
 `view_3d=True` tilts the camera and draws each bridge as a raised deck, so you can see the roads under it. The deck is one sloped mesh:
 the ramps rise smoothly and meet the ground with no step. A map page has a 2D/3D button. A dashboard has the tilt slider in its `navigate` box,
-and a **3D bridges** switch in the Roads box (off: the flat bridge at every zoom). Below zoom 16 the bridges are flat.
+and a **3D bridges** switch in the Roads box (off: the flat bridge at every zoom). Below zoom 15 the bridges are flat.
 
 The bridge roads that touch each other are one group. A longer group is higher (5 m up to 60 m of length, 22 m from 600 m; see `bridge_decks`). [How the height of a 3D bridge is calculated](bridge-height.md) explains the height, the ramps and the terrain rule.
 `bridge_heights={road_id: 14}` gives the whole group of that road one height when the page is made, and the engine makes the ramps for it (a tall bridge has long ramps, and a bridge of a few metres rises only as far as the grade lets it). `bridge_height_col="height_m"` does the same from a column of the roads: a road with a value gives its group that height, and a road with no value gives nothing (two heights in one group are an error, also when they come from the two keywords). `rsSetBridgeHeight(road, 14)` does the same live in the page, but the ramps keep the length that the engine made. In a dashboard, the **Height** field of the Roads box (under "3D bridges", while a 3D bridge is selected) calls it. With the 3D terrain on, the deck stands on the terrain. A planned input profile, with a height for each node of a group of bridges, is on [The bridge profile: input and output](bridge-profile.md).

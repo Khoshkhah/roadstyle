@@ -331,7 +331,7 @@ with the heights at its two nodes and its top only. Stage 2 is the profile throu
    - A node above the `top_m` of the rule raises the `top_m` of its chains. A given `top_m` below a node is an error.
    - The grade warning is on the average grade of a chain (the height difference over `length_m`), only where an end has a height of the person (`source` is not `rule` or `data`). It compares with `design_grade`, which is 1 in 8 until the design rules are built.
    - The checks "a `ground` node with `z_m` above 0" and "two decks cross" of the table below are not built. The paths of the given values (the colored view) are not returned by the engine: the prototype makes the view.
-4. The page: the landing on fill, the Height box, `rsBridgeGroups()`.
+4. The page. **4a, built:** the page has the profile (the option `bridge_profile`), `rsBridgeGroups()` returns the `chains` and `nodes`, and the Height box lists the nodes with their height and `source`. **Not built:** 4b the landing on fill; 4c a change of the height of a node or a chain in the open page (the page has no maker: the box sets the height of a whole group in JavaScript, as before).
 5. A converter from an urbanstyle profile to a complete input profile, outside the engine. It matches the axes to the chains by the OSM ways (12 of 12 on the Granville Bridge).
 6. The default heights from the design rules (the other note), and the curve `design`.
 

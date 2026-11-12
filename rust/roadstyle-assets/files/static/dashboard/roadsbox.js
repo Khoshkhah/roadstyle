@@ -28,7 +28,15 @@ function _rdHeightBlock(){
   const n = g.roads.length;
   return '<div class="rs-rd-bh"><span>Height</span><input type="number" data-bh min="0" max="500" step="0.5" value="' + (Math.round(g.height * 10) / 10) + '" aria-label="Height of the selected bridge, in metres"><u>m</u>' +
     '<button type="button" data-bh-reset' + (g.set ? "" : " disabled") + '>Reset</button></div>' +
-    '<div class="rs-rd-bhn">One height for the ' + n + (n === 1 ? " road" : " roads") + ' of this bridge that touch each other.</div>';
+    '<div class="rs-rd-bhn">One height for the ' + n + (n === 1 ? " road" : " roads") + ' of this bridge that touch each other.</div>' + _rdNodes(g);
+}
+// the nodes of the group, from the bridge profile: the height of each in metres and where it comes from (`given`: a person; `rule`, `data`: the engine). A group that the person set is
+// drawn at its height, so each node shows the profile's height times (height now / the top of its chain).
+function _rdNodes(g){
+  if(!g.nodes.length) return "";
+  const top = id => { const c = g.chains.find(c => c.from === id || c.to === id); return c && c.top_m ? c.top_m : null; };
+  const z = nd => Math.round(nd.z_m * (g.set && top(nd.id) ? g.height / top(nd.id) : 1) * 10) / 10;
+  return '<div class="rs-rd-bhn rs-rd-bhnodes">' + g.nodes.map(nd => '<span data-node="' + _esc(nd.id) + '">' + _esc(nd.id) + " " + z(nd) + " m " + _esc(nd.source) + "</span>").join(" · ") + "</div>";
 }
 // the group of the bridge that a selection is: a deck (its properties have the group) or a road of a bridge (its row is in a group)
 function _rdGroupOf(d){

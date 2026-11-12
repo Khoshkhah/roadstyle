@@ -108,6 +108,4 @@ pub struct Bridges {
     /// A complete bridge profile (docs/reference/formats.md, "The bridge profile (planned)"): the engine's maker makes the decks from it, in place of today's rule. `bridge_heights` and
     /// `bridge_height_col` do nothing then. None: today's rule.
     pub profile: Option<serde_json::Value>,
-    /// Write the complete profile of the page (the one that was given, or the one that today's rule gives) into the metadata of the style, under `roadstyle:bridge_profile`.
-    pub profile_export: bool,
 }

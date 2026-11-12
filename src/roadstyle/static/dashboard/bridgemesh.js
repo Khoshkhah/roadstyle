@@ -406,14 +406,22 @@ export function _bmPickAt(p){
   return {type: "Feature", id: k, properties: f.properties, geometry: f.geometry, layer: map.getLayer(_bmDeck()), source: _bmSrc(), state: {}};
 }
 
-// the groups: [{group, roads (the road rows), height (metres), set (the person gave it)}], largest first
+// the groups: [{group, roads (the road rows), height (metres), set (the person gave it), chains, nodes}], largest first. `chains` and `nodes` are the values of the complete bridge profile
+// that the page was made from (the page option bridge_profile, from the style's metadata roadstyle:bridge_profile; docs/reference/formats.md): [] when the style has none. `height` is the height now, so a group with `set`
+// is drawn at `height` and not at the `top_m` of its chains.
 export function rsBridgeGroups(){
   _bmLoad();
   const g = new Map();
   _bmFeats.forEach(f => { const p = f.properties; if(p.__rs_casing_slab) return;
-    let e = g.get(p.__rs_group); if(!e) g.set(p.__rs_group, e = {group: p.__rs_group, roads: new Set(), height: p.__rs_full, set: false});
+    let e = g.get(p.__rs_group); if(!e) g.set(p.__rs_group, e = {group: p.__rs_group, roads: new Set(), chains: new Set(), height: p.__rs_full, set: false});
+    e.chains.add("c" + p.__rs_chain);       // the chain id of the profile is c<N>, N = the engine's chain number
     (p.__rs_edges || []).forEach(r => e.roads.add(r)); });
-  return [...g.values()].map(e => ({group: e.group, roads: [...e.roads], height: _bmHeights.has(e.group) ? _bmHeights.get(e.group) : e.height, set: _bmHeights.has(e.group)}))
+  const prof = O.bridge_profile, pc = new Map(), pn = new Map();
+  ((prof && prof.groups) || []).forEach(x => { x.chains.forEach(c => pc.set(c.id, c)); x.nodes.forEach(n => pn.set(n.id, n)); });
+  return [...g.values()].map(e => {
+    const chains = [...e.chains].filter(id => pc.has(id)).map(id => pc.get(id)), ends = new Set(chains.flatMap(c => [c.from, c.to]));
+    return {group: e.group, roads: [...e.roads], height: _bmHeights.has(e.group) ? _bmHeights.get(e.group) : e.height, set: _bmHeights.has(e.group),
+      chains, nodes: [...ends].filter(id => pn.has(id)).map(id => pn.get(id))}; })
     .sort((a, b) => b.roads.length - a.roads.length);
 }
 // the group of a target: a group number from rsBridgeGroups, or a road row of a bridge

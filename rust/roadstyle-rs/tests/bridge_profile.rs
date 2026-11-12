@@ -27,7 +27,7 @@ fn decks(style: &Value) -> Vec<Value> {
 
 /// The complete profile that today's rule wrote.
 fn profile_of_today() -> Value {
-    let s = style(&[("bridge_profile_export", true.into())]).unwrap();
+    let s = style(&[]).unwrap();
     s["metadata"]["roadstyle:bridge_profile"].clone()
 }
 
@@ -38,11 +38,9 @@ fn error_of(profile: Value) -> String {
 #[test]
 fn the_maker_makes_the_decks_of_today_from_the_profile_of_today() {
     let today = style(&[]).unwrap();
-    let wrote = style(&[("bridge_profile_export", true.into())]).unwrap();
-    let profile = wrote["metadata"]["roadstyle:bridge_profile"].clone();
+    let profile = today["metadata"]["roadstyle:bridge_profile"].clone();
     assert!(!decks(&today).is_empty(), "Monaco has 3D bridges");
-    assert!(today["metadata"]["roadstyle:bridge_profile"].is_null(), "the profile is in the style only when it is asked for");
-    assert_eq!(decks(&today), decks(&wrote), "asking for the profile does not change the decks");
+    assert!(profile.is_object(), "the style of a page with 3D bridges has the profile");
     // the profile as JSON text and back (a file), and the maker: the same decks
     let text = serde_json::to_string(&profile).unwrap();
     let from_text: Value = serde_json::from_str(&text).unwrap();
@@ -50,7 +48,7 @@ fn the_maker_makes_the_decks_of_today_from_the_profile_of_today() {
     let made = style(&[("bridge_profile", from_text)]).unwrap();
     assert_eq!(decks(&today), decks(&made), "the maker makes the decks of today from the profile of today");
     // a page that is given a profile can write it again: the same profile
-    let again = style(&[("bridge_profile", profile.clone()), ("bridge_profile_export", true.into())]).unwrap();
+    let again = style(&[("bridge_profile", profile.clone())]).unwrap();
     assert_eq!(again["metadata"]["roadstyle:bridge_profile"], profile);
 }
 
@@ -147,13 +145,13 @@ fn node<'a>(p: &'a Value, id: &str) -> &'a Value {
 }
 
 fn export(input: Value) -> Result<(Value, Value), roadstyle_rs::Error> {
-    let s = style(&[("bridge_profile", input), ("bridge_profile_export", true.into())])?;
+    let s = style(&[("bridge_profile", input)])?;
     Ok((s["metadata"]["roadstyle:bridge_profile"].clone(), s))
 }
 
 #[test]
 fn the_filler_makes_the_profile_of_today_from_an_empty_input_and_changes_nothing_in_a_complete_one() {
-    let today = style(&[("bridge_profile_export", true.into())]).unwrap();
+    let today = style(&[]).unwrap();
     let profile = today["metadata"]["roadstyle:bridge_profile"].clone();
     for empty in [serde_json::json!({}), serde_json::json!({"groups": []}), serde_json::json!({"parameters": {}, "groups": [{"nodes": [], "chains": []}]})] {
         let (p, s) = export(empty).unwrap();

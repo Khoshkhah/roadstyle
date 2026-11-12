@@ -24,6 +24,8 @@ export interface DashboardOptions {
   sources?: Record<string, { source: string; layer: string | null }> | null;
   /** The style's arrows (roadstyle:arrows): "points" (the dashboard places them), "line", "line-center", or null (none). */
   arrows?: "points" | "line" | "line-center" | null;
+  /** The complete bridge profile of the 3D decks (the metadata roadstyle:bridge_profile; docs/reference/formats.md); rsBridgeGroups lists its chains and nodes. null: none. */
+  bridge_profile?: { format: string; parameters: Record<string, unknown>; groups: Array<{ name: string; nodes: unknown[]; chains: unknown[] }> } | null;
   /** The live data that the road layer reads (render's live_data=True): the feature-state names and the ramp; null: none. */
   live?: { color: string; width: string; types?: Record<string, unknown>; ramp?: string[]; nodata?: string } | null;
   /** The base maps of the switcher: {key, label, tiles, bg, maxzoom, attr}. None: the dashboard does not touch the map's base map. */

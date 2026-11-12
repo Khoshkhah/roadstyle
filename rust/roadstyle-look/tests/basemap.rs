@@ -118,6 +118,12 @@ fn the_64_looks_of_mapstyle() {
                 t.shift_remove("vehicles");
             }
         }
+        // changed on 2026-11-11: the 3D decks show from zoom 15 (bridges.decks.flat_below was 16)
+        for path in ["/config/bridge_decks/flat_below", "/theme/bridges/decks/flat_below"] {
+            if let Some(t) = got.pointer_mut(path) {
+                *t = 16.0.into();
+            }
+        }
         if let Some(t) = got.pointer_mut("/config/tiles/maxzoom") {
             *t = 15.into();
         }

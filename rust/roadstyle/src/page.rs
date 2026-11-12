@@ -61,6 +61,8 @@ pub struct PageOptions {
     pub sources: Value,
     pub arrows: Value,
     pub live: Value,
+    /// roadstyle:bridge_profile: the complete bridge profile of the 3D decks (`rsBridgeGroups` and the Height box read it), or null
+    pub bridge_profile: Value,
     pub popup_mode: String,
     pub find_control: bool,
     pub zoom_readout: bool,
