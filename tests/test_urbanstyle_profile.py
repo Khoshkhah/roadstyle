@@ -18,9 +18,28 @@ def edges():
     return gpd.read_parquet(SAMPLES / "granville_bridge_edges.parquet")
 
 
+# the four axes of the Granville file that are above the ground at a free end of the OSM bridge (the real bridge goes on past the end of the way): the axis and its distance along it where the
+# free end is, and how high the axis is there (m): a2 at 403.9 m (4.5), a5 at 288.0 m (0.6), a6 at 28.8 m (0.9) and a8 at 184.0 m (8.3)
+_RAISED = {"a2": 403.9, "a5": 288.0, "a6": 28.8, "a8": 184.0}
+
+
 @pytest.fixture(scope="module")
-def bridge():
+def raw_bridge():
+    """The file as urbanstyle wrote it."""
     return json.loads((SAMPLES / "granville_urbanstyle_axes.json").read_text())
+
+
+@pytest.fixture(scope="module")
+def bridge(raw_bridge):
+    """The same file with the four raised axes brought down to the ground at their free end: no height within 10 m of it, and a rise over the next 30 m (what the file would say if the OSM bridge were as
+    long as the real one). Every other axis is as urbanstyle wrote it."""
+    out = copy.deepcopy(raw_bridge)
+    for ax in out["axes"]:
+        if ax["id"] in _RAISED:
+            end, v = _RAISED[ax["id"]], ax["vertical"]
+            for k in ("points", "samples"):
+                v[k] = [[s, z * min(1.0, max(0.0, (abs(s - end) - 10.0) / 30.0))] for s, z in v[k]]
+    return out
 
 
 def _quiet(f, *a, **k):
@@ -38,10 +57,27 @@ def test_the_12_axes_of_the_granville_bridge_are_the_12_chains_and_give_the_heig
     junction = sorted(n["z_m"] for n in nodes.values() if n["z_m"] > 10)
     assert junction == pytest.approx([11.62, 11.74, 18.19, 22.71, 27.04], abs=0.05), junction
     assert all(n["source"] == "City of Vancouver LiDAR 2022" and n["method"] == "measured" for n in nodes.values())
-    # the end of a bridge is on the ground: the axes are 0.6 m to 8.3 m high at the ends of five chains (the deck goes on past the end of the OSM bridge way), and the end is 0
-    assert sum(1 for n in nodes.values() if n["z_m"] == 0.0) == 8, nodes
-    with pytest.warns(UserWarning, match="the axis a8 is 8.3 m high there because it goes on past the end"):
-        rs.bridge_profile_from_urbanstyle(edges, bridge)
+    assert sum(1 for n in nodes.values() if n["z_m"] == 0.0) == 8, nodes                  # the 8 free ends are on the ground
+
+
+def test_an_axis_that_is_above_the_ground_at_a_free_end_is_an_error_that_names_every_such_end(edges, raw_bridge):
+    """The Granville file as urbanstyle wrote it: the axes go on past the end of the OSM bridge, so four free ends are 0.6 m to 8.3 m above the ground. The converter does not set them to 0 (the deck
+    would drop to the ground in a few metres): it stops, and names each node, its axis and the height."""
+    with pytest.raises(ValueError) as e:
+        _quiet(rs.bridge_profile_from_urbanstyle, edges, raw_bridge)
+    msg = str(e.value)
+    assert "above the ground at 4 free ends" in msg, msg
+    for node, axis, z in (("n1", "a6", "0.9"), ("n2", "a8", "8.3"), ("n3", "a5", "0.6"), ("n13", "a2", "4.5")):
+        assert f"{node} (the axis {axis} is {z} m high)" in msg, msg
+    assert "does not set such an end to 0" in msg and "Fix the roads" in msg
+
+
+def test_a_free_end_within_half_a_metre_of_the_ground_is_on_it(edges, bridge):
+    near = copy.deepcopy(bridge)
+    ax = next(a for a in near["axes"] if a["id"] == "a7")                        # 0.2 m high at its free end n9 in the file
+    assert any(0 < z < 0.5 for _, z in ax["vertical"]["samples"][-3:]), ax["vertical"]["samples"][-3:]
+    given = _quiet(rs.bridge_profile_from_urbanstyle, edges, near)
+    assert next(n["z_m"] for n in given["groups"][0]["nodes"] if n["id"] == "n9") == 0.0
 
 
 def test_the_profile_is_complete_through_the_engine_and_the_decks_follow_the_lidar(edges, bridge):

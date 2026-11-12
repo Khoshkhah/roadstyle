@@ -14,6 +14,7 @@ from pathlib import Path
 __all__ = ["bridge_profile_from_urbanstyle"]
 
 FORMAT = "urbanstyle.bridge/1"
+_GROUND_M = 0.5                     # an axis that is this high or less at a free end of the bridge is on the ground there (the LiDAR and the rounding of the axis)
 _EDGE_M = 1.0                       # a grade point nearer than this to an end of the chain is the node's height, not an interior point
 
 
@@ -70,7 +71,8 @@ def bridge_profile_from_urbanstyle(edges, bridge, *, way_col="osm_id", max_node_
     ``bridge``: the dictionary of a ``.bridge.json`` file (format ``urbanstyle.bridge/1``) or its path. ``way_col``: the column of ``edges`` with the OSM way id (``osm_id``). ``kwargs`` are the keywords
     of ``render_edges`` that change which bridges are 3D (``bridge_col``, ``layer_col``...).
 
-    Every chain of the roads must have an axis with the same OSM ways: a chain with no axis is an error that names it. An axis that no chain has is a warning (urbanstyle can draw a bridge that roadstyle
+    Every chain of the roads must have an axis with the same OSM ways: a chain with no axis is an error that names it. A free end of a bridge (a node where one chain ends) is on the ground: an axis that is
+    more than 0.5 m high there is an error that names every such node and its height (the OSM bridge is shorter than the real one, and the converter does not draw a cliff in its place). An axis that no chain has is a warning (urbanstyle can draw a bridge that roadstyle
     does not). The result has ``parameters.curve = "design"``, the height of each node (``source`` of the axis, and ``method`` ``measured``, or ``derived`` for urbanstyle's own rule; the mean of the axes that end at a node, with a warning where they differ
     by more than ``max_node_gap_m``) and, for each chain, the grade points of its axis with the length of each vertical curve. Give it to ``bridge_profile=`` or to ``rs.bridge_profile``::
 
@@ -106,7 +108,7 @@ def bridge_profile_from_urbanstyle(edges, bridge, *, way_col="osm_id", max_node_
     nodes = {n["id"]: n for g in base["groups"] for n in g["nodes"]}
     axes = {a["id"]: {**a, "ways": {int(w[1:]) for w in a["ways"]}} for a in data["axes"]}
     heights: dict[str, list[tuple[float, str, str]]] = {}       # node id -> (z, source, method) of each axis that ends there
-    chains, unmatched = [], []
+    chains, unmatched, raised = [], [], []
     for g in base["groups"]:
         for c in g["chains"]:
             mine = ways.get(c["id"], set())
@@ -129,10 +131,11 @@ def bridge_profile_from_urbanstyle(edges, bridge, *, way_col="osm_id", max_node_
             for k, a in (("from", a0), ("to", a1)):
                 z = max(0.0, _z_at(v["samples"], a))
                 if nodes[c[k]]["kind"] == "ground":
-                    # the end of a bridge is on the ground. The axis goes on past it (a landing on fill) and is above the ground there, so the height of the axis is not the height of the end
-                    if z > 0.5:
-                        warnings.warn(f"the node {c[k]} is a free end of the bridge in these roads, so it is on the ground (0 m); the axis {axis['id']} is {z:.1f} m high there because it goes on past the end", stacklevel=3)
-                    z = 0.0
+                    # the end of a bridge is on the ground, so the axis must be on it there. An axis that is above the ground at a free end goes on past the end of the OSM bridge (a landing on fill, or
+                    # a deck that OSM does not tag as a bridge): that is an error, listed after the loop. The converter does not set the end to 0: that would draw a cliff
+                    if z > _GROUND_M:
+                        raised.append((c[k], axis["id"], z))
+                    z = 0.0                    # within 0.5 m of the ground: the end is on it
                 heights.setdefault(c[k], []).append((z, src, method))
             pts = []
             for (s, z), curve in zip(v["points"], v["curves"], strict=True):
@@ -145,6 +148,11 @@ def bridge_profile_from_urbanstyle(edges, bridge, *, way_col="osm_id", max_node_
             chains.append({"id": c["id"], "points": pts})
     if unmatched:
         raise ValueError("these chains of the roads have no axis with the same OSM ways in the bridge file: " + "; ".join(unmatched))
+    if raised:
+        names = ", ".join(f"{n} (the axis {a} is {z:.1f} m high)" for n, a, z in sorted(set(raised), key=lambda r: int(r[0][1:])))
+        raise ValueError(f"the bridge file is above the ground at {len(set(r[0] for r in raised))} free ends of the bridge in these roads: {names}. The end of a bridge is on the ground, so the axis goes on past the end "
+                         "of the OSM bridge (a landing on fill, or a deck that OSM does not tag as a bridge). The converter does not set such an end to 0: the deck would drop to the ground in a few metres. "
+                         "Fix the roads (the group must include the part where the deck is still above the ground) or the heights in the bridge file")
     used = {w for c in chains for w in ways[c["id"]]}
     for a in axes.values():
         if not a["ways"] & used:
