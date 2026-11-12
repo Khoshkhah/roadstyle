@@ -51,7 +51,7 @@ pub fn crs_of(code: &str) -> Result<Value, crate::Error> {
 /// The option of the page from the keyword's value: a path (string), or `{"tiles": path, "url": address, "on", "popup", "min_zoom", "max_tiles", "cache_mb"}`.
 /// `ground`: the page's own ground option (null: none). Null in, null out.
 pub fn option(given: &Value, ground: &Value) -> Result<Value, crate::Error> {
-    let mut o: Map<String, Value> = match given {
+    let o: Map<String, Value> = match given {
         Value::Null => return Ok(Value::Null),
         Value::String(p) => Map::from_iter([("tiles".to_string(), json!(p))]),
         Value::Object(m) => m.clone(),
