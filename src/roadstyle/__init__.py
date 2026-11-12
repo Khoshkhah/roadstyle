@@ -43,6 +43,7 @@ from .overlays import Overlay
 from .pages import render_dashboard, render_street_view, sidebar_html
 from .render import render_edges
 from .snapshot import snapshot
+from .urbanstyle_profile import bridge_profile_from_urbanstyle
 
 
 def use_settings(*sources) -> None:
@@ -116,7 +117,7 @@ __all__ = [
     "restore_area_inputs",
     "save_area_levels",
     "save_levels",
-    "render_edges", "render_dashboard", "render_street_view", "sidebar_html", "bridge_profile",
+    "render_edges", "render_dashboard", "render_street_view", "sidebar_html", "bridge_profile", "bridge_profile_from_urbanstyle",
     "filter_edges", "highway_types", "use_settings", "snapshot",
     "normalize_highway",
     "BASEMAPS", "Basemap", "get_basemap", "set_api_key", "get_api_key",

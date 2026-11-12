@@ -187,6 +187,25 @@ and the other nodes do not move to keep the grade. Check the grade yourself, or 
 
 One height for the whole group (the number above the nodes) and the node heights do not mix: the last one that you gave counts.
 
+## From an urbanstyle profile
+
+urbanstyle writes one `<name>.bridge.json` for each bridge (format `urbanstyle.bridge/1`): an axis for each chain of road ways, with a height line `[s, z]` in metres from LiDAR or from its own rule. `rs.bridge_profile_from_urbanstyle(edges, bridge)` turns the axes into an input profile.
+It is outside the engine: the engine reads the input profile and knows nothing of urbanstyle.
+
+```python
+given = rs.bridge_profile_from_urbanstyle(edges, "granville-bridge.bridge.json")      # a dictionary or the path of the file
+rs.render_dashboard(edges, view_3d=True, bridge_profile=given).save("map.html")
+```
+
+- An axis is a chain when they have the same OSM ways (`osm_id` of the roads; `way_col=` names another column). On the Granville Bridge, 12 of 12 axes match.
+- A chain with no axis is an error that names the chain. An axis with no chain is a warning.
+- An axis can run the other way and can go on past the end of the chain (urbanstyle continues a landing on fill, 18 m to 62 m). The converter reads the heights at the place on the axis that is nearest to each node.
+- The result has `parameters.curve = "design"`, the height of each node (`source` is the survey, `method` is `measured`; a node that two axes set differently gets the mean, with a warning), and the grade points of each chain as `points` with the length of each vertical curve.
+  A curve is shortened where it would reach past the end of the chain.
+- The engine warns of what the data shows. On the Granville Bridge, two free ends are 8.3 m and 4.5 m high (the deck goes on to the street on fill), and the chain c12 has its low point on the bridge.
+
+[`granville_urbanstyle_axes.json`](../samples/bridge-profile/granville_urbanstyle_axes.json) is the file for the Granville Bridge, reduced to the keys that the converter reads.
+
 ## What the engine checks
 
 The engine says what is wrong. It does not change a number that you gave.
@@ -208,6 +227,7 @@ All files are in `docs/samples/bridge-profile/` and are published with this site
 | [`bridge_profile_input.schema.json`](../samples/bridge-profile/bridge_profile_input.schema.json) | The JSON Schema of the input profile: every value is optional | 5.2 KB |
 | [`bridge_profile_complete.schema.json`](../samples/bridge-profile/bridge_profile_complete.schema.json) | The JSON Schema of the complete input profile | 5.4 KB |
 | [`granville_bridge_edges.parquet`](../samples/bridge-profile/granville_bridge_edges.parquet) | The roads of the example: the 41 edges (27 OpenStreetMap ways) of the Granville Bridge and its ramps, from duckOSM's Vancouver database. OpenStreetMap data, ODbL | 16.6 KB |
+| [`granville_urbanstyle_axes.json`](../samples/bridge-profile/granville_urbanstyle_axes.json) | The 12 axes of urbanstyle's measured profile of the Granville Bridge (`urbanstyle.bridge/1`), reduced to the OSM ways, the line, the length and the vertical profile. The input of `rs.bridge_profile_from_urbanstyle`. City of Vancouver LiDAR 2022 (Open Government Licence - Vancouver) | 11.5 KB |
 | [`granville_lidar_samples.json`](../samples/bridge-profile/granville_lidar_samples.json) | The deck heights that the City of Vancouver LiDAR 2022 gives on the 12 axes of the same bridge, from urbanstyle's profile (Open Government Licence - Vancouver). It is for comparison only. The profile above does not use it | 7.7 KB |
 
 The scripts that make them are in `docs/img/bridge-height/`. A prototype of the two parts, in Python, is `granville_input_profile.py` (`fill` is Part 1 and `make` is the planned design). It is not the engine. The engine's maker is in `rust/roadstyle-engine/src/decks.rs`.
