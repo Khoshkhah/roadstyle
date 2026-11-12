@@ -76,7 +76,7 @@ pub fn check(p: &[Pvi], length: f64) -> Result<(), String> {
     if p.len() < 2 || p[0].s != 0.0 || (p[p.len() - 1].s - length).abs() > 1e-6 {
         return Err("the points must start at 0 and end at the length of the chain".into());
     }
-    if let Some(w) = p.windows(2).find(|w| !(w[1].s > w[0].s)) {
+    if let Some(w) = p.windows(2).find(|w| w[1].s.partial_cmp(&w[0].s) != Some(std::cmp::Ordering::Greater)) {
         return Err(format!("the points are not in order of s: {} m comes after {} m", w[1].s, w[0].s));
     }
     if let Some(q) = p.iter().find(|q| !(q.z.is_finite() && q.z >= 0.0)) {
