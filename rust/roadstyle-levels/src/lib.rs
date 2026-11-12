@@ -80,6 +80,13 @@ impl LevelEdges {
         self.0.push((edge.edge_id, rank, edge));
     }
 
+    /// Makes space for `additional` more edges, with no extra space. Call it before the edges of a table are added:
+    /// without it the list doubles while it grows, and in WebAssembly, where the memory never shrinks, the peak stays
+    /// up to three times the size of the edges.
+    pub fn reserve(&mut self, additional: usize) {
+        self.0.reserve_exact(additional);
+    }
+
     /// The edges in the order they were added (all ranks).
     pub fn into_edges(self) -> Vec<LevelEdge> {
         self.0.into_iter().map(|(_, _, e)| e).collect()
