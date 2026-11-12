@@ -153,6 +153,10 @@
      ],
      "description": "ground: one chain ends here, height 0. junction: chains meet here"
     },
+    "portal": {
+     "type": "boolean",
+     "description": "A free end where the deck goes straight into a tunnel (a road of level below 0 starts at the node). The engine writes it; with z_reference elevation the page does not check the ground there"
+    },
     "chains": {
      "type": "array",
      "items": {

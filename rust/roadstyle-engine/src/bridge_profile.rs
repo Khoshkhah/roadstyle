@@ -117,6 +117,10 @@ pub struct Node {
     pub id: String,
     pub lonlat: [f64; 2],
     pub kind: Kind,
+    /// a free end where the deck goes straight into a tunnel (a road of level below 0 starts at the node): the road enters the hill, so the ground is above the deck, and the page does not check
+    /// the ground there (`z_reference: "elevation"`). Not there: not a portal
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub portal: bool,
     pub chains: Vec<String>,
     pub z_m: f64,
     pub source: String,
