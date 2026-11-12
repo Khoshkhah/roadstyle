@@ -162,6 +162,28 @@ fn the_four_requests_over_http() {
     let lines: Value = serde_json::from_slice(&body).unwrap();
     assert!(lines[0][0][0].as_f64().unwrap() > 7.3, "{lines}");
 
+    // the whole road table and the ends of each road (the level editor on a page with no road table): one row and four numbers for each road
+    let (_, body) = ask("GET", "/road_table", "");
+    let table: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(table["props"].as_array().unwrap().len(), n);
+    assert_eq!(table["props"][1], rows[1], "the table's row is the row of /rows");
+    let (_, ends) = ask("GET", "/road_ends", "");
+    assert_eq!(ends.len(), n * 4 * 8);
+    assert!(f64::from_le_bytes(ends[..8].try_into().unwrap()) > 7.3, "the start longitude of the first road");
+
+    // the 3D walls: a wall and a roof as tiles of this map; the tile of the wall's place has bytes
+    let (lon, lat) = (7.4243, 43.7384);
+    let fc = json!({"type": "FeatureCollection", "features": [
+        {"type": "Feature", "properties": {"type": "front", "height": 12.0, "base": 0.0, "azimuth": 90.0}, "geometry": {"type": "LineString", "coordinates": [[lon, lat], [lon, lat + 0.0002]]}},
+        {"type": "Feature", "properties": {"height": 12.0}, "geometry": {"type": "Polygon", "coordinates": [[[lon, lat], [lon - 0.0002, lat], [lon - 0.0002, lat + 0.0002], [lon, lat + 0.0002], [lon, lat]]]}}]});
+    let (head, body) = ask("POST", "/walls", &fc.to_string());
+    let w: Value = serde_json::from_slice(&body).unwrap();
+    assert!(head.starts_with("HTTP/1.1 200") && w["walls"].as_u64() == Some(2), "{head} {w}");
+    assert!(w["source"]["tiles"][0].as_str().unwrap().starts_with("/tiles/walls/"), "{w}");
+    let (z, x, y) = addresses()[2];
+    let (head, bytes) = ask("GET", &format!("/tiles/walls/{z}/{x}/{y}"), "");
+    assert!(head.starts_with("HTTP/1.1 200") && !bytes.is_empty(), "{head}");
+
     // a query: a BIGINT is a text, a DOUBLE a number, an error is a 400 with the database's text
     let (_, body) = ask("POST", "/query", r#"{"sql": "SELECT count(*) AS n, 9007199254740993 AS big, 1.5 AS half, 2.5::DOUBLE AS two FROM roads"}"#);
     let r: Value = serde_json::from_slice(&body).unwrap();

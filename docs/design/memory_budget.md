@@ -254,8 +254,8 @@ error that says so. Nothing takes its place.
 | Way | Adapter |
 |---|---|
 | A. One HTML file | None. The page has the road table and the overlays' rows in itself. `rs.request.rows` of a page with no adapter throws. |
-| B. Files on a server | The style points at the PMTiles file. The host gives `rows` and `query` (DuckDB-wasm on the Parquet files at the URL). |
-| C. Made in the browser | The host gives the functions of its map worker and of its DuckDB-wasm (Studio: `roadTable()`, `roadLines`, its `query`). |
+| B. Files on a server | `rsFilesAdapter(base)` (`dashboard/ways.js`, 2026-11-11): the style, a tile of the PMTiles file, and the rows from `props.json`. The host gives `query` and `schema` (DuckDB-wasm on the Parquet files at the URL). |
+| C. Made in the browser | `rsEngineAdapter({tiler, sources})` (`dashboard/ways.js`, 2026-11-11): the style and the tiles of the Tiler, the rows and the lines of the road table. The host gives `query` and `schema`. A page with a map worker gives the same functions over its worker (Studio still uses the host functions of before). |
 | D. Made by a local program | `rsHttpAdapter(base)`: the program answers the four requests at the addresses below. |
 
 **The addresses of `rsHttpAdapter(base)`** (the program of step 3 answers them; they are in `adapter.js`):
@@ -427,9 +427,14 @@ Each step has a check. A step starts only when the step before it is done. The t
 | 4 | **The CI budget** (part 6). | The test fails when a change adds an object for each feature, or when the memory grows with the area, the layers or the length of the run. |
 | 5 | **3D pieces by tile** (part 2), after the bridge mesh is on `main`. The 3D walls are done (2026-11-10, "The 3D walls" above): the same way for the decks and the piers. | The bridges of the urbanstyle Monaco page look the same, and the mesh memory follows the view. |
 | 6 | **Moving points** (part 5), if roadstyle-sim needs them. | The same budget test with points. |
-| 7 | **OPFS transport** for tiles and Parquet, when a page builds more than the memory holds (Studio above about 200,000 roads). | The same tiles as the worker's tiles, byte for byte. |
+| 7 | **OPFS transport** for tiles and Parquet, when a page builds more than the memory holds (Studio above about 200,000 roads). The first user is duckOSM's online version (Studio, way C): its stage 3 writes the tables as Parquet files to OPFS, and DuckDB-Wasm reads them with `registerFileHandle` (duckOSM `docs/design/streaming_load.md`). | The same tiles as the worker's tiles, byte for byte. |
+| 8 | **One DuckDB helper for ways B and C** (`query` and `schema` over a DuckDB-Wasm connection: Parquet files at a URL in way B, the OPFS files of step 7 in way C), and Studio on `rsEngineAdapter` with it. Then ways C and D use the same roadstyle code. After duckOSM's stage 3, so that the helper reads the files where they are. | The data dock gives the same rows in ways B, C and D (Monaco). |
+| 9 | **One copy of the duckOSM reading steps** in roadstyle's Rust (today in duckOSM's server, roadstyle's Python and roadstyle-wasm's `roads_sql.js`). Then `roadstyle local AREA.duckdb` (way D on the command line) reads a duckOSM file. When a project needs it. | The three callers give the same roads as today. |
 
 The order puts the largest measured part first. Step 0 can change the order.
+
+**The adapters of the four ways are done** (2026-11-11, roadstyle PR 171): `dashboard/ways.js` has `rsFilesAdapter` (B), `rsEngineAdapter` (C)
+and `rsHttpAdapter` (D); way A needs none. Steps 8 and 9 above close what ways B, C and D still do not have.
 
 ## Open questions for Kaveh
 
@@ -439,7 +444,9 @@ The order puts the largest measured part first. Step 0 can change the order.
    `index.html`, which sets `window.RS_SIDE` from `roadTable()`.
 3. **3D pieces:** OGC 3D Tiles files (a standard that other viewers read), or roadstyle's own pieces in the vector tiles (one protocol with the
    2D tiles)?
-4. **The optional DuckDB helper:** do you want roadstyle to ship it, or does each host write its own two functions?
+4. **The optional DuckDB helper:** do you want roadstyle to ship it, or does each host write its own two functions? *Answered 2026-11-11
+   (Kaveh: "make possible for using all these versions"): roadstyle ships the adapters of ways B, C and D (`dashboard/ways.js`); the queries
+   stay the host's, because roadstyle has no DuckDB of its own in the page.*
 
 ## Not in this note
 
