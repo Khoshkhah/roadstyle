@@ -66,7 +66,7 @@ pub struct Group {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
-    /// one chain ends here: the height is 0
+    /// one chain ends here: the end of a bridge is on the ground, and the height is 0 (a height above 0 is an error)
     Ground,
     /// chains meet here
     Junction,
@@ -156,6 +156,9 @@ impl BridgeProfile {
                 }
                 if !(n.z_m.is_finite() && n.z_m >= 0.0) {
                     return bad(format!("the node {} has z_m {}; a height is a number of metres, 0 or more", n.id, n.z_m));
+                }
+                if n.kind == Kind::Ground && n.z_m != 0.0 {
+                    return bad(crate::bridge_fill::ground_end(&n.id, n.z_m));
                 }
                 if !(n.lonlat[0].is_finite() && n.lonlat[1].is_finite()) {
                     return bad(format!("the node {} has no position", n.id));

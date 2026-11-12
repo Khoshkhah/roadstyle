@@ -10,6 +10,10 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 - **The 3D bridge decks show from zoom 15** (`bridge_decks.flat_below`; it was 16). Below zoom 15 a bridge is still its flat line.
 
+### Fixed
+
+- **The end of a 3D bridge is on the ground.** A free end (a node with `kind: "ground"`) with a `z_m` above 0 is an error in `bridge_profile=` (it was a warning that said the deck ends in the air), the page cannot set it (`rsSetBridgeNode` throws, the number in the Height box is fixed), and `rs.bridge_profile_from_urbanstyle` gives a free end the height 0 and warns when the axis is more than 0.5 m high there. With the curve `design`, a straight grade steeper than the design grade is a warning.
+
 ### Added
 
 - **`rs.bridge_profile_from_urbanstyle(edges, bridge)`: the heights of an urbanstyle bridge file as an input profile** (`src/roadstyle/urbanstyle_profile.py`, [the guide](docs/guides/bridge-profile.md#from-an-urbanstyle-profile)). An axis is a chain when they have the same OSM ways; the node heights and the grade points of the axes become the node heights and the interior points of the curve `design`. On the Granville Bridge 12 of 12 axes match. The sample is `docs/samples/bridge-profile/granville_urbanstyle_axes.json`.

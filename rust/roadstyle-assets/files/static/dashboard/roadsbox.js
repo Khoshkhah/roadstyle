@@ -32,13 +32,13 @@ function _rdHeightBlock(){
 }
 // the nodes of the group, from the bridge profile: a row for each with its height in metres (a number to change: rsSetBridgeNode) and where the height comes from (`given`: a person;
 // `rule`, `data`: the engine; `page`: set in this page). A group that the person set is drawn at its height, so each node shows the profile's height times (height now / the top of its chain).
-// Reset nodes gives the profile's heights back. Copy profile puts the profile with these heights on the clipboard, to give to `bridge_profile=` for the exact pieces.
+// A free end of a bridge is on the ground: its number is fixed at 0. Reset nodes gives the profile's heights back. Copy profile puts the profile with these heights on the clipboard, to give to `bridge_profile=` for the exact pieces.
 function _rdNodes(g){
   if(!g.nodes.length) return "";
   const top = id => { const c = g.chains.find(c => c.from === id || c.to === id); return c && c.top_m ? c.top_m : null; };
   const z = nd => Math.round(nd.z_m * (g.set && top(nd.id) ? g.height / top(nd.id) : 1) * 10) / 10;
-  const rows = g.nodes.map(nd => '<div class="rs-rd-bh rs-rd-bn" data-node="' + _esc(nd.id) + '"><span>' + _esc(nd.id) + '</span><input type="number" data-bn="' + _esc(nd.id) + '" min="0" max="500" step="0.5" value="' + z(nd) +
-    '" aria-label="Height of the node ' + _esc(nd.id) + ', in metres"><u>m</u><em>' + _esc(nd.source) + "</em></div>").join("");
+  const rows = g.nodes.map(nd => '<div class="rs-rd-bh rs-rd-bn" data-node="' + _esc(nd.id) + '"><span>' + _esc(nd.id) + '</span><input type="number" data-bn="' + _esc(nd.id) + '" min="0" max="500" step="0.5" value="' + z(nd) + '"' + (nd.kind === "ground" ? " disabled" : "") +
+    ' aria-label="Height of the node ' + _esc(nd.id) + ', in metres' + (nd.kind === "ground" ? " (a free end is on the ground)" : "") + '"><u>m</u><em>' + _esc(nd.source) + "</em></div>").join("");
   return '<div class="rs-rd-bhn">Nodes: the height at each end of a bridge road. Change one and the roads that meet there are drawn again.</div>' + rows +
     '<div class="rs-rd-bar rs-rd-bnbar"><button type="button" data-bn-reset' + (g.nodesSet.length ? "" : " disabled") + '>Reset nodes</button><button type="button" data-bn-copy>Copy profile</button></div>';
 }

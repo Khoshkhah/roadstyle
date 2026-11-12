@@ -145,3 +145,19 @@ def test_the_height_box_has_a_number_for_each_node_and_reset_and_copy(page):
     assert page.evaluate("_bmEdits().size") == 0
     page.evaluate("rsDeselect()")
     assert not page.errors, page.errors
+
+
+def test_a_free_end_of_a_bridge_is_on_the_ground_and_its_number_is_fixed(page):
+    ground = page.evaluate("rsBridgeGroups().flatMap(g=>g.nodes).find(n=>n.kind==='ground').id")
+    with pytest.raises(Exception, match="free end of its bridge"):
+        page.evaluate(f"rsSetBridgeNode({ground!r}, 3)")
+    page.evaluate(f"rsSetBridgeNode({ground!r}, 0)")                      # 0 is what it is
+    assert page.evaluate("_bmEdits().size") == 0
+    node = _junction(page)
+    group = page.evaluate(f"rsBridgeGroups().find(g=>g.nodes.some(n=>n.id==={node!r})).group")
+    page.evaluate(f"document.dispatchEvent(new CustomEvent('rs:select', {{detail: {{properties: {{__rs_group: {group}}}}}}}))")
+    page.evaluate("rs.tools.open('roads')")
+    page.wait_for_timeout(300)
+    assert page.evaluate(f'document.querySelector(\'#rs-roads-box input[data-bn="{ground}"]\').disabled') is True
+    assert page.evaluate(f'document.querySelector(\'#rs-roads-box input[data-bn="{node}"]\').disabled') is False
+    page.evaluate("rsDeselect()")

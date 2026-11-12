@@ -174,8 +174,9 @@ What the rule `design` does, in order:
 On the Granville Bridge with no input, the rule gives junctions at 9.0 m, 9.0 m, 9.0 m, 9.0 m and 4.4 m (the last is 89 m from the ground: 5 % of 89 m). The real bridge is 22 m to 39 m high, because it crosses a street, a railway and False Creek.
 The rule does not know that. The heights of your own five junctions are fixed points, and the rule fills everything else around them.
 
-**Warnings** (the page still draws): a chain between two ground ends that is too short to reach its top; a curve that was shortened; a level top of more than 76 m that you gave; a low point on a bridge; two decks that cross with less than 5 m between them (found from the lines of the chains, with the curve `design` only);
-a node on the ground that you raised (the deck ends in the air there, and the page draws no landing).
+**Warnings** (the page still draws): a chain between two ground ends that is too short to reach its top; a curve that was shortened; a level top of more than 76 m that you gave; a low point on a bridge; two decks that cross with less than 5 m between them (found from the lines of the chains, with the curve `design` only); a straight grade steeper than the design grade (with the curve `design`).
+
+**The end of a bridge is on the ground.** A node where one chain ends (`kind: "ground"`) has the height 0. A `z_m` above 0 there is an error, because a deck that ends in the air is a wrong height: the page draws no landing, and the engine does not guess one. Fix the height, or fix the roads (a bridge that ends too early in the OSM data).
 
 ## Change a node in the open page
 
@@ -199,10 +200,10 @@ rs.render_dashboard(edges, view_3d=True, bridge_profile=given).save("map.html")
 
 - An axis is a chain when they have the same OSM ways (`osm_id` of the roads; `way_col=` names another column). On the Granville Bridge, 12 of 12 axes match.
 - A chain with no axis is an error that names the chain. An axis with no chain is a warning.
-- An axis can run the other way and can go on past the end of the chain (urbanstyle continues a landing on fill, 18 m to 62 m). The converter reads the heights at the place on the axis that is nearest to each node.
+- An axis can run the other way and can go on past the end of the chain (urbanstyle continues a landing on fill, 18 m to 62 m). The converter reads the heights at the place on the axis that is nearest to each node. The end of a bridge is on the ground, so a free end gets the height 0, and the converter warns when the axis is more than 0.5 m high there.
 - The result has `parameters.curve = "design"`, the height of each node (`source` is the survey, `method` is `measured`; a node that two axes set differently gets the mean, with a warning), and the grade points of each chain as `points` with the length of each vertical curve.
   A curve is shortened where it would reach past the end of the chain.
-- The engine warns of what the data shows. On the Granville Bridge, two free ends are 8.3 m and 4.5 m high (the deck goes on to the street on fill), and the chain c12 has its low point on the bridge.
+- The engine warns of what the data shows. On the Granville Bridge, the axes are 8.3 m and 4.5 m high where the OSM bridge ends at two free ends (the real bridge goes on past the end of the OSM way), so those chains drop steeply to the ground at the end, and the chain c12 has its low point on the bridge. The cause is the OSM data: its bridge is shorter than the real one.
 
 [`granville_urbanstyle_axes.json`](../samples/bridge-profile/granville_urbanstyle_axes.json) is the file for the Granville Bridge, reduced to the keys that the converter reads.
 

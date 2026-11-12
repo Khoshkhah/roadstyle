@@ -69,6 +69,11 @@ struct InChain {
     width_source: Option<String>,
 }
 
+/// The error for a free end of a bridge (a node where one chain ends) with a height above 0: the end is on the ground, so the height is wrong.
+pub fn ground_end(id: &str, z: f64) -> String {
+    format!("the node {id} is a free end of its bridge, so it is on the ground, and its z_m is {z}: a deck that ends in the air is a wrong height. Give 0, or leave z_m out")
+}
+
 fn bad<T>(m: String) -> Result<T, Error> {
     Err(Error::Data(format!("bridge_profile: {m}")))
 }
@@ -134,6 +139,7 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
             }
             match n.z_m {
                 Some(z) if !(z.is_finite() && z >= 0.0) => return bad(format!("the node {id} has z_m {z}; a height is a number of metres, 0 or more")),
+                Some(z) if node.kind == Kind::Ground && z != 0.0 => return bad(ground_end(&id, z)),
                 Some(z) => {
                     node.z_m = z;
                     node.source = n.source.clone().unwrap_or_else(|| "given".into());
@@ -198,10 +204,6 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
             design_points(&mut found, &given_points, warnings);
         }
     }
-    // a node on the ground that the person raised: allowed (a deck that goes on to a street on fill), and the deck ends in the air there
-    for n in found.groups.iter().flat_map(|g| &g.nodes).filter(|n| n.kind == Kind::Ground && n.z_m > 0.0) {
-        warnings.push(format!("bridge_profile: the node {} is a free end of its bridge and is {} m high: the deck ends in the air there, and the page draws no landing", n.id, n.z_m));
-    }
     // the top of a chain that the person did not give: the top of the rule, or the higher node if a given height is above it. A given top below its nodes is an error.
     for grp in &mut found.groups {
         let z: HashMap<&str, f64> = grp.nodes.iter().map(|n| (n.id.as_str(), n.z_m)).collect();
@@ -231,8 +233,8 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
     for grp in &found.groups {
         let z: HashMap<&str, f64> = grp.nodes.iter().map(|n| (n.id.as_str(), n.z_m)).collect();
         for c in &grp.chains {
-            if !(given_z.contains(&c.from) || given_z.contains(&c.to)) {
-                continue;
+            if !(given_z.contains(&c.from) || given_z.contains(&c.to)) || found.parameters.curve == Some(Curve::Design) {
+                continue;                          // (with the curve `design` every straight grade is checked: `design_curves`)
             }
             let grade = (z[c.from.as_str()] - z[c.to.as_str()]).abs() / c.length_m;
             if grade > found.parameters.design_grade + 1e-9 {
@@ -389,6 +391,11 @@ fn design_curves(found: &mut BridgeProfile, warnings: &mut Vec<String>) -> Resul
             p.push(Pvi { s: c.length_m, z: z[&c.to], curve_m: 0.0 });
             if let Err(e) = bridge_curve::check(&p.iter().map(|q| Pvi { curve_m: 0.0, ..*q }).collect::<Vec<_>>(), c.length_m) {
                 return bad(format!("the chain {}: {e}", c.id));
+            }
+            // a straight grade steeper than the design grade (a height of the person next to a point or a node that is too far in height): a warning, and the number is not changed
+            let worst = p.windows(2).map(|w| ((w[1].z - w[0].z).abs() / (w[1].s - w[0].s), w)).max_by(|a, b| a.0.total_cmp(&b.0));
+            if let Some((grade, w)) = worst.filter(|(g, _)| *g > found.parameters.design_grade + 1e-9) {
+                warnings.push(format!("bridge_profile: the chain {} goes from {:.1} m to {:.1} m between {:.0} m and {:.0} m (a grade of {:.3}); the design grade is {}", c.id, w[0].z, w[1].z, w[0].s, w[1].s, grade, found.parameters.design_grade));
             }
             let mut want: Vec<f64> = (0..p.len()).map(|i| {
                 if i == 0 || i == p.len() - 1 || c.points[i - 1].curve_m.is_some() { p[i].curve_m } else {

@@ -527,13 +527,14 @@ export function rsSetBridgeHeight(target, metres){
 }
 // rsSetBridgeNode(id, metres): the node `id` of the bridge profile (rsBridgeGroups()[].nodes[].id) gets this height, in metres above the ground, 0 or more; null gives the profile's height back.
 // The chains that meet at the node are drawn from the profile with the new height. The group's own height (rsSetBridgeHeight) is then given up: the last one that the person gave counts.
-// A page whose style has no bridge profile (made before the profile, or without 3D bridges) throws.
+// A free end of a bridge (a node with kind `ground`) is on the ground: any other height for it throws. A page whose style has no bridge profile (made before the profile, or without 3D bridges) throws.
 export function rsSetBridgeNode(id, metres){
   const prof = O.bridge_profile;
   if(!prof || !prof.groups) throw new Error("rsSetBridgeNode: this page has no bridge profile (it has no 3D bridges, or it was made by an older roadstyle)");
   const node = prof.groups.flatMap(g => g.nodes).find(n => n.id === id);
   if(!node) throw new Error("rsSetBridgeNode: the profile has no node " + JSON.stringify(id));
   if(metres != null && !(metres >= 0)) throw new Error("rsSetBridgeNode: metres must be a number of 0 or more, or null, got " + JSON.stringify(metres));
+  if(node.kind === "ground" && metres != null && +metres !== 0) throw new Error("rsSetBridgeNode: the node " + id + " is a free end of its bridge, so it is on the ground (0 m); a deck that ends in the air is a wrong height");
   const gr = rsBridgeGroups().find(x => x.nodes.some(n => n.id === id));
   if(metres == null || +metres === node.z_m) _bmNodeZ.delete(id); else { _bmNodeZ.set(id, +metres); if(gr) _bmHeights.delete(gr.group); }
   _bmEditMemo = null; _bmGeom = true; map.triggerRepaint();

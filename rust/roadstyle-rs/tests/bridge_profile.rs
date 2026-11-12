@@ -112,13 +112,13 @@ fn first_node(p: &Value, kind: &str) -> (usize, usize) {
 #[test]
 fn a_person_changes_a_number_and_the_maker_uses_it() {
     let today = decks(&style(&[]).unwrap());
-    // a node on the ground that stands 3 m above the ground (a landing on fill) changes the ramp that starts at it
+    // a junction that is 0.1 m higher changes the ramps of its chains
     let mut p = profile_of_today();
-    let (g, i) = first_node(&p, "ground");
-    p["groups"][g]["nodes"][i]["z_m"] = 3.0.into();
+    let (g, i) = first_node(&p, "junction");
+    p["groups"][g]["nodes"][i]["z_m"] = (p["groups"][g]["nodes"][i]["z_m"].as_f64().unwrap() * 0.5).into();
     p["groups"][g]["nodes"][i]["source"] = "given".into();
     let changed = decks(&style(&[("bridge_profile", p)]).unwrap());
-    assert_ne!(today, changed, "a node 3 m high changes the pieces of its chain");
+    assert_ne!(today, changed, "a junction at half its height changes the pieces of its chains");
     // a width for a chain: the deck of that chain is drawn that wide
     let mut p = profile_of_today();
     p["groups"][0]["chains"][0]["width_m"] = 9.0.into();
@@ -188,7 +188,7 @@ fn a_given_height_is_kept_and_everything_else_is_filled() {
     let c = &p["groups"][0]["chains"][0];
     assert_eq!((c["top_m"].as_f64().unwrap(), c["width_m"].as_f64().unwrap(), c["width_source"].as_str().unwrap()), (40.0, 9.0, "given"));
     // a node above the top of the rule raises the top of its chains
-    let (input, id) = input_with_height(&today, "ground", 50.0);
+    let (input, id) = input_with_height(&today, "junction", 50.0);
     let p = export(input).unwrap().0;
     for c in p["groups"].as_array().unwrap().iter().flat_map(|g| g["chains"].as_array().unwrap()).filter(|c| c["from"] == id.as_str() || c["to"] == id.as_str()) {
         assert!(c["top_m"].as_f64().unwrap() >= 50.0);
@@ -218,11 +218,11 @@ fn a_profile_with_a_value_missing_is_filled_and_one_that_is_not_for_these_roads_
     assert!(e.contains("interior control points") && e.contains("curve `design`"), "{e}");
     // a node above the top of its chain
     let e = error_of(with(&|q| {
-        let top = q["groups"][0]["chains"][0]["top_m"].as_f64().unwrap();
-        let from = q["groups"][0]["chains"][0]["from"].as_str().unwrap().to_string();
-        for n in q["groups"][0]["nodes"].as_array_mut().unwrap() {
-            if n["id"] == from.as_str() { n["z_m"] = (top + 1.0).into(); }
-        }
+        // a junction (the end of a bridge is on the ground and cannot be raised) and the first chain that ends there
+        let (g, i) = first_node(q, "junction");
+        let id = q["groups"][g]["nodes"][i]["id"].as_str().unwrap().to_string();
+        let top = q["groups"][g]["chains"].as_array().unwrap().iter().find(|c| c["from"] == id.as_str() || c["to"] == id.as_str()).unwrap()["top_m"].as_f64().unwrap();
+        q["groups"][g]["nodes"][i]["z_m"] = (top + 1.0).into();
     }));
     assert!(e.contains("cannot be above the top"), "{e}");
     // not for these roads
@@ -248,19 +248,20 @@ fn an_input_that_cannot_be_true_for_these_roads_is_an_error_that_says_what() {
     let n = &today["groups"][g]["nodes"][i];
     let (ll, id) = (n["lonlat"].clone(), n["id"].clone());
     let nodes = |v: Value| serde_json::json!({"groups": [{"nodes": v}]});
-    let e = error_of(nodes(serde_json::json!([{"lonlat": ll, "z_m": 1.0}, {"id": id, "z_m": 2.0}])));
+    let e = error_of(nodes(serde_json::json!([{"lonlat": ll, "z_m": 0.0}, {"id": id, "z_m": 0.0}])));
     assert!(e.contains("two entries of the input are for the node"), "{e}");
-    assert!(error_of(nodes(serde_json::json!([{"lonlat": [0.0, 0.0], "z_m": 1.0}]))).contains("no node of these roads is within 5 m"));
+    assert!(error_of(nodes(serde_json::json!([{"lonlat": [0.0, 0.0], "z_m": 0.0}]))).contains("no node of these roads is within 5 m"));
     assert!(error_of(nodes(serde_json::json!([{"z_m": 1.0}]))).contains("no id and no lonlat"));
     assert!(error_of(nodes(serde_json::json!([{"lonlat": ll, "z_m": -1.0}]))).contains("0 or more"));
-    assert!(error_of(nodes(serde_json::json!([{"id": "n999", "z_m": 1.0}]))).contains("n999"));
+    assert!(error_of(nodes(serde_json::json!([{"id": "n999", "z_m": 0.0}]))).contains("n999"));
     assert!(error_of(nodes(serde_json::json!([{"lonlat": ll, "kind": "junction", "z_m": 1.0}]))).contains("is a Ground in these roads"));
     assert!(error_of(serde_json::json!({"groups": [{"chains": [{"width_m": 4.0}]}]})).contains("has no id"));
     assert!(error_of(serde_json::json!({"groups": [{"chains": [{"id": "c1", "width_m": 0.0}]}]})).contains("above 0"));
     assert!(error_of(serde_json::json!({"groups": [{"chains": [{"id": "c1"}, {"id": "c1"}]}]})).contains("two entries of the input are for the chain c1"));
     // a given top below a given height
-    let chain = n["chains"][0].clone();
-    let input = serde_json::json!({"groups": [{"nodes": [{"id": id, "z_m": 3.0}], "chains": [{"id": chain, "top_m": 1.0}]}]});
+    let (g, i) = first_node(&today, "junction");
+    let (jid, chain) = (today["groups"][g]["nodes"][i]["id"].clone(), today["groups"][g]["nodes"][i]["chains"][0].clone());
+    let input = serde_json::json!({"groups": [{"nodes": [{"id": jid, "z_m": 3.0}], "chains": [{"id": chain, "top_m": 1.0}]}]});
     assert!(error_of(input).contains("cannot be above the top"));
     assert!(error_of(serde_json::json!({"groups": [{"name": "x"}]})).contains("has a name and no node"));
 }
@@ -389,4 +390,22 @@ fn points_and_curves_given_by_a_person_are_kept_and_the_wrong_ones_say_what() {
     // points with the curve smooth
     let e = export(serde_json::json!({"parameters": {"curve": "smooth"}, "groups": [{"chains": [{"id": c_id, "points": pts}]}]})).unwrap_err().to_string();
     assert!(e.contains("curve `design`"), "{e}");
+}
+
+#[test]
+fn the_end_of_a_bridge_is_on_the_ground_and_a_height_above_0_there_is_an_error_that_says_so() {
+    let p = profile_of_today();
+    // in an input
+    let (input, id) = input_with_height(&p, "ground", 3.0);
+    let e = export(input).unwrap_err().to_string();
+    assert!(e.contains(&id) && e.contains("free end of its bridge") && e.contains("on the ground") && e.contains("wrong height"), "{e}");
+    // 0 is allowed (it is the height already)
+    let (input, id) = input_with_height(&p, "ground", 0.0);
+    assert_eq!(node(&export(input).unwrap().0, &id)["z_m"].as_f64(), Some(0.0));
+    // in a complete profile that the maker reads
+    let mut q = p.clone();
+    let (g, i) = first_node(&q, "ground");
+    q["groups"][g]["nodes"][i]["z_m"] = 3.0.into();
+    let e = error_of(q);
+    assert!(e.contains("free end of its bridge"), "{e}");
 }

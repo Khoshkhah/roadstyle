@@ -38,8 +38,10 @@ def test_the_12_axes_of_the_granville_bridge_are_the_12_chains_and_give_the_heig
     junction = sorted(n["z_m"] for n in nodes.values() if n["z_m"] > 10)
     assert junction == pytest.approx([11.62, 11.74, 18.19, 22.71, 27.04], abs=0.05), junction
     assert all(n["source"] == "City of Vancouver LiDAR 2022" and n["method"] == "measured" for n in nodes.values())
-    # the free ends that the LiDAR finds above the ground: the deck goes on to the street on fill past the end of the OSM bridge way
-    assert sorted(round(n["z_m"], 1) for n in nodes.values() if n["z_m"] < 10 and n["z_m"] > 4) == [4.5, 8.3]
+    # the end of a bridge is on the ground: the axes are 0.6 m to 8.3 m high at the ends of five chains (the deck goes on past the end of the OSM bridge way), and the end is 0
+    assert sum(1 for n in nodes.values() if n["z_m"] == 0.0) == 8, nodes
+    with pytest.warns(UserWarning, match="the axis a8 is 8.3 m high there because it goes on past the end"):
+        rs.bridge_profile_from_urbanstyle(edges, bridge)
 
 
 def test_the_profile_is_complete_through_the_engine_and_the_decks_follow_the_lidar(edges, bridge):
