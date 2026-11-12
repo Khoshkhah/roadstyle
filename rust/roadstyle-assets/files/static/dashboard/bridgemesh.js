@@ -26,7 +26,7 @@ let _bmHeights = new Map();                          // group -> the metres that
 let _bmShown = null;                                 // the ids of the features that the filters show (filter.js); null: all
 let _bmGeom = true, _bmDirty = new Set(), _bmAll = true;
 let _bmEnds = new Map(), _bmMiss = false, _bmRetry = 0;   // chain -> {za, zb} the ground at its two ends (terrain on), a height that was not there yet, the tries
-let _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9};   // what the last build found wrong in its own vertices (`_bmStats`)
+let _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9, landings: 0, filled: 0};   // what the last build found wrong in its own vertices (`_bmStats`)
 let _bmPosArr = null, _bmBounds = null;               // the vertices (mercator units from the origin) for the pick, and the bounds of each feature
 let _bmGl = null, _bmProg = null, _bmBuf = {}, _bmLoc = {}, _bmOrigin = [0, 0], _bmOp = null, _bmPatched = null;
 
@@ -37,6 +37,14 @@ const _bmOn = () => { try { return map.getGlobalState().rs_bridges3d !== false; 
 const _bmSrc = () => { const s = _src("decks"); return s ? s.source : null; };
 const _bmMerc = (lon, lat) => [(lon + 180) / 360, 0.5 - Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) / (2 * Math.PI)];
 
+// the landed ends of the chains, from the bridge profile: a Map "<chain number>:0" (the start) or "<chain number>:1" (the end) -> the height z_m of the end, for each chain end at a `ground`
+// node that has a height above 0 (a deck that goes on to a street on fill). The chain id of the profile is c<N>.
+function _bmLanded(){
+  const out = new Map(), prof = O.bridge_profile;
+  ((prof && prof.groups) || []).forEach(g => { const z = new Map(g.nodes.map(n => [n.id, n.kind === "ground" && n.z_m > 0 ? n.z_m : 0]));
+    g.chains.forEach(c => { const n = c.id.slice(1); if(z.get(c.from)) out.set(n + ":0", z.get(c.from)); if(z.get(c.to)) out.set(n + ":1", z.get(c.to)); }); });
+  return out;
+}
 // the decks' full height in metres: the group's own when it was set, else the look's (`__rs_full`)
 function _bmHeight(p){ const h = _bmHeights.get(p.__rs_group); return h == null ? p.__rs_full : h; }
 
@@ -113,7 +121,7 @@ function _bmBuild(){
   let o = null;
   // the ground at the two end nodes of each chain (the terrain on): the deck is level between them. The nodes are the engine's (`__rs_enda`, `__rs_endb`), the same
   // coordinates for the chains that meet at a node, so they agree on its height
-  _bmEnds = new Map(); _bmMiss = false; _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9};
+  _bmEnds = new Map(); _bmMiss = false; _bmStat = {rows: 0, inverted: 0, tooThick: 0, underGround: 0, maxEndGap: 0, minEndClearance: 1e9, landings: 0, filled: 0};
   if(map.getTerrain()){
     const e = new Map();
     _bmFeats.forEach(f => { const p = f.properties; if(p.__rs_casing_slab || !(p.__rs_enda || p.__rs_endb)) return;
@@ -123,6 +131,7 @@ function _bmBuild(){
     e.forEach((c, k) => _bmEnds.set(k, {za: c.a ? _bmElev(c.a) : null, zb: c.b ? _bmElev(c.b) : null}));
   }
   const push = (x, y, z, sh) => { pos.push(x, y, z); shade.push(sh); };
+  const landed = _bmLanded();                    // the landed ends of the chains (once for the whole build)
   _bmFeats.forEach((f, k) => {
     const p = f.properties, ring = f.geometry && f.geometry.coordinates && f.geometry.coordinates[0], first = shade.length;
     adj[k] = null;
@@ -165,6 +174,12 @@ function _bmBuild(){
       _bmStat.rows++;
     }
     const v = (c, z) => { const q = _bmMerc(c[0], c[1]); return [q[0] - o[0], q[1] - o[1], z * mz]; };
+    const z0 = landed.get(p.__rs_chain + ":0"), z1 = landed.get(p.__rs_chain + ":1");
+    // THE FILL: at a landed end the walls go down to the ground while the underside of the deck is lower than the height of the end (the fill is the street that goes on to the bridge);
+    // from there the wall's bottom rises to the deck's underside over the same height again, so the fill ends in a slope and not in a cliff. The end is the one that the vertex is nearest to.
+    const sAt = i => p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0);
+    const wallBot = (i, sd) => { const ze = sAt(i) < 0.5 ? z0 : z1, b0 = bot(i, sd); if(!ze) return b0;
+      const t = Math.min(1, Math.max(0, (b0 - GS[sd][i] - ze) / ze)); if(t < 1) _bmStat.filled++; return GS[sd][i] + (b0 - GS[sd][i]) * t; };
     const quad = (a, b, c, d, sh) => { [a, b, c, a, c, d].forEach(q => push(q[0], q[1], q[2], sh)); };
     for(let i = 0; i < m - 1; i++){
       quad(v(A[i], top(i, 0)), v(A[i + 1], top(i + 1, 0)), v(B[i + 1], top(i + 1, 1)), v(B[i], top(i, 1)), 1);            // the top, sloped
@@ -173,9 +188,14 @@ function _bmBuild(){
       for(const [sd, S] of [[0, A], [1, B]]){                                                                                  // the two walls
         const dx = (S[i + 1][0] - S[i][0]) * cos, dy = S[i + 1][1] - S[i][1], d = Math.hypot(dx, dy) || 1;
         const sh = 0.6 + 0.3 * Math.abs((dy / d) * _bmLight[0] - (dx / d) * _bmLight[1]);
-        quad(v(S[i], top(i, sd)), v(S[i + 1], top(i + 1, sd)), v(S[i + 1], bot(i + 1, sd)), v(S[i], bot(i, sd)), sh);
+        quad(v(S[i], top(i, sd)), v(S[i + 1], top(i + 1, sd)), v(S[i + 1], wallBot(i + 1, sd)), v(S[i], wallBot(i, sd)), sh);
       }
     }
+    // A LANDING ON FILL: a free end of a chain (a `ground` node of the bridge profile) that the profile gave a height above 0 is a deck that goes on to a street on fill. Its end is closed
+    // with a face down to the ground (the deck and its casing), and the walls of its ramp go down too (the fill above). A junction is not a free end: the next deck goes on there.
+    // With no profile, a free end is on the ground and has no face.
+    for(const [end, i, up] of [[0, 0, p.__rs_lift0 > 0.01 && p.__rs_s0 < 1e-6], [1, m - 1, p.__rs_lift1 > 0.01 && p.__rs_s1 > 1 - 1e-6]])
+      if(up && landed.has(p.__rs_chain + ":" + end)){ quad(v(A[i], top(i, 0)), v(B[i], top(i, 1)), v(B[i], GS[1][i]), v(A[i], GS[0][i]), 0.7); if(!cas) _bmStat.landings++; }
     _bmRanges.push([first, shade.length]);
   });
   _bmOrigin = o || [0, 0]; _bmN = shade.length;
