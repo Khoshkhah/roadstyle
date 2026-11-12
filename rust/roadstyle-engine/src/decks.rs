@@ -462,7 +462,7 @@ fn today_profile(b: &Bridges, chains: &[Chain], dk: &DeckLook, given: &[Option<f
             id: format!("c{}", i + 1), osm_ways: Vec::new(), length_m: chain_length(c), from: id_of[&c.head].clone(), to: id_of[&c.tail].clone(), points: Vec::new(),
             top_m: Some(top(c.group)), width_m: None, width_source: None });
     }
-    BridgeProfile { format: bridge_profile::FORMAT.into(), parameters: bridge_profile::Parameters { design_speed_kmh: 50.0, design_grade: 1.0 / grade, curve: Some(Curve::Smooth), height_rule: None }, groups }
+    BridgeProfile { format: bridge_profile::FORMAT.into(), ground: None, parameters: bridge_profile::Parameters { design_speed_kmh: 50.0, design_grade: 1.0 / grade, curve: Some(Curve::Smooth), height_rule: None }, groups }
 }
 
 /// The length of a chain in metres: its line in the metres around its first point (the same frame as `chain_features`).

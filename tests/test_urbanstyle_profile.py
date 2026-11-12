@@ -64,6 +64,12 @@ def test_the_profile_is_complete_through_the_engine_and_the_decks_follow_the_lid
     assert err < 1.0, err
 
 
+def test_the_converter_says_that_the_heights_are_above_urbanstyles_own_ground(edges, bridge):
+    with pytest.warns(UserWarning, match="above urbanstyle's own reference ground"):
+        given = rs.bridge_profile_from_urbanstyle(edges, bridge)
+    assert "ground" not in given
+
+
 def test_the_page_draws_the_converted_profile(edges, bridge):
     given = _quiet(rs.bridge_profile_from_urbanstyle, edges, bridge)
     html = _quiet(rs.render_edges, edges, backend="web", view_3d=True, bridge_profile=given).html

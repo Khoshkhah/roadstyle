@@ -245,6 +245,34 @@ fn page_camera(look: &Look, k: &PageKeys) -> Result<Camera, crate::Error> {
     Ok(Camera { pitch: number(&cam["pitch"])?, bearing: number(&cam["bearing"])?, max_pitch: number(&cam["max_pitch"])? })
 }
 
+/// The bridge profile of a page with the ground that its heights are above. A page with a ground (the page option `ground`) writes it into a profile that has none; a profile and a page whose
+/// ground ids differ do not belong together (the standard "The ground reference", section 4): an error that names the two ids. A profile on a ground and a page with none is a warning.
+fn profile_on_ground(profile: &Value, ground: &Value, warnings: &mut Vec<String>) -> Result<Value, crate::Error> {
+    let id = |g: &Value| g.get("id").and_then(Value::as_str).map(str::to_string);
+    let mine = profile.get("ground").filter(|g| g.is_object());
+    match (mine, ground.is_object()) {
+        (Some(m), true) => {
+            if let (Some(a), Some(b)) = (id(m), id(ground)) {
+                if a != b {
+                    return Err(crate::error::options(format!("bridge_profile: its heights are above the ground {a}, and the page draws the ground {b}: two products of one area with different ground ids do not belong together")));
+                }
+            }
+            Ok(profile.clone())
+        }
+        (None, true) if profile.is_object() => {
+            let mut out = profile.clone();
+            let facts: Map<String, Value> = ["id", "source", "product", "vertical_datum"].iter().filter_map(|k| ground.get(*k).filter(|v| !v.is_null()).map(|v| ((*k).to_string(), v.clone()))).collect();
+            out["ground"] = Value::Object(facts);
+            Ok(out)
+        }
+        (Some(m), false) => {
+            warnings.push(format!("bridge_profile: its heights are above the ground {}, and the page has no ground (it draws the AWS Terrain Tiles)", id(m).unwrap_or_else(|| "(no id)".into())));
+            Ok(profile.clone())
+        }
+        _ => Ok(profile.clone()),
+    }
+}
+
 pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, options: &Options, given: &Map<String, Value>)
                  -> Result<Page, crate::Error> {
     let (template, layout) = form_of(given)?;
@@ -300,7 +328,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let google_3d = k.google_3d.unwrap_or(dashboard.toolbar.is_some());
     let opts = PageOptions {
         dashboard, basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
-        sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(), bridge_profile: meta["roadstyle:bridge_profile"].clone(),
+        sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(), bridge_profile: profile_on_ground(&meta["roadstyle:bridge_profile"], &k.ground, &mut src.warnings)?,
         popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
         street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d,
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),

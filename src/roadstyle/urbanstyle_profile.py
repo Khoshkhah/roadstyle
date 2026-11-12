@@ -82,6 +82,10 @@ def bridge_profile_from_urbanstyle(edges, bridge, *, way_col="osm_id", max_node_
     from ._engine import export_inline
 
     data = _read(bridge)
+    z_datum = data.get("z_datum")
+    z_datum = z_datum.get("value") if isinstance(z_datum, dict) else z_datum
+    warnings.warn("the heights of an urbanstyle bridge file are above urbanstyle's own reference ground" + (f" ({str(z_datum)[:110].rstrip()}...)" if z_datum else "")
+                  + ", which is the ground of the area only if urbanstyle used the same elevation file; the profile does not name a ground. Give the ground of the area in the input if the two agree", stacklevel=2)
     if data.get("format") != FORMAT:
         raise ValueError(f"the bridge file has the format {data.get('format')!r}; this reads {FORMAT!r}")
     kwargs.pop("view_3d", None)

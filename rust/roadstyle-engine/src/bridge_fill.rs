@@ -11,7 +11,7 @@
 //! Two properties are tested: an empty input gives the profile of today, and a complete profile gives itself (the filler twice is the filler once).
 
 use crate::bridge_curve::{self, Pvi};
-use crate::bridge_profile::{metres_between, BridgeProfile, Curve, Kind, Point, Rule, FORMAT, MATCH_M};
+use crate::bridge_profile::{metres_between, BridgeProfile, Curve, Ground, Kind, Point, Rule, FORMAT, MATCH_M};
 use crate::Error;
 use serde::Deserialize;
 use serde_json::Value;
@@ -23,6 +23,7 @@ use std::collections::HashMap;
 struct Input {
     format: Option<String>,
     parameters: Option<Params>,
+    ground: Option<Ground>,
     groups: Option<Vec<InGroup>>,
 }
 
@@ -86,6 +87,9 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
         if f != FORMAT {
             return bad(format!("the format is {f:?}; this engine reads {FORMAT:?}"));
         }
+    }
+    if input.ground.is_some() {
+        found.ground = input.ground.clone();
     }
     let given_params = input.parameters.as_ref();
     if given_params.and_then(|p| p.height_rule) == Some(Rule::Design) {

@@ -47,6 +47,8 @@ def _defs(complete):
         "point": obj({"s": {"type": "number", "minimum": 0, "description": "Metres from the first end of the chain"},
                       "z_m": {"type": "number", "minimum": 0},
                       "curve_m": {"type": "number", "minimum": 0, "description": "The length of the vertical curve around the point, in metres (0: none). The filler writes it; the maker needs it"}, **mark}, required=("s", "z_m")),
+        "ground": obj({"id": {"type": "string", "description": "The ground id: the SHA-256 of the elevation file (duckOSM main.elevation_metadata.sha256)"},
+                       "source": {"type": "string"}, "product": {"type": "string", "description": "DTM or DSM"}, "vertical_datum": {"type": "string"}}),
         "parameters": obj({"design_speed_kmh": {"type": "number", "exclusiveMinimum": 0, "maximum": 200}, "design_grade": {"type": "number", "exclusiveMinimum": 0, "maximum": 0.3},
                            "curve": {"enum": ["smooth", "design"], "description": "smooth: the curve of today. design: straight grades and vertical curves"},
                            "height_rule": {"enum": ["length", "design"], "description": "How the filler finds a height that was not given. length: today's rule. design: the design rules"}},
@@ -61,7 +63,7 @@ def _defs(complete):
 def schema(complete):
     """The schema of the complete profile (`complete`) or of the input profile (every value optional)."""
     name = "bridge_profile_complete" if complete else "bridge_profile_input"
-    props = {"format": {"const": FORMAT}, "parameters": {"$ref": "#/$defs/parameters"}, "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}, **({"minItems": 1} if complete else {})}}
+    props = {"format": {"const": FORMAT}, "parameters": {"$ref": "#/$defs/parameters"}, "ground": {"$ref": "#/$defs/ground"}, "groups": {"type": "array", "items": {"$ref": "#/$defs/group"}, **({"minItems": 1} if complete else {})}}
     out = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": f"{SITE}{name}.schema.json",
            "title": ("The complete input profile of a group of 3D bridges: what Part 1 writes and Part 2 reads " if complete
                      else "The input profile of a group of 3D bridges: every value is optional"),

@@ -20,7 +20,25 @@ pub const FORMAT: &str = "roadstyle.bridge_profile/1";
 pub struct BridgeProfile {
     pub format: String,
     pub parameters: Parameters,
+    /// the ground that the heights are above (`z_m` is metres above the ground of the area: duckOSM's reference ground). Not there: not said
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ground: Option<Ground>,
     pub groups: Vec<Group>,
+}
+
+/// The ground of an area, as the page option `ground` names it (docs/design/ground_terrain.md): the facts of the ground, not its file. Two products of one area with different ids do not belong together.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Ground {
+    /// the ground id: the SHA-256 of the elevation file (duckOSM `main.elevation_metadata.sha256`); not there where no whole file was read
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vertical_datum: Option<String>,
 }
 
 /// The design speed and the design grade, the curve, and the rule that the filler heights follow.
