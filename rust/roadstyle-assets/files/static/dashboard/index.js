@@ -41,6 +41,7 @@ import {initWalls} from "./walls.js";
 import {initTunnel} from "./tunnel.js";
 import {initBridgeMesh, useBridgeMesh, initBridgeApi} from "./bridgemesh.js";
 import {initScene3D} from "./scene3d.js";
+import {initBuildingsTool, useBuildingsTool} from "./buildingstool.js";
 import {initViews} from "./views.js";
 import {initArrows} from "./arrows.js";
 import {initSelect, useSelect} from "./select.js";
@@ -131,6 +132,7 @@ export function rsDashboard(map, options){
   initBridgeApi();
   initBridgeMesh();
   initScene3D();
+  initBuildingsTool();
   initViews();
   initArrows();
   initSelect();
@@ -166,7 +168,7 @@ export function rsDashboard(map, options){
       if(rs.error){ console.error(rs.error); style = null; }
       o.style = style; fromStyle(o, given);
       if(more && "road_table" in more) o.road_table = more.road_table;      // the new style's road table (stage 1)
-      useStyle(style); useOverlays(); useFeatures(); useSelect(); useFilter(); useBridgeMesh(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); useRoadsBox(); useTops(); refreshState();
+      useStyle(style); useOverlays(); useFeatures(); useBuildingsTool(); useSelect(); useFilter(); useBridgeMesh(); initTunnel(); initArrows(); initBoundary(); useColor(); useLegend(); useColorBox(); useRoadsBox(); useTops(); refreshState();
       _emit("rs:stylechange", {});     // a part that paints on the road layers (the design panel) paints again
     },
     // a new look on the same tiles (LiveMap.setLook, docs/guides/design-panel.md): each road layer on the map (the prefix and its id, and its copies with the

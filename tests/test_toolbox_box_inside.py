@@ -354,18 +354,18 @@ def test_a_persons_switch_of_the_3d_buildings_tilts_and_zooms_the_map_and_off_fl
         page.route(_URL, _serve(html))
         page.goto(_URL)
         page.wait_for_function("window.map && window.map.loaded && window.map.loaded() && !!window.rs", timeout=90_000)
-        page.wait_for_function("document.getElementById('rs-top-buildings') === null || !document.getElementById('rs-top-buildings').disabled", timeout=60_000)
+        page.wait_for_function("!document.getElementById('rs-b3d-btn').disabled", timeout=60_000)
         page.evaluate("map.jumpTo({zoom: 11, pitch: 0})")
         page.evaluate("rs.tools.open('basemap')")
         page.wait_for_timeout(500)
-        start = page.evaluate("[document.getElementById('rs-top-buildings').checked, Math.round(map.getPitch()), Math.round(map.getZoom())]")
-        page.evaluate("document.getElementById('rs-top-buildings').click()")           # the box starts with the buildings on: this click switches them off
+        start = page.evaluate("[document.getElementById('rs-b3d-btn').classList.contains('rs-on'), Math.round(map.getPitch()), Math.round(map.getZoom())]")
+        page.evaluate("document.getElementById('rs-b3d-btn').click()")           # the toolbar's button starts on: this click switches the buildings off
         page.wait_for_timeout(300)
         off = page.evaluate("[rsBuildings(), Math.round(map.getPitch())]")
-        page.evaluate("document.getElementById('rs-top-buildings').click()")           # on again: the map tilts and zooms in
+        page.evaluate("document.getElementById('rs-b3d-btn').click()")           # on again: the map tilts and zooms in
         page.wait_for_timeout(1500)
         on = page.evaluate("[rsBuildings(), Math.round(map.getPitch()), Math.round(map.getZoom())]")
-        page.evaluate("document.getElementById('rs-top-buildings').click()")           # off: flat again
+        page.evaluate("document.getElementById('rs-b3d-btn').click()")           # off: flat again
         page.wait_for_timeout(1200)
         flat = page.evaluate("Math.round(map.getPitch())")
         scripted = page.evaluate("(() => { rsBuildings(true); return Math.round(map.getPitch()); })()")      # a script moves nothing

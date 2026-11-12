@@ -59,6 +59,7 @@ color
 legend
 overlays
 features
+buildingstool
 walls
 tunnel
 views

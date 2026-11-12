@@ -40,8 +40,10 @@ export const _NO_HOVER = matchMedia("(hover: none)");
 export const _emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, {detail}));
 // extra overlay layers (zones / POIs / lines), their metadata: label, source, layers, popup, tooltip, interactive, under, base, ...
 export let OVERLAYS = [];
-// the page's own buildings (a layer of its area with a 3D layer, features.js) are on: they win over the buildings of a vector base map
-export const _ownBuildings = () => OVERLAYS.some(o => o.extrude && o.visible !== false);
+// the page's own buildings are on: they win over the buildings of a vector base map. They are a layer of its area with a 3D layer (features.js) or the part
+// `buildings` of the 3D scene (scene3d.js, which adds its test to _ownSources)
+export const _ownSources = [];
+export const _ownBuildings = () => OVERLAYS.some(o => o.extrude && o.visible !== false) || _ownSources.some(f => f());
 // true from the map's first `load` event: a style that comes later (rs.setStyle) is added to a loaded map, and no `load` comes again for it
 // (isStyleLoaded is false while the new sources load)
 export let RS_LOADED = false;

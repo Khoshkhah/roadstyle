@@ -130,9 +130,9 @@ What each part of the dashboard screen does, and how to change it. Each item has
 
 ### Base map { .rs-part }
 
-![The base-map box: seven base maps, and Hillshade, Labels and 3D buildings under On top](../img/dashboard-basemap-box.png){ width="320" }
+![The base-map box: seven base maps, and Hillshade, 3D terrain, Labels and One-way arrows under On top](../img/dashboard-basemap-box.png){ width="320" }
 
-**Use it for:** the base map, and the switches *On top*: hillshade, 3D terrain, labels, one-way arrows and 3D buildings.<br>
+**Use it for:** the base map, and the switches *On top*: hillshade, 3D terrain, labels and one-way arrows, and the *3D buildings opacity* slider while 3D buildings are on. The switch for the 3D buildings is the toolbox's own button.<br>
 **From Python:** yes, `basemap=`, `basemaps=`, `hillshade=`, `terrain=`, `arrows=`, `buildings_opacity=`
 { .rs-facts }
 
@@ -155,7 +155,7 @@ What each part of the dashboard screen does, and how to change it. Each item has
     - **Hillshade and 3D terrain** come from the Terrain Tiles on AWS (no key). With the 3D terrain on, a tunnel is drawn on the hill above it and a bridge on the valley under it.
     - `terrain_tunnels=` sets what a tunnel does on the terrain: `"fade"` (the default), `"hide"` or `"show"`. MapLibre has no height for a line, so a per-edge height (a `z` column) cannot be drawn.
     - **One-way arrows** are on by default. A page with `arrows=False` has no switch.
-    - **3D buildings** tilt a flat map to 55° and zoom in to 15 when the zoom is under 14.5. The *Opacity* slider sets `buildings_opacity` (default 1).
+    - **3D buildings** (the building button of the toolbox) is one switch for every source of 3D buildings that the page has: the buildings of a vector base map (OpenFreeMap), the buildings of the area (a map layer with a 3D layer), and the part `buildings` of a [3D scene](scene-3d.md). The button is on while any source shows its buildings. A click switches all sources. It is grey, with the reason in its title, when the page has none. For the base map's buildings, a click also tilts a flat map to 55° and zooms in to 15 when the zoom is under 14.5. The *3D buildings opacity* slider in the base-map box sets `buildings_opacity` (default 1).
     - Base-map layers of the style (the duckOSM layers: land cover, water, buildings) get one switch, *Map layers* (`overlays_label`).
     - `rsAddTopRow`: `get` says whether the layer shows, `set(on)` shows or hides it, `available()` greys the row. The event `rs:toprowschange` reads the state again.
 

@@ -13,7 +13,7 @@
 // THE PICK: on the triangles that are drawn, projected with the layer's matrix (as bridgemesh.js does). A click on the scene sends `rs:scene3dselect` and, with `popup`, shows the
 // `extras` of the primitive; the primitive is drawn again in the select colour. Nothing is drawn or picked with a part off.
 // ERRORS: a problem is never silent: it goes to the console, to a toast, and to `rsScene3dProblems()`; the part of the scene that it concerns is not drawn.
-import {map, O, _emit} from "./core.js";
+import {map, O, _emit, _ownSources} from "./core.js";
 import {rsToast} from "./notice.js";
 import {_esc, _rfields} from "../popup.js";
 
@@ -385,11 +385,14 @@ export function rsScene3dVertices(max = 1000){
   return out.slice(0, max);
 }
 const _s3Label = k => k.charAt(0).toUpperCase() + k.slice(1);
+// the part `buildings` has no row in the box: the toolbar's buildings button switches it with the other 3D buildings (buildingstool.js)
+export const _s3HasBuildings = () => !!_s3Opt() && _s3Kinds.has("buildings");
+export const _s3BuildingsShown = () => _s3HasBuildings() && !!_s3Kinds.get("buildings") && _s3Active();
 function _s3Rows(){
   const o = _s3Opt(), add = window.rsAddTopRow;
   const off = () => !_s3Terrain() ? "Needs the 3D terrain" : map.getZoom() < o.min_zoom ? "Zoom in to " + o.min_zoom + " to see the 3D roads" : "";
   add({id: "scene3d", label: "3D scene", get: () => _s3On, set: on => rsScene3d(on), available: () => _s3Terrain(), unavailable: off});
-  for(const k of o.kinds) add({id: "scene3d-" + k, label: "3D " + k, get: () => _s3Kinds.get(k), set: on => rsScene3dKind(k, on), available: () => _s3Terrain() && _s3On, unavailable: () => _s3On ? off() : "The 3D roads are off"});
+  for(const k of o.kinds) if(k !== "buildings") add({id: "scene3d-" + k, label: "3D " + k, get: () => _s3Kinds.get(k), set: on => rsScene3dKind(k, on), available: () => _s3Terrain() && _s3On, unavailable: () => _s3On ? off() : "The 3D roads are off"});
 }
 
 // ---- the page
@@ -399,6 +402,7 @@ export function initScene3D(){
   const o = _s3Opt(); if(!o) return;
   try { _s3Inverse = _s3Inv(o.crs); } catch(e){ _s3Problem("crs", e.message, true); return; }
   _s3On = o.on !== false; o.kinds.forEach(k => _s3Kinds.set(k, true));
+  _ownSources.push(_s3BuildingsShown);          // the scene's buildings win over the buildings of a vector base map
   _s3Rows();
   const ensure = () => { if(!map.getLayer(_s3Id) && map.isStyleLoaded()) map.addLayer(_s3Layer); };
   ensure(); for(const ev of ["styledata", "idle"]) map.on(ev, ensure);

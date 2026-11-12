@@ -35,12 +35,12 @@ def test_the_pages_own_buildings_hide_the_vector_base_maps_buildings():
         page.evaluate("map.jumpTo({pitch: 50})")
         page.wait_for_timeout(500)
         vis = lambda: page.evaluate("[map.getLayoutProperty('vbm-building-3d', 'visibility'), map.getLayoutProperty('vbm-building', 'visibility')]")  # noqa: E731
-        row = lambda: page.evaluate("document.getElementById('rs-top-buildings').disabled")  # noqa: E731
+        row = lambda: page.evaluate("document.getElementById('rs-b3d-btn').disabled")  # noqa: E731
         assert vis()[0] == "visible" and not row(), "no page buildings: the style's 3D buildings show"
         page.evaluate("""RS_OVERLAYS.push({label: 'buildings', extrude: 'rs-x', visible: true, layers: [], source: 'none'});
                          document.dispatchEvent(new CustomEvent('rs:overlayschange'));""")
         page.wait_for_timeout(300)
-        assert vis() == ["none", "none"] and row(), "the page's buildings are on: the style's are not drawn, its row is off"
+        assert vis() == ["none", "none"] and not row(), "the page's buildings are on: the style's are not drawn, and the button stays on and works for the page's"
         page.evaluate("RS_OVERLAYS.at(-1).visible = false; document.dispatchEvent(new CustomEvent('rs:overlaychange'));")
         page.wait_for_timeout(300)
         assert vis()[0] == "visible" and not row(), "the page's buildings are switched off: the style's come back"

@@ -142,7 +142,7 @@ Push **Run** under a block: a large window opens with the map and the change on 
     - `rs.setOverlay(label, visible)` shows or hides one overlay of the page.
     - `rs.basemaps()` gives the base maps of the page as `[{key, label}]`.
     - `rsSetBridges`, `rsSetTunnels` and `rsSetClasses` are the single-control forms of `rs.setFilter`.
-    - `rsBuildingsOpacity(value)` sets the opacity of the 3D buildings of a vector base map, from 0 to 1 (the *Opacity* slider under the *3D buildings* row of the base-map box). No argument gives the opacity now. The event is `rs:buildingsopacitychange` (`opacity`).
+    - `rsBuildingsOpacity(value)` sets the opacity of the 3D buildings of a vector base map, from 0 to 1 (the *3D buildings opacity* slider of the base-map box). No argument gives the opacity now. The event is `rs:buildingsopacitychange` (`opacity`).
 
 ### Save and share the state { .rs-part }
 
