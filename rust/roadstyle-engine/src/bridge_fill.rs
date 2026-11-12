@@ -11,7 +11,7 @@
 //! Two properties are tested: an empty input gives the profile of today, and a complete profile gives itself (the filler twice is the filler once).
 
 use crate::bridge_curve::{self, Pvi};
-use crate::bridge_profile::{metres_between, BridgeProfile, Curve, Ground, Kind, Point, Rule, FORMAT, MATCH_M};
+use crate::bridge_profile::{metres_between, BridgeProfile, Curve, Ground, Kind, Point, Rule, ZReference, FORMAT, MATCH_M};
 use crate::Error;
 use serde::Deserialize;
 use serde_json::Value;
@@ -34,6 +34,7 @@ struct Params {
     design_grade: Option<f64>,
     curve: Option<Curve>,
     height_rule: Option<Rule>,
+    z_reference: Option<ZReference>,
 }
 
 #[derive(Deserialize)]
@@ -75,6 +76,11 @@ pub fn ground_end(id: &str, z: f64) -> String {
     format!("the node {id} is a free end of its bridge, so it is on the ground, and its z_m is {z}: a deck that ends in the air is a wrong height. Give 0, or leave z_m out")
 }
 
+/// The error for a profile with `z_reference: "elevation"` that does not name its ground: an elevation means nothing without the vertical datum of the ground that it is measured in.
+pub fn elevation_needs_ground() -> String {
+    "z_reference is \"elevation\", so the profile must name its ground (ground.id, the SHA-256 of the elevation file; ground.vertical_datum): an elevation means nothing without the datum that it is in".into()
+}
+
 fn bad<T>(m: String) -> Result<T, Error> {
     Err(Error::Data(format!("bridge_profile: {m}")))
 }
@@ -92,6 +98,23 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
         found.ground = input.ground.clone();
     }
     let given_params = input.parameters.as_ref();
+    let elev = given_params.and_then(|p| p.z_reference) == Some(ZReference::Elevation);
+    if let Some(r) = given_params.and_then(|p| p.z_reference) {
+        found.parameters.z_reference = Some(r);
+    }
+    if elev {
+        // the heights are elevations: no rule can find one (the rules measure from the ground), and the curve is `design` (the ramps of `smooth` start on the ground)
+        if given_params.and_then(|p| p.height_rule) == Some(Rule::Design) {
+            return bad("z_reference is \"elevation\", so every node needs its own elevation: the rule height_rule \"design\" finds heights above the ground, and cannot be used".into());
+        }
+        if given_params.and_then(|p| p.curve) == Some(Curve::Smooth) {
+            return bad("z_reference is \"elevation\", which needs the curve \"design\": the curve \"smooth\" makes ramps from the ground".into());
+        }
+        found.parameters.curve = Some(Curve::Design);
+        if input.ground.as_ref().and_then(|g| g.id.as_ref()).is_none() {
+            return bad(elevation_needs_ground());
+        }
+    }
     if given_params.and_then(|p| p.height_rule) == Some(Rule::Design) {
         // the design rules: 5 % unless the person gives a grade, and the curve `design` unless the person gives the curve
         found.parameters.height_rule = Some(Rule::Design);
@@ -142,8 +165,8 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
                 node.lonlat = ll;
             }
             match n.z_m {
-                Some(z) if !(z.is_finite() && z >= 0.0) => return bad(format!("the node {id} has z_m {z}; a height is a number of metres, 0 or more")),
-                Some(z) if node.kind == Kind::Ground && z != 0.0 => return bad(ground_end(&id, z)),
+                Some(z) if !(z.is_finite() && (elev || z >= 0.0)) => return bad(format!("the node {id} has z_m {z}; a height is a number of metres, 0 or more")),
+                Some(z) if !elev && node.kind == Kind::Ground && z != 0.0 => return bad(ground_end(&id, z)),
                 Some(z) => {
                     node.z_m = z;
                     node.source = n.source.clone().unwrap_or_else(|| "given".into());
@@ -182,7 +205,7 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
             return bad(format!("the chain {id} is {:.1} m long in these roads, and the input says {} m: the input is not for these roads", chain.length_m, c.length_m.unwrap()));
         }
         for (what, v) in [("top_m", c.top_m), ("width_m", c.width_m)] {
-            if v.is_some_and(|v| !(v.is_finite() && v > 0.0)) {
+            if v.is_some_and(|v| !(v.is_finite() && (v > 0.0 || (elev && what == "top_m")))) {
                 return bad(format!("the chain {id} has {what} {}; it is a number of metres above 0", v.unwrap()));
             }
         }
@@ -202,6 +225,13 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
             given_top.insert(id.clone(), t);
         }
     }
+    if elev {
+        let missing: Vec<&str> = found.groups.iter().flat_map(|g| g.nodes.iter()).filter(|n| !fixed_z.contains(&n.id)).map(|n| n.id.as_str()).collect();
+        if !missing.is_empty() {
+            let shown = missing.iter().take(8).copied().collect::<Vec<_>>().join(", ");
+            return bad(format!("z_reference is \"elevation\", so every node needs its elevation in z_m, and {} nodes have none: {shown}{}", missing.len(), if missing.len() > 8 { ", ..." } else { "" }));
+        }
+    }
     if found.parameters.height_rule == Some(Rule::Design) {
         design_heights(&mut found, &fixed_z, warnings);
         if found.parameters.curve == Some(Curve::Design) {
@@ -219,7 +249,7 @@ pub fn fill(mut found: BridgeProfile, input: &Value, warnings: &mut Vec<String>)
                 match given_top.get(&c.id) {
                     Some(&t) if top > t + 1e-9 => return bad(format!("the chain {} has top_m {t}, and its highest point is {top} m high: a point cannot be above the top of its chain", c.id)),
                     Some(&t) => c.top_m = Some(t),
-                    None => c.top_m = Some(top.max(MIN_TOP_M)),
+                    None => c.top_m = Some(if elev { top } else { top.max(MIN_TOP_M) }),
                 }
                 continue;
             }
@@ -393,7 +423,7 @@ fn design_curves(found: &mut BridgeProfile, warnings: &mut Vec<String>) -> Resul
             let mut p: Vec<Pvi> = vec![Pvi { s: 0.0, z: z[&c.from], curve_m: 0.0 }];
             p.extend(c.points.iter().map(|q| Pvi { s: q.s, z: q.z_m, curve_m: q.curve_m.unwrap_or(0.0) }));
             p.push(Pvi { s: c.length_m, z: z[&c.to], curve_m: 0.0 });
-            if let Err(e) = bridge_curve::check(&p.iter().map(|q| Pvi { curve_m: 0.0, ..*q }).collect::<Vec<_>>(), c.length_m) {
+            if let Err(e) = bridge_curve::check(&p.iter().map(|q| Pvi { curve_m: 0.0, ..*q }).collect::<Vec<_>>(), c.length_m, if found.parameters.is_elevation() { f64::NEG_INFINITY } else { 0.0 }) {
                 return bad(format!("the chain {}: {e}", c.id));
             }
             // a straight grade steeper than the design grade (a height of the person next to a point or a node that is too far in height): a warning, and the number is not changed

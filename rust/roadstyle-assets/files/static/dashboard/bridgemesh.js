@@ -10,13 +10,20 @@
 // steps of 2.5 m on the way to the mesh, so a new ramp has its shape and not the old cuts. rsBridgeProfile() gives the profile with the new heights, to give to `bridge_profile=` for the exact pieces.
 // THE TERRAIN: with the 3D terrain on, a deck is level between the ground heights at the two end nodes of its chain (`__rs_enda`, `__rs_endb`; `__rs_s0`, `__rs_s1`:
 // where a piece is along its chain), and its ramps rise from the ground at each free end. The heights come from the terrain's tiles, read here (`_bmDemAt`).
+// THE ELEVATION PROFILE (parameters.z_reference "elevation"): the node heights and the points of a chain are elevations in the vertical datum of the profile's ground, and a deck is drawn at its
+// elevation (the terrain's exaggeration included), over the same ground (the terrain from the page's `ground`). There is no level line between the ground at the two ends, and no lift: the
+// deck's height is the profile's, in every chain, so the engine's marks of a piece (its lift) are not read. A free end must be on the ground: where the profile's elevation and the terrain
+// differ by more than `_BM_END_TOL` metres, the bridges of that group are not drawn and the page says so (rsBridgeProblems(), a toast).
 import {map, O, RS_PREFIX, style, _src, _sfeats, _emit} from "./core.js";
+import {rsToast} from "./notice.js";
 import {_elDemTile, _elDemMaxZoom} from "./elevation.js";
 
 const _bmId = () => RS_PREFIX + "roads-bridge-mesh";
 const _bmDeck = () => RS_PREFIX + "roads-bridge-decks", _bmCasing = () => RS_PREFIX + "roads-deck-casing";
 const _BM_STEP = 2.5;                                 // metres between the vertices of a piece of an edited chain
 const _BM_CLEAR = 0.3, _BM_CLEAR_SLOPE = 2.5;       // metres above the terrain where the deck meets it: this, and this for each metre of slope
+const _BM_RISE_M = 3;                                // an elevation profile: the height over the ground at which the slab has its whole thickness and no clearance
+const _BM_END_TOL = 1;                               // an elevation profile: how far (metres) the elevation of a free end may be from the ground there
 const _bmM = 40075016.686;                           // the metres round the equator
 const _bmLight = [-0.4, 0.5, 0.75];                  // the light of the walls (fixed on the map)
 const _BM_VS = "attribute vec3 a_pos; attribute float a_shade; attribute vec4 a_col; uniform mat4 u_m; varying vec4 v_col;" +
@@ -72,7 +79,7 @@ function _bmChainFn(cp, zf, zt){
   const prof = O.bridge_profile, par = prof.parameters, l = cp.length_m;
   if(par.curve === "design"){
     const pts = [{s: 0, z: zf, c: 0}, ...cp.points.map(q => ({s: q.s, z: q.z_m, c: q.curve_m || 0})), {s: l, z: zt, c: 0}];
-    return {full: Math.max(...pts.map(q => q.z), 0.1), z: d => _bmDesignZ(pts, Math.max(0, Math.min(l, d)))};
+    return {full: Math.max(...pts.map(q => q.z), par.z_reference === "elevation" ? -Infinity : 0.1), z: d => _bmDesignZ(pts, Math.max(0, Math.min(l, d)))};
   }
   const top = Math.max(cp.top_m || 0, zf, zt);
   return {full: top, z: _bmSmoothZ(zf, zt, top, 1 / par.design_grade, l)};
@@ -80,22 +87,26 @@ function _bmChainFn(cp, zf, zt){
 function _bmEdits(){
   if(_bmEditMemo) return _bmEditMemo;
   _bmEditMemo = new Map();
-  const prof = O.bridge_profile;
-  if(!_bmNodeZ.size || !prof) return _bmEditMemo;
+  const prof = O.bridge_profile, elev = _bmElevation();
+  if(!prof || !(_bmNodeZ.size || elev)) return _bmEditMemo;
   const nodes = new Map(); prof.groups.forEach(g => g.nodes.forEach(n => nodes.set(n.id, n)));
   const zOf = id => _bmNodeZ.has(id) ? _bmNodeZ.get(id) : nodes.get(id).z_m;
   prof.groups.forEach(g => g.chains.forEach(cp => {
-    if(!_bmNodeZ.has(cp.from) && !_bmNodeZ.has(cp.to)) return;
+    if(!elev && !_bmNodeZ.has(cp.from) && !_bmNodeZ.has(cp.to)) return;
     const f = _bmChainFn(cp, zOf(cp.from), zOf(cp.to)), l = cp.length_m;
-    _bmEditMemo.set(+cp.id.slice(1), {full: f.full, length: l, z: f.z, lift: s => f.z(s * l) / f.full});
+    _bmEditMemo.set(+cp.id.slice(1), {full: f.full, length: l, z: f.z, elev, lift: s => f.z(s * l) / f.full});
   }));
   return _bmEditMemo;
 }
-// what a piece is drawn with: its full height, and, when its chain has an edited node, the lift along the chain (s: 0 to 1) and the length of the chain
+// what a piece is drawn with: its full height, and, when its chain has an edited node, the lift along the chain (s: 0 to 1) and the length of the chain. An elevation profile: `elev`, and `z(d)`, the elevation in metres at
+// d metres from the head end of the chain
 function _bmPiece(p){
   const e = _bmEdits().get(p.__rs_chain);
-  return e ? {full: e.full, lift: e.lift, length: e.length} : {full: _bmHeight(p), lift: null, length: 0};
+  return e ? {full: e.full, lift: e.lift, length: e.length, elev: e.elev, z: e.z} : {full: _bmHeight(p), lift: null, length: 0, elev: false, z: null};
 }
+// whether the page's heights are elevations (the profile's parameters.z_reference)
+function _bmElevation(){ const pr = O.bridge_profile; return !!(pr && pr.parameters && pr.parameters.z_reference === "elevation"); }
+let _bmProblems = [], _bmProblemKey = "", _bmToast = null;     // the free ends of an elevation profile that are not on the ground, the text of the last toast, and the toast
 
 // the colour (bytes) of feature k: the paint expression of its layer, with its properties and its feature state
 function _bmColour(k){
@@ -163,6 +174,18 @@ function _bmClearance(c){
   if(e1 == null || e2 == null || e3 == null || e4 == null){ _bmMiss = true; return null; }
   return _BM_CLEAR + _BM_CLEAR_SLOPE * Math.hypot((e1 - e2) / 8, (e3 - e4) / 8);
 }
+// the problems of an elevation profile, once for each new text: the console and a toast that stays until it is closed (a bridge that is not drawn is never silent)
+function _bmReport(){
+  const key = _bmProblems.map(q => q.message).join(" | ");
+  if(key === _bmProblemKey) return;
+  _bmProblemKey = key;
+  if(_bmToast){ _bmToast.close(); _bmToast = null; }               // a problem that is solved (the terrain is on, an elevation is fixed) takes its message off the screen
+  if(!_bmProblems.length) return;
+  console.error("roadstyle: " + key);
+  _bmToast = rsToast(_bmProblems[0].message + (_bmProblems.length > 1 ? " (and " + (_bmProblems.length - 1) + " more: rsBridgeProblems())" : ""), {kind: "error", ms: 0});
+}
+// the free ends of an elevation profile that are not on the ground (and the case of no terrain): [{node, z_m, ground_m, chains, message}]; [] when there is none, or the profile is above the ground
+export const rsBridgeProblems = () => _bmProblems.map(q => ({...q}));
 // the vertices of every feature: the position (metres from the origin, in mercator units), the shade of its face and, later, its colour
 function _bmBuild(){
   const s = _bmSrc(); _bmFeats = s ? _sfeats(s) : []; _bmRanges = []; _bmIdx = null;
@@ -179,12 +202,30 @@ function _bmBuild(){
       if(p.__rs_endb) c.b = p.__rs_endb; });
     e.forEach((c, k) => _bmEnds.set(k, {za: c.a ? _bmElev(c.a) : null, zb: c.b ? _bmElev(c.b) : null}));
   }
+  // an elevation profile: each free end must be on the ground (the terrain), or the bridges of its group are not drawn, and the page says so
+  const badChain = new Set(); _bmProblems = [];
+  if(_bmElevation()){
+    if(!map.getTerrain()) _bmProblems.push({node: null, chains: [], message: "the bridge profile has elevations, and the page has no 3D terrain: the bridges are not drawn. Turn the terrain on (the page option ground)"});
+    else {
+      const ex = map.getTerrain().exaggeration || 1;
+      O.bridge_profile.groups.forEach(gr => gr.nodes.forEach(n => {
+        if(n.kind !== "ground") return;
+        const z = _bmNodeZ.has(n.id) ? _bmNodeZ.get(n.id) : n.z_m, g = _bmElev(n.lonlat);
+        if(g == null || Math.abs(z - g / ex) <= _BM_END_TOL) return;       // not there yet (its tile): the mesh is made again when it comes; or on the ground
+        _bmProblems.push({node: n.id, z_m: z, ground_m: g / ex, chains: n.chains.slice(), message: "the free end " + n.id + " is at " + z.toFixed(1) + " m and the ground there is " + (g / ex).toFixed(1) +
+          " m: its bridge is not drawn. A free end must be on the ground (within " + _BM_END_TOL + " m): fix the elevation, or the roads (an OSM bridge that ends too early)"});
+        n.chains.forEach(c => badChain.add(+c.slice(1)));
+      }));
+    }
+    _bmReport();
+  }
   const push = (x, y, z, sh) => { pos.push(x, y, z); shade.push(sh); };
   _bmFeats.forEach((f, k) => {
     const p = f.properties, ring = f.geometry && f.geometry.coordinates && f.geometry.coordinates[0], first = shade.length;
     adj[k] = null;
     if(!ring || ring.length < 5 || (ring.length - 1) % 2){ _bmRanges.push([first, first]); return; }
-    const pi = _bmPiece(p), H = pi.full, th = p.__rs_thick, cas = !!p.__rs_casing_slab;
+    const pi = _bmPiece(p), H = pi.full, th = p.__rs_thick, cas = !!p.__rs_casing_slab, elevMode = !!pi.elev;
+    if(elevMode && (badChain.has(p.__rs_chain) || !map.getTerrain())){ _bmRanges.push([first, first]); return; }
     let m = (ring.length - 1) / 2, A = [], B = [];
     for(let i = 0; i < m; i++){ A.push(ring[i]); B.push(ring[2 * m - 1 - i]); }
     if(!o) o = _bmMerc(A[0][0], A[0][1]);
@@ -207,7 +248,11 @@ function _bmBuild(){
     const along = i => cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0;
     const L = i => pi.lift ? pi.lift(p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * along(i)) : p.__rs_lift0 + (p.__rs_lift1 - p.__rs_lift0) * along(i);
     // the slab thins out to nothing on the ground (twice as fast as the lift rises), so the top of a ramp lands flush with the road: no blunt end
-    const thin = i => Math.min(1, 2 * L(i));
+    // an elevation profile: the deck stands at its elevation, and the slab and the clearance follow its height over the ground under each side
+    const EX = (map.getTerrain() && map.getTerrain().exaggeration) || 1;
+    const E = i => pi.z((p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * along(i)) * pi.length) * EX;
+    const rise = (i, sd) => Math.max(0, Math.min(1, (E(i) - GS[sd][i]) / (_BM_RISE_M * EX)));
+    const thin = (i, sd) => elevMode ? rise(i, sd) : Math.min(1, 2 * L(i));
     const ce = _bmEnds.get(p.__rs_chain);          // the terrain on: the level line between the ground at the two ends of the chain
     if(map.getTerrain() && (!ce || ce.za == null || ce.zb == null)){ _bmMiss = true; _bmRanges.push([first, first]); return; }    // no height yet: not drawn
     const zg = i => ce ? ce.za + (ce.zb - ce.za) * (p.__rs_s0 + (p.__rs_s1 - p.__rs_s0) * (cum[m - 1] > 0 ? cum[i] / cum[m - 1] : 0)) : 0;
@@ -221,8 +266,8 @@ function _bmBuild(){
       if(g == null || cl == null){ _bmMiss = true; _bmRanges.push([first, first]); return; }
       GS[sd].push(g); CL[sd].push(cl);
     }
-    const base = (i, sd) => { const s3 = L(i); return GS[sd][i] * (1 - s3) + (zg(i) + H) * s3 + CL[sd][i] * (1 - s3); };
-    const top = (i, sd) => base(i, sd) + (cas ? 0.35 * th : th) * thin(i);
+    const base = (i, sd) => { if(elevMode) return E(i) + CL[sd][i] * (1 - rise(i, sd)); const s3 = L(i); return GS[sd][i] * (1 - s3) + (zg(i) + H) * s3 + CL[sd][i] * (1 - s3); };
+    const top = (i, sd) => base(i, sd) + (cas ? 0.35 * th : th) * thin(i, sd);
     const bot = (i, sd) => cas ? Math.max(ce ? -1e9 : 0, base(i, sd) - 0.5) : base(i, sd);       // below the ground on the terrain is inside the hill: hidden, not cut
     if(ce){ const mid = m >> 1, g = (GS[0][mid] + GS[1][mid]) / 2; adj[k] = [(bot(mid, 0) + bot(mid, 1)) / 2 - g, (top(mid, 0) + top(mid, 1)) / 2 - g]; }
     // the checks of the mesh (see _bmStats): a slab with its top under its bottom, a slab or a deck much thicker than it is made, a top under the ground
@@ -231,7 +276,7 @@ function _bmBuild(){
       if(thick < -0.01) _bmStat.inverted++;
       if(thick > made + 0.05) _bmStat.tooThick++;
       if(t < GS[sd][i] - 0.05) _bmStat.underGround++;
-      if(!cas && L(i) < 1e-3){ _bmStat.maxEndGap = Math.max(_bmStat.maxEndGap, Math.abs(base(i, sd) - GS[sd][i] - CL[sd][i])); _bmStat.minEndClearance = Math.min(_bmStat.minEndClearance, base(i, sd) - GS[sd][i]); }      // a deck's free end is at the clearance above the ground
+      if(!cas && (elevMode ? rise(i, sd) : L(i)) < 1e-3){ _bmStat.maxEndGap = Math.max(_bmStat.maxEndGap, Math.abs(base(i, sd) - GS[sd][i] - CL[sd][i])); _bmStat.minEndClearance = Math.min(_bmStat.minEndClearance, base(i, sd) - GS[sd][i]); }      // a deck's free end is at the clearance above the ground
       _bmStat.rows++;
     }
     const v = (c, z) => { const q = _bmMerc(c[0], c[1]); return [q[0] - o[0], q[1] - o[1], z * mz]; };
@@ -274,6 +319,7 @@ function _bmSyncPickers(adj){
     const p = f.properties; if(!_bmOrig.has(k)) _bmOrig.set(k, [p.__rs_base, p.__rs_height]);
     const [b0, h0] = _bmOrig.get(k), pi = _bmPiece(p), r = p.__rs_full ? pi.full / p.__rs_full : 1, a = adj && adj[k];
     if(a) return [Math.max(0, a[0]), Math.max(a[0] + 0.1, a[1])];
+    if(pi.elev) return [0, 0.1];                      // an elevation profile, not drawn (no terrain, or a free end off the ground): a pick shape on the ground
     if(pi.lift){ const z = pi.lift((p.__rs_s0 + p.__rs_s1) / 2) * pi.full; return [z, z + h0 - b0]; }      // an edited chain: the deck at the middle of the piece
     return [b0 * r, h0 + b0 * (r - 1)];
   });
@@ -381,7 +427,7 @@ export function initBridgeMesh(){
   });
   map.on("sourcedata", e => { if(e.sourceId === _bmSrc() && e.sourceDataType !== "metadata"){ _bmGeom = true; } });
 }
-export const useBridgeMesh = () => { _bmOrig.clear(); _bmHeights.clear(); _bmNodeZ.clear(); _bmEditMemo = null; _bmPickHash = ""; _bmGeom = true; _bmAll = true; _bmEnsure(); };
+export const useBridgeMesh = () => { _bmOrig.clear(); _bmHeights.clear(); _bmNodeZ.clear(); _bmEditMemo = null; _bmProblems = []; _bmProblemKey = ""; if(_bmToast){ _bmToast.close(); _bmToast = null; } _bmPickHash = ""; _bmGeom = true; _bmAll = true; _bmEnsure(); };
 
 // THE STREET VIEW MARKER on a bridge: the height (metres) of the deck top at a point of the bridge road `road` (its row), where the marker stands;
 // 0 where the mesh is not drawn (flat below flat_below, the 3D terrain) or the road has no deck
@@ -399,6 +445,13 @@ export function _bmDeckZ(lng, lat, road){
     const d = ((cx / n - lng) * k) ** 2 + (cy / n - lat) ** 2; if(d < bd){ bd = d; best = f.properties; } }
   if(!best) return null;
   const pi = _bmPiece(best), L = pi.lift ? pi.lift((best.__rs_s0 + best.__rs_s1) / 2) : (best.__rs_lift0 + best.__rs_lift1) / 2, ce = _bmEnds.get(best.__rs_chain);
+  if(pi.elev){
+    // an elevation profile: the deck's elevation over the ground under the marker (both with the terrain's exaggeration); null where the mesh is not drawn
+    const g = _bmElev([lng, lat]), ex = (map.getTerrain() && map.getTerrain().exaggeration) || 1;
+    if(g == null || !map.getTerrain() || _bmProblems.some(q => q.chains.includes("c" + best.__rs_chain))) return null;
+    const h = pi.z((best.__rs_s0 + best.__rs_s1) / 2 * pi.length) * ex - g, r = Math.max(0, Math.min(1, h / (_BM_RISE_M * ex)));
+    return Math.max(0, h) + best.__rs_thick * r;
+  }
   // the terrain on: the deck's level line there, as a height over the ground under the marker (the marker stands on the terrain)
   const here = _bmElev([lng, lat]);
   if(ce && (ce.za == null || ce.zb == null || here == null)) return null;      // no height yet: not on the deck
@@ -493,8 +546,10 @@ export function rsBridgeGroups(){
   return [...g.values()].map(e => {
     const chains = [...e.chains].filter(id => pc.has(id)).map(id => pc.get(id)), ends = new Set(chains.flatMap(c => [c.from, c.to]));
     // the height now: the group's own when it was set; else, with edited nodes, the highest of the edited chains; else the engine's
-    const edited = chains.map(c => ed.get(+c.id.slice(1))).filter(Boolean), nodeSet = edited.length > 0;
-    return {group: e.group, roads: [...e.roads], height: _bmHeights.has(e.group) ? _bmHeights.get(e.group) : nodeSet ? Math.max(e.height, ...edited.map(x => x.full)) : e.height, set: _bmHeights.has(e.group),
+    const edited = chains.map(c => ed.get(+c.id.slice(1))).filter(Boolean), nodeSet = edited.length > 0, elev = _bmElevation();
+    // an elevation profile: the height of a group is its highest elevation (metres above the datum of the ground), and there is no group height to set
+    return {group: e.group, roads: [...e.roads], zReference: elev ? "elevation" : "ground",
+      height: elev && nodeSet ? Math.max(...edited.map(x => x.full)) : _bmHeights.has(e.group) ? _bmHeights.get(e.group) : nodeSet ? Math.max(e.height, ...edited.map(x => x.full)) : e.height, set: _bmHeights.has(e.group),
       chains, nodes: [...ends].filter(id => pn.has(id)).map(id => pn.get(id)), nodesSet: [...ends].filter(id => _bmNodeZ.has(id))}; })
     .sort((a, b) => b.roads.length - a.roads.length);
 }
@@ -510,6 +565,7 @@ function _bmGroupOf(t){
 // metres = null gives the look's height back. The roads of a group that touch are one height: no road of it is set alone.
 export function rsSetBridgeHeight(target, metres){
   const list = Array.isArray(target) ? target : [target], done = [];
+  if(_bmElevation()) throw new Error("rsSetBridgeHeight: the heights of this page are elevations (z_reference \"elevation\"), so a group has no height of its own: set the nodes (rsSetBridgeNode)");
   if(metres != null && !(metres >= 0)) throw new Error("rsSetBridgeHeight: metres must be a number of 0 or more, or null, got " + JSON.stringify(metres));
   for(const t of list){
     const g = _bmGroupOf(t);
@@ -525,7 +581,7 @@ export function rsSetBridgeHeight(target, metres){
   _emit("rs:bridgeheightchange", {groups: done.map(g => ({group: g, height: _bmHeights.has(g) ? _bmHeights.get(g) : null}))});
   return done;
 }
-// rsSetBridgeNode(id, metres): the node `id` of the bridge profile (rsBridgeGroups()[].nodes[].id) gets this height, in metres above the ground, 0 or more; null gives the profile's height back.
+// rsSetBridgeNode(id, metres): the node `id` of the bridge profile (rsBridgeGroups()[].nodes[].id) gets this height, in metres above the ground, 0 or more (an elevation profile: the elevation, any number); null gives the profile's height back.
 // The chains that meet at the node are drawn from the profile with the new height. The group's own height (rsSetBridgeHeight) is then given up: the last one that the person gave counts.
 // A free end of a bridge (a node with kind `ground`) is on the ground: any other height for it throws. A page whose style has no bridge profile (made before the profile, or without 3D bridges) throws.
 export function rsSetBridgeNode(id, metres){
@@ -533,8 +589,9 @@ export function rsSetBridgeNode(id, metres){
   if(!prof || !prof.groups) throw new Error("rsSetBridgeNode: this page has no bridge profile (it has no 3D bridges, or it was made by an older roadstyle)");
   const node = prof.groups.flatMap(g => g.nodes).find(n => n.id === id);
   if(!node) throw new Error("rsSetBridgeNode: the profile has no node " + JSON.stringify(id));
-  if(metres != null && !(metres >= 0)) throw new Error("rsSetBridgeNode: metres must be a number of 0 or more, or null, got " + JSON.stringify(metres));
-  if(node.kind === "ground" && metres != null && +metres !== 0) throw new Error("rsSetBridgeNode: the node " + id + " is a free end of its bridge, so it is on the ground (0 m); a deck that ends in the air is a wrong height");
+  const elev = _bmElevation();
+  if(metres != null && !(elev ? Number.isFinite(+metres) : metres >= 0)) throw new Error("rsSetBridgeNode: metres must be " + (elev ? "a number (an elevation)" : "a number of 0 or more") + ", or null, got " + JSON.stringify(metres));
+  if(!elev && node.kind === "ground" && metres != null && +metres !== 0) throw new Error("rsSetBridgeNode: the node " + id + " is a free end of its bridge, so it is on the ground (0 m); a deck that ends in the air is a wrong height");
   const gr = rsBridgeGroups().find(x => x.nodes.some(n => n.id === id));
   if(metres == null || +metres === node.z_m) _bmNodeZ.delete(id); else { _bmNodeZ.set(id, +metres); if(gr) _bmHeights.delete(gr.group); }
   _bmEditMemo = null; _bmGeom = true; map.triggerRepaint();
@@ -573,4 +630,4 @@ export function rsSetBridges3D(on){
 export const _bmHas = () => !!_bmSrc() && !!map.getSource(_bmSrc());
 // what the last build found wrong in its own vertices: {rows, inverted (a slab whose top is under its bottom), tooThick, underGround (a top under the ground), maxEndGap (metres between a free end and the ground plus the clearance), minEndClearance (the least height of a free end above the ground)}; for the tests
 export const _bmStats = () => ({..._bmStat});
-export function initBridgeApi(){ window.rsSetBridges3D = rsSetBridges3D; window.rsBridgeGroups = rsBridgeGroups; window.rsSetBridgeHeight = rsSetBridgeHeight; window.rsBridgeHeight = rsBridgeHeight; window.rsSetBridgeNode = rsSetBridgeNode; window.rsBridgeProfile = rsBridgeProfile; }
+export function initBridgeApi(){ window.rsSetBridges3D = rsSetBridges3D; window.rsBridgeGroups = rsBridgeGroups; window.rsSetBridgeHeight = rsSetBridgeHeight; window.rsBridgeHeight = rsBridgeHeight; window.rsSetBridgeNode = rsSetBridgeNode; window.rsBridgeProfile = rsBridgeProfile; window.rsBridgeProblems = rsBridgeProblems; }

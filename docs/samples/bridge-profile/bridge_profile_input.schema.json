@@ -50,7 +50,7 @@
     },
     "z_m": {
      "type": "number",
-     "minimum": 0
+     "description": "The height of the point above the ground, 0 or more (with z_reference elevation: its elevation)"
     },
     "curve_m": {
      "type": "number",
@@ -123,6 +123,13 @@
       "design"
      ],
      "description": "How the filler finds a height that was not given. length: today's rule. design: the design rules"
+    },
+    "z_reference": {
+     "enum": [
+      "ground",
+      "elevation"
+     ],
+     "description": "What z_m is. ground: metres above the ground of the page (the default; a free end is 0). elevation: the elevation in the vertical datum of the profile's ground (every node needs one)"
     }
    }
   },
@@ -156,8 +163,7 @@
     },
     "z_m": {
      "type": "number",
-     "minimum": 0,
-     "description": "The height of the node above the ground, in metres"
+     "description": "The height of the node above the ground, in metres, 0 or more (with z_reference elevation: its elevation in the datum of the ground, any number)"
     },
     "source": {
      "type": "string",
@@ -224,8 +230,7 @@
     },
     "top_m": {
      "type": "number",
-     "exclusiveMinimum": 0,
-     "description": "The full height of the chain: the height that its ramps are made for (the curve smooth). The page's __rs_full"
+     "description": "The full height of the chain: the height that its ramps are made for (the curve smooth). The page's __rs_full. Above 0 (with z_reference elevation: the highest elevation of the chain)"
     },
     "width_m": {
      "type": "number",
@@ -266,6 +271,79 @@
      "type": "array",
      "items": {
       "$ref": "#/$defs/chain"
+     }
+    }
+   }
+  }
+ },
+ "if": {
+  "required": [
+   "parameters"
+  ],
+  "properties": {
+   "parameters": {
+    "required": [
+     "z_reference"
+    ],
+    "properties": {
+     "z_reference": {
+      "const": "elevation"
+     }
+    }
+   }
+  }
+ },
+ "then": {
+  "required": [
+   "ground"
+  ],
+  "properties": {
+   "ground": {
+    "required": [
+     "id"
+    ]
+   },
+   "parameters": {
+    "properties": {
+     "curve": {
+      "const": "design"
+     }
+    }
+   }
+  }
+ },
+ "else": {
+  "properties": {
+   "groups": {
+    "items": {
+     "properties": {
+      "nodes": {
+       "items": {
+        "properties": {
+         "z_m": {
+          "minimum": 0
+         }
+        }
+       }
+      },
+      "chains": {
+       "items": {
+        "properties": {
+         "top_m": {
+          "exclusiveMinimum": 0
+         },
+         "points": {
+          "items": {
+           "properties": {
+            "z_m": {
+             "minimum": 0
+            }
+           }
+          }
+         }
+        }
+       }
+      }
      }
     }
    }

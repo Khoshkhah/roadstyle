@@ -288,3 +288,41 @@ def test_the_ground_of_an_input_is_kept_in_the_complete_profile_and_the_filler_t
     assert "ground" not in rs.bridge_profile(_roads())                                                      # not said: not written
     with pytest.raises(ValueError, match="unknown field"):
         rs.bridge_profile(_roads(), {"ground": {"file": "x.tif"}})
+
+
+def _elevation_input(base=100.0, ground_id="a" * 64):
+    """Every node of the Y and of the lone bridge at `base` metres plus the height that today's rule gives it: an input with z_reference "elevation"."""
+    nodes = [{"id": n["id"], "z_m": base + n["z_m"], "source": "test", "method": "measured"} for g in rs.bridge_profile(_roads())["groups"] for n in g["nodes"]]
+    return {"parameters": {"z_reference": "elevation"}, "ground": {"id": ground_id, "vertical_datum": "EGM2008"}, "groups": [{"nodes": nodes}]}
+
+
+def test_a_profile_with_elevations_keeps_them_and_the_free_ends_are_not_forced_to_0():
+    p = rs.bridge_profile(_roads(), _elevation_input())
+    assert p["parameters"]["z_reference"] == "elevation" and p["parameters"]["curve"] == "design" and p["ground"]["vertical_datum"] == "EGM2008"
+    ends = [n["z_m"] for g in p["groups"] for n in g["nodes"] if n["kind"] == "ground"]
+    assert ends and all(z >= 100.0 for z in ends)                                                           # a free end is on the ground, and the ground is at 100 m here
+    assert all(c["top_m"] >= 100.0 for g in p["groups"] for c in g["chains"])
+    assert rs.bridge_profile(_roads(), p) == p                                                              # the filler twice is the filler once
+
+
+def test_a_profile_with_elevations_says_what_is_missing_or_cannot_be_used():
+    with pytest.raises(ValueError, match=r"must name its ground"):
+        rs.bridge_profile(_roads(), {k: v for k, v in _elevation_input().items() if k != "ground"})
+    short = _elevation_input()
+    short["groups"][0]["nodes"].pop(0)
+    with pytest.raises(ValueError, match=r"every node needs its elevation.*1 nodes have none"):
+        rs.bridge_profile(_roads(), short)
+    with pytest.raises(ValueError, match=r"height_rule.*cannot be used"):
+        rs.bridge_profile(_roads(), {**_elevation_input(), "parameters": {"z_reference": "elevation", "height_rule": "design"}})
+    with pytest.raises(ValueError, match=r"needs the curve"):
+        rs.bridge_profile(_roads(), {**_elevation_input(), "parameters": {"z_reference": "elevation", "curve": "smooth"}})
+
+
+def test_a_page_with_elevations_needs_the_ground_that_they_are_in():
+    given = _elevation_input(ground_id="a" * 64)
+    with pytest.raises(ValueError, match=r"elevations in the ground a{64}, and the page has no ground"):
+        rs.render_edges(_roads(), backend="web", view_3d=True, bridge_profile=given)
+    ok = rs.render_edges(_roads(), backend="web", view_3d=True, ground=_GROUND, bridge_profile=given).html
+    assert _page_profile(ok)["parameters"]["z_reference"] == "elevation"
+    with pytest.raises(ValueError, match=r"ground b{64}, and the page draws the ground a{64}"):
+        rs.render_edges(_roads(), backend="web", view_3d=True, ground=_GROUND, bridge_profile=_elevation_input(ground_id="b" * 64))

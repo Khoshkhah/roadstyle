@@ -265,6 +265,9 @@ fn profile_on_ground(profile: &Value, ground: &Value, warnings: &mut Vec<String>
             out["ground"] = Value::Object(facts);
             Ok(out)
         }
+        (Some(m), false) if profile.pointer("/parameters/z_reference").and_then(Value::as_str) == Some("elevation") => {
+            Err(crate::error::options(format!("bridge_profile: its heights are elevations in the ground {}, and the page has no ground (ground=): an elevation is drawn over the ground that it is measured in, never over another terrain such as the AWS Terrain Tiles", id(m).unwrap_or_else(|| "(no id)".into()))))
+        }
         (Some(m), false) => {
             warnings.push(format!("bridge_profile: its heights are above the ground {}, and the page has no ground (it draws the AWS Terrain Tiles)", id(m).unwrap_or_else(|| "(no id)".into())));
             Ok(profile.clone())

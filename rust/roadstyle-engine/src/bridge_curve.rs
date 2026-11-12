@@ -70,17 +70,17 @@ pub fn curves(p: &[Pvi]) -> Vec<(f64, f64)> {
     p.iter().filter(|q| q.curve_m > 0.0).map(|q| (q.s - q.curve_m / 2.0, q.s + q.curve_m / 2.0)).collect()
 }
 
-/// The checks of a list of points: in order of `s` with the first at 0 and the last at `length` (the chain's ends), heights of 0 or more, curves that do not leave the chain or overlap.
-/// The message names the first thing that is wrong.
-pub fn check(p: &[Pvi], length: f64) -> Result<(), String> {
+/// The checks of a list of points: in order of `s` with the first at 0 and the last at `length` (the chain's ends), heights of `min_z` or more (0 for a height above the ground, `f64::NEG_INFINITY`
+/// for an elevation), curves that do not leave the chain or overlap. The message names the first thing that is wrong.
+pub fn check(p: &[Pvi], length: f64, min_z: f64) -> Result<(), String> {
     if p.len() < 2 || p[0].s != 0.0 || (p[p.len() - 1].s - length).abs() > 1e-6 {
         return Err("the points must start at 0 and end at the length of the chain".into());
     }
     if let Some(w) = p.windows(2).find(|w| w[1].s.partial_cmp(&w[0].s) != Some(std::cmp::Ordering::Greater)) {
         return Err(format!("the points are not in order of s: {} m comes after {} m", w[1].s, w[0].s));
     }
-    if let Some(q) = p.iter().find(|q| !(q.z.is_finite() && q.z >= 0.0)) {
-        return Err(format!("the point at {} m has z_m {}; a height is a number of metres, 0 or more", q.s, q.z));
+    if let Some(q) = p.iter().find(|q| !(q.z.is_finite() && q.z >= min_z)) {
+        return Err(format!("the point at {} m has z_m {}; a height is a number of metres{}", q.s, q.z, if min_z.is_finite() { ", 0 or more" } else { "" }));
     }
     for (i, q) in p.iter().enumerate() {
         if !(q.curve_m.is_finite() && q.curve_m >= 0.0) || (q.curve_m > 0.0 && (i == 0 || i == p.len() - 1)) {
@@ -138,10 +138,10 @@ mod tests {
     #[test]
     fn the_checks_say_what_is_wrong() {
         let ok = [p(0.0, 0.0, 0.0), p(100.0, 5.0, 30.0), p(200.0, 0.0, 0.0)];
-        assert!(check(&ok, 200.0).is_ok());
-        assert!(check(&ok, 250.0).unwrap_err().contains("end at the length"));
-        assert!(check(&[p(0.0, 0.0, 0.0), p(120.0, 5.0, 0.0), p(100.0, 5.0, 0.0), p(200.0, 0.0, 0.0)], 200.0).unwrap_err().contains("not in order"));
-        assert!(check(&[p(0.0, 0.0, 0.0), p(100.0, 5.0, 250.0), p(200.0, 0.0, 0.0)], 200.0).unwrap_err().contains("overlap"));
-        assert!(check(&[p(0.0, 0.0, 10.0), p(200.0, 0.0, 0.0)], 200.0).unwrap_err().contains("two ends"));
+        assert!(check(&ok, 200.0, 0.0).is_ok());
+        assert!(check(&ok, 250.0, 0.0).unwrap_err().contains("end at the length"));
+        assert!(check(&[p(0.0, 0.0, 0.0), p(120.0, 5.0, 0.0), p(100.0, 5.0, 0.0), p(200.0, 0.0, 0.0)], 200.0, 0.0).unwrap_err().contains("not in order"));
+        assert!(check(&[p(0.0, 0.0, 0.0), p(100.0, 5.0, 250.0), p(200.0, 0.0, 0.0)], 200.0, 0.0).unwrap_err().contains("overlap"));
+        assert!(check(&[p(0.0, 0.0, 10.0), p(200.0, 0.0, 0.0)], 200.0, 0.0).unwrap_err().contains("two ends"));
     }
 }

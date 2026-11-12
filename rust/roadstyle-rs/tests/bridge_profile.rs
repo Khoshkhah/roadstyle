@@ -409,3 +409,84 @@ fn the_end_of_a_bridge_is_on_the_ground_and_a_height_above_0_there_is_an_error_t
     let e = error_of(q);
     assert!(e.contains("free end of its bridge"), "{e}");
 }
+
+/// An input profile with `z_reference: "elevation"`: every node of the profile `p` at `base` metres plus its height in `p`, and the ground named.
+fn elevation_input(p: &Value, base: f64) -> Value {
+    let nodes: Vec<Value> = p["groups"].as_array().unwrap().iter().flat_map(|g| g["nodes"].as_array().unwrap())
+        .map(|n| serde_json::json!({"id": n["id"], "z_m": base + n["z_m"].as_f64().unwrap(), "source": "test", "method": "measured"})).collect();
+    serde_json::json!({"parameters": {"z_reference": "elevation"},
+                       "ground": {"id": "3e79bae171d8f22d9e2a0cfd64408b4ac961ba533db492f00c36cca9ff7582b5", "source": "test ground", "product": "DTM", "vertical_datum": "EGM2008"},
+                       "groups": [{"nodes": nodes}]})
+}
+
+#[test]
+fn an_elevation_profile_keeps_every_elevation_and_the_free_ends_are_not_forced_to_0() {
+    let p = profile_of_today();
+    let (out, s) = export(elevation_input(&p, 120.0)).unwrap();
+    assert_eq!(out["parameters"]["z_reference"], "elevation");
+    assert_eq!(out["parameters"]["curve"], "design", "elevation needs the curve design");
+    assert_eq!(out["ground"]["vertical_datum"], "EGM2008");
+    let mut ground_ends = 0;
+    for g in out["groups"].as_array().unwrap() {
+        for n in g["nodes"].as_array().unwrap() {
+            let before = node(&p, n["id"].as_str().unwrap())["z_m"].as_f64().unwrap();
+            assert_eq!(n["z_m"].as_f64().unwrap(), 120.0 + before, "the elevation is the one that was given");
+            assert_eq!((n["source"].as_str().unwrap(), n["method"].as_str().unwrap()), ("test", "measured"));
+            ground_ends += (n["kind"] == "ground") as usize;
+        }
+        for c in g["chains"].as_array().unwrap() {
+            assert!(c["top_m"].as_f64().unwrap() >= 120.0, "the top of a chain is its highest elevation");
+        }
+    }
+    assert!(ground_ends > 0, "the roads have free ends, and they are at 120 m or more: not an error");
+    assert!(!decks(&s).is_empty());
+    // the filler twice is the filler once
+    let (again, _) = export(serde_json::from_value(out.clone()).unwrap()).unwrap();
+    assert_eq!(again, out);
+}
+
+#[test]
+fn an_elevation_below_the_sea_still_gives_decks_with_finite_marks() {
+    let p = profile_of_today();
+    let (_, s) = export(elevation_input(&p, -8.0)).unwrap();
+    let d = decks(&s);
+    assert!(!d.is_empty());
+    for f in &d {
+        for k in ["__rs_base", "__rs_height", "__rs_lift0", "__rs_lift1", "__rs_full"] {
+            if let Some(v) = f["properties"].get(k) {
+                assert!(v.as_f64().is_some_and(|x| x.is_finite() && x >= -1e-9), "{k} = {v}");
+            }
+        }
+    }
+}
+
+#[test]
+fn an_elevation_profile_says_what_is_missing_or_cannot_be_used() {
+    let p = profile_of_today();
+    // a node with no elevation: every node needs one, the error names them
+    let mut input = elevation_input(&p, 50.0);
+    let removed = input["groups"][0]["nodes"].as_array_mut().unwrap().remove(0)["id"].as_str().unwrap().to_string();
+    let e = export(input).unwrap_err().to_string();
+    assert!(e.contains("every node needs its elevation") && e.contains(&removed), "{e}");
+    // no ground
+    let mut input = elevation_input(&p, 50.0);
+    input.as_object_mut().unwrap().remove("ground");
+    let e = export(input).unwrap_err().to_string();
+    assert!(e.contains("must name its ground") && e.contains("ground.id"), "{e}");
+    // the rule of the design finds heights above the ground
+    let mut input = elevation_input(&p, 50.0);
+    input["parameters"]["height_rule"] = "design".into();
+    let e = export(input).unwrap_err().to_string();
+    assert!(e.contains("height_rule") && e.contains("elevation"), "{e}");
+    // the curve smooth makes ramps from the ground
+    let mut input = elevation_input(&p, 50.0);
+    input["parameters"]["curve"] = "smooth".into();
+    let e = export(input).unwrap_err().to_string();
+    assert!(e.contains("needs the curve"), "{e}");
+}
+
+#[test]
+fn a_profile_that_is_above_the_ground_has_no_z_reference_and_is_not_changed() {
+    let p = profile_of_today();
+    assert!(p["parameters"].get("z_reference").is_none(), "the profile of today does not say it: its heights are above the ground");
+}
