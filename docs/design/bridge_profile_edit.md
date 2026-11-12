@@ -276,7 +276,7 @@ Each part checks what it can see. The engine says what is wrong and does not cha
 | 1 | A given node is not within 5 m of exactly one node of the group, or two entries are for one node | Error |
 | 1 | A `z_m` below 0 | Error |
 | 1 | The grade between two given heights is above the design grade | Warning. Above the maximum grade of the road class: error |
-| 1 | A `ground` node with `z_m` above 0 | Allowed, with a warning: the deck ends in the air there. The page draws no landing (a landing on fill was built in November 2026 and not wanted) |
+| 1 | A `ground` node with `z_m` above 0 | Error: the end of a bridge is on the ground, and a deck that ends in the air is a wrong height. The page draws no landing, and the engine does not guess one (decided 2026-11-11) |
 | 2 | A height or a width is missing | Error: fill the profile first |
 | 2 | The `s` of a point is outside the chain, or the points are not in order of `s` | Error |
 | 2 | Two curves overlap (a short chain with a high design speed) | Warning. The curves are shortened and the message says so |
@@ -345,7 +345,7 @@ Each decision has the recommendation of this note.
 4. **A new keyword.** `bridge_profile=` replaces `bridge_heights` and `bridge_height_col` in the end. The two stay while the engine has no input profile.
 5. **The curve.** `smooth` first, then `design`. Decided 2026-11-11: `design` is an option and `smooth` stays the default, because the change of the default changes the look of every bridge.
 6. **The Height box in the open page.** It changes the input profile, and the output is made again. The ramps are then new too (today they keep the first length).
-7. **The landing on fill.** The page draws the sides down to the ground.
+7. **The landing on fill.** No. The end of a bridge is on the ground; a height above 0 there is an error (decided 2026-11-11).
 8. **The urbanstyle converter.** Yes, outside the engine.
 9. **Where the file is kept.** "One rule for every path" says the page, the tiles and the editor must read the same data. A profile that belongs to the area could be kept with the area, in duckOSM. This is for later.
 

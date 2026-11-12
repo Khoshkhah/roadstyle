@@ -117,7 +117,7 @@ A complete profile is also a valid input profile. Part 1 on a complete profile c
 | `groups[].chains` | list of chains | optional | required | A chain is a line of bridge roads between two nodes |
 | `nodes[].id` | text `n1`, `n2`... | optional | required | The id of the node in a complete profile |
 | `nodes[].lonlat` | `[longitude, latitude]` | optional | required | The position. In an input profile it names the node: the node of the group within 5 m. A node needs a `lonlat` or an `id` |
-| `nodes[].kind` | `"ground"` or `"junction"` | optional | required | `ground`: one chain ends here, and the height is 0. `junction`: chains meet here |
+| `nodes[].kind` | `"ground"` or `"junction"` | optional | required | `ground`: one chain ends here, and the height is 0 (the end of a bridge is on the ground: a `z_m` above 0 is an error). `junction`: chains meet here |
 | `nodes[].chains` | list of chain ids | optional | required | The chains that meet at the node |
 | `nodes[].z_m` | number, 0 or more | optional | required | The height of the node above the ground, in metres |
 | `nodes[].source`, `.method` | text, and `mapped`, `measured`, `derived` or `chosen` | optional | required | Where the value comes from, and how it was found |

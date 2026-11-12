@@ -123,7 +123,13 @@ def bridge_profile_from_urbanstyle(edges, bridge, *, way_col="osm_id", max_node_
             src = v.get("source", "urbanstyle")
             method = "derived" if src == "urbanstyle" else "measured"           # urbanstyle's own rule, or a survey or LiDAR that it read
             for k, a in (("from", a0), ("to", a1)):
-                heights.setdefault(c[k], []).append((max(0.0, _z_at(v["samples"], a)), src, method))
+                z = max(0.0, _z_at(v["samples"], a))
+                if nodes[c[k]]["kind"] == "ground":
+                    # the end of a bridge is on the ground. The axis goes on past it (a landing on fill) and is above the ground there, so the height of the axis is not the height of the end
+                    if z > 0.5:
+                        warnings.warn(f"the node {c[k]} is a free end of the bridge in these roads, so it is on the ground (0 m); the axis {axis['id']} is {z:.1f} m high there because it goes on past the end", stacklevel=3)
+                    z = 0.0
+                heights.setdefault(c[k], []).append((z, src, method))
             pts = []
             for (s, z), curve in zip(v["points"], v["curves"], strict=True):
                 s_chain = (s - a0) * sign
