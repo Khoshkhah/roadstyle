@@ -5,7 +5,7 @@
 // A vertex of a tile is (east - origin.x, height, -(north - origin.y)) in metres of the archive's CRS (the GLB's root `extras.simready`). Each vertex is converted
 // to Web Mercator on the CPU, once, when its tile is read (the inverse of the CRS: `_s3Inv`; the parameters are rows of data/crs.json). The height is metres above the datum of the
 // ground, drawn as height x the terrain's exaggeration, so the layer needs the 3D terrain, and the terrain's mesh is lower than the exact ground in places: the whole scene is lifted by
-// `ontop.scene_3d.lift_m` (measured on Monaco: with no lift only a few % of the road pixels are visible, with 0.6 m 93 to 100 %).
+// `ontop.scene_3d.lift_m`. Measured on Monaco: with no lift only 0.3 to 6 % of the road pixels are visible, with 0.6 m 93 to 100 %. A lift that follows the slope (the surface normals of the GLB give a noisy slope) made the road edges ragged, so the lift is one number.
 //
 // THE TILES: the tiles that the view touches and one ring around them (a primitive is in the tile of the centre of its box, so it can reach a few metres into the next one), the
 // nearest `max_tiles` of them, from `min_zoom` on. They are read one at a time as they come, kept in a cache with a byte budget (`cache_mb`) and drawn while they are in it.
@@ -388,7 +388,7 @@ const _s3Label = k => k.charAt(0).toUpperCase() + k.slice(1);
 function _s3Rows(){
   const o = _s3Opt(), add = window.rsAddTopRow;
   const off = () => !_s3Terrain() ? "Needs the 3D terrain" : map.getZoom() < o.min_zoom ? "Zoom in to " + o.min_zoom + " to see the 3D roads" : "";
-  add({id: "scene3d", label: "3D roads", get: () => _s3On, set: on => rsScene3d(on), available: () => _s3Terrain(), unavailable: off});
+  add({id: "scene3d", label: "3D scene", get: () => _s3On, set: on => rsScene3d(on), available: () => _s3Terrain(), unavailable: off});
   for(const k of o.kinds) add({id: "scene3d-" + k, label: "3D " + k, get: () => _s3Kinds.get(k), set: on => rsScene3dKind(k, on), available: () => _s3Terrain() && _s3On, unavailable: () => _s3On ? off() : "The 3D roads are off"});
 }
 

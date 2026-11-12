@@ -274,10 +274,9 @@ def test_the_rows_are_in_the_base_map_box_and_the_scene_needs_the_terrain(tmp_pa
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, html, f["path"], terrain=False)
         try:
-            rows = page.evaluate("[...document.querySelectorAll('.rs-bm-box label.rs-bm-row')].map(l => [l.textContent.trim(), l.querySelector('input').disabled]).filter(r => r[0].startsWith('3D'))")
+            rows = page.evaluate("[...document.querySelectorAll('.rs-bm-box label.rs-bm-row')].map(l => [l.textContent.trim(), l.querySelector('input').disabled]).filter(r => /^3D (scene|roads|kerbs|markings|structures)$/.test(r[0]))")
             names = [r[0] for r in rows]
-            assert names[:1] == ["3D roads"] or "3D roads" in names, rows
-            assert {"3D kerbs", "3D markings", "3D structures"} <= set(names)
+            assert names == ["3D scene", "3D roads", "3D kerbs", "3D markings", "3D structures"], rows
             assert all(r[1] for r in rows if r[0] in ("3D kerbs", "3D markings"))             # no terrain: greyed
             assert page.evaluate("rsScene3dStatus().drawn") is False
             page.evaluate("rsTerrain(true)")

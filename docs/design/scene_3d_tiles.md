@@ -1,6 +1,6 @@
 # 3D road tiles (GLB) on the map
 
-Date: 2026-11-12. Status: proposal. Nothing is built. The request comes from SimReady (`docs/7-plan/3d-map.md`, step 4, and
+Date: 2026-11-12. Status: built (Option A), with the changes in "What the build changed" below. The request comes from SimReady (`docs/7-plan/3d-map.md`, step 4, and
 `build/roadstyle-gaps.md`, "No 3D scene (GLB) on the map").
 
 ## Summary
@@ -101,6 +101,23 @@ Like Option A, with `proj4js` (about 90 KB) in `rust/roadstyle-assets/files/vend
 
 **Option A.** It is the smallest, and the table covers Monaco, Stockholm and Tartu today. If a CRS outside the two families appears, move the projection to
 Option B. The module keeps the projection behind one function (`crsToLonLat`), so the move changes nothing else.
+
+## What the build changed
+
+Option A was built (the pick of the roadstyle session, 2026-11-12). The spike and the build changed these points of the proposal:
+
+1. **The lift of risk 10 is one number, 0.6 m** (`ontop.scene_3d.lift_m`, `data/basemaps.json`). Measured on SimReady's look page with the real Monaco archive (3D terrain on, the flat
+   layers hidden, three views): the share of road pixels that show, against a lift of 4 m: 0.3 to 6 % with no lift, 7 to 23 % with 0.15 m, 87 to 101 % with 0.3 m, 93 to 102 % with 0.6 m.
+   A lift that follows the slope (0.3 m + 2.5 m for each metre of slope, from the surface normal, the rule of `bridgemesh.js`) was tried and made the road edges ragged: the GLB's normals are noisy
+   from one vertex to the next. Heights agree with the page's ground (median road height minus terrain height: 6 mm).
+2. **The CRS table is read by Rust, not by the page.** `scene3d.rs` looks the archive's EPSG code up in `data/crs.json` at render time and writes the parameters into the page option;
+   the page has only the formulas (transverse Mercator, Lambert conformal conic, Web Mercator). So the keyword needs the archive's path (not only an address), and the rows of the
+   switches and the ground check exist before the page opens. The page keeps the ground check for `rsGround` at run time.
+3. **The rows are `rsAddTopRow` rows** of the base-map box (the page part for a page's own layers), so they have both themes with no new CSS. The scene's own row is *3D scene*, one row for each part is
+   *3D roads*, *3D kerbs*, ... An unavailable row shows why in its tooltip.
+4. **Light:** `ambient` 0.8, so the noisy normals do not make bands; the dark theme dims the colour (`dim`).
+5. **Speed:** a tile is read and converted in 2 to 50 ms on the main thread (Monaco, 8 tiles, 270,000 vertices, 0.57 s in all), so there is no worker.
+6. **Not done:** hover on the scene, a part's colour from the palette (the GLB's material colour is used), a `File` or `Blob` as the archive.
 
 ## Steps after the pick
 
