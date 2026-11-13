@@ -562,13 +562,19 @@ pub fn levels_tile(edges: &LevelEdges, roles: &TileRoles, o: &Options) -> Result
     let n = roads.first.len();
     let owned: Vec<bool> = (0..n).map(|r| (roles.owned)(edges[roads.first[r]].edge_id)).collect();
     let mut counted = owned.clone(); // owned or of an earlier tile
+    let mut fixed = vec![false; n];
     for (i, e) in edges.iter().enumerate() {
         if let Some(v) = (roles.earlier)(e.edge_id) {
             let r = roads.road[i];
             counted[r] = true;
+            fixed[r] = true;
             rules.fixed.push((r, if roads.same[i] { v } else { [v[2], v[1], v[0], v[3]] }));
         }
     }
+    // a meet of two roads of earlier tiles is theirs: this tile can miss a road at their node (a road with no part near the
+    // tile), so it can see a meet where the tile of the roads saw a crossing (France). The solve does not move fixed roads, so
+    // the rule only made the check fail.
+    rules.meets.retain(|&(a, _, b, _)| !(fixed[a] && fixed[b]));
     let steps = (2.0 * o.max_level as f64 / o.margin + 1e-9).floor() as i64;
     let start = tags_start(edges, &roads, o, steps);
     let s = solve::solve_local(&rules, &start, steps, o.min_positions)?;
