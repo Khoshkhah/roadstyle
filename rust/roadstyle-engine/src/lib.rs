@@ -239,12 +239,15 @@ pub fn level_edges(table: &RoadTable, cols: [&str; 7]) -> roadstyle_levels::Leve
     for i in 0..table.len() {
         edges.add(0, roadstyle_levels::LevelEdge {
             edge_id: i as i64,
-            highway: text(table.get(i, hw)).unwrap_or_default(),
-            tunnel: text(table.get(i, tunnel)),
-            bridge: text(table.get(i, bridge)),
-            layer: text(table.get(i, layer)),
-            junction: text(table.get(i, junction)),
-            band: text(table.get(i, band)),
+            tags: roadstyle_levels::LevelTags {
+                highway: text(table.get(i, hw)).unwrap_or_default(),
+                tunnel: text(table.get(i, tunnel)),
+                bridge: text(table.get(i, bridge)),
+                layer: text(table.get(i, layer)),
+                junction: text(table.get(i, junction)),
+                band: text(table.get(i, band)),
+            }
+            .into(),
             order: text(table.get(i, order)).and_then(|s| s.trim().parse::<f64>().ok()).filter(|x| !x.is_nan()),
             geometry: table.line(i).map_or_else(Vec::new, |c| c.iter().map(|p| (p[0], p[1])).collect()),
         });

@@ -5,7 +5,7 @@
 
 mod common;
 
-use roadstyle_rs::levels::{levels, LevelEdge, LevelEdges, Method, Options};
+use roadstyle_rs::levels::{levels, LevelEdge, LevelEdges, LevelTags, Method, Options};
 use roadstyle_rs::read::read_roads;
 use std::path::PathBuf;
 
@@ -17,11 +17,15 @@ fn edges() -> LevelEdges {
         let text = |k: &str| t.get(i, k).unwrap().as_str().map(String::from);
         out.add(t.get(i, "rank").unwrap().as_u64().unwrap() as u8, LevelEdge {
             edge_id: t.get(i, "edge_id").unwrap().as_i64().unwrap(),
-            highway: text("highway").unwrap(),
-            tunnel: text("tunnel"),
-            bridge: text("bridge"),
-            layer: text("layer"),
-            junction: text("junction"),
+            tags: LevelTags {
+                highway: text("highway").unwrap(),
+                tunnel: text("tunnel"),
+                bridge: text("bridge"),
+                layer: text("layer"),
+                junction: text("junction"),
+                ..Default::default()
+            }
+            .into(),
             geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect(),
             ..Default::default()
         });
