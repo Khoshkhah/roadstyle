@@ -6,9 +6,9 @@ use crate::Error;
 use super::solve::Rules;
 use super::{LevelEdge, Options, Order, Pt};
 use crate::flags;
-use crate::plane::{casing_parts, circle, crosses, distance, metres, outside, Indexed};
+use crate::plane::{casing_parts, circle, crosses, distance, metres, outside, Indexed, Utm};
 use rstar::{RTree, AABB};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// The roads: edges with the same line (in one direction or the other) and the same `highway`, `tunnel`, `bridge`,
 /// `layer` and band (roadstyle's `_road_split`).
@@ -42,34 +42,48 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, Error> {
         }
         ends.push((id(&e.geometry[0]), id(e.geometry.last().unwrap())));
     }
-    type Key<'a> = ((u32, u32), Vec<(u64, u64)>, [Option<&'a str>; 5]);
-    let mut roads: HashMap<Key, usize> = HashMap::new();
+    // the key of a road: its end nodes, a hash of its line (the smaller way round) and its tags, and a number for two lines with one
+    // hash. A key that is found is checked against the road's first edge. (The line itself as the key: Kentucky +0.5 GB.)
+    use std::hash::{Hash, Hasher};
+    fn kind(e: &LevelEdge) -> [Option<&str>; 5] {
+        [Some(e.highway.as_str()), e.tunnel.as_deref(), e.bridge.as_deref(), e.layer.as_deref(), e.band.as_deref()]
+    }
+    let line = |e: &LevelEdge, back: bool| -> Vec<(u64, u64)> {
+        let mut l: Vec<(u64, u64)> = e.geometry.iter().map(bits).collect();
+        if back {
+            l.reverse();
+        }
+        l
+    };
+    let mut roads: HashMap<(u32, u32, u64, u32), usize> = HashMap::new();
     let (mut first, mut road, mut same) = (Vec::new(), Vec::new(), Vec::new());
     for (i, e) in edges.iter().enumerate() {
-        let fwd: Vec<(u64, u64)> = e.geometry.iter().map(bits).collect();
-        let rev: Vec<(u64, u64)> = fwd.iter().rev().copied().collect();
         let (s, t) = ends[i];
-        let a = e;
-        let kind = [
-            Some(a.highway.as_str()),
-            a.tunnel.as_deref(),
-            a.bridge.as_deref(),
-            a.layer.as_deref(),
-            a.band.as_deref(),
-        ];
-        let key = ((s.min(t), s.max(t)), fwd.clone().min(rev), kind);
-        let r = *roads.entry(key).or_insert_with(|| {
-            first.push(i);
-            first.len() - 1
-        });
+        let g = &e.geometry;
+        let back = g.iter().rev().map(bits).lt(g.iter().map(bits));
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (line(e, back), kind(e)).hash(&mut h);
+        let h = h.finish();
+        let mut k = 0;
+        let r = loop {
+            match roads.get(&(s.min(t), s.max(t), h, k)) {
+                None => {
+                    first.push(i);
+                    roads.insert((s.min(t), s.max(t), h, k), first.len() - 1);
+                    break first.len() - 1;
+                }
+                Some(&r) => {
+                    let f = edges[first[r]];
+                    let fb = f.geometry.iter().rev().map(bits).lt(f.geometry.iter().map(bits));
+                    if kind(f) == kind(e) && line(f, fb) == line(e, back) {
+                        break r;
+                    }
+                    k += 1;
+                }
+            }
+        };
         road.push(r);
-        same.push(
-            edges[first[r]]
-                .geometry
-                .iter()
-                .map(bits)
-                .eq(fwd.iter().copied()),
-        );
+        same.push(edges[first[r]].geometry.iter().map(bits).eq(g.iter().map(bits)));
     }
     Ok(Roads {
         ends,
@@ -168,7 +182,7 @@ struct Net<'a> {
     band: Vec<i64>,
     omega: Vec<Option<f64>>,
     ends: Vec<(u32, u32)>,
-    m: Vec<Vec<Pt>>,
+    utm: Utm,
 }
 
 impl<'a> Net<'a> {
@@ -177,10 +191,24 @@ impl<'a> Net<'a> {
         let band = head.iter().map(|e| if o.band_col { band(e) } else { level(e) }).collect();
         let omega = head.iter().map(|e| priority(e, o.order)).collect();
         let ends = roads.first.iter().map(|&i| roads.ends[i]).collect();
-        let lines: Vec<&[Pt]> = head.iter().map(|e| e.geometry.as_slice()).collect();
-        let m = metres(&lines);
-        Net { head, band, omega, ends, m }
+        let utm = metres(head.iter().map(|e| e.geometry.as_slice()));
+        Net { head, band, omega, ends, utm }
     }
+
+    /// The line of road `r` in metres, made when it is needed (all lines in metres: Kentucky +0.2 GB).
+    fn m(&self, r: usize) -> Vec<Pt> {
+        self.head[r].geometry.iter().map(|&p| self.utm.project(p)).collect()
+    }
+}
+
+/// The nodes that pairs of roads share, as `(road, road, node)` with the smaller road first, sorted: the nodes of a pair are one run.
+type Shared = Vec<(u32, u32, u32)>;
+
+fn shared_nodes(shared: &Shared, x: usize, y: usize) -> &[(u32, u32, u32)] {
+    let (x, y) = (x as u32, y as u32);
+    let a = shared.partition_point(|&(i, j, _)| (i, j) < (x, y));
+    let b = shared.partition_point(|&(i, j, _)| (i, j) <= (x, y));
+    &shared[a..b]
 }
 
 /// What the road ends at the nodes give.
@@ -190,7 +218,7 @@ struct AtNodes {
     /// (car road, path, end) of a path that a car road crosses at its end
     crossings: Vec<(usize, usize, usize)>,
     /// the nodes that each pair of roads shares
-    shared: BTreeMap<(usize, usize), BTreeSet<u32>>,
+    shared: Shared,
 }
 
 /// meet: the road ends at each node. A path (PATH_CLASSES) at a node where a car road goes on (two car road ends or more there) is a
@@ -203,20 +231,24 @@ fn at_nodes(net: &Net) -> AtNodes {
     let is_path = |r: usize| crate::PATH_CLASSES.contains(&net.head[r].highway.as_str());
     let is_car = |r: usize| !is_path(r) && net.head[r].highway != "platform" && net.omega[r].is_some();
     let crossing = |car: usize, path: usize| is_car(car) && is_path(path) && net.band[car] == net.band[path] && net.omega[car] > net.omega[path];
-    let mut at: BTreeMap<u32, Vec<(usize, usize)>> = BTreeMap::new();
+    // (node, road, end) of each road end, sorted: the ends at a node are one run
+    let mut at: Vec<(u32, u32, u8)> = Vec::with_capacity(2 * net.ends.len());
     for (r, &(s, t)) in net.ends.iter().enumerate() {
-        at.entry(s).or_default().push((r, 0));
-        at.entry(t).or_default().push((r, 2));
+        at.push((s, r as u32, 0));
+        at.push((t, r as u32, 2));
     }
-    let mut out = AtNodes { meets: Vec::new(), crossings: Vec::new(), shared: BTreeMap::new() };
-    for (&v, here) in &at {
+    at.sort_unstable();
+    let mut out = AtNodes { meets: Vec::new(), crossings: Vec::new(), shared: Vec::new() };
+    for run in at.chunk_by(|a, b| a.0 == b.0) {
+        let v = run[0].0;
+        let here: Vec<(usize, usize)> = run.iter().map(|&(_, r, e)| (r as usize, e as usize)).collect();
         let cars = here.iter().filter(|&&(r, _)| is_car(r)).count();
         for (i, &(x, ex)) in here.iter().enumerate() {
             for &(y, ey) in &here[i + 1..] {
                 if x == y {
                     continue;
                 }
-                out.shared.entry((x.min(y), x.max(y))).or_default().insert(v);
+                out.shared.push((x.min(y) as u32, x.max(y) as u32, v));
                 if cars >= 2 && (crossing(x, y) || crossing(y, x)) {
                     let (car, end, path) = if crossing(x, y) { (x, ex, y) } else { (y, ey, x) };
                     out.crossings.push((car, path, end));
@@ -226,30 +258,42 @@ fn at_nodes(net: &Net) -> AtNodes {
             }
         }
     }
+    out.shared.sort_unstable();
+    out.shared.dedup();
     out
 }
 
-/// The pairs of roads of different bands that are within `band_dist` of each other.
+/// The pairs of roads of different bands that are within `band_dist` of each other. Each pair has a road off the band of most roads:
+/// only those roads go in the tree (Kentucky: a tree of all roads and their boxes, +0.2 GB), and each road looks for them.
 fn near_pairs(net: &Net, band_dist: f64) -> BTreeSet<(usize, usize)> {
     let mut near = BTreeSet::new();
-    if net.band.iter().all(|&b| b == net.band[0]) {
+    let mut count: HashMap<i64, usize> = HashMap::new();
+    for &b in &net.band {
+        *count.entry(b).or_default() += 1;
+    }
+    if count.len() < 2 {
         return near;
     }
-    let boxes: Vec<AABB<[f64; 2]>> = net.m.iter().map(|l| {
+    let most = count.iter().max_by_key(|&(b, c)| (*c, -*b)).map(|(b, _)| *b).unwrap();
+    let bbox = |l: &[Pt]| {
         let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
         for p in l {
             (x0, y0, x1, y1) = (x0.min(p.0), y0.min(p.1), x1.max(p.0), y1.max(p.1));
         }
         AABB::from_corners([x0, y0], [x1, y1])
-    }).collect();
-    let tree = RTree::bulk_load(boxes.iter().enumerate().map(|(i, b)| Indexed(i, *b)).collect());
-    for (i, b) in boxes.iter().enumerate() {
+    };
+    let off: Vec<usize> = (0..net.band.len()).filter(|&r| net.band[r] != most).collect();
+    let lines: Vec<Vec<Pt>> = off.iter().map(|&r| net.m(r)).collect();
+    let tree = RTree::bulk_load(lines.iter().enumerate().map(|(k, l)| Indexed(k, bbox(l))).collect());
+    for i in 0..net.band.len() {
+        let mi = net.m(i);
+        let b = bbox(&mi);
         let (lo, hi) = (b.lower(), b.upper());
         let q = AABB::from_corners([lo[0] - band_dist, lo[1] - band_dist], [hi[0] + band_dist, hi[1] + band_dist]);
-        for Indexed(j, _) in tree.locate_in_envelope_intersecting(&q) {
-            let j = *j;
-            if i < j && net.band[i] != net.band[j] && distance(std::slice::from_ref(&net.m[i]), std::slice::from_ref(&net.m[j])) <= band_dist {
-                near.insert((i, j));
+        for Indexed(k, _) in tree.locate_in_envelope_intersecting(&q) {
+            let j = off[*k];
+            if net.band[i] != net.band[j] && distance(std::slice::from_ref(&mi), std::slice::from_ref(&lines[*k])) <= band_dist {
+                near.insert((i.min(j), i.max(j)));
             }
         }
     }
@@ -258,19 +302,17 @@ fn near_pairs(net: &Net, band_dist: f64) -> BTreeSet<(usize, usize)> {
 
 /// stack: roads of different bands within band_dist, away from the nodes they share. The stacks as (upper, lower), and the pairs of
 /// roads that only meet (no stack).
-fn stacks(net: &Net, shared: &BTreeMap<(usize, usize), BTreeSet<u32>>, o: &Options) -> (Vec<(usize, usize)>, BTreeSet<(usize, usize)>) {
-    let mut node_at: HashMap<u32, Pt> = HashMap::new();
-    for (r, &(s, t)) in net.ends.iter().enumerate() {
-        node_at.entry(s).or_insert(net.m[r][0]);
-        node_at.entry(t).or_insert(*net.m[r].last().unwrap());
-    }
-    let (m, band, band_dist) = (&net.m, &net.band, o.band_dist);
+fn stacks(net: &Net, shared: &Shared, o: &Options) -> (Vec<(usize, usize)>, BTreeSet<(usize, usize)>) {
+    let (band, band_dist) = (&net.band, o.band_dist);
     let mut stacks = Vec::new();
     let mut only_meet = BTreeSet::new();
     for (i, j) in near_pairs(net, band_dist) {
-        if let Some(nodes) = shared.get(&(i, j)).filter(|_| !o.band_col) {
-            let hole: Vec<Vec<Pt>> = nodes.iter().map(|v| circle(node_at[v], band_dist)).collect();
-            let (a, b) = (outside(&m[i], &hole), outside(&m[j], &hole));
+        let nodes = shared_nodes(shared, i, j);
+        if !nodes.is_empty() && !o.band_col {
+            let (mi, mj) = (net.m(i), net.m(j));
+            let at = |&(_, _, v): &(u32, u32, u32)| if net.ends[i].0 == v { mi[0] } else { *mi.last().unwrap() };
+            let hole: Vec<Vec<Pt>> = nodes.iter().map(|v| circle(at(v), band_dist)).collect();
+            let (a, b) = (outside(&mi, &hole), outside(&mj, &hole));
             if a.is_empty() || b.is_empty() || distance(&a, &b) > band_dist {
                 only_meet.insert((i, j));
                 continue;
@@ -282,9 +324,10 @@ fn stacks(net: &Net, shared: &BTreeMap<(usize, usize), BTreeSet<u32>>, o: &Optio
 }
 
 /// order: where roads meet, of one band or of different bands that only meet; (higher, lower).
-fn orders(net: &Net, shared: &BTreeMap<(usize, usize), BTreeSet<u32>>, only_meet: &BTreeSet<(usize, usize)>) -> Vec<(usize, usize)> {
+fn orders(net: &Net, shared: &Shared, only_meet: &BTreeSet<(usize, usize)>) -> Vec<(usize, usize)> {
     let mut orders = Vec::new();
-    for &(x, y) in shared.keys() {
+    for run in shared.chunk_by(|a, b| (a.0, a.1) == (b.0, b.1)) {
+        let (x, y) = (run[0].0 as usize, run[0].1 as usize);
         let (Some(wx), Some(wy)) = (net.omega[x], net.omega[y]) else { continue };
         if wx != wy && (net.band[x] == net.band[y] || only_meet.contains(&(x, y))) {
             orders.push(if wx > wy { (x, y) } else { (y, x) });
@@ -297,19 +340,27 @@ fn orders(net: &Net, shared: &BTreeMap<(usize, usize), BTreeSet<u32>>, only_meet
 #[allow(clippy::type_complexity)]
 fn lifts(net: &Net, stacks: &[(usize, usize)], meets: &[(usize, usize, usize, usize)], heads: &HashMap<usize, [f64; 2]>, o: &Options)
          -> (Vec<(usize, usize, usize)>, Vec<(usize, usize, usize)>) {
+    // the roads that meet each lower road, and those at each head of an upper road: only for the roads of the stacks (for all roads:
+    // Kentucky +0.6 GB)
+    let upper: HashSet<usize> = stacks.iter().map(|s| s.0).collect();
+    let lower: HashSet<usize> = stacks.iter().map(|s| s.1).collect();
     let mut touching: HashMap<usize, BTreeSet<usize>> = HashMap::new();
     let mut at_head: HashMap<(usize, usize), BTreeSet<usize>> = HashMap::new();
     for &(x, ex, y, ey) in meets {
-        touching.entry(x).or_default().insert(y);
-        touching.entry(y).or_default().insert(x);
-        at_head.entry((x, ex)).or_default().insert(y);
-        at_head.entry((y, ey)).or_default().insert(x);
+        for (a, ea, b) in [(x, ex, y), (y, ey, x)] {
+            if lower.contains(&a) {
+                touching.entry(a).or_default().insert(b);
+            }
+            if upper.contains(&a) {
+                at_head.entry((a, ea)).or_default().insert(b);
+            }
+        }
     }
     let empty = BTreeSet::new();
-    let m = &net.m;
     let (mut lifts, mut near) = (Vec::new(), Vec::new());
     for &(u, l) in stacks {
-        let parts = casing_parts(&m[u], heads.get(&u).copied().unwrap_or([o.head_m; 2]));
+        let (mu, ml) = (net.m(u), net.m(l));
+        let parts = casing_parts(&mu, heads.get(&u).copied().unwrap_or([o.head_m; 2]));
         let tl = touching.get(&l).unwrap_or(&empty);
         for (h, p) in parts.iter().enumerate() {
             let Some(p) = p else { continue };
@@ -319,7 +370,7 @@ fn lifts(net: &Net, stacks: &[(usize, usize)], meets: &[(usize, usize, usize, us
                     continue;
                 }
             }
-            if crosses(p, &m[u], &m[l]) {
+            if crosses(p, &mu, &ml) {
                 lifts.push((u, l, h));
             } else if o.near_rules {
                 near.push((u, l, h));
