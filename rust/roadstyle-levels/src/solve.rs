@@ -237,11 +237,14 @@ fn numbers(rules: &Rules, steps: i64, min_positions: bool) -> Result<(Vec<i64>, 
 }
 
 /// The levels of a large area with little memory (Kaveh, 2026-11-13): `start` gives each road its numbers `[casing_start,
-/// casing_level, casing_end, fill]` in the box `[0, steps]` (the tags rule), then each group of roads that the rules broken by those
-/// numbers join is solved alone, with the roads around it fixed at their numbers of that moment. The memory is that of the largest
-/// group, not of the area (Kentucky: 50,547 groups, the largest 4,854 of 1,266,648 roads). The groups go one after the other: a rule
-/// between two groups is a rule of the later one, so every hard rule holds at the end. A group with no solution keeps its numbers.
-/// `stages`: the sums over the groups.
+/// casing_level, casing_end, fill]` in the box `[0, steps]` (the tags rule). Then two passes, each a repair and a compress:
+/// - the repair: each group of roads that the broken rules join is solved alone, with its neighbours (the roads of one rule more)
+///   free too and the roads after them fixed at their numbers of that moment. The memory is that of the largest group, not of the
+///   area (Kentucky: 50,547 groups, the largest 4,854 of 1,266,648 roads). The groups go one after the other: a rule between two
+///   groups is a rule of the later one, so every hard rule holds at the end. A group with no solution keeps its numbers.
+/// - the compress: the least numbers that keep every rule that holds now, then each casing part as high as its fills let it
+///   (the cost stage). The tags numbers and the repairs leave gaps; the compress removes them, so the levels are few.
+/// `stages`: the values of the stages for the last numbers, as `solve` gives them.
 pub fn solve_local(rules: &Rules, start: &[[i64; 4]], steps: i64, min_positions: bool) -> Result<Solved, Error> {
     let n = rules.roads;
     let mut x: Vec<[i64; 4]> = start.to_vec();
@@ -252,28 +255,77 @@ pub fn solve_local(rules: &Rules, start: &[[i64; 4]], steps: i64, min_positions:
     }
     // the rules as (kind, index): 0 meet, 1 lift, 2 crossing, 3 order, 4 near
     let count = [rules.meets.len(), rules.lifts.len(), rules.crossings.len(), rules.orders.len(), rules.near.len()];
-    let roads_of = |k: u8, i: usize| -> (usize, usize) {
-        match k {
-            0 => (rules.meets[i].0, rules.meets[i].2),
-            1 => (rules.lifts[i].0, rules.lifts[i].1),
-            2 => (rules.crossings[i].0, rules.crossings[i].1),
-            3 => rules.orders[i],
-            _ => (rules.near[i].0, rules.near[i].1),
-        }
-    };
-    let broken = |x: &[[i64; 4]], k: u8, i: usize| -> bool {
-        match k {
-            0 => {
-                let (a, ea, b, eb) = rules.meets[i];
-                x[a][ea] > x[b][3] || x[b][eb] > x[a][3]
+    // the rules of each road
+    let (at, of) = by_node::<(u8, u32)>(n, |put| {
+        for (k, &m) in count.iter().enumerate() {
+            for i in 0..m {
+                let (a, b) = roads_of(rules, k as u8, i);
+                put(a, (k as u8, i as u32));
+                if b != a {
+                    put(b, (k as u8, i as u32));
+                }
             }
-            1 => x[rules.lifts[i].1][3] >= x[rules.lifts[i].0][rules.lifts[i].2],
-            2 => x[rules.crossings[i].1][3] >= x[rules.crossings[i].0][rules.crossings[i].2],
-            3 => x[rules.orders[i].1][3] >= x[rules.orders[i].0][3],
-            _ => x[rules.near[i].1][3] >= x[rules.near[i].0][rules.near[i].2],
         }
-    };
-    // the groups: the roads that a broken rule joins
+    });
+    for _ in 0..2 {
+        repair(rules, &mut x, &fixed, &count, &at, &of, steps, min_positions);
+        compress(rules, &mut x, &fixed);
+    }
+    // all numbers in the columns of the whole area (0 as the last node), the check of every hard rule, and the report
+    let mut flat = vec![0i64; 4 * n + 3];
+    for r in 0..n {
+        flat[r] = x[r][3];
+        for h in 0..3 {
+            flat[col(n, r, h)] = x[r][h];
+        }
+    }
+    feasible(rules, &flat, steps)?;
+    let c = Cleaned::new(rules);
+    let miss = |a: i64, b: i64| (a + 1 - b).max(0); // the steps by which b_lower + 1 <= a_upper is broken
+    let mut stages = [
+        c.lifts.iter().map(|&(u, l, h)| miss(x[l][3], x[u][h])).sum(),
+        c.crossings.iter().map(|&(cr, p, h)| miss(x[p][3], x[cr][h])).sum(),
+        c.orders.iter().map(|&(a, b)| miss(x[b][3], x[a][3])).sum(),
+        c.near.iter().map(|&(u, l, h)| miss(x[l][3], x[u][h])).sum(),
+        x.iter().map(|p| 3 * p[3] - p[0] - p[1] - p[2]).sum(),
+    ];
+    if min_positions {
+        let (lo, hi) = x.iter().flatten().fold((i64::MAX, i64::MIN), |(a, b), &v| (a.min(v), b.max(v)));
+        stages[4] += (3 * n as i64 * steps + 1) * (hi - lo);
+    }
+    Ok(report(n, &c, &flat, stages))
+}
+
+/// Rule `(k, i)` is broken by the numbers `x` (see `solve_local`).
+fn broken(rules: &Rules, x: &[[i64; 4]], k: u8, i: usize) -> bool {
+    match k {
+        0 => {
+            let (a, ea, b, eb) = rules.meets[i];
+            x[a][ea] > x[b][3] || x[b][eb] > x[a][3]
+        }
+        1 => x[rules.lifts[i].1][3] >= x[rules.lifts[i].0][rules.lifts[i].2],
+        2 => x[rules.crossings[i].1][3] >= x[rules.crossings[i].0][rules.crossings[i].2],
+        3 => x[rules.orders[i].1][3] >= x[rules.orders[i].0][3],
+        _ => x[rules.near[i].1][3] >= x[rules.near[i].0][rules.near[i].2],
+    }
+}
+
+/// The roads `(a, b)` of rule `(k, i)`.
+fn roads_of(rules: &Rules, k: u8, i: usize) -> (usize, usize) {
+    match k {
+        0 => (rules.meets[i].0, rules.meets[i].2),
+        1 => (rules.lifts[i].0, rules.lifts[i].1),
+        2 => (rules.crossings[i].0, rules.crossings[i].1),
+        3 => rules.orders[i],
+        _ => (rules.near[i].0, rules.near[i].1),
+    }
+}
+
+/// One repair pass of `solve_local`: each group of roads that a broken rule joins, with its neighbours, solved alone.
+#[allow(clippy::too_many_arguments)]
+fn repair(rules: &Rules, x: &mut [[i64; 4]], fixed: &[bool], count: &[usize; 5], at: &[usize], of: &[(u8, u32)], steps: i64,
+    min_positions: bool) {
+    let n = rules.roads;
     let mut parent: Vec<u32> = (0..n as u32).collect();
     fn find(p: &mut [u32], mut v: usize) -> usize {
         while p[v] as usize != v {
@@ -285,8 +337,8 @@ pub fn solve_local(rules: &Rules, start: &[[i64; 4]], steps: i64, min_positions:
     let mut bad = vec![false; n];
     for (k, &m) in count.iter().enumerate() {
         for i in 0..m {
-            if broken(&x, k as u8, i) {
-                let (a, b) = roads_of(k as u8, i);
+            if broken(rules, x, k as u8, i) {
+                let (a, b) = roads_of(rules, k as u8, i);
                 bad[a] = true;
                 bad[b] = true;
                 let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
@@ -299,36 +351,31 @@ pub fn solve_local(rules: &Rules, start: &[[i64; 4]], steps: i64, min_positions:
     let mut members: Vec<(u32, u32)> = (0..n).filter(|&r| bad[r]).map(|r| (find(&mut parent, r) as u32, r as u32)).collect();
     members.sort_unstable();
     drop((parent, bad));
-    // the rules of each road
-    let (at, of) = by_node::<(u8, u32)>(n, |put| {
-        for (k, &m) in count.iter().enumerate() {
-            for i in 0..m {
-                let (a, b) = roads_of(k as u8, i);
-                put(a, (k as u8, i as u32));
-                if b != a {
-                    put(b, (k as u8, i as u32));
-                }
-            }
-        }
-    });
-    let mut stages = [0i64; 5];
     for group in members.chunk_by(|a, b| a.0 == b.0) {
-        // the roads of the group first, then the roads around it; the rules that touch the group
+        // the roads of the group, then its neighbours (free too), then the roads after them (fixed); the rules of the free roads
         let mut roads: Vec<usize> = group.iter().map(|&(_, r)| r as usize).collect();
-        let size = roads.len();
         let mut local: std::collections::HashMap<usize, usize> = roads.iter().enumerate().map(|(l, &r)| (r, l)).collect();
-        let mut ids: Vec<(u8, u32)> = roads.iter().flat_map(|&r| of[at[r]..at[r + 1]].iter().copied()).collect();
-        ids.sort_unstable();
-        ids.dedup();
-        for &(k, i) in &ids {
-            let (a, b) = roads_of(k, i as usize);
-            for v in [a, b] {
-                if !local.contains_key(&v) {
-                    local.insert(v, roads.len());
-                    roads.push(v);
+        let rules_of = |roads: &[usize]| {
+            let mut ids: Vec<(u8, u32)> = roads.iter().flat_map(|&r| of[at[r]..at[r + 1]].iter().copied()).collect();
+            ids.sort_unstable();
+            ids.dedup();
+            ids
+        };
+        let mut add = |ids: &[(u8, u32)], roads: &mut Vec<usize>| {
+            for &(k, i) in ids {
+                let (a, b) = roads_of(rules, k, i as usize);
+                for v in [a, b] {
+                    if !local.contains_key(&v) {
+                        local.insert(v, roads.len());
+                        roads.push(v);
+                    }
                 }
             }
-        }
+        };
+        add(&rules_of(&roads), &mut roads);
+        let free = roads.len();
+        let ids = rules_of(&roads);
+        add(&ids, &mut roads);
         let m = |v: usize| local[&v];
         let mut sub = Rules { roads: roads.len(), ..Default::default() };
         for &(k, i) in &ids {
@@ -354,34 +401,77 @@ pub fn solve_local(rules: &Rules, start: &[[i64; 4]], steps: i64, min_positions:
             }
         }
         for (l, &r) in roads.iter().enumerate() {
-            if l >= size || fixed[r] {
+            if l >= free || fixed[r] {
                 sub.fixed.push((l, x[r]));
             }
         }
-        let Ok((xs, st)) = numbers(&sub, steps, min_positions) else { continue };
+        let Ok((xs, _)) = numbers(&sub, steps, min_positions) else { continue };
         if feasible(&sub, &xs, steps).is_err() {
             continue;
         }
         let (nl, z) = (sub.roads, xs[xs.len() - 1]);
-        for (l, &r) in roads[..size].iter().enumerate() {
+        for (l, &r) in roads[..free].iter().enumerate() {
             if !fixed[r] {
                 x[r] = [xs[nl + 3 * l] - z, xs[nl + 3 * l + 1] - z, xs[nl + 3 * l + 2] - z, xs[l] - z];
             }
         }
-        for (s, v) in stages.iter_mut().zip(st) {
-            *s += v;
+    }
+}
+
+/// The compress of `solve_local`: the least numbers that keep every rule that holds in `x` (a rule x_v >= x_u + d moves x_v up,
+/// in sweeps from 0 until no number moves; the numbers stay at or below `x`, so the sweeps end), then each casing part up to the
+/// lowest fill over it: its own fill, and at a head the fills of the roads that meet there. The fixed roads do not move.
+fn compress(rules: &Rules, x: &mut [[i64; 4]], fixed: &[bool]) {
+    let keep = |k: u8, v: &[(usize, usize, usize)]| -> Vec<bool> { (0..v.len()).map(|i| !broken(rules, x, k, i)).collect() };
+    let (lifts, crossings, near) = (keep(1, &rules.lifts), keep(2, &rules.crossings), keep(4, &rules.near));
+    let orders: Vec<bool> = (0..rules.orders.len()).map(|i| !broken(rules, x, 3, i)).collect();
+    let meets: Vec<bool> = (0..rules.meets.len()).map(|i| !broken(rules, x, 0, i)).collect();
+    let mut y: Vec<[i64; 4]> = x.iter().zip(fixed).map(|(&v, &f)| if f { v } else { [0; 4] }).collect();
+    let mut moved = true;
+    let up = |y: &mut [[i64; 4]], r: usize, p: usize, v: i64, moved: &mut bool| {
+        if !fixed[r] && y[r][p] < v {
+            y[r][p] = v;
+            *moved = true;
+        }
+    };
+    while moved {
+        moved = false;
+        for r in 0..y.len() {
+            let v = y[r][0].max(y[r][1]).max(y[r][2]);
+            up(&mut y, r, 3, v, &mut moved); // a casing part not over its fill
+        }
+        for (&(a, ea, b, eb), _) in rules.meets.iter().zip(&meets).filter(|m| *m.1) {
+            let (va, vb) = (y[a][ea], y[b][eb]);
+            up(&mut y, b, 3, va, &mut moved);
+            up(&mut y, a, 3, vb, &mut moved);
+        }
+        for (v, k) in [(&rules.lifts, &lifts), (&rules.crossings, &crossings), (&rules.near, &near)] {
+            for (&(u, l, h), _) in v.iter().zip(k).filter(|m| *m.1) {
+                let w = y[l][3] + 1;
+                up(&mut y, u, h, w, &mut moved);
+            }
+        }
+        for (&(a, b), _) in rules.orders.iter().zip(&orders).filter(|m| *m.1) {
+            let w = y[b][3] + 1;
+            up(&mut y, a, 3, w, &mut moved);
         }
     }
-    // all numbers in the columns of the whole area (0 as the last node), the check of every hard rule, and the report
-    let mut flat = vec![0i64; 4 * n + 3];
-    for r in 0..n {
-        flat[r] = x[r][3];
-        for h in 0..3 {
-            flat[col(n, r, h)] = x[r][h];
+    // the casing parts up: as high as the fills over them let them be
+    for (r, p) in y.iter_mut().enumerate() {
+        if !fixed[r] {
+            *p = [p[3]; 4];
         }
     }
-    feasible(rules, &flat, steps)?;
-    Ok(report(n, &Cleaned::new(rules), &flat, stages))
+    for &(a, ea, b, eb) in &rules.meets {
+        let (fa, fb) = (y[a][3], y[b][3]);
+        if !fixed[a] {
+            y[a][ea] = y[a][ea].min(fb);
+        }
+        if !fixed[b] {
+            y[b][eb] = y[b][eb].min(fa);
+        }
+    }
+    x.copy_from_slice(&y);
 }
 
 /// The answer: the numbers of the parts and the rules that the numbers `x` do not keep.
@@ -604,6 +694,23 @@ mod tests {
         let s = solve(&r, 2, true).unwrap();
         assert_eq!((s.given_up.len(), s.stages[0]), (1, 1), "{:?}", s.parts);
         assert!(s.parts.iter().flatten().all(|&x| (0..=2).contains(&x)));
+    }
+
+    #[test]
+    fn the_local_repair_lifts_the_bridge_and_closes_the_gaps() {
+        // road 0 crosses road 1 with its main part, road 2 meets road 1 at its end; the start has the bridge at grade and gaps
+        let r = Rules {
+            roads: 3,
+            meets: vec![(1, 2, 2, 0)],
+            lifts: vec![(0, 1, 1)],
+            ..Default::default()
+        };
+        let s = solve_local(&r, &[[5, 5, 5, 5], [5, 5, 5, 5], [0, 0, 0, 12]], 20, true).unwrap();
+        assert!(s.given_up.is_empty(), "{:?}", s.parts);
+        let mut values: Vec<i64> = s.parts.iter().flatten().copied().collect();
+        values.sort_unstable();
+        values.dedup();
+        assert_eq!(values, [0, 1], "{:?}", s.parts);
     }
 
     #[test]
