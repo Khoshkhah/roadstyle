@@ -231,10 +231,13 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
         Method::Tags => tags(edges, &roads.ends),
         _ => {
             let (mut rules, _, _) = input::relations(edges, &roads, o, &HashMap::new());
-            // each edge's road, and whether the edge runs against it
+            // each edge's road, and whether the edge runs against it: only for the edges of the edits and the fixed numbers (for all
+            // edges: Kentucky +0.1 GB)
+            let wanted: HashSet<i64> = o.edits.iter().flat_map(|e| [e.a, e.b]).chain(o.fixed.iter().map(|f| f.0)).collect();
             let at: HashMap<i64, (usize, bool)> = edges
                 .iter()
                 .enumerate()
+                .filter(|(_, e)| wanted.contains(&e.edge_id))
                 .map(|(i, e)| (e.edge_id, (roads.road[i], !roads.same[i])))
                 .collect();
             edit(&mut rules, &o.edits, &at)?;
@@ -253,7 +256,21 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
             }
             // in steps of the margin, as roadstyle's: the box [-max_level, max_level] holds 2 max_level / margin + 1 numbers
             let steps = (2.0 * o.max_level as f64 / o.margin + 1e-9).floor() as i64;
-            let s = solve::solve(&rules, steps, o.min_positions)?;
+            // the tags rule first, then each group of roads whose rules it breaks alone (solve::solve_local): the memory of the largest
+            // group, not of the area. The tags numbers of a road: its lowest casing and its highest fill, in the box [0, steps]
+            let start = {
+                let level = tag_levels(edges, &roads.ends);
+                let n = roads.first.len();
+                let mut p = vec![[i64::MAX, i64::MAX, i64::MAX, i64::MIN]; n];
+                for i in 0..edges.len() {
+                    let (r, (casing, fill)) = (roads.road[i], level(i));
+                    let c = p[r][0].min(casing);
+                    p[r] = [c, c, c, p[r][3].max(fill)];
+                }
+                let to_box = |v: i64| (((v + o.max_level) as f64 / o.margin).round() as i64).clamp(0, steps);
+                p.iter().map(|q| [to_box(q[0]), to_box(q[1]), to_box(q[2]), to_box(q[3])]).collect::<Vec<_>>()
+            };
+            let s = solve::solve_local(&rules, &start, steps, o.min_positions)?;
             let both: std::collections::BTreeSet<(usize, usize)> = rules
                 .lifts
                 .iter()
@@ -489,25 +506,12 @@ pub fn edge_hash(ids: &[i64]) -> String {
 /// `method="tags"` (`_tag_intervals`): N(v) is the value of [min L, max L] of the edges at node v nearest 0; the
 /// casing is min(N(s), N(t), L) and the fill max(N(s), N(t), L).
 fn tags(edges: &[&LevelEdge], ends: &[(u32, u32)]) -> Vec<Row> {
-    let lv: Vec<i64> = edges.iter().map(|e| input::level(e)).collect();
-    let mut at: HashMap<u32, (i64, i64)> = HashMap::new();
-    for (&(s, t), &l) in ends.iter().zip(&lv) {
-        for v in [s, t] {
-            let e = at.entry(v).or_insert((l, l));
-            *e = (e.0.min(l), e.1.max(l));
-        }
-    }
-    let nv = |v: u32| {
-        let (lo, hi) = at[&v];
-        lo.max(0).min(hi)
-    };
+    let level = tag_levels(edges, ends);
     edges
         .iter()
-        .zip(ends)
-        .zip(&lv)
-        .map(|((e, &(s, t)), &l)| {
-            let c = nv(s).min(nv(t)).min(l);
-            let f = nv(s).max(nv(t)).max(l);
+        .enumerate()
+        .map(|(i, e)| {
+            let (c, f) = level(i);
             Row {
                 edge_id: e.edge_id,
                 casing_start: c,
@@ -521,6 +525,26 @@ fn tags(edges: &[&LevelEdge], ends: &[(u32, u32)]) -> Vec<Row> {
             }
         })
         .collect()
+}
+
+/// The casing and the fill of edge `i` by the tags rule (see `tags`).
+fn tag_levels<'a>(edges: &[&LevelEdge], ends: &'a [(u32, u32)]) -> impl Fn(usize) -> (i64, i64) + 'a {
+    let lv: Vec<i64> = edges.iter().map(|e| input::level(e)).collect();
+    let mut at: HashMap<u32, (i64, i64)> = HashMap::new();
+    for (&(s, t), &l) in ends.iter().zip(&lv) {
+        for v in [s, t] {
+            let e = at.entry(v).or_insert((l, l));
+            *e = (e.0.min(l), e.1.max(l));
+        }
+    }
+    move |i| {
+        let nv = |v: u32| {
+            let (lo, hi) = at[&v];
+            lo.max(0).min(hi)
+        };
+        let ((s, t), l) = (ends[i], lv[i]);
+        (nv(s).min(nv(t)).min(l), nv(s).max(nv(t)).max(l))
+    }
 }
 
 /// The solver's numbers (`parts`, in the box [0, 2 max_level]) around the ground: the main casing number that most edges have
@@ -571,12 +595,13 @@ fn solved_rows(
         weight[r] += 1;
     }
     let parts = to_ground(&s.parts, &weight, max_level)?;
-    let met: HashSet<(usize, usize)> = rules
-        .meets
-        .iter()
-        .flat_map(|&(x, ex, y, ey)| [(x, ex), (y, ey)])
-        .collect();
     let n = roads.first.len();
+    // the ends of each road that meet another road: bit 1 the start, bit 4 the end (a set of pairs: Kentucky +0.1 GB)
+    let mut met = vec![0u8; n];
+    for &(x, ex, y, ey) in &rules.meets {
+        met[x] |= 1 << ex;
+        met[y] |= 1 << ey;
+    }
     let (mut fwd, mut back) = (vec![false; n], vec![false; n]);
     for (i, &r) in roads.road.iter().enumerate() {
         if roads.same[i] {
@@ -586,7 +611,7 @@ fn solved_rows(
         }
     }
     let cap = |r: usize, end: usize| {
-        if !met.contains(&(r, end)) && fwd[r] && back[r] {
+        if met[r] & (1 << end) == 0 && fwd[r] && back[r] {
             "square"
         } else {
             "round"

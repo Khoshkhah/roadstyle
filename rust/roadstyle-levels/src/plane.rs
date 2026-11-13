@@ -5,7 +5,7 @@ use super::Pt;
 use rstar::{RTreeObject, AABB};
 
 /// The UTM zone of a point and the projection to it: the transverse Mercator series of Krüger (6th order, as PROJ).
-struct Utm {
+pub(crate) struct Utm {
     lon0: f64,
     north: f64,
     a: f64,
@@ -40,7 +40,7 @@ impl Utm {
         }
     }
 
-    fn project(&self, p: Pt) -> Pt {
+    pub(crate) fn project(&self, p: Pt) -> Pt {
         let (phi, lam) = (p.1.to_radians(), p.0.to_radians() - self.lon0);
         let s = phi.sin();
         let t = (s.atanh() - self.c * (self.c * s).atanh()).sinh();
@@ -57,17 +57,13 @@ impl Utm {
     }
 }
 
-/// The lines in metres, in the UTM zone of the center of their box (geopandas' `estimate_utm_crs`).
-pub(crate) fn metres(lines: &[&[Pt]]) -> Vec<Vec<Pt>> {
+/// The UTM zone of the center of the lines' box (geopandas' `estimate_utm_crs`): its `project` puts a point in metres.
+pub(crate) fn metres<'a>(lines: impl Iterator<Item = &'a [Pt]>) -> Utm {
     let (mut x0, mut y0, mut x1, mut y1) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
-    for p in lines.iter().flat_map(|l| l.iter()) {
+    for p in lines.flatten() {
         (x0, y0, x1, y1) = (x0.min(p.0), y0.min(p.1), x1.max(p.0), y1.max(p.1));
     }
-    let utm = Utm::new((x0 + x1) / 2.0, (y0 + y1) / 2.0);
-    lines
-        .iter()
-        .map(|l| l.iter().map(|&p| utm.project(p)).collect())
-        .collect()
+    Utm::new((x0 + x1) / 2.0, (y0 + y1) / 2.0)
 }
 
 // ---- plane geometry (metres) ----

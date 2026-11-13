@@ -26,6 +26,14 @@ pub struct Network {
 }
 
 impl Network {
+    /// Room for `m` more arcs, with no extra room: a list that doubles needs up to three times its size for a moment.
+    pub fn reserve(&mut self, m: usize) {
+        self.from.reserve_exact(m);
+        self.to.reserve_exact(m);
+        self.cost.reserve_exact(m);
+        self.cap.reserve_exact(m);
+    }
+
     pub fn add(&mut self, from: usize, to: usize, cost: i64, cap: i64) {
         self.from.push(from as u32);
         self.to.push(to as u32);
