@@ -3,7 +3,7 @@
 
 mod common;
 
-use roadstyle_rs::levels::{levels, Edit, LevelEdge, LevelEdges, Method, Options, Order};
+use roadstyle_rs::levels::{levels, Edit, LevelEdge, LevelEdges, LevelTags, Method, Options, Order};
 use serde_json::Value;
 
 /// The roads of an area; `rank_col` (the row number modulo 5) as the order value and `layer` as the band.
@@ -13,8 +13,8 @@ fn edges(area: &str) -> LevelEdges {
     let mut out = LevelEdges::default();
     for i in 0..t.len() {
         let text = |k: &str| t.get(i, k).and_then(roadstyle_rs::Cell::as_str).map(String::from);
-        out.add(0, LevelEdge { edge_id: i as i64, highway: text("highway").unwrap_or_default(), tunnel: text("tunnel"), bridge: text("bridge"),
-                               layer: text("layer"), junction: text("junction"), band: text("layer"), order: Some((i % 5) as f64),
+        out.add(0, LevelEdge { edge_id: i as i64, tags: LevelTags { highway: text("highway").unwrap_or_default(), tunnel: text("tunnel"), bridge: text("bridge"),
+                               layer: text("layer"), junction: text("junction"), band: text("layer") }.into(), order: Some((i % 5) as f64),
                                geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect() });
     }
     out

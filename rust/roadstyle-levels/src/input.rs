@@ -46,7 +46,7 @@ pub fn road_split(edges: &[&LevelEdge]) -> Result<Roads, Error> {
     // hash. A key that is found is checked against the road's first edge. (The line itself as the key: Kentucky +0.5 GB.)
     use std::hash::{Hash, Hasher};
     fn kind(e: &LevelEdge) -> [Option<&str>; 5] {
-        [Some(e.highway.as_str()), e.tunnel.as_deref(), e.bridge.as_deref(), e.layer.as_deref(), e.band.as_deref()]
+        [Some(e.tags.highway.as_str()), e.tags.tunnel.as_deref(), e.tags.bridge.as_deref(), e.tags.layer.as_deref(), e.tags.band.as_deref()]
     }
     let line = |e: &LevelEdge, back: bool| -> Vec<(u64, u64)> {
         let mut l: Vec<(u64, u64)> = e.geometry.iter().map(bits).collect();
@@ -101,15 +101,15 @@ fn is_yes_tag(v: Option<&str>) -> bool {
 /// The OSM level of an edge (`_level`): a non-zero `layer`, else bridge 1, tunnel -1, else 0.
 pub fn level(e: &LevelEdge) -> i64 {
     flags::level(
-        flags::layer(e.layer.as_deref()),
-        is_yes_tag(e.bridge.as_deref()),
-        is_yes_tag(e.tunnel.as_deref()),
+        flags::layer(e.tags.layer.as_deref()),
+        is_yes_tag(e.tags.bridge.as_deref()),
+        is_yes_tag(e.tags.tunnel.as_deref()),
     )
 }
 
 /// The band of a road from `band_col` (`pd.to_numeric(...).fillna(0).round()`: a value that is not a number is 0).
 fn band(e: &LevelEdge) -> i64 {
-    e.band
+    e.tags.band
         .as_deref()
         .and_then(|s| s.trim().parse::<f64>().ok())
         .filter(|v| v.is_finite())
@@ -148,7 +148,7 @@ fn priority(e: &LevelEdge, order: Order) -> Option<f64> {
         _ => {}
     }
     let z = |c: &str| CLASS_ORDER.iter().find(|(names, _)| names.contains(&c)).map(|&(_, v)| v);
-    let h = e.highway.as_str();
+    let h = e.tags.highway.as_str();
     if h.is_empty() {
         return None; // a road with no class takes no part in the order (the caller's empty highway is no class)
     }
@@ -161,13 +161,13 @@ fn priority(e: &LevelEdge, order: Order) -> Option<f64> {
     }
     let a = e;
     let tier = if matches!(
-        a.junction.as_deref().map(str::to_lowercase).as_deref(),
+        a.tags.junction.as_deref().map(str::to_lowercase).as_deref(),
         Some("roundabout" | "circular")
     ) {
         3.0
-    } else if is_yes_tag(a.tunnel.as_deref()) {
+    } else if is_yes_tag(a.tags.tunnel.as_deref()) {
         2.0
-    } else if is_yes_tag(a.bridge.as_deref()) {
+    } else if is_yes_tag(a.tags.bridge.as_deref()) {
         1.0
     } else {
         0.0
@@ -228,8 +228,8 @@ struct AtNodes {
 /// the road are of one band (a footbridge or a tunnel mouth at the node stays a meet), and the road's priority is above the path's (the
 /// order wish puts it over the path too; a pedestrian street over a service road stays a meet). A platform is not a car road.
 fn at_nodes(net: &Net) -> AtNodes {
-    let is_path = |r: usize| crate::PATH_CLASSES.contains(&net.head[r].highway.as_str());
-    let is_car = |r: usize| !is_path(r) && net.head[r].highway != "platform" && net.omega[r].is_some();
+    let is_path = |r: usize| crate::PATH_CLASSES.contains(&net.head[r].tags.highway.as_str());
+    let is_car = |r: usize| !is_path(r) && net.head[r].tags.highway != "platform" && net.omega[r].is_some();
     let crossing = |car: usize, path: usize| is_car(car) && is_path(path) && net.band[car] == net.band[path] && net.omega[car] > net.omega[path];
     // (node, road, end) of each road end, sorted: the ends at a node are one run
     let mut at: Vec<(u32, u32, u8)> = Vec::with_capacity(2 * net.ends.len());
@@ -401,9 +401,13 @@ mod tests {
     fn node_rules(path: &str, bridge: bool, road: &str) -> Rules {
         let e = |id: i64, hw: &str, br: bool, geometry: Vec<Pt>| LevelEdge {
             edge_id: id,
-            highway: hw.into(),
-            bridge: br.then(|| "yes".into()),
-            layer: br.then(|| "1".into()),
+            tags: crate::LevelTags {
+                highway: hw.into(),
+                bridge: br.then(|| "yes".into()),
+                layer: br.then(|| "1".into()),
+                ..Default::default()
+            }
+            .into(),
             geometry,
             ..Default::default()
         };

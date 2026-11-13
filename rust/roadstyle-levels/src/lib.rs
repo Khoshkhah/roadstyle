@@ -54,17 +54,24 @@ impl Method {
     }
 }
 
-/// One edge as the levels read it: its id, the tags that the rules read, and its line. `band` and `order`: the values of
-/// `band_col` and of an `order` column, for `Options::band_col` and `Order::Column`.
-#[derive(Default)]
-pub struct LevelEdge {
-    pub edge_id: i64,
+/// The tags of an edge that the rules read. `band`: the value of `band_col`, for `Options::band_col`. Many edges have the
+/// same tags (all edges of a way, and most roads of one class): they can share one copy (Kentucky: 2.45 million edges).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct LevelTags {
     pub highway: String,
     pub tunnel: Option<String>,
     pub bridge: Option<String>,
     pub layer: Option<String>,
     pub junction: Option<String>,
     pub band: Option<String>,
+}
+
+/// One edge as the levels read it: its id, its tags (shared, see [`LevelTags`]), and its line. `order`: the value of an
+/// `order` column, for `Order::Column`.
+#[derive(Default)]
+pub struct LevelEdge {
+    pub edge_id: i64,
+    pub tags: std::sync::Arc<LevelTags>,
     pub order: Option<f64>,
     pub geometry: Vec<Pt>,
 }
@@ -675,8 +682,7 @@ mod tests {
                 0,
                 LevelEdge {
                     edge_id: id,
-                    highway: "residential".into(),
-                    bridge,
+                    tags: LevelTags { highway: "residential".into(), bridge, ..Default::default() }.into(),
                     geometry,
                     ..Default::default()
                 },

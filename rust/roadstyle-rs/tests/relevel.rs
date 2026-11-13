@@ -16,8 +16,8 @@ fn roads() -> RoadTable {
     let mut edges = roadstyle_rs::levels::LevelEdges::default();
     for i in 0..t.len() {
         let text = |k: &str| t.get(i, k).and_then(roadstyle_rs::Cell::as_str).map(String::from);
-        edges.add(0, roadstyle_rs::levels::LevelEdge { edge_id: i as i64, highway: text("highway").unwrap_or_default(), tunnel: text("tunnel"),
-            bridge: text("bridge"), layer: text("layer"), junction: text("junction"), band: None, order: None,
+        edges.add(0, roadstyle_rs::levels::LevelEdge { edge_id: i as i64, tags: roadstyle_rs::levels::LevelTags { highway: text("highway").unwrap_or_default(), tunnel: text("tunnel"),
+            bridge: text("bridge"), layer: text("layer"), junction: text("junction"), band: None }.into(), order: None,
             geometry: t.line(i).unwrap().iter().map(|&[x, y]| (x, y)).collect() });
     }
     let lv = roadstyle_rs::levels::levels(&edges, &Default::default()).unwrap().unwrap();
