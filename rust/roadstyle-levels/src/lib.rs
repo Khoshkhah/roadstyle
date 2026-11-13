@@ -215,10 +215,32 @@ pub fn levels(edges: &LevelEdges, o: &Options) -> Result<Option<Levels>, Error> 
     if o.method == Method::None {
         return Ok(None);
     }
-    compute(&edges.edges(), o).map(Some)
+    let mut rows = Vec::new();
+    let mut lv = compute(&edges.edges(), o, &mut |mut part| {
+        rows.append(&mut part);
+        Ok(())
+    })?;
+    lv.rows = rows;
+    Ok(Some(lv))
 }
 
-fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
+/// The edges of one part of the rows of [`levels_each`].
+const ROWS_PER_PART: usize = 1 << 16;
+
+/// [`levels`], with the rows given to `sink` in parts in the order of the result (`edge_id`), so that all rows are never in
+/// memory at once (Kentucky: 2.45 million rows). The `Levels` has no rows.
+pub fn levels_each(
+    edges: &LevelEdges,
+    o: &Options,
+    sink: &mut dyn FnMut(Vec<Row>) -> Result<(), Error>,
+) -> Result<Option<Levels>, Error> {
+    if o.method == Method::None {
+        return Ok(None);
+    }
+    compute(&edges.edges(), o, sink).map(Some)
+}
+
+fn compute(edges: &[&LevelEdge], o: &Options, sink: &mut dyn FnMut(Vec<Row>) -> Result<(), Error>) -> Result<Levels, Error> {
     if o.method == Method::Tags && (o.band_col || !matches!(o.order, Order::Priority | Order::None))
     {
         return Err(Error::Options("compute_levels: band_col and order are part of the optimization problem; use method='solve'".into()));
@@ -234,8 +256,8 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
         (0, 0, [0; 5], 0, 0, 0);
     let (mut given_up_pairs, mut orders_not_kept_pairs, mut near_not_kept, mut crossings_not_kept) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    let rows = match o.method {
-        Method::Tags => tags(edges, &roads.ends),
+    match o.method {
+        Method::Tags => sink(tags(edges, &roads.ends))?,
         _ => {
             let (mut rules, _, _) = input::relations(edges, &roads, o, &HashMap::new());
             // each edge's road, and whether the edge runs against it: only for the edges of the edits and the fixed numbers (for all
@@ -303,12 +325,13 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
             crossings = rules.crossings.len();
             crossings_not_kept = s.crossings_not_kept.iter().map(|&(c, p, h)| (id(c), id(p), h)).collect();
             stages = s.stages;
-            solved_rows(edges, &roads, &rules, &s, o.head_m, o.max_level)?
+            solved_rows(edges, &roads, &rules, &s, o.head_m, o.max_level, sink)?
         }
     };
-    let ids: Vec<i64> = rows.iter().map(|r| r.edge_id).collect();
+    // the rows are in the order of the edges
+    let ids: Vec<i64> = edges.iter().map(|e| e.edge_id).collect();
     Ok(Levels {
-        rows,
+        rows: Vec::new(),
         method: o.method,
         edge_hash: edge_hash(&ids),
         roads: roads.first.len(),
@@ -596,7 +619,8 @@ fn solved_rows(
     s: &solve::Solved,
     head_m: f64,
     max_level: i64,
-) -> Result<Vec<Row>, Error> {
+    sink: &mut dyn FnMut(Vec<Row>) -> Result<(), Error>,
+) -> Result<(), Error> {
     let mut weight = vec![0; roads.first.len()];
     for &r in &roads.road {
         weight[r] += 1;
@@ -624,10 +648,7 @@ fn solved_rows(
             "round"
         }
     };
-    Ok(edges
-        .iter()
-        .enumerate()
-        .map(|(i, e)| {
+    let row = |(i, e): (usize, &&LevelEdge)| {
             let r = roads.road[i];
             let [a0, am, a2, b] = parts[r];
             let (cs, ce) = (cap(r, 0), cap(r, 2));
@@ -647,8 +668,12 @@ fn solved_rows(
                 cap_start: Some(cap_start),
                 cap_end: Some(cap_end),
             }
-        })
-        .collect())
+    };
+    for start in (0..edges.len()).step_by(ROWS_PER_PART) {
+        let end = (start + ROWS_PER_PART).min(edges.len());
+        sink(edges[start..end].iter().enumerate().map(|(k, e)| row((start + k, e))).collect())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
