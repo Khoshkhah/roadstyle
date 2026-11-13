@@ -244,9 +244,13 @@ fn numbers(rules: &Rules, steps: i64, min_positions: bool) -> Result<(Vec<i64>, 
 ///   groups is a rule of the later one, so every hard rule holds at the end. A group with no solution keeps its numbers.
 /// - the compress: the least numbers that keep every rule that holds now, then each casing part as high as its fills let it
 ///   (the cost stage). The tags numbers and the repairs leave gaps; the compress removes them, so the levels are few.
+///
 /// `stages`: the values of the stages for the last numbers, as `solve` gives them.
 pub fn solve_local(rules: &Rules, start: &[[i64; 4]], steps: i64, min_positions: bool) -> Result<Solved, Error> {
     let n = rules.roads;
+    if n == 0 {
+        return Ok(Solved::default());
+    }
     let mut x: Vec<[i64; 4]> = start.to_vec();
     let mut fixed = vec![false; n];
     for &(r, v) in &rules.fixed {
@@ -365,8 +369,8 @@ fn repair(rules: &Rules, x: &mut [[i64; 4]], fixed: &[bool], count: &[usize; 5],
             for &(k, i) in ids {
                 let (a, b) = roads_of(rules, k, i as usize);
                 for v in [a, b] {
-                    if !local.contains_key(&v) {
-                        local.insert(v, roads.len());
+                    if let std::collections::hash_map::Entry::Vacant(e) = local.entry(v) {
+                        e.insert(roads.len());
                         roads.push(v);
                     }
                 }

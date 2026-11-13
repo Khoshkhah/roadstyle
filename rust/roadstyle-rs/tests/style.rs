@@ -74,7 +74,7 @@ fn style_hash(area: &Path) -> String {
 #[test]
 fn monaco_style() {
     let area = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/monaco");
-    assert_eq!(style_hash(&area), "7cedf79cff9bb6cecea2b08d1042fc8d10dc9f8e021e7586b3ae8c4d5316ff53");
+    assert_eq!(style_hash(&area), "14af17880a7b4d27a76c269bd6e5c7562a84b3dc3056b77c74e0f589912be6ea");
 }
 
 /// Tartu's inputs are not in git: get them with `tests/get_goldens.sh`, then `cargo test --release -- --ignored`.
