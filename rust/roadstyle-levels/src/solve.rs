@@ -361,7 +361,7 @@ fn repair(rules: &Rules, x: &mut [[i64; 4]], fixed: &[bool], count: &[usize; 5],
             ids.dedup();
             ids
         };
-        let mut add = |ids: &[(u8, u32)], roads: &mut Vec<usize>| {
+        let add = |ids: &[(u8, u32)], roads: &mut Vec<usize>, local: &mut std::collections::HashMap<usize, usize>| {
             for &(k, i) in ids {
                 let (a, b) = roads_of(rules, k, i as usize);
                 for v in [a, b] {
@@ -372,10 +372,19 @@ fn repair(rules: &Rules, x: &mut [[i64; 4]], fixed: &[bool], count: &[usize; 5],
                 }
             }
         };
-        add(&rules_of(&roads), &mut roads);
+        add(&rules_of(&roads), &mut roads, &mut local);
         let free = roads.len();
-        let ids = rules_of(&roads);
-        add(&ids, &mut roads);
+        // only the rules of a road that can move: a rule between two fixed roads is another group's (when it is broken, the
+        // group had no solution)
+        let moves = |v: usize| local.get(&v).is_some_and(|&l| l < free) && !fixed[v];
+        let ids: Vec<(u8, u32)> = rules_of(&roads)
+            .into_iter()
+            .filter(|&(k, i)| {
+                let (a, b) = roads_of(rules, k, i as usize);
+                moves(a) || moves(b)
+            })
+            .collect();
+        add(&ids, &mut roads, &mut local);
         let m = |v: usize| local[&v];
         let mut sub = Rules { roads: roads.len(), ..Default::default() };
         for &(k, i) in &ids {

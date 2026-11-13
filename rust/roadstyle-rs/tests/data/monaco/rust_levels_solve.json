@@ -6,13 +6,13 @@
   "pairs": 479,
   "order_pairs": 6276,
   "given_up": 0,
-  "orders_not_kept": 18,
+  "orders_not_kept": 15,
   "near_not_kept": 0,
   "stages": [
     0,
     4,
-    43,
+    47,
     0,
-    6561080
+    6563100
   ]
 }
