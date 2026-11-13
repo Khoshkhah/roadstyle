@@ -55,7 +55,29 @@ enum Kind {
     Gone,
 }
 
-type Arc = (usize, usize, i64, Kind);
+/// An arc `from -> to` of cost `w`: 16 bytes (Kentucky: 19 million arcs). The costs are small (0, -1, the box, the span).
+type Arc = (u32, u32, i32, Kind);
+
+fn arc(i: usize, j: usize, w: i64, k: Kind) -> Arc {
+    (i as u32, j as u32, w as i32, k)
+}
+
+/// Lists by node in one list, in the order they come (node `u` has `out[start[u]..start[u + 1]]`): a list for each of the
+/// millions of nodes took its own allocation. `each` gives the entries; it runs two times (the count, then the fill).
+fn by_node<T: Copy + Default>(nodes: usize, each: impl Fn(&mut dyn FnMut(usize, T))) -> (Vec<usize>, Vec<T>) {
+    let mut start = vec![0usize; nodes + 1];
+    each(&mut |u, _| start[u + 1] += 1);
+    for v in 0..nodes {
+        start[v + 1] += start[v];
+    }
+    let mut fill = start.clone();
+    let mut out = vec![T::default(); start[nodes]];
+    each(&mut |u, e| {
+        out[fill[u]] = e;
+        fill[u] += 1;
+    });
+    (start, out)
+}
 
 /// The column of the casing part `h` of road `r` (the road's fill is the column `r`).
 fn col(n: usize, r: usize, h: usize) -> usize {
@@ -90,39 +112,41 @@ fn rule_arcs(rules: &Rules, c: &Cleaned, steps: i64) -> Vec<Arc> {
     let n = rules.roads;
     let col = |r, h| col(n, r, h);
     let (hi, lo, z) = (4 * n, 4 * n + 1, 4 * n + 2);
-    let mut arcs: Vec<Arc> = Vec::new();
+    let size = 3 * n + 2 * rules.meets.len() + 8 * n + 2 + 8 * rules.fixed.len() + c.lifts.len() + c.crossings.len()
+        + c.near.len() + c.orders.len();
+    let mut arcs: Vec<Arc> = Vec::with_capacity(size);
     for r in 0..n {
         for h in 0..3 {
-            arcs.push((col(r, h), r, 0, Kind::Hard)); // H1: a casing part not over its own fill
+            arcs.push(arc(col(r, h), r, 0, Kind::Hard)); // H1: a casing part not over its own fill
         }
     }
     for &(x, ex, y, ey) in &rules.meets {
-        arcs.push((col(x, ex), y, 0, Kind::Hard)); // H2: the heads of two roads that meet, under the other's fill
-        arcs.push((col(y, ey), x, 0, Kind::Hard));
+        arcs.push(arc(col(x, ex), y, 0, Kind::Hard)); // H2: the heads of two roads that meet, under the other's fill
+        arcs.push(arc(col(y, ey), x, 0, Kind::Hard));
     }
     for v in 0..4 * n {
-        arcs.push((v, hi, 0, Kind::Hard)); // the span: every number between L and H
-        arcs.push((lo, v, 0, Kind::Hard));
+        arcs.push(arc(v, hi, 0, Kind::Hard)); // the span: every number between L and H
+        arcs.push(arc(lo, v, 0, Kind::Hard));
     }
-    arcs.push((hi, z, steps, Kind::Hard)); // the box [0, steps]; z is 0
-    arcs.push((z, lo, 0, Kind::Hard));
+    arcs.push(arc(hi, z, steps, Kind::Hard)); // the box [0, steps]; z is 0
+    arcs.push(arc(z, lo, 0, Kind::Hard));
     for &(r, v) in &rules.fixed {
         for (c, x) in [col(r, 0), col(r, 1), col(r, 2), r].into_iter().zip(v) {
-            arcs.push((c, z, x, Kind::Hard)); // x_c = x: x_c - x_z <= x and x_z - x_c <= -x
-            arcs.push((z, c, -x, Kind::Hard));
+            arcs.push(arc(c, z, x, Kind::Hard)); // x_c = x: x_c - x_z <= x and x_z - x_c <= -x
+            arcs.push(arc(z, c, -x, Kind::Hard));
         }
     }
     for &(u, l, h) in &c.lifts {
-        arcs.push((l, col(u, h), -1, Kind::Stack)); // H3: b_l + 1 <= a_(u, h)
+        arcs.push(arc(l, col(u, h), -1, Kind::Stack)); // H3: b_l + 1 <= a_(u, h)
     }
     for &(cr, p, h) in &c.crossings {
-        arcs.push((p, col(cr, h), -1, Kind::Crossing)); // b_p + 1 <= a_(c, h)
+        arcs.push(arc(p, col(cr, h), -1, Kind::Crossing)); // b_p + 1 <= a_(c, h)
     }
     for &(u, l, h) in &c.near {
-        arcs.push((l, col(u, h), -1, Kind::Near));
+        arcs.push(arc(l, col(u, h), -1, Kind::Near));
     }
     for &(x, y) in &c.orders {
-        arcs.push((y, x, -1, Kind::Order)); // H4: b_y + 1 <= b_x
+        arcs.push(arc(y, x, -1, Kind::Order)); // H4: b_y + 1 <= b_x
     }
     arcs
 }
@@ -143,6 +167,7 @@ fn soft_stages(arcs: &mut Vec<Arc>, nodes: usize, pi: &mut [i64], stages: &mut [
         stages[s] = -(0..idx.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>(); // the value of the LP (duality)
         let mut more = Vec::new();
         for (e, &a) in idx.iter().enumerate() {
+            let a = a as usize;
             let (i, j, w, kind) = arcs[a];
             if kind == soft && flow[e] >= 1 {
                 arcs[a].3 = Kind::Gone; // broken: it holds the other way, x_j - x_i <= -w
@@ -154,6 +179,7 @@ fn soft_stages(arcs: &mut Vec<Arc>, nodes: usize, pi: &mut [i64], stages: &mut [
                 }
             }
         }
+        arcs.reserve_exact(more.len());   // the exact size: a list that doubles needs up to three times its size for a moment
         arcs.extend(more);
     }
     Ok(())
@@ -162,10 +188,17 @@ fn soft_stages(arcs: &mut Vec<Arc>, nodes: usize, pi: &mut [i64], stages: &mut [
 /// The numbers are in a box of `steps + 1` values (roadstyle's `2 * max_level / margin`); `min_positions`: the span of the numbers is
 /// as small as possible.
 pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, Error> {
-    let n = rules.roads;
-    if n == 0 {
+    if rules.roads == 0 {
         return Ok(Solved::default());
     }
+    let (x, stages) = numbers(rules, steps, min_positions)?;
+    feasible(rules, &x, steps)?;
+    Ok(report(rules.roads, &Cleaned::new(rules), &x, stages))
+}
+
+/// The numbers of all nodes (the columns, then H, L and 0 as the last), and the best value of each stage.
+fn numbers(rules: &Rules, steps: i64, min_positions: bool) -> Result<(Vec<i64>, [i64; 5]), Error> {
+    let n = rules.roads;
     let (hi, lo) = (4 * n, 4 * n + 1);
     let c = Cleaned::new(rules);
     let mut arcs = rule_arcs(rules, &c, steps);
@@ -185,7 +218,8 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
     pi = from_node(&arcs, nodes, lo, &pi);
     let span = -pi[hi];
     if min_positions {
-        arcs.push((hi, lo, span, Kind::Hard));
+        arcs.reserve_exact(1);
+        arcs.push(arc(hi, lo, span, Kind::Hard));
     }
     let mut supply = vec![0i64; nodes];
     for r in 0..n {
@@ -195,12 +229,159 @@ pub fn solve(rules: &Rules, steps: i64, min_positions: bool) -> Result<Solved, E
         }
     }
     let (g, _) = network(&arcs, nodes, |k| (k == Kind::Hard).then_some(INF));
+    drop(arcs); // the network has the rules now: the list goes before the largest flow
     let flow = g.solve(&supply, &mut pi)?;
     let w4 = if min_positions { w4 } else { 0 };
     stages[4] = w4 * span - (0..g.from.len()).map(|e| flow[e] * g.cost[e]).sum::<i64>();
-    let x = least_numbers(&g, &flow, &pi);
-    feasible(rules, &x, steps)?;
-    Ok(report(n, &c, &x, stages))
+    Ok((least_numbers(&g, &flow, &pi), stages))
+}
+
+/// The levels of a large area with little memory (Kaveh, 2026-11-13): `start` gives each road its numbers `[casing_start,
+/// casing_level, casing_end, fill]` in the box `[0, steps]` (the tags rule), then each group of roads that the rules broken by those
+/// numbers join is solved alone, with the roads around it fixed at their numbers of that moment. The memory is that of the largest
+/// group, not of the area (Kentucky: 50,547 groups, the largest 4,854 of 1,266,648 roads). The groups go one after the other: a rule
+/// between two groups is a rule of the later one, so every hard rule holds at the end. A group with no solution keeps its numbers.
+/// `stages`: the sums over the groups.
+pub fn solve_local(rules: &Rules, start: &[[i64; 4]], steps: i64, min_positions: bool) -> Result<Solved, Error> {
+    let n = rules.roads;
+    let mut x: Vec<[i64; 4]> = start.to_vec();
+    let mut fixed = vec![false; n];
+    for &(r, v) in &rules.fixed {
+        x[r] = v;
+        fixed[r] = true;
+    }
+    // the rules as (kind, index): 0 meet, 1 lift, 2 crossing, 3 order, 4 near
+    let count = [rules.meets.len(), rules.lifts.len(), rules.crossings.len(), rules.orders.len(), rules.near.len()];
+    let roads_of = |k: u8, i: usize| -> (usize, usize) {
+        match k {
+            0 => (rules.meets[i].0, rules.meets[i].2),
+            1 => (rules.lifts[i].0, rules.lifts[i].1),
+            2 => (rules.crossings[i].0, rules.crossings[i].1),
+            3 => rules.orders[i],
+            _ => (rules.near[i].0, rules.near[i].1),
+        }
+    };
+    let broken = |x: &[[i64; 4]], k: u8, i: usize| -> bool {
+        match k {
+            0 => {
+                let (a, ea, b, eb) = rules.meets[i];
+                x[a][ea] > x[b][3] || x[b][eb] > x[a][3]
+            }
+            1 => x[rules.lifts[i].1][3] >= x[rules.lifts[i].0][rules.lifts[i].2],
+            2 => x[rules.crossings[i].1][3] >= x[rules.crossings[i].0][rules.crossings[i].2],
+            3 => x[rules.orders[i].1][3] >= x[rules.orders[i].0][3],
+            _ => x[rules.near[i].1][3] >= x[rules.near[i].0][rules.near[i].2],
+        }
+    };
+    // the groups: the roads that a broken rule joins
+    let mut parent: Vec<u32> = (0..n as u32).collect();
+    fn find(p: &mut [u32], mut v: usize) -> usize {
+        while p[v] as usize != v {
+            p[v] = p[p[v] as usize];
+            v = p[v] as usize;
+        }
+        v
+    }
+    let mut bad = vec![false; n];
+    for (k, &m) in count.iter().enumerate() {
+        for i in 0..m {
+            if broken(&x, k as u8, i) {
+                let (a, b) = roads_of(k as u8, i);
+                bad[a] = true;
+                bad[b] = true;
+                let (ra, rb) = (find(&mut parent, a), find(&mut parent, b));
+                if ra != rb {
+                    parent[ra.max(rb)] = ra.min(rb) as u32;
+                }
+            }
+        }
+    }
+    let mut members: Vec<(u32, u32)> = (0..n).filter(|&r| bad[r]).map(|r| (find(&mut parent, r) as u32, r as u32)).collect();
+    members.sort_unstable();
+    drop((parent, bad));
+    // the rules of each road
+    let (at, of) = by_node::<(u8, u32)>(n, |put| {
+        for (k, &m) in count.iter().enumerate() {
+            for i in 0..m {
+                let (a, b) = roads_of(k as u8, i);
+                put(a, (k as u8, i as u32));
+                if b != a {
+                    put(b, (k as u8, i as u32));
+                }
+            }
+        }
+    });
+    let mut stages = [0i64; 5];
+    for group in members.chunk_by(|a, b| a.0 == b.0) {
+        // the roads of the group first, then the roads around it; the rules that touch the group
+        let mut roads: Vec<usize> = group.iter().map(|&(_, r)| r as usize).collect();
+        let size = roads.len();
+        let mut local: std::collections::HashMap<usize, usize> = roads.iter().enumerate().map(|(l, &r)| (r, l)).collect();
+        let mut ids: Vec<(u8, u32)> = roads.iter().flat_map(|&r| of[at[r]..at[r + 1]].iter().copied()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        for &(k, i) in &ids {
+            let (a, b) = roads_of(k, i as usize);
+            for v in [a, b] {
+                if !local.contains_key(&v) {
+                    local.insert(v, roads.len());
+                    roads.push(v);
+                }
+            }
+        }
+        let m = |v: usize| local[&v];
+        let mut sub = Rules { roads: roads.len(), ..Default::default() };
+        for &(k, i) in &ids {
+            let i = i as usize;
+            match k {
+                0 => {
+                    let (a, ea, b, eb) = rules.meets[i];
+                    sub.meets.push((m(a), ea, m(b), eb));
+                }
+                1 => {
+                    let (u, l, h) = rules.lifts[i];
+                    sub.lifts.push((m(u), m(l), h));
+                }
+                2 => {
+                    let (c, p, h) = rules.crossings[i];
+                    sub.crossings.push((m(c), m(p), h));
+                }
+                3 => sub.orders.push((m(rules.orders[i].0), m(rules.orders[i].1))),
+                _ => {
+                    let (u, l, h) = rules.near[i];
+                    sub.near.push((m(u), m(l), h));
+                }
+            }
+        }
+        for (l, &r) in roads.iter().enumerate() {
+            if l >= size || fixed[r] {
+                sub.fixed.push((l, x[r]));
+            }
+        }
+        let Ok((xs, st)) = numbers(&sub, steps, min_positions) else { continue };
+        if feasible(&sub, &xs, steps).is_err() {
+            continue;
+        }
+        let (nl, z) = (sub.roads, xs[xs.len() - 1]);
+        for (l, &r) in roads[..size].iter().enumerate() {
+            if !fixed[r] {
+                x[r] = [xs[nl + 3 * l] - z, xs[nl + 3 * l + 1] - z, xs[nl + 3 * l + 2] - z, xs[l] - z];
+            }
+        }
+        for (s, v) in stages.iter_mut().zip(st) {
+            *s += v;
+        }
+    }
+    // all numbers in the columns of the whole area (0 as the last node), the check of every hard rule, and the report
+    let mut flat = vec![0i64; 4 * n + 3];
+    for r in 0..n {
+        flat[r] = x[r][3];
+        for h in 0..3 {
+            flat[col(n, r, h)] = x[r][h];
+        }
+    }
+    feasible(rules, &flat, steps)?;
+    Ok(report(n, &Cleaned::new(rules), &flat, stages))
 }
 
 /// The answer: the numbers of the parts and the rules that the numbers `x` do not keep.
@@ -260,20 +441,18 @@ fn feasible(rules: &Rules, x: &[i64], steps: i64) -> Result<(), Error> {
 }
 
 /// The arcs whose kind has a capacity, as a network; and the index into `arcs` of each of its arcs.
-fn network(
-    arcs: &[(usize, usize, i64, Kind)],
-    nodes: usize,
-    cap: impl Fn(Kind) -> Option<i64>,
-) -> (Network, Vec<usize>) {
+fn network(arcs: &[Arc], nodes: usize, cap: impl Fn(Kind) -> Option<i64>) -> (Network, Vec<u32>) {
+    let m = arcs.iter().filter(|a| cap(a.3).is_some()).count();
     let mut g = Network {
         nodes,
         ..Default::default()
     };
-    let mut idx = Vec::new();
+    g.reserve(m);
+    let mut idx = Vec::with_capacity(m);
     for (a, &(i, j, w, kind)) in arcs.iter().enumerate() {
         if let Some(c) = cap(kind) {
-            g.add(i, j, w, c);
-            idx.push(a);
+            g.add(i as usize, j as usize, w as i64, c);
+            idx.push(a as u32);
         }
     }
     (g, idx)
@@ -281,11 +460,11 @@ fn network(
 
 /// Potentials for the hard rules (the reduced cost of each arc is not negative): the shortest distances from an extra
 /// node with an arc of cost 0 to each node, by a Bellman-Ford with a queue. An error when the rules have no solution.
-fn potentials(arcs: &[(usize, usize, i64, Kind)], nodes: usize) -> Result<Vec<i64>, Error> {
+fn potentials(arcs: &[Arc], nodes: usize) -> Result<Vec<i64>, Error> {
     let mut out: Vec<Vec<(usize, i64)>> = vec![Vec::new(); nodes];
     for &(i, j, w, kind) in arcs {
         if kind == Kind::Hard {
-            out[i].push((j, w));
+            out[i as usize].push((j as usize, w as i64));
         }
     }
     let mut dist = vec![0i64; nodes];
@@ -315,18 +494,15 @@ fn potentials(arcs: &[(usize, usize, i64, Kind)], nodes: usize) -> Result<Vec<i6
 
 /// The shortest distances from `from` in the hard rules, with a Dijkstra on the costs reduced by `pi`: potentials for
 /// the last stage. Every node can be reached from L.
-fn from_node(
-    arcs: &[(usize, usize, i64, Kind)],
-    nodes: usize,
-    from: usize,
-    pi: &[i64],
-) -> Vec<i64> {
-    let mut out: Vec<Vec<(u32, i64)>> = vec![Vec::new(); nodes];
-    for &(i, j, w, kind) in arcs {
-        if kind == Kind::Hard {
-            out[i].push((j as u32, w + pi[i] - pi[j]));
+fn from_node(arcs: &[Arc], nodes: usize, from: usize, pi: &[i64]) -> Vec<i64> {
+    let (start, out) = by_node(nodes, |put| {
+        for &(i, j, w, kind) in arcs {
+            if kind == Kind::Hard {
+                let (i, j) = (i as usize, j as usize);
+                put(i, (j as u32, w as i64 + pi[i] - pi[j]));
+            }
         }
-    }
+    });
     let mut dist = vec![i64::MAX; nodes];
     dist[from] = 0;
     let mut heap = BinaryHeap::from([Reverse((0i64, from))]);
@@ -334,7 +510,7 @@ fn from_node(
         if d > dist[u] {
             continue;
         }
-        for &(v, c) in &out[u] {
+        for &(v, c) in &out[start[u]..start[u + 1]] {
             debug_assert!(c >= 0);
             let v = v as usize;
             if d + c < dist[v] {
@@ -353,16 +529,21 @@ fn from_node(
 fn least_numbers(g: &Network, flow: &[i64], pi: &[i64]) -> Vec<i64> {
     let n = g.nodes;
     let p: Vec<i64> = pi.iter().map(|v| -v).collect();
-    let mut out: Vec<Vec<(u32, i64)>> = vec![Vec::new(); n];
-    for k in 0..g.from.len() {
-        let (i, j, w) = (g.from[k] as usize, g.to[k] as usize, g.cost[k]);
-        if flow[k] < g.cap[k] {
-            out[j].push((i as u32, w + p[j] - p[i]));
+    // each entry: the next node and the arc, 8 bytes; the high bit says that the arc is used backwards (it has flow). The cost
+    // reduced by p comes from the arc when the entry is read: ±w + p[u] - p[v]
+    const BACK: u32 = 1 << 31;
+    assert!(g.from.len() < BACK as usize, "levels: more than 2^31 arcs");
+    let (start, out) = by_node(n, |put| {
+        for k in 0..g.from.len() {
+            let (i, j) = (g.from[k] as usize, g.to[k] as usize);
+            if flow[k] < g.cap[k] {
+                put(j, (i as u32, k as u32));
+            }
+            if flow[k] > 0 {
+                put(i, (j as u32, k as u32 | BACK));
+            }
         }
-        if flow[k] > 0 {
-            out[i].push((j as u32, -w + p[i] - p[j]));
-        }
-    }
+    });
     let top = *p.iter().max().unwrap();
     let mut dist: Vec<i64> = p.iter().map(|&v| top - v).collect(); // the arcs from the extra node
     let mut heap: BinaryHeap<Reverse<(i64, usize)>> =
@@ -371,9 +552,11 @@ fn least_numbers(g: &Network, flow: &[i64], pi: &[i64]) -> Vec<i64> {
         if d > dist[u] {
             continue;
         }
-        for &(v, c) in &out[u] {
-            debug_assert!(c >= 0);
+        for &(v, k) in &out[start[u]..start[u + 1]] {
             let v = v as usize;
+            let w = g.cost[(k & !BACK) as usize];
+            let c = if k & BACK == 0 { w } else { -w } + p[u] - p[v];
+            debug_assert!(c >= 0);
             if d + c < dist[v] {
                 dist[v] = d + c;
                 heap.push(Reverse((d + c, v)));

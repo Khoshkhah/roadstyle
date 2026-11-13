@@ -253,7 +253,21 @@ fn compute(edges: &[&LevelEdge], o: &Options) -> Result<Levels, Error> {
             }
             // in steps of the margin, as roadstyle's: the box [-max_level, max_level] holds 2 max_level / margin + 1 numbers
             let steps = (2.0 * o.max_level as f64 / o.margin + 1e-9).floor() as i64;
-            let s = solve::solve(&rules, steps, o.min_positions)?;
+            // the tags rule first, then each group of roads whose rules it breaks alone (solve::solve_local): the memory of the largest
+            // group, not of the area. The tags numbers of a road: its lowest casing and its highest fill, in the box [0, steps]
+            let start = {
+                let rows = tags(edges, &roads.ends);
+                let n = roads.first.len();
+                let mut p = vec![[i64::MAX, i64::MAX, i64::MAX, i64::MIN]; n];
+                for (i, row) in rows.iter().enumerate() {
+                    let r = roads.road[i];
+                    let c = p[r][0].min(row.casing_level);
+                    p[r] = [c, c, c, p[r][3].max(row.fill_level)];
+                }
+                let to_box = |v: i64| (((v + o.max_level) as f64 / o.margin).round() as i64).clamp(0, steps);
+                p.iter().map(|q| [to_box(q[0]), to_box(q[1]), to_box(q[2]), to_box(q[3])]).collect::<Vec<_>>()
+            };
+            let s = solve::solve_local(&rules, &start, steps, o.min_positions)?;
             let both: std::collections::BTreeSet<(usize, usize)> = rules
                 .lifts
                 .iter()
