@@ -1,4 +1,4 @@
-# 3D road tiles (GLB) on the map
+# 3D scene (GLB tiles) on the map
 
 Date: 2026-11-12. Status: built (Option A), with the changes in "What the build changed" below. The request comes from SimReady (`docs/7-plan/3d-map.md`, step 4, and
 `build/roadstyle-gaps.md`, "No 3D scene (GLB) on the map").
