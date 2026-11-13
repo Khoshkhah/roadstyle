@@ -487,6 +487,20 @@ fn compress(rules: &Rules, x: &mut [[i64; 4]], fixed: &[bool]) {
     x.copy_from_slice(&y);
 }
 
+/// The values of the soft stages 0 to 3 (the steps by which the stack rules, the crossings, the order wishes and the near rules are
+/// broken) of the numbers `x` of the roads, over the rules whose roads are all `counted` (a tile counts a rule once, see
+/// `levels_tile`).
+pub(crate) fn stage_sums(rules: &Rules, x: &[[i64; 4]], counted: &dyn Fn(usize) -> bool) -> [i64; 4] {
+    let c = Cleaned::new(rules);
+    let miss = |a: i64, b: i64| (a + 1 - b).max(0);
+    [
+        c.lifts.iter().filter(|r| counted(r.0) && counted(r.1)).map(|&(u, l, h)| miss(x[l][3], x[u][h])).sum(),
+        c.crossings.iter().filter(|r| counted(r.0) && counted(r.1)).map(|&(cr, p, h)| miss(x[p][3], x[cr][h])).sum(),
+        c.orders.iter().filter(|r| counted(r.0) && counted(r.1)).map(|&(a, b)| miss(x[b][3], x[a][3])).sum(),
+        c.near.iter().filter(|r| counted(r.0) && counted(r.1)).map(|&(u, l, h)| miss(x[l][3], x[u][h])).sum(),
+    ]
+}
+
 /// The answer: the numbers of the parts and the rules that the numbers `x` do not keep.
 fn report(n: usize, c: &Cleaned, x: &[i64], stages: [i64; 5]) -> Solved {
     let col = |r, h| col(n, r, h);

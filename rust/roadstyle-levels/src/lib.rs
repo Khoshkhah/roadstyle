@@ -287,18 +287,7 @@ fn compute(edges: &[&LevelEdge], o: &Options, sink: &mut dyn FnMut(Vec<Row>) -> 
             let steps = (2.0 * o.max_level as f64 / o.margin + 1e-9).floor() as i64;
             // the tags rule first, then each group of roads whose rules it breaks alone (solve::solve_local): the memory of the largest
             // group, not of the area. The tags numbers of a road: its lowest casing and its highest fill, in the box [0, steps]
-            let start = {
-                let level = tag_levels(edges, &roads.ends);
-                let n = roads.first.len();
-                let mut p = vec![[i64::MAX, i64::MAX, i64::MAX, i64::MIN]; n];
-                for i in 0..edges.len() {
-                    let (r, (casing, fill)) = (roads.road[i], level(i));
-                    let c = p[r][0].min(casing);
-                    p[r] = [c, c, c, p[r][3].max(fill)];
-                }
-                let to_box = |v: i64| (((v + o.max_level) as f64 / o.margin).round() as i64).clamp(0, steps);
-                p.iter().map(|q| [to_box(q[0]), to_box(q[1]), to_box(q[2]), to_box(q[3])]).collect::<Vec<_>>()
-            };
+            let start = tags_start(edges, &roads, o, steps);
             let s = solve::solve_local(&rules, &start, steps, o.min_positions)?;
             let both: std::collections::BTreeSet<(usize, usize)> = rules
                 .lifts
@@ -533,6 +522,126 @@ pub fn edge_hash(ids: &[i64]) -> String {
         .to_string()
 }
 
+/// What a tile knows of its edges (see [`levels_tile`]): the edges it owns (their numbers are its answer), and the numbers of
+/// the edges that an earlier tile solved (raw numbers in the box `[0, steps]`, in the way of the edge). The other edges are
+/// of a later tile: they are free in this tile, and their rules are counted in the later tile.
+pub struct TileRoles<'a> {
+    pub owned: &'a dyn Fn(i64) -> bool,
+    pub earlier: &'a dyn Fn(i64) -> Option<[i64; 4]>,
+}
+
+/// The answer of one tile: the rows of its edges with raw numbers (in the box `[0, steps]`; [`Ground`] maps them for the whole
+/// area), and its part of the summary. A rule is counted in the tile where none of its roads is of a later tile, so each rule
+/// one time.
+#[derive(Default)]
+pub struct TileLevels {
+    pub rows: Vec<Row>,
+    /// the roads that the tile owns
+    pub roads: usize,
+    pub pairs: usize,
+    pub order_pairs: usize,
+    pub given_up: usize,
+    pub orders_not_kept: usize,
+    pub crossings: usize,
+    /// the soft stages 0 to 3, and the sum of the casings of the owned roads (the stage 4 without the span; see
+    /// [`tiled_stage4`])
+    pub stages: [i64; 5],
+}
+
+/// The levels of one tile of a large area (`method = "solve"`): the roads of `edges` (the tile's own edges and the edges
+/// around it), with the roads that an earlier tile solved fixed at their numbers. The tags rule first, then the local repair,
+/// as [`levels`]. An area in one tile gives the numbers of [`levels`] before the move to the ground.
+pub fn levels_tile(edges: &LevelEdges, roles: &TileRoles, o: &Options) -> Result<TileLevels, Error> {
+    if o.method != Method::Solve || !o.fixed.is_empty() || !o.edits.is_empty() {
+        return Err(Error::Options("levels_tile: only method='solve', with no fixed numbers and no edits".into()));
+    }
+    let edges = edges.edges();
+    let edges = &edges[..];
+    let roads = input::road_split(edges)?;
+    let (mut rules, _, _) = input::relations(edges, &roads, o, &HashMap::new());
+    let n = roads.first.len();
+    let owned: Vec<bool> = (0..n).map(|r| (roles.owned)(edges[roads.first[r]].edge_id)).collect();
+    let mut counted = owned.clone(); // owned or of an earlier tile
+    for (i, e) in edges.iter().enumerate() {
+        if let Some(v) = (roles.earlier)(e.edge_id) {
+            let r = roads.road[i];
+            counted[r] = true;
+            rules.fixed.push((r, if roads.same[i] { v } else { [v[2], v[1], v[0], v[3]] }));
+        }
+    }
+    let steps = (2.0 * o.max_level as f64 / o.margin + 1e-9).floor() as i64;
+    let start = tags_start(edges, &roads, o, steps);
+    let s = solve::solve_local(&rules, &start, steps, o.min_positions)?;
+    let mut out = TileLevels { roads: owned.iter().filter(|&&x| x).count(), ..Default::default() };
+    rows_of(edges, &roads, &rules, &s.parts, o.head_m, &|i| owned[roads.road[i]], &mut |mut r| {
+        out.rows.append(&mut r);
+        Ok(())
+    })?;
+    let both = |u: usize, l: usize| counted[u] && counted[l];
+    out.pairs = rules.lifts.iter().chain(&rules.near).filter(|r| both(r.0, r.1)).map(|&(u, l, _)| (u, l)).collect::<HashSet<_>>().len();
+    out.order_pairs = rules.orders.iter().filter(|r| both(r.0, r.1)).collect::<HashSet<_>>().len();
+    out.given_up = s.given_up.iter().filter(|r| both(r.0, r.1)).count();
+    out.orders_not_kept = s.orders_not_kept.iter().filter(|r| both(r.0, r.1)).count();
+    out.crossings = rules.crossings.iter().filter(|r| both(r.0, r.1)).count();
+    let st = solve::stage_sums(&rules, &s.parts, &|r| counted[r]);
+    out.stages = [st[0], st[1], st[2], st[3], s.parts.iter().zip(&owned).filter(|(_, &o)| o).map(|(p, _)| 3 * p[3] - p[0] - p[1] - p[2]).sum()];
+    Ok(out)
+}
+
+/// The stage 4 of the tiles of an area: the sum of the casings (`casings`, the sum of the tiles' stage 4) and, with
+/// `min_positions`, the span of all numbers (`span`) with its weight, as the solve of the whole area gives it.
+pub fn tiled_stage4(casings: i64, roads: usize, span: i64, o: &Options) -> i64 {
+    let steps = (2.0 * o.max_level as f64 / o.margin + 1e-9).floor() as i64;
+    casings + if o.min_positions { (3 * roads as i64 * steps + 1) * span } else { 0 }
+}
+
+/// The move to the ground of the raw numbers of all tiles (as [`to_ground`]): the main casing number that most edges have
+/// becomes 0, and the numbers become consecutive.
+pub struct Ground {
+    values: Vec<i64>,
+    zero: i64,
+}
+
+impl Ground {
+    /// From the count of the edges of each main casing number (`casing`), and all numbers of all rows (`values`).
+    pub fn new(casing: &HashMap<i64, usize>, values: &std::collections::BTreeSet<i64>, max_level: i64) -> Result<Ground, Error> {
+        let ground = casing.iter().max_by_key(|(v, c)| (**c, -**v)).map_or(0, |(v, _)| *v);
+        let mut values: Vec<i64> = values.iter().copied().chain([ground]).collect();
+        values.sort_unstable();
+        values.dedup();
+        let top = values.len() as i64 - 1;
+        if top > 2 * max_level {
+            return Err(Error::Options(format!(
+                "compute_levels: the answer has {} different numbers, more than the box [-max_level, max_level] holds ({}): \
+                 make max_level larger or the margin 1 or more",
+                top + 1,
+                2 * max_level + 1
+            )));
+        }
+        let zero = (values.binary_search(&ground).unwrap() as i64).clamp(top - max_level, max_level);
+        Ok(Ground { values, zero })
+    }
+
+    /// The level of a raw number.
+    pub fn level(&self, v: i64) -> i64 {
+        self.values.binary_search(&v).expect("a number of the rows") as i64 - self.zero
+    }
+}
+
+/// The tags numbers of each road: its lowest casing and its highest fill, in the box [0, steps].
+fn tags_start(edges: &[&LevelEdge], roads: &input::Roads, o: &Options, steps: i64) -> Vec<[i64; 4]> {
+    let level = tag_levels(edges, &roads.ends);
+    let n = roads.first.len();
+    let mut p = vec![[i64::MAX, i64::MAX, i64::MAX, i64::MIN]; n];
+    for i in 0..edges.len() {
+        let (r, (casing, fill)) = (roads.road[i], level(i));
+        let c = p[r][0].min(casing);
+        p[r] = [c, c, c, p[r][3].max(fill)];
+    }
+    let to_box = |v: i64| (((v + o.max_level) as f64 / o.margin).round() as i64).clamp(0, steps);
+    p.iter().map(|q| [to_box(q[0]), to_box(q[1]), to_box(q[2]), to_box(q[3])]).collect()
+}
+
 /// `method="tags"` (`_tag_intervals`): N(v) is the value of [min L, max L] of the edges at node v nearest 0; the
 /// casing is min(N(s), N(t), L) and the fill max(N(s), N(t), L).
 fn tags(edges: &[&LevelEdge], ends: &[(u32, u32)]) -> Vec<Row> {
@@ -626,6 +735,20 @@ fn solved_rows(
         weight[r] += 1;
     }
     let parts = to_ground(&s.parts, &weight, max_level)?;
+    rows_of(edges, roads, rules, &parts, head_m, &|_| true, sink)
+}
+
+/// The rows of the edges `keep` (by their place in `edges`) from the numbers of the roads (`parts`), in the order of the edges:
+/// an edge against its road gets the heads the other way round; a cap is round, square at the dead end of a two-way road.
+fn rows_of(
+    edges: &[&LevelEdge],
+    roads: &input::Roads,
+    rules: &solve::Rules,
+    parts: &[[i64; 4]],
+    head_m: f64,
+    keep: &dyn Fn(usize) -> bool,
+    sink: &mut dyn FnMut(Vec<Row>) -> Result<(), Error>,
+) -> Result<(), Error> {
     let n = roads.first.len();
     // the ends of each road that meet another road: bit 1 the start, bit 4 the end (a set of pairs: Kentucky +0.1 GB)
     let mut met = vec![0u8; n];
@@ -671,7 +794,7 @@ fn solved_rows(
     };
     for start in (0..edges.len()).step_by(ROWS_PER_PART) {
         let end = (start + ROWS_PER_PART).min(edges.len());
-        sink(edges[start..end].iter().enumerate().map(|(k, e)| row((start + k, e))).collect())?;
+        sink(edges[start..end].iter().enumerate().filter(|(k, _)| keep(start + k)).map(|(k, e)| row((start + k, e))).collect())?;
     }
     Ok(())
 }
