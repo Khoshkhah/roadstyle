@@ -548,6 +548,17 @@ pub struct TileLevels {
     pub stages: [i64; 5],
 }
 
+/// `method="tags"` on one tile of a large area (duckOSM's levels by tiles): the rule reads only an edge's tags and the edges at
+/// the two ends of its line, so a tile with its own edges and the edges around them gives the rows of its own edges (`owned`) as
+/// [`levels`] gives them. Returns those rows (in `edge_id` order) and the number of the tile's own roads (for the summary).
+pub fn tags_tile(edges: &LevelEdges, owned: &dyn Fn(i64) -> bool) -> Result<(Vec<Row>, usize), Error> {
+    let edges = edges.edges();
+    let roads = input::road_split(&edges)?;
+    let own_roads = roads.first.iter().filter(|&&f| owned(edges[f].edge_id)).count();
+    let rows = tags(&edges, &roads.ends).into_iter().filter(|r| owned(r.edge_id)).collect();
+    Ok((rows, own_roads))
+}
+
 /// The levels of one tile of a large area (`method = "solve"`): the roads of `edges` (the tile's own edges and the edges
 /// around it), with the roads that an earlier tile solved fixed at their numbers. The tags rule first, then the local repair,
 /// as [`levels`]. An area in one tile gives the numbers of [`levels`] before the move to the ground.
@@ -825,6 +836,38 @@ mod tests {
         let parts = [[0, 0, 0, 1], [0, 0, 0, 1], [2, 2, 3, 4]];
         assert_eq!(to_ground(&parts, &[1, 1, 1], 2).unwrap(), [[-2, -2, -2, -1], [-2, -2, -2, -1], [0, 0, 1, 2]]);
         assert!(to_ground(&[[0, 1, 2, 5], [3, 4, 4, 5]], &[1, 1], 2).is_err());
+    }
+
+    /// The tags rule by tiles: each tile has its own edges and the edges at their ends, and the rows of the tiles are the rows of
+    /// the whole rule. Three edges in a line, the middle one a bridge: each end node sees the bridge.
+    #[test]
+    fn the_tags_rule_by_tiles_equals_the_whole() {
+        let edge = |id: i64, x: f64, bridge: bool| LevelEdge {
+            edge_id: id,
+            tags: LevelTags { highway: "primary".into(), bridge: bridge.then(|| "yes".to_string()), layer: bridge.then(|| "1".to_string()), ..Default::default() }.into(),
+            geometry: vec![(x, 0.0), (x + 1e-3, 0.0)],
+            ..Default::default()
+        };
+        let all = [(1, 0.0, false), (2, 1e-3, true), (3, 2e-3, false)];
+        let mut whole = LevelEdges::default();
+        for &(id, x, b) in &all {
+            whole.add(0, edge(id, x, b));
+        }
+        let o = Options { method: Method::Tags, ..Default::default() };
+        let want = levels(&whole, &o).unwrap().unwrap().rows;
+        // tile A owns edges 1 and 2 and sees edge 3 at the end of edge 2; tile B owns edge 3 and sees edge 2
+        let mut got = Vec::new();
+        for (own, see) in [(&[1, 2][..], &[3][..]), (&[3][..], &[2][..])] {
+            let mut t = LevelEdges::default();
+            for &(id, x, b) in all.iter().filter(|e| own.contains(&e.0) || see.contains(&e.0)) {
+                t.add(0, edge(id, x, b));
+            }
+            let (rows, roads) = tags_tile(&t, &|id| own.contains(&id)).unwrap();
+            assert_eq!(roads, own.len());
+            got.extend(rows);
+        }
+        got.sort_by_key(|r| r.edge_id);
+        assert_eq!(got, want);
     }
 
     #[test]
