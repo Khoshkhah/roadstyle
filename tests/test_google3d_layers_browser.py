@@ -146,6 +146,25 @@ def test_the_header_has_a_labels_button_for_the_window_only():
     assert (before, on, off) == (("false", "SATELLITE"), ("true", "HYBRID"), ("false", "SATELLITE"))
 
 
+def test_a_narrow_window_keeps_the_header_in_one_row_with_the_labels_button():
+    """A window under 440 px: our Imagery | Map switch is hidden, the name of the road stays (cut), and the buttons stay in one row with the Labels button."""
+    html, _ = _options()
+    errors = []
+    with pw.sync_playwright() as p:
+        page = _open_window(p, html, errors)
+        page.evaluate("document.querySelector('.rs-g3d').style.width = '340px'")
+        page.wait_for_function("document.querySelector('.rs-g3d').classList.contains('rs-g3d-narrow')")
+        got = page.evaluate("""() => { const bar = document.querySelector('.rs-g3d .rs-svw-bar'), kids = [...bar.children].filter(e => e.offsetParent && !e.classList.contains('rs-svw-x'));
+            const mid = e => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }, mids = kids.map(mid), t = document.querySelector('.rs-g3d .rs-svw-t');
+            return {spread: Math.max(...mids) - Math.min(...mids), names: kids.map(e => e.className), labels: !!document.querySelector('.rs-g3d-labels').offsetParent,
+                    barRight: bar.getBoundingClientRect().right, last: Math.max(...kids.map(e => e.getBoundingClientRect().right)), name: t.getBoundingClientRect().width, view: getComputedStyle(document.querySelector('.rs-g3d-view')).display, follow: document.querySelector('.rs-g3d-follow').textContent}; }""")
+        page.evaluate("document.querySelector('.rs-g3d').style.width = '700px'")
+        page.wait_for_function("!document.querySelector('.rs-g3d').classList.contains('rs-g3d-narrow')")
+        page.context.browser.close()
+    assert errors == []
+    assert got["spread"] < 6 and got["labels"] and got["last"] <= got["barRight"] and got["name"] > 40 and got["view"] == "none", got
+
+
 def test_the_selected_road_is_one_solid_line_above_the_mesh_and_its_points_are_pins():
     """The selection is one polyline 1.5 m above the mesh (the option `mesh_altitude_m`), also in a tunnel (level -1); its `points` are pins."""
     html, o = _options(dashboard={"google_3d": {"mesh_altitude_m": 2.5}})

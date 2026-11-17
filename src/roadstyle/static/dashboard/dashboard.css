@@ -157,6 +157,10 @@ html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a 
 .rs-svw-bar{flex-wrap:wrap}   /* the buttons and the credit of a window do not fit in one row: the second row, and the note of the 3D window has a row of its own */
 .rs-svw-t{flex:1 0 auto;max-width:100%}   /* the name of the road keeps its room: a crowded header wraps, it does not cut the name or the provider tabs */
 .rs-svw-prov{flex:0 0 auto}
+.rs-g3d-narrow .rs-svw-bar{flex-wrap:nowrap}   /* a narrow 3D window: one row; the name of the road is cut, the buttons keep their size, and our Imagery | Map switch is hidden (Google's round button does it) */
+.rs-g3d-narrow .rs-svw-t{flex:1 1 0;min-width:0;max-width:none}
+.rs-g3d-narrow .rs-svw-bar>*:not(.rs-svw-t){flex:none}
+.rs-g3d-narrow .rs-g3d-view{display:none}
 .rs-svw-step{display:inline-flex;flex:0 0 auto}   /* the two arrows wrap together */
 .rs-svw-bar{position:relative}
 .rs-svw-bar button.rs-svw-x{position:absolute;top:6px;right:8px}   /* the close button stays at the top right when the header wraps (by its class: the tooltip code takes the `title` away on hover) */
