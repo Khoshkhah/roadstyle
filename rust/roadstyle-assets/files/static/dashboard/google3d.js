@@ -25,6 +25,7 @@ export function initGoogle3D(){
       ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
       '<span class="rs-svw-mode rs-g3d-view" role="group" aria-label="View"><button type="button" data-v="imagery" class="on" title="Google\'s 3D photos of the city">Imagery</button>'+
       '<button type="button" data-v="map" title="Google\'s drawn 3D map">Map</button></span>'+
+      '<button type="button" class="rs-g3d-labels" title="Labels in this window only; the map keeps its own">Labels</button>'+
       '<button type="button" class="rs-g3d-follow on" title="Follow the map">Following</button>'+
       '<button type="button" class="rs-svw-x" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
@@ -176,7 +177,13 @@ export function initGoogle3D(){
     const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d, gmp-marker-3d").forEach(x=>x.remove()); line=null; };
     const redrawRoad=()=>{ try{ drawLayers(); }catch(e){ LOG.push("redraw: "+String(e&&e.message||e).slice(0, 120)); } };
     const modeChanged=()=>{ quietUntil=performance.now()+1000; keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
-    document.addEventListener("rs:labelschange", ()=>{ if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); });
+    // the header's Labels button: this window's labels only (the map keeps its own); until it is clicked, the page's switch rules
+    const lbtn=w.querySelector(".rs-g3d-labels");
+    const paintLabels=()=>{ const on=labelsWanted(); lbtn.classList.toggle("on", on); lbtn.setAttribute("aria-pressed", String(on)); };
+    const labelsChanged=()=>{ paintLabels(); if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); };
+    lbtn.onclick=()=>{ ownLabels=!labelsWanted(); try{ localStorage.setItem(LAB_KEY, ownLabels ? "1" : "0"); }catch(e){} labelsChanged(); };
+    paintLabels();
+    document.addEventListener("rs:labelschange", labelsChanged);
     let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes
     setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode) modeChanged(); lastMode=v; }, 200);
     const open=()=>{
@@ -217,13 +224,10 @@ export function initGoogle3D(){
     showWrap.innerHTML='<button type="button" class="rs-g3d-show" title="What the window draws">Show ▾</button><div class="rs-g3d-menu" hidden></div>';
     bar.insertBefore(showWrap, fbtn);
     const showBtn=showWrap.querySelector(".rs-g3d-show"), menu=showWrap.querySelector(".rs-g3d-menu");
-    const paintMenu=()=>{ const list=[...REG.values()].filter(avail); showWrap.hidden=false;
+    const paintMenu=()=>{ const list=[...REG.values()].filter(avail); showWrap.hidden=list.length<2;
       menu.innerHTML=""; for(const d of list){ const lab=document.createElement("label"), c=document.createElement("input"); c.type="checkbox"; c.checked=layerOn(d); c.dataset.id=d.id;
         c.onchange=()=>{ const v=stored(); v[d.id]=c.checked; try{ localStorage.setItem(LKEY, JSON.stringify(v)); }catch(e){} drawLayers(); };
-        lab.append(c, document.createTextNode(" "+(d.label||d.id))); menu.appendChild(lab); }
-      const lab=document.createElement("label"), c=document.createElement("input"); c.type="checkbox"; c.checked=labelsWanted(); c.dataset.id="labels";      // the last row: the labels of this window only
-      c.onchange=()=>{ ownLabels=c.checked; try{ localStorage.setItem(LAB_KEY, ownLabels ? "1" : "0"); }catch(e){} if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); };
-      lab.append(c, document.createTextNode(" Labels")); lab.title="The labels of this window only; the map keeps its own"; menu.appendChild(lab); };
+        lab.append(c, document.createTextNode(" "+(d.label||d.id))); menu.appendChild(lab); } };
     showBtn.onclick=e=>{ e.stopPropagation(); menu.hidden=!menu.hidden; };
     document.addEventListener("click", e=>{ if(!e.target.closest || !e.target.closest(".rs-g3d-showwrap")) menu.hidden=true; }, true);
     // THE SELECTION STYLE, in one place: the template's `google_3d.selection_style` (a page can change any of its keys). Every kind of a layer with `selection: true` (the built-in

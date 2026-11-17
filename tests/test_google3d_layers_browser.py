@@ -93,7 +93,7 @@ def test_the_window_draws_the_layers_and_the_show_menu_hides_one(tmp_path):
         browser.close()
 
     assert errors == []
-    assert labels == [["Selected road", True], ["Zones", True], ["Points", False], ["Labels", False]]
+    assert labels == [["Selected road", True], ["Zones", True], ["Points", False]]
 
 
 def _open_window(p, html, errors):
@@ -124,21 +124,26 @@ def test_google_3d_selected_false_starts_the_window_with_only_the_pages_layers()
     assert on == {"selected": False, "zones": True} and again is True
 
 
-def test_the_show_menu_has_a_labels_box_for_the_window_only():
-    """The Show menu always shows; its Labels box sets Google's mode (HYBRID has labels, SATELLITE has none) and the page's own switch is not touched."""
+def test_the_header_has_a_labels_button_for_the_window_only():
+    """The header's Labels button sets Google's mode (HYBRID has labels, SATELLITE none); the page's own Labels switch is not touched."""
     html, _ = _options()
     errors = []
     with pw.sync_playwright() as p:
         page = _open_window(p, html, errors)
-        box = page.locator(".rs-g3d-menu input[data-id=labels]")
-        before = [page.eval_on_selector(".rs-g3d-showwrap", "e => !e.hidden"), box.is_checked(), page.evaluate("document.querySelector('gmp-map-3d').mode")]
-        box.evaluate("c => { c.checked = true; c.dispatchEvent(new Event('change')); }")
-        on = page.evaluate("document.querySelector('gmp-map-3d').mode")
-        box.evaluate("c => { c.checked = false; c.dispatchEvent(new Event('change')); }")
-        off = page.evaluate("document.querySelector('gmp-map-3d').mode")
+        def mode():
+            return page.evaluate("document.querySelector('gmp-map-3d').mode")
+
+        def pressed():
+            return page.get_attribute(".rs-g3d-labels", "aria-pressed")
+
+        before = (pressed(), mode())
+        page.click(".rs-g3d-labels")
+        on = (pressed(), mode())
+        page.click(".rs-g3d-labels")
+        off = (pressed(), mode())
         page.context.browser.close()
     assert errors == []
-    assert before == [True, False, "SATELLITE"] and (on, off) == ("HYBRID", "SATELLITE")
+    assert (before, on, off) == (("false", "SATELLITE"), ("true", "HYBRID"), ("false", "SATELLITE"))
 
 
 def test_the_selected_road_is_one_solid_line_above_the_mesh_and_its_points_are_pins():

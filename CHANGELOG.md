@@ -12,7 +12,7 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 
-- **The Google 3D window has its own *Labels* box** in the *Show* menu, so the window can show or hide Google's labels while the map keeps its labels. It starts from the page's Labels switch, and the window keeps its own choice after that. The *Show* menu now always shows (it showed only with two or more layers).
+- **The Google 3D window has its own *Labels* button** in its header, so the window can show or hide Google's labels while the map keeps its labels. It starts from the page's Labels switch, and the window keeps its own choice after you click it.
 
 ### Changed
 
