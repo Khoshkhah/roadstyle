@@ -19,7 +19,7 @@ export function initGoogle3D(){
   if(O.google_3d){
     const w=document.createElement("div"); w.className="rs-svw rs-g3d"; w.hidden=true;
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
-      '<span class="rs-g3d-note rs-g3d-tun" hidden>This road is in a tunnel: Google shows the surface above it</span>'+
+      '<span class="rs-g3d-tun" hidden title="This road is in a tunnel: Google shows the surface above it"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-label="Tunnel"><path d="M2 14V8a6 6 0 0 1 12 0v6M5.5 14V8.5a2.5 2.5 0 0 1 5 0V14"/></svg></span>'+
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
       '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
       ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
