@@ -9,15 +9,11 @@ All notable changes to **roadstyle** are documented here. The format is based on
 ### Added
 
 - **`google_3d_selected=False` starts the Google 3D window without the built-in layer *Selected road*.** A dashboard that shows only its own `google_3d_layers` can now do this. The default is `True`, as before.
-
-### Added
-
 - **The Google 3D window has its own *Labels* button** in its header, so the window can show or hide Google's labels while the map keeps its labels. It starts from the page's Labels switch, and the window keeps its own choice after you click it.
 
 ### Changed
 
 - **The Google 3D window's header has no "heights: Mapzen" text.** The page's attribution box has the credit ("Ground heights: Mapzen, SRTM"), and now names the source of the page's own ground when the page has one (`rsGround`).
-
 - **One 3D buildings button for every source.** The toolbox's buildings button now switches the buildings of a vector base map (OpenFreeMap), the buildings of the area (a map layer with a 3D layer) and the part `buildings` of a 3D scene (`scene_3d`). It is on while any source shows its buildings, and grey, with the reason in its title, when the page has none. The base-map box has no *3D buildings* row any more, the Layers box has no *Buildings 3D* row, and the scene has no *3D buildings* row: the button is the one switch. The *Opacity* slider of the box is now *3D buildings opacity*. The scene's buildings win over the base map's, as the area's own buildings do. The calls `rsBuildings`, `rsSetBuildings3D` and `rsScene3dKind("buildings", on)` are as before.
 - **The Google 3D window shows a small tunnel icon, not a line of text.** For a road in a tunnel, the bar had the words "This road is in a tunnel: Google shows the surface above it". Now it has a small icon with the same words as its title.
 - **The 3D bridge decks show from zoom 15** (`bridge_decks.flat_below`; it was 16). Below zoom 15 a bridge is still its flat line.
