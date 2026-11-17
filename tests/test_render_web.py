@@ -3085,3 +3085,16 @@ def test_the_bridge_profile_schemas_check_the_samples_and_agree_with_the_referen
     assert "bridge_profile_input.schema.json" in section and "bridge_profile_complete.schema.json" in section
     for key, default in (("design_speed_kmh", 50), ("design_grade", 0.05)):
         assert f"Default {default}" in section, key                                                       # the defaults of the reference
+
+
+def test_street_view_mode_is_an_option_of_the_window(monkeypatch):
+    """`street_view_mode`: "" (the window chooses: Linked with a key, else Classic), "linked" or "classic"; a wrong value, and "linked" without a key, are errors."""
+    monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
+    e = _edges()
+    assert _opt(render_edges(e, backend="web", street_view="window").html, "street_view_mode") == ""
+    assert _opt(render_edges(e, backend="web", street_view="window", street_view_key="AIzaTEST", street_view_mode="classic").html, "street_view_mode") == "classic"
+    assert _opt(render_edges(e, backend="web", street_view="window", street_view_key="AIzaTEST", street_view_mode="linked").html, "street_view_mode") == "linked"
+    with pytest.raises(ValueError, match="street_view_mode"):
+        render_edges(e, backend="web", street_view="window", street_view_key="AIzaTEST", street_view_mode="plain")
+    with pytest.raises(ValueError, match="needs a Google Maps"):
+        render_edges(e, backend="web", street_view="window", street_view_key="", street_view_mode="linked")

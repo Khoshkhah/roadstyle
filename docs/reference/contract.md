@@ -114,7 +114,6 @@ contract makes changeable (or a value that is not used).
 | `arrows`, `labels` | bool, true | `render`; the map options (`arrows.on`, `labels.on`) | engine | gap: no switch at run time (a visibility change is enough) | |
 | `arrow_icon`, `arrow_color`, `arrow_rules` | the look (`arrows`, `labels.base_size`) | option | `arrows.js` | no | |
 | `street_view` | `"window"`, true, false | `render`; option | `streetview.js`, `svspot.js` | yes | `rsSetStreetView`; `rs:streetviewchange` |
-| Street View mode | `"linked"` or classic | `localStorage` `rs-street-view-mode` | `streetview.js` | yes | the window's buttons |
 | `street_view_key` | text, `GOOGLE_MAPS_KEY` | `render`; option | `streetview.js`, `google3d.js` | no | |
 | `mapillary_token` | text, `MAPILLARY_TOKEN` | `render`; option | `svproviders.js` | no | |
 | Street View provider, coverage | `"google"`, `"panoramax"`, `"mapillary"`; on/off | `localStorage` `rs-street-view-provider`, `rs-street-view-cov` | `streetview.js` | yes | the window's buttons |
@@ -255,7 +254,7 @@ The table is not renamed: the column keywords (`highway_col`, `bridge_col`, ...)
 
 | Name | Content | Set by |
 |---|---|---|
-| `rs-street-view-mode` | the Street View mode (`linked` or classic) | `streetview.js` |
+| `rs-street-view-mode` | the Street View mode (`linked` or classic) of the standalone Street View page (the dashboard window has the option `street_view_mode`) | `templates/street_view.html` |
 | `rs-street-view-window:<path>`, `rs-google-3d-window:<path>` | the place of the two windows | `float.js` |
 | `rs-host-panel:<path>` | the host panel open or closed | `panel.js` |
 | `--rs-side` | the width of the side panel (the controls on the right move with it) | `panel.js` |

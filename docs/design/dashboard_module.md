@@ -187,6 +187,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `street_view` | `street_view`: `"window"`, `true` or `false` | `"window"` | `streetview.js`, `svspot.js` |
 | `street_view_key` | `street_view_key` | `""` | `streetview.js`, `google3d.js` |
 | `mapillary_token` | `mapillary_token` | `""` | `svproviders.js`, `settings.js` |
+| `street_view_mode` | `street_view_mode` | `""` | `streetview.js` |
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
 | `dashboard.google_3d.layers` | `google_3d_layers`: `[{id, label, kind, source, match, scope, max, on, arrows, style}]` (`roadstyle::dashboard::Layer3d`) | `[]` | `google3d.js` |
 | `dashboard.google_3d.selected` | `google_3d_selected`: `True` | The layer *Selected road* starts on. `False`: the window draws only the page's layers |

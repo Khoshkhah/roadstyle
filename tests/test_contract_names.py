@@ -56,7 +56,7 @@ def test_every_name_of_the_reference_is_in_the_code():
 def test_the_storage_keys_and_css_variables():
     code = " ".join(p.read_text() for p in (ROOT / "rust/roadstyle-assets/files/static/dashboard").glob("*.[jc]s*"))
     doc = DOC.read_text()
-    for name in ("rs-street-view-mode", "rs-street-view-window", "rs-google-3d-window", "rs-host-panel:", "--rs-side"):
+    for name in ("rs-street-view-window", "rs-google-3d-window", "rs-host-panel:", "--rs-side"):
         assert name in code and name in doc, name
 
 

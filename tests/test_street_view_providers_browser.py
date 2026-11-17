@@ -98,7 +98,7 @@ def test_panoramax_shows_the_nearest_photo_with_no_key_and_remembers_the_choice(
         assert page.locator(".rs-svw-alt").is_visible()
         assert any("place_position=18.0" in u and "place_distance=0-30" in u for u in asked)
         assert page.evaluate("localStorage.getItem('rs-street-view-provider')") == "panoramax"
-        assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-mode").is_hidden()                                  # Linked / Classic are Google's
+        assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-mode").count() == 0                                 # the bar has no Linked / Classic switch
         _pick(page, "google")
         assert page.locator(".rs-svw-alt").is_hidden() and page.evaluate("window.__psvgone") is True
         assert "needs this page served" in page.inner_text(".rs-svw-msg")
@@ -248,3 +248,19 @@ def test_the_google_frame_is_credentialless(tmp_path):
 
 def test_the_street_view_page_frame_is_credentialless():
     assert 'id="sv-frame" title="Google Street View" hidden allowfullscreen credentialless' in rs.render_street_view(_edges()).html
+
+
+@pytest.mark.parametrize("kw, visible", [({"street_view_key": "AIzaTEST"}, False), ({"street_view_key": "AIzaTEST", "street_view_mode": "classic"}, True), ({}, True)])
+def test_the_bar_has_step_buttons_except_in_the_linked_panel(tmp_path, kw, visible):
+    """Linked (a key, no `street_view_mode`) has no ◀ ▶ buttons in the bar: the panorama has Google's own arrows. Classic, and a page with no key, have them."""
+    path = tmp_path / "d.html"
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", **kw).save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            page.route("https://maps.googleapis.com/**", lambda r: r.fulfill(body="", content_type="text/javascript"))
+            page.evaluate("rsSetStreetView(true)")
+            shown = page.evaluate("!!document.querySelector('.rs-svw:not(.rs-g3d) .rs-svw-step').offsetParent")
+        finally:
+            browser.close()
+    assert shown is visible

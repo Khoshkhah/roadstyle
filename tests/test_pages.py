@@ -93,12 +93,12 @@ def test_street_view_key_turns_the_embed_into_a_panorama_that_reports_its_moves(
 
 
 def test_street_view_window_takes_the_key_too(monkeypatch):
-    """The floating window every dashboard uses: the same Linked / Classic switch with a key."""
+    """The floating window every dashboard uses: Linked with a key (no switch in the bar: the page's `street_view_mode` chooses)."""
     monkeypatch.delenv("GOOGLE_MAPS_KEY", raising=False)
     h = rs.render_edges(_edges(), backend="web", street_view="window").html
     assert _in('"street_view_key": "", "google_3d"', h)
     h = rs.render_edges(_edges(), backend="web", street_view="window", street_view_key="AIzaTEST").html
-    assert _in('"street_view_key": "AIzaTEST", "google_3d"', h) and "__rsGmReady" in h and 'class="rs-svw-mode"' in h
+    assert _in('"street_view_key": "AIzaTEST", "google_3d"', h) and "__rsGmReady" in h and 'class="rs-svw-mode"' not in h
 
 
 def test_street_view_key_comes_from_the_environment(monkeypatch):

@@ -51,8 +51,9 @@ rs.render_edges(edges, street_view_key=KEY)  # the window with Linked / Classic 
 A key needs more than the key itself: billing, the Maps JavaScript API and a list of your web
 addresses. See [Keys and tokens](google-key.md).
 
-With a Google Maps JavaScript API key, the window bar has a **Linked / Classic** switch.
-Linked is a real panorama, and the map marker walks with you. Classic is the keyless embed.
+With a Google Maps JavaScript API key, the window shows **Linked**: a real panorama, and the map marker walks with you.
+Without a key it shows **Classic**: the keyless embed. The keyword `street_view_mode="classic"` makes a page with a key use Classic.
+The window bar has no switch for it.
 
 ## Docked beside the map
 
@@ -111,10 +112,11 @@ Every `render_edges` keyword also works here. On a phone, Street View is under t
 
     With `street_view_key=`, the panel is a real panorama (the Maps JavaScript API).
     Each step and turn moves the marker on the map. The map pans to keep the marker in view.
-    Only Google's own street imagery shows. The step buttons of the page still walk along the clicked road.
+    Only Google's own street imagery shows. The window bar has no step buttons here: use Google's arrows in the picture. `rsStreetViewStep(m)` still steps along the clicked road. Classic, Panoramax and Mapillary have the ◀ ▶ buttons.
 
-    A switch in the bar changes between **Linked** (this panorama) and **Classic** (the keyless embed).
-    The browser remembers the choice.
+    The page chooses between **Linked** (this panorama) and **Classic** (the keyless embed) with `street_view_mode=`.
+    The default is Linked with a key, and Classic without one. `street_view_mode="linked"` without a key is an error.
+    The window bar has no switch. The standalone Street View page (`render_street_view`) still has one.
 
     The key is written into the page, as every browser key is. To make a key and limit it to your own
     addresses, see [Keys and tokens](google-key.md). Google bills Dynamic Street View for each panorama

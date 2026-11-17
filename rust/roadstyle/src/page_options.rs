@@ -20,7 +20,7 @@ const BASEMAPS: &str = roadstyle_assets::text!("data/basemaps.json");
 const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "basemap_switcher": true, "name": "roadstyle", "pitch": null,
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
-    "street_view_key": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true,
+    "street_view_key": null, "street_view_mode": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true,
     "template": null, "layout": null, "dashboard": null, "page_script": null, "vehicles": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "google_3d_selected": true, "hillshade": false, "terrain": false, "terrain_exaggeration": null, "terrain_tunnels": "fade", "buildings_opacity": null, "ground": null, "scene_3d": null}"#;
 
 /// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
@@ -70,6 +70,7 @@ struct PageKeys {
     popup_mode: Option<String>,
     street_view: Value,
     street_view_key: Option<String>,
+    street_view_mode: Option<String>,
     mapillary_token: Option<String>,
     google_3d: Option<bool>,
     google_3d_layers: Vec<crate::dashboard::Layer3d>,
@@ -196,6 +197,14 @@ fn check_keys<'a>(k: &'a PageKeys, look: &Look, dashboard: &crate::dashboard::Da
     }
     crate::dashboard::check_layers(&k.google_3d_layers).map_err(crate::error::options)?;
     let key = k.street_view_key.clone().filter(|v| !v.is_empty());
+    match k.street_view_mode.as_deref() {
+        None | Some("") | Some("classic") => {}
+        Some("linked") if key.is_none() && dashboard.toolbar.is_none() => {
+            return Err(crate::error::options("street_view_mode=\"linked\" needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY"));
+        }
+        Some("linked") => {}
+        Some(m) => return Err(crate::error::options(format!("street_view_mode must be \"linked\" or \"classic\" (or None: Linked with a key, else Classic), got {m:?}"))),
+    }
     // a page with a toolbar has the settings tool, where the person can type the key; a page without one has no place for it
     if k.google_3d == Some(true) && key.is_none() && dashboard.toolbar.is_none() {
         return Err(crate::error::options("google_3d=True needs a Google Maps JavaScript API key: pass street_view_key=... or set GOOGLE_MAPS_KEY \
@@ -336,7 +345,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
         dashboard, basemaps: bms, ontop, basemap_switcher: k.basemap_switcher, tiles: tiled, simple: ctl["simple"].clone(),
         sources: meta["roadstyle:sources"].clone(), arrows: meta["roadstyle:arrows"].clone(), live: meta["roadstyle:live"].clone(), bridge_profile: profile_on_ground(&meta["roadstyle:bridge_profile"], &k.ground, &mut src.warnings)?,
         popup_mode: mode.into(), find_control: k.find_control, zoom_readout: k.zoom_readout, pitch_3d: number(&ctl["pitch_3d"])?,
-        street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), google_3d,
+        street_view: k.street_view.clone(), street_view_key: key.unwrap_or_default(), street_view_mode: k.street_view_mode.clone().unwrap_or_default(), google_3d,
         mapillary_token: k.mapillary_token.clone().unwrap_or_default(),
         select_color: ctl["select_color"].clone(), dock: ctl["dock"].clone(), vehicle_look: ctl["vehicle_look"].clone(), vehicles: k.vehicles.clone(), filter: ctl["filter"].clone(), filter_control: k.filter_control,
         color_options: Some(&meta["roadstyle:color_options"]).filter(|v| present(v)).cloned().unwrap_or_else(|| json!([])), legend: k.legend, hillshade: k.hillshade, terrain: k.terrain, terrain_exaggeration: k.terrain_exaggeration, terrain_tunnels: k.terrain_tunnels.clone(), buildings_opacity: k.buildings_opacity, ground: k.ground.clone(), scene_3d: crate::scene3d::option(&k.scene_3d, &k.ground)?,

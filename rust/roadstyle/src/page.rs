@@ -76,6 +76,8 @@ pub struct PageOptions {
     pub google_3d: bool,
     /// a Mapillary client token for the Street View window (the person can also save one in the settings)
     pub mapillary_token: String,
+    /// the Street View window's panel: "linked" (a real panorama, needs the key), "classic" (the keyless embed) or "" (Linked with a key, else Classic)
+    pub street_view_mode: String,
     pub select_color: Value,
     /// the colours of the data dock's objects on the map (the look's `dock` section: result, selected, roles, role_series); null when the look has none
     pub dock: Value,

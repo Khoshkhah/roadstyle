@@ -8,6 +8,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 
+- **`street_view_mode=`** chooses the panel of the Street View window: `"linked"` (a real panorama, needs the key), `"classic"` (the keyless embed) or `None` (Linked with a key, else Classic, as before). The window bar has no *Linked | Classic* switch any more, and the browser no longer remembers a choice for it. `"linked"` without a key is an error. The Linked panel has no ◀ ▶ step buttons either (Google's own arrows are in the picture); `rsStreetViewStep` still works, and the other panels keep the buttons. The standalone `render_street_view` page keeps its switch.
+
 - **`google_3d_selected=False` starts the Google 3D window without the built-in layer *Selected road*.** A dashboard that shows only its own `google_3d_layers` can now do this. The default is `True`, as before.
 - **The Google 3D window has its own *Labels* button** in its header, so the window can show or hide Google's labels while the map keeps its labels. It starts from the page's Labels switch, and the window keeps its own choice after you click it.
 
