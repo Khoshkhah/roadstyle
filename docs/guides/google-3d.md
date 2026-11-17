@@ -56,7 +56,7 @@ turns off. Click **Follow the map** to set the 3D view to the map again. A road 
     Google puts its camera above sea level. The map is on the ground. So the page reads the
     height of the ground under the center from the free
     [Terrain Tiles on AWS](https://registry.opendata.aws/terrain-tiles/) (Mapzen, no key) and gives it to Google.
-    The window bar shows the credit **heights: Mapzen**. If the heights do not load, the bar shows
+    The page's attribution box shows the credit **Ground heights: Mapzen, SRTM** (or the source of the page's own ground). If the heights do not load, the bar shows
     **⚠ no ground heights**. Then the 3D view can be too close on a hill.
 
     The map has the last word. If the map stops at its limit (a box from `map.setMaxBounds(...)`,
@@ -99,7 +99,12 @@ rs.render_dashboard(edges, google_3d=True, google_3d_layers=[
 
 The window has a **Show** menu with one check box for each layer. It shows when there are two or
 more layers. The page remembers your choice.
+
+The header has a **Labels** button for the labels of this window only (the map keeps its own labels). It starts from the page's Labels switch, and the window keeps its own choice after you click it. A phone header has no Labels button: the page's switch rules the window.
 A wrong key, a wrong `kind`, a repeated `id` or a `selection` layer without `match` stops with an error.
+
+The window has one built-in layer, *Selected road*. To draw only your own layers, start it off with `google_3d_selected=False`.
+The *Show* menu can turn it on again.
 
 ## The selection
 

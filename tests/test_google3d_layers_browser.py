@@ -108,6 +108,44 @@ def _open_window(p, html, errors):
     return page
 
 
+def test_google_3d_selected_false_starts_the_window_with_only_the_pages_layers():
+    """`google_3d_selected=False`: the built-in layer "Selected road" starts off, so the window draws only the page's layers; the Show menu turns it on."""
+    assert _options()[1]["dashboard"]["google_3d"]["selected"] is True
+    html, o = _options(google_3d_layers=[_LAYER], google_3d_selected=False)
+    assert o["dashboard"]["google_3d"]["selected"] is False
+    errors = []
+    with pw.sync_playwright() as p:
+        page = _open_window(p, html, errors)
+        on = page.evaluate("Object.fromEntries(rsG3dLayers.list().map(l => [l.id, l.on]))")
+        page.evaluate("rsG3dLayers.setOn('selected', true)")
+        again = page.evaluate("rsG3dLayers.isOn('selected')")
+        page.context.browser.close()
+    assert errors == []
+    assert on == {"selected": False, "zones": True} and again is True
+
+
+def test_the_header_has_a_labels_button_for_the_window_only():
+    """The header's Labels button sets Google's mode (HYBRID has labels, SATELLITE none); the page's own Labels switch is not touched."""
+    html, _ = _options()
+    errors = []
+    with pw.sync_playwright() as p:
+        page = _open_window(p, html, errors)
+        def mode():
+            return page.evaluate("document.querySelector('gmp-map-3d').mode")
+
+        def pressed():
+            return page.get_attribute(".rs-g3d-labels", "aria-pressed")
+
+        before = (pressed(), mode())
+        page.click(".rs-g3d-labels")
+        on = (pressed(), mode())
+        page.click(".rs-g3d-labels")
+        off = (pressed(), mode())
+        page.context.browser.close()
+    assert errors == []
+    assert (before, on, off) == (("false", "SATELLITE"), ("true", "HYBRID"), ("false", "SATELLITE"))
+
+
 def test_the_selected_road_is_one_solid_line_above_the_mesh_and_its_points_are_pins():
     """The selection is one polyline 1.5 m above the mesh (the option `mesh_altitude_m`), also in a tunnel (level -1); its `points` are pins."""
     html, o = _options(dashboard={"google_3d": {"mesh_altitude_m": 2.5}})

@@ -19,19 +19,14 @@ export function initGoogle3D(){
   if(O.google_3d){
     const w=document.createElement("div"); w.className="rs-svw rs-g3d"; w.hidden=true;
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
-      '<span class="rs-g3d-note rs-g3d-tun" hidden>This road is in a tunnel: Google shows the surface above it</span>'+
+      '<span class="rs-g3d-tun" hidden title="This road is in a tunnel: Google shows the surface above it"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-label="Tunnel"><path d="M2 14V8a6 6 0 0 1 12 0v6M5.5 14V8.5a2.5 2.5 0 0 1 5 0V14"/></svg></span>'+
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
-      '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
-      ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
       '<span class="rs-svw-mode rs-g3d-view" role="group" aria-label="View"><button type="button" data-v="imagery" class="on" title="Google\'s 3D photos of the city">Imagery</button>'+
       '<button type="button" data-v="map" title="Google\'s drawn 3D map">Map</button></span>'+
+      '<button type="button" class="rs-g3d-labels" title="Labels in this window only; the map keeps its own">Labels</button>'+
       '<button type="button" class="rs-g3d-follow on" title="Follow the map">Following</button>'+
       '<button type="button" class="rs-svw-x" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
-    // the credit of the heights: the ground's source, else the AWS tiles' (Mapzen)
-    const credit=()=>{ const a=w.querySelector(".rs-g3d-src"), g=O.ground;
-      if(g && g.terrain){ a.textContent="heights: "+(g.source||"the area's ground"); a.title="Ground heights: the area's ground"+(g.source?", "+g.source:""); a.removeAttribute("href"); } };
-    credit(); document.addEventListener("rs:groundchange", credit);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
     let m3=null, lib=null, line=null, btn=null;
@@ -148,7 +143,11 @@ export function initGoogle3D(){
     // leaves Google's own toggle alone (the round thumbnail at the top right of the window: imagery or Google's stylised 3D map). The reviewer's
     // last choice is kept for the next opening. window.rsG3dLog keeps Google's last console warnings, and window.rsG3dMode() the mode the
     // element reports (the debug line shows both).
-    const modeOf=l=>{ const n=window.rsLabelsOn && window.rsLabelsOn() ? "HYBRID" : "SATELLITE"; return (l.MapMode && l.MapMode[n]) || n; };
+    // the window's own Labels choice (the Show menu: a box here that is not the page's switch, so the map keeps its labels); until it is set, the page's switch rules
+    const LAB_KEY="rs-g3d-labels:"+location.pathname;
+    let ownLabels=null; try{ const v=localStorage.getItem(LAB_KEY); if(v!==null) ownLabels=v==="1"; }catch(e){}
+    const labelsWanted=()=>ownLabels!==null ? ownLabels : !!(window.rsLabelsOn && window.rsLabelsOn());
+    const modeOf=l=>{ const n=labelsWanted() ? "HYBRID" : "SATELLITE"; return (l.MapMode && l.MapMode[n]) || n; };
     const viewBtns=[...w.querySelectorAll(".rs-g3d-view button")];
     const paintView=()=>viewBtns.forEach(b=>{ const on=b.dataset.v===(drawnMode() ? "map" : "imagery"); b.classList.toggle("on", !!m3 && on); b.disabled=!m3; b.setAttribute("aria-pressed", String(!!m3 && on)); });
     viewBtns.forEach(b=>b.onclick=()=>{ if(!m3 || !lib) return; m3.mode = b.dataset.v==="map" ? lib.MapMode.ROADMAP : modeOf(lib); paintView(); });
@@ -164,7 +163,7 @@ export function initGoogle3D(){
     const hasLabelOption=()=>!!m3 && "defaultLabelsDisabled" in m3;
     window.rsLabelsTipExtra=()=>drawnMode() && !hasLabelOption() ? "Google's drawn 3D map keeps its labels" : "";
     const applyLabels=()=>{ if(!m3 || !lib) return false;
-      if(drawnMode()){ if(hasLabelOption()) m3.defaultLabelsDisabled=!(window.rsLabelsOn && window.rsLabelsOn()); return false; }
+      if(drawnMode()){ if(hasLabelOption()) m3.defaultLabelsDisabled=!labelsWanted(); return false; }
       const mode=modeOf(lib); if(String(m3.mode)===String(mode)) return false; m3.mode=mode; return true; };
     // A MODE CHANGE (Google's own toggle or the page's): every polyline is removed from the 3D map and the selected entity's line is drawn again from the
     // build's geometry, 300 ms after the switch and again after Google's first camera event in the new mode. One line, the build's, in both views.
@@ -172,7 +171,13 @@ export function initGoogle3D(){
     const clearLines=()=>{ if(m3) m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d, gmp-marker-3d").forEach(x=>x.remove()); line=null; };
     const redrawRoad=()=>{ try{ drawLayers(); }catch(e){ LOG.push("redraw: "+String(e&&e.message||e).slice(0, 120)); } };
     const modeChanged=()=>{ quietUntil=performance.now()+1000; keepMode(); document.dispatchEvent(new Event("rs:g3dmodechange")); afterSwitch(); clearLines(); redrawNext=true; clearTimeout(redrawT); redrawT=setTimeout(redrawRoad, 300); };
-    document.addEventListener("rs:labelschange", ()=>{ if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); });
+    // the header's Labels button: this window's labels only (the map keeps its own); until it is clicked, the page's switch rules
+    const lbtn=w.querySelector(".rs-g3d-labels");
+    const paintLabels=()=>{ const on=labelsWanted(); lbtn.classList.toggle("on", on); lbtn.setAttribute("aria-pressed", String(on)); };
+    const labelsChanged=()=>{ paintLabels(); if(applyLabels()) modeChanged(); else document.dispatchEvent(new Event("rs:g3dmodechange")); };
+    lbtn.onclick=()=>{ ownLabels=!labelsWanted(); try{ localStorage.setItem(LAB_KEY, ownLabels ? "1" : "0"); }catch(e){} labelsChanged(); };
+    paintLabels();
+    document.addEventListener("rs:labelschange", labelsChanged);
     let lastMode=null;      // Google's own toggle changes the mode without the page: only the picture changes
     setInterval(()=>{ if(!m3){ lastMode=null; return; } const v=String(m3.mode); if(lastMode!==null && v!==lastMode) modeChanged(); lastMode=v; }, 200);
     const open=()=>{
@@ -228,7 +233,7 @@ export function initGoogle3D(){
                          arrowEvery:SS.arrow_every, fill:SS.fill});
     let want=null;
     const selParts=()=>want && want.cs.length ? (Array.isArray(want.cs[0]) && Array.isArray(want.cs[0][0]) ? want.cs : [want.cs]).filter(c=>c.length>1) : [];
-    REG.set("selected", {id:"selected", label:"Selected road", kind:"line", selection:true,
+    REG.set("selected", {id:"selected", label:"Selected road", kind:"line", selection:true, on:!G || G.selected!==false,      // google_3d_selected=False: a page that shows only its own layers starts with this one off (the Show menu or rsG3dLayers.setOn turns it on)
       features:()=>({type:"FeatureCollection", features:selParts().map(c=>({type:"Feature", geometry:{type:"LineString", coordinates:c}, properties:{lvl:want.lvl}}))})});
     const register=d=>{ if(!d || !d.id || typeof d.features!=="function") throw new Error("rsG3dLayers.register: a layer needs an id and a features(selection) function"); REG.set(d.id, {kind:"line", ...d}); paintMenu(); drawLayers(); };
     window.rsG3dLayers={register, list:()=>[...REG.values()].map(d=>({id:d.id, label:d.label, kind:d.kind, on:layerOn(d), available:avail(d)})),

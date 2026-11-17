@@ -21,7 +21,7 @@ const DEFAULTS: &str = r#"{"basemap": null, "basemaps": null, "api_key": null, "
     "bearing": null, "max_pitch": null, "view_3d": false, "find_control": false, "zoom_readout": true, "overlay_control": true,
     "overlay_popup": true, "side_panel_html": null, "host_panel_width": 320, "road_popup": true, "popup_mode": null, "street_view": "window",
     "street_view_key": null, "mapillary_token": null, "google_3d": null, "hover_color": null, "compress": true, "views": null, "tiles": true,
-    "template": null, "layout": null, "dashboard": null, "page_script": null, "vehicles": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "hillshade": false, "terrain": false, "terrain_exaggeration": null, "terrain_tunnels": "fade", "buildings_opacity": null, "ground": null, "scene_3d": null}"#;
+    "template": null, "layout": null, "dashboard": null, "page_script": null, "vehicles": null, "page_style": null, "boundary_dim": false, "boundary_limit": false, "filter_control": true, "legend": true, "google_3d_layers": [], "google_3d_selected": true, "hillshade": false, "terrain": false, "terrain_exaggeration": null, "terrain_tunnels": "fade", "buildings_opacity": null, "ground": null, "scene_3d": null}"#;
 
 /// The map options that a template's defaults give way to when the call gives them (page_from: `mine`): they go into `given` too.
 const SIDEBAR_YIELDS: [&str; 3] = ["name", "road_popup", "minzoom"];
@@ -73,6 +73,7 @@ struct PageKeys {
     mapillary_token: Option<String>,
     google_3d: Option<bool>,
     google_3d_layers: Vec<crate::dashboard::Layer3d>,
+    google_3d_selected: bool,
     boundary_dim: bool,
     boundary_limit: bool,
     dashboard: Option<Value>,
@@ -314,6 +315,7 @@ pub fn page_from(roads: RoadTable, features: Option<FeatureTable>, look: &Look, 
     let ontop = if bms.len() > 1 { ontop_layers() } else { Value::Null };
     let mut dashboard = dashboard;
     dashboard.google_3d.layers = k.google_3d_layers.clone();
+    dashboard.google_3d.selected = k.google_3d_selected;
     dashboard.boundary.dim = k.boundary_dim;
     dashboard.boundary.limit = k.boundary_limit;
     // street_view="dock": Street View beside the map with a divider (the map and the window share the screen). The page has no panel and the bar is at the
@@ -548,6 +550,7 @@ pub fn host_options(look: &Look, given: &Map<String, Value>) -> Result<(Value, V
     let mut warnings = Vec::new();
     let (active, bms, style) = basemaps(&k, look, &mut warnings)?;
     dashboard.google_3d.layers = k.google_3d_layers.clone();
+    dashboard.google_3d.selected = k.google_3d_selected;
     dashboard.boundary.dim = k.boundary_dim;
     dashboard.boundary.limit = k.boundary_limit;
     if let Some(over) = k.dashboard.as_ref().filter(|v| !v.is_null()) {
