@@ -56,8 +56,11 @@ const _tbCredits = () => {
   const shown = s => { const w = document.querySelector(s); return w && !w.hidden ? w : null; }, svw = shown(".rs-svw:not(.rs-g3d)"), sp = svw && svw.dataset.prov;
   if(sp === "panoramax") rows.push({text: "Photos: Panoramax contributors (CC-BY-SA)", href: "https://panoramax.fr/"});    // the window frames a Panoramax / Mapillary viewer: their credit, not Google's
   if(sp === "mapillary") rows.push({text: "Photos: Mapillary contributors (CC-BY-SA)", href: "https://www.mapillary.com/"});
-  if(shown(".rs-g3d") || (svw && (!sp || sp === "google")))
-    rows.push({text: "Map data \u00a9 Google", href: "https://www.google.com/help/terms_maps/"}, {text: "Ground heights: Mapzen, SRTM", href: "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"});
+  if(shown(".rs-g3d") || (svw && (!sp || sp === "google"))){
+    const g = O.ground && O.ground.terrain ? O.ground : null;        // the page's own ground (rsGround): its source is the credit, else the AWS Terrain Tiles' (Mapzen, SRTM)
+    rows.push({text: "Map data \u00a9 Google", href: "https://www.google.com/help/terms_maps/"},
+              g ? {text: "Ground heights: " + (g.source || "the area's ground")} : {text: "Ground heights: Mapzen, SRTM", href: "https://github.com/tilezen/joerd/blob/master/docs/attribution.md"});
+  }
   // the credits of the page's own data (dashboard.credits: OpenStreetMap by default), first; not again when the base map's list already names the source
   const own = ((O.dashboard && O.dashboard.credits) || []).filter(c => { const w = (c.text.match(/[A-Za-z]+/) || [""])[0].toLowerCase(); return !w || !rows.some(r => r.text.toLowerCase().includes(w)); });
   rows.unshift(...own.map(c => ({text: c.text, href: c.href})));

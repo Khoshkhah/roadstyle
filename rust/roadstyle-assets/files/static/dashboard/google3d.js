@@ -21,17 +21,11 @@ export function initGoogle3D(){
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
       '<span class="rs-g3d-tun" hidden title="This road is in a tunnel: Google shows the surface above it"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-label="Tunnel"><path d="M2 14V8a6 6 0 0 1 12 0v6M5.5 14V8.5a2.5 2.5 0 0 1 5 0V14"/></svg></span>'+
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
-      '<a class="rs-g3d-src" href="https://github.com/tilezen/joerd/blob/master/docs/attribution.md" target="_blank" rel="noopener"'+
-      ' title="Ground heights: Terrain Tiles on AWS (Mapzen; SRTM and other sources)">heights: Mapzen</a>'+
       '<span class="rs-svw-mode rs-g3d-view" role="group" aria-label="View"><button type="button" data-v="imagery" class="on" title="Google\'s 3D photos of the city">Imagery</button>'+
       '<button type="button" data-v="map" title="Google\'s drawn 3D map">Map</button></span>'+
       '<button type="button" class="rs-g3d-follow on" title="Follow the map">Following</button>'+
       '<button type="button" class="rs-svw-x" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
-    // the credit of the heights: the ground's source, else the AWS tiles' (Mapzen)
-    const credit=()=>{ const a=w.querySelector(".rs-g3d-src"), g=O.ground;
-      if(g && g.terrain){ a.textContent="heights: "+(g.source||"the area's ground"); a.title="Ground heights: the area's ground"+(g.source?", "+g.source:""); a.removeAttribute("href"); } };
-    credit(); document.addEventListener("rs:groundchange", credit);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
     let m3=null, lib=null, line=null, btn=null;

@@ -56,7 +56,7 @@ turns off. Click **Follow the map** to set the 3D view to the map again. A road 
     Google puts its camera above sea level. The map is on the ground. So the page reads the
     height of the ground under the center from the free
     [Terrain Tiles on AWS](https://registry.opendata.aws/terrain-tiles/) (Mapzen, no key) and gives it to Google.
-    The window bar shows the credit **heights: Mapzen**. If the heights do not load, the bar shows
+    The page's attribution box shows the credit **Ground heights: Mapzen, SRTM** (or the source of the page's own ground). If the heights do not load, the bar shows
     **⚠ no ground heights**. Then the 3D view can be too close on a hill.
 
     The map has the last word. If the map stops at its limit (a box from `map.setMaxBounds(...)`,
