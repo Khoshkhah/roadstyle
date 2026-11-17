@@ -81,18 +81,17 @@ def test_the_first_view_on_a_desktop_is_beside_the_panel():
     assert not errors, errors
 
 
-def test_the_google_3d_window_bar_wraps_on_a_phone():
+def test_the_google_3d_window_bar_stays_short_on_a_phone():
     html, errors = rs.render_dashboard(_edges(), basemap="blank", google_3d=True).html, []
     with pw.sync_playwright() as p:
         browser = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
         page = _open(browser, html, errors, viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True)
         r = page.evaluate("""() => { const w = document.querySelector('.rs-g3d'); w.hidden = false;
-          const n = w.querySelector('.rs-g3d-note'); n.hidden = false;
+          const n = w.querySelector('.rs-g3d-tun'); n.hidden = false;
           const box = e => e.getBoundingClientRect(), bar = w.querySelector('.rs-svw-bar');
-          return {bar: box(bar).width, note: box(n).width, noteTop: box(n).top, line: parseFloat(getComputedStyle(n).lineHeight),
-                  noteH: box(n).height, btnBottom: Math.max(...[...bar.querySelectorAll('button')].map(b => box(b).bottom))}; }""")
-        assert r["note"] > r["bar"] * 0.8, r                       # the note has the width of the bar, not a narrow column
-        assert r["noteH"] < r["line"] * 3, r                       # it has one or two lines, not one word on a line
+          return {bar: box(bar).width, note: box(n).width, noteH: box(n).height, barH: box(bar).height}; }""")
+        assert r["note"] < 24 and r["noteH"] < 24, r               # the tunnel mark is a small icon, not a line of text
+        assert r["barH"] < 70, r                                   # it does not make the header wrap into many rows
         browser.close()
     assert not errors, errors
 
@@ -185,8 +184,8 @@ def test_the_google_3d_header_is_one_row_on_a_phone(w, h):
         page = _open(browser, html, errors, viewport={"width": w, "height": h}, **_TOUCH)
         r = page.evaluate("""() => { const win = document.querySelector('.rs-g3d'); win.hidden = false;
           const bar = win.querySelector('.rs-svw-bar'), kids = [...bar.children].filter(e => e.offsetParent), mid = e => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }, mids = kids.map(mid);   // the centres: items of other heights share a row
-          return {h: bar.getBoundingClientRect().height, spread: Math.max(...mids) - Math.min(...mids), n: kids.length, credit: getComputedStyle(win.querySelector('.rs-g3d-src')).display}; }""")
-        assert r["spread"] < 6 and r["h"] < 46 and r["credit"] == "none", r      # one row; the credit is in the attribution box
+          return {h: bar.getBoundingClientRect().height, spread: Math.max(...mids) - Math.min(...mids), n: kids.length}; }""")
+        assert r["spread"] < 6 and r["h"] < 46, r      # one row
         browser.close()
     assert not errors, errors
 
