@@ -35,9 +35,11 @@ The window bar has these controls:
 
 | Control | What it does |
 |---|---|
-| **Imagery** / **Map** | the photographic mesh, or Google's drawn 3D map |
 | **Following** / **Follow the map** | on at the start (`google_3d.follow` in the template). If it is on, the 3D view follows the map. Click it to follow again |
 | **Show** | the layers of the window (see [Your own layers](#your-own-layers)) |
+| **Labels** | Google's labels in this window only; the map keeps its own |
+
+To change the view (the photographic mesh or Google's drawn 3D map), use Google's round button at the top right of the map. The header has no switch for it.
 
 ## The two cameras move together
 

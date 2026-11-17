@@ -20,14 +20,13 @@ export function initGoogle3D(){
     const w=document.createElement("div"); w.className="rs-svw rs-g3d"; w.hidden=true;
     w.innerHTML='<div class="rs-svw-bar"><span class="rs-svw-t">Google 3D</span>'+
       '<span class="rs-g3d-tun" hidden title="This road is in a tunnel: Google shows the surface above it"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-label="Tunnel"><path d="M2 14V8a6 6 0 0 1 12 0v6M5.5 14V8.5a2.5 2.5 0 0 1 5 0V14"/></svg></span>'+
+      '<span class="rs-g3d-bri" hidden title="This road is on a bridge"><svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-label="Bridge"><path d="M1 6h14M2 13Q8 3 14 13M5 6v4.2M8 6v2.6M11 6v4.2"/></svg></span>'+
       '<span class="rs-g3d-warn" hidden title="The ground heights did not load: on a hill, the 3D view can be closer than the map">\u26a0 no ground heights</span>'+
-      '<span class="rs-svw-mode rs-g3d-view" role="group" aria-label="View"><button type="button" data-v="imagery" class="on" title="Google\'s 3D photos of the city">Imagery</button>'+
-      '<button type="button" data-v="map" title="Google\'s drawn 3D map">Map</button></span>'+
       '<button type="button" class="rs-g3d-labels" title="Labels in this window only; the map keeps its own">Labels</button>'+
       '<button type="button" class="rs-g3d-follow on" title="Follow the map">Following</button>'+
       '<button type="button" class="rs-svw-x" title="Close">✕</button></div><div class="rs-svw-msg"></div>';
     document.body.appendChild(w);
-    const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun");
+    const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"), tun=w.querySelector(".rs-g3d-tun"), bri=w.querySelector(".rs-g3d-bri");
     const {st, save, place}=_rsFloat(w, bar, "rs-google-3d-window", true);
     let m3=null, lib=null, line=null, btn=null;
     const say=html=>{ msg.innerHTML=html; msg.hidden=false; if(m3){ m3.remove(); m3=null; line=null; } };
@@ -91,8 +90,8 @@ export function initGoogle3D(){
     const paintFollow=()=>{ COUNT.follow=follow; fbtn.classList.toggle("on", follow); fbtn.setAttribute("aria-pressed", follow);
       fbtn.textContent=follow ? "Following" : w.classList.contains("rs-g3d-narrow") ? "Follow" : "Follow the map";
       fbtn.title=follow ? "Following the map: a drag in this window stops it" : "Not following the map: click to follow again"; };
-    // a narrow window (under 440 px; the window can be resized): the header stays one row. Our Imagery | Map switch is hidden (Google's own round button does the same),
-    // the name of the road is cut with "…", and "Follow the map" is "Follow" (rs-g3d-narrow, dashboard.css)
+    // a narrow window (under 440 px; the window can be resized): the header stays one row. The name of the road is cut with "…", and "Follow the map" is "Follow"
+    // (rs-g3d-narrow, dashboard.css). The view (imagery or Google's drawn map) is Google's own round button at the top right of the map: the header has no switch for it
     new ResizeObserver(()=>{ const n=w.clientWidth>0 && w.clientWidth<440; if(w.classList.contains("rs-g3d-narrow")!==n){ w.classList.toggle("rs-g3d-narrow", n); paintFollow(); } }).observe(w);
     // WHAT IS "THE REVIEWER MOVED THE 3D VIEW": any change of Google's camera that the page did not set, whatever the input was (a right-button or Ctrl drag, two
     // fingers, Google's compass or tilt control, a key). The page's own sets are remembered for 2 s: an event within 500 ms of one, or equal to one (1e-7
@@ -151,9 +150,6 @@ export function initGoogle3D(){
     let ownLabels=null; try{ const v=localStorage.getItem(LAB_KEY); if(v!==null) ownLabels=v==="1"; }catch(e){}
     const labelsWanted=()=>ownLabels!==null ? ownLabels : !!(window.rsLabelsOn && window.rsLabelsOn());
     const modeOf=l=>{ const n=labelsWanted() ? "HYBRID" : "SATELLITE"; return (l.MapMode && l.MapMode[n]) || n; };
-    const viewBtns=[...w.querySelectorAll(".rs-g3d-view button")];
-    const paintView=()=>viewBtns.forEach(b=>{ const on=b.dataset.v===(drawnMode() ? "map" : "imagery"); b.classList.toggle("on", !!m3 && on); b.disabled=!m3; b.setAttribute("aria-pressed", String(!!m3 && on)); });
-    viewBtns.forEach(b=>b.onclick=()=>{ if(!m3 || !lib) return; m3.mode = b.dataset.v==="map" ? lib.MapMode.ROADMAP : modeOf(lib); paintView(); });
     const MODE_KEY="rs-g3d-mode:"+location.pathname;
     const keptMode=()=>{ try{ return localStorage.getItem(MODE_KEY); }catch(e){ return null; } };
     const keepMode=()=>{ if(m3 && m3.mode){ try{ localStorage.setItem(MODE_KEY, String(m3.mode)); }catch(e){} } };
@@ -197,11 +193,11 @@ export function initGoogle3D(){
       _gmLoad(_svKey).then(()=>google.maps.importLibrary("maps3d")).then(l=>{
         if(w.hidden || m3) return;               // closed while it loaded
         lib=l; m3=new l.Map3DElement(Object.assign(toGoogle(), {mode:(k=>k && !/^(HYBRID|SATELLITE)$/i.test(k) ? k : modeOf(l))(keptMode())}));
-        m3.addEventListener("gmp-modechange", ()=>{ modeChanged(); lastMode=String(m3.mode); paintView(); });
+        m3.addEventListener("gmp-modechange", ()=>{ modeChanged(); lastMode=String(m3.mode); });
         for(const ev of ["gmp-centerchange", "gmp-headingchange", "gmp-tiltchange", "gmp-rangechange"])           // nothing moves the map from Google's camera: they redraw the road once and stop Follow
           m3.addEventListener(ev, ()=>{ if(redrawNext){ redrawNext=false; redrawRoad(); } onGoogleCamera(); });
         m3.addEventListener("gmp-error", e=>{ LOG.push("gmp-error: "+((e && (e.message || (e.detail && e.detail.message))) || "")); say("<b>Google 3D imagery did not load.</b><span>Google reported an error; the window does not show another style.</span>"); });
-        quietUntil=performance.now()+1500; msg.hidden=true; w.appendChild(m3); applyLabels(); paintView(); document.dispatchEvent(new Event("rs:g3dmodechange"));
+        quietUntil=performance.now()+1500; msg.hidden=true; w.appendChild(m3); applyLabels(); document.dispatchEvent(new Event("rs:g3dmodechange"));
         setTimeout(()=>{ if(m3){ if(want) ttl.textContent=want.name||"Unnamed road"; try{ paintMenu(); drawLayers(); }catch(e){ LOG.push("open: "+String(e&&e.message||e).slice(0, 120)); } } }, 0);
       }).catch(e=>{ console.warn("rs google 3d:", e); say("<b>Google 3D did not load.</b><span>"+_esc(e.message||e)+"</span>"+SETUP); });
     };
@@ -295,6 +291,7 @@ export function initGoogle3D(){
         if(def.kind==="ribbon"){ const w=(st.widthProp && +pr[st.widthProp]) || st.widthM || 3; polygon(offsetRing(cs, w/2), st); continue; }
         const tunnel=pr.lvl<0, dash=tunnel && !def.selection ? [7, 5] : st.dash;      // the selected road is one solid line in both views: short dashes break up on the mesh (the bar's note says "tunnel")
         if(tunnel) tun.hidden=false;
+        if(pr.lvl>0) bri.hidden=false;
         if(dash){ const {total, run}=along(cs);
           for(let a=0; a<total; a+=dash[0]+dash[1]) polyline(run(a, Math.min(a+dash[0], total)), tunnel && !def.selection ? {...st, color:"#7e57c2"} : st); }
         else polyline(cs, st);
@@ -303,7 +300,7 @@ export function initGoogle3D(){
     const drawLayers=()=>{
       if(!m3 || !lib) return;
       m3.querySelectorAll("gmp-polyline-3d, gmp-polygon-3d, gmp-marker-3d").forEach(x=>x.remove());       // one selection, one set of lines: whatever an earlier draw left goes
-      made=[]; line=made; tun.hidden=true;
+      made=[]; line=made; tun.hidden=bri.hidden=true;
       for(const def of REG.values()){ if(!avail(def) || !layerOn(def)) continue;
         try{ const view=def.scope==="view", b=map.getBounds(); if(!view && !want) continue;
           let fs=(def.features(want && want.sel || {key:want && want.name, props:{}}, {bounds:b, parts:selParts(), level:want ? want.lvl : 0}) || {}).features || [];
@@ -344,7 +341,7 @@ export function initGoogle3D(){
     rsSetGoogle3D=function(on){
       w.hidden=!on;
       if(on){ follow=true; paintFollow(); if(!_wPhone()) place(); if(!m3) open(); }
-      else { keepMode(); if(m3){ m3.remove(); m3=null; line=null; } paintView(); ttl.textContent="Google 3D"; tun.hidden=true; }
+      else { keepMode(); if(m3){ m3.remove(); m3=null; line=null; } ttl.textContent="Google 3D"; tun.hidden=bri.hidden=true; }
       st.open=!!on; save(); if(btn) btn.classList.toggle("rs-on", !!on);
       _emit("rs:google3dchange", {open:!!on});
     };
