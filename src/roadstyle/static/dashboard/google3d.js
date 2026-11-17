@@ -88,11 +88,11 @@ export function initGoogle3D(){
     let follow=G ? G.follow : true, setQueued=false;
     const fbtn=w.querySelector(".rs-g3d-follow");
     const paintFollow=()=>{ COUNT.follow=follow; fbtn.classList.toggle("on", follow); fbtn.setAttribute("aria-pressed", follow);
-      fbtn.textContent=follow ? "Following" : w.classList.contains("rs-g3d-narrow") ? "Follow" : "Follow the map";
+      fbtn.textContent=follow ? "Following" : w.classList.contains("rs-svw-narrow") ? "Follow" : "Follow the map";
       fbtn.title=follow ? "Following the map: a drag in this window stops it" : "Not following the map: click to follow again"; };
     // a narrow window (under 440 px; the window can be resized): the header stays one row. The name of the road is cut with "…", and "Follow the map" is "Follow"
-    // (rs-g3d-narrow, dashboard.css). The view (imagery or Google's drawn map) is Google's own round button at the top right of the map: the header has no switch for it
-    new ResizeObserver(()=>{ const n=w.clientWidth>0 && w.clientWidth<440; if(w.classList.contains("rs-g3d-narrow")!==n){ w.classList.toggle("rs-g3d-narrow", n); paintFollow(); } }).observe(w);
+    // (rs-svw-narrow, dashboard.css). The view (imagery or Google's drawn map) is Google's own round button at the top right of the map: the header has no switch for it
+    new ResizeObserver(()=>{ const n=w.clientWidth>0 && w.clientWidth<440; if(w.classList.contains("rs-svw-narrow")!==n){ w.classList.toggle("rs-svw-narrow", n); paintFollow(); } }).observe(w);
     // WHAT IS "THE REVIEWER MOVED THE 3D VIEW": any change of Google's camera that the page did not set, whatever the input was (a right-button or Ctrl drag, two
     // fingers, Google's compass or tilt control, a key). The page's own sets are remembered for 2 s: an event within 500 ms of one, or equal to one (1e-7
     // degrees, 0.5 m, 0.2 degrees), is its echo. Nothing counts in the first second after a mode change (Google draws again). The input detection below is a second trigger.
@@ -327,7 +327,7 @@ export function initGoogle3D(){
       want={cs:any, name, lvl, sel:sel||(keep && want ? want.sel : null)}; want.points=(want.sel && want.sel.points) || [];
       if(!m3 || !lib || (!parts.length && !want.points.length)) return;
       if(!keep) setFollow(true);               // a road selection turns Follow on: the map leads (a redraw after a mode change does not)
-      ttl.textContent=name || roadTitle(want.sel && want.sel.props);
+      ttl.textContent=name || roadTitle(want.sel && want.sel.props); ttl.title=ttl.textContent;       // a cut name (narrow window) is whole in the tooltip
       drawLayers();
     };
     const tryDraw=(cs, name, lvl, keep, sel)=>{ try{ draw(cs, name, lvl, keep, sel); }catch(e){ LOG.push("draw: "+String(e&&e.message||e).slice(0, 140)); console.warn("rs google 3d: the road was not drawn:", e); } };

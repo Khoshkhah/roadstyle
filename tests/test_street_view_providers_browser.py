@@ -264,3 +264,22 @@ def test_the_bar_has_step_buttons_except_in_the_linked_panel(tmp_path, kw, visib
         finally:
             browser.close()
     assert shown is visible
+
+
+def test_a_narrow_street_view_window_keeps_a_long_name_and_the_provider_tabs_in_one_row(tmp_path):
+    """Under 440 px, the name of the road is cut with an ellipsis, so the provider tabs stay on the row of the name."""
+    path = tmp_path / "d.html"
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window").save(path)
+    with pw.sync_playwright() as p:
+        browser, page, errors = _open(p, path)
+        try:
+            page.route("https://www.google.com/**", lambda r: r.fulfill(body="<html></html>", content_type="text/html"))
+            page.evaluate("rsSetStreetView(true)")
+            got = page.evaluate("""() => { const w = document.querySelector('.rs-svw:not(.rs-g3d)'); w.style.width = '340px';
+                const t = w.querySelector('.rs-svw-t'); t.textContent = 'Boulevard Princesse Charlotte of Monaco, the long road';
+                return new Promise(r => setTimeout(() => { const kids = [...w.querySelector('.rs-svw-bar').children].filter(e => e.offsetParent && !e.classList.contains('rs-svw-x'));
+                  const mid = e => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }, mids = kids.map(mid);
+                  r({narrow: w.classList.contains('rs-svw-narrow'), spread: Math.max(...mids) - Math.min(...mids), cut: t.scrollWidth > t.clientWidth}); }, 400)); }""")
+        finally:
+            browser.close()
+    assert got["narrow"] and got["spread"] < 6 and got["cut"], got

@@ -57,6 +57,8 @@ export function initStreetView(){
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked (a real panorama, with a Google key) or Classic (Google's keyless embed): the page's option `street_view_mode`; none: Linked with a key, else Classic
     let mode=_svKey && O.street_view_mode!=="classic" ? "linked" : "classic", pano=null, svc=null;
+    // a narrow window (under 440 px): the header stays one row, the name of the road is cut with "…" (its tooltip has the whole name) (rs-svw-narrow, dashboard.css)
+    new ResizeObserver(()=>w.classList.toggle("rs-svw-narrow", w.clientWidth>0 && w.clientWidth<440)).observe(w);
     const gload=()=>_gmLoad(_svKey);
     // THE PANORAMA EXISTS ONLY WHILE IT IS ON SCREEN. One that sat hidden - Classic showing, or the
     // window closed - came back black with a single tile in a corner, and showing it again first did
@@ -138,7 +140,7 @@ export function initStreetView(){
     let last=null, btn=null, ctlRef=null, ahead=false, exact=false;                   // the latest road selection: {name, url}
     const show=()=>{
       if(w.hidden || !last) return;
-      ttl.textContent=last.name;
+      ttl.textContent=last.name; ttl.title=last.name;
       if(prov!=="google") return showAlt();
       if(!last.url || fromDisk){               // Google's embed stays grey in a file:// page
         fr.hidden=true; hideP(); msg.hidden=false;

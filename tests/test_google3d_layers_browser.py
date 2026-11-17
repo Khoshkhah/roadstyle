@@ -153,13 +153,13 @@ def test_a_narrow_window_keeps_the_header_in_one_row_with_the_labels_button():
     with pw.sync_playwright() as p:
         page = _open_window(p, html, errors)
         page.evaluate("document.querySelector('.rs-g3d').style.width = '340px'")
-        page.wait_for_function("document.querySelector('.rs-g3d').classList.contains('rs-g3d-narrow')")
+        page.wait_for_function("document.querySelector('.rs-g3d').classList.contains('rs-svw-narrow')")
         got = page.evaluate("""() => { const bar = document.querySelector('.rs-g3d .rs-svw-bar'), kids = [...bar.children].filter(e => e.offsetParent && !e.classList.contains('rs-svw-x'));
             const mid = e => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }, mids = kids.map(mid), t = document.querySelector('.rs-g3d .rs-svw-t');
             return {spread: Math.max(...mids) - Math.min(...mids), names: kids.map(e => e.className), labels: !!document.querySelector('.rs-g3d-labels').offsetParent,
                     barRight: bar.getBoundingClientRect().right, last: Math.max(...kids.map(e => e.getBoundingClientRect().right)), name: t.getBoundingClientRect().width, view: document.querySelectorAll('.rs-g3d-view').length}; }""")
         page.evaluate("document.querySelector('.rs-g3d').style.width = '700px'")
-        page.wait_for_function("!document.querySelector('.rs-g3d').classList.contains('rs-g3d-narrow')")
+        page.wait_for_function("!document.querySelector('.rs-g3d').classList.contains('rs-svw-narrow')")
         page.context.browser.close()
     assert errors == []
     assert got["spread"] < 6 and got["labels"] and got["last"] <= got["barRight"] and got["name"] > 40 and got["view"] == 0, got
