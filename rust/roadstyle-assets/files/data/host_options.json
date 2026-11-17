@@ -45,7 +45,8 @@
         "arrow_every": 25.0,
         "fill": "rgba(34,211,238,0.35)"
       },
-      "layers": []
+      "layers": [],
+      "selected": true
     },
     "legend": {
       "rows": []
