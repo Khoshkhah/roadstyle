@@ -97,8 +97,7 @@ rs.render_dashboard(edges, google_3d=True, google_3d_layers=[
 | `arrows` | `True`: direction arrows along a `line` |
 | `style` | `color`, `width`, `outline`, `outline_width`, `dash` (`[metres on, metres off]`), `fill`, `width_m`, `width_prop`, `radius` |
 
-The window has a **Show** menu with one check box for each layer. It shows when there are two or
-more layers. The page remembers your choice.
+The window has a **Show** menu with one check box for each layer, and a **Labels** box for the labels of this window only (the map keeps its own). The page remembers your choices.
 A wrong key, a wrong `kind`, a repeated `id` or a `selection` layer without `match` stops with an error.
 
 The window has one built-in layer, *Selected road*. To draw only your own layers, start it off with `google_3d_selected=False`.
