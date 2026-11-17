@@ -101,6 +101,9 @@ The window has a **Show** menu with one check box for each layer. It shows when 
 more layers. The page remembers your choice.
 A wrong key, a wrong `kind`, a repeated `id` or a `selection` layer without `match` stops with an error.
 
+The window has one built-in layer, *Selected road*. To draw only your own layers, start it off with `google_3d_selected=False`.
+The *Show* menu can turn it on again.
+
 ## The selection
 
 The selected road is one solid line, also in a tunnel. It lies `mesh_altitude_m` (1.5 m) above Google's mesh.

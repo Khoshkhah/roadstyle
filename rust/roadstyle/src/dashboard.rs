@@ -509,6 +509,8 @@ pub struct Google3d {
     pub selection_style: SelectionStyle,
     /// the page's layers (the page keyword `google_3d_layers`); none in a template
     pub layers: Vec<Layer3d>,
+    /// the built-in layer "Selected road" starts on (the page keyword `google_3d_selected`); false: the window draws only the page's layers
+    pub selected: bool,
 }
 
 impl Google3d {
@@ -516,7 +518,7 @@ impl Google3d {
         Google3d { fov_deg: None, follow: true, min_alt_m: 80.0, min_zoom_drawn: 17.0, mesh_altitude_m: 1.5,
                    selection_style: SelectionStyle { color: "#22d3ee".into(), width: 8.0, outline: "#0b1020".into(), outline_width: 2.0,
                                                      arrow_color: "#ffffff".into(), arrow_width: 5.0, arrow_every: 25.0, fill: "rgba(34,211,238,0.35)".into() },
-                   layers: Vec::new() }
+                   layers: Vec::new(), selected: true }
     }
 }
 

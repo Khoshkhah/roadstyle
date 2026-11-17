@@ -189,6 +189,7 @@ placeholder `__RS_OPTIONS__`, with the camera as `camera`).
 | `mapillary_token` | `mapillary_token` | `""` | `svproviders.js`, `settings.js` |
 | `google_3d` | `google_3d` | `false` | `google3d.js` |
 | `dashboard.google_3d.layers` | `google_3d_layers`: `[{id, label, kind, source, match, scope, max, on, arrows, style}]` (`roadstyle::dashboard::Layer3d`) | `[]` | `google3d.js` |
+| `dashboard.google_3d.selected` | `google_3d_selected`: `True` | The layer *Selected road* starts on. `False`: the window draws only the page's layers |
 | `select_color` | `select_color` (the theme's `selection.select`) | (none) | `google3d.js` (the clicked road's line) |
 | `dock` | `dock` (the theme's `dock` section: `result`, `selected`, `roles`, `role_series`) | (none) | `index.js` (`window.RS_DOCK`), `data/kinds.js` |
 | `vehicle_look` | `vehicles` (the theme's `vehicles` section: `colours`, `classes`, the numbers of a run) | (none) | `vehicles.js` (`O.vehicle_look`) |

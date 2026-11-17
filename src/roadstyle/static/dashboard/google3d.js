@@ -228,7 +228,7 @@ export function initGoogle3D(){
                          arrowEvery:SS.arrow_every, fill:SS.fill});
     let want=null;
     const selParts=()=>want && want.cs.length ? (Array.isArray(want.cs[0]) && Array.isArray(want.cs[0][0]) ? want.cs : [want.cs]).filter(c=>c.length>1) : [];
-    REG.set("selected", {id:"selected", label:"Selected road", kind:"line", selection:true,
+    REG.set("selected", {id:"selected", label:"Selected road", kind:"line", selection:true, on:!G || G.selected!==false,      // google_3d_selected=False: a page that shows only its own layers starts with this one off (the Show menu or rsG3dLayers.setOn turns it on)
       features:()=>({type:"FeatureCollection", features:selParts().map(c=>({type:"Feature", geometry:{type:"LineString", coordinates:c}, properties:{lvl:want.lvl}}))})});
     const register=d=>{ if(!d || !d.id || typeof d.features!=="function") throw new Error("rsG3dLayers.register: a layer needs an id and a features(selection) function"); REG.set(d.id, {kind:"line", ...d}); paintMenu(); drawLayers(); };
     window.rsG3dLayers={register, list:()=>[...REG.values()].map(d=>({id:d.id, label:d.label, kind:d.kind, on:layerOn(d), available:avail(d)})),

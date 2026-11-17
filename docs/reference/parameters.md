@@ -158,6 +158,7 @@ rs.render_edges(edges, views={"Day": {"palette": "amber", "basemap": "ofm_positr
 | `mapillary_token` | env `MAPILLARY_TOKEN` | web | a free Mapillary client token (mapillary.com/developer) for the Mapillary tab and its coverage layer. A token that the person saves in the settings wins. Panoramax needs no key. The page contains the token: limit it to your site |
 | `google_3d` | on with a toolbar, else `False` | web | `True`: a Google 3D button and a floating window with Google's photorealistic 3D view; its camera and the map's move together, and a clicked road is drawn in it. Needs `street_view_key` (an error without it) ([guide](../guides/google-3d.md)) |
 | `google_3d_layers` | `[]` | web | layers for the Google 3D window. Each is `{id, kind, source, match, scope, max, on, arrows, style}`; a wrong key or `kind` is an error. A layer draws the features of a GeoJSON source of the page ([guide](../guides/google-3d.md#your-own-layers)) |
+| `google_3d_selected` | `True` | web | `False`: the built-in layer *Selected road* of the Google 3D window starts off, so the window draws only the layers of `google_3d_layers`. The *Show* menu and `rsG3dLayers.setOn("selected", true)` turn it on |
 
 ### Camera & 3D
 
