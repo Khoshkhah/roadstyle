@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAround, _spWarm} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAround, _spWarm, _spLoadAround} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {holdPopup} from "./select.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
@@ -113,12 +113,13 @@ export function initStreetView(){
     // turning with the picture; a click goes to that photo, looks the way of the move, and the marker goes where it was taken
     const aimNav=hd=>navBox.querySelectorAll("button").forEach(b=>{
       const rel=(((+b.dataset.bearing-hd)%360)+540)%360-180, a=rel*Math.PI/180;
-      b.style.left=(50+36*Math.sin(a))+"%"; b.style.top=(50-36*Math.cos(a))+"%"; b.style.transform="translate(-50%,-50%) rotate("+rel+"deg)"; });
+      b.style.left=(50+38*Math.sin(a))+"%"; b.style.top=(50-38*Math.cos(a))+"%"; b.style.transform="translate(-50%,-50%) rotate("+rel+"deg)"; });
     // the arrow of Mapillary's viewer, as it is in mapillary-js 4.1.2 (dist/mapillary.css, .mapillary-direction-arrow-step): a rounded white chevron in a round, transparent hit area, which
     // is shaded on hover (dashboard.css); the ground plane there lays it down in perspective
     const NAV_ARROW='<svg viewBox="0 0 100 58.77" aria-hidden="true"><path d="M97.44,43.82L56.18,2.56a8.75,8.75,0,0,0-12.37,0h0L2.56,43.8A8.75,8.75,0,0,0,14.94,56.18l35-35L85.05,56.2A8.75,8.75,0,1,0,97.44,43.82h0Z"/></svg>';
     let navPh=null;                             // the Panoramax photo on screen
-    const buildNav=r=>{
+    const buildNav=r=>{ drawNav(r); _spLoadAround(r).then(()=>{ if(navPh===r && prov==="panoramax" && !w.hidden) drawNav(r); }); };      // the photos around it may still have to be loaded
+    const drawNav=r=>{
       navPh=r; navBox.textContent=""; const list=_spAround(r); _spWarm(list);
       list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.innerHTML=NAV_ARROW;
         b.title="The photo "+Math.round(t.d)+" m away"; b.setAttribute("aria-label", b.title);
@@ -148,7 +149,7 @@ export function initStreetView(){
       if(_spNeedsToken(prov)) return note(NEED_TOKEN);
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;
       if(!alt) note("Looking for photos\u2026");   // a viewer that is open stays on screen while the next photo is found
-      if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]).then(()=>{ if(navPh && prov==="panoramax" && !w.hidden) buildNav(navPh); }); }      // the arrows are made again when the photos along the road have been loaded   // the road's other photos, loaded in the background
+      if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]).then(()=>{ if(navPh && prov==="panoramax" && !w.hidden) drawNav(navPh); }); }      // the arrows are made again when the photos along the road have been loaded   // the road's other photos, loaded in the background
       const fail=e=>failAt(tok, e);
       _spFind(prov, +vp[0], +vp[1], h).then(r=>{
         if(tok!==altTok || w.hidden) return;    // a newer spot, another provider, or the window closed meanwhile

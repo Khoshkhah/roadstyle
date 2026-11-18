@@ -72,19 +72,39 @@ function _spPanPick(list, lat, lng, heading){
   return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop,
           url: _spPan.blobs.get(best.url) || best.url};
 }
-// The photos near a photo, to go to: up to 8, the nearest first, 3 to 30 m away (a photo at the same spot is the same view), and at least 30 degrees apart seen from the photo.
-// Each as _spFind answers, plus bearing (degrees, from the photo to it) and d (metres). Only the photos that were loaded (the lookups and the load ahead, _spPrefetch).
+// The photos near a photo, to go to: one for each direction in which there is a place to go. Nearest first, 4 to 30 m away; a photo within 5 m of one that was taken
+// is the same place (a stack of photos, a parallel sequence), and the arrows are at least 60 degrees apart as seen from the photo, so that they do not touch (about 3 or 4 at
+// a crossing, 2 on a road), at most 6. Each as _spFind answers, plus bearing (degrees, from the photo to it) and d (metres). Only the photos that were loaded (the lookups
+// and the load ahead, _spPrefetch).
 export function _spAround(r){
   const k = Math.cos(r.lat * Math.PI / 180), near = [];
   for(const q of _spPan.photos.values()){
     if(q.id === r.id) continue;
-    const d = _spDist(r.lat, r.lng, q.lat, q.lng); if(d < 3 || d > 30) continue;
+    const d = _spDist(r.lat, r.lng, q.lat, q.lng); if(d < 4 || d > 30) continue;
     near.push({q, d, bearing: (Math.atan2((q.lng - r.lng) * k, q.lat - r.lat) * 180 / Math.PI + 360) % 360});
   }
   near.sort((a, b) => a.d - b.d);
-  const out = [], apart = (a, b) => { const x = Math.abs(a - b) % 360; return (x > 180 ? 360 - x : x) >= 30; };
-  for(const t of near){ if(out.length >= 8) break; if(out.every(o => apart(o.bearing, t.bearing))) out.push(t); }
+  const out = [], apart = (a, b) => { const x = Math.abs(a - b) % 360; return (x > 180 ? 360 - x : x) >= 60; };
+  for(const t of near){
+    if(out.length >= 6) break;
+    if(out.every(o => apart(o.bearing, t.bearing) && _spDist(o.q.lat, o.q.lng, t.q.lat, t.q.lng) >= 5)) out.push(t);
+  }
   return out.map(t => ({..._spPhotoOf(t.q), bearing: t.bearing, d: t.d}));
+}
+// Load the photos around a photo (the radius of _spAround, one request), so that there are arrows to them: a photo that was opened from a dot of the coverage, with no
+// road selected, has none loaded. Done at most once for a place; resolves when they are in the list.
+const _spAroundDone = new Set();
+export async function _spLoadAround(r){
+  if(_spCovered(r.lat, r.lng)) return;           // the load ahead along the road has them
+  const key = r.lat.toFixed(5) + "," + r.lng.toFixed(5); if(_spAroundDone.has(key)) return;
+  _spAroundDone.add(key);
+  try{
+    // a box, not "near this point": that answers only the nearest photo of each sequence, and the arrows need the photos in every direction
+    const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(r.lat * Math.PI / 180));
+    const x = await fetch(_SP_PANORAMAX + "/api/search?limit=100&bbox=" + [r.lng - dx, r.lat - dy, r.lng + dx, r.lat + dy].map(v => v.toFixed(6)).join(","));
+    if(!x.ok) throw new Error("Panoramax answered " + x.status);
+    ((await x.json()).features || []).map(_spPanPhoto).filter(Boolean).forEach(q => _spPan.photos.has(q.id) || _spPan.photos.set(q.id, q));
+  }catch(e){ _spAroundDone.delete(key); console.warn("rs street view: the photos around this one were not loaded:", e); }
 }
 // Load the images of some photos (as _spAround answers, the nearest first) into memory, so that a click on one shows it at once.
 let _spWarmTok = 0;
