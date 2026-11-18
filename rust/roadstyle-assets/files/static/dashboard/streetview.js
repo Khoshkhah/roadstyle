@@ -7,10 +7,10 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAlong, _spProject} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {holdPopup} from "./select.js";
-import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
+import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine, rsGetStreetViewSpot} from "./svspot.js";
 const SV_COV_ICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>';   // a folded map
 export let _svWindow = false;
 // with a Maps JavaScript API key (street_view_key=) the window offers Linked - a real panorama that
@@ -89,7 +89,7 @@ export function initStreetView(){
     if(!SV_PROVIDERS[prov]) prov="google";
     const chrome=()=>{                          // what the bar offers for the provider that is chosen
       provBox.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.p===prov));
-      stepBox.hidden = prov==="google" && mode==="linked";      // Linked: the panorama has Google's own arrows, and the marker follows them; the page's steps (rsStreetViewStep) stay in the API
+      stepBox.hidden = (prov==="google" && mode==="linked") || prov==="mapillary";      // Linked and Mapillary: the viewer has its own arrows, and the marker follows them; the page's steps (rsStreetViewStep) stay in the API. Panoramax has none: its steps go to the previous / next photo
       covBtn.hidden = prov==="google"; covBtn.style.color=""; covBtn.title="Coverage on the map: where this provider has photos"; covBtn.classList.toggle("on", cov);
       fr.title = SV_PROVIDERS[prov].title+" Street View"; w.dataset.prov=prov; };
     const drawCov=()=>_spCoverage(!w.hidden && cov ? prov : null, e=>{ covBtn.style.color="#e03131"; covBtn.title="The coverage tiles did not load: "+((e&&e.message)||"check the token in Settings \u2192 Keys"); });
@@ -107,12 +107,14 @@ export function initStreetView(){
     const note=(html, keep)=>{ fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
     const failAt=(tok, e)=>{ if(tok===altTok) note("<b>"+_esc(SV_PROVIDERS[prov].title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
     // r (a photo as _spFind answers) in the provider's viewer, looking h (null: the way the photo looks)
+    let shownPh=null;                           // the Panoramax photo on screen {m}: where the steps go on from
     const present=(r, h, tok)=>{
       const fail=e=>failAt(tok, e);
       const go=()=>{
         if(tok!==altTok || w.hidden) return;
         if(r && r.lng!=null) _spMark([r.lng, r.lat]);          // the ring shows which dot of the coverage this photo is (it can be on the other carriageway)
         fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
+        const line=rsStreetViewLine(); shownPh=prov==="panoramax" && r && r.lng!=null && line ? {m:_spProject(line, r.lng, r.lat).m} : null;
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();
       dropAlt(); const mine=tok; adiv.hidden=false;
@@ -159,7 +161,13 @@ export function initStreetView(){
     };
     const steps=[...bar.querySelectorAll("button[data-step]")];
     const ends=(a, z)=>{ steps[0].disabled=!!a; steps[1].disabled=!!z; };
-    steps.forEach(b=>{ b.onclick=()=>rsStreetViewStep(+b.dataset.step); });
+    // Panoramax has no arrows of its own: a step goes to the previous / next photo along the road (the photos that were loaded: svproviders.js _spAlong), and the marker goes with it
+    const stepPhoto=dir=>{
+      const line=rsStreetViewLine(); if(!line) return;
+      const spot=rsGetStreetViewSpot(), from=shownPh ? shownPh.m : (spot && spot.m!=null ? spot.m : null); if(from==null) return;
+      const list=_spAlong(line), q=dir>0 ? list.find(x=>x.m>from+4) : [...list].reverse().find(x=>x.m<from-4);
+      if(q) present(q, q.h, ++altTok); };
+    steps.forEach(b=>{ b.onclick=()=>prov==="panoramax" ? stepPhoto(+b.dataset.step>0 ? 1 : -1) : rsStreetViewStep(+b.dataset.step); });
     document.addEventListener("rs:select", e=>{
       const d=e.detail; if(d.overlay) return;  // roads only
       const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView}; ahead=false;

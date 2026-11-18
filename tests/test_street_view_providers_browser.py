@@ -26,7 +26,7 @@ moveTo(id){window.__mlyto=id; return Promise.resolve();} resize(){} remove(){win
 
 def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
     path = tmp_path / "d.html"
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False).save(path)      # no popup over the coverage dots
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False, dashboard={"panel": None}).save(path)      # no popup over the coverage dots; no panel: it is not used
     asked = []
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
@@ -283,3 +283,26 @@ def test_a_narrow_street_view_window_keeps_a_long_name_and_the_provider_tabs_in_
         finally:
             browser.close()
     assert got["narrow"] and got["spread"] < 6 and got["cut"], got
+
+
+def _photo(i, lat):
+    return {"id": f"p{i}", "geometry": {"type": "Point", "coordinates": [18.0, lat]}, "properties": {"view:azimuth": 0, "geovisio:producer": "x"},
+            "assets": {"sd": {"href": f"https://pics.example/p{i}/sd.jpg"}}}
+
+
+def test_panoramax_steps_go_to_the_previous_and_next_photo_along_the_road_and_mapillary_has_none(tmp_path):
+    """Panoramax has no arrows of its own: the bar's steps go from photo to photo along the road (not 15 m). Mapillary's viewer has its own arrows: no steps."""
+    along = {"features": [_photo(1, 59.3020), _photo(2, 59.30495), _photo(3, 59.3075), _photo(4, 59.3090)]}   # the road runs north along 18.0; the spot is at 59.305
+
+    def body(page, asked):
+        _pick(page, "panoramax")
+        page.wait_for_function("window.__psv")
+        assert page.evaluate("window.__psv.panorama") == "https://pics.example/p2/sd.jpg"      # the photo nearest to the spot
+        step = lambda m: page.click(f".rs-svw-step button[data-step='{m}']")                  # noqa: E731
+        for m, want in [(15, "p3"), (15, "p4"), (-15, "p3"), (-15, "p2"), (-15, "p1")]:
+            step(m)
+            page.wait_for_function(f"window.__psvgo && window.__psvgo[0].endsWith('/{want}/sd.jpg')", timeout=5000)
+        assert page.locator(".rs-svw-step").is_visible()
+        _pick(page, "mapillary")
+        assert page.locator(".rs-svw-step").is_hidden()
+    _run(tmp_path, body, panoramax=along)

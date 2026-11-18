@@ -69,6 +69,33 @@ function _spPanPick(list, lat, lng, heading){
   return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop,
           url: _spPan.blobs.get(best.url) || best.url};
 }
+// Where a point is on a line (line: [[lng, lat], ...]): {m: metres from the line's start, d: metres from the line, h: the line's heading there (degrees),
+// lng, lat: the point of the line that is nearest}
+export function _spProject(line, lng, lat){
+  const k = Math.cos(lat * Math.PI / 180), X = c => c[0] * 110540 * k, Y = c => c[1] * 110540;
+  let best = null, cum = 0;
+  for(let i = 1; i < line.length; i++){
+    const ax = X(line[i - 1]), ay = Y(line[i - 1]), bx = X(line[i]), by = Y(line[i]), dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy);
+    const t = L ? Math.max(0, Math.min(1, ((lng * 110540 * k - ax) * dx + (lat * 110540 - ay) * dy) / (L * L))) : 0;
+    const px = ax + t * dx, py = ay + t * dy, d = Math.hypot(lng * 110540 * k - px, lat * 110540 - py);
+    if(!best || d < best.d) best = {m: cum + t * L, d, h: (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360, lng: px / (110540 * k), lat: py / 110540};
+    cum += L;
+  }
+  return best;
+}
+// The Panoramax photos along a line, in order from its start, each as _spFind answers plus m (metres along the line), d (metres off it) and h (the road's heading
+// there). Only photos near the line that look along it (a flat photo within 45 degrees of the road's direction; a 360 photo has every direction). The list is the
+// photos that were loaded so far (the lookups and the load ahead, _spPrefetch). sx, sy: the point of the line nearest to the photo, where the map marker goes.
+export function _spAlong(line){
+  if(!line || line.length < 2) return [];
+  const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; }, out = [];
+  for(const q of _spPan.photos.values()){
+    const p = _spProject(line, q.lng, q.lat); if(p.d > 25 || _spAim(q.az, q.fov, p.h, turn) === Infinity) continue;
+    out.push({id: q.id, lng: q.lng, lat: q.lat, sx: p.lng, sy: p.lat, by: q.by, azimuth: q.az, fov: q.fov, fovKnown: q.fovKnown, crop: q.crop,
+              url: _spPan.blobs.get(q.url) || q.url, m: p.m, d: p.d, h: p.h});
+  }
+  return out.sort((a, b) => a.m - b.m);
+}
 // Load ahead the photos along a road (line: [[lng, lat], ...]) near the spot (lat, lng): their list, in boxes along the line,
 // and the images of the nearest ones into memory. A new road cancels the old load.
 export function _spPrefetch(provider, line, lat, lng){
