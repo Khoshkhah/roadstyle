@@ -167,8 +167,8 @@ html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a 
 .rs-svw-nav{position:absolute;left:0;right:0;z-index:10;display:none;pointer-events:none;overflow:hidden}   /* over the picture of a Panoramax photo: its top and height are the picture's, set with the arrows (streetview.js aimNav) */
 .rs-svw[data-prov="panoramax"] .rs-svw-alt:not([hidden])~.rs-svw-nav{display:block}
 .rs-svw-ground{position:absolute;left:50%}   /* Mapillary's .mapillary-direction-perspective: its size, place and tilt are set with the arrows (streetview.js aimNav) */
-.rs-svw-nav button{position:absolute;left:0;top:0;pointer-events:auto;border:0;border-radius:50%;padding:0;background:rgba(0,0,0,0);cursor:pointer}   /* Mapillary's .mapillary-direction-circle */
-.rs-svw-nav button:is(:hover,:focus-visible){background:rgba(0,0,0,.4)}
+.rs-svw-nav button{position:absolute;left:0;top:0;pointer-events:auto;border:0;border-radius:50%;padding:0;background:transparent;cursor:pointer}   /* Mapillary's .mapillary-direction-circle */
+.rs-svw-nav button:is(:hover,:focus-visible){background:var(--rs-box-bg)}
 .rs-svw-nav svg{position:absolute;top:44%;left:50%;width:75%;height:44.0775%;transform:translate(-50%,-50%);pointer-events:none}   /* .mapillary-direction-arrow-step */
 .rs-svw-nav path{fill:#fff}
 .rs-svw-bar{position:relative}
