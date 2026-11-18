@@ -256,7 +256,7 @@ def test_the_street_view_page_frame_is_credentialless():
 def test_the_bar_has_step_buttons_except_in_the_linked_panel(tmp_path, kw, visible):
     """Linked (a key, no `street_view_mode`) has no ◀ ▶ buttons in the bar: the panorama has Google's own arrows. Classic, and a page with no key, have them."""
     path = tmp_path / "d.html"
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window", **kw).save(path)
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", dashboard={"panel": None}, **kw).save(path)
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         try:
@@ -271,7 +271,7 @@ def test_the_bar_has_step_buttons_except_in_the_linked_panel(tmp_path, kw, visib
 def test_a_narrow_street_view_window_keeps_a_long_name_and_the_provider_tabs_in_one_row(tmp_path):
     """Under 440 px, the name of the road is cut with an ellipsis, so the provider tabs stay on the row of the name."""
     path = tmp_path / "d.html"
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window").save(path)
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", dashboard={"panel": None}).save(path)
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         try:
@@ -295,8 +295,8 @@ def _photo(i, lat, n):
 
 
 def test_panoramax_steps_follow_the_sequence_and_mapillary_has_none(tmp_path):
-    """Panoramax has no arrows of its own: the bar's steps go to the previous / next photo of the photo's sequence (its prev / next links), the marker goes where the
-    photo was taken, and a step is off at the end of the sequence. Mapillary's viewer has its own arrows: no steps."""
+    """Panoramax has no arrows of its own: two arrows over its picture go to the previous / next photo of the photo's sequence (its prev / next links), the marker goes
+    where the photo was taken, and an arrow is off at the end of the sequence. The bar has no steps for Panoramax and Mapillary."""
     lats = [59.3020, 59.30495, 59.3075, 59.3090]                 # the road runs north along 18.0; the spot is at 59.305
     photos = [_photo(i + 1, lat, 4) for i, lat in enumerate(lats)]
 
@@ -304,16 +304,16 @@ def test_panoramax_steps_follow_the_sequence_and_mapillary_has_none(tmp_path):
         _pick(page, "panoramax")
         page.wait_for_function("window.__psv")
         assert page.evaluate("window.__psv.panorama") == "https://pics.example/p2/sd.jpg"      # the photo nearest to the spot
-        step = lambda m: page.click(f".rs-svw-step button[data-step='{m}']")                  # noqa: E731
+        step = lambda m: page.click(f".rs-svw-nav button[data-dir='{1 if m > 0 else -1}']")      # noqa: E731
         for m, want in [(15, "p3"), (15, "p4"), (-15, "p3"), (-15, "p2"), (-15, "p1")]:
             step(m)
             page.wait_for_function(f"window.__psvgo && window.__psvgo[0].endsWith('/{want}/sd.jpg')", timeout=5000)
             assert page.evaluate("(() => { const s = rsGetStreetViewSpot(); return Math.abs(s.lat - %s) < 1e-6; })()" % lats[int(want[1]) - 1])      # the marker is at the photo
-        assert page.locator(".rs-svw-step button[data-step='-15']").is_disabled()               # p1: the start of the sequence
+        assert page.locator(".rs-svw-nav button[data-dir='-1']").is_disabled()                 # p1: the start of the sequence
         step(15)
         page.wait_for_function("window.__psvgo[0].endsWith('/p2/sd.jpg')", timeout=5000)
-        assert not page.locator(".rs-svw-step button[data-step='-15']").is_disabled()
-        assert page.locator(".rs-svw-step").is_visible()
+        assert not page.locator(".rs-svw-nav button[data-dir='-1']").is_disabled()
+        assert page.locator(".rs-svw-nav").is_visible() and page.locator(".rs-svw-step").is_hidden()      # the arrows are over the picture, not in the bar
         _pick(page, "mapillary")
-        assert page.locator(".rs-svw-step").is_hidden()
+        assert page.locator(".rs-svw-nav").is_hidden() and page.locator(".rs-svw-step").is_hidden()
     _run(tmp_path, body, panoramax={"features": photos}, items={p["id"]: p for p in photos})

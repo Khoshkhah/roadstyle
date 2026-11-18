@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spNeighbour} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spNeighbour, _spWarm} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {holdPopup} from "./select.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
@@ -49,11 +49,14 @@ export function initStreetView(){
       '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button></span>'+
       '<button type="button" class="rs-svw-x" title="Close">\u2715</button></div>'+
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
-      '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>';
+      '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>'+
+      // Panoramax has no arrows in its picture: these two go to the next / previous photo of its sequence (shown only over a Panoramax photo, dashboard.css)
+      '<div class="rs-svw-nav"><button type="button" data-dir="1" title="Forward: the next photo" aria-label="Forward">\u25b2</button>'+
+      '<button type="button" data-dir="-1" title="Back: the previous photo" aria-label="Back">\u25bc</button></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
           fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"),
-          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step");
+          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step"), navBtns=[...w.querySelectorAll(".rs-svw-nav button")];
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked (a real panorama, with a Google key) or Classic (Google's keyless embed): the page's option `street_view_mode`; none: Linked with a key, else Classic
     let mode=_svKey && O.street_view_mode!=="classic" ? "linked" : "classic", pano=null, svc=null;
@@ -89,7 +92,7 @@ export function initStreetView(){
     if(!SV_PROVIDERS[prov]) prov="google";
     const chrome=()=>{                          // what the bar offers for the provider that is chosen
       provBox.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.p===prov));
-      stepBox.hidden = (prov==="google" && mode==="linked") || prov==="mapillary";      // Linked and Mapillary: the viewer has its own arrows, and the marker follows them; the page's steps (rsStreetViewStep) stay in the API. Panoramax has none: its steps go to the previous / next photo
+      stepBox.hidden = !(prov==="google" && mode==="classic");      // only the keyless embed needs the bar's steps: Linked and Mapillary have arrows in their picture, and Panoramax has the two buttons over its picture (rs-svw-nav); rsStreetViewStep stays in the API
       covBtn.hidden = prov==="google"; covBtn.style.color=""; covBtn.title="Coverage on the map: where this provider has photos"; covBtn.classList.toggle("on", cov);
       fr.title = SV_PROVIDERS[prov].title+" Street View"; w.dataset.prov=prov; };
     const drawCov=()=>_spCoverage(!w.hidden && cov ? prov : null, e=>{ covBtn.style.color="#e03131"; covBtn.title="The coverage tiles did not load: "+((e&&e.message)||"check the token in Settings \u2192 Keys"); });
@@ -114,7 +117,7 @@ export function initStreetView(){
         if(tok!==altTok || w.hidden) return;
         if(r && r.lng!=null) _spMark([r.lng, r.lat]);          // the ring shows which dot of the coverage this photo is (it can be on the other carriageway)
         fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
-        shownPh=prov==="panoramax" ? r : null; if(shownPh){ steps[0].disabled=!r.prev; steps[1].disabled=!r.next; }      // the ends of its sequence
+        shownPh=prov==="panoramax" ? r : null; if(shownPh){ navBtns[0].disabled=!r.next; navBtns[1].disabled=!r.prev; _spWarm(r); }      // the ends of its sequence; the images next to it are loaded ahead
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();
       dropAlt(); const mine=tok; adiv.hidden=false;
@@ -167,7 +170,8 @@ export function initStreetView(){
       if(!shownPh) return;
       const tok=++altTok; exact=true;
       try{ const q=await _spNeighbour(shownPh, dir); if(tok===altTok && q) present(q, null, tok); }catch(e){ failAt(tok, e); } };
-    steps.forEach(b=>{ b.onclick=()=>prov==="panoramax" ? stepPhoto(+b.dataset.step>0 ? 1 : -1) : rsStreetViewStep(+b.dataset.step); });
+    steps.forEach(b=>{ b.onclick=()=>rsStreetViewStep(+b.dataset.step); });
+    navBtns.forEach(b=>{ b.onclick=()=>stepPhoto(+b.dataset.dir); });
     document.addEventListener("rs:select", e=>{
       const d=e.detail; if(d.overlay) return;  // roads only
       const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView}; ahead=false;

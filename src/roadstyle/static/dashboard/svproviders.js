@@ -49,11 +49,32 @@ const _spLink = (f, rel) => { const l = (f.links || []).find(x => x.rel === rel 
 const _spPhotoOf = ph => ({id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, fovKnown: ph.fovKnown, crop: ph.crop,
                            url: _spPan.blobs.get(ph.url) || ph.url, prev: ph.prev, next: ph.next});
 // the photo before (dir < 0) or after (dir > 0) a Panoramax photo in its sequence, as _spFind answers; null at the end of the sequence
+const _spId = href => href.replace(/\/+$/, "").split("/").pop();
 export async function _spNeighbour(r, dir){
   const href = r && (dir > 0 ? r.next : r.prev); if(!href) return null;
+  const known = _spPan.photos.get(_spId(href));               // the photos along the road were loaded ahead (_spPrefetch): no request
+  if(known) return _spPhotoOf(known);
   const x = await fetch(href); if(!x.ok) throw new Error("Panoramax answered " + x.status);
   const ph = _spPanPhoto(await x.json()); if(!ph) throw new Error("this photo has no image");
+  _spPan.photos.set(ph.id, ph);
   return _spPhotoOf(ph);
+}
+// Load the images of the next and the previous photos of a photo's sequence into memory (up to 5 each way, the nearest first), so that a step shows at once.
+let _spWarmTok = 0;
+export function _spWarm(r){
+  const tok = ++_spWarmTok, todo = [], at = {1: r, "-1": r};
+  for(let i = 0; i < 5; i++) for(const dir of [1, -1]){
+    const cur = at[dir], href = cur && (dir > 0 ? cur.next : cur.prev), ph = href && _spPan.photos.get(_spId(href));
+    at[dir] = ph || null;
+    if(ph && !_spPan.blobs.has(ph.url)) todo.push(ph.url);
+  }
+  let i = 0;
+  const img = async () => {
+    while(i < todo.length && tok === _spWarmTok){
+      const u = todo[i++];
+      try{ const x = await fetch(u); if(x.ok) _spPan.blobs.set(u, URL.createObjectURL(await x.blob())); }catch(e){}
+    } };
+  Promise.all([img(), img(), img()]).then(() => { for(const [u, b] of _spPan.blobs){ if(_spPan.blobs.size <= 80) break; URL.revokeObjectURL(b); _spPan.blobs.delete(u); } });
 }
 const _spBoxHas = (b, lat, lng) => lng >= b[0] && lng <= b[2] && lat >= b[1] && lat <= b[3];
 const _spCovered = (lat, lng) => {            // the whole search circle of a spot is inside a box that was loaded in full
