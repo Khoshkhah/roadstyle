@@ -18,6 +18,21 @@ export const _spNeedsToken = p => p === "mapillary" && !_spToken();
 const _spDist = (a, b, c, d) => { const k = Math.cos(a * Math.PI / 180);
   return Math.hypot((c - a) * 110540, (d - b) * 110540 * k); };       // metres, short distances
 
+// The point of a road line ([[lng, lat], ...]) nearest to a spot, {lng, lat}, when it is at most `max` metres away; else null. A photo's own position is a GPS fix (a phone's, 5 m
+// off or more), so a marker that follows the photos leaves the road; this puts it back on the road that is selected.
+export function _spSnap(line, lat, lng, max){
+  if(!line || line.length < 2) return null;
+  const kx = 110540 * Math.cos(lat * Math.PI / 180), ky = 110540;
+  let best = null, bd = Infinity;
+  for(let i = 1; i < line.length; i++){
+    const ax = (line[i - 1][0] - lng) * kx, ay = (line[i - 1][1] - lat) * ky, bx = (line[i][0] - lng) * kx, by = (line[i][1] - lat) * ky;
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2)) : 0;
+    const px = ax + t * dx, py = ay + t * dy, d = Math.hypot(px, py);
+    if(d < bd){ bd = d; best = {lng: lng + px / kx, lat: lat + py / ky}; }
+  }
+  return bd <= max ? best : null;
+}
+
 // ---- Panoramax photos: one list, filled by the lookups and by the load ahead along the selected road ----
 const _spPan = {photos: new Map(), boxes: [], blobs: new Map(), tok: 0};
 // the part of the sphere a photo covers, as Panoramax itself reads it: the sensor and its visible area, else the XMP panorama tags

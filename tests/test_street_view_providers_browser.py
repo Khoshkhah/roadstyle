@@ -339,3 +339,19 @@ def test_a_photo_that_looks_aside_from_the_road_is_shown_with_a_note_and_has_arr
         page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)      # the next photo, not the one after it
         assert page.locator(".rs-svw-aside").is_hidden()                                                       # a neighbour is not "the nearest to the road"
     _run(tmp_path, body, panoramax={"features": photos})
+
+
+def test_the_marker_stays_on_the_selected_road_when_an_arrow_goes_to_a_photo_beside_it(tmp_path):
+    """A photo's own position is a GPS fix, a few metres beside the road. After a click on an arrow the marker is on the selected road (the nearest point to the photo), and the ring
+    of the coverage is on the photo. A photo more than 15 m from the road keeps its own place."""
+    photos = [_photo(1, 18.00005, 59.30490), _photo(2, 18.00005, 59.30505), _photo(3, 18.00005, 59.30520), _photo(4, 18.0003, 59.30535)]      # 3 m east of the road, and 15+ m
+
+    def body(page, asked):
+        _pick(page, "panoramax")
+        page.wait_for_function("window.__psv")
+        page.click(".rs-svw-nav button[data-bearing^='0']")
+        page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)
+        spot = page.evaluate("rsGetStreetViewSpot()")
+        assert abs(spot["lng"] - 18.0) < 1e-6 and abs(spot["lat"] - 59.30520) < 1e-5      # on the road, beside the photo
+        assert page.evaluate("Math.abs(_spPicked[0] - 18.00005) < 1e-9")                    # the ring is on the photo
+    _run(tmp_path, body, panoramax={"features": photos})

@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAround, _spWarm, _spLoadAround} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAround, _spWarm, _spLoadAround, _spSnap} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {holdPopup} from "./select.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
@@ -134,7 +134,9 @@ export function initStreetView(){
       navPh=r; navBox.textContent=""; const list=_spAround(r); _spWarm(list);
       list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.innerHTML=NAV_ARROW;
         b.title="The photo "+Math.round(t.d)+" m away"; b.setAttribute("aria-label", b.title);
-        b.onclick=()=>{ const tok=++altTok; exact=true; present(t, t.bearing, tok); }; navBox.appendChild(b); });
+        b.onclick=()=>{ const tok=++altTok; exact=true;
+          const on=_spSnap(rsStreetViewLine(), t.lat, t.lng, 15);      // the marker stays on the selected road: a photo's own position is a GPS fix, often beside the road
+          present(on ? {...t, sx:on.lng, sy:on.lat} : t, t.bearing, tok); }; navBox.appendChild(b); });
       aimNav(navYaw==null ? r.azimuth||0 : navYaw); };
     const present=(r, h, tok)=>{
       const fail=e=>failAt(tok, e);
