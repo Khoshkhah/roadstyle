@@ -24,9 +24,9 @@ _MLY_JS = """window.mapillary={Viewer:class{constructor(o){window.__mly=o; windo
 moveTo(id){window.__mlyto=id; return Promise.resolve();} resize(){} remove(){window.__mlygone=true;}}};"""
 
 
-def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
+def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY, items=None):
     path = tmp_path / "d.html"
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False).save(path)      # no popup over the coverage dots
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False, dashboard={"panel": None}).save(path)      # no popup over the coverage dots; no panel: it is not used
     asked = []
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
@@ -36,6 +36,8 @@ def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
                 asked.append(u)
                 if "/api/search" in u:
                     return r.fulfill(json=panoramax, headers={"access-control-allow-origin": "*"})
+                if "/api/collections/" in u and u.rsplit("/", 1)[-1] in (items or {}):
+                    return r.fulfill(json=items[u.rsplit("/", 1)[-1]], headers={"access-control-allow-origin": "*"})
                 if "/api/collections/" in u:
                     return r.fulfill(json={"id": "dot-1", "geometry": {"type": "Point", "coordinates": [18.0, 59.3052]},
                                            "properties": {"view:azimuth": 200, "geovisio:producer": "x"},
@@ -96,7 +98,7 @@ def test_panoramax_shows_the_nearest_photo_with_no_key_and_remembers_the_choice(
         page.wait_for_function("window.__psv")
         assert page.evaluate("window.__psv.panorama") == "https://pics.example/pic-123/sd.jpg"
         assert page.locator(".rs-svw-alt").is_visible()
-        assert any("place_position=18.0" in u and "place_distance=0-30" in u for u in asked)
+        assert any("/api/search" in u and "bbox=" in u and "place_position" not in u for u in asked)      # a box around the spot: place_position answers nothing at some places with photos
         assert page.evaluate("localStorage.getItem('rs-street-view-provider')") == "panoramax"
         assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-mode").count() == 0                                 # the bar has no Linked / Classic switch
         _pick(page, "google")
@@ -193,6 +195,8 @@ def test_a_click_on_a_coverage_dot_opens_that_photo_and_puts_the_marker_there(tm
         page.evaluate("window.__psvv.yaw = 0; window.__psvl['position-updated']()")                  # looking straight ahead in the photo
         spot = page.evaluate("rsGetStreetViewSpot()")
         assert abs(spot["lng"] - 18.0) < 1e-4 and abs(spot["lat"] - 59.3052) < 1e-4 and abs(spot["heading"] - 200) < 1 and spot["onRoad"] is False      # on the road, yet kept where the photo was taken
+        # no road is selected, so no photos were loaded for one: the photos around this photo are asked for, as a box (a "near this point" search gives only the nearest photo of each sequence)
+        assert any("/api/search" in u and "bbox=" in u and "limit=100" in u for u in asked)
     _run(tmp_path, body)
 
 
@@ -254,7 +258,7 @@ def test_the_street_view_page_frame_is_credentialless():
 def test_the_bar_has_step_buttons_except_in_the_linked_panel(tmp_path, kw, visible):
     """Linked (a key, no `street_view_mode`) has no ◀ ▶ buttons in the bar: the panorama has Google's own arrows. Classic, and a page with no key, have them."""
     path = tmp_path / "d.html"
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window", **kw).save(path)
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", dashboard={"panel": None}, **kw).save(path)
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         try:
@@ -269,7 +273,7 @@ def test_the_bar_has_step_buttons_except_in_the_linked_panel(tmp_path, kw, visib
 def test_a_narrow_street_view_window_keeps_a_long_name_and_the_provider_tabs_in_one_row(tmp_path):
     """Under 440 px, the name of the road is cut with an ellipsis, so the provider tabs stay on the row of the name."""
     path = tmp_path / "d.html"
-    rs.render_dashboard(_edges(), basemap="blank", street_view="window").save(path)
+    rs.render_dashboard(_edges(), basemap="blank", street_view="window", dashboard={"panel": None}).save(path)
     with pw.sync_playwright() as p:
         browser, page, errors = _open(p, path)
         try:
@@ -283,3 +287,71 @@ def test_a_narrow_street_view_window_keeps_a_long_name_and_the_provider_tabs_in_
         finally:
             browser.close()
     assert got["narrow"] and got["spread"] < 6 and got["cut"], got
+
+
+def _photo(i, lng, lat, az=0):
+    return {"id": f"p{i}", "geometry": {"type": "Point", "coordinates": [lng, lat]}, "properties": {"view:azimuth": az, "geovisio:producer": "x"},
+            "assets": {"sd": {"href": f"https://pics.example/p{i}/sd.jpg"}}}
+
+
+def test_panoramax_has_arrows_over_its_picture_chosen_as_mapillary_chooses_and_mapillary_has_none(tmp_path):
+    """Like Mapillary's viewer: at most one arrow on the picture for each of forward, left, back and right (the best photo of each: up to 20 m away, within 30 degrees of that
+    direction, looking about the way this photo looks); a click goes to that photo and the marker goes where it was taken. The bar has no steps for Panoramax and Mapillary."""
+    # the road runs north along 18.0, the spot is at 59.305, 0.00015 degrees of latitude are 16.6 m: p1 is behind p2, p3 and p4 ahead, p5 is 12 m to the west and looks north too,
+    # p6 is a side street photo that looks west (it is not a step: it looks another way)
+    pts = [(18.0, 59.30480), (18.0, 59.30495), (18.0, 59.30510), (18.0, 59.30525), (17.99977, 59.30495), (18.0, 59.30485)]
+    photos = [_photo(i + 1, lng, lat, 270 if i == 5 else 0) for i, (lng, lat) in enumerate(pts)]
+
+    def body(page, asked):
+        _pick(page, "panoramax")
+        page.wait_for_function("window.__psv")
+        assert page.evaluate("window.__psv.panorama") == "https://pics.example/p2/sd.jpg"      # the photo nearest to the spot
+        arrows = lambda: sorted(round(float(b)) for b in page.eval_on_selector_all(".rs-svw-nav button", "bs => bs.map(b => b.dataset.bearing)"))   # noqa: E731
+        assert arrows() == [0, 180, 270]                                                  # p3 ahead, p1 behind, p5 on the left; p4 is a worse "ahead" than p3; p6 looks another way
+        assert page.locator(".rs-svw-nav").is_visible() and page.locator(".rs-svw-step").is_hidden()
+        page.click(".rs-svw-nav button[data-bearing^='0']")
+        page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)
+        assert page.evaluate("Math.abs(rsGetStreetViewSpot().lat - 59.30510) < 1e-6")      # the marker is where p3 was taken
+        assert arrows() == [0, 180]                                                       # p4 ahead, p2 behind (p5 is 13 m to the left behind: neither)
+        page.click(".rs-svw-nav button[data-bearing^='180']")
+        page.wait_for_function("window.__psvgo[0].endsWith('/p2/sd.jpg')", timeout=5000)
+        _pick(page, "mapillary")
+        assert page.locator(".rs-svw-nav").is_hidden() and page.locator(".rs-svw-step").is_hidden()
+    _run(tmp_path, body, panoramax={"features": photos})
+
+
+def test_a_photo_that_looks_aside_from_the_road_is_shown_with_a_note_and_has_arrows_to_its_neighbours(tmp_path):
+    """No photo looks along the road, so the nearest one that looks aside is shown, and the window says so. The camera looks 130 degrees from the way the road runs: the photo
+    ahead is at 40 degrees from the left step, the one behind at 40 degrees from the right step, and both get an arrow. (With 30 degrees, none did, and farther photos did.)"""
+    photos = [_photo(i + 1, 18.0, lat, 130) for i, lat in enumerate([59.30480, 59.30495, 59.30510, 59.30525])]
+
+    def body(page, asked):
+        _pick(page, "panoramax")
+        page.wait_for_function("window.__psv")
+        assert page.evaluate("window.__psv.panorama") == "https://pics.example/p2/sd.jpg"
+        assert page.locator(".rs-svw-aside").is_visible()
+        text = page.inner_text(".rs-svw-aside")
+        assert "aside from the road" in text and "No photo here looks along the road" in text
+        assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-msg").is_hidden()
+        arrows = lambda: sorted(round(float(b)) for b in page.eval_on_selector_all(".rs-svw-nav button", "bs => bs.map(b => b.dataset.bearing)"))   # noqa: E731
+        assert arrows() == [0, 180]
+        page.click(".rs-svw-nav button[data-bearing^='0']")
+        page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)      # the next photo, not the one after it
+        assert page.locator(".rs-svw-aside").is_hidden()                                                       # a neighbour is not "the nearest to the road"
+    _run(tmp_path, body, panoramax={"features": photos})
+
+
+def test_the_marker_stays_on_the_selected_road_when_an_arrow_goes_to_a_photo_beside_it(tmp_path):
+    """A photo's own position is a GPS fix, a few metres beside the road. After a click on an arrow the marker is on the selected road (the nearest point to the photo), and the ring
+    of the coverage is on the photo. A photo more than 15 m from the road keeps its own place."""
+    photos = [_photo(1, 18.00005, 59.30490), _photo(2, 18.00005, 59.30505), _photo(3, 18.00005, 59.30520), _photo(4, 18.0003, 59.30535)]      # 3 m east of the road, and 15+ m
+
+    def body(page, asked):
+        _pick(page, "panoramax")
+        page.wait_for_function("window.__psv")
+        page.click(".rs-svw-nav button[data-bearing^='0']")
+        page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)
+        spot = page.evaluate("rsGetStreetViewSpot()")
+        assert abs(spot["lng"] - 18.0) < 1e-6 and abs(spot["lat"] - 59.30520) < 1e-5      # on the road, beside the photo
+        assert page.evaluate("Math.abs(_spPicked[0] - 18.00005) < 1e-9")                    # the ring is on the photo
+    _run(tmp_path, body, panoramax={"features": photos})

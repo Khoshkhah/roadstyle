@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAround, _spWarm, _spLoadAround, _spSnap} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {holdPopup} from "./select.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
@@ -49,11 +49,13 @@ export function initStreetView(){
       '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button></span>'+
       '<button type="button" class="rs-svw-x" title="Close">\u2715</button></div>'+
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
-      '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>';
+      '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div><div class="rs-svw-aside" hidden></div>'+
+      // Panoramax has no arrows in its picture: these are made over a Panoramax photo, one for each photo near it (dashboard.css; built by buildNav)
+      '<div class="rs-svw-nav"><div class="rs-svw-ground"></div></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
-          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"),
-          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step");
+          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"), aside=w.querySelector(".rs-svw-aside"),
+          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step"), navBox=w.querySelector(".rs-svw-ground");
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked (a real panorama, with a Google key) or Classic (Google's keyless embed): the page's option `street_view_mode`; none: Linked with a key, else Classic
     let mode=_svKey && O.street_view_mode!=="classic" ? "linked" : "classic", pano=null, svc=null;
@@ -70,7 +72,7 @@ export function initStreetView(){
       const g=google.maps; svc=svc || new g.StreetViewService();
       return svc.getPanorama({location:{lat:+lat, lng:+lng}, radius:50, preference:g.StreetViewPreference.NEAREST,
                               sources:[g.StreetViewSource.GOOGLE]}).then(r=>{
-        if(mode!=="linked" || w.hidden) return;   // flipped to Classic or closed while it was asked for
+        if(mode!=="linked" || w.hidden || prov!=="google") return;   // closed, or switched to Panoramax / Mapillary, while it was asked for: the late answer must not draw over their viewer
         const id=r.data.location.pano, pov={heading:+h||0, pitch:0};
         fr.hidden=true; msg.hidden=true; pdiv.hidden=false;
         if(pano){ pano.setPano(id); pano.setPov(pov); return; }
@@ -80,7 +82,7 @@ export function initStreetView(){
         pano.addListener("position_changed", report); pano.addListener("pov_changed", report);
         // a panorama does not see its box change size (the docked window, dragged by its divider): it is told
         if(dock){ const p0=pano; new ResizeObserver(()=>{ if(pano===p0) g.event.trigger(p0, "resize"); }).observe(pdiv); } },
-        ()=>{ hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
+        ()=>{ if(prov!=="google") return; hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
     // THE PROVIDER: Google (above), or Panoramax / Mapillary: the nearest photo to the spot in their own viewer (svproviders.js).
     // The choice and the coverage switch are remembered in this browser.
     const PROV_KEY="rs-street-view-provider", COV_KEY="rs-street-view-cov";
@@ -89,7 +91,7 @@ export function initStreetView(){
     if(!SV_PROVIDERS[prov]) prov="google";
     const chrome=()=>{                          // what the bar offers for the provider that is chosen
       provBox.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.p===prov));
-      stepBox.hidden = prov==="google" && mode==="linked";      // Linked: the panorama has Google's own arrows, and the marker follows them; the page's steps (rsStreetViewStep) stay in the API
+      stepBox.hidden = !(prov==="google" && mode==="classic");      // only the keyless embed needs the bar's steps: Linked and Mapillary have arrows in their picture, and Panoramax has the two buttons over its picture (rs-svw-nav); rsStreetViewStep stays in the API
       covBtn.hidden = prov==="google"; covBtn.style.color=""; covBtn.title="Coverage on the map: where this provider has photos"; covBtn.classList.toggle("on", cov);
       fr.title = SV_PROVIDERS[prov].title+" Street View"; w.dataset.prov=prov; };
     const drawCov=()=>_spCoverage(!w.hidden && cov ? prov : null, e=>{ covBtn.style.color="#e03131"; covBtn.title="The coverage tiles did not load: "+((e&&e.message)||"check the token in Settings \u2192 Keys"); });
@@ -103,20 +105,52 @@ export function initStreetView(){
     chrome();
     const NEED_TOKEN="<b>Mapillary needs a free token.</b>"+
       "<span>Make one at <a href=\"https://www.mapillary.com/developer\" target=\"_blank\" rel=\"noopener\">mapillary.com/developer</a> (a client token), then paste it in Settings \u2192 Keys (Save, then Reload). Coverage needs it too.</span>";
-    const dropAlt=()=>{ if(alt){ alt.ctl.destroy(); alt=null; } adiv.hidden=true; };
-    const note=(html, keep)=>{ fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
+    const dropAlt=()=>{ aside.hidden=true; if(alt){ alt.ctl.destroy(); alt=null; } adiv.hidden=true; };
+    const note=(html, keep)=>{ aside.hidden=true; fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
     const failAt=(tok, e)=>{ if(tok===altTok) note("<b>"+_esc(SV_PROVIDERS[prov].title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
     // r (a photo as _spFind answers) in the provider's viewer, looking h (null: the way the photo looks)
+    // Panoramax has no arrows of its own, as Mapillary's viewer has: one arrow on the picture for each photo near the one on screen (a step forward or back, a side street),
+    // turning with the picture; a click goes to that photo, looks the way of the move, and the marker goes where it was taken
+    // The arrows are laid out as Mapillary's viewer does (mapillary-js 4.1.2, DirectionDOMCalculator and DirectionDOMRenderer): one container at the bottom centre of the picture,
+    // 260 to 460 px wide by the size of the picture and 0.77 of that high, its bottom 8% of its height below the picture's bottom; the container is tilted (CSS perspective, rotateX 60).
+    // An arrow is a circle of 0.34 of its height, on a ring of radius 0.31 of its height, at the angle of the move to the camera's heading (so that it turns with the picture), turned
+    // to point that way, with a shadow to the lower side. The picture's own bar (zoom) is the bottom 40 px, and the container stands on it.
+    const aimNav=yaw=>{
+      const W=adiv.clientWidth, H=adiv.clientHeight; if(!W || !H) return;
+      const c=Math.max(0, Math.min(1, Math.min((W-320)/(1480-320), (H-240)/(820-240)))), cw=260+0.04*Math.round(25*c)*(460-260), ch=0.77*cw, circle=0.34*ch, radius=0.31*ch;
+      navBox.parentNode.style.top=adiv.offsetTop+"px"; navBox.parentNode.style.height=H+"px";
+      Object.assign(navBox.style, {width:cw+"px", height:ch+"px", marginLeft:(-cw/2)+"px", bottom:(40-0.08*ch)+"px", transform:"perspective("+cw+"px) rotateX(60deg)"});
+      navBox.querySelectorAll("button").forEach(b=>{
+        const rel=(((+b.dataset.bearing-yaw)%360)+540)%360-180, a=rel*Math.PI/180;
+        b.style.width=b.style.height=circle+"px"; b.style.marginLeft=b.style.marginTop=(-circle/2)+"px";
+        b.style.transform="translate("+Math.round(radius*Math.sin(a)+cw/2)+"px,"+Math.round(-radius*Math.cos(a)+ch/2)+"px) rotate("+rel+"deg)";
+        b.firstChild.style.filter="drop-shadow("+(3*Math.sin(a)).toFixed(2)+"px "+(3*Math.cos(a)).toFixed(2)+"px 1px rgba(0,0,0,0.8))"; }); };
+    // the arrow of Mapillary's viewer, as it is in mapillary-js 4.1.2 (dist/mapillary.css, .mapillary-direction-arrow-step): a rounded white chevron in a round, transparent hit area, which
+    // is shaded on hover (dashboard.css); the ground plane there lays it down in perspective
+    const NAV_ARROW='<svg viewBox="0 0 100 58.77" aria-hidden="true"><path d="M97.44,43.82L56.18,2.56a8.75,8.75,0,0,0-12.37,0h0L2.56,43.8A8.75,8.75,0,0,0,14.94,56.18l35-35L85.05,56.2A8.75,8.75,0,1,0,97.44,43.82h0Z"/></svg>';
+    let navPh=null, navYaw=null;                // the Panoramax photo on screen, and the heading of the view
+    const buildNav=r=>{ drawNav(r); _spLoadAround(r).then(()=>{ if(navPh===r && prov==="panoramax" && !w.hidden) drawNav(r); }); };      // the photos around it may still have to be loaded
+    const drawNav=r=>{
+      navPh=r; navBox.textContent=""; const list=_spAround(r); _spWarm(list);
+      list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.innerHTML=NAV_ARROW;
+        b.title="The photo "+Math.round(t.d)+" m away"; b.setAttribute("aria-label", b.title);
+        b.onclick=()=>{ const tok=++altTok; exact=true;
+          const on=_spSnap(rsStreetViewLine(), t.lat, t.lng, 15);      // the marker stays on the selected road: a photo's own position is a GPS fix, often beside the road
+          present(on ? {...t, sx:on.lng, sy:on.lat} : t, t.bearing, tok); }; navBox.appendChild(b); });
+      aimNav(navYaw==null ? r.azimuth||0 : navYaw); };
     const present=(r, h, tok)=>{
       const fail=e=>failAt(tok, e);
       const go=()=>{
         if(tok!==altTok || w.hidden) return;
         if(r && r.lng!=null) _spMark([r.lng, r.lat]);          // the ring shows which dot of the coverage this photo is (it can be on the other carriageway)
         fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
+        // a photo that looks aside from the road (nothing here looks along it): the window says so
+        aside.hidden=!(r && r.aside); if(r && r.aside){ aside.style.top=(adiv.offsetTop+8)+"px"; aside.textContent="This photo looks "+r.aside+"\u00b0 aside from the road. No photo here looks along the road."; }
+        if(prov==="panoramax"){ if(navPh!==r) navYaw=h==null ? null : +h; buildNav(r); }      // the arrows to the photos near it, and their images loaded ahead
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();
       dropAlt(); const mine=tok; adiv.hidden=false;
-      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef) rsSetStreetViewMarkerAt(lng, lat, hd, exact); }).then(c=>{
+      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef){ rsSetStreetViewMarkerAt(lng, lat, hd, exact); if(prov==="panoramax"){ navYaw=hd; aimNav(hd); } } }).then(c=>{
         if(mine!==altTok || w.hidden){ c.destroy(); return; }
         ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail);
     };
@@ -130,7 +164,7 @@ export function initStreetView(){
       if(_spNeedsToken(prov)) return note(NEED_TOKEN);
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;
       if(!alt) note("Looking for photos\u2026");   // a viewer that is open stays on screen while the next photo is found
-      if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]); }   // the road's other photos, loaded in the background
+      if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]).then(()=>{ if(navPh && prov==="panoramax" && !w.hidden) drawNav(navPh); }); }      // the arrows are made again when the photos along the road have been loaded   // the road's other photos, loaded in the background
       const fail=e=>failAt(tok, e);
       _spFind(prov, +vp[0], +vp[1], h).then(r=>{
         if(tok!==altTok || w.hidden) return;    // a newer spot, another provider, or the window closed meanwhile
@@ -154,7 +188,7 @@ export function initStreetView(){
       const src="https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d"+vp[0]+"!2d"+vp[1]+
                 "!3f"+(u.searchParams.get("heading")||0)+"!4f0!5f1";
       const embed=()=>{ if(fr.getAttribute("src")!==src) fr.src=src; fr.hidden=false; msg.hidden=true; hideP(); };
-      if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); embed(); }); return; }
+      if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); if(prov==="google") embed(); }); return; }
       embed();
     };
     const steps=[...bar.querySelectorAll("button[data-step]")];

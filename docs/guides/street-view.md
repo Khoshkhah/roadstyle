@@ -112,7 +112,7 @@ Every `render_edges` keyword also works here. On a phone, Street View is under t
 
     With `street_view_key=`, the panel is a real panorama (the Maps JavaScript API).
     Each step and turn moves the marker on the map. The map pans to keep the marker in view.
-    Only Google's own street imagery shows. The window bar has no step buttons here: use Google's arrows in the picture. `rsStreetViewStep(m)` still steps along the clicked road. Classic, Panoramax and Mapillary have the ◀ ▶ buttons.
+    Only Google's own street imagery shows. The window bar has no step buttons here: use Google's arrows in the picture. `rsStreetViewStep(m)` still steps along the clicked road. Only Classic has the ◀ ▶ buttons in the bar, and they move 15 m along the road. Panoramax has arrows over its picture, made as Mapillary's viewer makes them (the same shape, layout and choice). There are at most four, in a ring on the ground at the bottom of the picture: forward, left, back and right. For each direction the window takes the best photo: up to 20 m away, within 45° of that direction (Mapillary's viewer uses 30°; a camera that looks aside from the road needs more), looking about the way this photo looks, near 4 m, and of the same sequence if there is one. The arrows turn with the picture. A click goes to that photo and looks the way of the move. The marker goes to the nearest point of the selected road when the photo is less than 15 m from it (a photo's own GPS position is often beside the road), else to where the photo was taken. The images of these photos are loaded ahead, so a click shows at once. Mapillary's viewer has its own arrows.
 
     The page chooses between **Linked** (this panorama) and **Classic** (the keyless embed) with `street_view_mode=`.
     The default is Linked with a key, and Classic without one. `street_view_mode="linked"` without a key is an error.
@@ -126,7 +126,7 @@ Every `render_edges` keyword also works here. On a phone, Street View is under t
 
 The window title bar has a switch: **Google**, **Panoramax** and **Mapillary**. The browser remembers the choice.
 For each road that you click, and for each step, the window shows the photo of the provider that is nearest to the spot.
-The photo must be within 30 m and must look along the road (within 45 degrees). The view looks the way the road runs,
+The photo must be within 30 m and must look along the road (within 45 degrees). If no photo does, the window shows the nearest photo that looks aside and says so in a line over the picture. The view looks the way the road runs,
 if the provider says which way the photo looks. If the provider has no photo there, the window says so.
 
 | Provider | Key | Photos |

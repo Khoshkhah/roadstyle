@@ -18,6 +18,21 @@ export const _spNeedsToken = p => p === "mapillary" && !_spToken();
 const _spDist = (a, b, c, d) => { const k = Math.cos(a * Math.PI / 180);
   return Math.hypot((c - a) * 110540, (d - b) * 110540 * k); };       // metres, short distances
 
+// The point of a road line ([[lng, lat], ...]) nearest to a spot, {lng, lat}, when it is at most `max` metres away; else null. A photo's own position is a GPS fix (a phone's, 5 m
+// off or more), so a marker that follows the photos leaves the road; this puts it back on the road that is selected.
+export function _spSnap(line, lat, lng, max){
+  if(!line || line.length < 2) return null;
+  const kx = 110540 * Math.cos(lat * Math.PI / 180), ky = 110540;
+  let best = null, bd = Infinity;
+  for(let i = 1; i < line.length; i++){
+    const ax = (line[i - 1][0] - lng) * kx, ay = (line[i - 1][1] - lat) * ky, bx = (line[i][0] - lng) * kx, by = (line[i][1] - lat) * ky;
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2)) : 0;
+    const px = ax + t * dx, py = ay + t * dy, d = Math.hypot(px, py);
+    if(d < bd){ bd = d; best = {lng: lng + px / kx, lat: lat + py / ky}; }
+  }
+  return bd <= max ? best : null;
+}
+
 // ---- Panoramax photos: one list, filled by the lookups and by the load ahead along the selected road ----
 const _spPan = {photos: new Map(), boxes: [], blobs: new Map(), tok: 0};
 // the part of the sphere a photo covers, as Panoramax itself reads it: the sensor and its visible area, else the XMP panorama tags
@@ -41,8 +56,11 @@ const _spPanPhoto = f => {
   const sd = f.assets && (f.assets.sd || f.assets.hd); if(!sd || !f.geometry) return null;
   const q = f.properties || {}, io = q["pers:interior_orientation"] || {};
   return {id: f.id, lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], az: q["view:azimuth"] || 0,
-          by: q["geovisio:producer"], url: sd.href, fov: io.field_of_view || 70, fovKnown: io.field_of_view != null, crop: _spCrop(q)};
+          by: q["geovisio:producer"], seq: f.collection, url: sd.href, fov: io.field_of_view || 70, fovKnown: io.field_of_view != null, crop: _spCrop(q)};
 };
+// a photo's record in the shape _spFind answers: the marker goes where the photo was taken
+const _spPhotoOf = ph => ({id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, fovKnown: ph.fovKnown, crop: ph.crop, seq: ph.seq,
+                           url: _spPan.blobs.get(ph.url) || ph.url});
 const _spBoxHas = (b, lat, lng) => lng >= b[0] && lng <= b[2] && lat >= b[1] && lat <= b[3];
 const _spCovered = (lat, lng) => {            // the whole search circle of a spot is inside a box that was loaded in full
   const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));
@@ -58,22 +76,77 @@ function _spAim(az, fov, heading, turn){
 // the photo nearest the spot that looks along the road; the service does not sort by distance
 function _spPanPick(list, lat, lng, heading){
   const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
-  let best = null, bs = Infinity;
+  let best = null, bs = Infinity, side = null, sd = Infinity;
   for(const q of list){
     const d = _spDist(lat, lng, q.lat, q.lng); if(d > _SP_RADIUS) continue;
     // a flat photo must look the way the road runs (within 45 degrees); a 360 panorama has every direction
-    const sc = d + _spAim(q.az, q.fov, heading, turn); if(sc >= Infinity) continue;
+    const sc = d + _spAim(q.az, q.fov, heading, turn);
+    if(sc >= Infinity){ if(d < sd){ sd = d; side = q; } continue; }      // looks aside: kept only for when no photo looks along the road
     if(sc < bs){ bs = sc; best = q; } }
+  // none looks along the road: the nearest one that looks aside, with `aside` (degrees from the road's direction) so that the window says so
+  const aside = !best && side ? Math.round(turn(side.az, heading)) : 0;
+  if(aside) best = side;
   if(!best) return null;
   // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
-  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop,
+  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop, seq: best.seq, aside,
           url: _spPan.blobs.get(best.url) || best.url};
+}
+// The photos to go to from a photo, chosen as Mapillary's viewer does (mapillary-js 4.1.2, EdgeCalculator.computeStepEdges): for each of four steps (forward, left, back, right: the way of the
+// move seen from the photo's direction) the one best photo, so 4 at most. A candidate is up to 20 m away, its direction from the photo is within 45 degrees of the step's (Mapillary's is 30: a camera that looks aside from the road, as the cars of Avenue du Port do, sees the photos of the road at 120 degrees, so a photo of 31 degrees was left out and the next one, farther along, was chosen: the arrow jumped over photos; 45 degrees leave no gap between the four steps), and it
+// looks about the way this photo looks (within 30 degrees). The best has the lowest score: a distance near 4 m (weight 4), a small error of the direction of the move (3), a small
+// difference of the way it looks (4), and the same sequence (a penalty of 2 for another one). Each as _spFind answers, plus bearing (degrees, from the photo to it) and d (metres).
+// Only the photos that were loaded (the lookups and the load ahead, _spPrefetch).
+const _SP_STEPS = [0, -90, 180, 90];            // forward, left, back, right (a compass bearing: left is -90)
+export function _spAround(r){
+  const k = Math.cos(r.lat * Math.PI / 180), az = r.azimuth || 0, flat = a => a.fov == null || a.fov < 300;
+  const diff = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; }, out = [];
+  for(const step of _SP_STEPS){
+    let best = null, lowest = Infinity;
+    for(const q of _spPan.photos.values()){
+      if(q.id === r.id) continue;
+      const d = _spDist(r.lat, r.lng, q.lat, q.lng); if(d > 20 || d < .3) continue;
+      const bearing = (Math.atan2((q.lng - r.lng) * k, q.lat - r.lat) * 180 / Math.PI + 360) % 360;
+      const motion = diff(bearing - az, step), rot = flat(q) && flat(r) ? diff(q.az, az) : 0;
+      if(motion > 45 || rot > 30) continue;
+      const score = 4 * Math.abs(d - 4) / 20 + 3 * motion / 45 + 4 * rot / 30 + 2 * (q.seq === r.seq ? 0 : 1);
+      if(score < lowest){ lowest = score; best = {q, d, bearing}; }
+    }
+    if(best && !out.some(o => o.id === best.q.id)) out.push({..._spPhotoOf(best.q), bearing: best.bearing, d: best.d});      // on the border of two steps, one photo is one arrow
+  }
+  return out;
+}
+// Load the photos around a photo (the radius of _spAround, one request), so that there are arrows to them: a photo that was opened from a dot of the coverage, with no
+// road selected, has none loaded. Done at most once for a place; resolves when they are in the list.
+const _spAroundDone = new Set();
+export async function _spLoadAround(r){
+  if(_spCovered(r.lat, r.lng)) return;           // the load ahead along the road has them
+  const key = r.lat.toFixed(5) + "," + r.lng.toFixed(5); if(_spAroundDone.has(key)) return;
+  _spAroundDone.add(key);
+  try{
+    // a box, not "near this point": that answers only the nearest photo of each sequence, and the arrows need the photos in every direction
+    const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(r.lat * Math.PI / 180));
+    const x = await fetch(_SP_PANORAMAX + "/api/search?limit=100&bbox=" + [r.lng - dx, r.lat - dy, r.lng + dx, r.lat + dy].map(v => v.toFixed(6)).join(","));
+    if(!x.ok) throw new Error("Panoramax answered " + x.status);
+    ((await x.json()).features || []).map(_spPanPhoto).filter(Boolean).forEach(q => _spPan.photos.has(q.id) || _spPan.photos.set(q.id, q));
+  }catch(e){ _spAroundDone.delete(key); console.warn("rs street view: the photos around this one were not loaded:", e); }
+}
+// Load the images of some photos (as _spAround answers, the nearest first) into memory, so that a click on one shows it at once.
+let _spWarmTok = 0;
+export function _spWarm(list){
+  const tok = ++_spWarmTok, todo = list.map(q => q.url).filter(u => !u.startsWith("blob:") && !_spPan.blobs.has(u));
+  let i = 0;
+  const img = async () => {
+    while(i < todo.length && tok === _spWarmTok){
+      const u = todo[i++];
+      try{ const x = await fetch(u); if(x.ok) _spPan.blobs.set(u, URL.createObjectURL(await x.blob())); }catch(e){}
+    } };
+  Promise.all([img(), img(), img()]).then(() => { for(const [u, b] of _spPan.blobs){ if(_spPan.blobs.size <= 80) break; URL.revokeObjectURL(b); _spPan.blobs.delete(u); } });
 }
 // Load ahead the photos along a road (line: [[lng, lat], ...]) near the spot (lat, lng): their list, in boxes along the line,
 // and the images of the nearest ones into memory. A new road cancels the old load.
 export function _spPrefetch(provider, line, lat, lng){
   const tok = ++_spPan.tok;
-  if(provider !== "panoramax" || !line || line.length < 2) return;
+  if(provider !== "panoramax" || !line || line.length < 2) return Promise.resolve();
   const k = Math.cos(lat * Math.PI / 180), pts = [];
   for(let i = 1; i < line.length; i++){            // a sample every ~100 m along the line
     const [x0, y0] = line[i - 1], [x1, y1] = line[i], n = Math.max(1, Math.ceil(_spDist(y0, x0, y1, x1) / 100));
@@ -95,7 +168,8 @@ export function _spPrefetch(provider, line, lat, lng){
         have.push(...fs);
       }catch(e){}
     } };
-  Promise.all([lane(), lane(), lane()]).then(async () => {
+  const listed = Promise.all([lane(), lane(), lane()]);      // the lists of photos are loaded: the promise that this answers
+  listed.then(async () => {
     if(tok !== _spPan.tok) return;
     const todo = have.filter(q => !_spPan.blobs.has(q.url)).map(q => [_spDist(lat, lng, q.lat, q.lng), q])
       .sort((a, b) => a[0] - b[0]).slice(0, 30).map(x => x[1]);
@@ -109,6 +183,7 @@ export function _spPrefetch(provider, line, lat, lng){
     // keep the memory small: forget the oldest images
     for(const [u, b] of _spPan.blobs){ if(_spPan.blobs.size <= 80) break; URL.revokeObjectURL(b); _spPan.blobs.delete(u); }
   });
+  return listed;
 }
 
 // the nearest photo to a spot: {id, lat, lng, ...what its viewer needs} | null (none within the radius);
@@ -117,8 +192,9 @@ export async function _spFind(provider, lat, lng, heading){
   if(provider === "panoramax"){
     // the photos along the road that were loaded ahead (_spPrefetch) answer at once
     if(_spCovered(lat, lng)) return _spPanPick([..._spPan.photos.values()], lat, lng, heading);
-    const r = await fetch(_SP_PANORAMAX + "/api/search?limit=30&place_position=" + lng.toFixed(6) + "," + lat.toFixed(6) +
-                          "&place_distance=0-" + _SP_RADIUS);
+    // a box around the spot, not "place_position": that search answers nothing at some places that have photos (Avenue du Port, Monaco: a photo 3 m away, 0 answers)
+    const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));
+    const r = await fetch(_SP_PANORAMAX + "/api/search?limit=100&bbox=" + [lng - dx, lat - dy, lng + dx, lat + dy].map(v => v.toFixed(6)).join(","));
     if(!r.ok) throw new Error("Panoramax answered " + r.status);
     const got = ((await r.json()).features || []).map(_spPanPhoto).filter(Boolean);
     got.forEach(q => _spPan.photos.has(q.id) || _spPan.photos.set(q.id, q));
@@ -129,15 +205,15 @@ export async function _spFind(provider, lat, lng, heading){
     const bbox = [lng - dx, lat - dy, lng + dx, lat + dy].map(v => v.toFixed(6)).join(",");
     const r = await fetch("https://graph.mapillary.com/images?fields=id,geometry,compass_angle,is_pano&limit=100&bbox=" + bbox + "&access_token=" + encodeURIComponent(_spToken()));
     if(!r.ok) throw new Error(r.status === 400 || r.status === 401 || r.status === 403 ? "Mapillary refused the token." : "Mapillary answered " + r.status);
-    let best = null, bs = Infinity;
+    let best = null, bs = Infinity, side = null, sd = Infinity;
     const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
     for(const f of (await r.json()).data || []){
       const [x, y] = f.geometry.coordinates, d = _spDist(lat, lng, y, x); if(d > _SP_RADIUS) continue;
       // like Panoramax: a flat image must look the way the road runs (within 45 degrees); a 360 image has every direction
-      const sc = d + _spAim(f.compass_angle, f.is_pano ? 360 : 70, heading, turn); if(sc >= Infinity) continue;
+      const sc = d + _spAim(f.compass_angle, f.is_pano ? 360 : 70, heading, turn);
+      if(sc >= Infinity){ if(d < sd){ sd = d; side = {id: f.id, lng: x, lat: y, aside: Math.round(turn(f.compass_angle, heading))}; } continue; }
       if(sc < bs){ bs = sc; best = {id: f.id, lng: x, lat: y}; } }
-    if(!best) return null;
-    return best;
+    return best || side;
   }
   return null;
 }
@@ -279,7 +355,7 @@ export function _spDotClick(e){
     if(!r.ok) throw new Error("Panoramax answered " + r.status);
     const ph = _spPanPhoto(await r.json());
     if(!ph) throw new Error("this photo has no image");
-    return {id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, fovKnown: ph.fovKnown, crop: ph.crop, url: _spPan.blobs.get(ph.url) || ph.url};
+    return _spPhotoOf(ph);
   })());
   return true;
 }
