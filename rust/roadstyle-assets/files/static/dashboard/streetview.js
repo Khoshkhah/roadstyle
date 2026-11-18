@@ -49,12 +49,12 @@ export function initStreetView(){
       '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button></span>'+
       '<button type="button" class="rs-svw-x" title="Close">\u2715</button></div>'+
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
-      '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>'+
+      '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div><div class="rs-svw-aside" hidden></div>'+
       // Panoramax has no arrows in its picture: these are made over a Panoramax photo, one for each photo near it (dashboard.css; built by buildNav)
       '<div class="rs-svw-nav"><div class="rs-svw-ground"></div></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
-          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"),
+          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"), aside=w.querySelector(".rs-svw-aside"),
           provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step"), navBox=w.querySelector(".rs-svw-ground");
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked (a real panorama, with a Google key) or Classic (Google's keyless embed): the page's option `street_view_mode`; none: Linked with a key, else Classic
@@ -105,8 +105,8 @@ export function initStreetView(){
     chrome();
     const NEED_TOKEN="<b>Mapillary needs a free token.</b>"+
       "<span>Make one at <a href=\"https://www.mapillary.com/developer\" target=\"_blank\" rel=\"noopener\">mapillary.com/developer</a> (a client token), then paste it in Settings \u2192 Keys (Save, then Reload). Coverage needs it too.</span>";
-    const dropAlt=()=>{ if(alt){ alt.ctl.destroy(); alt=null; } adiv.hidden=true; };
-    const note=(html, keep)=>{ fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
+    const dropAlt=()=>{ aside.hidden=true; if(alt){ alt.ctl.destroy(); alt=null; } adiv.hidden=true; };
+    const note=(html, keep)=>{ aside.hidden=true; fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
     const failAt=(tok, e)=>{ if(tok===altTok) note("<b>"+_esc(SV_PROVIDERS[prov].title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
     // r (a photo as _spFind answers) in the provider's viewer, looking h (null: the way the photo looks)
     // Panoramax has no arrows of its own, as Mapillary's viewer has: one arrow on the picture for each photo near the one on screen (a step forward or back, a side street),
@@ -142,6 +142,8 @@ export function initStreetView(){
         if(tok!==altTok || w.hidden) return;
         if(r && r.lng!=null) _spMark([r.lng, r.lat]);          // the ring shows which dot of the coverage this photo is (it can be on the other carriageway)
         fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
+        // a photo that looks aside from the road (nothing here looks along it): the window says so
+        aside.hidden=!(r && r.aside); if(r && r.aside){ aside.style.top=(adiv.offsetTop+8)+"px"; aside.textContent="This photo looks "+r.aside+"\u00b0 aside from the road. No photo here looks along the road."; }
         if(prov==="panoramax"){ if(navPh!==r) navYaw=h==null ? null : +h; buildNav(r); }      // the arrows to the photos near it, and their images loaded ahead
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();

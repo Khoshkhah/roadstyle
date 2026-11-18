@@ -61,19 +61,23 @@ function _spAim(az, fov, heading, turn){
 // the photo nearest the spot that looks along the road; the service does not sort by distance
 function _spPanPick(list, lat, lng, heading){
   const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
-  let best = null, bs = Infinity;
+  let best = null, bs = Infinity, side = null, sd = Infinity;
   for(const q of list){
     const d = _spDist(lat, lng, q.lat, q.lng); if(d > _SP_RADIUS) continue;
     // a flat photo must look the way the road runs (within 45 degrees); a 360 panorama has every direction
-    const sc = d + _spAim(q.az, q.fov, heading, turn); if(sc >= Infinity) continue;
+    const sc = d + _spAim(q.az, q.fov, heading, turn);
+    if(sc >= Infinity){ if(d < sd){ sd = d; side = q; } continue; }      // looks aside: kept only for when no photo looks along the road
     if(sc < bs){ bs = sc; best = q; } }
+  // none looks along the road: the nearest one that looks aside, with `aside` (degrees from the road's direction) so that the window says so
+  const aside = !best && side ? Math.round(turn(side.az, heading)) : 0;
+  if(aside) best = side;
   if(!best) return null;
   // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
-  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop, seq: best.seq,
+  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop, seq: best.seq, aside,
           url: _spPan.blobs.get(best.url) || best.url};
 }
 // The photos to go to from a photo, chosen as Mapillary's viewer does (mapillary-js 4.1.2, EdgeCalculator.computeStepEdges): for each of four steps (forward, left, back, right: the way of the
-// move seen from the photo's direction) the one best photo, so 4 at most. A candidate is up to 20 m away, its direction from the photo is within 30 degrees of the step's, and it
+// move seen from the photo's direction) the one best photo, so 4 at most. A candidate is up to 20 m away, its direction from the photo is within 45 degrees of the step's (Mapillary's is 30: a camera that looks aside from the road, as the cars of Avenue du Port do, sees the photos of the road at 120 degrees, so a photo of 31 degrees was left out and the next one, farther along, was chosen: the arrow jumped over photos; 45 degrees leave no gap between the four steps), and it
 // looks about the way this photo looks (within 30 degrees). The best has the lowest score: a distance near 4 m (weight 4), a small error of the direction of the move (3), a small
 // difference of the way it looks (4), and the same sequence (a penalty of 2 for another one). Each as _spFind answers, plus bearing (degrees, from the photo to it) and d (metres).
 // Only the photos that were loaded (the lookups and the load ahead, _spPrefetch).
@@ -88,11 +92,11 @@ export function _spAround(r){
       const d = _spDist(r.lat, r.lng, q.lat, q.lng); if(d > 20 || d < .3) continue;
       const bearing = (Math.atan2((q.lng - r.lng) * k, q.lat - r.lat) * 180 / Math.PI + 360) % 360;
       const motion = diff(bearing - az, step), rot = flat(q) && flat(r) ? diff(q.az, az) : 0;
-      if(motion > 30 || rot > 30) continue;
-      const score = 4 * Math.abs(d - 4) / 20 + 3 * motion / 30 + 4 * rot / 30 + 2 * (q.seq === r.seq ? 0 : 1);
+      if(motion > 45 || rot > 30) continue;
+      const score = 4 * Math.abs(d - 4) / 20 + 3 * motion / 45 + 4 * rot / 30 + 2 * (q.seq === r.seq ? 0 : 1);
       if(score < lowest){ lowest = score; best = {q, d, bearing}; }
     }
-    if(best) out.push({..._spPhotoOf(best.q), bearing: best.bearing, d: best.d});
+    if(best && !out.some(o => o.id === best.q.id)) out.push({..._spPhotoOf(best.q), bearing: best.bearing, d: best.d});      // on the border of two steps, one photo is one arrow
   }
   return out;
 }
@@ -185,15 +189,15 @@ export async function _spFind(provider, lat, lng, heading){
     const bbox = [lng - dx, lat - dy, lng + dx, lat + dy].map(v => v.toFixed(6)).join(",");
     const r = await fetch("https://graph.mapillary.com/images?fields=id,geometry,compass_angle,is_pano&limit=100&bbox=" + bbox + "&access_token=" + encodeURIComponent(_spToken()));
     if(!r.ok) throw new Error(r.status === 400 || r.status === 401 || r.status === 403 ? "Mapillary refused the token." : "Mapillary answered " + r.status);
-    let best = null, bs = Infinity;
+    let best = null, bs = Infinity, side = null, sd = Infinity;
     const turn = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; };
     for(const f of (await r.json()).data || []){
       const [x, y] = f.geometry.coordinates, d = _spDist(lat, lng, y, x); if(d > _SP_RADIUS) continue;
       // like Panoramax: a flat image must look the way the road runs (within 45 degrees); a 360 image has every direction
-      const sc = d + _spAim(f.compass_angle, f.is_pano ? 360 : 70, heading, turn); if(sc >= Infinity) continue;
+      const sc = d + _spAim(f.compass_angle, f.is_pano ? 360 : 70, heading, turn);
+      if(sc >= Infinity){ if(d < sd){ sd = d; side = {id: f.id, lng: x, lat: y, aside: Math.round(turn(f.compass_angle, heading))}; } continue; }
       if(sc < bs){ bs = sc; best = {id: f.id, lng: x, lat: y}; } }
-    if(!best) return null;
-    return best;
+    return best || side;
   }
   return null;
 }

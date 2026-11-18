@@ -318,3 +318,24 @@ def test_panoramax_has_arrows_over_its_picture_chosen_as_mapillary_chooses_and_m
         _pick(page, "mapillary")
         assert page.locator(".rs-svw-nav").is_hidden() and page.locator(".rs-svw-step").is_hidden()
     _run(tmp_path, body, panoramax={"features": photos})
+
+
+def test_a_photo_that_looks_aside_from_the_road_is_shown_with_a_note_and_has_arrows_to_its_neighbours(tmp_path):
+    """No photo looks along the road, so the nearest one that looks aside is shown, and the window says so. The camera looks 130 degrees from the way the road runs: the photo
+    ahead is at 40 degrees from the left step, the one behind at 40 degrees from the right step, and both get an arrow. (With 30 degrees, none did, and farther photos did.)"""
+    photos = [_photo(i + 1, 18.0, lat, 130) for i, lat in enumerate([59.30480, 59.30495, 59.30510, 59.30525])]
+
+    def body(page, asked):
+        _pick(page, "panoramax")
+        page.wait_for_function("window.__psv")
+        assert page.evaluate("window.__psv.panorama") == "https://pics.example/p2/sd.jpg"
+        assert page.locator(".rs-svw-aside").is_visible()
+        text = page.inner_text(".rs-svw-aside")
+        assert "aside from the road" in text and "No photo here looks along the road" in text
+        assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-msg").is_hidden()
+        arrows = lambda: sorted(round(float(b)) for b in page.eval_on_selector_all(".rs-svw-nav button", "bs => bs.map(b => b.dataset.bearing)"))   # noqa: E731
+        assert arrows() == [0, 180]
+        page.click(".rs-svw-nav button[data-bearing^='0']")
+        page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)      # the next photo, not the one after it
+        assert page.locator(".rs-svw-aside").is_hidden()                                                       # a neighbour is not "the nearest to the road"
+    _run(tmp_path, body, panoramax={"features": photos})
