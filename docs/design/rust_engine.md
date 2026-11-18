@@ -136,7 +136,7 @@ The crate makes the style of `export_inline` for simple mode with stored levels 
   classes, the bridge look and its shadows, and the road-wide end caps of `twin_casing: "each"` (`_twin_ends`).
 - [x] `arrows`, `labels`, `minzoom` (true or a table; 2026-10-23).
 - [x] `view_3d`: the 3D bridge decks (`decks.rs`, 2026-10-23). The engine makes the ribbons with its own mitre offsets, not GEOS: the same properties, the same shapes to the rounding (1e-6 deg).
-- [x] `items`: edge items and lanes (`__rs_k` 5, `__rs_ic`, the items' mitre ends; 2026-10-23). `items_popup` is a page keyword. A MultiLineString item is an error in the engine.
+- [x] `items`: edge items and lanes (`__rs_k` 5, `__rs_ic`, the items' mitre ends; 2026-10-23). `items_popup` is a page keyword. A MultiLineString item is one piece for each of its lines, with one id and one rank (2026-11-18).
 - [x] `overlays=`: the caller's own `Overlay` layers (`_build_overlays`, `overlays.py`; every kind, a style of the settings, on edges, in metres as items; 2026-10-23).
 - [x] `boundary` (the dashed outline), `hover_color`, `select_color` (2026-10-23).
 - [x] `data_maxzoom`, `data_tolerance`, `pitch`, `bearing`, `max_pitch` (2026-10-23).

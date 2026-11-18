@@ -46,6 +46,8 @@ pub type Cells<'a> = Props<'a, Cell<'a>>;
 pub struct Item {
     pub props: Props<'static>,
     pub coords: Option<Vec<Pt>>,
+    /// a line of a MultiLineString item: drawn as it is, with no corner join (a mark's strokes touch each other)
+    pub part: bool,
 }
 
 /// What a piece draws of its road.

@@ -168,3 +168,29 @@ fn a_page_with_views() {
     let page = roadstyle_rs::page_options::page_from(roads(|_, _| {}), None, &l, &o, o.args.as_object().unwrap()).unwrap();
     case("page_views", json!({"bytes": page.html.len(), "hash": common::hash16(&json!(page.html)), "warnings": page.warnings}));
 }
+
+#[test]
+fn a_multilinestring_item_is_one_piece_for_each_of_its_lines() {
+    // each road's line in two parts that touch (a dash and the next, the strokes of a painted mark): one item of two lines, picked
+    let rs: Vec<(i64, Value, Vec<Value>)> = some_roads().into_iter().filter(|r| r.2.len() >= 3).take(5).collect();
+    let parts = |c: &[Value]| { let m = c.len() / 2; vec![c[..=m].to_vec(), c[m..].to_vec()] };
+    let items = fc(rs.iter().map(|(e, _, c)| json!({"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": parts(c)},
+        "properties": {"edge_id": e, "width_m": 0.3, "color": "#ffffff", "lane_id": format!("{e}_1"), "pick": true}})).collect());
+    let s = roadstyle_rs::sources_of(roads(|_, _| {}), &look(json!({"items": items})), None, None, None).unwrap();
+    let mut out = Vec::new();
+    s.write_style(&mut out, roadstyle_rs::sources::SourceMode::INLINE).unwrap();
+    let style: Value = serde_json::from_slice(&out).unwrap();
+    let feats: Vec<&Value> = style["sources"].as_object().unwrap().values().filter_map(|v| v["data"]["features"].as_array()).flatten()
+        .filter(|f| f["properties"].get("lane_id").is_some()).collect();
+    assert_eq!(feats.len(), 2 * rs.len(), "one piece for each line of each item");
+    for (e, _, c) in &rs {
+        let mine: Vec<&&Value> = feats.iter().filter(|f| f["properties"]["lane_id"] == json!(format!("{e}_1"))).collect();
+        assert_eq!(mine.len(), 2);
+        // the same fields and the same road id (a pick or a hover lights the item once, both lines), and each line as given: no corner
+        // joined between the parts
+        assert_eq!(mine[0]["properties"], mine[1]["properties"]);
+        assert_eq!(mine[0]["id"], mine[1]["id"]);
+        let got: Vec<Value> = mine.iter().map(|f| f["geometry"]["coordinates"].clone()).collect();
+        assert_eq!(got, parts(c).into_iter().map(Value::from).collect::<Vec<_>>());
+    }
+}

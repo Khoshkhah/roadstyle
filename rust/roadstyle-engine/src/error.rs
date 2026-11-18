@@ -54,8 +54,6 @@ pub enum Unsupported {
     Palette { palette: String, look: String },
     /// A view's palette that changes `key` of an item and not of its road.
     ItemPalette { palette: String, key: String },
-    /// An overlay's line item that is a MultiLineString (the engine draws LineString items).
-    MultiLineItem { overlay: String, item: usize },
     /// Line items of an overlay from a typed table (only a caller's overlay has items).
     TableItems { overlay: String },
     /// A tiled page with a view's palette (the tiles have one palette).
@@ -77,7 +75,6 @@ impl fmt::Display for Error {
                 Unsupported::Styler => f.write_str("a Styler object (style=) is not in this engine: use color_by, colors, cmap, vmin, vmax or width_by"),
                 Unsupported::Palette { palette, look } => write!(f, "palette {palette:?}: this engine has the look's palette ({look:?}) only"),
                 Unsupported::ItemPalette { palette, key } => write!(f, "palette {palette:?} changes {key} of an item and not of its road: not in this engine"),
-                Unsupported::MultiLineItem { overlay, item } => write!(f, "overlay {overlay}: item {item} is a MultiLineString; this engine draws LineString items only"),
                 Unsupported::TableItems { overlay } => write!(f, "overlay {overlay}: line items from a typed table are not made (only a caller's overlay has items)"),
                 Unsupported::TiledPalettes => f.write_str("tiles=True with a view's palette: the tiles have one palette (a page with a palette in a view needs tiles=False)"),
             },
