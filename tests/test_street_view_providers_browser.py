@@ -195,9 +195,8 @@ def test_a_click_on_a_coverage_dot_opens_that_photo_and_puts_the_marker_there(tm
         page.evaluate("window.__psvv.yaw = 0; window.__psvl['position-updated']()")                  # looking straight ahead in the photo
         spot = page.evaluate("rsGetStreetViewSpot()")
         assert abs(spot["lng"] - 18.0) < 1e-4 and abs(spot["lat"] - 59.3052) < 1e-4 and abs(spot["heading"] - 200) < 1 and spot["onRoad"] is False      # on the road, yet kept where the photo was taken
-        # no road is selected, so no photos were loaded for one: the photos around this photo are asked for, and there is an arrow to the photo 22 m south of it
-        page.wait_for_function("document.querySelectorAll('.rs-svw-nav button').length === 1")
-        assert abs(float(page.get_attribute(".rs-svw-nav button", "data-bearing")) - 180) < 1
+        # no road is selected, so no photos were loaded for one: the photos around this photo are asked for, as a box (a "near this point" search gives only the nearest photo of each sequence)
+        assert any("/api/search" in u and "bbox=" in u and "limit=100" in u for u in asked)
     _run(tmp_path, body)
 
 
@@ -295,24 +294,25 @@ def _photo(i, lng, lat, az=0):
             "assets": {"sd": {"href": f"https://pics.example/p{i}/sd.jpg"}}}
 
 
-def test_panoramax_has_an_arrow_over_its_picture_for_each_photo_near_it_and_mapillary_has_none(tmp_path):
-    """Like Mapillary's viewer: one arrow on the picture for each direction with a photo near the one on screen (4 to 30 m, 60 degrees apart): a click goes to that photo and the
-    marker goes where it was taken. The bar has no steps for Panoramax and Mapillary."""
-    # the road runs north along 18.0, the spot is at 59.305; p1 and p4 are 44 m from p2, a side street photo (p5) is 16 m west of p2
-    pts = [(18.0, 59.30455), (18.0, 59.30495), (18.0, 59.30515), (18.0, 59.30535), (17.99972, 59.30495)]
-    photos = [_photo(i + 1, lng, lat, 90 if i == 4 else 0) for i, (lng, lat) in enumerate(pts)]
+def test_panoramax_has_arrows_over_its_picture_chosen_as_mapillary_chooses_and_mapillary_has_none(tmp_path):
+    """Like Mapillary's viewer: at most one arrow on the picture for each of forward, left, back and right (the best photo of each: up to 20 m away, within 30 degrees of that
+    direction, looking about the way this photo looks); a click goes to that photo and the marker goes where it was taken. The bar has no steps for Panoramax and Mapillary."""
+    # the road runs north along 18.0, the spot is at 59.305, 0.00015 degrees of latitude are 16.6 m: p1 is behind p2, p3 and p4 ahead, p5 is 12 m to the west and looks north too,
+    # p6 is a side street photo that looks west (it is not a step: it looks another way)
+    pts = [(18.0, 59.30480), (18.0, 59.30495), (18.0, 59.30510), (18.0, 59.30525), (17.99977, 59.30495), (18.0, 59.30485)]
+    photos = [_photo(i + 1, lng, lat, 270 if i == 5 else 0) for i, (lng, lat) in enumerate(pts)]
 
     def body(page, asked):
         _pick(page, "panoramax")
         page.wait_for_function("window.__psv")
         assert page.evaluate("window.__psv.panorama") == "https://pics.example/p2/sd.jpg"      # the photo nearest to the spot
         arrows = lambda: sorted(round(float(b)) for b in page.eval_on_selector_all(".rs-svw-nav button", "bs => bs.map(b => b.dataset.bearing)"))   # noqa: E731
-        assert arrows() == [0, 270]                                                       # p3 ahead (22 m), p5 on the left (16 m); p1 and p4 are too far
+        assert arrows() == [0, 180, 270]                                                  # p3 ahead, p1 behind, p5 on the left; p4 is a worse "ahead" than p3; p6 looks another way
         assert page.locator(".rs-svw-nav").is_visible() and page.locator(".rs-svw-step").is_hidden()
         page.click(".rs-svw-nav button[data-bearing^='0']")
         page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)
-        assert page.evaluate("Math.abs(rsGetStreetViewSpot().lat - 59.30515) < 1e-6")      # the marker is where p3 was taken
-        assert arrows() == [0, 180]                                                       # p4 ahead, p2 behind; p5 (27 m, at 216) is within 60 degrees of p2: no arrow
+        assert page.evaluate("Math.abs(rsGetStreetViewSpot().lat - 59.30510) < 1e-6")      # the marker is where p3 was taken
+        assert arrows() == [0, 180]                                                       # p4 ahead, p2 behind (p5 is 13 m to the left behind: neither)
         page.click(".rs-svw-nav button[data-bearing^='180']")
         page.wait_for_function("window.__psvgo[0].endsWith('/p2/sd.jpg')", timeout=5000)
         _pick(page, "mapillary")

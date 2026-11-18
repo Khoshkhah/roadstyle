@@ -111,31 +111,42 @@ export function initStreetView(){
     // r (a photo as _spFind answers) in the provider's viewer, looking h (null: the way the photo looks)
     // Panoramax has no arrows of its own, as Mapillary's viewer has: one arrow on the picture for each photo near the one on screen (a step forward or back, a side street),
     // turning with the picture; a click goes to that photo, looks the way of the move, and the marker goes where it was taken
-    const aimNav=hd=>navBox.querySelectorAll("button").forEach(b=>{
-      const rel=(((+b.dataset.bearing-hd)%360)+540)%360-180, a=rel*Math.PI/180;
-      b.style.left=(50+38*Math.sin(a))+"%"; b.style.top=(50-38*Math.cos(a))+"%"; b.style.transform="translate(-50%,-50%) rotate("+rel+"deg)"; });
+    // The arrows are laid out as Mapillary's viewer does (mapillary-js 4.1.2, DirectionDOMCalculator and DirectionDOMRenderer): one container at the bottom centre of the picture,
+    // 260 to 460 px wide by the size of the picture and 0.77 of that high, its bottom 8% of its height below the picture's bottom; the container is tilted (CSS perspective, rotateX 60).
+    // An arrow is a circle of 0.34 of its height, on a ring of radius 0.31 of its height, at the angle of the move to the camera's heading (so that it turns with the picture), turned
+    // to point that way, with a shadow to the lower side. The picture's own bar (zoom) is the bottom 40 px, and the container stands on it.
+    const aimNav=yaw=>{
+      const W=adiv.clientWidth, H=adiv.clientHeight; if(!W || !H) return;
+      const c=Math.max(0, Math.min(1, Math.min((W-320)/(1480-320), (H-240)/(820-240)))), cw=260+0.04*Math.round(25*c)*(460-260), ch=0.77*cw, circle=0.34*ch, radius=0.31*ch;
+      navBox.parentNode.style.top=adiv.offsetTop+"px"; navBox.parentNode.style.height=H+"px";
+      Object.assign(navBox.style, {width:cw+"px", height:ch+"px", marginLeft:(-cw/2)+"px", bottom:(40-0.08*ch)+"px", transform:"perspective("+cw+"px) rotateX(60deg)"});
+      navBox.querySelectorAll("button").forEach(b=>{
+        const rel=(((+b.dataset.bearing-yaw)%360)+540)%360-180, a=rel*Math.PI/180;
+        b.style.width=b.style.height=circle+"px"; b.style.marginLeft=b.style.marginTop=(-circle/2)+"px";
+        b.style.transform="translate("+Math.round(radius*Math.sin(a)+cw/2)+"px,"+Math.round(-radius*Math.cos(a)+ch/2)+"px) rotate("+rel+"deg)";
+        b.firstChild.style.filter="drop-shadow("+(3*Math.sin(a)).toFixed(2)+"px "+(3*Math.cos(a)).toFixed(2)+"px 1px rgba(0,0,0,0.8))"; }); };
     // the arrow of Mapillary's viewer, as it is in mapillary-js 4.1.2 (dist/mapillary.css, .mapillary-direction-arrow-step): a rounded white chevron in a round, transparent hit area, which
     // is shaded on hover (dashboard.css); the ground plane there lays it down in perspective
     const NAV_ARROW='<svg viewBox="0 0 100 58.77" aria-hidden="true"><path d="M97.44,43.82L56.18,2.56a8.75,8.75,0,0,0-12.37,0h0L2.56,43.8A8.75,8.75,0,0,0,14.94,56.18l35-35L85.05,56.2A8.75,8.75,0,1,0,97.44,43.82h0Z"/></svg>';
-    let navPh=null;                             // the Panoramax photo on screen
+    let navPh=null, navYaw=null;                // the Panoramax photo on screen, and the heading of the view
     const buildNav=r=>{ drawNav(r); _spLoadAround(r).then(()=>{ if(navPh===r && prov==="panoramax" && !w.hidden) drawNav(r); }); };      // the photos around it may still have to be loaded
     const drawNav=r=>{
       navPh=r; navBox.textContent=""; const list=_spAround(r); _spWarm(list);
       list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.innerHTML=NAV_ARROW;
         b.title="The photo "+Math.round(t.d)+" m away"; b.setAttribute("aria-label", b.title);
         b.onclick=()=>{ const tok=++altTok; exact=true; present(t, t.bearing, tok); }; navBox.appendChild(b); });
-      aimNav(r.azimuth||0); };
+      aimNav(navYaw==null ? r.azimuth||0 : navYaw); };
     const present=(r, h, tok)=>{
       const fail=e=>failAt(tok, e);
       const go=()=>{
         if(tok!==altTok || w.hidden) return;
         if(r && r.lng!=null) _spMark([r.lng, r.lat]);          // the ring shows which dot of the coverage this photo is (it can be on the other carriageway)
         fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
-        if(prov==="panoramax") buildNav(r);      // the arrows to the photos near it, and their images loaded ahead
+        if(prov==="panoramax"){ if(navPh!==r) navYaw=h==null ? null : +h; buildNav(r); }      // the arrows to the photos near it, and their images loaded ahead
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();
       dropAlt(); const mine=tok; adiv.hidden=false;
-      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef){ rsSetStreetViewMarkerAt(lng, lat, hd, exact); if(prov==="panoramax") aimNav(hd); } }).then(c=>{
+      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef){ rsSetStreetViewMarkerAt(lng, lat, hd, exact); if(prov==="panoramax"){ navYaw=hd; aimNav(hd); } } }).then(c=>{
         if(mine!==altTok || w.hidden){ c.destroy(); return; }
         ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail);
     };

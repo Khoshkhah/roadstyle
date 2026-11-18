@@ -41,10 +41,10 @@ const _spPanPhoto = f => {
   const sd = f.assets && (f.assets.sd || f.assets.hd); if(!sd || !f.geometry) return null;
   const q = f.properties || {}, io = q["pers:interior_orientation"] || {};
   return {id: f.id, lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], az: q["view:azimuth"] || 0,
-          by: q["geovisio:producer"], url: sd.href, fov: io.field_of_view || 70, fovKnown: io.field_of_view != null, crop: _spCrop(q)};
+          by: q["geovisio:producer"], seq: f.collection, url: sd.href, fov: io.field_of_view || 70, fovKnown: io.field_of_view != null, crop: _spCrop(q)};
 };
 // a photo's record in the shape _spFind answers: the marker goes where the photo was taken
-const _spPhotoOf = ph => ({id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, fovKnown: ph.fovKnown, crop: ph.crop,
+const _spPhotoOf = ph => ({id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, fovKnown: ph.fovKnown, crop: ph.crop, seq: ph.seq,
                            url: _spPan.blobs.get(ph.url) || ph.url});
 const _spBoxHas = (b, lat, lng) => lng >= b[0] && lng <= b[2] && lat >= b[1] && lat <= b[3];
 const _spCovered = (lat, lng) => {            // the whole search circle of a spot is inside a box that was loaded in full
@@ -69,27 +69,32 @@ function _spPanPick(list, lat, lng, heading){
     if(sc < bs){ bs = sc; best = q; } }
   if(!best) return null;
   // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
-  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop,
+  return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop, seq: best.seq,
           url: _spPan.blobs.get(best.url) || best.url};
 }
-// The photos near a photo, to go to: one for each direction in which there is a place to go. Nearest first, 4 to 30 m away; a photo within 5 m of one that was taken
-// is the same place (a stack of photos, a parallel sequence), and the arrows are at least 60 degrees apart as seen from the photo, so that they do not touch (about 3 or 4 at
-// a crossing, 2 on a road), at most 6. Each as _spFind answers, plus bearing (degrees, from the photo to it) and d (metres). Only the photos that were loaded (the lookups
-// and the load ahead, _spPrefetch).
+// The photos to go to from a photo, chosen as Mapillary's viewer does (mapillary-js 4.1.2, EdgeCalculator.computeStepEdges): for each of four steps (forward, left, back, right: the way of the
+// move seen from the photo's direction) the one best photo, so 4 at most. A candidate is up to 20 m away, its direction from the photo is within 30 degrees of the step's, and it
+// looks about the way this photo looks (within 30 degrees). The best has the lowest score: a distance near 4 m (weight 4), a small error of the direction of the move (3), a small
+// difference of the way it looks (4), and the same sequence (a penalty of 2 for another one). Each as _spFind answers, plus bearing (degrees, from the photo to it) and d (metres).
+// Only the photos that were loaded (the lookups and the load ahead, _spPrefetch).
+const _SP_STEPS = [0, -90, 180, 90];            // forward, left, back, right (a compass bearing: left is -90)
 export function _spAround(r){
-  const k = Math.cos(r.lat * Math.PI / 180), near = [];
-  for(const q of _spPan.photos.values()){
-    if(q.id === r.id) continue;
-    const d = _spDist(r.lat, r.lng, q.lat, q.lng); if(d < 4 || d > 30) continue;
-    near.push({q, d, bearing: (Math.atan2((q.lng - r.lng) * k, q.lat - r.lat) * 180 / Math.PI + 360) % 360});
+  const k = Math.cos(r.lat * Math.PI / 180), az = r.azimuth || 0, flat = a => a.fov == null || a.fov < 300;
+  const diff = (a, b) => { const d = Math.abs(_spDeg(a - b)); return d > 180 ? 360 - d : d; }, out = [];
+  for(const step of _SP_STEPS){
+    let best = null, lowest = Infinity;
+    for(const q of _spPan.photos.values()){
+      if(q.id === r.id) continue;
+      const d = _spDist(r.lat, r.lng, q.lat, q.lng); if(d > 20 || d < .3) continue;
+      const bearing = (Math.atan2((q.lng - r.lng) * k, q.lat - r.lat) * 180 / Math.PI + 360) % 360;
+      const motion = diff(bearing - az, step), rot = flat(q) && flat(r) ? diff(q.az, az) : 0;
+      if(motion > 30 || rot > 30) continue;
+      const score = 4 * Math.abs(d - 4) / 20 + 3 * motion / 30 + 4 * rot / 30 + 2 * (q.seq === r.seq ? 0 : 1);
+      if(score < lowest){ lowest = score; best = {q, d, bearing}; }
+    }
+    if(best) out.push({..._spPhotoOf(best.q), bearing: best.bearing, d: best.d});
   }
-  near.sort((a, b) => a.d - b.d);
-  const out = [], apart = (a, b) => { const x = Math.abs(a - b) % 360; return (x > 180 ? 360 - x : x) >= 60; };
-  for(const t of near){
-    if(out.length >= 6) break;
-    if(out.every(o => apart(o.bearing, t.bearing) && _spDist(o.q.lat, o.q.lng, t.q.lat, t.q.lng) >= 5)) out.push(t);
-  }
-  return out.map(t => ({..._spPhotoOf(t.q), bearing: t.bearing, d: t.d}));
+  return out;
 }
 // Load the photos around a photo (the radius of _spAround, one request), so that there are arrows to them: a photo that was opened from a dot of the coverage, with no
 // road selected, has none loaded. Done at most once for a place; resolves when they are in the list.
