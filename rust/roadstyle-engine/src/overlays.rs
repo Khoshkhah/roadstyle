@@ -570,12 +570,15 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
         let w = w.as_f64().filter(|w| w.is_finite())
             .ok_or_else(|| crate::error::data(format!("overlay {label}: item {j} has no width in metres ({})", wcol.as_deref().unwrap_or("width_m"))))?;
         let o = ocol.as_ref().and_then(|c| p.get(c)).and_then(Value::as_f64).filter(|o| o.is_finite());
-        let line: Vec<crate::simple::Pt> = match g["type"].as_str() {
-            Some("LineString") => serde_json::from_value(g["coordinates"].clone()).map_err(|e| crate::error::data(format!("overlay {label}: item {j}: {e}")))?,
-            Some("MultiLineString") => return Err(crate::Error::Unsupported(crate::Unsupported::MultiLineItem { overlay: label.to_string(), item: j })),
-            _ => Vec::new(),
+        // a MultiLineString item: one piece for each of its lines, each with the item's fields and number
+        let multi = g["type"].as_str() == Some("MultiLineString");
+        let lines: Vec<Vec<crate::simple::Pt>> = match g["type"].as_str() {
+            Some("LineString") => vec![serde_json::from_value(g["coordinates"].clone()).map_err(|e| crate::error::data(format!("overlay {label}: item {j}: {e}")))?],
+            Some("MultiLineString") => serde_json::from_value(g["coordinates"].clone()).map_err(|e| crate::error::data(format!("overlay {label}: item {j}: {e}")))?,
+            _ => vec![Vec::new()],
         };
-        let lat = if line.is_empty() { 0.0 } else { line.iter().map(|c| c[1]).sum::<f64>() / line.len() as f64 };
+        let all: Vec<&crate::simple::Pt> = lines.iter().flatten().collect();
+        let lat = if all.is_empty() { 0.0 } else { all.iter().map(|c| c[1]).sum::<f64>() / all.len() as f64 };
         let sec = 1.0 / lat.to_radians().cos().max(0.01);
         let d = dcol.as_ref().and_then(|c| p.get(c)).filter(|d| !d.is_null()).cloned().unwrap_or_else(|| json!(u.dash));
         p.insert(Mark::ItemWidthM.name().into(), json!(crate::layers::round_to(w * sec, 4)));
@@ -596,7 +599,9 @@ pub fn item_pieces(ov: &mut Overlay, i: usize, look: &crate::Look) -> Result<Vec
         if !dash.is_empty() {
             q.insert(Mark::Dash.name(), json!(dash.join(",")));
         }
-        out.push(crate::simple::Item { props: q, coords: (!line.is_empty()).then_some(line) });
+        for line in lines {
+            out.push(crate::simple::Item { props: q.clone(), coords: (!line.is_empty()).then_some(line), part: multi });
+        }
     }
     Ok(out)
 }

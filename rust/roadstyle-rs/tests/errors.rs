@@ -69,7 +69,6 @@ fn no_message_names_a_binding() {
     let all = [EngineError::Unsupported(Unsupported::Styler),
                EngineError::Unsupported(Unsupported::Palette { palette: "p".into(), look: "q".into() }),
                EngineError::Unsupported(Unsupported::ItemPalette { palette: "p".into(), key: "k".into() }),
-               EngineError::Unsupported(Unsupported::MultiLineItem { overlay: "o".into(), item: 0 }),
                EngineError::Unsupported(Unsupported::TableItems { overlay: "o".into() }),
                EngineError::Unsupported(Unsupported::TiledPalettes),
                EngineError::Limit { what: Limit::Roads, found: 1, max: 0 }, EngineError::Limit { what: Limit::Edges, found: 1, max: 0 },

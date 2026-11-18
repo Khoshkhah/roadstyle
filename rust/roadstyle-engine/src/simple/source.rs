@@ -295,10 +295,17 @@ pub fn simple_source(roads: &Roads, head_m: f64, shadows: bool, width_col: Optio
     items.sort_by_key(|f| [Mark::Edge.name(), Mark::ItemOrder.name(), Mark::ItemOverlay.name(), Mark::Item.name()].map(|k| f.props.get(k).and_then(Value::as_i64).unwrap_or(0)));
     let mut per_edge: HashMap<i64, usize> = HashMap::new();
     let mut placed = Vec::with_capacity(items.len());
+    let mut last: Option<(i64, Option<i64>, Option<i64>)> = None;
     for mut f in items {
         let e = f.props.get(Mark::Edge.name()).and_then(Value::as_u64).and_then(crate::road::row_of).unwrap_or(0) as i64;
+        // the lines of one MultiLineString item (its parts, one after the other): one id and one rank, so a pick or a hover lights the
+        // item once, all its lines
+        let item = (e, f.props.get(Mark::ItemOverlay.name()).and_then(Value::as_i64), f.props.get(Mark::Item.name()).and_then(Value::as_i64));
         let r = per_edge.entry(e).or_default();
-        *r += 1;
+        if !(f.part && last == Some(item)) {
+            *r += 1;
+        }
+        last = Some(item);
         if *r > MAX_ITEMS {
             return Err(crate::Error::Limit { what: crate::Limit::Items { edge: e as usize }, found: *r, max: MAX_ITEMS });
         }

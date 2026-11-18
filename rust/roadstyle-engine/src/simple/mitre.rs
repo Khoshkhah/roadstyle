@@ -147,7 +147,7 @@ fn mitre_roads(out: &mut [Piece], line_of: &[Option<&[Pt]>], roads: &Roads, xy: 
 /// The ends of the items: an end that meets the items of its colour and dash is pushed on to close the corner.
 fn mitre_items(items: &mut [Item], xy: &impl Fn(&Pt) -> (f64, f64)) {
     // the items: an end with the items of its colour and dash that start within ITEM_JOIN_M (and a start with those that end there)
-    let lines: Vec<usize> = (0..items.len()).filter(|&k| items[k].coords.as_ref().is_some_and(|c| c.len() >= 2)).collect();
+    let lines: Vec<usize> = (0..items.len()).filter(|&k| !items[k].part && items[k].coords.as_ref().is_some_and(|c| c.len() >= 2)).collect();
     let text = |f: &Item, k: &str| f.props.get(k).filter(|v| !v.is_null()).map(Value::to_string);     // missing or null
     let key = |f: &Item| (text(f, Mark::ItemColor.name()), text(f, Mark::Dash.name()));
     let cell = |p: &Pt| ((p[0] / 3e-5).floor() as i64, (p[1] / 3e-5).floor() as i64);
