@@ -287,33 +287,31 @@ def test_a_narrow_street_view_window_keeps_a_long_name_and_the_provider_tabs_in_
     assert got["narrow"] and got["spread"] < 6 and got["cut"], got
 
 
-def _photo(i, lat, n):
-    link = lambda rel, j: {"rel": rel, "href": f"https://api.panoramax.xyz/api/collections/c1/items/p{j}"}      # noqa: E731
-    return {"id": f"p{i}", "collection": "c1", "geometry": {"type": "Point", "coordinates": [18.0, lat]}, "properties": {"view:azimuth": 0, "geovisio:producer": "x"},
-            "assets": {"sd": {"href": f"https://pics.example/p{i}/sd.jpg"}},
-            "links": ([link("prev", i - 1)] if i > 1 else []) + ([link("next", i + 1)] if i < n else [])}
+def _photo(i, lng, lat, az=0):
+    return {"id": f"p{i}", "geometry": {"type": "Point", "coordinates": [lng, lat]}, "properties": {"view:azimuth": az, "geovisio:producer": "x"},
+            "assets": {"sd": {"href": f"https://pics.example/p{i}/sd.jpg"}}}
 
 
-def test_panoramax_steps_follow_the_sequence_and_mapillary_has_none(tmp_path):
-    """Panoramax has no arrows of its own: two arrows over its picture go to the previous / next photo of the photo's sequence (its prev / next links), the marker goes
-    where the photo was taken, and an arrow is off at the end of the sequence. The bar has no steps for Panoramax and Mapillary."""
-    lats = [59.3020, 59.30495, 59.3075, 59.3090]                 # the road runs north along 18.0; the spot is at 59.305
-    photos = [_photo(i + 1, lat, 4) for i, lat in enumerate(lats)]
+def test_panoramax_has_an_arrow_over_its_picture_for_each_photo_near_it_and_mapillary_has_none(tmp_path):
+    """Like Mapillary's viewer: one arrow on the picture for each photo near the one on screen (3 to 30 m, 30 degrees apart): a click goes to that photo and the
+    marker goes where it was taken. The bar has no steps for Panoramax and Mapillary."""
+    # the road runs north along 18.0, the spot is at 59.305; p1 and p4 are 44 m from p2, a side street photo (p5) is 16 m west of p2
+    pts = [(18.0, 59.30455), (18.0, 59.30495), (18.0, 59.30515), (18.0, 59.30535), (17.99972, 59.30495)]
+    photos = [_photo(i + 1, lng, lat, 90 if i == 4 else 0) for i, (lng, lat) in enumerate(pts)]
 
     def body(page, asked):
         _pick(page, "panoramax")
         page.wait_for_function("window.__psv")
         assert page.evaluate("window.__psv.panorama") == "https://pics.example/p2/sd.jpg"      # the photo nearest to the spot
-        step = lambda m: page.click(f".rs-svw-nav button[data-dir='{1 if m > 0 else -1}']")      # noqa: E731
-        for m, want in [(15, "p3"), (15, "p4"), (-15, "p3"), (-15, "p2"), (-15, "p1")]:
-            step(m)
-            page.wait_for_function(f"window.__psvgo && window.__psvgo[0].endsWith('/{want}/sd.jpg')", timeout=5000)
-            assert page.evaluate("(() => { const s = rsGetStreetViewSpot(); return Math.abs(s.lat - %s) < 1e-6; })()" % lats[int(want[1]) - 1])      # the marker is at the photo
-        assert page.locator(".rs-svw-nav button[data-dir='-1']").is_disabled()                 # p1: the start of the sequence
-        step(15)
+        arrows = lambda: sorted(round(float(b)) for b in page.eval_on_selector_all(".rs-svw-nav button", "bs => bs.map(b => b.dataset.bearing)"))   # noqa: E731
+        assert arrows() == [0, 270]                                                       # p3 ahead (22 m), p5 on the left (16 m); p1 and p4 are too far
+        assert page.locator(".rs-svw-nav").is_visible() and page.locator(".rs-svw-step").is_hidden()
+        page.click(".rs-svw-nav button[data-bearing^='0']")
+        page.wait_for_function("window.__psvgo && window.__psvgo[0].endsWith('/p3/sd.jpg')", timeout=5000)
+        assert page.evaluate("Math.abs(rsGetStreetViewSpot().lat - 59.30515) < 1e-6")      # the marker is where p3 was taken
+        assert arrows() == [0, 180, 216]                                                  # p4 ahead, p2 behind, p5 (27 m) behind to the left
+        page.click(".rs-svw-nav button[data-bearing^='180']")
         page.wait_for_function("window.__psvgo[0].endsWith('/p2/sd.jpg')", timeout=5000)
-        assert not page.locator(".rs-svw-nav button[data-dir='-1']").is_disabled()
-        assert page.locator(".rs-svw-nav").is_visible() and page.locator(".rs-svw-step").is_hidden()      # the arrows are over the picture, not in the bar
         _pick(page, "mapillary")
         assert page.locator(".rs-svw-nav").is_hidden() and page.locator(".rs-svw-step").is_hidden()
-    _run(tmp_path, body, panoramax={"features": photos}, items={p["id"]: p for p in photos})
+    _run(tmp_path, body, panoramax={"features": photos})

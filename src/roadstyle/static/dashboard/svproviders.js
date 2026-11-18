@@ -41,41 +41,11 @@ const _spPanPhoto = f => {
   const sd = f.assets && (f.assets.sd || f.assets.hd); if(!sd || !f.geometry) return null;
   const q = f.properties || {}, io = q["pers:interior_orientation"] || {};
   return {id: f.id, lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], az: q["view:azimuth"] || 0,
-          by: q["geovisio:producer"], url: sd.href, fov: io.field_of_view || 70, fovKnown: io.field_of_view != null, crop: _spCrop(q),
-          prev: _spLink(f, "prev"), next: _spLink(f, "next")};     // the neighbours in its sequence (their records' addresses), as Panoramax gives them
+          by: q["geovisio:producer"], url: sd.href, fov: io.field_of_view || 70, fovKnown: io.field_of_view != null, crop: _spCrop(q)};
 };
-const _spLink = (f, rel) => { const l = (f.links || []).find(x => x.rel === rel && x.href); return l ? new URL(l.href, _SP_PANORAMAX + "/api/").href : null; };
 // a photo's record in the shape _spFind answers: the marker goes where the photo was taken
 const _spPhotoOf = ph => ({id: ph.id, lng: ph.lng, lat: ph.lat, sx: ph.lng, sy: ph.lat, by: ph.by, azimuth: ph.az, fov: ph.fov, fovKnown: ph.fovKnown, crop: ph.crop,
-                           url: _spPan.blobs.get(ph.url) || ph.url, prev: ph.prev, next: ph.next});
-// the photo before (dir < 0) or after (dir > 0) a Panoramax photo in its sequence, as _spFind answers; null at the end of the sequence
-const _spId = href => href.replace(/\/+$/, "").split("/").pop();
-export async function _spNeighbour(r, dir){
-  const href = r && (dir > 0 ? r.next : r.prev); if(!href) return null;
-  const known = _spPan.photos.get(_spId(href));               // the photos along the road were loaded ahead (_spPrefetch): no request
-  if(known) return _spPhotoOf(known);
-  const x = await fetch(href); if(!x.ok) throw new Error("Panoramax answered " + x.status);
-  const ph = _spPanPhoto(await x.json()); if(!ph) throw new Error("this photo has no image");
-  _spPan.photos.set(ph.id, ph);
-  return _spPhotoOf(ph);
-}
-// Load the images of the next and the previous photos of a photo's sequence into memory (up to 5 each way, the nearest first), so that a step shows at once.
-let _spWarmTok = 0;
-export function _spWarm(r){
-  const tok = ++_spWarmTok, todo = [], at = {1: r, "-1": r};
-  for(let i = 0; i < 5; i++) for(const dir of [1, -1]){
-    const cur = at[dir], href = cur && (dir > 0 ? cur.next : cur.prev), ph = href && _spPan.photos.get(_spId(href));
-    at[dir] = ph || null;
-    if(ph && !_spPan.blobs.has(ph.url)) todo.push(ph.url);
-  }
-  let i = 0;
-  const img = async () => {
-    while(i < todo.length && tok === _spWarmTok){
-      const u = todo[i++];
-      try{ const x = await fetch(u); if(x.ok) _spPan.blobs.set(u, URL.createObjectURL(await x.blob())); }catch(e){}
-    } };
-  Promise.all([img(), img(), img()]).then(() => { for(const [u, b] of _spPan.blobs){ if(_spPan.blobs.size <= 80) break; URL.revokeObjectURL(b); _spPan.blobs.delete(u); } });
-}
+                           url: _spPan.blobs.get(ph.url) || ph.url});
 const _spBoxHas = (b, lat, lng) => lng >= b[0] && lng <= b[2] && lat >= b[1] && lat <= b[3];
 const _spCovered = (lat, lng) => {            // the whole search circle of a spot is inside a box that was loaded in full
   const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));
@@ -100,7 +70,33 @@ function _spPanPick(list, lat, lng, heading){
   if(!best) return null;
   // sx, sy: the spot on the road, where the map marker stays (a photo's own position is a GPS fix, often beside the road)
   return {id: best.id, lng: best.lng, lat: best.lat, sx: lng, sy: lat, by: best.by, azimuth: best.az, fov: best.fov, fovKnown: best.fovKnown, crop: best.crop,
-          url: _spPan.blobs.get(best.url) || best.url, prev: best.prev, next: best.next};
+          url: _spPan.blobs.get(best.url) || best.url};
+}
+// The photos near a photo, to go to: up to 8, the nearest first, 3 to 30 m away (a photo at the same spot is the same view), and at least 30 degrees apart seen from the photo.
+// Each as _spFind answers, plus bearing (degrees, from the photo to it) and d (metres). Only the photos that were loaded (the lookups and the load ahead, _spPrefetch).
+export function _spAround(r){
+  const k = Math.cos(r.lat * Math.PI / 180), near = [];
+  for(const q of _spPan.photos.values()){
+    if(q.id === r.id) continue;
+    const d = _spDist(r.lat, r.lng, q.lat, q.lng); if(d < 3 || d > 30) continue;
+    near.push({q, d, bearing: (Math.atan2((q.lng - r.lng) * k, q.lat - r.lat) * 180 / Math.PI + 360) % 360});
+  }
+  near.sort((a, b) => a.d - b.d);
+  const out = [], apart = (a, b) => { const x = Math.abs(a - b) % 360; return (x > 180 ? 360 - x : x) >= 30; };
+  for(const t of near){ if(out.length >= 8) break; if(out.every(o => apart(o.bearing, t.bearing))) out.push(t); }
+  return out.map(t => ({..._spPhotoOf(t.q), bearing: t.bearing, d: t.d}));
+}
+// Load the images of some photos (as _spAround answers, the nearest first) into memory, so that a click on one shows it at once.
+let _spWarmTok = 0;
+export function _spWarm(list){
+  const tok = ++_spWarmTok, todo = list.map(q => q.url).filter(u => !u.startsWith("blob:") && !_spPan.blobs.has(u));
+  let i = 0;
+  const img = async () => {
+    while(i < todo.length && tok === _spWarmTok){
+      const u = todo[i++];
+      try{ const x = await fetch(u); if(x.ok) _spPan.blobs.set(u, URL.createObjectURL(await x.blob())); }catch(e){}
+    } };
+  Promise.all([img(), img(), img()]).then(() => { for(const [u, b] of _spPan.blobs){ if(_spPan.blobs.size <= 80) break; URL.revokeObjectURL(b); _spPan.blobs.delete(u); } });
 }
 // Load ahead the photos along a road (line: [[lng, lat], ...]) near the spot (lat, lng): their list, in boxes along the line,
 // and the images of the nearest ones into memory. A new road cancels the old load.

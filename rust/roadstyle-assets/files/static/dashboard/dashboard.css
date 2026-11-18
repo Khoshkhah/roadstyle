@@ -162,11 +162,10 @@ html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a 
 .rs-svw-narrow .rs-svw-bar>*:not(.rs-svw-t){flex:none}
 .rs-svw-step{display:inline-flex;flex:0 0 auto}
 .rs-svw-step[hidden]{display:none}
-.rs-svw-nav{position:absolute;left:50%;bottom:50px;transform:translateX(-50%);z-index:3;display:none;flex-direction:column;gap:6px}   /* the two arrows over a Panoramax photo */
-.rs-svw[data-prov="panoramax"] .rs-svw-alt:not([hidden])~.rs-svw-nav{display:flex}
-.rs-svw-nav button{width:48px;height:30px;border:0;border-radius:15px;background:rgba(20,20,20,.62);color:#fff;font:15px/1 system-ui;cursor:pointer;padding:0}
-.rs-svw-nav button:is(:hover,:focus-visible):not(:disabled){background:var(--accent-fill)}
-.rs-svw-nav button:disabled{opacity:.35;cursor:default}   /* the two arrows wrap together */
+.rs-svw-nav{position:absolute;left:0;right:0;bottom:50px;height:36%;max-height:150px;z-index:3;display:none;pointer-events:none}   /* the arrows over a Panoramax photo, on an ellipse (streetview.js aimNav) */
+.rs-svw[data-prov="panoramax"] .rs-svw-alt:not([hidden])~.rs-svw-nav{display:block}
+.rs-svw-nav button{position:absolute;pointer-events:auto;width:30px;height:30px;border:0;border-radius:50%;background:rgba(20,20,20,.6);color:#fff;font:13px/1 system-ui;cursor:pointer;padding:0}
+.rs-svw-nav button:is(:hover,:focus-visible){background:var(--accent-fill)}   /* the two arrows wrap together */
 .rs-svw-bar{position:relative}
 .rs-svw-bar button.rs-svw-x{position:absolute;top:6px;right:8px}   /* the close button stays at the top right when the header wraps (by its class: the tooltip code takes the `title` away on hover) */
 /* the phone form of a template (template.js; `rs-phone` and `rs-tpl-*` are on <html> from the first paint). A sidebar template shows its

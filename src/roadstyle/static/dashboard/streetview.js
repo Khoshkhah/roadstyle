@@ -7,7 +7,7 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spNeighbour, _spWarm} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAround, _spWarm} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {holdPopup} from "./select.js";
 import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
@@ -50,13 +50,12 @@ export function initStreetView(){
       '<button type="button" class="rs-svw-x" title="Close">\u2715</button></div>'+
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
       '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>'+
-      // Panoramax has no arrows in its picture: these two go to the next / previous photo of its sequence (shown only over a Panoramax photo, dashboard.css)
-      '<div class="rs-svw-nav"><button type="button" data-dir="1" title="Forward: the next photo" aria-label="Forward">\u25b2</button>'+
-      '<button type="button" data-dir="-1" title="Back: the previous photo" aria-label="Back">\u25bc</button></div>';
+      // Panoramax has no arrows in its picture: these are made over a Panoramax photo, one for each photo near it (dashboard.css; built by buildNav)
+      '<div class="rs-svw-nav"></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
           fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"),
-          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step"), navBtns=[...w.querySelectorAll(".rs-svw-nav button")];
+          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step"), navBox=w.querySelector(".rs-svw-nav");
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked (a real panorama, with a Google key) or Classic (Google's keyless embed): the page's option `street_view_mode`; none: Linked with a key, else Classic
     let mode=_svKey && O.street_view_mode!=="classic" ? "linked" : "classic", pano=null, svc=null;
@@ -110,18 +109,28 @@ export function initStreetView(){
     const note=(html, keep)=>{ fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
     const failAt=(tok, e)=>{ if(tok===altTok) note("<b>"+_esc(SV_PROVIDERS[prov].title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
     // r (a photo as _spFind answers) in the provider's viewer, looking h (null: the way the photo looks)
-    let shownPh=null;                           // the Panoramax photo on screen: where the steps go on from
+    // Panoramax has no arrows of its own, as Mapillary's viewer has: one arrow on the picture for each photo near the one on screen (a step forward or back, a side street),
+    // turning with the picture; a click goes to that photo, looks the way of the move, and the marker goes where it was taken
+    const aimNav=hd=>navBox.querySelectorAll("button").forEach(b=>{
+      const rel=(((+b.dataset.bearing-hd)%360)+540)%360-180, a=rel*Math.PI/180;
+      b.style.left=(50+36*Math.sin(a))+"%"; b.style.top=(50-36*Math.cos(a))+"%"; b.style.transform="translate(-50%,-50%) rotate("+rel+"deg)"; });
+    const buildNav=r=>{
+      navBox.textContent=""; const list=_spAround(r); _spWarm(list);
+      list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.textContent="\u25b2";
+        b.title="The photo "+Math.round(t.d)+" m away"; b.setAttribute("aria-label", b.title);
+        b.onclick=()=>{ const tok=++altTok; exact=true; present(t, t.bearing, tok); }; navBox.appendChild(b); });
+      aimNav(r.azimuth||0); };
     const present=(r, h, tok)=>{
       const fail=e=>failAt(tok, e);
       const go=()=>{
         if(tok!==altTok || w.hidden) return;
         if(r && r.lng!=null) _spMark([r.lng, r.lat]);          // the ring shows which dot of the coverage this photo is (it can be on the other carriageway)
         fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
-        shownPh=prov==="panoramax" ? r : null; if(shownPh){ navBtns[0].disabled=!r.next; navBtns[1].disabled=!r.prev; _spWarm(r); }      // the ends of its sequence; the images next to it are loaded ahead
+        if(prov==="panoramax") buildNav(r);      // the arrows to the photos near it, and their images loaded ahead
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();
       dropAlt(); const mine=tok; adiv.hidden=false;
-      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef) rsSetStreetViewMarkerAt(lng, lat, hd, exact); }).then(c=>{
+      _spOpen(prov, adiv, (lng, lat, hd)=>{ if(alt && alt.ctl===ctlRef){ rsSetStreetViewMarkerAt(lng, lat, hd, exact); if(prov==="panoramax") aimNav(hd); } }).then(c=>{
         if(mine!==altTok || w.hidden){ c.destroy(); return; }
         ctlRef=c; alt={prov:prov, ctl:c}; go(); }, fail);
     };
@@ -164,14 +173,7 @@ export function initStreetView(){
     };
     const steps=[...bar.querySelectorAll("button[data-step]")];
     const ends=(a, z)=>{ steps[0].disabled=!!a; steps[1].disabled=!!z; };
-    // Panoramax has no arrows of its own: a step goes to the previous / next photo of the photo's sequence (Panoramax's prev / next links), the way panoramax.fr does,
-    // and the marker goes to where that photo was taken
-    const stepPhoto=async dir=>{
-      if(!shownPh) return;
-      const tok=++altTok; exact=true;
-      try{ const q=await _spNeighbour(shownPh, dir); if(tok===altTok && q) present(q, null, tok); }catch(e){ failAt(tok, e); } };
     steps.forEach(b=>{ b.onclick=()=>rsStreetViewStep(+b.dataset.step); });
-    navBtns.forEach(b=>{ b.onclick=()=>stepPhoto(+b.dataset.dir); });
     document.addEventListener("rs:select", e=>{
       const d=e.detail; if(d.overlay) return;  // roads only
       const p=d.properties||{}; last={name:p.name||p.highway||"Unnamed road", url:d.streetView}; ahead=false;
