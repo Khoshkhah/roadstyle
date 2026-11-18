@@ -102,7 +102,7 @@ export function _spWarm(list){
 // and the images of the nearest ones into memory. A new road cancels the old load.
 export function _spPrefetch(provider, line, lat, lng){
   const tok = ++_spPan.tok;
-  if(provider !== "panoramax" || !line || line.length < 2) return;
+  if(provider !== "panoramax" || !line || line.length < 2) return Promise.resolve();
   const k = Math.cos(lat * Math.PI / 180), pts = [];
   for(let i = 1; i < line.length; i++){            // a sample every ~100 m along the line
     const [x0, y0] = line[i - 1], [x1, y1] = line[i], n = Math.max(1, Math.ceil(_spDist(y0, x0, y1, x1) / 100));
@@ -124,7 +124,8 @@ export function _spPrefetch(provider, line, lat, lng){
         have.push(...fs);
       }catch(e){}
     } };
-  Promise.all([lane(), lane(), lane()]).then(async () => {
+  const listed = Promise.all([lane(), lane(), lane()]);      // the lists of photos are loaded: the promise that this answers
+  listed.then(async () => {
     if(tok !== _spPan.tok) return;
     const todo = have.filter(q => !_spPan.blobs.has(q.url)).map(q => [_spDist(lat, lng, q.lat, q.lng), q])
       .sort((a, b) => a[0] - b[0]).slice(0, 30).map(x => x[1]);
@@ -138,6 +139,7 @@ export function _spPrefetch(provider, line, lat, lng){
     // keep the memory small: forget the oldest images
     for(const [u, b] of _spPan.blobs){ if(_spPan.blobs.size <= 80) break; URL.revokeObjectURL(b); _spPan.blobs.delete(u); }
   });
+  return listed;
 }
 
 // the nearest photo to a spot: {id, lat, lng, ...what its viewer needs} | null (none within the radius);

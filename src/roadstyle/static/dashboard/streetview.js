@@ -114,8 +114,9 @@ export function initStreetView(){
     const aimNav=hd=>navBox.querySelectorAll("button").forEach(b=>{
       const rel=(((+b.dataset.bearing-hd)%360)+540)%360-180, a=rel*Math.PI/180;
       b.style.left=(50+36*Math.sin(a))+"%"; b.style.top=(50-36*Math.cos(a))+"%"; b.style.transform="translate(-50%,-50%) rotate("+rel+"deg)"; });
+    let navPh=null;                             // the Panoramax photo on screen
     const buildNav=r=>{
-      navBox.textContent=""; const list=_spAround(r); _spWarm(list);
+      navPh=r; navBox.textContent=""; const list=_spAround(r); _spWarm(list);
       list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.textContent="\u25b2";
         b.title="The photo "+Math.round(t.d)+" m away"; b.setAttribute("aria-label", b.title);
         b.onclick=()=>{ const tok=++altTok; exact=true; present(t, t.bearing, tok); }; navBox.appendChild(b); });
@@ -144,7 +145,7 @@ export function initStreetView(){
       if(_spNeedsToken(prov)) return note(NEED_TOKEN);
       const u=new URL(last.url), vp=u.searchParams.get("viewpoint").split(","), h=+u.searchParams.get("heading")||0;
       if(!alt) note("Looking for photos\u2026");   // a viewer that is open stays on screen while the next photo is found
-      if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]); }   // the road's other photos, loaded in the background
+      if(!ahead){ ahead=true; _spPrefetch(prov, rsStreetViewLine(), +vp[0], +vp[1]).then(()=>{ if(navPh && prov==="panoramax" && !w.hidden) buildNav(navPh); }); }      // the arrows are made again when the photos along the road have been loaded   // the road's other photos, loaded in the background
       const fail=e=>failAt(tok, e);
       _spFind(prov, +vp[0], +vp[1], h).then(r=>{
         if(tok!==altTok || w.hidden) return;    // a newer spot, another provider, or the window closed meanwhile
