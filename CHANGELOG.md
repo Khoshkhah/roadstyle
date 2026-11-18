@@ -8,10 +8,14 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ### Added
 
+- **`street_view_mode=`** chooses the panel of the Street View window: `"linked"` (a real panorama, needs the key), `"classic"` (the keyless embed) or `None` (Linked with a key, else Classic, as before). The window bar has no *Linked | Classic* switch any more, and the browser no longer remembers a choice for it. `"linked"` without a key is an error. The Linked panel has no ◀ ▶ step buttons either (Google's own arrows are in the picture); `rsStreetViewStep` still works, and the other panels keep the buttons. The standalone `render_street_view` page keeps its switch.
+
 - **`google_3d_selected=False` starts the Google 3D window without the built-in layer *Selected road*.** A dashboard that shows only its own `google_3d_layers` can now do this. The default is `True`, as before.
 - **The Google 3D window has its own *Labels* button** in its header, so the window can show or hide Google's labels while the map keeps its labels. It starts from the page's Labels switch, and the window keeps its own choice after you click it.
 
 ### Changed
+
+- **The Google 3D window's header has no *Imagery | Map* switch, and a narrow window keeps its header in one row.** Google's own round button at the top right of the map changes the view. A road above the ground gets a small bridge icon, as a road in a tunnel gets the tunnel icon. Under 440 px wide, the window shortens *Follow the map* to *Follow* and cuts the name of the road with "…", so all the buttons stay on one row.
 
 - **The Google 3D window's header has no "heights: Mapzen" text.** The page's attribution box has the credit ("Ground heights: Mapzen, SRTM"), and now names the source of the page's own ground when the page has one (`rsGround`).
 - **One 3D buildings button for every source.** The toolbox's buildings button now switches the buildings of a vector base map (OpenFreeMap), the buildings of the area (a map layer with a 3D layer) and the part `buildings` of a 3D scene (`scene_3d`). It is on while any source shows its buildings, and grey, with the reason in its title, when the page has none. The base-map box has no *3D buildings* row any more, the Layers box has no *Buildings 3D* row, and the scene has no *3D buildings* row: the button is the one switch. The *Opacity* slider of the box is now *3D buildings opacity*. The scene's buildings win over the base map's, as the area's own buildings do. The calls `rsBuildings`, `rsSetBuildings3D` and `rsScene3dKind("buildings", on)` are as before.

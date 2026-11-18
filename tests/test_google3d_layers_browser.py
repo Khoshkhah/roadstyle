@@ -146,6 +146,39 @@ def test_the_header_has_a_labels_button_for_the_window_only():
     assert (before, on, off) == (("false", "SATELLITE"), ("true", "HYBRID"), ("false", "SATELLITE"))
 
 
+def test_a_narrow_window_keeps_the_header_in_one_row_with_the_labels_button():
+    """A window under 440 px: the name of the road stays (cut), "Follow the map" is "Follow", and the buttons stay in one row with the Labels button. The header has no Imagery | Map switch."""
+    html, _ = _options()
+    errors = []
+    with pw.sync_playwright() as p:
+        page = _open_window(p, html, errors)
+        page.evaluate("document.querySelector('.rs-g3d').style.width = '340px'")
+        page.wait_for_function("document.querySelector('.rs-g3d').classList.contains('rs-svw-narrow')")
+        got = page.evaluate("""() => { const bar = document.querySelector('.rs-g3d .rs-svw-bar'), kids = [...bar.children].filter(e => e.offsetParent && !e.classList.contains('rs-svw-x'));
+            const mid = e => { const b = e.getBoundingClientRect(); return (b.top + b.bottom) / 2; }, mids = kids.map(mid), t = document.querySelector('.rs-g3d .rs-svw-t');
+            return {spread: Math.max(...mids) - Math.min(...mids), names: kids.map(e => e.className), labels: !!document.querySelector('.rs-g3d-labels').offsetParent,
+                    barRight: bar.getBoundingClientRect().right, last: Math.max(...kids.map(e => e.getBoundingClientRect().right)), name: t.getBoundingClientRect().width, view: document.querySelectorAll('.rs-g3d-view').length}; }""")
+        page.evaluate("document.querySelector('.rs-g3d').style.width = '700px'")
+        page.wait_for_function("!document.querySelector('.rs-g3d').classList.contains('rs-svw-narrow')")
+        page.context.browser.close()
+    assert errors == []
+    assert got["spread"] < 6 and got["labels"] and got["last"] <= got["barRight"] and got["name"] > 40 and got["view"] == 0, got
+
+
+def test_the_header_shows_a_tunnel_icon_for_a_road_below_the_ground_and_a_bridge_icon_for_one_above_it():
+    html, _ = _options()
+    errors = []
+    with pw.sync_playwright() as p:
+        page = _open_window(p, html, errors)
+        shown = {}
+        for lvl in (-1, 0, 1):
+            shown[lvl] = page.evaluate("""l => { rsG3dDraw([[18.0, 59.30], [18.0, 59.31]], "R", l, {key: "k", props: {}});
+                return ['.rs-g3d-tun', '.rs-g3d-bri'].map(s => !!document.querySelector(s).offsetParent); }""", lvl)
+        page.context.browser.close()
+    assert errors == []
+    assert shown == {-1: [True, False], 0: [False, False], 1: [False, True]}
+
+
 def test_the_selected_road_is_one_solid_line_above_the_mesh_and_its_points_are_pins():
     """The selection is one polyline 1.5 m above the mesh (the option `mesh_altitude_m`), also in a tunnel (level -1); its `points` are pins."""
     html, o = _options(dashboard={"google_3d": {"mesh_altitude_m": 2.5}})

@@ -45,8 +45,6 @@ export function initStreetView(){
       '<span class="rs-svw-prov"></span>'+
       // the coverage of the provider that is open: an icon button right after the switch (a text button made the bar wrap in a 380 px window)
       '<button type="button" class="rs-svw-cov" title="Coverage on the map: where this provider has photos" aria-label="Coverage on the map" hidden>'+SV_COV_ICON+'</button>'+
-      '<span class="rs-svw-mode" hidden><button type="button" data-m="linked" title="The map marker walks and turns with you; Google\'s street photos only">Linked</button>'+
-      '<button type="button" data-m="classic" title="Google\'s plain Street View: the marker stays where you clicked">Classic</button></span>'+
       '<span class="rs-svw-step"><button type="button" data-step="-15" title="Back 15 m along the road">\u25c0</button>'+
       '<button type="button" data-step="15" title="Forward 15 m along the road">\u25b6</button></span>'+
       '<button type="button" class="rs-svw-x" title="Close">\u2715</button></div>'+
@@ -54,23 +52,13 @@ export function initStreetView(){
       '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
-          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"), flip=w.querySelector(".rs-svw-mode"),
-          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov");
+          fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"),
+          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step");
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
-    // Linked or Classic, remembered in this browser (the same choice as the Street View page's)
-    const MODE_KEY="rs-street-view-mode";
-    let mode="classic", pano=null, svc=null;
-    if(_svKey){ mode="linked"; try{ mode=localStorage.getItem(MODE_KEY)||"linked"; }catch(e){}
-      flip.hidden=false;
-      const mark=()=>flip.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.m===mode));
-      mark();
-      flip.querySelectorAll("button").forEach(b=>b.onclick=()=>{
-        if(b.dataset.m===mode) return;
-        mode=b.dataset.m; mark(); try{ localStorage.setItem(MODE_KEY, mode); }catch(e){}
-        if(mode==="classic"){ hideP(); rsSetStreetViewMarkerAt(null); }
-        // the same spot in the other panel: where the viewer has walked to, where the marker stands
-        if(!rsStreetViewStep(0)) show();
-      }); }
+    // Linked (a real panorama, with a Google key) or Classic (Google's keyless embed): the page's option `street_view_mode`; none: Linked with a key, else Classic
+    let mode=_svKey && O.street_view_mode!=="classic" ? "linked" : "classic", pano=null, svc=null;
+    // a narrow window (under 440 px): the header stays one row, the name of the road is cut with "…" (its tooltip has the whole name) (rs-svw-narrow, dashboard.css)
+    new ResizeObserver(()=>w.classList.toggle("rs-svw-narrow", w.clientWidth>0 && w.clientWidth<440)).observe(w);
     const gload=()=>_gmLoad(_svKey);
     // THE PANORAMA EXISTS ONLY WHILE IT IS ON SCREEN. One that sat hidden - Classic showing, or the
     // window closed - came back black with a single tile in a corner, and showing it again first did
@@ -101,7 +89,7 @@ export function initStreetView(){
     if(!SV_PROVIDERS[prov]) prov="google";
     const chrome=()=>{                          // what the bar offers for the provider that is chosen
       provBox.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.p===prov));
-      flip.hidden = !_svKey || prov!=="google";
+      stepBox.hidden = prov==="google" && mode==="linked";      // Linked: the panorama has Google's own arrows, and the marker follows them; the page's steps (rsStreetViewStep) stay in the API
       covBtn.hidden = prov==="google"; covBtn.style.color=""; covBtn.title="Coverage on the map: where this provider has photos"; covBtn.classList.toggle("on", cov);
       fr.title = SV_PROVIDERS[prov].title+" Street View"; w.dataset.prov=prov; };
     const drawCov=()=>_spCoverage(!w.hidden && cov ? prov : null, e=>{ covBtn.style.color="#e03131"; covBtn.title="The coverage tiles did not load: "+((e&&e.message)||"check the token in Settings \u2192 Keys"); });
@@ -152,7 +140,7 @@ export function initStreetView(){
     let last=null, btn=null, ctlRef=null, ahead=false, exact=false;                   // the latest road selection: {name, url}
     const show=()=>{
       if(w.hidden || !last) return;
-      ttl.textContent=last.name;
+      ttl.textContent=last.name; ttl.title=last.name;
       if(prov!=="google") return showAlt();
       if(!last.url || fromDisk){               // Google's embed stays grey in a file:// page
         fr.hidden=true; hideP(); msg.hidden=false;
