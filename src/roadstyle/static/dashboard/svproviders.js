@@ -177,8 +177,9 @@ export async function _spFind(provider, lat, lng, heading){
   if(provider === "panoramax"){
     // the photos along the road that were loaded ahead (_spPrefetch) answer at once
     if(_spCovered(lat, lng)) return _spPanPick([..._spPan.photos.values()], lat, lng, heading);
-    const r = await fetch(_SP_PANORAMAX + "/api/search?limit=30&place_position=" + lng.toFixed(6) + "," + lat.toFixed(6) +
-                          "&place_distance=0-" + _SP_RADIUS);
+    // a box around the spot, not "place_position": that search answers nothing at some places that have photos (Avenue du Port, Monaco: a photo 3 m away, 0 answers)
+    const dy = _SP_RADIUS / 111320, dx = dy / Math.max(.05, Math.cos(lat * Math.PI / 180));
+    const r = await fetch(_SP_PANORAMAX + "/api/search?limit=100&bbox=" + [lng - dx, lat - dy, lng + dx, lat + dy].map(v => v.toFixed(6)).join(","));
     if(!r.ok) throw new Error("Panoramax answered " + r.status);
     const got = ((await r.json()).features || []).map(_spPanPhoto).filter(Boolean);
     got.forEach(q => _spPan.photos.has(q.id) || _spPan.photos.set(q.id, q));

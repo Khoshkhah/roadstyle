@@ -98,7 +98,7 @@ def test_panoramax_shows_the_nearest_photo_with_no_key_and_remembers_the_choice(
         page.wait_for_function("window.__psv")
         assert page.evaluate("window.__psv.panorama") == "https://pics.example/pic-123/sd.jpg"
         assert page.locator(".rs-svw-alt").is_visible()
-        assert any("place_position=18.0" in u and "place_distance=0-30" in u for u in asked)
+        assert any("/api/search" in u and "bbox=" in u and "place_position" not in u for u in asked)      # a box around the spot: place_position answers nothing at some places with photos
         assert page.evaluate("localStorage.getItem('rs-street-view-provider')") == "panoramax"
         assert page.locator(".rs-svw:not(.rs-g3d) .rs-svw-mode").count() == 0                                 # the bar has no Linked / Classic switch
         _pick(page, "google")
