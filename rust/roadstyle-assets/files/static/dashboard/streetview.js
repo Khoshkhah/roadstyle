@@ -51,11 +51,11 @@ export function initStreetView(){
       '<div class="rs-svw-msg">Click a road to see it in Street View.</div>'+
       '<iframe title="Google Street View" allowfullscreen credentialless hidden></iframe><div class="rs-svw-pano" hidden></div><div class="rs-svw-alt" hidden></div>'+
       // Panoramax has no arrows in its picture: these are made over a Panoramax photo, one for each photo near it (dashboard.css; built by buildNav)
-      '<div class="rs-svw-nav"></div>';
+      '<div class="rs-svw-nav"><div class="rs-svw-ground"></div></div>';
     document.body.appendChild(w);
     const bar=w.firstChild, ttl=w.querySelector(".rs-svw-t"), msg=w.querySelector(".rs-svw-msg"),
           fr=w.querySelector("iframe"), pdiv=w.querySelector(".rs-svw-pano"), adiv=w.querySelector(".rs-svw-alt"),
-          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step"), navBox=w.querySelector(".rs-svw-nav");
+          provBox=w.querySelector(".rs-svw-prov"), covBtn=w.querySelector(".rs-svw-cov"), stepBox=w.querySelector(".rs-svw-step"), navBox=w.querySelector(".rs-svw-ground");
     const {st, save, place}=dock ? _svDock(w) : _rsFloat(w, bar, "rs-street-view-window", false);
     // Linked (a real panorama, with a Google key) or Classic (Google's keyless embed): the page's option `street_view_mode`; none: Linked with a key, else Classic
     let mode=_svKey && O.street_view_mode!=="classic" ? "linked" : "classic", pano=null, svc=null;
@@ -114,10 +114,13 @@ export function initStreetView(){
     const aimNav=hd=>navBox.querySelectorAll("button").forEach(b=>{
       const rel=(((+b.dataset.bearing-hd)%360)+540)%360-180, a=rel*Math.PI/180;
       b.style.left=(50+36*Math.sin(a))+"%"; b.style.top=(50-36*Math.cos(a))+"%"; b.style.transform="translate(-50%,-50%) rotate("+rel+"deg)"; });
+    // the arrow of Mapillary's viewer, as it is in mapillary-js 4.1.2 (dist/mapillary.css, .mapillary-direction-arrow-step): a rounded white chevron in a round, transparent hit area, which
+    // is shaded on hover (dashboard.css); the ground plane there lays it down in perspective
+    const NAV_ARROW='<svg viewBox="0 0 100 58.77" aria-hidden="true"><path d="M97.44,43.82L56.18,2.56a8.75,8.75,0,0,0-12.37,0h0L2.56,43.8A8.75,8.75,0,0,0,14.94,56.18l35-35L85.05,56.2A8.75,8.75,0,1,0,97.44,43.82h0Z"/></svg>';
     let navPh=null;                             // the Panoramax photo on screen
     const buildNav=r=>{
       navPh=r; navBox.textContent=""; const list=_spAround(r); _spWarm(list);
-      list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.textContent="\u25b2";
+      list.forEach(t=>{ const b=document.createElement("button"); b.type="button"; b.dataset.bearing=t.bearing; b.innerHTML=NAV_ARROW;
         b.title="The photo "+Math.round(t.d)+" m away"; b.setAttribute("aria-label", b.title);
         b.onclick=()=>{ const tok=++altTok; exact=true; present(t, t.bearing, tok); }; navBox.appendChild(b); });
       aimNav(r.azimuth||0); };

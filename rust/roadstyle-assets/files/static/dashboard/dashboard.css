@@ -162,10 +162,13 @@ html.rs-phone .rs-svw{   /* a phone (the template's phone width): a window is a 
 .rs-svw-narrow .rs-svw-bar>*:not(.rs-svw-t){flex:none}
 .rs-svw-step{display:inline-flex;flex:0 0 auto}
 .rs-svw-step[hidden]{display:none}
-.rs-svw-nav{position:absolute;left:0;right:0;bottom:50px;height:36%;max-height:150px;z-index:3;display:none;pointer-events:none}   /* the arrows over a Panoramax photo, on an ellipse (streetview.js aimNav) */
+.rs-svw-nav{position:absolute;left:0;right:0;bottom:44px;height:96px;z-index:10;display:none;pointer-events:none}   /* the arrows over a Panoramax photo (streetview.js aimNav) */
 .rs-svw[data-prov="panoramax"] .rs-svw-alt:not([hidden])~.rs-svw-nav{display:block}
-.rs-svw-nav button{position:absolute;pointer-events:auto;width:30px;height:30px;border:0;border-radius:50%;background:rgba(20,20,20,.6);color:#fff;font:13px/1 system-ui;cursor:pointer;padding:0}
-.rs-svw-nav button:is(:hover,:focus-visible){background:var(--accent-fill)}   /* the two arrows wrap together */
+.rs-svw-ground{position:absolute;left:50%;bottom:0;width:150px;height:150px;margin-left:-75px;transform-origin:50% 100%;transform:perspective(300px) rotateX(62deg)}   /* a square of ground, laid down: its circle of arrows is an ellipse on the picture */
+.rs-svw-nav button{position:absolute;pointer-events:auto;width:58px;height:58px;border:0;border-radius:50%;padding:0;background:rgba(0,0,0,0);cursor:pointer}   /* Mapillary's .mapillary-direction-circle */
+.rs-svw-nav button:is(:hover,:focus-visible){background:rgba(0,0,0,.4)}
+.rs-svw-nav svg{position:absolute;top:44%;left:50%;width:75%;height:44.0775%;transform:translate(-50%,-50%);pointer-events:none}   /* .mapillary-direction-arrow-step */
+.rs-svw-nav path{fill:#fff}   /* the two arrows wrap together */
 .rs-svw-bar{position:relative}
 .rs-svw-bar button.rs-svw-x{position:absolute;top:6px;right:8px}   /* the close button stays at the top right when the header wraps (by its class: the tooltip code takes the `title` away on hover) */
 /* the phone form of a template (template.js; `rs-phone` and `rs-tpl-*` are on <html> from the first paint). A sidebar template shows its
