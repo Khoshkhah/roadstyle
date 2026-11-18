@@ -24,7 +24,7 @@ _MLY_JS = """window.mapillary={Viewer:class{constructor(o){window.__mly=o; windo
 moveTo(id){window.__mlyto=id; return Promise.resolve();} resize(){} remove(){window.__mlygone=true;}}};"""
 
 
-def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
+def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY, items=None):
     path = tmp_path / "d.html"
     rs.render_dashboard(_edges(), basemap="blank", street_view="window", road_popup=False, dashboard={"panel": None}).save(path)      # no popup over the coverage dots; no panel: it is not used
     asked = []
@@ -36,6 +36,8 @@ def _run(tmp_path, body, panoramax=_PAN, mapillary=_MLY):
                 asked.append(u)
                 if "/api/search" in u:
                     return r.fulfill(json=panoramax, headers={"access-control-allow-origin": "*"})
+                if "/api/collections/" in u and u.rsplit("/", 1)[-1] in (items or {}):
+                    return r.fulfill(json=items[u.rsplit("/", 1)[-1]], headers={"access-control-allow-origin": "*"})
                 if "/api/collections/" in u:
                     return r.fulfill(json={"id": "dot-1", "geometry": {"type": "Point", "coordinates": [18.0, 59.3052]},
                                            "properties": {"view:azimuth": 200, "geovisio:producer": "x"},
@@ -285,14 +287,18 @@ def test_a_narrow_street_view_window_keeps_a_long_name_and_the_provider_tabs_in_
     assert got["narrow"] and got["spread"] < 6 and got["cut"], got
 
 
-def _photo(i, lat):
-    return {"id": f"p{i}", "geometry": {"type": "Point", "coordinates": [18.0, lat]}, "properties": {"view:azimuth": 0, "geovisio:producer": "x"},
-            "assets": {"sd": {"href": f"https://pics.example/p{i}/sd.jpg"}}}
+def _photo(i, lat, n):
+    link = lambda rel, j: {"rel": rel, "href": f"https://api.panoramax.xyz/api/collections/c1/items/p{j}"}      # noqa: E731
+    return {"id": f"p{i}", "collection": "c1", "geometry": {"type": "Point", "coordinates": [18.0, lat]}, "properties": {"view:azimuth": 0, "geovisio:producer": "x"},
+            "assets": {"sd": {"href": f"https://pics.example/p{i}/sd.jpg"}},
+            "links": ([link("prev", i - 1)] if i > 1 else []) + ([link("next", i + 1)] if i < n else [])}
 
 
-def test_panoramax_steps_go_to_the_previous_and_next_photo_along_the_road_and_mapillary_has_none(tmp_path):
-    """Panoramax has no arrows of its own: the bar's steps go from photo to photo along the road (not 15 m). Mapillary's viewer has its own arrows: no steps."""
-    along = {"features": [_photo(1, 59.3020), _photo(2, 59.30495), _photo(3, 59.3075), _photo(4, 59.3090)]}   # the road runs north along 18.0; the spot is at 59.305
+def test_panoramax_steps_follow_the_sequence_and_mapillary_has_none(tmp_path):
+    """Panoramax has no arrows of its own: the bar's steps go to the previous / next photo of the photo's sequence (its prev / next links), the marker goes where the
+    photo was taken, and a step is off at the end of the sequence. Mapillary's viewer has its own arrows: no steps."""
+    lats = [59.3020, 59.30495, 59.3075, 59.3090]                 # the road runs north along 18.0; the spot is at 59.305
+    photos = [_photo(i + 1, lat, 4) for i, lat in enumerate(lats)]
 
     def body(page, asked):
         _pick(page, "panoramax")
@@ -302,7 +308,12 @@ def test_panoramax_steps_go_to_the_previous_and_next_photo_along_the_road_and_ma
         for m, want in [(15, "p3"), (15, "p4"), (-15, "p3"), (-15, "p2"), (-15, "p1")]:
             step(m)
             page.wait_for_function(f"window.__psvgo && window.__psvgo[0].endsWith('/{want}/sd.jpg')", timeout=5000)
+            assert page.evaluate("(() => { const s = rsGetStreetViewSpot(); return Math.abs(s.lat - %s) < 1e-6; })()" % lats[int(want[1]) - 1])      # the marker is at the photo
+        assert page.locator(".rs-svw-step button[data-step='-15']").is_disabled()               # p1: the start of the sequence
+        step(15)
+        page.wait_for_function("window.__psvgo[0].endsWith('/p2/sd.jpg')", timeout=5000)
+        assert not page.locator(".rs-svw-step button[data-step='-15']").is_disabled()
         assert page.locator(".rs-svw-step").is_visible()
         _pick(page, "mapillary")
         assert page.locator(".rs-svw-step").is_hidden()
-    _run(tmp_path, body, panoramax=along)
+    _run(tmp_path, body, panoramax={"features": photos}, items={p["id"]: p for p in photos})

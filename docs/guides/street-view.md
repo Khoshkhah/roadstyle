@@ -112,7 +112,7 @@ Every `render_edges` keyword also works here. On a phone, Street View is under t
 
     With `street_view_key=`, the panel is a real panorama (the Maps JavaScript API).
     Each step and turn moves the marker on the map. The map pans to keep the marker in view.
-    Only Google's own street imagery shows. The window bar has no step buttons here: use Google's arrows in the picture. `rsStreetViewStep(m)` still steps along the clicked road. Classic has the ◀ ▶ buttons, and they move 15 m along the road. In Panoramax they go to the previous and next photo along the road, and the marker goes with the photo. Mapillary's viewer has its own arrows, so the bar has no ◀ ▶ buttons there.
+    Only Google's own street imagery shows. The window bar has no step buttons here: use Google's arrows in the picture. `rsStreetViewStep(m)` still steps along the clicked road. Classic has the ◀ ▶ buttons, and they move 15 m along the road. In Panoramax they go to the previous and next photo of the photo's sequence (the way panoramax.fr does), and the marker goes to where that photo was taken. The button is off at the start or the end of the sequence. Mapillary's viewer has its own arrows, so the bar has no ◀ ▶ buttons there.
 
     The page chooses between **Linked** (this panorama) and **Classic** (the keyless embed) with `street_view_mode=`.
     The default is Linked with a key, and Classic without one. `street_view_mode="linked"` without a key is an error.

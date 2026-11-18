@@ -7,10 +7,10 @@ import {map, O, _emit} from "./core.js";
 import {_gmLoad, _rsFloat} from "./float.js";
 import {defineTool, STREETVIEW_ICON} from "./tools.js";
 import {savedKey} from "./settings.js";
-import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spAlong, _spProject} from "./svproviders.js";
+import {SV_PROVIDERS, _spFind, _spOpen, _spCoverage, _spNeedsToken, _spPrefetch, _spOnDot, _spMark, _spNeighbour} from "./svproviders.js";
 import {_wPhone} from "./windows.js";
 import {holdPopup} from "./select.js";
-import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine, rsGetStreetViewSpot} from "./svspot.js";
+import {rsSetStreetViewMarkerAt, rsSetStreetViewMarker, rsStreetViewStep, rsStreetViewLine} from "./svspot.js";
 const SV_COV_ICON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>';   // a folded map
 export let _svWindow = false;
 // with a Maps JavaScript API key (street_view_key=) the window offers Linked - a real panorama that
@@ -107,14 +107,14 @@ export function initStreetView(){
     const note=(html, keep)=>{ fr.hidden=true; hideP(); if(!keep) dropAlt(); else adiv.hidden=true; msg.hidden=false; msg.innerHTML=html; };
     const failAt=(tok, e)=>{ if(tok===altTok) note("<b>"+_esc(SV_PROVIDERS[prov].title)+" is not reachable.</b><span>"+_esc(e.message||String(e))+"</span>"); };
     // r (a photo as _spFind answers) in the provider's viewer, looking h (null: the way the photo looks)
-    let shownPh=null;                           // the Panoramax photo on screen {m}: where the steps go on from
+    let shownPh=null;                           // the Panoramax photo on screen: where the steps go on from
     const present=(r, h, tok)=>{
       const fail=e=>failAt(tok, e);
       const go=()=>{
         if(tok!==altTok || w.hidden) return;
         if(r && r.lng!=null) _spMark([r.lng, r.lat]);          // the ring shows which dot of the coverage this photo is (it can be on the other carriageway)
         fr.hidden=true; hideP(); msg.hidden=true; adiv.hidden=false;
-        const line=rsStreetViewLine(); shownPh=prov==="panoramax" && r && r.lng!=null && line ? {m:_spProject(line, r.lng, r.lat).m} : null;
+        shownPh=prov==="panoramax" ? r : null; if(shownPh){ steps[0].disabled=!r.prev; steps[1].disabled=!r.next; }      // the ends of its sequence
         alt.ctl.go(r, h).catch(fail); };
       if(alt && alt.prov===prov) return go();
       dropAlt(); const mine=tok; adiv.hidden=false;
@@ -161,12 +161,12 @@ export function initStreetView(){
     };
     const steps=[...bar.querySelectorAll("button[data-step]")];
     const ends=(a, z)=>{ steps[0].disabled=!!a; steps[1].disabled=!!z; };
-    // Panoramax has no arrows of its own: a step goes to the previous / next photo along the road (the photos that were loaded: svproviders.js _spAlong), and the marker goes with it
-    const stepPhoto=dir=>{
-      const line=rsStreetViewLine(); if(!line) return;
-      const spot=rsGetStreetViewSpot(), from=shownPh ? shownPh.m : (spot && spot.m!=null ? spot.m : null); if(from==null) return;
-      const list=_spAlong(line), q=dir>0 ? list.find(x=>x.m>from+4) : [...list].reverse().find(x=>x.m<from-4);
-      if(q) present(q, q.h, ++altTok); };
+    // Panoramax has no arrows of its own: a step goes to the previous / next photo of the photo's sequence (Panoramax's prev / next links), the way panoramax.fr does,
+    // and the marker goes to where that photo was taken
+    const stepPhoto=async dir=>{
+      if(!shownPh) return;
+      const tok=++altTok; exact=true;
+      try{ const q=await _spNeighbour(shownPh, dir); if(tok===altTok && q) present(q, null, tok); }catch(e){ failAt(tok, e); } };
     steps.forEach(b=>{ b.onclick=()=>prov==="panoramax" ? stepPhoto(+b.dataset.step>0 ? 1 : -1) : rsStreetViewStep(+b.dataset.step); });
     document.addEventListener("rs:select", e=>{
       const d=e.detail; if(d.overlay) return;  // roads only
