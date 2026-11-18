@@ -70,7 +70,7 @@ export function initStreetView(){
       const g=google.maps; svc=svc || new g.StreetViewService();
       return svc.getPanorama({location:{lat:+lat, lng:+lng}, radius:50, preference:g.StreetViewPreference.NEAREST,
                               sources:[g.StreetViewSource.GOOGLE]}).then(r=>{
-        if(mode!=="linked" || w.hidden) return;   // flipped to Classic or closed while it was asked for
+        if(mode!=="linked" || w.hidden || prov!=="google") return;   // closed, or switched to Panoramax / Mapillary, while it was asked for: the late answer must not draw over their viewer
         const id=r.data.location.pano, pov={heading:+h||0, pitch:0};
         fr.hidden=true; msg.hidden=true; pdiv.hidden=false;
         if(pano){ pano.setPano(id); pano.setPov(pov); return; }
@@ -80,7 +80,7 @@ export function initStreetView(){
         pano.addListener("position_changed", report); pano.addListener("pov_changed", report);
         // a panorama does not see its box change size (the docked window, dragged by its divider): it is told
         if(dock){ const p0=pano; new ResizeObserver(()=>{ if(pano===p0) g.event.trigger(p0, "resize"); }).observe(pdiv); } },
-        ()=>{ hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
+        ()=>{ if(prov!=="google") return; hideP(); msg.hidden=false; msg.textContent="No street photos within 50 m of this spot."; }); });
     // THE PROVIDER: Google (above), or Panoramax / Mapillary: the nearest photo to the spot in their own viewer (svproviders.js).
     // The choice and the coverage switch are remembered in this browser.
     const PROV_KEY="rs-street-view-provider", COV_KEY="rs-street-view-cov";
@@ -154,7 +154,7 @@ export function initStreetView(){
       const src="https://www.google.com/maps/embed?pb=!6m7!1m6!2m2!1d"+vp[0]+"!2d"+vp[1]+
                 "!3f"+(u.searchParams.get("heading")||0)+"!4f0!5f1";
       const embed=()=>{ if(fr.getAttribute("src")!==src) fr.src=src; fr.hidden=false; msg.hidden=true; hideP(); };
-      if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); embed(); }); return; }
+      if(_svKey && mode==="linked"){ fr.hidden=true; panoAt(vp[0], vp[1], u.searchParams.get("heading")||0).catch(e=>{ console.warn("rs street view:", e); if(prov==="google") embed(); }); return; }
       embed();
     };
     const steps=[...bar.querySelectorAll("button[data-step]")];
