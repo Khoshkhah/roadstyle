@@ -33,11 +33,17 @@ pub struct Shot {
     pub settle: Duration,
     /// the longest time for the map to load
     pub timeout: Duration,
+    /// false: only the map and its attribution, no toolbox, buttons or panels (a picture cannot use them)
+    pub controls: bool,
 }
+
+/// Hides each element of the page except the map's canvas and the attribution (and the elements that hold them).
+/// The page runs it before the screenshot when `controls` is false.
+pub const HIDE_CONTROLS: &str = "(() => { const keep = [...document.querySelectorAll('canvas.maplibregl-canvas, .maplibregl-ctrl-attrib')]; for (const el of document.body.querySelectorAll('*')) { if (!keep.some(k => el.contains(k) || k.contains(el))) el.style.visibility = 'hidden'; } })()";
 
 impl Default for Shot {
     fn default() -> Shot {
-        Shot { width: 1200, height: 800, scale: 1.0, settle: Duration::from_millis(2500), timeout: Duration::from_secs(40) }
+        Shot { width: 1200, height: 800, scale: 1.0, settle: Duration::from_millis(2500), timeout: Duration::from_secs(40), controls: true }
     }
 }
 
@@ -172,6 +178,9 @@ pub fn snapshot(page: &Path, out: &Path, camera: &Camera, shot: &Shot) -> Result
     }
     if !cam.is_empty() {
         tab.evaluate(&format!("window.map && window.map.jumpTo({})", Value::Object(cam)), false).map_err(page_err)?;
+    }
+    if !shot.controls {
+        tab.evaluate(HIDE_CONTROLS, false).map_err(page_err)?;
     }
     std::thread::sleep(shot.settle);
     let png = tab.capture_screenshot(Page::CaptureScreenshotFormatOption::Png, None, None, true).map_err(page_err)?;

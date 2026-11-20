@@ -49,8 +49,9 @@ usage:
       the page keeps only what is in view. --table: more Parquet files for the queries (the roads file is the table `roads`). --frames: the
       Parquet file of a run (columns frame, t, row, value), the window of frames of the page.
   roadstyle snapshot <page.html> <out.png> [--center LON,LAT] [--zoom Z] [--pitch P] [--bearing B] [--width 1200] [--height 800]
-                    [--scale 1] [--settle 2.5] [--timeout 40]
-      a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot).
+                    [--scale 1] [--settle 2.5] [--timeout 40] [--no-controls]
+      a PNG of a saved page, drawn by Chromium (roadstyle-snapshot; Python's rs.snapshot). --no-controls: only the map and its
+      attribution, no toolbox or buttons.
 
 <roads> and <edges>: a .parquet (GeoParquet, the line in the column geometry), .geojson, .shp (with its .dbf and .prj beside it)
 or .gpkg file.";
@@ -458,7 +459,11 @@ fn snapshot(page: &str, out: &str, mut opts: Vec<(String, Option<String>)>) -> R
     let shot = Shot { width: num("width", take(&mut opts, "width"))?.map_or(d.width, |x| x as u32),
                       height: num("height", take(&mut opts, "height"))?.map_or(d.height, |x| x as u32),
                       scale: num("scale", take(&mut opts, "scale"))?.unwrap_or(d.scale),
-                      settle: secs("settle", take(&mut opts, "settle"), d.settle)?, timeout: secs("timeout", take(&mut opts, "timeout"), d.timeout)? };
+                      settle: secs("settle", take(&mut opts, "settle"), d.settle)?, timeout: secs("timeout", take(&mut opts, "timeout"), d.timeout)?,
+                      controls: match opts.iter().position(|(n, _)| n == "no_controls") {
+                          Some(i) => { opts.remove(i); false }
+                          None => true,
+                      } };
     if let Some((k, _)) = opts.first() {
         return Err(Error::Usage(format!("snapshot: unknown option --{k}\n{USAGE}")));
     }
