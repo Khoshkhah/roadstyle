@@ -47,6 +47,14 @@
   a level editor and a design panel (themes, road colours and widths, names, layers) that any page can open.
 - **Ready for AI agents.** An MCP server and an agent skill.
 
+## What is new in 0.30.0
+
+- **3D bridges:** a sloped deck for each group of bridges from a bridge profile, with ramps and portals on the 3D terrain, a Height field and a page that explains the heights.
+- **A 3D scene and traffic:** `scene_3d=` adds a 3D scene to the map, and the vehicles of a traffic microsimulation run on the map.
+- **Street View:** Panoramax has arrows over its picture, as Mapillary has, and `street_view_mode=` chooses the panel. The Google 3D window has its own *Labels* button, and one 3D buildings button works for every source.
+- **Dashboard parts:** objects and cards for each kind of the data dock, a Reset button, and the level editor and the design editor as parts (`levelEditPart`, `designEditPart`).
+- **Pictures of the map only:** `rs.snapshot(..., controls=False)` leaves out the toolbox, the buttons and the panels.
+
 ## What is new in 0.29.0
 
 - **Ask, an AI agent in the side panel:** a question in words becomes SQL on the page's data, an answer, a table and roads on the map. It uses the person's own key of a free service (Gemini, Groq, OpenRouter, Z.ai) or of Claude, and **Auto** goes to the next service or model when one cannot answer ([guide](https://khoshkhah.github.io/roadstyle/guides/ask/)).
@@ -98,7 +106,7 @@
   <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard_dark.jpg" alt="The dashboard in the dark theme with the OpenFreeMap Fiord base map: Monaco, one road selected" width="80%">
 </p>
 
-More: [What is new in 0.28.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0280) ·
+More: [What is new in 0.29.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0290) ·
 [Dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) ·
 [Dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) ·
 [Big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) ·

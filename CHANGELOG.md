@@ -6,6 +6,8 @@ All notable changes to **roadstyle** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-20
+
 ### Added
 
 - **`rs.snapshot(..., controls=False)`** (and `roadstyle snapshot --no-controls`) takes a picture of the map only: the page hides the toolbox, the buttons and the panels before the screenshot, and keeps the attribution. A picture cannot use them. The default (`True`) takes the whole page, as before.
