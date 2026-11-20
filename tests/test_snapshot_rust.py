@@ -43,6 +43,7 @@ def _pixels(path):
     ({"center": (7.4246, 43.7384), "zoom": 16.5, "pitch": 45, "bearing": 20},
      ["--center", "7.4246,43.7384", "--zoom", "16.5", "--pitch", "45", "--bearing", "20"]),
     ({"scale": 2}, ["--scale", "2"]),
+    ({"controls": False}, ["--no-controls"]),
 ])
 def test_rust_snapshot_is_python_snapshot(page, tmp_path, camera, args):
     import roadstyle as rs

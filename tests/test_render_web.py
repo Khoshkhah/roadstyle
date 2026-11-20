@@ -411,6 +411,10 @@ def test_snapshot_writes_png(tmp_path):
     rs.snapshot(wm.html, out, zoom=13, width=500, height=400, scale=2, settle=1.5)  # an HTML str
     head = out.read_bytes()[16:24]                # IHDR: width, height as big-endian uint32
     assert (int.from_bytes(head[:4], "big"), int.from_bytes(head[4:], "big")) == (1000, 800)
+    bare = tmp_path / "bare.png"                  # controls=False: the map only, no buttons
+    rs.snapshot(wm, out, zoom=13, width=500, height=400, settle=1.5)
+    rs.snapshot(wm, bare, zoom=13, width=500, height=400, settle=1.5, controls=False)
+    assert bare.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n" and bare.read_bytes() != out.read_bytes()
 
 
 def test_web_street_view_window():

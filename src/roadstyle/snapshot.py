@@ -16,10 +16,14 @@ import os
 import tempfile
 from pathlib import Path
 
+# hides each element of the page except the map's canvas and the attribution (and the elements that
+# hold them); the same text is HIDE_CONTROLS of rust/roadstyle-snapshot
+HIDE_CONTROLS = "(() => { const keep = [...document.querySelectorAll('canvas.maplibregl-canvas, .maplibregl-ctrl-attrib')]; for (const el of document.body.querySelectorAll('*')) { if (!keep.some(k => el.contains(k) || k.contains(el))) el.style.visibility = 'hidden'; } })()"
+
 
 def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, bearing=None,
              width: int = 1200, height: int = 800, scale: float = 1, settle: float = 2.5,
-             timeout: float = 40.0):
+             timeout: float = 40.0, controls: bool = True):
     """Render a map to a PNG via headless Chromium and return the output path.
 
     Parameters
@@ -34,6 +38,8 @@ def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, beari
         HiDPI screens, READMEs and print.
     settle : seconds to wait after loading for tiles/labels to finish drawing.
     timeout : seconds to wait for the map to finish loading before shooting anyway.
+    controls : False: only the map and its attribution, no toolbox, buttons or panels (a picture
+        cannot use them).
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -81,6 +87,8 @@ def snapshot(map_or_html, out_path, *, center=None, zoom=None, pitch=None, beari
                     page.evaluate("cam => window.map.jumpTo(cam)", cam)
             except Exception:                       # folium/other pages: just let them settle
                 pass
+            if not controls:
+                page.evaluate(HIDE_CONTROLS)
             page.wait_for_timeout(int(settle * 1000))
             page.screenshot(path=str(out_path))
             browser.close()
