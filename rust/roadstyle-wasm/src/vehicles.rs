@@ -213,6 +213,27 @@ impl VehicleScene {
             by_edge.entry(l.edge.as_str()).or_default().push(i);
         }
         let mut out = Vec::new();
+        // a roundabout's ring: its lanes inside the junctions get the ring's lines too, so the ring's marks are one unbroken ring
+        let mut from: HashMap<u32, usize> = HashMap::new();
+        for (j, nx) in n.next.iter().enumerate() {
+            for &k in nx {
+                from.entry(k).or_insert(j);
+            }
+        }
+        for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| l.internal && l.line.pts.len() > 1) {
+            let Some(&j) = from.get(&(i as u32)) else { continue };
+            // only a lane that goes on along the ring in the same lane (not one that changes lanes or leaves the ring)
+            let a = &n.lanes[j];
+            let on = n.next[i].iter().any(|&k| n.lanes[k as usize].ring && n.lanes[k as usize].index == a.index);
+            if !(a.ring && on) {
+                continue;
+            }
+            let top = n.lanes.iter().filter(|x| x.edge == a.edge).map(|x| x.index).max().unwrap_or(0);
+            out.push(feat(if a.index == 0 { "edge_line" } else { "lane_line" }, j, line(offset_line(&l.line.pts, l.width / 2.0)), json!({})));
+            if a.index == top {
+                out.push(feat("edge_line", j, line(offset_line(&l.line.pts, -l.width / 2.0)), json!({})));
+            }
+        }
         let mut edges: Vec<_> = by_edge.into_iter().collect();
         edges.sort_by(|a, b| a.0.cmp(b.0));
         for (_, mut lanes) in edges {
@@ -225,9 +246,13 @@ impl VehicleScene {
                     out.push(feat("edge_line", i, line(right.clone()), json!({})));
                 }
                 out.push(feat(if k == last { "edge_line" } else { "lane_line" }, i, line(left.clone()), json!({})));
-                out.push(feat("stop", i, line(vec![*left.last().unwrap(), *right.last().unwrap()]), json!({})));
+                // a stop line only where SUMO can make a vehicle stop or give way, never on a roundabout's ring
+                if l.stops && !l.ring {
+                    out.push(feat("stop", i, line(vec![*left.last().unwrap(), *right.last().unwrap()]), json!({})));
+                }
+                // turn arrows only where the lane's end has more than one way out, off a ring, and with room (15 m)
                 let dirs: String = ['l', 's', 'r', 't'].iter().filter(|&&c| l.dirs.contains(c) || l.dirs.contains(c.to_ascii_uppercase())).collect();
-                if !dirs.is_empty() && l.line.len() > 6.0 {
+                if !dirs.is_empty() && l.ways_out > 1 && !l.ring && l.line.len() >= 15.0 {
                     let (p, angle) = l.line.at(l.line.len() - 4.0);
                     out.push(feat("arrow", i, json!({"type": "Point", "coordinates": r7(&p)}), json!({"dirs": dirs, "angle": angle})));
                 }

@@ -78,6 +78,13 @@ pub struct Lane {
     /// the directions of the connections from this lane (SUMO's `dir`: s straight, l left, r right, t U-turn, L and R partly left
     /// and right), each once, in the file's order; empty for an internal lane
     pub dirs: String,
+    /// a vehicle can have to stop or give way at the lane's end: one of its connections has a traffic light (`tl`) or a state that
+    /// is not major (`m` minor, `=` equal, `s` stop, `w` all-way stop, `o`/`O` a light that is off or blinks)
+    pub stops: bool,
+    /// the lane is on a ring of a `<roundabout>`
+    pub ring: bool,
+    /// the number of edges that the connections from the lane's edge go to (the ways out at its end)
+    pub ways_out: u32,
 }
 
 /// The network of a run.
@@ -120,6 +127,9 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
     let mut conns: Vec<(String, String)> = Vec::new();
     let mut raw_junctions: Vec<(String, Vec<[f64; 2]>)> = Vec::new();
     let mut dirs: HashMap<String, String> = HashMap::new();
+    let mut stops: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut outs: HashMap<String, std::collections::HashSet<String>> = HashMap::new();
+    let mut ring_edges: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut edge: Option<(String, bool)> = None;
     for t in tags(text) {
         match (t.name, t.closing) {
@@ -149,10 +159,17 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
                     raw_junctions.push((id.to_string(), pts));
                 }
             }
+            ("roundabout", false) => ring_edges.extend(t.get("edges").unwrap_or("").split_whitespace().map(str::to_string)),
             ("connection", false) => {
                 let (Some(from), Some(to)) = (t.get("from"), t.get("to")) else { continue };
                 let (fl, tl) = (t.get("fromLane").unwrap_or("0"), t.get("toLane").unwrap_or("0"));
                 let a = format!("{from}_{fl}");
+                if !from.starts_with(':') {
+                    if t.get("tl").is_some() || t.get("state").is_some_and(|st| st.chars().any(|c| "m=swoO".contains(c))) {
+                        stops.insert(a.clone());
+                    }
+                    outs.entry(from.to_string()).or_default().insert(to.to_string());
+                }
                 if let Some(d) = t.get("dir") {
                     let e = dirs.entry(a.clone()).or_default();
                     if !from.starts_with(':') && !e.contains(d) {
@@ -185,7 +202,8 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
         let length = if length.is_nan() { line.len() } else { length };
         by_id.insert(id.clone(), lanes.len() as u32);
         let dirs = dirs.remove(&id).unwrap_or_default();
-        lanes.push(Lane { id, edge, internal, index, length, width, line, dirs });
+        let (stops, ring, ways_out) = (stops.contains(&id), ring_edges.contains(&edge), outs.get(&edge).map_or(0, |o| o.len() as u32));
+        lanes.push(Lane { id, edge, internal, index, length, width, line, dirs, stops, ring, ways_out });
     }
     let mut junctions = Vec::with_capacity(raw_junctions.len());
     for (id, pts) in raw_junctions {

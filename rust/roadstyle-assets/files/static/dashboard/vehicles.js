@@ -223,7 +223,14 @@ function _vhAddLanes(){
   if(!_vhLanes) return;
   if(map.getSource(src) && _vhLanesIn !== _vhLanes) map.getSource(src).setData(_vhLanes);     // a second run
   _vhLanesIn = _vhLanes;
-  if(map.getLayer(_vhIdsOf(_vhLevels[0])["vehicle-lane-fill"])) return;
+  if(_vhAdding || map.getLayer(_vhIdsOf(_vhLevels[0])["vehicle-lane-fill"])) return;
+  // addImage and addLayer fire styledata, which calls this again (_vhOnTop): one run at a time
+  _vhAdding = true;
+  try { _vhAddLaneLayers(src); } finally { _vhAdding = false; }
+  _vhLanePaint();
+}
+let _vhAdding = false;
+function _vhAddLaneLayers(src){
   const L = O.vehicle_look && O.vehicle_look.lanes;
   if(!L) throw new Error("rs.vehicles: the look has no vehicles.lanes (the palette's colours, the profile's numbers)");
   const lat = _vhOrigin[1], mm = L.marking_m, butt = {"line-cap": "butt", "line-join": "round"}, round = {"line-cap": "round", "line-join": "round"};
@@ -253,7 +260,6 @@ function _vhAddLanes(){
                            "icon-rotation-alignment": "map", "icon-pitch-alignment": "map", "icon-allow-overlap": true,
                            "icon-ignore-placement": true, "icon-size": arrowSize}}, veh);
   }
-  _vhLanePaint();
 }
 
 // "#rrggbb" or [r, g, b, a] (0..1) to [r, g, b, a]
