@@ -47,6 +47,10 @@
   a level editor and a design panel (themes, road colours and widths, names, layers) that any page can open.
 - **Ready for AI agents.** An MCP server and an agent skill.
 
+## What is new in 0.31.0
+
+- **A SUMO run on a page from Python:** `vehicles={"fcd": path, "net": path}` puts the run's vehicles on the map, with a play bar. The vehicles module is in the package: you build nothing.
+
 ## What is new in 0.30.0
 
 - **3D bridges:** a sloped deck for each group of bridges from a bridge profile, with ramps and portals on the 3D terrain, a Height field and a page that explains the heights.
@@ -106,7 +110,7 @@
   <img src="https://raw.githubusercontent.com/Khoshkhah/roadstyle/main/docs/img/gallery/dashboard_dark.jpg" alt="The dashboard in the dark theme with the OpenFreeMap Fiord base map: Monaco, one road selected" width="80%">
 </p>
 
-More: [What is new in 0.29.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0290) ·
+More: [What is new in 0.30.0](https://khoshkhah.github.io/roadstyle/#what-is-new-in-0300) ·
 [Dashboard layout](https://khoshkhah.github.io/roadstyle/guides/dashboard-layout/) ·
 [Dashboard parts](https://khoshkhah.github.io/roadstyle/guides/dashboard-parts/) ·
 [Big networks](https://khoshkhah.github.io/roadstyle/guides/big-networks/) ·
