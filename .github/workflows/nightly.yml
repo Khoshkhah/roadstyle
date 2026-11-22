@@ -1,0 +1,81 @@
+name: Nightly wheel
+
+# The Linux x86_64 wheel of the newest code, with the vehicles module in it, for Colab or another Linux Python before a release.
+# It is the only file of the GitHub pre-release "nightly", and each run replaces it. A merge to main that changes the package runs
+# it; a run by hand (workflow_dispatch) can take any branch, to test a pull request. Nothing goes to PyPI.
+# The version is <the version of pyproject.toml>+nightly.<the run number>: it meets "roadstyle>=<that version>" and pip does not
+# take it for the PyPI release of the same version (docs/get-started.md, "The nightly wheel").
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/nightly.yml", "pyproject.toml", "rust/**", "src/roadstyle/**"]
+  workflow_dispatch:
+
+# one run at a time: two runs must not replace the wheel at the same time
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RUST: "1.99.1"                  # the version of rust.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set the version <version>+nightly.<run number>
+        run: |
+          v=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          sed -i "0,/^version = \"$v\"/s//version = \"$v+nightly.${{ github.run_number }}\"/" pyproject.toml
+          grep -m1 '^version' pyproject.toml
+
+      # the job vehicles-pkg of release.yml: roadstyle's vehicles module (rust/roadstyle-wasm/build_vehicles.sh)
+      - name: Toolchain and the wasm-bindgen program of the version in Cargo.lock
+        run: |
+          rustup toolchain install "$RUST" --profile minimal --target wasm32-unknown-unknown
+          rustup default "$RUST"
+          v=$(grep -m1 -A1 '^name = "wasm-bindgen"$' rust/Cargo.lock | sed -n 's/^version = "\(.*\)"/\1/p')
+          curl -sSfL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$v/wasm-bindgen-$v-x86_64-unknown-linux-musl.tar.gz" | tar xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/wasm-bindgen-$v-x86_64-unknown-linux-musl" >> "$GITHUB_PATH"
+
+      - name: The vehicles module
+        run: |
+          (cd rust && cargo fetch --locked)
+          rust/roadstyle-wasm/build_vehicles.sh
+
+      - name: Build the wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: x86_64
+          args: --profile dist --out dist
+          manylinux: auto
+
+      - name: Test the wheel in a new virtual environment (the Rust engine and the vehicles module)
+        run: |
+          python -m venv test-env && source test-env/bin/activate
+          pip install dist/*.whl
+          cd /tmp && python -c "import roadstyle, roadstyle._rust; from roadstyle.render import VEHICLES_PKG as p; \
+            assert (p / 'roadstyle_wasm.js').is_file() and (p / 'roadstyle_wasm_bg.wasm.gz').is_file(), p; print(roadstyle.__version__, roadstyle.__file__)"
+
+      - name: Replace the wheel of the pre-release "nightly"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f nightly "$GITHUB_SHA" && git push -f origin nightly
+          notes="The Linux x86_64 wheel of ${GITHUB_REF_NAME} at ${GITHUB_SHA::7} (run ${{ github.run_number }}). For tests only: the releases for users are on PyPI."
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release view nightly --json assets -q '.assets[].name' | while read -r a; do gh release delete-asset nightly "$a" -y; done
+            gh release edit nightly --prerelease --title "Nightly wheel" --notes "$notes"
+          else
+            gh release create nightly --prerelease --title "Nightly wheel" --notes "$notes"
+          fi
+          gh release upload nightly dist/*.whl

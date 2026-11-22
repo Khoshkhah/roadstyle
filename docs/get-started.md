@@ -31,6 +31,13 @@ pip install "roadstyle[duckdb,arrow]"   # extras combine; "roadstyle[all]" gives
     The latest unreleased version without a clone:
     `pip install "roadstyle[all] @ git+https://github.com/Khoshkhah/roadstyle.git"`.
 
+    **The nightly wheel.** Each merge to main that changes the package makes a Linux x86_64 wheel (also for Colab), with the
+    Rust engine and the vehicles module in it, so you build nothing. It is the only file of the GitHub pre-release
+    [nightly](https://github.com/Khoshkhah/roadstyle/releases/tag/nightly), and its version is `<version>+nightly.<run>`.
+    Its file name changes with each run; the GitHub API gives the newest:
+    `pip install "roadstyle[all] @ $(curl -s https://api.github.com/repos/Khoshkhah/roadstyle/releases/tags/nightly | grep -o 'https://[^"]*\.whl' | head -1)"`.
+    Use it for tests only: the releases for users are on PyPI.
+
     An install from the source (a clone or git) builds roadstyle's Rust engine with maturin, so it needs a Rust
     toolchain ([rustup](https://rustup.rs)). The wheels on PyPI have the engine in them. To work on the engine without an install,
     use `PYTHONPATH=src` and build the module with `python rust/roadstyle-py/build.py`.
