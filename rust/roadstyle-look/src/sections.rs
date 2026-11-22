@@ -494,8 +494,14 @@ pub struct VehicleLanesLook {
     pub fill: ThemeColor,
     /// the line between two lanes and at the edge of a road
     pub marking: ThemeColor,
-    /// the width of a marking, m (half of it on each lane)
+    /// the width of a marking line between two lanes and at the sides of a road, m
     pub marking_m: Num,
+    /// the dashes of the line between two lanes of one direction: [dash, gap], m
+    pub dash_m: [Num; 2],
+    /// the width of the stop line at the end of a lane, m
+    pub stop_m: Num,
+    /// the length of a turn arrow on a lane, m
+    pub arrow_m: Num,
 }
 
 /// One SUMO vClass: its kind (a key of `VehiclesLook::colours`) and its default size [length, width, height] in m.

@@ -75,6 +75,9 @@ pub struct Lane {
     pub length: f64,
     pub width: f64,
     pub line: Line,
+    /// the directions of the connections from this lane (SUMO's `dir`: s straight, l left, r right, t U-turn, L and R partly left
+    /// and right), each once, in the file's order; empty for an internal lane
+    pub dirs: String,
 }
 
 /// The network of a run.
@@ -116,6 +119,7 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
     let mut raw: Vec<RawLane> = Vec::new();
     let mut conns: Vec<(String, String)> = Vec::new();
     let mut raw_junctions: Vec<(String, Vec<[f64; 2]>)> = Vec::new();
+    let mut dirs: HashMap<String, String> = HashMap::new();
     let mut edge: Option<(String, bool)> = None;
     for t in tags(text) {
         match (t.name, t.closing) {
@@ -149,6 +153,12 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
                 let (Some(from), Some(to)) = (t.get("from"), t.get("to")) else { continue };
                 let (fl, tl) = (t.get("fromLane").unwrap_or("0"), t.get("toLane").unwrap_or("0"));
                 let a = format!("{from}_{fl}");
+                if let Some(d) = t.get("dir") {
+                    let e = dirs.entry(a.clone()).or_default();
+                    if !from.starts_with(':') && !e.contains(d) {
+                        e.push_str(d);
+                    }
+                }
                 match t.get("via") {
                     Some(via) => {
                         conns.push((a, via.to_string()));
@@ -174,7 +184,8 @@ pub fn read_net(text: &str) -> Result<Net, Error> {
         let line = Line::new(ll);
         let length = if length.is_nan() { line.len() } else { length };
         by_id.insert(id.clone(), lanes.len() as u32);
-        lanes.push(Lane { id, edge, internal, index, length, width, line });
+        let dirs = dirs.remove(&id).unwrap_or_default();
+        lanes.push(Lane { id, edge, internal, index, length, width, line, dirs });
     }
     let mut junctions = Vec::with_capacity(raw_junctions.len());
     for (id, pts) in raw_junctions {

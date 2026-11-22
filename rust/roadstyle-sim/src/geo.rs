@@ -72,3 +72,52 @@ impl Line {
         ([a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u], heading_deg(a, b))
     }
 }
+
+/// The line `pts` moved `d` metres to its right (left for a negative `d`): each point along the mean of the normals of its two
+/// segments, by d / cos(half the turn), at most 2 d (a sharp corner).
+pub fn offset_line(pts: &[[f64; 2]], d: f64) -> Vec<[f64; 2]> {
+    let n = pts.len();
+    if n < 2 {
+        return pts.to_vec();
+    }
+    let unit_right = |a: [f64; 2], b: [f64; 2]| {
+        let v = delta_m(a, b);
+        let l = v[0].hypot(v[1]).max(1e-9);
+        [v[1] / l, -v[0] / l]
+    };
+    (0..n)
+        .map(|i| {
+            let r0 = if i > 0 { Some(unit_right(pts[i - 1], pts[i])) } else { None };
+            let r1 = if i + 1 < n { Some(unit_right(pts[i], pts[i + 1])) } else { None };
+            let r = match (r0, r1) {
+                (Some(a), Some(b)) => {
+                    let m = [a[0] + b[0], a[1] + b[1]];
+                    let l = m[0].hypot(m[1]).max(1e-9);
+                    let cos_half = (l / 2.0).max(0.5);
+                    [m[0] / l / cos_half, m[1] / l / cos_half]
+                }
+                (Some(a), None) | (None, Some(a)) => a,
+                (None, None) => [0.0, 0.0],
+            };
+            offset(pts[i], r[0] * d, r[1] * d)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod offset_tests {
+    use super::*;
+
+    #[test]
+    fn a_line_moved_right_keeps_its_distance() {
+        // a line to the east, then to the north: 1.5 m to its right is south of the first segment and east of the second
+        let a = [7.4, 43.7];
+        let b = offset(a, 100.0, 0.0);
+        let c = offset(b, 0.0, 100.0);
+        let o = offset_line(&[a, b, c], 1.5);
+        assert!((delta_m(a, o[0])[1] + 1.5).abs() < 1e-6);
+        assert!((delta_m(c, o[2])[0] - 1.5).abs() < 1e-6);
+        let corner = delta_m(b, o[1]);
+        assert!((corner[0] - 1.5).abs() < 1e-6 && (corner[1] + 1.5).abs() < 1e-6, "{corner:?}");
+    }
+}

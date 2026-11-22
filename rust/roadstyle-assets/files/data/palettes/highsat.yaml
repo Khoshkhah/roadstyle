@@ -43,7 +43,7 @@ vehicles:   # the vehicles of a traffic microsimulation run (docs/design/vehicle
     two_wheel: {light: "#7c3aed", dark: "#c4b5fd"}
     rail: {light: "#0f766e", dark: "#5eead4"}
     special: {light: "#be185d", dark: "#f9a8d4"}
-  lanes:                      # the lanes of the run under the vehicles (SUMO's lanes of net.xml): the surface and the marking between two lanes
-    fill: {light: "#c9cdd3", dark: "#30363e"}
-    marking: {light: "#ffffff", dark: "#aeb4bc"}
+  lanes:                      # the lanes of the run under the vehicles (SUMO's lanes of net.xml): the surface (the junctions too) and the marks (lines, stop lines, turn arrows)
+    fill: {light: "#4b5058", dark: "#1b1f25"}
+    marking: {light: "#ffffff", dark: "#e5e7eb"}
 background: {light: "#e8e6e1", dark: "#0e1113"}

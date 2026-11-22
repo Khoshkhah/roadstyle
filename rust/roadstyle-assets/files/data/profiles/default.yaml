@@ -135,7 +135,10 @@ vehicles:   # the vehicles of a traffic microsimulation run (docs/design/vehicle
   lane_change_s: 2            # a lane change blends the places on the two lanes over this time, centred on the sample of the change
   heading_lookahead_m: 2      # the heading is the road's direction this far ahead of the vehicle's middle
   lanes:                      # the lanes of the run under the vehicles (SUMO's lanes of net.xml, at their width); the palette's vehicles.lanes colour them
-    marking_m: 0.15           # the width of the marking between two lanes and at a road's edge, m (half of it on each lane)
+    marking_m: 0.15           # the width of a marking line between two lanes and at the sides of a road, m
+    dash_m: [3, 6]            # the line between two lanes of one direction: dash and gap, m (solid at the sides)
+    stop_m: 0.5               # the width of the stop line at the end of each lane, m
+    arrow_m: 4                # the length of the turn arrows near the end of each lane (from the dir of its connections), m
   classes:                    # each SUMO vClass: its kind (a colour of the palette) and its default size [length, width, height] in m, SUMO's (Vehicle_Type_Parameter_Defaults, 2026-11-10); a vType's own size wins; a class that is not here is an error
     passenger: {kind: car, size: [5, 1.8, 1.5]}
     taxi: {kind: car, size: [5, 1.8, 1.5]}

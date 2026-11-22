@@ -27,8 +27,13 @@ const _VH_STRIDE = 16;                 // the numbers of one vehicle in VehicleS
 const _VH_MAX_CLASSES = 8;             // the colours the shader holds (a class number past it takes colour number % 8)
 const _VH_KEYS = ["placement", "teleport_m", "lane_change_s", "heading_lookahead_m", "class_sizes"];
 // the layers of one level: the junctions, the lane markings, the lanes, the vehicles
-const _vhIds4 = (lv) => ["vehicle-junctions", "vehicle-lane-marking", "vehicle-lane-fill", "vehicles", "vehicle-junction-edges"].map(k => `${RS_PREFIX}${k}-${lv}`);
-const _VH_SEAM_M = 0.6;                // the outline of a junction's area, m: it covers the seam to its lanes, which SUMO does not draw to the edge exactly
+// the layers of one level, from the bottom up; the vehicles last
+const _VH_PARTS = ["vehicle-junctions", "vehicle-junction-edges", "vehicle-lane-fill", "vehicle-lane-edges", "vehicle-lane-lines",
+                   "vehicle-stop-lines", "vehicle-turn-arrows", "vehicles"];
+const _vhIdsOf = (lv) => Object.fromEntries(_VH_PARTS.map(k => [k, `${RS_PREFIX}${k}-${lv}`]));
+const _vhVehId = (lv) => `${RS_PREFIX}vehicles-${lv}`;
+const _VH_SEAM_M = 1.0;                // the outline of a junction's area, m (round): it closes the seams and notches to its lanes and rounds its corners
+const _VH_ARROW_PX = 96;               // the height of an arrow icon, px
 let _vhLevels = [0];                   // the levels of the run, from the lowest
 const _vhLayers = new Map();           // level -> its vehicle layer
 const _VH_M_PX = 40075016.686 / 512;   // the metres of one pixel at zoom 0 at the equator (MapLibre's 512 px tiles)
@@ -89,7 +94,7 @@ function _vhMul(a, b){
 // one vehicle layer for each level; they share the program and the buffers (made by the first)
 function _vhLayerFor(level){
   return {
-  id: _vhIds4(level)[3], type: "custom", renderingMode: "3d",
+  id: _vhVehId(level), type: "custom", renderingMode: "3d",
   onAdd(m, gl){
     if(_vhProg) return;
     if(!(typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext))
@@ -173,9 +178,9 @@ function _vhTunnelOpacity(){
 
 // every layer of the run on top, in the order of the levels: after the 3D switch, a base map change or a new style added layers
 function _vhOnTop(){
-  if(!_vhScene || !map.getLayer(_vhIds4(_vhLevels[0])[3])) return;
+  if(!_vhScene || !map.getLayer(_vhVehId(_vhLevels[0]))) return;
   _vhAddLanes();
-  const want = _vhLevels.flatMap(lv => { const [jn, mk, fl, veh, je] = _vhIds4(lv); return [jn, je, mk, fl, veh]; }).filter(id => map.getLayer(id)), order = map.getLayersOrder();
+  const want = _vhLevels.flatMap(lv => Object.values(_vhIdsOf(lv))).filter(id => map.getLayer(id)), order = map.getLayersOrder();
   if(order.slice(-want.length).join() !== want.join()) want.forEach(id => map.moveLayer(id));
 }
 
@@ -185,38 +190,68 @@ function _vhPx(m, lat){
   return ["interpolate", ["exponential", 2], ["zoom"], 10, ["*", m, k * 2 ** 10], 24, ["*", m, k * 2 ** 24]];
 }
 
-// the lane layers: their colours in the theme, a tunnel lane faded (_vhTunnelOpacity)
+// the lane layers: their colours in the theme (opaque; a piece on a tunnel road faded, _vhTunnelOpacity)
 function _vhLanePaint(){
   const l = O.vehicle_look.lanes, fill = _vhDark() ? l.fill.dark : l.fill.light, mark = _vhDark() ? l.marking.dark : l.marking.light;
   const op = ["case", ["get", "tunnel"], _vhTunnelOpacity(), 1];
+  const set = (id, kind, col) => { if(map.getLayer(id)){ map.setPaintProperty(id, `${kind}-color`, col); map.setPaintProperty(id, `${kind}-opacity`, op); } };
   for(const lv of _vhLevels){
-    const [jn, mk, fl, , je] = _vhIds4(lv);
-    if(map.getLayer(jn)){ map.setPaintProperty(jn, "fill-color", fill); map.setPaintProperty(jn, "fill-opacity", op); }
-    if(map.getLayer(je)){ map.setPaintProperty(je, "line-color", fill); map.setPaintProperty(je, "line-opacity", op); }
-    if(map.getLayer(mk)){ map.setPaintProperty(mk, "line-color", mark); map.setPaintProperty(mk, "line-opacity", op); }
-    if(map.getLayer(fl)){ map.setPaintProperty(fl, "line-color", fill); map.setPaintProperty(fl, "line-opacity", op); }
+    const id = _vhIdsOf(lv);
+    set(id["vehicle-junctions"], "fill", fill); set(id["vehicle-junction-edges"], "line", fill); set(id["vehicle-lane-fill"], "line", fill);
+    for(const k of ["vehicle-lane-edges", "vehicle-lane-lines", "vehicle-stop-lines"]) set(id[k], "line", mark);
+    set(id["vehicle-turn-arrows"], "icon", mark);
   }
 }
 
-// the lane source and layers, under the vehicle layer (again after a style change that removed them)
+// a turn arrow icon (white; the layer colours it) for the directions `dirs` (l, s, r, t), pointing up = the lane's direction
+function _vhArrowIcon(dirs){
+  const w = 64, h = _VH_ARROW_PX, c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"); g.strokeStyle = g.fillStyle = "#fff"; g.lineWidth = 7; g.lineCap = "round"; g.lineJoin = "round";
+  const head = (x, y, ang) => { g.save(); g.translate(x, y); g.rotate(ang); g.beginPath(); g.moveTo(0, -11); g.lineTo(10, 6); g.lineTo(-10, 6); g.closePath(); g.fill(); g.restore(); };
+  const fork = 52;
+  g.beginPath(); g.moveTo(32, h - 6); g.lineTo(32, fork); g.stroke();
+  if(dirs.includes("s")){ g.beginPath(); g.moveTo(32, fork); g.lineTo(32, 18); g.stroke(); head(32, 14, 0); }
+  if(dirs.includes("l")){ g.beginPath(); g.moveTo(32, fork + 4); g.quadraticCurveTo(32, 34, 14, 34); g.stroke(); head(10, 34, -Math.PI / 2); }
+  if(dirs.includes("r")){ g.beginPath(); g.moveTo(32, fork + 4); g.quadraticCurveTo(32, 34, 50, 34); g.stroke(); head(54, 34, Math.PI / 2); }
+  if(dirs.includes("t")){ g.beginPath(); g.moveTo(32, fork + 8); g.lineTo(32, 40); g.arc(20, 40, 12, 0, Math.PI, true); g.lineTo(8, 56); g.stroke(); head(8, 62, Math.PI); }
+  return g.getImageData(0, 0, w, h);
+}
+
+// the lane source and layers, under the vehicle layer of each level (again after a style change that removed them)
 function _vhAddLanes(){
   const src = RS_PREFIX + "vehicle-lanes";
   if(!_vhLanes) return;
   if(map.getSource(src) && _vhLanesIn !== _vhLanes) map.getSource(src).setData(_vhLanes);     // a second run
   _vhLanesIn = _vhLanes;
-  if(map.getLayer(_vhIds4(_vhLevels[0])[2])) return;
-  if(!O.vehicle_look || !O.vehicle_look.lanes) throw new Error("rs.vehicles: the look has no vehicles.lanes (the palette's colours, the profile's marking_m)");
-  const lat = _vhOrigin[1], mm = O.vehicle_look.lanes.marking_m, round = {"line-cap": "butt", "line-join": "round"};
+  if(map.getLayer(_vhIdsOf(_vhLevels[0])["vehicle-lane-fill"])) return;
+  const L = O.vehicle_look && O.vehicle_look.lanes;
+  if(!L) throw new Error("rs.vehicles: the look has no vehicles.lanes (the palette's colours, the profile's numbers)");
+  const lat = _vhOrigin[1], mm = L.marking_m, butt = {"line-cap": "butt", "line-join": "round"}, round = {"line-cap": "round", "line-join": "round"};
   if(!map.getSource(src)) map.addSource(src, {type: "geojson", data: _vhLanes});
+  for(const d of new Set(_vhLanes.features.filter(f => f.properties.kind === "arrow").map(f => f.properties.dirs))){
+    const name = `${RS_PREFIX}rs-turn-${d}`;
+    if(!map.hasImage(name)) map.addImage(name, _vhArrowIcon(d), {sdf: true});
+  }
+  const k = 1 / (_VH_M_PX * Math.cos(lat * Math.PI / 180));
+  const arrowSize = ["interpolate", ["exponential", 2], ["zoom"], 10, L.arrow_m * k * 2 ** 10 / _VH_ARROW_PX, 24, L.arrow_m * k * 2 ** 24 / _VH_ARROW_PX];
   for(const lv of _vhLevels){
-    const [jn, mk, fl, veh, je] = _vhIds4(lv), at = ["==", ["get", "level"], lv], lane = ["all", at, ["==", ["get", "kind"], "lane"]];
-    map.addLayer({id: jn, type: "fill", source: src, filter: ["all", at, ["==", ["get", "kind"], "junction"]]}, veh);
-    map.addLayer({id: je, type: "line", source: src, filter: ["all", at, ["==", ["get", "kind"], "junction"]], layout: round,
+    const id = _vhIdsOf(lv), veh = id.vehicles, at = ["==", ["get", "level"], lv], of = (kind) => ["all", at, ["==", ["get", "kind"], kind]];
+    map.addLayer({id: id["vehicle-junctions"], type: "fill", source: src, filter: of("junction")}, veh);
+    map.addLayer({id: id["vehicle-junction-edges"], type: "line", source: src, filter: of("junction"), layout: round,
                   paint: {"line-width": _vhPx(_VH_SEAM_M, lat)}}, veh);
-    map.addLayer({id: mk, type: "line", source: src, filter: ["all", lane, ["!", ["get", "internal"]]], layout: round,
-                  paint: {"line-width": _vhPx(["get", "w"], lat)}}, veh);
-    map.addLayer({id: fl, type: "line", source: src, filter: lane, layout: round,
-                  paint: {"line-width": _vhPx(["case", ["get", "internal"], ["get", "w"], ["-", ["get", "w"], mm]], lat)}}, veh);
+    // each lane a little wider than it is: two lanes side by side overlap, with no seam between them
+    map.addLayer({id: id["vehicle-lane-fill"], type: "line", source: src, filter: of("lane"), layout: butt,
+                  paint: {"line-width": _vhPx(["+", ["get", "w"], 0.1], lat)}}, veh);
+    map.addLayer({id: id["vehicle-lane-edges"], type: "line", source: src, filter: of("edge_line"), layout: butt,
+                  paint: {"line-width": _vhPx(mm, lat)}}, veh);
+    map.addLayer({id: id["vehicle-lane-lines"], type: "line", source: src, filter: of("lane_line"), layout: butt,
+                  paint: {"line-width": _vhPx(mm, lat), "line-dasharray": [L.dash_m[0] / mm, L.dash_m[1] / mm]}}, veh);
+    map.addLayer({id: id["vehicle-stop-lines"], type: "line", source: src, filter: of("stop"), layout: butt,
+                  paint: {"line-width": _vhPx(L.stop_m, lat)}}, veh);
+    map.addLayer({id: id["vehicle-turn-arrows"], type: "symbol", source: src, filter: of("arrow"),
+                  layout: {"icon-image": ["concat", `${RS_PREFIX}rs-turn-`, ["get", "dirs"]], "icon-rotate": ["get", "angle"],
+                           "icon-rotation-alignment": "map", "icon-pitch-alignment": "map", "icon-allow-overlap": true,
+                           "icon-ignore-placement": true, "icon-size": arrowSize}}, veh);
   }
   _vhLanePaint();
 }
@@ -309,7 +344,7 @@ async function _vhLoad(o){
   // the style can be busy after "load" (a theme or base map change of the page): wait for an "idle" with the style loaded, not for
   // "load", which fires once only
   await new Promise(r => { const ok = () => map.isStyleLoaded() ? r() : map.once("idle", ok); ok(); });
-  for(const lv of _vhLevels) if(!map.getLayer(_vhIds4(lv)[3])) map.addLayer(_vhLayerFor(lv));
+  for(const lv of _vhLevels) if(!map.getLayer(_vhVehId(lv))) map.addLayer(_vhLayerFor(lv));
   if(!_vhOn){
     _vhOn = true; map.on("styledata", _vhOnTop);
     const repaint = () => { if(_vhScene){ _vhPaint(); if(_vhLanes) _vhLanePaint(); map.triggerRepaint(); } };

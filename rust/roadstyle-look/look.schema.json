@@ -2487,7 +2487,24 @@
           "$ref": "#/$defs/ThemeColor"
         },
         "marking_m": {
-          "description": "the width of a marking, m (half of it on each lane)",
+          "description": "the width of a marking line between two lanes and at the sides of a road, m",
+          "$ref": "#/$defs/Num"
+        },
+        "dash_m": {
+          "description": "the dashes of the line between two lanes of one direction: [dash, gap], m",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Num"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "stop_m": {
+          "description": "the width of the stop line at the end of a lane, m",
+          "$ref": "#/$defs/Num"
+        },
+        "arrow_m": {
+          "description": "the length of a turn arrow on a lane, m",
           "$ref": "#/$defs/Num"
         }
       },
@@ -2495,7 +2512,10 @@
       "required": [
         "fill",
         "marking",
-        "marking_m"
+        "marking_m",
+        "dash_m",
+        "stop_m",
+        "arrow_m"
       ]
     },
     "BackgroundLook": {

@@ -5,7 +5,7 @@
 //! metres"): small numbers, exact in float32, that the vehicle layer turns back with one matrix
 //! (`mainMatrix x translate(origin) x scale(metre)`). x is east, y is south (Mercator's direction), z is up.
 
-use roadstyle_sim::{read_fcd_parquet, read_net, read_vtypes, Placement, Run, RunOptions};
+use roadstyle_sim::{offset_line, read_fcd_parquet, read_net, read_vtypes, Placement, Run, RunOptions};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -152,7 +152,11 @@ impl VehicleScene {
 
     /// The lanes and the junctions of the run's net.xml as a GeoJSON FeatureCollection, the surface that the vehicles drive on: first
     /// a Polygon for each junction's area (`kind` "junction", `id`, `level`, `tunnel`), then a LineString in lon/lat (the lane's middle) for each lane
-    /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction). Empty with no net.xml.
+    /// (`kind` "lane", `id` SUMO's lane id, `w` its width in m, `internal` a lane inside a junction), then the road marks of the
+    /// lanes that are not internal: `edge_line` (the outer sides of an edge's lanes, solid), `lane_line` (between two lanes of one
+    /// edge, dashed), `stop` (across a lane at its end) and `arrow` (a point 4 m before a lane's end: `dirs`, the directions of its
+    /// connections, l r s t only, and `angle`, the lane's heading there). Every feature has `level` and `tunnel`. Empty with no
+    /// net.xml.
     pub fn lanes(&self) -> String {
         let r7 = |p: &[f64; 2]| [(p[0] * 1e7).round() / 1e7, (p[1] * 1e7).round() / 1e7];
         let feats: Vec<Value> = self.run.net.as_ref().map_or(Vec::new(), |n| {
@@ -187,9 +191,49 @@ impl VehicleScene {
                     json!({"type": "Feature", "properties": {"kind": "lane", "id": l.id, "w": l.width, "internal": l.internal, "level": lv, "tunnel": tun > 0.0},
                            "geometry": {"type": "LineString", "coordinates": c}})
                 }))
+                .chain(self.marks(n, &look, r7))
                 .collect()
         });
         json!({"type": "FeatureCollection", "features": feats}).to_string()
+    }
+
+    /// The road marks of the lanes that are not internal (see `lanes`).
+    fn marks(&self, n: &roadstyle_sim::Net, look: &dyn Fn(usize) -> [f32; 2], r7: impl Fn(&[f64; 2]) -> [f64; 2]) -> Vec<Value> {
+        let line = |pts: Vec<[f64; 2]>| json!({"type": "LineString", "coordinates": pts.iter().map(&r7).collect::<Vec<_>>()});
+        let feat = |kind: &str, i: usize, geom: Value, extra: Value| {
+            let [lv, tun] = look(i);
+            let mut p = json!({"kind": kind, "level": lv, "tunnel": tun > 0.0});
+            if let (Some(p), Some(x)) = (p.as_object_mut(), extra.as_object()) {
+                p.extend(x.clone());
+            }
+            json!({"type": "Feature", "properties": p, "geometry": geom})
+        };
+        let mut by_edge: HashMap<&str, Vec<usize>> = HashMap::new();
+        for (i, l) in n.lanes.iter().enumerate().filter(|(_, l)| !l.internal && l.line.pts.len() > 1) {
+            by_edge.entry(l.edge.as_str()).or_default().push(i);
+        }
+        let mut out = Vec::new();
+        let mut edges: Vec<_> = by_edge.into_iter().collect();
+        edges.sort_by(|a, b| a.0.cmp(b.0));
+        for (_, mut lanes) in edges {
+            lanes.sort_by_key(|&i| n.lanes[i].index);
+            let last = lanes.len() - 1;
+            for (k, &i) in lanes.iter().enumerate() {
+                let l = &n.lanes[i];
+                let (right, left) = (offset_line(&l.line.pts, l.width / 2.0), offset_line(&l.line.pts, -l.width / 2.0));
+                if k == 0 {
+                    out.push(feat("edge_line", i, line(right.clone()), json!({})));
+                }
+                out.push(feat(if k == last { "edge_line" } else { "lane_line" }, i, line(left.clone()), json!({})));
+                out.push(feat("stop", i, line(vec![*left.last().unwrap(), *right.last().unwrap()]), json!({})));
+                let dirs: String = ['l', 's', 'r', 't'].iter().filter(|&&c| l.dirs.contains(c) || l.dirs.contains(c.to_ascii_uppercase())).collect();
+                if !dirs.is_empty() && l.line.len() > 6.0 {
+                    let (p, angle) = l.line.at(l.line.len() - 4.0);
+                    out.push(feat("arrow", i, json!({"type": "Point", "coordinates": r7(&p)}), json!({"dirs": dirs, "angle": angle})));
+                }
+            }
+        }
+        out
     }
 
     /// Every vehicle on the network at clock time `t` (seconds of the run), STRIDE numbers each.
